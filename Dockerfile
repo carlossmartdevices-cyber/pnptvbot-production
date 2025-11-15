@@ -37,6 +37,8 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy source code from builder
 COPY --from=builder --chown=nodejs:nodejs /app/src ./src
 COPY --from=builder --chown=nodejs:nodejs /app/config ./config
+COPY --from=builder --chown=nodejs:nodejs /app/public ./public
+COPY --from=builder --chown=nodejs:nodejs /app/views ./views
 
 # Create logs and uploads directories with proper permissions
 RUN mkdir -p logs uploads \
