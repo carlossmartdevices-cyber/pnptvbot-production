@@ -102,8 +102,22 @@ const startBot = async () => {
       // Register webhook callback BEFORE 404 handler
       // Use bot.handleUpdate() directly since express.json() already parses the body
       // bot.webhookCallback() expects raw body, but express.json() consumes it
-      apiApp.post(webhookPath, (req, res) => {
-        return bot.handleUpdate(req.body, res);
+      apiApp.post(webhookPath, async (req, res) => {
+        try {
+          logger.info('Received webhook request:', {
+            body: req.body,
+            headers: req.headers,
+            method: req.method,
+            path: req.path,
+          });
+
+          await bot.handleUpdate(req.body);
+          res.sendStatus(200);
+          logger.info('Webhook processed successfully');
+        } catch (error) {
+          logger.error('Error processing webhook:', error);
+          res.sendStatus(500);
+        }
       });
       logger.info(`✓ Webhook callback registered at: ${webhookPath}`);
     } else {
