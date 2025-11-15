@@ -1,4 +1,4 @@
-require('dotenv-safe').config();
+require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
 const express = require('express');
 const { initializeDatabase, testConnection } = require('../../config/database');
