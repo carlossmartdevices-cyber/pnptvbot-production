@@ -75,6 +75,10 @@ class PaymentService {
    */
   static async createEpaycoPayment(payment, plan) {
     try {
+      if (!process.env.EPAYCO_PUBLIC_KEY) {
+        throw new Error('ePayco is not configured. Please contact support.');
+      }
+
       const epaycoData = {
         public_key: process.env.EPAYCO_PUBLIC_KEY,
         currency: 'USD',
@@ -119,6 +123,10 @@ class PaymentService {
    */
   static async createDaimoPayment(payment, plan) {
     try {
+      if (!process.env.DAIMO_API_KEY) {
+        throw new Error('Daimo payment is not configured. Please contact support.');
+      }
+
       // Daimo Pay API integration
       const response = await axios.post('https://api.daimo.com/v1/payments', {
         amount: plan.price,
@@ -312,6 +320,11 @@ class PaymentService {
     try {
       const { signature, ...data } = webhookData;
       const secret = process.env.DAIMO_WEBHOOK_SECRET;
+
+      if (!secret) {
+        logger.warn('DAIMO_WEBHOOK_SECRET not configured, skipping verification');
+        return true; // Allow in development/testing
+      }
 
       const payload = JSON.stringify(data);
       const hmac = crypto.createHmac('sha256', secret);

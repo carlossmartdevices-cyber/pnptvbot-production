@@ -3,8 +3,11 @@ const logger = require('../../../utils/logger');
 
 /**
  * Session middleware for Telegraf
- * Uses Redis for session storage
+ * Uses Redis for session storage, falls back to in-memory
  */
+
+// In-memory session fallback
+const memoryStore = new Map();
 
 /**
  * Get session key for user
@@ -24,8 +27,14 @@ const sessionMiddleware = () => async (ctx, next) => {
   const sessionKey = getSessionKey(ctx);
 
   try {
-    // Load session from Redis
-    let session = await cache.get(sessionKey);
+    // Try to load session from Redis, fallback to memory
+    let session;
+    try {
+      session = await cache.get(sessionKey);
+    } catch (redisError) {
+      logger.warn('Redis unavailable, using in-memory session:', redisError.message);
+      session = memoryStore.get(sessionKey);
+    }
 
     if (!session) {
       session = {
@@ -42,7 +51,12 @@ const sessionMiddleware = () => async (ctx, next) => {
     ctx.saveSession = async () => {
       try {
         const ttl = parseInt(process.env.SESSION_TTL || '86400', 10);
-        await cache.set(sessionKey, ctx.session, ttl);
+        try {
+          await cache.set(sessionKey, ctx.session, ttl);
+        } catch (redisError) {
+          // Fallback to in-memory storage
+          memoryStore.set(sessionKey, ctx.session);
+        }
       } catch (error) {
         logger.error('Error saving session:', error);
       }
@@ -51,7 +65,11 @@ const sessionMiddleware = () => async (ctx, next) => {
     // Clear session method
     ctx.clearSession = async () => {
       try {
-        await cache.del(sessionKey);
+        try {
+          await cache.del(sessionKey);
+        } catch (redisError) {
+          memoryStore.delete(sessionKey);
+        }
         ctx.session = {
           language: ctx.from?.language_code || 'en',
           userId: ctx.from?.id,
