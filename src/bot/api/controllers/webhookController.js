@@ -2,24 +2,79 @@ const PaymentService = require('../../services/paymentService');
 const logger = require('../../../utils/logger');
 
 /**
+ * Validate ePayco webhook payload
+ * @param {Object} payload - Webhook payload
+ * @returns {Object} { valid: boolean, error?: string }
+ */
+const validateEpaycoPayload = (payload) => {
+  const requiredFields = ['x_ref_payco', 'x_transaction_state', 'x_extra1', 'x_extra2', 'x_extra3'];
+  const missingFields = requiredFields.filter((field) => !payload[field]);
+
+  if (missingFields.length > 0) {
+    return {
+      valid: false,
+      error: `Missing required fields: ${missingFields.join(', ')}`,
+    };
+  }
+
+  return { valid: true };
+};
+
+/**
+ * Validate Daimo webhook payload
+ * @param {Object} payload - Webhook payload
+ * @returns {Object} { valid: boolean, error?: string }
+ */
+const validateDaimoPayload = (payload) => {
+  const requiredFields = ['transaction_id', 'status', 'metadata'];
+  const missingFields = requiredFields.filter((field) => !payload[field]);
+
+  if (missingFields.length > 0) {
+    return {
+      valid: false,
+      error: `Missing required fields: ${missingFields.join(', ')}`,
+    };
+  }
+
+  // Validate metadata structure
+  if (!payload.metadata || !payload.metadata.paymentId || !payload.metadata.userId || !payload.metadata.planId) {
+    return {
+      valid: false,
+      error: 'Invalid metadata structure: paymentId, userId, and planId are required',
+    };
+  }
+
+  return { valid: true };
+};
+
+/**
  * Handle ePayco webhook
  * @param {Request} req - Express request
  * @param {Response} res - Express response
  */
 const handleEpaycoWebhook = async (req, res) => {
   try {
-    logger.info('ePayco webhook received:', req.body);
+    logger.info('ePayco webhook received', {
+      transactionId: req.body.x_ref_payco,
+      state: req.body.x_transaction_state,
+    });
+
+    // Validate payload structure
+    const validation = validateEpaycoPayload(req.body);
+    if (!validation.valid) {
+      logger.warn('Invalid ePayco webhook payload', { error: validation.error });
+      return res.status(400).json({ success: false, error: validation.error });
+    }
 
     const result = await PaymentService.processEpaycoWebhook(req.body);
 
     if (result.success) {
-      res.status(200).send('OK');
-    } else {
-      res.status(400).json({ error: result.error });
+      return res.status(200).json({ success: true });
     }
+    return res.status(400).json({ success: false, error: result.error });
   } catch (error) {
     logger.error('Error handling ePayco webhook:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 
@@ -30,18 +85,27 @@ const handleEpaycoWebhook = async (req, res) => {
  */
 const handleDaimoWebhook = async (req, res) => {
   try {
-    logger.info('Daimo webhook received:', req.body);
+    logger.info('Daimo webhook received', {
+      transactionId: req.body.transaction_id,
+      status: req.body.status,
+    });
+
+    // Validate payload structure
+    const validation = validateDaimoPayload(req.body);
+    if (!validation.valid) {
+      logger.warn('Invalid Daimo webhook payload', { error: validation.error });
+      return res.status(400).json({ success: false, error: validation.error });
+    }
 
     const result = await PaymentService.processDaimoWebhook(req.body);
 
     if (result.success) {
-      res.status(200).send('OK');
-    } else {
-      res.status(400).json({ error: result.error });
+      return res.status(200).json({ success: true });
     }
+    return res.status(400).json({ success: false, error: result.error });
   } catch (error) {
     logger.error('Error handling Daimo webhook:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
 

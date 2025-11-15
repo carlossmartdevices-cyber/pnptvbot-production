@@ -21,6 +21,34 @@ const {
  */
 class PaymentService {
   /**
+   * Retry an async operation with exponential backoff
+   * @param {Function} operation - Async function to retry
+   * @param {number} maxRetries - Maximum number of retries (default: 3)
+   * @param {string} operationName - Name for logging
+   * @returns {Promise<any>} Result of the operation
+   */
+  static async retryWithBackoff(operation, maxRetries = 3, operationName = 'operation') {
+    let lastError;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * (2 ** attempt), 10000); // Cap at 10 seconds
+          logger.warn(`${operationName} failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms`, {
+            error: error.message,
+          });
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    }
+    logger.error(`${operationName} failed after ${maxRetries + 1} attempts`, {
+      error: lastError.message,
+    });
+    throw lastError;
+  }
+  /**
    * Create payment for subscription
    * @param {Object} paymentData - { userId, planId, provider }
    * @returns {Promise<Object>} { success, error, paymentUrl, paymentId }
@@ -30,7 +58,7 @@ class PaymentService {
       // Get plan details
       const plan = await PlanModel.getById(paymentData.planId);
       if (!plan) {
-        return { success: false, error: 'Plan not found' };
+        throw new NotFoundError('Plan');
       }
 
       // Validate payment data
@@ -43,7 +71,7 @@ class PaymentService {
       }, schemas.payment);
 
       if (error) {
-        return { success: false, error };
+        throw new PaymentError(error);
       }
 
       // Create payment record
@@ -55,6 +83,13 @@ class PaymentService {
         provider: paymentData.provider,
       });
 
+      logger.info('Payment record created', {
+        paymentId: payment.id,
+        userId: paymentData.userId,
+        planId: paymentData.planId,
+        provider: paymentData.provider,
+      });
+
       // Generate payment URL based on provider
       let paymentUrl;
       if (paymentData.provider === 'epayco') {
@@ -62,7 +97,7 @@ class PaymentService {
       } else if (paymentData.provider === 'daimo') {
         paymentUrl = await this.createDaimoPayment(payment, plan);
       } else {
-        return { success: false, error: 'Invalid payment provider' };
+        throw new PaymentError('Invalid payment provider');
       }
 
       return {
@@ -72,8 +107,14 @@ class PaymentService {
         paymentId: payment.id,
       };
     } catch (error) {
-      logger.error('Error creating payment:', error);
-      return { success: false, error: error.message };
+      logger.error('Error creating payment:', {
+        userId: paymentData?.userId,
+        planId: paymentData?.planId,
+        provider: paymentData?.provider,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
     }
   }
 
@@ -134,28 +175,43 @@ class PaymentService {
   static async createDaimoPayment(payment, plan) {
     try {
       if (!process.env.DAIMO_API_KEY) {
-        throw new Error('Daimo payment is not configured. Please contact support.');
+        throw new ConfigurationError('Daimo payment is not configured. Please contact support.');
       }
 
-      // Daimo Pay API integration
-      const response = await axios.post('https://api.daimo.com/v1/payments', {
-        amount: plan.price,
-        currency: 'USDC',
-        description: `${plan.name} Plan - PNPtv`,
-        metadata: {
-          paymentId: payment.id,
-          userId: payment.userId,
-          planId: payment.planId,
-        },
-        callback_url: `${process.env.BOT_WEBHOOK_DOMAIN}/api/webhooks/daimo`,
-      }, {
-        headers: {
-          Authorization: `Bearer ${process.env.DAIMO_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // Daimo Pay API integration with retry logic
+      const response = await this.retryWithBackoff(
+        async () => axios.post('https://api.daimo.com/v1/payments', {
+          amount: plan.price,
+          currency: 'USDC',
+          description: `${plan.name} Plan - PNPtv`,
+          metadata: {
+            paymentId: payment.id,
+            userId: payment.userId,
+            planId: payment.planId,
+          },
+          callback_url: `${process.env.BOT_WEBHOOK_DOMAIN}/api/webhooks/daimo`,
+        }, {
+          headers: {
+            Authorization: `Bearer ${process.env.DAIMO_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 10000, // 10 second timeout
+        }),
+        3,
+        'Daimo payment creation',
+      );
 
       const { payment_url, transaction_id } = response.data;
+
+      if (!payment_url || !transaction_id) {
+        throw new PaymentProviderError('daimo', 'Invalid response from Daimo API');
+      }
+
+      logger.info('Daimo payment created', {
+        paymentId: payment.id,
+        transactionId: transaction_id,
+        amount: plan.price,
+      });
 
       // Update payment with transaction details
       await PaymentModel.updateStatus(payment.id, 'pending', {
@@ -166,8 +222,12 @@ class PaymentService {
 
       return payment_url;
     } catch (error) {
-      logger.error('Error creating Daimo payment:', error);
-      throw error;
+      logger.error('Error creating Daimo payment:', {
+        paymentId: payment.id,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw new PaymentProviderError('daimo', error.message);
     }
   }
 
@@ -186,18 +246,16 @@ class PaymentService {
       const userId = x_extra2;
       const planId = x_extra3;
 
-      // Verify webhook signature for ePayco
-      if (process.env.EPAYCO_PRIVATE_KEY && x_signature) {
-        const isValid = this.verifyEpaycoSignature(webhookData);
-        if (!isValid) {
-          logger.warn('Invalid ePayco webhook signature', { paymentId, transactionId: x_ref_payco });
-          throw new InvalidSignatureError('epayco');
-        }
+      // Verify webhook signature for ePayco (always required)
+      const isValid = this.verifyEpaycoSignature(webhookData);
+      if (!isValid) {
+        logger.warn('Invalid ePayco webhook signature', { paymentId, transactionId: x_ref_payco });
+        throw new InvalidSignatureError('epayco');
       }
 
       // Idempotency check: Use transaction ID as unique key
       const idempotencyKey = `webhook:epayco:${x_ref_payco}`;
-      const lockAcquired = await cache.acquireLock(idempotencyKey, 300); // 5 min lock
+      const lockAcquired = await cache.acquireLock(idempotencyKey, 120); // 2 min lock
 
       if (!lockAcquired) {
         logger.info('Webhook already processing (idempotency)', { paymentId, transactionId: x_ref_payco });
@@ -281,7 +339,7 @@ class PaymentService {
 
       // Idempotency check: Use transaction ID as unique key
       const idempotencyKey = `webhook:daimo:${transaction_id}`;
-      const lockAcquired = await cache.acquireLock(idempotencyKey, 300); // 5 min lock
+      const lockAcquired = await cache.acquireLock(idempotencyKey, 120); // 2 min lock
 
       if (!lockAcquired) {
         logger.info('Webhook already processing (idempotency)', { paymentId, transactionId: transaction_id });
@@ -381,8 +439,17 @@ class PaymentService {
       const secret = process.env.DAIMO_WEBHOOK_SECRET;
 
       if (!secret) {
-        logger.warn('DAIMO_WEBHOOK_SECRET not configured, skipping verification');
-        return true; // Allow in development/testing
+        logger.error('CRITICAL: DAIMO_WEBHOOK_SECRET not configured - webhook signature verification failed');
+        if (process.env.NODE_ENV === 'production') {
+          throw new ConfigurationError('DAIMO_WEBHOOK_SECRET must be configured in production');
+        }
+        logger.warn('Development mode: allowing webhook without verification');
+        return true;
+      }
+
+      if (!signature) {
+        logger.error('Daimo webhook signature missing');
+        return false;
       }
 
       const payload = JSON.stringify(data);
@@ -408,8 +475,17 @@ class PaymentService {
       const secret = process.env.EPAYCO_PRIVATE_KEY;
 
       if (!secret) {
-        logger.warn('EPAYCO_PRIVATE_KEY not configured, skipping verification');
-        return true; // Allow in development/testing
+        logger.error('CRITICAL: EPAYCO_PRIVATE_KEY not configured - webhook signature verification failed');
+        if (process.env.NODE_ENV === 'production') {
+          throw new ConfigurationError('EPAYCO_PRIVATE_KEY must be configured in production');
+        }
+        logger.warn('Development mode: allowing webhook without verification');
+        return true;
+      }
+
+      if (!x_signature) {
+        logger.error('ePayco webhook signature missing');
+        return false;
       }
 
       // ePayco signature format: concatenate specific fields and hash

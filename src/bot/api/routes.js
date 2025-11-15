@@ -31,21 +31,60 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use('/api/', limiter);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.status(200).json({
+// Stricter rate limiting for webhooks to prevent abuse
+const webhookLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 50, // Limit each IP to 50 webhook requests per 5 minutes
+  message: 'Too many webhook requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+});
+
+// Health check with dependency checks
+app.get('/health', async (req, res) => {
+  const health = {
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-  });
+    dependencies: {},
+  };
+
+  try {
+    // Check Redis connection
+    const { getRedis } = require('../../config/redis');
+    const redis = getRedis();
+    await redis.ping();
+    health.dependencies.redis = 'ok';
+  } catch (error) {
+    health.dependencies.redis = 'error';
+    health.status = 'degraded';
+    logger.error('Redis health check failed:', error);
+  }
+
+  try {
+    // Check database connection
+    const { pool } = require('../../config/database');
+    await pool.query('SELECT 1');
+    health.dependencies.database = 'ok';
+  } catch (error) {
+    health.dependencies.database = 'error';
+    health.status = 'degraded';
+    logger.error('Database health check failed:', error);
+  }
+
+  const statusCode = health.status === 'ok' ? 200 : 503;
+  res.status(statusCode).json(health);
 });
 
 // API routes
-app.post('/api/webhooks/epayco', webhookController.handleEpaycoWebhook);
-app.post('/api/webhooks/daimo', webhookController.handleDaimoWebhook);
+app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
+app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
 app.get('/api/payment-response', webhookController.handlePaymentResponse);
 
 // Stats endpoint
