@@ -1,0 +1,26 @@
+[Unit]
+Description=PNPtv Telegram Bot
+Documentation=https://github.com/carlossmartdevices-cyber/pnptvbot-production
+After=network.target postgresql.service redis.service
+
+[Service]
+Type=simple
+User=pnptv
+WorkingDirectory=/home/pnptv/pnptvbot-production
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /home/pnptv/pnptvbot-production/src/bot/core/bot.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/log/pnptv-bot/output.log
+StandardError=append:/var/log/pnptv-bot/error.log
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/pnptv/pnptvbot-production/logs
+ReadWritePaths=/home/pnptv/pnptvbot-production/uploads
+
+[Install]
+WantedBy=multi-user.target
