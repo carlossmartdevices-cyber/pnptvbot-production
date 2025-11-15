@@ -9,6 +9,9 @@ const logger = require('../../utils/logger');
 // Controllers
 const webhookController = require('./controllers/webhookController');
 
+// Middleware
+const { errorHandler, notFoundHandler, asyncHandler } = require('./middleware/errorHandler');
+
 const app = express();
 
 // Security middleware
@@ -46,26 +49,16 @@ app.post('/api/webhooks/daimo', webhookController.handleDaimoWebhook);
 app.get('/api/payment-response', webhookController.handlePaymentResponse);
 
 // Stats endpoint
-app.get('/api/stats', async (req, res) => {
-  try {
-    const UserService = require('../services/userService');
-    const stats = await UserService.getStatistics();
-    res.json(stats);
-  } catch (error) {
-    logger.error('Error getting stats:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+app.get('/api/stats', asyncHandler(async (req, res) => {
+  const UserService = require('../services/userService');
+  const stats = await UserService.getStatistics();
+  res.json(stats);
+}));
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
-});
+// 404 handler - must come after all routes
+app.use(notFoundHandler);
 
-// Error handler
-app.use((err, req, res, next) => {
-  logger.error('Express error:', err);
-  res.status(500).json({ error: 'Internal server error' });
-});
+// Centralized error handler - must be last
+app.use(errorHandler);
 
 module.exports = app;

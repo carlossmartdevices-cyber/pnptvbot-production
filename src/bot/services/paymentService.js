@@ -5,6 +5,16 @@ const UserModel = require('../../models/userModel');
 const PlanModel = require('../../models/planModel');
 const logger = require('../../utils/logger');
 const { validateSchema, schemas } = require('../../utils/validation');
+const { cache } = require('../../config/redis');
+const {
+  PaymentError,
+  PaymentProviderError,
+  PaymentNotFoundError,
+  DuplicatePaymentError,
+  InvalidSignatureError,
+  NotFoundError,
+  ConfigurationError,
+} = require('../../utils/errors');
 
 /**
  * Payment Service - Business logic for payment operations
@@ -162,58 +172,87 @@ class PaymentService {
   }
 
   /**
-   * Process ePayco webhook
+   * Process ePayco webhook with idempotency
    * @param {Object} webhookData - Webhook payload
    * @returns {Promise<Object>} { success, error }
    */
   static async processEpaycoWebhook(webhookData) {
     try {
       const {
-        x_ref_payco, x_transaction_state, x_extra1, x_extra2, x_extra3,
+        x_ref_payco, x_transaction_state, x_extra1, x_extra2, x_extra3, x_signature,
       } = webhookData;
 
       const paymentId = x_extra1;
       const userId = x_extra2;
       const planId = x_extra3;
 
-      // Get payment record
-      const payment = await PaymentModel.getById(paymentId);
-      if (!payment) {
-        logger.warn('Payment not found for ePayco webhook', { paymentId });
-        return { success: false, error: 'Payment not found' };
+      // Verify webhook signature for ePayco
+      if (process.env.EPAYCO_PRIVATE_KEY && x_signature) {
+        const isValid = this.verifyEpaycoSignature(webhookData);
+        if (!isValid) {
+          logger.warn('Invalid ePayco webhook signature', { paymentId, transactionId: x_ref_payco });
+          throw new InvalidSignatureError('epayco');
+        }
       }
 
-      // Check transaction state
-      if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Approved') {
-        // Payment successful
-        await this.activateSubscription(userId, planId, payment);
+      // Idempotency check: Use transaction ID as unique key
+      const idempotencyKey = `webhook:epayco:${x_ref_payco}`;
+      const lockAcquired = await cache.acquireLock(idempotencyKey, 300); // 5 min lock
 
-        await PaymentModel.updateStatus(paymentId, 'success', {
+      if (!lockAcquired) {
+        logger.info('Webhook already processing (idempotency)', { paymentId, transactionId: x_ref_payco });
+        throw new DuplicatePaymentError(paymentId);
+      }
+
+      try {
+        // Get payment record
+        const payment = await PaymentModel.getById(paymentId);
+        if (!payment) {
+          logger.warn('Payment not found for ePayco webhook', { paymentId });
+          throw new PaymentNotFoundError(paymentId);
+        }
+
+        // Check if already processed
+        if (payment.status === 'success' || payment.status === 'failed') {
+          logger.info('Payment already processed', { paymentId, status: payment.status });
+          return { success: true, alreadyProcessed: true };
+        }
+
+        // Check transaction state
+        if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Approved') {
+          // Payment successful
+          await this.activateSubscription(userId, planId, payment);
+
+          await PaymentModel.updateStatus(paymentId, 'success', {
+            transactionId: x_ref_payco,
+            completedAt: new Date(),
+          });
+
+          logger.info('ePayco payment successful', { paymentId, userId });
+          return { success: true };
+        }
+
+        if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Declined') {
+          // Payment failed
+          await PaymentModel.updateStatus(paymentId, 'failed', {
+            transactionId: x_ref_payco,
+            failedAt: new Date(),
+          });
+
+          logger.warn('ePayco payment failed', { paymentId, userId });
+          return { success: false, error: 'Payment declined' };
+        }
+
+        // Pending state
+        await PaymentModel.updateStatus(paymentId, 'pending', {
           transactionId: x_ref_payco,
-          completedAt: new Date(),
         });
 
-        logger.info('ePayco payment successful', { paymentId, userId });
         return { success: true };
+      } finally {
+        // Always release lock
+        await cache.releaseLock(idempotencyKey);
       }
-
-      if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Declined') {
-        // Payment failed
-        await PaymentModel.updateStatus(paymentId, 'failed', {
-          transactionId: x_ref_payco,
-          failedAt: new Date(),
-        });
-
-        logger.warn('ePayco payment failed', { paymentId, userId });
-        return { success: false, error: 'Payment declined' };
-      }
-
-      // Pending state
-      await PaymentModel.updateStatus(paymentId, 'pending', {
-        transactionId: x_ref_payco,
-      });
-
-      return { success: true };
     } catch (error) {
       logger.error('Error processing ePayco webhook:', error);
       return { success: false, error: error.message };
@@ -221,7 +260,7 @@ class PaymentService {
   }
 
   /**
-   * Process Daimo webhook
+   * Process Daimo webhook with idempotency
    * @param {Object} webhookData - Webhook payload
    * @returns {Promise<Object>} { success, error }
    */
@@ -231,7 +270,7 @@ class PaymentService {
       const isValid = this.verifyDaimoSignature(webhookData);
       if (!isValid) {
         logger.warn('Invalid Daimo webhook signature');
-        return { success: false, error: 'Invalid signature' };
+        throw new InvalidSignatureError('daimo');
       }
 
       const {
@@ -240,37 +279,57 @@ class PaymentService {
 
       const { paymentId, userId, planId } = metadata;
 
-      // Get payment record
-      const payment = await PaymentModel.getById(paymentId);
-      if (!payment) {
-        logger.warn('Payment not found for Daimo webhook', { paymentId });
-        return { success: false, error: 'Payment not found' };
+      // Idempotency check: Use transaction ID as unique key
+      const idempotencyKey = `webhook:daimo:${transaction_id}`;
+      const lockAcquired = await cache.acquireLock(idempotencyKey, 300); // 5 min lock
+
+      if (!lockAcquired) {
+        logger.info('Webhook already processing (idempotency)', { paymentId, transactionId: transaction_id });
+        throw new DuplicatePaymentError(paymentId);
       }
 
-      if (status === 'completed') {
-        // Payment successful
-        await this.activateSubscription(userId, planId, payment);
+      try {
+        // Get payment record
+        const payment = await PaymentModel.getById(paymentId);
+        if (!payment) {
+          logger.warn('Payment not found for Daimo webhook', { paymentId });
+          throw new PaymentNotFoundError(paymentId);
+        }
 
-        await PaymentModel.updateStatus(paymentId, 'success', {
-          transactionId: transaction_id,
-          completedAt: new Date(),
-        });
+        // Check if already processed
+        if (payment.status === 'success' || payment.status === 'failed') {
+          logger.info('Payment already processed', { paymentId, status: payment.status });
+          return { success: true, alreadyProcessed: true };
+        }
 
-        logger.info('Daimo payment successful', { paymentId, userId });
+        if (status === 'completed') {
+          // Payment successful
+          await this.activateSubscription(userId, planId, payment);
+
+          await PaymentModel.updateStatus(paymentId, 'success', {
+            transactionId: transaction_id,
+            completedAt: new Date(),
+          });
+
+          logger.info('Daimo payment successful', { paymentId, userId });
+          return { success: true };
+        }
+
+        if (status === 'failed') {
+          await PaymentModel.updateStatus(paymentId, 'failed', {
+            transactionId: transaction_id,
+            failedAt: new Date(),
+          });
+
+          logger.warn('Daimo payment failed', { paymentId, userId });
+          return { success: false, error: 'Payment failed' };
+        }
+
         return { success: true };
+      } finally {
+        // Always release lock
+        await cache.releaseLock(idempotencyKey);
       }
-
-      if (status === 'failed') {
-        await PaymentModel.updateStatus(paymentId, 'failed', {
-          transactionId: transaction_id,
-          failedAt: new Date(),
-        });
-
-        logger.warn('Daimo payment failed', { paymentId, userId });
-        return { success: false, error: 'Payment failed' };
-      }
-
-      return { success: true };
     } catch (error) {
       logger.error('Error processing Daimo webhook:', error);
       return { success: false, error: error.message };
@@ -334,6 +393,38 @@ class PaymentService {
       return signature === expectedSignature;
     } catch (error) {
       logger.error('Error verifying Daimo signature:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Verify ePayco webhook signature
+   * @param {Object} webhookData - Webhook payload
+   * @returns {boolean} Verification result
+   */
+  static verifyEpaycoSignature(webhookData) {
+    try {
+      const { x_signature, ...data } = webhookData;
+      const secret = process.env.EPAYCO_PRIVATE_KEY;
+
+      if (!secret) {
+        logger.warn('EPAYCO_PRIVATE_KEY not configured, skipping verification');
+        return true; // Allow in development/testing
+      }
+
+      // ePayco signature format: concatenate specific fields and hash
+      const {
+        x_cust_id_cliente, x_ref_payco, x_transaction_id, x_amount,
+      } = data;
+
+      const signatureString = `${x_cust_id_cliente}^${secret}^${x_ref_payco}^${x_transaction_id}^${x_amount}`;
+      const hmac = crypto.createHmac('sha256', secret);
+      hmac.update(signatureString);
+      const expectedSignature = hmac.digest('hex');
+
+      return x_signature === expectedSignature;
+    } catch (error) {
+      logger.error('Error verifying ePayco signature:', error);
       return false;
     }
   }

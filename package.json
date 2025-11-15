@@ -13,7 +13,10 @@
     "lint:fix": "eslint src/ --fix",
     "swagger": "node src/bot/api/swagger.js",
     "migrate": "node scripts/migrate.js",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "validate:env": "node -e \"require('./src/utils/envValidator').validateEnv()\"",
+    "validate:indexes": "node scripts/validate-indexes.js",
+    "prestart": "npm run validate:env"
   },
   "keywords": [
     "telegram",
