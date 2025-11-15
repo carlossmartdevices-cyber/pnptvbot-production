@@ -128,9 +128,9 @@ const startBot = async () => {
     }
 
     // Add 404 and error handlers AFTER webhook callback
-    const { errorHandler, notFoundHandler } = require('../api/middleware/errorHandler');
-    apiApp.use(notFoundHandler);
-    apiApp.use(errorHandler);
+    const { errorHandler: expressErrorHandler, notFoundHandler: expressNotFoundHandler } = require('../api/middleware/errorHandler');
+    apiApp.use(expressNotFoundHandler);
+    apiApp.use(expressErrorHandler);
     logger.info('✓ Error handlers registered');
 
     // Start API server
