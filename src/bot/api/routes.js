@@ -68,14 +68,16 @@ app.get('/health', async (req, res) => {
   }
 
   try {
-    // Check database connection
-    const { pool } = require('../../config/database');
-    await pool.query('SELECT 1');
-    health.dependencies.database = 'ok';
+    // Check Firestore connection
+    const { getFirestore } = require('../../config/firebase');
+    const db = getFirestore();
+    // Simple health check: verify we can access Firestore
+    await db.collection('_health_check').limit(1).get();
+    health.dependencies.firestore = 'ok';
   } catch (error) {
-    health.dependencies.database = 'error';
+    health.dependencies.firestore = 'error';
     health.status = 'degraded';
-    logger.error('Database health check failed:', error);
+    logger.error('Firestore health check failed:', error);
   }
 
   const statusCode = health.status === 'ok' ? 200 : 503;
