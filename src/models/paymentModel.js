@@ -1,13 +1,12 @@
-const { getFirestore } = require('../config/firebase');
+const { DataTypes, Model, Op } = require('sequelize');
+const { getDatabase } = require('../config/database');
 const logger = require('../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 
-const COLLECTION = 'payments';
-
 /**
- * Payment Model - Handles payment transactions
+ * Payment Model - PostgreSQL/Sequelize implementation
  */
-class PaymentModel {
+class Payment extends Model {
   /**
    * Create payment record
    * @param {Object} paymentData - Payment data
@@ -15,21 +14,18 @@ class PaymentModel {
    */
   static async create(paymentData) {
     try {
-      const db = getFirestore();
-      const paymentId = paymentData.paymentId || uuidv4();
-      const paymentRef = db.collection(COLLECTION).doc(paymentId);
-
-      const data = {
-        ...paymentData,
+      const payment = await super.create({
+        id: paymentData.paymentId || uuidv4(),
+        userId: paymentData.userId.toString(),
+        planId: paymentData.planId,
+        amount: paymentData.amount,
+        currency: paymentData.currency,
+        provider: paymentData.provider,
         status: 'pending',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      });
 
-      await paymentRef.set(data);
-
-      logger.info('Payment created', { paymentId, userId: paymentData.userId });
-      return { id: paymentId, ...data };
+      logger.info('Payment created', { paymentId: payment.id, userId: paymentData.userId });
+      return payment.toJSON();
     } catch (error) {
       logger.error('Error creating payment:', error);
       throw error;
@@ -43,14 +39,8 @@ class PaymentModel {
    */
   static async getById(paymentId) {
     try {
-      const db = getFirestore();
-      const doc = await db.collection(COLLECTION).doc(paymentId).get();
-
-      if (!doc.exists) {
-        return null;
-      }
-
-      return { id: doc.id, ...doc.data() };
+      const payment = await this.findByPk(paymentId);
+      return payment ? payment.toJSON() : null;
     } catch (error) {
       logger.error('Error getting payment:', error);
       return null;
@@ -66,13 +56,19 @@ class PaymentModel {
    */
   static async updateStatus(paymentId, status, metadata = {}) {
     try {
-      const db = getFirestore();
-      const paymentRef = db.collection(COLLECTION).doc(paymentId);
-
-      await paymentRef.update({
+      const updateData = {
         status,
         ...metadata,
-        updatedAt: new Date(),
+      };
+
+      if (status === 'success') {
+        updateData.completedAt = new Date();
+      } else if (status === 'failed') {
+        updateData.failedAt = new Date();
+      }
+
+      await this.update(updateData, {
+        where: { id: paymentId },
       });
 
       logger.info('Payment status updated', { paymentId, status });
@@ -91,19 +87,13 @@ class PaymentModel {
    */
   static async getByUser(userId, limit = 20) {
     try {
-      const db = getFirestore();
-      const snapshot = await db.collection(COLLECTION)
-        .where('userId', '==', userId.toString())
-        .orderBy('createdAt', 'desc')
-        .limit(limit)
-        .get();
-
-      const payments = [];
-      snapshot.forEach((doc) => {
-        payments.push({ id: doc.id, ...doc.data() });
+      const payments = await this.findAll({
+        where: { userId: userId.toString() },
+        order: [['createdAt', 'DESC']],
+        limit,
       });
 
-      return payments;
+      return payments.map((payment) => payment.toJSON());
     } catch (error) {
       logger.error('Error getting user payments:', error);
       return [];
@@ -118,19 +108,13 @@ class PaymentModel {
    */
   static async getByStatus(status, limit = 100) {
     try {
-      const db = getFirestore();
-      const snapshot = await db.collection(COLLECTION)
-        .where('status', '==', status)
-        .orderBy('createdAt', 'desc')
-        .limit(limit)
-        .get();
-
-      const payments = [];
-      snapshot.forEach((doc) => {
-        payments.push({ id: doc.id, ...doc.data() });
+      const payments = await this.findAll({
+        where: { status },
+        order: [['createdAt', 'DESC']],
+        limit,
       });
 
-      return payments;
+      return payments.map((payment) => payment.toJSON());
     } catch (error) {
       logger.error('Error getting payments by status:', error);
       return [];
@@ -138,26 +122,21 @@ class PaymentModel {
   }
 
   /**
-   * Get payment by transaction ID (from payment provider)
+   * Get payment by transaction ID
    * @param {string} transactionId - Transaction ID from provider
-   * @param {string} provider - Payment provider (epayco, daimo)
+   * @param {string} provider - Payment provider
    * @returns {Promise<Object|null>} Payment data
    */
   static async getByTransactionId(transactionId, provider) {
     try {
-      const db = getFirestore();
-      const snapshot = await db.collection(COLLECTION)
-        .where('transactionId', '==', transactionId)
-        .where('provider', '==', provider)
-        .limit(1)
-        .get();
+      const payment = await this.findOne({
+        where: {
+          transactionId,
+          provider,
+        },
+      });
 
-      if (snapshot.empty) {
-        return null;
-      }
-
-      const doc = snapshot.docs[0];
-      return { id: doc.id, ...doc.data() };
+      return payment ? payment.toJSON() : null;
     } catch (error) {
       logger.error('Error getting payment by transaction ID:', error);
       return null;
@@ -172,31 +151,44 @@ class PaymentModel {
    */
   static async getRevenue(startDate, endDate) {
     try {
-      const db = getFirestore();
-      const snapshot = await db.collection(COLLECTION)
-        .where('status', '==', 'success')
-        .where('createdAt', '>=', startDate)
-        .where('createdAt', '<=', endDate)
-        .get();
+      const { sequelize } = this;
+      
+      const stats = await this.findAll({
+        where: {
+          status: 'success',
+          createdAt: {
+            [Op.between]: [startDate, endDate],
+          },
+        },
+        attributes: [
+          [sequelize.fn('SUM', sequelize.col('amount')), 'total'],
+          [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+          [sequelize.fn('AVG', sequelize.col('amount')), 'average'],
+          'planId',
+          'provider',
+        ],
+        group: ['planId', 'provider'],
+        raw: true,
+      });
 
       let total = 0;
       let count = 0;
       const byPlan = {};
       const byProvider = {};
 
-      snapshot.forEach((doc) => {
-        const payment = doc.data();
-        total += payment.amount || 0;
-        count += 1;
-
-        // Count by plan
-        if (payment.planId) {
-          byPlan[payment.planId] = (byPlan[payment.planId] || 0) + 1;
+      stats.forEach((stat) => {
+        const amount = parseFloat(stat.total || 0);
+        const cnt = parseInt(stat.count || 0, 10);
+        
+        total += amount;
+        count += cnt;
+        
+        if (stat.planId) {
+          byPlan[stat.planId] = (byPlan[stat.planId] || 0) + cnt;
         }
-
-        // Count by provider
-        if (payment.provider) {
-          byProvider[payment.provider] = (byProvider[payment.provider] || 0) + 1;
+        
+        if (stat.provider) {
+          byProvider[stat.provider] = (byProvider[stat.provider] || 0) + cnt;
         }
       });
 
@@ -216,4 +208,91 @@ class PaymentModel {
   }
 }
 
-module.exports = PaymentModel;
+/**
+ * Initialize Payment model
+ * @param {Sequelize} sequelize - Sequelize instance
+ * @returns {Payment} Payment model
+ */
+const initPaymentModel = (sequelize) => {
+  Payment.init(
+    {
+      id: {
+        type: DataTypes.UUID,
+        primaryKey: true,
+        defaultValue: DataTypes.UUIDV4,
+      },
+      userId: {
+        type: DataTypes.BIGINT,
+        allowNull: false,
+        field: 'user_id',
+      },
+      planId: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        field: 'plan_id',
+      },
+      amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: false,
+      },
+      currency: {
+        type: DataTypes.STRING(10),
+        allowNull: false,
+      },
+      provider: {
+        type: DataTypes.ENUM('epayco', 'daimo'),
+        allowNull: false,
+      },
+      status: {
+        type: DataTypes.ENUM('pending', 'success', 'failed'),
+        allowNull: false,
+        defaultValue: 'pending',
+      },
+      transactionId: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        unique: true,
+        field: 'transaction_id',
+      },
+      paymentUrl: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        field: 'payment_url',
+      },
+      metadata: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      },
+      completedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: 'completed_at',
+      },
+      failedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: 'failed_at',
+      },
+    },
+    {
+      sequelize,
+      modelName: 'Payment',
+      tableName: 'payments',
+      timestamps: true,
+      underscored: true,
+    },
+  );
+
+  return Payment;
+};
+
+// Auto-initialize if database is available
+try {
+  const sequelize = getDatabase();
+  initPaymentModel(sequelize);
+} catch (error) {
+  logger.warn('Payment model not initialized yet');
+}
+
+module.exports = Payment;
+module.exports.initPaymentModel = initPaymentModel;

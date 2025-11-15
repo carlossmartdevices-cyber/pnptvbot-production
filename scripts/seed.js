@@ -1,6 +1,6 @@
 require('dotenv-safe').config();
-const { initializeFirebase } = require('../src/config/firebase');
-const PlanModel = require('../src/models/planModel');
+const { initializeDatabase, testConnection } = require('../src/config/database');
+const Plan = require('../src/models/planModel');
 const logger = require('../src/utils/logger');
 
 /**
@@ -10,12 +10,17 @@ const seedDatabase = async () => {
   try {
     logger.info('Starting database seed...');
 
-    // Initialize Firebase
-    initializeFirebase();
+    // Initialize PostgreSQL
+    initializeDatabase();
+    const connected = await testConnection();
+
+    if (!connected) {
+      throw new Error('Failed to connect to PostgreSQL');
+    }
 
     // Initialize default plans
     logger.info('Seeding default subscription plans...');
-    await PlanModel.initializeDefaultPlans();
+    await Plan.initializeDefaultPlans();
 
     logger.info('✓ Database seeded successfully');
     process.exit(0);

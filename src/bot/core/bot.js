@@ -1,7 +1,7 @@
 require('dotenv-safe').config();
 const { Telegraf } = require('telegraf');
 const express = require('express');
-const { initializeFirebase } = require('../../config/firebase');
+const { initializeDatabase, testConnection } = require('../../config/database');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
@@ -28,9 +28,13 @@ const startBot = async () => {
     // Initialize Sentry
     initSentry();
 
-    // Initialize Firebase
-    initializeFirebase();
-    logger.info('✓ Firebase initialized');
+    // Initialize PostgreSQL
+    initializeDatabase();
+    const dbConnected = await testConnection();
+    if (!dbConnected) {
+      throw new Error('Failed to connect to PostgreSQL');
+    }
+    logger.info('✓ PostgreSQL connected');
 
     // Initialize Redis
     initializeRedis();

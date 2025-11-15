@@ -20,7 +20,8 @@ A comprehensive, production-ready Telegram bot for PNPtv featuring live streamin
 - 🌐 **i18n**: Full English/Spanish support with dynamic language switching
 - 📊 **Analytics**: User statistics, revenue tracking, and insights
 - 🚨 **Error Tracking**: Sentry integration for production monitoring
-- ⚡ **Performance**: Redis caching, optimized Firestore queries
+- ⚡ **Performance**: Redis caching, optimized PostgreSQL queries with indexes
+- 🗄️ **Database**: PostgreSQL with Sequelize ORM for robust data management
 - 🐳 **Containerization**: Docker and Docker Compose ready
 - 🔄 **CI/CD**: GitHub Actions workflow for automated testing and deployment
 - 📝 **Logging**: Structured logging with Winston and daily log rotation
@@ -30,8 +31,8 @@ A comprehensive, production-ready Telegram bot for PNPtv featuring live streamin
 
 - Node.js 18.x or higher
 - npm 9.x or higher
+- PostgreSQL 14.x or higher
 - Redis 7.x
-- Firebase/Firestore account
 - Telegram Bot Token (from @BotFather)
 - (Optional) Sentry account for error tracking
 - (Optional) OpenAI API key for AI support
@@ -58,12 +59,16 @@ cp .env.example .env
 
 Edit `.env` with your credentials (see Environment Variables section below).
 
-### 3. Seed Database
+### 3. Setup Database
 
-Initialize default subscription plans:
+Run migrations and seed data:
 
 ```bash
-npm run seed
+# Run database migrations
+npm run db:migrate
+
+# Seed default plans
+npm run db:seed
 ```
 
 ### 4. Run Development Server
@@ -75,7 +80,14 @@ npm run dev
 ### 5. Run with Docker
 
 ```bash
+# Start all services (PostgreSQL, Redis, Bot)
 docker-compose up -d
+
+# Run migrations
+docker-compose exec bot npm run db:migrate
+
+# Seed database
+docker-compose exec bot npm run db:seed
 ```
 
 ## 🔧 Environment Variables
@@ -87,10 +99,12 @@ BOT_TOKEN=your_telegram_bot_token
 NODE_ENV=development
 PORT=3000
 
-# Firebase
-FIREBASE_PROJECT_ID=your_firebase_project_id
-FIREBASE_PRIVATE_KEY=your_firebase_private_key
-FIREBASE_CLIENT_EMAIL=your_firebase_client_email
+# PostgreSQL
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=pnptv_bot
+DB_USER=postgres
+DB_PASSWORD=your_secure_password
 
 # Redis
 REDIS_HOST=localhost

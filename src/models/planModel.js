@@ -1,15 +1,14 @@
-const { getFirestore } = require('../config/firebase');
+const { DataTypes, Model, Op } = require('sequelize');
+const { getDatabase } = require('../config/database');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
-const COLLECTION = 'plans';
-
 /**
- * Plan Model - Handles subscription plan data
+ * Plan Model - PostgreSQL/Sequelize implementation
  */
-class PlanModel {
+class Plan extends Model {
   /**
-   * Get all plans
+   * Get all active plans
    * @returns {Promise<Array>} All subscription plans
    */
   static async getAll() {
@@ -18,20 +17,15 @@ class PlanModel {
       const cached = await cache.get(cacheKey);
       if (cached) return cached;
 
-      const db = getFirestore();
-      const snapshot = await db.collection(COLLECTION)
-        .where('active', '==', true)
-        .orderBy('price', 'asc')
-        .get();
-
-      const plans = [];
-      snapshot.forEach((doc) => {
-        plans.push({ id: doc.id, ...doc.data() });
+      const plans = await this.findAll({
+        where: { active: true },
+        order: [['price', 'ASC']],
       });
 
-      await cache.set(cacheKey, plans, 3600); // Cache for 1 hour
+      const plansData = plans.map((plan) => plan.toJSON());
+      await cache.set(cacheKey, plansData, 3600); // Cache for 1 hour
 
-      return plans;
+      return plansData;
     } catch (error) {
       logger.error('Error getting plans:', error);
       return this.getDefaultPlans();
@@ -49,17 +43,15 @@ class PlanModel {
       const cached = await cache.get(cacheKey);
       if (cached) return cached;
 
-      const db = getFirestore();
-      const doc = await db.collection(COLLECTION).doc(planId).get();
+      const plan = await this.findByPk(planId);
 
-      if (!doc.exists) {
-        return null;
+      if (plan) {
+        const planData = plan.toJSON();
+        await cache.set(cacheKey, planData, 3600);
+        return planData;
       }
 
-      const plan = { id: doc.id, ...doc.data() };
-      await cache.set(cacheKey, plan, 3600);
-
-      return plan;
+      return null;
     } catch (error) {
       logger.error('Error getting plan:', error);
       return null;
@@ -74,27 +66,24 @@ class PlanModel {
    */
   static async createOrUpdate(planId, planData) {
     try {
-      const db = getFirestore();
-      const planRef = db.collection(COLLECTION).doc(planId);
-
-      const data = {
-        ...planData,
-        updatedAt: new Date(),
-      };
-
-      const doc = await planRef.get();
-      if (!doc.exists) {
-        data.createdAt = new Date();
-      }
-
-      await planRef.set(data, { merge: true });
+      const [plan] = await this.upsert({
+        id: planId,
+        name: planData.name,
+        nameEs: planData.nameEs,
+        price: planData.price,
+        currency: planData.currency || 'USD',
+        duration: planData.duration || 30,
+        features: planData.features || [],
+        featuresEs: planData.featuresEs || [],
+        active: planData.active !== undefined ? planData.active : true,
+      });
 
       // Invalidate cache
       await cache.del(`plan:${planId}`);
       await cache.del('plans:all');
 
       logger.info('Plan created/updated', { planId });
-      return { id: planId, ...data };
+      return plan.toJSON();
     } catch (error) {
       logger.error('Error creating/updating plan:', error);
       throw error;
@@ -106,10 +95,11 @@ class PlanModel {
    * @param {string} planId - Plan ID
    * @returns {Promise<boolean>} Success status
    */
-  static async delete(planId) {
+  static async deletePlan(planId) {
     try {
-      const db = getFirestore();
-      await db.collection(COLLECTION).doc(planId).delete();
+      await this.destroy({
+        where: { id: planId },
+      });
 
       // Invalidate cache
       await cache.del(`plan:${planId}`);
@@ -124,7 +114,7 @@ class PlanModel {
   }
 
   /**
-   * Get default plans (fallback if database is empty)
+   * Get default plans (fallback)
    * @returns {Array} Default plans
    */
   static getDefaultPlans() {
@@ -135,7 +125,7 @@ class PlanModel {
         nameEs: 'Básico',
         price: 9.99,
         currency: 'USD',
-        duration: 30, // days
+        duration: 30,
         features: [
           'Access to radio',
           'Basic Zoom rooms',
@@ -216,4 +206,78 @@ class PlanModel {
   }
 }
 
-module.exports = PlanModel;
+/**
+ * Initialize Plan model
+ * @param {Sequelize} sequelize - Sequelize instance
+ * @returns {Plan} Plan model
+ */
+const initPlanModel = (sequelize) => {
+  Plan.init(
+    {
+      id: {
+        type: DataTypes.STRING(50),
+        primaryKey: true,
+        allowNull: false,
+      },
+      name: {
+        type: DataTypes.STRING(100),
+        allowNull: false,
+      },
+      nameEs: {
+        type: DataTypes.STRING(100),
+        allowNull: false,
+        field: 'name_es',
+      },
+      price: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: false,
+      },
+      currency: {
+        type: DataTypes.STRING(10),
+        allowNull: false,
+        defaultValue: 'USD',
+      },
+      duration: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 30,
+      },
+      features: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        allowNull: false,
+        defaultValue: [],
+      },
+      featuresEs: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        allowNull: false,
+        defaultValue: [],
+        field: 'features_es',
+      },
+      active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+      },
+    },
+    {
+      sequelize,
+      modelName: 'Plan',
+      tableName: 'plans',
+      timestamps: true,
+      underscored: true,
+    },
+  );
+
+  return Plan;
+};
+
+// Auto-initialize if database is available
+try {
+  const sequelize = getDatabase();
+  initPlanModel(sequelize);
+} catch (error) {
+  logger.warn('Plan model not initialized yet');
+}
+
+module.exports = Plan;
+module.exports.initPlanModel = initPlanModel;
