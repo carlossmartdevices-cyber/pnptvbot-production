@@ -172,6 +172,44 @@ const cache = {
       return 0;
     }
   },
+
+  /**
+   * Set a key only if it doesn't exist (idempotency)
+   * @param {string} key - Cache key
+   * @param {any} value - Value to cache
+   * @param {number} ttl - Time to live in seconds
+   * @returns {Promise<boolean>} True if key was set, false if already exists
+   */
+  async setNX(key, value, ttl = 3600) {
+    try {
+      const client = getRedis();
+      const stringValue = JSON.stringify(value);
+      const result = await client.set(key, stringValue, 'EX', ttl, 'NX');
+      return result === 'OK';
+    } catch (error) {
+      logger.error('Cache setNX error:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Acquire a lock for idempotent operations
+   * @param {string} lockKey - Lock identifier
+   * @param {number} ttl - Lock duration in seconds (default 300s = 5 min)
+   * @returns {Promise<boolean>} True if lock acquired, false if already locked
+   */
+  async acquireLock(lockKey, ttl = 300) {
+    return this.setNX(`lock:${lockKey}`, { acquiredAt: new Date().toISOString() }, ttl);
+  },
+
+  /**
+   * Release a lock
+   * @param {string} lockKey - Lock identifier
+   * @returns {Promise<boolean>} Success status
+   */
+  async releaseLock(lockKey) {
+    return this.del(`lock:${lockKey}`);
+  },
 };
 
 /**

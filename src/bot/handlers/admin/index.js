@@ -35,6 +35,66 @@ const registerAdminHandlers = (bot) => {
     }
   });
 
+  // Quick stats command
+  bot.command('stats', async (ctx) => {
+    try {
+      if (!UserService.isAdmin(ctx.from.id)) {
+        await ctx.reply(t('unauthorized', ctx.session.language || 'en'));
+        return;
+      }
+
+      const lang = ctx.session.language || 'en';
+
+      // Get comprehensive statistics
+      const userStats = await UserService.getStatistics();
+
+      // Revenue stats for different periods
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      const [todayRevenue, monthRevenue, last30Revenue] = await Promise.all([
+        PaymentModel.getRevenue(today, now),
+        PaymentModel.getRevenue(thisMonth, now),
+        PaymentModel.getRevenue(last30Days, now),
+      ]);
+
+      // Build comprehensive stats message
+      const statsMessage =
+        `📊 *Real-Time Statistics*\n\n` +
+        `*User Metrics:*\n` +
+        `👥 Total Users: ${userStats.total}\n` +
+        `💎 Premium Users: ${userStats.active}\n` +
+        `🆓 Free Users: ${userStats.free}\n` +
+        `📈 Conversion Rate: ${userStats.conversionRate.toFixed(2)}%\n\n` +
+        `*Revenue - Today:*\n` +
+        `💰 Total: $${todayRevenue.total.toFixed(2)}\n` +
+        `📦 Payments: ${todayRevenue.count}\n` +
+        `📊 Average: $${todayRevenue.average.toFixed(2)}\n\n` +
+        `*Revenue - This Month:*\n` +
+        `💰 Total: $${monthRevenue.total.toFixed(2)}\n` +
+        `📦 Payments: ${monthRevenue.count}\n` +
+        `📊 Average: $${monthRevenue.average.toFixed(2)}\n\n` +
+        `*Revenue - Last 30 Days:*\n` +
+        `💰 Total: $${last30Revenue.total.toFixed(2)}\n` +
+        `📦 Payments: ${last30Revenue.count}\n` +
+        `📊 Average: $${last30Revenue.average.toFixed(2)}\n\n` +
+        `*Payment Breakdown (Last 30 Days):*\n` +
+        `${Object.entries(last30Revenue.byPlan).map(([plan, count]) => `  ${plan}: ${count}`).join('\n') || '  No data'}\n\n` +
+        `*Provider Breakdown:*\n` +
+        `${Object.entries(last30Revenue.byProvider).map(([provider, count]) => `  ${provider}: ${count}`).join('\n') || '  No data'}\n\n` +
+        `_Updated: ${now.toLocaleString()}_`;
+
+      await ctx.reply(statsMessage, { parse_mode: 'Markdown' });
+
+      logger.info('Stats command executed', { adminId: ctx.from.id });
+    } catch (error) {
+      logger.error('Error in /stats command:', error);
+      await ctx.reply('Error fetching statistics. Please try again.');
+    }
+  });
+
   // User management
   bot.action('admin_users', async (ctx) => {
     try {
