@@ -100,8 +100,11 @@ const startBot = async () => {
       logger.info(`✓ Webhook set to: ${webhookUrl}`);
 
       // Register webhook callback BEFORE 404 handler
-      // Use POST method for webhook endpoint
-      apiApp.post(webhookPath, bot.webhookCallback(webhookPath));
+      // Use bot.handleUpdate() directly since express.json() already parses the body
+      // bot.webhookCallback() expects raw body, but express.json() consumes it
+      apiApp.post(webhookPath, (req, res) => {
+        return bot.handleUpdate(req.body, res);
+      });
       logger.info(`✓ Webhook callback registered at: ${webhookPath}`);
     } else {
       // Polling mode for development
