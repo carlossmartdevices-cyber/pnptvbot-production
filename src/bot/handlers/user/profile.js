@@ -203,6 +203,13 @@ const showProfile = async (ctx, edit = true) => {
     const lang = getLanguage(ctx);
     const user = await UserService.getOrCreateFromContext(ctx);
 
+    // Validate user exists
+    if (!user) {
+      logger.error('Failed to get user for profile display');
+      await ctx.reply(t('error', lang));
+      return;
+    }
+
     let profileText = `${t('profileTitle', lang)}\n\n`;
     profileText += `👤 ${user.firstName || 'User'} ${user.lastName || ''}\n`;
     if (user.username) profileText += `@${user.username}\n`;

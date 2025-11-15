@@ -80,15 +80,21 @@ const sessionMiddleware = () => async (ctx, next) => {
       }
     };
 
-    // Execute next middleware
-    await next();
-
-    // Auto-save session after processing
-    await ctx.saveSession();
+    // Use try-finally to ensure session is always saved
+    try {
+      // Execute next middleware
+      await next();
+    } finally {
+      // Auto-save session after processing (always executes)
+      try {
+        await ctx.saveSession();
+      } catch (saveError) {
+        logger.error('Failed to save session after middleware:', saveError);
+      }
+    }
   } catch (error) {
     logger.error('Session middleware error:', error);
-    // Don't call next() again - it was already called above
-    throw error; // Re-throw to let error handler deal with it
+    throw error;
   }
 };
 

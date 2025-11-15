@@ -235,9 +235,11 @@ const generateZoomToken = () => {
     throw new Error('Zoom API credentials not configured');
   }
 
+  // JWT exp must be in seconds (not milliseconds)
+  // Set expiration to 1 hour from now
   const payload = {
     iss: process.env.ZOOM_API_KEY,
-    exp: Date.now() + 5000,
+    exp: Math.floor(Date.now() / 1000) + 3600, // Current time in seconds + 1 hour
   };
 
   return jwt.sign(payload, process.env.ZOOM_API_SECRET);

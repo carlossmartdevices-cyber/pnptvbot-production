@@ -203,14 +203,28 @@ const showEmailPrompt = async (ctx) => {
 const completeOnboarding = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
+
+    // Validate user context exists
+    if (!ctx.from?.id) {
+      logger.error('Missing user context in onboarding completion');
+      await ctx.reply('An error occurred. Please try /start again.');
+      return;
+    }
+
     const userId = ctx.from.id;
 
     // Update user profile
-    await UserService.updateProfile(userId, {
+    const result = await UserService.updateProfile(userId, {
       language: lang,
-      email: ctx.session.temp.email || null,
+      email: ctx.session.temp?.email || null,
       onboardingComplete: true,
     });
+
+    if (!result.success) {
+      logger.error('Failed to update user profile:', result.error);
+      await ctx.reply('An error occurred. Please try /start again.');
+      return;
+    }
 
     // Clear temp session data
     ctx.session.temp = {};
