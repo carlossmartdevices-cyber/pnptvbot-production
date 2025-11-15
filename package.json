@@ -60,7 +60,7 @@
     "qrcode": "^1.5.3",
     "geolib": "^3.3.4",
     "node-geocoder": "^4.3.0",
-    "zoomus": "^1.1.10",
+    "zoomus": "^0.1.5",
     "agora-access-token": "^2.0.4",
     "openai": "^4.24.7",
     "stripe": "^14.12.0",

@@ -1,4 +1,4 @@
-require('dotenv-safe').config();
+require('dotenv-safe').config({ allowEmptyValues: true });
 const { initializeDatabase, testConnection } = require('../src/config/database');
 const Plan = require('../src/models/planModel');
 const logger = require('../src/utils/logger');
