@@ -3,6 +3,7 @@ const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
+const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
 /**
  * Zoom room handlers
@@ -12,7 +13,7 @@ const registerZoomHandlers = (bot) => {
   // Show zoom menu
   bot.action('show_zoom', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
         t('zoomTitle', lang),
@@ -31,7 +32,7 @@ const registerZoomHandlers = (bot) => {
   // Create room
   bot.action('zoom_create', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp.creatingZoomRoom = true;
       ctx.session.temp.zoomRoomStep = 'name';
       await ctx.saveSession();
@@ -50,7 +51,7 @@ const registerZoomHandlers = (bot) => {
   // Join room
   bot.action('zoom_join', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       // In production, fetch active rooms from database
       const activeRooms = [
@@ -89,7 +90,7 @@ const registerZoomHandlers = (bot) => {
   // My rooms
   bot.action('zoom_my_rooms', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
         `${t('myRooms', lang)}\n\nYour room history will appear here.`,
@@ -106,7 +107,7 @@ const registerZoomHandlers = (bot) => {
   bot.on('text', async (ctx, next) => {
     if (ctx.session.temp?.creatingZoomRoom) {
       try {
-        const lang = ctx.session.language || 'en';
+        const lang = getLanguage(ctx);
         const step = ctx.session.temp.zoomRoomStep;
 
         if (step === 'name') {
@@ -139,7 +140,7 @@ const registerZoomHandlers = (bot) => {
   bot.action(/^zoom_privacy_(.+)$/, async (ctx) => {
     try {
       const privacy = ctx.match[1];
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       ctx.session.temp.zoomRoomPrivacy = privacy;
       await ctx.saveSession();
@@ -158,7 +159,7 @@ const registerZoomHandlers = (bot) => {
  */
 const createZoomMeeting = async (ctx) => {
   try {
-    const lang = ctx.session.language || 'en';
+    const lang = getLanguage(ctx);
 
     // Check if Zoom is configured
     if (!process.env.ZOOM_API_KEY || !process.env.ZOOM_API_SECRET) {
@@ -220,7 +221,7 @@ const createZoomMeeting = async (ctx) => {
     logger.info('Zoom meeting created', { userId: ctx.from.id, meetingId });
   } catch (error) {
     logger.error('Error creating Zoom meeting:', error);
-    const lang = ctx.session.language || 'en';
+    const lang = getLanguage(ctx);
     await ctx.reply(t('error', lang));
   }
 };
