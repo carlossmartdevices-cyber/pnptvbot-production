@@ -142,7 +142,7 @@ pnptvbot-production/
 │   │   └── api/               # REST API and webhooks
 │   │       ├── routes.js
 │   │       └── controllers/
-│   ├── models/                # Data models (Firestore)
+│   ├── models/                # Data models (PostgreSQL/Sequelize)
 │   │   ├── userModel.js
 │   │   ├── planModel.js
 │   │   └── paymentModel.js
@@ -151,7 +151,7 @@ pnptvbot-production/
 │   │   ├── validation.js     # Input validation
 │   │   └── logger.js         # Logging
 │   └── config/                # Configuration
-│       ├── firebase.js
+│       ├── database.js
 │       └── redis.js
 ├── scripts/                   # Utility scripts
 │   ├── cron.js               # Scheduled tasks
@@ -284,23 +284,11 @@ BOT_WEBHOOK_PATH=/webhook/telegram
 
 4. Push to main branch to trigger deployment
 
-### Firestore Setup
-
-1. Create indexes:
-
-```bash
-npm run migrate
-```
-
-Or manually create indexes in Firebase Console as defined in `src/config/firebase.js`.
-
-2. Set up Firestore security rules to restrict access.
-
 ## 📈 Scaling Considerations
 
 - **Redis Cluster**: For high availability and horizontal scaling
 - **Load Balancer**: Distribute traffic across multiple bot instances
-- **Firestore Optimization**: Use composite indexes and pagination
+- **PostgreSQL Optimization**: Use composite indexes, connection pooling, and query optimization
 - **CDN**: Serve static assets (images, media) via CDN
 - **Caching Strategy**: Cache frequently accessed data with appropriate TTLs
 - **Queue System**: Implement message queue for broadcasts and background jobs
@@ -316,9 +304,10 @@ The bot includes automated cron jobs (configured in `scripts/cron.js`):
 
 ### Database Maintenance
 
-- Regularly review and optimize Firestore indexes
-- Monitor storage usage and implement data retention policies
-- Backup Firestore data periodically
+- Regularly review and optimize PostgreSQL indexes
+- Monitor database performance with pg_stat_statements
+- Implement regular backup strategy (pg_dump or continuous archiving)
+- Monitor database size and implement data retention policies
 
 ## 🐛 Troubleshooting
 
@@ -333,13 +322,13 @@ The bot includes automated cron jobs (configured in `scripts/cron.js`):
 
 1. Check webhook configuration and URLs
 2. Verify payment provider credentials
-3. Review payment logs in Firestore
+3. Review payment logs in PostgreSQL database
 4. Check webhook signature verification
 
 ### Performance Issues
 
 1. Monitor Redis cache hit rate
-2. Review Firestore query performance
+2. Review PostgreSQL query performance with EXPLAIN ANALYZE
 3. Check for memory leaks
 4. Analyze error rates in Sentry
 
@@ -399,7 +388,8 @@ For support and questions:
 ## 🙏 Acknowledgments
 
 - Telegraf.js - Modern Telegram Bot Framework
-- Firebase - Backend and database
+- PostgreSQL - Robust relational database
+- Sequelize - ORM for database operations
 - Redis - Caching and sessions
 - OpenAI - AI assistant
 - Sentry - Error tracking
