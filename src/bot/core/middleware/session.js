@@ -87,7 +87,8 @@ const sessionMiddleware = () => async (ctx, next) => {
     await ctx.saveSession();
   } catch (error) {
     logger.error('Session middleware error:', error);
-    await next();
+    // Don't call next() again - it was already called above
+    throw error; // Re-throw to let error handler deal with it
   }
 };
 

@@ -4,6 +4,7 @@ const { t } = require('../../../utils/i18n');
 const { isValidEmail } = require('../../../utils/validation');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
+const { showMainMenu } = require('./menu');
 
 /**
  * Onboarding handlers
@@ -218,7 +219,6 @@ const completeOnboarding = async (ctx) => {
     await ctx.reply(t('onboardingComplete', lang));
 
     // Show main menu
-    const { showMainMenu } = require('./menu');
     await showMainMenu(ctx);
   } catch (error) {
     logger.error('Error completing onboarding:', error);
