@@ -9,29 +9,33 @@ const COLLECTION = 'plans';
  */
 class PlanModel {
   /**
-   * Get all plans
+   * Get all plans (with optimized caching)
    * @returns {Promise<Array>} All subscription plans
    */
   static async getAll() {
     try {
       const cacheKey = 'plans:all';
-      const cached = await cache.get(cacheKey);
-      if (cached) return cached;
 
-      const db = getFirestore();
-      const snapshot = await db.collection(COLLECTION)
-        .where('active', '==', true)
-        .orderBy('price', 'asc')
-        .get();
+      // Use getOrSet for simplified cache-aside pattern
+      return await cache.getOrSet(
+        cacheKey,
+        async () => {
+          const db = getFirestore();
+          const snapshot = await db.collection(COLLECTION)
+            .where('active', '==', true)
+            .orderBy('price', 'asc')
+            .get();
 
-      const plans = [];
-      snapshot.forEach((doc) => {
-        plans.push({ id: doc.id, ...doc.data() });
-      });
+          const plans = [];
+          snapshot.forEach((doc) => {
+            plans.push({ id: doc.id, ...doc.data() });
+          });
 
-      await cache.set(cacheKey, plans, 3600); // Cache for 1 hour
-
-      return plans;
+          logger.info(`Fetched ${plans.length} plans from database`);
+          return plans.length > 0 ? plans : this.getDefaultPlans();
+        },
+        3600, // Cache for 1 hour
+      );
     } catch (error) {
       logger.error('Error getting plans:', error);
       return this.getDefaultPlans();
@@ -39,27 +43,31 @@ class PlanModel {
   }
 
   /**
-   * Get plan by ID
+   * Get plan by ID (with optimized caching)
    * @param {string} planId - Plan ID
    * @returns {Promise<Object|null>} Plan data
    */
   static async getById(planId) {
     try {
       const cacheKey = `plan:${planId}`;
-      const cached = await cache.get(cacheKey);
-      if (cached) return cached;
 
-      const db = getFirestore();
-      const doc = await db.collection(COLLECTION).doc(planId).get();
+      return await cache.getOrSet(
+        cacheKey,
+        async () => {
+          const db = getFirestore();
+          const doc = await db.collection(COLLECTION).doc(planId).get();
 
-      if (!doc.exists) {
-        return null;
-      }
+          if (!doc.exists) {
+            logger.warn(`Plan not found: ${planId}`);
+            return null;
+          }
 
-      const plan = { id: doc.id, ...doc.data() };
-      await cache.set(cacheKey, plan, 3600);
-
-      return plan;
+          const plan = { id: doc.id, ...doc.data() };
+          logger.info(`Fetched plan from database: ${planId}`);
+          return plan;
+        },
+        3600, // Cache for 1 hour
+      );
     } catch (error) {
       logger.error('Error getting plan:', error);
       return null;
@@ -211,6 +219,47 @@ class PlanModel {
       return true;
     } catch (error) {
       logger.error('Error initializing default plans:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Prewarm cache with all plans
+   * Call this on application startup to ensure fast first requests
+   * @returns {Promise<boolean>} Success status
+   */
+  static async prewarmCache() {
+    try {
+      logger.info('Prewarming plans cache...');
+
+      // Load all plans into cache
+      const plans = await this.getAll();
+
+      // Load individual plan caches
+      for (const plan of plans) {
+        await this.getById(plan.id);
+      }
+
+      logger.info(`Cache prewarmed with ${plans.length} plans`);
+      return true;
+    } catch (error) {
+      logger.error('Error prewarming plans cache:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Invalidate all plan caches
+   * @returns {Promise<boolean>} Success status
+   */
+  static async invalidateCache() {
+    try {
+      await cache.delPattern('plan:*');
+      await cache.del('plans:all');
+      logger.info('All plan caches invalidated');
+      return true;
+    } catch (error) {
+      logger.error('Error invalidating plan cache:', error);
       return false;
     }
   }

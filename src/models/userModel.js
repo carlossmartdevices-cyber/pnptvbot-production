@@ -46,27 +46,30 @@ class UserModel {
   }
 
   /**
-   * Get user by ID
+   * Get user by ID (with optimized caching)
    * @param {number|string} userId - Telegram user ID
    * @returns {Promise<Object|null>} User data or null
    */
   static async getById(userId) {
     try {
       const cacheKey = `user:${userId}`;
-      const cached = await cache.get(cacheKey);
-      if (cached) return cached;
 
-      const db = getFirestore();
-      const doc = await db.collection(COLLECTION).doc(userId.toString()).get();
+      return await cache.getOrSet(
+        cacheKey,
+        async () => {
+          const db = getFirestore();
+          const doc = await db.collection(COLLECTION).doc(userId.toString()).get();
 
-      if (!doc.exists) {
-        return null;
-      }
+          if (!doc.exists) {
+            return null;
+          }
 
-      const userData = { id: doc.id, ...doc.data() };
-      await cache.set(cacheKey, userData, 600); // Cache for 10 minutes
-
-      return userData;
+          const userData = { id: doc.id, ...doc.data() };
+          logger.debug(`Fetched user from database: ${userId}`);
+          return userData;
+        },
+        600, // Cache for 10 minutes
+      );
     } catch (error) {
       logger.error('Error getting user:', error);
       return null;
@@ -131,49 +134,55 @@ class UserModel {
   }
 
   /**
-   * Get nearby users
+   * Get nearby users (with optimized caching)
    * @param {Object} location - { lat, lng }
    * @param {number} radiusKm - Search radius in kilometers
    * @returns {Promise<Array>} Nearby users
    */
   static async getNearby(location, radiusKm = 10) {
     try {
-      const cacheKey = `nearby:${location.lat},${location.lng}:${radiusKm}`;
-      const cached = await cache.get(cacheKey);
-      if (cached) return cached;
+      // Round coordinates to reduce cache fragmentation
+      const lat = Math.round(location.lat * 100) / 100;
+      const lng = Math.round(location.lng * 100) / 100;
+      const cacheKey = `nearby:${lat},${lng}:${radiusKm}`;
 
-      const db = getFirestore();
+      return await cache.getOrSet(
+        cacheKey,
+        async () => {
+          const db = getFirestore();
 
-      // Simple approach: Get all users with location and filter by distance
-      // In production, use Geohash or Google Maps API for better performance
-      const snapshot = await db.collection(COLLECTION)
-        .where('location', '!=', null)
-        .where('subscriptionStatus', 'in', ['active', 'free'])
-        .limit(100)
-        .get();
+          // Simple approach: Get all users with location and filter by distance
+          // In production, use Geohash or Google Maps API for better performance
+          const snapshot = await db.collection(COLLECTION)
+            .where('location', '!=', null)
+            .where('subscriptionStatus', 'in', ['active', 'free'])
+            .limit(100)
+            .get();
 
-      const users = [];
-      snapshot.forEach((doc) => {
-        const userData = { id: doc.id, ...doc.data() };
-        if (userData.location) {
-          const distance = this.calculateDistance(
-            location.lat,
-            location.lng,
-            userData.location.lat,
-            userData.location.lng,
-          );
-          if (distance <= radiusKm) {
-            users.push({ ...userData, distance });
-          }
-        }
-      });
+          const users = [];
+          snapshot.forEach((doc) => {
+            const userData = { id: doc.id, ...doc.data() };
+            if (userData.location) {
+              const distance = this.calculateDistance(
+                location.lat,
+                location.lng,
+                userData.location.lat,
+                userData.location.lng,
+              );
+              if (distance <= radiusKm) {
+                users.push({ ...userData, distance });
+              }
+            }
+          });
 
-      // Sort by distance
-      users.sort((a, b) => a.distance - b.distance);
+          // Sort by distance
+          users.sort((a, b) => a.distance - b.distance);
 
-      await cache.set(cacheKey, users, 300); // Cache for 5 minutes
-
-      return users;
+          logger.info(`Found ${users.length} nearby users within ${radiusKm}km`);
+          return users;
+        },
+        300, // Cache for 5 minutes
+      );
     } catch (error) {
       logger.error('Error getting nearby users:', error);
       return [];
@@ -307,6 +316,72 @@ class UserModel {
       return true;
     } catch (error) {
       logger.error('Error deleting user:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get statistics for dashboard
+   * @returns {Promise<Object>} User statistics
+   */
+  static async getStatistics() {
+    try {
+      const cacheKey = 'stats:users';
+
+      return await cache.getOrSet(
+        cacheKey,
+        async () => {
+          const db = getFirestore();
+
+          // Get total users
+          const totalSnapshot = await db.collection(COLLECTION).count().get();
+          const total = totalSnapshot.data().count;
+
+          // Get premium users
+          const premiumSnapshot = await db.collection(COLLECTION)
+            .where('subscriptionStatus', '==', 'active')
+            .count()
+            .get();
+          const premium = premiumSnapshot.data().count;
+
+          const free = total - premium;
+          const conversionRate = total > 0 ? (premium / total) * 100 : 0;
+
+          const stats = {
+            total,
+            premium,
+            free,
+            conversionRate: Math.round(conversionRate * 100) / 100,
+            timestamp: new Date().toISOString(),
+          };
+
+          logger.info('User statistics calculated', stats);
+          return stats;
+        },
+        60, // Cache for 1 minute (stats change frequently)
+      );
+    } catch (error) {
+      logger.error('Error getting user statistics:', error);
+      return {
+        total: 0, premium: 0, free: 0, conversionRate: 0,
+      };
+    }
+  }
+
+  /**
+   * Invalidate user cache
+   * @param {number|string} userId - User ID
+   * @returns {Promise<boolean>} Success status
+   */
+  static async invalidateCache(userId) {
+    try {
+      await cache.del(`user:${userId}`);
+      await cache.delPattern('nearby:*');
+      await cache.del('stats:users');
+      logger.info('User cache invalidated', { userId });
+      return true;
+    } catch (error) {
+      logger.error('Error invalidating user cache:', error);
       return false;
     }
   }
