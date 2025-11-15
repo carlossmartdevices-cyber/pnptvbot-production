@@ -14,7 +14,21 @@ const registerOnboardingHandlers = (bot) => {
   // Start command - begin onboarding or show main menu
   bot.command('start', async (ctx) => {
     try {
+      // Validate context has required data
+      if (!ctx.from?.id) {
+        logger.error('/start command called without user context');
+        await ctx.reply('An error occurred. Please try again.');
+        return;
+      }
+
       const user = await UserService.getOrCreateFromContext(ctx);
+
+      // Validate user was created/fetched successfully
+      if (!user) {
+        logger.error('/start command: Failed to get or create user', { userId: ctx.from.id });
+        await ctx.reply('An error occurred. Please try again in a few moments.');
+        return;
+      }
 
       if (user.onboardingComplete) {
         // User already onboarded, show main menu
