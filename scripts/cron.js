@@ -1,6 +1,6 @@
 require('dotenv-safe').config();
 const cron = require('node-cron');
-const { initializeDatabase, testConnection } = require('../src/config/database');
+const { initializeFirebase } = require('../src/config/firebase');
 const { initializeRedis } = require('../src/config/redis');
 const UserService = require('../src/bot/services/userService');
 const logger = require('../src/utils/logger');
@@ -13,13 +13,7 @@ const startCronJobs = async () => {
     logger.info('Initializing cron jobs...');
 
     // Initialize dependencies
-    initializeDatabase();
-    const connected = await testConnection();
-
-    if (!connected) {
-      throw new Error('Failed to connect to PostgreSQL');
-    }
-
+    initializeFirebase();
     initializeRedis();
 
     // Check for expired subscriptions daily at midnight
