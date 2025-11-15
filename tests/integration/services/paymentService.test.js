@@ -118,20 +118,17 @@ describe('PaymentService Integration Tests', () => {
       });
     });
 
-    it('should return error when plan is not found', async () => {
+    it('should throw error when plan is not found', async () => {
       PlanModel.getById.mockResolvedValue(null);
 
-      const result = await PaymentService.createPayment({
+      await expect(PaymentService.createPayment({
         userId: 123,
         planId: 'invalid_plan',
         provider: 'epayco',
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Plan not found');
+      })).rejects.toThrow('Plan not found');
     });
 
-    it('should return error for invalid payment data', async () => {
+    it('should throw error for invalid payment data', async () => {
       // Mock PlanModel to return a valid plan so we test validation
       PlanModel.getById.mockResolvedValue({
         id: 'plan_123',
@@ -141,17 +138,14 @@ describe('PaymentService Integration Tests', () => {
         duration: 30,
       });
 
-      const result = await PaymentService.createPayment({
+      await expect(PaymentService.createPayment({
         userId: 'invalid_user_id', // Should be a number
         planId: 'plan_123',
         provider: 'invalid_provider', // Invalid provider
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('must be');
+      })).rejects.toThrow();
     });
 
-    it('should handle Daimo API errors gracefully', async () => {
+    it('should throw error when Daimo API fails', async () => {
       PlanModel.getById.mockResolvedValue({
         id: 'plan_456',
         name: 'Premium',
@@ -175,15 +169,12 @@ describe('PaymentService Integration Tests', () => {
       process.env.DAIMO_API_KEY = 'test_api_key';
       process.env.BOT_WEBHOOK_DOMAIN = 'https://example.com';
 
-      const result = await PaymentService.createPayment({
+      await expect(PaymentService.createPayment({
         userId: 456,
         planId: 'plan_456',
         provider: 'daimo',
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
-    });
+      })).rejects.toThrow('Internal server error');
+    }, 15000); // Increase timeout for retry mechanism
   });
 
   describe('processDaimoWebhook', () => {

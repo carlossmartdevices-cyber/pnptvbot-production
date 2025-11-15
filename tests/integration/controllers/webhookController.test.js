@@ -1,9 +1,10 @@
 const request = require('supertest');
-const app = require('../../../src/bot/api/routes');
-const PaymentService = require('../../../src/bot/services/paymentService');
 
 // Mock PaymentService
 jest.mock('../../../src/bot/services/paymentService');
+
+const app = require('../../../src/bot/api/routes');
+const PaymentService = require('../../../src/bot/services/paymentService');
 
 describe('Webhook Controller Integration Tests', () => {
   beforeEach(() => {
@@ -28,7 +29,7 @@ describe('Webhook Controller Integration Tests', () => {
         .send(webhookData);
 
       expect(response.status).toBe(200);
-      expect(response.text).toBe('OK');
+      expect(response.body).toEqual({ success: true });
       expect(PaymentService.processEpaycoWebhook).toHaveBeenCalledWith(webhookData);
     });
 
@@ -52,7 +53,7 @@ describe('Webhook Controller Integration Tests', () => {
         .send(webhookData);
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({ error: 'Invalid signature' });
+      expect(response.body).toEqual({ success: false, error: 'Invalid signature' });
     });
 
     it('should return 500 for internal server errors', async () => {
@@ -72,7 +73,7 @@ describe('Webhook Controller Integration Tests', () => {
         .send(webhookData);
 
       expect(response.status).toBe(500);
-      expect(response.body).toEqual({ error: 'Internal server error' });
+      expect(response.body).toEqual({ success: false, error: 'Internal server error' });
     });
 
     it('should handle declined transactions', async () => {
@@ -95,7 +96,7 @@ describe('Webhook Controller Integration Tests', () => {
         .send(webhookData);
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({ error: 'Payment declined' });
+      expect(response.body).toEqual({ success: false, error: 'Payment declined' });
     });
   });
 
@@ -119,7 +120,7 @@ describe('Webhook Controller Integration Tests', () => {
         .send(webhookData);
 
       expect(response.status).toBe(200);
-      expect(response.text).toBe('OK');
+      expect(response.body).toEqual({ success: true });
       expect(PaymentService.processDaimoWebhook).toHaveBeenCalledWith(webhookData);
     });
 
@@ -145,7 +146,7 @@ describe('Webhook Controller Integration Tests', () => {
         .send(webhookData);
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({ error: 'Invalid signature' });
+      expect(response.body).toEqual({ success: false, error: 'Invalid signature' });
     });
 
     it('should return 500 for internal server errors', async () => {
@@ -167,7 +168,7 @@ describe('Webhook Controller Integration Tests', () => {
         .send(webhookData);
 
       expect(response.status).toBe(500);
-      expect(response.body).toEqual({ error: 'Internal server error' });
+      expect(response.body).toEqual({ success: false, error: 'Internal server error' });
     });
 
     it('should handle failed Daimo payments', async () => {
@@ -192,7 +193,7 @@ describe('Webhook Controller Integration Tests', () => {
         .send(webhookData);
 
       expect(response.status).toBe(400);
-      expect(response.body).toEqual({ error: 'Payment failed' });
+      expect(response.body).toEqual({ success: false, error: 'Payment failed' });
     });
 
     it('should handle pending Daimo payments', async () => {
@@ -214,7 +215,7 @@ describe('Webhook Controller Integration Tests', () => {
         .send(webhookData);
 
       expect(response.status).toBe(200);
-      expect(response.text).toBe('OK');
+      expect(response.body).toEqual({ success: true });
     });
   });
 
@@ -283,13 +284,17 @@ describe('Webhook Controller Integration Tests', () => {
   });
 
   describe('Health Check', () => {
-    it('should return 200 for health check', async () => {
+    it('should return health status with dependencies check', async () => {
       const response = await request(app).get('/health');
 
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('status', 'ok');
+      // Status can be 200 (ok) or 503 (degraded) depending on dependencies availability
+      expect([200, 503]).toContain(response.status);
+      expect(response.body).toHaveProperty('status');
       expect(response.body).toHaveProperty('timestamp');
       expect(response.body).toHaveProperty('uptime');
+      expect(response.body).toHaveProperty('dependencies');
+      expect(response.body.dependencies).toHaveProperty('redis');
+      expect(response.body.dependencies).toHaveProperty('database');
     });
   });
 
