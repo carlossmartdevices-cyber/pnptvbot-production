@@ -15,6 +15,9 @@ const registerAdminHandlers = require('../handlers/admin');
 const registerPaymentHandlers = require('../handlers/payments');
 const registerMediaHandlers = require('../handlers/media');
 
+// Models for cache prewarming
+const PlanModel = require('../../models/planModel');
+
 // API Server
 const apiApp = require('../api/routes');
 
@@ -59,6 +62,14 @@ const startBot = async () => {
     try {
       initializeRedis();
       logger.info('✓ Redis initialized');
+
+      // Prewarm cache with critical data
+      try {
+        await PlanModel.prewarmCache();
+        logger.info('✓ Cache prewarmed successfully');
+      } catch (cacheError) {
+        logger.warn('Cache prewarming failed, continuing:', cacheError.message);
+      }
     } catch (error) {
       logger.warn('Redis initialization failed, continuing without cache:', error.message);
     }

@@ -118,19 +118,31 @@ const cache = {
   },
 
   /**
-   * Delete all keys matching pattern
+   * Delete all keys matching pattern using SCAN (non-blocking)
    * @param {string} pattern - Key pattern (e.g., 'user:*')
    * @returns {Promise<number>} Number of deleted keys
    */
   async delPattern(pattern) {
     try {
       const client = getRedis();
-      const keys = await client.keys(pattern);
-      if (keys.length > 0) {
-        await client.del(...keys);
-        return keys.length;
+      let deletedCount = 0;
+      const batchSize = 100;
+
+      // Use SCAN instead of KEYS to avoid blocking Redis
+      const stream = client.scanStream({
+        match: pattern,
+        count: batchSize,
+      });
+
+      for await (const keys of stream) {
+        if (keys.length > 0) {
+          await client.del(...keys);
+          deletedCount += keys.length;
+        }
       }
-      return 0;
+
+      logger.info(`Deleted ${deletedCount} keys matching pattern: ${pattern}`);
+      return deletedCount;
     } catch (error) {
       logger.error('Cache delete pattern error:', error);
       return 0;
@@ -209,6 +221,122 @@ const cache = {
    */
   async releaseLock(lockKey) {
     return this.del(`lock:${lockKey}`);
+  },
+
+  /**
+   * Get or set cache value (cache-aside pattern)
+   * @param {string} key - Cache key
+   * @param {Function} fetchFn - Async function to fetch value if not cached
+   * @param {number} ttl - Time to live in seconds
+   * @returns {Promise<any>} Cached or fetched value
+   */
+  async getOrSet(key, fetchFn, ttl = null) {
+    try {
+      // Try to get from cache first
+      const cached = await this.get(key);
+      if (cached !== null) {
+        return cached;
+      }
+
+      // Not in cache, fetch the value
+      const value = await fetchFn();
+
+      // Store in cache for next time
+      if (value !== null && value !== undefined) {
+        await this.set(key, value, ttl);
+      }
+
+      return value;
+    } catch (error) {
+      logger.error('Cache getOrSet error:', error);
+      // Fallback to fetching if cache fails
+      return fetchFn();
+    }
+  },
+
+  /**
+   * Get multiple keys at once
+   * @param {Array<string>} keys - Array of cache keys
+   * @returns {Promise<Object>} Object with key-value pairs
+   */
+  async mget(keys) {
+    try {
+      const client = getRedis();
+      const values = await client.mget(...keys);
+
+      const result = {};
+      keys.forEach((key, index) => {
+        try {
+          result[key] = values[index] ? JSON.parse(values[index]) : null;
+        } catch (error) {
+          result[key] = null;
+        }
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('Cache mget error:', error);
+      return {};
+    }
+  },
+
+  /**
+   * Set multiple key-value pairs at once
+   * @param {Object} keyValuePairs - Object with key-value pairs
+   * @param {number} ttl - Time to live in seconds (applied to all keys)
+   * @returns {Promise<boolean>} Success status
+   */
+  async mset(keyValuePairs, ttl = null) {
+    try {
+      const client = getRedis();
+      const cacheTTL = ttl || parseInt(process.env.REDIS_TTL || '300', 10);
+
+      // Use pipeline for efficiency
+      const pipeline = client.pipeline();
+
+      Object.entries(keyValuePairs).forEach(([key, value]) => {
+        const stringValue = JSON.stringify(value);
+        pipeline.set(key, stringValue, 'EX', cacheTTL);
+      });
+
+      await pipeline.exec();
+      return true;
+    } catch (error) {
+      logger.error('Cache mset error:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Get all keys matching a pattern using SCAN (non-blocking)
+   * @param {string} pattern - Key pattern (e.g., 'user:*')
+   * @param {number} limit - Maximum number of keys to return (default: 1000)
+   * @returns {Promise<Array<string>>} Array of matching keys
+   */
+  async scanKeys(pattern, limit = 1000) {
+    try {
+      const client = getRedis();
+      const keys = [];
+      const batchSize = 100;
+
+      const stream = client.scanStream({
+        match: pattern,
+        count: batchSize,
+      });
+
+      for await (const batch of stream) {
+        keys.push(...batch);
+        if (keys.length >= limit) {
+          stream.destroy(); // Stop scanning once limit is reached
+          break;
+        }
+      }
+
+      return keys.slice(0, limit);
+    } catch (error) {
+      logger.error('Cache scanKeys error:', error);
+      return [];
+    }
   },
 };
 
