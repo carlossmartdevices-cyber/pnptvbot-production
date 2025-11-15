@@ -1,16 +1,15 @@
 const { Markup } = require('telegraf');
-const { Configuration, OpenAIApi } = require('openai');
+const OpenAI = require('openai');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 
 let openai = null;
 
-// Initialize OpenAI
+// Initialize OpenAI (v4 API)
 if (process.env.OPENAI_API_KEY) {
-  const configuration = new Configuration({
+  openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });
-  openai = new OpenAIApi(configuration);
 }
 
 /**
@@ -132,7 +131,7 @@ const registerSupportHandlers = (bot) => {
         // Send to OpenAI
         if (openai) {
           try {
-            const response = await openai.createChatCompletion({
+            const response = await openai.chat.completions.create({
               model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
               messages: [
                 {
@@ -147,7 +146,7 @@ const registerSupportHandlers = (bot) => {
               max_tokens: parseInt(process.env.OPENAI_MAX_TOKENS || '500', 10),
             });
 
-            const aiResponse = response.data.choices[0].message.content;
+            const aiResponse = response.choices[0].message.content;
             await ctx.reply(`🤖 Cristina: ${aiResponse}\n\n_Type "exit" to end chat_`);
           } catch (aiError) {
             logger.error('OpenAI error:', aiError);
