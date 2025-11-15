@@ -3,6 +3,7 @@ const UserService = require('../../services/userService');
 const { t } = require('../../../utils/i18n');
 const { isValidEmail } = require('../../../utils/validation');
 const logger = require('../../../utils/logger');
+const { getLanguage } = require('../../utils/helpers');
 
 /**
  * Onboarding handlers
@@ -49,7 +50,7 @@ const registerOnboardingHandlers = (bot) => {
   // Age confirmation
   bot.action('age_confirm_yes', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp.ageConfirmed = true;
 
       await ctx.editMessageText(t('termsAccepted', lang));
@@ -63,7 +64,7 @@ const registerOnboardingHandlers = (bot) => {
 
   bot.action('age_confirm_no', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       await ctx.editMessageText(t('underAge', lang));
     } catch (error) {
       logger.error('Error in age rejection:', error);
@@ -73,7 +74,7 @@ const registerOnboardingHandlers = (bot) => {
   // Terms acceptance
   bot.action('accept_terms', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp.termsAccepted = true;
 
       await ctx.editMessageText(t('termsAccepted', lang));
@@ -96,7 +97,7 @@ const registerOnboardingHandlers = (bot) => {
 
   bot.action('provide_email', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp.waitingForEmail = true;
       await ctx.saveSession();
 
@@ -112,7 +113,7 @@ const registerOnboardingHandlers = (bot) => {
   bot.on('text', async (ctx, next) => {
     if (ctx.session.temp?.waitingForEmail) {
       const email = ctx.message.text.trim();
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       if (isValidEmail(email)) {
         ctx.session.temp.email = email;
@@ -152,7 +153,7 @@ const showLanguageSelection = async (ctx) => {
  * @param {Context} ctx - Telegraf context
  */
 const showAgeConfirmation = async (ctx) => {
-  const lang = ctx.session.language || 'en';
+  const lang = getLanguage(ctx);
 
   await ctx.reply(
     t('ageConfirmation', lang),
@@ -168,7 +169,7 @@ const showAgeConfirmation = async (ctx) => {
  * @param {Context} ctx - Telegraf context
  */
 const showTermsAndPrivacy = async (ctx) => {
-  const lang = ctx.session.language || 'en';
+  const lang = getLanguage(ctx);
 
   await ctx.reply(
     t('termsAndPrivacy', lang) + '\n\n📄 Terms: https://pnptv.com/terms\n🔒 Privacy: https://pnptv.com/privacy',
@@ -183,7 +184,7 @@ const showTermsAndPrivacy = async (ctx) => {
  * @param {Context} ctx - Telegraf context
  */
 const showEmailPrompt = async (ctx) => {
-  const lang = ctx.session.language || 'en';
+  const lang = getLanguage(ctx);
 
   await ctx.reply(
     t('emailPrompt', lang),
@@ -200,7 +201,7 @@ const showEmailPrompt = async (ctx) => {
  */
 const completeOnboarding = async (ctx) => {
   try {
-    const lang = ctx.session.language || 'en';
+    const lang = getLanguage(ctx);
     const userId = ctx.from.id;
 
     // Update user profile
@@ -223,12 +224,6 @@ const completeOnboarding = async (ctx) => {
     logger.error('Error completing onboarding:', error);
     await ctx.reply('An error occurred. Please try /start again.');
   }
-};
-
-// Helper function placeholder (will be in menu.js)
-const showMainMenu = async (ctx) => {
-  const lang = ctx.session.language || 'en';
-  await ctx.reply(t('mainMenuIntro', lang) + '\n\nUse /menu to see options.');
 };
 
 module.exports = registerOnboardingHandlers;

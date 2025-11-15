@@ -3,6 +3,7 @@ const UserService = require('../../services/userService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const moment = require('moment');
+const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
 /**
  * Profile handlers
@@ -21,7 +22,7 @@ const registerProfileHandlers = (bot) => {
   // Edit profile actions
   bot.action('edit_photo', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp.waitingForPhoto = true;
       await ctx.saveSession();
 
@@ -33,7 +34,7 @@ const registerProfileHandlers = (bot) => {
 
   bot.action('edit_bio', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp.waitingForBio = true;
       await ctx.saveSession();
 
@@ -45,7 +46,7 @@ const registerProfileHandlers = (bot) => {
 
   bot.action('edit_location', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp.waitingForLocation = true;
       await ctx.saveSession();
 
@@ -62,7 +63,7 @@ const registerProfileHandlers = (bot) => {
 
   bot.action('edit_interests', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp.waitingForInterests = true;
       await ctx.saveSession();
 
@@ -76,7 +77,7 @@ const registerProfileHandlers = (bot) => {
   bot.on('photo', async (ctx, next) => {
     if (ctx.session.temp?.waitingForPhoto) {
       try {
-        const lang = ctx.session.language || 'en';
+        const lang = getLanguage(ctx);
         const photo = ctx.message.photo[ctx.message.photo.length - 1];
 
         await UserService.updateProfile(ctx.from.id, {
@@ -101,7 +102,7 @@ const registerProfileHandlers = (bot) => {
   bot.on('location', async (ctx, next) => {
     if (ctx.session.temp?.waitingForLocation) {
       try {
-        const lang = ctx.session.language || 'en';
+        const lang = getLanguage(ctx);
         const { latitude, longitude } = ctx.message.location;
 
         const result = await UserService.updateLocation(ctx.from.id, {
@@ -133,8 +134,13 @@ const registerProfileHandlers = (bot) => {
 
     if (temp?.waitingForBio) {
       try {
-        const lang = ctx.session.language || 'en';
-        const bio = ctx.message.text.substring(0, 500);
+        const lang = getLanguage(ctx);
+        const bio = validateUserInput(ctx.message.text, 500);
+
+        if (!bio) {
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
 
         await UserService.updateProfile(ctx.from.id, { bio });
 
@@ -151,12 +157,24 @@ const registerProfileHandlers = (bot) => {
 
     if (temp?.waitingForInterests) {
       try {
-        const lang = ctx.session.language || 'en';
-        const interests = ctx.message.text
+        const lang = getLanguage(ctx);
+        const inputText = validateUserInput(ctx.message.text, 500);
+
+        if (!inputText) {
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
+
+        const interests = inputText
           .split(',')
           .map((i) => i.trim())
           .filter((i) => i.length > 0)
           .slice(0, 10);
+
+        if (interests.length === 0) {
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
 
         await UserService.updateProfile(ctx.from.id, { interests });
 
@@ -182,7 +200,7 @@ const registerProfileHandlers = (bot) => {
  */
 const showProfile = async (ctx, edit = true) => {
   try {
-    const lang = ctx.session.language || 'en';
+    const lang = getLanguage(ctx);
     const user = await UserService.getOrCreateFromContext(ctx);
 
     let profileText = `${t('profileTitle', lang)}\n\n`;
