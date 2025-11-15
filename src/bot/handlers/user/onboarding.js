@@ -113,18 +113,33 @@ const registerOnboardingHandlers = (bot) => {
   // Listen for email input
   bot.on('text', async (ctx, next) => {
     if (ctx.session.temp?.waitingForEmail) {
-      const email = ctx.message.text.trim();
       const lang = getLanguage(ctx);
 
-      if (isValidEmail(email)) {
-        ctx.session.temp.email = email;
+      // Validate message text exists
+      if (!ctx.message?.text) {
+        logger.warn('Email handler received message without text');
+        await ctx.reply(t('invalidInput', lang) + '\nPlease send a valid email address.');
+        return;
+      }
+
+      // Normalize email: trim, lowercase, check length
+      const rawEmail = ctx.message.text.trim().toLowerCase();
+
+      // Check email length (emails shouldn't exceed 254 characters per RFC)
+      if (rawEmail.length > 254 || rawEmail.length < 5) {
+        await ctx.reply(t('invalidInput', lang) + '\nEmail must be between 5 and 254 characters.');
+        return;
+      }
+
+      if (isValidEmail(rawEmail)) {
+        ctx.session.temp.email = rawEmail;
         ctx.session.temp.waitingForEmail = false;
         await ctx.saveSession();
 
         await ctx.reply(t('emailReceived', lang));
         await completeOnboarding(ctx);
       } else {
-        await ctx.reply(t('invalidInput', lang) + '\nPlease send a valid email address.');
+        await ctx.reply(t('invalidInput', lang) + '\nPlease send a valid email address (e.g., user@example.com).');
       }
       return;
     }

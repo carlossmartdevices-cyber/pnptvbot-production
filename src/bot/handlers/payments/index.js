@@ -72,6 +72,14 @@ const registerPaymentHandlers = (bot) => {
     try {
       const planId = ctx.match[1];
       const lang = getLanguage(ctx);
+
+      // Validate user context exists
+      if (!ctx.from?.id) {
+        logger.error('Missing user context in ePayco payment');
+        await ctx.reply(t('error', lang));
+        return;
+      }
+
       const userId = ctx.from.id;
 
       await ctx.editMessageText(t('loading', lang));
@@ -108,6 +116,14 @@ const registerPaymentHandlers = (bot) => {
     try {
       const planId = ctx.match[1];
       const lang = getLanguage(ctx);
+
+      // Validate user context exists
+      if (!ctx.from?.id) {
+        logger.error('Missing user context in Daimo payment');
+        await ctx.reply(t('error', lang));
+        return;
+      }
+
       const userId = ctx.from.id;
 
       await ctx.editMessageText(t('loading', lang));

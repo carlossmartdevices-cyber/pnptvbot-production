@@ -35,6 +35,14 @@ const registerNearbyHandlers = (bot) => {
     try {
       const radius = parseInt(ctx.match[1], 10);
       const lang = getLanguage(ctx);
+
+      // Validate user context exists
+      if (!ctx.from?.id) {
+        logger.error('Missing user context in nearby users search');
+        await ctx.reply(t('error', lang));
+        return;
+      }
+
       const userId = ctx.from.id;
 
       await ctx.editMessageText(t('loading', lang));
