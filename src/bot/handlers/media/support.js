@@ -2,6 +2,7 @@ const { Markup } = require('telegraf');
 const OpenAI = require('openai');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
+const { getLanguage } = require('../../utils/helpers');
 
 let openai = null;
 
@@ -20,7 +21,7 @@ const registerSupportHandlers = (bot) => {
   // Show support menu
   bot.action('show_support', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
         t('supportTitle', lang),
@@ -39,7 +40,7 @@ const registerSupportHandlers = (bot) => {
   // AI Chat
   bot.action('support_ai_chat', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp.aiChatActive = true;
       await ctx.saveSession();
 
@@ -57,7 +58,7 @@ const registerSupportHandlers = (bot) => {
   // Contact Admin
   bot.action('support_contact_admin', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp.contactingAdmin = true;
       await ctx.saveSession();
 
@@ -75,7 +76,7 @@ const registerSupportHandlers = (bot) => {
   // FAQ
   bot.action('support_faq', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       const faq = lang === 'es'
         ? `❓ Preguntas Frecuentes:\n\n` +
@@ -112,7 +113,7 @@ const registerSupportHandlers = (bot) => {
   bot.on('text', async (ctx, next) => {
     if (ctx.session.temp?.aiChatActive) {
       try {
-        const lang = ctx.session.language || 'en';
+        const lang = getLanguage(ctx);
         const userMessage = ctx.message.text;
 
         // Exit AI chat
@@ -166,7 +167,7 @@ const registerSupportHandlers = (bot) => {
 
     if (ctx.session.temp?.contactingAdmin) {
       try {
-        const lang = ctx.session.language || 'en';
+        const lang = getLanguage(ctx);
         const message = ctx.message.text;
 
         // Send to admin users
@@ -203,7 +204,7 @@ const registerSupportHandlers = (bot) => {
   // Support command
   bot.command('support', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.reply(
         t('supportTitle', lang),

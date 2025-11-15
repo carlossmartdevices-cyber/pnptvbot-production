@@ -5,6 +5,7 @@ const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
+const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
 /**
  * Admin handlers
@@ -15,11 +16,11 @@ const registerAdminHandlers = (bot) => {
   bot.command('admin', async (ctx) => {
     try {
       if (!UserService.isAdmin(ctx.from.id)) {
-        await ctx.reply(t('unauthorized', ctx.session.language || 'en'));
+        await ctx.reply(t('unauthorized', getLanguage(ctx)));
         return;
       }
 
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.reply(
         t('adminPanel', lang),
@@ -39,11 +40,11 @@ const registerAdminHandlers = (bot) => {
   bot.command('stats', async (ctx) => {
     try {
       if (!UserService.isAdmin(ctx.from.id)) {
-        await ctx.reply(t('unauthorized', ctx.session.language || 'en'));
+        await ctx.reply(t('unauthorized', getLanguage(ctx)));
         return;
       }
 
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       // Get comprehensive statistics
       const userStats = await UserService.getStatistics();
@@ -100,7 +101,7 @@ const registerAdminHandlers = (bot) => {
     try {
       if (!UserService.isAdmin(ctx.from.id)) return;
 
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp.adminSearchingUser = true;
       await ctx.saveSession();
 
@@ -120,7 +121,7 @@ const registerAdminHandlers = (bot) => {
     try {
       if (!UserService.isAdmin(ctx.from.id)) return;
 
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
         t('broadcastTarget', lang),
@@ -142,7 +143,7 @@ const registerAdminHandlers = (bot) => {
       if (!UserService.isAdmin(ctx.from.id)) return;
 
       const target = ctx.match[1];
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       ctx.session.temp.broadcastTarget = target;
       ctx.session.temp.waitingForBroadcast = true;
@@ -164,7 +165,7 @@ const registerAdminHandlers = (bot) => {
     try {
       if (!UserService.isAdmin(ctx.from.id)) return;
 
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       const plans = await PlanModel.getAll();
 
       let message = `${t('planManagement', lang)}\n\n`;
@@ -189,7 +190,7 @@ const registerAdminHandlers = (bot) => {
     try {
       if (!UserService.isAdmin(ctx.from.id)) return;
 
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       // Get statistics
       const userStats = await UserService.getStatistics();
@@ -225,7 +226,7 @@ const registerAdminHandlers = (bot) => {
     try {
       if (!UserService.isAdmin(ctx.from.id)) return;
 
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp = {};
       await ctx.saveSession();
 
@@ -252,7 +253,7 @@ const registerAdminHandlers = (bot) => {
     // User search
     if (ctx.session.temp?.adminSearchingUser) {
       try {
-        const lang = ctx.session.language || 'en';
+        const lang = getLanguage(ctx);
         const query = ctx.message.text;
 
         let user = null;
@@ -290,7 +291,7 @@ const registerAdminHandlers = (bot) => {
     // Broadcast message
     if (ctx.session.temp?.waitingForBroadcast) {
       try {
-        const lang = ctx.session.language || 'en';
+        const lang = getLanguage(ctx);
         const message = ctx.message.text;
         const target = ctx.session.temp.broadcastTarget;
 
@@ -342,7 +343,7 @@ const registerAdminHandlers = (bot) => {
       if (!UserService.isAdmin(ctx.from.id)) return;
 
       const userId = ctx.session.temp.selectedUserId;
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       // Extend by 30 days
       const newExpiry = new Date();
@@ -373,7 +374,7 @@ const registerAdminHandlers = (bot) => {
       if (!UserService.isAdmin(ctx.from.id)) return;
 
       const userId = ctx.session.temp.selectedUserId;
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await UserModel.updateSubscription(userId, {
         status: 'deactivated',
