@@ -1,4 +1,4 @@
-require('dotenv-safe').config();
+require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const express = require('express');
 const { initializeFirebase } = require('../../config/firebase');
@@ -19,22 +19,49 @@ const registerMediaHandlers = require('../handlers/media');
 const apiApp = require('../api/routes');
 
 /**
+ * Validate critical environment variables
+ */
+const validateCriticalEnvVars = () => {
+  const criticalVars = ['BOT_TOKEN', 'FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL'];
+  const missing = criticalVars.filter((varName) => !process.env[varName]);
+
+  if (missing.length > 0) {
+    logger.error(`Missing critical environment variables: ${missing.join(', ')}`);
+    logger.error('Please configure these variables in your .env file');
+    throw new Error(`Missing critical environment variables: ${missing.join(', ')}`);
+  }
+};
+
+/**
  * Initialize and start the bot
  */
 const startBot = async () => {
   try {
     logger.info('Starting PNPtv Telegram Bot...');
 
-    // Initialize Sentry
+    // Validate critical environment variables
+    validateCriticalEnvVars();
+    logger.info('✓ Environment variables validated');
+
+    // Initialize Sentry (optional)
     initSentry();
 
     // Initialize Firebase
-    initializeFirebase();
-    logger.info('✓ Firebase initialized');
+    try {
+      initializeFirebase();
+      logger.info('✓ Firebase initialized');
+    } catch (error) {
+      logger.error('Failed to initialize Firebase. Please check your Firebase credentials.');
+      throw error;
+    }
 
-    // Initialize Redis
-    initializeRedis();
-    logger.info('✓ Redis initialized');
+    // Initialize Redis (optional, will use default localhost if not configured)
+    try {
+      initializeRedis();
+      logger.info('✓ Redis initialized');
+    } catch (error) {
+      logger.warn('Redis initialization failed, continuing without cache:', error.message);
+    }
 
     // Create bot instance
     const bot = new Telegraf(process.env.BOT_TOKEN);

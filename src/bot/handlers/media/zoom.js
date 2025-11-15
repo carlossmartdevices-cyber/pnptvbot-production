@@ -159,6 +159,18 @@ const registerZoomHandlers = (bot) => {
 const createZoomMeeting = async (ctx) => {
   try {
     const lang = ctx.session.language || 'en';
+
+    // Check if Zoom is configured
+    if (!process.env.ZOOM_API_KEY || !process.env.ZOOM_API_SECRET) {
+      await ctx.editMessageText(
+        'Zoom integration is not configured yet. Please contact support.',
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('back', lang), 'show_zoom')],
+        ]),
+      );
+      return;
+    }
+
     const roomName = ctx.session.temp.zoomRoomName;
     const privacy = ctx.session.temp.zoomRoomPrivacy;
 
@@ -218,6 +230,10 @@ const createZoomMeeting = async (ctx) => {
  * @returns {string} JWT token
  */
 const generateZoomToken = () => {
+  if (!process.env.ZOOM_API_KEY || !process.env.ZOOM_API_SECRET) {
+    throw new Error('Zoom API credentials not configured');
+  }
+
   const payload = {
     iss: process.env.ZOOM_API_KEY,
     exp: Date.now() + 5000,
