@@ -3,6 +3,7 @@ const PaymentService = require('../../services/paymentService');
 const PlanModel = require('../../../models/planModel');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
+const { getLanguage } = require('../../utils/helpers');
 
 /**
  * Payment handlers
@@ -12,7 +13,7 @@ const registerPaymentHandlers = (bot) => {
   // Show subscription plans
   bot.action('show_subscription_plans', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       const plans = await PlanModel.getAll();
 
       let message = t('subscriptionPlans', lang) + '\n\n';
@@ -48,7 +49,7 @@ const registerPaymentHandlers = (bot) => {
   bot.action(/^select_plan_(.+)$/, async (ctx) => {
     try {
       const planId = ctx.match[1];
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       ctx.session.temp.selectedPlan = planId;
       await ctx.saveSession();
@@ -70,7 +71,7 @@ const registerPaymentHandlers = (bot) => {
   bot.action(/^pay_epayco_(.+)$/, async (ctx) => {
     try {
       const planId = ctx.match[1];
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       const userId = ctx.from.id;
 
       await ctx.editMessageText(t('loading', lang));
@@ -106,7 +107,7 @@ const registerPaymentHandlers = (bot) => {
   bot.action(/^pay_daimo_(.+)$/, async (ctx) => {
     try {
       const planId = ctx.match[1];
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       const userId = ctx.from.id;
 
       await ctx.editMessageText(t('loading', lang));

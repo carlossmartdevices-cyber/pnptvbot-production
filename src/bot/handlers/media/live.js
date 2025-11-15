@@ -2,6 +2,7 @@ const { Markup } = require('telegraf');
 const { t } = require('../../../utils/i18n');
 const UserService = require('../../services/userService');
 const logger = require('../../../utils/logger');
+const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
 /**
  * Live streaming handlers
@@ -11,7 +12,7 @@ const registerLiveHandlers = (bot) => {
   // Show live streams menu
   bot.action('show_live', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
         t('liveTitle', lang),
@@ -30,7 +31,7 @@ const registerLiveHandlers = (bot) => {
   // Start live stream
   bot.action('live_start', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       const hasSubscription = await UserService.hasActiveSubscription(ctx.from.id);
 
       if (!hasSubscription) {
@@ -62,7 +63,7 @@ const registerLiveHandlers = (bot) => {
   // View active streams
   bot.action('live_view', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       // In production, fetch from database
       const activeStreams = [
@@ -105,7 +106,7 @@ const registerLiveHandlers = (bot) => {
   // My streams
   bot.action('live_my_streams', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
         `${t('myStreams', lang)}\n\nYour stream history will appear here.`,
@@ -122,7 +123,7 @@ const registerLiveHandlers = (bot) => {
   bot.action(/^live_join_(.+)$/, async (ctx) => {
     try {
       const streamId = ctx.match[1];
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       // In production, generate Agora token and stream URL
       const streamUrl = `https://stream.pnptv.com/live/${streamId}`;
@@ -143,11 +144,18 @@ const registerLiveHandlers = (bot) => {
   bot.on('text', async (ctx, next) => {
     if (ctx.session.temp?.creatingLiveStream) {
       try {
-        const lang = ctx.session.language || 'en';
+        const lang = getLanguage(ctx);
         const step = ctx.session.temp.liveStreamStep;
 
         if (step === 'title') {
-          ctx.session.temp.liveStreamTitle = ctx.message.text;
+          const title = validateUserInput(ctx.message.text, 100);
+
+          if (!title) {
+            await ctx.reply(t('invalidInput', lang) + '\n' + t('enterStreamTitle', lang));
+            return;
+          }
+
+          ctx.session.temp.liveStreamTitle = title;
           ctx.session.temp.liveStreamStep = 'paid';
           await ctx.saveSession();
 
@@ -187,7 +195,7 @@ const registerLiveHandlers = (bot) => {
   // Handle paid/free selection
   bot.action('live_paid_yes', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp.liveStreamIsPaid = true;
       ctx.session.temp.liveStreamStep = 'price';
       await ctx.saveSession();
@@ -222,7 +230,7 @@ const registerLiveHandlers = (bot) => {
  */
 const createLiveStream = async (ctx) => {
   try {
-    const lang = ctx.session.language || 'en';
+    const lang = getLanguage(ctx);
     const title = ctx.session.temp.liveStreamTitle;
     const isPaid = ctx.session.temp.liveStreamIsPaid;
     const price = ctx.session.temp.liveStreamPrice || 0;
@@ -253,7 +261,7 @@ const createLiveStream = async (ctx) => {
     });
   } catch (error) {
     logger.error('Error creating live stream:', error);
-    const lang = ctx.session.language || 'en';
+    const lang = getLanguage(ctx);
     await ctx.reply(t('error', lang));
   }
 };

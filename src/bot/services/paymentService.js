@@ -440,10 +440,11 @@ class PaymentService {
 
       if (!secret) {
         logger.error('CRITICAL: DAIMO_WEBHOOK_SECRET not configured - webhook signature verification failed');
-        if (process.env.NODE_ENV === 'production') {
-          throw new ConfigurationError('DAIMO_WEBHOOK_SECRET must be configured in production');
+        // Only allow missing secret in local development
+        if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
+          throw new ConfigurationError('DAIMO_WEBHOOK_SECRET must be configured in production and staging');
         }
-        logger.warn('Development mode: allowing webhook without verification');
+        logger.warn('Development mode: allowing webhook without verification (INSECURE - only for local development)');
         return true;
       }
 
@@ -480,10 +481,11 @@ class PaymentService {
 
       if (!secret) {
         logger.error('CRITICAL: EPAYCO_PRIVATE_KEY not configured - webhook signature verification failed');
-        if (process.env.NODE_ENV === 'production') {
-          throw new ConfigurationError('EPAYCO_PRIVATE_KEY must be configured in production');
+        // Only allow missing secret in local development
+        if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
+          throw new ConfigurationError('EPAYCO_PRIVATE_KEY must be configured in production and staging');
         }
-        logger.warn('Development mode: allowing webhook without verification');
+        logger.warn('Development mode: allowing webhook without verification (INSECURE - only for local development)');
         return true;
       }
 

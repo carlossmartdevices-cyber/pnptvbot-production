@@ -1,6 +1,7 @@
 const { Markup } = require('telegraf');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
+const { getLanguage } = require('../../utils/helpers');
 
 /**
  * Radio handlers
@@ -10,7 +11,7 @@ const registerRadioHandlers = (bot) => {
   // Show radio menu
   bot.action('show_radio', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
         t('radioTitle', lang),
@@ -30,7 +31,7 @@ const registerRadioHandlers = (bot) => {
   // Listen now
   bot.action('radio_listen', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       const streamUrl = process.env.RADIO_STREAM_URL || 'https://stream.pnptv.com/radio';
 
       await ctx.editMessageText(
@@ -48,7 +49,7 @@ const registerRadioHandlers = (bot) => {
   // Request song
   bot.action('radio_request', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
       ctx.session.temp.waitingForSongRequest = true;
       await ctx.saveSession();
 
@@ -66,7 +67,7 @@ const registerRadioHandlers = (bot) => {
   // Now playing
   bot.action('radio_now_playing', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       // In production, fetch from radio API
       const nowPlaying = {
@@ -90,7 +91,7 @@ const registerRadioHandlers = (bot) => {
   // Radio schedule
   bot.action('radio_schedule', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
         `${t('radioSchedule', lang)}\n\n` +
@@ -112,7 +113,7 @@ const registerRadioHandlers = (bot) => {
   bot.on('text', async (ctx, next) => {
     if (ctx.session.temp?.waitingForSongRequest) {
       try {
-        const lang = ctx.session.language || 'en';
+        const lang = getLanguage(ctx);
         const songName = ctx.message.text;
 
         // In production, save to queue
