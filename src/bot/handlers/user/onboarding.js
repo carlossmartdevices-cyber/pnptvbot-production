@@ -32,6 +32,13 @@ const registerOnboardingHandlers = (bot) => {
   // Language selection
   bot.action(/^set_lang_(.+)$/, async (ctx) => {
     try {
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid language selection format');
+        await ctx.reply('An error occurred. Please try /start again.');
+        return;
+      }
+
       const lang = ctx.match[1];
       ctx.session.language = lang;
       await ctx.saveSession();

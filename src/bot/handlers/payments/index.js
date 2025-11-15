@@ -48,6 +48,12 @@ const registerPaymentHandlers = (bot) => {
   // Select plan
   bot.action(/^select_plan_(.+)$/, async (ctx) => {
     try {
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid plan selection action format');
+        return;
+      }
+
       const planId = ctx.match[1];
       const lang = getLanguage(ctx);
 
@@ -70,6 +76,12 @@ const registerPaymentHandlers = (bot) => {
   // Pay with ePayco
   bot.action(/^pay_epayco_(.+)$/, async (ctx) => {
     try {
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid ePayco payment action format');
+        return;
+      }
+
       const planId = ctx.match[1];
       const lang = getLanguage(ctx);
 
@@ -114,6 +126,12 @@ const registerPaymentHandlers = (bot) => {
   // Pay with Daimo
   bot.action(/^pay_daimo_(.+)$/, async (ctx) => {
     try {
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid Daimo payment action format');
+        return;
+      }
+
       const planId = ctx.match[1];
       const lang = getLanguage(ctx);
 

@@ -122,6 +122,12 @@ const registerLiveHandlers = (bot) => {
   // Join stream
   bot.action(/^live_join_(.+)$/, async (ctx) => {
     try {
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid stream join action format');
+        return;
+      }
+
       const streamId = ctx.match[1];
       const lang = getLanguage(ctx);
 
