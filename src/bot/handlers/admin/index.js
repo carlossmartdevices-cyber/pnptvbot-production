@@ -1,0 +1,338 @@
+const { Markup } = require('telegraf');
+const UserService = require('../../services/userService');
+const UserModel = require('../../../models/userModel');
+const PaymentModel = require('../../../models/paymentModel');
+const PlanModel = require('../../../models/planModel');
+const { t } = require('../../../utils/i18n');
+const logger = require('../../../utils/logger');
+
+/**
+ * Admin handlers
+ * @param {Telegraf} bot - Bot instance
+ */
+const registerAdminHandlers = (bot) => {
+  // Admin command
+  bot.command('admin', async (ctx) => {
+    try {
+      if (!UserService.isAdmin(ctx.from.id)) {
+        await ctx.reply(t('unauthorized', ctx.session.language || 'en'));
+        return;
+      }
+
+      const lang = ctx.session.language || 'en';
+
+      await ctx.reply(
+        t('adminPanel', lang),
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('userManagement', lang), 'admin_users')],
+          [Markup.button.callback(t('broadcast', lang), 'admin_broadcast')],
+          [Markup.button.callback(t('planManagement', lang), 'admin_plans')],
+          [Markup.button.callback(t('analytics', lang), 'admin_analytics')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error in /admin command:', error);
+    }
+  });
+
+  // User management
+  bot.action('admin_users', async (ctx) => {
+    try {
+      if (!UserService.isAdmin(ctx.from.id)) return;
+
+      const lang = ctx.session.language || 'en';
+      ctx.session.temp.adminSearchingUser = true;
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        t('searchUser', lang),
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('cancel', lang), 'admin_cancel')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error in admin users:', error);
+    }
+  });
+
+  // Broadcast
+  bot.action('admin_broadcast', async (ctx) => {
+    try {
+      if (!UserService.isAdmin(ctx.from.id)) return;
+
+      const lang = ctx.session.language || 'en';
+
+      await ctx.editMessageText(
+        t('broadcastTarget', lang),
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('allUsers', lang), 'broadcast_all')],
+          [Markup.button.callback(t('premiumOnly', lang), 'broadcast_premium')],
+          [Markup.button.callback(t('freeOnly', lang), 'broadcast_free')],
+          [Markup.button.callback(t('cancel', lang), 'admin_cancel')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error in admin broadcast:', error);
+    }
+  });
+
+  // Broadcast target selection
+  bot.action(/^broadcast_(.+)$/, async (ctx) => {
+    try {
+      if (!UserService.isAdmin(ctx.from.id)) return;
+
+      const target = ctx.match[1];
+      const lang = ctx.session.language || 'en';
+
+      ctx.session.temp.broadcastTarget = target;
+      ctx.session.temp.waitingForBroadcast = true;
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        t('enterBroadcast', lang),
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('cancel', lang), 'admin_cancel')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error in broadcast target:', error);
+    }
+  });
+
+  // Plan management
+  bot.action('admin_plans', async (ctx) => {
+    try {
+      if (!UserService.isAdmin(ctx.from.id)) return;
+
+      const lang = ctx.session.language || 'en';
+      const plans = await PlanModel.getAll();
+
+      let message = `${t('planManagement', lang)}\n\n`;
+      plans.forEach((plan) => {
+        message += `💎 ${plan.name} - $${plan.price}/month\n`;
+      });
+
+      await ctx.editMessageText(
+        message,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('➕ Add Plan', 'admin_plan_add')],
+          [Markup.button.callback(t('back', lang), 'admin_cancel')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error in admin plans:', error);
+    }
+  });
+
+  // Analytics
+  bot.action('admin_analytics', async (ctx) => {
+    try {
+      if (!UserService.isAdmin(ctx.from.id)) return;
+
+      const lang = ctx.session.language || 'en';
+
+      // Get statistics
+      const userStats = await UserService.getStatistics();
+      const revenue = await PaymentModel.getRevenue(
+        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        new Date(),
+      );
+
+      const analytics = `${t('analytics', lang)}\n\n` +
+        `👥 Total Users: ${userStats.total}\n` +
+        `💎 Premium Users: ${userStats.active}\n` +
+        `🆓 Free Users: ${userStats.free}\n` +
+        `📈 Conversion Rate: ${userStats.conversionRate.toFixed(2)}%\n\n` +
+        `💰 Last 30 Days Revenue:\n` +
+        `Total: $${revenue.total.toFixed(2)}\n` +
+        `Payments: ${revenue.count}\n` +
+        `Average: $${revenue.average.toFixed(2)}`;
+
+      await ctx.editMessageText(
+        analytics,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('🔄 Refresh', 'admin_analytics')],
+          [Markup.button.callback(t('back', lang), 'admin_cancel')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error in admin analytics:', error);
+    }
+  });
+
+  // Admin cancel
+  bot.action('admin_cancel', async (ctx) => {
+    try {
+      if (!UserService.isAdmin(ctx.from.id)) return;
+
+      const lang = ctx.session.language || 'en';
+      ctx.session.temp = {};
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        t('adminPanel', lang),
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('userManagement', lang), 'admin_users')],
+          [Markup.button.callback(t('broadcast', lang), 'admin_broadcast')],
+          [Markup.button.callback(t('planManagement', lang), 'admin_plans')],
+          [Markup.button.callback(t('analytics', lang), 'admin_analytics')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error in admin cancel:', error);
+    }
+  });
+
+  // Handle admin text inputs
+  bot.on('text', async (ctx, next) => {
+    if (!UserService.isAdmin(ctx.from.id)) {
+      return next();
+    }
+
+    // User search
+    if (ctx.session.temp?.adminSearchingUser) {
+      try {
+        const lang = ctx.session.language || 'en';
+        const query = ctx.message.text;
+
+        let user = null;
+        if (!Number.isNaN(parseInt(query, 10))) {
+          user = await UserModel.getById(query);
+        }
+
+        if (!user) {
+          await ctx.reply(t('userNotFound', lang));
+          return;
+        }
+
+        ctx.session.temp.adminSearchingUser = false;
+        ctx.session.temp.selectedUserId = user.id;
+        await ctx.saveSession();
+
+        await ctx.reply(
+          `${t('userFound', lang)}\n\n` +
+          `👤 ${user.firstName || ''} ${user.lastName || ''}\n` +
+          `🆔 ${user.id}\n` +
+          `📧 ${user.email || 'N/A'}\n` +
+          `💎 Status: ${user.subscriptionStatus}`,
+          Markup.inlineKeyboard([
+            [Markup.button.callback(t('extendSubscription', lang), 'admin_extend_sub')],
+            [Markup.button.callback(t('deactivateUser', lang), 'admin_deactivate')],
+            [Markup.button.callback(t('back', lang), 'admin_cancel')],
+          ]),
+        );
+      } catch (error) {
+        logger.error('Error searching user:', error);
+      }
+      return;
+    }
+
+    // Broadcast message
+    if (ctx.session.temp?.waitingForBroadcast) {
+      try {
+        const lang = ctx.session.language || 'en';
+        const message = ctx.message.text;
+        const target = ctx.session.temp.broadcastTarget;
+
+        ctx.session.temp.waitingForBroadcast = false;
+        await ctx.saveSession();
+
+        // Get target users
+        let users = [];
+        if (target === 'all') {
+          const result = await UserModel.getAll(1000);
+          users = result.users;
+        } else if (target === 'premium') {
+          users = await UserModel.getBySubscriptionStatus('active');
+        } else if (target === 'free') {
+          users = await UserModel.getBySubscriptionStatus('free');
+        }
+
+        // Send broadcast
+        let sent = 0;
+        for (const user of users) {
+          try {
+            await ctx.telegram.sendMessage(user.id, `📢 ${message}`);
+            sent += 1;
+          } catch (sendError) {
+            logger.warn('Failed to send broadcast to user:', { userId: user.id });
+          }
+        }
+
+        await ctx.reply(
+          t('broadcastSent', lang, { count: sent }),
+          Markup.inlineKeyboard([
+            [Markup.button.callback(t('back', lang), 'admin_cancel')],
+          ]),
+        );
+
+        logger.info('Broadcast sent', { adminId: ctx.from.id, target, sent });
+      } catch (error) {
+        logger.error('Error sending broadcast:', error);
+      }
+      return;
+    }
+
+    return next();
+  });
+
+  // Extend subscription
+  bot.action('admin_extend_sub', async (ctx) => {
+    try {
+      if (!UserService.isAdmin(ctx.from.id)) return;
+
+      const userId = ctx.session.temp.selectedUserId;
+      const lang = ctx.session.language || 'en';
+
+      // Extend by 30 days
+      const newExpiry = new Date();
+      newExpiry.setDate(newExpiry.getDate() + 30);
+
+      await UserModel.updateSubscription(userId, {
+        status: 'active',
+        planId: 'premium',
+        expiry: newExpiry,
+      });
+
+      await ctx.editMessageText(
+        `✅ Subscription extended for user ${userId} until ${newExpiry.toLocaleDateString()}`,
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('back', lang), 'admin_cancel')],
+        ]),
+      );
+
+      logger.info('Subscription extended by admin', { adminId: ctx.from.id, userId });
+    } catch (error) {
+      logger.error('Error extending subscription:', error);
+    }
+  });
+
+  // Deactivate user
+  bot.action('admin_deactivate', async (ctx) => {
+    try {
+      if (!UserService.isAdmin(ctx.from.id)) return;
+
+      const userId = ctx.session.temp.selectedUserId;
+      const lang = ctx.session.language || 'en';
+
+      await UserModel.updateSubscription(userId, {
+        status: 'deactivated',
+        planId: null,
+        expiry: new Date(),
+      });
+
+      await ctx.editMessageText(
+        `✅ User ${userId} deactivated`,
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('back', lang), 'admin_cancel')],
+        ]),
+      );
+
+      logger.info('User deactivated by admin', { adminId: ctx.from.id, userId });
+    } catch (error) {
+      logger.error('Error deactivating user:', error);
+    }
+  });
+};
+
+module.exports = registerAdminHandlers;
