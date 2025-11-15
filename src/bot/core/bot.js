@@ -99,14 +99,22 @@ const startBot = async () => {
       await bot.telegram.setWebhook(webhookUrl);
       logger.info(`✓ Webhook set to: ${webhookUrl}`);
 
-      // Use Express for webhook
-      apiApp.use(bot.webhookCallback(webhookPath));
+      // Register webhook callback BEFORE 404 handler
+      // Use POST method for webhook endpoint
+      apiApp.post(webhookPath, bot.webhookCallback(webhookPath));
+      logger.info(`✓ Webhook callback registered at: ${webhookPath}`);
     } else {
       // Polling mode for development
       await bot.telegram.deleteWebhook();
       await bot.launch();
       logger.info('✓ Bot started in polling mode');
     }
+
+    // Add 404 and error handlers AFTER webhook callback
+    const { errorHandler, notFoundHandler } = require('../api/middleware/errorHandler');
+    apiApp.use(notFoundHandler);
+    apiApp.use(errorHandler);
+    logger.info('✓ Error handlers registered');
 
     // Start API server
     const PORT = process.env.PORT || 3000;

@@ -10,7 +10,7 @@ const logger = require('../../utils/logger');
 const webhookController = require('./controllers/webhookController');
 
 // Middleware
-const { errorHandler, notFoundHandler, asyncHandler } = require('./middleware/errorHandler');
+const { asyncHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
@@ -96,10 +96,6 @@ app.get('/api/stats', asyncHandler(async (req, res) => {
   res.json(stats);
 }));
 
-// 404 handler - must come after all routes
-app.use(notFoundHandler);
-
-// Centralized error handler - must be last
-app.use(errorHandler);
-
+// Export app WITHOUT 404/error handlers
+// These will be added in bot.js AFTER the webhook callback
 module.exports = app;
