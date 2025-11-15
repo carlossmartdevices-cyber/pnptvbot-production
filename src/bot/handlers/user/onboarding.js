@@ -4,6 +4,7 @@ const { t } = require('../../../utils/i18n');
 const { isValidEmail } = require('../../../utils/validation');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
+const { showMainMenu } = require('./menu');
 
 /**
  * Onboarding handlers
@@ -202,14 +203,28 @@ const showEmailPrompt = async (ctx) => {
 const completeOnboarding = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
+
+    // Validate user context exists
+    if (!ctx.from?.id) {
+      logger.error('Missing user context in onboarding completion');
+      await ctx.reply('An error occurred. Please try /start again.');
+      return;
+    }
+
     const userId = ctx.from.id;
 
     // Update user profile
-    await UserService.updateProfile(userId, {
+    const result = await UserService.updateProfile(userId, {
       language: lang,
-      email: ctx.session.temp.email || null,
+      email: ctx.session.temp?.email || null,
       onboardingComplete: true,
     });
+
+    if (!result.success) {
+      logger.error('Failed to update user profile:', result.error);
+      await ctx.reply('An error occurred. Please try /start again.');
+      return;
+    }
 
     // Clear temp session data
     ctx.session.temp = {};
@@ -218,7 +233,6 @@ const completeOnboarding = async (ctx) => {
     await ctx.reply(t('onboardingComplete', lang));
 
     // Show main menu
-    const { showMainMenu } = require('./menu');
     await showMainMenu(ctx);
   } catch (error) {
     logger.error('Error completing onboarding:', error);
