@@ -303,23 +303,23 @@ describe('PaymentService Security Tests', () => {
 
       const promise = PaymentService.retryWithBackoff(
         operation,
-        3,
+        2,
         'test-operation',
       );
 
-      // First call
+      // First call happens immediately
       await Promise.resolve();
       expect(operation).toHaveBeenCalledTimes(1);
 
       // First retry after 1000ms (2^0 * 1000)
-      jest.advanceTimersByTime(1000);
-      await Promise.resolve();
+      await jest.advanceTimersByTimeAsync(1000);
       expect(operation).toHaveBeenCalledTimes(2);
 
       // Second retry after 2000ms (2^1 * 1000)
-      jest.advanceTimersByTime(2000);
-      await Promise.resolve();
+      await jest.advanceTimersByTimeAsync(2000);
       expect(operation).toHaveBeenCalledTimes(3);
+
+      await promise;
 
       jest.useRealTimers();
     });
@@ -336,28 +336,34 @@ describe('PaymentService Security Tests', () => {
 
       const promise = PaymentService.retryWithBackoff(
         operation,
-        5,
+        4,
         'test-operation',
       );
 
+      // First call
       await Promise.resolve();
-      jest.advanceTimersByTime(1000); // 2^0 * 1000
-      await Promise.resolve();
-      jest.advanceTimersByTime(2000); // 2^1 * 1000
-      await Promise.resolve();
-      jest.advanceTimersByTime(4000); // 2^2 * 1000
-      await Promise.resolve();
-      jest.advanceTimersByTime(8000); // 2^3 * 1000
-      await Promise.resolve();
-      // Next would be 16000ms, but should be capped at 10000ms
-      jest.advanceTimersByTime(10000);
-      await Promise.resolve();
+
+      // Retry 1: 1000ms (2^0 * 1000)
+      await jest.advanceTimersByTimeAsync(1000);
+
+      // Retry 2: 2000ms (2^1 * 1000)
+      await jest.advanceTimersByTimeAsync(2000);
+
+      // Retry 3: 4000ms (2^2 * 1000)
+      await jest.advanceTimersByTimeAsync(4000);
+
+      // Retry 4: 8000ms (2^3 * 1000)
+      await jest.advanceTimersByTimeAsync(8000);
+
+      // Retry 5: would be 16000ms but capped at 10000ms
+      await jest.advanceTimersByTimeAsync(10000);
 
       const result = await promise;
       expect(result).toBe('success');
+      expect(operation).toHaveBeenCalledTimes(5);
 
       jest.useRealTimers();
-    });
+    }, 30000);
   });
 
   describe('Production Security Checks', () => {

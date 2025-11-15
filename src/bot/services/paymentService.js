@@ -459,6 +459,10 @@ class PaymentService {
 
       return signature === expectedSignature;
     } catch (error) {
+      // Re-throw configuration errors - these should not be caught
+      if (error.name === 'ConfigurationError' || error.message.includes('must be configured')) {
+        throw error;
+      }
       logger.error('Error verifying Daimo signature:', error);
       return false;
     }
@@ -500,6 +504,10 @@ class PaymentService {
 
       return x_signature === expectedSignature;
     } catch (error) {
+      // Re-throw configuration errors - these should not be caught
+      if (error.name === 'ConfigurationError' || error.message.includes('must be configured')) {
+        throw error;
+      }
       logger.error('Error verifying ePayco signature:', error);
       return false;
     }
