@@ -214,6 +214,56 @@ class PaymentModel {
       };
     }
   }
+
+  /**
+   * Get all payments with optional filters
+   * @param {Object} filters - { startDate, endDate, provider, status, limit }
+   * @returns {Promise<Array>} Payments
+   */
+  static async getAll(filters = {}) {
+    try {
+      const db = getFirestore();
+      let query = db.collection(COLLECTION);
+
+      // Apply filters
+      if (filters.status) {
+        query = query.where('status', '==', filters.status);
+      }
+
+      if (filters.provider) {
+        query = query.where('provider', '==', filters.provider);
+      }
+
+      if (filters.startDate) {
+        query = query.where('createdAt', '>=', filters.startDate);
+      }
+
+      if (filters.endDate) {
+        query = query.where('createdAt', '<=', filters.endDate);
+      }
+
+      // Order and limit
+      query = query.orderBy('createdAt', 'desc');
+
+      if (filters.limit) {
+        query = query.limit(filters.limit);
+      } else {
+        query = query.limit(1000); // Default max limit
+      }
+
+      const snapshot = await query.get();
+
+      const payments = [];
+      snapshot.forEach((doc) => {
+        payments.push({ id: doc.id, ...doc.data() });
+      });
+
+      return payments;
+    } catch (error) {
+      logger.error('Error getting all payments:', error);
+      return [];
+    }
+  }
 }
 
 module.exports = PaymentModel;
