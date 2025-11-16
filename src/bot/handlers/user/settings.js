@@ -50,6 +50,12 @@ const registerSettingsHandlers = (bot) => {
   // Change language
   bot.action(/^change_lang_(.+)$/, async (ctx) => {
     try {
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid language change action format');
+        return;
+      }
+
       const newLang = ctx.match[1];
       ctx.session.language = newLang;
       await ctx.saveSession();

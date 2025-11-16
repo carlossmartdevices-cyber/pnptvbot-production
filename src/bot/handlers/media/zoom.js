@@ -139,6 +139,12 @@ const registerZoomHandlers = (bot) => {
   // Handle privacy selection
   bot.action(/^zoom_privacy_(.+)$/, async (ctx) => {
     try {
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid zoom privacy action format');
+        return;
+      }
+
       const privacy = ctx.match[1];
       const lang = getLanguage(ctx);
 

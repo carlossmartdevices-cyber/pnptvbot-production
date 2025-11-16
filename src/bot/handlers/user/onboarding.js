@@ -14,7 +14,21 @@ const registerOnboardingHandlers = (bot) => {
   // Start command - begin onboarding or show main menu
   bot.command('start', async (ctx) => {
     try {
+      // Validate context has required data
+      if (!ctx.from?.id) {
+        logger.error('/start command called without user context');
+        await ctx.reply('An error occurred. Please try again.');
+        return;
+      }
+
       const user = await UserService.getOrCreateFromContext(ctx);
+
+      // Validate user was created/fetched successfully
+      if (!user) {
+        logger.error('/start command: Failed to get or create user', { userId: ctx.from.id });
+        await ctx.reply('An error occurred. Please try again in a few moments.');
+        return;
+      }
 
       if (user.onboardingComplete) {
         // User already onboarded, show main menu
@@ -32,6 +46,13 @@ const registerOnboardingHandlers = (bot) => {
   // Language selection
   bot.action(/^set_lang_(.+)$/, async (ctx) => {
     try {
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid language selection format');
+        await ctx.reply('An error occurred. Please try /start again.');
+        return;
+      }
+
       const lang = ctx.match[1];
       ctx.session.language = lang;
       await ctx.saveSession();
@@ -113,18 +134,33 @@ const registerOnboardingHandlers = (bot) => {
   // Listen for email input
   bot.on('text', async (ctx, next) => {
     if (ctx.session.temp?.waitingForEmail) {
-      const email = ctx.message.text.trim();
       const lang = getLanguage(ctx);
 
-      if (isValidEmail(email)) {
-        ctx.session.temp.email = email;
+      // Validate message text exists
+      if (!ctx.message?.text) {
+        logger.warn('Email handler received message without text');
+        await ctx.reply(t('invalidInput', lang) + '\nPlease send a valid email address.');
+        return;
+      }
+
+      // Normalize email: trim, lowercase, check length
+      const rawEmail = ctx.message.text.trim().toLowerCase();
+
+      // Check email length (emails shouldn't exceed 254 characters per RFC)
+      if (rawEmail.length > 254 || rawEmail.length < 5) {
+        await ctx.reply(t('invalidInput', lang) + '\nEmail must be between 5 and 254 characters.');
+        return;
+      }
+
+      if (isValidEmail(rawEmail)) {
+        ctx.session.temp.email = rawEmail;
         ctx.session.temp.waitingForEmail = false;
         await ctx.saveSession();
 
         await ctx.reply(t('emailReceived', lang));
         await completeOnboarding(ctx);
       } else {
-        await ctx.reply(t('invalidInput', lang) + '\nPlease send a valid email address.');
+        await ctx.reply(t('invalidInput', lang) + '\nPlease send a valid email address (e.g., user@example.com).');
       }
       return;
     }

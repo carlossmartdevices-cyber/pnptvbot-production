@@ -78,6 +78,14 @@ const registerProfileHandlers = (bot) => {
     if (ctx.session.temp?.waitingForPhoto) {
       try {
         const lang = getLanguage(ctx);
+
+        // Validate photo exists
+        if (!ctx.message?.photo || ctx.message.photo.length === 0) {
+          logger.warn('Photo handler triggered but no photo found');
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
+
         const photo = ctx.message.photo[ctx.message.photo.length - 1];
 
         await UserService.updateProfile(ctx.from.id, {
@@ -103,6 +111,14 @@ const registerProfileHandlers = (bot) => {
     if (ctx.session.temp?.waitingForLocation) {
       try {
         const lang = getLanguage(ctx);
+
+        // Validate location exists
+        if (!ctx.message?.location || !ctx.message.location.latitude || !ctx.message.location.longitude) {
+          logger.warn('Location handler triggered but no valid location found');
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
+
         const { latitude, longitude } = ctx.message.location;
 
         const result = await UserService.updateLocation(ctx.from.id, {

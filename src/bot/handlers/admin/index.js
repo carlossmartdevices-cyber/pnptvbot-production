@@ -142,6 +142,12 @@ const registerAdminHandlers = (bot) => {
     try {
       if (!UserService.isAdmin(ctx.from.id)) return;
 
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid broadcast target action format');
+        return;
+      }
+
       const target = ctx.match[1];
       const lang = getLanguage(ctx);
 

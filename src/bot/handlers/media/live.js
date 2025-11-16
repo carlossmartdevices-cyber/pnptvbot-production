@@ -122,6 +122,12 @@ const registerLiveHandlers = (bot) => {
   // Join stream
   bot.action(/^live_join_(.+)$/, async (ctx) => {
     try {
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid stream join action format');
+        return;
+      }
+
       const streamId = ctx.match[1];
       const lang = getLanguage(ctx);
 
@@ -231,7 +237,17 @@ const registerLiveHandlers = (bot) => {
 const createLiveStream = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
-    const title = ctx.session.temp.liveStreamTitle;
+
+    // Validate title exists
+    const title = ctx.session.temp?.liveStreamTitle;
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      logger.error('Missing or invalid live stream title');
+      await ctx.reply(t('error', lang) + '\nPlease try creating the stream again.');
+      ctx.session.temp.creatingLiveStream = false;
+      await ctx.saveSession();
+      return;
+    }
+
     const isPaid = ctx.session.temp.liveStreamIsPaid;
     const price = ctx.session.temp.liveStreamPrice || 0;
 

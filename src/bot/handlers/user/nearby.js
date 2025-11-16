@@ -35,6 +35,14 @@ const registerNearbyHandlers = (bot) => {
     try {
       const radius = parseInt(ctx.match[1], 10);
       const lang = getLanguage(ctx);
+
+      // Validate user context exists
+      if (!ctx.from?.id) {
+        logger.error('Missing user context in nearby users search');
+        await ctx.reply(t('error', lang));
+        return;
+      }
+
       const userId = ctx.from.id;
 
       await ctx.editMessageText(t('loading', lang));
@@ -81,6 +89,12 @@ const registerNearbyHandlers = (bot) => {
   // View user profile
   bot.action(/^view_user_(.+)$/, async (ctx) => {
     try {
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid view user action format');
+        return;
+      }
+
       const targetUserId = ctx.match[1];
       const lang = getLanguage(ctx);
 

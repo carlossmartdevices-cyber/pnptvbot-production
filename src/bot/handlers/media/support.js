@@ -114,6 +114,13 @@ const registerSupportHandlers = (bot) => {
     if (ctx.session.temp?.aiChatActive) {
       try {
         const lang = getLanguage(ctx);
+
+        // Validate message text exists
+        if (!ctx.message?.text) {
+          logger.warn('AI chat received message without text');
+          return next();
+        }
+
         const userMessage = ctx.message.text;
 
         // Exit AI chat
@@ -168,10 +175,25 @@ const registerSupportHandlers = (bot) => {
     if (ctx.session.temp?.contactingAdmin) {
       try {
         const lang = getLanguage(ctx);
+
+        // Validate message text exists
+        if (!ctx.message?.text) {
+          logger.warn('Contact admin received message without text');
+          return next();
+        }
+
         const message = ctx.message.text;
 
         // Send to admin users
-        const adminIds = process.env.ADMIN_USER_IDS?.split(',') || [];
+        const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter(id => id.trim()) || [];
+
+        if (adminIds.length === 0) {
+          logger.error('No admin users configured for support messages');
+          await ctx.reply('Support system not configured. Please contact us via email.');
+          ctx.session.temp.contactingAdmin = false;
+          return;
+        }
+
         for (const adminId of adminIds) {
           try {
             await ctx.telegram.sendMessage(
