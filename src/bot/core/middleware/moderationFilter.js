@@ -1,5 +1,5 @@
 const ModerationService = require('../../services/moderationService');
-const UserService = require('../../services/userService');
+const ChatCleanupService = require('../../services/chatCleanupService');
 const logger = require('../../../utils/logger');
 const { t } = require('../../../utils/i18n');
 
@@ -135,13 +135,7 @@ async function handleWarn(ctx, result, lang) {
     });
 
     // Delete warning message after 10 seconds
-    setTimeout(async () => {
-      try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-      } catch (error) {
-        logger.debug('Could not delete warning message:', error.message);
-      }
-    }, 10000);
+    ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 10000);
 
     // If user should be banned, kick them
     if (warningResult.shouldBan) {
@@ -194,13 +188,7 @@ async function handleWarnAndDelete(ctx, result, lang) {
     });
 
     // Delete warning message after 10 seconds
-    setTimeout(async () => {
-      try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-      } catch (error) {
-        logger.debug('Could not delete warning message:', error.message);
-      }
-    }, 10000);
+    ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 10000);
 
     // Try to send a private message to the user
     try {
@@ -265,13 +253,7 @@ async function kickUser(ctx, userId, groupId, reason, lang) {
     const sentMessage = await ctx.reply(kickMessage, { parse_mode: 'Markdown' });
 
     // Delete kick message after 30 seconds
-    setTimeout(async () => {
-      try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-      } catch (error) {
-        logger.debug('Could not delete kick message:', error.message);
-      }
-    }, 30000);
+    ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30000);
 
     logger.info('User kicked from group', { userId, groupId, reason });
   } catch (error) {

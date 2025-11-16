@@ -1,4 +1,5 @@
 const ModerationService = require('../../services/moderationService');
+const ChatCleanupService = require('../../services/chatCleanupService');
 const logger = require('../../../utils/logger');
 const { t } = require('../../../utils/i18n');
 
@@ -56,14 +57,7 @@ async function handleRules(ctx) {
 
     await ctx.reply(rulesMessage, { parse_mode: 'Markdown' });
 
-    // Delete command message after 5 seconds
-    setTimeout(async () => {
-      try {
-        await ctx.deleteMessage();
-      } catch (error) {
-        logger.debug('Could not delete rules command:', error.message);
-      }
-    }, 5000);
+    // Note: Both the command and bot reply will be auto-deleted by chatCleanupMiddleware after 5 minutes
 
     logger.info('Rules displayed', {
       userId: ctx.from.id,
@@ -127,21 +121,16 @@ async function handleMyWarnings(ctx) {
     try {
       await ctx.telegram.sendMessage(userId, message, { parse_mode: 'Markdown' });
 
-      // Delete command in group
-      await ctx.deleteMessage();
+      // Delete command in group (will be auto-deleted by chatCleanupMiddleware)
+      // No need to manually delete
     } catch (error) {
       // User hasn't started bot, send in group
       const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
 
-      // Delete both messages after 10 seconds
-      setTimeout(async () => {
-        try {
-          await ctx.deleteMessage();
-          await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-        } catch (err) {
-          logger.debug('Could not delete warnings messages:', err.message);
-        }
-      }, 10000);
+      // Delete reply after 10 seconds (faster than default 5 min)
+      ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 10000);
+
+      // Command will be auto-deleted by chatCleanupMiddleware after 5 minutes
     }
 
     logger.info('Warnings checked', {
