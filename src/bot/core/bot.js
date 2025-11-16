@@ -22,6 +22,14 @@ const registerModerationHandlers = require('../handlers/moderation');
 const registerModerationAdminHandlers = require('../handlers/moderation/adminCommands');
 const registerCallManagementHandlers = require('../handlers/admin/callManagement');
 const registerPrivateCallHandlers = require('../handlers/user/privateCalls');
+const registerPaymentHistoryHandlers = require('../handlers/user/paymentHistory');
+const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnalytics');
+const registerUserCallManagementHandlers = require('../handlers/user/callManagement');
+const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
+const registerCallPackageHandlers = require('../handlers/user/callPackages');
+
+// Services
+const CallReminderService = require('../services/callReminderService');
 
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
@@ -116,6 +124,15 @@ const startBot = async () => {
     registerModerationAdminHandlers(bot); // Admin moderation commands
     registerCallManagementHandlers(bot); // Admin call management
     registerPrivateCallHandlers(bot); // User private call booking
+    registerPaymentHistoryHandlers(bot); // User payment history and receipts
+    registerPaymentAnalyticsHandlers(bot); // Admin payment analytics dashboard
+    registerUserCallManagementHandlers(bot); // User call management (reschedule, cancel)
+    registerCallFeedbackHandlers(bot); // Post-call feedback and ratings
+    registerCallPackageHandlers(bot); // Call packages (bulk pricing)
+
+    // Initialize call reminder service (automated reminders)
+    CallReminderService.initialize(bot);
+    logger.info('✓ Call reminder service initialized');
 
     // Error handling
     bot.catch(errorHandler);
