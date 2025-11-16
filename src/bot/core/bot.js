@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
 const express = require('express');
 const { initializeFirebase } = require('../../config/firebase');
