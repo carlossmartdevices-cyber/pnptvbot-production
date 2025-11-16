@@ -150,7 +150,7 @@ function printEnvSummary() {
   console.log(`Bot Username: ${process.env.BOT_USERNAME || 'NOT SET'}`);
   console.log(`Webhook Mode: ${process.env.BOT_WEBHOOK_DOMAIN ? 'Yes' : 'No (polling)'}`);
   console.log(`Redis: ${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}`);
-  console.log(`\nFeature Configuration:`);
+  console.log('\nFeature Configuration:');
   console.log(`  - ePayco Payments: ${isFeatureEnabled('epayco') ? '✓' : '✗'}`);
   console.log(`  - Daimo Payments: ${isFeatureEnabled('daimo') ? '✓' : '✗'}`);
   console.log(`  - Sentry Monitoring: ${isFeatureEnabled('sentry') ? '✓' : '✗'}`);

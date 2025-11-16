@@ -241,9 +241,7 @@ class ModerationService {
 
         if (hasLinks) {
           // Check if any link is whitelisted
-          const hasAllowedLink = links.some((link) =>
-            this.isAllowedDomain(link, settings.allowedDomains)
-          );
+          const hasAllowedLink = links.some((link) => this.isAllowedDomain(link, settings.allowedDomains));
 
           if (!hasAllowedLink) {
             return {

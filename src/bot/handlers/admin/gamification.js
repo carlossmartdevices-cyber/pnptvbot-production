@@ -288,7 +288,7 @@ const showActivityStatistics = async (ctx) => {
     const allTimeBreakdown = await GamificationModel.getActivityBreakdown('alltime');
 
     let text = `📊 ${t('gamification.statistics', lang)}\n\n`;
-    text += `📅 **This Week:**\n`;
+    text += '📅 **This Week:**\n';
     text += `👥 Active Users: ${stats.activeUsersThisWeek}\n`;
     text += `💎 Total Points: ${weeklyBreakdown.totalPoints}\n`;
     text += `💬 Messages: ${weeklyBreakdown.totalMessages}\n`;
@@ -296,7 +296,7 @@ const showActivityStatistics = async (ctx) => {
     text += `👍 Likes: ${weeklyBreakdown.totalLikes}\n`;
     text += `🔄 Interactions: ${weeklyBreakdown.totalInteractions}\n\n`;
 
-    text += `🌍 **All Time:**\n`;
+    text += '🌍 **All Time:**\n';
     text += `💎 Total Points: ${allTimeBreakdown.totalPoints}\n`;
     text += `💬 Messages: ${allTimeBreakdown.totalMessages}\n`;
     text += `📤 Shares: ${allTimeBreakdown.totalShares}\n`;

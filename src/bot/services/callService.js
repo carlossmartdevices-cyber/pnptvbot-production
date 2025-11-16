@@ -224,12 +224,12 @@ class CallService {
    */
   static async sendCallReminder(bot, call, minutesBefore = 15) {
     try {
-      const message = `🔔 *Reminder: Private Call in ${minutesBefore} minutes*\n\n` +
-        `📅 Date: ${call.scheduledDate}\n` +
-        `⏰ Time: ${call.scheduledTime}\n` +
-        `⏱ Duration: ${call.duration} minutes\n\n` +
-        `🔗 Join here: ${call.meetingUrl}\n\n` +
-        `See you soon! 👋`;
+      const message = `🔔 *Reminder: Private Call in ${minutesBefore} minutes*\n\n`
+        + `📅 Date: ${call.scheduledDate}\n`
+        + `⏰ Time: ${call.scheduledTime}\n`
+        + `⏱ Duration: ${call.duration} minutes\n\n`
+        + `🔗 Join here: ${call.meetingUrl}\n\n`
+        + 'See you soon! 👋';
 
       await bot.telegram.sendMessage(call.userId, message, {
         parse_mode: 'Markdown',

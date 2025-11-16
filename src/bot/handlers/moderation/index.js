@@ -36,24 +36,24 @@ async function handleRules(ctx) {
 
     let rulesMessage = `📋 **${t('moderation.group_rules', lang)}**\n\n`;
     rulesMessage += `Welcome to **${ctx.chat.title}**!\n\n`;
-    rulesMessage += `Please follow these rules:\n\n`;
+    rulesMessage += 'Please follow these rules:\n\n';
 
     // Anti-Links
-    rulesMessage += `🔗 **Links:** Not allowed (will be deleted)\n`;
+    rulesMessage += '🔗 **Links:** Not allowed (will be deleted)\n';
 
     // Anti-Spam
-    rulesMessage += `📢 **Spam:** No excessive caps, emojis, or repeated characters\n`;
+    rulesMessage += '📢 **Spam:** No excessive caps, emojis, or repeated characters\n';
 
     // Anti-Flood
-    rulesMessage += `💬 **Flooding:** Maximum 5 messages in 10 seconds\n`;
+    rulesMessage += '💬 **Flooding:** Maximum 5 messages in 10 seconds\n';
 
     // Warnings
-    rulesMessage += `\n⚠️ **Warning System:**\n`;
-    rulesMessage += `• You will receive up to 3 warnings\n`;
-    rulesMessage += `• After 3 warnings, you will be removed from the group\n`;
-    rulesMessage += `• Use /warnings to check your current warnings\n\n`;
+    rulesMessage += '\n⚠️ **Warning System:**\n';
+    rulesMessage += '• You will receive up to 3 warnings\n';
+    rulesMessage += '• After 3 warnings, you will be removed from the group\n';
+    rulesMessage += '• Use /warnings to check your current warnings\n\n';
 
-    rulesMessage += `Thank you for helping keep this group safe and friendly! 🙏`;
+    rulesMessage += 'Thank you for helping keep this group safe and friendly! 🙏';
 
     await ctx.reply(rulesMessage, { parse_mode: 'Markdown' });
 
@@ -93,13 +93,13 @@ async function handleMyWarnings(ctx) {
 
     if (!warnings || warnings.totalWarnings === 0) {
       message = `✅ **${t('moderation.no_warnings', lang)}**\n\n`;
-      message += `You have no warnings in this group. Keep up the good behavior!`;
+      message += 'You have no warnings in this group. Keep up the good behavior!';
     } else {
       message = `⚠️ **${t('moderation.your_warnings', lang)}**\n\n`;
       message += `You have **${warnings.totalWarnings}** warning(s) in this group.\n`;
-      message += `Maximum warnings: **3**\n\n`;
+      message += 'Maximum warnings: **3**\n\n';
 
-      message += `**Recent warnings:**\n`;
+      message += '**Recent warnings:**\n';
 
       // Show last 3 warnings
       const recentWarnings = warnings.warnings.slice(-3).reverse();
@@ -113,7 +113,7 @@ async function handleMyWarnings(ctx) {
       if (remaining > 0) {
         message += `\n⚠️ You have **${remaining}** warning(s) remaining before being removed.`;
       } else {
-        message += `\n🚫 You have reached the maximum warnings.`;
+        message += '\n🚫 You have reached the maximum warnings.';
       }
     }
 

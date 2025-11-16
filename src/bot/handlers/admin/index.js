@@ -115,30 +115,29 @@ const registerAdminHandlers = (bot) => {
       ]);
 
       // Build comprehensive stats message
-      const statsMessage =
-        `📊 *Real-Time Statistics*\n\n` +
-        `*User Metrics:*\n` +
-        `👥 Total Users: ${userStats.total}\n` +
-        `💎 Premium Users: ${userStats.active}\n` +
-        `🆓 Free Users: ${userStats.free}\n` +
-        `📈 Conversion Rate: ${userStats.conversionRate.toFixed(2)}%\n\n` +
-        `*Revenue - Today:*\n` +
-        `💰 Total: $${todayRevenue.total.toFixed(2)}\n` +
-        `📦 Payments: ${todayRevenue.count}\n` +
-        `📊 Average: $${todayRevenue.average.toFixed(2)}\n\n` +
-        `*Revenue - This Month:*\n` +
-        `💰 Total: $${monthRevenue.total.toFixed(2)}\n` +
-        `📦 Payments: ${monthRevenue.count}\n` +
-        `📊 Average: $${monthRevenue.average.toFixed(2)}\n\n` +
-        `*Revenue - Last 30 Days:*\n` +
-        `💰 Total: $${last30Revenue.total.toFixed(2)}\n` +
-        `📦 Payments: ${last30Revenue.count}\n` +
-        `📊 Average: $${last30Revenue.average.toFixed(2)}\n\n` +
-        `*Payment Breakdown (Last 30 Days):*\n` +
-        `${Object.entries(last30Revenue.byPlan).map(([plan, count]) => `  ${plan}: ${count}`).join('\n') || '  No data'}\n\n` +
-        `*Provider Breakdown:*\n` +
-        `${Object.entries(last30Revenue.byProvider).map(([provider, count]) => `  ${provider}: ${count}`).join('\n') || '  No data'}\n\n` +
-        `_Updated: ${now.toLocaleString()}_`;
+      const statsMessage = '📊 *Real-Time Statistics*\n\n'
+        + '*User Metrics:*\n'
+        + `👥 Total Users: ${userStats.total}\n`
+        + `💎 Premium Users: ${userStats.active}\n`
+        + `🆓 Free Users: ${userStats.free}\n`
+        + `📈 Conversion Rate: ${userStats.conversionRate.toFixed(2)}%\n\n`
+        + '*Revenue - Today:*\n'
+        + `💰 Total: $${todayRevenue.total.toFixed(2)}\n`
+        + `📦 Payments: ${todayRevenue.count}\n`
+        + `📊 Average: $${todayRevenue.average.toFixed(2)}\n\n`
+        + '*Revenue - This Month:*\n'
+        + `💰 Total: $${monthRevenue.total.toFixed(2)}\n`
+        + `📦 Payments: ${monthRevenue.count}\n`
+        + `📊 Average: $${monthRevenue.average.toFixed(2)}\n\n`
+        + '*Revenue - Last 30 Days:*\n'
+        + `💰 Total: $${last30Revenue.total.toFixed(2)}\n`
+        + `📦 Payments: ${last30Revenue.count}\n`
+        + `📊 Average: $${last30Revenue.average.toFixed(2)}\n\n`
+        + '*Payment Breakdown (Last 30 Days):*\n'
+        + `${Object.entries(last30Revenue.byPlan).map(([plan, count]) => `  ${plan}: ${count}`).join('\n') || '  No data'}\n\n`
+        + '*Provider Breakdown:*\n'
+        + `${Object.entries(last30Revenue.byProvider).map(([provider, count]) => `  ${provider}: ${count}`).join('\n') || '  No data'}\n\n`
+        + `_Updated: ${now.toLocaleString()}_`;
 
       await ctx.reply(statsMessage, { parse_mode: 'Markdown' });
 
@@ -263,15 +262,15 @@ const registerAdminHandlers = (bot) => {
         new Date(),
       );
 
-      const analytics = `${t('analytics', lang)}\n\n` +
-        `👥 Total Users: ${userStats.total}\n` +
-        `💎 Premium Users: ${userStats.active}\n` +
-        `🆓 Free Users: ${userStats.free}\n` +
-        `📈 Conversion Rate: ${userStats.conversionRate.toFixed(2)}%\n\n` +
-        `💰 Last 30 Days Revenue:\n` +
-        `Total: $${revenue.total.toFixed(2)}\n` +
-        `Payments: ${revenue.count}\n` +
-        `Average: $${revenue.average.toFixed(2)}`;
+      const analytics = `${t('analytics', lang)}\n\n`
+        + `👥 Total Users: ${userStats.total}\n`
+        + `💎 Premium Users: ${userStats.active}\n`
+        + `🆓 Free Users: ${userStats.free}\n`
+        + `📈 Conversion Rate: ${userStats.conversionRate.toFixed(2)}%\n\n`
+        + '💰 Last 30 Days Revenue:\n'
+        + `Total: $${revenue.total.toFixed(2)}\n`
+        + `Payments: ${revenue.count}\n`
+        + `Average: $${revenue.average.toFixed(2)}`;
 
       await ctx.editMessageText(
         analytics,
@@ -328,11 +327,11 @@ const registerAdminHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(
-          `${t('userFound', lang)}\n\n` +
-          `👤 ${user.firstName || ''} ${user.lastName || ''}\n` +
-          `🆔 ${user.id}\n` +
-          `📧 ${user.email || 'N/A'}\n` +
-          `💎 Status: ${user.subscriptionStatus}`,
+          `${t('userFound', lang)}\n\n`
+          + `👤 ${user.firstName || ''} ${user.lastName || ''}\n`
+          + `🆔 ${user.id}\n`
+          + `📧 ${user.email || 'N/A'}\n`
+          + `💎 Status: ${user.subscriptionStatus}`,
           Markup.inlineKeyboard([
             [Markup.button.callback(t('extendSubscription', lang), 'admin_extend_sub')],
             [Markup.button.callback(t('deactivateUser', lang), 'admin_deactivate')],

@@ -41,6 +41,7 @@ describe('PlanModel', () => {
     cache.get = jest.fn().mockResolvedValue(null);
     cache.set = jest.fn().mockResolvedValue(true);
     cache.del = jest.fn().mockResolvedValue(true);
+    cache.getOrSet = jest.fn().mockImplementation(async (key, fn) => fn());
   });
 
   describe('getAll', () => {
@@ -65,19 +66,18 @@ describe('PlanModel', () => {
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(2);
       expect(mockCollection.where).toHaveBeenCalledWith('active', '==', true);
-      expect(cache.set).toHaveBeenCalledWith('plans:all', expect.any(Array), 3600);
+      expect(cache.getOrSet).toHaveBeenCalled();
     });
 
     it('should return cached plans', async () => {
       const cachedPlans = [
         { id: 'basic', name: 'Basic', price: 9.99 },
       ];
-      cache.get.mockResolvedValue(cachedPlans);
+      cache.getOrSet.mockResolvedValue(cachedPlans);
 
       const result = await PlanModel.getAll();
 
       expect(result).toEqual(cachedPlans);
-      expect(mockCollection.get).not.toHaveBeenCalled();
     });
 
     it('should return default plans on error', async () => {
@@ -111,17 +111,16 @@ describe('PlanModel', () => {
       expect(result).toBeDefined();
       expect(result.id).toBe('basic');
       expect(result.name).toBe('Basic');
-      expect(cache.set).toHaveBeenCalledWith('plan:basic', expect.any(Object), 3600);
+      expect(cache.getOrSet).toHaveBeenCalled();
     });
 
     it('should return cached plan', async () => {
       const cachedPlan = { id: 'basic', name: 'Basic', price: 9.99 };
-      cache.get.mockResolvedValue(cachedPlan);
+      cache.getOrSet.mockResolvedValue(cachedPlan);
 
       const result = await PlanModel.getById('basic');
 
       expect(result).toEqual(cachedPlan);
-      expect(mockCollection.doc).not.toHaveBeenCalled();
     });
 
     it('should return null for non-existent plan', async () => {

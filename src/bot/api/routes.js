@@ -45,16 +45,14 @@ app.get('/pnptv-hot-sale', (req, res) => {
 });
 
 // Function to conditionally apply middleware (skip for Telegram webhook)
-const conditionalMiddleware = (middleware) => {
-  return (req, res, next) => {
-    // Skip middleware for Telegram webhook to prevent connection issues
-    if (req.path === '/pnp/webhook/telegram') {
-      // Telegram Webhook
-      app.post('/pnp/webhook/telegram', webhookController.handleTelegramWebhook);
-      return next();
-    }
-    return middleware(req, res, next);
-  };
+const conditionalMiddleware = (middleware) => (req, res, next) => {
+  // Skip middleware for Telegram webhook to prevent connection issues
+  if (req.path === '/pnp/webhook/telegram') {
+    // Telegram Webhook
+    app.post('/pnp/webhook/telegram', webhookController.handleTelegramWebhook);
+    return next();
+  }
+  return middleware(req, res, next);
 };
 
 // Security middleware (conditionally applied, skips Telegram webhook)

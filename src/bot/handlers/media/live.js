@@ -70,8 +70,8 @@ const registerLiveHandlers = (bot) => {
 
   // View active streams
   bot.action('live_view', async (ctx) => {
+    const lang = getLanguage(ctx);
     try {
-      const lang = getLanguage(ctx);
 
       // Fetch active streams from database
       const activeStreams = await LiveStreamModel.getActiveStreams(20);
@@ -108,8 +108,8 @@ const registerLiveHandlers = (bot) => {
 
   // My streams
   bot.action('live_my_streams', async (ctx) => {
+    const lang = getLanguage(ctx);
     try {
-      const lang = getLanguage(ctx);
       const userId = ctx.from.id;
 
       // Fetch user's streams
@@ -165,6 +165,7 @@ const registerLiveHandlers = (bot) => {
 
   // Join stream
   bot.action(/^live_join_(.+)$/, async (ctx) => {
+    const lang = getLanguage(ctx);
     try {
       // Validate match result exists
       if (!ctx.match || !ctx.match[1]) {
@@ -173,7 +174,6 @@ const registerLiveHandlers = (bot) => {
       }
 
       const streamId = ctx.match[1];
-      const lang = getLanguage(ctx);
       const userId = ctx.from.id;
 
       // Get user info
@@ -189,7 +189,7 @@ const registerLiveHandlers = (bot) => {
         const { stream, viewerToken } = await LiveStreamModel.joinStream(
           streamId,
           userId,
-          user.firstName || user.username || 'Anonymous'
+          user.firstName || user.username || 'Anonymous',
         );
 
         // Check if stream is paid and user hasn't paid (future payment integration)
@@ -239,6 +239,17 @@ const registerLiveHandlers = (bot) => {
         );
 
         await ctx.editMessageText(
+          `${t('joinedStream', lang)}\n\n`
+            + `🎤 ${stream.title}\n`
+            + `👤 ${stream.hostName}\n`
+            + `👥 ${stream.currentViewers} watching\n\n`
+            + `${t('streamInstructions', lang)}`,
+          Markup.inlineKeyboard([
+            [Markup.button.url('📺 Watch Stream', streamUrl)],
+            [Markup.button.callback('❤️ Like', `live_like_${streamId}`)],
+            [Markup.button.callback('👋 Leave', `live_leave_${streamId}`)],
+            [Markup.button.callback(t('back', lang), 'live_view')],
+          ]),
           `${t('joinedStream', lang)}\n\n` +
             `🎤 ${stream.title}\n` +
             `👤 ${stream.hostName}\n` +
@@ -371,15 +382,15 @@ const registerLiveHandlers = (bot) => {
     }
 
     if (ctx.session.temp?.creatingLiveStream) {
+      const lang = getLanguage(ctx);
       try {
-        const lang = getLanguage(ctx);
         const step = ctx.session.temp.liveStreamStep;
 
         if (step === 'title') {
           const title = validateUserInput(ctx.message.text, 100);
 
           if (!title) {
-            await ctx.reply(t('invalidInput', lang) + '\n' + t('enterStreamTitle', lang));
+            await ctx.reply(`${t('invalidInput', lang)}\n${t('enterStreamTitle', lang)}`);
             return;
           }
 
@@ -844,6 +855,7 @@ const registerLiveHandlers = (bot) => {
 
   // Leave stream
   bot.action(/^live_leave_(.+)$/, async (ctx) => {
+    const lang = getLanguage(ctx);
     try {
       if (!ctx.match || !ctx.match[1]) {
         logger.error('Invalid leave action format');
@@ -851,7 +863,6 @@ const registerLiveHandlers = (bot) => {
       }
 
       const streamId = ctx.match[1];
-      const lang = getLanguage(ctx);
       const userId = ctx.from.id;
 
       await LiveStreamModel.leaveStream(streamId, userId);
@@ -873,6 +884,7 @@ const registerLiveHandlers = (bot) => {
 
   // Manage stream
   bot.action(/^live_manage_(.+)$/, async (ctx) => {
+    const lang = getLanguage(ctx);
     try {
       if (!ctx.match || !ctx.match[1]) {
         logger.error('Invalid manage action format');
@@ -880,7 +892,6 @@ const registerLiveHandlers = (bot) => {
       }
 
       const streamId = ctx.match[1];
-      const lang = getLanguage(ctx);
       const userId = ctx.from.id;
 
       const stream = await LiveStreamModel.getById(streamId);
@@ -896,11 +907,11 @@ const registerLiveHandlers = (bot) => {
       }
 
       await ctx.editMessageText(
-        `⚙️ ${t('manageStream', lang)}\n\n` +
-          `🎤 ${stream.title}\n` +
-          `👥 ${stream.currentViewers} watching\n` +
-          `👁 ${stream.totalViews} total views\n` +
-          `❤️ ${stream.likes} likes`,
+        `⚙️ ${t('manageStream', lang)}\n\n`
+          + `🎤 ${stream.title}\n`
+          + `👥 ${stream.currentViewers} watching\n`
+          + `👁 ${stream.totalViews} total views\n`
+          + `❤️ ${stream.likes} likes`,
         Markup.inlineKeyboard([
           [Markup.button.callback('🛑 End Stream', `live_end_${streamId}`)],
           [Markup.button.callback('🎭 My Emotes', 'live_my_emotes')],
@@ -915,6 +926,7 @@ const registerLiveHandlers = (bot) => {
 
   // End stream
   bot.action(/^live_end_(.+)$/, async (ctx) => {
+    const lang = getLanguage(ctx);
     try {
       if (!ctx.match || !ctx.match[1]) {
         logger.error('Invalid end action format');
@@ -922,7 +934,6 @@ const registerLiveHandlers = (bot) => {
       }
 
       const streamId = ctx.match[1];
-      const lang = getLanguage(ctx);
       const userId = ctx.from.id;
 
       await LiveStreamModel.endStream(streamId, userId);
@@ -930,10 +941,10 @@ const registerLiveHandlers = (bot) => {
       const stream = await LiveStreamModel.getById(streamId);
 
       await ctx.editMessageText(
-        `✅ ${t('streamEnded', lang)}\n\n` +
-          `🎤 ${stream.title}\n` +
-          `👁 ${stream.totalViews} total views\n` +
-          `❤️ ${stream.likes} likes`,
+        `✅ ${t('streamEnded', lang)}\n\n`
+          + `🎤 ${stream.title}\n`
+          + `👁 ${stream.totalViews} total views\n`
+          + `❤️ ${stream.likes} likes`,
         Markup.inlineKeyboard([
           [Markup.button.callback(t('myStreams', lang), 'live_my_streams')],
           [Markup.button.callback(t('back', lang), 'show_live')],
@@ -1387,7 +1398,7 @@ const createLiveStream = async (ctx) => {
     const title = ctx.session.temp?.liveStreamTitle;
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       logger.error('Missing or invalid live stream title');
-      await ctx.reply(t('error', lang) + '\nPlease try creating the stream again.');
+      await ctx.reply(`${t('error', lang)}\nPlease try creating the stream again.`);
       ctx.session.temp.creatingLiveStream = false;
       await ctx.saveSession();
       return;
@@ -1437,10 +1448,10 @@ const createLiveStream = async (ctx) => {
     await ctx.saveSession();
 
     await ctx.editMessageText(
-      `${t('streamCreated', lang)}\n\n` +
-        `🎤 ${stream.title}\n` +
-        `🔴 ${t('liveNow', lang)}\n\n` +
-        `${t('streamHostInstructions', lang)}`,
+      `${t('streamCreated', lang)}\n\n`
+        + `🎤 ${stream.title}\n`
+        + `🔴 ${t('liveNow', lang)}\n\n`
+        + `${t('streamHostInstructions', lang)}`,
       Markup.inlineKeyboard([
         [Markup.button.url('🎥 Start Broadcasting', streamUrl)],
         [Markup.button.callback('⚙️ Manage', `live_manage_${stream.streamId}`)],

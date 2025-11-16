@@ -1,6 +1,6 @@
+const Sentry = require('@sentry/node');
 const logger = require('../../../utils/logger');
 const { isOperationalError } = require('../../../utils/errors');
-const Sentry = require('@sentry/node');
 
 /**
  * Centralized Error Handler Middleware for Express
