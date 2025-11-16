@@ -167,6 +167,26 @@ const translations = {
     locationRequired: 'Please share your location first.',
     networkError: 'Network error. Please check your connection and try again.',
     serverError: 'Server error. Please try again later.',
+
+    // Moderation
+    moderation: {
+      warning: 'Warning',
+      user_kicked: 'User Removed',
+      group_rules: 'Group Rules',
+      no_warnings: 'No Warnings',
+      your_warnings: 'Your Warnings',
+      reason: {
+        unauthorized_link: 'Unauthorized link detected',
+        spam: 'Spam message',
+        flooding: 'Sending messages too fast',
+        profanity: 'Inappropriate language',
+        user_banned: 'User is banned',
+        excessive_caps: 'Excessive capital letters',
+        excessive_emojis: 'Too many emojis',
+        repeated_characters: 'Repeated characters',
+        excessive_punctuation: 'Excessive punctuation',
+      },
+    },
   },
   es: {
     // General
@@ -331,6 +351,26 @@ const translations = {
     locationRequired: 'Por favor comparte tu ubicación primero.',
     networkError: 'Error de red. Por favor verifica tu conexión e intenta de nuevo.',
     serverError: 'Error del servidor. Por favor intenta más tarde.',
+
+    // Moderation
+    moderation: {
+      warning: 'Advertencia',
+      user_kicked: 'Usuario Eliminado',
+      group_rules: 'Reglas del Grupo',
+      no_warnings: 'Sin Advertencias',
+      your_warnings: 'Tus Advertencias',
+      reason: {
+        unauthorized_link: 'Enlace no autorizado detectado',
+        spam: 'Mensaje de spam',
+        flooding: 'Enviando mensajes muy rápido',
+        profanity: 'Lenguaje inapropiado',
+        user_banned: 'Usuario está baneado',
+        excessive_caps: 'Exceso de mayúsculas',
+        excessive_emojis: 'Demasiados emojis',
+        repeated_characters: 'Caracteres repetidos',
+        excessive_punctuation: 'Puntuación excesiva',
+      },
+    },
   },
 };
 
