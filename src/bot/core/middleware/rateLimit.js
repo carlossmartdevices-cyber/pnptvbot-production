@@ -2,6 +2,7 @@ const { RateLimiterRedis } = require('rate-limiter-flexible');
 const { getRedis } = require('../../../config/redis');
 const logger = require('../../../utils/logger');
 const { t } = require('../../../utils/i18n');
+const UserService = require('../../services/userService');
 
 let rateLimiter = null;
 
@@ -36,6 +37,11 @@ const rateLimitMiddleware = () => {
     const userId = ctx.from?.id;
 
     if (!userId) {
+      return next();
+    }
+
+    // Exempt admin users from rate limiting
+    if (UserService.isAdmin(userId)) {
       return next();
     }
 

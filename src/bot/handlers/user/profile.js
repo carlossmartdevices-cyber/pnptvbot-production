@@ -135,7 +135,7 @@ const registerProfileHandlers = (bot) => {
     if (temp?.waitingForBio) {
       try {
         const lang = getLanguage(ctx);
-        const bio = validateUserInput(ctx.message.text, 500);
+        const bio = validateUserInput(ctx.message.text, 1000);
 
         if (!bio) {
           await ctx.reply(t('invalidInput', lang));
