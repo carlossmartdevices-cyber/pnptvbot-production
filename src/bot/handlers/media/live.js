@@ -2,6 +2,7 @@ const { Markup } = require('telegraf');
 const { t } = require('../../../utils/i18n');
 const UserService = require('../../services/userService');
 const LiveStreamModel = require('../../../models/liveStreamModel');
+const { CATEGORIES } = require('../../../models/liveStreamModel');
 const UserModel = require('../../../models/userModel');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
@@ -21,6 +22,7 @@ const registerLiveHandlers = (bot) => {
         Markup.inlineKeyboard([
           [Markup.button.callback(t('startLive', lang), 'live_start')],
           [Markup.button.callback(t('viewStreams', lang), 'live_view')],
+          [Markup.button.callback('📁 Browse Categories', 'live_browse_categories')],
           [Markup.button.callback(t('myStreams', lang), 'live_my_streams')],
           [Markup.button.callback(t('back', lang), 'back_to_main')],
         ]),
@@ -202,15 +204,31 @@ const registerLiveHandlers = (bot) => {
         // Generate stream URL with token
         const streamUrl = `https://stream.pnptv.com/live/${streamId}?token=${viewerToken}`;
 
+        const categoryEmoji = {
+          music: '🎵',
+          gaming: '🎮',
+          talk_show: '🎙',
+          education: '📚',
+          entertainment: '🎭',
+          sports: '⚽',
+          news: '📰',
+          other: '📁',
+        }[stream.category] || '📁';
+
         await ctx.editMessageText(
           `${t('joinedStream', lang)}\n\n` +
             `🎤 ${stream.title}\n` +
             `👤 ${stream.hostName}\n` +
-            `👥 ${stream.currentViewers} watching\n\n` +
+            `${categoryEmoji} ${stream.category}\n` +
+            `👥 ${stream.currentViewers} watching\n` +
+            `💬 ${stream.totalComments || 0} comments\n\n` +
             `${t('streamInstructions', lang)}`,
           Markup.inlineKeyboard([
             [Markup.button.url('📺 Watch Stream', streamUrl)],
-            [Markup.button.callback('❤️ Like', `live_like_${streamId}`)],
+            [
+              Markup.button.callback('❤️ Like', `live_like_${streamId}`),
+              Markup.button.callback('💬 Comments', `live_comments_${streamId}`),
+            ],
             [Markup.button.callback('👋 Leave', `live_leave_${streamId}`)],
             [Markup.button.callback(t('back', lang), 'live_view')],
           ]),
@@ -251,6 +269,70 @@ const registerLiveHandlers = (bot) => {
 
   // Handle stream creation text input
   bot.on('text', async (ctx, next) => {
+    // Handle commenting on stream
+    if (ctx.session.temp?.commentingOnStream) {
+      try {
+        const lang = getLanguage(ctx);
+        const streamId = ctx.session.temp.commentingOnStream;
+        const userId = ctx.from.id;
+        const user = await UserModel.getById(userId);
+
+        if (!user) {
+          await ctx.reply(t('userNotFound', lang));
+          ctx.session.temp.commentingOnStream = null;
+          await ctx.saveSession();
+          return;
+        }
+
+        const commentText = validateUserInput(ctx.message.text, 500);
+
+        if (!commentText) {
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
+
+        try {
+          await LiveStreamModel.addComment(
+            streamId,
+            userId,
+            user.firstName || user.username || 'Anonymous',
+            commentText
+          );
+
+          // Clear commenting state
+          ctx.session.temp.commentingOnStream = null;
+          await ctx.saveSession();
+
+          await ctx.reply(
+            `${t('commentAdded', lang)} ✅`,
+            Markup.inlineKeyboard([
+              [Markup.button.callback('💬 View Comments', `live_comments_${streamId}`)],
+              [Markup.button.callback(t('back', lang), `live_join_${streamId}`)],
+            ]),
+          );
+
+          logger.info('Comment added', { userId, streamId });
+        } catch (commentError) {
+          if (commentError.message.includes('banned')) {
+            await ctx.reply(t('bannedFromCommenting', lang));
+          } else if (commentError.message.includes('wait')) {
+            await ctx.reply(commentError.message); // Slow mode message
+          } else if (commentError.message.includes('disabled')) {
+            await ctx.reply(t('commentsDisabled', lang));
+          } else {
+            await ctx.reply(t('error', lang));
+          }
+
+          ctx.session.temp.commentingOnStream = null;
+          await ctx.saveSession();
+        }
+      } catch (error) {
+        logger.error('Error processing comment:', error);
+        await ctx.reply(t('error', lang));
+      }
+      return;
+    }
+
     if (ctx.session.temp?.creatingLiveStream) {
       try {
         const lang = getLanguage(ctx);
@@ -265,18 +347,33 @@ const registerLiveHandlers = (bot) => {
           }
 
           ctx.session.temp.liveStreamTitle = title;
-          ctx.session.temp.liveStreamStep = 'paid';
+          ctx.session.temp.liveStreamStep = 'category';
           await ctx.saveSession();
 
+          // Show category selection
+          const categoryButtons = [
+            [
+              Markup.button.callback('🎵 Music', 'live_category_music'),
+              Markup.button.callback('🎮 Gaming', 'live_category_gaming'),
+            ],
+            [
+              Markup.button.callback('🎙 Talk Show', 'live_category_talk_show'),
+              Markup.button.callback('📚 Education', 'live_category_education'),
+            ],
+            [
+              Markup.button.callback('🎭 Entertainment', 'live_category_entertainment'),
+              Markup.button.callback('⚽ Sports', 'live_category_sports'),
+            ],
+            [
+              Markup.button.callback('📰 News', 'live_category_news'),
+              Markup.button.callback('📁 Other', 'live_category_other'),
+            ],
+            [Markup.button.callback(t('cancel', lang), 'show_live')],
+          ];
+
           await ctx.reply(
-            t('streamPaid', lang),
-            Markup.inlineKeyboard([
-              [
-                Markup.button.callback('✅ Yes', 'live_paid_yes'),
-                Markup.button.callback('❌ No (Free)', 'live_paid_no'),
-              ],
-              [Markup.button.callback(t('cancel', lang), 'show_live')],
-            ]),
+            t('selectStreamCategory', lang),
+            Markup.inlineKeyboard(categoryButtons),
           );
           return;
         }
@@ -329,6 +426,212 @@ const registerLiveHandlers = (bot) => {
       await createLiveStream(ctx);
     } catch (error) {
       logger.error('Error in free stream:', error);
+    }
+  });
+
+  // Category selection handlers
+  bot.action(/^live_category_(.+)$/, async (ctx) => {
+    try {
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid category action format');
+        return;
+      }
+
+      const categoryKey = ctx.match[1];
+      const lang = getLanguage(ctx);
+
+      // Map button action to CATEGORIES constant
+      const categoryMap = {
+        music: CATEGORIES.MUSIC,
+        gaming: CATEGORIES.GAMING,
+        talk_show: CATEGORIES.TALK_SHOW,
+        education: CATEGORIES.EDUCATION,
+        entertainment: CATEGORIES.ENTERTAINMENT,
+        sports: CATEGORIES.SPORTS,
+        news: CATEGORIES.NEWS,
+        other: CATEGORIES.OTHER,
+      };
+
+      ctx.session.temp.liveStreamCategory = categoryMap[categoryKey] || CATEGORIES.OTHER;
+      ctx.session.temp.liveStreamStep = 'paid';
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        t('streamPaid', lang),
+        Markup.inlineKeyboard([
+          [
+            Markup.button.callback('✅ Yes', 'live_paid_yes'),
+            Markup.button.callback('❌ No (Free)', 'live_paid_no'),
+          ],
+          [Markup.button.callback(t('cancel', lang), 'show_live')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error selecting category:', error);
+    }
+  });
+
+  // Browse streams by category
+  bot.action('live_browse_categories', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+
+      const categoryButtons = [
+        [
+          Markup.button.callback('🎵 Music', 'live_view_category_music'),
+          Markup.button.callback('🎮 Gaming', 'live_view_category_gaming'),
+        ],
+        [
+          Markup.button.callback('🎙 Talk Show', 'live_view_category_talk_show'),
+          Markup.button.callback('📚 Education', 'live_view_category_education'),
+        ],
+        [
+          Markup.button.callback('🎭 Entertainment', 'live_view_category_entertainment'),
+          Markup.button.callback('⚽ Sports', 'live_view_category_sports'),
+        ],
+        [
+          Markup.button.callback('📰 News', 'live_view_category_news'),
+          Markup.button.callback('📁 Other', 'live_view_category_other'),
+        ],
+        [Markup.button.callback(t('back', lang), 'show_live')],
+      ];
+
+      await ctx.editMessageText(
+        t('browseByCategory', lang),
+        Markup.inlineKeyboard(categoryButtons),
+      );
+    } catch (error) {
+      logger.error('Error showing categories:', error);
+    }
+  });
+
+  // View streams in category
+  bot.action(/^live_view_category_(.+)$/, async (ctx) => {
+    try {
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid view category action format');
+        return;
+      }
+
+      const categoryKey = ctx.match[1];
+      const lang = getLanguage(ctx);
+
+      const categoryMap = {
+        music: CATEGORIES.MUSIC,
+        gaming: CATEGORIES.GAMING,
+        talk_show: CATEGORIES.TALK_SHOW,
+        education: CATEGORIES.EDUCATION,
+        entertainment: CATEGORIES.ENTERTAINMENT,
+        sports: CATEGORIES.SPORTS,
+        news: CATEGORIES.NEWS,
+        other: CATEGORIES.OTHER,
+      };
+
+      const category = categoryMap[categoryKey];
+      const streams = await LiveStreamModel.getByCategory(category, 20);
+
+      if (streams.length === 0) {
+        await ctx.editMessageText(
+          t('noStreamsInCategory', lang),
+          Markup.inlineKeyboard([
+            [Markup.button.callback(t('back', lang), 'live_browse_categories')],
+          ]),
+        );
+        return;
+      }
+
+      let message = `📺 ${t('streamsInCategory', lang)}\n\n`;
+      const buttons = [];
+
+      streams.forEach((stream) => {
+        const priceTag = stream.isPaid ? ` 💰$${stream.price}` : ' 🆓';
+        message += `🎤 ${stream.title}${priceTag}\n👤 ${stream.hostName}\n👥 ${stream.currentViewers} viewers\n\n`;
+        buttons.push([
+          Markup.button.callback(`▶️ ${stream.title}`, `live_join_${stream.streamId}`),
+        ]);
+      });
+
+      buttons.push([Markup.button.callback(t('back', lang), 'live_browse_categories')]);
+
+      await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
+    } catch (error) {
+      logger.error('Error viewing category streams:', error);
+      await ctx.reply(t('error', lang));
+    }
+  });
+
+  // Stream comments
+  bot.action(/^live_comments_(.+)$/, async (ctx) => {
+    try {
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid comments action format');
+        return;
+      }
+
+      const streamId = ctx.match[1];
+      const lang = getLanguage(ctx);
+
+      // Get latest comments
+      const comments = await LiveStreamModel.getComments(streamId, 10);
+      const stream = await LiveStreamModel.getById(streamId);
+
+      if (!stream) {
+        await ctx.editMessageText(t('streamNotFound', lang));
+        return;
+      }
+
+      let message = `💬 ${t('streamComments', lang)}\n\n🎤 ${stream.title}\n\n`;
+
+      if (comments.length === 0) {
+        message += t('noCommentsYet', lang);
+      } else {
+        comments.forEach((comment, index) => {
+          if (index < 5) { // Show last 5 comments
+            message += `👤 ${comment.userName}: ${comment.text}\n`;
+          }
+        });
+
+        if (comments.length > 5) {
+          message += `\n...and ${comments.length - 5} more comments`;
+        }
+      }
+
+      await ctx.editMessageText(
+        message,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('💬 Add Comment', `live_add_comment_${streamId}`)],
+          [Markup.button.callback(t('back', lang), `live_join_${streamId}`)],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error showing comments:', error);
+      await ctx.reply(t('error', lang));
+    }
+  });
+
+  // Add comment to stream
+  bot.action(/^live_add_comment_(.+)$/, async (ctx) => {
+    try {
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid add comment action format');
+        return;
+      }
+
+      const streamId = ctx.match[1];
+      const lang = getLanguage(ctx);
+
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.commentingOnStream = streamId;
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        t('enterComment', lang),
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('cancel', lang), `live_comments_${streamId}`)],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error initiating comment:', error);
     }
   });
 
@@ -478,6 +781,7 @@ const createLiveStream = async (ctx) => {
 
     const isPaid = ctx.session.temp.liveStreamIsPaid;
     const price = ctx.session.temp.liveStreamPrice || 0;
+    const category = ctx.session.temp.liveStreamCategory || CATEGORIES.OTHER;
     const userId = ctx.from.id;
 
     // Get user info
@@ -498,9 +802,14 @@ const createLiveStream = async (ctx) => {
       hostName: user.firstName || user.username || 'Anonymous',
       title,
       description: '',
+      category,
+      tags: [],
       isPaid,
       price,
       maxViewers: 1000,
+      allowComments: true,
+      recordStream: false,
+      language: lang,
     });
 
     // Generate stream URL with host token

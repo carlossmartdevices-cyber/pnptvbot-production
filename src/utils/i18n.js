@@ -142,6 +142,16 @@ const translations = {
     streamInstructions: 'Click "Watch Stream" to start viewing. Enjoy!',
     paidStreamNotice: '💰 This is a paid stream',
     paymentIntegrationPending: 'Payment integration coming soon. Free access for now!',
+    selectStreamCategory: '📁 Select a category for your stream:',
+    browseByCategory: '📁 Browse streams by category:',
+    noStreamsInCategory: 'No streams found in this category',
+    streamsInCategory: 'Streams',
+    streamComments: 'Stream Comments',
+    noCommentsYet: 'No comments yet. Be the first to comment!',
+    enterComment: 'Type your comment (max 500 characters):',
+    commentAdded: 'Comment added successfully!',
+    bannedFromCommenting: 'You are banned from commenting on this stream',
+    commentsDisabled: 'Comments are disabled for this stream',
 
     // Radio
     radioTitle: '📻 PNPtv Radio - 24/7',
@@ -445,6 +455,16 @@ const translations = {
     streamInstructions: 'Haz clic en "Ver Transmisión" para comenzar a ver. ¡Disfruta!',
     paidStreamNotice: '💰 Esta es una transmisión de pago',
     paymentIntegrationPending: 'Integración de pagos próximamente. ¡Acceso gratuito por ahora!',
+    selectStreamCategory: '📁 Selecciona una categoría para tu transmisión:',
+    browseByCategory: '📁 Explorar transmisiones por categoría:',
+    noStreamsInCategory: 'No hay transmisiones en esta categoría',
+    streamsInCategory: 'Transmisiones',
+    streamComments: 'Comentarios de la Transmisión',
+    noCommentsYet: '¡No hay comentarios aún. Sé el primero en comentar!',
+    enterComment: 'Escribe tu comentario (máx 500 caracteres):',
+    commentAdded: '¡Comentario agregado exitosamente!',
+    bannedFromCommenting: 'Estás bloqueado de comentar en esta transmisión',
+    commentsDisabled: 'Los comentarios están deshabilitados para esta transmisión',
 
     // Radio
     radioTitle: '📻 Radio PNPtv - 24/7',
