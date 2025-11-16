@@ -37,6 +37,9 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy source code from builder
 COPY --from=builder --chown=nodejs:nodejs /app/src ./src
 
+# Copy .env.example for dotenv-safe validation
+COPY --from=builder --chown=nodejs:nodejs /app/.env.example ./.env.example
+
 # Create logs and uploads directories with proper permissions
 RUN mkdir -p logs uploads \
     && chown -R nodejs:nodejs /app
