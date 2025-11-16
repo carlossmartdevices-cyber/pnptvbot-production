@@ -36,6 +36,10 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy source code from builder
 COPY --from=builder --chown=nodejs:nodejs /app/src ./src
+COPY --from=builder --chown=nodejs:nodejs /app/src/config ./src/config
+
+# Copy public directory for landing pages
+COPY --from=builder --chown=nodejs:nodejs /app/public ./public
 
 # Copy .env.example for dotenv-safe validation
 COPY --from=builder --chown=nodejs:nodejs /app/.env.example ./.env.example
