@@ -253,7 +253,7 @@ await axios.post(
 await axios.post(
   `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`,
   {
-    url: 'https://yourdomain.com/webhook/telegram',
+    url: 'https://yourdomain.com/pnp/webhook/telegram',
     allowed_updates: ['message', 'callback_query']
   }
 );

@@ -2,6 +2,7 @@ const { Markup } = require('telegraf');
 const UserService = require('../../services/userService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
+const { getLanguage } = require('../../utils/helpers');
 
 /**
  * Settings handlers
@@ -11,7 +12,7 @@ const registerSettingsHandlers = (bot) => {
   // Show settings menu
   bot.action('show_settings', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
         t('settingsTitle', lang),
@@ -49,6 +50,12 @@ const registerSettingsHandlers = (bot) => {
   // Change language
   bot.action(/^change_lang_(.+)$/, async (ctx) => {
     try {
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid language change action format');
+        return;
+      }
+
       const newLang = ctx.match[1];
       ctx.session.language = newLang;
       await ctx.saveSession();
@@ -70,7 +77,7 @@ const registerSettingsHandlers = (bot) => {
   // Notifications settings
   bot.action('settings_notifications', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
         `${t('notifications', lang)}\n\nNotification preferences coming soon...`,
@@ -86,7 +93,7 @@ const registerSettingsHandlers = (bot) => {
   // Privacy settings
   bot.action('settings_privacy', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
         `${t('privacy', lang)}\n\nPrivacy settings coming soon...`,
@@ -102,7 +109,7 @@ const registerSettingsHandlers = (bot) => {
   // About
   bot.action('settings_about', async (ctx) => {
     try {
-      const lang = ctx.session.language || 'en';
+      const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
         `${t('about', lang)}\n\n🎬 PNPtv Bot v1.0.0\n\nYour entertainment hub for live streams, radio, and more!\n\n🌐 Website: https://pnptv.com\n📧 Support: support@pnptv.com`,
