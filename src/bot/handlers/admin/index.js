@@ -31,6 +31,7 @@ async function showAdminPanel(ctx, edit = false) {
     if (userRole === 'superadmin' || userRole === 'admin') {
       buttons.push([Markup.button.callback(t('broadcast', lang), 'admin_broadcast')]);
       buttons.push([Markup.button.callback(t('analytics', lang), 'admin_analytics')]);
+      buttons.push([Markup.button.callback(t('gamification.title', lang), 'admin_gamification')]);
     }
 
     // SuperAdmin only features
@@ -57,7 +58,13 @@ async function showAdminPanel(ctx, edit = false) {
  * Admin handlers
  * @param {Telegraf} bot - Bot instance
  */
+// Import gamification handler
+const registerGamificationHandlers = require('./gamification');
+
 const registerAdminHandlers = (bot) => {
+  // Register gamification handlers
+  registerGamificationHandlers(bot);
+
   // Admin command
   bot.command('admin', async (ctx) => {
     try {

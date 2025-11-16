@@ -9,6 +9,7 @@ const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
 const usernameEnforcement = require('./middleware/usernameEnforcement');
 const moderationFilter = require('./middleware/moderationFilter');
+const activityTrackerMiddleware = require('./middleware/activityTracker');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('../../utils/logger');
 
@@ -102,6 +103,7 @@ const startBot = async () => {
     bot.use(chatCleanupMiddleware()); // Auto-delete bot messages, commands, and system messages after 5 min
     bot.use(usernameEnforcement()); // Require username and track changes
     bot.use(moderationFilter()); // Moderation filter for group messages
+    bot.use(activityTrackerMiddleware()); // Track user activity for gamification
 
     // Register handlers
     registerUserHandlers(bot);
