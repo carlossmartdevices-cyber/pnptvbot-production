@@ -7,7 +7,7 @@
   "extends": ["airbnb-base"],
   "parserOptions": {
     "ecmaVersion": 12,
-    "sourceType": "module"
+    "sourceType": "script"
   },
   "rules": {
     "no-console": "off",

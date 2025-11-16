@@ -1,7 +1,7 @@
 const { Markup } = require('telegraf');
 const UserService = require('../../services/userService');
 const PermissionService = require('../../services/permissionService');
-const { PERMISSIONS } = require('../../models/permissionModel');
+const { PERMISSIONS } = require('../../../models/permissionModel');
 const UserModel = require('../../../models/userModel');
 const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
