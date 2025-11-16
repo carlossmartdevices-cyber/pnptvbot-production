@@ -20,6 +20,8 @@ const registerPaymentHandlers = require('../handlers/payments');
 const registerMediaHandlers = require('../handlers/media');
 const registerModerationHandlers = require('../handlers/moderation');
 const registerModerationAdminHandlers = require('../handlers/moderation/adminCommands');
+const registerCallManagementHandlers = require('../handlers/admin/callManagement');
+const registerPrivateCallHandlers = require('../handlers/user/privateCalls');
 
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
@@ -112,6 +114,8 @@ const startBot = async () => {
     registerMediaHandlers(bot);
     registerModerationHandlers(bot); // User moderation commands
     registerModerationAdminHandlers(bot); // Admin moderation commands
+    registerCallManagementHandlers(bot); // Admin call management
+    registerPrivateCallHandlers(bot); // User private call booking
 
     // Error handling
     bot.catch(errorHandler);

@@ -1,5 +1,6 @@
 const PaymentService = require('../../services/paymentService');
 const logger = require('../../../utils/logger');
+const DaimoConfig = require('../../../config/daimo');
 
 /**
  * Validate ePayco webhook payload
@@ -22,29 +23,13 @@ const validateEpaycoPayload = (payload) => {
 
 /**
  * Validate Daimo webhook payload
+ * Uses the official Daimo Pay webhook structure
  * @param {Object} payload - Webhook payload
  * @returns {Object} { valid: boolean, error?: string }
  */
 const validateDaimoPayload = (payload) => {
-  const requiredFields = ['transaction_id', 'status', 'metadata'];
-  const missingFields = requiredFields.filter((field) => !payload[field]);
-
-  if (missingFields.length > 0) {
-    return {
-      valid: false,
-      error: `Missing required fields: ${missingFields.join(', ')}`,
-    };
-  }
-
-  // Validate metadata structure
-  if (!payload.metadata || !payload.metadata.paymentId || !payload.metadata.userId || !payload.metadata.planId) {
-    return {
-      valid: false,
-      error: 'Invalid metadata structure: paymentId, userId, and planId are required',
-    };
-  }
-
-  return { valid: true };
+  // Use the validation from DaimoConfig
+  return DaimoConfig.validateWebhookPayload(payload);
 };
 
 /**
@@ -80,31 +65,57 @@ const handleEpaycoWebhook = async (req, res) => {
 
 /**
  * Handle Daimo webhook
+ * Receives payment events from Daimo Pay (Zelle, CashApp, Venmo, Revolut, Wise)
+ * Webhook URL: easybots.store/api/daimo -> /api/webhooks/daimo
  * @param {Request} req - Express request
  * @param {Response} res - Express response
  */
 const handleDaimoWebhook = async (req, res) => {
   try {
-    logger.info('Daimo webhook received', {
-      transactionId: req.body.transaction_id,
-      status: req.body.status,
+    const { id, status, source, metadata } = req.body;
+
+    logger.info('Daimo Pay webhook received', {
+      eventId: id,
+      status,
+      txHash: source?.txHash,
+      userId: metadata?.userId,
+      planId: metadata?.planId,
+      chain: 'Optimism',
+      token: source?.tokenSymbol || 'USDC',
     });
 
     // Validate payload structure
     const validation = validateDaimoPayload(req.body);
     if (!validation.valid) {
-      logger.warn('Invalid Daimo webhook payload', { error: validation.error });
+      logger.warn('Invalid Daimo webhook payload', {
+        error: validation.error,
+        receivedFields: Object.keys(req.body),
+      });
       return res.status(400).json({ success: false, error: validation.error });
     }
 
+    // Process webhook
     const result = await PaymentService.processDaimoWebhook(req.body);
 
     if (result.success) {
+      logger.info('Daimo webhook processed successfully', {
+        eventId: id,
+        status,
+        alreadyProcessed: result.alreadyProcessed || false,
+      });
       return res.status(200).json({ success: true });
     }
+
+    logger.warn('Daimo webhook processing failed', {
+      eventId: id,
+      error: result.error,
+    });
     return res.status(400).json({ success: false, error: result.error });
   } catch (error) {
-    logger.error('Error handling Daimo webhook:', error);
+    logger.error('Error handling Daimo webhook:', {
+      error: error.message,
+      stack: error.stack,
+    });
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
