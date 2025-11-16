@@ -7,6 +7,7 @@ const COLLECTIONS = {
   USER_WARNINGS: 'userWarnings',
   BANNED_USERS: 'bannedUsers',
   MODERATION_LOGS: 'moderationLogs',
+  USERNAME_HISTORY: 'usernameHistory',
 };
 
 /**
@@ -490,6 +491,188 @@ class ModerationModel {
       return true;
     } catch (error) {
       logger.error('Error invalidating moderation cache:', error);
+      return false;
+    }
+  }
+
+  // ==================== USERNAME TRACKING ====================
+
+  /**
+   * Record username change
+   * @param {number|string} userId - User ID
+   * @param {string} oldUsername - Previous username (null if first time)
+   * @param {string} newUsername - New username (null if removed)
+   * @param {number|string} groupId - Group ID where change was detected
+   * @returns {Promise<string>} Record ID
+   */
+  static async recordUsernameChange(userId, oldUsername, newUsername, groupId = null) {
+    try {
+      const db = getFirestore();
+
+      const record = {
+        userId: userId.toString(),
+        oldUsername: oldUsername || null,
+        newUsername: newUsername || null,
+        groupId: groupId ? groupId.toString() : null,
+        changedAt: new Date(),
+        flagged: false, // Can be flagged by admins if suspicious
+      };
+
+      const docRef = await db.collection(COLLECTIONS.USERNAME_HISTORY).add(record);
+
+      // Also log it
+      await this.addLog({
+        action: 'username_changed',
+        userId,
+        groupId,
+        reason: 'Username change detected',
+        details: `${oldUsername || 'none'} → ${newUsername || 'none'}`,
+      });
+
+      logger.info('Username change recorded', {
+        userId,
+        oldUsername,
+        newUsername,
+        groupId,
+        recordId: docRef.id,
+      });
+
+      return docRef.id;
+    } catch (error) {
+      logger.error('Error recording username change:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get username history for a user
+   * @param {number|string} userId - User ID
+   * @param {number} limit - Max results
+   * @returns {Promise<Array>} Username history
+   */
+  static async getUsernameHistory(userId, limit = 20) {
+    try {
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTIONS.USERNAME_HISTORY)
+        .where('userId', '==', userId.toString())
+        .orderBy('changedAt', 'desc')
+        .limit(limit)
+        .get();
+
+      const history = [];
+      snapshot.forEach((doc) => {
+        history.push({ id: doc.id, ...doc.data() });
+      });
+
+      return history;
+    } catch (error) {
+      logger.error('Error getting username history:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get recent username changes in a group
+   * @param {number|string} groupId - Group ID
+   * @param {number} limit - Max results
+   * @returns {Promise<Array>} Recent username changes
+   */
+  static async getRecentUsernameChanges(groupId, limit = 50) {
+    try {
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTIONS.USERNAME_HISTORY)
+        .where('groupId', '==', groupId.toString())
+        .orderBy('changedAt', 'desc')
+        .limit(limit)
+        .get();
+
+      const changes = [];
+      snapshot.forEach((doc) => {
+        changes.push({ id: doc.id, ...doc.data() });
+      });
+
+      return changes;
+    } catch (error) {
+      logger.error('Error getting recent username changes:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Flag a username change as suspicious
+   * @param {string} recordId - Username change record ID
+   * @param {number|string} flaggedBy - Admin user ID
+   * @param {string} reason - Reason for flagging
+   * @returns {Promise<boolean>} Success status
+   */
+  static async flagUsernameChange(recordId, flaggedBy, reason = '') {
+    try {
+      const db = getFirestore();
+      await db.collection(COLLECTIONS.USERNAME_HISTORY).doc(recordId).update({
+        flagged: true,
+        flaggedBy: flaggedBy.toString(),
+        flaggedAt: new Date(),
+        flagReason: reason,
+      });
+
+      logger.info('Username change flagged', { recordId, flaggedBy, reason });
+      return true;
+    } catch (error) {
+      logger.error('Error flagging username change:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get flagged username changes
+   * @param {number|string} groupId - Group ID (optional)
+   * @returns {Promise<Array>} Flagged username changes
+   */
+  static async getFlaggedUsernameChanges(groupId = null) {
+    try {
+      const db = getFirestore();
+      let query = db.collection(COLLECTIONS.USERNAME_HISTORY)
+        .where('flagged', '==', true)
+        .orderBy('flaggedAt', 'desc');
+
+      if (groupId) {
+        query = query.where('groupId', '==', groupId.toString());
+      }
+
+      const snapshot = await query.limit(100).get();
+
+      const flagged = [];
+      snapshot.forEach((doc) => {
+        flagged.push({ id: doc.id, ...doc.data() });
+      });
+
+      return flagged;
+    } catch (error) {
+      logger.error('Error getting flagged username changes:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if user has changed username recently (within hours)
+   * @param {number|string} userId - User ID
+   * @param {number} hours - Time window in hours
+   * @returns {Promise<boolean>} Has recent change
+   */
+  static async hasRecentUsernameChange(userId, hours = 24) {
+    try {
+      const db = getFirestore();
+      const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+      const snapshot = await db.collection(COLLECTIONS.USERNAME_HISTORY)
+        .where('userId', '==', userId.toString())
+        .where('changedAt', '>=', since)
+        .limit(1)
+        .get();
+
+      return !snapshot.empty;
+    } catch (error) {
+      logger.error('Error checking recent username change:', error);
       return false;
     }
   }

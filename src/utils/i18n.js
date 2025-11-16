@@ -175,6 +175,7 @@ const translations = {
       group_rules: 'Group Rules',
       no_warnings: 'No Warnings',
       your_warnings: 'Your Warnings',
+      username_required: 'Username Required',
       reason: {
         unauthorized_link: 'Unauthorized link detected',
         spam: 'Spam message',
@@ -359,6 +360,7 @@ const translations = {
       group_rules: 'Reglas del Grupo',
       no_warnings: 'Sin Advertencias',
       your_warnings: 'Tus Advertencias',
+      username_required: 'Username Requerido',
       reason: {
         unauthorized_link: 'Enlace no autorizado detectado',
         spam: 'Mensaje de spam',
