@@ -43,19 +43,32 @@ const startBot = async () => {
     logger.info('Starting PNPtv Telegram Bot...');
 
     // Validate critical environment variables
-    validateCriticalEnvVars();
-    logger.info('✓ Environment variables validated');
+    try {
+      validateCriticalEnvVars();
+      logger.info('✓ Environment variables validated');
+    } catch (error) {
+      logger.error('CRITICAL: Missing environment variables, but attempting to continue...');
+      logger.error(error.message);
+      // Continuar de todos modos, el bot puede fallar después pero al menos intentamos
+    }
 
     // Initialize Sentry (optional)
-    initSentry();
+    try {
+      initSentry();
+      logger.info('✓ Sentry initialized');
+    } catch (error) {
+      logger.warn('Sentry initialization failed, continuing without monitoring:', error.message);
+    }
 
-    // Initialize Firebase
+    // Initialize Firebase (with fallback)
     try {
       initializeFirebase();
       logger.info('✓ Firebase initialized');
     } catch (error) {
-      logger.error('Failed to initialize Firebase. Please check your Firebase credentials.');
-      throw error;
+      logger.error('Firebase initialization failed. Bot will run in DEGRADED mode without database.');
+      logger.error('Error:', error.message);
+      logger.warn('⚠️  Bot features requiring database will not work!');
+      // NO hacemos throw, permitimos que el bot continúe
     }
 
     // Initialize Redis (optional, will use default localhost if not configured)
@@ -72,6 +85,7 @@ const startBot = async () => {
       }
     } catch (error) {
       logger.warn('Redis initialization failed, continuing without cache:', error.message);
+      logger.warn('⚠️  Performance may be degraded without caching');
     }
 
     // Create bot instance
@@ -152,14 +166,52 @@ const startBot = async () => {
       bot.stop('SIGTERM');
     });
   } catch (error) {
-    logger.error('Failed to start bot:', error);
-    process.exit(1);
+    logger.error('❌ CRITICAL ERROR during bot startup:', error);
+    logger.error('Stack trace:', error.stack);
+    logger.warn('⚠️  Bot encountered a critical error but will attempt to keep process alive');
+    logger.warn('⚠️  Some features may not work properly. Check logs above for details.');
+
+    // NO hacemos process.exit(1) para que el proceso no muera
+    // En Railway/Render esto evita reinicios infinitos
+    // El proceso se mantiene vivo pero en estado degradado
+
+    // Intentar mantener el proceso vivo con un servidor mínimo
+    try {
+      const PORT = process.env.PORT || 3000;
+      apiApp.listen(PORT, () => {
+        logger.info(`⚠️  Emergency API server running on port ${PORT} (degraded mode)`);
+        logger.info('Bot is NOT fully functional. Fix configuration and restart.');
+      });
+    } catch (apiError) {
+      logger.error('Failed to start emergency API server:', apiError);
+      // Como último recurso, mantener el proceso vivo sin hacer nada
+      logger.warn('Process will stay alive but non-functional. Manual intervention required.');
+    }
   }
 };
 
+// Manejadores globales de errores para evitar que el proceso muera
+process.on('uncaughtException', (error) => {
+  logger.error('❌ UNCAUGHT EXCEPTION:', error);
+  logger.error('Stack:', error.stack);
+  logger.warn('Process will continue despite uncaught exception');
+  // NO hacer process.exit(), mantener el proceso vivo
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('❌ UNHANDLED PROMISE REJECTION:', reason);
+  logger.error('Promise:', promise);
+  logger.warn('Process will continue despite unhandled rejection');
+  // NO hacer process.exit(), mantener el proceso vivo
+});
+
 // Start the bot
 if (require.main === module) {
-  startBot();
+  startBot().catch((err) => {
+    logger.error('Unhandled error in startBot():', err);
+    logger.warn('Process will stay alive despite error');
+    // No hacer nada más, mantener proceso vivo
+  });
 }
 
 module.exports = { startBot };
