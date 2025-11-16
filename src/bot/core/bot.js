@@ -6,6 +6,8 @@ const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
 const rateLimitMiddleware = require('./middleware/rateLimit');
+const chatCleanupMiddleware = require('./middleware/chatCleanup');
+const moderationFilter = require('./middleware/moderationFilter');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('../../utils/logger');
 
@@ -14,6 +16,8 @@ const registerUserHandlers = require('../handlers/user');
 const registerAdminHandlers = require('../handlers/admin');
 const registerPaymentHandlers = require('../handlers/payments');
 const registerMediaHandlers = require('../handlers/media');
+const registerModerationHandlers = require('../handlers/moderation');
+const registerModerationAdminHandlers = require('../handlers/moderation/adminCommands');
 
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
@@ -94,12 +98,16 @@ const startBot = async () => {
     // Register middleware
     bot.use(sessionMiddleware());
     bot.use(rateLimitMiddleware());
+    bot.use(chatCleanupMiddleware()); // Auto-delete bot messages, commands, and system messages after 5 min
+    bot.use(moderationFilter()); // Moderation filter for group messages
 
     // Register handlers
     registerUserHandlers(bot);
     registerAdminHandlers(bot);
     registerPaymentHandlers(bot);
     registerMediaHandlers(bot);
+    registerModerationHandlers(bot); // User moderation commands
+    registerModerationAdminHandlers(bot); // Admin moderation commands
 
     // Error handling
     bot.catch(errorHandler);
