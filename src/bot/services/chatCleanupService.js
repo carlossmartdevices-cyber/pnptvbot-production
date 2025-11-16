@@ -113,10 +113,20 @@ class ChatCleanupService {
    * @param {Object} telegram - Telegram bot instance
    * @param {Object} message - Sent message object
    * @param {number} delay - Delay in milliseconds
+   * @param {boolean} isBroadcast - If true, don't schedule deletion (for important broadcasts)
    * @returns {number} Timeout ID
    */
-  static scheduleBotMessage(telegram, message, delay = this.CLEANUP_DELAY) {
+  static scheduleBotMessage(telegram, message, delay = this.CLEANUP_DELAY, isBroadcast = false) {
     if (!message || !message.chat || !message.message_id) {
+      return null;
+    }
+
+    // Skip deletion for broadcast messages
+    if (isBroadcast) {
+      logger.debug('Broadcast message - skipping auto-delete', {
+        chatId: message.chat.id,
+        messageId: message.message_id,
+      });
       return null;
     }
 
