@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
@@ -8,6 +9,7 @@ const logger = require('../../utils/logger');
 
 // Controllers
 const webhookController = require('./controllers/webhookController');
+const subscriptionController = require('./controllers/subscriptionController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -21,6 +23,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Logging (before other middleware for accurate request tracking)
 app.use(morgan('combined', { stream: logger.stream }));
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, '../../../public')));
 
 // Function to conditionally apply middleware (skip for Telegram webhook)
 const conditionalMiddleware = (middleware) => {
@@ -109,6 +114,15 @@ app.get('/api/stats', asyncHandler(async (req, res) => {
   const stats = await UserService.getStatistics();
   res.json(stats);
 }));
+
+// Subscription API routes
+app.get('/api/subscription/plans', asyncHandler(subscriptionController.getPlans));
+app.post('/api/subscription/create-plan', asyncHandler(subscriptionController.createEpaycoPlan));
+app.post('/api/subscription/create-checkout', asyncHandler(subscriptionController.createCheckout));
+app.post('/api/subscription/epayco/confirmation', webhookLimiter, asyncHandler(subscriptionController.handleEpaycoConfirmation));
+app.get('/api/subscription/payment-response', asyncHandler(subscriptionController.handlePaymentResponse));
+app.get('/api/subscription/subscriber/:identifier', asyncHandler(subscriptionController.getSubscriber));
+app.get('/api/subscription/stats', asyncHandler(subscriptionController.getStatistics));
 
 // Export app WITHOUT 404/error handlers
 // These will be added in bot.js AFTER the webhook callback
