@@ -58,10 +58,10 @@ const validateUserInput = (text, maxLength = 500) => {
  * Check if session temp state is expired
  * @param {Object} ctx - Telegraf context
  * @param {string} stateKey - State key to check
- * @param {number} timeoutMinutes - Timeout in minutes (default: 5)
+ * @param {number} _timeoutMinutes - Timeout in minutes (unused, default: 5)
  * @returns {boolean} True if expired or not set
  */
-const isSessionExpired = (ctx, stateKey, timeoutMinutes = 5) => {
+const isSessionExpired = (ctx, stateKey, _timeoutMinutes = 5) => {
   const tempState = ctx.session?.temp?.[stateKey];
   if (!tempState) return true;
 

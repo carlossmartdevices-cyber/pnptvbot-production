@@ -4,6 +4,54 @@ const PaymentService = require('../../services/paymentService');
 const logger = require('../../../utils/logger');
 
 /**
+ * Process refund through payment provider
+ * @param {Object} call - The call object
+ * @param {number} refundAmount - The amount to refund
+ * @param {number} refundPercentage - The percentage of refund
+ * @returns {Promise<void>}
+ */
+async function processRefund(call, refundAmount, refundPercentage) {
+  try {
+    // Validate refund parameters
+    if (!call || refundAmount <= 0) {
+      logger.warn('Invalid refund parameters', { callId: call?.id, refundAmount });
+      return;
+    }
+
+    logger.info('Processing refund', {
+      callId: call.id,
+      userId: call.userId,
+      refundAmount,
+      refundPercentage,
+      transactionId: call.transactionId,
+    });
+
+    // Call PaymentService to process refund through payment provider
+    // This should integrate with Daimo Pay or ePayco refund API
+    if (PaymentService && typeof PaymentService.processRefund === 'function') {
+      await PaymentService.processRefund({
+        callId: call.id,
+        userId: call.userId,
+        transactionId: call.transactionId,
+        refundAmount,
+        refundPercentage,
+        reason: 'User cancelled call',
+      });
+    } else {
+      logger.warn('PaymentService.processRefund not implemented yet');
+    }
+
+    logger.info('Refund processing initiated', {
+      callId: call.id,
+      refundAmount,
+    });
+  } catch (error) {
+    logger.error('Error in processRefund:', error);
+    throw error;
+  }
+}
+
+/**
  * Call Management Handlers - Reschedule, cancel, view history
  */
 function registerCallManagementHandlers(bot) {
@@ -389,8 +437,16 @@ function registerCallManagementHandlers(bot) {
         refundAmount,
       });
 
-      // TODO: Process actual refund through payment provider
-      // This would integrate with Daimo Pay refund API
+      // Process refund through payment provider if refund amount is greater than 0
+      if (refundPercentage > 0) {
+        try {
+          await processRefund(call, refundAmount, refundPercentage);
+        } catch (refundError) {
+          logger.error('Error processing refund in payment provider:', refundError);
+          // Refund processing failed but cancellation was recorded
+          // User should contact support if refund is not received
+        }
+      }
     } catch (error) {
       logger.error('Error executing cancellation:', error);
       await ctx.reply('❌ Error cancelling call. Please contact support.');

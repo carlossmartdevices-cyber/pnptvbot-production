@@ -30,7 +30,8 @@ const RATE_LIMIT_MS = 3000; // 3 seconds between messages
 /**
  * Agent instructions - Cristina Customer Support AI
  */
-const AGENT_INSTRUCTIONS = `You are Cristina, the PNPtv Customer Support AI Assistant - a professional, helpful, and friendly support chatbot.
+const AGENT_INSTRUCTIONS = `You are Cristina, the PNPtv Customer Support AI Assistant
+- a professional, helpful, and friendly support chatbot.
 
 🎯 YOUR ROLE
 
@@ -46,7 +47,8 @@ You are the official customer support assistant for PNPtv, providing:
 - Professional, friendly, and helpful
 - Clear and concise responses
 - Empathetic and non-judgmental
-- Respond in the user's language (detect: English, Spanish, French, Portuguese, German, Italian, Arabic, Hindi, Chinese, Russian)
+- Respond in the user's language (detect: English, Spanish, French, Portuguese,
+  German, Italian, Arabic, Hindi, Chinese, Russian)
 - Use emojis sparingly for clarity
 - Always promote safety, consent, and well-being
 
@@ -386,9 +388,13 @@ const registerSupportHandlers = (bot) => {
             }
 
             // Send AI response
-            await ctx.reply(`🤖 Cristina: ${aiResponse}\n\n_${lang === 'es' ? 'Escribe "exit" para finalizar el chat' : 'Type "exit" to end chat'}_`, {
-              parse_mode: 'Markdown',
-            });
+            const exitMessage = lang === 'es'
+              ? 'Escribe "exit" para finalizar el chat'
+              : 'Type "exit" to end chat';
+            await ctx.reply(
+              `🤖 Cristina: ${aiResponse}\n\n_${exitMessage}_`,
+              { parse_mode: 'Markdown' }
+            );
           } catch (aiError) {
             logger.error('Mistral AI error:', aiError);
 
@@ -414,11 +420,12 @@ const registerSupportHandlers = (bot) => {
           }
 
           // Fallback response if Mistral AI not configured
-          await ctx.reply(
-            lang === 'es'
-              ? '🤖 Cristina: Estoy aquí para ayudarte. Por favor usa /support para acceder al menú de soporte para asistencia específica.'
-              : '🤖 Cristina: I\'m here to help! Please use /support to access the support menu for specific assistance.',
-          );
+          const fallbackMessage = lang === 'es'
+            ? '🤖 Cristina: Estoy aquí para ayudarte. '
+              + 'Por favor usa /support para acceder al menú de soporte para asistencia específica.'
+            : '🤖 Cristina: I\'m here to help! '
+              + 'Please use /support to access the support menu for specific assistance.';
+          await ctx.reply(fallbackMessage);
         }
       } catch (error) {
         logger.error('Error in AI chat:', error);

@@ -149,9 +149,11 @@ const registerActivationHandlers = (bot) => {
 
         await ctx.reply(successMessage);
 
-        // Optional: Send to main menu or show features
-        setTimeout(async () => {
+        // Send follow-up message after initial response
+        // Using Promise.resolve().then() instead of setTimeout to maintain context
+        Promise.resolve().then(async () => {
           try {
+            await new Promise(resolve => setTimeout(resolve, 2000));
             await ctx.reply(
               lang === 'es'
                 ? '📱 Usa /menu para ver todas las funciones disponibles.'
@@ -160,7 +162,7 @@ const registerActivationHandlers = (bot) => {
           } catch (err) {
             logger.error('Error sending follow-up message:', err);
           }
-        }, 2000);
+        });
       } catch (updateError) {
         // Rollback code usage if user update fails
         logger.error('Error updating user after activation:', updateError);

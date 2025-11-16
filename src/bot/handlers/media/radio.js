@@ -1,7 +1,6 @@
 const { Markup } = require('telegraf');
 const moment = require('moment');
 const RadioModel = require('../../../models/radioModel');
-const UserModel = require('../../../models/userModel');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');

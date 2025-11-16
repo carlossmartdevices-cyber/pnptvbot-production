@@ -138,7 +138,11 @@ app.get('/api/stats', asyncHandler(async (req, res) => {
 app.get('/api/subscription/plans', asyncHandler(subscriptionController.getPlans));
 app.post('/api/subscription/create-plan', asyncHandler(subscriptionController.createEpaycoPlan));
 app.post('/api/subscription/create-checkout', asyncHandler(subscriptionController.createCheckout));
-app.post('/api/subscription/epayco/confirmation', webhookLimiter, asyncHandler(subscriptionController.handleEpaycoConfirmation));
+app.post(
+  '/api/subscription/epayco/confirmation',
+  webhookLimiter,
+  asyncHandler(subscriptionController.handleEpaycoConfirmation)
+);
 app.get('/api/subscription/payment-response', asyncHandler(subscriptionController.handlePaymentResponse));
 app.get('/api/subscription/subscriber/:identifier', asyncHandler(subscriptionController.getSubscriber));
 app.get('/api/subscription/stats', asyncHandler(subscriptionController.getStatistics));

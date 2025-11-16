@@ -6,7 +6,7 @@ const { isOperationalError } = require('../../../utils/errors');
  * Centralized Error Handler Middleware for Express
  * Handles all errors thrown in routes and controllers
  */
-function errorHandler(err, req, res, next) {
+function errorHandler(err, req, res, _next) {
   // Log the error
   logger.error('Express error handler:', {
     error: err.message,
