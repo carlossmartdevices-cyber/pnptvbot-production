@@ -22,23 +22,10 @@ app.use(express.urlencoded({ extended: true }));
 // Logging (before other middleware for accurate request tracking)
 app.use(morgan('combined', { stream: logger.stream }));
 
-// Function to conditionally apply middleware (skip for Telegram webhook)
-const conditionalMiddleware = (middleware) => {
-  return (req, res, next) => {
-    // Skip middleware for Telegram webhook to prevent connection issues
-    if (req.path === '/pnp/webhook/telegram') {
-      // Telegram Webhook
-      app.post('/pnp/webhook/telegram', webhookController.handleTelegramWebhook);
-      return next();
-    }
-    return middleware(req, res, next);
-  };
-};
-
-// Security middleware (conditionally applied, skips Telegram webhook)
-app.use(conditionalMiddleware(helmet()));
-app.use(conditionalMiddleware(cors()));
-app.use(conditionalMiddleware(compression()));
+// Security middleware
+app.use(helmet());
+app.use(cors());
+app.use(compression());
 
 // Rate limiting for API
 const limiter = rateLimit({
@@ -99,8 +86,8 @@ app.get('/health', async (req, res) => {
 });
 
 // API routes
-app.post('/pnp/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
-app.post('/pnp/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
+app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
+app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
 app.get('/api/payment-response', webhookController.handlePaymentResponse);
 
 // Stats endpoint

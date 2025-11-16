@@ -115,7 +115,7 @@ const startBot = async () => {
     // Start bot
     if (process.env.NODE_ENV === 'production' && process.env.BOT_WEBHOOK_DOMAIN) {
       // Webhook mode for production
-      const webhookPath = process.env.BOT_WEBHOOK_PATH || '/pnp/webhook/telegram';
+      const webhookPath = process.env.BOT_WEBHOOK_PATH || '/webhook/telegram';
       const webhookUrl = `${process.env.BOT_WEBHOOK_DOMAIN}${webhookPath}`;
 
       await bot.telegram.setWebhook(webhookUrl);
