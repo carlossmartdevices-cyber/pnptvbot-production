@@ -11,7 +11,7 @@ const AVAILABILITY_COLLECTION = 'callAvailability';
 class CallModel {
   /**
    * Create a new call booking
-   * @param {Object} callData - { userId, userName, paymentId, scheduledDate, scheduledTime, duration }
+   * @param {Object} callData - { userId, userName, paymentId, scheduledDate, scheduledTime, duration, performer }
    * @returns {Promise<Object>} Created call
    */
   static async create(callData) {
@@ -27,11 +27,16 @@ class CallModel {
         updatedAt: new Date(),
         meetingUrl: null,
         reminderSent: false,
+        performer: callData.performer || 'Santino', // Default performer
       };
 
       await callRef.set(data);
 
-      logger.info('Private call booking created', { callId, userId: callData.userId });
+      logger.info('Private call booking created', {
+        callId,
+        userId: callData.userId,
+        performer: data.performer,
+      });
       return { id: callId, ...data };
     } catch (error) {
       logger.error('Error creating call booking:', error);

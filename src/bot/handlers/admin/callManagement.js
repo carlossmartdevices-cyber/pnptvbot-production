@@ -144,13 +144,17 @@ const registerCallManagementHandlers = (bot) => {
 
       const broadcastMessage =
         '🎉 *Great News!*\n\n' +
-        '📞 I\'m now available for *Private 1:1 Calls*!\n\n' +
+        '📞 We\'re now available for *Private 1:1 Calls*!\n\n' +
+        '👥 *Choose your performer:*\n' +
+        '• 🎭 Santino\n' +
+        '• 🎤 Lex Boy\n\n' +
         '💎 *What you get:*\n' +
         '• 45 minutes of personalized consultation\n' +
         '• Direct video call (HD quality)\n' +
         '• Expert advice and guidance\n' +
-        '• Flexible scheduling\n\n' +
-        '💰 Price: $100 USD\n\n' +
+        '• ⚡ Quick scheduling (can start in 15 min!)\n' +
+        '• Or schedule for later\n\n' +
+        '💰 Price: $100 USD (pay with Zelle, CashApp, Venmo, Revolut, Wise)\n\n' +
         '🚀 *Limited slots available!*\n' +
         'Book your call now before they\'re gone.';
 
@@ -274,13 +278,17 @@ const registerCallManagementHandlers = (bot) => {
 
       const broadcastMessage =
         '🎉 *Great News!*\n\n' +
-        '📞 I\'m now available for *Private 1:1 Calls*!\n\n' +
+        '📞 We\'re now available for *Private 1:1 Calls*!\n\n' +
+        '👥 *Choose your performer:*\n' +
+        '• 🎭 Santino\n' +
+        '• 🎤 Lex Boy\n\n' +
         '💎 *What you get:*\n' +
         '• 45 minutes of personalized consultation\n' +
         '• Direct video call (HD quality)\n' +
         '• Expert advice and guidance\n' +
-        '• Flexible scheduling\n\n' +
-        '💰 Price: $100 USD\n\n' +
+        '• ⚡ Quick scheduling (can start in 15 min!)\n' +
+        '• Or schedule for later\n\n' +
+        '💰 Price: $100 USD (pay with Zelle, CashApp, Venmo, Revolut, Wise)\n\n' +
         '🚀 *Limited slots available!*\n' +
         'Book your call now before they\'re gone.';
 
