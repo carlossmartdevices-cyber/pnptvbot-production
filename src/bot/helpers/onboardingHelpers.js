@@ -535,10 +535,22 @@ async function showMainMenu(ctx) {
   await ctx.reply(
     t('mainMenuIntro', lang),
     Markup.inlineKeyboard([
-      [Markup.button.callback('💎 ' + t('subscribe', lang), 'show_subscription_plans')],
-      [Markup.button.callback('👤 ' + t('myProfile', lang), 'show_my_profile')],
-      [Markup.button.callback('🌍 ' + t('nearbyUsers', lang), 'show_nearby')],
-      [Markup.button.callback('🤖 ' + t('support', lang), 'show_help')],
+      [
+        Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
+        Markup.button.callback(t('myProfile', lang), 'show_profile'),
+      ],
+      [
+        Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
+        Markup.button.callback(t('liveStreams', lang), 'show_live'),
+      ],
+      [
+        Markup.button.callback(t('radio', lang), 'show_radio'),
+        Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
+      ],
+      [
+        Markup.button.callback(t('support', lang), 'show_support'),
+        Markup.button.callback(t('settings', lang), 'show_settings'),
+      ],
     ])
   );
 }

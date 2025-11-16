@@ -118,6 +118,7 @@ async function startFreshOnboarding(ctx) {
     termsAccepted: false,
     privacyAccepted: false,
     awaitingEmail: false,
+    temp: {}, // Initialize temp object for handlers
   };
 
   await ctx.reply(
@@ -149,6 +150,7 @@ async function handleAgeReverification(ctx, userData) {
     privacyAccepted: userData.privacyAccepted || false,
     email: userData.email || null,
     awaitingEmail: false,
+    temp: {}, // Initialize temp object for handlers
   };
 
   // Show age re-verification message
@@ -178,6 +180,7 @@ async function resumeOnboarding(ctx, userData) {
     privacyAccepted: userData.privacyAccepted || false,
     email: userData.email || null,
     awaitingEmail: false,
+    temp: {}, // Initialize temp object for handlers
   };
 
   console.log(`[Start] Resuming onboarding at step: ${ctx.session.onboardingStep}`);
