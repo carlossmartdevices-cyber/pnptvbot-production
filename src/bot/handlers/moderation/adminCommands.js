@@ -28,6 +28,12 @@ const registerModerationAdminHandlers = (bot) => {
 
   // /setlinks - Configure link policy
   bot.command('setlinks', handleSetLinks);
+
+  // /userhistory - View username history
+  bot.command('userhistory', handleUserHistory);
+
+  // /usernamechanges - View recent username changes in group
+  bot.command('usernamechanges', handleUsernameChanges);
 };
 
 /**
@@ -437,6 +443,145 @@ async function handleModStats(ctx) {
   } catch (error) {
     logger.error('Error viewing moderation stats:', error);
     await ctx.reply('Error loading moderation statistics.');
+  }
+}
+
+/**
+ * Handle /userhistory command
+ * View username change history for a specific user
+ */
+async function handleUserHistory(ctx) {
+  try {
+    const chatType = ctx.chat?.type;
+
+    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+      return ctx.reply('This command only works in groups.');
+    }
+
+    if (!(await isAdmin(ctx))) {
+      return ctx.reply('⛔ Only administrators can use this command.');
+    }
+
+    const args = ctx.message.text.split(' ').slice(1);
+    let targetUserId;
+
+    // Get user from reply or argument
+    if (ctx.message.reply_to_message) {
+      targetUserId = ctx.message.reply_to_message.from.id;
+    } else if (args[0]) {
+      targetUserId = args[0];
+    } else {
+      return ctx.reply('Usage: `/userhistory <user_id>` or reply to a user\'s message with `/userhistory`', {
+        parse_mode: 'Markdown',
+      });
+    }
+
+    // Get username history
+    const history = await ModerationModel.getUsernameHistory(targetUserId, 20);
+
+    if (history.length === 0) {
+      return ctx.reply('No username history found for this user.');
+    }
+
+    let message = `📋 **Username History**\n\n`;
+    message += `👤 **User ID:** ${targetUserId}\n`;
+    message += `📊 **Total Changes:** ${history.length}\n\n`;
+
+    history.forEach((record, index) => {
+      const date = new Date(record.changedAt.toDate());
+      const dateStr = date.toLocaleString();
+
+      message += `**${index + 1}.** ${dateStr}\n`;
+      message += `   From: @${record.oldUsername || 'none'}\n`;
+      message += `   To: @${record.newUsername || 'none'}\n`;
+
+      if (record.flagged) {
+        message += `   🚩 **FLAGGED:** ${record.flagReason || 'Suspicious'}\n`;
+      }
+
+      message += `\n`;
+    });
+
+    // Send as file if too long
+    if (message.length > 4000) {
+      message = message.substring(0, 4000) + '\n\n_...truncated_';
+    }
+
+    await ctx.reply(message, { parse_mode: 'Markdown' });
+
+    logger.info('Username history viewed', {
+      groupId: ctx.chat.id,
+      adminId: ctx.from.id,
+      targetUserId,
+      historyCount: history.length,
+    });
+  } catch (error) {
+    logger.error('Error viewing username history:', error);
+    await ctx.reply('Error loading username history.');
+  }
+}
+
+/**
+ * Handle /usernamechanges command
+ * View recent username changes in the group
+ */
+async function handleUsernameChanges(ctx) {
+  try {
+    const chatType = ctx.chat?.type;
+
+    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+      return ctx.reply('This command only works in groups.');
+    }
+
+    if (!(await isAdmin(ctx))) {
+      return ctx.reply('⛔ Only administrators can use this command.');
+    }
+
+    const groupId = ctx.chat.id;
+    const args = ctx.message.text.split(' ').slice(1);
+    const limit = parseInt(args[0], 10) || 20;
+
+    // Get recent username changes
+    const changes = await ModerationModel.getRecentUsernameChanges(groupId, Math.min(limit, 50));
+
+    if (changes.length === 0) {
+      return ctx.reply('No username changes recorded in this group yet.');
+    }
+
+    let message = `📋 **Recent Username Changes**\n\n`;
+    message += `📊 **Last ${changes.length} changes:**\n\n`;
+
+    changes.forEach((record, index) => {
+      const date = new Date(record.changedAt.toDate());
+      const dateStr = date.toLocaleDateString();
+
+      message += `**${index + 1}.** User ID: ${record.userId}\n`;
+      message += `   ${dateStr}: @${record.oldUsername || 'none'} → @${record.newUsername || 'none'}\n`;
+
+      if (record.flagged) {
+        message += `   🚩 FLAGGED\n`;
+      }
+
+      message += `\n`;
+    });
+
+    message += `\nUse /userhistory <user_id> to see full history for a specific user.`;
+
+    // Send as file if too long
+    if (message.length > 4000) {
+      message = message.substring(0, 4000) + '\n\n_...truncated_';
+    }
+
+    await ctx.reply(message, { parse_mode: 'Markdown' });
+
+    logger.info('Username changes viewed', {
+      groupId,
+      adminId: ctx.from.id,
+      count: changes.length,
+    });
+  } catch (error) {
+    logger.error('Error viewing username changes:', error);
+    await ctx.reply('Error loading username changes.');
   }
 }
 

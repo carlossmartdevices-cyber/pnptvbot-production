@@ -6,7 +6,7 @@
 **Rama**: `claude/payment-tests-docker-optimization-01JaJZrVUNbiSLqkykGsVoEv`
 **Tests**: 212/212 passing ✅
 **Configuración**: Completa ✅
-
+docker-compose down && docker-compose build --no-cache bot && docker-compose up -d
 ---
 
 ## 📋 Cambios Implementados
