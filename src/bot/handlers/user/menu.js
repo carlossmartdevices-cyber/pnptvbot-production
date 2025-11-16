@@ -24,6 +24,65 @@ const registerMenuHandlers = (bot) => {
       logger.error('Error in back to main:', error);
     }
   });
+
+  // Group menu actions
+  bot.action('group_contact_admin', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const lang = ctx.session?.language || 'en';
+
+      const messageEs = `📞 *Contactar a un Admin*\n\n` +
+        `Para contactar a un administrador del grupo, por favor:\n\n` +
+        `1. Menciona a uno de los administradores en el chat del grupo\n` +
+        `2. O envía un mensaje directo al bot con tu consulta usando el botón "Chat Bot PNPtv!"\n\n` +
+        `Los administradores responderán lo antes posible.`;
+
+      const messageEn = `📞 *Contact an Admin*\n\n` +
+        `To contact a group administrator, please:\n\n` +
+        `1. Mention one of the administrators in the group chat\n` +
+        `2. Or send a direct message to the bot with your query using the "PNPtv! Bot Chat" button\n\n` +
+        `Administrators will respond as soon as possible.`;
+
+      const message = lang === 'es' ? messageEs : messageEn;
+
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      logger.error('Error in group contact admin:', error);
+    }
+  });
+
+  bot.action('group_show_rules', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const lang = ctx.session?.language || 'en';
+
+      const rulesEs = `📋 *Reglas de la Comunidad PNPtv!*\n\n` +
+        `1️⃣ *Respeto:* Trata a todos los miembros con respeto y cortesía\n\n` +
+        `2️⃣ *No Spam:* Evita el spam, publicidad no autorizada o contenido repetitivo\n\n` +
+        `3️⃣ *Privacidad:* No compartas información personal de otros miembros sin su consentimiento\n\n` +
+        `4️⃣ *Contenido Apropiado:* El contenido debe ser apropiado para la comunidad\n\n` +
+        `5️⃣ *No Acoso:* El acoso, bullying o comportamiento hostil no será tolerado\n\n` +
+        `6️⃣ *Uso del Bot:* Usa el bot en privado para funciones personales (perfil, suscripciones, pagos)\n\n` +
+        `⚠️ *Incumplir estas reglas puede resultar en advertencias, restricciones o expulsión del grupo.*\n\n` +
+        `¡Gracias por mantener nuestra comunidad segura y agradable! 🙏`;
+
+      const rulesEn = `📋 *PNPtv! Community Rules*\n\n` +
+        `1️⃣ *Respect:* Treat all members with respect and courtesy\n\n` +
+        `2️⃣ *No Spam:* Avoid spam, unauthorized advertising or repetitive content\n\n` +
+        `3️⃣ *Privacy:* Do not share personal information of other members without their consent\n\n` +
+        `4️⃣ *Appropriate Content:* Content must be appropriate for the community\n\n` +
+        `5️⃣ *No Harassment:* Harassment, bullying or hostile behavior will not be tolerated\n\n` +
+        `6️⃣ *Bot Usage:* Use the bot privately for personal features (profile, subscriptions, payments)\n\n` +
+        `⚠️ *Breaking these rules may result in warnings, restrictions or expulsion from the group.*\n\n` +
+        `Thank you for keeping our community safe and enjoyable! 🙏`;
+
+      const message = lang === 'es' ? rulesEs : rulesEn;
+
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      logger.error('Error showing group rules:', error);
+    }
+  });
 };
 
 /**
@@ -32,7 +91,16 @@ const registerMenuHandlers = (bot) => {
  */
 const showMainMenu = async (ctx) => {
   const lang = ctx.session?.language || 'en';
+  const chatType = ctx.chat?.type;
 
+  // Check if this is a group or supergroup
+  if (chatType === 'group' || chatType === 'supergroup') {
+    // Show limited group menu
+    await showGroupMenu(ctx);
+    return;
+  }
+
+  // Show full private chat menu
   await ctx.reply(
     t('mainMenuIntro', lang),
     Markup.inlineKeyboard([
@@ -53,6 +121,48 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(t('settings', lang), 'show_settings'),
       ],
     ]),
+  );
+};
+
+/**
+ * Show limited group menu (for privacy and anti-spam)
+ * @param {Context} ctx - Telegraf context
+ */
+const showGroupMenu = async (ctx) => {
+  const lang = ctx.session?.language || 'en';
+  const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'User';
+  const botUsername = ctx.botInfo?.username || 'pnptv_bot';
+
+  const messageEs = `✨ Hola ${username}! Gracias por usar el Panel Rápido para Miembros del Grupo.\n\n` +
+    `🔒 Recuerda que para usar todas las funciones de PNPtv! debes hacerlo directamente desde el chat del bot, ` +
+    `por protección de tu privacidad y para cumplir con las políticas anti-spam de la comunidad.\n\n` +
+    `Desde este panel puedes acceder a estas opciones:`;
+
+  const messageEn = `✨ Hi ${username}! Thanks for using the Quick Member Panel!\n\n` +
+    `🔒 Remember that to use all PNPtv! features you must do it directly through the bot chat, ` +
+    `to protect your privacy and comply with our community anti-spam policies.\n\n` +
+    `From this panel, you can still access these options:`;
+
+  const message = lang === 'es' ? messageEs : messageEn;
+
+  const keyboard = lang === 'es'
+    ? [
+      [Markup.button.callback('📞 Contactar a un Admin', 'group_contact_admin')],
+      [Markup.button.callback('📋 Reglas de la Comunidad', 'group_show_rules')],
+      [Markup.button.url(`💬 Chat Bot PNPtv!`, `https://t.me/${botUsername}?start=group_menu`)],
+    ]
+    : [
+      [Markup.button.callback('📞 Contact an Admin', 'group_contact_admin')],
+      [Markup.button.callback('📋 Community Rules', 'group_show_rules')],
+      [Markup.button.url(`💬 PNPtv! Bot Chat`, `https://t.me/${botUsername}?start=group_menu`)],
+    ];
+
+  await ctx.reply(
+    message,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard(keyboard),
+    },
   );
 };
 

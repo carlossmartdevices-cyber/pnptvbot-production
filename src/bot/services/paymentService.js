@@ -704,6 +704,126 @@ class PaymentService {
       return [];
     }
   }
+
+  /**
+   * Generate receipt for a payment
+   * @param {string} paymentId - Payment ID
+   * @returns {Promise<Object|null>} Receipt data
+   */
+  static async generateReceipt(paymentId) {
+    try {
+      const payment = await PaymentModel.getById(paymentId);
+
+      if (!payment || payment.status !== 'success') {
+        return null;
+      }
+
+      const date = payment.completedAt?.toDate ? payment.completedAt.toDate() : new Date(payment.completedAt || payment.createdAt);
+
+      // Get plan details
+      let itemName = 'Subscription Plan';
+      if (payment.planId === 'private_call_45min') {
+        itemName = 'Private 1:1 Call - 45 minutes';
+      } else {
+        try {
+          const PlanModel = require('../../models/planModel');
+          const plan = await PlanModel.getById(payment.planId);
+          if (plan) {
+            itemName = plan.name;
+          }
+        } catch (error) {
+          logger.warn('Could not fetch plan details for receipt', { planId: payment.planId });
+        }
+      }
+
+      return {
+        id: payment.id,
+        date: date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }),
+        transactionId: payment.transactionId || payment.transactionHash || payment.id.substring(0, 8),
+        itemName,
+        amount: payment.amount,
+        currency: payment.currency || 'USD',
+        network: payment.chain || 'Optimism',
+        token: payment.tokenSymbol || 'USDC',
+        provider: payment.provider,
+        status: payment.status,
+      };
+    } catch (error) {
+      logger.error('Error generating receipt:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get payment analytics
+   * @param {Object} filters - { startDate, endDate, provider, status }
+   * @returns {Promise<Object>} Analytics data
+   */
+  static async getPaymentAnalytics(filters = {}) {
+    try {
+      const payments = await PaymentModel.getAll(filters);
+
+      const analytics = {
+        totalPayments: payments.length,
+        successfulPayments: 0,
+        failedPayments: 0,
+        pendingPayments: 0,
+        totalRevenue: 0,
+        revenueByProvider: {},
+        revenueByPlan: {},
+        averagePayment: 0,
+        conversionRate: 0,
+      };
+
+      payments.forEach(payment => {
+        // Count by status
+        if (payment.status === 'success') {
+          analytics.successfulPayments += 1;
+          analytics.totalRevenue += payment.amount || 0;
+
+          // Revenue by provider
+          const provider = payment.provider || 'unknown';
+          analytics.revenueByProvider[provider] = (analytics.revenueByProvider[provider] || 0) + payment.amount;
+
+          // Revenue by plan
+          const planId = payment.planId || 'unknown';
+          analytics.revenueByPlan[planId] = (analytics.revenueByPlan[planId] || 0) + payment.amount;
+        } else if (payment.status === 'failed') {
+          analytics.failedPayments += 1;
+        } else if (payment.status === 'pending') {
+          analytics.pendingPayments += 1;
+        }
+      });
+
+      // Calculate averages and rates
+      if (analytics.successfulPayments > 0) {
+        analytics.averagePayment = analytics.totalRevenue / analytics.successfulPayments;
+      }
+
+      if (analytics.totalPayments > 0) {
+        analytics.conversionRate = (analytics.successfulPayments / analytics.totalPayments) * 100;
+      }
+
+      return analytics;
+    } catch (error) {
+      logger.error('Error getting payment analytics:', error);
+      return {
+        totalPayments: 0,
+        successfulPayments: 0,
+        failedPayments: 0,
+        pendingPayments: 0,
+        totalRevenue: 0,
+        revenueByProvider: {},
+        revenueByPlan: {},
+        averagePayment: 0,
+        conversionRate: 0,
+      };
+    }
+  }
 }
 
 module.exports = PaymentService;
