@@ -1,11 +1,57 @@
 const { Markup } = require('telegraf');
 const UserService = require('../../services/userService');
+const PermissionService = require('../../services/permissionService');
+const { PERMISSIONS } = require('../../models/permissionModel');
 const UserModel = require('../../../models/userModel');
 const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
+
+/**
+ * Show admin panel based on user role
+ * @param {Context} ctx - Telegraf context
+ * @param {boolean} edit - Whether to edit message or send new
+ */
+async function showAdminPanel(ctx, edit = false) {
+  try {
+    const lang = getLanguage(ctx);
+    const userId = ctx.from.id;
+    const userRole = await PermissionService.getUserRole(userId);
+    const roleDisplay = await PermissionService.getUserRoleDisplay(userId, lang);
+
+    // Build menu based on role
+    const buttons = [];
+
+    // Common for all admin roles
+    buttons.push([Markup.button.callback(t('userManagement', lang), 'admin_users')]);
+
+    // Admin and SuperAdmin features
+    if (userRole === 'superadmin' || userRole === 'admin') {
+      buttons.push([Markup.button.callback(t('broadcast', lang), 'admin_broadcast')]);
+      buttons.push([Markup.button.callback(t('analytics', lang), 'admin_analytics')]);
+    }
+
+    // SuperAdmin only features
+    if (userRole === 'superadmin') {
+      buttons.push([Markup.button.callback('📋 Gestión de Menús', 'admin_menus')]);
+      buttons.push([Markup.button.callback('👑 Gestión de Roles', 'admin_roles')]);
+      buttons.push([Markup.button.callback(t('planManagement', lang), 'admin_plans')]);
+      buttons.push([Markup.button.callback('📜 Ver Logs', 'admin_logs')]);
+    }
+
+    const message = `${roleDisplay}\n\n${t('adminPanel', lang)}`;
+
+    if (edit) {
+      await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
+    } else {
+      await ctx.reply(message, Markup.inlineKeyboard(buttons));
+    }
+  } catch (error) {
+    logger.error('Error showing admin panel:', error);
+  }
+}
 
 /**
  * Admin handlers
@@ -15,22 +61,15 @@ const registerAdminHandlers = (bot) => {
   // Admin command
   bot.command('admin', async (ctx) => {
     try {
-      if (!UserService.isAdmin(ctx.from.id)) {
+      // Check if user is admin using new permission system
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      if (!isAdmin) {
         await ctx.reply(t('unauthorized', getLanguage(ctx)));
         return;
       }
 
-      const lang = getLanguage(ctx);
-
-      await ctx.reply(
-        t('adminPanel', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('userManagement', lang), 'admin_users')],
-          [Markup.button.callback(t('broadcast', lang), 'admin_broadcast')],
-          [Markup.button.callback(t('planManagement', lang), 'admin_plans')],
-          [Markup.button.callback(t('analytics', lang), 'admin_analytics')],
-        ]),
-      );
+      await showAdminPanel(ctx, false);
     } catch (error) {
       logger.error('Error in /admin command:', error);
     }
@@ -221,24 +260,16 @@ const registerAdminHandlers = (bot) => {
     }
   });
 
-  // Admin cancel
+  // Admin cancel / back to main panel
   bot.action('admin_cancel', async (ctx) => {
     try {
-      if (!UserService.isAdmin(ctx.from.id)) return;
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
 
-      const lang = getLanguage(ctx);
       ctx.session.temp = {};
       await ctx.saveSession();
 
-      await ctx.editMessageText(
-        t('adminPanel', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('userManagement', lang), 'admin_users')],
-          [Markup.button.callback(t('broadcast', lang), 'admin_broadcast')],
-          [Markup.button.callback(t('planManagement', lang), 'admin_plans')],
-          [Markup.button.callback(t('analytics', lang), 'admin_analytics')],
-        ]),
-      );
+      await showAdminPanel(ctx, true);
     } catch (error) {
       logger.error('Error in admin cancel:', error);
     }
