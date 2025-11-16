@@ -30,6 +30,8 @@ class UserModel {
         data.createdAt = timestamp;
         data.subscriptionStatus = 'free';
         data.language = userData.language || 'en';
+        // Default role for new users
+        data.role = userData.role || 'user';
       }
 
       await userRef.set(data, { merge: true });
@@ -37,7 +39,7 @@ class UserModel {
       // Invalidate cache
       await cache.del(`user:${userId}`);
 
-      logger.info('User created/updated', { userId });
+      logger.info('User created/updated', { userId, role: data.role });
       return data;
     } catch (error) {
       logger.error('Error creating/updating user:', error);
@@ -295,6 +297,85 @@ class UserModel {
       return users;
     } catch (error) {
       logger.error('Error getting users by subscription status:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Update user role
+   * @param {number|string} userId - User ID
+   * @param {string} role - New role (superadmin, admin, moderator, user)
+   * @param {number|string} assignedBy - Admin userId who assigned the role
+   * @returns {Promise<boolean>} Success status
+   */
+  static async updateRole(userId, role, assignedBy) {
+    try {
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      await userRef.update({
+        role,
+        assignedBy: assignedBy ? assignedBy.toString() : null,
+        roleAssignedAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // Invalidate cache
+      await cache.del(`user:${userId}`);
+
+      logger.info('User role updated', { userId, role, assignedBy });
+      return true;
+    } catch (error) {
+      logger.error('Error updating user role:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get users by role
+   * @param {string} role - Role name
+   * @returns {Promise<Array>} Users with specified role
+   */
+  static async getByRole(role) {
+    try {
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTION)
+        .where('role', '==', role)
+        .get();
+
+      const users = [];
+      snapshot.forEach((doc) => {
+        users.push({ id: doc.id, ...doc.data() });
+      });
+
+      logger.info(`Found ${users.length} users with role: ${role}`);
+      return users;
+    } catch (error) {
+      logger.error('Error getting users by role:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all admin users (superadmin, admin, moderator)
+   * @returns {Promise<Array>} Admin users
+   */
+  static async getAllAdmins() {
+    try {
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTION)
+        .where('role', 'in', ['superadmin', 'admin', 'moderator'])
+        .get();
+
+      const admins = [];
+      snapshot.forEach((doc) => {
+        admins.push({ id: doc.id, ...doc.data() });
+      });
+
+      logger.info(`Found ${admins.length} admin users`);
+      return admins;
+    } catch (error) {
+      logger.error('Error getting admin users:', error);
       return [];
     }
   }

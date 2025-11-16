@@ -90,6 +90,12 @@ class PlanModel {
         updatedAt: new Date(),
       };
 
+      // Auto-generate SKU if not provided
+      if (!data.sku && data.duration) {
+        data.sku = this.generateSKU(planId, data.duration);
+        logger.info(`Auto-generated SKU: ${data.sku} for plan: ${planId}`);
+      }
+
       const doc = await planRef.get();
       if (!doc.exists) {
         data.createdAt = new Date();
@@ -101,7 +107,7 @@ class PlanModel {
       await cache.del(`plan:${planId}`);
       await cache.del('plans:all');
 
-      logger.info('Plan created/updated', { planId });
+      logger.info('Plan created/updated', { planId, sku: data.sku });
       return { id: planId, ...data };
     } catch (error) {
       logger.error('Error creating/updating plan:', error);
@@ -132,6 +138,19 @@ class PlanModel {
   }
 
   /**
+   * Generate SKU for a plan
+   * SKU format: PNPTV-{PLANID}-{DURATION}D
+   * Example: PNPTV-BASIC-30D, PNPTV-PREMIUM-30D
+   * @param {string} planId - Plan ID
+   * @param {number} duration - Duration in days
+   * @returns {string} Generated SKU
+   */
+  static generateSKU(planId, duration) {
+    const planIdUpper = planId.toUpperCase();
+    return `PNPTV-${planIdUpper}-${duration}D`;
+  }
+
+  /**
    * Get default plans (fallback if database is empty)
    * @returns {Array} Default plans
    */
@@ -139,6 +158,7 @@ class PlanModel {
     return [
       {
         id: 'basic',
+        sku: 'PNPTV-BASIC-30D', // SKU for invoices and reports
         name: 'Basic',
         nameEs: 'Básico',
         price: 9.99,
@@ -158,6 +178,7 @@ class PlanModel {
       },
       {
         id: 'premium',
+        sku: 'PNPTV-PREMIUM-30D',
         name: 'Premium',
         nameEs: 'Premium',
         price: 19.99,
@@ -179,6 +200,7 @@ class PlanModel {
       },
       {
         id: 'gold',
+        sku: 'PNPTV-GOLD-30D',
         name: 'Gold',
         nameEs: 'Gold',
         price: 29.99,
