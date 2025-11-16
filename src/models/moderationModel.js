@@ -169,7 +169,9 @@ class ModerationModel {
 
       await warningRef.update(updatedData);
 
-      logger.info('Warning added to user', { userId, groupId, reason, total: updatedWarnings.length });
+      logger.info('Warning added to user', {
+        userId, groupId, reason, total: updatedWarnings.length,
+      });
       return { ...currentData, ...updatedData };
     } catch (error) {
       logger.error('Error adding warning:', error);
@@ -253,7 +255,9 @@ class ModerationModel {
       // Clear warnings when banned
       await this.clearWarnings(userId, groupId);
 
-      logger.info('User banned', { userId, groupId, reason, bannedBy });
+      logger.info('User banned', {
+        userId, groupId, reason, bannedBy,
+      });
       return banData;
     } catch (error) {
       logger.error('Error banning user:', error);

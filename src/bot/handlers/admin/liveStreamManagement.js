@@ -60,16 +60,16 @@ const registerLiveStreamManagementHandlers = (bot) => {
       activeStreams.forEach((stream, index) => {
         if (index < 10) { // Show max 10 in message
           const priceTag = stream.isPaid ? ` 💰$${stream.price}` : '';
-          message +=
-            `${index + 1}. ${stream.title}${priceTag}\n` +
-            `   👤 ${stream.hostName} (ID: ${stream.hostId})\n` +
-            `   👥 ${stream.currentViewers} watching | 👁 ${stream.totalViews} views\n` +
-            `   ❤️ ${stream.likes} likes\n\n`;
+          message
+            += `${index + 1}. ${stream.title}${priceTag}\n`
+            + `   👤 ${stream.hostName} (ID: ${stream.hostId})\n`
+            + `   👥 ${stream.currentViewers} watching | 👁 ${stream.totalViews} views\n`
+            + `   ❤️ ${stream.likes} likes\n\n`;
 
           buttons.push([
             Markup.button.callback(
               `⚙️ ${stream.title.substring(0, 25)}`,
-              `admin_stream_manage_${stream.streamId}`
+              `admin_stream_manage_${stream.streamId}`,
             ),
           ]);
         }
@@ -101,16 +101,15 @@ const registerLiveStreamManagementHandlers = (bot) => {
       const lang = getLanguage(ctx);
       const stats = await LiveStreamModel.getStatistics();
 
-      const message =
-        '📊 *Live Stream Statistics*\n\n' +
-        `📺 Total Streams: ${stats.total}\n` +
-        `🔴 Active: ${stats.active}\n` +
-        `🗓 Scheduled: ${stats.scheduled}\n` +
-        `⚫ Ended: ${stats.ended}\n\n` +
-        `*Engagement:*\n` +
-        `👁 Total Views: ${stats.totalViewers.toLocaleString()}\n` +
-        `❤️ Total Likes: ${stats.totalLikes.toLocaleString()}\n\n` +
-        `_Updated: ${new Date().toLocaleString()}_`;
+      const message = '📊 *Live Stream Statistics*\n\n'
+        + `📺 Total Streams: ${stats.total}\n`
+        + `🔴 Active: ${stats.active}\n`
+        + `🗓 Scheduled: ${stats.scheduled}\n`
+        + `⚫ Ended: ${stats.ended}\n\n`
+        + '*Engagement:*\n'
+        + `👁 Total Views: ${stats.totalViewers.toLocaleString()}\n`
+        + `❤️ Total Likes: ${stats.totalLikes.toLocaleString()}\n\n`
+        + `_Updated: ${new Date().toLocaleString()}_`;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -146,18 +145,17 @@ const registerLiveStreamManagementHandlers = (bot) => {
         return;
       }
 
-      let message = '📺 *All Streams*\n\n';
+      const message = '📺 *All Streams*\n\n';
       const buttons = [];
 
       activeStreams.slice(0, 15).forEach((stream) => {
-        const statusIcon =
-          stream.status === 'active' ? '🔴' :
-          stream.status === 'scheduled' ? '🗓' : '⚫';
+        const statusIcon = stream.status === 'active' ? '🔴'
+          : stream.status === 'scheduled' ? '🗓' : '⚫';
 
         buttons.push([
           Markup.button.callback(
             `${statusIcon} ${stream.title.substring(0, 30)}`,
-            `admin_stream_manage_${stream.streamId}`
+            `admin_stream_manage_${stream.streamId}`,
           ),
         ]);
       });
@@ -199,21 +197,19 @@ const registerLiveStreamManagementHandlers = (bot) => {
         return;
       }
 
-      const statusEmoji =
-        stream.status === 'active' ? '🔴 LIVE' :
-        stream.status === 'scheduled' ? '🗓 Scheduled' : '⚫ Ended';
+      const statusEmoji = stream.status === 'active' ? '🔴 LIVE'
+        : stream.status === 'scheduled' ? '🗓 Scheduled' : '⚫ Ended';
 
-      const message =
-        `📺 *Stream Details*\n\n` +
-        `${statusEmoji}\n\n` +
-        `*Title:* ${stream.title}\n` +
-        `*Host:* ${stream.hostName} (ID: ${stream.hostId})\n` +
-        `*Status:* ${stream.status}\n\n` +
-        `*Viewers:* ${stream.currentViewers} watching now\n` +
-        `*Total Views:* ${stream.totalViews}\n` +
-        `*Likes:* ${stream.likes}\n\n` +
-        `*Type:* ${stream.isPaid ? `💰 Paid ($${stream.price})` : '🆓 Free'}\n` +
-        `*Max Viewers:* ${stream.maxViewers}\n\n`;
+      const message = '📺 *Stream Details*\n\n'
+        + `${statusEmoji}\n\n`
+        + `*Title:* ${stream.title}\n`
+        + `*Host:* ${stream.hostName} (ID: ${stream.hostId})\n`
+        + `*Status:* ${stream.status}\n\n`
+        + `*Viewers:* ${stream.currentViewers} watching now\n`
+        + `*Total Views:* ${stream.totalViews}\n`
+        + `*Likes:* ${stream.likes}\n\n`
+        + `*Type:* ${stream.isPaid ? `💰 Paid ($${stream.price})` : '🆓 Free'}\n`
+        + `*Max Viewers:* ${stream.maxViewers}\n\n`;
 
       const buttons = [];
 
@@ -259,10 +255,10 @@ const registerLiveStreamManagementHandlers = (bot) => {
       await LiveStreamModel.endStream(streamId, stream.hostId);
 
       await ctx.editMessageText(
-        `✅ Stream ended by admin\n\n` +
-          `🎤 ${stream.title}\n` +
-          `👁 ${stream.totalViews} total views\n` +
-          `❤️ ${stream.likes} likes`,
+        '✅ Stream ended by admin\n\n'
+          + `🎤 ${stream.title}\n`
+          + `👁 ${stream.totalViews} total views\n`
+          + `❤️ ${stream.likes} likes`,
         Markup.inlineKeyboard([
           [Markup.button.callback(t('back', lang), 'admin_live_active')],
         ]),
@@ -274,7 +270,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
       try {
         await ctx.telegram.sendMessage(
           stream.hostId,
-          `⚠️ Your stream "${stream.title}" was ended by an administrator.`
+          `⚠️ Your stream "${stream.title}" was ended by an administrator.`,
         );
       } catch (notifyError) {
         logger.warn('Failed to notify stream host:', { streamId, hostId: stream.hostId });
@@ -313,12 +309,12 @@ const registerLiveStreamManagementHandlers = (bot) => {
       await ctx.saveSession();
 
       await ctx.editMessageText(
-        `⚠️ *Confirm Deletion*\n\n` +
-          `Are you sure you want to delete this stream?\n\n` +
-          `*Title:* ${stream.title}\n` +
-          `*Host:* ${stream.hostName}\n` +
-          `*Views:* ${stream.totalViews}\n\n` +
-          `This action cannot be undone.`,
+        '⚠️ *Confirm Deletion*\n\n'
+          + 'Are you sure you want to delete this stream?\n\n'
+          + `*Title:* ${stream.title}\n`
+          + `*Host:* ${stream.hostName}\n`
+          + `*Views:* ${stream.totalViews}\n\n`
+          + 'This action cannot be undone.',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -327,7 +323,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
               Markup.button.callback('❌ Cancel', `admin_stream_manage_${streamId}`),
             ],
           ]),
-        }
+        },
       );
     } catch (error) {
       logger.error('Error preparing stream deletion:', error);
@@ -361,9 +357,9 @@ const registerLiveStreamManagementHandlers = (bot) => {
       await LiveStreamModel.delete(streamId);
 
       await ctx.editMessageText(
-        `✅ Stream deleted successfully\n\n` +
-          `🎤 ${stream.title}\n` +
-          `👤 ${stream.hostName}`,
+        '✅ Stream deleted successfully\n\n'
+          + `🎤 ${stream.title}\n`
+          + `👤 ${stream.hostName}`,
         Markup.inlineKeyboard([
           [Markup.button.callback(t('back', lang), 'admin_live_active')],
         ]),

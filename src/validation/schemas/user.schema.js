@@ -94,7 +94,8 @@ const schemas = {
    */
   registration: Joi.object({
     userId: Joi.string().pattern(/^\d+$/).required(),
-    username: Joi.string().min(5).max(32).pattern(/^[a-zA-Z0-9_]+$/).optional(),
+    username: Joi.string().min(5).max(32).pattern(/^[a-zA-Z0-9_]+$/)
+      .optional(),
     firstName: Joi.string().min(1).max(100).required(),
     lastName: Joi.string().min(1).max(100).optional(),
     languageCode: Joi.string().length(2).optional(),
@@ -149,8 +150,8 @@ const validate = (schema, source = 'message', extractor = null) => async (ctx, n
 
     // Send user-friendly error message
     await ctx.reply(
-      `❌ Datos inválidos: ${errorMessages}\n\n` +
-      'Por favor verifica e intenta de nuevo.',
+      `❌ Datos inválidos: ${errorMessages}\n\n`
+      + 'Por favor verifica e intenta de nuevo.',
     );
 
     return; // Stop middleware chain

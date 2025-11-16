@@ -3,8 +3,8 @@
  * Handles live streaming with Agora integration
  */
 
-const { getFirestore } = require('../config/firebase');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
+const { getFirestore } = require('../config/firebase');
 const logger = require('../utils/logger');
 const redisClient = require('../config/redis');
 
@@ -89,10 +89,10 @@ class LiveStreamModel {
   /**
    * Generate Agora tokens for host and viewers
    * @param {string} channelName - Agora channel name
-   * @param {string} userId - User ID
+   * @param {string} _userId - User ID
    * @returns {Object} Tokens for host and viewer
    */
-  static generateAgoraTokens(channelName, userId) {
+  static generateAgoraTokens(channelName, _userId) {
     try {
       const appId = process.env.AGORA_APP_ID;
       const appCertificate = process.env.AGORA_APP_CERTIFICATE;
@@ -106,7 +106,7 @@ class LiveStreamModel {
       }
 
       const uid = 0; // 0 means any user can join
-      const role = RtcRole.PUBLISHER;
+      const _role = RtcRole.PUBLISHER; // Reserved for future use
       const expirationTimeInSeconds = 3600; // 1 hour
       const currentTimestamp = Math.floor(Date.now() / 1000);
       const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
@@ -118,7 +118,7 @@ class LiveStreamModel {
         channelName,
         uid,
         RtcRole.PUBLISHER,
-        privilegeExpiredTs
+        privilegeExpiredTs,
       );
 
       // Viewer token (can only subscribe)
@@ -128,7 +128,7 @@ class LiveStreamModel {
         channelName,
         uid,
         RtcRole.SUBSCRIBER,
-        privilegeExpiredTs
+        privilegeExpiredTs,
       );
 
       return { hostToken, viewerToken };
@@ -281,7 +281,7 @@ class LiveStreamModel {
       }
 
       // Check if viewer is already in stream
-      const isAlreadyViewing = stream.viewers.some(v => v.viewerId === String(viewerId));
+      const isAlreadyViewing = stream.viewers.some((v) => v.viewerId === String(viewerId));
 
       if (!isAlreadyViewing) {
         // Add viewer
@@ -315,7 +315,7 @@ class LiveStreamModel {
       logger.info('User joined stream', { streamId, viewerId });
 
       // Invalidate cache
-      await redisClient.del(`active_streams:*`);
+      await redisClient.del('active_streams:*');
 
       return {
         stream,
@@ -343,7 +343,7 @@ class LiveStreamModel {
       }
 
       // Remove viewer from active viewers list
-      const updatedViewers = stream.viewers.filter(v => v.viewerId !== String(viewerId));
+      const updatedViewers = stream.viewers.filter((v) => v.viewerId !== String(viewerId));
       const viewerLeft = stream.viewers.length > updatedViewers.length;
 
       if (viewerLeft) {
@@ -371,7 +371,7 @@ class LiveStreamModel {
         logger.info('User left stream', { streamId, viewerId });
 
         // Invalidate cache
-        await redisClient.del(`active_streams:*`);
+        await redisClient.del('active_streams:*');
       }
     } catch (error) {
       logger.error('Error leaving stream:', error);
@@ -424,7 +424,7 @@ class LiveStreamModel {
       logger.info('Stream ended', { streamId, hostId });
 
       // Invalidate cache
-      await redisClient.del(`active_streams:*`);
+      await redisClient.del('active_streams:*');
     } catch (error) {
       logger.error('Error ending stream:', error);
       throw error;
@@ -449,7 +449,7 @@ class LiveStreamModel {
       logger.info('Stream liked', { streamId });
 
       // Invalidate cache
-      await redisClient.del(`active_streams:*`);
+      await redisClient.del('active_streams:*');
     } catch (error) {
       logger.error('Error liking stream:', error);
       throw error;
@@ -553,7 +553,7 @@ class LiveStreamModel {
       logger.info('Stream deleted', { streamId });
 
       // Invalidate cache
-      await redisClient.del(`active_streams:*`);
+      await redisClient.del('active_streams:*');
     } catch (error) {
       logger.error('Error deleting stream:', error);
       throw error;

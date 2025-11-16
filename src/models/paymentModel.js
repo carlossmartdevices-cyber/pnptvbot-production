@@ -1,6 +1,6 @@
+const { v4: uuidv4 } = require('uuid');
 const { getFirestore } = require('../config/firebase');
 const logger = require('../utils/logger');
-const { v4: uuidv4 } = require('uuid');
 
 const COLLECTION = 'payments';
 

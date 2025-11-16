@@ -55,8 +55,12 @@ const registerZoomHandlers = (bot) => {
 
       // In production, fetch active rooms from database
       const activeRooms = [
-        { id: '1', name: 'Community Chat', host: 'PNPtv', participants: 15 },
-        { id: '2', name: 'Music Session', host: 'DJ Alex', participants: 8 },
+        {
+          id: '1', name: 'Community Chat', host: 'PNPtv', participants: 15,
+        },
+        {
+          id: '2', name: 'Music Session', host: 'DJ Alex', participants: 8,
+        },
       ];
 
       if (activeRooms.length === 0) {

@@ -35,7 +35,7 @@ const translations = {
     myProfile: '👤 My Profile',
     nearbyUsers: '🌍 Nearby Users',
     liveStreams: '🎤 Live Streams',
-    radio: '📻 Radio',
+    radioMenu: '📻 Radio',
     zoomRooms: '🎥 Zoom Rooms',
     support: '🤖 Support',
     settings: '⚙️ Settings',
@@ -50,8 +50,11 @@ const translations = {
     paymentMethod: 'Choose payment method:',
     payWithEpayco: '💳 Pay with ePayco (USD)',
     payWithDaimo: '💰 Pay with Daimo (USDC)',
-    paymentInstructions: '💳 Payment Instructions:\n\nPlease click the link below to complete your payment:\n\n{paymentUrl}\n\nOnce payment is confirmed, your subscription will be activated automatically.',
-    paymentSuccess: '✅ Payment successful! Your PRIME subscription is now active. Enjoy premium features!',
+    paymentInstructions: '💳 Payment Instructions:\n\n'
+      + 'Please click the link below to complete your payment:\n\n{paymentUrl}\n\n'
+      + 'Once payment is confirmed, your subscription will be activated automatically.',
+    paymentSuccess: '✅ Payment successful! Your PRIME subscription is now active. '
+      + 'Enjoy premium features!',
     paymentFailed: '❌ Payment failed. Please try again or contact support.',
     subscriptionActive: 'Your subscription is active until {expiry}',
     subscriptionExpired: 'Your subscription has expired. Please renew to continue enjoying PRIME features.',
@@ -237,7 +240,6 @@ const translations = {
     analytics: '📊 Analytics',
     searchUser: 'Enter user ID or username to search:',
     userFound: 'User found:',
-    userNotFound: 'User not found.',
     extendSubscription: '⏰ Extend Subscription',
     deactivateUser: '🚫 Deactivate User',
     broadcastTarget: 'Select broadcast target:',
@@ -338,7 +340,7 @@ const translations = {
     myProfile: '👤 Mi Perfil',
     nearbyUsers: '🌍 Usuarios Cercanos',
     liveStreams: '🎤 Transmisiones en Vivo',
-    radio: '📻 Radio',
+    radioMenu: '📻 Radio',
     zoomRooms: '🎥 Salas Zoom',
     support: '🤖 Soporte',
     settings: '⚙️ Configuración',
@@ -353,8 +355,11 @@ const translations = {
     paymentMethod: 'Elige método de pago:',
     payWithEpayco: '💳 Pagar con ePayco (USD)',
     payWithDaimo: '💰 Pagar con Daimo (USDC)',
-    paymentInstructions: '💳 Instrucciones de Pago:\n\nPor favor haz clic en el enlace para completar tu pago:\n\n{paymentUrl}\n\nUna vez confirmado el pago, tu suscripción se activará automáticamente.',
-    paymentSuccess: '✅ ¡Pago exitoso! Tu suscripción PRIME está activa. ¡Disfruta las funciones premium!',
+    paymentInstructions: '💳 Instrucciones de Pago:\n\n'
+      + 'Por favor haz clic en el enlace para completar tu pago:\n\n{paymentUrl}\n\n'
+      + 'Una vez confirmado el pago, tu suscripción se activará automáticamente.',
+    paymentSuccess: '✅ ¡Pago exitoso! Tu suscripción PRIME está activa. '
+      + '¡Disfruta las funciones premium!',
     paymentFailed: '❌ Pago fallido. Por favor intenta de nuevo o contacta soporte.',
     subscriptionActive: 'Tu suscripción está activa hasta {expiry}',
     subscriptionExpired: 'Tu suscripción ha expirado. Por favor renueva para continuar disfrutando PRIME.',
@@ -441,7 +446,8 @@ const translations = {
     streamLiked: '❤️ ¡Me gusta!',
     manageStream: 'Gestionar Transmisión',
     liveNow: 'En Vivo Ahora',
-    streamHostInstructions: 'Haz clic en "Iniciar Transmisión" para salir en vivo. ¡Comparte tu enlace con los espectadores!',
+    streamHostInstructions: 'Haz clic en "Iniciar Transmisión" para salir en vivo. '
+      + '¡Comparte tu enlace con los espectadores!',
     streamInstructions: 'Haz clic en "Ver Transmisión" para comenzar a ver. ¡Disfruta!',
     paidStreamNotice: '💰 Esta es una transmisión de pago',
     paymentIntegrationPending: 'Integración de pagos próximamente. ¡Acceso gratuito por ahora!',
@@ -459,7 +465,8 @@ const translations = {
       description: 'Tu experiencia de streaming musical 24/7',
       onAir: 'Al Aire',
       liveNow: 'En Vivo Ahora',
-      tip: 'Toca el botón de abajo para abrir el stream en tu reproductor favorito',
+      tip: 'Toca el botón de abajo para abrir el stream en tu '
+        + 'reproductor favorito',
       openStream: '🎧 Abrir Stream',
       artist: 'Artista',
       duration: 'Duración',
@@ -512,7 +519,8 @@ const translations = {
     duration30: '30 minutos',
     duration60: '60 minutos',
     duration120: '2 horas',
-    roomCreated: '🎥 ¡Tu sala Zoom está lista!\n\n🔗 URL de Ingreso: {url}\n\n💡 Comparte este enlace con los participantes.',
+    roomCreated: '🎥 ¡Tu sala Zoom está lista!\n\n🔗 URL de Ingreso: {url}\n\n'
+      + '💡 Comparte este enlace con los participantes.',
     noActiveRooms: 'No hay salas activas disponibles.',
 
     // Support
@@ -540,7 +548,6 @@ const translations = {
     analytics: '📊 Analíticas',
     searchUser: 'Ingresa ID o nombre de usuario para buscar:',
     userFound: 'Usuario encontrado:',
-    userNotFound: 'Usuario no encontrado.',
     extendSubscription: '⏰ Extender Suscripción',
     deactivateUser: '🚫 Desactivar Usuario',
     broadcastTarget: 'Selecciona objetivo de difusión:',

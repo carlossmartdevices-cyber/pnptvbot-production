@@ -76,7 +76,9 @@ const getDaimoConfig = () => {
  * @param {Object} params - { amount, userId, planId, chatId }
  * @returns {Object} Payment intent object
  */
-const createPaymentIntent = ({ amount, userId, planId, chatId, description }) => {
+const createPaymentIntent = ({
+  amount, userId, planId, chatId, description,
+}) => {
   const config = getDaimoConfig();
 
   // Convert amount to token units (USDC has 6 decimals)
@@ -189,9 +191,7 @@ const mapDaimoStatus = (daimoStatus) => {
  * @param {string} units - Amount in token units
  * @returns {number} Amount in display value (e.g., 10.50)
  */
-const formatAmountFromUnits = (units) => {
-  return parseFloat(units) / 1e6;
-};
+const formatAmountFromUnits = (units) => parseFloat(units) / 1e6;
 
 module.exports = {
   getDaimoConfig,

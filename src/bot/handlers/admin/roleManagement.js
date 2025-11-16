@@ -269,12 +269,12 @@ const registerRoleManagementHandlers = (bot) => {
       const role = user.role || 'user';
       const roleDisplay = await PermissionService.getUserRoleDisplay(userId, 'es');
 
-      let message = `👤 *Gestionar Usuario*\n\n`;
+      let message = '👤 *Gestionar Usuario*\n\n';
       message += `Nombre: ${user.firstName || 'N/A'}\n`;
       message += `Usuario: @${user.username || 'N/A'}\n`;
       message += `ID: \`${userId}\`\n`;
       message += `Rol actual: ${roleDisplay}\n\n`;
-      message += `¿Qué deseas hacer?`;
+      message += '¿Qué deseas hacer?';
 
       const keyboard = [];
 
@@ -351,7 +351,7 @@ const registerRoleManagementHandlers = (bot) => {
       await ctx.reply('❌ Error al asignar rol. Intenta nuevamente.');
     }
 
-    return; // Don't call next() - we handled this message
+    // Don't call next() - we handled this message
   });
 };
 

@@ -23,40 +23,40 @@ const registerPrivateCallHandlers = (bot) => {
         : '🔴 *Currently Unavailable*';
 
       const message = lang === 'es'
-        ? `📞 *Llamada Privada 1:1*\n\n` +
-          `${availabilityIndicator}\n\n` +
-          `💎 *¿Qué incluye?*\n` +
-          `• 45 minutos de consulta personalizada\n` +
-          `• Videollamada directa (calidad HD)\n` +
-          `• Consejos expertos y orientación\n` +
-          `• Horario flexible\n\n` +
-          `💰 *Precio:* $100 USD (USDC en Optimism)\n\n` +
-          `📱 *Puedes pagar con:*\n` +
-          `• Zelle\n` +
-          `• CashApp\n` +
-          `• Venmo\n` +
-          `• Revolut\n` +
-          `• Wise\n\n` +
-          (availability.available
-            ? '👥 *Elige con quién quieres la llamada:*'
-            : '⏰ No disponible en este momento. Te notificaremos cuando haya disponibilidad.')
-        : `📞 *Private 1:1 Call*\n\n` +
-          `${availabilityIndicator}\n\n` +
-          `💎 *What's included:*\n` +
-          `• 45 minutes of personalized consultation\n` +
-          `• Direct video call (HD quality)\n` +
-          `• Expert advice and guidance\n` +
-          `• Flexible scheduling\n\n` +
-          `💰 *Price:* $100 USD (USDC on Optimism)\n\n` +
-          `📱 *You can pay using:*\n` +
-          `• Zelle\n` +
-          `• CashApp\n` +
-          `• Venmo\n` +
-          `• Revolut\n` +
-          `• Wise\n\n` +
-          (availability.available
-            ? '👥 *Choose who you want to talk to:*'
-            : '⏰ Not available right now. We\'ll notify you when available.');
+        ? '📞 *Llamada Privada 1:1*\n\n'
+          + `${availabilityIndicator}\n\n`
+          + '💎 *¿Qué incluye?*\n'
+          + '• 45 minutos de consulta personalizada\n'
+          + '• Videollamada directa (calidad HD)\n'
+          + '• Consejos expertos y orientación\n'
+          + '• Horario flexible\n\n'
+          + '💰 *Precio:* $100 USD (USDC en Optimism)\n\n'
+          + '📱 *Puedes pagar con:*\n'
+          + '• Zelle\n'
+          + '• CashApp\n'
+          + '• Venmo\n'
+          + '• Revolut\n'
+          + `• Wise\n\n${
+            availability.available
+              ? '👥 *Elige con quién quieres la llamada:*'
+              : '⏰ No disponible en este momento. Te notificaremos cuando haya disponibilidad.'}`
+        : '📞 *Private 1:1 Call*\n\n'
+          + `${availabilityIndicator}\n\n`
+          + '💎 *What\'s included:*\n'
+          + '• 45 minutes of personalized consultation\n'
+          + '• Direct video call (HD quality)\n'
+          + '• Expert advice and guidance\n'
+          + '• Flexible scheduling\n\n'
+          + '💰 *Price:* $100 USD (USDC on Optimism)\n\n'
+          + '📱 *You can pay using:*\n'
+          + '• Zelle\n'
+          + '• CashApp\n'
+          + '• Venmo\n'
+          + '• Revolut\n'
+          + `• Wise\n\n${
+            availability.available
+              ? '👥 *Choose who you want to talk to:*'
+              : '⏰ Not available right now. We\'ll notify you when available.'}`;
 
       const buttons = availability.available
         ? [
@@ -87,14 +87,14 @@ const registerPrivateCallHandlers = (bot) => {
 
       const lang = getLanguage(ctx);
       const message = lang === 'es'
-        ? `🎭 *Llamada con Santino*\n\n` +
-          `Has seleccionado una llamada privada de 45 minutos con Santino.\n\n` +
-          `💰 Precio: $100 USD\n\n` +
-          `Procede al pago para reservar tu llamada.`
-        : `🎭 *Call with Santino*\n\n` +
-          `You've selected a 45-minute private call with Santino.\n\n` +
-          `💰 Price: $100 USD\n\n` +
-          `Proceed to payment to book your call.`;
+        ? '🎭 *Llamada con Santino*\n\n'
+          + 'Has seleccionado una llamada privada de 45 minutos con Santino.\n\n'
+          + '💰 Precio: $100 USD\n\n'
+          + 'Procede al pago para reservar tu llamada.'
+        : '🎭 *Call with Santino*\n\n'
+          + 'You\'ve selected a 45-minute private call with Santino.\n\n'
+          + '💰 Price: $100 USD\n\n'
+          + 'Proceed to payment to book your call.';
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -117,14 +117,14 @@ const registerPrivateCallHandlers = (bot) => {
 
       const lang = getLanguage(ctx);
       const message = lang === 'es'
-        ? `🎤 *Llamada con Lex Boy*\n\n` +
-          `Has seleccionado una llamada privada de 45 minutos con Lex Boy.\n\n` +
-          `💰 Precio: $100 USD\n\n` +
-          `Procede al pago para reservar tu llamada.`
-        : `🎤 *Call with Lex Boy*\n\n` +
-          `You've selected a 45-minute private call with Lex Boy.\n\n` +
-          `💰 Price: $100 USD\n\n` +
-          `Proceed to payment to book your call.`;
+        ? '🎤 *Llamada con Lex Boy*\n\n'
+          + 'Has seleccionado una llamada privada de 45 minutos con Lex Boy.\n\n'
+          + '💰 Precio: $100 USD\n\n'
+          + 'Procede al pago para reservar tu llamada.'
+        : '🎤 *Call with Lex Boy*\n\n'
+          + 'You\'ve selected a 45-minute private call with Lex Boy.\n\n'
+          + '💰 Price: $100 USD\n\n'
+          + 'Proceed to payment to book your call.';
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -177,34 +177,34 @@ const registerPrivateCallHandlers = (bot) => {
         await ctx.saveSession();
 
         const paymentMessage = lang === 'es'
-          ? `💳 *Pago de Llamada Privada*\n\n` +
-            `Precio: $100 USDC\n\n` +
-            `📱 *Puedes pagar usando:*\n` +
-            `• Zelle\n` +
-            `• CashApp\n` +
-            `• Venmo\n` +
-            `• Revolut\n` +
-            `• Wise\n\n` +
-            `💡 *Cómo funciona:*\n` +
-            `1. Haz clic en "Pagar Ahora"\n` +
-            `2. Elige tu app de pago preferida\n` +
-            `3. El pago se convierte automáticamente a USDC\n` +
-            `4. Agenda tu llamada inmediatamente después\n\n` +
-            `🔒 Seguro y rápido en la red Optimism`
-          : `💳 *Private Call Payment*\n\n` +
-            `Price: $100 USDC\n\n` +
-            `📱 *You can pay using:*\n` +
-            `• Zelle\n` +
-            `• CashApp\n` +
-            `• Venmo\n` +
-            `• Revolut\n` +
-            `• Wise\n\n` +
-            `💡 *How it works:*\n` +
-            `1. Click "Pay Now"\n` +
-            `2. Choose your preferred payment app\n` +
-            `3. Payment is automatically converted to USDC\n` +
-            `4. Schedule your call immediately after\n\n` +
-            `🔒 Secure and fast on Optimism network`;
+          ? '💳 *Pago de Llamada Privada*\n\n'
+            + 'Precio: $100 USDC\n\n'
+            + '📱 *Puedes pagar usando:*\n'
+            + '• Zelle\n'
+            + '• CashApp\n'
+            + '• Venmo\n'
+            + '• Revolut\n'
+            + '• Wise\n\n'
+            + '💡 *Cómo funciona:*\n'
+            + '1. Haz clic en "Pagar Ahora"\n'
+            + '2. Elige tu app de pago preferida\n'
+            + '3. El pago se convierte automáticamente a USDC\n'
+            + '4. Agenda tu llamada inmediatamente después\n\n'
+            + '🔒 Seguro y rápido en la red Optimism'
+          : '💳 *Private Call Payment*\n\n'
+            + 'Price: $100 USDC\n\n'
+            + '📱 *You can pay using:*\n'
+            + '• Zelle\n'
+            + '• CashApp\n'
+            + '• Venmo\n'
+            + '• Revolut\n'
+            + '• Wise\n\n'
+            + '💡 *How it works:*\n'
+            + '1. Click "Pay Now"\n'
+            + '2. Choose your preferred payment app\n'
+            + '3. Payment is automatically converted to USDC\n'
+            + '4. Schedule your call immediately after\n\n'
+            + '🔒 Secure and fast on Optimism network';
 
         await ctx.editMessageText(paymentMessage, {
           parse_mode: 'Markdown',
@@ -244,12 +244,12 @@ const registerPrivateCallHandlers = (bot) => {
       const availability = await CallService.getAvailability();
 
       const message = lang === 'es'
-        ? `📅 *Agenda tu Llamada*\n\n` +
-          `¡Pago confirmado! 🎉\n\n` +
-          `Elige cuándo quieres tu llamada:`
-        : `📅 *Schedule Your Call*\n\n` +
-          `Payment confirmed! 🎉\n\n` +
-          `Choose when you want your call:`;
+        ? '📅 *Agenda tu Llamada*\n\n'
+          + '¡Pago confirmado! 🎉\n\n'
+          + 'Elige cuándo quieres tu llamada:'
+        : '📅 *Schedule Your Call*\n\n'
+          + 'Payment confirmed! 🎉\n\n'
+          + 'Choose when you want your call:';
 
       const buttons = [];
 
@@ -321,26 +321,26 @@ const registerPrivateCallHandlers = (bot) => {
         await ctx.saveSession();
 
         const message = lang === 'es'
-          ? `✅ *¡Llamada Reservada!*\n\n` +
-            `🎭 Con: ${performer}\n` +
-            `📅 Fecha: ${scheduledDateStr}\n` +
-            `⏰ Hora: ${scheduledTimeStr}\n` +
-            `⏱ Duración: 45 minutos\n\n` +
-            `🔗 *Link de la llamada:*\n` +
-            `${booking.call.meetingUrl}\n\n` +
-            `⚡ *Tu llamada comienza en 15 minutos!*\n` +
-            `Prepárate y únete usando el link de arriba.\n\n` +
-            `¡Nos vemos pronto! 👋`
-          : `✅ *Call Booked!*\n\n` +
-            `🎭 With: ${performer}\n` +
-            `📅 Date: ${scheduledDateStr}\n` +
-            `⏰ Time: ${scheduledTimeStr}\n` +
-            `⏱ Duration: 45 minutes\n\n` +
-            `🔗 *Join Link:*\n` +
-            `${booking.call.meetingUrl}\n\n` +
-            `⚡ *Your call starts in 15 minutes!*\n` +
-            `Get ready and join using the link above.\n\n` +
-            `See you soon! 👋`;
+          ? '✅ *¡Llamada Reservada!*\n\n'
+            + `🎭 Con: ${performer}\n`
+            + `📅 Fecha: ${scheduledDateStr}\n`
+            + `⏰ Hora: ${scheduledTimeStr}\n`
+            + '⏱ Duración: 45 minutos\n\n'
+            + '🔗 *Link de la llamada:*\n'
+            + `${booking.call.meetingUrl}\n\n`
+            + '⚡ *Tu llamada comienza en 15 minutos!*\n'
+            + 'Prepárate y únete usando el link de arriba.\n\n'
+            + '¡Nos vemos pronto! 👋'
+          : '✅ *Call Booked!*\n\n'
+            + `🎭 With: ${performer}\n`
+            + `📅 Date: ${scheduledDateStr}\n`
+            + `⏰ Time: ${scheduledTimeStr}\n`
+            + '⏱ Duration: 45 minutes\n\n'
+            + '🔗 *Join Link:*\n'
+            + `${booking.call.meetingUrl}\n\n`
+            + '⚡ *Your call starts in 15 minutes!*\n'
+            + 'Get ready and join using the link above.\n\n'
+            + 'See you soon! 👋';
 
         await ctx.editMessageText(message, {
           parse_mode: 'Markdown',
@@ -370,20 +370,20 @@ const registerPrivateCallHandlers = (bot) => {
       const lang = getLanguage(ctx);
 
       const message = lang === 'es'
-        ? `📅 *Agenda tu Llamada*\n\n` +
-          `Por favor, envía tu fecha y hora preferida en el siguiente formato:\n\n` +
-          `📅 Fecha: DD/MM/YYYY\n` +
-          `⏰ Hora: HH:MM (zona horaria)\n\n` +
-          `Ejemplo:\n` +
-          `25/01/2025\n` +
-          `15:00 EST`
-        : `📅 *Schedule Your Call*\n\n` +
-          `Please send your preferred date and time in the following format:\n\n` +
-          `📅 Date: DD/MM/YYYY\n` +
-          `⏰ Time: HH:MM (timezone)\n\n` +
-          `Example:\n` +
-          `01/25/2025\n` +
-          `3:00 PM EST`;
+        ? '📅 *Agenda tu Llamada*\n\n'
+          + 'Por favor, envía tu fecha y hora preferida en el siguiente formato:\n\n'
+          + '📅 Fecha: DD/MM/YYYY\n'
+          + '⏰ Hora: HH:MM (zona horaria)\n\n'
+          + 'Ejemplo:\n'
+          + '25/01/2025\n'
+          + '15:00 EST'
+        : '📅 *Schedule Your Call*\n\n'
+          + 'Please send your preferred date and time in the following format:\n\n'
+          + '📅 Date: DD/MM/YYYY\n'
+          + '⏰ Time: HH:MM (timezone)\n\n'
+          + 'Example:\n'
+          + '01/25/2025\n'
+          + '3:00 PM EST';
 
       // Set user state to expect scheduling input
       ctx.session.temp = ctx.session.temp || {};
@@ -402,7 +402,7 @@ const registerPrivateCallHandlers = (bot) => {
   bot.on('text', async (ctx, next) => {
     try {
       if (ctx.session?.temp?.awaitingCallSchedule) {
-        const text = ctx.message.text;
+        const { text } = ctx.message;
         const userId = ctx.from.id;
         const userName = ctx.from.first_name + (ctx.from.last_name ? ` ${ctx.from.last_name}` : '');
         const userUsername = ctx.from.username;
@@ -415,10 +415,10 @@ const registerPrivateCallHandlers = (bot) => {
 
         if (!scheduledDate || !scheduledTime) {
           await ctx.reply(
-            '⚠️ Please provide both date and time.\n\n' +
-            'Format:\n' +
-            'DD/MM/YYYY\n' +
-            'HH:MM timezone',
+            '⚠️ Please provide both date and time.\n\n'
+            + 'Format:\n'
+            + 'DD/MM/YYYY\n'
+            + 'HH:MM timezone',
           );
           return;
         }
@@ -445,24 +445,24 @@ const registerPrivateCallHandlers = (bot) => {
 
           const lang = getLanguage(ctx);
           const message = lang === 'es'
-            ? `✅ *¡Llamada Reservada!*\n\n` +
-              `🎭 Con: ${performer}\n` +
-              `📅 Fecha: ${scheduledDate}\n` +
-              `⏰ Hora: ${scheduledTime}\n` +
-              `⏱ Duración: 45 minutos\n\n` +
-              `🔗 *Link de la llamada:*\n` +
-              `${booking.call.meetingUrl}\n\n` +
-              `📧 Recibirás un recordatorio 15 minutos antes de la llamada.\n\n` +
-              `¡Nos vemos pronto! 👋`
-            : `✅ *Call Booked Successfully!*\n\n` +
-              `🎭 With: ${performer}\n` +
-              `📅 Date: ${scheduledDate}\n` +
-              `⏰ Time: ${scheduledTime}\n` +
-              `⏱ Duration: 45 minutes\n\n` +
-              `🔗 *Join Link:*\n` +
-              `${booking.call.meetingUrl}\n\n` +
-              `📧 You'll receive a reminder 15 minutes before the call.\n\n` +
-              `See you soon! 👋`;
+            ? '✅ *¡Llamada Reservada!*\n\n'
+              + `🎭 Con: ${performer}\n`
+              + `📅 Fecha: ${scheduledDate}\n`
+              + `⏰ Hora: ${scheduledTime}\n`
+              + '⏱ Duración: 45 minutos\n\n'
+              + '🔗 *Link de la llamada:*\n'
+              + `${booking.call.meetingUrl}\n\n`
+              + '📧 Recibirás un recordatorio 15 minutos antes de la llamada.\n\n'
+              + '¡Nos vemos pronto! 👋'
+            : '✅ *Call Booked Successfully!*\n\n'
+              + `🎭 With: ${performer}\n`
+              + `📅 Date: ${scheduledDate}\n`
+              + `⏰ Time: ${scheduledTime}\n`
+              + '⏱ Duration: 45 minutes\n\n'
+              + '🔗 *Join Link:*\n'
+              + `${booking.call.meetingUrl}\n\n`
+              + '📧 You\'ll receive a reminder 15 minutes before the call.\n\n'
+              + 'See you soon! 👋';
 
           await ctx.reply(message, {
             parse_mode: 'Markdown',
@@ -494,9 +494,9 @@ const registerPrivateCallHandlers = (bot) => {
       // For now, just acknowledge
       await ctx.answerCbQuery('✅ You\'ll be notified when available!');
       await ctx.editMessageText(
-        '🔔 *Notification Enabled*\n\n' +
-        'We\'ll send you a message as soon as slots become available.\n\n' +
-        'Stay tuned! 📢',
+        '🔔 *Notification Enabled*\n\n'
+        + 'We\'ll send you a message as soon as slots become available.\n\n'
+        + 'Stay tuned! 📢',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -518,8 +518,8 @@ const registerPrivateCallHandlers = (bot) => {
 
       if (calls.length === 0) {
         await ctx.editMessageText(
-          '📅 *My Calls*\n\n' +
-          'You haven\'t booked any calls yet.',
+          '📅 *My Calls*\n\n'
+          + 'You haven\'t booked any calls yet.',
           {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
@@ -541,10 +541,10 @@ const registerPrivateCallHandlers = (bot) => {
           cancelled: '❌',
         }[call.status] || '📞';
 
-        message +=
-          `${index + 1}. ${statusEmoji} ${call.status.toUpperCase()}\n` +
-          `   📅 ${call.scheduledDate} at ${call.scheduledTime}\n` +
-          `   ⏱ 45 minutes\n`;
+        message
+          += `${index + 1}. ${statusEmoji} ${call.status.toUpperCase()}\n`
+          + `   📅 ${call.scheduledDate} at ${call.scheduledTime}\n`
+          + '   ⏱ 45 minutes\n';
 
         if (call.meetingUrl && (call.status === 'confirmed' || call.status === 'pending')) {
           message += `   🔗 ${call.meetingUrl}\n`;

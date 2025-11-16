@@ -19,13 +19,13 @@ const registerCallManagementHandlers = (bot) => {
       const statusEmoji = availability.available ? '🟢' : '🔴';
       const statusText = availability.available ? 'Available' : 'Not Available';
 
-      const message = `📞 *Private Call Management*\n\n` +
-        `${statusEmoji} Status: ${statusText}\n` +
-        `📊 Total Calls: ${stats.total}\n` +
-        `✅ Completed: ${stats.completed}\n` +
-        `📅 Upcoming: ${stats.pending + stats.confirmed}\n` +
-        `💰 Total Revenue: $${stats.revenue}\n\n` +
-        `Use the buttons below to manage your availability:`;
+      const message = '📞 *Private Call Management*\n\n'
+        + `${statusEmoji} Status: ${statusText}\n`
+        + `📊 Total Calls: ${stats.total}\n`
+        + `✅ Completed: ${stats.completed}\n`
+        + `📅 Upcoming: ${stats.pending + stats.confirmed}\n`
+        + `💰 Total Revenue: $${stats.revenue}\n\n`
+        + 'Use the buttons below to manage your availability:';
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -78,10 +78,10 @@ const registerCallManagementHandlers = (bot) => {
 
       await ctx.answerCbQuery('✅ Marked as available for 24 hours');
       await ctx.editMessageText(
-        '✅ *Availability Updated*\n\n' +
-        'You are now marked as available for private calls.\n' +
-        'This will expire in 24 hours.\n\n' +
-        'Do you want to notify users?',
+        '✅ *Availability Updated*\n\n'
+        + 'You are now marked as available for private calls.\n'
+        + 'This will expire in 24 hours.\n\n'
+        + 'Do you want to notify users?',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -115,8 +115,8 @@ const registerCallManagementHandlers = (bot) => {
 
       await ctx.answerCbQuery('✅ Marked as unavailable');
       await ctx.editMessageText(
-        '✅ *Availability Updated*\n\n' +
-        'You are now marked as unavailable for private calls.',
+        '✅ *Availability Updated*\n\n'
+        + 'You are now marked as unavailable for private calls.',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -142,21 +142,20 @@ const registerCallManagementHandlers = (bot) => {
 
       await ctx.answerCbQuery('📢 Broadcasting to all users...');
 
-      const broadcastMessage =
-        '🎉 *Great News!*\n\n' +
-        '📞 We\'re now available for *Private 1:1 Calls*!\n\n' +
-        '👥 *Choose your performer:*\n' +
-        '• 🎭 Santino\n' +
-        '• 🎤 Lex Boy\n\n' +
-        '💎 *What you get:*\n' +
-        '• 45 minutes of personalized consultation\n' +
-        '• Direct video call (HD quality)\n' +
-        '• Expert advice and guidance\n' +
-        '• ⚡ Quick scheduling (can start in 15 min!)\n' +
-        '• Or schedule for later\n\n' +
-        '💰 Price: $100 USD (pay with Zelle, CashApp, Venmo, Revolut, Wise)\n\n' +
-        '🚀 *Limited slots available!*\n' +
-        'Book your call now before they\'re gone.';
+      const broadcastMessage = '🎉 *Great News!*\n\n'
+        + '📞 We\'re now available for *Private 1:1 Calls*!\n\n'
+        + '👥 *Choose your performer:*\n'
+        + '• 🎭 Santino\n'
+        + '• 🎤 Lex Boy\n\n'
+        + '💎 *What you get:*\n'
+        + '• 45 minutes of personalized consultation\n'
+        + '• Direct video call (HD quality)\n'
+        + '• Expert advice and guidance\n'
+        + '• ⚡ Quick scheduling (can start in 15 min!)\n'
+        + '• Or schedule for later\n\n'
+        + '💰 Price: $100 USD (pay with Zelle, CashApp, Venmo, Revolut, Wise)\n\n'
+        + '🚀 *Limited slots available!*\n'
+        + 'Book your call now before they\'re gone.';
 
       const results = await CallService.broadcastAvailability(
         ctx.telegram,
@@ -164,10 +163,10 @@ const registerCallManagementHandlers = (bot) => {
       );
 
       await ctx.editMessageText(
-        `📢 *Broadcast Completed*\n\n` +
-        `✅ Sent: ${results.sent}\n` +
-        `❌ Failed: ${results.failed}\n` +
-        `📊 Total: ${results.total}`,
+        '📢 *Broadcast Completed*\n\n'
+        + `✅ Sent: ${results.sent}\n`
+        + `❌ Failed: ${results.failed}\n`
+        + `📊 Total: ${results.total}`,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -188,8 +187,8 @@ const registerCallManagementHandlers = (bot) => {
 
       if (calls.length === 0) {
         await ctx.editMessageText(
-          '📅 *Upcoming Calls*\n\n' +
-          'No upcoming calls scheduled.',
+          '📅 *Upcoming Calls*\n\n'
+          + 'No upcoming calls scheduled.',
           {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
@@ -206,11 +205,11 @@ const registerCallManagementHandlers = (bot) => {
         const date = new Date(call.scheduledDate);
         const dateStr = date.toLocaleDateString();
 
-        message +=
-          `${index + 1}. ${call.userName} (@${call.userUsername || 'N/A'})\n` +
-          `   📅 ${dateStr} at ${call.scheduledTime}\n` +
-          `   🔗 ${call.meetingUrl}\n` +
-          `   Status: ${call.status}\n\n`;
+        message
+          += `${index + 1}. ${call.userName} (@${call.userUsername || 'N/A'})\n`
+          + `   📅 ${dateStr} at ${call.scheduledTime}\n`
+          + `   🔗 ${call.meetingUrl}\n`
+          + `   Status: ${call.status}\n\n`;
       });
 
       await ctx.editMessageText(message, {
@@ -245,8 +244,8 @@ const registerCallManagementHandlers = (bot) => {
       });
 
       await ctx.reply(
-        '✅ You are now available for 24 hours.\n\n' +
-        'Send /broadcast to notify users.',
+        '✅ You are now available for 24 hours.\n\n'
+        + 'Send /broadcast to notify users.',
         {
           reply_markup: {
             inline_keyboard: [
@@ -276,21 +275,20 @@ const registerCallManagementHandlers = (bot) => {
         return;
       }
 
-      const broadcastMessage =
-        '🎉 *Great News!*\n\n' +
-        '📞 We\'re now available for *Private 1:1 Calls*!\n\n' +
-        '👥 *Choose your performer:*\n' +
-        '• 🎭 Santino\n' +
-        '• 🎤 Lex Boy\n\n' +
-        '💎 *What you get:*\n' +
-        '• 45 minutes of personalized consultation\n' +
-        '• Direct video call (HD quality)\n' +
-        '• Expert advice and guidance\n' +
-        '• ⚡ Quick scheduling (can start in 15 min!)\n' +
-        '• Or schedule for later\n\n' +
-        '💰 Price: $100 USD (pay with Zelle, CashApp, Venmo, Revolut, Wise)\n\n' +
-        '🚀 *Limited slots available!*\n' +
-        'Book your call now before they\'re gone.';
+      const broadcastMessage = '🎉 *Great News!*\n\n'
+        + '📞 We\'re now available for *Private 1:1 Calls*!\n\n'
+        + '👥 *Choose your performer:*\n'
+        + '• 🎭 Santino\n'
+        + '• 🎤 Lex Boy\n\n'
+        + '💎 *What you get:*\n'
+        + '• 45 minutes of personalized consultation\n'
+        + '• Direct video call (HD quality)\n'
+        + '• Expert advice and guidance\n'
+        + '• ⚡ Quick scheduling (can start in 15 min!)\n'
+        + '• Or schedule for later\n\n'
+        + '💰 Price: $100 USD (pay with Zelle, CashApp, Venmo, Revolut, Wise)\n\n'
+        + '🚀 *Limited slots available!*\n'
+        + 'Book your call now before they\'re gone.';
 
       await ctx.reply('📢 Broadcasting to all users...');
 
@@ -300,10 +298,10 @@ const registerCallManagementHandlers = (bot) => {
       );
 
       await ctx.reply(
-        `📢 *Broadcast Completed*\n\n` +
-        `✅ Sent: ${results.sent}\n` +
-        `❌ Failed: ${results.failed}\n` +
-        `📊 Total: ${results.total}`,
+        '📢 *Broadcast Completed*\n\n'
+        + `✅ Sent: ${results.sent}\n`
+        + `❌ Failed: ${results.failed}\n`
+        + `📊 Total: ${results.total}`,
         { parse_mode: 'Markdown' },
       );
     } catch (error) {

@@ -80,24 +80,24 @@ const registerSupportHandlers = (bot) => {
       const lang = getLanguage(ctx);
 
       const faq = lang === 'es'
-        ? `❓ Preguntas Frecuentes:\n\n` +
-          `1. ¿Cómo me suscribo a PRIME?\n` +
-          `   → Use /menu y seleccione "Suscribirse a PRIME"\n\n` +
-          `2. ¿Cómo actualizo mi perfil?\n` +
-          `   → Use /menu → "Mi Perfil" → "Editar Perfil"\n\n` +
-          `3. ¿Cómo encuentro usuarios cercanos?\n` +
-          `   → Comparta su ubicación en "Usuarios Cercanos"\n\n` +
-          `4. ¿Cómo inicio una transmisión en vivo?\n` +
-          `   → Necesita suscripción PRIME → "Transmisiones en Vivo"`
-        : `❓ Frequently Asked Questions:\n\n` +
-          `1. How do I subscribe to PRIME?\n` +
-          `   → Use /menu and select "Subscribe to PRIME"\n\n` +
-          `2. How do I update my profile?\n` +
-          `   → Use /menu → "My Profile" → "Edit Profile"\n\n` +
-          `3. How do I find nearby users?\n` +
-          `   → Share your location in "Nearby Users"\n\n` +
-          `4. How do I start a live stream?\n` +
-          `   → Requires PRIME subscription → "Live Streams"`;
+        ? '❓ Preguntas Frecuentes:\n\n'
+          + '1. ¿Cómo me suscribo a PRIME?\n'
+          + '   → Use /menu y seleccione "Suscribirse a PRIME"\n\n'
+          + '2. ¿Cómo actualizo mi perfil?\n'
+          + '   → Use /menu → "Mi Perfil" → "Editar Perfil"\n\n'
+          + '3. ¿Cómo encuentro usuarios cercanos?\n'
+          + '   → Comparta su ubicación en "Usuarios Cercanos"\n\n'
+          + '4. ¿Cómo inicio una transmisión en vivo?\n'
+          + '   → Necesita suscripción PRIME → "Transmisiones en Vivo"'
+        : '❓ Frequently Asked Questions:\n\n'
+          + '1. How do I subscribe to PRIME?\n'
+          + '   → Use /menu and select "Subscribe to PRIME"\n\n'
+          + '2. How do I update my profile?\n'
+          + '   → Use /menu → "My Profile" → "Edit Profile"\n\n'
+          + '3. How do I find nearby users?\n'
+          + '   → Share your location in "Nearby Users"\n\n'
+          + '4. How do I start a live stream?\n'
+          + '   → Requires PRIME subscription → "Live Streams"';
 
       await ctx.editMessageText(
         faq,
@@ -199,7 +199,7 @@ const registerSupportHandlers = (bot) => {
         }
 
         // Send to admin users
-        const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter(id => id.trim()) || [];
+        const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
 
         if (adminIds.length === 0) {
           logger.error('No admin users configured for support messages');

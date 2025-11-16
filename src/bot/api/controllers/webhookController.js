@@ -27,10 +27,10 @@ const validateEpaycoPayload = (payload) => {
  * @param {Object} payload - Webhook payload
  * @returns {Object} { valid: boolean, error?: string }
  */
-const validateDaimoPayload = (payload) => {
+const validateDaimoPayload = (payload) =>
   // Use the validation from DaimoConfig
-  return DaimoConfig.validateWebhookPayload(payload);
-};
+  DaimoConfig.validateWebhookPayload(payload)
+;
 
 /**
  * Handle ePayco webhook
@@ -72,7 +72,9 @@ const handleEpaycoWebhook = async (req, res) => {
  */
 const handleDaimoWebhook = async (req, res) => {
   try {
-    const { id, status, source, metadata } = req.body;
+    const {
+      id, status, source, metadata,
+    } = req.body;
 
     logger.info('Daimo Pay webhook received', {
       eventId: id,

@@ -329,12 +329,12 @@ const showRadioStatistics = async (ctx) => {
     const history = await RadioModel.getHistory(5);
 
     let text = `📊 ${t('radio.admin.statistics', lang)}\n\n`;
-    text += `📈 **Overall Stats:**\n`;
+    text += '📈 **Overall Stats:**\n';
     text += `Total Requests: ${stats.totalRequests}\n`;
     text += `Songs Played: ${stats.totalSongsPlayed}\n`;
     text += `Pending Requests: ${stats.pendingRequests}\n\n`;
 
-    text += `🎵 **Recently Played:**\n`;
+    text += '🎵 **Recently Played:**\n';
     if (history && history.length > 0) {
       history.forEach((song, index) => {
         text += `${index + 1}. ${song.title}`;

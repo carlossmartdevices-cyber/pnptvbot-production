@@ -1,7 +1,7 @@
+const { v4: uuidv4 } = require('uuid');
 const MenuConfigModel = require('../../models/menuConfigModel');
 const UserModel = require('../../models/userModel');
 const logger = require('../../utils/logger');
-const { v4: uuidv4 } = require('uuid');
 
 /**
  * Menu Config Service - Business logic for menu configuration

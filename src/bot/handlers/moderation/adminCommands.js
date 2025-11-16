@@ -203,7 +203,7 @@ async function handleBanUser(ctx) {
     }
 
     const groupId = ctx.chat.id;
-    const message = ctx.message;
+    const { message } = ctx;
 
     // Get user from reply or mention
     let targetUserId;
@@ -272,7 +272,7 @@ async function handleUnbanUser(ctx) {
     }
 
     const groupId = ctx.chat.id;
-    const message = ctx.message;
+    const { message } = ctx;
 
     let targetUserId;
 
@@ -322,7 +322,7 @@ async function handleClearWarnings(ctx) {
     }
 
     const groupId = ctx.chat.id;
-    const message = ctx.message;
+    const { message } = ctx;
 
     let targetUserId;
     let targetUserName;
@@ -393,7 +393,7 @@ async function handleModLogs(ctx) {
 
     // Send as document if too long
     if (message.length > 4000) {
-      message = message.substring(0, 4000) + '\n\n_...truncated_';
+      message = `${message.substring(0, 4000)}\n\n_...truncated_`;
     }
 
     await ctx.reply(message, { parse_mode: 'Markdown' });
@@ -428,7 +428,7 @@ async function handleModStats(ctx) {
     const groupId = ctx.chat.id;
     const stats = await ModerationService.getStatistics(groupId);
 
-    let message = `📊 **Moderation Statistics**\n\n`;
+    let message = '📊 **Moderation Statistics**\n\n';
     message += `⚠️ Total Warnings: ${stats.totalWarnings}\n`;
     message += `👥 Users with Warnings: ${stats.usersWithWarnings}\n`;
     message += `🚫 Total Bans: ${stats.totalBans}\n`;
@@ -483,7 +483,7 @@ async function handleUserHistory(ctx) {
       return ctx.reply('No username history found for this user.');
     }
 
-    let message = `📋 **Username History**\n\n`;
+    let message = '📋 **Username History**\n\n';
     message += `👤 **User ID:** ${targetUserId}\n`;
     message += `📊 **Total Changes:** ${history.length}\n\n`;
 
@@ -499,12 +499,12 @@ async function handleUserHistory(ctx) {
         message += `   🚩 **FLAGGED:** ${record.flagReason || 'Suspicious'}\n`;
       }
 
-      message += `\n`;
+      message += '\n';
     });
 
     // Send as file if too long
     if (message.length > 4000) {
-      message = message.substring(0, 4000) + '\n\n_...truncated_';
+      message = `${message.substring(0, 4000)}\n\n_...truncated_`;
     }
 
     await ctx.reply(message, { parse_mode: 'Markdown' });
@@ -548,7 +548,7 @@ async function handleUsernameChanges(ctx) {
       return ctx.reply('No username changes recorded in this group yet.');
     }
 
-    let message = `📋 **Recent Username Changes**\n\n`;
+    let message = '📋 **Recent Username Changes**\n\n';
     message += `📊 **Last ${changes.length} changes:**\n\n`;
 
     changes.forEach((record, index) => {
@@ -559,17 +559,17 @@ async function handleUsernameChanges(ctx) {
       message += `   ${dateStr}: @${record.oldUsername || 'none'} → @${record.newUsername || 'none'}\n`;
 
       if (record.flagged) {
-        message += `   🚩 FLAGGED\n`;
+        message += '   🚩 FLAGGED\n';
       }
 
-      message += `\n`;
+      message += '\n';
     });
 
-    message += `\nUse /userhistory <user_id> to see full history for a specific user.`;
+    message += '\nUse /userhistory <user_id> to see full history for a specific user.';
 
     // Send as file if too long
     if (message.length > 4000) {
-      message = message.substring(0, 4000) + '\n\n_...truncated_';
+      message = `${message.substring(0, 4000)}\n\n_...truncated_`;
     }
 
     await ctx.reply(message, { parse_mode: 'Markdown' });

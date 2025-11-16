@@ -1,4 +1,4 @@
-const axios = require('axios');
+const _axios = require('axios');
 const crypto = require('crypto');
 const PaymentModel = require('../../models/paymentModel');
 const UserModel = require('../../models/userModel');
@@ -49,6 +49,7 @@ class PaymentService {
     });
     throw lastError;
   }
+
   /**
    * Create payment for subscription
    * @param {Object} paymentData - { userId, planId, provider }
@@ -537,11 +538,11 @@ class PaymentService {
       const bot = require('../core/bot');
       await bot.telegram.sendMessage(
         chatId,
-        `✅ *Payment Confirmed!*\n\n` +
-        `Amount: ${amount} USDC\n\n` +
-        `🎉 Your 1:1 call has been purchased!\n\n` +
-        `📅 *Next Step: Schedule your call*\n\n` +
-        `Click the button below to schedule your 45-minute call.`,
+        '✅ *Payment Confirmed!*\n\n'
+        + `Amount: ${amount} USDC\n\n`
+        + '🎉 Your 1:1 call has been purchased!\n\n'
+        + '📅 *Next Step: Schedule your call*\n\n'
+        + 'Click the button below to schedule your 45-minute call.',
         {
           parse_mode: 'Markdown',
           reply_markup: {

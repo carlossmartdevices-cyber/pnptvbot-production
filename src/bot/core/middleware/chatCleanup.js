@@ -13,32 +13,30 @@ const logger = require('../../../utils/logger');
  * @param {number} delay - Delay in milliseconds (default: 5 minutes)
  * @returns {Function} Middleware function
  */
-const chatCleanupMiddleware = (delay = 5 * 60 * 1000) => {
-  return async (ctx, next) => {
-    const chatType = ctx.chat?.type;
+const chatCleanupMiddleware = (delay = 5 * 60 * 1000) => async (ctx, next) => {
+  const chatType = ctx.chat?.type;
 
-    // Only apply to groups and supergroups
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
-      return next();
+  // Only apply to groups and supergroups
+  if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+    return next();
+  }
+
+  try {
+    // Handle incoming messages
+    if (ctx.message) {
+      await handleIncomingMessage(ctx, delay);
     }
 
-    try {
-      // Handle incoming messages
-      if (ctx.message) {
-        await handleIncomingMessage(ctx, delay);
-      }
+    // Continue with the rest of the middleware chain
+    await next();
 
-      // Continue with the rest of the middleware chain
-      await next();
-
-      // Handle outgoing bot messages (replies)
-      await handleOutgoingMessages(ctx, delay);
-    } catch (error) {
-      logger.error('Chat cleanup middleware error:', error);
-      // Don't block the message flow
-      throw error;
-    }
-  };
+    // Handle outgoing bot messages (replies)
+    await handleOutgoingMessages(ctx, delay);
+  } catch (error) {
+    logger.error('Chat cleanup middleware error:', error);
+    // Don't block the message flow
+    throw error;
+  }
 };
 
 /**
@@ -46,7 +44,7 @@ const chatCleanupMiddleware = (delay = 5 * 60 * 1000) => {
  * Schedule deletion of commands and system messages
  */
 async function handleIncomingMessage(ctx, delay) {
-  const message = ctx.message;
+  const { message } = ctx;
 
   // Check if it's a command
   if (message.text && message.text.startsWith('/')) {
@@ -103,26 +101,24 @@ async function handleOutgoingMessages(ctx, delay) {
    * Helper to wrap reply methods
    * Checks if message has broadcast flag in extra options
    */
-  const wrapReplyMethod = (originalMethod, methodName) => {
-    return async function (...args) {
-      const sentMessage = await originalMethod.apply(this, args);
+  const wrapReplyMethod = (originalMethod, methodName) => async function (...args) {
+    const sentMessage = await originalMethod.apply(this, args);
 
-      if (sentMessage) {
-        // Check if last argument has broadcast flag
-        const lastArg = args[args.length - 1];
-        const isBroadcast = lastArg && typeof lastArg === 'object' && lastArg.broadcast === true;
+    if (sentMessage) {
+      // Check if last argument has broadcast flag
+      const lastArg = args[args.length - 1];
+      const isBroadcast = lastArg && typeof lastArg === 'object' && lastArg.broadcast === true;
 
-        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, delay, isBroadcast);
+      ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, delay, isBroadcast);
 
-        logger.debug(`Bot message scheduled for deletion (${methodName})`, {
-          chatId: ctx.chat.id,
-          messageId: sentMessage.message_id,
-          isBroadcast,
-        });
-      }
+      logger.debug(`Bot message scheduled for deletion (${methodName})`, {
+        chatId: ctx.chat.id,
+        messageId: sentMessage.message_id,
+        isBroadcast,
+      });
+    }
 
-      return sentMessage;
-    };
+    return sentMessage;
   };
 
   // Wrap all reply methods
