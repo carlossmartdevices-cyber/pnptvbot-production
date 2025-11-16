@@ -357,7 +357,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
 
 # Set webhook
-curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://domain.com/webhook/telegram"
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://domain.com/pnp/webhook/telegram"
 ```
 
 ---

@@ -146,7 +146,7 @@ Location: `src/config/firebase.js` lines 65-102
 
 ## API ENDPOINTS
 - **Health Check**: `GET /health`
-- **Webhook (Telegram)**: `POST /webhook/telegram`
+- **Webhook (Telegram)**: `POST /pnp/webhook/telegram`
 - **Stats**: `GET /api/stats`
 - **Webhooks**:
   - `POST /api/webhooks/epayco`

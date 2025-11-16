@@ -279,7 +279,7 @@ node src/bot/core/bot.js
 │  │ Middleware: helmet, cors, rate-limit    │  │
 │  └──────────────────────────────────────────┘  │
 │  Routes:                                       │
-│  • POST /webhook/telegram                      │
+│  • POST /pnp/webhook/telegram                      │
 │  • POST /api/webhooks/epayco                   │
 │  • POST /api/webhooks/daimo                    │
 │  • GET  /health                                │

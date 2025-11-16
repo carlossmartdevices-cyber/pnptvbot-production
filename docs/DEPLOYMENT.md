@@ -459,7 +459,7 @@ services:
 
 1. Verify HTTPS is configured
 2. Check webhook URL in Telegram
-3. Test webhook endpoint: `curl -X POST https://yourdomain.com/webhook/telegram`
+3. Test webhook endpoint: `curl -X POST https://yourdomain.com/pnp/webhook/telegram`
 4. Review Nginx/load balancer logs
 
 ### High Memory Usage

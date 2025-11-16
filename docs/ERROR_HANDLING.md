@@ -252,7 +252,7 @@ PORT=3000
 # Telegram
 BOT_TOKEN=
 BOT_WEBHOOK_DOMAIN=https://tu-app.railway.app
-BOT_WEBHOOK_PATH=/webhook/telegram
+BOT_WEBHOOK_PATH=/pnp/webhook/telegram
 
 # Firebase
 FIREBASE_PROJECT_ID=

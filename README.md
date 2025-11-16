@@ -270,7 +270,7 @@ docker-compose down
 ```env
 NODE_ENV=production
 BOT_WEBHOOK_DOMAIN=https://yourdomain.com
-BOT_WEBHOOK_PATH=/webhook/telegram
+BOT_WEBHOOK_PATH=/pnp/webhook/telegram
 ```
 
 2. Configure webhook mode in production for better performance

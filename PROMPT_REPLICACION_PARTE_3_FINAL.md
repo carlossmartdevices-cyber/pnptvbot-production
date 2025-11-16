@@ -280,7 +280,7 @@ const envSchema = Joi.object({
     then: Joi.required(),
     otherwise: Joi.optional(),
   }),
-  BOT_WEBHOOK_PATH: Joi.string().default('/webhook/telegram'),
+  BOT_WEBHOOK_PATH: Joi.string().default('/pnp/webhook/telegram'),
 
   // Environment
   NODE_ENV: Joi.string().valid('development', 'production').default('development'),
@@ -905,7 +905,7 @@ BOT_USERNAME=pnptv_bot
 # Webhook (solo producción)
 # Debe ser HTTPS con certificado válido
 BOT_WEBHOOK_DOMAIN=https://yourdomain.com
-BOT_WEBHOOK_PATH=/webhook/telegram
+BOT_WEBHOOK_PATH=/pnp/webhook/telegram
 
 # ───────────────────────────────────────────────────────────
 # ENVIRONMENT
@@ -1258,7 +1258,7 @@ docker-compose logs -f bot
 
 ```bash
 # Opción 1: Manualmente con curl
-curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://yourdomain.com/webhook/telegram"
+curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://yourdomain.com/pnp/webhook/telegram"
 
 # Opción 2: El bot lo hace automáticamente al iniciar en producción
 
