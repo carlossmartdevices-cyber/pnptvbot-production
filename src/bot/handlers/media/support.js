@@ -1,5 +1,5 @@
 const { Markup } = require('telegraf');
-const Mistral = require('@mistralai/mistralai');
+const { Mistral } = require('@mistralai/mistralai');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
