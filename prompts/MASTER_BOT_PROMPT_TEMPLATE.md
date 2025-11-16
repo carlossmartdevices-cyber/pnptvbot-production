@@ -910,7 +910,7 @@ Sanitización:
 // src/bot/api/routes.js
 
 Routes:
-- POST   /webhook/telegram                # Telegram webhook
+- POST   /pnp/webhook/telegram                # Telegram webhook
 - POST   /api/webhooks/{{provider1}}      # Payment webhook
 - POST   /api/webhooks/{{provider2}}
 - GET    /api/payment-response            # Redirect después de pago
@@ -1011,7 +1011,7 @@ REDIS_TTL_DEFAULT=600
 
 # API Configuration
 PORT=3000
-WEBHOOK_URL=https://yourdomain.com/webhook/telegram
+WEBHOOK_URL=https://yourdomain.com/pnp/webhook/telegram
 API_BASE_URL=https://yourdomain.com
 
 # Monitoring (opcional)

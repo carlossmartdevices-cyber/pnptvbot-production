@@ -13,7 +13,7 @@ Both issues have been fixed.
 ## Problem Description
 
 ### Symptoms
-- Telegram webhook endpoint: `https://pnptv.app/webhook/telegram`
+- Telegram webhook endpoint: `https://pnptv.app/pnp/webhook/telegram`
 - All POST requests to webhook returned **404 Not Found**
 - Bot container running and healthy
 - No webhook requests appearing in bot logs
@@ -56,7 +56,7 @@ apiApp.use(bot.webhookCallback());        // Line 103 - ❌ TOO LATE!
 ```
 
 **Result**:
-1. When a request comes to `/webhook/telegram`
+1. When a request comes to `/pnp/webhook/telegram`
 2. It doesn't match any explicit routes
 3. `notFoundHandler` catches it and returns 404
 4. Webhook callback is never executed
@@ -132,7 +132,7 @@ module.exports = app;
 ```diff
 // Start bot
 if (process.env.NODE_ENV === 'production' && process.env.BOT_WEBHOOK_DOMAIN) {
-  const webhookPath = process.env.BOT_WEBHOOK_PATH || '/webhook/telegram';
+  const webhookPath = process.env.BOT_WEBHOOK_PATH || '/pnp/webhook/telegram';
   const webhookUrl = `${process.env.BOT_WEBHOOK_DOMAIN}${webhookPath}`;
 
   await bot.telegram.setWebhook(webhookUrl);
@@ -169,7 +169,7 @@ apiApp.listen(PORT, () => {
 3. ✅ Logging (morgan)
 4. ✅ Rate limiting
 5. ✅ Explicit API routes (/api/webhooks/*, /api/stats, /health)
-6. ✅ **Telegram webhook callback** (/webhook/telegram)
+6. ✅ **Telegram webhook callback** (/pnp/webhook/telegram)
 7. ✅ 404 handler (catches unmatched routes)
 8. ✅ Error handler (catches unhandled errors)
 
@@ -214,7 +214,7 @@ Created optimized Nginx configuration with:
 
 ### Critical Webhook Settings
 ```nginx
-location /webhook/telegram {
+location /pnp/webhook/telegram {
     # CRITICAL: Don't buffer the request body
     proxy_request_buffering off;
     proxy_buffering off;
@@ -229,7 +229,7 @@ location /webhook/telegram {
     proxy_set_header X-Forwarded-Proto $scheme;
 
     # Proxy to bot
-    proxy_pass http://localhost:3000/webhook/telegram;
+    proxy_pass http://localhost:3000/pnp/webhook/telegram;
 }
 ```
 
@@ -253,8 +253,8 @@ location /webhook/telegram {
 
 ### Pre-Fix Behavior
 ```bash
-$ curl -X POST https://pnptv.app/webhook/telegram -H "Content-Type: application/json" -d '{"test":true}'
-{"error":"NOT_FOUND","message":"Route not found: POST /webhook/telegram"}  # ❌ 404
+$ curl -X POST https://pnptv.app/pnp/webhook/telegram -H "Content-Type: application/json" -d '{"test":true}'
+{"error":"NOT_FOUND","message":"Route not found: POST /pnp/webhook/telegram"}  # ❌ 404
 
 $ docker-compose logs bot
 # No incoming webhook requests logged  # ❌ Requests not reaching bot
@@ -262,11 +262,11 @@ $ docker-compose logs bot
 
 ### Post-Fix Expected Behavior
 ```bash
-$ curl -X POST https://pnptv.app/webhook/telegram -H "Content-Type: application/json" -d '{"update_id":1,"message":{...}}'
+$ curl -X POST https://pnptv.app/pnp/webhook/telegram -H "Content-Type: application/json" -d '{"update_id":1,"message":{...}}'
 OK  # ✅ 200
 
 $ docker-compose logs bot
-✓ Webhook callback registered at: /webhook/telegram  # ✅ Route registered
+✓ Webhook callback registered at: /pnp/webhook/telegram  # ✅ Route registered
 ✓ Error handlers registered                          # ✅ Correct order
 Received webhook update: {...}                        # ✅ Processing updates
 ```
@@ -276,8 +276,8 @@ Received webhook update: {...}                        # ✅ Processing updates
 After deployment:
 
 **Bot Startup Logs**:
-- [ ] `✓ Webhook set to: https://pnptv.app/webhook/telegram`
-- [ ] `✓ Webhook callback registered at: /webhook/telegram`
+- [ ] `✓ Webhook set to: https://pnptv.app/pnp/webhook/telegram`
+- [ ] `✓ Webhook callback registered at: /pnp/webhook/telegram`
 - [ ] `✓ Error handlers registered`
 - [ ] `✓ API server running on port 3000`
 
@@ -285,7 +285,7 @@ After deployment:
 ```bash
 curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo
 ```
-- [ ] `url`: "https://pnptv.app/webhook/telegram"
+- [ ] `url`: "https://pnptv.app/pnp/webhook/telegram"
 - [ ] `has_custom_certificate`: false
 - [ ] `pending_update_count`: 0
 - [ ] `last_error_date`: not present or old
@@ -347,9 +347,9 @@ curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo
 1. **Add Integration Tests**
 ```javascript
 // tests/integration/webhook.test.js
-it('should accept POST to /webhook/telegram', async () => {
+it('should accept POST to /pnp/webhook/telegram', async () => {
   const response = await request(app)
-    .post('/webhook/telegram')
+    .post('/pnp/webhook/telegram')
     .send({ update_id: 1, message: { text: 'test' } });
   expect(response.status).toBe(200);
 });
@@ -359,7 +359,7 @@ it('should accept POST to /webhook/telegram', async () => {
 ```javascript
 it('should register webhook before 404 handler', () => {
   const routes = app._router.stack.map(r => r.route?.path || r.name);
-  const webhookIndex = routes.indexOf('/webhook/telegram');
+  const webhookIndex = routes.indexOf('/pnp/webhook/telegram');
   const notFoundIndex = routes.indexOf('notFoundHandler');
   expect(webhookIndex).toBeLessThan(notFoundIndex);
 });
@@ -413,7 +413,7 @@ docker-compose up -d
 docker-compose logs -f bot
 
 # Test webhook
-curl -X POST https://pnptv.app/webhook/telegram \
+curl -X POST https://pnptv.app/pnp/webhook/telegram \
   -H "Content-Type: application/json" \
   -d '{"update_id": 1}'
 

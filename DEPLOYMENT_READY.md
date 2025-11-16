@@ -316,7 +316,7 @@ docker-compose exec redis redis-cli ping
 2. **Configurar Webhook en Telegram**
    ```bash
    curl -X POST "https://api.telegram.org/bot8499797477:AAEhUsf3zEB07hw86tMa-Odtv0CAm91gIwI/setWebhook" \
-     -d "url=https://pnp.app/webhook/telegram"
+     -d "url=https://pnp.app/pnp/webhook/telegram"
    ```
 
 3. **Configurar Webhooks de Pagos**

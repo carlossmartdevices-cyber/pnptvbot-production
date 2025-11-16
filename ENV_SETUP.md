@@ -125,7 +125,7 @@ BOT_WEBHOOK_DOMAIN=
 ```env
 NODE_ENV=production
 BOT_WEBHOOK_DOMAIN=https://yourdomain.com
-BOT_WEBHOOK_PATH=/webhook/telegram
+BOT_WEBHOOK_PATH=/pnp/webhook/telegram
 # Bot will run in webhook mode
 ```
 

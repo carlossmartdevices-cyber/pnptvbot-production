@@ -72,7 +72,7 @@ sudo certbot renew --dry-run
 ## Key Features
 
 ### 1. **Telegram Webhook Handling**
-- Dedicated `/webhook/telegram` endpoint
+- Dedicated `/pnp/webhook/telegram` endpoint
 - POST-only access
 - Request body preservation (critical for webhook processing)
 - No buffering to prevent body consumption issues
@@ -119,7 +119,7 @@ sudo tail -f /var/log/nginx/telegram-webhook.log
 
 3. **Test webhook endpoint:**
 ```bash
-curl -X POST https://pnptv.app/webhook/telegram \
+curl -X POST https://pnptv.app/pnp/webhook/telegram \
   -H "Content-Type: application/json" \
   -d '{"test": true}'
 ```
@@ -215,7 +215,7 @@ After deploying the configuration:
 - [ ] HTTP redirects to HTTPS: `curl -I http://pnptv.app`
 - [ ] HTTPS works: `curl -I https://pnptv.app/health`
 - [ ] Health endpoint returns 200: `curl https://pnptv.app/health`
-- [ ] Webhook endpoint accepts POST: `curl -X POST https://pnptv.app/webhook/telegram -H "Content-Type: application/json" -d '{"test":true}'`
+- [ ] Webhook endpoint accepts POST: `curl -X POST https://pnptv.app/pnp/webhook/telegram -H "Content-Type: application/json" -d '{"test":true}'`
 - [ ] Telegram bot receives webhooks: Send message to bot
 - [ ] SSL certificate valid: `openssl s_client -connect pnptv.app:443`
 - [ ] Security headers present: `curl -I https://pnptv.app`
@@ -253,7 +253,7 @@ proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=my_cache:10m max_size=1g 
 1. **Restrict webhook access to Telegram IPs:**
 ```nginx
 # Get latest Telegram IP ranges from: https://core.telegram.org/bots/webhooks#the-short-version
-location /webhook/telegram {
+location /pnp/webhook/telegram {
     allow 149.154.160.0/20;
     allow 91.108.4.0/22;
     deny all;

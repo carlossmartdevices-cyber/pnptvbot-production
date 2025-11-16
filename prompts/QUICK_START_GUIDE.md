@@ -197,7 +197,7 @@ railway up
 
 # Configura webhook en Telegram
 curl -X POST https://api.telegram.org/bot<TOKEN>/setWebhook \
-  -d url=https://your-app.railway.app/webhook/telegram
+  -d url=https://your-app.railway.app/pnp/webhook/telegram
 
 # Verifica
 curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo
@@ -283,7 +283,7 @@ curl https://your-domain.com/health
 
 # Re-setea webhook
 curl -X POST https://api.telegram.org/bot<TOKEN>/setWebhook \
-  -d url=https://your-domain.com/webhook/telegram
+  -d url=https://your-domain.com/pnp/webhook/telegram
 ```
 
 ### Pagos no se confirman

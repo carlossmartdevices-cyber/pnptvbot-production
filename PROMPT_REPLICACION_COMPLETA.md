@@ -166,7 +166,7 @@ Plataforma integral que combina:
 │  └──────────────────────────────────────────────┘   │
 │                                                      │
 │  Routes:                                             │
-│  - POST /webhook/telegram  → Bot webhook            │
+│  - POST /pnp/webhook/telegram  → Bot webhook            │
 │  - POST /api/webhooks/epayco → Webhook ePayco       │
 │  - POST /api/webhooks/daimo → Webhook Daimo         │
 │  - GET  /health            → Health check           │
@@ -1632,7 +1632,7 @@ const startBot = async () => {
     // Iniciar bot
     if (process.env.NODE_ENV === 'production' && process.env.BOT_WEBHOOK_DOMAIN) {
       // Webhook mode (producción)
-      const webhookPath = process.env.BOT_WEBHOOK_PATH || '/webhook/telegram';
+      const webhookPath = process.env.BOT_WEBHOOK_PATH || '/pnp/webhook/telegram';
       const webhookUrl = `${process.env.BOT_WEBHOOK_DOMAIN}${webhookPath}`;
 
       await bot.telegram.setWebhook(webhookUrl);
