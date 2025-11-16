@@ -31,6 +31,7 @@ const registerCallPackageHandlers = require('../handlers/user/callPackages');
 
 // Services
 const CallReminderService = require('../services/callReminderService');
+const GroupCleanupService = require('../services/groupCleanupService');
 
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
@@ -135,6 +136,10 @@ const startBot = async () => {
     // Initialize call reminder service (automated reminders)
     CallReminderService.initialize(bot);
     logger.info('✓ Call reminder service initialized');
+
+    // Initialize group cleanup service (spam removal at 12:00 and 00:00 UTC)
+    const groupCleanup = new GroupCleanupService(bot);
+    groupCleanup.initialize();
 
     // Error handling
     bot.catch(errorHandler);
