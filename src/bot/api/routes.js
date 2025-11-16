@@ -26,7 +26,9 @@ app.use(morgan('combined', { stream: logger.stream }));
 const conditionalMiddleware = (middleware) => {
   return (req, res, next) => {
     // Skip middleware for Telegram webhook to prevent connection issues
-    if (req.path === '/webhook/telegram') {
+    if (req.path === '/pnp/webhook/telegram') {
+      // Telegram Webhook
+      app.post('/pnp/webhook/telegram', webhookController.handleTelegramWebhook);
       return next();
     }
     return middleware(req, res, next);
@@ -97,8 +99,8 @@ app.get('/health', async (req, res) => {
 });
 
 // API routes
-app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
-app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
+app.post('/pnp/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
+app.post('/pnp/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
 app.get('/api/payment-response', webhookController.handlePaymentResponse);
 
 // Stats endpoint

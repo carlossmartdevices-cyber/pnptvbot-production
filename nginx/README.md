@@ -15,7 +15,7 @@ sudo cp nginx/pnptv-bot.conf /etc/nginx/sites-available/pnptv-bot.conf
 ### 2. Update Configuration
 
 Edit the configuration file and replace placeholder values:
-- `pnptv.app` - Replace with your actual domain
+- `easybots.store` - Replace with your actual domain
 - SSL certificate paths - Update to match your Let's Encrypt setup
 
 ```bash
@@ -52,7 +52,7 @@ sudo apt install certbot python3-certbot-nginx
 ### Obtain Certificate
 
 ```bash
-sudo certbot --nginx -d pnptv.app -d www.pnptv.app
+sudo certbot --nginx -d easybots.store -d www.easybots.store
 ```
 
 ### Auto-renewal
