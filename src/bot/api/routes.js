@@ -27,6 +27,23 @@ app.use(morgan('combined', { stream: logger.stream }));
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../../../public')));
 
+// Landing page routes
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+});
+
+app.get('/lifetime-pass', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+});
+
+app.get('/promo', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+});
+
+app.get('/pnptv-hot-sale', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+});
+
 // Function to conditionally apply middleware (skip for Telegram webhook)
 const conditionalMiddleware = (middleware) => {
   return (req, res, next) => {

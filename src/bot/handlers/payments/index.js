@@ -5,12 +5,15 @@ const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const DaimoConfig = require('../../../config/daimo');
+const registerActivationHandlers = require('./activation');
 
 /**
  * Payment handlers
  * @param {Telegraf} bot - Bot instance
  */
 const registerPaymentHandlers = (bot) => {
+  // Register activation code handlers
+  registerActivationHandlers(bot);
   // Show subscription plans
   bot.action('show_subscription_plans', async (ctx) => {
     try {
