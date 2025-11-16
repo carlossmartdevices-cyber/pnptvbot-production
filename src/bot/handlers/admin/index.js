@@ -134,9 +134,13 @@ const registerAdminHandlers = (bot) => {
         + `📦 Payments: ${last30Revenue.count}\n`
         + `📊 Average: $${last30Revenue.average.toFixed(2)}\n\n`
         + '*Payment Breakdown (Last 30 Days):*\n'
-        + `${Object.entries(last30Revenue.byPlan).map(([plan, count]) => `  ${plan}: ${count}`).join('\n') || '  No data'}\n\n`
+        + `${Object.entries(last30Revenue.byPlan)
+          .map(([plan, count]) => `  ${plan}: ${count}`)
+          .join('\n') || '  No data'}\n\n`
         + '*Provider Breakdown:*\n'
-        + `${Object.entries(last30Revenue.byProvider).map(([provider, count]) => `  ${provider}: ${count}`).join('\n') || '  No data'}\n\n`
+        + `${Object.entries(last30Revenue.byProvider)
+          .map(([provider, count]) => `  ${provider}: ${count}`)
+          .join('\n') || '  No data'}\n\n`
         + `_Updated: ${now.toLocaleString()}_`;
 
       await ctx.reply(statsMessage, { parse_mode: 'Markdown' });

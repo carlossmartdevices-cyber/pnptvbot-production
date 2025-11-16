@@ -84,9 +84,9 @@ const moderationFilter = () => async (ctx, next) => {
  * Handle delete action (banned users)
  * @param {Object} ctx - Telegraf context
  * @param {Object} result - Moderation result
- * @param {string} lang - Language code
+ * @param {string} _lang - Language code (unused)
  */
-async function handleDelete(ctx, result, lang) {
+async function handleDelete(ctx, result, _lang) {
   try {
     // Delete the message
     await ctx.deleteMessage();

@@ -3,6 +3,17 @@ const logger = require('../../../utils/logger');
 const DaimoConfig = require('../../../config/daimo');
 
 /**
+ * Sanitize bot username for safe HTML insertion
+ * @param {string} username - Raw username
+ * @returns {string} Sanitized username
+ */
+const sanitizeBotUsername = (username) => {
+  if (!username) return 'pnptv_bot';
+  // Remove any HTML/script characters, keep only alphanumeric and underscore
+  return username.replace(/[^a-zA-Z0-9_]/g, '') || 'pnptv_bot';
+};
+
+/**
  * Validate ePayco webhook payload
  * @param {Object} payload - Webhook payload
  * @returns {Object} { valid: boolean, error?: string }
@@ -46,9 +57,10 @@ const handleEpaycoWebhook = async (req, res) => {
 
     // Validate payload structure
     const validation = validateEpaycoPayload(req.body);
-    if (!validation.valid) {
-      logger.warn('Invalid ePayco webhook payload', { error: validation.error });
-      return res.status(400).json({ success: false, error: validation.error });
+    if (!validation || !validation.valid) {
+      const errorMsg = validation?.error || 'Invalid webhook payload';
+      logger.warn('Invalid ePayco webhook payload', { error: errorMsg });
+      return res.status(400).json({ success: false, error: errorMsg });
     }
 
     const result = await PaymentService.processEpaycoWebhook(req.body);
@@ -88,12 +100,13 @@ const handleDaimoWebhook = async (req, res) => {
 
     // Validate payload structure
     const validation = validateDaimoPayload(req.body);
-    if (!validation.valid) {
+    if (!validation || !validation.valid) {
+      const errorMsg = validation?.error || 'Invalid webhook payload';
       logger.warn('Invalid Daimo webhook payload', {
-        error: validation.error,
+        error: errorMsg,
         receivedFields: Object.keys(req.body),
       });
-      return res.status(400).json({ success: false, error: validation.error });
+      return res.status(400).json({ success: false, error: errorMsg });
     }
 
     // Process webhook
@@ -129,7 +142,7 @@ const handleDaimoWebhook = async (req, res) => {
  */
 const handlePaymentResponse = async (req, res) => {
   try {
-    const { ref, status } = req.query;
+    const { status } = req.query;
 
     if (status === 'success' || status === 'approved') {
       res.send(`
@@ -188,7 +201,7 @@ const handlePaymentResponse = async (req, res) => {
             <div class="success-icon">✅</div>
             <h1>Payment Successful!</h1>
             <p>Your PRIME subscription has been activated. Return to the Telegram bot to enjoy premium features!</p>
-            <a href="https://t.me/${process.env.BOT_USERNAME || 'pnptv_bot'}" class="button">Open Telegram Bot</a>
+            <a href="https://t.me/${sanitizeBotUsername(process.env.BOT_USERNAME)}" class="button">Open Telegram Bot</a>
           </div>
         </body>
         </html>
@@ -251,7 +264,7 @@ const handlePaymentResponse = async (req, res) => {
             <div class="error-icon">❌</div>
             <h1>Payment Failed</h1>
             <p>Your payment could not be processed. Please try again or contact support.</p>
-            <a href="https://t.me/${process.env.BOT_USERNAME || 'pnptv_bot'}" class="button">Return to Bot</a>
+            <a href="https://t.me/${sanitizeBotUsername(process.env.BOT_USERNAME)}" class="button">Return to Bot</a>
           </div>
         </body>
         </html>

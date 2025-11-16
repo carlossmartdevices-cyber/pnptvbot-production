@@ -32,6 +32,9 @@ class ChatCleanupService {
       return null;
     }
 
+    // Save reference to this to ensure context is maintained in callbacks
+    const self = this;
+
     const timeoutId = setTimeout(async () => {
       try {
         await telegram.deleteMessage(chatId, messageId);
@@ -44,7 +47,9 @@ class ChatCleanupService {
         });
 
         // Remove from scheduled deletions
-        this.scheduledDeletions.delete(timeoutId);
+        if (timeoutId) {
+          self.scheduledDeletions.delete(timeoutId);
+        }
       } catch (error) {
         // Message might already be deleted or bot doesn't have permission
         if (error.response?.error_code === 400) {
@@ -59,7 +64,9 @@ class ChatCleanupService {
         }
 
         // Remove from scheduled deletions even if failed
-        this.scheduledDeletions.delete(timeoutId);
+        if (timeoutId) {
+          self.scheduledDeletions.delete(timeoutId);
+        }
       }
     }, delay);
 

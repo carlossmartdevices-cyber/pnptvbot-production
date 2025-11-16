@@ -196,11 +196,18 @@ const rateLimitByContext = (context = 'default', options = {}) => {
 
       // Default response
       const messages = {
-        payment: `🚫 Demasiados intentos de pago. Por favor espera ${retryAfter} segundos antes de intentar nuevamente.\n\nSi necesitas ayuda, contacta a soporte.`,
-        registration: `🚫 Demasiados intentos de registro. Por favor espera ${retryAfter} segundos.\n\nVerifica tu información e intenta nuevamente.`,
-        upload: `📁 Demasiadas cargas de archivos. Por favor espera ${retryAfter} segundos.`,
-        message: `💬 Estás enviando mensajes muy rápido. Por favor espera ${retryAfter} segundos.`,
-        default: `⏱ Demasiadas solicitudes. Por favor espera ${retryAfter} segundos antes de continuar.`,
+        payment: `🚫 Demasiados intentos de pago. `
+          + `Por favor espera ${retryAfter} segundos antes de intentar nuevamente.\n\n`
+          + `Si necesitas ayuda, contacta a soporte.`,
+        registration: `🚫 Demasiados intentos de registro. `
+          + `Por favor espera ${retryAfter} segundos.\n\n`
+          + `Verifica tu información e intenta nuevamente.`,
+        upload: `📁 Demasiadas cargas de archivos. `
+          + `Por favor espera ${retryAfter} segundos.`,
+        message: `💬 Estás enviando mensajes muy rápido. `
+          + `Por favor espera ${retryAfter} segundos.`,
+        default: `⏱ Demasiadas solicitudes. `
+          + `Por favor espera ${retryAfter} segundos antes de continuar.`,
       };
 
       const message = messages[context] || messages.default;

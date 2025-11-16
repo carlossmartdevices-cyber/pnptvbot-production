@@ -2,7 +2,6 @@ const { Markup } = require('telegraf');
 const CallService = require('../../services/callService');
 const CallModel = require('../../../models/callModel');
 const PaymentService = require('../../services/paymentService');
-const DaimoConfig = require('../../../config/daimo');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const { t } = require('../../../utils/i18n');

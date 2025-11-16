@@ -1,4 +1,3 @@
-const _axios = require('axios');
 const crypto = require('crypto');
 const PaymentModel = require('../../models/paymentModel');
 const UserModel = require('../../models/userModel');
@@ -560,9 +559,9 @@ class PaymentService {
   /**
    * Notify user of failed payment via Telegram
    * @param {string} chatId - Telegram chat ID
-   * @param {Object} payment - Payment record
+   * @param {Object} _payment - Payment record (unused)
    */
-  static async notifyPaymentFailure(chatId, payment) {
+  static async notifyPaymentFailure(chatId, _payment) {
     try {
       const bot = require('../core/bot');
       await bot.telegram.sendMessage(chatId, '❌ Payment failed. Please try again or contact support.');
@@ -575,10 +574,10 @@ class PaymentService {
    * Activate user subscription after successful payment
    * @param {string} userId - User ID
    * @param {string} planId - Plan ID
-   * @param {Object} payment - Payment record
+   * @param {Object} _payment - Payment record (unused)
    * @returns {Promise<boolean>} Success status
    */
-  static async activateSubscription(userId, planId, payment) {
+  static async activateSubscription(userId, planId, _payment) {
     try {
       const plan = await PlanModel.getById(planId);
       if (!plan) {

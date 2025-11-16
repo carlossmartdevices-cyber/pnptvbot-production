@@ -3,7 +3,6 @@ const CallModel = require('../../models/callModel');
 const PaymentModel = require('../../models/paymentModel');
 const UserModel = require('../../models/userModel');
 const logger = require('../../utils/logger');
-const { ConfigurationError } = require('../../utils/errors');
 
 /**
  * Call Service - Business logic for private 1:1 calls

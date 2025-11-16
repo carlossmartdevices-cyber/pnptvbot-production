@@ -181,10 +181,14 @@ const translations = {
     emotesUsed: 'Emotes used',
     myEmotes: 'My Custom Emotes',
     noCustomEmotes: 'You have no custom emotes yet. Create one to get started!',
-    enterEmoteCode: 'Enter a code for your emote (3-20 alphanumeric characters):\n\nExample: MyEmote, PogChamp, LUL',
-    enterEmoteImage: 'Send the URL of your emote image:\n\nExample: https://example.com/emote.png\n\nSupported formats: PNG, JPG, GIF, WEBP',
+    enterEmoteCode: 'Enter a code for your emote (3-20 alphanumeric characters):\n\n'
+      + 'Example: MyEmote, PogChamp, LUL',
+    enterEmoteImage: 'Send the URL of your emote image:\n\n'
+      + 'Example: https://example.com/emote.png\n\n'
+      + 'Supported formats: PNG, JPG, GIF, WEBP',
     invalidEmoteCode: '❌ Invalid emote code. Use 3-20 alphanumeric characters only.',
-    invalidImageUrl: '❌ Invalid image URL. Please provide a valid URL ending in .png, .jpg, .jpeg, .gif, or .webp',
+    invalidImageUrl: '❌ Invalid image URL. '
+      + 'Please provide a valid URL ending in .png, .jpg, .jpeg, .gif, or .webp',
     emoteCreated: 'Custom emote created!',
     emoteAwaitingApproval: 'Your emote is pending admin approval',
     emoteNotFound: 'Emote not found',
@@ -536,15 +540,21 @@ const translations = {
     availableEmotes: 'Emotes Disponibles',
     defaultEmotes: 'Emotes Predeterminados',
     customEmotes: 'Emotes Personalizados',
-    useEmotesInComment: '¡Puedes usar emotes en tu comentario! Haz clic en "Mostrar Emotes" para ver los emotes disponibles.',
+    useEmotesInComment: '¡Puedes usar emotes en tu comentario! '
+      + 'Haz clic en "Mostrar Emotes" para ver los emotes disponibles.',
     emoteUsageInstructions: '¡Escribe códigos de emotes como :smile: o :fire: en tu mensaje!',
     emotesUsed: 'Emotes usados',
     myEmotes: 'Mis Emotes Personalizados',
     noCustomEmotes: '¡Aún no tienes emotes personalizados. Crea uno para comenzar!',
-    enterEmoteCode: 'Ingresa un código para tu emote (3-20 caracteres alfanuméricos):\n\nEjemplo: MiEmote, PogChamp, LUL',
-    enterEmoteImage: 'Envía la URL de la imagen de tu emote:\n\nEjemplo: https://ejemplo.com/emote.png\n\nFormatos soportados: PNG, JPG, GIF, WEBP',
-    invalidEmoteCode: '❌ Código de emote inválido. Usa solo 3-20 caracteres alfanuméricos.',
-    invalidImageUrl: '❌ URL de imagen inválida. Proporciona una URL válida que termine en .png, .jpg, .jpeg, .gif, o .webp',
+    enterEmoteCode: 'Ingresa un código para tu emote (3-20 caracteres alfanuméricos):\n\n'
+      + 'Ejemplo: MiEmote, PogChamp, LUL',
+    enterEmoteImage: 'Envía la URL de la imagen de tu emote:\n\n'
+      + 'Ejemplo: https://ejemplo.com/emote.png\n\n'
+      + 'Formatos soportados: PNG, JPG, GIF, WEBP',
+    invalidEmoteCode: '❌ Código de emote inválido. '
+      + 'Usa solo 3-20 caracteres alfanuméricos.',
+    invalidImageUrl: '❌ URL de imagen inválida. '
+      + 'Proporciona una URL válida que termine en .png, .jpg, .jpeg, .gif, o .webp',
     emoteCreated: '¡Emote personalizado creado!',
     emoteAwaitingApproval: 'Tu emote está pendiente de aprobación del administrador',
     emoteNotFound: 'Emote no encontrado',

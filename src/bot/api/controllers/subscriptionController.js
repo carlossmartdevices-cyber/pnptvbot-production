@@ -141,6 +141,7 @@ class SubscriptionController {
       }
 
       // Create checkout data for frontend
+      const baseUrl = process.env.BOT_WEBHOOK_DOMAIN || 'http://localhost:3000';
       const checkoutData = {
         planId,
         planName: plan.name,
@@ -154,8 +155,8 @@ class SubscriptionController {
         docType,
         publicKey: process.env.EPAYCO_PUBLIC_KEY,
         test: process.env.EPAYCO_TEST_MODE === 'true',
-        confirmationUrl: `${process.env.BOT_WEBHOOK_DOMAIN || 'http://localhost:3000'}/api/subscription/epayco/confirmation`,
-        responseUrl: `${process.env.BOT_WEBHOOK_DOMAIN || 'http://localhost:3000'}/api/subscription/payment-response`,
+        confirmationUrl: `${baseUrl}/api/subscription/epayco/confirmation`,
+        responseUrl: `${baseUrl}/api/subscription/payment-response`,
       };
 
       logger.info('Checkout session created', {
@@ -190,9 +191,7 @@ class SubscriptionController {
       const {
         x_ref_payco,
         x_transaction_state,
-        x_amount,
-        x_currency_code,
-        x_signature,
+        // x_amount, x_currency_code, x_signature not used yet (TODO: implement signature verification)
         x_extra1, // email
         x_extra2, // telegramId
         x_extra3, // planId

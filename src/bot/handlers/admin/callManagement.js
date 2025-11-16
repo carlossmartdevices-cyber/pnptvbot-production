@@ -1,8 +1,6 @@
 const { Markup } = require('telegraf');
 const CallService = require('../../services/callService');
 const logger = require('../../../utils/logger');
-const { getLanguage } = require('../../utils/helpers');
-const { t } = require('../../../utils/i18n');
 
 /**
  * Admin call management handlers
@@ -12,7 +10,6 @@ const registerCallManagementHandlers = (bot) => {
   // Show call management menu
   bot.action('admin_call_management', async (ctx) => {
     try {
-      const lang = getLanguage(ctx);
       const availability = await CallService.getAvailability();
       const stats = await CallService.getStatistics();
 
