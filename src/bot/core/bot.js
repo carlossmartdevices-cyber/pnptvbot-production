@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
 const express = require('express');
 const { initializeFirebase } = require('../../config/firebase');
@@ -10,6 +10,7 @@ const chatCleanupMiddleware = require('./middleware/chatCleanup');
 const usernameEnforcement = require('./middleware/usernameEnforcement');
 const moderationFilter = require('./middleware/moderationFilter');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
+const groupCommandReminder = require('./middleware/groupCommandReminder');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('../../utils/logger');
 
@@ -22,6 +23,15 @@ const registerModerationHandlers = require('../handlers/moderation');
 const registerModerationAdminHandlers = require('../handlers/moderation/adminCommands');
 const registerCallManagementHandlers = require('../handlers/admin/callManagement');
 const registerPrivateCallHandlers = require('../handlers/user/privateCalls');
+const registerPaymentHistoryHandlers = require('../handlers/user/paymentHistory');
+const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnalytics');
+const registerUserCallManagementHandlers = require('../handlers/user/callManagement');
+const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
+const registerCallPackageHandlers = require('../handlers/user/callPackages');
+
+// Services
+const CallReminderService = require('../services/callReminderService');
+const GroupCleanupService = require('../services/groupCleanupService');
 
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
@@ -106,6 +116,7 @@ const startBot = async () => {
     bot.use(usernameEnforcement()); // Require username and track changes
     bot.use(moderationFilter()); // Moderation filter for group messages
     bot.use(activityTrackerMiddleware()); // Track user activity for gamification
+    bot.use(groupCommandReminder()); // Remind users to use bot in private when using commands in groups
 
     // Register handlers
     registerUserHandlers(bot);
@@ -116,6 +127,19 @@ const startBot = async () => {
     registerModerationAdminHandlers(bot); // Admin moderation commands
     registerCallManagementHandlers(bot); // Admin call management
     registerPrivateCallHandlers(bot); // User private call booking
+    registerPaymentHistoryHandlers(bot); // User payment history and receipts
+    registerPaymentAnalyticsHandlers(bot); // Admin payment analytics dashboard
+    registerUserCallManagementHandlers(bot); // User call management (reschedule, cancel)
+    registerCallFeedbackHandlers(bot); // Post-call feedback and ratings
+    registerCallPackageHandlers(bot); // Call packages (bulk pricing)
+
+    // Initialize call reminder service (automated reminders)
+    CallReminderService.initialize(bot);
+    logger.info('✓ Call reminder service initialized');
+
+    // Initialize group cleanup service (spam removal at 12:00 and 00:00 UTC)
+    const groupCleanup = new GroupCleanupService(bot);
+    groupCleanup.initialize();
 
     // Error handling
     bot.catch(errorHandler);

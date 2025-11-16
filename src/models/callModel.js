@@ -27,6 +27,10 @@ class CallModel {
         updatedAt: new Date(),
         meetingUrl: null,
         reminderSent: false,
+        reminder24hSent: false,
+        reminder1hSent: false,
+        reminder15minSent: false,
+        feedbackSubmitted: false,
         performer: callData.performer || 'Santino', // Default performer
       };
 

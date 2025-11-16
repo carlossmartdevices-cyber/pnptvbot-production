@@ -1,295 +1,265 @@
-# 🚀 Deployment Checklist
+# Production Deployment Checklist
 
-## Pre-Deployment
+## ✅ Pre-Deployment Verification
 
-### 1️⃣ Code Review
-- [x] All tests passing (42/42 ✅)
-- [x] Docker build successful
-- [x] No merge conflicts
-- [x] Code reviewed and approved
-- [ ] Security review completed
-- [ ] Performance review completed
+### Code Quality
+- ✅ All syntax checks passed
+- ✅ No uncommitted changes
+- ✅ Latest code pushed to branch: `claude/adapt-integrate-feature-01C8BS68M7rQf6kArNKhnudH`
+- ✅ All handlers registered in `src/bot/core/bot.js`
 
-### 2️⃣ Environment Setup
-- [ ] Production `.env` file configured
-- [ ] All required variables set:
-  - [ ] `BOT_TOKEN`
-  - [ ] `FIREBASE_PROJECT_ID`
-  - [ ] `FIREBASE_PRIVATE_KEY`
-  - [ ] `FIREBASE_CLIENT_EMAIL`
-  - [ ] `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-  - [ ] `REDIS_HOST`, `REDIS_PORT`
-  - [ ] `EPAYCO_PUBLIC_KEY`, `EPAYCO_PRIVATE_KEY` ⚠️ CRITICAL
-  - [ ] `DAIMO_API_KEY`, `DAIMO_WEBHOOK_SECRET` ⚠️ CRITICAL
-  - [ ] `SENTRY_DSN` (for error tracking)
+### Recent Changes (Ready for Deployment)
+```
+e7b439c - feat: enhance Daimo Pay and Private Calls systems
+50ed828 - feat: enhance Private Calls with multi-performer and quick scheduling
+b6f75ea - feat: add Private 1:1 Call system with payment and scheduling
+6f65dbb - feat: integrate Daimo Pay with support for Zelle, CashApp, Venmo, Revolut, Wise
+```
 
-### 3️⃣ Infrastructure
-- [ ] PostgreSQL 15+ server ready
-- [ ] Redis 7+ server ready
-- [ ] Firewall rules configured
-- [ ] Backup system in place
-- [ ] Monitoring tools configured
+---
 
-### 4️⃣ DNS & SSL
-- [ ] Domain configured (`BOT_WEBHOOK_DOMAIN`)
+## 🔧 Environment Configuration
+
+### Critical Environment Variables (MUST SET)
+
+#### **Core Bot Settings**
+```bash
+BOT_TOKEN=                    # Get from @BotFather
+BOT_WEBHOOK_DOMAIN=           # Your production domain (https://yourdomain.com)
+BOT_WEBHOOK_PATH=/pnp/webhook/telegram
+NODE_ENV=production
+PORT=3000
+```
+
+#### **Firebase (Database)**
+```bash
+FIREBASE_PROJECT_ID=          # From Firebase Console
+FIREBASE_PRIVATE_KEY=         # From Firebase Service Account JSON
+FIREBASE_CLIENT_EMAIL=        # From Firebase Service Account JSON
+FIREBASE_DATABASE_URL=        # Firebase Realtime Database URL (optional)
+```
+
+#### **Payment Providers - CRITICAL FOR SECURITY**
+
+**ePayco:**
+```bash
+EPAYCO_PUBLIC_KEY=            # From ePayco dashboard
+EPAYCO_PRIVATE_KEY=           # CRITICAL: Required for webhook signature verification
+EPAYCO_P_CUST_ID=             # Your customer ID
+EPAYCO_TEST_MODE=false        # Set to false for production
+```
+
+**Daimo Pay (Zelle, CashApp, Venmo, Revolut, Wise):**
+```bash
+DAIMO_API_KEY=                        # From Daimo Pay dashboard
+DAIMO_WEBHOOK_SECRET=                 # CRITICAL: Required for webhook signature verification
+DAIMO_TREASURY_ADDRESS=0x...          # Optimism address where USDC is deposited
+DAIMO_REFUND_ADDRESS=0x...            # Optimism address for refunds (optional, defaults to treasury)
+```
+
+⚠️ **WARNING:** In production, `EPAYCO_PRIVATE_KEY` and `DAIMO_WEBHOOK_SECRET` are **REQUIRED**. Without them, webhook signature verification will fail and payments won't be processed.
+
+#### **Video Calls (Daily.co)**
+```bash
+DAILY_API_KEY=                # Sign up at https://www.daily.co/
+```
+
+#### **Redis (Caching & Session)**
+```bash
+REDIS_HOST=                   # Redis server host
+REDIS_PORT=6379
+REDIS_PASSWORD=               # Set a strong password
+REDIS_DB=0
+```
+
+#### **Admin Users**
+```bash
+ADMIN_USER_IDS=123456789,987654321    # Comma-separated Telegram user IDs
+```
+
+#### **Security**
+```bash
+JWT_SECRET=                   # Minimum 32 characters, randomly generated
+ENCRYPTION_KEY=               # Minimum 32 characters, randomly generated
+```
+
+---
+
+## 📋 Pre-Deployment Steps
+
+### 1. Merge to Main Branch
+```bash
+# Option A: Via GitHub Pull Request (Recommended)
+# 1. Go to GitHub repository
+# 2. Create PR from: claude/adapt-integrate-feature-01C8BS68M7rQf6kArNKhnudH
+# 3. To: main
+# 4. Review changes (12 files changed, 2488+ additions)
+# 5. Merge pull request
+
+# Option B: Via Command Line (if you have permissions)
+git checkout main
+git merge claude/adapt-integrate-feature-01C8BS68M7rQf6kArNKhnudH
+git push origin main
+```
+
+### 2. Install Dependencies
+```bash
+npm install --production
+```
+
+### 3. Run Tests (if available)
+```bash
+npm test
+```
+
+---
+
+## 🚀 Deployment Process
+
+### Webhook Configuration
+
+**Daimo webhook URL:**
+```
+https://easybots.store/api/webhooks/daimo
+```
+
+**Telegram webhook:**
+```
+https://easybots.store/pnp/webhook/telegram
+```
+
+### Start the Bot
+
+#### Production Mode (Webhook)
+```bash
+NODE_ENV=production npm start
+```
+
+#### Using Process Manager (PM2 - Recommended)
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# Start bot
+pm2 start src/bot/core/bot.js --name pnptv-bot
+
+# Save process list
+pm2 save
+
+# Set up auto-restart on server reboot
+pm2 startup
+```
+
+---
+
+## 🔍 Post-Deployment Verification
+
+### Test Core Features
+
+#### ✅ User Features
+- [ ] `/start` - Bot welcomes user
+- [ ] `/payments` - View payment history
+- [ ] `/packages` - View call packages
+- [ ] `/mycalls` - View scheduled calls
+- [ ] Book a private call with payment
+- [ ] Reschedule a call
+- [ ] Cancel a call (check refund policy)
+- [ ] Leave feedback after call
+
+#### ✅ Admin Features  
+- [ ] `/analytics` - View dashboard
+- [ ] `/available` - Set call availability
+- [ ] `/broadcast` - Send availability notification
+- [ ] View payment analytics
+- [ ] View call analytics
+
+#### ✅ Payment Flow
+- [ ] Create Daimo payment link
+- [ ] Process webhook after payment
+- [ ] Activate subscription/call credits
+- [ ] Generate receipt
+
+#### ✅ Automated Systems
+- [ ] Call reminders (24h, 1h, 15min before scheduled calls)
+- [ ] Auto-complete calls after duration
+
+---
+
+## 🔐 Security Checklist
+
+- [ ] `DAIMO_WEBHOOK_SECRET` configured
+- [ ] `EPAYCO_PRIVATE_KEY` configured  
+- [ ] All webhooks use HTTPS URLs
 - [ ] SSL certificate valid
-- [ ] Webhook URLs accessible from internet
+- [ ] Environment variables not committed to git
+- [ ] `ADMIN_USER_IDS` set correctly
+- [ ] Rate limiting active
+- [ ] Error handling configured
 
-## Deployment Steps
+---
 
-### Step 1: Merge to Production Branch
+## 🐛 Troubleshooting
 
+### Bot Not Responding
 ```bash
-# Switch to base branch
-git checkout claude/pnptv-telegram-bot-production-01HqjZJ4WHxosMdUWvbHNX97
-
-# Pull latest changes
-git pull origin claude/pnptv-telegram-bot-production-01HqjZJ4WHxosMdUWvbHNX97
-
-# Merge the feature branch
-git merge claude/payment-tests-docker-optimization-01JaJZrVUNbiSLqkykGsVoEv
-
-# Push merged changes
-git push origin claude/pnptv-telegram-bot-production-01HqjZJ4WHxosMdUWvbHNX97
-```
-
-**Checklist:**
-- [ ] Merge completed without conflicts
-- [ ] All commits included
-- [ ] Branch pushed to remote
-
-### Step 2: Pre-Deployment Tests
-
-```bash
-# Run all tests
-npm run test:all
-
-# Build Docker images locally
-docker-compose build
-
-# Test locally
-docker-compose up -d
-curl http://localhost:3000/health
-```
-
-**Checklist:**
-- [ ] All tests pass
-- [ ] Docker build successful
-- [ ] Local services start correctly
-- [ ] Health check returns 200
-
-### Step 3: Deploy to Production
-
-```bash
-# Option 1: Using deployment script
-./scripts/deploy.sh production
-
-# Option 2: Manual deployment
-docker-compose down
-git pull origin <production-branch>
-docker-compose build
-docker-compose up -d
-```
-
-**Checklist:**
-- [ ] Services stopped gracefully
-- [ ] Latest code pulled
-- [ ] Images built successfully
-- [ ] Services started
-
-### Step 4: Verify Deployment
-
-```bash
-# Check service status
-docker-compose ps
+# Check if bot is running
+pm2 status
 
 # Check logs
-docker-compose logs bot
-docker-compose logs postgres
-docker-compose logs redis
+pm2 logs pnptv-bot --lines 100
 
-# Test health endpoint
-curl https://your-domain.com/health | jq
-
-# Test webhook endpoints
-curl -X POST https://your-domain.com/api/webhooks/epayco \
-  -H "Content-Type: application/json" \
-  -d '{"test": true}'
+# Restart bot
+pm2 restart pnptv-bot
 ```
 
-**Checklist:**
-- [ ] All containers running
-- [ ] All containers healthy
-- [ ] No errors in logs
-- [ ] Health check returns 200
-- [ ] Webhook endpoints accessible
-
-## Post-Deployment
-
-### 1️⃣ Monitoring
-
+### Webhook Not Receiving Updates
 ```bash
-# Watch logs in real-time
-docker-compose logs -f bot
+# Check webhook status
+curl "https://api.telegram.org/bot${BOT_TOKEN}/getWebhookInfo"
 
-# Monitor resource usage
-docker stats
-
-# Check database connections
-docker-compose exec postgres psql -U pnptv_user -d pnptv -c "SELECT count(*) FROM pg_stat_activity;"
+# Reset webhook
+curl -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=https://easybots.store/pnp/webhook/telegram"
 ```
 
-**Checklist:**
-- [ ] No errors in logs (first 5 minutes)
-- [ ] CPU usage normal (<50%)
-- [ ] Memory usage normal (<70%)
-- [ ] Database connections established
-
-### 2️⃣ Functional Testing
-
-**Test Payment Flow:**
-- [ ] Create test payment (ePayco)
-- [ ] Create test payment (Daimo)
-- [ ] Verify webhook reception
-- [ ] Verify signature validation
-- [ ] Verify subscription activation
-
-**Test Error Handling:**
-- [ ] Invalid payment provider
-- [ ] Invalid signature
-- [ ] Missing required fields
-- [ ] Rate limiting
-
-### 3️⃣ Performance Testing
-
-```bash
-# Load test webhooks
-ab -n 100 -c 10 https://your-domain.com/health
-
-# Monitor response times
-curl -w "@curl-format.txt" -o /dev/null -s https://your-domain.com/health
-```
-
-**Checklist:**
-- [ ] Response time < 200ms (health check)
-- [ ] Response time < 500ms (webhooks)
-- [ ] No 5xx errors under load
-- [ ] Rate limiting working
-
-### 4️⃣ Security Verification
-
-- [ ] Webhook signatures verified
-- [ ] Rate limiting active
-- [ ] Non-root user in containers
-- [ ] No secrets in logs
-- [ ] HTTPS only (no HTTP)
-
-### 5️⃣ Backup & Recovery
-
-```bash
-# Create database backup
-docker-compose exec postgres pg_dump -U pnptv_user pnptv > backup_$(date +%Y%m%d).sql
-
-# Test restore process (on separate instance)
-cat backup_20251115.sql | docker-compose exec -T postgres psql -U pnptv_user pnptv
-```
-
-**Checklist:**
-- [ ] Database backup successful
-- [ ] Backup stored securely
-- [ ] Restore process tested
-- [ ] Backup schedule configured
-
-## Rollback Plan
-
-If deployment fails:
-
-```bash
-# 1. Stop current services
-docker-compose down
-
-# 2. Revert to previous version
-git checkout <previous-commit-hash>
-
-# 3. Rebuild and redeploy
-docker-compose build
-docker-compose up -d
-
-# 4. Verify rollback
-curl https://your-domain.com/health
-```
-
-**Emergency Contacts:**
-- DevOps Lead: [Contact]
-- Database Admin: [Contact]
-- On-Call Engineer: [Contact]
-
-## Metrics to Monitor
-
-### First Hour
-- [ ] Request rate stable
-- [ ] Error rate < 0.1%
-- [ ] Response time < 500ms
-- [ ] No memory leaks
-- [ ] No database connection issues
-
-### First Day
-- [ ] All payments processing correctly
-- [ ] Webhooks functioning (100% success rate)
-- [ ] No unexpected errors
-- [ ] User satisfaction maintained
-
-### First Week
-- [ ] Performance metrics stable
-- [ ] No new bugs reported
-- [ ] Database size growing as expected
-- [ ] Backup system working
-
-## Documentation
-
-- [ ] Update deployment docs
-- [ ] Document any issues encountered
-- [ ] Update runbook if needed
-- [ ] Share knowledge with team
-
-## Sign-Off
-
-- [ ] Deployment Lead: _______________ Date: ___/___/___
-- [ ] QA Lead: _______________ Date: ___/___/___
-- [ ] Product Owner: _______________ Date: ___/___/___
+### Payments Not Processing
+1. Verify webhook secrets are set
+2. Check webhook URLs in payment provider dashboards
+3. Check logs for signature verification errors
 
 ---
 
-## Quick Reference
+## 📊 Key Metrics to Monitor
 
-### Service Ports
-- Bot API: 3000
-- PostgreSQL: 5432
-- Redis: 6379
-
-### Key Endpoints
-- Health: `GET /health`
-- ePayco Webhook: `POST /api/webhooks/epayco`
-- Daimo Webhook: `POST /api/webhooks/daimo`
-- Payment Response: `GET /api/payment-response`
-
-### Logs Location
-- Application: `docker-compose logs bot`
-- PostgreSQL: `docker-compose logs postgres`
-- Redis: `docker-compose logs redis`
-
-### Common Issues & Solutions
-
-| Issue | Solution |
-|-------|----------|
-| Container won't start | Check `.env` variables, view logs |
-| Health check fails | Verify Redis/PostgreSQL connectivity |
-| Webhook signature fails | Verify `EPAYCO_PRIVATE_KEY` and `DAIMO_WEBHOOK_SECRET` |
-| Database connection error | Check PostgreSQL container health |
-| Memory leak | Restart bot container, check logs |
+1. **Bot Health:** Uptime, response time, error rate
+2. **Payments:** Success rate, revenue, conversion rate
+3. **Calls:** Bookings, cancellations, completion rate
+4. **System:** Memory, CPU, Redis, Firebase connections
 
 ---
 
-**Last Updated**: 2025-11-15
-**Version**: 1.0.0
-**Branch**: `claude/payment-tests-docker-optimization-01JaJZrVUNbiSLqkykGsVoEv`
+## ✨ New Features in This Release
+
+### Payment System
+- Payment history and receipts (`/payments`)
+- Admin analytics dashboard (`/analytics`)
+- Promo code infrastructure
+- Revenue tracking
+
+### Private Calls System  
+- Automated reminders (24h, 1h, 15min)
+- Call rescheduling
+- Cancellation with refund policies (100%/50%/0%)
+- Post-call feedback (1-5 stars)
+- Call packages with bulk pricing:
+  * 3-pack: $270 (save $30 - 10% off)
+  * 5-pack: $425 (save $75 - 15% off)
+  * 10-pack: $800 (save $200 - 20% off)
+- Call management interface (`/mycalls`)
+
+---
+
+**Version:** 1.0.0  
+**Branch:** claude/adapt-integrate-feature-01C8BS68M7rQf6kArNKhnudH  
+**Files Modified:** 4  
+**Files Added:** 8  
+**Total Changes:** +2,488 lines
