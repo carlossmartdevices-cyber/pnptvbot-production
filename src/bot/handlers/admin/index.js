@@ -85,7 +85,8 @@ const registerAdminHandlers = (bot) => {
   // Quick stats command
   bot.command('stats', async (ctx) => {
     try {
-      if (!UserService.isAdmin(ctx.from.id)) {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
         await ctx.reply(t('unauthorized', getLanguage(ctx)));
         return;
       }
@@ -145,7 +146,8 @@ const registerAdminHandlers = (bot) => {
   // User management
   bot.action('admin_users', async (ctx) => {
     try {
-      if (!UserService.isAdmin(ctx.from.id)) return;
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
 
       const lang = getLanguage(ctx);
       ctx.session.temp.adminSearchingUser = true;
@@ -165,7 +167,8 @@ const registerAdminHandlers = (bot) => {
   // Broadcast
   bot.action('admin_broadcast', async (ctx) => {
     try {
-      if (!UserService.isAdmin(ctx.from.id)) return;
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
 
       const lang = getLanguage(ctx);
 
@@ -186,7 +189,8 @@ const registerAdminHandlers = (bot) => {
   // Broadcast target selection
   bot.action(/^broadcast_(.+)$/, async (ctx) => {
     try {
-      if (!UserService.isAdmin(ctx.from.id)) return;
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
 
       // Validate match result exists
       if (!ctx.match || !ctx.match[1]) {
@@ -215,7 +219,8 @@ const registerAdminHandlers = (bot) => {
   // Plan management
   bot.action('admin_plans', async (ctx) => {
     try {
-      if (!UserService.isAdmin(ctx.from.id)) return;
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
 
       const lang = getLanguage(ctx);
       const plans = await PlanModel.getAll();
@@ -240,7 +245,8 @@ const registerAdminHandlers = (bot) => {
   // Analytics
   bot.action('admin_analytics', async (ctx) => {
     try {
-      if (!UserService.isAdmin(ctx.from.id)) return;
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
 
       const lang = getLanguage(ctx);
 
@@ -290,7 +296,8 @@ const registerAdminHandlers = (bot) => {
 
   // Handle admin text inputs
   bot.on('text', async (ctx, next) => {
-    if (!UserService.isAdmin(ctx.from.id)) {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin) {
       return next();
     }
 
@@ -384,7 +391,8 @@ const registerAdminHandlers = (bot) => {
   // Extend subscription
   bot.action('admin_extend_sub', async (ctx) => {
     try {
-      if (!UserService.isAdmin(ctx.from.id)) return;
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
 
       const userId = ctx.session.temp.selectedUserId;
       const lang = getLanguage(ctx);
@@ -415,7 +423,8 @@ const registerAdminHandlers = (bot) => {
   // Deactivate user
   bot.action('admin_deactivate', async (ctx) => {
     try {
-      if (!UserService.isAdmin(ctx.from.id)) return;
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
 
       const userId = ctx.session.temp.selectedUserId;
       const lang = getLanguage(ctx);
