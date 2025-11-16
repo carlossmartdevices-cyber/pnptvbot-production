@@ -959,6 +959,236 @@ class LiveStreamModel {
   }
 
   /**
+   * Set recording URL for VOD (Video on Demand)
+   * @param {string} streamId - Stream ID
+   * @param {string} recordingUrl - URL of the recorded stream
+   * @returns {Promise<void>}
+   */
+  static async setRecordingUrl(streamId, recordingUrl) {
+    try {
+      const db = getFirestore();
+
+      await db.collection(COLLECTION).doc(streamId).update({
+        recordingUrl,
+        updatedAt: new Date(),
+      });
+
+      logger.info('Recording URL set for stream', { streamId, recordingUrl });
+    } catch (error) {
+      logger.error('Error setting recording URL:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get available VODs (recorded streams)
+   * @param {Object} filters - Filter options
+   * @param {number} limit - Maximum number of VODs
+   * @returns {Promise<Array>} VOD streams
+   */
+  static async getVODs(filters = {}, limit = 50) {
+    try {
+      const db = getFirestore();
+      const { category, hostId, minDuration = 0 } = filters;
+
+      let query = db
+        .collection(COLLECTION)
+        .where('status', '==', 'ended')
+        .where('recordStream', '==', true)
+        .orderBy('endedAt', 'desc')
+        .limit(limit);
+
+      if (category) {
+        query = query.where('category', '==', category);
+      }
+
+      if (hostId) {
+        query = query.where('hostId', '==', String(hostId));
+      }
+
+      const snapshot = await query.get();
+      const vods = [];
+
+      snapshot.forEach((doc) => {
+        const stream = doc.data();
+
+        // Filter by minimum duration if specified
+        if (minDuration && stream.duration < minDuration) {
+          return;
+        }
+
+        // Only include streams with recording URL
+        if (stream.recordingUrl) {
+          if (stream.startedAt?.toDate) stream.startedAt = stream.startedAt.toDate();
+          if (stream.endedAt?.toDate) stream.endedAt = stream.endedAt.toDate();
+          vods.push(stream);
+        }
+      });
+
+      return vods;
+    } catch (error) {
+      logger.error('Error getting VODs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Set thumbnail for stream
+   * @param {string} streamId - Stream ID
+   * @param {string} thumbnailUrl - Thumbnail URL
+   * @returns {Promise<void>}
+   */
+  static async setThumbnail(streamId, thumbnailUrl) {
+    try {
+      const db = getFirestore();
+
+      await db.collection(COLLECTION).doc(streamId).update({
+        thumbnailUrl,
+        updatedAt: new Date(),
+      });
+
+      logger.info('Thumbnail set for stream', { streamId, thumbnailUrl });
+    } catch (error) {
+      logger.error('Error setting thumbnail:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Increment share count
+   * @param {string} streamId - Stream ID
+   * @returns {Promise<void>}
+   */
+  static async incrementShareCount(streamId) {
+    try {
+      await this.updateAnalytics(streamId, { shareCount: 1 });
+      logger.info('Share count incremented', { streamId });
+    } catch (error) {
+      logger.error('Error incrementing share count:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate shareable link
+   * @param {string} streamId - Stream ID
+   * @param {string} botUsername - Bot username
+   * @returns {string} Shareable deep link
+   */
+  static generateShareLink(streamId, botUsername) {
+    return `https://t.me/${botUsername}?start=stream_${streamId}`;
+  }
+
+  /**
+   * Notify followers when stream starts
+   * @param {string} streamerId - Streamer user ID
+   * @param {Object} streamInfo - Stream information
+   * @param {Function} sendNotification - Function to send Telegram message
+   * @returns {Promise<number>} Number of notifications sent
+   */
+  static async notifyFollowers(streamerId, streamInfo, sendNotification) {
+    try {
+      const subscribers = await this.getStreamSubscribers(streamerId);
+
+      let notificationsSent = 0;
+
+      for (const subscriberId of subscribers) {
+        try {
+          await sendNotification(
+            subscriberId,
+            `🔴 ${streamInfo.hostName} is now live!\n\n` +
+            `🎤 ${streamInfo.title}\n` +
+            `${this.getCategoryEmoji(streamInfo.category)} ${streamInfo.category}\n\n` +
+            `Tap below to join the stream!`,
+            streamInfo.streamId
+          );
+          notificationsSent++;
+        } catch (notifyError) {
+          logger.warn('Failed to notify subscriber', { subscriberId, error: notifyError.message });
+        }
+      }
+
+      logger.info('Followers notified', { streamerId, notificationsSent });
+      return notificationsSent;
+    } catch (error) {
+      logger.error('Error notifying followers:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get category emoji
+   * @param {string} category - Category name
+   * @returns {string} Category emoji
+   */
+  static getCategoryEmoji(category) {
+    const emojiMap = {
+      music: '🎵',
+      gaming: '🎮',
+      talk_show: '🎙',
+      education: '📚',
+      entertainment: '🎭',
+      sports: '⚽',
+      news: '📰',
+      other: '📁',
+    };
+    return emojiMap[category] || '📁';
+  }
+
+  /**
+   * Check if user is subscribed to streamer
+   * @param {string} userId - User ID
+   * @param {string} streamerId - Streamer ID
+   * @returns {Promise<boolean>} True if subscribed
+   */
+  static async isSubscribedToStreamer(userId, streamerId) {
+    try {
+      const db = getFirestore();
+      const snapshot = await db
+        .collection(NOTIFICATIONS_COLLECTION)
+        .where('userId', '==', String(userId))
+        .where('streamerId', '==', String(streamerId))
+        .where('notificationsEnabled', '==', true)
+        .limit(1)
+        .get();
+
+      return !snapshot.empty;
+    } catch (error) {
+      logger.error('Error checking subscription:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unsubscribe from streamer
+   * @param {string} userId - User ID
+   * @param {string} streamerId - Streamer ID
+   * @returns {Promise<void>}
+   */
+  static async unsubscribeFromStreamer(userId, streamerId) {
+    try {
+      const db = getFirestore();
+
+      const snapshot = await db
+        .collection(NOTIFICATIONS_COLLECTION)
+        .where('userId', '==', String(userId))
+        .where('streamerId', '==', String(streamerId))
+        .get();
+
+      const batch = db.batch();
+      snapshot.forEach((doc) => {
+        batch.update(doc.ref, { notificationsEnabled: false });
+      });
+      await batch.commit();
+
+      logger.info('User unsubscribed from streamer', { userId, streamerId });
+    } catch (error) {
+      logger.error('Error unsubscribing from streamer:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get stream statistics
    * @returns {Promise<Object>} Statistics
    */

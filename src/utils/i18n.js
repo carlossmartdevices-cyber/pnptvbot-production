@@ -153,6 +153,22 @@ const translations = {
     bannedFromCommenting: 'You are banned from commenting on this stream',
     commentsDisabled: 'Comments are disabled for this stream',
 
+    // VOD (Video on Demand)
+    availableVODs: 'Available Recordings',
+    noVODsAvailable: 'No recordings available yet',
+    watchVOD: 'Watch Recording',
+    vodNotFound: 'Recording not found',
+
+    // Share
+    shareStream: 'Share Stream',
+    shareLinkCopied: 'Share link ready!',
+    shareInstructions: 'Share this link with your friends or post it on Telegram!',
+    shareToTelegram: 'Share to Telegram',
+
+    // Subscribe/Follow
+    subscribedToStreamer: '🔔 You will be notified when this streamer goes live!',
+    unsubscribedFromStreamer: '🔕 You won\'t receive notifications from this streamer anymore',
+
     // Radio
     radioTitle: '📻 PNPtv Radio - 24/7',
     listenNow: '🎧 Listen Now',
@@ -465,6 +481,22 @@ const translations = {
     commentAdded: '¡Comentario agregado exitosamente!',
     bannedFromCommenting: 'Estás bloqueado de comentar en esta transmisión',
     commentsDisabled: 'Los comentarios están deshabilitados para esta transmisión',
+
+    // VOD (Video on Demand)
+    availableVODs: 'Grabaciones Disponibles',
+    noVODsAvailable: 'No hay grabaciones disponibles aún',
+    watchVOD: 'Ver Grabación',
+    vodNotFound: 'Grabación no encontrada',
+
+    // Share
+    shareStream: 'Compartir Transmisión',
+    shareLinkCopied: '¡Enlace listo para compartir!',
+    shareInstructions: '¡Comparte este enlace con tus amigos o publícalo en Telegram!',
+    shareToTelegram: 'Compartir en Telegram',
+
+    // Subscribe/Follow
+    subscribedToStreamer: '🔔 ¡Recibirás notificaciones cuando este streamer esté en vivo!',
+    unsubscribedFromStreamer: '🔕 Ya no recibirás notificaciones de este streamer',
 
     // Radio
     radioTitle: '📻 Radio PNPtv - 24/7',

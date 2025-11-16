@@ -22,7 +22,10 @@ const registerLiveHandlers = (bot) => {
         Markup.inlineKeyboard([
           [Markup.button.callback(t('startLive', lang), 'live_start')],
           [Markup.button.callback(t('viewStreams', lang), 'live_view')],
-          [Markup.button.callback('📁 Browse Categories', 'live_browse_categories')],
+          [
+            Markup.button.callback('📁 Browse Categories', 'live_browse_categories'),
+            Markup.button.callback('🎬 VODs', 'live_view_vods'),
+          ],
           [Markup.button.callback(t('myStreams', lang), 'live_my_streams')],
           [Markup.button.callback(t('back', lang), 'back_to_main')],
         ]),
@@ -204,16 +207,35 @@ const registerLiveHandlers = (bot) => {
         // Generate stream URL with token
         const streamUrl = `https://stream.pnptv.com/live/${streamId}?token=${viewerToken}`;
 
-        const categoryEmoji = {
-          music: '🎵',
-          gaming: '🎮',
-          talk_show: '🎙',
-          education: '📚',
-          entertainment: '🎭',
-          sports: '⚽',
-          news: '📰',
-          other: '📁',
-        }[stream.category] || '📁';
+        const categoryEmoji = LiveStreamModel.getCategoryEmoji(stream.category);
+
+        // Check if user is subscribed to streamer
+        const isSubscribed = stream.hostId !== String(userId) ?
+          await LiveStreamModel.isSubscribedToStreamer(userId, stream.hostId) : false;
+
+        const buttons = [
+          [Markup.button.url('📺 Watch Stream', streamUrl)],
+          [
+            Markup.button.callback('❤️ Like', `live_like_${streamId}`),
+            Markup.button.callback('💬 Comments', `live_comments_${streamId}`),
+          ],
+          [Markup.button.callback('🔗 Share', `live_share_${streamId}`)],
+        ];
+
+        // Add subscribe/unsubscribe button if not own stream
+        if (stream.hostId !== String(userId)) {
+          buttons.push([
+            Markup.button.callback(
+              isSubscribed ? '🔕 Unfollow' : '🔔 Follow',
+              `live_${isSubscribed ? 'unsubscribe' : 'subscribe'}_${stream.hostId}`
+            ),
+          ]);
+        }
+
+        buttons.push(
+          [Markup.button.callback('👋 Leave', `live_leave_${streamId}`)],
+          [Markup.button.callback(t('back', lang), 'live_view')]
+        );
 
         await ctx.editMessageText(
           `${t('joinedStream', lang)}\n\n` +
@@ -223,15 +245,7 @@ const registerLiveHandlers = (bot) => {
             `👥 ${stream.currentViewers} watching\n` +
             `💬 ${stream.totalComments || 0} comments\n\n` +
             `${t('streamInstructions', lang)}`,
-          Markup.inlineKeyboard([
-            [Markup.button.url('📺 Watch Stream', streamUrl)],
-            [
-              Markup.button.callback('❤️ Like', `live_like_${streamId}`),
-              Markup.button.callback('💬 Comments', `live_comments_${streamId}`),
-            ],
-            [Markup.button.callback('👋 Leave', `live_leave_${streamId}`)],
-            [Markup.button.callback(t('back', lang), 'live_view')],
-          ]),
+          Markup.inlineKeyboard(buttons),
         );
 
         logger.info('User joined stream', { userId, streamId });
@@ -759,6 +773,182 @@ const registerLiveHandlers = (bot) => {
       await ctx.reply(t('error', lang));
     }
   });
+
+  // View VODs
+  bot.action('live_view_vods', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+
+      const vods = await LiveStreamModel.getVODs({}, 20);
+
+      if (vods.length === 0) {
+        await ctx.editMessageText(
+          t('noVODsAvailable', lang),
+          Markup.inlineKeyboard([
+            [Markup.button.callback(t('back', lang), 'show_live')],
+          ]),
+        );
+        return;
+      }
+
+      let message = `🎬 ${t('availableVODs', lang)}\n\n`;
+      const buttons = [];
+
+      vods.forEach((vod, index) => {
+        if (index < 10) { // Show max 10
+          const categoryEmoji = LiveStreamModel.getCategoryEmoji(vod.category);
+          message +=
+            `${categoryEmoji} ${vod.title}\n` +
+            `👤 ${vod.hostName}\n` +
+            `⏱ ${vod.duration} min | 👁 ${vod.totalViews} views\n\n`;
+
+          buttons.push([
+            Markup.button.callback(`▶️ ${vod.title.substring(0, 30)}`, `live_play_vod_${vod.streamId}`),
+          ]);
+        }
+      });
+
+      buttons.push([Markup.button.callback(t('back', lang), 'show_live')]);
+
+      await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
+    } catch (error) {
+      logger.error('Error viewing VODs:', error);
+      await ctx.reply(t('error', lang));
+    }
+  });
+
+  // Play VOD
+  bot.action(/^live_play_vod_(.+)$/, async (ctx) => {
+    try {
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid play VOD action format');
+        return;
+      }
+
+      const streamId = ctx.match[1];
+      const lang = getLanguage(ctx);
+
+      const vod = await LiveStreamModel.getById(streamId);
+
+      if (!vod || !vod.recordingUrl) {
+        await ctx.editMessageText(
+          t('vodNotFound', lang),
+          Markup.inlineKeyboard([
+            [Markup.button.callback(t('back', lang), 'live_view_vods')],
+          ]),
+        );
+        return;
+      }
+
+      const categoryEmoji = LiveStreamModel.getCategoryEmoji(vod.category);
+
+      await ctx.editMessageText(
+        `🎬 ${t('watchVOD', lang)}\n\n` +
+          `🎤 ${vod.title}\n` +
+          `👤 ${vod.hostName}\n` +
+          `${categoryEmoji} ${vod.category}\n` +
+          `⏱ Duration: ${vod.duration} minutes\n` +
+          `👁 ${vod.totalViews} views\n` +
+          `❤️ ${vod.likes} likes\n` +
+          `💬 ${vod.totalComments || 0} comments\n`,
+        Markup.inlineKeyboard([
+          [Markup.button.url('▶️ Play Recording', vod.recordingUrl)],
+          [Markup.button.callback('🔗 Share', `live_share_${streamId}`)],
+          [Markup.button.callback(t('back', lang), 'live_view_vods')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error playing VOD:', error);
+      await ctx.reply(t('error', lang));
+    }
+  });
+
+  // Share stream
+  bot.action(/^live_share_(.+)$/, async (ctx) => {
+    try {
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid share action format');
+        return;
+      }
+
+      const streamId = ctx.match[1];
+      const lang = getLanguage(ctx);
+
+      // Get bot username
+      const botInfo = await ctx.telegram.getMe();
+      const shareLink = LiveStreamModel.generateShareLink(streamId, botInfo.username);
+
+      // Increment share count
+      await LiveStreamModel.incrementShareCount(streamId);
+
+      await ctx.answerCbQuery(t('shareLinkCopied', lang));
+
+      // Send share message
+      await ctx.reply(
+        `🔗 ${t('shareStream', lang)}\n\n${shareLink}\n\n${t('shareInstructions', lang)}`,
+        Markup.inlineKeyboard([
+          [
+            Markup.button.url(
+              t('shareToTelegram', lang),
+              `https://t.me/share/url?url=${encodeURIComponent(shareLink)}`
+            ),
+          ],
+          [Markup.button.callback(t('back', lang), `live_join_${streamId}`)],
+        ]),
+      );
+
+      logger.info('Stream shared', { userId: ctx.from.id, streamId });
+    } catch (error) {
+      logger.error('Error sharing stream:', error);
+      await ctx.answerCbQuery('Error');
+    }
+  });
+
+  // Subscribe to streamer
+  bot.action(/^live_subscribe_(.+)$/, async (ctx) => {
+    try {
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid subscribe action format');
+        return;
+      }
+
+      const streamerId = ctx.match[1];
+      const lang = getLanguage(ctx);
+      const userId = ctx.from.id;
+
+      await LiveStreamModel.subscribeToStreamer(userId, streamerId);
+
+      await ctx.answerCbQuery(t('subscribedToStreamer', lang));
+
+      logger.info('User subscribed to streamer', { userId, streamerId });
+    } catch (error) {
+      logger.error('Error subscribing to streamer:', error);
+      await ctx.answerCbQuery('Error');
+    }
+  });
+
+  // Unsubscribe from streamer
+  bot.action(/^live_unsubscribe_(.+)$/, async (ctx) => {
+    try {
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid unsubscribe action format');
+        return;
+      }
+
+      const streamerId = ctx.match[1];
+      const lang = getLanguage(ctx);
+      const userId = ctx.from.id;
+
+      await LiveStreamModel.unsubscribeFromStreamer(userId, streamerId);
+
+      await ctx.answerCbQuery(t('unsubscribedFromStreamer', lang));
+
+      logger.info('User unsubscribed from streamer', { userId, streamerId });
+    } catch (error) {
+      logger.error('Error unsubscribing from streamer:', error);
+      await ctx.answerCbQuery('Error');
+    }
+  });
 };
 
 /**
@@ -833,6 +1023,31 @@ const createLiveStream = async (ctx) => {
         [Markup.button.callback(t('back', lang), 'show_live')],
       ]),
     );
+
+    // Notify followers asynchronously (don't await to not block user)
+    LiveStreamModel.notifyFollowers(
+      userId,
+      {
+        hostName: stream.hostName,
+        title: stream.title,
+        category: stream.category,
+        streamId: stream.streamId,
+      },
+      async (subscriberId, message, streamId) => {
+        try {
+          await ctx.telegram.sendMessage(
+            subscriberId,
+            message,
+            Markup.inlineKeyboard([
+              [Markup.button.callback('📺 Join Stream', `live_join_${streamId}`)],
+            ])
+          );
+        } catch (error) {
+          // Silently fail if user blocked bot
+          logger.warn('Failed to send notification', { subscriberId, error: error.message });
+        }
+      }
+    ).catch(err => logger.error('Error notifying followers:', err));
 
     logger.info('Live stream created', {
       userId, streamId: stream.streamId, title, isPaid, price,
