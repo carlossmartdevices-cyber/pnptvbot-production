@@ -27,9 +27,37 @@ class UserModel {
 
       const doc = await userRef.get();
       if (!doc.exists) {
+        // New user - set default values
         data.createdAt = timestamp;
+        data.lastActive = timestamp;
         data.subscriptionStatus = 'free';
         data.language = userData.language || 'en';
+
+        // Onboarding defaults
+        data.onboardingComplete = false;
+
+        // Age verification defaults
+        data.ageVerified = false;
+        data.ageVerifiedAt = null;
+        data.ageVerificationExpiresAt = null;
+        data.ageVerificationIntervalHours = 168; // 7 days
+
+        // Legal compliance defaults
+        data.termsAccepted = false;
+        data.privacyAccepted = false;
+
+        // Membership defaults
+        data.tier = 'Free';
+        data.membershipExpiresAt = null;
+
+        // Email defaults
+        data.email = null;
+        data.emailVerified = false;
+
+        // Profile defaults
+        data.bio = null;
+        data.location = null;
+        data.photoUrl = null;
       }
 
       await userRef.set(data, { merge: true });

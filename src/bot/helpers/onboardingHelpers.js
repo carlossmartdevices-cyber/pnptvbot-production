@@ -1,0 +1,562 @@
+const { Markup } = require('telegraf');
+const { getFirestore } = require('../../config/firebase');
+const { t } = require('../../utils/i18n');
+const { isValidEmail } = require('../../utils/validation');
+const logger = require('../../utils/logger');
+const { activateMembership } = require('../../utils/membershipManager');
+
+/**
+ * Handle language selection
+ * @param {Context} ctx - Telegraf context
+ */
+async function handleLanguageSelection(ctx) {
+  try {
+    // Answer callback query immediately
+    try {
+      await ctx.answerCbQuery();
+    } catch (err) {
+      logger.warn(`Could not answer callback query: ${err.message}`);
+    }
+
+    const lang = ctx.match[1]; // Extract language from callback data (language_en or language_es)
+
+    // Validate language
+    if (!['en', 'es'].includes(lang)) {
+      logger.error('Invalid language selected:', lang);
+      return await ctx.reply(t('error', 'en'));
+    }
+
+    // Update session
+    ctx.session.language = lang;
+    ctx.session.onboardingStep = 'ageVerification';
+    console.log(`[Onboarding] User ${ctx.from.id} selected language: ${lang}`);
+
+    // Edit message to confirm language
+    try {
+      await ctx.editMessageText(t('languageSelected', lang), { parse_mode: 'Markdown' });
+    } catch (editError) {
+      if (editError.description?.includes('message is not modified') ||
+          editError.description?.includes('message to edit not found')) {
+        await ctx.reply(t('languageSelected', lang), { parse_mode: 'Markdown' });
+      } else {
+        throw editError;
+      }
+    }
+
+    // Proceed to age verification
+    await showAgeVerification(ctx);
+  } catch (error) {
+    logger.error('Error in handleLanguageSelection:', error);
+    await ctx.reply(t('error', ctx.session?.language || 'en'));
+  }
+}
+
+/**
+ * Show age verification step
+ * @param {Context} ctx - Telegraf context
+ */
+async function showAgeVerification(ctx) {
+  const lang = ctx.session.language || 'en';
+
+  await ctx.reply(
+    t('ageVerification', lang),
+    Markup.inlineKeyboard([
+      [Markup.button.callback(t('confirmAge', lang), 'confirm_age')],
+    ])
+  );
+}
+
+/**
+ * Handle age confirmation
+ * @param {Context} ctx - Telegraf context
+ */
+async function handleAgeConfirmation(ctx) {
+  try {
+    try {
+      await ctx.answerCbQuery();
+    } catch (err) {
+      logger.warn(`Could not answer callback query: ${err.message}`);
+    }
+
+    const lang = ctx.session.language || 'en';
+    const userId = ctx.from.id.toString();
+
+    // Calculate age verification expiry (7 days from now)
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + (168 * 60 * 60 * 1000)); // 168 hours = 7 days
+
+    // Update session
+    ctx.session.ageVerified = true;
+    ctx.session.ageVerifiedAt = now;
+    ctx.session.ageVerificationExpiresAt = expiresAt;
+    ctx.session.onboardingStep = 'terms';
+
+    console.log(`[Onboarding] User ${userId} confirmed age, valid until ${expiresAt.toISOString()}`);
+
+    // Update Firestore immediately with age verification
+    try {
+      const db = getFirestore();
+      await db.collection('users').doc(userId).set({
+        ageVerified: true,
+        ageVerifiedAt: now,
+        ageVerificationExpiresAt: expiresAt,
+        ageVerificationIntervalHours: 168,
+        updatedAt: now,
+      }, { merge: true });
+    } catch (dbError) {
+      logger.error('Failed to save age verification to Firestore:', dbError);
+    }
+
+    // Confirm and proceed to terms
+    try {
+      await ctx.editMessageText(t('ageVerificationSuccess', lang));
+    } catch (editError) {
+      if (editError.description?.includes('message is not modified') ||
+          editError.description?.includes('message to edit not found')) {
+        await ctx.reply(t('ageVerificationSuccess', lang));
+      } else {
+        throw editError;
+      }
+    }
+
+    await showTerms(ctx);
+  } catch (error) {
+    logger.error('Error in handleAgeConfirmation:', error);
+    await ctx.reply(t('error', ctx.session?.language || 'en'));
+  }
+}
+
+/**
+ * Show terms and conditions
+ * @param {Context} ctx - Telegraf context
+ */
+async function showTerms(ctx) {
+  const lang = ctx.session.language || 'en';
+  const botUrl = process.env.BOT_URL || 'https://pnptv.app';
+
+  await ctx.reply(
+    t('terms', lang) + `\n\n📄 ${botUrl}/terms`,
+    Markup.inlineKeyboard([
+      [Markup.button.callback(t('accept', lang), 'accept_terms')],
+      [Markup.button.callback(t('decline', lang), 'decline_terms')],
+    ])
+  );
+}
+
+/**
+ * Handle terms acceptance
+ * @param {Context} ctx - Telegraf context
+ */
+async function handleTermsAcceptance(ctx) {
+  try {
+    try {
+      await ctx.answerCbQuery();
+    } catch (err) {
+      logger.warn(`Could not answer callback query: ${err.message}`);
+    }
+
+    const lang = ctx.session.language || 'en';
+
+    // Update session
+    ctx.session.termsAccepted = true;
+    ctx.session.onboardingStep = 'privacy';
+
+    console.log(`[Onboarding] User ${ctx.from.id} accepted terms`);
+
+    // Confirm and proceed to privacy
+    try {
+      await ctx.editMessageText(t('termsAccepted', lang));
+    } catch (editError) {
+      if (editError.description?.includes('message is not modified') ||
+          editError.description?.includes('message to edit not found')) {
+        await ctx.reply(t('termsAccepted', lang));
+      } else {
+        throw editError;
+      }
+    }
+
+    await showPrivacyPolicy(ctx);
+  } catch (error) {
+    logger.error('Error in handleTermsAcceptance:', error);
+    await ctx.reply(t('error', ctx.session?.language || 'en'));
+  }
+}
+
+/**
+ * Handle terms decline
+ * @param {Context} ctx - Telegraf context
+ */
+async function handleTermsDecline(ctx) {
+  try {
+    try {
+      await ctx.answerCbQuery(t('termsDeclined', ctx.session?.language || 'en'), { show_alert: true });
+    } catch (err) {
+      logger.warn(`Could not answer callback query: ${err.message}`);
+    }
+
+    const lang = ctx.session.language || 'en';
+
+    console.log(`[Onboarding] User ${ctx.from.id} declined terms`);
+
+    await ctx.reply(t('termsDeclined', lang));
+  } catch (error) {
+    logger.error('Error in handleTermsDecline:', error);
+  }
+}
+
+/**
+ * Show privacy policy
+ * @param {Context} ctx - Telegraf context
+ */
+async function showPrivacyPolicy(ctx) {
+  const lang = ctx.session.language || 'en';
+  const botUrl = process.env.BOT_URL || 'https://pnptv.app';
+
+  await ctx.reply(
+    t('privacy', lang) + `\n\n🔒 ${botUrl}/privacy`,
+    Markup.inlineKeyboard([
+      [Markup.button.callback(t('accept', lang), 'accept_privacy')],
+      [Markup.button.callback(t('decline', lang), 'decline_privacy')],
+    ])
+  );
+}
+
+/**
+ * Handle privacy policy acceptance
+ * @param {Context} ctx - Telegraf context
+ */
+async function handlePrivacyAcceptance(ctx) {
+  try {
+    try {
+      await ctx.answerCbQuery();
+    } catch (err) {
+      logger.warn(`Could not answer callback query: ${err.message}`);
+    }
+
+    const lang = ctx.session.language || 'en';
+
+    // Update session
+    ctx.session.privacyAccepted = true;
+    ctx.session.onboardingStep = 'email';
+
+    console.log(`[Onboarding] User ${ctx.from.id} accepted privacy policy`);
+
+    // Confirm and proceed to email
+    try {
+      await ctx.editMessageText(t('privacyAccepted', lang));
+    } catch (editError) {
+      if (editError.description?.includes('message is not modified') ||
+          editError.description?.includes('message to edit not found')) {
+        await ctx.reply(t('privacyAccepted', lang));
+      } else {
+        throw editError;
+      }
+    }
+
+    await showEmailPrompt(ctx);
+  } catch (error) {
+    logger.error('Error in handlePrivacyAcceptance:', error);
+    await ctx.reply(t('error', ctx.session?.language || 'en'));
+  }
+}
+
+/**
+ * Handle privacy policy decline
+ * @param {Context} ctx - Telegraf context
+ */
+async function handlePrivacyDecline(ctx) {
+  try {
+    try {
+      await ctx.answerCbQuery(t('privacyDeclined', ctx.session?.language || 'en'), { show_alert: true });
+    } catch (err) {
+      logger.warn(`Could not answer callback query: ${err.message}`);
+    }
+
+    const lang = ctx.session.language || 'en';
+
+    console.log(`[Onboarding] User ${ctx.from.id} declined privacy policy`);
+
+    await ctx.reply(t('privacyDeclined', lang));
+  } catch (error) {
+    logger.error('Error in handlePrivacyDecline:', error);
+  }
+}
+
+/**
+ * Show email collection prompt
+ * @param {Context} ctx - Telegraf context
+ */
+async function showEmailPrompt(ctx) {
+  const lang = ctx.session.language || 'en';
+
+  // Set awaiting email flag
+  ctx.session.awaitingEmail = true;
+  ctx.session.onboardingStep = 'email';
+
+  await ctx.reply(
+    t('emailPrompt', lang),
+    Markup.removeKeyboard() // Remove any previous keyboard
+  );
+
+  await ctx.reply(
+    t('emailInstructions', lang),
+    Markup.inlineKeyboard([
+      [Markup.button.callback(t('skipEmail', lang), 'skip_email')],
+    ])
+  );
+}
+
+/**
+ * Handle email submission (called from text handler in bot registration)
+ * @param {Context} ctx - Telegraf context
+ */
+async function handleEmailSubmission(ctx) {
+  try {
+    const lang = ctx.session.language || 'en';
+    const email = ctx.message.text.trim().toLowerCase();
+
+    console.log(`[Onboarding] User ${ctx.from.id} submitted email: ${email}`);
+
+    // Validate email
+    if (!isValidEmail(email)) {
+      await ctx.reply(t('emailInvalid', lang));
+      return;
+    }
+
+    // Save email to session
+    ctx.session.email = email;
+    ctx.session.awaitingEmail = false;
+
+    // Save to Firestore immediately
+    try {
+      const db = getFirestore();
+      await db.collection('users').doc(ctx.from.id.toString()).set({
+        email,
+        emailVerified: false, // Can add verification later
+        updatedAt: new Date(),
+      }, { merge: true });
+
+      console.log(`[Onboarding] Email saved to Firestore for user ${ctx.from.id}`);
+    } catch (dbError) {
+      logger.error('Failed to save email to Firestore:', dbError);
+    }
+
+    await ctx.reply(t('emailConfirmed', lang));
+
+    // Proceed to free channel invite
+    await generateFreeChannelInvite(ctx);
+  } catch (error) {
+    logger.error('Error in handleEmailSubmission:', error);
+    await ctx.reply(t('error', ctx.session?.language || 'en'));
+  }
+}
+
+/**
+ * Handle email skip
+ * @param {Context} ctx - Telegraf context
+ */
+async function handleSkipEmail(ctx) {
+  try {
+    try {
+      await ctx.answerCbQuery();
+    } catch (err) {
+      logger.warn(`Could not answer callback query: ${err.message}`);
+    }
+
+    console.log(`[Onboarding] User ${ctx.from.id} skipped email`);
+
+    // Clear awaiting email flag
+    ctx.session.awaitingEmail = false;
+
+    // Proceed to free channel invite
+    await generateFreeChannelInvite(ctx);
+  } catch (error) {
+    logger.error('Error in handleSkipEmail:', error);
+    await ctx.reply(t('error', ctx.session?.language || 'en'));
+  }
+}
+
+/**
+ * Generate and send free channel invite link
+ * @param {Context} ctx - Telegraf context
+ */
+async function generateFreeChannelInvite(ctx) {
+  try {
+    const lang = ctx.session.language || 'en';
+    const userId = ctx.from.id.toString();
+
+    ctx.session.onboardingStep = 'freeChannelInvite';
+
+    // Get channel IDs from environment
+    const freeChannelId = process.env.FREE_CHANNEL_ID || '-1003159260496';
+    const freeGroupId = process.env.FREE_GROUP_ID || '-1003291737499';
+
+    console.log(`[Onboarding] Generating free channel invites for user ${userId}`);
+
+    let channelInviteUrl = null;
+    let groupInviteUrl = null;
+
+    // Try to generate channel invite link
+    try {
+      const channelInvite = await ctx.telegram.createChatInviteLink(freeChannelId, {
+        member_limit: 1,
+        name: `Free - User ${userId}`,
+      });
+      channelInviteUrl = channelInvite.invite_link;
+      console.log(`[Onboarding] Channel invite created: ${channelInviteUrl}`);
+    } catch (channelError) {
+      logger.error('Failed to create channel invite link:', channelError);
+      // Non-blocking - continue flow
+    }
+
+    // Try to generate group invite link
+    try {
+      const groupInvite = await ctx.telegram.createChatInviteLink(freeGroupId, {
+        member_limit: 1,
+        name: `Free - User ${userId}`,
+      });
+      groupInviteUrl = groupInvite.invite_link;
+      console.log(`[Onboarding] Group invite created: ${groupInviteUrl}`);
+    } catch (groupError) {
+      logger.error('Failed to create group invite link:', groupError);
+      // Non-blocking - continue flow
+    }
+
+    // Send invite links if available
+    if (channelInviteUrl || groupInviteUrl) {
+      let message = t('freeChannelInvite', lang) + '\n\n';
+      if (channelInviteUrl) {
+        message += `📺 ${t('freeChannel', lang)}: ${channelInviteUrl}\n`;
+      }
+      if (groupInviteUrl) {
+        message += `💬 ${t('freeGroup', lang)}: ${groupInviteUrl}\n`;
+      }
+
+      await ctx.reply(message);
+    } else {
+      // Fallback message if invite generation failed
+      logger.warn(`Failed to generate any invite links for user ${userId}`);
+      await ctx.reply(t('freeChannelInviteFailed', lang));
+    }
+
+    // Complete onboarding
+    await completeOnboarding(ctx);
+  } catch (error) {
+    logger.error('Error in generateFreeChannelInvite:', error);
+    // Non-blocking - still complete onboarding
+    await completeOnboarding(ctx);
+  }
+}
+
+/**
+ * Complete onboarding and create user profile
+ * @param {Context} ctx - Telegraf context
+ */
+async function completeOnboarding(ctx) {
+  try {
+    const lang = ctx.session.language || 'en';
+    const userId = ctx.from.id.toString();
+
+    console.log(`[Onboarding] Completing onboarding for user ${userId}`);
+
+    // Create complete user document in Firestore
+    const db = getFirestore();
+    const userRef = db.collection('users').doc(userId);
+
+    const now = new Date();
+    const userData = {
+      userId,
+      username: ctx.from.username || null,
+      firstName: ctx.from.first_name || null,
+      lastName: ctx.from.last_name || null,
+      language: ctx.session.language,
+      email: ctx.session.email || null,
+      emailVerified: false,
+
+      // Onboarding tracking
+      onboardingComplete: true,
+      createdAt: now,
+      lastActive: now,
+
+      // Age verification
+      ageVerified: ctx.session.ageVerified || false,
+      ageVerifiedAt: ctx.session.ageVerifiedAt || now,
+      ageVerificationExpiresAt: ctx.session.ageVerificationExpiresAt || null,
+      ageVerificationIntervalHours: 168,
+
+      // Legal compliance
+      termsAccepted: ctx.session.termsAccepted || false,
+      privacyAccepted: ctx.session.privacyAccepted || false,
+
+      // Membership (will be set by auto-activation)
+      tier: 'Free',
+      membershipExpiresAt: null,
+
+      // Profile (optional fields)
+      bio: null,
+      location: null,
+      photoUrl: null,
+
+      updatedAt: now,
+    };
+
+    await userRef.set(userData, { merge: true });
+    console.log(`[Onboarding] User document created in Firestore for user ${userId}`);
+
+    // Auto-activate free membership if enabled
+    if (process.env.AUTO_ACTIVATE_FREE_USERS === 'true') {
+      console.log(`[Onboarding] Auto-activating Free membership for user ${userId}`);
+      await activateMembership(userId, 'Free', 'system', 0, ctx.telegram);
+    }
+
+    // Clear onboarding session data
+    ctx.session.onboardingStep = null;
+    ctx.session.awaitingEmail = false;
+    ctx.session.onboardingComplete = true;
+
+    // Send completion message
+    await ctx.reply(t('profileCreated', lang));
+
+    // Show main menu
+    await showMainMenu(ctx);
+  } catch (error) {
+    logger.error('Error in completeOnboarding:', error);
+    await ctx.reply(t('error', ctx.session?.language || 'en'));
+  }
+}
+
+/**
+ * Show main menu
+ * @param {Context} ctx - Telegraf context
+ */
+async function showMainMenu(ctx) {
+  const lang = ctx.session.language || 'en';
+
+  await ctx.reply(
+    t('mainMenuIntro', lang),
+    Markup.inlineKeyboard([
+      [Markup.button.callback('💎 ' + t('subscribe', lang), 'show_subscription_plans')],
+      [Markup.button.callback('👤 ' + t('myProfile', lang), 'show_my_profile')],
+      [Markup.button.callback('🌍 ' + t('nearbyUsers', lang), 'show_nearby')],
+      [Markup.button.callback('🤖 ' + t('support', lang), 'show_help')],
+    ])
+  );
+}
+
+module.exports = {
+  handleLanguageSelection,
+  handleAgeConfirmation,
+  handleTermsAcceptance,
+  handleTermsDecline,
+  handlePrivacyAcceptance,
+  handlePrivacyDecline,
+  handleEmailSubmission,
+  handleSkipEmail,
+  showAgeVerification,
+  showTerms,
+  showPrivacyPolicy,
+  showEmailPrompt,
+  generateFreeChannelInvite,
+  completeOnboarding,
+  showMainMenu,
+};

@@ -18,15 +18,37 @@ const translations = {
     // Onboarding
     selectLanguage: 'Please select your language:',
     languageSelected: 'Language set to English 🇺🇸',
-    ageConfirmation: 'Are you 18 years or older?',
-    ageConfirmYes: 'Yes, I am 18+',
-    ageConfirmNo: 'No',
+    ageVerification: '🔞 Age Verification Required\n\nYou must be 18 or older to use this service.\n\nAre you 18 years or older?',
+    confirmAge: 'Yes, I am 18+',
+    ageVerificationSuccess: '✅ Age verified successfully!',
+    ageVerificationReminder: '🔄 Age Re-Verification Required\n\nFor security purposes, please confirm your age again (required every 7 days).',
     underAge: 'Sorry, you must be 18 or older to use this service.',
-    termsAndPrivacy: 'Please read and accept our Terms of Service and Privacy Policy:',
-    termsAccepted: 'Terms and Privacy Policy accepted ✅',
-    emailPrompt: 'Would you like to provide your email for updates? (Optional)',
-    emailReceived: 'Email saved successfully!',
+
+    // Terms and Privacy
+    terms: '📄 Terms & Conditions\n\nPlease read and accept our Terms of Service to continue:',
+    termsAccepted: '✅ Terms of Service accepted!',
+    termsDeclined: '❌ You must accept the Terms of Service to use this bot.',
+    privacy: '🔒 Privacy Policy\n\nPlease read and accept our Privacy Policy to continue:',
+    privacyAccepted: '✅ Privacy Policy accepted!',
+    privacyDeclined: '❌ You must accept the Privacy Policy to use this bot.',
+    accept: 'Accept & Continue',
+    decline: 'Decline',
+
+    // Email Collection
+    emailPrompt: '📧 Email Address (Optional)\n\nWould you like to provide your email for updates and notifications?',
+    emailInstructions: 'Please send your email address or click Skip to continue.',
+    emailConfirmed: '✅ Email saved successfully!',
+    emailInvalid: '❌ Invalid email format. Please try again.',
     skipEmail: 'Skip',
+
+    // Free Channel Invite
+    freeChannelInvite: '🎉 Welcome to PNPtv!\n\nJoin our free community:',
+    freeChannel: 'Free Channel',
+    freeGroup: 'Free Group',
+    freeChannelInviteFailed: '✅ Onboarding complete! You can now access all features.',
+
+    // Profile Creation
+    profileCreated: '🎉 Your profile has been created successfully!',
     onboardingComplete: '🎉 Welcome aboard! Your profile is all set. Use /menu to get started.',
 
     // Main Menu
@@ -182,15 +204,37 @@ const translations = {
     // Onboarding
     selectLanguage: 'Por favor selecciona tu idioma:',
     languageSelected: 'Idioma configurado a Español 🇪🇸',
-    ageConfirmation: '¿Tienes 18 años o más?',
-    ageConfirmYes: 'Sí, tengo 18+',
-    ageConfirmNo: 'No',
+    ageVerification: '🔞 Verificación de Edad Requerida\n\nDebes tener 18 años o más para usar este servicio.\n\n¿Tienes 18 años o más?',
+    confirmAge: 'Sí, tengo 18+',
+    ageVerificationSuccess: '✅ ¡Edad verificada exitosamente!',
+    ageVerificationReminder: '🔄 Re-Verificación de Edad Requerida\n\nPor seguridad, por favor confirma tu edad nuevamente (requerido cada 7 días).',
     underAge: 'Lo sentimos, debes tener 18 años o más para usar este servicio.',
-    termsAndPrivacy: 'Por favor lee y acepta nuestros Términos de Servicio y Política de Privacidad:',
-    termsAccepted: 'Términos y Política de Privacidad aceptados ✅',
-    emailPrompt: '¿Deseas proporcionar tu correo para actualizaciones? (Opcional)',
-    emailReceived: '¡Correo guardado exitosamente!',
+
+    // Terms and Privacy
+    terms: '📄 Términos y Condiciones\n\nPor favor lee y acepta nuestros Términos de Servicio para continuar:',
+    termsAccepted: '✅ ¡Términos de Servicio aceptados!',
+    termsDeclined: '❌ Debes aceptar los Términos de Servicio para usar este bot.',
+    privacy: '🔒 Política de Privacidad\n\nPor favor lee y acepta nuestra Política de Privacidad para continuar:',
+    privacyAccepted: '✅ ¡Política de Privacidad aceptada!',
+    privacyDeclined: '❌ Debes aceptar la Política de Privacidad para usar este bot.',
+    accept: 'Aceptar y Continuar',
+    decline: 'Rechazar',
+
+    // Email Collection
+    emailPrompt: '📧 Correo Electrónico (Opcional)\n\n¿Deseas proporcionar tu correo para actualizaciones y notificaciones?',
+    emailInstructions: 'Por favor envía tu dirección de correo o haz clic en Omitir para continuar.',
+    emailConfirmed: '✅ ¡Correo guardado exitosamente!',
+    emailInvalid: '❌ Formato de correo inválido. Por favor intenta de nuevo.',
     skipEmail: 'Omitir',
+
+    // Free Channel Invite
+    freeChannelInvite: '🎉 ¡Bienvenido a PNPtv!\n\nÚnete a nuestra comunidad gratuita:',
+    freeChannel: 'Canal Gratuito',
+    freeGroup: 'Grupo Gratuito',
+    freeChannelInviteFailed: '✅ ¡Onboarding completado! Ahora puedes acceder a todas las funciones.',
+
+    // Profile Creation
+    profileCreated: '🎉 ¡Tu perfil ha sido creado exitosamente!',
     onboardingComplete: '🎉 ¡Bienvenido! Tu perfil está configurado. Usa /menu para comenzar.',
 
     // Main Menu
