@@ -32,6 +32,19 @@ class UserModel {
         data.language = userData.language || 'en';
         // Default role for new users
         data.role = userData.role || 'user';
+        // Default privacy settings
+        data.privacy = {
+          showLocation: true,
+          showInterests: true,
+          showBio: true,
+          allowMessages: true,
+          showOnline: true,
+        };
+        // Initialize counters
+        data.profileViews = 0;
+        data.favorites = [];
+        data.blocked = [];
+        data.badges = [];
       }
 
       await userRef.set(data, { merge: true });
@@ -463,6 +476,311 @@ class UserModel {
       return true;
     } catch (error) {
       logger.error('Error invalidating user cache:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Update user privacy settings
+   * @param {number|string} userId - User ID
+   * @param {Object} privacy - Privacy settings
+   * @returns {Promise<boolean>} Success status
+   */
+  static async updatePrivacy(userId, privacy) {
+    try {
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      await userRef.update({
+        privacy,
+        updatedAt: new Date(),
+      });
+
+      await cache.del(`user:${userId}`);
+
+      logger.info('User privacy updated', { userId, privacy });
+      return true;
+    } catch (error) {
+      logger.error('Error updating user privacy:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Increment profile views
+   * @param {number|string} userId - User ID
+   * @returns {Promise<boolean>} Success status
+   */
+  static async incrementProfileViews(userId) {
+    try {
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const currentViews = doc.data().profileViews || 0;
+      await userRef.update({
+        profileViews: currentViews + 1,
+        updatedAt: new Date(),
+      });
+
+      await cache.del(`user:${userId}`);
+
+      logger.info('Profile views incremented', { userId, views: currentViews + 1 });
+      return true;
+    } catch (error) {
+      logger.error('Error incrementing profile views:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Add user to favorites
+   * @param {number|string} userId - User ID
+   * @param {number|string} targetUserId - Target user ID to favorite
+   * @returns {Promise<boolean>} Success status
+   */
+  static async addToFavorites(userId, targetUserId) {
+    try {
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const favorites = doc.data().favorites || [];
+      if (!favorites.includes(targetUserId.toString())) {
+        favorites.push(targetUserId.toString());
+        await userRef.update({
+          favorites,
+          updatedAt: new Date(),
+        });
+
+        await cache.del(`user:${userId}`);
+        logger.info('User added to favorites', { userId, targetUserId });
+      }
+
+      return true;
+    } catch (error) {
+      logger.error('Error adding to favorites:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove user from favorites
+   * @param {number|string} userId - User ID
+   * @param {number|string} targetUserId - Target user ID to remove from favorites
+   * @returns {Promise<boolean>} Success status
+   */
+  static async removeFromFavorites(userId, targetUserId) {
+    try {
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const favorites = doc.data().favorites || [];
+      const updatedFavorites = favorites.filter((id) => id !== targetUserId.toString());
+
+      await userRef.update({
+        favorites: updatedFavorites,
+        updatedAt: new Date(),
+      });
+
+      await cache.del(`user:${userId}`);
+      logger.info('User removed from favorites', { userId, targetUserId });
+
+      return true;
+    } catch (error) {
+      logger.error('Error removing from favorites:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Block user
+   * @param {number|string} userId - User ID
+   * @param {number|string} targetUserId - Target user ID to block
+   * @returns {Promise<boolean>} Success status
+   */
+  static async blockUser(userId, targetUserId) {
+    try {
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const blocked = doc.data().blocked || [];
+      if (!blocked.includes(targetUserId.toString())) {
+        blocked.push(targetUserId.toString());
+
+        // Remove from favorites if present
+        const favorites = doc.data().favorites || [];
+        const updatedFavorites = favorites.filter((id) => id !== targetUserId.toString());
+
+        await userRef.update({
+          blocked,
+          favorites: updatedFavorites,
+          updatedAt: new Date(),
+        });
+
+        await cache.del(`user:${userId}`);
+        logger.info('User blocked', { userId, targetUserId });
+      }
+
+      return true;
+    } catch (error) {
+      logger.error('Error blocking user:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Unblock user
+   * @param {number|string} userId - User ID
+   * @param {number|string} targetUserId - Target user ID to unblock
+   * @returns {Promise<boolean>} Success status
+   */
+  static async unblockUser(userId, targetUserId) {
+    try {
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const blocked = doc.data().blocked || [];
+      const updatedBlocked = blocked.filter((id) => id !== targetUserId.toString());
+
+      await userRef.update({
+        blocked: updatedBlocked,
+        updatedAt: new Date(),
+      });
+
+      await cache.del(`user:${userId}`);
+      logger.info('User unblocked', { userId, targetUserId });
+
+      return true;
+    } catch (error) {
+      logger.error('Error unblocking user:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if user is blocked
+   * @param {number|string} userId - User ID
+   * @param {number|string} targetUserId - Target user ID to check
+   * @returns {Promise<boolean>} Blocked status
+   */
+  static async isBlocked(userId, targetUserId) {
+    try {
+      const user = await this.getById(userId);
+      if (!user) return false;
+
+      const blocked = user.blocked || [];
+      return blocked.includes(targetUserId.toString());
+    } catch (error) {
+      logger.error('Error checking blocked status:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get user favorites
+   * @param {number|string} userId - User ID
+   * @returns {Promise<Array>} Favorite users
+   */
+  static async getFavorites(userId) {
+    try {
+      const user = await this.getById(userId);
+      if (!user || !user.favorites || user.favorites.length === 0) {
+        return [];
+      }
+
+      const db = getFirestore();
+      const favorites = [];
+
+      for (const favoriteId of user.favorites) {
+        const doc = await db.collection(COLLECTION).doc(favoriteId).get();
+        if (doc.exists) {
+          favorites.push({ id: doc.id, ...doc.data() });
+        }
+      }
+
+      logger.info(`Retrieved ${favorites.length} favorites for user ${userId}`);
+      return favorites;
+    } catch (error) {
+      logger.error('Error getting favorites:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Add badge to user
+   * @param {number|string} userId - User ID
+   * @param {string} badge - Badge name (verified, premium, vip, moderator, etc.)
+   * @returns {Promise<boolean>} Success status
+   */
+  static async addBadge(userId, badge) {
+    try {
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const badges = doc.data().badges || [];
+      if (!badges.includes(badge)) {
+        badges.push(badge);
+        await userRef.update({
+          badges,
+          updatedAt: new Date(),
+        });
+
+        await cache.del(`user:${userId}`);
+        logger.info('Badge added to user', { userId, badge });
+      }
+
+      return true;
+    } catch (error) {
+      logger.error('Error adding badge:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove badge from user
+   * @param {number|string} userId - User ID
+   * @param {string} badge - Badge name to remove
+   * @returns {Promise<boolean>} Success status
+   */
+  static async removeBadge(userId, badge) {
+    try {
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const badges = doc.data().badges || [];
+      const updatedBadges = badges.filter((b) => b !== badge);
+
+      await userRef.update({
+        badges: updatedBadges,
+        updatedAt: new Date(),
+      });
+
+      await cache.del(`user:${userId}`);
+      logger.info('Badge removed from user', { userId, badge });
+
+      return true;
+    } catch (error) {
+      logger.error('Error removing badge:', error);
       return false;
     }
   }
