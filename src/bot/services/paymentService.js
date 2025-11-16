@@ -15,6 +15,7 @@ const {
   NotFoundError,
   ConfigurationError,
 } = require('../../utils/errors');
+const DaimoConfig = require('../../config/daimo');
 
 /**
  * Payment Service - Business logic for payment operations
@@ -168,65 +169,65 @@ class PaymentService {
 
   /**
    * Create Daimo payment
+   * Uses Daimo Pay to accept payments via Zelle, CashApp, Venmo, Revolut, Wise
+   * Payments are automatically converted to USDC on Optimism
    * @param {Object} payment - Payment record
    * @param {Object} plan - Plan details
    * @returns {Promise<string>} Payment URL
    */
   static async createDaimoPayment(payment, plan) {
     try {
-      if (!process.env.DAIMO_API_KEY) {
-        throw new ConfigurationError('Daimo payment is not configured. Please contact support.');
+      // Validate Daimo configuration
+      let config;
+      try {
+        config = DaimoConfig.getDaimoConfig();
+      } catch (configError) {
+        throw new ConfigurationError(configError.message);
       }
 
-      // Daimo Pay API integration with retry logic
-      const response = await this.retryWithBackoff(
-        async () => axios.post('https://api.daimo.com/v1/payments', {
-          amount: plan.price,
-          currency: 'USDC',
-          description: `${plan.name} Plan - PNPtv`,
-          metadata: {
-            paymentId: payment.id,
-            userId: payment.userId,
-            planId: payment.planId,
-          },
-          callback_url: `${process.env.BOT_WEBHOOK_DOMAIN}/api/webhooks/daimo`,
-        }, {
-          headers: {
-            Authorization: `Bearer ${process.env.DAIMO_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 10000, // 10 second timeout
-        }),
-        3,
-        'Daimo payment creation',
-      );
-
-      const { payment_url, transaction_id } = response.data;
-
-      if (!payment_url || !transaction_id) {
-        throw new PaymentProviderError('daimo', 'Invalid response from Daimo API');
-      }
-
-      logger.info('Daimo payment created', {
-        paymentId: payment.id,
-        transactionId: transaction_id,
+      // Create payment intent
+      const paymentIntent = DaimoConfig.createPaymentIntent({
         amount: plan.price,
+        userId: payment.userId,
+        planId: payment.planId,
+        chatId: payment.chatId,
+        description: `${plan.name} Plan - ${plan.duration} days`,
+      });
+
+      // Generate payment link
+      const paymentUrl = DaimoConfig.generatePaymentLink(paymentIntent);
+
+      logger.info('Daimo payment link created', {
+        paymentId: payment.id,
+        userId: payment.userId,
+        amount: plan.price,
+        chain: 'Optimism',
+        token: 'USDC',
+        supportedApps: config.supportedPaymentApps.join(', '),
       });
 
       // Update payment with transaction details
       await PaymentModel.updateStatus(payment.id, 'pending', {
-        paymentUrl: payment_url,
-        transactionId: transaction_id,
+        paymentUrl,
         provider: 'daimo',
+        chain: 'Optimism',
+        token: 'USDC',
+        paymentIntent,
       });
 
-      return payment_url;
+      return paymentUrl;
     } catch (error) {
       logger.error('Error creating Daimo payment:', {
         paymentId: payment.id,
         error: error.message,
         stack: error.stack,
       });
+
+      // Re-throw configuration errors as-is
+      if (error instanceof ConfigurationError) {
+        throw error;
+      }
+
       throw new PaymentProviderError('daimo', error.message);
     }
   }
@@ -319,7 +320,8 @@ class PaymentService {
 
   /**
    * Process Daimo webhook with idempotency
-   * @param {Object} webhookData - Webhook payload
+   * Handles payment events from Daimo Pay (Zelle, CashApp, Venmo, Revolut, Wise)
+   * @param {Object} webhookData - Webhook payload from Daimo Pay
    * @returns {Promise<Object>} { success, error }
    */
   static async processDaimoWebhook(webhookData) {
@@ -331,57 +333,151 @@ class PaymentService {
         throw new InvalidSignatureError('daimo');
       }
 
+      // Extract data from Daimo Pay webhook format
       const {
-        transaction_id, status, metadata,
+        id: paymentEventId,
+        status: daimoStatus,
+        source,
+        destination,
+        metadata,
       } = webhookData;
 
-      const { paymentId, userId, planId } = metadata;
+      const {
+        payerAddress, txHash, chainId, amountUnits, tokenSymbol,
+      } = source;
 
-      // Idempotency check: Use transaction ID as unique key
-      const idempotencyKey = `webhook:daimo:${transaction_id}`;
+      const { userId, planId, chatId } = metadata;
+
+      // Use transaction hash as unique identifier for idempotency
+      const idempotencyKey = `webhook:daimo:${txHash}`;
       const lockAcquired = await cache.acquireLock(idempotencyKey, 120); // 2 min lock
 
       if (!lockAcquired) {
-        logger.info('Webhook already processing (idempotency)', { paymentId, transactionId: transaction_id });
-        throw new DuplicatePaymentError(paymentId);
+        logger.info('Webhook already processing (idempotency)', { txHash, paymentEventId });
+        return { success: true, alreadyProcessed: true };
       }
 
       try {
-        // Get payment record
-        const payment = await PaymentModel.getById(paymentId);
+        // Find payment by metadata (since we may not have a direct payment ID)
+        // First try to get payment ID from metadata
+        let payment;
+        if (metadata.paymentId) {
+          payment = await PaymentModel.getById(metadata.paymentId);
+        } else {
+          // Fallback: find by userId and planId (recent pending payment)
+          const userPayments = await PaymentModel.getByUser(userId, 10);
+          payment = userPayments.find(
+            (p) => p.planId === planId && p.status === 'pending' && p.provider === 'daimo',
+          );
+        }
+
         if (!payment) {
-          logger.warn('Payment not found for Daimo webhook', { paymentId });
-          throw new PaymentNotFoundError(paymentId);
+          logger.warn('Payment not found for Daimo webhook', {
+            userId, planId, txHash,
+          });
+          throw new PaymentNotFoundError(`userId:${userId},planId:${planId}`);
         }
 
         // Check if already processed
         if (payment.status === 'success' || payment.status === 'failed') {
-          logger.info('Payment already processed', { paymentId, status: payment.status });
+          logger.info('Payment already processed', {
+            paymentId: payment.id,
+            status: payment.status,
+            txHash,
+          });
           return { success: true, alreadyProcessed: true };
         }
 
-        if (status === 'completed') {
-          // Payment successful
+        // Map Daimo status to internal status
+        const internalStatus = DaimoConfig.mapDaimoStatus(daimoStatus);
+
+        // Process based on status
+        if (daimoStatus === 'payment_completed') {
+          // Payment successful - convert amount for logging
+          const amountDisplay = DaimoConfig.formatAmountFromUnits(amountUnits);
+
+          // Activate subscription
           await this.activateSubscription(userId, planId, payment);
 
-          await PaymentModel.updateStatus(paymentId, 'success', {
-            transactionId: transaction_id,
+          // Update payment record
+          await PaymentModel.updateStatus(payment.id, 'success', {
+            transactionId: txHash,
+            transactionHash: txHash,
+            payerAddress,
+            chainId,
+            amountUnits,
+            amountDisplay,
+            tokenSymbol,
             completedAt: new Date(),
+            daimoEventId: paymentEventId,
           });
 
-          logger.info('Daimo payment successful', { paymentId, userId });
+          logger.info('Daimo payment successful', {
+            paymentId: payment.id,
+            userId,
+            amount: amountDisplay,
+            token: tokenSymbol,
+            txHash,
+            chain: 'Optimism',
+          });
+
+          // Notify user via Telegram (if chatId available)
+          if (chatId) {
+            await this.notifyPaymentSuccess(chatId, payment, amountDisplay);
+          }
+
           return { success: true };
         }
 
-        if (status === 'failed') {
-          await PaymentModel.updateStatus(paymentId, 'failed', {
-            transactionId: transaction_id,
+        if (daimoStatus === 'payment_bounced') {
+          // Payment failed/bounced
+          await PaymentModel.updateStatus(payment.id, 'failed', {
+            transactionId: txHash,
+            transactionHash: txHash,
             failedAt: new Date(),
+            failureReason: 'Payment bounced',
+            daimoEventId: paymentEventId,
           });
 
-          logger.warn('Daimo payment failed', { paymentId, userId });
-          return { success: false, error: 'Payment failed' };
+          logger.warn('Daimo payment bounced', {
+            paymentId: payment.id,
+            userId,
+            txHash,
+          });
+
+          // Notify user of failure
+          if (chatId) {
+            await this.notifyPaymentFailure(chatId, payment);
+          }
+
+          return { success: false, error: 'Payment bounced' };
         }
+
+        if (daimoStatus === 'payment_started') {
+          // Payment initiated but not completed yet
+          await PaymentModel.updateStatus(payment.id, 'pending', {
+            transactionId: txHash,
+            transactionHash: txHash,
+            payerAddress,
+            startedAt: new Date(),
+            daimoEventId: paymentEventId,
+          });
+
+          logger.info('Daimo payment started', {
+            paymentId: payment.id,
+            userId,
+            txHash,
+          });
+
+          return { success: true, pending: true };
+        }
+
+        // Default: pending status
+        logger.info('Daimo payment status update', {
+          paymentId: payment.id,
+          status: daimoStatus,
+          txHash,
+        });
 
         return { success: true };
       } finally {
@@ -389,8 +485,40 @@ class PaymentService {
         await cache.releaseLock(idempotencyKey);
       }
     } catch (error) {
-      logger.error('Error processing Daimo webhook:', error);
+      logger.error('Error processing Daimo webhook:', {
+        error: error.message,
+        stack: error.stack,
+      });
       return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Notify user of successful payment via Telegram
+   * @param {string} chatId - Telegram chat ID
+   * @param {Object} payment - Payment record
+   * @param {number} amount - Payment amount
+   */
+  static async notifyPaymentSuccess(chatId, payment, amount) {
+    try {
+      const bot = require('../core/bot');
+      await bot.telegram.sendMessage(chatId, `✅ Payment successful!\n\nAmount: ${amount} USDC\nYour subscription has been activated.`);
+    } catch (error) {
+      logger.error('Error notifying payment success:', error);
+    }
+  }
+
+  /**
+   * Notify user of failed payment via Telegram
+   * @param {string} chatId - Telegram chat ID
+   * @param {Object} payment - Payment record
+   */
+  static async notifyPaymentFailure(chatId, payment) {
+    try {
+      const bot = require('../core/bot');
+      await bot.telegram.sendMessage(chatId, '❌ Payment failed. Please try again or contact support.');
+    } catch (error) {
+      logger.error('Error notifying payment failure:', error);
     }
   }
 
