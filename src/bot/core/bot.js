@@ -103,31 +103,62 @@ const startBot = async () => {
       // Use bot.handleUpdate() directly since express.json() already parses the body
       // bot.webhookCallback() expects raw body, but express.json() consumes it
       apiApp.post(webhookPath, async (req, res) => {
-        // Set connection header to keep-alive explicitly
+        // Disable response timeout for this specific route
+        req.setTimeout(0);
+        res.setTimeout(0);
+
+        // Set headers for stable connection
         res.setHeader('Connection', 'keep-alive');
+        res.setHeader('Content-Type', 'application/json');
 
         try {
-          logger.info('Received webhook request:', {
-            body: req.body,
-            headers: req.headers,
+          logger.info('Telegram webhook received:', {
+            hasBody: !!req.body,
+            bodyKeys: req.body ? Object.keys(req.body) : [],
+            contentType: req.headers['content-type'],
             method: req.method,
             path: req.path,
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
           });
+
+          // Validate that we have a body
+          if (!req.body || Object.keys(req.body).length === 0) {
+            logger.warn('Webhook received empty body');
+            return res.status(200).json({ ok: true, message: 'Empty body received' });
+          }
 
           // Process the update
           await bot.handleUpdate(req.body);
 
-          // Send response with explicit status and content
+          // Send success response
           res.status(200).json({ ok: true });
           logger.info('Webhook processed successfully');
         } catch (error) {
-          logger.error('Error processing webhook:', error);
+          logger.error('Error processing Telegram webhook:', {
+            error: error.message,
+            stack: error.stack,
+            body: req.body,
+          });
 
-          // Send error response without closing connection abruptly
-          res.status(500).json({ ok: false, error: 'Internal server error' });
+          // Always send a response to prevent connection reset
+          // Telegram expects a response even on errors
+          res.status(200).json({ ok: false, error: error.message });
         }
       });
       logger.info(`✓ Webhook callback registered at: ${webhookPath}`);
+
+      // Add a test endpoint to verify webhook configuration
+      apiApp.get(webhookPath, (req, res) => {
+        res.status(200).json({
+          status: 'ok',
+          message: 'Telegram webhook endpoint is active',
+          path: webhookPath,
+          webhookUrl,
+          note: 'This endpoint only accepts POST requests from Telegram',
+        });
+      });
+      logger.info(`✓ Webhook test endpoint registered at: ${webhookPath} (GET)`);
     } else {
       // Polling mode for development
       await bot.telegram.deleteWebhook();

@@ -14,17 +14,29 @@ const { asyncHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
-// Security middleware
-app.use(helmet());
-app.use(cors());
-app.use(compression());
-
-// Body parsing
+// CRITICAL: Apply body parsing FIRST for ALL routes
+// This must be before any route registration
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Logging
+// Logging (before other middleware for accurate request tracking)
 app.use(morgan('combined', { stream: logger.stream }));
+
+// Function to conditionally apply middleware (skip for Telegram webhook)
+const conditionalMiddleware = (middleware) => {
+  return (req, res, next) => {
+    // Skip middleware for Telegram webhook to prevent connection issues
+    if (req.path === '/webhook/telegram') {
+      return next();
+    }
+    return middleware(req, res, next);
+  };
+};
+
+// Security middleware (conditionally applied, skips Telegram webhook)
+app.use(conditionalMiddleware(helmet()));
+app.use(conditionalMiddleware(cors()));
+app.use(conditionalMiddleware(compression()));
 
 // Rate limiting for API
 const limiter = rateLimit({
