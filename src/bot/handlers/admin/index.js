@@ -32,6 +32,8 @@ async function showAdminPanel(ctx, edit = false) {
       buttons.push([Markup.button.callback(t('broadcast', lang), 'admin_broadcast')]);
       buttons.push([Markup.button.callback(t('analytics', lang), 'admin_analytics')]);
       buttons.push([Markup.button.callback(t('gamification.title', lang), 'admin_gamification')]);
+      buttons.push([Markup.button.callback('📻 Radio Management', 'admin_radio')]);
+      buttons.push([Markup.button.callback('📺 Live Stream Management', 'admin_live_streams')]);
     }
 
     // SuperAdmin only features
@@ -60,10 +62,14 @@ async function showAdminPanel(ctx, edit = false) {
  */
 // Import gamification handler
 const registerGamificationHandlers = require('./gamification');
+const registerRadioManagementHandlers = require('./radioManagement');
+const registerLiveStreamManagementHandlers = require('./liveStreamManagement');
 
 const registerAdminHandlers = (bot) => {
   // Register gamification handlers
   registerGamificationHandlers(bot);
+  registerRadioManagementHandlers(bot);
+  registerLiveStreamManagementHandlers(bot);
 
   // Admin command
   bot.command('admin', async (ctx) => {
