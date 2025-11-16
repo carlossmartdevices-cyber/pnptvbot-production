@@ -22,6 +22,7 @@ const updatePlans = async () => {
     const newPlans = [
       {
         id: 'trial_week',
+        sku: 'EASYBOT-PNP-7D',
         name: 'Trial Week',
         nameEs: 'Semana de Prueba',
         price: 14.99,
@@ -41,6 +42,7 @@ const updatePlans = async () => {
       },
       {
         id: 'pnp_member',
+        sku: 'EASYBOT-PNP-30D',
         name: 'PNP Member',
         nameEs: 'Miembro PNP',
         price: 24.99,
@@ -62,6 +64,7 @@ const updatePlans = async () => {
       },
       {
         id: 'crystal_member',
+        sku: 'EASYBOT-PNP-120D',
         name: 'Crystal Member',
         nameEs: 'Miembro Crystal',
         price: 49.99,
@@ -85,6 +88,7 @@ const updatePlans = async () => {
       },
       {
         id: 'diamond_member',
+        sku: 'EASYBOT-PNP-365D',
         name: 'Diamond Member',
         nameEs: 'Miembro Diamond',
         price: 99.99,
@@ -112,6 +116,7 @@ const updatePlans = async () => {
       },
       {
         id: 'lifetime_pass',
+        sku: 'EASYBOT-PNP-LIFE',
         name: 'Lifetime Pass',
         nameEs: 'Pase de por Vida',
         price: 249.99,
@@ -151,7 +156,7 @@ const updatePlans = async () => {
     logger.info('Creating new plans...');
     for (const plan of newPlans) {
       await Plan.createOrUpdate(plan.id, plan);
-      logger.info(`✓ Plan created: ${plan.name} - $${plan.price} (${plan.duration} days)`);
+      logger.info(`✓ Plan created: ${plan.name} - SKU: ${plan.sku} - $${plan.price} (${plan.duration} days)`);
     }
 
     logger.info('✓ Subscription plans updated successfully');

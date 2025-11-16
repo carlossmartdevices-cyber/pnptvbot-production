@@ -68,6 +68,7 @@ class Plan extends Model {
     try {
       const [plan] = await this.upsert({
         id: planId,
+        sku: planData.sku,
         name: planData.name,
         nameEs: planData.nameEs,
         price: planData.price,
@@ -218,6 +219,11 @@ const initPlanModel = (sequelize) => {
         type: DataTypes.STRING(50),
         primaryKey: true,
         allowNull: false,
+      },
+      sku: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        unique: true,
       },
       name: {
         type: DataTypes.STRING(100),
