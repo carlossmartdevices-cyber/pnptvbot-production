@@ -1,16 +1,17 @@
 const { Markup } = require('telegraf');
-const OpenAI = require('openai');
+const Mistral = require('@mistralai/mistralai');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 
-let openai = null;
+let mistralClient = null;
 
-// Initialize OpenAI
-if (process.env.OPENAI_API_KEY) {
-  openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+// Initialize Mistral AI
+if (process.env.MISTRAL_API_KEY) {
+  mistralClient = new Mistral({
+    apiKey: process.env.MISTRAL_API_KEY,
   });
+  logger.info('Mistral AI initialized for customer support');
 }
 
 /**
@@ -123,10 +124,16 @@ const registerSupportHandlers = (bot) => {
 
         const userMessage = ctx.message.text;
 
-        // Exit AI chat
-        if (userMessage.toLowerCase() === '/exit' || userMessage.toLowerCase() === 'exit') {
+        // Exit AI chat for any command or exit keyword
+        if (userMessage.startsWith('/') || userMessage.toLowerCase() === 'exit') {
           ctx.session.temp.aiChatActive = false;
           await ctx.saveSession();
+
+          // If it's a command other than /exit, pass it to the next handler
+          if (userMessage.startsWith('/') && !userMessage.toLowerCase().startsWith('/exit')) {
+            return next();
+          }
+
           await ctx.reply(
             'Chat ended. Use /support to access support menu.',
             Markup.inlineKeyboard([
@@ -136,32 +143,32 @@ const registerSupportHandlers = (bot) => {
           return;
         }
 
-        // Send to OpenAI
-        if (openai) {
+        // Send to Mistral AI
+        if (mistralClient) {
           try {
-            const response = await openai.chat.completions.create({
-              model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
+            const response = await mistralClient.chat.complete({
+              model: process.env.MISTRAL_MODEL || 'mistral-large-latest',
               messages: [
                 {
                   role: 'system',
-                  content: `You are Cristina, a helpful AI assistant for PNPtv, a Telegram bot platform for live streaming, radio, and social networking. Answer questions concisely in ${lang === 'es' ? 'Spanish' : 'English'}.`,
+                  content: `You are Cristina, a helpful AI assistant for PNPtv, a Telegram bot platform for live streaming, radio, and social networking. Answer questions concisely in ${lang === 'es' ? 'Spanish' : 'English'}. Be friendly, professional, and helpful.`,
                 },
                 {
                   role: 'user',
                   content: userMessage,
                 },
               ],
-              max_tokens: parseInt(process.env.OPENAI_MAX_TOKENS || '500', 10),
+              maxTokens: parseInt(process.env.MISTRAL_MAX_TOKENS || '1000', 10),
             });
 
             const aiResponse = response.choices[0].message.content;
             await ctx.reply(`🤖 Cristina: ${aiResponse}\n\n_Type "exit" to end chat_`);
           } catch (aiError) {
-            logger.error('OpenAI error:', aiError);
+            logger.error('Mistral AI error:', aiError);
             await ctx.reply('Sorry, I encountered an error. Please try again.');
           }
         } else {
-          // Fallback response if OpenAI not configured
+          // Fallback response if Mistral AI not configured
           await ctx.reply(
             '🤖 Cristina: I\'m here to help! Please use /support to access the support menu for specific assistance.',
           );
@@ -183,6 +190,13 @@ const registerSupportHandlers = (bot) => {
         }
 
         const message = ctx.message.text;
+
+        // Exit contact admin mode if user sends a command
+        if (message.startsWith('/')) {
+          ctx.session.temp.contactingAdmin = false;
+          await ctx.saveSession();
+          return next();
+        }
 
         // Send to admin users
         const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter(id => id.trim()) || [];
