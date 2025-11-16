@@ -103,6 +103,9 @@ const startBot = async () => {
       // Use bot.handleUpdate() directly since express.json() already parses the body
       // bot.webhookCallback() expects raw body, but express.json() consumes it
       apiApp.post(webhookPath, async (req, res) => {
+        // Set connection header to keep-alive explicitly
+        res.setHeader('Connection', 'keep-alive');
+
         try {
           logger.info('Received webhook request:', {
             body: req.body,
@@ -111,12 +114,17 @@ const startBot = async () => {
             path: req.path,
           });
 
+          // Process the update
           await bot.handleUpdate(req.body);
-          res.sendStatus(200);
+
+          // Send response with explicit status and content
+          res.status(200).json({ ok: true });
           logger.info('Webhook processed successfully');
         } catch (error) {
           logger.error('Error processing webhook:', error);
-          res.sendStatus(500);
+
+          // Send error response without closing connection abruptly
+          res.status(500).json({ ok: false, error: 'Internal server error' });
         }
       });
       logger.info(`✓ Webhook callback registered at: ${webhookPath}`);
@@ -133,11 +141,16 @@ const startBot = async () => {
     apiApp.use(expressErrorHandler);
     logger.info('✓ Error handlers registered');
 
-    // Start API server
+    // Start API server with proper connection handling
     const PORT = process.env.PORT || 3000;
-    apiApp.listen(PORT, () => {
+    const server = apiApp.listen(PORT, () => {
       logger.info(`✓ API server running on port ${PORT}`);
     });
+
+    // Configure server timeouts and keepalive to prevent connection resets
+    server.keepAliveTimeout = 65000; // Slightly higher than nginx timeout
+    server.headersTimeout = 66000; // Higher than keepAliveTimeout
+    server.timeout = 120000; // 2 minutes total timeout for long requests
 
     logger.info('🚀 PNPtv Telegram Bot is running!');
 
