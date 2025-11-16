@@ -1,5 +1,6 @@
 const { Markup } = require('telegraf');
 const LiveStreamModel = require('../../../models/liveStreamModel');
+const EmoteModel = require('../../../models/emoteModel');
 const PermissionService = require('../../services/permissionService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
@@ -27,6 +28,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
           [Markup.button.callback('🔴 Active Streams', 'admin_live_active')],
           [Markup.button.callback('📊 Stream Statistics', 'admin_live_stats')],
           [Markup.button.callback('🗑 Manage All Streams', 'admin_live_all')],
+          [Markup.button.callback('🎭 Approve Emotes', 'admin_emote_approval')],
           [Markup.button.callback(t('back', lang), 'admin_cancel')],
         ]),
       );
@@ -379,6 +381,224 @@ const registerLiveStreamManagementHandlers = (bot) => {
     } catch (error) {
       logger.error('Error confirming stream deletion:', error);
       await ctx.reply('Error deleting stream');
+    }
+  });
+
+  // Admin emote approval
+  bot.action('admin_emote_approval', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const lang = getLanguage(ctx);
+      const pendingEmotes = await EmoteModel.getPendingEmotes(20);
+
+      if (pendingEmotes.length === 0) {
+        await ctx.editMessageText(
+          '✅ No pending emotes to review',
+          Markup.inlineKeyboard([
+            [Markup.button.callback(t('back', lang), 'admin_live_streams')],
+          ]),
+        );
+        return;
+      }
+
+      let message = `🎭 *Pending Emotes (${pendingEmotes.length})*\n\n`;
+
+      pendingEmotes.slice(0, 10).forEach((emote, index) => {
+        message +=
+          `${index + 1}. \`:${emote.code}:\`\n` +
+          `   👤 ${emote.streamerName}\n` +
+          `   📅 ${emote.createdAt.toDate().toLocaleDateString()}\n\n`;
+      });
+
+      if (pendingEmotes.length > 10) {
+        message += `_...and ${pendingEmotes.length - 10} more_\n`;
+      }
+
+      const buttons = [];
+      pendingEmotes.slice(0, 10).forEach((emote) => {
+        buttons.push([
+          Markup.button.callback(
+            `Review :${emote.code}:`,
+            `admin_emote_review_${emote.emoteId}`
+          ),
+        ]);
+      });
+
+      buttons.push([Markup.button.callback('🔄 Refresh', 'admin_emote_approval')]);
+      buttons.push([Markup.button.callback(t('back', lang), 'admin_live_streams')]);
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons),
+      });
+    } catch (error) {
+      logger.error('Error showing emote approval:', error);
+      await ctx.reply('Error loading pending emotes');
+    }
+  });
+
+  // Review specific emote
+  bot.action(/^admin_emote_review_(.+)$/, async (ctx) => {
+    try {
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid emote review action format');
+        return;
+      }
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const emoteId = ctx.match[1];
+      const lang = getLanguage(ctx);
+
+      // Get all pending emotes to find this one
+      const pendingEmotes = await EmoteModel.getPendingEmotes(100);
+      const emote = pendingEmotes.find((e) => e.emoteId === emoteId);
+
+      if (!emote) {
+        await ctx.editMessageText(
+          'Emote not found or already reviewed',
+          Markup.inlineKeyboard([
+            [Markup.button.callback(t('back', lang), 'admin_emote_approval')],
+          ]),
+        );
+        return;
+      }
+
+      const message =
+        `🎭 *Review Emote*\n\n` +
+        `Code: \`:${emote.code}:\`\n` +
+        `Creator: ${emote.streamerName} (ID: ${emote.streamerId})\n` +
+        `Image: ${emote.imageUrl}\n` +
+        `Created: ${emote.createdAt.toDate().toLocaleDateString()}\n\n` +
+        `Please review the emote image and decide:`;
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback('✅ Approve', `admin_emote_approve_${emoteId}`),
+            Markup.button.callback('❌ Reject', `admin_emote_reject_${emoteId}`),
+          ],
+          [Markup.button.url('🖼️ View Image', emote.imageUrl)],
+          [Markup.button.callback(t('back', lang), 'admin_emote_approval')],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error reviewing emote:', error);
+      await ctx.reply('Error loading emote details');
+    }
+  });
+
+  // Approve emote
+  bot.action(/^admin_emote_approve_(.+)$/, async (ctx) => {
+    try {
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid emote approve action format');
+        return;
+      }
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const emoteId = ctx.match[1];
+      const lang = getLanguage(ctx);
+      const adminId = ctx.from.id;
+
+      // Get emote info before approval
+      const pendingEmotes = await EmoteModel.getPendingEmotes(100);
+      const emote = pendingEmotes.find((e) => e.emoteId === emoteId);
+
+      if (!emote) {
+        await ctx.answerCbQuery('Emote not found');
+        return;
+      }
+
+      await EmoteModel.approveEmote(emoteId, adminId);
+
+      await ctx.editMessageText(
+        `✅ *Emote Approved*\n\n` +
+          `Code: :${emote.code}:\n` +
+          `Creator: ${emote.streamerName}`,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(t('back', lang), 'admin_emote_approval')],
+          ]),
+        }
+      );
+
+      logger.info('Emote approved by admin', { adminId, emoteId, code: emote.code });
+
+      // Notify the creator
+      try {
+        await ctx.telegram.sendMessage(
+          emote.streamerId,
+          `✅ Your emote \":${emote.code}:\" has been approved and is now active!`
+        );
+      } catch (notifyError) {
+        logger.warn('Failed to notify emote creator:', { emoteId, streamerId: emote.streamerId });
+      }
+    } catch (error) {
+      logger.error('Error approving emote:', error);
+      await ctx.reply('Error approving emote');
+    }
+  });
+
+  // Reject emote
+  bot.action(/^admin_emote_reject_(.+)$/, async (ctx) => {
+    try {
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid emote reject action format');
+        return;
+      }
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const emoteId = ctx.match[1];
+      const lang = getLanguage(ctx);
+      const adminId = ctx.from.id;
+
+      // Get emote info before rejection
+      const pendingEmotes = await EmoteModel.getPendingEmotes(100);
+      const emote = pendingEmotes.find((e) => e.emoteId === emoteId);
+
+      if (!emote) {
+        await ctx.answerCbQuery('Emote not found');
+        return;
+      }
+
+      await EmoteModel.rejectEmote(emoteId, adminId, 'Inappropriate or against guidelines');
+
+      await ctx.editMessageText(
+        `❌ *Emote Rejected*\n\n` +
+          `Code: :${emote.code}:\n` +
+          `Creator: ${emote.streamerName}`,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(t('back', lang), 'admin_emote_approval')],
+          ]),
+        }
+      );
+
+      logger.info('Emote rejected by admin', { adminId, emoteId, code: emote.code });
+
+      // Notify the creator
+      try {
+        await ctx.telegram.sendMessage(
+          emote.streamerId,
+          `❌ Your emote \":${emote.code}:\" was rejected. Reason: Inappropriate or against guidelines`
+        );
+      } catch (notifyError) {
+        logger.warn('Failed to notify emote creator:', { emoteId, streamerId: emote.streamerId });
+      }
+    } catch (error) {
+      logger.error('Error rejecting emote:', error);
+      await ctx.reply('Error rejecting emote');
     }
   });
 };
