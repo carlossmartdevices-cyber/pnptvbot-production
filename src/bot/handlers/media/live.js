@@ -102,7 +102,7 @@ const registerLiveHandlers = (bot) => {
       await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
     } catch (error) {
       logger.error('Error viewing streams:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 
@@ -159,7 +159,7 @@ const registerLiveHandlers = (bot) => {
       await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
     } catch (error) {
       logger.error('Error showing my streams:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 
@@ -278,7 +278,7 @@ const registerLiveHandlers = (bot) => {
       }
     } catch (error) {
       logger.error('Error joining stream:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 
@@ -357,7 +357,7 @@ const registerLiveHandlers = (bot) => {
           } else if (commentError.message.includes('disabled')) {
             await ctx.reply(t('commentsDisabled', lang));
           } else {
-            await ctx.reply(t('error', lang));
+            await ctx.reply(t('error', getLanguage(ctx)));
           }
 
           ctx.session.temp.commentingOnStream = null;
@@ -365,7 +365,7 @@ const registerLiveHandlers = (bot) => {
         }
       } catch (error) {
         logger.error('Error processing comment:', error);
-        await ctx.reply(t('error', lang));
+        await ctx.reply(t('error', getLanguage(ctx)));
       }
       return;
     }
@@ -505,7 +505,7 @@ const registerLiveHandlers = (bot) => {
         }
       } catch (error) {
         logger.error('Error in emote creation:', error);
-        await ctx.reply(t('error', lang));
+        await ctx.reply(t('error', getLanguage(ctx)));
       }
       return;
     }
@@ -671,7 +671,7 @@ const registerLiveHandlers = (bot) => {
       await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
     } catch (error) {
       logger.error('Error viewing category streams:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 
@@ -720,7 +720,7 @@ const registerLiveHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error showing comments:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 
@@ -867,7 +867,7 @@ const registerLiveHandlers = (bot) => {
       logger.info('User left stream', { userId, streamId });
     } catch (error) {
       logger.error('Error leaving stream:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 
@@ -909,7 +909,7 @@ const registerLiveHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error managing stream:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 
@@ -943,7 +943,7 @@ const registerLiveHandlers = (bot) => {
       logger.info('Stream ended by host', { userId, streamId });
     } catch (error) {
       logger.error('Error ending stream:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 
@@ -986,7 +986,7 @@ const registerLiveHandlers = (bot) => {
       await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
     } catch (error) {
       logger.error('Error viewing VODs:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 
@@ -1032,7 +1032,7 @@ const registerLiveHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error playing VOD:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 
@@ -1174,7 +1174,7 @@ const registerLiveHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error showing my emotes:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 
@@ -1239,7 +1239,7 @@ const registerLiveHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error showing manage emotes:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 
@@ -1299,7 +1299,7 @@ const registerLiveHandlers = (bot) => {
       });
     } catch (error) {
       logger.error('Error editing emote:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 
@@ -1370,7 +1370,7 @@ const registerLiveHandlers = (bot) => {
       logger.info('Emote deleted by user', { userId, emoteId });
     } catch (error) {
       logger.error('Error deleting emote:', error);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', getLanguage(ctx)));
     }
   });
 };
