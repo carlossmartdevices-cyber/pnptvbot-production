@@ -56,10 +56,23 @@ class PaymentService {
    */
   static async createPayment(paymentData) {
     try {
-      // Get plan details
-      const plan = await PlanModel.getById(paymentData.planId);
-      if (!plan) {
-        throw new NotFoundError('Plan');
+      // Handle special case for private calls
+      let plan;
+      if (paymentData.planId === 'private_call_45min') {
+        plan = {
+          id: 'private_call_45min',
+          name: 'Private 1:1 Call - 45 minutes',
+          nameEs: 'Llamada Privada 1:1 - 45 minutos',
+          price: 100,
+          currency: 'USD',
+          duration: 1, // 1 day for call validity
+        };
+      } else {
+        // Get plan details
+        plan = await PlanModel.getById(paymentData.planId);
+        if (!plan) {
+          throw new NotFoundError('Plan');
+        }
       }
 
       // Validate payment data
@@ -423,7 +436,12 @@ class PaymentService {
 
           // Notify user via Telegram (if chatId available)
           if (chatId) {
-            await this.notifyPaymentSuccess(chatId, payment, amountDisplay);
+            // Check if this is a private call payment
+            if (planId === 'private_call_45min') {
+              await this.notifyCallPaymentSuccess(chatId, payment, amountDisplay);
+            } else {
+              await this.notifyPaymentSuccess(chatId, payment, amountDisplay);
+            }
           }
 
           return { success: true };
@@ -505,6 +523,36 @@ class PaymentService {
       await bot.telegram.sendMessage(chatId, `✅ Payment successful!\n\nAmount: ${amount} USDC\nYour subscription has been activated.`);
     } catch (error) {
       logger.error('Error notifying payment success:', error);
+    }
+  }
+
+  /**
+   * Notify user of successful call payment via Telegram
+   * @param {string} chatId - Telegram chat ID
+   * @param {Object} payment - Payment record
+   * @param {number} amount - Payment amount
+   */
+  static async notifyCallPaymentSuccess(chatId, payment, amount) {
+    try {
+      const bot = require('../core/bot');
+      await bot.telegram.sendMessage(
+        chatId,
+        `✅ *Payment Confirmed!*\n\n` +
+        `Amount: ${amount} USDC\n\n` +
+        `🎉 Your 1:1 call has been purchased!\n\n` +
+        `📅 *Next Step: Schedule your call*\n\n` +
+        `Click the button below to schedule your 45-minute call.`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '📅 Schedule Call Now', callback_data: 'schedule_private_call' }],
+            ],
+          },
+        },
+      );
+    } catch (error) {
+      logger.error('Error notifying call payment success:', error);
     }
   }
 
