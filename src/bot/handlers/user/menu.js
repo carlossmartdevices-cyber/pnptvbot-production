@@ -1,6 +1,7 @@
 const { Markup } = require('telegraf');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
+const ChatCleanupService = require('../../services/chatCleanupService');
 
 /**
  * Main menu handlers
@@ -45,7 +46,13 @@ const registerMenuHandlers = (bot) => {
 
       const message = lang === 'es' ? messageEs : messageEn;
 
-      await ctx.reply(message, { parse_mode: 'Markdown' });
+      const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
+
+      // Auto-delete menu messages in groups after 2 minutes
+      const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+      if (isGroup) {
+        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000, false);
+      }
     } catch (error) {
       logger.error('Error in group contact admin:', error);
     }
@@ -78,7 +85,13 @@ const registerMenuHandlers = (bot) => {
 
       const message = lang === 'es' ? rulesEs : rulesEn;
 
-      await ctx.reply(message, { parse_mode: 'Markdown' });
+      const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
+
+      // Auto-delete menu messages in groups after 2 minutes
+      const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+      if (isGroup) {
+        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000, false);
+      }
     } catch (error) {
       logger.error('Error showing group rules:', error);
     }
@@ -155,13 +168,16 @@ const showGroupMenu = async (ctx) => {
       [Markup.button.url(`💬 PNPtv! Bot Chat`, `https://t.me/${botUsername}?start=group_menu`)],
     ];
 
-  await ctx.reply(
+  const sentMessage = await ctx.reply(
     message,
     {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard(keyboard),
     },
   );
+
+  // Auto-delete menu messages in groups after 2 minutes
+  ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000, false);
 };
 
 /**
