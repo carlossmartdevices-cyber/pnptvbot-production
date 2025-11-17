@@ -19,5 +19,8 @@ module.exports = {
     min_uptime: '10s',
     max_restarts: 10,
     restart_delay: 4000,
+    kill_timeout: 5000, // Dar 5 segundos para shutdown limpio
+    wait_ready: false,
+    listen_timeout: 10000,
   }],
 };

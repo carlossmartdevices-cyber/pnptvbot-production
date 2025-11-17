@@ -40,6 +40,7 @@ const apiApp = require('../api/routes');
 // Variable de estado para saber si el bot está iniciado
 let botStarted = false;
 let botInstance = null;
+let isWebhookMode = false;
 
 /**
  * Validate critical environment variables
@@ -187,6 +188,7 @@ const startBot = async () => {
       logger.info(`✓ Webhook test endpoint registered at: ${webhookPath} (GET)`);
       botInstance = bot; // Asignar la instancia del bot
       botStarted = true; // Actualizar el estado
+      isWebhookMode = true; // Marcar que estamos en modo webhook
       logger.info('✓ Bot started in webhook mode');
     } else {
       // Polling mode for development
@@ -234,13 +236,16 @@ const startBot = async () => {
 // Manejadores de señales corregidos
 process.once('SIGINT', async () => {
   logger.info('Received SIGINT, stopping bot...');
-  if (botStarted && botInstance) {
+  if (botStarted && botInstance && !isWebhookMode) {
+    // Solo llamar stop() en modo polling, no en webhook
     try {
       await botInstance.stop('SIGINT');
       logger.info('Bot stopped successfully (SIGINT)');
     } catch (err) {
       logger.error('Error stopping bot:', err);
     }
+  } else if (isWebhookMode) {
+    logger.info('Bot running in webhook mode, graceful shutdown (SIGINT)');
   } else {
     logger.warn('SIGINT received but bot was not started, skipping stop()');
   }
@@ -249,13 +254,16 @@ process.once('SIGINT', async () => {
 
 process.once('SIGTERM', async () => {
   logger.info('Received SIGTERM, stopping bot...');
-  if (botStarted && botInstance) {
+  if (botStarted && botInstance && !isWebhookMode) {
+    // Solo llamar stop() en modo polling, no en webhook
     try {
       await botInstance.stop('SIGTERM');
       logger.info('Bot stopped successfully (SIGTERM)');
     } catch (err) {
       logger.error('Error stopping bot:', err);
     }
+  } else if (isWebhookMode) {
+    logger.info('Bot running in webhook mode, graceful shutdown (SIGTERM)');
   } else {
     logger.warn('SIGTERM received but bot was not started, skipping stop()');
   }
