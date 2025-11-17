@@ -38,16 +38,18 @@ RUN npm ci --only=production && npm cache clean --force
 COPY --from=builder --chown=nodejs:nodejs /app/src ./src
 
 # Copy public directory for landing pages
-COPY --from=builder --chown=nodejs:nodejs /app/public ./public
+COPY --from=builder /app/public ./public
 
 # Copy .env.example for dotenv-safe validation
 COPY --from=builder --chown=nodejs:nodejs /app/.env.example ./.env.example
 
 # Create logs and uploads directories with proper permissions
+# Fix ownership and permissions for all files
 RUN mkdir -p logs uploads \
     && chown -R nodejs:nodejs /app \
     && chmod -R 755 /app/public \
-    && find /app/public -type f -exec chmod 644 {} \;
+    && find /app/public -type f -exec chmod 644 {} \; \
+    && ls -la /app/public
 
 # Switch to non-root user for security
 USER nodejs
