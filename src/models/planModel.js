@@ -1,5 +1,4 @@
 const { DataTypes, Model } = require('sequelize');
-const { getDatabase } = require('../config/database');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
@@ -396,10 +395,14 @@ const initPlanModel = (sequelize) => {
 
 // Auto-initialize if database is available
 try {
-  const sequelize = getDatabase();
-  initPlanModel(sequelize);
+  const db = require('../config/database');
+  const sequelize = db.getDatabase();
+  if (sequelize) {
+    initPlanModel(sequelize);
+    logger.info('Plan model initialized successfully');
+  }
 } catch (error) {
-  logger.warn('Plan model not initialized - database not available yet');
+  logger.warn('Plan model not initialized - database not available yet:', error.message);
 }
 
 module.exports = Plan;
