@@ -15,6 +15,9 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - REDIS_HOST=redis
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     depends_on:
       redis:
         condition: service_healthy
@@ -36,6 +39,9 @@ services:
     restart: unless-stopped
     # Ports removed - only accessible via internal Docker network
     # Uncomment if you need external access: ports: ["${REDIS_PORT:-6379}:6379"]
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     volumes:
       - redis-data:/data
     networks:
