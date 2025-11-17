@@ -393,17 +393,8 @@ const initPlanModel = (sequelize) => {
   return Plan;
 };
 
-// Auto-initialize if database is available
-try {
-  const db = require('../config/database');
-  const sequelize = db.getDatabase();
-  if (sequelize) {
-    initPlanModel(sequelize);
-    logger.info('Plan model initialized successfully');
-  }
-} catch (error) {
-  logger.warn('Plan model not initialized - database not available yet:', error.message);
-}
+// Plan model is now Firestore-based and does not require Sequelize initialization
+// The model methods use Firebase and Redis for data storage and caching
 
 module.exports = Plan;
 module.exports.initPlanModel = initPlanModel;

@@ -3,7 +3,6 @@ const { Telegraf } = require('telegraf');
 const { initializeFirebase } = require('../../config/firebase');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
-const { getDatabase, testConnection, syncDatabase } = require('../../config/database');
 const sessionMiddleware = require('./middleware/session');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
@@ -94,38 +93,17 @@ const startBot = async () => {
       // NO hacemos throw, permitimos que el bot continúe
     }
 
-    // Initialize PostgreSQL Database
-    let dbInitialized = false;
-    try {
-      getDatabase(); // Initialize database connection
-      const connected = await testConnection();
-      if (connected) {
-        await syncDatabase({ alter: false });
-        logger.info('✓ PostgreSQL database initialized and synced');
-        dbInitialized = true;
-      } else {
-        logger.warn('PostgreSQL database connection failed, some features may not work');
-      }
-    } catch (error) {
-      logger.warn('PostgreSQL database initialization failed:', error.message);
-      logger.warn('⚠️  Bot features requiring database will not work');
-    }
-
     // Initialize Redis (optional, will use default localhost if not configured)
     try {
       initializeRedis();
       logger.info('✓ Redis initialized');
 
-      // Prewarm cache with critical data only if database is initialized
-      if (dbInitialized) {
-        try {
-          await PlanModel.prewarmCache();
-          logger.info('✓ Cache prewarmed successfully');
-        } catch (cacheError) {
-          logger.warn('Cache prewarming failed, continuing:', cacheError.message);
-        }
-      } else {
-        logger.info('Skipping cache prewarming - database not available');
+      // Prewarm cache with critical data
+      try {
+        await PlanModel.prewarmCache();
+        logger.info('✓ Cache prewarmed successfully');
+      } catch (cacheError) {
+        logger.warn('Cache prewarming failed, continuing:', cacheError.message);
       }
     } catch (error) {
       logger.warn('Redis initialization failed, continuing without cache:', error.message);
