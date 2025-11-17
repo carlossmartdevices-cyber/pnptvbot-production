@@ -130,6 +130,69 @@ const registerRadioManagementHandlers = (bot) => {
     }
   });
 
+  // All requests management
+  bot.action('admin_radio_all_requests', async (ctx) => {
+    try {
+      await showAllRequestsMenu(ctx);
+    } catch (error) {
+      logger.error('Error showing all requests menu:', error);
+    }
+  });
+
+  // View requests by status
+  bot.action(/^admin_radio_view_(.+)$/, async (ctx) => {
+    try {
+      const status = ctx.match[1];
+      if (['pending', 'approved', 'rejected', 'played', 'all'].includes(status)) {
+        await showRequestsByStatus(ctx, status);
+      }
+    } catch (error) {
+      logger.error('Error viewing requests by status:', error);
+    }
+  });
+
+  // Play request directly
+  bot.action(/^admin_radio_play_(.+)$/, async (ctx) => {
+    try {
+      const requestId = ctx.match[1];
+      await playRequest(ctx, requestId);
+    } catch (error) {
+      logger.error('Error playing request:', error);
+    }
+  });
+
+  // Search history
+  bot.action('admin_radio_search', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      ctx.session.temp.waitingForHistorySearch = true;
+      await ctx.saveSession();
+
+      await ctx.editMessageText('🔍 Enter song title or artist to search:');
+    } catch (error) {
+      logger.error('Error starting history search:', error);
+    }
+  });
+
+  // Top requests
+  bot.action('admin_radio_top', async (ctx) => {
+    try {
+      await showTopRequests(ctx);
+    } catch (error) {
+      logger.error('Error showing top requests:', error);
+    }
+  });
+
+  // Edit schedule entry
+  bot.action(/^admin_radio_edit_schedule_(.+)$/, async (ctx) => {
+    try {
+      const scheduleId = ctx.match[1];
+      await startEditSchedule(ctx, scheduleId);
+    } catch (error) {
+      logger.error('Error starting schedule edit:', error);
+    }
+  });
+
   // Handle text inputs for radio admin
   bot.on('text', async (ctx, next) => {
     const { temp } = ctx.session;
@@ -156,6 +219,17 @@ const registerRadioManagementHandlers = (bot) => {
       return;
     }
 
+    // History search flow
+    if (temp?.waitingForHistorySearch) {
+      try {
+        await handleHistorySearch(ctx);
+        return;
+      } catch (error) {
+        logger.error('Error in history search:', error);
+      }
+      return;
+    }
+
     return next();
   });
 };
@@ -175,10 +249,12 @@ const showRadioAdminMenu = async (ctx) => {
     text += `⏳ ${t('radio.admin.pendingRequests', lang)}: ${stats.pendingRequests}\n`;
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(t('radio.admin.setNowPlaying', lang), 'admin_radio_set_now_playing')],
-      [Markup.button.callback(t('radio.admin.viewRequests', lang), 'admin_radio_requests')],
-      [Markup.button.callback(t('radio.admin.manageSchedule', lang), 'admin_radio_schedule')],
-      [Markup.button.callback(t('radio.admin.statistics', lang), 'admin_radio_stats')],
+      [Markup.button.callback('🎵 Set Now Playing', 'admin_radio_set_now_playing')],
+      [Markup.button.callback('📋 Manage Requests', 'admin_radio_all_requests')],
+      [Markup.button.callback('📅 Manage Schedule', 'admin_radio_schedule')],
+      [Markup.button.callback('📊 Statistics', 'admin_radio_stats')],
+      [Markup.button.callback('🔍 Search History', 'admin_radio_search')],
+      [Markup.button.callback('🎯 Top Requests', 'admin_radio_top')],
       [Markup.button.callback(t('back', lang), 'admin_panel')],
     ]);
 
@@ -269,13 +345,13 @@ const showScheduleManagement = async (ctx) => {
     const lang = getLanguage(ctx);
     const schedule = await RadioModel.getSchedule();
 
-    let text = `📅 ${t('radio.admin.scheduleManagement', lang)}\n\n`;
+    let text = `📅 **Radio Programming Schedule**\n\n`;
 
     if (schedule && schedule.length > 0) {
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
       schedule.forEach((entry) => {
-        text += `${days[entry.dayOfWeek]} ${entry.timeSlot}\n`;
+        text += `**${days[entry.dayOfWeek]} ${entry.timeSlot}**\n`;
         text += `📻 ${entry.programName}\n`;
         if (entry.description) {
           text += `_${entry.description}_\n`;
@@ -283,15 +359,17 @@ const showScheduleManagement = async (ctx) => {
         text += '\n';
       });
     } else {
-      text += t('radio.admin.noScheduleEntries', lang);
+      text += 'No schedule entries yet.';
     }
 
-    const keyboard = [[Markup.button.callback(t('radio.admin.addToSchedule', lang), 'admin_radio_add_schedule')]];
+    const keyboard = [[Markup.button.callback('➕ Add Program', 'admin_radio_add_schedule')]];
 
-    // Add delete buttons for each schedule entry
+    // Add edit and delete buttons for each schedule entry
     schedule.forEach((entry) => {
+      const programName = entry.programName.length > 15 ? entry.programName.substring(0, 15) + '...' : entry.programName;
       keyboard.push([
-        Markup.button.callback(`🗑️ ${entry.programName}`, `admin_radio_delete_schedule_${entry.id}`),
+        Markup.button.callback(`✏️ ${programName}`, `admin_radio_edit_schedule_${entry.id}`),
+        Markup.button.callback('🗑️', `admin_radio_delete_schedule_${entry.id}`),
       ]);
     });
 
@@ -325,14 +403,23 @@ const deleteScheduleEntry = async (ctx, scheduleId) => {
 const showRadioStatistics = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
-    const stats = await RadioModel.getStatistics();
+    const stats = await RadioModel.getDetailedStatistics();
     const history = await RadioModel.getHistory(5);
 
-    let text = `📊 ${t('radio.admin.statistics', lang)}\n\n`;
+    let text = `📊 Radio Statistics\n\n`;
     text += '📈 **Overall Stats:**\n';
     text += `Total Requests: ${stats.totalRequests}\n`;
     text += `Songs Played: ${stats.totalSongsPlayed}\n`;
-    text += `Pending Requests: ${stats.pendingRequests}\n\n`;
+    text += `Approval Rate: ${stats.approvalRate}%\n\n`;
+
+    text += '📊 **Request Status:**\n';
+    text += `⏳ Pending: ${stats.pendingRequests}\n`;
+    text += `✅ Approved: ${stats.approvedRequests}\n`;
+    text += `❌ Rejected: ${stats.rejectedRequests}\n\n`;
+
+    text += '📅 **Time-based Stats:**\n';
+    text += `Today: ${stats.todayRequests} requests\n`;
+    text += `This Week: ${stats.weekRequests} requests\n\n`;
 
     text += '🎵 **Recently Played:**\n';
     if (history && history.length > 0) {
@@ -430,6 +517,212 @@ const handleScheduleInput = async (ctx) => {
 
     await ctx.reply(t('radio.admin.scheduleCreated', lang));
     await showScheduleManagement(ctx);
+  }
+};
+
+/**
+ * Show all requests menu
+ */
+const showAllRequestsMenu = async (ctx) => {
+  try {
+    const lang = getLanguage(ctx);
+
+    let text = '📋 **Manage Song Requests**\n\n';
+    text += 'Select request status to view:\n';
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('⏳ Pending', 'admin_radio_view_pending')],
+      [Markup.button.callback('✅ Approved', 'admin_radio_view_approved')],
+      [Markup.button.callback('❌ Rejected', 'admin_radio_view_rejected')],
+      [Markup.button.callback('🎵 Played', 'admin_radio_view_played')],
+      [Markup.button.callback('📊 All Requests', 'admin_radio_view_all')],
+      [Markup.button.callback(t('back', lang), 'admin_radio')],
+    ]);
+
+    await ctx.editMessageText(text, keyboard);
+  } catch (error) {
+    logger.error('Error in showAllRequestsMenu:', error);
+  }
+};
+
+/**
+ * Show requests by status
+ */
+const showRequestsByStatus = async (ctx, status) => {
+  try {
+    const lang = getLanguage(ctx);
+    const requests = await RadioModel.getRequestsByStatus(status, 20);
+
+    const statusEmoji = {
+      pending: '⏳',
+      approved: '✅',
+      rejected: '❌',
+      played: '🎵',
+      all: '📊',
+    };
+
+    let text = `${statusEmoji[status]} **${status.charAt(0).toUpperCase() + status.slice(1)} Requests**\n\n`;
+
+    if (requests && requests.length > 0) {
+      for (let i = 0; i < Math.min(requests.length, 10); i++) {
+        const request = requests[i];
+        const user = await UserModel.getById(request.userId);
+        const userName = user ? `${user.firstName} ${user.lastName || ''}` : `User ${request.userId}`;
+
+        text += `${i + 1}. ${request.songName}\n`;
+        text += `   👤 ${userName}\n`;
+        text += `   📅 ${request.requestedAt.toDate ? request.requestedAt.toDate().toLocaleDateString() : new Date(request.requestedAt).toLocaleDateString()}\n\n`;
+      }
+
+      if (requests.length > 10) {
+        text += `\n_Showing 10 of ${requests.length} requests_\n`;
+      }
+    } else {
+      text += `No ${status} requests found.`;
+    }
+
+    const keyboard = [];
+
+    // Add action buttons for each request
+    if (status === 'pending') {
+      requests.slice(0, 5).forEach((request) => {
+        keyboard.push([
+          Markup.button.callback(`✅ ${request.songName.substring(0, 20)}`, `admin_radio_approve_${request.id}`),
+          Markup.button.callback('❌', `admin_radio_reject_${request.id}`),
+          Markup.button.callback('▶️', `admin_radio_play_${request.id}`),
+        ]);
+      });
+    } else if (status === 'approved') {
+      requests.slice(0, 5).forEach((request) => {
+        keyboard.push([
+          Markup.button.callback(`▶️ ${request.songName.substring(0, 25)}`, `admin_radio_play_${request.id}`),
+          Markup.button.callback('❌', `admin_radio_reject_${request.id}`),
+        ]);
+      });
+    }
+
+    keyboard.push([Markup.button.callback(t('back', lang), 'admin_radio_all_requests')]);
+
+    await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
+  } catch (error) {
+    logger.error('Error in showRequestsByStatus:', error);
+  }
+};
+
+/**
+ * Play request and set as now playing
+ */
+const playRequest = async (ctx, requestId) => {
+  try {
+    const lang = getLanguage(ctx);
+
+    const success = await RadioModel.playRequest(requestId);
+
+    if (success) {
+      await ctx.answerCbQuery('✅ Now playing!');
+      await showRadioAdminMenu(ctx);
+    } else {
+      await ctx.answerCbQuery('❌ Error playing request');
+    }
+  } catch (error) {
+    logger.error('Error playing request:', error);
+  }
+};
+
+/**
+ * Handle history search
+ */
+const handleHistorySearch = async (ctx) => {
+  try {
+    const lang = getLanguage(ctx);
+    const query = ctx.message.text;
+
+    const results = await RadioModel.searchHistory(query);
+
+    delete ctx.session.temp.waitingForHistorySearch;
+    await ctx.saveSession();
+
+    let text = `🔍 **Search Results for "${query}"**\n\n`;
+
+    if (results && results.length > 0) {
+      results.forEach((song, index) => {
+        text += `${index + 1}. ${song.title}`;
+        if (song.artist) {
+          text += ` - ${song.artist}`;
+        }
+        const playedAt = song.playedAt.toDate ? song.playedAt.toDate() : new Date(song.playedAt);
+        text += `\n   ⏰ ${playedAt.toLocaleDateString()} ${playedAt.toLocaleTimeString()}\n\n`;
+      });
+    } else {
+      text += 'No results found.';
+    }
+
+    await ctx.reply(
+      text,
+      Markup.inlineKeyboard([
+        [Markup.button.callback('🔍 New Search', 'admin_radio_search')],
+        [Markup.button.callback(t('back', lang), 'admin_radio')],
+      ]),
+    );
+  } catch (error) {
+    logger.error('Error handling history search:', error);
+  }
+};
+
+/**
+ * Show top requested songs
+ */
+const showTopRequests = async (ctx) => {
+  try {
+    const lang = getLanguage(ctx);
+    const topSongs = await RadioModel.getTopRequests(10);
+
+    let text = '🎯 **Top Requested Songs**\n\n';
+
+    if (topSongs && topSongs.length > 0) {
+      topSongs.forEach((song, index) => {
+        text += `${index + 1}. ${song.songName}\n`;
+        text += `   🔢 Requested ${song.count} times\n\n`;
+      });
+    } else {
+      text += 'No data available yet.';
+    }
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback(t('refresh', lang), 'admin_radio_top')],
+      [Markup.button.callback(t('back', lang), 'admin_radio')],
+    ]);
+
+    await ctx.editMessageText(text, keyboard);
+  } catch (error) {
+    logger.error('Error in showTopRequests:', error);
+  }
+};
+
+/**
+ * Start editing schedule entry
+ */
+const startEditSchedule = async (ctx, scheduleId) => {
+  try {
+    const lang = getLanguage(ctx);
+
+    ctx.session.temp.editingSchedule = {
+      scheduleId,
+      step: 'field',
+    };
+    await ctx.saveSession();
+
+    await ctx.editMessageText(
+      '✏️ What would you like to edit?',
+      Markup.inlineKeyboard([
+        [Markup.button.callback('📝 Program Name', `edit_schedule_field_programName_${scheduleId}`)],
+        [Markup.button.callback('⏰ Time Slot', `edit_schedule_field_timeSlot_${scheduleId}`)],
+        [Markup.button.callback('📄 Description', `edit_schedule_field_description_${scheduleId}`)],
+        [Markup.button.callback(t('cancel', lang), 'admin_radio_schedule')],
+      ]),
+    );
+  } catch (error) {
+    logger.error('Error starting schedule edit:', error);
   }
 };
 

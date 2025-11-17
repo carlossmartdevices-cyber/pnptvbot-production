@@ -422,6 +422,245 @@ class RadioModel {
       return null;
     }
   }
+
+  /**
+   * Get all requests (not just pending)
+   * @param {string} status - Status filter (all, pending, approved, rejected, played)
+   * @param {number} limit - Number of requests to return
+   * @returns {Promise<Array>} Requests
+   */
+  static async getRequestsByStatus(status = 'all', limit = 50) {
+    try {
+      const db = getFirestore();
+      let query = db.collection(REQUESTS_COLLECTION);
+
+      if (status !== 'all') {
+        query = query.where('status', '==', status);
+      }
+
+      const snapshot = await query
+        .orderBy('requestedAt', 'desc')
+        .limit(limit)
+        .get();
+
+      const requests = [];
+      snapshot.forEach((doc) => {
+        requests.push({ id: doc.id, ...doc.data() });
+      });
+
+      logger.info(`Retrieved ${requests.length} requests with status: ${status}`);
+      return requests;
+    } catch (error) {
+      logger.error('Error getting requests by status:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Update schedule entry
+   * @param {string} scheduleId - Schedule ID
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<boolean>} Success status
+   */
+  static async updateSchedule(scheduleId, updates) {
+    try {
+      const db = getFirestore();
+      const scheduleRef = db.collection(SCHEDULE_COLLECTION).doc(scheduleId);
+
+      await scheduleRef.update({
+        ...updates,
+        updatedAt: new Date(),
+      });
+
+      // Invalidate cache
+      await cache.del('radio:schedule');
+
+      logger.info('Schedule updated', { scheduleId });
+      return true;
+    } catch (error) {
+      logger.error('Error updating schedule:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Search history by song title or artist
+   * @param {string} query - Search query
+   * @param {number} limit - Number of results
+   * @returns {Promise<Array>} Matching songs
+   */
+  static async searchHistory(query, limit = 10) {
+    try {
+      const db = getFirestore();
+      const lowerQuery = query.toLowerCase();
+
+      const snapshot = await db.collection(HISTORY_COLLECTION)
+        .orderBy('playedAt', 'desc')
+        .limit(100) // Get more results to filter
+        .get();
+
+      const results = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const title = (data.title || '').toLowerCase();
+        const artist = (data.artist || '').toLowerCase();
+
+        if (title.includes(lowerQuery) || artist.includes(lowerQuery)) {
+          results.push({ id: doc.id, ...data });
+        }
+      });
+
+      return results.slice(0, limit);
+    } catch (error) {
+      logger.error('Error searching history:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get detailed statistics with time ranges
+   * @returns {Promise<Object>} Detailed statistics
+   */
+  static async getDetailedStatistics() {
+    try {
+      const db = getFirestore();
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const thisWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      // Get counts
+      const [
+        totalRequests,
+        totalHistory,
+        pendingRequests,
+        approvedRequests,
+        rejectedRequests,
+        todayRequests,
+        weekRequests,
+      ] = await Promise.all([
+        db.collection(REQUESTS_COLLECTION).count().get(),
+        db.collection(HISTORY_COLLECTION).count().get(),
+        db.collection(REQUESTS_COLLECTION).where('status', '==', 'pending').count().get(),
+        db.collection(REQUESTS_COLLECTION).where('status', '==', 'approved').count().get(),
+        db.collection(REQUESTS_COLLECTION).where('status', '==', 'rejected').count().get(),
+        db.collection(REQUESTS_COLLECTION).where('requestedAt', '>=', today).count().get(),
+        db.collection(REQUESTS_COLLECTION).where('requestedAt', '>=', thisWeek).count().get(),
+      ]);
+
+      const stats = {
+        totalRequests: totalRequests.data().count,
+        totalSongsPlayed: totalHistory.data().count,
+        pendingRequests: pendingRequests.data().count,
+        approvedRequests: approvedRequests.data().count,
+        rejectedRequests: rejectedRequests.data().count,
+        todayRequests: todayRequests.data().count,
+        weekRequests: weekRequests.data().count,
+        approvalRate: totalRequests.data().count > 0
+          ? ((approvedRequests.data().count / totalRequests.data().count) * 100).toFixed(2)
+          : 0,
+      };
+
+      logger.info('Detailed radio statistics calculated', stats);
+      return stats;
+    } catch (error) {
+      logger.error('Error getting detailed statistics:', error);
+      return {
+        totalRequests: 0,
+        totalSongsPlayed: 0,
+        pendingRequests: 0,
+        approvedRequests: 0,
+        rejectedRequests: 0,
+        todayRequests: 0,
+        weekRequests: 0,
+        approvalRate: 0,
+      };
+    }
+  }
+
+  /**
+   * Mark request as played and add to now playing
+   * @param {string} requestId - Request ID
+   * @returns {Promise<boolean>} Success status
+   */
+  static async playRequest(requestId) {
+    try {
+      const db = getFirestore();
+      const requestRef = db.collection(REQUESTS_COLLECTION).doc(requestId);
+      const requestDoc = await requestRef.get();
+
+      if (!requestDoc.exists) {
+        logger.warn('Request not found for playing', { requestId });
+        return false;
+      }
+
+      const requestData = requestDoc.data();
+
+      // Set as now playing
+      await this.setNowPlaying({
+        title: requestData.songName,
+        artist: requestData.artist || 'Unknown Artist',
+        duration: requestData.duration || '3:00',
+      });
+
+      // Update request status
+      await requestRef.update({
+        status: 'played',
+        playedAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // Invalidate caches
+      await cache.del('radio:requests:pending');
+
+      logger.info('Request marked as played', { requestId });
+      return true;
+    } catch (error) {
+      logger.error('Error playing request:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get top requested songs
+   * @param {number} limit - Number of results
+   * @returns {Promise<Array>} Top requested songs
+   */
+  static async getTopRequests(limit = 10) {
+    try {
+      const db = getFirestore();
+      const snapshot = await db.collection(REQUESTS_COLLECTION)
+        .where('status', '==', 'played')
+        .orderBy('playedAt', 'desc')
+        .limit(100)
+        .get();
+
+      // Count song frequencies
+      const songCounts = {};
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const songName = data.songName.toLowerCase();
+
+        if (!songCounts[songName]) {
+          songCounts[songName] = {
+            songName: data.songName,
+            count: 0,
+          };
+        }
+        songCounts[songName].count += 1;
+      });
+
+      // Sort by count
+      const topSongs = Object.values(songCounts)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+
+      logger.info(`Retrieved top ${topSongs.length} requested songs`);
+      return topSongs;
+    } catch (error) {
+      logger.error('Error getting top requests:', error);
+      return [];
+    }
+  }
 }
 
 module.exports = RadioModel;
