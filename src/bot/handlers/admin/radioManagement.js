@@ -240,6 +240,11 @@ const registerRadioManagementHandlers = (bot) => {
 const showRadioAdminMenu = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
+
+    // Clear any ongoing admin tasks
+    ctx.session.temp = {};
+    await ctx.saveSession();
+
     const stats = await RadioModel.getStatistics();
 
     let text = `📻 ${t('radio.admin.title', lang)}\n\n`;
@@ -255,7 +260,7 @@ const showRadioAdminMenu = async (ctx) => {
       [Markup.button.callback('📊 Estadísticas', 'admin_radio_stats')],
       [Markup.button.callback('🔍 Buscar Canción', 'admin_radio_search')],
       [Markup.button.callback('🎯 Top 10', 'admin_radio_top')],
-      [Markup.button.callback('◀️ Volver', 'admin_panel')],
+      [Markup.button.callback('◀️ Volver', 'admin_cancel')],
     ]);
 
     await ctx.editMessageText(text, keyboard);

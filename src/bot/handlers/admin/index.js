@@ -159,7 +159,11 @@ const registerAdminHandlers = (bot) => {
       if (!isAdmin) return;
 
       const lang = getLanguage(ctx);
-      ctx.session.temp.adminSearchingUser = true;
+
+      // Clear any ongoing admin tasks
+      ctx.session.temp = {
+        adminSearchingUser: true,
+      };
       await ctx.saveSession();
 
       await ctx.editMessageText(
@@ -181,12 +185,17 @@ const registerAdminHandlers = (bot) => {
 
       const lang = getLanguage(ctx);
 
+      // Clear any ongoing admin tasks
+      ctx.session.temp = {};
+      await ctx.saveSession();
+
       await ctx.editMessageText(
         t('broadcastTarget', lang),
         Markup.inlineKeyboard([
           [Markup.button.callback('👥 Todos los Usuarios', 'broadcast_all')],
           [Markup.button.callback('💎 Solo Premium', 'broadcast_premium')],
           [Markup.button.callback('🆓 Solo Gratis', 'broadcast_free')],
+          [Markup.button.callback('↩️ Churned (Ex-Premium)', 'broadcast_churned')],
           [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
         ]),
       );
@@ -211,17 +220,48 @@ const registerAdminHandlers = (bot) => {
       const lang = getLanguage(ctx);
 
       ctx.session.temp.broadcastTarget = target;
-      ctx.session.temp.waitingForBroadcast = true;
+      ctx.session.temp.broadcastStep = 'media';
+      ctx.session.temp.broadcastData = {};
       await ctx.saveSession();
 
       await ctx.editMessageText(
-        t('enterBroadcast', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
-        ]),
+        '📎 *Paso 1/4: Subir Media*\n\n'
+        + 'Por favor envía una imagen, video o archivo para adjuntar al broadcast.\n\n'
+        + '💡 También puedes saltar este paso si solo quieres enviar texto.',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('⏭️ Saltar (Solo Texto)', 'broadcast_skip_media')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
       );
     } catch (error) {
       logger.error('Error in broadcast target:', error);
+    }
+  });
+
+  // Skip media upload
+  bot.action('broadcast_skip_media', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      ctx.session.temp.broadcastStep = 'text_en';
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
+        + 'Por favor escribe el mensaje en inglés que quieres enviar:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error skipping media:', error);
     }
   });
 
@@ -232,6 +272,11 @@ const registerAdminHandlers = (bot) => {
       if (!isAdmin) return;
 
       const lang = getLanguage(ctx);
+
+      // Clear any ongoing admin tasks
+      ctx.session.temp = {};
+      await ctx.saveSession();
+
       const plans = await PlanModel.getAll();
 
       let message = `💎 **Gestión de Planes**\n\n`;
@@ -545,6 +590,10 @@ const registerAdminHandlers = (bot) => {
 
       const lang = getLanguage(ctx);
 
+      // Clear any ongoing admin tasks
+      ctx.session.temp = {};
+      await ctx.saveSession();
+
       // Get statistics
       const userStats = await UserService.getStatistics();
       const revenue = await PaymentModel.getRevenue(
@@ -586,6 +635,148 @@ const registerAdminHandlers = (bot) => {
       await showAdminPanel(ctx, true);
     } catch (error) {
       logger.error('Error in admin cancel:', error);
+    }
+  });
+
+  // Handle media uploads for broadcast
+  bot.on('photo', async (ctx, next) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
+      return next();
+    }
+
+    try {
+      const photo = ctx.message.photo[ctx.message.photo.length - 1];
+      ctx.session.temp.broadcastData.mediaType = 'photo';
+      ctx.session.temp.broadcastData.mediaFileId = photo.file_id;
+      ctx.session.temp.broadcastStep = 'text_en';
+      await ctx.saveSession();
+
+      await ctx.reply(
+        '✅ Imagen guardada correctamente\n\n'
+        + '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
+        + 'Por favor escribe el mensaje en inglés que quieres enviar:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error handling photo for broadcast:', error);
+    }
+  });
+
+  bot.on('video', async (ctx, next) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
+      return next();
+    }
+
+    try {
+      ctx.session.temp.broadcastData.mediaType = 'video';
+      ctx.session.temp.broadcastData.mediaFileId = ctx.message.video.file_id;
+      ctx.session.temp.broadcastStep = 'text_en';
+      await ctx.saveSession();
+
+      await ctx.reply(
+        '✅ Video guardado correctamente\n\n'
+        + '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
+        + 'Por favor escribe el mensaje en inglés que quieres enviar:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error handling video for broadcast:', error);
+    }
+  });
+
+  bot.on('document', async (ctx, next) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
+      return next();
+    }
+
+    try {
+      ctx.session.temp.broadcastData.mediaType = 'document';
+      ctx.session.temp.broadcastData.mediaFileId = ctx.message.document.file_id;
+      ctx.session.temp.broadcastStep = 'text_en';
+      await ctx.saveSession();
+
+      await ctx.reply(
+        '✅ Documento guardado correctamente\n\n'
+        + '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
+        + 'Por favor escribe el mensaje en inglés que quieres enviar:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error handling document for broadcast:', error);
+    }
+  });
+
+  bot.on('audio', async (ctx, next) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
+      return next();
+    }
+
+    try {
+      ctx.session.temp.broadcastData.mediaType = 'audio';
+      ctx.session.temp.broadcastData.mediaFileId = ctx.message.audio.file_id;
+      ctx.session.temp.broadcastStep = 'text_en';
+      await ctx.saveSession();
+
+      await ctx.reply(
+        '✅ Audio guardado correctamente\n\n'
+        + '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
+        + 'Por favor escribe el mensaje en inglés que quieres enviar:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error handling audio for broadcast:', error);
+    }
+  });
+
+  bot.on('voice', async (ctx, next) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
+      return next();
+    }
+
+    try {
+      ctx.session.temp.broadcastData.mediaType = 'voice';
+      ctx.session.temp.broadcastData.mediaFileId = ctx.message.voice.file_id;
+      ctx.session.temp.broadcastStep = 'text_en';
+      await ctx.saveSession();
+
+      await ctx.reply(
+        '✅ Mensaje de voz guardado correctamente\n\n'
+        + '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
+        + 'Por favor escribe el mensaje en inglés que quieres enviar:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error handling voice for broadcast:', error);
     }
   });
 
@@ -636,15 +827,47 @@ const registerAdminHandlers = (bot) => {
       return;
     }
 
-    // Broadcast message
-    if (ctx.session.temp?.waitingForBroadcast) {
+    // Broadcast flow - Handle text inputs
+    if (ctx.session.temp?.broadcastStep === 'text_en') {
       try {
-        const lang = getLanguage(ctx);
+        const message = ctx.message.text;
+
+        // Save English text
+        ctx.session.temp.broadcastData.textEn = message;
+        ctx.session.temp.broadcastStep = 'text_es';
+        await ctx.saveSession();
+
+        await ctx.reply(
+          '🇪🇸 *Paso 3/4: Texto en Español*\n\n'
+          + 'Por favor escribe el mensaje en español que quieres enviar:',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            ]),
+          },
+        );
+      } catch (error) {
+        logger.error('Error saving English text:', error);
+      }
+      return;
+    }
+
+    // Broadcast flow - Spanish text and send
+    if (ctx.session.temp?.broadcastStep === 'text_es') {
+      try {
         const message = ctx.message.text;
         const target = ctx.session.temp.broadcastTarget;
+        const broadcastData = ctx.session.temp.broadcastData;
 
-        ctx.session.temp.waitingForBroadcast = false;
-        await ctx.saveSession();
+        // Save Spanish text
+        broadcastData.textEs = message;
+
+        await ctx.reply(
+          '📤 *Paso 4/4: Enviando Broadcast...*\n\n'
+          + 'Procesando envío a usuarios seleccionados...',
+          { parse_mode: 'Markdown' },
+        );
 
         // Get target users
         let users = [];
@@ -655,29 +878,81 @@ const registerAdminHandlers = (bot) => {
           users = await UserModel.getBySubscriptionStatus('active');
         } else if (target === 'free') {
           users = await UserModel.getBySubscriptionStatus('free');
+        } else if (target === 'churned') {
+          users = await UserModel.getChurnedUsers();
         }
 
         // Send broadcast
         let sent = 0;
+        let failed = 0;
+
         for (const user of users) {
           try {
-            await ctx.telegram.sendMessage(user.id, `📢 ${message}`);
+            const userLang = user.language || 'en';
+            const textToSend = userLang === 'es' ? broadcastData.textEs : broadcastData.textEn;
+
+            // Send with media if available
+            if (broadcastData.mediaType && broadcastData.mediaFileId) {
+              const sendMethod = {
+                photo: 'sendPhoto',
+                video: 'sendVideo',
+                document: 'sendDocument',
+                audio: 'sendAudio',
+                voice: 'sendVoice',
+              }[broadcastData.mediaType];
+
+              if (sendMethod) {
+                await ctx.telegram[sendMethod](user.id, broadcastData.mediaFileId, {
+                  caption: `📢 ${textToSend}`,
+                });
+              } else {
+                await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`);
+              }
+            } else {
+              // Text only
+              await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`);
+            }
+
             sent += 1;
           } catch (sendError) {
-            logger.warn('Failed to send broadcast to user:', { userId: user.id });
+            failed += 1;
+            logger.warn('Failed to send broadcast to user:', { userId: user.id, error: sendError.message });
           }
         }
 
+        // Clear broadcast session data
+        ctx.session.temp.broadcastTarget = null;
+        ctx.session.temp.broadcastStep = null;
+        ctx.session.temp.broadcastData = null;
+        await ctx.saveSession();
+
         await ctx.reply(
-          t('broadcastSent', lang, { count: sent }),
-          Markup.inlineKeyboard([
-            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
-          ]),
+          `✅ *Broadcast Completado*\n\n`
+          + `📊 Estadísticas:\n`
+          + `✓ Enviados: ${sent}\n`
+          + `✗ Fallidos: ${failed}\n`
+          + `📈 Total intentos: ${sent + failed}\n\n`
+          + `🎯 Audiencia: ${target === 'all' ? 'Todos' : target === 'premium' ? 'Premium' : target === 'free' ? 'Gratis' : 'Churned'}\n`
+          + `🌐 Mensajes bilingües: EN / ES\n`
+          + `${broadcastData.mediaType ? `📎 Con media: ${broadcastData.mediaType}` : '📝 Solo texto'}`,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('◀️ Volver al Panel Admin', 'admin_cancel')],
+            ]),
+          },
         );
 
-        logger.info('Broadcast sent', { adminId: ctx.from.id, target, sent });
+        logger.info('Broadcast sent', {
+          adminId: ctx.from.id,
+          target,
+          sent,
+          failed,
+          hasMedia: !!broadcastData.mediaType,
+        });
       } catch (error) {
         logger.error('Error sending broadcast:', error);
+        await ctx.reply('❌ Error al enviar el broadcast. Por favor intenta de nuevo.');
       }
       return;
     }
