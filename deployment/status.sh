@@ -11,29 +11,10 @@ echo "📊 PNPtv Bot Status Check"
 echo "=========================="
 echo ""
 
-# PostgreSQL
-echo -e "${BLUE}🗄️  PostgreSQL:${NC}"
-if pg_isready -h localhost -p 5432 > /dev/null 2>&1; then
-    echo -e "   ${GREEN}✅ Running${NC}"
-
-    # Check database
-    DB_EXISTS=$(psql -U postgres -h localhost -lqt 2>/dev/null | cut -d \| -f 1 | grep -w pnptv_bot | wc -l)
-    if [ "$DB_EXISTS" -gt 0 ]; then
-        echo -e "   ${GREEN}✅ Database 'pnptv_bot' exists${NC}"
-
-        # Count plans
-        PLAN_COUNT=$(psql -U postgres -h localhost -d pnptv_bot -t -c "SELECT COUNT(*) FROM plans;" 2>/dev/null | tr -d ' ')
-        echo -e "   ${GREEN}✅ Subscription plans: $PLAN_COUNT${NC}"
-
-        # Count users
-        USER_COUNT=$(psql -U postgres -h localhost -d pnptv_bot -t -c "SELECT COUNT(*) FROM users;" 2>/dev/null | tr -d ' ')
-        echo -e "   ${GREEN}✅ Total users: $USER_COUNT${NC}"
-    else
-        echo -e "   ${RED}❌ Database 'pnptv_bot' not found${NC}"
-    fi
-else
-    echo -e "   ${RED}❌ Not running${NC}"
-fi
+# Firebase/Firestore
+echo -e "${BLUE}🔥 Firebase/Firestore:${NC}"
+echo "   Cloud-based database - monitored via Google Cloud Console"
+echo "   Check: https://console.firebase.google.com/"
 echo ""
 
 # Redis
@@ -114,8 +95,8 @@ echo ""
 echo "================================"
 echo -e "${BLUE}📋 Quick Actions:${NC}"
 echo ""
-echo "Start bot:    npm start"
-echo "PM2 status:   pm2 status"
-echo "View logs:    pm2 logs pnptv-bot"
-echo "Check plans:  psql -U postgres -d pnptv_bot -c 'SELECT * FROM plans;'"
+echo "Start bot:         npm start"
+echo "PM2 status:        pm2 status"
+echo "View logs:         pm2 logs pnptv-bot"
+echo "Firebase console:  https://console.firebase.google.com/"
 echo ""
