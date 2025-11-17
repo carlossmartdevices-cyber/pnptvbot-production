@@ -335,9 +335,11 @@ const registerAdminHandlers = (bot) => {
           + `👤 ${user.firstName || ''} ${user.lastName || ''}\n`
           + `🆔 ${user.id}\n`
           + `📧 ${user.email || 'N/A'}\n`
-          + `💎 Status: ${user.subscriptionStatus}`,
+          + `💎 Status: ${user.subscriptionStatus}\n`
+          + `📦 Plan: ${user.planId || 'N/A'}`,
           Markup.inlineKeyboard([
             [Markup.button.callback('📅 Extender Suscripción', 'admin_extend_sub')],
+            [Markup.button.callback('💎 Cambiar Plan', 'admin_change_plan')],
             [Markup.button.callback('🚫 Desactivar Usuario', 'admin_deactivate')],
             [Markup.button.callback('◀️ Volver', 'admin_cancel')],
           ]),
@@ -454,6 +456,109 @@ const registerAdminHandlers = (bot) => {
       logger.info('User deactivated by admin', { adminId: ctx.from.id, userId });
     } catch (error) {
       logger.error('Error deactivating user:', error);
+    }
+  });
+
+  // Change plan - Show available plans
+  bot.action('admin_change_plan', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.session.temp.selectedUserId;
+      const lang = getLanguage(ctx);
+      const user = await UserModel.getById(userId);
+
+      if (!user) {
+        await ctx.answerCbQuery('User not found');
+        return;
+      }
+
+      const plans = await PlanModel.getAll();
+
+      let text = `💎 **Cambiar Plan de Usuario**\n\n`;
+      text += `👤 ${user.firstName} ${user.lastName || ''}\n`;
+      text += `📦 Plan Actual: ${user.planId || 'Ninguno'}\n`;
+      text += `💎 Status: ${user.subscriptionStatus}\n\n`;
+      text += `Selecciona el nuevo plan:\n`;
+
+      const keyboard = [];
+
+      // Add button for each plan
+      plans.forEach((plan) => {
+        keyboard.push([
+          Markup.button.callback(
+            `${plan.name} - $${plan.price}`,
+            `admin_set_plan_${userId}_${plan.id}`,
+          ),
+        ]);
+      });
+
+      // Add option to set as free
+      keyboard.push([Markup.button.callback('🆓 Plan Gratis', `admin_set_plan_${userId}_free`)]);
+      keyboard.push([Markup.button.callback('◀️ Volver', 'admin_cancel')]);
+
+      await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
+    } catch (error) {
+      logger.error('Error showing plan change menu:', error);
+    }
+  });
+
+  // Set plan for user
+  bot.action(/^admin_set_plan_(.+)_(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.match[1];
+      const planId = ctx.match[2];
+      const lang = getLanguage(ctx);
+
+      const user = await UserModel.getById(userId);
+      if (!user) {
+        await ctx.answerCbQuery('User not found');
+        return;
+      }
+
+      // Set new plan
+      if (planId === 'free') {
+        await UserModel.updateSubscription(userId, {
+          status: 'free',
+          planId: null,
+          expiry: null,
+        });
+      } else {
+        const plan = await PlanModel.getById(planId);
+        if (!plan) {
+          await ctx.answerCbQuery('Plan not found');
+          return;
+        }
+
+        // Set new expiry date based on plan duration
+        const newExpiry = new Date();
+        newExpiry.setDate(newExpiry.getDate() + (plan.duration || 30));
+
+        await UserModel.updateSubscription(userId, {
+          status: 'active',
+          planId,
+          expiry: newExpiry,
+        });
+      }
+
+      await ctx.editMessageText(
+        `✅ Plan actualizado exitosamente\n\n`
+        + `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`
+        + `💎 Nuevo Plan: ${planId === 'free' ? 'Gratis' : planId}\n`
+        + `📅 Estado: ${planId === 'free' ? 'free' : 'active'}`,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+        ]),
+      );
+
+      logger.info('Plan changed by admin', { adminId: ctx.from.id, userId, newPlan: planId });
+    } catch (error) {
+      logger.error('Error changing user plan:', error);
+      await ctx.answerCbQuery('Error al cambiar el plan');
     }
   });
 };
