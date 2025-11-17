@@ -9,7 +9,7 @@ services:
     container_name: pnptv-bot
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:3000"
+      - "${HOST_PORT:-3001}:3000"
     env_file:
       - .env
     environment:
