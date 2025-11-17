@@ -169,6 +169,10 @@ const showGamificationMenu = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
 
+    // Clear any ongoing admin tasks
+    ctx.session.temp = {};
+    await ctx.saveSession();
+
     const text = `${t('gamification.title', lang)}\n\n${t('gamification.description', lang)}`;
 
     const keyboard = Markup.inlineKeyboard([
@@ -176,7 +180,7 @@ const showGamificationMenu = async (ctx) => {
       [Markup.button.callback('🌟 Ranking Histórico', 'gamification_alltime_leaderboard')],
       [Markup.button.callback('📊 Estadísticas', 'gamification_statistics')],
       [Markup.button.callback('🏅 Gestión de Insignias', 'gamification_badges')],
-      [Markup.button.callback('◀️ Volver', 'admin_panel')],
+      [Markup.button.callback('◀️ Volver', 'admin_cancel')],
     ]);
 
     await ctx.editMessageText(text, keyboard);

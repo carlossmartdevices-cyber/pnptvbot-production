@@ -159,7 +159,11 @@ const registerAdminHandlers = (bot) => {
       if (!isAdmin) return;
 
       const lang = getLanguage(ctx);
-      ctx.session.temp.adminSearchingUser = true;
+
+      // Clear any ongoing admin tasks
+      ctx.session.temp = {
+        adminSearchingUser: true,
+      };
       await ctx.saveSession();
 
       await ctx.editMessageText(
@@ -180,6 +184,10 @@ const registerAdminHandlers = (bot) => {
       if (!isAdmin) return;
 
       const lang = getLanguage(ctx);
+
+      // Clear any ongoing admin tasks
+      ctx.session.temp = {};
+      await ctx.saveSession();
 
       await ctx.editMessageText(
         t('broadcastTarget', lang),
@@ -264,6 +272,11 @@ const registerAdminHandlers = (bot) => {
       if (!isAdmin) return;
 
       const lang = getLanguage(ctx);
+
+      // Clear any ongoing admin tasks
+      ctx.session.temp = {};
+      await ctx.saveSession();
+
       const plans = await PlanModel.getAll();
 
       let message = `💎 **Gestión de Planes**\n\n`;
@@ -576,6 +589,10 @@ const registerAdminHandlers = (bot) => {
       if (!isAdmin) return;
 
       const lang = getLanguage(ctx);
+
+      // Clear any ongoing admin tasks
+      ctx.session.temp = {};
+      await ctx.saveSession();
 
       // Get statistics
       const userStats = await UserService.getStatistics();

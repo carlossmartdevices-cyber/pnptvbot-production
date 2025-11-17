@@ -22,6 +22,10 @@ const registerLiveStreamManagementHandlers = (bot) => {
 
       const lang = getLanguage(ctx);
 
+      // Clear any ongoing admin tasks
+      ctx.session.temp = {};
+      await ctx.saveSession();
+
       await ctx.editMessageText(
         '📺 Gestión de Transmisiones en Vivo',
         Markup.inlineKeyboard([

@@ -11,6 +11,10 @@ const { getLanguage } = require('../../utils/helpers');
  */
 async function showRoleManagement(ctx, edit = false) {
   try {
+    // Clear any ongoing admin tasks
+    ctx.session.temp = {};
+    await ctx.saveSession();
+
     const admins = await PermissionService.getAllAdmins();
 
     let message = '👑 *Gestión de Roles*\n\n';
