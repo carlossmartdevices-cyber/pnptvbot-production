@@ -36,7 +36,6 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy source code from builder
 COPY --from=builder --chown=nodejs:nodejs /app/src ./src
-COPY --from=builder --chown=nodejs:nodejs /app/src/config ./src/config
 
 # Copy public directory for landing pages
 COPY --from=builder --chown=nodejs:nodejs /app/public ./public
@@ -46,7 +45,9 @@ COPY --from=builder --chown=nodejs:nodejs /app/.env.example ./.env.example
 
 # Create logs and uploads directories with proper permissions
 RUN mkdir -p logs uploads \
-    && chown -R nodejs:nodejs /app
+    && chown -R nodejs:nodejs /app \
+    && chmod -R 755 /app/public \
+    && find /app/public -type f -exec chmod 644 {} \;
 
 # Switch to non-root user for security
 USER nodejs
