@@ -251,17 +251,17 @@ const showGroupMenu = async (ctx) => {
   const keyboard = lang === 'es'
     ? [
       [Markup.button.callback('⭐ Planes PRIME', 'group_subscription_plans')],
-      [Markup.button.callback('📞 Reservar Llamada', 'group_book_call')],
+      [Markup.button.callback('🎥 Reservar Videollamada', 'group_book_call')],
       [Markup.button.callback('📞 Contactar a un Admin', 'group_contact_admin')],
       [Markup.button.callback('📋 Reglas de la Comunidad', 'group_show_rules')],
-      [Markup.button.url(`💬 Chat Bot PNPtv!`, `https://t.me/${botUsername}?start=group_menu`)],
+      [Markup.button.url(`🤖 Bot PNPtv!`, `https://t.me/${botUsername}?start=group_menu`)],
     ]
     : [
       [Markup.button.callback('⭐ PRIME Subscription', 'group_subscription_plans')],
-      [Markup.button.callback('📞 Book a Call', 'group_book_call')],
+      [Markup.button.callback('🎥 Book a Video Call', 'group_book_call')],
       [Markup.button.callback('📞 Contact an Admin', 'group_contact_admin')],
       [Markup.button.callback('📋 Community Rules', 'group_show_rules')],
-      [Markup.button.url(`💬 PNPtv! Bot Chat`, `https://t.me/${botUsername}?start=group_menu`)],
+      [Markup.button.url(`🤖 Bot PNPtv!`, `https://t.me/${botUsername}?start=group_menu`)],
     ];
 
   await ctx.reply(
