@@ -4,8 +4,11 @@ FROM node:18-alpine AS builder
 # Set working directory
 WORKDIR /app
 
-# Install build dependencies for native modules
-RUN apk add --no-cache python3 make g++
+# Install build dependencies for native modules with retry logic
+RUN apk update && \
+    (apk add --no-cache python3 make g++ || \
+     (sleep 5 && apk add --no-cache python3 make g++) || \
+     (sleep 10 && apk add --no-cache python3 make g++))
 
 # Copy package files
 COPY package*.json ./
@@ -22,11 +25,13 @@ FROM node:18-alpine AS production
 # Set working directory
 WORKDIR /app
 
-# Install runtime dependencies for native modules
-RUN apk add --no-cache \
-    tini \
-    && addgroup -g 1001 -S nodejs \
-    && adduser -S nodejs -u 1001
+# Install runtime dependencies for native modules with retry logic
+RUN apk update && \
+    (apk add --no-cache tini || \
+     (sleep 5 && apk add --no-cache tini) || \
+     (sleep 10 && apk add --no-cache tini)) && \
+    addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
 
 # Copy package files
 COPY package*.json ./
