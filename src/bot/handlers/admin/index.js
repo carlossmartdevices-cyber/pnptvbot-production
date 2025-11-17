@@ -25,23 +25,23 @@ async function showAdminPanel(ctx, edit = false) {
     const buttons = [];
 
     // Common for all admin roles
-    buttons.push([Markup.button.callback(t('userManagement', lang), 'admin_users')]);
+    buttons.push([Markup.button.callback('👥 Usuarios', 'admin_users')]);
 
     // Admin and SuperAdmin features
     if (userRole === 'superadmin' || userRole === 'admin') {
-      buttons.push([Markup.button.callback(t('broadcast', lang), 'admin_broadcast')]);
-      buttons.push([Markup.button.callback(t('analytics', lang), 'admin_analytics')]);
-      buttons.push([Markup.button.callback(t('gamification.title', lang), 'admin_gamification')]);
-      buttons.push([Markup.button.callback('📻 Radio Management', 'admin_radio')]);
-      buttons.push([Markup.button.callback('📺 Live Stream Management', 'admin_live_streams')]);
+      buttons.push([Markup.button.callback('📢 Difusión', 'admin_broadcast')]);
+      buttons.push([Markup.button.callback('📊 Analíticas', 'admin_analytics')]);
+      buttons.push([Markup.button.callback('🎮 Gamificación', 'admin_gamification')]);
+      buttons.push([Markup.button.callback('📻 Radio', 'admin_radio')]);
+      buttons.push([Markup.button.callback('📺 Transmisiones', 'admin_live_streams')]);
     }
 
     // SuperAdmin only features
     if (userRole === 'superadmin') {
-      buttons.push([Markup.button.callback('📋 Gestión de Menús', 'admin_menus')]);
-      buttons.push([Markup.button.callback('👑 Gestión de Roles', 'admin_roles')]);
-      buttons.push([Markup.button.callback(t('planManagement', lang), 'admin_plans')]);
-      buttons.push([Markup.button.callback('📜 Ver Logs', 'admin_logs')]);
+      buttons.push([Markup.button.callback('📋 Menús', 'admin_menus')]);
+      buttons.push([Markup.button.callback('👑 Roles', 'admin_roles')]);
+      buttons.push([Markup.button.callback('💎 Planes', 'admin_plans')]);
+      buttons.push([Markup.button.callback('📜 Logs', 'admin_logs')]);
     }
 
     const message = `${roleDisplay}\n\n${t('adminPanel', lang)}`;
@@ -165,7 +165,7 @@ const registerAdminHandlers = (bot) => {
       await ctx.editMessageText(
         t('searchUser', lang),
         Markup.inlineKeyboard([
-          [Markup.button.callback(t('cancel', lang), 'admin_cancel')],
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
         ]),
       );
     } catch (error) {
@@ -184,10 +184,10 @@ const registerAdminHandlers = (bot) => {
       await ctx.editMessageText(
         t('broadcastTarget', lang),
         Markup.inlineKeyboard([
-          [Markup.button.callback(t('allUsers', lang), 'broadcast_all')],
-          [Markup.button.callback(t('premiumOnly', lang), 'broadcast_premium')],
-          [Markup.button.callback(t('freeOnly', lang), 'broadcast_free')],
-          [Markup.button.callback(t('cancel', lang), 'admin_cancel')],
+          [Markup.button.callback('👥 Todos los Usuarios', 'broadcast_all')],
+          [Markup.button.callback('💎 Solo Premium', 'broadcast_premium')],
+          [Markup.button.callback('🆓 Solo Gratis', 'broadcast_free')],
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
         ]),
       );
     } catch (error) {
@@ -217,7 +217,7 @@ const registerAdminHandlers = (bot) => {
       await ctx.editMessageText(
         t('enterBroadcast', lang),
         Markup.inlineKeyboard([
-          [Markup.button.callback(t('cancel', lang), 'admin_cancel')],
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
         ]),
       );
     } catch (error) {
@@ -242,8 +242,8 @@ const registerAdminHandlers = (bot) => {
       await ctx.editMessageText(
         message,
         Markup.inlineKeyboard([
-          [Markup.button.callback('➕ Add Plan', 'admin_plan_add')],
-          [Markup.button.callback(t('back', lang), 'admin_cancel')],
+          [Markup.button.callback('➕ Agregar Plan', 'admin_plan_add')],
+          [Markup.button.callback('◀️ Volver', 'admin_cancel')],
         ]),
       );
     } catch (error) {
@@ -279,8 +279,8 @@ const registerAdminHandlers = (bot) => {
       await ctx.editMessageText(
         analytics,
         Markup.inlineKeyboard([
-          [Markup.button.callback('🔄 Refresh', 'admin_analytics')],
-          [Markup.button.callback(t('back', lang), 'admin_cancel')],
+          [Markup.button.callback('🔄 Actualizar', 'admin_analytics')],
+          [Markup.button.callback('◀️ Volver', 'admin_cancel')],
         ]),
       );
     } catch (error) {
@@ -337,9 +337,9 @@ const registerAdminHandlers = (bot) => {
           + `📧 ${user.email || 'N/A'}\n`
           + `💎 Status: ${user.subscriptionStatus}`,
           Markup.inlineKeyboard([
-            [Markup.button.callback(t('extendSubscription', lang), 'admin_extend_sub')],
-            [Markup.button.callback(t('deactivateUser', lang), 'admin_deactivate')],
-            [Markup.button.callback(t('back', lang), 'admin_cancel')],
+            [Markup.button.callback('📅 Extender Suscripción', 'admin_extend_sub')],
+            [Markup.button.callback('🚫 Desactivar Usuario', 'admin_deactivate')],
+            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
           ]),
         );
       } catch (error) {
@@ -383,7 +383,7 @@ const registerAdminHandlers = (bot) => {
         await ctx.reply(
           t('broadcastSent', lang, { count: sent }),
           Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'admin_cancel')],
+            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
           ]),
         );
 
@@ -419,7 +419,7 @@ const registerAdminHandlers = (bot) => {
       await ctx.editMessageText(
         `✅ Subscription extended for user ${userId} until ${newExpiry.toLocaleDateString()}`,
         Markup.inlineKeyboard([
-          [Markup.button.callback(t('back', lang), 'admin_cancel')],
+          [Markup.button.callback('◀️ Volver', 'admin_cancel')],
         ]),
       );
 
@@ -447,7 +447,7 @@ const registerAdminHandlers = (bot) => {
       await ctx.editMessageText(
         `✅ User ${userId} deactivated`,
         Markup.inlineKeyboard([
-          [Markup.button.callback(t('back', lang), 'admin_cancel')],
+          [Markup.button.callback('◀️ Volver', 'admin_cancel')],
         ]),
       );
 
