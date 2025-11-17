@@ -21,6 +21,10 @@ const registerMediaHandlers = require('../handlers/media');
 const registerModerationHandlers = require('../handlers/moderation');
 const registerModerationAdminHandlers = require('../handlers/moderation/adminCommands');
 const registerCallManagementHandlers = require('../handlers/admin/callManagement');
+const registerRoleManagementHandlers = require('../handlers/admin/roleManagement');
+const registerGamificationHandlers = require('../handlers/admin/gamification');
+const registerLiveStreamManagementHandlers = require('../handlers/admin/liveStreamManagement');
+const registerRadioManagementHandlers = require('../handlers/admin/radioManagement');
 const registerPrivateCallHandlers = require('../handlers/user/privateCalls');
 const registerPaymentHistoryHandlers = require('../handlers/user/paymentHistory');
 const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnalytics');
@@ -126,6 +130,10 @@ const startBot = async () => {
     registerModerationHandlers(bot); // User moderation commands
     registerModerationAdminHandlers(bot); // Admin moderation commands
     registerCallManagementHandlers(bot); // Admin call management
+    registerRoleManagementHandlers(bot); // Admin role management (superadmin only)
+    registerGamificationHandlers(bot); // Admin gamification management
+    registerLiveStreamManagementHandlers(bot); // Admin live stream management
+    registerRadioManagementHandlers(bot); // Admin radio management
     registerPrivateCallHandlers(bot); // User private call booking
     registerPaymentHistoryHandlers(bot); // User payment history and receipts
     registerPaymentAnalyticsHandlers(bot); // Admin payment analytics dashboard

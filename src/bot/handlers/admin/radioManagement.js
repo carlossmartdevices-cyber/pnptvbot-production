@@ -249,13 +249,13 @@ const showRadioAdminMenu = async (ctx) => {
     text += `⏳ ${t('radio.admin.pendingRequests', lang)}: ${stats.pendingRequests}\n`;
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('🎵 Set Now Playing', 'admin_radio_set_now_playing')],
-      [Markup.button.callback('📋 Manage Requests', 'admin_radio_all_requests')],
-      [Markup.button.callback('📅 Manage Schedule', 'admin_radio_schedule')],
-      [Markup.button.callback('📊 Statistics', 'admin_radio_stats')],
-      [Markup.button.callback('🔍 Search History', 'admin_radio_search')],
-      [Markup.button.callback('🎯 Top Requests', 'admin_radio_top')],
-      [Markup.button.callback(t('back', lang), 'admin_panel')],
+      [Markup.button.callback('🎵 Canción en Vivo', 'admin_radio_set_now_playing')],
+      [Markup.button.callback('📋 Solicitudes', 'admin_radio_all_requests')],
+      [Markup.button.callback('📅 Programación', 'admin_radio_schedule')],
+      [Markup.button.callback('📊 Estadísticas', 'admin_radio_stats')],
+      [Markup.button.callback('🔍 Buscar Canción', 'admin_radio_search')],
+      [Markup.button.callback('🎯 Top 10', 'admin_radio_top')],
+      [Markup.button.callback('◀️ Volver', 'admin_panel')],
     ]);
 
     await ctx.editMessageText(text, keyboard);
@@ -362,7 +362,7 @@ const showScheduleManagement = async (ctx) => {
       text += 'No schedule entries yet.';
     }
 
-    const keyboard = [[Markup.button.callback('➕ Add Program', 'admin_radio_add_schedule')]];
+    const keyboard = [[Markup.button.callback('➕ Nuevo Programa', 'admin_radio_add_schedule')]];
 
     // Add edit and delete buttons for each schedule entry
     schedule.forEach((entry) => {
@@ -373,7 +373,7 @@ const showScheduleManagement = async (ctx) => {
       ]);
     });
 
-    keyboard.push([Markup.button.callback(t('back', lang), 'admin_radio')]);
+    keyboard.push([Markup.button.callback('◀️ Volver', 'admin_radio')]);
 
     await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
   } catch (error) {
@@ -435,8 +435,8 @@ const showRadioStatistics = async (ctx) => {
     }
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(t('refresh', lang), 'admin_radio_stats')],
-      [Markup.button.callback(t('back', lang), 'admin_radio')],
+      [Markup.button.callback('🔄 Actualizar', 'admin_radio_stats')],
+      [Markup.button.callback('◀️ Volver', 'admin_radio')],
     ]);
 
     await ctx.editMessageText(text, keyboard);
@@ -531,12 +531,12 @@ const showAllRequestsMenu = async (ctx) => {
     text += 'Select request status to view:\n';
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('⏳ Pending', 'admin_radio_view_pending')],
-      [Markup.button.callback('✅ Approved', 'admin_radio_view_approved')],
-      [Markup.button.callback('❌ Rejected', 'admin_radio_view_rejected')],
-      [Markup.button.callback('🎵 Played', 'admin_radio_view_played')],
-      [Markup.button.callback('📊 All Requests', 'admin_radio_view_all')],
-      [Markup.button.callback(t('back', lang), 'admin_radio')],
+      [Markup.button.callback('⏳ Pendientes', 'admin_radio_view_pending')],
+      [Markup.button.callback('✅ Aprobadas', 'admin_radio_view_approved')],
+      [Markup.button.callback('❌ Rechazadas', 'admin_radio_view_rejected')],
+      [Markup.button.callback('🎵 Reproducidas', 'admin_radio_view_played')],
+      [Markup.button.callback('📊 Todas', 'admin_radio_view_all')],
+      [Markup.button.callback('◀️ Volver', 'admin_radio')],
     ]);
 
     await ctx.editMessageText(text, keyboard);
@@ -601,7 +601,7 @@ const showRequestsByStatus = async (ctx, status) => {
       });
     }
 
-    keyboard.push([Markup.button.callback(t('back', lang), 'admin_radio_all_requests')]);
+    keyboard.push([Markup.button.callback('◀️ Volver', 'admin_radio_all_requests')]);
 
     await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
   } catch (error) {
@@ -660,8 +660,8 @@ const handleHistorySearch = async (ctx) => {
     await ctx.reply(
       text,
       Markup.inlineKeyboard([
-        [Markup.button.callback('🔍 New Search', 'admin_radio_search')],
-        [Markup.button.callback(t('back', lang), 'admin_radio')],
+        [Markup.button.callback('🔍 Nueva Búsqueda', 'admin_radio_search')],
+        [Markup.button.callback('◀️ Volver', 'admin_radio')],
       ]),
     );
   } catch (error) {
@@ -689,8 +689,8 @@ const showTopRequests = async (ctx) => {
     }
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(t('refresh', lang), 'admin_radio_top')],
-      [Markup.button.callback(t('back', lang), 'admin_radio')],
+      [Markup.button.callback('🔄 Actualizar', 'admin_radio_top')],
+      [Markup.button.callback('◀️ Volver', 'admin_radio')],
     ]);
 
     await ctx.editMessageText(text, keyboard);
@@ -713,12 +713,12 @@ const startEditSchedule = async (ctx, scheduleId) => {
     await ctx.saveSession();
 
     await ctx.editMessageText(
-      '✏️ What would you like to edit?',
+      '✏️ ¿Qué deseas editar?',
       Markup.inlineKeyboard([
-        [Markup.button.callback('📝 Program Name', `edit_schedule_field_programName_${scheduleId}`)],
-        [Markup.button.callback('⏰ Time Slot', `edit_schedule_field_timeSlot_${scheduleId}`)],
-        [Markup.button.callback('📄 Description', `edit_schedule_field_description_${scheduleId}`)],
-        [Markup.button.callback(t('cancel', lang), 'admin_radio_schedule')],
+        [Markup.button.callback('📝 Nombre del Programa', `edit_schedule_field_programName_${scheduleId}`)],
+        [Markup.button.callback('⏰ Horario', `edit_schedule_field_timeSlot_${scheduleId}`)],
+        [Markup.button.callback('📄 Descripción', `edit_schedule_field_description_${scheduleId}`)],
+        [Markup.button.callback('❌ Cancelar', 'admin_radio_schedule')],
       ]),
     );
   } catch (error) {

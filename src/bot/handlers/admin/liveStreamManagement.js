@@ -23,13 +23,13 @@ const registerLiveStreamManagementHandlers = (bot) => {
       const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
-        '📺 Live Stream Management',
+        '📺 Gestión de Transmisiones en Vivo',
         Markup.inlineKeyboard([
-          [Markup.button.callback('🔴 Active Streams', 'admin_live_active')],
-          [Markup.button.callback('📊 Stream Statistics', 'admin_live_stats')],
-          [Markup.button.callback('🗑 Manage All Streams', 'admin_live_all')],
-          [Markup.button.callback('🎭 Approve Emotes', 'admin_emote_approval')],
-          [Markup.button.callback(t('back', lang), 'admin_cancel')],
+          [Markup.button.callback('🔴 Transmisiones Activas', 'admin_live_active')],
+          [Markup.button.callback('📊 Estadísticas', 'admin_live_stats')],
+          [Markup.button.callback('🗑 Gestionar Todas', 'admin_live_all')],
+          [Markup.button.callback('🎭 Aprobar Emotes', 'admin_emote_approval')],
+          [Markup.button.callback('◀️ Volver', 'admin_cancel')],
         ]),
       );
     } catch (error) {
@@ -50,7 +50,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
         await ctx.editMessageText(
           t('noActiveStreams', lang),
           Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'admin_live_streams')],
+            [Markup.button.callback('◀️ Volver', 'admin_live_streams')],
           ]),
         );
         return;
@@ -81,8 +81,8 @@ const registerLiveStreamManagementHandlers = (bot) => {
         message += `_...and ${activeStreams.length - 10} more_\n`;
       }
 
-      buttons.push([Markup.button.callback('🔄 Refresh', 'admin_live_active')]);
-      buttons.push([Markup.button.callback(t('back', lang), 'admin_live_streams')]);
+      buttons.push([Markup.button.callback('🔄 Actualizar', 'admin_live_active')]);
+      buttons.push([Markup.button.callback('◀️ Volver', 'admin_live_streams')]);
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -116,7 +116,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback('🔄 Refresh', 'admin_live_stats')],
+          [Markup.button.callback('🔄 Actualizar', 'admin_live_stats')],
           [Markup.button.callback(t('back', lang), 'admin_live_streams')],
         ]),
       });
@@ -141,7 +141,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
         await ctx.editMessageText(
           'No streams found',
           Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'admin_live_streams')],
+            [Markup.button.callback('◀️ Volver', 'admin_live_streams')],
           ]),
         );
         return;
@@ -193,7 +193,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
         await ctx.editMessageText(
           t('streamNotFound', lang),
           Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'admin_live_active')],
+            [Markup.button.callback('◀️ Volver', 'admin_live_active')],
           ]),
         );
         return;
@@ -217,11 +217,11 @@ const registerLiveStreamManagementHandlers = (bot) => {
 
       // Show different actions based on stream status
       if (stream.status === 'active') {
-        buttons.push([Markup.button.callback('🛑 End Stream', `admin_stream_end_${streamId}`)]);
+        buttons.push([Markup.button.callback('🛑 Finalizar Transmisión', `admin_stream_end_${streamId}`)]);
       }
 
-      buttons.push([Markup.button.callback('🗑 Delete Stream', `admin_stream_delete_${streamId}`)]);
-      buttons.push([Markup.button.callback(t('back', lang), 'admin_live_active')]);
+      buttons.push([Markup.button.callback('🗑 Eliminar Transmisión', `admin_stream_delete_${streamId}`)]);
+      buttons.push([Markup.button.callback('◀️ Volver', 'admin_live_active')]);
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -262,7 +262,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
           + `👁 ${stream.totalViews} total views\n`
           + `❤️ ${stream.likes} likes`,
         Markup.inlineKeyboard([
-          [Markup.button.callback(t('back', lang), 'admin_live_active')],
+          [Markup.button.callback('◀️ Volver', 'admin_live_active')],
         ]),
       );
 
@@ -321,8 +321,8 @@ const registerLiveStreamManagementHandlers = (bot) => {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [
-              Markup.button.callback('✅ Confirm', `admin_stream_delete_confirm_${streamId}`),
-              Markup.button.callback('❌ Cancel', `admin_stream_manage_${streamId}`),
+              Markup.button.callback('✅ Confirmar', `admin_stream_delete_confirm_${streamId}`),
+              Markup.button.callback('❌ Cancelar', `admin_stream_manage_${streamId}`),
             ],
           ]),
         },
@@ -363,7 +363,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
           + `🎤 ${stream.title}\n`
           + `👤 ${stream.hostName}`,
         Markup.inlineKeyboard([
-          [Markup.button.callback(t('back', lang), 'admin_live_active')],
+          [Markup.button.callback('◀️ Volver', 'admin_live_active')],
         ]),
       );
 
@@ -393,7 +393,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
         await ctx.editMessageText(
           '✅ No pending emotes to review',
           Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'admin_live_streams')],
+            [Markup.button.callback('◀️ Volver', 'admin_live_streams')],
           ]),
         );
         return;
@@ -422,7 +422,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
         ]);
       });
 
-      buttons.push([Markup.button.callback('🔄 Refresh', 'admin_emote_approval')]);
+      buttons.push([Markup.button.callback('🔄 Actualizar', 'admin_emote_approval')]);
       buttons.push([Markup.button.callback(t('back', lang), 'admin_live_streams')]);
 
       await ctx.editMessageText(message, {
@@ -457,7 +457,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
         await ctx.editMessageText(
           'Emote not found or already reviewed',
           Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'admin_emote_approval')],
+            [Markup.button.callback('◀️ Volver', 'admin_emote_approval')],
           ]),
         );
         return;
@@ -475,11 +475,11 @@ const registerLiveStreamManagementHandlers = (bot) => {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [
-            Markup.button.callback('✅ Approve', `admin_emote_approve_${emoteId}`),
-            Markup.button.callback('❌ Reject', `admin_emote_reject_${emoteId}`),
+            Markup.button.callback('✅ Aprobar', `admin_emote_approve_${emoteId}`),
+            Markup.button.callback('❌ Rechazar', `admin_emote_reject_${emoteId}`),
           ],
-          [Markup.button.url('🖼️ View Image', emote.imageUrl)],
-          [Markup.button.callback(t('back', lang), 'admin_emote_approval')],
+          [Markup.button.url('🖼️ Ver Imagen', emote.imageUrl)],
+          [Markup.button.callback('◀️ Volver', 'admin_emote_approval')],
         ]),
       });
     } catch (error) {
@@ -521,7 +521,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'admin_emote_approval')],
+            [Markup.button.callback('◀️ Volver', 'admin_emote_approval')],
           ]),
         }
       );
@@ -576,7 +576,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'admin_emote_approval')],
+            [Markup.button.callback('◀️ Volver', 'admin_emote_approval')],
           ]),
         }
       );
