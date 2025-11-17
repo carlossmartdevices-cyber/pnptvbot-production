@@ -24,6 +24,10 @@ const registerGroupWelcomeHandlers = (bot) => {
   // Handle badge selection
   bot.action(/^badge_select_(.+)$/, handleBadgeSelection);
 
+  // Handle action buttons
+  bot.action('group_subscribe_prime', handleSubscribeAction);
+  bot.action('group_book_call', handleBookCallAction);
+
   // Handle view rules button
   bot.action('group_view_rules', handleViewRules);
 };
@@ -151,12 +155,14 @@ If you want the full experience:
 async function sendBadgeSelectionMessage(ctx, username, lang) {
   try {
     const message = lang === 'es'
-      ? `👑 Ahora dinos… qué vibra eres tú?
+      ? `👑 Perteneces a… (elige tu tribu)
 
-Escoge tu energía y te damos tu primera insignia. Se guarda al instante.`
-      : `👑 Tell us… what's your vibe?
+Dime qué clase de desmadre eres, y te doy tu primera insignia.
+Se guarda al toque.`
+      : `👑 You belong to… (pick your tribe)
 
-Pick your energy and get your first badge. It saves instantly.`;
+Tell us what kind of chaos you are, and we'll give you your first badge.
+It saves instantly.`;
 
     const keyboard = Markup.inlineKeyboard([
       [
@@ -234,6 +240,9 @@ async function handleBadgeSelection(ctx) {
     // Send congratulations message
     await sendCongratsMessage(ctx, username, badge, lang);
 
+    // Send action buttons (Subscribe + Book Call)
+    await sendActionButtons(ctx, lang);
+
     // Send rules menu
     await sendRulesMenu(ctx, lang);
 
@@ -257,12 +266,14 @@ async function handleBadgeSelection(ctx) {
 async function sendCongratsMessage(ctx, username, badge, lang) {
   try {
     const message = lang === 'es'
-      ? `${badge.emoji} Listo ${username}, ya tienes tu primera insignia.
+      ? `🎉 Que chimba papi! Primera insignia desbloqueada.
 
-Eres ${badge.name} y oficialmente parte de la familia PNPtv!. Aquí ya entraste de verdad.`
-      : `${badge.emoji} Nice ${username} — you just earned your first badge.
+${username} es ${badge.name}
+y oficialmente parte de la familia PNPtv!`
+      : `🎉 Que chimba papi! First badge unlocked.
 
-You're officially a ${badge.name} and now part of the PNPtv! family for real.`;
+${username} is a ${badge.name}
+and officially part of the PNPtv! family.`;
 
     await ctx.reply(message);
 
@@ -273,6 +284,41 @@ You're officially a ${badge.name} and now part of the PNPtv! family for real.`;
     });
   } catch (error) {
     logger.error('Error sending congrats message:', error);
+  }
+}
+
+/**
+ * Send action buttons (Subscribe + Book Call)
+ */
+async function sendActionButtons(ctx, lang) {
+  try {
+    const message = lang === 'es'
+      ? `🚀 ¿Quieres más?
+
+Explora todo lo que PNPtv! tiene para ti:`
+      : `🚀 Want more?
+
+Explore everything PNPtv! has for you:`;
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback(
+        lang === 'es' ? '⭐ Suscríbete a PNPtv! PRIME' : '⭐ Subscribe to PNPtv! PRIME',
+        'group_subscribe_prime'
+      )],
+      [Markup.button.callback(
+        lang === 'es' ? '📲 Reserva una Llamada con Performers' : '📲 Book a Call with Performers',
+        'group_book_call'
+      )],
+    ]);
+
+    await ctx.reply(message, keyboard);
+
+    logger.info('Action buttons sent', {
+      chatId: ctx.chat.id,
+      language: lang,
+    });
+  } catch (error) {
+    logger.error('Error sending action buttons:', error);
   }
 }
 
@@ -319,14 +365,20 @@ async function handleViewRules(ctx) {
 • Nada de spam
 • Consentimiento siempre
 • No ventas externas
-• Cuídate y cuida a los demás`
+• No compartas links
+• Cuídate y cuida a los demás
+
+Lista completa de reglas y términos en nuestro sitio.`
       : `📘 Quick Rules:
 
 • Respect people
 • No spam
 • Consent always
 • No external selling
-• Take care of yourself and others`;
+• Do not share links
+• Take care of yourself and others
+
+Full list of rules and terms and conditions on our site.`;
 
     // Send rules as a reply or edit the message
     try {
@@ -349,6 +401,71 @@ async function handleViewRules(ctx) {
   } catch (error) {
     logger.error('Error handling view rules:', error);
     await ctx.answerCbQuery('Error loading rules. Please try again.');
+  }
+}
+
+/**
+ * Handle subscribe button action
+ */
+async function handleSubscribeAction(ctx) {
+  try {
+    await ctx.answerCbQuery();
+
+    const userId = ctx.from.id;
+    const user = await UserModel.getById(userId);
+    const lang = user?.language || 'en';
+
+    // Send subscribe command message
+    const message = lang === 'es'
+      ? '⭐ Para suscribirte a PRIME, usa el comando /subscribe'
+      : '⭐ To subscribe to PRIME, use the /subscribe command';
+
+    await ctx.reply(message);
+
+    logger.info('Subscribe action triggered', {
+      userId,
+      chatId: ctx.chat.id,
+    });
+  } catch (error) {
+    logger.error('Error handling subscribe action:', error);
+    await ctx.answerCbQuery('An error occurred. Please try again.');
+  }
+}
+
+/**
+ * Handle book call button action
+ */
+async function handleBookCallAction(ctx) {
+  try {
+    await ctx.answerCbQuery();
+
+    const userId = ctx.from.id;
+    const user = await UserModel.getById(userId);
+    const lang = user?.language || 'en';
+
+    // Redirect to private chat with the bot
+    const botUsername = ctx.botInfo?.username || 'PNPtvBot';
+    const message = lang === 'es'
+      ? `📲 Para reservar una llamada con performers, abre el chat privado del bot:
+
+👉 @${botUsername}
+
+Luego usa el menú para acceder a las videollamadas.`
+      : `📲 To book a call with performers, open the bot's private chat:
+
+👉 @${botUsername}
+
+Then use the menu to access video calls.`;
+
+    await ctx.reply(message);
+
+    logger.info('Book call action triggered', {
+      userId,
+      chatId: ctx.chat.id,
+    });
+  } catch (error) {
+    logger.error('Error handling book call action:', error);
+    await ctx.answerCbQuery('An error occurred. Please try again.');
   }
 }
 
