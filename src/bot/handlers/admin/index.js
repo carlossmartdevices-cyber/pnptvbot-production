@@ -225,7 +225,7 @@ const registerAdminHandlers = (bot) => {
     }
   });
 
-  // Plan management
+  // Plan management - List all plans
   bot.action('admin_plans', async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
@@ -234,20 +234,306 @@ const registerAdminHandlers = (bot) => {
       const lang = getLanguage(ctx);
       const plans = await PlanModel.getAll();
 
-      let message = `${t('planManagement', lang)}\n\n`;
+      let message = `💎 **Gestión de Planes**\n\n`;
+      message += `Total de planes activos: ${plans.length}\n\n`;
+      message += `Selecciona un plan para editar o eliminar:`;
+
+      const keyboard = [];
+
+      // Add button for each plan
       plans.forEach((plan) => {
-        message += `💎 ${plan.name} - $${plan.price}/month\n`;
+        keyboard.push([
+          Markup.button.callback(
+            `${plan.nameEs || plan.name} - $${plan.price}`,
+            `admin_plan_view_${plan.id}`,
+          ),
+        ]);
+      });
+
+      keyboard.push([Markup.button.callback('➕ Agregar Plan', 'admin_plan_add')]);
+      keyboard.push([Markup.button.callback('◀️ Volver', 'admin_cancel')]);
+
+      await ctx.editMessageText(
+        message,
+        Markup.inlineKeyboard(keyboard),
+      );
+    } catch (error) {
+      logger.error('Error in admin plans:', error);
+      await ctx.answerCbQuery('Error al cargar planes');
+    }
+  });
+
+  // View plan details
+  bot.action(/^admin_plan_view_(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const planId = ctx.match[1];
+      const plan = await PlanModel.getById(planId);
+
+      if (!plan) {
+        await ctx.answerCbQuery('Plan no encontrado');
+        return;
+      }
+
+      let message = `💎 **Detalles del Plan**\n\n`;
+      message += `📋 ID: ${plan.id}\n`;
+      message += `📦 SKU: ${plan.sku || 'N/A'}\n`;
+      message += `🏷️ Nombre (EN): ${plan.name}\n`;
+      message += `🏷️ Nombre (ES): ${plan.nameEs}\n`;
+      message += `💰 Precio: $${plan.price} ${plan.currency}\n`;
+      message += `⏱️ Duración: ${plan.duration} días\n`;
+      message += `✅ Activo: ${plan.active ? 'Sí' : 'No'}\n\n`;
+
+      message += `📝 Características (EN):\n`;
+      plan.features.forEach((feature, index) => {
+        message += `  ${index + 1}. ${feature}\n`;
+      });
+
+      message += `\n📝 Características (ES):\n`;
+      plan.featuresEs.forEach((feature, index) => {
+        message += `  ${index + 1}. ${feature}\n`;
       });
 
       await ctx.editMessageText(
         message,
         Markup.inlineKeyboard([
-          [Markup.button.callback('➕ Agregar Plan', 'admin_plan_add')],
-          [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+          [Markup.button.callback('✏️ Editar', `admin_plan_edit_${planId}`)],
+          [Markup.button.callback('🗑️ Eliminar', `admin_plan_delete_${planId}`)],
+          [Markup.button.callback('◀️ Volver a Planes', 'admin_plans')],
         ]),
       );
     } catch (error) {
-      logger.error('Error in admin plans:', error);
+      logger.error('Error viewing plan:', error);
+      await ctx.answerCbQuery('Error al cargar plan');
+    }
+  });
+
+  // Edit plan - Show edit menu
+  bot.action(/^admin_plan_edit_(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const planId = ctx.match[1];
+      const plan = await PlanModel.getById(planId);
+
+      if (!plan) {
+        await ctx.answerCbQuery('Plan no encontrado');
+        return;
+      }
+
+      // Store plan ID in session for editing
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.editingPlanId = planId;
+      await ctx.saveSession();
+
+      let message = `✏️ **Editar Plan: ${plan.nameEs}**\n\n`;
+      message += `Selecciona qué campo deseas modificar:\n`;
+
+      await ctx.editMessageText(
+        message,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('🏷️ Nombre', `admin_plan_edit_field_${planId}_name`)],
+          [Markup.button.callback('💰 Precio', `admin_plan_edit_field_${planId}_price`)],
+          [Markup.button.callback('⏱️ Duración', `admin_plan_edit_field_${planId}_duration`)],
+          [Markup.button.callback('📝 Características', `admin_plan_edit_field_${planId}_features`)],
+          [Markup.button.callback('✅ Activar/Desactivar', `admin_plan_toggle_active_${planId}`)],
+          [Markup.button.callback('◀️ Volver', `admin_plan_view_${planId}`)],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error showing edit menu:', error);
+      await ctx.answerCbQuery('Error al mostrar menú de edición');
+    }
+  });
+
+  // Toggle plan active status
+  bot.action(/^admin_plan_toggle_active_(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const planId = ctx.match[1];
+      const plan = await PlanModel.getById(planId);
+
+      if (!plan) {
+        await ctx.answerCbQuery('Plan no encontrado');
+        return;
+      }
+
+      // Toggle active status
+      await PlanModel.createOrUpdate(planId, {
+        ...plan.dataValues,
+        active: !plan.active,
+      });
+
+      await ctx.answerCbQuery(`Plan ${!plan.active ? 'activado' : 'desactivado'} exitosamente`);
+
+      // Refresh the view
+      ctx.match = [null, planId];
+      await bot.handleUpdate({
+        ...ctx.update,
+        callback_query: {
+          ...ctx.update.callback_query,
+          data: `admin_plan_view_${planId}`,
+        },
+      });
+    } catch (error) {
+      logger.error('Error toggling plan active status:', error);
+      await ctx.answerCbQuery('Error al cambiar estado');
+    }
+  });
+
+  // Edit plan field - Prompt for input
+  bot.action(/^admin_plan_edit_field_(.+)_(name|price|duration|features)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const planId = ctx.match[1];
+      const field = ctx.match[2];
+      const plan = await PlanModel.getById(planId);
+
+      if (!plan) {
+        await ctx.answerCbQuery('Plan no encontrado');
+        return;
+      }
+
+      // Store edit context in session
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.editingPlanId = planId;
+      ctx.session.temp.editingPlanField = field;
+      await ctx.saveSession();
+
+      let message = '';
+      let currentValue = '';
+
+      switch (field) {
+        case 'name':
+          currentValue = `EN: ${plan.name}\nES: ${plan.nameEs}`;
+          message = `✏️ **Editar Nombre del Plan**\n\n`;
+          message += `Valor actual:\n${currentValue}\n\n`;
+          message += `Envía el nuevo nombre en formato:\n`;
+          message += `EN: Nombre en inglés\n`;
+          message += `ES: Nombre en español\n\n`;
+          message += `Ejemplo:\n`;
+          message += `EN: Premium Plan\n`;
+          message += `ES: Plan Premium`;
+          break;
+
+        case 'price':
+          currentValue = `$${plan.price}`;
+          message = `💰 **Editar Precio del Plan**\n\n`;
+          message += `Precio actual: ${currentValue}\n\n`;
+          message += `Envía el nuevo precio (solo el número):\n`;
+          message += `Ejemplo: 29.99`;
+          break;
+
+        case 'duration':
+          currentValue = `${plan.duration} días`;
+          message = `⏱️ **Editar Duración del Plan**\n\n`;
+          message += `Duración actual: ${currentValue}\n\n`;
+          message += `Envía la nueva duración en días:\n`;
+          message += `Ejemplo: 30`;
+          break;
+
+        case 'features':
+          currentValue = `EN:\n${plan.features.map((f, i) => `${i + 1}. ${f}`).join('\n')}\n\n`;
+          currentValue += `ES:\n${plan.featuresEs.map((f, i) => `${i + 1}. ${f}`).join('\n')}`;
+          message = `📝 **Editar Características del Plan**\n\n`;
+          message += `Características actuales:\n${currentValue}\n\n`;
+          message += `Envía las nuevas características en formato:\n`;
+          message += `EN:\n`;
+          message += `- Característica 1\n`;
+          message += `- Característica 2\n`;
+          message += `ES:\n`;
+          message += `- Característica 1\n`;
+          message += `- Característica 2`;
+          break;
+      }
+
+      await ctx.editMessageText(
+        message,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('❌ Cancelar', `admin_plan_edit_${planId}`)],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error prompting for plan field edit:', error);
+      await ctx.answerCbQuery('Error al iniciar edición');
+    }
+  });
+
+  // Delete plan - Confirmation
+  bot.action(/^admin_plan_delete_(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const planId = ctx.match[1];
+      const plan = await PlanModel.getById(planId);
+
+      if (!plan) {
+        await ctx.answerCbQuery('Plan no encontrado');
+        return;
+      }
+
+      let message = `⚠️ **Confirmar Eliminación**\n\n`;
+      message += `¿Estás seguro de que deseas eliminar este plan?\n\n`;
+      message += `📋 Plan: ${plan.nameEs}\n`;
+      message += `💰 Precio: $${plan.price}\n\n`;
+      message += `⚠️ Esta acción no se puede deshacer.\n`;
+      message += `Los usuarios con este plan no se verán afectados.`;
+
+      await ctx.editMessageText(
+        message,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('✅ Sí, eliminar', `admin_plan_delete_confirm_${planId}`)],
+          [Markup.button.callback('❌ Cancelar', `admin_plan_view_${planId}`)],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error showing delete confirmation:', error);
+      await ctx.answerCbQuery('Error al mostrar confirmación');
+    }
+  });
+
+  // Delete plan - Confirmed
+  bot.action(/^admin_plan_delete_confirm_(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const planId = ctx.match[1];
+      const plan = await PlanModel.getById(planId);
+
+      if (!plan) {
+        await ctx.answerCbQuery('Plan no encontrado');
+        return;
+      }
+
+      const planName = plan.nameEs;
+      const success = await PlanModel.delete(planId);
+
+      if (success) {
+        await ctx.editMessageText(
+          `✅ **Plan Eliminado**\n\n` +
+          `El plan "${planName}" ha sido eliminado exitosamente.`,
+          Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Volver a Planes', 'admin_plans')],
+          ]),
+        );
+
+        logger.info('Plan deleted by admin', { adminId: ctx.from.id, planId, planName });
+        await ctx.answerCbQuery('Plan eliminado exitosamente');
+      } else {
+        await ctx.answerCbQuery('Error al eliminar plan');
+      }
+    } catch (error) {
+      logger.error('Error deleting plan:', error);
+      await ctx.answerCbQuery('Error al eliminar plan');
     }
   });
 
@@ -392,6 +678,140 @@ const registerAdminHandlers = (bot) => {
         logger.info('Broadcast sent', { adminId: ctx.from.id, target, sent });
       } catch (error) {
         logger.error('Error sending broadcast:', error);
+      }
+      return;
+    }
+
+    // Plan field editing
+    if (ctx.session.temp?.editingPlanId && ctx.session.temp?.editingPlanField) {
+      try {
+        const planId = ctx.session.temp.editingPlanId;
+        const field = ctx.session.temp.editingPlanField;
+        const input = ctx.message.text;
+        const plan = await PlanModel.getById(planId);
+
+        if (!plan) {
+          await ctx.reply('Plan no encontrado');
+          ctx.session.temp.editingPlanId = null;
+          ctx.session.temp.editingPlanField = null;
+          await ctx.saveSession();
+          return;
+        }
+
+        let updateData = { ...plan.dataValues };
+        let successMessage = '';
+
+        switch (field) {
+          case 'name': {
+            // Parse format: EN: name\nES: name
+            const lines = input.split('\n');
+            let nameEn = plan.name;
+            let nameEs = plan.nameEs;
+
+            lines.forEach((line) => {
+              if (line.startsWith('EN:')) {
+                nameEn = line.substring(3).trim();
+              } else if (line.startsWith('ES:')) {
+                nameEs = line.substring(3).trim();
+              }
+            });
+
+            updateData.name = nameEn;
+            updateData.nameEs = nameEs;
+            successMessage = `✅ Nombre actualizado:\nEN: ${nameEn}\nES: ${nameEs}`;
+            break;
+          }
+
+          case 'price': {
+            const price = parseFloat(input);
+            if (Number.isNaN(price) || price < 0) {
+              await ctx.reply('❌ Precio inválido. Por favor ingresa un número válido.');
+              return;
+            }
+            updateData.price = price;
+            successMessage = `✅ Precio actualizado: $${price}`;
+            break;
+          }
+
+          case 'duration': {
+            const duration = parseInt(input, 10);
+            if (Number.isNaN(duration) || duration < 1) {
+              await ctx.reply('❌ Duración inválida. Por favor ingresa un número de días válido.');
+              return;
+            }
+            updateData.duration = duration;
+            // Regenerate SKU with new duration
+            updateData.sku = PlanModel.generateSKU(planId, duration);
+            successMessage = `✅ Duración actualizada: ${duration} días\nSKU actualizado: ${updateData.sku}`;
+            break;
+          }
+
+          case 'features': {
+            // Parse format: EN:\n- feature1\n- feature2\nES:\n- feature1\n- feature2
+            const sections = input.split(/EN:|ES:/i).filter((s) => s.trim());
+            const featuresEn = [];
+            const featuresEs = [];
+
+            if (sections.length >= 1) {
+              // First section is EN
+              const enLines = sections[0].split('\n').filter((l) => l.trim().startsWith('-'));
+              enLines.forEach((line) => {
+                const feature = line.replace(/^-\s*/, '').trim();
+                if (feature) featuresEn.push(feature);
+              });
+            }
+
+            if (sections.length >= 2) {
+              // Second section is ES
+              const esLines = sections[1].split('\n').filter((l) => l.trim().startsWith('-'));
+              esLines.forEach((line) => {
+                const feature = line.replace(/^-\s*/, '').trim();
+                if (feature) featuresEs.push(feature);
+              });
+            }
+
+            if (featuresEn.length === 0 || featuresEs.length === 0) {
+              await ctx.reply('❌ Formato inválido. Asegúrate de incluir características en ambos idiomas.');
+              return;
+            }
+
+            updateData.features = featuresEn;
+            updateData.featuresEs = featuresEs;
+            successMessage = `✅ Características actualizadas:\nEN: ${featuresEn.length} características\nES: ${featuresEs.length} características`;
+            break;
+          }
+
+          default:
+            await ctx.reply('Campo desconocido');
+            return;
+        }
+
+        // Update the plan
+        await PlanModel.createOrUpdate(planId, updateData);
+
+        // Clear editing state
+        ctx.session.temp.editingPlanId = null;
+        ctx.session.temp.editingPlanField = null;
+        await ctx.saveSession();
+
+        await ctx.reply(
+          successMessage,
+          Markup.inlineKeyboard([
+            [Markup.button.callback('✏️ Editar Otro Campo', `admin_plan_edit_${planId}`)],
+            [Markup.button.callback('👁️ Ver Detalles', `admin_plan_view_${planId}`)],
+            [Markup.button.callback('◀️ Volver a Planes', 'admin_plans')],
+          ]),
+        );
+
+        logger.info('Plan field updated by admin', {
+          adminId: ctx.from.id,
+          planId,
+          field,
+          newValue: updateData[field],
+        });
+      } catch (error) {
+        logger.error('Error updating plan field:', error);
+        await ctx.reply('Error al actualizar el plan');
       }
       return;
     }
