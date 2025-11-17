@@ -36,8 +36,8 @@ services:
     image: postgres:15-alpine
     container_name: pnptv-postgres
     restart: unless-stopped
-    ports:
-      - "${DB_PORT:-5432}:5432"
+    # Ports removed - only accessible via internal Docker network
+    # Uncomment if you need external access: ports: ["${DB_PORT:-5432}:5432"]
     environment:
       - POSTGRES_DB=${DB_NAME:-pnptv}
       - POSTGRES_USER=${DB_USER:-pnptv_user}
@@ -67,8 +67,8 @@ services:
     image: redis:7-alpine
     container_name: pnptv-redis
     restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    # Ports removed - only accessible via internal Docker network
+    # Uncomment if you need external access: ports: ["${REDIS_PORT:-6379}:6379"]
     volumes:
       - redis-data:/data
     networks:
