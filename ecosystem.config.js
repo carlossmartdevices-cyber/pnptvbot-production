@@ -1,23 +1,37 @@
 module.exports = {
-  apps: [{
-    name: 'pnptv-bot',
-    script: './src/bot/core/bot.js',
-    instances: 1,
-    autorestart: true,
-    watch: false,
-    max_memory_restart: '1G',
-    env: {
-      NODE_ENV: 'production',
-    },
-    env_development: {
-      NODE_ENV: 'development',
-    },
-    error_file: './logs/pm2-error.log',
-    out_file: './logs/pm2-out.log',
-    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-    merge_logs: true,
-    min_uptime: '10s',
-    max_restarts: 10,
-    restart_delay: 4000,
-  }],
+  apps: [
+    {
+      name: 'pnptv-bot',
+      script: './src/bot/core/bot.js',
+      instances: 1,
+      exec_mode: 'fork',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3000
+      },
+      // Auto restart on crash
+      max_memory_restart: '500M',
+
+      // Restart configuration
+      restart_delay: 4000,
+      max_restarts: 10,
+      min_uptime: '10s',
+
+      // Graceful shutdown
+      kill_timeout: 5000,
+      listen_timeout: 3000,
+
+      // Logging
+      output: './logs/out.log',
+      error: './logs/error.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+
+      // Watch & Restart on file changes (set to false in production)
+      watch: false,
+      ignore_watch: ['node_modules', 'logs', 'uploads', '.git'],
+
+      // Environment variables from .env file
+      env_file: '.env'
+    }
+  ]
 };
