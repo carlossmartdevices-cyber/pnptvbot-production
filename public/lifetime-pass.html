@@ -191,6 +191,31 @@
             transform: none;
         }
 
+        .pay-now-button {
+            background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+            color: #333;
+            padding: 25px 60px;
+            font-size: 1.5em;
+            font-weight: bold;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .pay-now-button:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 15px 40px rgba(255, 215, 0, 0.6);
+            background: linear-gradient(135deg, #ffed4e 0%, #ffaa00 100%);
+        }
+
+        .pay-now-button:active {
+            transform: translateY(-2px) scale(1.02);
+        }
+
         .activation-section {
             background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
             padding: 40px;
@@ -361,14 +386,14 @@
             </div>
 
             <div class="payment-section">
-                <h2>💳 Elige tu método de pago</h2>
-                <div id="loading-es" class="loading">
-                    <div class="spinner"></div>
-                    <p>Cargando enlaces de pago...</p>
-                </div>
-                <div id="paymentLinks" class="payment-links"></div>
-                <div id="no-links-es" class="no-links-message" style="display: none;">
-                    <p>⚠️ Todos los enlaces están en uso. Por favor, contacta al soporte para obtener un nuevo enlace.</p>
+                <h2>💳 Obtén tu Acceso de Por Vida Ahora</h2>
+                <div style="text-align: center; margin: 30px 0;">
+                    <button id="payNowBtn" class="pay-now-button" onclick="payNow()">
+                        💰 PAGAR AHORA - $80 USD
+                    </button>
+                    <p style="margin-top: 15px; font-size: 0.9em; opacity: 0.8;">
+                        ℹ️ Si el enlace está expirado, intente de nuevo
+                    </p>
                 </div>
             </div>
 
@@ -437,14 +462,14 @@
             </div>
 
             <div class="payment-section">
-                <h2>💳 Choose your payment method</h2>
-                <div id="loading-en" class="loading">
-                    <div class="spinner"></div>
-                    <p>Loading payment links...</p>
-                </div>
-                <div id="paymentLinksEn" class="payment-links"></div>
-                <div id="no-links-en" class="no-links-message" style="display: none;">
-                    <p>⚠️ All links are currently in use. Please contact support for a new link.</p>
+                <h2>💳 Get Your Lifetime Access Now</h2>
+                <div style="text-align: center; margin: 30px 0;">
+                    <button id="payNowBtnEn" class="pay-now-button" onclick="payNow()">
+                        💰 PAY NOW - $80 USD
+                    </button>
+                    <p style="margin-top: 15px; font-size: 0.9em; opacity: 0.8;">
+                        ℹ️ If the link is expired, please try again
+                    </p>
                 </div>
             </div>
 
@@ -469,6 +494,27 @@
         let paymentUrls = [];
         let db;
         let currentLang = 'es';
+
+        // Meru payment links - randomizer will select one
+        const meruPaymentLinks = [
+            'https://pay.getmeru.com/CtJb_x',
+            'https://pay.getmeru.com/XvaSxc',
+            'https://pay.getmeru.com/tuQXK0',
+            'https://pay.getmeru.com/_S6Zcg',
+            'https://pay.getmeru.com/u9PTJd',
+            'https://pay.getmeru.com/HnQM_-',
+            'https://pay.getmeru.com/7brFcr',
+            'https://pay.getmeru.com/KVWbaA',
+            'https://pay.getmeru.com/v0Q_Un',
+            'https://pay.getmeru.com/n1LTnG'
+        ];
+
+        // Pay Now function - redirects to random Meru link
+        function payNow() {
+            const randomIndex = Math.floor(Math.random() * meruPaymentLinks.length);
+            const selectedLink = meruPaymentLinks[randomIndex];
+            window.open(selectedLink, '_blank');
+        }
 
         // Initialize Firebase
         function initFirebase() {

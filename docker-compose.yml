@@ -1,4 +1,5 @@
-version: '3.8'
+# Docker Compose version field is deprecated and will be removed
+# Keeping for compatibility but can be safely removed
 
 services:
   bot:
