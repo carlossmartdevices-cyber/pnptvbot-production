@@ -1,11 +1,13 @@
-const { DataTypes, Model } = require('sequelize');
+const { getFirestore } = require('../config/firebase');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
 /**
- * Plan Model - Handles subscription plan data with PostgreSQL
+ * Plan Model - Handles subscription plan data with Firestore
  */
-class Plan extends Model {
+class Plan {
+  static COLLECTION = 'plans';
+
   /**
    * Get all active plans (with caching)
    * @returns {Promise<Array>} All subscription plans
@@ -17,12 +19,19 @@ class Plan extends Model {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const plans = await this.findAll({
-            where: { active: true },
-            order: [['price', 'ASC']],
-          });
+          const db = getFirestore();
+          const snapshot = await db
+            .collection(this.COLLECTION)
+            .where('active', '==', true)
+            .orderBy('price', 'asc')
+            .get();
 
-          logger.info(`Fetched ${plans.length} plans from database`);
+          const plans = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+
+          logger.info(`Fetched ${plans.length} plans from Firestore`);
           return plans.length > 0 ? plans : this.getDefaultPlans();
         },
         3600, // Cache for 1 hour
@@ -45,15 +54,19 @@ class Plan extends Model {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const plan = await this.findByPk(planId);
+          const db = getFirestore();
+          const doc = await db.collection(this.COLLECTION).doc(planId).get();
 
-          if (!plan) {
+          if (!doc.exists) {
             logger.warn(`Plan not found: ${planId}`);
             return null;
           }
 
-          logger.info(`Fetched plan from database: ${planId}`);
-          return plan;
+          logger.info(`Fetched plan from Firestore: ${planId}`);
+          return {
+            id: doc.id,
+            ...doc.data(),
+          };
         },
         3600, // Cache for 1 hour
       );
@@ -78,7 +91,8 @@ class Plan extends Model {
         logger.info(`Auto-generated SKU: ${data.sku} for plan: ${planId}`);
       }
 
-      const [plan] = await this.upsert({
+      const db = getFirestore();
+      const planDoc = {
         id: planId,
         sku: data.sku,
         name: data.name,
@@ -89,14 +103,17 @@ class Plan extends Model {
         features: data.features || [],
         featuresEs: data.featuresEs || [],
         active: data.active !== undefined ? data.active : true,
-      });
+        updatedAt: new Date(),
+      };
+
+      await db.collection(this.COLLECTION).doc(planId).set(planDoc, { merge: true });
 
       // Invalidate cache
       await cache.del(`plan:${planId}`);
       await cache.del('plans:all');
 
       logger.info('Plan created/updated', { planId, sku: data.sku });
-      return plan;
+      return planDoc;
     } catch (error) {
       logger.error('Error creating/updating plan:', error);
       throw error;
@@ -110,9 +127,8 @@ class Plan extends Model {
    */
   static async delete(planId) {
     try {
-      await this.destroy({
-        where: { id: planId },
-      });
+      const db = getFirestore();
+      await db.collection(this.COLLECTION).doc(planId).delete();
 
       // Invalidate cache
       await cache.del(`plan:${planId}`);
@@ -323,78 +339,4 @@ class Plan extends Model {
   }
 }
 
-/**
- * Initialize Plan model
- * @param {Sequelize} sequelize - Sequelize instance
- * @returns {Plan} Plan model
- */
-const initPlanModel = (sequelize) => {
-  Plan.init(
-    {
-      id: {
-        type: DataTypes.STRING(50),
-        primaryKey: true,
-        allowNull: false,
-      },
-      sku: {
-        type: DataTypes.STRING(50),
-        allowNull: true,
-        unique: true,
-      },
-      name: {
-        type: DataTypes.STRING(100),
-        allowNull: false,
-      },
-      nameEs: {
-        type: DataTypes.STRING(100),
-        allowNull: false,
-        field: 'name_es',
-      },
-      price: {
-        type: DataTypes.DECIMAL(10, 2),
-        allowNull: false,
-      },
-      currency: {
-        type: DataTypes.STRING(10),
-        allowNull: false,
-        defaultValue: 'USD',
-      },
-      duration: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 30,
-      },
-      features: {
-        type: DataTypes.ARRAY(DataTypes.STRING),
-        allowNull: false,
-        defaultValue: [],
-      },
-      featuresEs: {
-        type: DataTypes.ARRAY(DataTypes.STRING),
-        allowNull: false,
-        defaultValue: [],
-        field: 'features_es',
-      },
-      active: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: true,
-      },
-    },
-    {
-      sequelize,
-      modelName: 'Plan',
-      tableName: 'plans',
-      timestamps: true,
-      underscored: true,
-    },
-  );
-
-  return Plan;
-};
-
-// Plan model is now Firestore-based and does not require Sequelize initialization
-// The model methods use Firebase and Redis for data storage and caching
-
 module.exports = Plan;
-module.exports.initPlanModel = initPlanModel;
