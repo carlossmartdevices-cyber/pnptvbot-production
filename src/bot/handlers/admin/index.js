@@ -399,7 +399,7 @@ const registerAdminHandlers = (bot) => {
     return next();
   });
 
-  // Extend subscription
+  // Extend subscription - Show duration options
   bot.action('admin_extend_sub', async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
@@ -407,27 +407,114 @@ const registerAdminHandlers = (bot) => {
 
       const userId = ctx.session.temp.selectedUserId;
       const lang = getLanguage(ctx);
+      const user = await UserModel.getById(userId);
 
-      // Extend by 30 days
-      const newExpiry = new Date();
-      newExpiry.setDate(newExpiry.getDate() + 30);
+      if (!user) {
+        await ctx.answerCbQuery('Usuario no encontrado');
+        return;
+      }
+
+      let text = `📅 **Extender Membresía**\n\n`;
+      text += `👤 ${user.firstName} ${user.lastName || ''}\n`;
+      text += `💎 Status: ${user.subscriptionStatus}\n`;
+      if (user.subscriptionExpiry) {
+        text += `⏰ Expira: ${new Date(user.subscriptionExpiry).toLocaleDateString()}\n`;
+      }
+      text += `\nSelecciona la duración de la extensión:\n`;
+
+      await ctx.editMessageText(
+        text,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('📅 1 Semana', `admin_extend_duration_${userId}_7`)],
+          [Markup.button.callback('📅 2 Semanas', `admin_extend_duration_${userId}_14`)],
+          [Markup.button.callback('📅 1 Mes', `admin_extend_duration_${userId}_30`)],
+          [Markup.button.callback('♾️ Lifetime', `admin_extend_duration_${userId}_lifetime`)],
+          [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error showing extension options:', error);
+      await ctx.answerCbQuery('Error al mostrar opciones');
+    }
+  });
+
+  // Handle extension duration selection
+  bot.action(/^admin_extend_duration_(.+)_(7|14|30|lifetime)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.match[1];
+      const duration = ctx.match[2];
+      const lang = getLanguage(ctx);
+      const user = await UserModel.getById(userId);
+
+      if (!user) {
+        await ctx.answerCbQuery('Usuario no encontrado');
+        return;
+      }
+
+      let newExpiry;
+      let durationText;
+
+      if (duration === 'lifetime') {
+        // Lifetime subscription - no expiry
+        newExpiry = null;
+        durationText = 'Lifetime (sin vencimiento)';
+      } else {
+        // Calculate new expiry based on current expiry or now
+        const baseDate = user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date()
+          ? new Date(user.subscriptionExpiry)
+          : new Date();
+
+        newExpiry = new Date(baseDate);
+        const days = parseInt(duration, 10);
+        newExpiry.setDate(newExpiry.getDate() + days);
+
+        if (days === 7) {
+          durationText = '1 semana';
+        } else if (days === 14) {
+          durationText = '2 semanas';
+        } else if (days === 30) {
+          durationText = '1 mes';
+        } else {
+          durationText = `${days} días`;
+        }
+      }
 
       await UserModel.updateSubscription(userId, {
         status: 'active',
-        planId: 'premium',
+        planId: user.planId || 'premium',
         expiry: newExpiry,
       });
 
+      let successText = `✅ **Membresía Extendida**\n\n`;
+      successText += `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`;
+      successText += `⏱️ Duración: ${durationText}\n`;
+      if (newExpiry) {
+        successText += `📅 Nueva fecha de vencimiento: ${newExpiry.toLocaleDateString()}\n`;
+      } else {
+        successText += `♾️ Membresía Lifetime activada\n`;
+      }
+
       await ctx.editMessageText(
-        `✅ Subscription extended for user ${userId} until ${newExpiry.toLocaleDateString()}`,
+        successText,
         Markup.inlineKeyboard([
           [Markup.button.callback('◀️ Volver', 'admin_cancel')],
         ]),
       );
 
-      logger.info('Subscription extended by admin', { adminId: ctx.from.id, userId });
+      logger.info('Subscription extended by admin', {
+        adminId: ctx.from.id,
+        userId,
+        duration,
+        newExpiry,
+      });
+
+      await ctx.answerCbQuery('✅ Membresía extendida exitosamente');
     } catch (error) {
       logger.error('Error extending subscription:', error);
+      await ctx.answerCbQuery('Error al extender membresía');
     }
   });
 
