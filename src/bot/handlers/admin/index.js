@@ -187,6 +187,7 @@ const registerAdminHandlers = (bot) => {
           [Markup.button.callback('👥 Todos los Usuarios', 'broadcast_all')],
           [Markup.button.callback('💎 Solo Premium', 'broadcast_premium')],
           [Markup.button.callback('🆓 Solo Gratis', 'broadcast_free')],
+          [Markup.button.callback('↩️ Churned (Ex-Premium)', 'broadcast_churned')],
           [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
         ]),
       );
@@ -655,6 +656,8 @@ const registerAdminHandlers = (bot) => {
           users = await UserModel.getBySubscriptionStatus('active');
         } else if (target === 'free') {
           users = await UserModel.getBySubscriptionStatus('free');
+        } else if (target === 'churned') {
+          users = await UserModel.getChurnedUsers();
         }
 
         // Send broadcast

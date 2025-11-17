@@ -784,6 +784,47 @@ class UserModel {
       return false;
     }
   }
+
+  /**
+   * Get churned users (users who had premium but now are free)
+   * Churned users are those with subscriptionStatus = 'free' who have payment history
+   * @returns {Promise<Array>} Churned users
+   */
+  static async getChurnedUsers() {
+    try {
+      const db = getFirestore();
+
+      // Get all free users
+      const freeUsersSnapshot = await db.collection(COLLECTION)
+        .where('subscriptionStatus', '==', 'free')
+        .get();
+
+      const churnedUsers = [];
+
+      // Check which free users have payment history
+      for (const doc of freeUsersSnapshot.docs) {
+        const userId = doc.id;
+
+        // Check if user has any successful payments
+        const paymentsSnapshot = await db.collection('payments')
+          .where('userId', '==', userId)
+          .where('status', '==', 'success')
+          .limit(1)
+          .get();
+
+        // If user has payment history, they are churned
+        if (!paymentsSnapshot.empty) {
+          churnedUsers.push({ id: doc.id, ...doc.data() });
+        }
+      }
+
+      logger.info(`Found ${churnedUsers.length} churned users`);
+      return churnedUsers;
+    } catch (error) {
+      logger.error('Error getting churned users:', error);
+      return [];
+    }
+  }
 }
 
 module.exports = UserModel;
