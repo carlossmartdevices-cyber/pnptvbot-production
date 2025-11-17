@@ -1,15 +1,16 @@
 # Build stage - install all dependencies including dev dependencies
-FROM node:18-alpine3.20 AS builder
+FROM node:18-slim AS builder
 
 # Set working directory
 WORKDIR /app
 
 # Install build dependencies for native modules with aggressive retry logic
-RUN apk update && \
-    (apk add --no-cache python3 make g++ || \
-     (sleep 5 && apk update && apk add --no-cache python3 make g++) || \
-     (sleep 10 && apk update && apk add --no-cache python3 make g++) || \
-     (sleep 15 && apk update && apk add --no-cache python3 make g++))
+RUN apt-get update && \
+    (apt-get install -y --no-install-recommends python3 make g++ || \
+     (sleep 5 && apt-get update && apt-get install -y --no-install-recommends python3 make g++) || \
+     (sleep 10 && apt-get update && apt-get install -y --no-install-recommends python3 make g++) || \
+     (sleep 15 && apt-get update && apt-get install -y --no-install-recommends python3 make g++)) && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
@@ -21,19 +22,20 @@ RUN npm ci
 COPY . .
 
 # Production stage - minimal runtime image
-FROM node:18-alpine3.20 AS production
+FROM node:18-slim AS production
 
 # Set working directory
 WORKDIR /app
 
 # Install runtime dependencies for native modules with aggressive retry logic
-RUN apk update && \
-    (apk add --no-cache tini || \
-     (sleep 5 && apk update && apk add --no-cache tini) || \
-     (sleep 10 && apk update && apk add --no-cache tini) || \
-     (sleep 15 && apk update && apk add --no-cache tini)) && \
-    addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+RUN apt-get update && \
+    (apt-get install -y --no-install-recommends tini || \
+     (sleep 5 && apt-get update && apt-get install -y --no-install-recommends tini) || \
+     (sleep 10 && apt-get update && apt-get install -y --no-install-recommends tini) || \
+     (sleep 15 && apt-get update && apt-get install -y --no-install-recommends tini)) && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd -g 1001 -r nodejs && \
+    useradd -r -g nodejs -u 1001 nodejs
 
 # Copy package files
 COPY package*.json ./
@@ -69,7 +71,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => {process.exit(1)})"
 
 # Use tini to handle signals properly
-ENTRYPOINT ["/sbin/tini", "--"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # Start the bot
 CMD ["node", "src/bot/core/bot.js"]
