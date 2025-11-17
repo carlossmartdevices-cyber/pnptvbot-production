@@ -1,14 +1,15 @@
 # Build stage - install all dependencies including dev dependencies
-FROM node:18-alpine AS builder
+FROM node:18-alpine3.20 AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Install build dependencies for native modules with retry logic
+# Install build dependencies for native modules with aggressive retry logic
 RUN apk update && \
     (apk add --no-cache python3 make g++ || \
-     (sleep 5 && apk add --no-cache python3 make g++) || \
-     (sleep 10 && apk add --no-cache python3 make g++))
+     (sleep 5 && apk update && apk add --no-cache python3 make g++) || \
+     (sleep 10 && apk update && apk add --no-cache python3 make g++) || \
+     (sleep 15 && apk update && apk add --no-cache python3 make g++))
 
 # Copy package files
 COPY package*.json ./
@@ -20,16 +21,17 @@ RUN npm ci
 COPY . .
 
 # Production stage - minimal runtime image
-FROM node:18-alpine AS production
+FROM node:18-alpine3.20 AS production
 
 # Set working directory
 WORKDIR /app
 
-# Install runtime dependencies for native modules with retry logic
+# Install runtime dependencies for native modules with aggressive retry logic
 RUN apk update && \
     (apk add --no-cache tini || \
-     (sleep 5 && apk add --no-cache tini) || \
-     (sleep 10 && apk add --no-cache tini)) && \
+     (sleep 5 && apk update && apk add --no-cache tini) || \
+     (sleep 10 && apk update && apk add --no-cache tini) || \
+     (sleep 15 && apk update && apk add --no-cache tini)) && \
     addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
