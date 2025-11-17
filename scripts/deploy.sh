@@ -43,9 +43,8 @@ echo "📋 Checking required environment variables..."
 required_vars=(
     "BOT_TOKEN"
     "FIREBASE_PROJECT_ID"
-    "DB_HOST"
-    "DB_USER"
-    "DB_PASSWORD"
+    "FIREBASE_PRIVATE_KEY"
+    "FIREBASE_CLIENT_EMAIL"
     "REDIS_HOST"
 )
 
@@ -161,7 +160,6 @@ health_check() {
 
 # Check each service
 health_check "redis"
-health_check "postgres"
 
 # Check bot health endpoint
 echo ""
@@ -221,8 +219,8 @@ echo ""
 echo "🔗 Access Points:"
 echo "  Bot API: http://localhost:3000"
 echo "  Health Check: http://localhost:3000/health"
-echo "  PostgreSQL: localhost:5432"
 echo "  Redis: localhost:6379"
+echo "  Firebase: Cloud Firestore (via Google Cloud)"
 echo ""
 echo "📋 Useful Commands:"
 echo "  View logs: docker-compose logs -f bot"

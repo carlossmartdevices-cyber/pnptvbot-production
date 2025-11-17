@@ -1,49 +1,16 @@
-const { Sequelize } = require('sequelize');
+const { initializeFirebase, getFirestore } = require('./firebase');
 const logger = require('../utils/logger');
 
-let sequelize = null;
-
 /**
- * Initialize Sequelize connection to PostgreSQL
- * @returns {Sequelize} Sequelize instance
+ * Initialize Database (uses Firestore)
+ * This function initializes the Firestore connection
+ * @returns {admin.firestore.Firestore} Firestore instance
  */
 const initializeDatabase = () => {
   try {
-    if (sequelize) {
-      return sequelize;
-    }
-
-    const {
-      DB_HOST = 'localhost',
-      DB_PORT = 5432,
-      DB_NAME = 'pnptv_bot',
-      DB_USER = 'pnptv_user',
-      DB_PASSWORD = 'pnptv_password',
-      DB_SSL = 'false',
-    } = process.env;
-
-    sequelize = new Sequelize(DB_NAME, DB_USER, DB_PASSWORD, {
-      host: DB_HOST,
-      port: parseInt(DB_PORT, 10),
-      dialect: 'postgres',
-      logging: false, // Set to console.log for debugging
-      pool: {
-        max: parseInt(process.env.DB_POOL_MAX || 10, 10),
-        min: parseInt(process.env.DB_POOL_MIN || 2, 10),
-        acquire: 30000,
-        idle: 10000,
-      },
-      dialectOptions: {
-        ssl: DB_SSL === 'true' ? { require: true, rejectUnauthorized: false } : false,
-      },
-      define: {
-        timestamps: true,
-        underscored: true,
-      },
-    });
-
-    logger.info('Sequelize database connection configured');
-    return sequelize;
+    const db = initializeFirebase();
+    logger.info('Firestore database initialized successfully');
+    return db;
   } catch (error) {
     logger.error('Failed to initialize database:', error);
     throw error;
@@ -51,15 +18,12 @@ const initializeDatabase = () => {
 };
 
 /**
- * Get Sequelize instance
+ * Get Firestore instance
  * Creates connection if not already created
- * @returns {Sequelize}
+ * @returns {admin.firestore.Firestore}
  */
 const getDatabase = () => {
-  if (!sequelize) {
-    return initializeDatabase();
-  }
-  return sequelize;
+  return getFirestore();
 };
 
 /**
@@ -68,9 +32,10 @@ const getDatabase = () => {
  */
 const testConnection = async () => {
   try {
-    const db = getDatabase();
-    await db.authenticate();
-    logger.info(' Database connection successful');
+    const db = getFirestore();
+    // Test Firestore connection by doing a simple query
+    await db.collection('_test').doc('_test').get();
+    logger.info('Firestore database connection successful');
     return true;
   } catch (error) {
     logger.error('Database connection failed:', error);
@@ -79,17 +44,16 @@ const testConnection = async () => {
 };
 
 /**
- * Sync all models with database
- * @param {Object} options - Sync options (e.g., { alter: true })
+ * Firestore doesn't require sync like relational databases
+ * This is a no-op function for compatibility
  * @returns {Promise<void>}
  */
-const syncDatabase = async (options = {}) => {
+const syncDatabase = async () => {
   try {
-    const db = getDatabase();
-    await db.sync({ ...options });
-    logger.info(' Database models synced successfully');
+    logger.info('Firestore does not require schema synchronization');
+    return true;
   } catch (error) {
-    logger.error('Failed to sync database models:', error);
+    logger.error('Failed to sync database:', error);
     throw error;
   }
 };
@@ -99,10 +63,12 @@ const syncDatabase = async (options = {}) => {
  * @returns {Promise<void>}
  */
 const closeDatabase = async () => {
-  if (sequelize) {
-    await sequelize.close();
-    sequelize = null;
-    logger.info('Database connection closed');
+  try {
+    const db = getFirestore();
+    await db.terminate();
+    logger.info('Firestore connection closed');
+  } catch (error) {
+    logger.error('Error closing database connection:', error);
   }
 };
 
