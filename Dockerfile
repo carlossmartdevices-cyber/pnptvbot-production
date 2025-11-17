@@ -5,11 +5,9 @@ FROM node:18-slim AS builder
 WORKDIR /app
 
 # Install build dependencies for native modules with aggressive retry logic
+# Using Debian apt-get which has more reliable mirrors than Alpine
 RUN apt-get update && \
-    (apt-get install -y --no-install-recommends python3 make g++ || \
-     (sleep 5 && apt-get update && apt-get install -y --no-install-recommends python3 make g++) || \
-     (sleep 10 && apt-get update && apt-get install -y --no-install-recommends python3 make g++) || \
-     (sleep 15 && apt-get update && apt-get install -y --no-install-recommends python3 make g++)) && \
+    apt-get install -y --no-install-recommends python3 make g++ && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy package files
@@ -27,12 +25,10 @@ FROM node:18-slim AS production
 # Set working directory
 WORKDIR /app
 
-# Install runtime dependencies for native modules with aggressive retry logic
+# Install runtime dependencies for native modules
+# Using Debian apt-get which has more reliable mirrors than Alpine
 RUN apt-get update && \
-    (apt-get install -y --no-install-recommends tini || \
-     (sleep 5 && apt-get update && apt-get install -y --no-install-recommends tini) || \
-     (sleep 10 && apt-get update && apt-get install -y --no-install-recommends tini) || \
-     (sleep 15 && apt-get update && apt-get install -y --no-install-recommends tini)) && \
+    apt-get install -y --no-install-recommends tini && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd -g 1001 -r nodejs && \
     useradd -r -g nodejs -u 1001 nodejs
