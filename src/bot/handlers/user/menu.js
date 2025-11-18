@@ -26,6 +26,8 @@ const registerMenuHandlers = (bot) => {
     }
   });
 
+  // Note: show_subscription_plans handler is in payments/index.js
+
   // Group menu actions
   bot.action('group_contact_admin', async (ctx) => {
     try {

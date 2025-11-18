@@ -727,7 +727,7 @@ const unblockUser = async (ctx, targetUserId) => {
 };
 
 /**
- * Share profile - Generate Member Card
+ * Share profile - Generate Member Card with Photo
  */
 const shareProfile = async (ctx) => {
   try {
@@ -739,12 +739,14 @@ const shareProfile = async (ctx) => {
       return;
     }
 
-    // Build Member Card text
-    let cardText = '╔═══════════════════════╗\n';
-    cardText += '          💎 MEMBER CARD 💎\n';
-    cardText += '╚═══════════════════════╝\n\n';
+    await ctx.answerCbQuery();
 
-    // Badges
+    // Build enhanced Member Card text (using HTML for better parsing)
+    let cardText = '┏━━━━━━━━━━━━━━━━━━━━━━━┓\n';
+    cardText += '┃      💎 MEMBER CARD 💎      ┃\n';
+    cardText += '┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n';
+
+    // Badges - display prominently
     if (user.badges && user.badges.length > 0) {
       const badgeList = user.badges.map((badge) => {
         if (typeof badge === 'string') {
@@ -756,24 +758,15 @@ const shareProfile = async (ctx) => {
         }
         return '';
       }).filter(Boolean).join(' ');
-      cardText += `${badgeList}\n`;
+      cardText += `${badgeList}\n\n`;
     }
 
-    // Basic info
-    cardText += `\n👤 ${user.firstName || 'User'} ${user.lastName || ''}\n`;
-    if (user.username) cardText += `@${user.username}\n`;
+    // Basic info with better formatting
+    cardText += `━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    cardText += `👤 <b>${user.firstName || 'User'} ${user.lastName || ''}</b>\n`;
+    if (user.username) cardText += `📱 @${user.username}\n`;
 
-    // Bio
-    if (user.bio) {
-      cardText += `\n📝 ${user.bio}\n`;
-    }
-
-    // Interests
-    if (user.interests && user.interests.length > 0) {
-      cardText += `\n🎯 ${user.interests.join(', ')}\n`;
-    }
-
-    // Subscription status
+    // Subscription status - highlight for PRIME members
     if (user.subscriptionStatus === 'active' && user.planExpiry) {
       try {
         let expiry;
@@ -786,31 +779,68 @@ const shareProfile = async (ctx) => {
         }
 
         if (expiry && !isNaN(expiry.getTime())) {
-          cardText += `\n💎 PRIME ${t('subscriptionActive', lang, { expiry: moment(expiry).format('MMM DD, YYYY') })}\n`;
+          cardText += `💎 <b>PRIME Member</b>\n`;
+          cardText += `   Valid until: ${moment(expiry).format('MMM DD, YYYY')}\n`;
         }
       } catch (error) {
         logger.warn('Error parsing planExpiry in share:', error);
       }
+    } else {
+      cardText += `⭐ Free Member\n`;
+    }
+    cardText += `━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    // Bio
+    if (user.bio) {
+      cardText += `📝 <b>About</b>\n`;
+      // Escape HTML special characters in bio
+      const escapedBio = user.bio.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      cardText += `${escapedBio}\n\n`;
+    }
+
+    // Interests with better formatting
+    if (user.interests && user.interests.length > 0) {
+      cardText += `🎯 <b>Interests</b>\n`;
+      // Escape HTML special characters in interests
+      const escapedInterests = user.interests.map(i =>
+        i.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      );
+      cardText += `${escapedInterests.join(' • ')}\n\n`;
     }
 
     // Profile link (deep link to view profile)
-    cardText += `\n🔗 https://t.me/${ctx.botInfo.username}?start=viewprofile_${ctx.from.id}\n`;
+    cardText += `━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    cardText += `🔗 <b>View Full Profile:</b>\n`;
+    cardText += `https://t.me/${ctx.botInfo.username}?start=viewprofile_${ctx.from.id}\n\n`;
 
-    cardText += '\n╔═══════════════════════╗\n';
-    cardText += '    PNPtv - Entertainment Hub\n';
-    cardText += '╚═══════════════════════╝';
+    cardText += '┏━━━━━━━━━━━━━━━━━━━━━━━┓\n';
+    cardText += '┃  🎬 PNPtv! - Entertainment Hub  ┃\n';
+    cardText += '┗━━━━━━━━━━━━━━━━━━━━━━━┛';
 
-    // Send the card with inline keyboard to share
+    // Share keyboard
     const shareKeyboard = Markup.inlineKeyboard([
       [Markup.button.switchToChat(
-        t('shareProfileCard', lang),
+        t('shareProfileCard', lang) || '📤 Share Profile Card',
         cardText,
       )],
       [Markup.button.callback(t('back', lang), 'show_profile')],
     ]);
 
-    await ctx.editMessageText(cardText, shareKeyboard);
-    await ctx.answerCbQuery(t('profileShared', lang));
+    // Check if user has a profile photo
+    if (user.photoFileId) {
+      // Send with photo
+      await ctx.replyWithPhoto(user.photoFileId, {
+        caption: cardText,
+        parse_mode: 'HTML',
+        ...shareKeyboard,
+      });
+    } else {
+      // Send without photo (text only)
+      await ctx.reply(cardText, {
+        parse_mode: 'HTML',
+        ...shareKeyboard,
+      });
+    }
   } catch (error) {
     logger.error('Error sharing profile:', error);
     const lang = ctx.session?.language || 'en';

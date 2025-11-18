@@ -17,6 +17,7 @@ const registerPaymentHandlers = (bot) => {
   // Show subscription plans
   bot.action('show_subscription_plans', async (ctx) => {
     try {
+      await ctx.answerCbQuery();
       const lang = getLanguage(ctx);
       const plans = await PlanModel.getAll();
 
