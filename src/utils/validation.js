@@ -120,6 +120,21 @@ const schemas = {
     language: Joi.string().valid('en', 'es').default('en'),
   }),
 
+  // User profile update schema (for partial updates)
+  userProfileUpdate: Joi.object({
+    userId: Joi.number().integer().positive().optional(),
+    username: Joi.string().min(3).max(30).pattern(/^[a-zA-Z0-9_-]+$/)
+      .optional(),
+    firstName: Joi.string().min(1).max(50).optional(),
+    lastName: Joi.string().min(1).max(50).optional(),
+    email: Joi.string().email().optional(),
+    age: Joi.number().integer().min(18).max(120).optional(),
+    bio: Joi.string().max(500).optional().allow(''),
+    interests: Joi.array().items(Joi.string().max(50)).max(10).optional(),
+    photoFileId: Joi.string().optional(),
+    language: Joi.string().valid('en', 'es').optional(),
+  }).min(1),
+
   // Location schema
   location: Joi.object({
     lat: Joi.number().min(-90).max(90).required(),

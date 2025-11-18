@@ -53,13 +53,14 @@ class UserService {
       // Sanitize inputs
       const sanitized = sanitizeObject(updates, ['bio', 'username']);
 
-      // Validate
+      // Validate using the partial update schema
       const { error, value } = validateSchema(
-        { userId: parseInt(userId, 10), ...sanitized },
-        schemas.userProfile,
+        sanitized,
+        schemas.userProfileUpdate,
       );
 
       if (error) {
+        logger.warn('Profile update validation failed:', error);
         return { success: false, error, data: null };
       }
 

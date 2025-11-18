@@ -30,6 +30,21 @@ const registerOnboardingHandlers = (bot) => {
         return;
       }
 
+      // Check for deep link parameters
+      const startParam = ctx.message?.text?.split(' ')[1];
+      if (startParam && startParam.startsWith('viewprofile_')) {
+        const targetUserId = startParam.replace('viewprofile_', '');
+        // Import profile handler and show the profile
+        const UserModel = require('../../../models/userModel');
+        const targetUser = await UserModel.getById(targetUserId);
+
+        if (targetUser) {
+          const { showProfile } = require('./profile');
+          await showProfile(ctx, targetUserId, false, targetUserId === ctx.from.id.toString());
+          return;
+        }
+      }
+
       if (user.onboardingComplete) {
         // User already onboarded, show main menu
         return ctx.scene?.enter ? ctx.scene.enter('main_menu') : showMainMenu(ctx);

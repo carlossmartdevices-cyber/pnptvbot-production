@@ -107,6 +107,15 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
+  // Share profile
+  bot.action('share_profile', async (ctx) => {
+    try {
+      await shareProfile(ctx);
+    } catch (error) {
+      logger.error('Error sharing profile:', error);
+    }
+  });
+
   // Edit profile actions
   bot.action('edit_photo', async (ctx) => {
     try {
@@ -470,6 +479,9 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
         Markup.button.callback(t('privacySettings', lang), 'privacy_settings'),
       ]);
       keyboard.push([
+        Markup.button.callback(t('shareProfile', lang), 'share_profile'),
+      ]);
+      keyboard.push([
         Markup.button.callback(t('myFavorites', lang), 'show_favorites'),
         Markup.button.callback(t('blockedUsers', lang), 'show_blocked'),
       ]);
@@ -714,4 +726,97 @@ const unblockUser = async (ctx, targetUserId) => {
   }
 };
 
+/**
+ * Share profile - Generate Member Card
+ */
+const shareProfile = async (ctx) => {
+  try {
+    const lang = getLanguage(ctx);
+    const user = await UserModel.getById(ctx.from.id);
+
+    if (!user) {
+      await ctx.reply(t('error', lang));
+      return;
+    }
+
+    // Build Member Card text
+    let cardText = '╔═══════════════════════╗\n';
+    cardText += '          💎 MEMBER CARD 💎\n';
+    cardText += '╚═══════════════════════╝\n\n';
+
+    // Badges
+    if (user.badges && user.badges.length > 0) {
+      const badgeList = user.badges.map((badge) => {
+        if (typeof badge === 'string') {
+          const badgeKey = `badges.${badge}`;
+          return t(badgeKey, lang);
+        }
+        if (typeof badge === 'object' && badge.icon && badge.name) {
+          return `${badge.icon} ${badge.name}`;
+        }
+        return '';
+      }).filter(Boolean).join(' ');
+      cardText += `${badgeList}\n`;
+    }
+
+    // Basic info
+    cardText += `\n👤 ${user.firstName || 'User'} ${user.lastName || ''}\n`;
+    if (user.username) cardText += `@${user.username}\n`;
+
+    // Bio
+    if (user.bio) {
+      cardText += `\n📝 ${user.bio}\n`;
+    }
+
+    // Interests
+    if (user.interests && user.interests.length > 0) {
+      cardText += `\n🎯 ${user.interests.join(', ')}\n`;
+    }
+
+    // Subscription status
+    if (user.subscriptionStatus === 'active' && user.planExpiry) {
+      try {
+        let expiry;
+        if (user.planExpiry.toDate && typeof user.planExpiry.toDate === 'function') {
+          expiry = user.planExpiry.toDate();
+        } else if (user.planExpiry._seconds) {
+          expiry = new Date(user.planExpiry._seconds * 1000);
+        } else {
+          expiry = new Date(user.planExpiry);
+        }
+
+        if (expiry && !isNaN(expiry.getTime())) {
+          cardText += `\n💎 PRIME ${t('subscriptionActive', lang, { expiry: moment(expiry).format('MMM DD, YYYY') })}\n`;
+        }
+      } catch (error) {
+        logger.warn('Error parsing planExpiry in share:', error);
+      }
+    }
+
+    // Profile link (deep link to view profile)
+    cardText += `\n🔗 https://t.me/${ctx.botInfo.username}?start=viewprofile_${ctx.from.id}\n`;
+
+    cardText += '\n╔═══════════════════════╗\n';
+    cardText += '    PNPtv - Entertainment Hub\n';
+    cardText += '╚═══════════════════════╝';
+
+    // Send the card with inline keyboard to share
+    const shareKeyboard = Markup.inlineKeyboard([
+      [Markup.button.switchToChat(
+        t('shareProfileCard', lang),
+        cardText,
+      )],
+      [Markup.button.callback(t('back', lang), 'show_profile')],
+    ]);
+
+    await ctx.editMessageText(cardText, shareKeyboard);
+    await ctx.answerCbQuery(t('profileShared', lang));
+  } catch (error) {
+    logger.error('Error sharing profile:', error);
+    const lang = ctx.session?.language || 'en';
+    await ctx.reply(t('error', lang));
+  }
+};
+
 module.exports = registerProfileHandlers;
+module.exports.showProfile = showProfile;
