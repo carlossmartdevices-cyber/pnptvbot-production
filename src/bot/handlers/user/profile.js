@@ -138,11 +138,15 @@ const registerProfileHandlers = (bot) => {
       ctx.session.temp.waitingForLocation = true;
       await ctx.saveSession();
 
-      await ctx.editMessageText(
+      await ctx.answerCbQuery();
+
+      // Send new message with location request keyboard
+      await ctx.reply(
         t('sendLocation', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('back', lang), 'show_profile')],
-        ]),
+        Markup.keyboard([
+          [Markup.button.locationRequest(lang === 'es' ? '📍 Compartir Ubicación' : '📍 Share Location')],
+          [lang === 'es' ? '❌ Cancelar' : '❌ Cancel'],
+        ]).resize(),
       );
     } catch (error) {
       logger.error('Error in edit location:', error);
@@ -197,13 +201,13 @@ const registerProfileHandlers = (bot) => {
   // Handle location
   bot.on('location', async (ctx, next) => {
     if (ctx.session.temp?.waitingForLocation) {
-      try {
-        const lang = getLanguage(ctx);
+      const lang = getLanguage(ctx);
 
+      try {
         // Validate location exists
         if (!ctx.message?.location || !ctx.message.location.latitude || !ctx.message.location.longitude) {
           logger.warn('Location handler triggered but no valid location found');
-          await ctx.reply(t('invalidInput', lang));
+          await ctx.reply(t('invalidInput', lang), Markup.removeKeyboard());
           return;
         }
 
@@ -218,13 +222,14 @@ const registerProfileHandlers = (bot) => {
         await ctx.saveSession();
 
         if (result.success) {
-          await ctx.reply(t('locationUpdated', lang));
+          await ctx.reply(t('locationUpdated', lang), Markup.removeKeyboard());
           await showProfile(ctx, ctx.from.id, false, true);
         } else {
-          await ctx.reply(t('error', lang));
+          await ctx.reply(t('error', lang), Markup.removeKeyboard());
         }
       } catch (error) {
         logger.error('Error updating location:', error);
+        await ctx.reply(t('error', lang), Markup.removeKeyboard());
       }
       return;
     }
@@ -232,9 +237,24 @@ const registerProfileHandlers = (bot) => {
     return next();
   });
 
-  // Handle text inputs (bio, interests)
+  // Handle text inputs (bio, interests, cancel)
   bot.on('text', async (ctx, next) => {
     const { temp } = ctx.session;
+
+    // Handle cancel for location
+    if (temp?.waitingForLocation && (ctx.message.text === '❌ Cancelar' || ctx.message.text === '❌ Cancel')) {
+      try {
+        const lang = getLanguage(ctx);
+        ctx.session.temp.waitingForLocation = false;
+        await ctx.saveSession();
+
+        await ctx.reply(t('operationCancelled', lang) || 'Operation cancelled', Markup.removeKeyboard());
+        await showProfile(ctx, ctx.from.id, false, true);
+      } catch (error) {
+        logger.error('Error cancelling location update:', error);
+      }
+      return;
+    }
 
     if (temp?.waitingForBio) {
       try {
@@ -252,6 +272,10 @@ const registerProfileHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(t('bioUpdated', lang));
+
+        // Small delay to ensure DB update is complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         await showProfile(ctx, ctx.from.id, false, true);
       } catch (error) {
         logger.error('Error updating bio:', error);
@@ -286,6 +310,10 @@ const registerProfileHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(t('interestsUpdated', lang));
+
+        // Small delay to ensure DB update is complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         await showProfile(ctx, ctx.from.id, false, true);
       } catch (error) {
         logger.error('Error updating interests:', error);
@@ -373,8 +401,27 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
 
     // Subscription info
     if (targetUser.subscriptionStatus === 'active' && targetUser.planExpiry) {
-      const expiry = targetUser.planExpiry.toDate ? targetUser.planExpiry.toDate() : new Date(targetUser.planExpiry);
-      profileText += `\n💎 PRIME: ${t('subscriptionActive', lang, { expiry: moment(expiry).format('MMM DD, YYYY') })}\n`;
+      try {
+        let expiry;
+        if (targetUser.planExpiry.toDate && typeof targetUser.planExpiry.toDate === 'function') {
+          expiry = targetUser.planExpiry.toDate();
+        } else if (targetUser.planExpiry._seconds) {
+          expiry = new Date(targetUser.planExpiry._seconds * 1000);
+        } else {
+          expiry = new Date(targetUser.planExpiry);
+        }
+
+        if (expiry && !isNaN(expiry.getTime())) {
+          profileText += `\n💎 PRIME: ${t('subscriptionActive', lang, { expiry: moment(expiry).format('MMM DD, YYYY') })}\n`;
+        } else if (isOwnProfile) {
+          profileText += '\n⭐ Free Plan\n';
+        }
+      } catch (error) {
+        logger.warn('Error parsing planExpiry date:', error);
+        if (isOwnProfile) {
+          profileText += '\n⭐ Free Plan\n';
+        }
+      }
     } else if (isOwnProfile) {
       profileText += '\n⭐ Free Plan\n';
     }
@@ -384,15 +431,25 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
       const views = targetUser.profileViews || 0;
       profileText += `\n${t('profileViews', lang, { views })}\n`;
 
+      // Parse createdAt date
       let createdAtDate;
-      if (targetUser.createdAt) {
-        if (typeof targetUser.createdAt === 'object' && typeof targetUser.createdAt.toDate === 'function') {
-          createdAtDate = targetUser.createdAt.toDate();
-        } else if (typeof targetUser.createdAt === 'string' || typeof targetUser.createdAt === 'number') {
-          createdAtDate = new Date(targetUser.createdAt);
+      try {
+        if (targetUser.createdAt) {
+          if (typeof targetUser.createdAt === 'object' && typeof targetUser.createdAt.toDate === 'function') {
+            createdAtDate = targetUser.createdAt.toDate();
+          } else if (targetUser.createdAt._seconds) {
+            createdAtDate = new Date(targetUser.createdAt._seconds * 1000);
+          } else if (typeof targetUser.createdAt === 'string' || typeof targetUser.createdAt === 'number') {
+            createdAtDate = new Date(targetUser.createdAt);
+          }
         }
+      } catch (error) {
+        logger.warn('Error parsing createdAt date:', error);
       }
-      const validDate = createdAtDate && !isNaN(createdAtDate.getTime()) ? moment(createdAtDate).format('MMM DD, YYYY') : '-';
+
+      const validDate = createdAtDate && !isNaN(createdAtDate.getTime())
+        ? moment(createdAtDate).format('MMM DD, YYYY')
+        : 'Recently';
       profileText += `${t('memberSince', lang, { date: validDate })}\n`;
     }
 

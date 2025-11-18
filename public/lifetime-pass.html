@@ -402,12 +402,7 @@
         </div>
     </div>
 
-    <script src="/firebase-config.js"></script>
     <script>
-        let paymentUrls = [];
-        let db;
-        let currentLang = 'es';
-
         // Meru payment links - randomizer will select one
         const meruPaymentLinks = [
             'https://pay.getmeru.com/CtJb_x',
@@ -429,114 +424,8 @@
             window.open(selectedLink, '_blank');
         }
 
-        // Initialize Firebase
-        function initFirebase() {
-            try {
-                if (typeof firebaseConfig === 'undefined') {
-                    console.error('Firebase config not loaded');
-                    showError();
-                    return;
-                }
-
-                firebase.initializeApp(firebaseConfig);
-                db = firebase.firestore();
-                loadPaymentLinks();
-            } catch (error) {
-                console.error('Firebase initialization error:', error);
-                showError();
-            }
-        }
-
-        // Load payment links from Firestore
-        async function loadPaymentLinks() {
-            try {
-                const querySnapshot = await db.collection("paymentLinks")
-                    .where("used", "==", false)
-                    .where("product", "==", "lifetime-pass")
-                    .limit(10)
-                    .get();
-
-                paymentUrls = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-
-                hideLoading();
-                renderPaymentLinks(currentLang);
-            } catch (error) {
-                console.error('Error loading payment links:', error);
-                hideLoading();
-                showNoLinks();
-            }
-        }
-
-        // Render payment links
-        function renderPaymentLinks(lang) {
-            const containerId = lang === 'es' ? 'paymentLinks' : 'paymentLinksEn';
-            const container = document.getElementById(containerId);
-
-            if (!container) return;
-
-            container.innerHTML = '';
-
-            if (paymentUrls.length === 0) {
-                showNoLinks(lang);
-                return;
-            }
-
-            paymentUrls.forEach((urlData, index) => {
-                const linkElement = document.createElement('a');
-                linkElement.href = urlData.url;
-                linkElement.className = 'payment-link';
-                linkElement.target = '_blank';
-                linkElement.rel = 'noopener noreferrer';
-
-                const linkText = lang === 'es'
-                    ? `💳 Pagar Ahora ${index + 1}`
-                    : `💳 Pay Now ${index + 1}`;
-
-                linkElement.textContent = linkText;
-
-                linkElement.onclick = async function(e) {
-                    if (this.classList.contains('used')) {
-                        e.preventDefault();
-                        const msg = lang === 'es'
-                            ? 'Este enlace ya ha sido utilizado.'
-                            : 'This link has already been used.';
-                        alert(msg);
-                        return false;
-                    }
-
-                    // Mark as used in Firestore
-                    try {
-                        await db.collection("paymentLinks").doc(urlData.id).update({
-                            used: true,
-                            usedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        this.classList.add('used');
-
-                        // Remove from available links
-                        paymentUrls = paymentUrls.filter(url => url.id !== urlData.id);
-
-                        // Reload if no links left
-                        if (paymentUrls.length === 0) {
-                            setTimeout(() => {
-                                showNoLinks(lang);
-                            }, 1000);
-                        }
-                    } catch (error) {
-                        console.error('Error marking link as used:', error);
-                    }
-                };
-
-                container.appendChild(linkElement);
-            });
-        }
-
         // Show language
         function showLanguage(lang) {
-            currentLang = lang;
-
             // Update language sections
             document.querySelectorAll('.language').forEach(el => el.classList.remove('active'));
             document.getElementById(lang).classList.add('active');
@@ -544,41 +433,6 @@
             // Update buttons
             document.querySelectorAll('.language-selector button').forEach(btn => btn.classList.remove('active'));
             document.getElementById('btn-' + lang).classList.add('active');
-
-            // Render payment links for selected language
-            renderPaymentLinks(lang);
-        }
-
-        // Hide loading
-        function hideLoading() {
-            document.getElementById('loading-es').style.display = 'none';
-            document.getElementById('loading-en').style.display = 'none';
-        }
-
-        // Show no links message
-        function showNoLinks(lang) {
-            const langToUse = lang || currentLang;
-            hideLoading();
-            document.getElementById('no-links-' + langToUse).style.display = 'block';
-        }
-
-        // Show error
-        function showError() {
-            hideLoading();
-            const containers = ['paymentLinks', 'paymentLinksEn'];
-            containers.forEach(id => {
-                const container = document.getElementById(id);
-                if (container) {
-                    container.innerHTML = '<div class="no-links-message">Error loading payment options. Please refresh the page.</div>';
-                }
-            });
-        }
-
-        // Initialize on page load
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initFirebase);
-        } else {
-            initFirebase();
         }
     </script>
 </body>

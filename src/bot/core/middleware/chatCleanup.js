@@ -10,28 +10,44 @@ const logger = require('../../../utils/logger');
  *
  * User regular messages are NOT deleted
  *
+ * Also provides immediate cleanup of previous bot messages on new interactions
+ *
  * @param {number} delay - Delay in milliseconds (default: 5 minutes)
  * @returns {Function} Middleware function
  */
 const chatCleanupMiddleware = (delay = 5 * 60 * 1000) => async (ctx, next) => {
   const chatType = ctx.chat?.type;
-
-  // Only apply to groups and supergroups
-  if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
-    return next();
-  }
+  const chatId = ctx.chat?.id;
 
   try {
-    // Handle incoming messages
-    if (ctx.message) {
+    // Delete previous bot messages on new user interaction (for private chats)
+    // This keeps the chat clean by removing previous bot responses
+    if (chatType === 'private' && chatId) {
+      // Delete on new message or callback query
+      if (ctx.message || ctx.callbackQuery) {
+        try {
+          await ChatCleanupService.deleteAllPreviousBotMessages(ctx.telegram, chatId);
+          logger.debug('Previous bot messages deleted on new interaction', {
+            chatId,
+            type: ctx.message ? 'message' : 'callback_query',
+          });
+        } catch (error) {
+          logger.error('Error deleting previous bot messages:', error);
+          // Don't block the flow
+        }
+      }
+    }
+
+    // Handle incoming messages (groups and supergroups)
+    if ((chatType === 'group' || chatType === 'supergroup') && ctx.message) {
       await handleIncomingMessage(ctx, delay);
     }
 
     // Continue with the rest of the middleware chain
     await next();
 
-    // Handle outgoing bot messages (replies)
-    await handleOutgoingMessages(ctx, delay);
+    // Handle outgoing bot messages (all chat types)
+    await handleOutgoingMessages(ctx, delay, chatType);
   } catch (error) {
     logger.error('Chat cleanup middleware error:', error);
     // Don't block the message flow
@@ -80,9 +96,10 @@ async function handleIncomingMessage(ctx, delay) {
 /**
  * Handle outgoing messages (bot replies)
  * Intercepts ctx.reply, ctx.replyWithMarkdown, etc.
- * ALL bot messages in groups are auto-deleted unless marked as broadcast
+ * - In groups: auto-delete messages after delay unless marked as broadcast
+ * - In private chats: track messages for immediate cleanup on next interaction
  */
-async function handleOutgoingMessages(ctx, delay) {
+async function handleOutgoingMessages(ctx, delay, chatType) {
   // Store original reply methods
   const originalReply = ctx.reply;
   const originalReplyWithMarkdown = ctx.replyWithMarkdown;
@@ -96,6 +113,7 @@ async function handleOutgoingMessages(ctx, delay) {
   const originalReplyWithVoice = ctx.replyWithVoice;
   const originalReplyWithVideoNote = ctx.replyWithVideoNote;
   const originalReplyWithLocation = ctx.replyWithLocation;
+  const originalEditMessageText = ctx.editMessageText;
 
   /**
    * Helper to wrap reply methods
@@ -105,20 +123,56 @@ async function handleOutgoingMessages(ctx, delay) {
     const sentMessage = await originalMethod.apply(this, args);
 
     if (sentMessage) {
+      const chatId = ctx.chat?.id;
+      const messageId = sentMessage.message_id;
+
       // Check if last argument has broadcast flag
       const lastArg = args[args.length - 1];
       const isBroadcast = lastArg && typeof lastArg === 'object' && lastArg.broadcast === true;
 
-      ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, delay, isBroadcast);
+      // In private chats, track messages for immediate cleanup
+      if (chatType === 'private' && chatId && messageId) {
+        ChatCleanupService.trackBotMessage(chatId, messageId);
+        logger.debug(`Bot message tracked (${methodName})`, {
+          chatId,
+          messageId,
+        });
+      }
 
-      logger.debug(`Bot message scheduled for deletion (${methodName})`, {
-        chatId: ctx.chat.id,
-        messageId: sentMessage.message_id,
-        isBroadcast,
-      });
+      // In groups, schedule for delayed deletion
+      if (chatType === 'group' || chatType === 'supergroup') {
+        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, delay, isBroadcast);
+        logger.debug(`Bot message scheduled for deletion (${methodName})`, {
+          chatId,
+          messageId,
+          isBroadcast,
+        });
+      }
     }
 
     return sentMessage;
+  };
+
+  /**
+   * Special wrapper for editMessageText
+   * Also tracks edited messages in private chats
+   */
+  const wrapEditMethod = (originalMethod) => async function (...args) {
+    const result = await originalMethod.apply(this, args);
+
+    // Track edited messages in private chats
+    if (chatType === 'private' && result && result.message_id) {
+      const chatId = ctx.chat?.id;
+      if (chatId) {
+        ChatCleanupService.trackBotMessage(chatId, result.message_id);
+        logger.debug('Edited message tracked', {
+          chatId,
+          messageId: result.message_id,
+        });
+      }
+    }
+
+    return result;
   };
 
   // Wrap all reply methods
@@ -134,6 +188,7 @@ async function handleOutgoingMessages(ctx, delay) {
   ctx.replyWithVoice = wrapReplyMethod(originalReplyWithVoice, 'replyWithVoice');
   ctx.replyWithVideoNote = wrapReplyMethod(originalReplyWithVideoNote, 'replyWithVideoNote');
   ctx.replyWithLocation = wrapReplyMethod(originalReplyWithLocation, 'replyWithLocation');
+  ctx.editMessageText = wrapEditMethod(originalEditMessageText);
 }
 
 /**

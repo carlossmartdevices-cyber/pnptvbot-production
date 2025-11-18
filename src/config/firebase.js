@@ -1,12 +1,40 @@
 
-const { Firestore } = require('@google-cloud/firestore');
-let firestoreInstance;
-function getFirestore() {
-  if (!firestoreInstance) {
-    firestoreInstance = new Firestore();
+
+const admin = require('firebase-admin');
+const logger = require('../utils/logger');
+
+let db = null;
+
+function initializeFirebase() {
+  if (db) return db;
+  try {
+    const serviceAccount = {
+      type: 'service_account',
+      project_id: process.env.FIREBASE_PROJECT_ID,
+      private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      client_email: process.env.FIREBASE_CLIENT_EMAIL,
+    };
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      databaseURL: process.env.FIREBASE_DATABASE_URL,
+    });
+    db = admin.firestore();
+    db.settings({ ignoreUndefinedProperties: true });
+    logger.info('Firebase initialized successfully');
+    return db;
+  } catch (error) {
+    logger.error('Failed to initialize Firebase:', error);
+    throw error;
   }
-  return firestoreInstance;
 }
+
+function getFirestore() {
+  if (!db) {
+    return initializeFirebase();
+  }
+  return db;
+}
+
 
 class PaymentModel {
   static async createPayment({ userId, planId, provider, sku, amount, status = 'pending', invoiceId = null }) {
@@ -58,6 +86,7 @@ class PaymentModel {
     return { total, count: payments.length, average: total / payments.length };
   }
 }
+
 
 module.exports = {
   getFirestore,
