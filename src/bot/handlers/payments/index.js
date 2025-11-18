@@ -47,12 +47,15 @@ const registerPaymentHandlers = (bot) => {
       await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
     } catch (error) {
       logger.error('Error showing subscription plans:', error);
+      await ctx.answerCbQuery('Error loading plans. Please try again.').catch(() => {});
     }
   });
 
   // Select plan
   bot.action(/^select_plan_(.+)$/, async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+
       // Validate match result exists
       if (!ctx.match || !ctx.match[1]) {
         logger.error('Invalid plan selection action format');
@@ -61,6 +64,8 @@ const registerPaymentHandlers = (bot) => {
 
       const planId = ctx.match[1];
       const lang = getLanguage(ctx);
+
+      logger.info('Plan selected', { planId, userId: ctx.from?.id });
 
       ctx.session.temp.selectedPlan = planId;
       await ctx.saveSession();
@@ -75,12 +80,15 @@ const registerPaymentHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error selecting plan:', error);
+      await ctx.answerCbQuery('Error selecting plan. Please try again.').catch(() => {});
     }
   });
 
   // Pay with ePayco
   bot.action(/^pay_epayco_(.+)$/, async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+
       // Validate match result exists
       if (!ctx.match || !ctx.match[1]) {
         logger.error('Invalid ePayco payment action format');
@@ -98,6 +106,8 @@ const registerPaymentHandlers = (bot) => {
       }
 
       const userId = ctx.from.id;
+
+      logger.info('Creating ePayco payment', { planId, userId });
 
       await ctx.editMessageText(t('loading', lang));
 
@@ -131,6 +141,8 @@ const registerPaymentHandlers = (bot) => {
   // Pay with Daimo
   bot.action(/^pay_daimo_(.+)$/, async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+
       // Validate match result exists
       if (!ctx.match || !ctx.match[1]) {
         logger.error('Invalid Daimo payment action format');
@@ -149,6 +161,8 @@ const registerPaymentHandlers = (bot) => {
 
       const userId = ctx.from.id;
       const chatId = ctx.chat?.id;
+
+      logger.info('Creating Daimo payment', { planId, userId });
 
       await ctx.editMessageText(t('loading', lang));
 
