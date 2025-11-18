@@ -61,6 +61,7 @@
     "node-cron": "^3.0.3",
     "node-geocoder": "^4.3.0",
     "openai": "^4.24.7",
+    "pdfkit": "^0.17.2",
     "qrcode": "^1.5.3",
     "rate-limiter-flexible": "^5.0.0",
     "redis": "^4.6.12",

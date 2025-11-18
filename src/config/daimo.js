@@ -33,11 +33,13 @@ const getDaimoConfig = () => {
 
   // Validate critical configuration
   if (!treasuryAddress) {
+    // Nunca loggear el valor de la dirección
     logger.error('DAIMO_TREASURY_ADDRESS not configured');
     throw new Error('DAIMO_TREASURY_ADDRESS is required for Daimo Pay');
   }
 
   if (!refundAddress) {
+    // Nunca loggear el valor de la dirección
     logger.warn('DAIMO_REFUND_ADDRESS not configured, using treasury address as fallback');
   }
 

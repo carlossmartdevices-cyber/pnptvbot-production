@@ -334,13 +334,21 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
     // Build profile text
     let profileText = isOwnProfile ? `${t('profileTitle', lang)}\n\n` : '👤 User Profile\n\n';
 
-    // Badges
+    // Badges (objeto-objeto, mostrar emoji y nombre)
     if (targetUser.badges && targetUser.badges.length > 0) {
-      const badgeEmojis = targetUser.badges.map((badge) => {
-        const badgeKey = `badges.${badge}`;
-        return t(badgeKey, lang);
-      }).join(' ');
-      profileText += `${badgeEmojis}\n`;
+      const badgeList = targetUser.badges.map((badge) => {
+        // Si es badge estándar
+        if (typeof badge === 'string') {
+          const badgeKey = `badges.${badge}`;
+          return t(badgeKey, lang);
+        }
+        // Si es badge personalizado (objeto)
+        if (typeof badge === 'object' && badge.icon && badge.name) {
+          return `${badge.icon} ${badge.name}`;
+        }
+        return '';
+      }).filter(Boolean).join(' ');
+      profileText += `${badgeList}\n`;
     }
 
     // Basic info
@@ -376,8 +384,16 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
       const views = targetUser.profileViews || 0;
       profileText += `\n${t('profileViews', lang, { views })}\n`;
 
-      const createdAt = targetUser.createdAt?.toDate ? targetUser.createdAt.toDate() : new Date(targetUser.createdAt);
-      profileText += `${t('memberSince', lang, { date: moment(createdAt).format('MMM DD, YYYY') })}\n`;
+      let createdAtDate;
+      if (targetUser.createdAt) {
+        if (typeof targetUser.createdAt === 'object' && typeof targetUser.createdAt.toDate === 'function') {
+          createdAtDate = targetUser.createdAt.toDate();
+        } else if (typeof targetUser.createdAt === 'string' || typeof targetUser.createdAt === 'number') {
+          createdAtDate = new Date(targetUser.createdAt);
+        }
+      }
+      const validDate = createdAtDate && !isNaN(createdAtDate.getTime()) ? moment(createdAtDate).format('MMM DD, YYYY') : '-';
+      profileText += `${t('memberSince', lang, { date: validDate })}\n`;
     }
 
     // Build keyboard

@@ -268,6 +268,13 @@ const completeOnboarding = async (ctx) => {
 
     await ctx.reply(t('onboardingComplete', lang));
 
+    // Mensaje de confirmación con link al canal
+    await ctx.reply(
+      lang === 'es'
+        ? '✅ Registro completado. ¡Bienvenido! Únete a la comunidad aquí: https://t.me/pnptv_community'
+        : '✅ Registration complete. Welcome! Join the community here: https://t.me/pnptv_community'
+    );
+
     // Show main menu
     await showMainMenu(ctx);
   } catch (error) {
