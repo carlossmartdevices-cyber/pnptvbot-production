@@ -127,10 +127,13 @@ const showMainMenu = async (ctx) => {
       ],
       [
         Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-        Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
+        Markup.button.callback(t('playerMenu', lang), 'show_player'),
       ],
       [
+        Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
         Markup.button.callback(t('support', lang), 'show_support'),
+      ],
+      [
         Markup.button.callback(t('settings', lang), 'show_settings'),
       ],
     ]),
@@ -201,10 +204,13 @@ const showMainMenuEdit = async (ctx) => {
         ],
         [
           Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-          Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
+          Markup.button.callback(t('playerMenu', lang), 'show_player'),
         ],
         [
+          Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
           Markup.button.callback(t('support', lang), 'show_support'),
+        ],
+        [
           Markup.button.callback(t('settings', lang), 'show_settings'),
         ],
       ]),
