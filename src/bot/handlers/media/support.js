@@ -785,6 +785,125 @@ const registerSupportHandlers = (bot) => {
     }
   });
 
+  // Cristina command - Direct AI chat
+  bot.command('cristina', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+
+      // Check if Mistral AI is available
+      if (!mistral) {
+        await ctx.reply(
+          lang === 'es'
+            ? '❌ El chat de IA no está disponible en este momento.'
+            : '❌ AI chat is not available at the moment.',
+        );
+        return;
+      }
+
+      // Get text after command
+      const commandText = ctx.message.text;
+      const question = commandText.replace('/cristina', '').trim();
+
+      // If no question, just greet
+      if (!question) {
+        const greeting = lang === 'es'
+          ? '💬 ¡Hola papi! Soy PNPtv! AI\n\n'
+            + 'Pregúntame lo que quieras sobre reducción de daños, salud sexual, recursos comunitarios, o lo que necesites.\n\n'
+            + 'Ejemplo: `/cristina es bueno tomar entre semana?`'
+          : '💬 Hi! I\'m PNPtv! AI\n\n'
+            + 'Ask me anything about harm reduction, sexual health, community resources, or whatever you need.\n\n'
+            + 'Example: `/cristina is it ok to party during the week?`';
+
+        await ctx.reply(greeting, { parse_mode: 'Markdown' });
+        return;
+      }
+
+      // Show thinking indicator
+      const thinkingMsg = await ctx.reply(
+        lang === 'es' ? '🤔 Pensando...' : '🤔 Thinking...',
+      );
+
+      // Ensure agent is initialized
+      if (AGENT_ID === null && mistral) {
+        await initializeAgent();
+      }
+
+      // Prepare language prompt
+      const languagePrompt = lang === 'es'
+        ? 'Responde en español con tono cercano y empático.'
+        : 'Respond in English with a warm and empathetic tone.';
+
+      let aiResponse;
+
+      try {
+        // Use Agents API if configured, otherwise Chat Completions
+        if (AGENT_ID) {
+          const completion = await mistral.agents.complete({
+            agentId: AGENT_ID,
+            messages: [
+              {
+                role: 'user',
+                content: `${languagePrompt}\n\n${question}`,
+              },
+            ],
+          });
+
+          aiResponse = completion.choices?.[0]?.message?.content ||
+                      completion.message?.content ||
+                      (lang === 'es'
+                        ? 'Disculpa, no pude procesar tu pregunta. Intenta de nuevo.'
+                        : 'Sorry, I couldn\'t process your question. Try again.');
+        } else {
+          const completion = await mistral.chat.complete({
+            model: process.env.MISTRAL_MODEL || 'mistral-small-latest',
+            messages: [
+              {
+                role: 'system',
+                content: AGENT_INSTRUCTIONS + `\n\n${languagePrompt}`,
+              },
+              {
+                role: 'user',
+                content: question,
+              },
+            ],
+            maxTokens: parseInt(process.env.MISTRAL_MAX_TOKENS || '500', 10),
+            temperature: 0.7,
+          });
+
+          aiResponse = completion.choices[0].message.content;
+        }
+
+        // Delete thinking message
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id);
+        } catch (e) {
+          // Ignore
+        }
+
+        // Send response
+        await ctx.reply(aiResponse, { parse_mode: 'Markdown' });
+
+      } catch (aiError) {
+        logger.error('Mistral AI error in /cristina:', aiError);
+
+        // Delete thinking message
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id);
+        } catch (e) {
+          // Ignore
+        }
+
+        await ctx.reply(
+          lang === 'es'
+            ? '❌ Lo siento, encontré un error. Por favor intenta de nuevo.'
+            : '❌ Sorry, I encountered an error. Please try again.',
+        );
+      }
+    } catch (error) {
+      logger.error('Error in /cristina command:', error);
+    }
+  });
+
   // Request membership activation
   bot.action('support_request_activation', async (ctx) => {
     try {
