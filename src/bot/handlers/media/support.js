@@ -250,6 +250,7 @@ const registerSupportHandlers = (bot) => {
       // Initialize chat session
       ctx.session.temp.aiChatActive = true;
       ctx.session.temp.aiChatHistory = [];
+      ctx.session.temp.aiQuestionCount = 0; // Track questions asked
       await ctx.saveSession();
 
       await ctx.answerCbQuery();
@@ -357,6 +358,7 @@ const registerSupportHandlers = (bot) => {
         if (userMessage.startsWith('/') || userMessage.toLowerCase() === 'exit') {
           ctx.session.temp.aiChatActive = false;
           ctx.session.temp.aiChatHistory = null;
+          ctx.session.temp.aiQuestionCount = 0;
           await ctx.saveSession();
 
           // If it's a command other than /exit, pass it to the next handler
@@ -369,6 +371,33 @@ const registerSupportHandlers = (bot) => {
               ? '💬 Chat finalizado. Use /support para acceder al menú de soporte.'
               : '💬 Chat ended. Use /support to access support menu.',
             Markup.inlineKeyboard([
+              [Markup.button.callback(t('back', lang), 'show_support')],
+            ]),
+          );
+          return;
+        }
+
+        // Check question limit (3 questions max)
+        const questionCount = ctx.session.temp.aiQuestionCount || 0;
+
+        if (questionCount >= 3) {
+          ctx.session.temp.aiChatActive = false;
+          ctx.session.temp.aiChatHistory = null;
+          ctx.session.temp.aiQuestionCount = 0;
+          await ctx.saveSession();
+
+          const limitMessage = lang === 'es'
+            ? '💬 Has alcanzado el límite de preguntas con Cristina (3 preguntas).\n\n'
+              + 'Para continuar con tu consulta, por favor contacta con nuestro equipo humano:\n\n'
+              + '👉 Usa el botón "Contactar Admin" abajo para hablar con una persona real.'
+            : '💬 You\'ve reached the question limit with Cristina (3 questions).\n\n'
+              + 'To continue with your inquiry, please contact our human team:\n\n'
+              + '👉 Use the "Contact Admin" button below to talk with a real person.';
+
+          await ctx.reply(
+            limitMessage,
+            Markup.inlineKeyboard([
+              [Markup.button.callback(t('contactAdmin', lang), 'support_contact_admin')],
               [Markup.button.callback(t('back', lang), 'show_support')],
             ]),
           );
@@ -480,12 +509,30 @@ const registerSupportHandlers = (bot) => {
               // Ignore if deletion fails
             }
 
-            // Send AI response
-            const exitMessage = lang === 'es'
-              ? 'Escribe "exit" para finalizar el chat'
-              : 'Type "exit" to end chat';
+            // Increment question count
+            ctx.session.temp.aiQuestionCount = (ctx.session.temp.aiQuestionCount || 0) + 1;
+            await ctx.saveSession();
+
+            // Send AI response with appropriate footer
+            const questionsRemaining = 3 - ctx.session.temp.aiQuestionCount;
+            let footer;
+
+            if (questionsRemaining === 0) {
+              footer = lang === 'es'
+                ? '\n\n_Esta fue tu última pregunta. La próxima te conectaré con un humano._'
+                : '\n\n_This was your last question. Next time I\'ll connect you with a human._';
+            } else if (questionsRemaining === 1) {
+              footer = lang === 'es'
+                ? '\n\n_Te queda 1 pregunta más. Escribe "exit" para salir._'
+                : '\n\n_You have 1 question left. Type "exit" to exit._';
+            } else {
+              footer = lang === 'es'
+                ? `\n\n_Te quedan ${questionsRemaining} preguntas. Escribe "exit" para salir._`
+                : `\n\n_You have ${questionsRemaining} questions left. Type "exit" to exit._`;
+            }
+
             await ctx.reply(
-              `${aiResponse}\n\n_${exitMessage}_`,
+              `${aiResponse}${footer}`,
               { parse_mode: 'Markdown' }
             );
           } catch (aiError) {
@@ -804,17 +851,36 @@ const registerSupportHandlers = (bot) => {
       const commandText = ctx.message.text;
       const question = commandText.replace('/cristina', '').trim();
 
-      // If no question, just greet
+      // If no question, just greet and reset counter
       if (!question) {
+        ctx.session.temp.cristinaQuestionCount = 0;
+        await ctx.saveSession();
+
         const greeting = lang === 'es'
           ? '💬 ¡Hola papi! Soy Cristina\n\n'
             + 'Pregúntame lo que quieras sobre reducción de daños, salud sexual, recursos comunitarios, o lo que necesites.\n\n'
+            + 'Puedes hacerme hasta 3 preguntas. Después de eso, te conectaré con una persona real.\n\n'
             + 'Ejemplo: `/cristina es bueno tomar entre semana?`'
           : '💬 Hi! I\'m Cristina\n\n'
             + 'Ask me anything about harm reduction, sexual health, community resources, or whatever you need.\n\n'
+            + 'You can ask me up to 3 questions. After that, I\'ll connect you with a real person.\n\n'
             + 'Example: `/cristina is it ok to party during the week?`';
 
         await ctx.reply(greeting, { parse_mode: 'Markdown' });
+        return;
+      }
+
+      // Check question limit
+      const questionCount = ctx.session.temp.cristinaQuestionCount || 0;
+
+      if (questionCount >= 3) {
+        const limitMessage = lang === 'es'
+          ? '💬 Has alcanzado el límite de preguntas con Cristina (3 preguntas).\n\n'
+            + 'Para continuar con tu consulta, por favor usa /support y selecciona "Contactar Admin" para hablar con una persona real.'
+          : '💬 You\'ve reached the question limit with Cristina (3 questions).\n\n'
+            + 'To continue with your inquiry, please use /support and select "Contact Admin" to talk with a real person.';
+
+        await ctx.reply(limitMessage);
         return;
       }
 
@@ -880,8 +946,32 @@ const registerSupportHandlers = (bot) => {
           // Ignore
         }
 
-        // Send response
-        await ctx.reply(aiResponse, { parse_mode: 'Markdown' });
+        // Increment question count
+        ctx.session.temp.cristinaQuestionCount = (ctx.session.temp.cristinaQuestionCount || 0) + 1;
+        await ctx.saveSession();
+
+        // Send response with question counter
+        const questionsRemaining = 3 - ctx.session.temp.cristinaQuestionCount;
+        let footer;
+
+        if (questionsRemaining === 0) {
+          footer = lang === 'es'
+            ? '\n\n_Esta fue tu última pregunta. Para más ayuda, usa /support → Contactar Admin._'
+            : '\n\n_This was your last question. For more help, use /support → Contact Admin._';
+        } else if (questionsRemaining === 1) {
+          footer = lang === 'es'
+            ? '\n\n_Te queda 1 pregunta más._'
+            : '\n\n_You have 1 question left._';
+        } else {
+          footer = lang === 'es'
+            ? `\n\n_Te quedan ${questionsRemaining} preguntas._`
+            : `\n\n_You have ${questionsRemaining} questions left._`;
+        }
+
+        await ctx.reply(
+          `${aiResponse}${footer}`,
+          { parse_mode: 'Markdown' }
+        );
 
       } catch (aiError) {
         logger.error('Mistral AI error in /cristina:', aiError);
