@@ -332,14 +332,22 @@ const registerAdminHandlers = (bot) => {
       message += `✅ Activo: ${plan.active ? 'Sí' : 'No'}\n\n`;
 
       message += `📝 Características (EN):\n`;
-      plan.features.forEach((feature, index) => {
-        message += `  ${index + 1}. ${feature}\n`;
-      });
+      if (plan.features && Array.isArray(plan.features)) {
+        plan.features.forEach((feature, index) => {
+          message += `  ${index + 1}. ${feature}\n`;
+        });
+      } else {
+        message += `  (No features defined)\n`;
+      }
 
       message += `\n📝 Características (ES):\n`;
-      plan.featuresEs.forEach((feature, index) => {
-        message += `  ${index + 1}. ${feature}\n`;
-      });
+      if (plan.featuresEs && Array.isArray(plan.featuresEs)) {
+        plan.featuresEs.forEach((feature, index) => {
+          message += `  ${index + 1}. ${feature}\n`;
+        });
+      } else {
+        message += `  (No hay características definidas)\n`;
+      }
 
       await ctx.editMessageText(
         message,

@@ -1,6 +1,6 @@
 const pool = require('../config/postgres');
 const logger = require('../utils/logger');
-const { generateRoomCode } = require('../utils/helpers');
+const { generateRoomCode } = require('../bot/utils/helpers');
 
 /**
  * Zoom Room Model
