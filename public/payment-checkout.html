@@ -216,11 +216,18 @@
                         <span id="plan-icon">💎</span>
                         <span id="plan-name">Premium</span>
                     </div>
-                    <div id="plan-description" style="color: #666; font-size: 14px; margin: 10px 0;"></div>
-                    <div class="plan-price">
-                        <span class="currency">COP</span> $<span id="plan-price">0</span>
+                    <div style="color: #888; font-size: 13px; margin: 8px 0;">
+                        SKU: <span id="plan-sku">EASYBOTS-PNP-030</span>
                     </div>
-                    <ul class="plan-features" id="plan-features"></ul>
+                    <div style="color: #667eea; font-weight: 600; font-size: 15px; margin: 8px 0;">
+                        <span id="plan-duration">30</span> días - Acceso a PNPtv!
+                    </div>
+                    <div class="plan-price">
+                        USD $<span id="plan-price-usd">0</span>
+                    </div>
+                    <div style="color: #888; font-size: 14px; margin-top: 5px;">
+                        COP $<span id="plan-price-cop">0</span>
+                    </div>
                 </div>
 
                 <button type="button" class="pay-button" id="pay-button">
@@ -228,7 +235,7 @@
                 </button>
 
                 <div class="security-note">
-                    🔒 Pago seguro procesado por ePayco. Tus datos están protegidos.
+                    Será llevado al checkout y su pago será procesado en pesos colombianos. En su estado de cuenta se verá como cobro por parte de <strong>Easy Bots</strong>.
                 </div>
 
                 <div class="back-link">
@@ -282,19 +289,25 @@
             // Plan info
             document.getElementById('plan-icon').textContent = paymentData.plan.icon || '💎';
             document.getElementById('plan-name').textContent = paymentData.plan.name;
-            document.getElementById('plan-description').textContent = paymentData.plan.description || '';
-            document.getElementById('plan-price').textContent = formatNumber(paymentData.amountCOP);
+            document.getElementById('plan-sku').textContent = paymentData.plan.sku || 'EASYBOTS-PNP-030';
 
-            // Features
-            const featuresList = document.getElementById('plan-features');
-            featuresList.innerHTML = '';
-            if (paymentData.plan.features && paymentData.plan.features.length > 0) {
-                paymentData.plan.features.forEach(feature => {
-                    const li = document.createElement('li');
-                    li.textContent = feature;
-                    featuresList.appendChild(li);
-                });
+            // Duration text
+            const duration = paymentData.plan.duration;
+            let durationText;
+            if (duration >= 36500) {
+                durationText = 'Acceso de por vida';
+            } else if (duration === 7) {
+                durationText = '7 días';
+            } else if (duration === 30) {
+                durationText = '30 días';
+            } else {
+                durationText = duration + ' días';
             }
+            document.getElementById('plan-duration').textContent = durationText;
+
+            // Prices
+            document.getElementById('plan-price-usd').textContent = paymentData.amountUSD.toFixed(2);
+            document.getElementById('plan-price-cop').textContent = formatNumber(paymentData.amountCOP);
         }
 
         // Initialize ePayco Checkout
@@ -321,9 +334,9 @@
 
             // Prepare ePayco data
             const epaycoData = {
-                // Plan info
-                name: paymentData.plan.description,
-                description: paymentData.plan.description,
+                // Plan info - use SKU only, not plan name
+                name: paymentData.plan.sku,
+                description: paymentData.plan.sku,
                 invoice: paymentData.paymentRef,
                 currency: "cop",
                 amount: paymentData.amountCOP.toString(),

@@ -77,6 +77,7 @@ class PaymentController {
           amountCOP: priceInCOP,
           plan: {
             id: plan.id,
+            sku: plan.sku || 'EASYBOTS-PNP-030',
             name: plan.display_name || plan.name,
             description: `Suscripción ${plan.display_name || plan.name} - PNPtv`,
             icon: plan.icon || '💎',
