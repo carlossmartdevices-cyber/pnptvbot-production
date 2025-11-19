@@ -63,3 +63,6 @@ dump.rdb
 
 # Docker
 docker-compose.override.yml
+
+# Invoice PDFs (generated dynamically)
+invoices/*.pdf

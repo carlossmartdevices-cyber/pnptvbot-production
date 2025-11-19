@@ -666,6 +666,191 @@ class EmailService {
     }
 
     /**
+     * Send purchase invoice email (from easybots.store)
+     * @param {Object} data - Invoice data
+     * @returns {Promise<Object>} Send result
+     */
+    async sendPurchaseInvoice(data) {
+        const {
+            email,
+            name = 'Usuario',
+            invoiceBuffer,
+            invoiceFileName,
+            amount,
+            currency = 'USD'
+        } = data;
+
+        const html = this.getPurchaseInvoiceTemplate({
+            name,
+            amount,
+            currency
+        });
+
+        // Convert buffer to base64 for attachment
+        const attachments = [{
+            filename: invoiceFileName,
+            content: invoiceBuffer,
+            contentType: 'application/pdf'
+        }];
+
+        try {
+            // If no transporter, log email instead
+            if (!this.transporter) {
+                logger.info('Purchase invoice email would be sent (no transporter configured):', {
+                    to: email,
+                    subject: 'Gracias por tu compra - Factura adjunta',
+                    attachments: [invoiceFileName]
+                });
+                return { success: true, messageId: 'logged', mode: 'logging' };
+            }
+
+            const mailOptions = {
+                from: this.from,
+                to: email,
+                subject: 'Gracias por tu compra - Factura adjunta',
+                html,
+                text: this.stripHtml(html),
+                attachments
+            };
+
+            const info = await this.transporter.sendMail(mailOptions);
+            logger.info('Purchase invoice email sent successfully:', {
+                to: email,
+                messageId: info.messageId,
+                invoiceFileName
+            });
+
+            return {
+                success: true,
+                messageId: info.messageId,
+                mode: 'sent'
+            };
+        } catch (error) {
+            logger.error('Error sending purchase invoice email:', {
+                to: email,
+                error: error.message
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Get purchase invoice email template (simple thank you with PDF attached)
+     * @param {Object} data - Template data
+     * @returns {string} HTML template
+     */
+    getPurchaseInvoiceTemplate(data) {
+        const { name, amount, currency } = data;
+
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2D8CFF;
+        }
+        .success-icon {
+            text-align: center;
+            font-size: 64px;
+            margin: 20px 0;
+        }
+        .info-box {
+            background: #f0f8ff;
+            padding: 20px;
+            border-left: 4px solid #2D8CFF;
+            margin: 20px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 12px;
+        }
+        .attachment-notice {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🛒 Easy Bots Store</div>
+        </div>
+
+        <div class="success-icon">✅</div>
+
+        <h1 style="color: #2D8CFF; text-align: center;">¡Gracias por tu compra, ${name}!</h1>
+
+        <p style="text-align: center; font-size: 16px;">
+            Tu pago de <strong>${amount} ${currency}</strong> ha sido procesado exitosamente.
+        </p>
+
+        <div class="attachment-notice">
+            <p style="margin: 0;">
+                📄 <strong>Factura adjunta</strong><br>
+                Tu factura de compra está adjunta a este correo electrónico en formato PDF.
+            </p>
+        </div>
+
+        <div class="info-box">
+            <h3 style="margin-top: 0;">🤖 Servicios de Inteligencia Artificial</h3>
+            <p>
+                Has adquirido servicios profesionales de desarrollo y mantenimiento de bots automatizados
+                y herramientas de IA para gestión empresarial.
+            </p>
+        </div>
+
+        <p style="text-align: center; margin-top: 30px;">
+            Gracias por confiar en <strong>Easy Bots Store</strong>
+        </p>
+
+        <div class="footer">
+            <p><strong>Easy Bots Store</strong></p>
+            <p>KR33 86-76 Bucaramanga, Colombia</p>
+            <p>Email: <a href="mailto:no-reply@easybots.store">no-reply@easybots.store</a> | Tel: +57 302 857 3797</p>
+            <p style="margin-top: 15px; font-size: 10px;">
+                Carlos Humberto Jimenez Manrique - NIT 1098643746-2
+            </p>
+            <p style="margin-top: 10px; font-size: 11px;">
+                © ${new Date().getFullYear()} Easy Bots Store. Todos los derechos reservados.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+    }
+
+    /**
      * Get payment confirmation email template
      * @param {Object} data - Template data
      * @returns {string} HTML template

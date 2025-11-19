@@ -186,7 +186,7 @@ class PaymentService {
                 disable_web_page_preview: false
               });
 
-              // Send payment confirmation email
+              // Send payment confirmation email (PNPtv subscription details)
               try {
                 const EmailService = require('../../../services/emailService');
                 await EmailService.sendPaymentConfirmation({
@@ -198,8 +198,54 @@ class PaymentService {
                   nextPaymentDate: nextPaymentDate,
                   inviteLinks: inviteLinks.map(inv => inv.link),
                 });
+                logger.info('Payment confirmation email sent', { email: x_customer_email });
               } catch (emailErr) {
                 logger.error('Error enviando email de confirmación:', emailErr);
+              }
+
+              // Generate invoice and send purchase confirmation (from easybots.store)
+              try {
+                const InvoiceService = require('./invoiceservice');
+                const EmailService = require('../../../services/emailService');
+
+                // Get plan SKU
+                const planSku = plan.sku || `EASYBOTS-${plan.id.toUpperCase()}`;
+
+                // Convert amount to USD if needed
+                let amountUSD = parseFloat(amountPaid);
+                let exchangeRate = 4200;
+                if (x_currency_code === 'COP') {
+                  exchangeRate = 1;
+                  amountUSD = parseFloat(amountPaid) / 4200;
+                }
+
+                // Generate invoice PDF
+                const invoice = await InvoiceService.generateInvoice({
+                  customerName: x_customer_name || 'Cliente',
+                  customerEmail: x_customer_email,
+                  planSku,
+                  planDescription: `Suscripción ${planName} - Servicios de IA y desarrollo de bots automatizados`,
+                  amount: amountUSD,
+                  currency: 'USD',
+                  exchangeRate
+                });
+
+                // Send purchase invoice email
+                await EmailService.sendPurchaseInvoice({
+                  email: x_customer_email,
+                  name: x_customer_name || 'Usuario',
+                  invoiceBuffer: invoice.buffer,
+                  invoiceFileName: invoice.fileName,
+                  amount: amountUSD,
+                  currency: 'USD'
+                });
+
+                logger.info('Purchase invoice generated and sent', {
+                  email: x_customer_email,
+                  invoiceId: invoice.id
+                });
+              } catch (invoiceErr) {
+                logger.error('Error generando/enviando factura:', invoiceErr);
               }
             } catch (err) {
               logger.error('Error enviando mensaje de bienvenida PRIME:', err);
@@ -392,11 +438,13 @@ class PaymentService {
               disable_web_page_preview: false
             });
 
-            // Send email if user email is available
+            // Send emails if user email is available
             try {
               const user = await UserModel.getById(userId);
               if (user && user.email) {
                 const EmailService = require('../../../services/emailService');
+
+                // Send PNPtv subscription confirmation
                 await EmailService.sendPaymentConfirmation({
                   email: user.email,
                   name: user.firstName || 'Usuario',
@@ -406,6 +454,46 @@ class PaymentService {
                   nextPaymentDate: nextPaymentDate,
                   inviteLinks: inviteLinks.map(inv => inv.link),
                 });
+                logger.info('Payment confirmation email sent (Daimo)', { email: user.email });
+
+                // Generate invoice and send purchase confirmation (from easybots.store)
+                try {
+                  const InvoiceService = require('./invoiceservice');
+
+                  // Get plan SKU
+                  const planSku = plan.sku || `EASYBOTS-${plan.id.toUpperCase()}`;
+
+                  // Daimo payments are in USD/USDC
+                  const amountUSD = parseFloat(amountPaid);
+
+                  // Generate invoice PDF
+                  const invoice = await InvoiceService.generateInvoice({
+                    customerName: user.firstName || user.name || 'Cliente',
+                    customerEmail: user.email,
+                    planSku,
+                    planDescription: `Suscripción ${planName} - Servicios de IA y desarrollo de bots automatizados`,
+                    amount: amountUSD,
+                    currency: 'USD',
+                    exchangeRate: 4200
+                  });
+
+                  // Send purchase invoice email
+                  await EmailService.sendPurchaseInvoice({
+                    email: user.email,
+                    name: user.firstName || 'Usuario',
+                    invoiceBuffer: invoice.buffer,
+                    invoiceFileName: invoice.fileName,
+                    amount: amountUSD,
+                    currency: 'USD'
+                  });
+
+                  logger.info('Purchase invoice generated and sent (Daimo)', {
+                    email: user.email,
+                    invoiceId: invoice.id
+                  });
+                } catch (invoiceErr) {
+                  logger.error('Error generating/sending invoice (Daimo):', invoiceErr);
+                }
               }
             } catch (emailErr) {
               logger.error('Error sending payment confirmation email:', emailErr);
