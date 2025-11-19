@@ -216,6 +216,25 @@ class UserModel {
   }
 
   /**
+   * Get subscriptions expiring between two dates
+   * @param {Date} startDate - Start date
+   * @param {Date} endDate - End date
+   * @returns {Promise<Array>} Users with subscriptions expiring in date range
+   */
+  static async getSubscriptionsExpiringBetween(startDate, endDate) {
+    try {
+      const result = await query(
+        'SELECT * FROM users WHERE subscription_status = $1 AND plan_expiry >= $2 AND plan_expiry <= $3',
+        ['active', startDate, endDate]
+      );
+      return result.rows;
+    } catch (error) {
+      logger.error('Error getting subscriptions expiring between dates:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get all users (with pagination)
    * @param {number} limit - Results per page
    * @param {string} startAfter - Last document ID
