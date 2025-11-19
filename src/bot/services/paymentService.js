@@ -91,7 +91,7 @@ class PaymentService {
       const planId = x_extra2;
 
       // Check if payment exists
-      const payment = paymentId ? await PaymentModel.getPaymentById(paymentId) : null;
+      const payment = paymentId ? await PaymentModel.getById(paymentId) : null;
 
       if (!payment && !userId) {
         logger.error('Payment not found and no user ID provided', { paymentId, refPayco: x_ref_payco });
@@ -102,11 +102,10 @@ class PaymentService {
       if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
         // Payment successful
         if (payment) {
-          await PaymentModel.updatePayment(paymentId, {
-            status: 'completed',
-            transactionId: x_transaction_id,
-            approvalCode: x_approval_code,
-            epaycoRef: x_ref_payco,
+          await PaymentModel.updateStatus(paymentId, 'completed', {
+            transaction_id: x_transaction_id,
+            approval_code: x_approval_code,
+            epayco_ref: x_ref_payco,
           });
         }
 
@@ -157,10 +156,9 @@ class PaymentService {
       } else if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Fallida') {
         // Payment failed
         if (payment) {
-          await PaymentModel.updatePayment(paymentId, {
-            status: 'failed',
-            transactionId: x_transaction_id,
-            epaycoRef: x_ref_payco,
+          await PaymentModel.updateStatus(paymentId, 'failed', {
+            transaction_id: x_transaction_id,
+            epayco_ref: x_ref_payco,
           });
         }
 
@@ -174,10 +172,9 @@ class PaymentService {
       } else if (x_transaction_state === 'Pendiente') {
         // Payment pending
         if (payment) {
-          await PaymentModel.updatePayment(paymentId, {
-            status: 'pending',
-            transactionId: x_transaction_id,
-            epaycoRef: x_ref_payco,
+          await PaymentModel.updateStatus(paymentId, 'pending', {
+            transaction_id: x_transaction_id,
+            epayco_ref: x_ref_payco,
           });
         }
 
@@ -227,7 +224,7 @@ class PaymentService {
 
       // Check if already processed (idempotency)
       if (paymentId) {
-        const payment = await PaymentModel.getPaymentById(paymentId);
+        const payment = await PaymentModel.getById(paymentId);
         if (payment && payment.status === 'completed') {
           logger.info('Daimo payment already processed', { paymentId, eventId: id });
           return { success: true, alreadyProcessed: true };
@@ -238,10 +235,9 @@ class PaymentService {
       if (status === 'confirmed' || status === 'completed') {
         // Payment successful
         if (paymentId) {
-          await PaymentModel.updatePayment(paymentId, {
-            status: 'completed',
-            transactionId: source?.txHash || id,
-            daimoEventId: id,
+          await PaymentModel.updateStatus(paymentId, 'completed', {
+            transaction_id: source?.txHash || id,
+            daimo_event_id: id,
           });
         }
 
@@ -269,10 +265,9 @@ class PaymentService {
       } else if (status === 'failed') {
         // Payment failed
         if (paymentId) {
-          await PaymentModel.updatePayment(paymentId, {
-            status: 'failed',
-            transactionId: source?.txHash || id,
-            daimoEventId: id,
+          await PaymentModel.updateStatus(paymentId, 'failed', {
+            transaction_id: source?.txHash || id,
+            daimo_event_id: id,
           });
         }
 
@@ -294,7 +289,7 @@ class PaymentService {
       return { success: false, error: error.message };
     }
   }
-  static async createPayment({ userId, planId, provider, sku, chatId }) {
+  static async createPayment({ userId, planId, provider, sku, chatId, language }) {
     try {
       const plan = await PlanModel.getById(planId);
       if (!plan || !plan.active) {
@@ -347,41 +342,14 @@ class PaymentService {
          // Create payment reference
          const paymentRef = `PAY-${payment.id.substring(0, 8).toUpperCase()}`;
 
-         // Generate ePayco Checkout URL with parameters
-         const planName = plan.display_name || plan.name;
-         const description = `Suscripción ${planName} - PNPtv`;
+         // Determine language code (default to Spanish)
+         const lang = language && language.toLowerCase().startsWith('en') ? 'en' : 'es';
 
-         // ePayco Checkout Standard URL
-         const baseUrl = 'https://checkout.epayco.co/checkout.html';
+         // Generate URL to landing page with language parameter
+         // The landing page will handle the ePayco checkout with SDK
+         const paymentUrl = `${webhookDomain}/payment/${payment.id}?lang=${lang}`;
 
-         // Build parameters according to ePayco documentation
-         const params = new URLSearchParams({
-           key: epaycoPublicKey,
-           external: 'true',
-           name: description,
-           description: description,
-           invoice: paymentRef,
-           currency: 'cop',
-           amount: priceInCOP.toString(),
-           tax_base: '0',
-           tax: '0',
-           country: 'co',
-           lang: 'es',
-           // Pass data in extra fields for webhook processing
-           extra1: userId.toString(), // User ID (Telegram ID)
-           extra2: planId, // Plan ID
-           extra3: payment.id, // Payment ID
-           // Webhook URLs
-           confirmation: `${webhookDomain}/api/webhooks/epayco`,
-           response: `${webhookDomain}/api/payment-response`,
-           // Test mode
-           test: epaycoTestMode ? 'true' : 'false',
-           autoclick: 'false'
-         });
-
-         const paymentUrl = `${baseUrl}?${params.toString()}`;
-
-         logger.info('ePayco payment URL generated', {
+         logger.info('ePayco payment URL generated (landing page)', {
            paymentId: payment.id,
            paymentRef,
            planId: plan.id,
@@ -389,8 +357,8 @@ class PaymentService {
            amountUSD: plan.price,
            amountCOP: priceInCOP,
            testMode: epaycoTestMode,
-           confirmationUrl: `${webhookDomain}/api/webhooks/epayco`,
-           responseUrl: `${webhookDomain}/api/payment-response`
+           language: lang,
+           paymentUrl,
          });
 
          return {
@@ -418,26 +386,31 @@ class PaymentService {
 
   static async completePayment(paymentId) {
     try {
-      const payment = await PaymentModel.getPaymentById(paymentId);
+      const payment = await PaymentModel.getById(paymentId);
       if (!payment) {
         logger.error('Pago no encontrado', { paymentId });
         throw new Error('No se encontró el pago. Verifica el ID o contacta soporte.');
       }
 
-      await PaymentModel.updatePayment(paymentId, { status: 'completed' });
+      // Get plan to obtain SKU (payment table doesn't store SKU, plan does)
+      const planId = payment.plan_id || payment.planId;
+      const plan = planId ? await PlanModel.getById(planId) : null;
+      const planSku = plan?.sku || 'EASYBOTS-PNP-030';
+
+      await PaymentModel.updateStatus(paymentId, 'completed');
 
       // Generar factura
       const invoice = await InvoiceService.generateInvoice({
-        userId: payment.userId,
-        planSku: payment.sku,
+        userId: payment.userId || payment.user_id,
+        planSku,
         amount: payment.amount,
       });
 
       // Enviar factura por email
-      const user = await UserModel.getById(payment.userId);
+      const user = await UserModel.getById(payment.userId || payment.user_id);
       await EmailService.sendInvoiceEmail({
         to: user.email,
-        subject: `Factura por suscripción (SKU: ${payment.sku})`,
+        subject: `Factura por suscripción (SKU: ${planSku})`,
         invoicePdf: invoice.pdf,
         invoiceNumber: invoice.id,
       });
