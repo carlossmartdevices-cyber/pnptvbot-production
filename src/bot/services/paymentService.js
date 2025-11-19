@@ -133,25 +133,74 @@ class PaymentService {
             // Enviar mensaje de bienvenida y datos de pago
             try {
               const { Telegraf } = require('telegraf');
-              const { sendPrimeWelcome } = require('../handlers/user/menu');
               const bot = new Telegraf(process.env.BOT_TOKEN);
-              const primeChannels = (process.env.PRIME_CHANNEL_ID || '').split(',').map(id => id.trim());
+              const primeChannels = (process.env.PRIME_CHANNEL_ID || '').split(',').map(id => id.trim()).filter(id => id);
               const amountPaid = x_amount;
-              const nextPayment = expiryDate.toLocaleDateString('es-CO');
-              const planName = plan.name || 'PRIME';
+              const nextPaymentDate = expiryDate.toLocaleDateString('es-CO', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              });
+              const planName = plan.display_name || plan.name || 'PRIME';
+
+              // Generate one-time use invite links for PRIME channels
+              const inviteLinks = [];
+              for (const channelId of primeChannels) {
+                try {
+                  const invite = await bot.telegram.createChatInviteLink(channelId, {
+                    member_limit: 1, // One-time use
+                    expire_date: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // Expires in 7 days
+                  });
+                  inviteLinks.push({ channelId, link: invite.invite_link });
+                } catch (inviteErr) {
+                  logger.error('Error creating invite link:', { channelId, error: inviteErr.message });
+                  // Fallback to static link
+                  inviteLinks.push({ channelId, link: `https://t.me/PNPTV_PRIME` });
+                }
+              }
+
               const message = [
-                `🎉 ¡Bienvenido a PRIME, ${x_customer_name || ''}!`,
+                `🎉 *¡Bienvenido a PRIME, ${x_customer_name || ''}!*`,
                 '',
                 `✅ Tu pago de *${amountPaid} ${x_currency_code || 'COP'}* por el plan *${planName}* fue recibido exitosamente.`,
                 '',
-                `Tu membresía está activa hasta: *${nextPayment}*`,
+                `📋 *Detalles de tu suscripción:*`,
+                `• Plan: ${planName}`,
+                `• Fecha de inicio: ${new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+                `• Próximo pago: *${nextPaymentDate}*`,
                 '',
-                'Accede al canal exclusivo aquí:',
-                ...primeChannels.map(id => `👉 [Ingresar a PRIME](https://t.me/c/${id.replace('-100','')})`),
+                '🔐 *Accede al canal exclusivo PRIME:*',
+                ...inviteLinks.map((inv, idx) => `👉 [Ingresar a PRIME Canal ${inviteLinks.length > 1 ? idx + 1 : ''}](${inv.link})`),
                 '',
-                '¡Gracias por confiar en PNPtv! Disfruta todos los beneficios y novedades.'
+                '⚠️ *Importante:* Estos enlaces son de un solo uso y expiran en 7 días.',
+                '',
+                '📅 *Te recordaremos:*',
+                '• 3 días antes de tu próximo pago',
+                '• 1 día antes de tu próximo pago',
+                '',
+                '💝 ¡Gracias por confiar en PNPtv! Disfruta todos los beneficios y novedades exclusivas.'
               ].join('\n');
-              await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown', disable_web_page_preview: true });
+
+              await bot.telegram.sendMessage(userId, message, {
+                parse_mode: 'Markdown',
+                disable_web_page_preview: false
+              });
+
+              // Send payment confirmation email
+              try {
+                const EmailService = require('../../../services/emailService');
+                await EmailService.sendPaymentConfirmation({
+                  email: x_customer_email,
+                  name: x_customer_name || 'Usuario',
+                  planName: planName,
+                  amount: amountPaid,
+                  currency: x_currency_code || 'COP',
+                  nextPaymentDate: nextPaymentDate,
+                  inviteLinks: inviteLinks.map(inv => inv.link),
+                });
+              } catch (emailErr) {
+                logger.error('Error enviando email de confirmación:', emailErr);
+              }
             } catch (err) {
               logger.error('Error enviando mensaje de bienvenida PRIME:', err);
             }
@@ -286,6 +335,84 @@ class PaymentService {
             expiryDate,
             txHash: source?.txHash,
           });
+
+          // Send welcome message with invite links
+          try {
+            const { Telegraf } = require('telegraf');
+            const bot = new Telegraf(process.env.BOT_TOKEN);
+            const primeChannels = (process.env.PRIME_CHANNEL_ID || '').split(',').map(id => id.trim()).filter(id => id);
+            const amountPaid = webhookData.amount?.value || '0';
+            const currency = webhookData.amount?.currency || 'USDC';
+            const nextPaymentDate = expiryDate.toLocaleDateString('es-CO', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
+            const planName = plan.display_name || plan.name || 'PRIME';
+
+            // Generate one-time use invite links
+            const inviteLinks = [];
+            for (const channelId of primeChannels) {
+              try {
+                const invite = await bot.telegram.createChatInviteLink(channelId, {
+                  member_limit: 1,
+                  expire_date: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60),
+                });
+                inviteLinks.push({ channelId, link: invite.invite_link });
+              } catch (inviteErr) {
+                logger.error('Error creating invite link:', { channelId, error: inviteErr.message });
+                inviteLinks.push({ channelId, link: `https://t.me/PNPTV_PRIME` });
+              }
+            }
+
+            const message = [
+              `🎉 *¡Bienvenido a PRIME!*`,
+              '',
+              `✅ Tu pago de *${amountPaid} ${currency}* por el plan *${planName}* fue recibido exitosamente.`,
+              '',
+              `📋 *Detalles de tu suscripción:*`,
+              `• Plan: ${planName}`,
+              `• Fecha de inicio: ${new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+              `• Próximo pago: *${nextPaymentDate}*`,
+              '',
+              '🔐 *Accede al canal exclusivo PRIME:*',
+              ...inviteLinks.map((inv, idx) => `👉 [Ingresar a PRIME Canal ${inviteLinks.length > 1 ? idx + 1 : ''}](${inv.link})`),
+              '',
+              '⚠️ *Importante:* Estos enlaces son de un solo uso y expiran en 7 días.',
+              '',
+              '📅 *Te recordaremos:*',
+              '• 3 días antes de tu próximo pago',
+              '• 1 día antes de tu próximo pago',
+              '',
+              '💝 ¡Gracias por confiar en PNPtv! Disfruta todos los beneficios y novedades exclusivas.'
+            ].join('\n');
+
+            await bot.telegram.sendMessage(userId, message, {
+              parse_mode: 'Markdown',
+              disable_web_page_preview: false
+            });
+
+            // Send email if user email is available
+            try {
+              const user = await UserModel.getById(userId);
+              if (user && user.email) {
+                const EmailService = require('../../../services/emailService');
+                await EmailService.sendPaymentConfirmation({
+                  email: user.email,
+                  name: user.firstName || 'Usuario',
+                  planName: planName,
+                  amount: amountPaid,
+                  currency: currency,
+                  nextPaymentDate: nextPaymentDate,
+                  inviteLinks: inviteLinks.map(inv => inv.link),
+                });
+              }
+            } catch (emailErr) {
+              logger.error('Error sending payment confirmation email:', emailErr);
+            }
+          } catch (err) {
+            logger.error('Error sending PRIME welcome message:', err);
+          }
         }
 
         return { success: true };
