@@ -19,9 +19,19 @@ DAIMO_REFUND_ADDRESS=0xYourRefundAddress      # Where failed payments are return
 
 ### Important Notes
 
-1. **Treasury Address**: This is your Optimism wallet address where all successful USDC payments will be deposited
-2. **Refund Address**: If a payment fails or bounces, it will be returned to this address
+1. **Treasury Address**: This is your Optimism wallet address where all successful USDC payments will be deposited (REQUIRED)
+2. **Refund Address**: If a payment fails or bounces, it will be returned to this address (OPTIONAL - defaults to treasury address)
 3. **Webhook Secret**: Used to verify that webhook events are coming from Daimo (not a third party)
+
+### Required vs Optional Variables
+
+**REQUIRED:**
+- `DAIMO_TREASURY_ADDRESS` - Must be a valid Optimism (Chain ID 10) wallet address
+- `DAIMO_WEBHOOK_SECRET` - Provided by Daimo when you register your webhook
+
+**OPTIONAL:**
+- `DAIMO_REFUND_ADDRESS` - Defaults to `DAIMO_TREASURY_ADDRESS` if not set
+- `DAIMO_API_KEY` - Only needed if using Daimo's API for payment creation (currently not used)
 
 ## Webhook Configuration
 
@@ -174,12 +184,16 @@ This prevents:
 
 ### Production Checklist
 
-- [ ] `DAIMO_TREASURY_ADDRESS` is set to your production Optimism wallet
-- [ ] `DAIMO_REFUND_ADDRESS` is set (or defaults to treasury)
-- [ ] `DAIMO_WEBHOOK_SECRET` is configured
-- [ ] Webhook URL is registered with Daimo: `https://easybots.store/api/daimo`
-- [ ] Test a small payment (e.g., $1) to verify end-to-end flow
+- [ ] `DAIMO_TREASURY_ADDRESS` is set to your production Optimism wallet (REQUIRED)
+- [ ] `DAIMO_REFUND_ADDRESS` is set (OPTIONAL - or defaults to treasury)
+- [ ] `DAIMO_WEBHOOK_SECRET` is configured (REQUIRED)
+- [ ] `BOT_WEBHOOK_DOMAIN` is set correctly (used to build webhook URL)
+- [ ] Webhook URL is registered with Daimo: `https://easybots.store/api/webhooks/daimo`
+- [ ] Test a small payment (e.g., $1 USDC) to verify end-to-end flow
+- [ ] Verify webhook receives `payment_completed` status correctly
+- [ ] Confirm user subscription is activated after payment
 - [ ] Monitor logs for any errors or issues
+- [ ] Check that welcome message is sent to user after successful payment
 
 ## Network Information
 

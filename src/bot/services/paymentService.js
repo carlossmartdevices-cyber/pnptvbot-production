@@ -259,7 +259,8 @@ class PaymentService {
       }
 
       // Process based on status
-      if (status === 'confirmed' || status === 'completed') {
+      // Daimo status values: payment_unpaid, payment_started, payment_completed, payment_bounced
+      if (status === 'payment_completed') {
         // Payment successful
         if (paymentId) {
           await PaymentModel.updateStatus(paymentId, 'completed', {
@@ -286,11 +287,38 @@ class PaymentService {
             expiryDate,
             txHash: source?.txHash,
           });
+
+          // Send welcome message with PRIME channel access
+          try {
+            const { Telegraf } = require('telegraf');
+            const bot = new Telegraf(process.env.BOT_TOKEN);
+            const primeChannels = (process.env.PRIME_CHANNEL_ID || '').split(',').map(id => id.trim());
+            const amountPaid = DaimoConfig.formatAmountFromUnits(source?.amountUnits || '0');
+            const nextPayment = expiryDate.toLocaleDateString('es-CO');
+            const planName = plan.name || 'PRIME';
+
+            const message = [
+              `🎉 ¡Bienvenido a PRIME!`,
+              '',
+              `✅ Tu pago de *$${amountPaid} USDC* por el plan *${planName}* fue recibido exitosamente.`,
+              '',
+              `Tu membresía está activa hasta: *${nextPayment}*`,
+              '',
+              'Accede al canal exclusivo aquí:',
+              ...primeChannels.map(id => `👉 [Ingresar a PRIME](https://t.me/c/${id.replace('-100','')})`),
+              '',
+              '¡Gracias por confiar en PNPtv! Disfruta todos los beneficios y novedades.'
+            ].join('\n');
+
+            await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown', disable_web_page_preview: true });
+          } catch (err) {
+            logger.error('Error enviando mensaje de bienvenida PRIME (Daimo):', err);
+          }
         }
 
         return { success: true };
-      } else if (status === 'failed') {
-        // Payment failed
+      } else if (status === 'payment_bounced') {
+        // Payment failed or bounced
         if (paymentId) {
           await PaymentModel.updateStatus(paymentId, 'failed', {
             transaction_id: source?.txHash || id,
@@ -298,13 +326,21 @@ class PaymentService {
           });
         }
 
-        logger.warn('Daimo payment failed', {
+        logger.warn('Daimo payment bounced', {
           paymentId,
           eventId: id,
           status,
         });
 
         return { success: true }; // Return success to acknowledge webhook
+      } else if (status === 'payment_started' || status === 'payment_unpaid') {
+        // Payment in progress or not yet paid
+        logger.info('Daimo payment in progress', {
+          paymentId,
+          eventId: id,
+          status,
+        });
+        return { success: true }; // Acknowledge webhook
       }
 
       return { success: true };
