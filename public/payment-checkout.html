@@ -121,40 +121,6 @@
             font-size: 18px;
         }
 
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-            font-size: 14px;
-        }
-
-        .form-group input,
-        .form-group select {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 15px;
-            transition: border-color 0.3s;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 2fr;
-            gap: 15px;
-        }
-
         .pay-button {
             width: 100%;
             padding: 16px;
@@ -219,10 +185,6 @@
         }
 
         @media (max-width: 600px) {
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-
             .header h1 {
                 font-size: 24px;
             }
@@ -261,39 +223,9 @@
                     <ul class="plan-features" id="plan-features"></ul>
                 </div>
 
-                <form id="payment-form">
-                    <div class="form-group">
-                        <label for="customer-name">Nombre completo *</label>
-                        <input type="text" id="customer-name" name="name" required placeholder="Juan Pérez">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="customer-email">Correo electrónico *</label>
-                        <input type="email" id="customer-email" name="email" required placeholder="juan@ejemplo.com">
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="doc-type">Tipo de documento</label>
-                            <select id="doc-type" name="docType">
-                                <option value="CC">CC</option>
-                                <option value="CE">CE</option>
-                                <option value="NIT">NIT</option>
-                                <option value="TI">TI</option>
-                                <option value="PP">PP</option>
-                                <option value="DNI">DNI</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="doc-number">Número de documento</label>
-                            <input type="text" id="doc-number" name="docNumber" placeholder="123456789">
-                        </div>
-                    </div>
-
-                    <button type="submit" class="pay-button" id="pay-button">
-                        💳 Pagar con ePayco
-                    </button>
-                </form>
+                <button type="button" class="pay-button" id="pay-button">
+                    💳 Pagar con ePayco
+                </button>
 
                 <div class="security-note">
                     🔒 Pago seguro procesado por ePayco. Tus datos están protegidos.
@@ -378,24 +310,14 @@
             });
         }
 
-        // Handle form submission
-        document.getElementById('payment-form').addEventListener('submit', function(e) {
+        // Handle pay button click
+        document.getElementById('pay-button').addEventListener('click', function(e) {
             e.preventDefault();
-
-            const name = document.getElementById('customer-name').value.trim();
-            const email = document.getElementById('customer-email').value.trim();
-            const docType = document.getElementById('doc-type').value;
-            const docNumber = document.getElementById('doc-number').value.trim() || '0000000';
-
-            if (!name || !email) {
-                showError('Por favor completa todos los campos requeridos');
-                return;
-            }
 
             // Disable button
             const payButton = document.getElementById('pay-button');
             payButton.disabled = true;
-            payButton.textContent = 'Procesando...';
+            payButton.textContent = 'Abriendo ePayco...';
 
             // Prepare ePayco data
             const epaycoData = {
@@ -410,13 +332,7 @@
                 country: "co",
                 lang: "es",
 
-                // Customer info
-                name_billing: name,
-                email_billing: email,
-                type_doc_billing: docType,
-                number_doc_billing: docNumber,
-
-                // Extra data for webhook
+                // Extra data for webhook (no customer data - ePayco will collect it)
                 extra1: paymentData.userId.toString(),
                 extra2: paymentData.planId,
                 extra3: paymentData.paymentId,
@@ -432,6 +348,11 @@
 
             try {
                 ePaycoHandler.open(epaycoData);
+                // Re-enable button after popup opens
+                setTimeout(() => {
+                    payButton.disabled = false;
+                    payButton.textContent = '💳 Pagar con ePayco';
+                }, 1000);
             } catch (error) {
                 console.error('Error opening ePayco checkout:', error);
                 showError('Error al abrir el checkout. Por favor, intenta nuevamente.');
