@@ -11,6 +11,7 @@ const logger = require('../../utils/logger');
 const webhookController = require('./controllers/webhookController');
 const subscriptionController = require('./controllers/subscriptionController');
 const paymentController = require('./controllers/paymentController');
+const zoomController = require('./controllers/zoomController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -174,6 +175,25 @@ app.post(
 app.get('/api/subscription/payment-response', asyncHandler(subscriptionController.handlePaymentResponse));
 app.get('/api/subscription/subscriber/:identifier', asyncHandler(subscriptionController.getSubscriber));
 app.get('/api/subscription/stats', asyncHandler(subscriptionController.getStatistics));
+
+// Zoom API routes
+app.get('/api/zoom/room/:roomCode', asyncHandler(zoomController.getRoomInfo));
+app.post('/api/zoom/join', asyncHandler(zoomController.joinMeeting));
+app.post('/api/zoom/host/join', asyncHandler(zoomController.joinAsHost));
+app.post('/api/zoom/end/:roomCode', asyncHandler(zoomController.endMeeting));
+app.get('/api/zoom/participants/:roomCode', asyncHandler(zoomController.getParticipants));
+app.post('/api/zoom/participant/:participantId/action', asyncHandler(zoomController.controlParticipant));
+app.post('/api/zoom/recording/:roomCode', asyncHandler(zoomController.toggleRecording));
+app.get('/api/zoom/stats/:roomCode', asyncHandler(zoomController.getRoomStats));
+
+// Zoom web pages
+app.get('/zoom/join/:roomCode', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/zoom/join.html'));
+});
+
+app.get('/zoom/host/:roomCode', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/zoom/host.html'));
+});
 
 // Export app WITHOUT 404/error handlers
 // These will be added in bot.js AFTER the webhook callback
