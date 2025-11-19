@@ -34,6 +34,59 @@ module.exports.sendPrimeWelcome = sendPrimeWelcome;
  * @param {Telegraf} bot - Bot instance
  */
 const registerMenuHandlers = (bot) => {
+    // /cristina command: starts AI support chat, message stays in chat (no autodelete)
+    bot.command('cristina', async (ctx) => {
+      try {
+        // Activate AI chat session
+        ctx.session.temp = ctx.session.temp || {};
+        ctx.session.temp.aiChatActive = true;
+        await ctx.saveSession();
+        const lang = ctx.session?.language || 'en';
+        await ctx.reply(
+          lang === 'es'
+            ? '🤖 Cristina está lista para ayudarte. Escribe tu pregunta o mensaje.'
+            : '🤖 Cristina is ready to help you. Type your question or message.'
+        );
+      } catch (error) {
+        logger.error('Error starting Cristina AI chat:', error);
+      }
+    });
+  // /menu command opens the same menu as /start
+  bot.command('menu', async (ctx) => {
+    try {
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error showing menu:', error);
+    }
+  });
+
+  // Intercept main menu button actions in group and show redirect message
+  const mainMenuActions = [
+    'show_subscription_plans',
+    'show_profile',
+    'show_nearby',
+    'show_live',
+    'show_radio',
+    'show_zoom',
+    'show_support',
+    'show_settings',
+    'admin_panel'
+  ];
+  mainMenuActions.forEach(action => {
+    bot.action(action, async (ctx, next) => {
+      const chatType = ctx.chat?.type;
+      if (chatType === 'group' || chatType === 'supergroup') {
+        const lang = ctx.session?.language || 'en';
+        const username = ctx.from?.username || ctx.from?.first_name || 'user';
+        const botUsername = ctx.botInfo?.username || 'pnptv_bot';
+        const redirectMsg = t('groupRedirect', lang)({ username, action, botUsername });
+        const sentMessage = await ctx.reply(redirectMsg, { parse_mode: 'Markdown', disable_web_page_preview: true });
+        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
+        return;
+      }
+      return next();
+    });
+  });
     // Locked feature handler for free users
     bot.action('locked_feature', async (ctx) => {
       const lang = ctx.session?.language || 'en';
@@ -115,7 +168,7 @@ const registerMenuHandlers = (bot) => {
       // Auto-delete menu messages in groups after 2 minutes
       const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
       if (isGroup) {
-        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000, false);
+        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
       }
     } catch (error) {
       logger.error('Error in group contact admin:', error);
@@ -174,7 +227,7 @@ const registerMenuHandlers = (bot) => {
       // Auto-delete menu messages in groups after 2 minutes
       const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
       if (isGroup) {
-        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000, false);
+        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
       }
     } catch (error) {
       logger.error('Error showing group rules:', error);
@@ -232,6 +285,12 @@ const showMainMenu = async (ctx) => {
       Markup.button.callback(t('support', lang), 'show_support'),
       Markup.button.callback(t('settings', lang), 'show_settings'),
     ],
+      [
+        Markup.button.callback(
+          lang === 'es' ? '🎟️ Invitaciones a eventos Zoom' : '🎟️ Invitations to Zoom events',
+          'show_zoom_invitations'
+        ),
+      ],
   ];
   if (isAdmin) {
     buttons.push([Markup.button.callback('🛡️ Admin Panel', 'admin_panel')]);
@@ -313,7 +372,7 @@ const showGroupMenu = async (ctx) => {
   );
 
   // Auto-delete menu messages in groups after 2 minutes
-  ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000, false);
+  ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
 };
 
 /**
