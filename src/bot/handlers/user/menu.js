@@ -285,6 +285,12 @@ const showMainMenu = async (ctx) => {
       Markup.button.callback(t('support', lang), 'show_support'),
       Markup.button.callback(t('settings', lang), 'show_settings'),
     ],
+      [
+        Markup.button.callback(
+          lang === 'es' ? '🎟️ Invitaciones a eventos Zoom' : '🎟️ Invitations to Zoom events',
+          'show_zoom_invitations'
+        ),
+      ],
   ];
   if (isAdmin) {
     buttons.push([Markup.button.callback('🛡️ Admin Panel', 'admin_panel')]);

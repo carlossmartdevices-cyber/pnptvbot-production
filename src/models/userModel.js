@@ -69,6 +69,15 @@ class UserModel {
   }
 
   /**
+   * Convert camelCase to snake_case
+   * @param {string} str - String in camelCase
+   * @returns {string} String in snake_case
+   */
+  static toSnakeCase(str) {
+    return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+  }
+
+  /**
    * Update user profile
    * @param {number|string} userId - User ID
    * @param {Object} updates - Fields to update
@@ -76,8 +85,15 @@ class UserModel {
    */
   static async updateProfile(userId, updates) {
     try {
-      const fields = Object.keys(updates);
-      const values = Object.values(updates);
+      // Convert camelCase keys to snake_case for PostgreSQL
+      const snakeCaseUpdates = {};
+      Object.keys(updates).forEach((key) => {
+        const snakeKey = this.toSnakeCase(key);
+        snakeCaseUpdates[snakeKey] = updates[key];
+      });
+
+      const fields = Object.keys(snakeCaseUpdates);
+      const values = Object.values(snakeCaseUpdates);
       const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
       values.push(new Date());
       await query(`UPDATE users SET ${setClause}, updated_at = $${fields.length + 1} WHERE id = $${fields.length + 2}`, [...values, userId.toString()]);
