@@ -67,17 +67,55 @@ class Plan {
   static async createOrUpdate(planId, planData) {
     try {
       const data = { ...planData };
-      if (!data.sku && data.duration) {
-        data.sku = this.generateSKU(planId, data.duration);
-        logger.info(`Auto-generated SKU: ${data.sku} for plan: ${planId}`);
-      }
-      await query(`INSERT INTO plans (id, sku, name, name_es, price, currency, duration, features, features_es, active, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-        ON CONFLICT (id) DO UPDATE SET sku = $2, name = $3, name_es = $4, price = $5, currency = $6, duration = $7, features = $8, features_es = $9, active = $10, updated_at = $11`,
-        [planId, data.sku, data.name, data.nameEs, data.price, data.currency || 'USD', data.duration || 30, JSON.stringify(data.features || []), JSON.stringify(data.featuresEs || []), data.active !== undefined ? data.active : true, new Date()]
+
+      await query(`INSERT INTO plans (id, name, display_name, tier, price, price_in_cop, currency, duration, duration_days, description, features, icon, active, recommended, is_lifetime, requires_manual_activation, payment_method, wompi_payment_link, crypto_bonus, updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+        ON CONFLICT (id) DO UPDATE SET
+          name = $2,
+          display_name = $3,
+          tier = $4,
+          price = $5,
+          price_in_cop = $6,
+          currency = $7,
+          duration = $8,
+          duration_days = $9,
+          description = $10,
+          features = $11,
+          icon = $12,
+          active = $13,
+          recommended = $14,
+          is_lifetime = $15,
+          requires_manual_activation = $16,
+          payment_method = $17,
+          wompi_payment_link = $18,
+          crypto_bonus = $19,
+          updated_at = $20`,
+        [
+          planId,
+          data.name,
+          data.displayName || data.name,
+          data.tier || 'Basic',
+          data.price,
+          data.priceInCop || null,
+          data.currency || 'USD',
+          data.duration || 30,
+          data.durationDays || data.duration || 30,
+          data.description || null,
+          JSON.stringify(data.features || []),
+          data.icon || null,
+          data.active !== undefined ? data.active : true,
+          data.recommended || false,
+          data.isLifetime || false,
+          data.requiresManualActivation || false,
+          data.paymentMethod || null,
+          data.wompiPaymentLink || null,
+          data.cryptoBonus ? JSON.stringify(data.cryptoBonus) : null,
+          new Date()
+        ]
       );
       await cache.del(`plan:${planId}`);
       await cache.del('plans:all');
-      logger.info('Plan created/updated', { planId, sku: data.sku });
+      logger.info('Plan created/updated', { planId, tier: data.tier });
       return data;
     } catch (error) {
       logger.error('Error creating/updating plan:', error);
@@ -104,102 +142,83 @@ class Plan {
   }
 
   /**
-   * Generate SKU for a plan
-   * SKU format: EASYBOTS-PNP-XXX where XXX is duration in days (3 digits)
-   * Example: EASYBOTS-PNP-007 (7 days), EASYBOTS-PNP-030 (30 days), EASYBOTS-PNP-000 (lifetime)
-   * @param {string} planId - Plan ID
-   * @param {number} duration - Duration in days
-   * @returns {string} Generated SKU
-   */
-  static generateSKU(planId, duration) {
-    // For lifetime plans (very large duration), use 000
-    if (duration >= 36500 || planId.includes('lifetime')) {
-      return 'EASYBOTS-PNP-000';
-    }
-
-    // Convert duration to 3-digit format with zero padding
-    const durationStr = String(duration).padStart(3, '0');
-    return `EASYBOTS-PNP-${durationStr}`;
-  }
-
-  /**
    * Get default plans (fallback if database is empty)
    * @returns {Array} Default plans
    */
   static getDefaultPlans() {
     return [
       {
-        id: 'trial_week',
-        sku: 'EASYBOTS-PNP-007',
+        id: 'trial-week',
         name: 'Trial Week',
-        nameEs: 'Semana de Prueba',
+        displayName: 'Trial Week',
+        tier: 'Basic',
         price: 14.99,
         currency: 'USD',
         duration: 7,
+        durationDays: 7,
+        description: 'Try premium features for one week',
         features: [
           'Premium channel access',
           'Access to Nearby Members feature',
           'Zoom meeting access: 1 per week',
         ],
-        featuresEs: [
-          'Acceso a canales premium',
-          'Acceso a función Miembros Cercanos',
-          'Acceso a reuniones Zoom: 1 por semana',
-        ],
+        icon: '🎯',
         active: true,
+        recommended: false,
+        isLifetime: false,
       },
       {
-        id: 'pnp_member',
-        sku: 'EASYBOTS-PNP-030',
+        id: 'pnp-member',
         name: 'PNP Member',
-        nameEs: 'Miembro PNP',
-        price: 29.99,
+        displayName: 'PNP Member',
+        tier: 'PNP',
+        price: 24.99,
         currency: 'USD',
         duration: 30,
+        durationDays: 30,
+        description: 'Full access to all premium features',
         features: [
           'Everything in Trial Week',
           'Unlimited premium channel access',
           'Zoom meeting access: 2 per week',
           'Priority customer support',
         ],
-        featuresEs: [
-          'Todo en Semana de Prueba',
-          'Acceso ilimitado a canales premium',
-          'Acceso a reuniones Zoom: 2 por semana',
-          'Soporte prioritario al cliente',
-        ],
+        icon: '⭐',
         active: true,
+        recommended: true,
+        isLifetime: false,
       },
       {
-        id: 'crystal_member',
-        sku: 'EASYBOTS-PNP-030',
+        id: 'crystal-member',
         name: 'Crystal Member',
-        nameEs: 'Miembro Crystal',
-        price: 59.99,
+        displayName: 'Crystal Member',
+        tier: 'Crystal',
+        price: 49.99,
         currency: 'USD',
-        duration: 30,
+        duration: 120,
+        durationDays: 120,
+        description: 'Extended membership with exclusive benefits',
         features: [
           'Everything in PNP Member',
           'Zoom meeting access: 4 per week',
           'Exclusive content access',
           'Early access to new features',
         ],
-        featuresEs: [
-          'Todo en Miembro PNP',
-          'Acceso a reuniones Zoom: 4 por semana',
-          'Acceso a contenido exclusivo',
-          'Acceso anticipado a nuevas funciones',
-        ],
+        icon: '💎',
         active: true,
+        recommended: false,
+        isLifetime: false,
       },
       {
-        id: 'diamond_member',
-        sku: 'EASYBOTS-PNP-030',
+        id: 'diamond-member',
         name: 'Diamond Member',
-        nameEs: 'Miembro Diamond',
-        price: 89.99,
+        displayName: 'Diamond Member',
+        tier: 'Diamond',
+        price: 99.99,
         currency: 'USD',
-        duration: 30,
+        duration: 365,
+        durationDays: 365,
+        description: 'Annual membership with VIP benefits',
         features: [
           'Everything in Crystal Member',
           'Unlimited Zoom meeting access',
@@ -207,23 +226,21 @@ class Plan {
           'Custom profile badge',
           'Access to exclusive events',
         ],
-        featuresEs: [
-          'Todo en Miembro Crystal',
-          'Acceso ilimitado a reuniones Zoom',
-          'Soporte VIP al cliente',
-          'Insignia de perfil personalizada',
-          'Acceso a eventos exclusivos',
-        ],
+        icon: '👑',
         active: true,
+        recommended: false,
+        isLifetime: false,
       },
       {
-        id: 'lifetime_pass',
-        sku: 'EASYBOTS-PNP-000',
+        id: 'lifetime-pass',
         name: 'Lifetime Pass',
-        nameEs: 'Pase de por Vida',
-        price: 499.99,
+        displayName: 'Lifetime Pass',
+        tier: 'Premium',
+        price: 249.99,
         currency: 'USD',
         duration: 36500, // 100 years
+        durationDays: 36500,
+        description: 'One-time payment for lifetime access',
         features: [
           'Everything in Diamond Member',
           'Lifetime access to all features',
@@ -231,14 +248,10 @@ class Plan {
           'Founder badge',
           'Priority feature requests',
         ],
-        featuresEs: [
-          'Todo en Miembro Diamond',
-          'Acceso de por vida a todas las funciones',
-          'Nunca vuelvas a pagar',
-          'Insignia de fundador',
-          'Solicitudes de funciones prioritarias',
-        ],
+        icon: '♾️',
         active: true,
+        recommended: false,
+        isLifetime: true,
       },
     ];
   }

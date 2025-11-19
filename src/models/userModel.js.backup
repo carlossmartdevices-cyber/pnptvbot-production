@@ -187,12 +187,20 @@ class UserModel {
    */
   static async getExpiredSubscriptions() {
     try {
+      const db = getFirestore();
       const now = new Date();
-      const result = await query(
-        'SELECT * FROM users WHERE subscription_status = $1 AND plan_expiry <= $2',
-        ['active', now]
-      );
-      return result.rows;
+
+      const snapshot = await db.collection(COLLECTION)
+        .where('subscriptionStatus', '==', 'active')
+        .where('planExpiry', '<=', now)
+        .get();
+
+      const users = [];
+      snapshot.forEach((doc) => {
+        users.push({ id: doc.id, ...doc.data() });
+      });
+
+      return users;
     } catch (error) {
       logger.error('Error getting expired subscriptions:', error);
       return [];
@@ -230,11 +238,17 @@ class UserModel {
    */
   static async getBySubscriptionStatus(status) {
     try {
-      const result = await query(
-        'SELECT * FROM users WHERE subscription_status = $1',
-        [status]
-      );
-      return result.rows;
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTION)
+        .where('subscriptionStatus', '==', status)
+        .get();
+
+      const users = [];
+      snapshot.forEach((doc) => {
+        users.push({ id: doc.id, ...doc.data() });
+      });
+
+      return users;
     } catch (error) {
       logger.error('Error getting users by subscription status:', error);
       return [];
@@ -282,12 +296,18 @@ class UserModel {
    */
   static async getByRole(role) {
     try {
-      const result = await query(
-        'SELECT * FROM users WHERE role = $1',
-        [role]
-      );
-      logger.info(`Found ${result.rows.length} users with role: ${role}`);
-      return result.rows;
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTION)
+        .where('role', '==', role)
+        .get();
+
+      const users = [];
+      snapshot.forEach((doc) => {
+        users.push({ id: doc.id, ...doc.data() });
+      });
+
+      logger.info(`Found ${users.length} users with role: ${role}`);
+      return users;
     } catch (error) {
       logger.error('Error getting users by role:', error);
       return [];
@@ -300,12 +320,18 @@ class UserModel {
    */
   static async getAllAdmins() {
     try {
-      const result = await query(
-        'SELECT * FROM users WHERE role IN ($1, $2, $3)',
-        ['superadmin', 'admin', 'moderator']
-      );
-      logger.info(`Found ${result.rows.length} admin users`);
-      return result.rows;
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTION)
+        .where('role', 'in', ['superadmin', 'admin', 'moderator']) // influencer not admin
+        .get();
+
+      const admins = [];
+      snapshot.forEach((doc) => {
+        admins.push({ id: doc.id, ...doc.data() });
+      });
+
+      logger.info(`Found ${admins.length} admin users`);
+      return admins;
     } catch (error) {
       logger.error('Error getting admin users:', error);
       return [];
@@ -319,10 +345,8 @@ class UserModel {
    */
   static async delete(userId) {
     try {
-      await query(
-        'DELETE FROM users WHERE id = $1',
-        [userId.toString()]
-      );
+      const db = getFirestore();
+      await db.collection(COLLECTION).doc(userId.toString()).delete();
 
       // Invalidate cache
       await cache.del(`user:${userId}`);
@@ -346,15 +370,18 @@ class UserModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
+          const db = getFirestore();
+
           // Get total users
-          const totalResult = await query('SELECT COUNT(*) as count FROM users');
-          const total = parseInt(totalResult.rows[0].count);
+          const totalSnapshot = await db.collection(COLLECTION).count().get();
+          const total = totalSnapshot.data().count;
 
           // Get premium users
-          const premiumResult = await query(
-            "SELECT COUNT(*) as count FROM users WHERE subscription_status = 'active'"
-          );
-          const premium = parseInt(premiumResult.rows[0].count);
+          const premiumSnapshot = await db.collection(COLLECTION)
+            .where('subscriptionStatus', '==', 'active')
+            .count()
+            .get();
+          const premium = premiumSnapshot.data().count;
 
           const free = total - premium;
           const conversionRate = total > 0 ? (premium / total) * 100 : 0;
@@ -422,14 +449,21 @@ class UserModel {
    */
   static async incrementProfileViews(userId) {
     try {
-      await query(
-        'UPDATE users SET profile_views = profile_views + 1, updated_at = $1 WHERE id = $2',
-        [new Date(), userId.toString()]
-      );
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const currentViews = doc.data().profileViews || 0;
+      await userRef.update({
+        profileViews: currentViews + 1,
+        updatedAt: new Date(),
+      });
 
       await cache.del(`user:${userId}`);
 
-      logger.info('Profile views incremented', { userId });
+      logger.info('Profile views incremented', { userId, views: currentViews + 1 });
       return true;
     } catch (error) {
       logger.error('Error incrementing profile views:', error);
@@ -445,16 +479,24 @@ class UserModel {
    */
   static async addToFavorites(userId, targetUserId) {
     try {
-      // Use PostgreSQL array functions to add without duplicates
-      await query(
-        `UPDATE users
-         SET favorites = array_append(favorites, $1), updated_at = $2
-         WHERE id = $3 AND NOT ($1 = ANY(favorites))`,
-        [targetUserId.toString(), new Date(), userId.toString()]
-      );
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
 
-      await cache.del(`user:${userId}`);
-      logger.info('User added to favorites', { userId, targetUserId });
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const favorites = doc.data().favorites || [];
+      if (!favorites.includes(targetUserId.toString())) {
+        favorites.push(targetUserId.toString());
+        await userRef.update({
+          favorites,
+          updatedAt: new Date(),
+        });
+
+        await cache.del(`user:${userId}`);
+        logger.info('User added to favorites', { userId, targetUserId });
+      }
+
       return true;
     } catch (error) {
       logger.error('Error adding to favorites:', error);
@@ -470,15 +512,23 @@ class UserModel {
    */
   static async removeFromFavorites(userId, targetUserId) {
     try {
-      await query(
-        `UPDATE users
-         SET favorites = array_remove(favorites, $1), updated_at = $2
-         WHERE id = $3`,
-        [targetUserId.toString(), new Date(), userId.toString()]
-      );
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const favorites = doc.data().favorites || [];
+      const updatedFavorites = favorites.filter((id) => id !== targetUserId.toString());
+
+      await userRef.update({
+        favorites: updatedFavorites,
+        updatedAt: new Date(),
+      });
 
       await cache.del(`user:${userId}`);
       logger.info('User removed from favorites', { userId, targetUserId });
+
       return true;
     } catch (error) {
       logger.error('Error removing from favorites:', error);
@@ -494,18 +544,30 @@ class UserModel {
    */
   static async blockUser(userId, targetUserId) {
     try {
-      // Add to blocked and remove from favorites in one query
-      await query(
-        `UPDATE users
-         SET blocked = array_append(blocked, $1),
-             favorites = array_remove(favorites, $1),
-             updated_at = $2
-         WHERE id = $3 AND NOT ($1 = ANY(blocked))`,
-        [targetUserId.toString(), new Date(), userId.toString()]
-      );
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
 
-      await cache.del(`user:${userId}`);
-      logger.info('User blocked', { userId, targetUserId });
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const blocked = doc.data().blocked || [];
+      if (!blocked.includes(targetUserId.toString())) {
+        blocked.push(targetUserId.toString());
+
+        // Remove from favorites if present
+        const favorites = doc.data().favorites || [];
+        const updatedFavorites = favorites.filter((id) => id !== targetUserId.toString());
+
+        await userRef.update({
+          blocked,
+          favorites: updatedFavorites,
+          updatedAt: new Date(),
+        });
+
+        await cache.del(`user:${userId}`);
+        logger.info('User blocked', { userId, targetUserId });
+      }
+
       return true;
     } catch (error) {
       logger.error('Error blocking user:', error);
@@ -521,15 +583,23 @@ class UserModel {
    */
   static async unblockUser(userId, targetUserId) {
     try {
-      await query(
-        `UPDATE users
-         SET blocked = array_remove(blocked, $1), updated_at = $2
-         WHERE id = $3`,
-        [targetUserId.toString(), new Date(), userId.toString()]
-      );
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const blocked = doc.data().blocked || [];
+      const updatedBlocked = blocked.filter((id) => id !== targetUserId.toString());
+
+      await userRef.update({
+        blocked: updatedBlocked,
+        updatedAt: new Date(),
+      });
 
       await cache.del(`user:${userId}`);
       logger.info('User unblocked', { userId, targetUserId });
+
       return true;
     } catch (error) {
       logger.error('Error unblocking user:', error);
@@ -568,14 +638,18 @@ class UserModel {
         return [];
       }
 
-      // Get all favorite users in one query
-      const result = await query(
-        'SELECT * FROM users WHERE id = ANY($1::text[])',
-        [user.favorites]
-      );
+      const db = getFirestore();
+      const favorites = [];
 
-      logger.info(`Retrieved ${result.rows.length} favorites for user ${userId}`);
-      return result.rows;
+      for (const favoriteId of user.favorites) {
+        const doc = await db.collection(COLLECTION).doc(favoriteId).get();
+        if (doc.exists) {
+          favorites.push({ id: doc.id, ...doc.data() });
+        }
+      }
+
+      logger.info(`Retrieved ${favorites.length} favorites for user ${userId}`);
+      return favorites;
     } catch (error) {
       logger.error('Error getting favorites:', error);
       return [];
@@ -610,26 +684,28 @@ class UserModel {
   /**
    * Remove badge from user
    * @param {number|string} userId - User ID
-   * @param {string} badgeName - Badge name to remove
+   * @param {string} badge - Badge name to remove
    * @returns {Promise<boolean>} Success status
    */
-  static async removeBadge(userId, badgeName) {
+  static async removeBadge(userId, badge) {
     try {
-      // Get current badges
-      const result = await query('SELECT badges FROM users WHERE id = $1', [userId.toString()]);
-      if (result.rows.length === 0) return false;
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
 
-      const badges = result.rows[0].badges || [];
-      // Filter out the badge by name
-      const updatedBadges = badges.filter(b => b.name !== badgeName);
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
 
-      await query(
-        'UPDATE users SET badges = $1, updated_at = $2 WHERE id = $3',
-        [JSON.stringify(updatedBadges), new Date(), userId.toString()]
-      );
+      const badges = doc.data().badges || [];
+      const updatedBadges = badges.filter((b) => b !== badge);
+
+      await userRef.update({
+        badges: updatedBadges,
+        updatedAt: new Date(),
+      });
 
       await cache.del(`user:${userId}`);
-      logger.info('Badge removed from user', { userId, badgeName });
+      logger.info('Badge removed from user', { userId, badge });
+
       return true;
     } catch (error) {
       logger.error('Error removing badge:', error);
@@ -644,17 +720,34 @@ class UserModel {
    */
   static async getChurnedUsers() {
     try {
-      // Get free users who have successful payment history
-      const result = await query(
-        `SELECT DISTINCT u.*
-         FROM users u
-         INNER JOIN payments p ON u.id = p.user_id
-         WHERE u.subscription_status = 'free'
-         AND p.status = 'success'`
-      );
+      const db = getFirestore();
 
-      logger.info(`Found ${result.rows.length} churned users`);
-      return result.rows;
+      // Get all free users
+      const freeUsersSnapshot = await db.collection(COLLECTION)
+        .where('subscriptionStatus', '==', 'free')
+        .get();
+
+      const churnedUsers = [];
+
+      // Check which free users have payment history
+      for (const doc of freeUsersSnapshot.docs) {
+        const userId = doc.id;
+
+        // Check if user has any successful payments
+        const paymentsSnapshot = await db.collection('payments')
+          .where('userId', '==', userId)
+          .where('status', '==', 'success')
+          .limit(1)
+          .get();
+
+        // If user has payment history, they are churned
+        if (!paymentsSnapshot.empty) {
+          churnedUsers.push({ id: doc.id, ...doc.data() });
+        }
+      }
+
+      logger.info(`Found ${churnedUsers.length} churned users`);
+      return churnedUsers;
     } catch (error) {
       logger.error('Error getting churned users:', error);
       return [];

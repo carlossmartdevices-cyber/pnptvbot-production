@@ -44,6 +44,22 @@ const registerMenuHandlers = (bot) => {
         { show_alert: true }
       );
     });
+    // Admin panel handler: only superadmins can access role management
+    bot.action('admin_panel', async (ctx) => {
+      try {
+        // PermissionService is required from roleManagement.js
+        const PermissionService = require('../admin/../../services/permissionService');
+        const showRoleManagement = require('../admin/roleManagement.js').showRoleManagement;
+        const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+        if (!isSuperAdmin) {
+          await ctx.answerCbQuery('❌ Solo Super Administradores pueden acceder');
+          return;
+        }
+        await showRoleManagement(ctx);
+      } catch (error) {
+        logger.error('Error in admin panel:', error);
+      }
+    });
   // Menu command
   bot.command('menu', async (ctx) => {
     try {
@@ -230,8 +246,19 @@ const showMainMenu = async (ctx) => {
  */
 const showGroupMenu = async (ctx) => {
   const lang = ctx.session?.language || 'en';
-  const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'User';
+  let username = ctx.from?.username ? `@${ctx.from.username}` : 'papi';
   const botUsername = ctx.botInfo?.username || 'pnptv_bot';
+
+  // Mensaje de notificación en grupo
+  const notifyText = `${username} I sent a private message. Please check it out.`;
+  await ctx.reply(notifyText);
+
+  // Menú compacto con link al handle
+  const menuLink = `https://t.me/${botUsername}?start=group_menu`;
+  const menuText = lang === 'es'
+    ? `Menú rápido: [Abrir Bot](${menuLink})`
+    : `Quick menu: [Open Bot](${menuLink})`;
+  await ctx.reply(menuText, { parse_mode: 'Markdown' });
 
   const messageEs = [
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
@@ -295,29 +322,49 @@ const showGroupMenu = async (ctx) => {
  */
 const showMainMenuEdit = async (ctx) => {
   const lang = ctx.session?.language || 'en';
+  const user = ctx.session?.user || {};
+  const isPremium = user.subscriptionStatus === 'active';
+  const isAdmin = user.role === 'admin';
+
+  let menuText = '';
+  if (isAdmin) {
+    menuText = lang === 'es'
+      ? '👑 ¡Bienvenido Admin!\nAcceso total a todas las funciones y panel de administración.'
+      : '👑 Welcome Admin!\nFull access to all features and admin panel.';
+  } else if (isPremium) {
+    menuText = t('welcomeScreenPrime', lang);
+  } else {
+    menuText = t('welcomeScreenFree', lang);
+  }
+
+  function buildButton(label, action, locked) {
+    return Markup.button.callback(locked ? `${label} 🔒` : label, locked ? 'locked_feature' : action);
+  }
+
+  const buttons = [
+    [
+      Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
+      Markup.button.callback(t('myProfile', lang), 'show_profile'),
+    ],
+    [
+      Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
+      buildButton(t('liveStreams', lang), 'show_live', !isPremium && !isAdmin),
+    ],
+    [
+      Markup.button.callback(t('radioMenu', lang), 'show_radio'),
+      buildButton(t('zoomRooms', lang), 'show_zoom', !isPremium && !isAdmin),
+    ],
+    [
+      Markup.button.callback(t('support', lang), 'show_support'),
+      Markup.button.callback(t('settings', lang), 'show_settings'),
+    ],
+  ];
+  if (isAdmin) {
+    buttons.push([Markup.button.callback('🛡️ Admin Panel', 'admin_panel')]);
+  }
 
   try {
-    await ctx.editMessageText(
-      t('mainMenuIntro', lang),
-      Markup.inlineKeyboard([
-        [
-          Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
-          Markup.button.callback(t('myProfile', lang), 'show_profile'),
-        ],
-        [
-          Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
-          Markup.button.callback(t('liveStreams', lang), 'show_live'),
-        ],
-        [
-          Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-          Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
-        ],
-        [
-          Markup.button.callback(t('support', lang), 'show_support'),
-          Markup.button.callback(t('settings', lang), 'show_settings'),
-        ],
-      ]),
-    );
+    await ctx.editMessageText(menuText, Markup.inlineKeyboard(buttons));
   } catch (error) {
     // If edit fails, send new message
     await showMainMenu(ctx);

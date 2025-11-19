@@ -33,7 +33,7 @@ const translations = {
 
     // Main Menu
     mainMenuIntro: '🎬 Welcome to PNPtv - Your Entertainment Hub!\n\nWhat would you like to do?',
-    subscribe: `Subscribe to PNPtv PRIME\n------------------------\n\nJoin the most intense PNP content platform created by and for the community.\n\nPRIME gives you full access to:\n• Full-length PNP videos with real latinos smoking and slamming  \n• Exclusive releases starring Santino (x.com/pnpmethdaddy)  \n• One new full video every week  \n• Live streams and private sessions  \n• Zoom Rooms for private meet-ups  \n• Unlimited Nearby to explore users around you  \n• Complete music and podcast library  \n• Priority support\n\nChoose the plan that fits you best and complete your payment.\nYour membership will be activated automatically.\n\nPayment methods available: card, crypto and most popular payment apps.`,
+    subscribe: `Subscribe to PNPtv PRIME\n----------------------------------\n\nJoin the most intense PNP content platform created by and for the community.\n\nPRIME gives you full access to:\n• Full-length PNP videos with real latinos smoking and slamming  \n• Exclusive releases starring Santino (x.com/pnpmethdaddy)  \n• Live streams and Zoom Rooms.\n• Unlimited Nearby to explore users around you  \n• Complete music and podcast library  \n\nChoose the plan that fits you best and complete your payment.\nYour membership will be activated automatically.\n\nPayment methods available: debit/credit card, Ceypto, and most popular payment apps. `,
     myProfile: '👤 My Profile',
     nearbyUsers: '🌍 Nearby Users',
     liveStreams: '🎤 Live Streams',
@@ -401,7 +401,7 @@ const translations = {
 
     // Main Menu
     mainMenuIntro: '🎬 Bienvenido a PNPtv - ¡Tu Centro de Entretenimiento!\n\n¿Qué te gustaría hacer?',
-    subscribe: `Suscríbete a PNPtv PRIME\n------------------------\n\nÚnete a la plataforma de contenido PNP más intensa, creada por y para la comunidad.\n\nPRIME te da acceso total a:\n• Videos PNP completos con latinos reales fumando y slameando  \n• Estrenos exclusivos protagonizados por Santino (x.com/pnpmethdaddy)  \n• Un video completo nuevo cada semana  \n• Transmisiones en vivo y sesiones privadas  \n• Salas Zoom para encuentros privados  \n• Nearby ilimitado para explorar usuarios cerca de ti  \n• Biblioteca completa de música y podcasts  \n• Soporte prioritario\n\nElige el plan que mejor se adapte a ti y completa tu pago.\nTu membresía se activará automáticamente.\n\nMétodos de pago disponibles: tarjeta, cripto y las apps de pago más populares.`,
+    subscribe: `Suscríbete a PNPtv PRIME\n----------------------------------\n\nÚnete a la plataforma de contenido PNP más intensa, creada por y para la comunidad.\n\nPRIME te da acceso total a:\n• Videos PNP completos con latinos reales fumando y slameando  \n• Estrenos exclusivos protagonizados por Santino (x.com/pnpmethdaddy)  \n• Transmisiones en vivo y Salas Zoom.\n• Nearby ilimitado para explorar usuarios cerca de ti  \n• Biblioteca completa de música y podcasts  \n\nElige el plan que mejor se adapte a ti y completa tu pago.\nTu membresía se activará automáticamente.\n\nMétodos de pago disponibles: tarjeta débito/crédito, Ceypto y las apps de pago más populares. `,
     myProfile: '👤 Mi Perfil',
     nearbyUsers: '🌍 Usuarios Cercanos',
     liveStreams: '🎤 Transmisiones en Vivo',

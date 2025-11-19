@@ -128,6 +128,32 @@ class PaymentService {
               expiryDate,
               refPayco: x_ref_payco,
             });
+
+            // Enviar mensaje de bienvenida y datos de pago
+            try {
+              const { Telegraf } = require('telegraf');
+              const { sendPrimeWelcome } = require('../handlers/user/menu');
+              const bot = new Telegraf(process.env.BOT_TOKEN);
+              const primeChannels = (process.env.PRIME_CHANNEL_ID || '').split(',').map(id => id.trim());
+              const amountPaid = x_amount;
+              const nextPayment = expiryDate.toLocaleDateString('es-CO');
+              const planName = plan.name || 'PRIME';
+              const message = [
+                `🎉 ¡Bienvenido a PRIME, ${x_customer_name || ''}!`,
+                '',
+                `✅ Tu pago de *${amountPaid} ${x_currency_code || 'COP'}* por el plan *${planName}* fue recibido exitosamente.`,
+                '',
+                `Tu membresía está activa hasta: *${nextPayment}*`,
+                '',
+                'Accede al canal exclusivo aquí:',
+                ...primeChannels.map(id => `👉 [Ingresar a PRIME](https://t.me/c/${id.replace('-100','')})`),
+                '',
+                '¡Gracias por confiar en PNPtv! Disfruta todos los beneficios y novedades.'
+              ].join('\n');
+              await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown', disable_web_page_preview: true });
+            } catch (err) {
+              logger.error('Error enviando mensaje de bienvenida PRIME:', err);
+            }
           }
         }
 
