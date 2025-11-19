@@ -2,6 +2,8 @@ const { Markup } = require('telegraf');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
+const SupportTopicModel = require('../../../models/supportTopicModel');
+const UserModel = require('../../../models/userModel');
 
 // Mistral AI integration
 let mistral = null;
@@ -475,11 +477,10 @@ const registerSupportHandlers = (bot) => {
           return next();
         }
 
-        // Send to admin users
-        const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
+        const supportGroupId = process.env.SUPPORT_GROUP_ID;
 
-        if (adminIds.length === 0) {
-          logger.error('No admin users configured for support messages');
+        if (!supportGroupId) {
+          logger.error('Support group ID not configured');
           await ctx.reply(
             lang === 'es'
               ? 'Sistema de soporte no configurado. Por favor contacta con nosotros vía email.'
@@ -489,22 +490,105 @@ const registerSupportHandlers = (bot) => {
           return;
         }
 
-        for (const adminId of adminIds) {
+        // Get or create support topic for this user
+        const userId = ctx.from.id.toString();
+        let topic = await SupportTopicModel.getByUserId(userId);
+
+        if (!topic) {
+          // Create new topic for this user
+          const user = await UserModel.getById(userId);
+          const username = ctx.from.username || 'NoUsername';
+          const firstName = ctx.from.first_name || 'User';
+          const topicName = `👤 ${firstName} (@${username}) - ID: ${userId}`;
+
           try {
-            await ctx.telegram.sendMessage(
-              adminId.trim(),
-              `📬 Support Message from User ${ctx.from.id} (@${ctx.from.username || 'no username'}):\n\n${message}`,
+            // Create forum topic in support group
+            const forumTopic = await ctx.telegram.createForumTopic(
+              supportGroupId,
+              topicName,
+              {
+                icon_custom_emoji_id: '5312536423851630001', // 💬 emoji (optional)
+              },
             );
-          } catch (sendError) {
-            logger.error('Error sending to admin:', sendError);
+
+            // Save topic to database
+            topic = await SupportTopicModel.create({
+              userId,
+              threadId: forumTopic.message_thread_id,
+              threadName: topicName,
+            });
+
+            logger.info('Support topic created', {
+              userId,
+              threadId: topic.thread_id,
+              topicName,
+            });
+
+            // Send welcome message to topic
+            const welcomeMessage = lang === 'es'
+              ? `🆕 **Nuevo ticket de soporte**\n\n`
+                + `👤 Usuario: ${firstName} ${ctx.from.last_name || ''}\n`
+                + `📧 Username: @${username}\n`
+                + `🆔 Telegram ID: \`${userId}\`\n`
+                + `🌍 Idioma: Español\n`
+                + `⏰ Fecha: ${new Date().toLocaleString('es-ES')}\n\n`
+                + `━━━━━━━━━━━━━━━━━━━━\n\n`
+                + `📝 **Primer mensaje:**\n${message}\n\n`
+                + `━━━━━━━━━━━━━━━━━━━━\n\n`
+                + `💡 Responde en este topic para comunicarte con el usuario.`
+              : `🆕 **New Support Ticket**\n\n`
+                + `👤 User: ${firstName} ${ctx.from.last_name || ''}\n`
+                + `📧 Username: @${username}\n`
+                + `🆔 Telegram ID: \`${userId}\`\n`
+                + `🌍 Language: English\n`
+                + `⏰ Date: ${new Date().toLocaleString('en-US')}\n\n`
+                + `━━━━━━━━━━━━━━━━━━━━\n\n`
+                + `📝 **First message:**\n${message}\n\n`
+                + `━━━━━━━━━━━━━━━━━━━━\n\n`
+                + `💡 Reply in this topic to communicate with the user.`;
+
+            await ctx.telegram.sendMessage(supportGroupId, welcomeMessage, {
+              message_thread_id: topic.thread_id,
+              parse_mode: 'Markdown',
+            });
+          } catch (topicError) {
+            logger.error('Error creating forum topic:', topicError);
+            await ctx.reply(
+              lang === 'es'
+                ? '❌ Error al crear el ticket de soporte. Por favor intenta de nuevo.'
+                : '❌ Error creating support ticket. Please try again.',
+            );
+            ctx.session.temp.contactingAdmin = false;
+            return;
           }
+        } else {
+          // Topic exists, send message to existing topic
+          const firstName = ctx.from.first_name || 'User';
+          const username = ctx.from.username || 'NoUsername';
+
+          const formattedMessage = `👤 **${firstName}** (@${username}):\n\n${message}`;
+
+          await ctx.telegram.sendMessage(supportGroupId, formattedMessage, {
+            message_thread_id: topic.thread_id,
+            parse_mode: 'Markdown',
+          });
+
+          // Update last message timestamp
+          await SupportTopicModel.updateLastMessage(userId);
+
+          logger.info('Message sent to existing support topic', {
+            userId,
+            threadId: topic.thread_id,
+          });
         }
 
         ctx.session.temp.contactingAdmin = false;
         await ctx.saveSession();
 
         await ctx.reply(
-          t('messageSent', lang),
+          lang === 'es'
+            ? '✅ Tu mensaje ha sido enviado al equipo de soporte. Te responderemos pronto por este chat.'
+            : '✅ Your message has been sent to the support team. We will reply to you soon via this chat.',
           Markup.inlineKeyboard([
             [Markup.button.callback(t('back', lang), 'show_support')],
           ]),
@@ -675,6 +759,199 @@ const registerSupportHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error in request activation:', error);
+    }
+  });
+
+  /**
+   * Listen for replies from support group
+   * Forward support team messages back to users
+   */
+  bot.on('message', async (ctx, next) => {
+    try {
+      const supportGroupId = process.env.SUPPORT_GROUP_ID;
+
+      // Only process messages from the support group
+      if (!supportGroupId || ctx.chat.id.toString() !== supportGroupId) {
+        return next();
+      }
+
+      // Only process messages in forum topics (not general messages)
+      if (!ctx.message.message_thread_id) {
+        return next();
+      }
+
+      // Skip messages from the bot itself
+      if (ctx.from.is_bot) {
+        return next();
+      }
+
+      // Get the topic from database
+      const topic = await SupportTopicModel.getByThreadId(ctx.message.message_thread_id);
+
+      if (!topic) {
+        logger.warn('Message in unknown support topic', {
+          threadId: ctx.message.message_thread_id,
+        });
+        return next();
+      }
+
+      // Forward message to user
+      const userId = topic.user_id;
+      const supporterName = ctx.from.first_name || 'Support Team';
+      const messageText = ctx.message.text;
+
+      if (!messageText) {
+        logger.warn('Non-text message in support topic, skipping forward');
+        return next();
+      }
+
+      // Format message with support team branding
+      const formattedMessage = `💬 **Soporte Técnico** (${supporterName}):\n\n${messageText}`;
+
+      try {
+        await ctx.telegram.sendMessage(userId, formattedMessage, {
+          parse_mode: 'Markdown',
+        });
+
+        // React to message in group to show it was sent
+        try {
+          await ctx.react('✅');
+        } catch (reactError) {
+          // Reactions might not be available, ignore
+          logger.debug('Could not react to message:', reactError.message);
+        }
+
+        logger.info('Support reply forwarded to user', {
+          userId,
+          threadId: topic.thread_id,
+          supporterName,
+        });
+      } catch (sendError) {
+        logger.error('Error forwarding message to user:', {
+          userId,
+          error: sendError.message,
+        });
+
+        // Notify in group that message couldn't be delivered
+        await ctx.reply(
+          `❌ No se pudo enviar el mensaje al usuario. El usuario puede haber bloqueado el bot o eliminado la conversación.`,
+          {
+            message_thread_id: ctx.message.message_thread_id,
+          },
+        );
+      }
+    } catch (error) {
+      logger.error('Error processing support group message:', error);
+      return next();
+    }
+  });
+
+  /**
+   * Command to close support ticket (admin only, in support group)
+   */
+  bot.command('cerrar', async (ctx) => {
+    try {
+      const supportGroupId = process.env.SUPPORT_GROUP_ID;
+
+      // Only works in support group
+      if (!supportGroupId || ctx.chat.id.toString() !== supportGroupId) {
+        return;
+      }
+
+      // Only in forum topics
+      if (!ctx.message.message_thread_id) {
+        return;
+      }
+
+      const topic = await SupportTopicModel.getByThreadId(ctx.message.message_thread_id);
+
+      if (!topic) {
+        await ctx.reply('❌ Topic no encontrado en la base de datos.');
+        return;
+      }
+
+      // Update topic status to closed
+      await SupportTopicModel.updateStatus(topic.user_id, 'closed');
+
+      // Close the forum topic
+      try {
+        await ctx.telegram.closeForumTopic(supportGroupId, ctx.message.message_thread_id);
+      } catch (closeError) {
+        logger.warn('Could not close forum topic:', closeError.message);
+      }
+
+      await ctx.reply(
+        `✅ Ticket cerrado.\n\n`
+        + `Usuario: ${topic.thread_name}\n`
+        + `Total de mensajes: ${topic.message_count}`,
+        {
+          message_thread_id: ctx.message.message_thread_id,
+        },
+      );
+
+      // Notify user
+      await ctx.telegram.sendMessage(
+        topic.user_id,
+        '✅ Tu ticket de soporte ha sido cerrado. Si necesitas ayuda adicional, puedes contactar a soporte nuevamente.',
+      );
+
+      logger.info('Support ticket closed', {
+        userId: topic.user_id,
+        threadId: topic.thread_id,
+      });
+    } catch (error) {
+      logger.error('Error closing support ticket:', error);
+    }
+  });
+
+  /**
+   * Command to reopen support ticket (admin only, in support group)
+   */
+  bot.command('reabrir', async (ctx) => {
+    try {
+      const supportGroupId = process.env.SUPPORT_GROUP_ID;
+
+      // Only works in support group
+      if (!supportGroupId || ctx.chat.id.toString() !== supportGroupId) {
+        return;
+      }
+
+      // Only in forum topics
+      if (!ctx.message.message_thread_id) {
+        return;
+      }
+
+      const topic = await SupportTopicModel.getByThreadId(ctx.message.message_thread_id);
+
+      if (!topic) {
+        await ctx.reply('❌ Topic no encontrado en la base de datos.');
+        return;
+      }
+
+      // Update topic status to open
+      await SupportTopicModel.updateStatus(topic.user_id, 'open');
+
+      // Reopen the forum topic
+      try {
+        await ctx.telegram.reopenForumTopic(supportGroupId, ctx.message.message_thread_id);
+      } catch (reopenError) {
+        logger.warn('Could not reopen forum topic:', reopenError.message);
+      }
+
+      await ctx.reply(
+        `✅ Ticket reabierto.\n\n`
+        + `Usuario: ${topic.thread_name}`,
+        {
+          message_thread_id: ctx.message.message_thread_id,
+        },
+      );
+
+      logger.info('Support ticket reopened', {
+        userId: topic.user_id,
+        threadId: topic.thread_id,
+      });
+    } catch (error) {
+      logger.error('Error reopening support ticket:', error);
     }
   });
 };
