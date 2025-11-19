@@ -347,41 +347,11 @@ class PaymentService {
          // Create payment reference
          const paymentRef = `PAY-${payment.id.substring(0, 8).toUpperCase()}`;
 
-         // Generate ePayco Checkout URL with parameters
-         const planName = plan.display_name || plan.name;
-         const description = `Suscripción ${planName} - PNPtv`;
+         // Generate URL to landing page (not direct to ePayco)
+         // The landing page will handle the ePayco checkout with SDK
+         const paymentUrl = `${webhookDomain}/payment/${payment.id}`;
 
-         // ePayco Checkout Standard URL
-         const baseUrl = 'https://checkout.epayco.co/checkout.html';
-
-         // Build parameters according to ePayco documentation
-         const params = new URLSearchParams({
-           key: epaycoPublicKey,
-           external: 'true',
-           name: description,
-           description: description,
-           invoice: paymentRef,
-           currency: 'cop',
-           amount: priceInCOP.toString(),
-           tax_base: '0',
-           tax: '0',
-           country: 'co',
-           lang: 'es',
-           // Pass data in extra fields for webhook processing
-           extra1: userId.toString(), // User ID (Telegram ID)
-           extra2: planId, // Plan ID
-           extra3: payment.id, // Payment ID
-           // Webhook URLs
-           confirmation: `${webhookDomain}/api/webhooks/epayco`,
-           response: `${webhookDomain}/api/payment-response`,
-           // Test mode
-           test: epaycoTestMode ? 'true' : 'false',
-           autoclick: 'false'
-         });
-
-         const paymentUrl = `${baseUrl}?${params.toString()}`;
-
-         logger.info('ePayco payment URL generated', {
+         logger.info('ePayco payment URL generated (landing page)', {
            paymentId: payment.id,
            paymentRef,
            planId: plan.id,
@@ -389,8 +359,7 @@ class PaymentService {
            amountUSD: plan.price,
            amountCOP: priceInCOP,
            testMode: epaycoTestMode,
-           confirmationUrl: `${webhookDomain}/api/webhooks/epayco`,
-           responseUrl: `${webhookDomain}/api/payment-response`
+           paymentUrl,
          });
 
          return {
