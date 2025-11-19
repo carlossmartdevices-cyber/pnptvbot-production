@@ -7,6 +7,13 @@ let db = null;
 
 function initializeFirebase() {
   if (db) return db;
+
+  // Check if Firebase is configured
+  if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL) {
+    logger.warn('Firebase credentials not configured, skipping Firebase initialization');
+    return null;
+  }
+
   try {
     const serviceAccount = {
       type: 'service_account',
@@ -24,13 +31,14 @@ function initializeFirebase() {
     return db;
   } catch (error) {
     logger.error('Failed to initialize Firebase:', error);
-    throw error;
+    logger.warn('Continuing without Firebase. Some features may not work.');
+    return null;
   }
 }
 
 function getFirestore() {
   if (!db) {
-    return initializeFirebase();
+    db = initializeFirebase();
   }
   return db;
 }
@@ -89,6 +97,7 @@ class PaymentModel {
 
 
 module.exports = {
+  initializeFirebase,
   getFirestore,
   PaymentModel
 };

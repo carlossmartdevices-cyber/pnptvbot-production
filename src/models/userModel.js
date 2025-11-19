@@ -1,4 +1,4 @@
-const { getFirestore } = require('../config/firebase');
+const { query } = require('../config/postgres');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
@@ -15,43 +15,22 @@ class UserModel {
    */
   static async createOrUpdate(userData) {
     try {
-      const db = getFirestore();
       const userId = userData.userId.toString();
-      const userRef = db.collection(COLLECTION).doc(userId);
-
       const timestamp = new Date();
       const data = {
         ...userData,
+        first_name: userData.first_name ?? '',
+        last_name: userData.last_name ?? '',
+        onboardingComplete: typeof userData.onboardingComplete === 'boolean' ? userData.onboardingComplete : false,
         updatedAt: timestamp,
       };
-
-      const doc = await userRef.get();
-      if (!doc.exists) {
-        data.createdAt = timestamp;
-        data.subscriptionStatus = 'free';
-        data.language = userData.language || 'en';
-        // Default role for new users
-        data.role = userData.role || 'user';
-        // Default privacy settings
-        data.privacy = {
-          showLocation: true,
-          showInterests: true,
-          showBio: true,
-          allowMessages: true,
-          showOnline: true,
-        };
-        // Initialize counters
-        data.profileViews = 0;
-        data.favorites = [];
-        data.blocked = [];
-        data.badges = [];
-      }
-
-      await userRef.set(data, { merge: true });
-
-      // Invalidate cache
+      // Upsert user in PostgreSQL
+      await query(`INSERT INTO users (id, username, first_name, last_name, email, role, privacy, profile_views, favorites, blocked, badges, subscription_status, plan_id, plan_expiry, language, created_at, updated_at, onboarding_complete)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        ON CONFLICT (id) DO UPDATE SET username = $2, first_name = $3, last_name = $4, email = $5, role = $6, privacy = $7, profile_views = $8, favorites = $9, blocked = $10, badges = $11, subscription_status = $12, plan_id = $13, plan_expiry = $14, language = $15, updated_at = $17, onboarding_complete = $18`,
+        [userId, data.username, data.first_name, data.last_name, data.email, data.role || 'user', JSON.stringify(data.privacy), data.profileViews || 0, data.favorites || [], data.blocked || [], data.badges || [], data.subscriptionStatus || 'free', data.planId, data.planExpiry, data.language || 'en', data.createdAt || timestamp, timestamp, data.onboardingComplete]
+      );
       await cache.del(`user:${userId}`);
-
       logger.info('User created/updated', { userId, role: data.role });
       return data;
     } catch (error) {
@@ -68,22 +47,20 @@ class UserModel {
   static async getById(userId) {
     try {
       const cacheKey = `user:${userId}`;
-
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const db = getFirestore();
-          const doc = await db.collection(COLLECTION).doc(userId.toString()).get();
-
-          if (!doc.exists) {
+          const result = await query('SELECT * FROM users WHERE id = $1', [userId.toString()]);
+          if (result.rows.length === 0) {
             return null;
           }
-
-          const userData = { id: doc.id, ...doc.data() };
-          logger.debug(`Fetched user from database: ${userId}`);
+          const userData = result.rows[0];
+          // Ensure onboardingComplete is boolean
+          userData.onboardingComplete = Boolean(userData.onboarding_complete);
+          logger.debug(`Fetched user from PostgreSQL: ${userId}`);
           return userData;
         },
-        600, // Cache for 10 minutes
+        600,
       );
     } catch (error) {
       logger.error('Error getting user:', error);
@@ -99,17 +76,12 @@ class UserModel {
    */
   static async updateProfile(userId, updates) {
     try {
-      const db = getFirestore();
-      const userRef = db.collection(COLLECTION).doc(userId.toString());
-
-      await userRef.update({
-        ...updates,
-        updatedAt: new Date(),
-      });
-
-      // Invalidate cache
+      const fields = Object.keys(updates);
+      const values = Object.values(updates);
+      const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
+      values.push(new Date());
+      await query(`UPDATE users SET ${setClause}, updated_at = $${fields.length + 1} WHERE id = $${fields.length + 2}`, [...values, userId.toString()]);
       await cache.del(`user:${userId}`);
-
       logger.info('User profile updated', { userId, updates });
       return true;
     } catch (error) {
@@ -445,20 +417,14 @@ class UserModel {
             total,
             premium,
             free,
-            conversionRate: Math.round(conversionRate * 100) / 100,
-            timestamp: new Date().toISOString(),
+            conversionRate,
           };
-
-          logger.info('User statistics calculated', stats);
           return stats;
-        },
-        60, // Cache for 1 minute (stats change frequently)
+        }
       );
     } catch (error) {
       logger.error('Error getting user statistics:', error);
-      return {
-        total: 0, premium: 0, free: 0, conversionRate: 0,
-      };
+      return { total: 0, premium: 0, free: 0, conversionRate: 0 };
     }
   }
 

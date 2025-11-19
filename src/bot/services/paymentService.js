@@ -32,7 +32,7 @@ class PaymentService {
       }
       return success;
     }
-  static async createPayment({ userId, planId, provider, sku }) {
+  static async createPayment({ userId, planId, provider, sku, chatId }) {
     try {
       const plan = await PlanModel.getById(planId);
       if (!plan || !plan.active) {
@@ -49,17 +49,94 @@ class PaymentService {
          status: 'pending',
        });
 
-       // Registrar estado inicial en la base de datos (ya se guarda como 'pending' en create)
+       logger.info('Payment created', {
+         paymentId: payment.id,
+         userId,
+         planId,
+         provider,
+         amount: plan.price
+       });
 
-       // Simular creación de enlace de pago (reemplazar con API real de ePayco/Daimo)
+       // Generate ePayco payment link
+       if (provider === 'epayco') {
+         const epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;
+         const epaycoTestMode = process.env.EPAYCO_TEST_MODE === 'true';
+         const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN;
+
+         if (!epaycoPublicKey) {
+           logger.error('ePayco public key not configured');
+           throw new Error('Configuración de pago incompleta. Contacta soporte.');
+         }
+
+         // Use price in Colombian pesos for ePayco
+         const priceInCOP = plan.price_in_cop || (parseFloat(plan.price) * 4000); // Fallback conversion
+
+         // Validate price in COP
+         if (!priceInCOP || priceInCOP <= 0) {
+           logger.error('Invalid price in COP', { planId: plan.id, price_in_cop: plan.price_in_cop });
+           throw new Error('Precio inválido para este plan. Contacta soporte.');
+         }
+
+         // Create payment reference
+         const paymentRef = `PAY-${payment.id.substring(0, 8).toUpperCase()}`;
+
+         // Generate ePayco Checkout URL with parameters
+         const planName = plan.display_name || plan.name;
+         const description = `Suscripción ${planName} - PNPtv`;
+
+         // ePayco Checkout Standard URL
+         const baseUrl = epaycoTestMode
+           ? 'https://checkout.epayco.co/checkout.html'
+           : 'https://checkout.epayco.co/checkout.html';
+
+         const params = new URLSearchParams({
+           key: epaycoPublicKey,
+           external: 'true',
+           name: description,
+           description: description,
+           invoice: paymentRef,
+           currency: 'cop',
+           amount: priceInCOP.toString(),
+           tax_base: '0',
+           tax: '0',
+           country: 'co',
+           lang: 'es',
+           external_reference: payment.id,
+           confirmation: `${webhookDomain}/api/webhooks/epayco`,
+           response: `${webhookDomain}/payment/response`,
+           test: epaycoTestMode ? 'true' : 'false',
+           autoclick: 'true'
+         });
+
+         const paymentUrl = `${baseUrl}?${params.toString()}`;
+
+         logger.info('ePayco payment URL generated', {
+           paymentId: payment.id,
+           paymentRef,
+           planId: plan.id,
+           amountUSD: plan.price,
+           amountCOP: priceInCOP,
+           testMode: epaycoTestMode
+         });
+
+         return {
+           success: true,
+           paymentUrl,
+           paymentId: payment.id,
+           paymentRef
+         };
+       }
+
+       // For other providers (like Daimo)
        const paymentUrl = `https://${provider}.com/pay?paymentId=${payment.id}`;
-
        return { success: true, paymentUrl, paymentId: payment.id };
     } catch (error) {
       logger.error('Error creando pago:', { error: error.message, planId, provider });
       throw new Error(
-        error.message.includes('plan')
+        error.message.includes('plan') || error.message.includes('inactivo')
           ? 'El plan seleccionado no existe o está inactivo.'
+          : error.message.includes('Configuración')
+          ? error.message
           : 'El proveedor de pago no está disponible, intente más tarde. Si el problema persiste, contacta soporte.'
       );
     }

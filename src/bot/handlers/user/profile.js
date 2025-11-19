@@ -368,99 +368,53 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
       await UserModel.incrementProfileViews(targetUserId);
     }
 
-    // Build profile text
-    let profileText = isOwnProfile ? `${t('profileTitle', lang)}\n\n` : '👤 User Profile\n\n';
-
-    // Badges (objeto-objeto, mostrar emoji y nombre)
-    if (targetUser.badges && targetUser.badges.length > 0) {
-      const badgeList = targetUser.badges.map((badge) => {
-        // Si es badge estándar
-        if (typeof badge === 'string') {
-          const badgeKey = `badges.${badge}`;
-          return t(badgeKey, lang);
-        }
-        // Si es badge personalizado (objeto)
-        if (typeof badge === 'object' && badge.icon && badge.name) {
-          return `${badge.icon} ${badge.name}`;
-        }
-        return '';
-      }).filter(Boolean).join(' ');
-      profileText += `${badgeList}\n`;
-    }
-
-    // Basic info
-    profileText += `👤 ${targetUser.firstName || 'User'} ${targetUser.lastName || ''}\n`;
-    if (targetUser.username) profileText += `@${targetUser.username}\n`;
-
-    // Bio (check privacy)
-    if (targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
-      profileText += `\n📝 ${targetUser.bio}\n`;
-    }
-
-    // Interests (check privacy)
-    if (targetUser.interests && targetUser.interests.length > 0
-      && (isOwnProfile || targetUser.privacy?.showInterests !== false)) {
-      profileText += `\n🎯 ${targetUser.interests.join(', ')}\n`;
-    }
-
-    // Location (check privacy)
-    if (targetUser.location && (isOwnProfile || targetUser.privacy?.showLocation !== false)) {
-      profileText += '\n📍 Location shared\n';
-    }
-
-    // Subscription info
-    if (targetUser.subscriptionStatus === 'active' && targetUser.planExpiry) {
-      try {
-        let expiry;
-        if (targetUser.planExpiry.toDate && typeof targetUser.planExpiry.toDate === 'function') {
-          expiry = targetUser.planExpiry.toDate();
-        } else if (targetUser.planExpiry._seconds) {
-          expiry = new Date(targetUser.planExpiry._seconds * 1000);
-        } else {
-          expiry = new Date(targetUser.planExpiry);
-        }
-
-        if (expiry && !isNaN(expiry.getTime())) {
-          profileText += `\n💎 PRIME: ${t('subscriptionActive', lang, { expiry: moment(expiry).format('MMM DD, YYYY') })}\n`;
-        } else if (isOwnProfile) {
-          profileText += '\n⭐ Free Plan\n';
-        }
-      } catch (error) {
-        logger.warn('Error parsing planExpiry date:', error);
-        if (isOwnProfile) {
-          profileText += '\n⭐ Free Plan\n';
-        }
+    // Build profile text with consistent design
+    let profileText = [
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      isOwnProfile ? '👤 My Profile' : '👤 User Profile',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      targetUser.badges && targetUser.badges.length > 0
+        ? targetUser.badges.map(badge => (typeof badge === 'object' && badge.icon ? `${badge.icon} ${badge.name}` : t(`badges.${badge}`, lang))).filter(Boolean).join(' ') : '',
+      `👤 ${targetUser.firstName || 'User'} ${targetUser.lastName || ''}`,
+      targetUser.username ? `@${targetUser.username}` : '',
+      targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `📝 ${targetUser.bio}` : '',
+      targetUser.interests && targetUser.interests.length > 0 && (isOwnProfile || targetUser.privacy?.showInterests !== false)
+        ? `🎯 ${targetUser.interests.join(', ')}` : '',
+      targetUser.location && (isOwnProfile || targetUser.privacy?.showLocation !== false) ? '📍 Location shared' : '',
+      targetUser.subscriptionStatus === 'active' && targetUser.planExpiry
+        ? (() => {
+            let expiry;
+            if (targetUser.planExpiry.toDate && typeof targetUser.planExpiry.toDate === 'function') {
+              expiry = targetUser.planExpiry.toDate();
+            } else if (targetUser.planExpiry._seconds) {
+              expiry = new Date(targetUser.planExpiry._seconds * 1000);
+            } else {
+              expiry = new Date(targetUser.planExpiry);
+            }
+            return expiry && !isNaN(expiry.getTime())
+              ? `💎 PRIME: ${t('subscriptionActive', lang, { expiry: moment(expiry).format('MMM DD, YYYY') })}`
+              : (isOwnProfile ? '⭐ Free Plan' : '');
+          })()
+        : (isOwnProfile ? '⭐ Free Plan' : ''),
+      isOwnProfile ? `${t('profileViews', lang, { views: targetUser.profileViews || 0 })}` : '',
+      ''
+    ].filter(Boolean).join('\n');
+    // Parse createdAt date
+    let createdAtDate;
+    if (targetUser.createdAt) {
+      if (typeof targetUser.createdAt === 'object' && typeof targetUser.createdAt.toDate === 'function') {
+        createdAtDate = targetUser.createdAt.toDate();
+      } else if (targetUser.createdAt._seconds) {
+        createdAtDate = new Date(targetUser.createdAt._seconds * 1000);
+      } else if (typeof targetUser.createdAt === 'string' || typeof targetUser.createdAt === 'number') {
+        createdAtDate = new Date(targetUser.createdAt);
       }
-    } else if (isOwnProfile) {
-      profileText += '\n⭐ Free Plan\n';
     }
-
-    // Profile stats (only for own profile)
-    if (isOwnProfile) {
-      const views = targetUser.profileViews || 0;
-      profileText += `\n${t('profileViews', lang, { views })}\n`;
-
-      // Parse createdAt date
-      let createdAtDate;
-      try {
-        if (targetUser.createdAt) {
-          if (typeof targetUser.createdAt === 'object' && typeof targetUser.createdAt.toDate === 'function') {
-            createdAtDate = targetUser.createdAt.toDate();
-          } else if (targetUser.createdAt._seconds) {
-            createdAtDate = new Date(targetUser.createdAt._seconds * 1000);
-          } else if (typeof targetUser.createdAt === 'string' || typeof targetUser.createdAt === 'number') {
-            createdAtDate = new Date(targetUser.createdAt);
-          }
-        }
-      } catch (error) {
-        logger.warn('Error parsing createdAt date:', error);
-      }
-
-      const validDate = createdAtDate && !isNaN(createdAtDate.getTime())
-        ? moment(createdAtDate).format('MMM DD, YYYY')
-        : 'Recently';
-      profileText += `${t('memberSince', lang, { date: validDate })}\n`;
-    }
+    const validDate = createdAtDate && !isNaN(createdAtDate.getTime())
+      ? moment(createdAtDate).format('MMM DD, YYYY')
+      : 'Recently';
+    profileText += `${t('memberSince', lang, { date: validDate })}\n`;
 
     // Build keyboard
     const keyboard = [];
@@ -506,6 +460,7 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
     } else {
       await ctx.reply(profileText, Markup.inlineKeyboard(keyboard));
     }
+
   } catch (error) {
     logger.error('Error in showProfile:', error);
     const lang = ctx.session?.language || 'en';
@@ -605,7 +560,12 @@ const showFavorites = async (ctx) => {
       return;
     }
 
-    let text = `${t('myFavorites', lang)}\n\n`;
+    let text = [
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '⭐ My Favorites',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      ''
+    ].join('\n');
     const keyboard = [];
 
     favorites.forEach((user, index) => {
@@ -640,7 +600,12 @@ const showBlockedUsers = async (ctx) => {
       return;
     }
 
-    let text = `${t('blockedUsers', lang)}\n\n`;
+    let text = [
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '🚫 Blocked Users',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      ''
+    ].join('\n');
     const keyboard = [];
 
     for (const blockedId of user.blocked) {

@@ -25,10 +25,12 @@ const registerPaymentHandlers = (bot) => {
 
       const buttons = [];
       plans.forEach((plan) => {
-        const planName = lang === 'es' ? plan.nameEs : plan.name;
-        const features = lang === 'es' ? plan.featuresEs : plan.features;
+        // Use display_name or name, fallback to name if nameEs doesn't exist
+        const planName = plan.display_name || plan.name;
+        // Features are in English, use them directly
+        const features = plan.features || [];
 
-        message += `${planName} - $${plan.price}/month\n`;
+        message += `${plan.icon || '💎'} ${planName} - $${plan.price}${plan.duration <= 30 ? '/month' : ''}\n`;
         features.forEach((feature) => {
           message += `  ✓ ${feature}\n`;
         });
@@ -36,7 +38,7 @@ const registerPaymentHandlers = (bot) => {
 
         buttons.push([
           Markup.button.callback(
-            `💎 ${planName}`,
+            `${plan.icon || '💎'} ${planName}`,
             `select_plan_${plan.id}`,
           ),
         ]);
@@ -191,7 +193,7 @@ const registerPaymentHandlers = (bot) => {
 
         const message = lang === 'es'
           ? '💳 *Pago con Daimo Pay*\n\n'
-            + `Plan: ${plan.nameEs || plan.name}\n`
+            + `Plan: ${plan.display_name || plan.name}\n`
             + `Precio: $${plan.price} USDC\n\n`
             + '📱 *Puedes pagar usando:*\n'
             + '• Zelle\n'
@@ -206,7 +208,7 @@ const registerPaymentHandlers = (bot) => {
             + '4. Tu suscripción se activa inmediatamente\n\n'
             + '🔒 Seguro y rápido en la red Optimism'
           : '💳 *Pay with Daimo Pay*\n\n'
-            + `Plan: ${plan.name}\n`
+            + `Plan: ${plan.display_name || plan.name}\n`
             + `Price: $${plan.price} USDC\n\n`
             + '📱 *You can pay using:*\n'
             + '• Zelle\n'

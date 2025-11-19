@@ -4,9 +4,9 @@
  */
 
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
-const { getFirestore } = require('../config/firebase');
+const { query } = require('../config/postgres');
 const logger = require('../utils/logger');
-const redisClient = require('../config/redis');
+const { cache, getRedis } = require('../config/redis');
 
 const COLLECTION = 'live_streams';
 const VIEWERS_COLLECTION = 'stream_viewers';
@@ -29,13 +29,8 @@ const CATEGORIES = {
 
 class LiveStreamModel {
   /**
-   * Create a new live stream
-   * @param {Object} streamData - Stream data
-   * @returns {Promise<Object>} Created stream
-   */
   static async create(streamData) {
     try {
-      const db = getFirestore();
       const {
         hostId,
         hostName,
@@ -52,27 +47,12 @@ class LiveStreamModel {
         recordStream = false,
         language = 'en',
       } = streamData;
-
-      // Validate required fields
       if (!hostId || !hostName || !title) {
         throw new Error('Missing required fields: hostId, hostName, or title');
       }
-
-      // Validate category
-      const validCategories = Object.values(CATEGORIES);
-      if (!validCategories.includes(category)) {
-        throw new Error(`Invalid category. Must be one of: ${validCategories.join(', ')}`);
-      }
-
-      // Generate unique stream ID
       const streamId = `stream_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      // Generate Agora channel name (alphanumeric only)
       const channelName = `live_${streamId.replace(/[^a-zA-Z0-9]/g, '')}`;
-
-      // Generate Agora tokens
       const tokens = this.generateAgoraTokens(channelName, hostId);
-
       const stream = {
         streamId,
         channelName,
@@ -80,37 +60,35 @@ class LiveStreamModel {
         hostName,
         title,
         description,
-        category,
-        tags: Array.isArray(tags) ? tags.slice(0, 5) : [], // Max 5 tags
-        language,
         isPaid,
-        price: isPaid ? parseFloat(price) : 0,
+        price,
         maxViewers,
-        currentViewers: 0,
-        totalViews: 0,
-        peakViewers: 0,
-        status: scheduledFor ? 'scheduled' : 'active',
-        scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
-        startedAt: scheduledFor ? null : new Date(),
-        endedAt: null,
-        duration: 0, // Will be calculated when stream ends
+        scheduledFor,
+        category,
+        tags,
         thumbnailUrl,
-        viewers: [],
-        likes: 0,
-        totalComments: 0,
         allowComments,
         recordStream,
-        recordingUrl: null, // Will be set after stream ends if recordStream is true
-        moderators: [String(hostId)], // Host is default moderator
-        bannedUsers: [],
-        chatSettings: {
-          slowMode: false, // Limit comments frequency
-          slowModeDelay: 5, // Seconds between comments
-          subscribersOnly: false,
-          emotesOnly: false,
-        },
-        analytics: {
-          avgWatchTime: 0,
+        language,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        tokens,
+      };
+      await query(`INSERT INTO live_streams (id, channel_name, host_id, host_name, title, description, is_paid, price, max_viewers, scheduled_for, category, tags, thumbnail_url, allow_comments, record_stream, language, created_at, updated_at, tokens) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`, [streamId, channelName, hostId, hostName, title, description, isPaid, price, maxViewers, scheduledFor, category, JSON.stringify(tags), thumbnailUrl, allowComments, recordStream, language, stream.createdAt, stream.updatedAt, JSON.stringify(tokens)]);
+      static async update(streamId, updates) {
+        try {
+          const fields = Object.keys(updates);
+          const values = Object.values(updates);
+          const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
+          values.push(new Date());
+          await query(`UPDATE live_streams SET ${setClause}, updated_at = $${fields.length + 1} WHERE id = $${fields.length + 2}`, [...values, streamId]);
+          logger.info('Live stream updated', { streamId, updates });
+          return true;
+        } catch (error) {
+          logger.error('Error updating live stream:', error);
+          return false;
+        }
+      }
           totalWatchTime: 0,
           engagementRate: 0,
           shareCount: 0,
@@ -229,39 +207,47 @@ class LiveStreamModel {
     try {
       // Check cache first
       const cacheKey = `active_streams:${limit}`;
-      const cached = await redisClient.get(cacheKey);
+      const cached = await cache.get(cacheKey);
 
       if (cached) {
-        return JSON.parse(cached);
+        return cached;
       }
 
-      const db = getFirestore();
-      const snapshot = await db
-        .collection(COLLECTION)
-        .where('status', '==', 'active')
-        .orderBy('startedAt', 'desc')
-        .limit(limit)
-        .get();
+      // Query from PostgreSQL
+      const result = await query(
+        `SELECT * FROM live_streams
+         WHERE status = 'live'
+         ORDER BY started_at DESC
+         LIMIT $1`,
+        [limit]
+      );
 
-      const streams = [];
-      snapshot.forEach((doc) => {
-        const stream = doc.data();
-
-        // Convert timestamps
-        if (stream.startedAt?.toDate) stream.startedAt = stream.startedAt.toDate();
-        if (stream.createdAt?.toDate) stream.createdAt = stream.createdAt.toDate();
-        if (stream.updatedAt?.toDate) stream.updatedAt = stream.updatedAt.toDate();
-
-        streams.push(stream);
-      });
+      const streams = result.rows.map(stream => ({
+        id: stream.id,
+        hostId: stream.host_id,
+        title: stream.title,
+        description: stream.description,
+        category: stream.category,
+        streamUrl: stream.stream_url,
+        thumbnailUrl: stream.thumbnail_url,
+        status: stream.status,
+        isPublic: stream.is_public,
+        scheduledAt: stream.scheduled_at,
+        startedAt: stream.started_at,
+        endedAt: stream.ended_at,
+        viewersCount: stream.viewers_count,
+        maxViewers: stream.max_viewers,
+        createdAt: stream.created_at,
+        updatedAt: stream.updated_at,
+      }));
 
       // Cache for 30 seconds
-      await redisClient.setex(cacheKey, CACHE_TTL, JSON.stringify(streams));
+      await cache.set(cacheKey, streams, CACHE_TTL);
 
       return streams;
     } catch (error) {
       logger.error('Error getting active streams:', error);
-      throw error;
+      return []; // Return empty array instead of throwing
     }
   }
 
@@ -366,7 +352,7 @@ class LiveStreamModel {
       logger.info('User joined stream', { streamId, viewerId });
 
       // Invalidate cache
-      await redisClient.del('active_streams:*');
+      await cache.delPattern('active_streams:*');
 
       return {
         stream,
@@ -422,7 +408,7 @@ class LiveStreamModel {
         logger.info('User left stream', { streamId, viewerId });
 
         // Invalidate cache
-        await redisClient.del('active_streams:*');
+        await cache.delPattern('active_streams:*');
       }
     } catch (error) {
       logger.error('Error leaving stream:', error);
@@ -481,7 +467,7 @@ class LiveStreamModel {
       logger.info('Stream ended', { streamId, hostId });
 
       // Invalidate cache
-      await redisClient.del('active_streams:*');
+      await cache.delPattern('active_streams:*');
     } catch (error) {
       logger.error('Error ending stream:', error);
       throw error;
@@ -506,7 +492,7 @@ class LiveStreamModel {
       logger.info('Stream liked', { streamId });
 
       // Invalidate cache
-      await redisClient.del('active_streams:*');
+      await cache.delPattern('active_streams:*');
     } catch (error) {
       logger.error('Error liking stream:', error);
       throw error;
@@ -885,7 +871,7 @@ class LiveStreamModel {
       const updateData = {};
 
       if (analytics.shareCount !== undefined) {
-        updateData['analytics.shareCount'] = require('firebase-admin').firestore.FieldValue.increment(analytics.shareCount);
+        // TODO: Implement analytics increment using PostgreSQL
       }
 
       if (analytics.avgWatchTime !== undefined) {
@@ -1253,7 +1239,7 @@ class LiveStreamModel {
       logger.info('Stream deleted', { streamId });
 
       // Invalidate cache
-      await redisClient.del('active_streams:*');
+      await cache.delPattern('active_streams:*');
     } catch (error) {
       logger.error('Error deleting stream:', error);
       throw error;

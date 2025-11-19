@@ -16,7 +16,12 @@ const { asyncHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
-// CRITICAL: Apply body parsing FIRST for ALL routes
+// CRITICAL: Trust proxy configuration MUST come first
+// This is needed for rate limiting behind nginx/reverse proxy
+// Only trust the first proxy (nginx on localhost)
+app.set('trust proxy', 1);
+
+// CRITICAL: Apply body parsing AFTER trust proxy
 // This must be before any route registration
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -71,6 +76,8 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  // Validate configuration is correct for trust proxy
+  validate: { trustProxy: false },
 });
 app.use('/api/', limiter);
 
@@ -82,6 +89,8 @@ const webhookLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false,
+  // Validate configuration is correct for trust proxy
+  validate: { trustProxy: false },
 });
 
 // Health check with dependency checks

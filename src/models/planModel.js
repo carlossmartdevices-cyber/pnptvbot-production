@@ -1,4 +1,4 @@
-const { getFirestore } = require('../config/firebase');
+const { query } = require('../config/postgres');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
@@ -15,26 +15,15 @@ class Plan {
   static async getAll() {
     try {
       const cacheKey = 'plans:all';
-
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const db = getFirestore();
-          const snapshot = await db
-            .collection(this.COLLECTION)
-            .where('active', '==', true)
-            .orderBy('price', 'asc')
-            .get();
-
-          const plans = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
-
-          logger.info(`Fetched ${plans.length} plans from Firestore`);
+          const result = await query('SELECT * FROM plans WHERE active = true ORDER BY price ASC');
+          const plans = result.rows;
+          logger.info(`Fetched ${plans.length} plans from PostgreSQL`);
           return plans.length > 0 ? plans : this.getDefaultPlans();
         },
-        3600, // Cache for 1 hour
+        3600,
       );
     } catch (error) {
       logger.error('Error getting plans:', error);
@@ -50,25 +39,18 @@ class Plan {
   static async getById(planId) {
     try {
       const cacheKey = `plan:${planId}`;
-
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const db = getFirestore();
-          const doc = await db.collection(this.COLLECTION).doc(planId).get();
-
-          if (!doc.exists) {
+          const result = await query('SELECT * FROM plans WHERE id = $1', [planId]);
+          if (result.rows.length === 0) {
             logger.warn(`Plan not found: ${planId}`);
             return null;
           }
-
-          logger.info(`Fetched plan from Firestore: ${planId}`);
-          return {
-            id: doc.id,
-            ...doc.data(),
-          };
+          logger.info(`Fetched plan from PostgreSQL: ${planId}`);
+          return result.rows[0];
         },
-        3600, // Cache for 1 hour
+        3600,
       );
     } catch (error) {
       logger.error('Error getting plan:', error);
@@ -84,36 +66,19 @@ class Plan {
    */
   static async createOrUpdate(planId, planData) {
     try {
-      // Auto-generate SKU if not provided
       const data = { ...planData };
       if (!data.sku && data.duration) {
         data.sku = this.generateSKU(planId, data.duration);
         logger.info(`Auto-generated SKU: ${data.sku} for plan: ${planId}`);
       }
-
-      const db = getFirestore();
-      const planDoc = {
-        id: planId,
-        sku: data.sku,
-        name: data.name,
-        nameEs: data.nameEs,
-        price: data.price,
-        currency: data.currency || 'USD',
-        duration: data.duration || 30,
-        features: data.features || [],
-        featuresEs: data.featuresEs || [],
-        active: data.active !== undefined ? data.active : true,
-        updatedAt: new Date(),
-      };
-
-      await db.collection(this.COLLECTION).doc(planId).set(planDoc, { merge: true });
-
-      // Invalidate cache
+      await query(`INSERT INTO plans (id, sku, name, name_es, price, currency, duration, features, features_es, active, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        ON CONFLICT (id) DO UPDATE SET sku = $2, name = $3, name_es = $4, price = $5, currency = $6, duration = $7, features = $8, features_es = $9, active = $10, updated_at = $11`,
+        [planId, data.sku, data.name, data.nameEs, data.price, data.currency || 'USD', data.duration || 30, JSON.stringify(data.features || []), JSON.stringify(data.featuresEs || []), data.active !== undefined ? data.active : true, new Date()]
+      );
       await cache.del(`plan:${planId}`);
       await cache.del('plans:all');
-
       logger.info('Plan created/updated', { planId, sku: data.sku });
-      return planDoc;
+      return data;
     } catch (error) {
       logger.error('Error creating/updating plan:', error);
       throw error;
@@ -127,13 +92,9 @@ class Plan {
    */
   static async delete(planId) {
     try {
-      const db = getFirestore();
-      await db.collection(this.COLLECTION).doc(planId).delete();
-
-      // Invalidate cache
+      await query('DELETE FROM plans WHERE id = $1', [planId]);
       await cache.del(`plan:${planId}`);
       await cache.del('plans:all');
-
       logger.info('Plan deleted', { planId });
       return true;
     } catch (error) {

@@ -1,4 +1,4 @@
-const { getFirestore } = require('../config/firebase');
+// Removed Firebase/Firestore dependency
 const logger = require('../utils/logger');
 const { v4: uuidv4 } = require('uuid');
 

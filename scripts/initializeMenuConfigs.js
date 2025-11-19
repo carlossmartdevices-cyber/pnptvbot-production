@@ -15,7 +15,6 @@
  */
 
 require('dotenv').config();
-const MenuConfigModel = require('../src/models/menuConfigModel');
 const logger = require('../src/utils/logger');
 
 /**

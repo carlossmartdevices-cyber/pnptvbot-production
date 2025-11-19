@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
-const { getFirestore } = require('../config/firebase');
+const { query } = require('../config/postgres');
 const logger = require('../utils/logger');
 
 const COLLECTION = 'payments';
@@ -15,19 +15,14 @@ class PaymentModel {
    */
   static async create(paymentData) {
     try {
-      const db = getFirestore();
       const paymentId = paymentData.paymentId || uuidv4();
-      const paymentRef = db.collection(COLLECTION).doc(paymentId);
-
       const data = {
         ...paymentData,
         status: 'pending',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-
-      await paymentRef.set(data);
-
+      await query(`INSERT INTO payments (id, user_id, amount, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)`, [paymentId, data.userId, data.amount, data.status, data.createdAt, data.updatedAt]);
       logger.info('Payment created', { paymentId, userId: paymentData.userId });
       return { id: paymentId, ...data };
     } catch (error) {
@@ -43,14 +38,11 @@ class PaymentModel {
    */
   static async getById(paymentId) {
     try {
-      const db = getFirestore();
-      const doc = await db.collection(COLLECTION).doc(paymentId).get();
-
-      if (!doc.exists) {
+      const result = await query('SELECT * FROM payments WHERE id = $1', [paymentId]);
+      if (result.rows.length === 0) {
         return null;
       }
-
-      return { id: doc.id, ...doc.data() };
+      return result.rows[0];
     } catch (error) {
       logger.error('Error getting payment:', error);
       return null;
@@ -66,15 +58,11 @@ class PaymentModel {
    */
   static async updateStatus(paymentId, status, metadata = {}) {
     try {
-      const db = getFirestore();
-      const paymentRef = db.collection(COLLECTION).doc(paymentId);
-
-      await paymentRef.update({
-        status,
-        ...metadata,
-        updatedAt: new Date(),
-      });
-
+      const fields = Object.keys(metadata);
+      const values = Object.values(metadata);
+      let setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+      setClause = `status = $1${setClause ? ', ' + setClause : ''}, updated_at = $${fields.length + 2}`;
+      await query(`UPDATE payments SET ${setClause} WHERE id = $${fields.length + 3}`, [status, ...values, new Date(), paymentId]);
       logger.info('Payment status updated', { paymentId, status });
       return true;
     } catch (error) {

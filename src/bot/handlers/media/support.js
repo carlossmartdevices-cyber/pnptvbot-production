@@ -9,18 +9,30 @@ let AGENT_ID = null;
 
 try {
   const { Mistral } = require('@mistralai/mistralai');
-  if (process.env.MISTRAL_API_KEY) {
+  const apiKey = process.env.MISTRAL_API_KEY;
+
+  // Validate API key is not a placeholder
+  const isValidApiKey = apiKey &&
+                        apiKey !== 'tu_api_key' &&
+                        apiKey !== 'your_api_key' &&
+                        apiKey !== 'YOUR_API_KEY' &&
+                        apiKey.length > 20; // Real API keys are longer
+
+  if (isValidApiKey) {
     mistral = new Mistral({
-      apiKey: process.env.MISTRAL_API_KEY,
+      apiKey: apiKey,
     });
 
     // Initialize agent on startup (will be created if not exists)
     initializeAgent().catch(err => {
       logger.error('Failed to initialize Mistral agent:', err);
+      mistral = null; // Disable Mistral if initialization fails
     });
+  } else {
+    logger.info('Mistral AI API key not configured or invalid. AI chat will be unavailable.');
   }
 } catch (error) {
-  logger.warn('Mistral AI package not installed. AI chat will be unavailable.');
+  logger.warn('Mistral AI package not installed or initialization failed. AI chat will be unavailable.');
 }
 
 // Rate limiting map: userId -> lastMessageTime
@@ -110,8 +122,15 @@ async function initializeAgent() {
 
   try {
     // Check if agent ID is provided in environment
-    if (process.env.MISTRAL_AGENT_ID) {
-      AGENT_ID = process.env.MISTRAL_AGENT_ID;
+    const agentId = process.env.MISTRAL_AGENT_ID;
+    const isValidAgentId = agentId &&
+                          agentId !== 'agent_id' &&
+                          agentId !== 'your_agent_id' &&
+                          agentId !== 'YOUR_AGENT_ID' &&
+                          agentId.length > 10; // Real agent IDs are longer
+
+    if (isValidAgentId) {
+      AGENT_ID = agentId;
       logger.info(`Using Mistral agent from env: ${AGENT_ID}`);
       return AGENT_ID;
     }

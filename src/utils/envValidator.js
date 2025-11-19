@@ -8,9 +8,6 @@ const logger = require('./logger');
 const REQUIRED_ENV_VARS = [
   'BOT_TOKEN',
   'BOT_USERNAME',
-  'FIREBASE_PROJECT_ID',
-  'FIREBASE_CLIENT_EMAIL',
-  'FIREBASE_PRIVATE_KEY',
   'REDIS_HOST',
   'REDIS_PORT',
 ];
