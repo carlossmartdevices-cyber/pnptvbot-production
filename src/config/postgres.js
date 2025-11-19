@@ -13,7 +13,7 @@ function initializePostgres() {
   try {
     pool = new Pool({
       host: process.env.POSTGRES_HOST || 'localhost',
-      port: process.env.POSTGRES_PORT || 55432,
+      port: process.env.POSTGRES_PORT || 5432,
       database: process.env.POSTGRES_DATABASE || 'pnptvbot',
       user: process.env.POSTGRES_USER || 'pnptvbot',
       password: process.env.POSTGRES_PASSWORD || 'pnptvbot_secure_pass_2025',
