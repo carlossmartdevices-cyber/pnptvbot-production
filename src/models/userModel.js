@@ -676,6 +676,73 @@ class UserModel {
       return [];
     }
   }
+
+  /**
+   * Search users by username (partial match, case insensitive)
+   * @param {string} username - Username to search (with or without @)
+   * @returns {Promise<Array>} Matching users
+   */
+  static async searchByUsername(username) {
+    try {
+      // Remove @ if present
+      const cleanUsername = username.replace(/^@/, '');
+
+      // Search with ILIKE for case-insensitive partial match
+      const result = await query(
+        'SELECT * FROM users WHERE username ILIKE $1 ORDER BY username LIMIT 10',
+        [`%${cleanUsername}%`]
+      );
+
+      logger.info(`Found ${result.rows.length} users matching username: ${cleanUsername}`);
+      return result.rows;
+    } catch (error) {
+      logger.error('Error searching users by username:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Search users by ID, username, or first name
+   * @param {string} query - Search query
+   * @returns {Promise<Array>} Matching users
+   */
+  static async search(searchQuery) {
+    try {
+      const cleanQuery = searchQuery.trim().replace(/^@/, '');
+
+      // Try to parse as ID first
+      if (!Number.isNaN(parseInt(cleanQuery, 10))) {
+        const user = await this.getById(cleanQuery);
+        if (user) {
+          return [user];
+        }
+      }
+
+      // Search by username or first name
+      const result = await query(
+        `SELECT * FROM users
+         WHERE username ILIKE $1
+         OR first_name ILIKE $1
+         OR last_name ILIKE $1
+         OR CONCAT(first_name, ' ', last_name) ILIKE $1
+         ORDER BY
+           CASE
+             WHEN username ILIKE $2 THEN 1
+             WHEN first_name ILIKE $2 THEN 2
+             ELSE 3
+           END,
+           username
+         LIMIT 10`,
+        [`%${cleanQuery}%`, `${cleanQuery}%`]
+      );
+
+      logger.info(`Found ${result.rows.length} users matching query: ${cleanQuery}`);
+      return result.rows;
+    } catch (error) {
+      logger.error('Error searching users:', error);
+      return [];
+    }
+  }
 }
 
 module.exports = UserModel;

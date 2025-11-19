@@ -185,8 +185,18 @@ const registerAdminHandlers = (bot) => {
 
       const lang = getLanguage(ctx);
 
+      // Initialize session properly
+      if (!ctx.session) {
+        ctx.session = {};
+      }
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
+
       // Clear any ongoing admin tasks
-      ctx.session.temp = {};
+      ctx.session.temp = {
+        broadcastMode: true,
+      };
       await ctx.saveSession();
 
       await ctx.editMessageText(
@@ -201,6 +211,7 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error in admin broadcast:', error);
+      await ctx.answerCbQuery('Error al iniciar broadcast');
     }
   });
 
@@ -218,6 +229,14 @@ const registerAdminHandlers = (bot) => {
 
       const target = ctx.match[1];
       const lang = getLanguage(ctx);
+
+      // Initialize session properly
+      if (!ctx.session) {
+        ctx.session = {};
+      }
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
 
       ctx.session.temp.broadcastTarget = target;
       ctx.session.temp.broadcastStep = 'media';
@@ -799,38 +818,87 @@ const registerAdminHandlers = (bot) => {
     if (ctx.session.temp?.adminSearchingUser) {
       try {
         const lang = getLanguage(ctx);
-        const query = ctx.message.text;
+        const searchQuery = ctx.message.text;
 
-        let user = null;
-        if (!Number.isNaN(parseInt(query, 10))) {
-          user = await UserModel.getById(query);
-        }
+        // Search users by ID, username, or name
+        const users = await UserModel.search(searchQuery);
 
-        if (!user) {
-          await ctx.reply(t('userNotFound', lang));
+        if (!users || users.length === 0) {
+          await ctx.reply(
+            `❌ ${t('userNotFound', lang)}\n\n`
+            + `Búsqueda: "${searchQuery}"\n\n`
+            + `Puedes buscar por:\n`
+            + `• ID de usuario (ej: 123456789)\n`
+            + `• Username (ej: @usuario o usuario)\n`
+            + `• Nombre (ej: Juan)`,
+            Markup.inlineKeyboard([
+              [Markup.button.callback('🔍 Buscar de nuevo', 'admin_users')],
+              [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+            ]),
+          );
           return;
         }
 
-        ctx.session.temp.adminSearchingUser = false;
-        ctx.session.temp.selectedUserId = user.id;
+        // If only one user found, show details directly
+        if (users.length === 1) {
+          const user = users[0];
+          ctx.session.temp.adminSearchingUser = false;
+          ctx.session.temp.selectedUserId = user.id;
+          await ctx.saveSession();
+
+          const statusEmoji = user.subscription_status === 'active' ? '💎' : '🆓';
+          const planExpiry = user.plan_expiry
+            ? `\n⏰ Expira: ${new Date(user.plan_expiry).toLocaleDateString()}`
+            : '';
+
+          await ctx.reply(
+            `✅ ${t('userFound', lang)}\n\n`
+            + `👤 ${user.first_name || ''} ${user.last_name || ''}\n`
+            + `${user.username ? `@${user.username}\n` : ''}`
+            + `🆔 ${user.id}\n`
+            + `📧 ${user.email || 'N/A'}\n`
+            + `${statusEmoji} Status: ${user.subscription_status}${planExpiry}\n`
+            + `📦 Plan: ${user.plan_id || 'N/A'}`,
+            Markup.inlineKeyboard([
+              [Markup.button.callback('✨ Activar Membresía', 'admin_activate_membership')],
+              [Markup.button.callback('📅 Extender Suscripción', 'admin_extend_sub')],
+              [Markup.button.callback('💎 Cambiar Plan', 'admin_change_plan')],
+              [Markup.button.callback('🚫 Desactivar Usuario', 'admin_deactivate')],
+              [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+            ]),
+          );
+          return;
+        }
+
+        // Multiple users found - show selection list
+        ctx.session.temp.adminSearchResults = users;
         await ctx.saveSession();
 
-        await ctx.reply(
-          `${t('userFound', lang)}\n\n`
-          + `👤 ${user.firstName || ''} ${user.lastName || ''}\n`
-          + `🆔 ${user.id}\n`
-          + `📧 ${user.email || 'N/A'}\n`
-          + `💎 Status: ${user.subscriptionStatus}\n`
-          + `📦 Plan: ${user.planId || 'N/A'}`,
-          Markup.inlineKeyboard([
-            [Markup.button.callback('📅 Extender Suscripción', 'admin_extend_sub')],
-            [Markup.button.callback('💎 Cambiar Plan', 'admin_change_plan')],
-            [Markup.button.callback('🚫 Desactivar Usuario', 'admin_deactivate')],
-            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
-          ]),
-        );
+        let message = `🔍 **Resultados de búsqueda**\n\n`;
+        message += `Encontrados ${users.length} usuarios:\n\n`;
+
+        const keyboard = [];
+        users.forEach((user, index) => {
+          const statusEmoji = user.subscription_status === 'active' ? '💎' : '🆓';
+          const displayName = `${statusEmoji} ${user.first_name || 'Usuario'} ${user.last_name || ''}`.trim();
+          const username = user.username ? `@${user.username}` : `ID: ${user.id}`;
+
+          message += `${index + 1}. ${displayName} (${username})\n`;
+          keyboard.push([
+            Markup.button.callback(
+              `${index + 1}. ${displayName.substring(0, 30)}`,
+              `admin_select_user_${user.id}`,
+            ),
+          ]);
+        });
+
+        keyboard.push([Markup.button.callback('🔍 Buscar de nuevo', 'admin_users')]);
+        keyboard.push([Markup.button.callback('◀️ Volver', 'admin_cancel')]);
+
+        await ctx.reply(message, Markup.inlineKeyboard(keyboard));
       } catch (error) {
         logger.error('Error searching user:', error);
+        await ctx.reply('Error al buscar usuario. Por favor intenta de nuevo.');
       }
       return;
     }
@@ -839,6 +907,11 @@ const registerAdminHandlers = (bot) => {
     if (ctx.session.temp?.broadcastStep === 'text_en') {
       try {
         const message = ctx.message.text;
+
+        // Initialize broadcastData if needed
+        if (!ctx.session.temp.broadcastData) {
+          ctx.session.temp.broadcastData = {};
+        }
 
         // Save English text
         ctx.session.temp.broadcastData.textEn = message;
@@ -866,7 +939,29 @@ const registerAdminHandlers = (bot) => {
       try {
         const message = ctx.message.text;
         const target = ctx.session.temp.broadcastTarget;
+
+        // Validate required data
+        if (!target) {
+          await ctx.reply('❌ Error: No se ha seleccionado el público objetivo. Por favor inicia el broadcast de nuevo.');
+          ctx.session.temp = {};
+          await ctx.saveSession();
+          return;
+        }
+
+        // Initialize broadcastData if needed
+        if (!ctx.session.temp.broadcastData) {
+          ctx.session.temp.broadcastData = {};
+        }
+
         const broadcastData = ctx.session.temp.broadcastData;
+
+        // Validate English text exists
+        if (!broadcastData.textEn) {
+          await ctx.reply('❌ Error: Falta el texto en inglés. Por favor inicia el broadcast de nuevo.');
+          ctx.session.temp = {};
+          await ctx.saveSession();
+          return;
+        }
 
         // Save Spanish text
         broadcastData.textEs = message;
@@ -1100,6 +1195,152 @@ const registerAdminHandlers = (bot) => {
     }
 
     return next();
+  });
+
+  // Handle user selection from search results
+  bot.action(/^admin_select_user_(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.match[1];
+      const user = await UserModel.getById(userId);
+      const lang = getLanguage(ctx);
+
+      if (!user) {
+        await ctx.answerCbQuery('Usuario no encontrado');
+        return;
+      }
+
+      ctx.session.temp.adminSearchingUser = false;
+      ctx.session.temp.selectedUserId = user.id;
+      await ctx.saveSession();
+
+      const statusEmoji = user.subscription_status === 'active' ? '💎' : '🆓';
+      const planExpiry = user.plan_expiry
+        ? `\n⏰ Expira: ${new Date(user.plan_expiry).toLocaleDateString()}`
+        : '';
+
+      await ctx.editMessageText(
+        `✅ ${t('userFound', lang)}\n\n`
+        + `👤 ${user.first_name || ''} ${user.last_name || ''}\n`
+        + `${user.username ? `@${user.username}\n` : ''}`
+        + `🆔 ${user.id}\n`
+        + `📧 ${user.email || 'N/A'}\n`
+        + `${statusEmoji} Status: ${user.subscription_status}${planExpiry}\n`
+        + `📦 Plan: ${user.plan_id || 'N/A'}`,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('✨ Activar Membresía', 'admin_activate_membership')],
+          [Markup.button.callback('📅 Extender Suscripción', 'admin_extend_sub')],
+          [Markup.button.callback('💎 Cambiar Plan', 'admin_change_plan')],
+          [Markup.button.callback('🚫 Desactivar Usuario', 'admin_deactivate')],
+          [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error selecting user:', error);
+      await ctx.answerCbQuery('Error al seleccionar usuario');
+    }
+  });
+
+  // Activate membership - Quick activation with default plan
+  bot.action('admin_activate_membership', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.session.temp.selectedUserId;
+      const user = await UserModel.getById(userId);
+
+      if (!user) {
+        await ctx.answerCbQuery('Usuario no encontrado');
+        return;
+      }
+
+      // Get available plans
+      const plans = await PlanModel.getAll();
+
+      let text = `✨ **Activar Membresía**\n\n`;
+      text += `👤 ${user.first_name} ${user.last_name || ''}\n`;
+      text += `${user.username ? `@${user.username}\n` : ''}`;
+      text += `💎 Status actual: ${user.subscription_status}\n\n`;
+      text += `Selecciona el plan para activar:\n`;
+
+      const keyboard = [];
+
+      // Add button for each plan
+      plans.forEach((plan) => {
+        keyboard.push([
+          Markup.button.callback(
+            `${plan.nameEs || plan.name} - $${plan.price} (${plan.duration} días)`,
+            `admin_activate_plan_${userId}_${plan.id}`,
+          ),
+        ]);
+      });
+
+      keyboard.push([Markup.button.callback('◀️ Volver', `admin_select_user_${userId}`)]);
+
+      await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
+    } catch (error) {
+      logger.error('Error showing activation options:', error);
+      await ctx.answerCbQuery('Error al mostrar opciones');
+    }
+  });
+
+  // Handle plan activation
+  bot.action(/^admin_activate_plan_(.+)_(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.match[1];
+      const planId = ctx.match[2];
+      const user = await UserModel.getById(userId);
+      const plan = await PlanModel.getById(planId);
+
+      if (!user || !plan) {
+        await ctx.answerCbQuery('Usuario o plan no encontrado');
+        return;
+      }
+
+      // Set new expiry date based on plan duration
+      const newExpiry = new Date();
+      newExpiry.setDate(newExpiry.getDate() + (plan.duration || 30));
+
+      await UserModel.updateSubscription(userId, {
+        status: 'active',
+        planId,
+        expiry: newExpiry,
+      });
+
+      let successText = `✅ **Membresía Activada**\n\n`;
+      successText += `👤 Usuario: ${user.first_name} ${user.last_name || ''}\n`;
+      successText += `${user.username ? `@${user.username}\n` : ''}`;
+      successText += `💎 Plan: ${plan.nameEs || plan.name}\n`;
+      successText += `💰 Precio: $${plan.price}\n`;
+      successText += `⏱️ Duración: ${plan.duration} días\n`;
+      successText += `📅 Expira: ${newExpiry.toLocaleDateString()}\n`;
+
+      await ctx.editMessageText(
+        successText,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('👤 Ver Usuario', `admin_select_user_${userId}`)],
+          [Markup.button.callback('◀️ Volver al Panel', 'admin_cancel')],
+        ]),
+      );
+
+      logger.info('Membership activated by admin', {
+        adminId: ctx.from.id,
+        userId,
+        planId,
+        newExpiry,
+      });
+
+      await ctx.answerCbQuery('✅ Membresía activada exitosamente');
+    } catch (error) {
+      logger.error('Error activating membership:', error);
+      await ctx.answerCbQuery('Error al activar membresía');
+    }
   });
 
   // Extend subscription - Show duration options
