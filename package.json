@@ -33,6 +33,7 @@
   "license": "MIT",
   "dependencies": {
     "@daimo/pay": "^1.19.0",
+    "@daimo/pay-common": "^1.19.0",
     "@google-cloud/firestore": "^7.1.0",
     "@mistralai/mistralai": "^1.10.0",
     "@sentry/node": "^7.99.0",
@@ -74,6 +75,7 @@
     "telegraf": "^4.16.3",
     "uuid": "^9.0.1",
     "validator": "^13.11.0",
+    "viem": "^2.22.0",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^4.7.1",
     "zoomus": "^0.1.5"

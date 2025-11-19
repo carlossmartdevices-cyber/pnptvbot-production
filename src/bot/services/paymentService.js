@@ -259,6 +259,8 @@ class PaymentService {
    * @returns {Object} { success: boolean, error?: string, alreadyProcessed?: boolean }
    */
   static async processDaimoWebhook(webhookData) {
+    const DaimoService = require('./daimoService');
+
     try {
       const {
         id,
@@ -278,6 +280,7 @@ class PaymentService {
       const userId = metadata?.userId;
       const planId = metadata?.planId;
       const paymentId = metadata?.paymentId;
+      const chatId = metadata?.chatId;
 
       if (!userId || !planId) {
         logger.error('Missing user ID or plan ID in Daimo webhook', { eventId: id });
@@ -294,17 +297,21 @@ class PaymentService {
       }
 
       // Process based on status
-      if (status === 'confirmed' || status === 'completed') {
+      if (status === 'payment_completed') {
         // Payment successful
         if (paymentId) {
           await PaymentModel.updateStatus(paymentId, 'completed', {
             transaction_id: source?.txHash || id,
             daimo_event_id: id,
+            payer_address: source?.payerAddress,
+            chain_id: source?.chainId,
           });
         }
 
         // Activate user subscription
         const plan = await PlanModel.getById(planId);
+        const user = await UserModel.getById(userId);
+
         if (plan) {
           const expiryDate = new Date();
           expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
@@ -321,10 +328,82 @@ class PaymentService {
             expiryDate,
             txHash: source?.txHash,
           });
+
+          // Get customer email from user record or subscriber record
+          let customerEmail = user?.email;
+          if (!customerEmail) {
+            // Try to get from subscriber by telegram ID
+            try {
+              const subscriber = await SubscriberModel.getByTelegramId(userId);
+              customerEmail = subscriber?.email;
+            } catch (e) {
+              logger.warn('Could not find subscriber email', { userId });
+            }
+          }
+
+          // Send both emails if we have an email
+          if (customerEmail) {
+            const userLanguage = user?.language || 'es';
+            const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
+
+            // 1. Send invoice email from easybots.store
+            try {
+              const invoiceEmailResult = await EmailService.sendInvoiceEmail({
+                to: customerEmail,
+                customerName: user?.first_name || user?.username || 'Valued Customer',
+                invoiceNumber: source?.txHash || id,
+                amount: amountUSD,
+                planName: plan.display_name || plan.name,
+                invoicePdf: null,
+              });
+
+              if (invoiceEmailResult.success) {
+                logger.info('Invoice email sent successfully (Daimo)', {
+                  to: customerEmail,
+                  txHash: source?.txHash,
+                });
+              }
+            } catch (emailError) {
+              logger.error('Error sending invoice email (non-critical):', {
+                error: emailError.message,
+                eventId: id,
+              });
+            }
+
+            // 2. Send welcome email from pnptv.app
+            try {
+              const welcomeEmailResult = await EmailService.sendWelcomeEmail({
+                to: customerEmail,
+                customerName: user?.first_name || user?.username || 'Valued Customer',
+                planName: plan.display_name || plan.name,
+                duration: plan.duration,
+                expiryDate,
+                language: userLanguage,
+              });
+
+              if (welcomeEmailResult.success) {
+                logger.info('Welcome email sent successfully (Daimo)', {
+                  to: customerEmail,
+                  planId,
+                  language: userLanguage,
+                });
+              }
+            } catch (emailError) {
+              logger.error('Error sending welcome email (non-critical):', {
+                error: emailError.message,
+                eventId: id,
+              });
+            }
+          } else {
+            logger.warn('No email address found for user, skipping email notifications', {
+              userId,
+              eventId: id,
+            });
+          }
         }
 
         return { success: true };
-      } else if (status === 'failed') {
+      } else if (status === 'payment_bounced' || status === 'payment_failed') {
         // Payment failed
         if (paymentId) {
           await PaymentModel.updateStatus(paymentId, 'failed', {
@@ -340,6 +419,22 @@ class PaymentService {
         });
 
         return { success: true }; // Return success to acknowledge webhook
+      } else if (status === 'payment_started' || status === 'payment_unpaid') {
+        // Payment pending/started
+        if (paymentId) {
+          await PaymentModel.updateStatus(paymentId, 'pending', {
+            transaction_id: source?.txHash || id,
+            daimo_event_id: id,
+          });
+        }
+
+        logger.info('Daimo payment pending', {
+          paymentId,
+          eventId: id,
+          status,
+        });
+
+        return { success: true };
       }
 
       return { success: true };
@@ -431,9 +526,52 @@ class PaymentService {
          };
        }
 
-       // For other providers (like Daimo)
-       const paymentUrl = `https://${provider}.com/pay?paymentId=${payment.id}`;
-       return { success: true, paymentUrl, paymentId: payment.id };
+       // Generate Daimo payment link
+       if (provider === 'daimo') {
+         const DaimoService = require('./daimoService');
+
+         if (!DaimoService.isConfigured()) {
+           logger.error('Daimo not configured');
+           throw new Error('Configuración de pago incompleta. Contacta soporte.');
+         }
+
+         try {
+           const paymentUrl = DaimoService.generatePaymentLink({
+             userId,
+             chatId,
+             planId,
+             amount: plan.price,
+             paymentId: payment.id,
+           });
+
+           logger.info('Daimo payment URL generated', {
+             paymentId: payment.id,
+             planId: plan.id,
+             userId,
+             amountUSD: plan.price,
+             chain: 'Optimism',
+             token: 'USDC',
+           });
+
+           return {
+             success: true,
+             paymentUrl,
+             paymentId: payment.id,
+             paymentRef: `DAIMO-${payment.id.substring(0, 8).toUpperCase()}`,
+           };
+         } catch (error) {
+           logger.error('Error generating Daimo payment link:', {
+             error: error.message,
+             userId,
+             planId,
+           });
+           throw new Error('No se pudo generar el link de pago. Contacta soporte.');
+         }
+       }
+
+       // For other providers
+       logger.error('Unknown payment provider', { provider });
+       throw new Error('Proveedor de pago no soportado.');
     } catch (error) {
       logger.error('Error creando pago:', { error: error.message, planId, provider });
       throw new Error(
