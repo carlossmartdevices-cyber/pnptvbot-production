@@ -160,6 +160,10 @@ const registerSupportHandlers = (bot) => {
         Markup.inlineKeyboard([
           [Markup.button.callback(t('chatWithCristina', lang), 'support_ai_chat')],
           [Markup.button.callback(t('contactAdmin', lang), 'support_contact_admin')],
+          [Markup.button.callback(
+            lang === 'es' ? '🎁 Solicitar Activación' : '🎁 Request Activation',
+            'support_request_activation'
+          )],
           [Markup.button.callback(t('faq', lang), 'support_faq')],
           [Markup.button.callback(t('back', lang), 'back_to_main')],
         ]),
@@ -511,6 +515,99 @@ const registerSupportHandlers = (bot) => {
       return;
     }
 
+    if (ctx.session.temp?.requestingActivation) {
+      try {
+        const lang = getLanguage(ctx);
+
+        // Validate message text exists
+        if (!ctx.message?.text) {
+          logger.warn('Request activation received message without text');
+          return next();
+        }
+
+        const message = ctx.message.text;
+
+        // Exit request activation mode if user sends a command
+        if (message.startsWith('/')) {
+          ctx.session.temp.requestingActivation = false;
+          await ctx.saveSession();
+          return next();
+        }
+
+        // Send to admin users with special format for activation request
+        const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
+
+        if (adminIds.length === 0) {
+          logger.error('No admin users configured for activation requests');
+          await ctx.reply(
+            lang === 'es'
+              ? 'Sistema de soporte no configurado. Por favor contacta con nosotros vía email.'
+              : 'Support system not configured. Please contact us via email.',
+          );
+          ctx.session.temp.requestingActivation = false;
+          return;
+        }
+
+        const user = ctx.from;
+        const activationRequest = lang === 'es'
+          ? `🎁 **SOLICITUD DE ACTIVACIÓN DE MEMBRESÍA**\n\n`
+            + `👤 Usuario: ${user.first_name} ${user.last_name || ''}\n`
+            + `🆔 Telegram ID: ${user.id}\n`
+            + `📧 Username: @${user.username || 'sin username'}\n\n`
+            + `📝 **Información proporcionada:**\n\n${message}\n\n`
+            + `⚡ Usa /admin → Activar Membresía para procesar manualmente.`
+          : `🎁 **MEMBERSHIP ACTIVATION REQUEST**\n\n`
+            + `👤 User: ${user.first_name} ${user.last_name || ''}\n`
+            + `🆔 Telegram ID: ${user.id}\n`
+            + `📧 Username: @${user.username || 'no username'}\n\n`
+            + `📝 **Information provided:**\n\n${message}\n\n`
+            + `⚡ Use /admin → Activate Membership to process manually.`;
+
+        for (const adminId of adminIds) {
+          try {
+            await ctx.telegram.sendMessage(
+              adminId.trim(),
+              activationRequest,
+              { parse_mode: 'Markdown' }
+            );
+          } catch (sendError) {
+            logger.error('Error sending activation request to admin:', sendError);
+          }
+        }
+
+        ctx.session.temp.requestingActivation = false;
+        await ctx.saveSession();
+
+        logger.info('Activation request sent to admins', {
+          userId: user.id,
+          username: user.username,
+        });
+
+        const successMessageEs = '✅ **Solicitud Enviada**\n\n'
+          + 'Tu solicitud de activación ha sido enviada a los administradores.\n\n'
+          + '📨 Recibirás una notificación cuando tu membresía sea activada.\n\n'
+          + '⏱️ Tiempo estimado de respuesta: 1-24 horas.';
+
+        const successMessageEn = '✅ **Request Sent**\n\n'
+          + 'Your activation request has been sent to the administrators.\n\n'
+          + '📨 You will receive a notification when your membership is activated.\n\n'
+          + '⏱️ Estimated response time: 1-24 hours.';
+
+        await ctx.reply(
+          lang === 'es' ? successMessageEs : successMessageEn,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(t('back', lang), 'show_support')],
+            ]),
+          },
+        );
+      } catch (error) {
+        logger.error('Error processing activation request:', error);
+      }
+      return;
+    }
+
     return next();
   });
 
@@ -524,11 +621,60 @@ const registerSupportHandlers = (bot) => {
         Markup.inlineKeyboard([
           [Markup.button.callback(t('chatWithCristina', lang), 'support_ai_chat')],
           [Markup.button.callback(t('contactAdmin', lang), 'support_contact_admin')],
+          [Markup.button.callback(
+            lang === 'es' ? '🎁 Solicitar Activación' : '🎁 Request Activation',
+            'support_request_activation'
+          )],
           [Markup.button.callback(t('faq', lang), 'support_faq')],
         ]),
       );
     } catch (error) {
       logger.error('Error in /support command:', error);
+    }
+  });
+
+  // Request membership activation
+  bot.action('support_request_activation', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      ctx.session.temp.requestingActivation = true;
+      await ctx.saveSession();
+
+      const messageEs = '🎁 **Solicitar Activación de Membresía**\n\n'
+        + 'Si compraste tu membresía fuera del bot o tu pago no se activó automáticamente, '
+        + 'por favor envía la siguiente información:\n\n'
+        + '📝 **Datos necesarios:**\n'
+        + '• Método de pago usado (ePayco, Daimo, etc.)\n'
+        + '• ID de transacción o comprobante\n'
+        + '• Plan comprado\n'
+        + '• Tu email (si lo usaste)\n'
+        + '• Cualquier detalle adicional\n\n'
+        + '💡 Un administrador revisará tu solicitud y activará tu membresía manualmente.\n\n'
+        + '_Escribe toda la información en un solo mensaje._';
+
+      const messageEn = '🎁 **Request Membership Activation**\n\n'
+        + 'If you purchased your membership outside the bot or your payment wasn\'t activated automatically, '
+        + 'please send the following information:\n\n'
+        + '📝 **Required information:**\n'
+        + '• Payment method used (ePayco, Daimo, etc.)\n'
+        + '• Transaction ID or receipt\n'
+        + '• Plan purchased\n'
+        + '• Your email (if you used one)\n'
+        + '• Any additional details\n\n'
+        + '💡 An administrator will review your request and activate your membership manually.\n\n'
+        + '_Write all the information in a single message._';
+
+      await ctx.editMessageText(
+        lang === 'es' ? messageEs : messageEn,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(t('cancel', lang), 'show_support')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error in request activation:', error);
     }
   });
 };
