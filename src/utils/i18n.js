@@ -280,10 +280,10 @@ const translations = {
 
     // Support
     supportTitle: '🤖 Support Center',
-    chatWithCristina: '💬 Chat with Cristina (AI)',
+    chatWithCristina: '💬 Chat with AI',
     contactAdmin: '👨‍💼 Contact Admin',
     faq: '❓ FAQ',
-    cristinaGreeting: 'Hi! I\'m Cristina, your AI assistant. How can I help you today?',
+    cristinaGreeting: 'Hi! I\'m PNPtv! AI. How can I help you today?',
     adminMessage: 'Please type your message for our support team:',
     messageSent: 'Your message has been sent to our support team. We\'ll get back to you soon!',
 
@@ -653,10 +653,10 @@ const translations = {
 
     // Support
     supportTitle: '🤖 Centro de Soporte',
-    chatWithCristina: '💬 Chat con Cristina (IA)',
+    chatWithCristina: '💬 Chat con IA',
     contactAdmin: '👨‍💼 Contactar Admin',
     faq: '❓ Preguntas Frecuentes',
-    cristinaGreeting: '¡Hola! Soy Cristina, tu asistente IA. ¿Cómo puedo ayudarte hoy?',
+    cristinaGreeting: '¡Hola! Soy PNPtv! AI. ¿Cómo puedo ayudarte hoy?',
     adminMessage: 'Por favor escribe tu mensaje para nuestro equipo de soporte:',
     messageSent: '¡Tu mensaje ha sido enviado a nuestro equipo de soporte! Te responderemos pronto.',
 
