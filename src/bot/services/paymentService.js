@@ -289,7 +289,7 @@ class PaymentService {
       return { success: false, error: error.message };
     }
   }
-  static async createPayment({ userId, planId, provider, sku, chatId }) {
+  static async createPayment({ userId, planId, provider, sku, chatId, language }) {
     try {
       const plan = await PlanModel.getById(planId);
       if (!plan || !plan.active) {
@@ -342,9 +342,12 @@ class PaymentService {
          // Create payment reference
          const paymentRef = `PAY-${payment.id.substring(0, 8).toUpperCase()}`;
 
-         // Generate URL to landing page (not direct to ePayco)
+         // Determine language code (default to Spanish)
+         const lang = language && language.toLowerCase().startsWith('en') ? 'en' : 'es';
+
+         // Generate URL to landing page with language parameter
          // The landing page will handle the ePayco checkout with SDK
-         const paymentUrl = `${webhookDomain}/payment/${payment.id}`;
+         const paymentUrl = `${webhookDomain}/payment/${payment.id}?lang=${lang}`;
 
          logger.info('ePayco payment URL generated (landing page)', {
            paymentId: payment.id,
@@ -354,6 +357,7 @@ class PaymentService {
            amountUSD: plan.price,
            amountCOP: priceInCOP,
            testMode: epaycoTestMode,
+           language: lang,
            paymentUrl,
          });
 

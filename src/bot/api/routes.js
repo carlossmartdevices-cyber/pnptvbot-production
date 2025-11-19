@@ -50,9 +50,19 @@ app.get('/pnptv-hot-sale', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
 });
 
-// Payment checkout page
+// Payment checkout page with language support
 app.get('/payment/:paymentId', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
+  // Get language from query parameter (e.g., ?lang=en)
+  const lang = req.query.lang || 'es'; // Default to Spanish
+
+  let fileName;
+  if (lang === 'en') {
+    fileName = 'payment-checkout-en.html';
+  } else {
+    fileName = 'payment-checkout-es.html';
+  }
+
+  res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
 
 // Function to conditionally apply middleware (skip for Telegram webhook)
