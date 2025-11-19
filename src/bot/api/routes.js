@@ -132,16 +132,17 @@ app.get('/health', async (req, res) => {
   }
 
   try {
-    // Check Firestore connection
-    const { getFirestore } = require('../../config/firebase');
-    const db = getFirestore();
-    // Simple health check: verify we can access Firestore
-    await db.collection('_health_check').limit(1).get();
-    health.dependencies.firestore = 'ok';
+    // Check PostgreSQL connection
+    const { testConnection } = require('../../config/postgres');
+    const isConnected = await testConnection();
+    health.dependencies.postgres = isConnected ? 'ok' : 'error';
+    if (!isConnected) {
+      health.status = 'degraded';
+    }
   } catch (error) {
-    health.dependencies.firestore = 'error';
+    health.dependencies.postgres = 'error';
     health.status = 'degraded';
-    logger.error('Firestore health check failed:', error);
+    logger.error('PostgreSQL health check failed:', error);
   }
 
   const statusCode = health.status === 'ok' ? 200 : 503;

@@ -1,8 +1,6 @@
-const { getFirestore } = require('../config/firebase');
+const { query } = require('../config/postgres');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
-
-const COLLECTION = 'subscribers';
 
 /**
  * Subscriber Model - Handles subscriber data operations with ePayco integration
@@ -15,7 +13,6 @@ class SubscriberModel {
    */
   static async create(subscriberData) {
     try {
-      const db = getFirestore();
       const {
         email, name, telegramId, plan, subscriptionId, provider,
       } = subscriberData;
@@ -34,9 +31,24 @@ class SubscriberModel {
         lastPaymentAt: timestamp,
       };
 
-      // Use email as document ID for easier lookups
-      const subscriberRef = db.collection(COLLECTION).doc(email);
-      await subscriberRef.set(data);
+      // Use email as unique identifier (UNIQUE constraint)
+      await query(
+        `INSERT INTO subscribers (telegram_id, email, name, plan, subscription_id, provider,
+         status, created_at, updated_at, last_payment_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          data.telegramId,
+          data.email,
+          data.name,
+          data.plan,
+          data.subscriptionId,
+          data.provider,
+          data.status,
+          data.createdAt,
+          data.updatedAt,
+          data.lastPaymentAt,
+        ]
+      );
 
       // Invalidate cache
       await cache.del(`subscriber:${email}`);
@@ -70,14 +82,29 @@ class SubscriberModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const db = getFirestore();
-          const doc = await db.collection(COLLECTION).doc(email).get();
+          const result = await query(
+            'SELECT * FROM subscribers WHERE email = $1',
+            [email]
+          );
 
-          if (!doc.exists) {
+          if (result.rows.length === 0) {
             return null;
           }
 
-          return { id: doc.id, ...doc.data() };
+          const row = result.rows[0];
+          return {
+            id: row.email,
+            email: row.email,
+            name: row.name,
+            telegramId: row.telegram_id,
+            plan: row.plan,
+            subscriptionId: row.subscription_id,
+            provider: row.provider,
+            status: row.status,
+            lastPaymentAt: row.last_payment_at,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          };
         },
         600, // Cache for 10 minutes
       );
@@ -99,18 +126,29 @@ class SubscriberModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const db = getFirestore();
-          const snapshot = await db.collection(COLLECTION)
-            .where('telegramId', '==', telegramId.toString())
-            .limit(1)
-            .get();
+          const result = await query(
+            'SELECT * FROM subscribers WHERE telegram_id = $1 LIMIT 1',
+            [telegramId.toString()]
+          );
 
-          if (snapshot.empty) {
+          if (result.rows.length === 0) {
             return null;
           }
 
-          const doc = snapshot.docs[0];
-          return { id: doc.id, ...doc.data() };
+          const row = result.rows[0];
+          return {
+            id: row.email,
+            email: row.email,
+            name: row.name,
+            telegramId: row.telegram_id,
+            plan: row.plan,
+            subscriptionId: row.subscription_id,
+            provider: row.provider,
+            status: row.status,
+            lastPaymentAt: row.last_payment_at,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          };
         },
         600, // Cache for 10 minutes
       );
@@ -129,16 +167,27 @@ class SubscriberModel {
    */
   static async updateStatus(email, status, additionalData = {}) {
     try {
-      const db = getFirestore();
-      const subscriberRef = db.collection(COLLECTION).doc(email);
+      const fields = ['status'];
+      const values = [status];
+      let paramIndex = 2;
 
-      const updateData = {
-        status,
-        updatedAt: new Date(),
-        ...additionalData,
-      };
+      Object.keys(additionalData).forEach((key) => {
+        fields.push(key);
+        values.push(additionalData[key]);
+        paramIndex++;
+      });
 
-      await subscriberRef.update(updateData);
+      fields.push('updated_at');
+      values.push(new Date());
+      paramIndex++;
+
+      const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
+      values.push(email);
+
+      await query(
+        `UPDATE subscribers SET ${setClause} WHERE email = $${paramIndex}`,
+        values
+      );
 
       // Invalidate cache
       const subscriber = await this.getByEmail(email);
@@ -162,13 +211,10 @@ class SubscriberModel {
    */
   static async updateLastPayment(email) {
     try {
-      const db = getFirestore();
-      const subscriberRef = db.collection(COLLECTION).doc(email);
-
-      await subscriberRef.update({
-        lastPaymentAt: new Date(),
-        updatedAt: new Date(),
-      });
+      await query(
+        'UPDATE subscribers SET last_payment_at = $1, updated_at = $2 WHERE email = $3',
+        [new Date(), new Date(), email]
+      );
 
       // Invalidate cache
       const subscriber = await this.getByEmail(email);
@@ -191,15 +237,24 @@ class SubscriberModel {
    */
   static async getActiveSubscribers() {
     try {
-      const db = getFirestore();
-      const snapshot = await db.collection(COLLECTION)
-        .where('status', '==', 'active')
-        .get();
+      const result = await query(
+        'SELECT * FROM subscribers WHERE status = $1',
+        ['active']
+      );
 
-      const subscribers = [];
-      snapshot.forEach((doc) => {
-        subscribers.push({ id: doc.id, ...doc.data() });
-      });
+      const subscribers = result.rows.map(row => ({
+        id: row.email,
+        email: row.email,
+        name: row.name,
+        telegramId: row.telegram_id,
+        plan: row.plan,
+        subscriptionId: row.subscription_id,
+        provider: row.provider,
+        status: row.status,
+        lastPaymentAt: row.last_payment_at,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
 
       logger.info(`Found ${subscribers.length} active subscribers`);
       return subscribers;
@@ -216,15 +271,24 @@ class SubscriberModel {
    */
   static async getByPlan(planId) {
     try {
-      const db = getFirestore();
-      const snapshot = await db.collection(COLLECTION)
-        .where('plan', '==', planId)
-        .get();
+      const result = await query(
+        'SELECT * FROM subscribers WHERE plan = $1',
+        [planId]
+      );
 
-      const subscribers = [];
-      snapshot.forEach((doc) => {
-        subscribers.push({ id: doc.id, ...doc.data() });
-      });
+      const subscribers = result.rows.map(row => ({
+        id: row.email,
+        email: row.email,
+        name: row.name,
+        telegramId: row.telegram_id,
+        plan: row.plan,
+        subscriptionId: row.subscription_id,
+        provider: row.provider,
+        status: row.status,
+        lastPaymentAt: row.last_payment_at,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
 
       logger.info(`Found ${subscribers.length} subscribers for plan ${planId}`);
       return subscribers;
@@ -241,10 +305,9 @@ class SubscriberModel {
    */
   static async delete(email) {
     try {
-      const db = getFirestore();
       const subscriber = await this.getByEmail(email);
 
-      await db.collection(COLLECTION).doc(email).delete();
+      await query('DELETE FROM subscribers WHERE email = $1', [email]);
 
       // Invalidate cache
       await cache.del(`subscriber:${email}`);
@@ -271,18 +334,16 @@ class SubscriberModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const db = getFirestore();
-
           // Get total subscribers
-          const totalSnapshot = await db.collection(COLLECTION).count().get();
-          const total = totalSnapshot.data().count;
+          const totalResult = await query('SELECT COUNT(*) as total FROM subscribers', []);
+          const total = parseInt(totalResult.rows[0].total);
 
           // Get active subscribers
-          const activeSnapshot = await db.collection(COLLECTION)
-            .where('status', '==', 'active')
-            .count()
-            .get();
-          const active = activeSnapshot.data().count;
+          const activeResult = await query(
+            'SELECT COUNT(*) as total FROM subscribers WHERE status = $1',
+            ['active']
+          );
+          const active = parseInt(activeResult.rows[0].total);
 
           const inactive = total - active;
 

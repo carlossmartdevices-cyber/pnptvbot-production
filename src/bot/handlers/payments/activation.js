@@ -1,4 +1,4 @@
-const { getFirestore } = require('../../../config/firebase');
+const { query } = require('../../../config/postgres');
 const UserModel = require('../../../models/userModel');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
@@ -47,12 +47,13 @@ const registerActivationHandlers = (bot) => {
           : '⏳ Verifying code...',
       );
 
-      // Verify code in Firestore
-      const db = getFirestore();
-      const codeRef = db.collection('activationCodes').doc(code);
-      const codeDoc = await codeRef.get();
+      // Verify code in PostgreSQL
+      const codeResult = await query(
+        'SELECT * FROM activation_codes WHERE code = $1',
+        [code]
+      );
 
-      if (!codeDoc.exists) {
+      if (codeResult.rows.length === 0) {
         logger.warn(`Invalid activation code attempted: ${code} by user ${userId}`);
         return ctx.reply(
           lang === 'es'
@@ -61,7 +62,7 @@ const registerActivationHandlers = (bot) => {
         );
       }
 
-      const codeData = codeDoc.data();
+      const codeData = codeResult.rows[0];
 
       // Check if code is already used
       if (codeData.used) {
@@ -74,7 +75,7 @@ const registerActivationHandlers = (bot) => {
       }
 
       // Check if code has expired (if expiration date is set)
-      if (codeData.expiresAt && codeData.expiresAt.toDate() < new Date()) {
+      if (codeData.expires_at && new Date(codeData.expires_at) < new Date()) {
         logger.warn(`Expired activation code attempted: ${code} by user ${userId}`);
         return ctx.reply(
           lang === 'es'
@@ -88,12 +89,12 @@ const registerActivationHandlers = (bot) => {
 
       try {
         // Mark code as used
-        await codeRef.update({
-          used: true,
-          usedAt: new Date(),
-          usedBy: userId,
-          usedByUsername: ctx.from.username || null,
-        });
+        await query(
+          `UPDATE activation_codes
+           SET used = true, used_at = $1, used_by = $2, used_by_username = $3
+           WHERE code = $4`,
+          [new Date(), String(userId), ctx.from.username || null, code]
+        );
 
         // Update user subscription
         const updates = {
@@ -110,15 +111,12 @@ const registerActivationHandlers = (bot) => {
         // Log successful activation
         logger.info(`Lifetime pass activated: code=${code}, userId=${userId}, product=${product}`);
 
-        // Log activation event to Firestore
-        await db.collection('activationLogs').add({
-          userId,
-          username: ctx.from.username || null,
-          code,
-          product,
-          activatedAt: new Date(),
-          success: true,
-        });
+        // Log activation event to PostgreSQL
+        await query(
+          `INSERT INTO activation_logs (user_id, username, code, product, activated_at, success)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [String(userId), ctx.from.username || null, code, product, new Date(), true]
+        );
 
         // Send success message with enhanced formatting
         const successMessage = lang === 'es'
@@ -168,12 +166,12 @@ const registerActivationHandlers = (bot) => {
         logger.error('Error updating user after activation:', updateError);
 
         try {
-          await codeRef.update({
-            used: false,
-            usedAt: null,
-            usedBy: null,
-            usedByUsername: null,
-          });
+          await query(
+            `UPDATE activation_codes
+             SET used = false, used_at = NULL, used_by = NULL, used_by_username = NULL
+             WHERE code = $1`,
+            [code]
+          );
         } catch (rollbackError) {
           logger.error('Error rolling back code usage:', rollbackError);
         }
@@ -220,15 +218,16 @@ const registerActivationHandlers = (bot) => {
 
       const code = parts[1].trim().toUpperCase();
 
-      const db = getFirestore();
-      const codeRef = db.collection('activationCodes').doc(code);
-      const codeDoc = await codeRef.get();
+      const codeResult = await query(
+        'SELECT * FROM activation_codes WHERE code = $1',
+        [code]
+      );
 
-      if (!codeDoc.exists) {
+      if (codeResult.rows.length === 0) {
         return ctx.reply('❌ Code does not exist in database.');
       }
 
-      const codeData = codeDoc.data();
+      const codeData = codeResult.rows[0];
 
       let status = '📊 Code Information:\n\n';
       status += `Code: ${code}\n`;
@@ -236,18 +235,18 @@ const registerActivationHandlers = (bot) => {
       status += `Used: ${codeData.used ? 'Yes' : 'No'}\n`;
 
       if (codeData.used) {
-        status += `Used At: ${codeData.usedAt?.toDate()?.toISOString() || 'Unknown'}\n`;
-        status += `Used By: ${codeData.usedBy || 'Unknown'}\n`;
-        status += `Username: ${codeData.usedByUsername || 'Unknown'}\n`;
+        status += `Used At: ${codeData.used_at ? new Date(codeData.used_at).toISOString() : 'Unknown'}\n`;
+        status += `Used By: ${codeData.used_by || 'Unknown'}\n`;
+        status += `Username: ${codeData.used_by_username || 'Unknown'}\n`;
       }
 
-      if (codeData.createdAt) {
-        status += `Created At: ${codeData.createdAt.toDate().toISOString()}\n`;
+      if (codeData.created_at) {
+        status += `Created At: ${new Date(codeData.created_at).toISOString()}\n`;
       }
 
-      if (codeData.expiresAt) {
-        status += `Expires At: ${codeData.expiresAt.toDate().toISOString()}\n`;
-        status += `Expired: ${codeData.expiresAt.toDate() < new Date() ? 'Yes' : 'No'}\n`;
+      if (codeData.expires_at) {
+        status += `Expires At: ${new Date(codeData.expires_at).toISOString()}\n`;
+        status += `Expired: ${new Date(codeData.expires_at) < new Date() ? 'Yes' : 'No'}\n`;
       }
 
       if (codeData.email) {
