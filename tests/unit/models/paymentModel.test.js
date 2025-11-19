@@ -1,47 +1,23 @@
 // Mock dependencies
-jest.mock('../../../src/config/firebase');
+jest.mock('../../../src/config/postgres');
 jest.mock('uuid');
 
 const PaymentModel = require('../../../src/models/paymentModel');
-const { getFirestore } = require('../../../src/config/firebase');
+const { query } = require('../../../src/config/postgres');
 const { v4: uuidv4 } = require('uuid');
 
 describe('PaymentModel', () => {
-  let mockDb;
-  let mockCollection;
-  let mockDoc;
+  const mockUuid = '123e4567-e89b-12d3-a456-426614174000';
+  const mockPaymentId = '987fcdeb-51a2-43d7-b123-456789abcdef';
 
   beforeEach(() => {
     jest.clearAllMocks();
-
-    mockDoc = {
-      get: jest.fn(),
-      set: jest.fn(),
-      update: jest.fn(),
-      exists: false,
-      id: 'test-payment-id',
-      data: jest.fn(),
-    };
-
-    mockCollection = {
-      doc: jest.fn().mockReturnValue(mockDoc),
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      get: jest.fn(),
-    };
-
-    mockDb = {
-      collection: jest.fn().mockReturnValue(mockCollection),
-    };
-
-    getFirestore.mockReturnValue(mockDb);
-    uuidv4.mockReturnValue('test-uuid-123');
+    uuidv4.mockReturnValue(mockUuid);
   });
 
   describe('create', () => {
     it('should create payment with generated ID', async () => {
-      mockDoc.set.mockResolvedValue();
+      query.mockResolvedValue({ rows: [], rowCount: 1 });
 
       const paymentData = {
         userId: 123456789,
@@ -54,30 +30,31 @@ describe('PaymentModel', () => {
       const result = await PaymentModel.create(paymentData);
 
       expect(result).toBeDefined();
-      expect(result.id).toBe('test-uuid-123');
+      expect(result.id).toBe(mockUuid);
       expect(result.status).toBe('pending');
       expect(result.amount).toBe(9.99);
       expect(result.createdAt).toBeInstanceOf(Date);
-      expect(mockDoc.set).toHaveBeenCalled();
+      expect(query).toHaveBeenCalled();
     });
 
     it('should create payment with provided ID', async () => {
-      mockDoc.set.mockResolvedValue();
+      query.mockResolvedValue({ rows: [], rowCount: 1 });
 
+      const customId = '550e8400-e29b-41d4-a716-446655440000';
       const paymentData = {
-        paymentId: 'custom-id',
+        paymentId: customId,
         userId: 123456789,
         amount: 19.99,
       };
 
       const result = await PaymentModel.create(paymentData);
 
-      expect(result.id).toBe('custom-id');
-      expect(mockCollection.doc).toHaveBeenCalledWith('custom-id');
+      expect(result.id).toBe(customId);
+      expect(query).toHaveBeenCalled();
     });
 
     it('should handle errors', async () => {
-      mockDoc.set.mockRejectedValue(new Error('Database error'));
+      query.mockRejectedValue(new Error('Database error'));
 
       await expect(PaymentModel.create({ userId: 123 })).rejects.toThrow();
     });
@@ -86,36 +63,33 @@ describe('PaymentModel', () => {
   describe('getById', () => {
     it('should get payment by ID', async () => {
       const paymentData = {
-        userId: 123456789,
+        id: mockPaymentId,
+        user_id: '123456789',
         amount: 9.99,
         status: 'success',
       };
 
-      mockDoc.get.mockResolvedValue({
-        exists: true,
-        id: 'payment-123',
-        data: () => paymentData,
-      });
+      query.mockResolvedValue({ rows: [paymentData] });
 
-      const result = await PaymentModel.getById('payment-123');
+      const result = await PaymentModel.getById(mockPaymentId);
 
       expect(result).toBeDefined();
-      expect(result.id).toBe('payment-123');
+      expect(result.id).toBe(mockPaymentId);
       expect(result.amount).toBe(9.99);
     });
 
     it('should return null for non-existent payment', async () => {
-      mockDoc.get.mockResolvedValue({ exists: false });
+      query.mockResolvedValue({ rows: [] });
 
-      const result = await PaymentModel.getById('non-existent');
+      const result = await PaymentModel.getById('550e8400-e29b-41d4-a716-446655440099');
 
       expect(result).toBeNull();
     });
 
     it('should handle errors', async () => {
-      mockDoc.get.mockRejectedValue(new Error('Database error'));
+      query.mockRejectedValue(new Error('Database error'));
 
-      const result = await PaymentModel.getById('payment-123');
+      const result = await PaymentModel.getById(mockPaymentId);
 
       expect(result).toBeNull();
     });
@@ -123,26 +97,24 @@ describe('PaymentModel', () => {
 
   describe('updateStatus', () => {
     it('should update payment status', async () => {
-      mockDoc.update.mockResolvedValue();
+      query.mockResolvedValue({ rowCount: 1 });
 
-      const result = await PaymentModel.updateStatus('payment-123', 'success', {
+      const result = await PaymentModel.updateStatus(mockPaymentId, 'success', {
         transactionId: 'txn-456',
       });
 
       expect(result).toBe(true);
-      expect(mockDoc.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          status: 'success',
-          transactionId: 'txn-456',
-          updatedAt: expect.any(Date),
-        })
-      );
+      expect(query).toHaveBeenCalled();
+      const callArgs = query.mock.calls[0];
+      expect(callArgs[0]).toContain('UPDATE payments');
+      expect(callArgs[0]).toContain('status = $1');
+      expect(callArgs[0]).toContain('payment_id = $2'); // transactionId mapped to payment_id
     });
 
     it('should handle errors', async () => {
-      mockDoc.update.mockRejectedValue(new Error('Update failed'));
+      query.mockRejectedValue(new Error('Update failed'));
 
-      const result = await PaymentModel.updateStatus('payment-123', 'failed');
+      const result = await PaymentModel.updateStatus(mockPaymentId, 'failed');
 
       expect(result).toBe(false);
     });
@@ -151,39 +123,35 @@ describe('PaymentModel', () => {
   describe('getByUser', () => {
     it('should get user payments', async () => {
       const payments = [
-        {
-          id: '1',
-          data: () => ({ userId: '123456789', amount: 9.99 }),
-        },
-        {
-          id: '2',
-          data: () => ({ userId: '123456789', amount: 19.99 }),
-        },
+        { id: mockUuid, user_id: '123456789', amount: 9.99 },
+        { id: mockPaymentId, user_id: '123456789', amount: 19.99 },
       ];
 
-      mockCollection.get.mockResolvedValue({
-        forEach: (callback) => payments.forEach(callback),
-      });
+      query.mockResolvedValue({ rows: payments });
 
       const result = await PaymentModel.getByUser(123456789);
 
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(2);
-      expect(mockCollection.where).toHaveBeenCalledWith('userId', '==', '123456789');
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE user_id = $1'),
+        ['123456789', 20]
+      );
     });
 
     it('should limit results', async () => {
-      mockCollection.get.mockResolvedValue({
-        forEach: () => {},
-      });
+      query.mockResolvedValue({ rows: [] });
 
       await PaymentModel.getByUser(123456789, 10);
 
-      expect(mockCollection.limit).toHaveBeenCalledWith(10);
+      expect(query).toHaveBeenCalledWith(
+        expect.any(String),
+        ['123456789', 10]
+      );
     });
 
     it('should handle errors', async () => {
-      mockCollection.get.mockRejectedValue(new Error('Query error'));
+      query.mockRejectedValue(new Error('Query error'));
 
       const result = await PaymentModel.getByUser(123456789);
 
@@ -194,24 +162,22 @@ describe('PaymentModel', () => {
   describe('getByStatus', () => {
     it('should get payments by status', async () => {
       const payments = [
-        {
-          id: '1',
-          data: () => ({ status: 'pending', amount: 9.99 }),
-        },
+        { id: mockUuid, status: 'pending', amount: 9.99 },
       ];
 
-      mockCollection.get.mockResolvedValue({
-        forEach: (callback) => payments.forEach(callback),
-      });
+      query.mockResolvedValue({ rows: payments });
 
       const result = await PaymentModel.getByStatus('pending');
 
       expect(Array.isArray(result)).toBe(true);
-      expect(mockCollection.where).toHaveBeenCalledWith('status', '==', 'pending');
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE status = $1'),
+        ['pending', 100]
+      );
     });
 
     it('should handle errors', async () => {
-      mockCollection.get.mockRejectedValue(new Error('Query error'));
+      query.mockRejectedValue(new Error('Query error'));
 
       const result = await PaymentModel.getByStatus('success');
 
@@ -222,30 +188,23 @@ describe('PaymentModel', () => {
   describe('getByTransactionId', () => {
     it('should get payment by transaction ID', async () => {
       const paymentData = {
-        transactionId: 'txn-123',
+        id: mockPaymentId,
+        payment_id: 'txn-123',
         provider: 'epayco',
         amount: 9.99,
       };
 
-      mockCollection.get.mockResolvedValue({
-        empty: false,
-        docs: [{
-          id: 'payment-123',
-          data: () => paymentData,
-        }],
-      });
+      query.mockResolvedValue({ rows: [paymentData] });
 
       const result = await PaymentModel.getByTransactionId('txn-123', 'epayco');
 
       expect(result).toBeDefined();
-      expect(result.id).toBe('payment-123');
-      expect(result.transactionId).toBe('txn-123');
+      expect(result.id).toBe(mockPaymentId);
+      expect(result.payment_id).toBe('txn-123');
     });
 
     it('should return null when not found', async () => {
-      mockCollection.get.mockResolvedValue({
-        empty: true,
-      });
+      query.mockResolvedValue({ rows: [] });
 
       const result = await PaymentModel.getByTransactionId('non-existent', 'epayco');
 
@@ -253,7 +212,7 @@ describe('PaymentModel', () => {
     });
 
     it('should handle errors', async () => {
-      mockCollection.get.mockRejectedValue(new Error('Query error'));
+      query.mockRejectedValue(new Error('Query error'));
 
       const result = await PaymentModel.getByTransactionId('txn-123', 'epayco');
 
@@ -265,37 +224,29 @@ describe('PaymentModel', () => {
     it('should calculate revenue statistics', async () => {
       const payments = [
         {
-          data: () => ({
-            amount: 9.99,
-            planId: 'basic',
-            provider: 'epayco',
-          }),
+          amount: '9.99',
+          plan_id: 'basic',
+          provider: 'epayco',
         },
         {
-          data: () => ({
-            amount: 19.99,
-            planId: 'premium',
-            provider: 'epayco',
-          }),
+          amount: '19.99',
+          plan_id: 'premium',
+          provider: 'epayco',
         },
         {
-          data: () => ({
-            amount: 29.99,
-            planId: 'gold',
-            provider: 'daimo',
-          }),
+          amount: '29.99',
+          plan_id: 'gold',
+          provider: 'daimo',
         },
       ];
 
-      mockCollection.get.mockResolvedValue({
-        forEach: (callback) => payments.forEach(callback),
-      });
+      query.mockResolvedValue({ rows: payments });
 
       const startDate = new Date('2024-01-01');
       const endDate = new Date('2024-12-31');
       const result = await PaymentModel.getRevenue(startDate, endDate);
 
-      expect(result.total).toBe(59.97);
+      expect(result.total).toBeCloseTo(59.97, 2);
       expect(result.count).toBe(3);
       expect(result.average).toBeCloseTo(19.99, 2);
       expect(result.byPlan).toHaveProperty('basic', 1);
@@ -305,9 +256,7 @@ describe('PaymentModel', () => {
     });
 
     it('should handle empty results', async () => {
-      mockCollection.get.mockResolvedValue({
-        forEach: () => {},
-      });
+      query.mockResolvedValue({ rows: [] });
 
       const result = await PaymentModel.getRevenue(new Date(), new Date());
 
@@ -317,7 +266,7 @@ describe('PaymentModel', () => {
     });
 
     it('should handle errors', async () => {
-      mockCollection.get.mockRejectedValue(new Error('Query error'));
+      query.mockRejectedValue(new Error('Query error'));
 
       const result = await PaymentModel.getRevenue(new Date(), new Date());
 
