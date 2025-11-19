@@ -392,20 +392,25 @@ class PaymentService {
         throw new Error('No se encontró el pago. Verifica el ID o contacta soporte.');
       }
 
+      // Get plan to obtain SKU (payment table doesn't store SKU, plan does)
+      const planId = payment.plan_id || payment.planId;
+      const plan = planId ? await PlanModel.getById(planId) : null;
+      const planSku = plan?.sku || 'EASYBOTS-PNP-030';
+
       await PaymentModel.updateStatus(paymentId, 'completed');
 
       // Generar factura
       const invoice = await InvoiceService.generateInvoice({
-        userId: payment.userId,
-        planSku: payment.sku,
+        userId: payment.userId || payment.user_id,
+        planSku,
         amount: payment.amount,
       });
 
       // Enviar factura por email
-      const user = await UserModel.getById(payment.userId);
+      const user = await UserModel.getById(payment.userId || payment.user_id);
       await EmailService.sendInvoiceEmail({
         to: user.email,
-        subject: `Factura por suscripción (SKU: ${payment.sku})`,
+        subject: `Factura por suscripción (SKU: ${planSku})`,
         invoicePdf: invoice.pdf,
         invoiceNumber: invoice.id,
       });
