@@ -4,6 +4,7 @@ const EmailService = require('../../bot/services/emailservice');
 const PlanModel = require('../../models/planModel');
 const UserModel = require('../../models/userModel');
 const SubscriberModel = require('../../models/subscriberModel');
+const DaimoConfig = require('../../config/daimo');
 const logger = require('../../utils/logger');
 const crypto = require('crypto');
 
@@ -395,7 +396,48 @@ class PaymentService {
          };
        }
 
-       // For other providers (like Daimo)
+       // Handle Daimo payment link generation
+       if (provider === 'daimo') {
+         try {
+           // Create Daimo payment intent
+           const paymentIntent = DaimoConfig.createPaymentIntent({
+             amount: plan.price,
+             userId: userId,
+             planId: planId,
+             chatId: chatId,
+             description: `${plan.display_name || plan.name} - PNPtv Subscription`,
+           });
+
+           // Add payment ID to metadata
+           paymentIntent.metadata.paymentId = payment.id;
+
+           // Generate Daimo payment link
+           const paymentUrl = DaimoConfig.generatePaymentLink(paymentIntent);
+
+           logger.info('Daimo payment URL generated', {
+             paymentId: payment.id,
+             planId: plan.id,
+             userId,
+             amountUSD: plan.price,
+             paymentUrl,
+           });
+
+           return {
+             success: true,
+             paymentUrl,
+             paymentId: payment.id,
+           };
+         } catch (error) {
+           logger.error('Error generating Daimo payment link:', {
+             error: error.message,
+             stack: error.stack,
+             paymentId: payment.id,
+           });
+           throw new Error('No se pudo generar el enlace de pago con Daimo. Por favor, intenta más tarde o contacta soporte.');
+         }
+       }
+
+       // For other providers
        const paymentUrl = `https://${provider}.com/pay?paymentId=${payment.id}`;
        return { success: true, paymentUrl, paymentId: payment.id };
     } catch (error) {
