@@ -1,4 +1,5 @@
 const { getFirestore } = require('../config/firebase');
+const { query } = require('../config/postgres');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
@@ -291,16 +292,23 @@ class RadioModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const db = getFirestore();
-          const snapshot = await db.collection(SCHEDULE_COLLECTION)
-            .orderBy('dayOfWeek', 'asc')
-            .orderBy('timeSlot', 'asc')
-            .get();
+          const result = await query(
+            `SELECT * FROM radio_schedule
+             WHERE active = true
+             ORDER BY day_of_week ASC, time_slot ASC`,
+          );
 
-          const schedule = [];
-          snapshot.forEach((doc) => {
-            schedule.push({ id: doc.id, ...doc.data() });
-          });
+          const schedule = result.rows.map((row) => ({
+            id: row.id,
+            dayOfWeek: row.day_of_week,
+            timeSlot: row.time_slot,
+            programName: row.program_name,
+            description: row.description,
+            host: row.host,
+            active: row.active,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          }));
 
           logger.info(`Retrieved ${schedule.length} schedule entries`);
           return schedule;
@@ -320,8 +328,10 @@ class RadioModel {
    */
   static async deleteSchedule(scheduleId) {
     try {
-      const db = getFirestore();
-      await db.collection(SCHEDULE_COLLECTION).doc(scheduleId).delete();
+      await query(
+        'DELETE FROM radio_schedule WHERE id = $1',
+        [scheduleId],
+      );
 
       // Invalidate cache
       await cache.del('radio:schedule');

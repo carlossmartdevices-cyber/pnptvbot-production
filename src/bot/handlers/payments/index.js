@@ -21,26 +21,29 @@ const registerPaymentHandlers = (bot) => {
       const lang = getLanguage(ctx);
       const plans = await PlanModel.getAll();
 
-      let message = `${t('subscriptionPlans', lang)}\n\n`;
+      // Header with internationalization
+      let message = `${t('subscriptionHeader', lang)}\n`;
+      message += `${t('subscriptionDivider', lang)}\n\n`;
+      message += `${t('subscriptionDescription', lang)}\n\n\n`;
 
       const buttons = [];
       plans.forEach((plan) => {
-        // Use display_name or name, fallback to name if nameEs doesn't exist
         const planName = plan.display_name || plan.name;
-        // Features are in English, use them directly
-        const features = plan.features || [];
+        const durationText = plan.duration_days || plan.duration;
+        const price = parseFloat(plan.price);
 
-        message += `${plan.icon || '💎'} ${planName} - $${plan.price}${plan.duration <= 30 ? '/month' : ''}\n`;
-        features.forEach((feature) => {
-          message += `  ✓ ${feature}\n`;
-        });
-        message += '\n';
+        // Format buttons with i18n
+        let buttonText;
+        if (plan.is_lifetime) {
+          // Lifetime Pass without duration
+          buttonText = `${planName} | $${price.toFixed(2)}`;
+        } else {
+          // Regular plans with duration
+          buttonText = `${planName} | ${durationText} ${t('days', lang)} | $${price.toFixed(2)}`;
+        }
 
         buttons.push([
-          Markup.button.callback(
-            `${plan.icon || '💎'} ${planName}`,
-            `select_plan_${plan.id}`,
-          ),
+          Markup.button.callback(buttonText, `select_plan_${plan.id}`),
         ]);
       });
 

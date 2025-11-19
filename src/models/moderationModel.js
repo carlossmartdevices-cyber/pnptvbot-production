@@ -1,4 +1,5 @@
 const { getFirestore } = require('../config/firebase');
+const { query } = require('../config/postgres');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
@@ -28,36 +29,71 @@ class ModerationModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const db = getFirestore();
-          const doc = await db.collection(COLLECTIONS.GROUP_SETTINGS).doc(groupId.toString()).get();
+          // Try PostgreSQL first
+          const result = await query(
+            'SELECT * FROM group_settings WHERE group_id = $1',
+            [groupId.toString()],
+          );
 
-          if (!doc.exists) {
-            // Create default settings
-            const defaultSettings = {
-              groupId: groupId.toString(),
-              antiLinksEnabled: true,
-              antiSpamEnabled: true,
-              antiFloodEnabled: true,
-              profanityFilterEnabled: false,
-              maxWarnings: 3,
-              floodLimit: 5, // messages
-              floodWindow: 10, // seconds
-              muteDuration: 3600, // 1 hour in seconds
-              allowedDomains: [], // Whitelist domains
-              bannedWords: [], // Custom banned words list
-              createdAt: new Date(),
-              updatedAt: new Date(),
+          if (result.rows.length > 0) {
+            const settings = result.rows[0];
+            return {
+              groupId: settings.group_id,
+              antiLinksEnabled: settings.anti_links_enabled,
+              antiSpamEnabled: settings.anti_spam_enabled,
+              antiFloodEnabled: settings.anti_flood_enabled,
+              profanityFilterEnabled: settings.profanity_filter_enabled,
+              maxWarnings: settings.max_warnings,
+              floodLimit: settings.flood_limit,
+              floodWindow: settings.flood_window,
+              muteDuration: settings.mute_duration,
+              allowedDomains: settings.allowed_domains || [],
+              bannedWords: settings.banned_words || [],
+              createdAt: settings.created_at,
+              updatedAt: settings.updated_at,
             };
-
-            await db.collection(COLLECTIONS.GROUP_SETTINGS)
-              .doc(groupId.toString())
-              .set(defaultSettings);
-
-            logger.info('Created default group settings', { groupId });
-            return defaultSettings;
           }
 
-          return { id: doc.id, ...doc.data() };
+          // Create default settings if not found
+          const defaultSettings = {
+            groupId: groupId.toString(),
+            antiLinksEnabled: true,
+            antiSpamEnabled: true,
+            antiFloodEnabled: true,
+            profanityFilterEnabled: false,
+            maxWarnings: 3,
+            floodLimit: 5,
+            floodWindow: 10,
+            muteDuration: 3600,
+            allowedDomains: [],
+            bannedWords: [],
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+
+          await query(
+            `INSERT INTO group_settings (
+              group_id, anti_links_enabled, anti_spam_enabled, anti_flood_enabled,
+              profanity_filter_enabled, max_warnings, flood_limit, flood_window,
+              mute_duration, allowed_domains, banned_words
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+            [
+              defaultSettings.groupId,
+              defaultSettings.antiLinksEnabled,
+              defaultSettings.antiSpamEnabled,
+              defaultSettings.antiFloodEnabled,
+              defaultSettings.profanityFilterEnabled,
+              defaultSettings.maxWarnings,
+              defaultSettings.floodLimit,
+              defaultSettings.floodWindow,
+              defaultSettings.muteDuration,
+              defaultSettings.allowedDomains,
+              defaultSettings.bannedWords,
+            ],
+          );
+
+          logger.info('Created default group settings', { groupId });
+          return defaultSettings;
         },
         600, // Cache for 10 minutes
       );
@@ -511,18 +547,20 @@ class ModerationModel {
    */
   static async recordUsernameChange(userId, oldUsername, newUsername, groupId = null) {
     try {
-      const db = getFirestore();
+      const result = await query(
+        `INSERT INTO username_history (
+          user_id, old_username, new_username, group_id, flagged
+        ) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [
+          userId.toString(),
+          oldUsername || null,
+          newUsername || null,
+          groupId ? groupId.toString() : null,
+          false,
+        ],
+      );
 
-      const record = {
-        userId: userId.toString(),
-        oldUsername: oldUsername || null,
-        newUsername: newUsername || null,
-        groupId: groupId ? groupId.toString() : null,
-        changedAt: new Date(),
-        flagged: false, // Can be flagged by admins if suspicious
-      };
-
-      const docRef = await db.collection(COLLECTIONS.USERNAME_HISTORY).add(record);
+      const recordId = result.rows[0].id;
 
       // Also log it
       await this.addLog({
@@ -538,10 +576,10 @@ class ModerationModel {
         oldUsername,
         newUsername,
         groupId,
-        recordId: docRef.id,
+        recordId,
       });
 
-      return docRef.id;
+      return recordId;
     } catch (error) {
       logger.error('Error recording username change:', error);
       throw error;

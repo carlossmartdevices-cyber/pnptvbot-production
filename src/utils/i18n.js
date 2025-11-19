@@ -5,6 +5,8 @@
 
 const translations = {
   en: {
+        groupRedirect: ({ username, command, botUsername }) =>
+          `@${username} I sent you a private message about your request. Please check it out. We do this for privacy reasons and to comply with our Group's anti-spam policy.\n\n[Open in private chat with your request](https://t.me/${botUsername}?start=${command})`,
     // General
     welcome: '👋 Welcome to PNPtv!',
       welcomeScreen: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          Welcome to PNPtv! Premium\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThis is your control dashboard.\nFrom here, you can access all your premium features:\nopen Zoom Rooms, start live streams, watch full videos,\nexplore Nearby without limits, and join private events.`,
@@ -16,6 +18,7 @@ const translations = {
     error: '❌ An error occurred. Please try again.',
     success: '✅ Success!',
     loading: '⏳ Loading...',
+    days: 'days',
 
     // Onboarding
     selectLanguage: 'Please select your language:',
@@ -42,6 +45,9 @@ const translations = {
     support: '🤖 Support',
     settings: '⚙️ Settings',
     // Subscription
+    subscriptionHeader: 'Subscribe to PNPtv PRIME',
+    subscriptionDivider: '---------------------------------------',
+    subscriptionDescription: 'Unlock the full PNPtv! experience and dive into the hottest community of Latinos smoking & slamming on Telegram.\n\nChoose your plan to access long-session videos, weekly releases, community features, and the full videography of Santino and other sexy Latino boys. Tap a plan below to see what\'s included.',
     subscriptionPlans: '💎 Choose Your PRIME Plan:',
     planBasic: '⭐ Basic - $9.99/month',
     planPremium: '🌟 Premium - $19.99/month',
@@ -373,6 +379,8 @@ const translations = {
     },
   },
   es: {
+        groupRedirect: ({ username, command, botUsername }) =>
+          `@${username} Te envié un mensaje privado sobre tu solicitud. Por favor revísalo. Esto es por privacidad y para cumplir con la política anti-spam del grupo.\n\n[Abrir en chat privado con tu solicitud](https://t.me/${botUsername}?start=${command})`,
     // General
     welcome: '👋 ¡Bienvenido a PNPtv!',
     welcomeScreen: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv! Premium\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel de control.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas Zoom, iniciar transmisiones en vivo, ver videos completos,\nexplorar Cercanos sin límites y unirte a eventos privados.',
@@ -384,6 +392,7 @@ const translations = {
     error: '❌ Ocurrió un error. Por favor intenta de nuevo.',
     success: '✅ ¡Éxito!',
     loading: '⏳ Cargando...',
+    days: 'días',
 
     // Onboarding
     selectLanguage: 'Por favor selecciona tu idioma:',
@@ -410,6 +419,9 @@ const translations = {
     support: '🤖 Soporte',
     settings: '⚙️ Configuración',
     // Subscription
+    subscriptionHeader: 'Suscríbete a PNPtv PRIME',
+    subscriptionDivider: '---------------------------------------',
+    subscriptionDescription: 'Desbloquea la experiencia completa de PNPtv y sumérgete en la comunidad más intensa de Latinos fumando y slamming en Telegram.\n\nElige tu plan para acceder a videos de sesiones largas, lanzamientos semanales, funciones comunitarias y la videografía completa de Santino y otros chicos latinos sexys. Toca un plan para ver qué incluye.',
     subscriptionPlans: '💎 Elige tu Plan PRIME:',
     planBasic: '⭐ Básico - $9.99/mes',
     planPremium: '🌟 Premium - $19.99/mes',
