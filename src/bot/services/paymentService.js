@@ -91,7 +91,7 @@ class PaymentService {
       const planId = x_extra2;
 
       // Check if payment exists
-      const payment = paymentId ? await PaymentModel.getPaymentById(paymentId) : null;
+      const payment = paymentId ? await PaymentModel.getById(paymentId) : null;
 
       if (!payment && !userId) {
         logger.error('Payment not found and no user ID provided', { paymentId, refPayco: x_ref_payco });
@@ -102,11 +102,10 @@ class PaymentService {
       if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
         // Payment successful
         if (payment) {
-          await PaymentModel.updatePayment(paymentId, {
-            status: 'completed',
-            transactionId: x_transaction_id,
-            approvalCode: x_approval_code,
-            epaycoRef: x_ref_payco,
+          await PaymentModel.updateStatus(paymentId, 'completed', {
+            transaction_id: x_transaction_id,
+            approval_code: x_approval_code,
+            epayco_ref: x_ref_payco,
           });
         }
 
@@ -157,10 +156,9 @@ class PaymentService {
       } else if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Fallida') {
         // Payment failed
         if (payment) {
-          await PaymentModel.updatePayment(paymentId, {
-            status: 'failed',
-            transactionId: x_transaction_id,
-            epaycoRef: x_ref_payco,
+          await PaymentModel.updateStatus(paymentId, 'failed', {
+            transaction_id: x_transaction_id,
+            epayco_ref: x_ref_payco,
           });
         }
 
@@ -174,10 +172,9 @@ class PaymentService {
       } else if (x_transaction_state === 'Pendiente') {
         // Payment pending
         if (payment) {
-          await PaymentModel.updatePayment(paymentId, {
-            status: 'pending',
-            transactionId: x_transaction_id,
-            epaycoRef: x_ref_payco,
+          await PaymentModel.updateStatus(paymentId, 'pending', {
+            transaction_id: x_transaction_id,
+            epayco_ref: x_ref_payco,
           });
         }
 
@@ -227,7 +224,7 @@ class PaymentService {
 
       // Check if already processed (idempotency)
       if (paymentId) {
-        const payment = await PaymentModel.getPaymentById(paymentId);
+        const payment = await PaymentModel.getById(paymentId);
         if (payment && payment.status === 'completed') {
           logger.info('Daimo payment already processed', { paymentId, eventId: id });
           return { success: true, alreadyProcessed: true };
@@ -238,10 +235,9 @@ class PaymentService {
       if (status === 'confirmed' || status === 'completed') {
         // Payment successful
         if (paymentId) {
-          await PaymentModel.updatePayment(paymentId, {
-            status: 'completed',
-            transactionId: source?.txHash || id,
-            daimoEventId: id,
+          await PaymentModel.updateStatus(paymentId, 'completed', {
+            transaction_id: source?.txHash || id,
+            daimo_event_id: id,
           });
         }
 
@@ -269,10 +265,9 @@ class PaymentService {
       } else if (status === 'failed') {
         // Payment failed
         if (paymentId) {
-          await PaymentModel.updatePayment(paymentId, {
-            status: 'failed',
-            transactionId: source?.txHash || id,
-            daimoEventId: id,
+          await PaymentModel.updateStatus(paymentId, 'failed', {
+            transaction_id: source?.txHash || id,
+            daimo_event_id: id,
           });
         }
 

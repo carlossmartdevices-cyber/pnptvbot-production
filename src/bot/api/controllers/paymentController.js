@@ -22,7 +22,7 @@ class PaymentController {
       }
 
       // Get payment from database
-      const payment = await PaymentModel.getPaymentById(paymentId);
+      const payment = await PaymentModel.getById(paymentId);
 
       if (!payment) {
         logger.warn('Payment not found', { paymentId });
@@ -43,8 +43,9 @@ class PaymentController {
         });
       }
 
-      // Get plan information
-      const plan = await PlanModel.getById(payment.planId);
+      // Get plan information (handle both camelCase and snake_case from payment)
+      const planId = payment.planId || payment.plan_id;
+      const plan = await PlanModel.getById(planId);
 
       if (!plan) {
         logger.error('Plan not found for payment', { paymentId, planId: payment.planId });
@@ -65,13 +66,16 @@ class PaymentController {
       const epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;
       const epaycoTestMode = process.env.EPAYCO_TEST_MODE === 'true';
 
+      // Handle both camelCase and snake_case from payment
+      const userId = payment.userId || payment.user_id;
+
       const responseData = {
         success: true,
         payment: {
           paymentId: payment.id,
           paymentRef,
-          userId: payment.userId,
-          planId: payment.planId,
+          userId,
+          planId,
           status: payment.status,
           amountUSD: parseFloat(plan.price),
           amountCOP: priceInCOP,
@@ -94,7 +98,7 @@ class PaymentController {
       logger.info('Payment info retrieved', {
         paymentId,
         planId: plan.id,
-        userId: payment.userId,
+        userId,
       });
 
       res.json(responseData);
