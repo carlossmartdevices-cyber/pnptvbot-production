@@ -30,9 +30,9 @@ const messageTimestamps = new Map();
 const RATE_LIMIT_MS = 3000; // 3 seconds between messages
 
 /**
- * Agent instructions - PNPtv Harm Reduction & Community Support AI
+ * Agent instructions - Cristina (PNPtv Harm Reduction & Community Support AI)
  */
-const AGENT_INSTRUCTIONS = `You are PNPtv!, an educational and community-focused AI from the queer Latino project PNPtv!
+const AGENT_INSTRUCTIONS = `You are Cristina, an educational and community-focused AI from the queer Latino project PNPtv!
 
 Your mission is to talk openly about drug use, especially methamphetamine, in the context of harm reduction, sex, and community life.
 
@@ -255,14 +255,14 @@ const registerSupportHandlers = (bot) => {
       await ctx.answerCbQuery();
 
       const greeting = lang === 'es'
-        ? '💬 **¡Hola! Soy PNPtv! AI**\n\n'
+        ? '💬 **¡Hola! Soy Cristina**\n\n'
           + 'Estoy aquí para apoyarte con:\n'
           + '• Reducción de daños y uso seguro\n'
           + '• Salud sexual y mental\n'
           + '• Recursos comunitarios\n'
           + '• Información sobre la plataforma\n\n'
           + '_Escribe tu pregunta o inquietud. Escribe "exit" para salir._'
-        : '💬 **Hi! I\'m PNPtv! AI**\n\n'
+        : '💬 **Hi! I\'m Cristina**\n\n'
           + 'I\'m here to support you with:\n'
           + '• Harm reduction and safer use\n'
           + '• Sexual and mental health\n'
@@ -807,10 +807,10 @@ const registerSupportHandlers = (bot) => {
       // If no question, just greet
       if (!question) {
         const greeting = lang === 'es'
-          ? '💬 ¡Hola papi! Soy PNPtv! AI\n\n'
+          ? '💬 ¡Hola papi! Soy Cristina\n\n'
             + 'Pregúntame lo que quieras sobre reducción de daños, salud sexual, recursos comunitarios, o lo que necesites.\n\n'
             + 'Ejemplo: `/cristina es bueno tomar entre semana?`'
-          : '💬 Hi! I\'m PNPtv! AI\n\n'
+          : '💬 Hi! I\'m Cristina\n\n'
             + 'Ask me anything about harm reduction, sexual health, community resources, or whatever you need.\n\n'
             + 'Example: `/cristina is it ok to party during the week?`';
 
