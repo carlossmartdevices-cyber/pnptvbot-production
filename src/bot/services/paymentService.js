@@ -152,6 +152,68 @@ class PaymentService {
           }
         }
 
+        // Send both emails after successful payment
+        if (x_customer_email && userId && planId) {
+          const plan = await PlanModel.getById(planId);
+          const user = await UserModel.getById(userId);
+
+          if (plan) {
+            // Get user language (from user record or default to Spanish)
+            const userLanguage = user?.language || 'es';
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
+
+            // 1. Send invoice email from easybots.store
+            try {
+              const invoiceEmailResult = await EmailService.sendInvoiceEmail({
+                to: x_customer_email,
+                customerName: x_customer_name || user?.first_name || 'Valued Customer',
+                invoiceNumber: x_ref_payco,
+                amount: parseFloat(x_amount),
+                planName: plan.display_name || plan.name,
+                invoicePdf: null, // PDF generation can be added later if needed
+              });
+
+              if (invoiceEmailResult.success) {
+                logger.info('Invoice email sent successfully', {
+                  to: x_customer_email,
+                  refPayco: x_ref_payco,
+                });
+              }
+            } catch (emailError) {
+              logger.error('Error sending invoice email (non-critical):', {
+                error: emailError.message,
+                refPayco: x_ref_payco,
+              });
+            }
+
+            // 2. Send welcome email from pnptv.app
+            try {
+              const welcomeEmailResult = await EmailService.sendWelcomeEmail({
+                to: x_customer_email,
+                customerName: x_customer_name || user?.first_name || 'Valued Customer',
+                planName: plan.display_name || plan.name,
+                duration: plan.duration,
+                expiryDate,
+                language: userLanguage,
+              });
+
+              if (welcomeEmailResult.success) {
+                logger.info('Welcome email sent successfully', {
+                  to: x_customer_email,
+                  planId,
+                  language: userLanguage,
+                });
+              }
+            } catch (emailError) {
+              logger.error('Error sending welcome email (non-critical):', {
+                error: emailError.message,
+                refPayco: x_ref_payco,
+              });
+            }
+          }
+        }
+
         return { success: true };
       } else if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Fallida') {
         // Payment failed
