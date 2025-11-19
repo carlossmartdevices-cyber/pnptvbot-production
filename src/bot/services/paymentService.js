@@ -3,7 +3,9 @@ const InvoiceService = require('../../bot/services/invoiceservice');
 const EmailService = require('../../bot/services/emailservice');
 const PlanModel = require('../../models/planModel');
 const UserModel = require('../../models/userModel');
+const SubscriberModel = require('../../models/subscriberModel');
 const logger = require('../../utils/logger');
+const crypto = require('crypto');
 
 class PaymentService {
     /**
@@ -32,6 +34,266 @@ class PaymentService {
       }
       return success;
     }
+
+  /**
+   * Process ePayco webhook confirmation
+   * @param {Object} webhookData - ePayco webhook data
+   * @returns {Object} { success: boolean, error?: string }
+   */
+  static async processEpaycoWebhook(webhookData) {
+    try {
+      const {
+        x_ref_payco,
+        x_transaction_id,
+        x_transaction_state,
+        x_amount,
+        x_currency_code,
+        x_signature,
+        x_approval_code,
+        x_extra1, // userId (telegram ID)
+        x_extra2, // planId
+        x_extra3, // paymentId
+        x_customer_email,
+        x_customer_name,
+      } = webhookData;
+
+      logger.info('Processing ePayco webhook', {
+        refPayco: x_ref_payco,
+        transactionId: x_transaction_id,
+        state: x_transaction_state,
+        amount: x_amount,
+        paymentId: x_extra3,
+      });
+
+      // Verify signature if available
+      if (x_signature && process.env.EPAYCO_PRIVATE_KEY) {
+        const p_cust_id_cliente = process.env.EPAYCO_P_CUST_ID || '';
+        const p_key = process.env.EPAYCO_PRIVATE_KEY;
+
+        // ePayco signature format
+        const signatureString = `${p_cust_id_cliente}^${p_key}^${x_ref_payco}^${x_transaction_id}^${x_amount}^${x_currency_code}`;
+        const expectedSignature = crypto.createHash('sha256').update(signatureString).digest('hex');
+
+        if (x_signature !== expectedSignature) {
+          logger.error('Invalid ePayco signature', {
+            received: x_signature,
+            expected: expectedSignature,
+            refPayco: x_ref_payco,
+          });
+          return { success: false, error: 'Invalid signature' };
+        }
+
+        logger.info('ePayco signature verified successfully');
+      }
+
+      const paymentId = x_extra3;
+      const userId = x_extra1;
+      const planId = x_extra2;
+
+      // Check if payment exists
+      const payment = paymentId ? await PaymentModel.getPaymentById(paymentId) : null;
+
+      if (!payment && !userId) {
+        logger.error('Payment not found and no user ID provided', { paymentId, refPayco: x_ref_payco });
+        return { success: false, error: 'Payment not found' };
+      }
+
+      // Process based on transaction state
+      if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
+        // Payment successful
+        if (payment) {
+          await PaymentModel.updatePayment(paymentId, {
+            status: 'completed',
+            transactionId: x_transaction_id,
+            approvalCode: x_approval_code,
+            epaycoRef: x_ref_payco,
+          });
+        }
+
+        // Activate user subscription
+        if (userId && planId) {
+          const plan = await PlanModel.getById(planId);
+          if (plan) {
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
+
+            await UserModel.updateSubscription(userId, {
+              status: 'active',
+              planId,
+              expiry: expiryDate,
+            });
+
+            logger.info('User subscription activated via webhook', {
+              userId,
+              planId,
+              expiryDate,
+              refPayco: x_ref_payco,
+            });
+          }
+        }
+
+        // Create or update subscriber record
+        if (x_customer_email) {
+          const existingSubscriber = await SubscriberModel.getByEmail(x_customer_email);
+
+          if (existingSubscriber) {
+            await SubscriberModel.updateStatus(x_customer_email, 'active', {
+              lastPaymentAt: new Date(),
+              subscriptionId: x_ref_payco,
+            });
+          } else if (userId && planId) {
+            await SubscriberModel.create({
+              email: x_customer_email,
+              name: x_customer_name || 'Unknown',
+              telegramId: userId,
+              plan: planId,
+              subscriptionId: x_ref_payco,
+              provider: 'epayco',
+            });
+          }
+        }
+
+        return { success: true };
+      } else if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Fallida') {
+        // Payment failed
+        if (payment) {
+          await PaymentModel.updatePayment(paymentId, {
+            status: 'failed',
+            transactionId: x_transaction_id,
+            epaycoRef: x_ref_payco,
+          });
+        }
+
+        logger.warn('Payment rejected by ePayco', {
+          paymentId,
+          refPayco: x_ref_payco,
+          state: x_transaction_state,
+        });
+
+        return { success: true }; // Return success to acknowledge webhook
+      } else if (x_transaction_state === 'Pendiente') {
+        // Payment pending
+        if (payment) {
+          await PaymentModel.updatePayment(paymentId, {
+            status: 'pending',
+            transactionId: x_transaction_id,
+            epaycoRef: x_ref_payco,
+          });
+        }
+
+        return { success: true };
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error('Error processing ePayco webhook:', {
+        error: error.message,
+        stack: error.stack,
+      });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Process Daimo webhook confirmation
+   * @param {Object} webhookData - Daimo webhook data
+   * @returns {Object} { success: boolean, error?: string, alreadyProcessed?: boolean }
+   */
+  static async processDaimoWebhook(webhookData) {
+    try {
+      const {
+        id,
+        status,
+        source,
+        metadata,
+      } = webhookData;
+
+      logger.info('Processing Daimo webhook', {
+        eventId: id,
+        status,
+        txHash: source?.txHash,
+        userId: metadata?.userId,
+        planId: metadata?.planId,
+      });
+
+      const userId = metadata?.userId;
+      const planId = metadata?.planId;
+      const paymentId = metadata?.paymentId;
+
+      if (!userId || !planId) {
+        logger.error('Missing user ID or plan ID in Daimo webhook', { eventId: id });
+        return { success: false, error: 'Missing user ID or plan ID' };
+      }
+
+      // Check if already processed (idempotency)
+      if (paymentId) {
+        const payment = await PaymentModel.getPaymentById(paymentId);
+        if (payment && payment.status === 'completed') {
+          logger.info('Daimo payment already processed', { paymentId, eventId: id });
+          return { success: true, alreadyProcessed: true };
+        }
+      }
+
+      // Process based on status
+      if (status === 'confirmed' || status === 'completed') {
+        // Payment successful
+        if (paymentId) {
+          await PaymentModel.updatePayment(paymentId, {
+            status: 'completed',
+            transactionId: source?.txHash || id,
+            daimoEventId: id,
+          });
+        }
+
+        // Activate user subscription
+        const plan = await PlanModel.getById(planId);
+        if (plan) {
+          const expiryDate = new Date();
+          expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
+
+          await UserModel.updateSubscription(userId, {
+            status: 'active',
+            planId,
+            expiry: expiryDate,
+          });
+
+          logger.info('User subscription activated via Daimo webhook', {
+            userId,
+            planId,
+            expiryDate,
+            txHash: source?.txHash,
+          });
+        }
+
+        return { success: true };
+      } else if (status === 'failed') {
+        // Payment failed
+        if (paymentId) {
+          await PaymentModel.updatePayment(paymentId, {
+            status: 'failed',
+            transactionId: source?.txHash || id,
+            daimoEventId: id,
+          });
+        }
+
+        logger.warn('Daimo payment failed', {
+          paymentId,
+          eventId: id,
+          status,
+        });
+
+        return { success: true }; // Return success to acknowledge webhook
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error('Error processing Daimo webhook:', {
+        error: error.message,
+        stack: error.stack,
+      });
+      return { success: false, error: error.message };
+    }
+  }
   static async createPayment({ userId, planId, provider, sku, chatId }) {
     try {
       const plan = await PlanModel.getById(planId);
@@ -68,6 +330,11 @@ class PaymentService {
            throw new Error('Configuración de pago incompleta. Contacta soporte.');
          }
 
+         if (!webhookDomain) {
+           logger.error('BOT_WEBHOOK_DOMAIN not configured');
+           throw new Error('Configuración de pago incompleta. Contacta soporte.');
+         }
+
          // Use price in Colombian pesos for ePayco
          const priceInCOP = plan.price_in_cop || (parseFloat(plan.price) * 4000); // Fallback conversion
 
@@ -85,10 +352,9 @@ class PaymentService {
          const description = `Suscripción ${planName} - PNPtv`;
 
          // ePayco Checkout Standard URL
-         const baseUrl = epaycoTestMode
-           ? 'https://checkout.epayco.co/checkout.html'
-           : 'https://checkout.epayco.co/checkout.html';
+         const baseUrl = 'https://checkout.epayco.co/checkout.html';
 
+         // Build parameters according to ePayco documentation
          const params = new URLSearchParams({
            key: epaycoPublicKey,
            external: 'true',
@@ -101,11 +367,16 @@ class PaymentService {
            tax: '0',
            country: 'co',
            lang: 'es',
-           external_reference: payment.id,
+           // Pass data in extra fields for webhook processing
+           extra1: userId.toString(), // User ID (Telegram ID)
+           extra2: planId, // Plan ID
+           extra3: payment.id, // Payment ID
+           // Webhook URLs
            confirmation: `${webhookDomain}/api/webhooks/epayco`,
-           response: `${webhookDomain}/payment/response`,
+           response: `${webhookDomain}/api/payment-response`,
+           // Test mode
            test: epaycoTestMode ? 'true' : 'false',
-           autoclick: 'true'
+           autoclick: 'false'
          });
 
          const paymentUrl = `${baseUrl}?${params.toString()}`;
@@ -114,9 +385,12 @@ class PaymentService {
            paymentId: payment.id,
            paymentRef,
            planId: plan.id,
+           userId,
            amountUSD: plan.price,
            amountCOP: priceInCOP,
-           testMode: epaycoTestMode
+           testMode: epaycoTestMode,
+           confirmationUrl: `${webhookDomain}/api/webhooks/epayco`,
+           responseUrl: `${webhookDomain}/api/payment-response`
          });
 
          return {

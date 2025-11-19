@@ -19,7 +19,11 @@ const sanitizeBotUsername = (username) => {
  * @returns {Object} { valid: boolean, error?: string }
  */
 const validateEpaycoPayload = (payload) => {
-  const requiredFields = ['x_ref_payco', 'x_transaction_state', 'x_extra1', 'x_extra2', 'x_extra3'];
+  // ePayco minimum required fields according to documentation
+  // x_ref_payco: ePayco transaction reference
+  // x_transaction_id: Transaction ID
+  // x_transaction_state: Transaction state (Aceptada, Rechazada, Pendiente)
+  const requiredFields = ['x_ref_payco', 'x_transaction_state'];
   const missingFields = requiredFields.filter((field) => !payload[field]);
 
   if (missingFields.length > 0) {
