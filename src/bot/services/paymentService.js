@@ -6,8 +6,136 @@ const UserModel = require('../../models/userModel');
 const SubscriberModel = require('../../models/subscriberModel');
 const logger = require('../../utils/logger');
 const crypto = require('crypto');
+const { Telegraf } = require('telegraf');
 
 class PaymentService {
+    /**
+     * Send payment confirmation notification to user via Telegram bot
+     * Includes purchase details and unique invite link to PRIME channel
+     * @param {Object} params - Notification parameters
+     * @param {string} params.userId - Telegram user ID
+     * @param {Object} params.plan - Plan object
+     * @param {string} params.transactionId - Transaction/reference ID
+     * @param {number} params.amount - Payment amount
+     * @param {Date} params.expiryDate - Subscription expiry date
+     * @param {string} params.language - User language ('es' or 'en')
+     * @returns {Promise<boolean>} Success status
+     */
+    static async sendPaymentConfirmationNotification({
+      userId, plan, transactionId, amount, expiryDate, language = 'es',
+    }) {
+      try {
+        const bot = new Telegraf(process.env.BOT_TOKEN);
+        const groupId = process.env.GROUP_ID || '-1003159260496'; // PRIME channel ID
+
+        // Create unique invite link for PRIME channel
+        let inviteLink = '';
+        try {
+          const response = await bot.telegram.createChatInviteLink(groupId, {
+            member_limit: 1, // Single use
+            name: `Subscription ${transactionId}`,
+          });
+          inviteLink = response.invite_link;
+          logger.info('Unique PRIME channel invite link created', {
+            userId,
+            transactionId,
+            inviteLink,
+          });
+        } catch (linkError) {
+          logger.error('Error creating invite link, using fallback', {
+            error: linkError.message,
+            userId,
+          });
+          // Fallback: try to create a regular link
+          try {
+            const fallbackResponse = await bot.telegram.createChatInviteLink(groupId);
+            inviteLink = fallbackResponse.invite_link;
+          } catch (fallbackError) {
+            logger.error('Fallback invite link also failed', {
+              error: fallbackError.message,
+            });
+            inviteLink = 'https://t.me/PNPTV_PRIME'; // Ultimate fallback
+          }
+        }
+
+        // Format expiry date
+        const expiryDateStr = expiryDate
+          ? expiryDate.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })
+          : (language === 'es' ? 'Sin vencimiento (Lifetime)' : 'No expiration (Lifetime)');
+
+        // Build message in user's language
+        const messageEs = [
+          '🎉 *¡Pago Confirmado!*',
+          '',
+          '✅ Tu suscripción ha sido activada exitosamente.',
+          '',
+          '📋 *Detalles de la Compra:*',
+          `💎 Plan: ${plan.display_name || plan.name}`,
+          `💵 Monto: $${amount.toFixed(2)} USD`,
+          `📅 Válido hasta: ${expiryDateStr}`,
+          `🔖 ID de Transacción: ${transactionId}`,
+          '',
+          '🌟 *¡Bienvenido a PRIME!*',
+          '',
+          '👉 Accede al canal exclusivo aquí:',
+          `[🔗 Ingresar a PRIME](${inviteLink})`,
+          '',
+          '💎 Disfruta de todo el contenido premium y beneficios exclusivos.',
+          '',
+          '¡Gracias por tu suscripción! 🙏',
+        ].join('\n');
+
+        const messageEn = [
+          '🎉 *Payment Confirmed!*',
+          '',
+          '✅ Your subscription has been activated successfully.',
+          '',
+          '📋 *Purchase Details:*',
+          `💎 Plan: ${plan.display_name || plan.name}`,
+          `💵 Amount: $${amount.toFixed(2)} USD`,
+          `📅 Valid until: ${expiryDateStr}`,
+          `🔖 Transaction ID: ${transactionId}`,
+          '',
+          '🌟 *Welcome to PRIME!*',
+          '',
+          '👉 Access the exclusive channel here:',
+          `[🔗 Join PRIME](${inviteLink})`,
+          '',
+          '💎 Enjoy all premium content and exclusive benefits.',
+          '',
+          'Thank you for your subscription! 🙏',
+        ].join('\n');
+
+        const message = language === 'es' ? messageEs : messageEn;
+
+        // Send notification
+        await bot.telegram.sendMessage(userId, message, {
+          parse_mode: 'Markdown',
+          disable_web_page_preview: false,
+        });
+
+        logger.info('Payment confirmation notification sent', {
+          userId,
+          planId: plan.id,
+          transactionId,
+          language,
+        });
+
+        return true;
+      } catch (error) {
+        logger.error('Error sending payment confirmation notification:', {
+          userId,
+          error: error.message,
+          stack: error.stack,
+        });
+        return false;
+      }
+    }
+
     /**
      * Reintentar pago fallido (simulado)
      * @param {string} paymentId
@@ -128,6 +256,25 @@ class PaymentService {
               expiryDate,
               refPayco: x_ref_payco,
             });
+
+            // Send payment confirmation notification via bot (with PRIME channel link)
+            const user = await UserModel.getById(userId);
+            const userLanguage = user?.language || 'es';
+            try {
+              await this.sendPaymentConfirmationNotification({
+                userId,
+                plan,
+                transactionId: x_ref_payco,
+                amount: parseFloat(x_amount),
+                expiryDate,
+                language: userLanguage,
+              });
+            } catch (notifError) {
+              logger.error('Error sending payment confirmation notification (non-critical):', {
+                error: notifError.message,
+                userId,
+              });
+            }
           }
         }
 
@@ -328,6 +475,26 @@ class PaymentService {
             expiryDate,
             txHash: source?.txHash,
           });
+
+          // Send payment confirmation notification via bot (with PRIME channel link)
+          const userLanguage = user?.language || 'es';
+          const DaimoService = require('./daimoService');
+          const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
+          try {
+            await this.sendPaymentConfirmationNotification({
+              userId,
+              plan,
+              transactionId: source?.txHash || id,
+              amount: amountUSD,
+              expiryDate,
+              language: userLanguage,
+            });
+          } catch (notifError) {
+            logger.error('Error sending payment confirmation notification (non-critical):', {
+              error: notifError.message,
+              userId,
+            });
+          }
 
           // Get customer email from user record or subscriber record
           let customerEmail = user?.email;
