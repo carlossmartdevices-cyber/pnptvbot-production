@@ -382,13 +382,13 @@ class PaymentService {
 
   static async completePayment(paymentId) {
     try {
-      const payment = await PaymentModel.getPaymentById(paymentId);
+      const payment = await PaymentModel.getById(paymentId);
       if (!payment) {
         logger.error('Pago no encontrado', { paymentId });
         throw new Error('No se encontró el pago. Verifica el ID o contacta soporte.');
       }
 
-      await PaymentModel.updatePayment(paymentId, { status: 'completed' });
+      await PaymentModel.updateStatus(paymentId, 'completed');
 
       // Generar factura
       const invoice = await InvoiceService.generateInvoice({
