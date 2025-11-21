@@ -65,9 +65,7 @@ const registerMenuHandlers = (bot) => {
     'show_subscription_plans',
     'show_profile',
     'show_nearby',
-    'show_live',
     'show_radio',
-    'show_zoom',
     'show_support',
     'show_settings',
     'admin_panel'
@@ -86,6 +84,22 @@ const registerMenuHandlers = (bot) => {
       }
       return next();
     });
+  });
+
+  // Bloquear Zoom Rooms y Live Streams y mostrar "Coming soon"
+  bot.action('show_live', async (ctx) => {
+    const lang = ctx.session?.language || 'en';
+    await ctx.answerCbQuery(
+      lang === 'es' ? '🚧 Próximamente: Transmisiones en vivo.' : '🚧 Coming soon: Live Streams.',
+      { show_alert: true }
+    );
+  });
+  bot.action('show_zoom', async (ctx) => {
+    const lang = ctx.session?.language || 'en';
+    await ctx.answerCbQuery(
+      lang === 'es' ? '🚧 Próximamente: Salas Zoom.' : '🚧 Coming soon: Zoom Rooms.',
+      { show_alert: true }
+    );
   });
     // Locked feature handler for free users
     bot.action('locked_feature', async (ctx) => {
@@ -265,6 +279,10 @@ const showMainMenu = async (ctx) => {
 
   // Button builder
   function buildButton(label, action, locked) {
+    // For Zoom Rooms and Live Streams, always lock and show 'Coming soon'
+    if (action === 'show_live' || action === 'show_zoom') {
+      return Markup.button.callback(`${label} 🚧`, action);
+    }
     return Markup.button.callback(locked ? `${label} 🔒` : label, locked ? 'locked_feature' : action);
   }
 
