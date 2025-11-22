@@ -34,6 +34,73 @@ module.exports.sendPrimeWelcome = sendPrimeWelcome;
  * @param {Telegraf} bot - Bot instance
  */
 const registerMenuHandlers = (bot) => {
+    // /cristina command: starts AI support chat, message stays in chat (no autodelete)
+    bot.command('cristina', async (ctx) => {
+      try {
+        // Activate AI chat session
+        ctx.session.temp = ctx.session.temp || {};
+        ctx.session.temp.aiChatActive = true;
+        await ctx.saveSession();
+        const lang = ctx.session?.language || 'en';
+        await ctx.reply(
+          lang === 'es'
+            ? '🤖 Cristina está lista para ayudarte. Escribe tu pregunta o mensaje.'
+            : '🤖 Cristina is ready to help you. Type your question or message.'
+        );
+      } catch (error) {
+        logger.error('Error starting Cristina AI chat:', error);
+      }
+    });
+  // /menu command opens the same menu as /start
+  bot.command('menu', async (ctx) => {
+    try {
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error showing menu:', error);
+    }
+  });
+
+  // Intercept main menu button actions in group and show redirect message
+  const mainMenuActions = [
+    'show_subscription_plans',
+    'show_profile',
+    'show_nearby',
+    'show_radio',
+    'show_support',
+    'show_settings',
+    'admin_panel'
+  ];
+  mainMenuActions.forEach(action => {
+    bot.action(action, async (ctx, next) => {
+      const chatType = ctx.chat?.type;
+      if (chatType === 'group' || chatType === 'supergroup') {
+        const lang = ctx.session?.language || 'en';
+        const username = ctx.from?.username || ctx.from?.first_name || 'user';
+        const botUsername = ctx.botInfo?.username || 'pnptv_bot';
+        const redirectMsg = t('groupRedirect', lang)({ username, action, botUsername });
+        const sentMessage = await ctx.reply(redirectMsg, { parse_mode: 'Markdown', disable_web_page_preview: true });
+        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
+        return;
+      }
+      return next();
+    });
+  });
+
+  // Bloquear Zoom Rooms y Live Streams y mostrar "Coming soon"
+  bot.action('show_live', async (ctx) => {
+    const lang = ctx.session?.language || 'en';
+    await ctx.answerCbQuery(
+      lang === 'es' ? '🚧 Próximamente: Transmisiones en vivo.' : '🚧 Coming soon: Live Streams.',
+      { show_alert: true }
+    );
+  });
+  bot.action('show_zoom', async (ctx) => {
+    const lang = ctx.session?.language || 'en';
+    await ctx.answerCbQuery(
+      lang === 'es' ? '🚧 Próximamente: Salas Zoom.' : '🚧 Coming soon: Zoom Rooms.',
+      { show_alert: true }
+    );
+  });
     // Locked feature handler for free users
     bot.action('locked_feature', async (ctx) => {
       const lang = ctx.session?.language || 'en';
@@ -43,6 +110,22 @@ const registerMenuHandlers = (bot) => {
           : '🔒 Feature for premium users only. Subscribe to unlock.',
         { show_alert: true }
       );
+    });
+    // Admin panel handler: only superadmins can access role management
+    bot.action('admin_panel', async (ctx) => {
+      try {
+        // PermissionService is required from roleManagement.js
+        const PermissionService = require('../admin/../../services/permissionService');
+        const showRoleManagement = require('../admin/roleManagement.js').showRoleManagement;
+        const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+        if (!isSuperAdmin) {
+          await ctx.answerCbQuery('❌ Solo Super Administradores pueden acceder');
+          return;
+        }
+        await showRoleManagement(ctx);
+      } catch (error) {
+        logger.error('Error in admin panel:', error);
+      }
     });
   // Menu command
   bot.command('menu', async (ctx) => {
@@ -99,7 +182,7 @@ const registerMenuHandlers = (bot) => {
       // Auto-delete menu messages in groups after 2 minutes
       const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
       if (isGroup) {
-        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000, false);
+        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
       }
     } catch (error) {
       logger.error('Error in group contact admin:', error);
@@ -158,7 +241,7 @@ const registerMenuHandlers = (bot) => {
       // Auto-delete menu messages in groups after 2 minutes
       const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
       if (isGroup) {
-        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000, false);
+        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
       }
     } catch (error) {
       logger.error('Error showing group rules:', error);
@@ -182,40 +265,29 @@ const showMainMenu = async (ctx) => {
     return;
   }
 
-  // Texts for each type
-  let menuText = '';
-  if (isAdmin) {
-    menuText = lang === 'es'
-      ? '👑 ¡Bienvenido Admin!\nAcceso total a todas las funciones y panel de administración.'
-      : '👑 Welcome Admin!\nFull access to all features and admin panel.';
-  } else if (isPremium) {
-    menuText = t('welcomeScreenPrime', lang);
-  } else {
-    menuText = t('welcomeScreenFree', lang);
-  }
-
-  // Button builder
-  function buildButton(label, action, locked) {
-    return Markup.button.callback(locked ? `${label} 🔒` : label, locked ? 'locked_feature' : action);
-  }
-
-  const buttons = [
-    [
-      Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
-      Markup.button.callback(t('myProfile', lang), 'show_profile'),
-    ],
-    [
-      Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
-      buildButton(t('liveStreams', lang), 'show_live', !isPremium && !isAdmin),
-    ],
-    [
-      Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-      buildButton(t('zoomRooms', lang), 'show_zoom', !isPremium && !isAdmin),
-    ],
-    [
-      Markup.button.callback(t('support', lang), 'show_support'),
-      Markup.button.callback(t('settings', lang), 'show_settings'),
-    ],
+  // Show full private chat menu
+  await ctx.reply(
+    t('mainMenuIntro', lang),
+    Markup.inlineKeyboard([
+      [
+        Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
+        Markup.button.callback(t('myProfile', lang), 'show_profile'),
+      ],
+      [
+        Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
+        Markup.button.callback(t('liveStreams', lang), 'show_live'),
+      ],
+      [
+        Markup.button.callback(t('radioMenu', lang), 'show_radio'),
+        Markup.button.callback(t('playerMenu', lang), 'show_player'),
+      ],
+      [
+        Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
+        Markup.button.callback(t('support', lang), 'show_support'),
+      ],
+      [
+        Markup.button.callback(t('settings', lang), 'show_settings'),
+      ],
   ];
   if (isAdmin) {
     buttons.push([Markup.button.callback('🛡️ Admin Panel', 'admin_panel')]);
@@ -230,8 +302,19 @@ const showMainMenu = async (ctx) => {
  */
 const showGroupMenu = async (ctx) => {
   const lang = ctx.session?.language || 'en';
-  const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'User';
+  let username = ctx.from?.username ? `@${ctx.from.username}` : 'papi';
   const botUsername = ctx.botInfo?.username || 'pnptv_bot';
+
+  // Mensaje de notificación en grupo
+  const notifyText = `${username} I sent a private message. Please check it out.`;
+  await ctx.reply(notifyText);
+
+  // Menú compacto con link al handle
+  const menuLink = `https://t.me/${botUsername}?start=group_menu`;
+  const menuText = lang === 'es'
+    ? `Menú rápido: [Abrir Bot](${menuLink})`
+    : `Quick menu: [Open Bot](${menuLink})`;
+  await ctx.reply(menuText, { parse_mode: 'Markdown' });
 
   const messageEs = [
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
@@ -286,7 +369,7 @@ const showGroupMenu = async (ctx) => {
   );
 
   // Auto-delete menu messages in groups after 2 minutes
-  ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000, false);
+  ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
 };
 
 /**
@@ -295,6 +378,46 @@ const showGroupMenu = async (ctx) => {
  */
 const showMainMenuEdit = async (ctx) => {
   const lang = ctx.session?.language || 'en';
+  const user = ctx.session?.user || {};
+  const isPremium = user.subscriptionStatus === 'active';
+  const isAdmin = user.role === 'admin';
+
+  let menuText = '';
+  if (isAdmin) {
+    menuText = lang === 'es'
+      ? '👑 ¡Bienvenido Admin!\nAcceso total a todas las funciones y panel de administración.'
+      : '👑 Welcome Admin!\nFull access to all features and admin panel.';
+  } else if (isPremium) {
+    menuText = t('welcomeScreenPrime', lang);
+  } else {
+    menuText = t('welcomeScreenFree', lang);
+  }
+
+  function buildButton(label, action, locked) {
+    return Markup.button.callback(locked ? `${label} 🔒` : label, locked ? 'locked_feature' : action);
+  }
+
+  const buttons = [
+    [
+      Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
+      Markup.button.callback(t('myProfile', lang), 'show_profile'),
+    ],
+    [
+      Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
+      buildButton(t('liveStreams', lang), 'show_live', !isPremium && !isAdmin),
+    ],
+    [
+      Markup.button.callback(t('radioMenu', lang), 'show_radio'),
+      buildButton(t('zoomRooms', lang), 'show_zoom', !isPremium && !isAdmin),
+    ],
+    [
+      Markup.button.callback(t('support', lang), 'show_support'),
+      Markup.button.callback(t('settings', lang), 'show_settings'),
+    ],
+  ];
+  if (isAdmin) {
+    buttons.push([Markup.button.callback('🛡️ Admin Panel', 'admin_panel')]);
+  }
 
   try {
     await ctx.editMessageText(
@@ -310,10 +433,13 @@ const showMainMenuEdit = async (ctx) => {
         ],
         [
           Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-          Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
+          Markup.button.callback(t('playerMenu', lang), 'show_player'),
         ],
         [
+          Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
           Markup.button.callback(t('support', lang), 'show_support'),
+        ],
+        [
           Markup.button.callback(t('settings', lang), 'show_settings'),
         ],
       ]),

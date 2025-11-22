@@ -4,6 +4,7 @@ const EmailService = require('../../bot/services/emailservice');
 const PlanModel = require('../../models/planModel');
 const UserModel = require('../../models/userModel');
 const SubscriberModel = require('../../models/subscriberModel');
+const DaimoConfig = require('../../config/daimo');
 const logger = require('../../utils/logger');
 const crypto = require('crypto');
 const { Telegraf } = require('telegraf');
@@ -174,6 +175,8 @@ class PaymentService {
         x_ref_payco,
         x_transaction_id,
         x_transaction_state,
+        x_cod_response, // Response code: 1=Aceptada, 2=Rechazada, 3=Pendiente, 4=Fallida
+        x_cod_transaction_state, // Transaction state code
         x_amount,
         x_currency_code,
         x_signature,
@@ -183,12 +186,16 @@ class PaymentService {
         x_extra3, // paymentId
         x_customer_email,
         x_customer_name,
+        x_response_reason_text, // Reason text for the response
       } = webhookData;
 
       logger.info('Processing ePayco webhook', {
         refPayco: x_ref_payco,
         transactionId: x_transaction_id,
         state: x_transaction_state,
+        codResponse: x_cod_response,
+        codTransactionState: x_cod_transaction_state,
+        responseReason: x_response_reason_text,
         amount: x_amount,
         paymentId: x_extra3,
       });
@@ -226,8 +233,16 @@ class PaymentService {
         return { success: false, error: 'Payment not found' };
       }
 
-      // Process based on transaction state
-      if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
+      // Process based on response code (x_cod_response) - primary check per ePayco docs
+      // x_cod_response: 1=Aceptada, 2=Rechazada, 3=Pendiente, 4=Fallida
+      const responseCode = parseInt(x_cod_response, 10);
+      const isApproved = responseCode === 1 || x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada';
+      const isRejected = responseCode === 2 || x_transaction_state === 'Rechazada';
+      const isPending = responseCode === 3 || x_transaction_state === 'Pendiente' || x_transaction_state === 'Colgante';
+      const isFailed = responseCode === 4 || x_transaction_state === 'Fallida';
+      const isAbandoned = x_transaction_state === 'Abandonada' || x_transaction_state === 'Cancelada';
+
+      if (isApproved) {
         // Payment successful
         if (payment) {
           await PaymentModel.updateStatus(paymentId, 'completed', {
@@ -362,8 +377,8 @@ class PaymentService {
         }
 
         return { success: true };
-      } else if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Fallida') {
-        // Payment failed
+      } else if (isRejected || isFailed) {
+        // Payment failed or rejected
         if (payment) {
           await PaymentModel.updateStatus(paymentId, 'failed', {
             transaction_id: x_transaction_id,
@@ -375,10 +390,12 @@ class PaymentService {
           paymentId,
           refPayco: x_ref_payco,
           state: x_transaction_state,
+          codResponse: x_cod_response,
+          reason: x_response_reason_text,
         });
 
         return { success: true }; // Return success to acknowledge webhook
-      } else if (x_transaction_state === 'Pendiente') {
+      } else if (isPending) {
         // Payment pending
         if (payment) {
           await PaymentModel.updateStatus(paymentId, 'pending', {
@@ -386,6 +403,12 @@ class PaymentService {
             epayco_ref: x_ref_payco,
           });
         }
+
+        logger.info('Payment abandoned by user', {
+          paymentId,
+          refPayco: x_ref_payco,
+          state: x_transaction_state,
+        });
 
         return { success: true };
       }
@@ -579,7 +602,7 @@ class PaymentService {
           });
         }
 
-        logger.warn('Daimo payment failed', {
+        logger.warn('Daimo payment bounced', {
           paymentId,
           eventId: id,
           status,

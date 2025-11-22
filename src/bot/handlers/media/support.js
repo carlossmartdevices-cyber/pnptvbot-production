@@ -29,6 +29,9 @@ try {
 const messageTimestamps = new Map();
 const RATE_LIMIT_MS = 3000; // 3 seconds between messages
 
+// Support topic map: odId -> topicId (for forum groups)
+const userTopicMap = new Map();
+
 /**
  * Agent instructions - Cristina (PNPtv Harm Reduction & Community Support AI)
  */
@@ -803,6 +806,70 @@ const registerSupportHandlers = (bot) => {
         );
       } catch (error) {
         logger.error('Error processing activation request:', error);
+      }
+      return;
+    }
+
+    return next();
+  });
+
+  // Handle replies from support group to users
+  bot.on('text', async (ctx, next) => {
+    const supportGroupId = process.env.SUPPORT_GROUP_ID;
+
+    // Check if this is a message in the support group (topic or reply)
+    if (supportGroupId &&
+        ctx.chat?.id?.toString() === supportGroupId.replace('-100', '-100')) {
+
+      // Skip if it's the bot's own message
+      if (ctx.from.is_bot) return next();
+
+      try {
+        let userId = null;
+
+        // Try to get user ID from topic thread (forum topic name contains user ID)
+        if (ctx.message?.message_thread_id) {
+          // Find user ID from our map
+          for (const [uid, topicId] of userTopicMap.entries()) {
+            if (topicId === ctx.message.message_thread_id) {
+              userId = uid;
+              break;
+            }
+          }
+        }
+
+        // Fallback: Extract user ID from replied message
+        if (!userId && ctx.message?.reply_to_message?.text) {
+          const replyText = ctx.message.reply_to_message.text;
+          const userIdMatch = replyText.match(/ID: `?(\d+)`?/);
+          if (userIdMatch && userIdMatch[1]) {
+            userId = userIdMatch[1];
+          }
+        }
+
+        if (userId) {
+          const adminResponse = ctx.message.text;
+          const adminName = ctx.from.first_name || 'Support';
+
+          // Send reply to user
+          await ctx.telegram.sendMessage(
+            userId,
+            `📩 *Response from Support*\n\n${adminResponse}\n\n— ${adminName}`,
+            { parse_mode: 'Markdown' }
+          );
+
+          // Confirm in group
+          await ctx.reply('✅ Message sent to user', { reply_to_message_id: ctx.message.message_id });
+
+          logger.info('Support reply sent to user', {
+            userId,
+            adminId: ctx.from.id,
+            adminName
+          });
+        }
+      } catch (error) {
+        logger.error('Error sending support reply:', error);
+        await ctx.reply('❌ Failed to send message to user');
       }
       return;
     }
