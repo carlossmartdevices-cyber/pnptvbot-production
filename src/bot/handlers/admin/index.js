@@ -229,9 +229,15 @@ const registerAdminHandlers = (bot) => {
 
       const target = ctx.match[1];
       const lang = getLanguage(ctx);
-      // Robust session initialization (merged logic)
-      if (!ctx.session) ctx.session = {};
-      ctx.session.temp = ctx.session.temp || {};
+
+      // Initialize session properly
+      if (!ctx.session) {
+        ctx.session = {};
+      }
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
+
       ctx.session.temp.broadcastTarget = target;
       ctx.session.temp.broadcastStep = 'media';
       ctx.session.temp.broadcastData = {};
