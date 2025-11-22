@@ -394,7 +394,8 @@ class PaymentService {
       }
 
       // Process based on status
-      if (status === 'confirmed' || status === 'completed') {
+      // Daimo status values: payment_unpaid, payment_started, payment_completed, payment_bounced
+      if (status === 'payment_completed') {
         // Payment successful
         if (paymentId) {
           await PaymentModel.updateStatus(paymentId, 'completed', {
@@ -422,130 +423,37 @@ class PaymentService {
             txHash: source?.txHash,
           });
 
-          // Send welcome message with invite links
+          // Send welcome message with PRIME channel access
           try {
             const { Telegraf } = require('telegraf');
             const bot = new Telegraf(process.env.BOT_TOKEN);
-            const primeChannels = (process.env.PRIME_CHANNEL_ID || '').split(',').map(id => id.trim()).filter(id => id);
-            const amountPaid = webhookData.amount?.value || '0';
-            const currency = webhookData.amount?.currency || 'USDC';
-            const nextPaymentDate = expiryDate.toLocaleDateString('es-CO', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            });
-            const planName = plan.display_name || plan.name || 'PRIME';
-
-            // Generate one-time use invite links
-            const inviteLinks = [];
-            for (const channelId of primeChannels) {
-              try {
-                const invite = await bot.telegram.createChatInviteLink(channelId, {
-                  member_limit: 1,
-                  expire_date: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60),
-                });
-                inviteLinks.push({ channelId, link: invite.invite_link });
-              } catch (inviteErr) {
-                logger.error('Error creating invite link:', { channelId, error: inviteErr.message });
-                inviteLinks.push({ channelId, link: `https://t.me/PNPTV_PRIME` });
-              }
-            }
+            const primeChannels = (process.env.PRIME_CHANNEL_ID || '').split(',').map(id => id.trim());
+            const amountPaid = DaimoConfig.formatAmountFromUnits(source?.amountUnits || '0');
+            const nextPayment = expiryDate.toLocaleDateString('es-CO');
+            const planName = plan.name || 'PRIME';
 
             const message = [
-              `🎉 *¡Bienvenido a PRIME!*`,
+              `🎉 ¡Bienvenido a PRIME!`,
               '',
-              `✅ Tu pago de *${amountPaid} ${currency}* por el plan *${planName}* fue recibido exitosamente.`,
+              `✅ Tu pago de *$${amountPaid} USDC* por el plan *${planName}* fue recibido exitosamente.`,
               '',
-              `📋 *Detalles de tu suscripción:*`,
-              `• Plan: ${planName}`,
-              `• Fecha de inicio: ${new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}`,
-              `• Próximo pago: *${nextPaymentDate}*`,
+              `Tu membresía está activa hasta: *${nextPayment}*`,
               '',
-              '🔐 *Accede al canal exclusivo PRIME:*',
-              ...inviteLinks.map((inv, idx) => `👉 [Ingresar a PRIME Canal ${inviteLinks.length > 1 ? idx + 1 : ''}](${inv.link})`),
+              'Accede al canal exclusivo aquí:',
+              ...primeChannels.map(id => `👉 [Ingresar a PRIME](https://t.me/c/${id.replace('-100','')})`),
               '',
-              '⚠️ *Importante:* Estos enlaces son de un solo uso y expiran en 7 días.',
-              '',
-              '📅 *Te recordaremos:*',
-              '• 3 días antes de tu próximo pago',
-              '• 1 día antes de tu próximo pago',
-              '',
-              '💝 ¡Gracias por confiar en PNPtv! Disfruta todos los beneficios y novedades exclusivas.'
+              '¡Gracias por confiar en PNPtv! Disfruta todos los beneficios y novedades.'
             ].join('\n');
 
-            await bot.telegram.sendMessage(userId, message, {
-              parse_mode: 'Markdown',
-              disable_web_page_preview: false
-            });
-
-            // Send emails if user email is available
-            try {
-              const user = await UserModel.getById(userId);
-              if (user && user.email) {
-                const EmailService = require('../../../services/emailService');
-
-                // Send PNPtv subscription confirmation
-                await EmailService.sendPaymentConfirmation({
-                  email: user.email,
-                  name: user.firstName || 'Usuario',
-                  planName: planName,
-                  amount: amountPaid,
-                  currency: currency,
-                  nextPaymentDate: nextPaymentDate,
-                  inviteLinks: inviteLinks.map(inv => inv.link),
-                });
-                logger.info('Payment confirmation email sent (Daimo)', { email: user.email });
-
-                // Generate invoice and send purchase confirmation (from easybots.store)
-                try {
-                  const InvoiceService = require('./invoiceservice');
-
-                  // Get plan SKU
-                  const planSku = plan.sku || `EASYBOTS-${plan.id.toUpperCase()}`;
-
-                  // Daimo payments are in USD/USDC
-                  const amountUSD = parseFloat(amountPaid);
-
-                  // Generate invoice PDF
-                  const invoice = await InvoiceService.generateInvoice({
-                    customerName: user.firstName || user.name || 'Cliente',
-                    customerEmail: user.email,
-                    planSku,
-                    planDescription: `Suscripción ${planName} - Servicios de IA y desarrollo de bots automatizados`,
-                    amount: amountUSD,
-                    currency: 'USD',
-                    exchangeRate: 4200
-                  });
-
-                  // Send purchase invoice email
-                  await EmailService.sendPurchaseInvoice({
-                    email: user.email,
-                    name: user.firstName || 'Usuario',
-                    invoiceBuffer: invoice.buffer,
-                    invoiceFileName: invoice.fileName,
-                    amount: amountUSD,
-                    currency: 'USD'
-                  });
-
-                  logger.info('Purchase invoice generated and sent (Daimo)', {
-                    email: user.email,
-                    invoiceId: invoice.id
-                  });
-                } catch (invoiceErr) {
-                  logger.error('Error generating/sending invoice (Daimo):', invoiceErr);
-                }
-              }
-            } catch (emailErr) {
-              logger.error('Error sending payment confirmation email:', emailErr);
-            }
+            await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown', disable_web_page_preview: true });
           } catch (err) {
-            logger.error('Error sending PRIME welcome message:', err);
+            logger.error('Error enviando mensaje de bienvenida PRIME (Daimo):', err);
           }
         }
 
         return { success: true };
-      } else if (status === 'failed') {
-        // Payment failed
+      } else if (status === 'payment_bounced') {
+        // Payment failed or bounced
         if (paymentId) {
           await PaymentModel.updateStatus(paymentId, 'failed', {
             transaction_id: source?.txHash || id,
@@ -553,13 +461,21 @@ class PaymentService {
           });
         }
 
-        logger.warn('Daimo payment failed', {
+        logger.warn('Daimo payment bounced', {
           paymentId,
           eventId: id,
           status,
         });
 
         return { success: true }; // Return success to acknowledge webhook
+      } else if (status === 'payment_started' || status === 'payment_unpaid') {
+        // Payment in progress or not yet paid
+        logger.info('Daimo payment in progress', {
+          paymentId,
+          eventId: id,
+          status,
+        });
+        return { success: true }; // Acknowledge webhook
       }
 
       return { success: true };
