@@ -216,7 +216,7 @@ const registerAdminHandlers = (bot) => {
   });
 
   // Broadcast target selection
-  bot.action(/^broadcast_(.+)$/, async (ctx) => {
+  bot.action(/^broadcast_(all|premium|free|churned)$/, async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
@@ -256,6 +256,11 @@ const registerAdminHandlers = (bot) => {
         },
       );
     } catch (error) {
+      // Ignore "message is not modified" errors (user clicked same button twice)
+      if (error.message && error.message.includes('message is not modified')) {
+        await ctx.answerCbQuery();
+        return;
+      }
       logger.error('Error in broadcast target:', error);
     }
   });
@@ -985,11 +990,19 @@ const registerAdminHandlers = (bot) => {
           users = await UserModel.getChurnedUsers();
         }
 
-        // Send broadcast
+        // Send broadcast with rate limiting
         let sent = 0;
         let failed = 0;
+        const totalUsers = users.length;
+        const batchSize = 25;
+        const delayBetweenMessages = 50; // 50ms between messages
+        const delayBetweenBatches = 1000; // 1 second between batches
 
-        for (const user of users) {
+        // Helper function to delay
+        const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+        for (let i = 0; i < users.length; i++) {
+          const user = users[i];
           try {
             const userLang = user.language || 'en';
             const textToSend = userLang === 'es' ? broadcastData.textEs : broadcastData.textEn;
@@ -1020,6 +1033,26 @@ const registerAdminHandlers = (bot) => {
           } catch (sendError) {
             failed += 1;
             logger.warn('Failed to send broadcast to user:', { userId: user.id, error: sendError.message });
+          }
+
+          // Rate limiting: delay between messages
+          await delay(delayBetweenMessages);
+
+          // Longer delay and progress update every batch
+          if ((i + 1) % batchSize === 0 && i + 1 < totalUsers) {
+            await delay(delayBetweenBatches);
+            // Send progress update
+            try {
+              await ctx.reply(
+                `📤 *Progreso del Broadcast*\n\n`
+                + `✓ Enviados: ${sent}\n`
+                + `✗ Fallidos: ${failed}\n`
+                + `📊 Progreso: ${i + 1}/${totalUsers} (${Math.round(((i + 1) / totalUsers) * 100)}%)`,
+                { parse_mode: 'Markdown' },
+              );
+            } catch (progressError) {
+              // Ignore progress update errors
+            }
           }
         }
 
@@ -1455,6 +1488,39 @@ const registerAdminHandlers = (bot) => {
         newExpiry,
       });
 
+      // Send notification to user with plan details and PRIME channel invite
+      try {
+        const primeChannelId = process.env.PRIME_CHANNEL_ID;
+        if (primeChannelId) {
+          // Create single-use invite link
+          const inviteLink = await ctx.telegram.createChatInviteLink(primeChannelId, {
+            member_limit: 1,
+            name: `Admin activation - ${userId}`,
+          });
+
+          // Get user language for notification
+          const userLang = user.language || 'es';
+          const planName = duration === 'lifetime' ? 'Lifetime Pass' : `${durationText} extension`;
+
+          const notificationText = userLang === 'es'
+            ? `🎉 *¡Tu membresía ha sido activada!*\n\n` +
+              `📦 Plan: ${planName}\n` +
+              `${newExpiry ? `📅 Vence: ${newExpiry.toLocaleDateString()}` : '♾️ Sin vencimiento'}\n\n` +
+              `🔗 *Accede al canal PRIME:*\n${inviteLink.invite_link}\n\n` +
+              `⚠️ Este enlace es de un solo uso.`
+            : `🎉 *Your membership has been activated!*\n\n` +
+              `📦 Plan: ${planName}\n` +
+              `${newExpiry ? `📅 Expires: ${newExpiry.toLocaleDateString()}` : '♾️ No expiration'}\n\n` +
+              `🔗 *Access PRIME channel:*\n${inviteLink.invite_link}\n\n` +
+              `⚠️ This link is single-use only.`;
+
+          await ctx.telegram.sendMessage(userId, notificationText, { parse_mode: 'Markdown' });
+          logger.info('User notified of admin activation', { userId, planName });
+        }
+      } catch (notifyError) {
+        logger.warn('Could not send activation notification to user:', notifyError.message);
+      }
+
       await ctx.answerCbQuery('✅ Membresía extendida exitosamente');
     } catch (error) {
       logger.error('Error extending subscription:', error);
@@ -1587,6 +1653,53 @@ const registerAdminHandlers = (bot) => {
       );
 
       logger.info('Plan changed by admin', { adminId: ctx.from.id, userId, newPlan: planId });
+
+      // Send notification to user with plan details and PRIME channel invite (only for non-free plans)
+      if (planId !== 'free') {
+        try {
+          const primeChannelId = process.env.PRIME_CHANNEL_ID;
+          if (primeChannelId) {
+            const plan = await PlanModel.getById(planId);
+
+            // Create single-use invite link
+            const inviteLink = await ctx.telegram.createChatInviteLink(primeChannelId, {
+              member_limit: 1,
+              name: `Admin plan change - ${userId}`,
+            });
+
+            // Get user language and plan details
+            const userLang = user.language || 'es';
+            const planName = userLang === 'es' ? (plan?.nameEs || planId) : (plan?.name || planId);
+            const planPrice = plan?.price || 0;
+            const planDuration = plan?.duration || 30;
+
+            // Calculate expiry
+            const newExpiry = new Date();
+            newExpiry.setDate(newExpiry.getDate() + planDuration);
+
+            const notificationText = userLang === 'es'
+              ? `🎉 *¡Tu membresía ha sido activada!*\n\n` +
+                `📦 Plan: ${planName}\n` +
+                `💰 Valor: $${planPrice}\n` +
+                `⏱️ Duración: ${planDuration} días\n` +
+                `📅 Vence: ${newExpiry.toLocaleDateString()}\n\n` +
+                `🔗 *Accede al canal PRIME:*\n${inviteLink.invite_link}\n\n` +
+                `⚠️ Este enlace es de un solo uso.`
+              : `🎉 *Your membership has been activated!*\n\n` +
+                `📦 Plan: ${planName}\n` +
+                `💰 Price: $${planPrice}\n` +
+                `⏱️ Duration: ${planDuration} days\n` +
+                `📅 Expires: ${newExpiry.toLocaleDateString()}\n\n` +
+                `🔗 *Access PRIME channel:*\n${inviteLink.invite_link}\n\n` +
+                `⚠️ This link is single-use only.`;
+
+            await ctx.telegram.sendMessage(userId, notificationText, { parse_mode: 'Markdown' });
+            logger.info('User notified of admin plan change', { userId, planId, planName });
+          }
+        } catch (notifyError) {
+          logger.warn('Could not send plan change notification to user:', notifyError.message);
+        }
+      }
     } catch (error) {
       logger.error('Error changing user plan:', error);
       await ctx.answerCbQuery('Error al cambiar el plan');

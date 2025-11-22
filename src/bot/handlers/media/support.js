@@ -39,6 +39,9 @@ try {
 const messageTimestamps = new Map();
 const RATE_LIMIT_MS = 3000; // 3 seconds between messages
 
+// Support topic map: odId -> topicId (for forum groups)
+const userTopicMap = new Map();
+
 /**
  * Agent instructions - Cristina Customer Support AI
  */
@@ -471,28 +474,96 @@ const registerSupportHandlers = (bot) => {
           return next();
         }
 
-        // Send to admin users
-        const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
+        // Send to support group if configured
+        const supportGroupId = process.env.SUPPORT_GROUP_ID;
 
-        if (adminIds.length === 0) {
-          logger.error('No admin users configured for support messages');
-          await ctx.reply(
-            lang === 'es'
-              ? 'Sistema de soporte no configurado. Por favor contacta con nosotros vía email.'
-              : 'Support system not configured. Please contact us via email.',
-          );
-          ctx.session.temp.contactingAdmin = false;
-          return;
-        }
-
-        for (const adminId of adminIds) {
+        if (supportGroupId) {
           try {
-            await ctx.telegram.sendMessage(
-              adminId.trim(),
-              `📬 Support Message from User ${ctx.from.id} (@${ctx.from.username || 'no username'}):\n\n${message}`,
+            const userId = ctx.from.id.toString();
+            let topicId = userTopicMap.get(userId);
+
+            // Create topic for user if doesn't exist
+            if (!topicId) {
+              try {
+                const topicName = ctx.from.username
+                  ? `@${ctx.from.username} (${ctx.from.id})`
+                  : `${ctx.from.first_name || 'User'} (${ctx.from.id})`;
+
+                const topic = await ctx.telegram.createForumTopic(
+                  supportGroupId,
+                  topicName,
+                  { icon_custom_emoji_id: '5368324170671202286' } // 💬 emoji
+                );
+
+                topicId = topic.message_thread_id;
+                userTopicMap.set(userId, topicId);
+
+                // Send welcome message in topic
+                await ctx.telegram.sendMessage(
+                  supportGroupId,
+                  `👤 *User Info*\n\n`
+                  + `Name: ${ctx.from.first_name || ''} ${ctx.from.last_name || ''}\n`
+                  + `ID: \`${ctx.from.id}\`\n`
+                  + `Username: @${ctx.from.username || 'none'}\n\n`
+                  + `_Reply in this topic to respond to the user_`,
+                  {
+                    parse_mode: 'Markdown',
+                    message_thread_id: topicId
+                  }
+                );
+
+                logger.info('Created support topic for user', { userId, topicId });
+              } catch (topicError) {
+                // Forum topics not enabled, fall back to regular message
+                logger.warn('Could not create forum topic, using regular message:', topicError.message);
+                topicId = null;
+              }
+            }
+
+            // Send message to topic or group
+            const messageOptions = { parse_mode: 'Markdown' };
+            if (topicId) {
+              messageOptions.message_thread_id = topicId;
+            }
+
+            const supportMessage = await ctx.telegram.sendMessage(
+              supportGroupId,
+              `📬 *New Message*\n\n${message}`,
+              messageOptions
             );
+
+            logger.info('Support message sent to group', {
+              userId: ctx.from.id,
+              messageId: supportMessage.message_id,
+              topicId
+            });
           } catch (sendError) {
-            logger.error('Error sending to admin:', sendError);
+            logger.error('Error sending to support group:', sendError);
+          }
+        } else {
+          // Fallback to individual admin IDs
+          const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
+
+          if (adminIds.length === 0) {
+            logger.error('No admin users configured for support messages');
+            await ctx.reply(
+              lang === 'es'
+                ? 'Sistema de soporte no configurado. Por favor contacta con nosotros vía email.'
+                : 'Support system not configured. Please contact us via email.',
+            );
+            ctx.session.temp.contactingAdmin = false;
+            return;
+          }
+
+          for (const adminId of adminIds) {
+            try {
+              await ctx.telegram.sendMessage(
+                adminId.trim(),
+                `📬 Support Message from User ${ctx.from.id} (@${ctx.from.username || 'no username'}):\n\n${message}`,
+              );
+            } catch (sendError) {
+              logger.error('Error sending to admin:', sendError);
+            }
           }
         }
 
@@ -507,6 +578,70 @@ const registerSupportHandlers = (bot) => {
         );
       } catch (error) {
         logger.error('Error contacting admin:', error);
+      }
+      return;
+    }
+
+    return next();
+  });
+
+  // Handle replies from support group to users
+  bot.on('text', async (ctx, next) => {
+    const supportGroupId = process.env.SUPPORT_GROUP_ID;
+
+    // Check if this is a message in the support group (topic or reply)
+    if (supportGroupId &&
+        ctx.chat?.id?.toString() === supportGroupId.replace('-100', '-100')) {
+
+      // Skip if it's the bot's own message
+      if (ctx.from.is_bot) return next();
+
+      try {
+        let userId = null;
+
+        // Try to get user ID from topic thread (forum topic name contains user ID)
+        if (ctx.message?.message_thread_id) {
+          // Find user ID from our map
+          for (const [uid, topicId] of userTopicMap.entries()) {
+            if (topicId === ctx.message.message_thread_id) {
+              userId = uid;
+              break;
+            }
+          }
+        }
+
+        // Fallback: Extract user ID from replied message
+        if (!userId && ctx.message?.reply_to_message?.text) {
+          const replyText = ctx.message.reply_to_message.text;
+          const userIdMatch = replyText.match(/ID: `?(\d+)`?/);
+          if (userIdMatch && userIdMatch[1]) {
+            userId = userIdMatch[1];
+          }
+        }
+
+        if (userId) {
+          const adminResponse = ctx.message.text;
+          const adminName = ctx.from.first_name || 'Support';
+
+          // Send reply to user
+          await ctx.telegram.sendMessage(
+            userId,
+            `📩 *Response from Support*\n\n${adminResponse}\n\n— ${adminName}`,
+            { parse_mode: 'Markdown' }
+          );
+
+          // Confirm in group
+          await ctx.reply('✅ Message sent to user', { reply_to_message_id: ctx.message.message_id });
+
+          logger.info('Support reply sent to user', {
+            userId,
+            adminId: ctx.from.id,
+            adminName
+          });
+        }
+      } catch (error) {
+        logger.error('Error sending support reply:', error);
+        await ctx.reply('❌ Failed to send message to user');
       }
       return;
     }
