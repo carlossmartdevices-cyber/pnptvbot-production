@@ -136,6 +136,94 @@ const registerMenuHandlers = (bot) => {
     }
   });
 
+  // Start group video call from menu button
+  bot.action('start_group_video_call', async (ctx) => {
+    try {
+      const chatType = ctx.chat?.type;
+      if (chatType !== 'group' && chatType !== 'supergroup') {
+        await ctx.answerCbQuery('❌ This feature only works in groups', { show_alert: true });
+        return;
+      }
+
+      // Check if user is admin
+      const chatMember = await ctx.getChatMember(ctx.from.id);
+      if (!['creator', 'administrator'].includes(chatMember.status)) {
+        const lang = ctx.session?.language || 'en';
+        await ctx.answerCbQuery(
+          lang === 'es' ? '❌ Solo administradores pueden iniciar videollamadas' : '❌ Only admins can start video calls',
+          { show_alert: true }
+        );
+        return;
+      }
+
+      // Execute the startgroupcall command
+      const fakeCtx = {
+        ...ctx,
+        args: [],
+        reply: ctx.reply.bind(ctx),
+        chat: ctx.chat,
+        from: ctx.from,
+        botInfo: ctx.botInfo,
+        getChatMember: ctx.getChatMember.bind(ctx),
+        answerCbQuery: ctx.answerCbQuery.bind(ctx),
+      };
+
+      // Trigger the /startgroupcall handler logic
+      const startGrpCall = async () => {
+        const groupName = fakeCtx.chat.title || 'Group Video Call';
+        const groupId = fakeCtx.chat.id;
+        const hostId = fakeCtx.from.id;
+        const hostName = fakeCtx.from.first_name || 'Admin';
+        
+        const roomCode = `GRP_${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+        const callLink = `https://t.me/${fakeCtx.botInfo?.username}?start=join_group_call_${roomCode}`;
+
+        const inviteMessage = [
+          `🎥 *GROUP VIDEO CALL STARTED*`,
+          ``,
+          `📱 Host: @${fakeCtx.from.username || hostName}`,
+          `👥 Group: ${groupName}`,
+          `🆔 Call Room: \`${roomCode}\``,
+          ``,
+          `🔗 Join the call:`,
+          `[📲 Tap to Join](${callLink})`,
+          ``,
+          `⏱️ Call started at: ${new Date().toLocaleTimeString()}`,
+          ``,
+          `👇 Or use the button below to join:`,
+        ].join('\n');
+
+        await ctx.reply(inviteMessage, {
+          parse_mode: 'Markdown',
+          disable_web_page_preview: true,
+          ...Markup.inlineKeyboard([
+            [
+              Markup.button.url('📱 Join Video Call', callLink),
+              Markup.button.callback('❌ End Call', `end_group_call_${roomCode}`),
+            ],
+            [
+              Markup.button.callback('📊 Call Info', `group_call_info_${roomCode}`),
+              Markup.button.callback('👥 Participants', `group_call_participants_${roomCode}`),
+            ],
+          ]),
+        });
+
+        logger.info('Group video call started from menu', {
+          groupId,
+          roomCode,
+          hostId,
+          groupName,
+        });
+      };
+
+      await startGrpCall();
+      await ctx.answerCbQuery('✅ Video call started!');
+    } catch (error) {
+      logger.error('Error starting group video call from menu:', error);
+      await ctx.answerCbQuery('❌ Error starting call');
+    }
+  });
+
   // Back to main menu action
   bot.action('back_to_main', async (ctx) => {
     try {
@@ -348,11 +436,13 @@ const showGroupMenu = async (ctx) => {
 
   const keyboard = lang === 'es'
     ? [
+      [Markup.button.callback('🎥 Iniciar Video Grupal', 'start_group_video_call')],
       [Markup.button.callback('📞 Contactar a un Admin', 'group_contact_admin')],
       [Markup.button.callback('📋 Reglas de la Comunidad', 'group_show_rules')],
       [Markup.button.url(`💬 Chat Bot PNPtv!`, `https://t.me/${botUsername}?start=group_menu`)],
     ]
     : [
+      [Markup.button.callback('🎥 Start Group Video', 'start_group_video_call')],
       [Markup.button.callback('📞 Contact an Admin', 'group_contact_admin')],
       [Markup.button.callback('📋 Community Rules', 'group_show_rules')],
       [Markup.button.url(`💬 PNPtv! Bot Chat`, `https://t.me/${botUsername}?start=group_menu`)],
