@@ -993,19 +993,19 @@ const registerAdminHandlers = (bot) => {
           ctx.session.temp.selectedUserId = user.id;
           await ctx.saveSession();
 
-          const statusEmoji = user.subscription_status === 'active' ? '💎' : '🆓';
-          const planExpiry = user.plan_expiry
-            ? `\n⏰ Expira: ${new Date(user.plan_expiry).toLocaleDateString()}`
+          const statusEmoji = user.subscriptionStatus === 'active' ? '💎' : '🆓';
+          const planExpiry = user.planExpiry
+            ? `\n⏰ Expira: ${new Date(user.planExpiry).toLocaleDateString()}`
             : '';
 
           await ctx.reply(
             `✅ ${t('userFound', lang)}\n\n`
-            + `👤 ${user.first_name || ''} ${user.last_name || ''}\n`
+            + `👤 ${user.firstName || ''} ${user.lastName || ''}\n`
             + `${user.username ? `@${user.username}\n` : ''}`
             + `🆔 ${user.id}\n`
             + `📧 ${user.email || 'N/A'}\n`
-            + `${statusEmoji} Status: ${user.subscription_status}${planExpiry}\n`
-            + `📦 Plan: ${user.plan_id || 'N/A'}`,
+            + `${statusEmoji} Status: ${user.subscriptionStatus}${planExpiry}\n`
+            + `📦 Plan: ${user.planId || 'N/A'}`,
             Markup.inlineKeyboard([
               [Markup.button.callback('✨ Activar Membresía', 'admin_activate_membership')],
               [Markup.button.callback('📅 Extender Suscripción', 'admin_extend_sub')],
@@ -1026,8 +1026,8 @@ const registerAdminHandlers = (bot) => {
 
         const keyboard = [];
         users.forEach((user, index) => {
-          const statusEmoji = user.subscription_status === 'active' ? '💎' : '🆓';
-          const displayName = `${statusEmoji} ${user.first_name || 'Usuario'} ${user.last_name || ''}`.trim();
+          const statusEmoji = user.subscriptionStatus === 'active' ? '💎' : '🆓';
+          const displayName = `${statusEmoji} ${user.firstName || 'Usuario'} ${user.lastName || ''}`.trim();
           const username = user.username ? `@${user.username}` : `ID: ${user.id}`;
 
           message += `${index + 1}. ${displayName} (${username})\n`;
@@ -1447,19 +1447,19 @@ const registerAdminHandlers = (bot) => {
       ctx.session.temp.selectedUserId = user.id;
       await ctx.saveSession();
 
-      const statusEmoji = user.subscription_status === 'active' ? '💎' : '🆓';
-      const planExpiry = user.plan_expiry
-        ? `\n⏰ Expira: ${new Date(user.plan_expiry).toLocaleDateString()}`
+      const statusEmoji = user.subscriptionStatus === 'active' ? '💎' : '🆓';
+      const planExpiry = user.planExpiry
+        ? `\n⏰ Expira: ${new Date(user.planExpiry).toLocaleDateString()}`
         : '';
 
       await ctx.editMessageText(
         `✅ ${t('userFound', lang)}\n\n`
-        + `👤 ${user.first_name || ''} ${user.last_name || ''}\n`
+        + `👤 ${user.firstName || ''} ${user.lastName || ''}\n`
         + `${user.username ? `@${user.username}\n` : ''}`
         + `🆔 ${user.id}\n`
         + `📧 ${user.email || 'N/A'}\n`
-        + `${statusEmoji} Status: ${user.subscription_status}${planExpiry}\n`
-        + `📦 Plan: ${user.plan_id || 'N/A'}`,
+        + `${statusEmoji} Status: ${user.subscriptionStatus}${planExpiry}\n`
+        + `📦 Plan: ${user.planId || 'N/A'}`,
         Markup.inlineKeyboard([
           [Markup.button.callback('✨ Activar Membresía', 'admin_activate_membership')],
           [Markup.button.callback('📅 Extender Suscripción', 'admin_extend_sub')],
@@ -1492,9 +1492,9 @@ const registerAdminHandlers = (bot) => {
       const plans = await PlanModel.getAll();
 
       let text = `✨ **Activar Membresía**\n\n`;
-      text += `👤 ${user.first_name} ${user.last_name || ''}\n`;
+      text += `👤 ${user.firstName} ${user.lastName || ''}\n`;
       text += `${user.username ? `@${user.username}\n` : ''}`;
-      text += `💎 Status actual: ${user.subscription_status}\n\n`;
+      text += `💎 Status actual: ${user.subscriptionStatus}\n\n`;
       text += `Selecciona el plan para activar:\n`;
 
       const keyboard = [];
@@ -1545,7 +1545,7 @@ const registerAdminHandlers = (bot) => {
       });
 
       let successText = `✅ **Membresía Activada**\n\n`;
-      successText += `👤 Usuario: ${user.first_name} ${user.last_name || ''}\n`;
+      successText += `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`;
       successText += `${user.username ? `@${user.username}\n` : ''}`;
       successText += `💎 Plan: ${plan.nameEs || plan.name}\n`;
       successText += `💰 Precio: $${plan.price}\n`;
