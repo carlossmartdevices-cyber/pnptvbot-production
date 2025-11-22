@@ -716,52 +716,50 @@ class PaymentService {
          };
        }
 
-       // Generate Daimo payment link
+       // Handle Daimo payment link generation
        if (provider === 'daimo') {
-         const DaimoService = require('./daimoService');
-
-         if (!DaimoService.isConfigured()) {
-           logger.error('Daimo not configured');
-           throw new Error('Configuración de pago incompleta. Contacta soporte.');
-         }
-
          try {
-           const paymentUrl = DaimoService.generatePaymentLink({
-             userId,
-             chatId,
-             planId,
+           // Create Daimo payment intent
+           const paymentIntent = DaimoConfig.createPaymentIntent({
              amount: plan.price,
-             paymentId: payment.id,
+             userId: userId,
+             planId: planId,
+             chatId: chatId,
+             description: `${plan.display_name || plan.name} - PNPtv Subscription`,
            });
+
+           // Add payment ID to metadata
+           paymentIntent.metadata.paymentId = payment.id;
+
+           // Generate Daimo payment link
+           const paymentUrl = DaimoConfig.generatePaymentLink(paymentIntent);
 
            logger.info('Daimo payment URL generated', {
              paymentId: payment.id,
              planId: plan.id,
              userId,
              amountUSD: plan.price,
-             chain: 'Optimism',
-             token: 'USDC',
+             paymentUrl,
            });
 
            return {
              success: true,
              paymentUrl,
              paymentId: payment.id,
-             paymentRef: `DAIMO-${payment.id.substring(0, 8).toUpperCase()}`,
            };
          } catch (error) {
            logger.error('Error generating Daimo payment link:', {
              error: error.message,
-             userId,
-             planId,
+             stack: error.stack,
+             paymentId: payment.id,
            });
-           throw new Error('No se pudo generar el link de pago. Contacta soporte.');
+           throw new Error('No se pudo generar el enlace de pago con Daimo. Por favor, intenta más tarde o contacta soporte.');
          }
        }
 
        // For other providers
-       logger.error('Unknown payment provider', { provider });
-       throw new Error('Proveedor de pago no soportado.');
+       const paymentUrl = `https://${provider}.com/pay?paymentId=${payment.id}`;
+       return { success: true, paymentUrl, paymentId: payment.id };
     } catch (error) {
       logger.error('Error creando pago:', { error: error.message, planId, provider });
       throw new Error(
