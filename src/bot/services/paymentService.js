@@ -138,6 +138,81 @@ class PaymentService {
     }
 
     /**
+     * Send notification to support group about new paid member
+     * @param {Object} params - Notification parameters
+     * @param {string} params.userId - Telegram user ID
+     * @param {string} params.customerName - Customer name
+     * @param {string} params.customerEmail - Customer email
+     * @param {Object} params.plan - Plan object
+     * @param {number} params.amount - Payment amount
+     * @param {string} params.currency - Currency code
+     * @param {string} params.transactionId - Transaction reference
+     * @param {Date} params.expiryDate - Subscription expiry date
+     * @returns {Promise<boolean>} Success status
+     */
+    static async sendSupportGroupNotification({
+      userId, customerName, customerEmail, plan, amount, currency, transactionId, expiryDate,
+    }) {
+      try {
+        const bot = new Telegraf(process.env.BOT_TOKEN);
+        const supportGroupId = process.env.SUPPORT_GROUP_ID;
+
+        if (!supportGroupId) {
+          logger.warn('SUPPORT_GROUP_ID not configured, skipping notification');
+          return false;
+        }
+
+        const planName = plan?.display_name || plan?.name || 'Unknown Plan';
+        const formattedDate = expiryDate?.toLocaleDateString('es-CO', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }) || 'N/A';
+
+        const message = [
+          '🎉 *NUEVO PAGO RECIBIDO*',
+          '',
+          '👤 *Usuario:*',
+          `• Telegram ID: \`${userId}\``,
+          `• Nombre: ${customerName || 'No proporcionado'}`,
+          `• Email: ${customerEmail || 'No proporcionado'}`,
+          '',
+          '💳 *Detalles del Pago:*',
+          `• Plan: *${planName}*`,
+          `• Monto: *${amount} ${currency}*`,
+          `• Referencia: \`${transactionId}\``,
+          '',
+          '📅 *Suscripción:*',
+          `• Vence: ${formattedDate}`,
+          '',
+          '⚠️ *Acción requerida:* Contactar al usuario para confirmar que todo funciona correctamente.',
+          '',
+          `👉 [Abrir chat con usuario](tg://user?id=${userId})`,
+        ].join('\n');
+
+        await bot.telegram.sendMessage(supportGroupId, message, {
+          parse_mode: 'Markdown',
+          disable_web_page_preview: true,
+        });
+
+        logger.info('Support group notification sent', {
+          userId,
+          transactionId,
+          supportGroupId,
+        });
+
+        return true;
+      } catch (error) {
+        logger.error('Error sending support group notification:', {
+          userId,
+          error: error.message,
+          stack: error.stack,
+        });
+        return false;
+      }
+    }
+
+    /**
      * Reintentar pago fallido (simulado)
      * @param {string} paymentId
      * @param {number} maxRetries
@@ -287,6 +362,25 @@ class PaymentService {
             } catch (notifError) {
               logger.error('Error sending payment confirmation notification (non-critical):', {
                 error: notifError.message,
+                userId,
+              });
+            }
+
+            // Send notification to support group for manual follow-up
+            try {
+              await this.sendSupportGroupNotification({
+                userId,
+                customerName: x_customer_name,
+                customerEmail: x_customer_email,
+                plan,
+                amount: parseFloat(x_amount),
+                currency: x_currency_code || 'COP',
+                transactionId: x_ref_payco,
+                expiryDate,
+              });
+            } catch (supportNotifError) {
+              logger.error('Error sending support group notification (non-critical):', {
+                error: supportNotifError.message,
                 userId,
               });
             }
