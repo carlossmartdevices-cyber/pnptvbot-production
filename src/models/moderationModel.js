@@ -802,6 +802,92 @@ class ModerationModel {
       return false;
     }
   }
+
+  /**
+   * Get non-compliant users in a group
+   * @param {number|string} groupId - Group ID
+   * @returns {Promise<Array>} Non-compliant users with pending warning
+   */
+  static async getNonCompliantUsers(groupId) {
+    try {
+      const result = await query(
+        `SELECT * FROM profile_compliance
+         WHERE group_id = $1 AND warning_sent_at IS NOT NULL AND compliance_met_at IS NULL
+         ORDER BY purge_deadline ASC`,
+        [groupId.toString()]
+      );
+
+      return result.rows.map(row => ({
+        id: row.id.toString(),
+        userId: row.user_id,
+        groupId: row.group_id,
+        usernameValid: row.username_valid,
+        nameValid: row.name_valid,
+        complianceIssues: row.compliance_issues,
+        warningSentAt: row.warning_sent_at,
+        warningCount: row.warning_count,
+        purgeDeadline: row.purge_deadline,
+        purged: row.purged,
+        purgedAt: row.purged_at,
+        complianceMet: row.compliance_met_at,
+        createdAt: row.created_at,
+      }));
+    } catch (error) {
+      logger.error('Error getting non-compliant users:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all users pending purge (deadline passed, not purged yet)
+   * @returns {Promise<Array>} Users pending purge
+   */
+  static async getUsersPendingPurge() {
+    try {
+      const now = new Date();
+
+      const result = await query(
+        `SELECT * FROM profile_compliance
+         WHERE purge_deadline <= $1 AND purged = false AND compliance_met_at IS NULL
+         ORDER BY purge_deadline ASC`,
+        [now]
+      );
+
+      return result.rows.map(row => ({
+        id: row.id.toString(),
+        userId: row.user_id,
+        groupId: row.group_id,
+        complianceIssues: row.compliance_issues,
+        purgeDeadline: row.purge_deadline,
+      }));
+    } catch (error) {
+      logger.error('Error getting users pending purge:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Mark user compliance as met
+   * @param {number|string} userId - User ID
+   * @param {number|string} groupId - Group ID
+   * @returns {Promise<boolean>} Success status
+   */
+  static async markComplianceMet(userId, groupId) {
+    try {
+      await query(
+        `UPDATE profile_compliance
+         SET compliance_met_at = $1, username_valid = true, name_valid = true
+         WHERE user_id = $2 AND group_id = $3`,
+        [new Date(), userId.toString(), groupId.toString()]
+      );
+
+      logger.info('User marked as compliant', { userId, groupId });
+      return true;
+    } catch (error) {
+      logger.error('Error marking compliance as met:', error);
+      return false;
+    }
+  }
 }
 
 module.exports = ModerationModel;

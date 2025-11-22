@@ -292,6 +292,33 @@ CREATE INDEX IF NOT EXISTS idx_call_feedback_user_id ON call_feedback(user_id);
 CREATE INDEX IF NOT EXISTS idx_call_feedback_rating ON call_feedback(rating);
 CREATE INDEX IF NOT EXISTS idx_call_feedback_created_at ON call_feedback(created_at);
 
+-- Profile compliance tracking (for username/name validation)
+CREATE TABLE IF NOT EXISTS profile_compliance (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  group_id VARCHAR(255) NOT NULL,
+  username_valid BOOLEAN DEFAULT FALSE,
+  name_valid BOOLEAN DEFAULT FALSE,
+  compliance_issues TEXT[], -- Array of issues: 'no_username', 'invalid_name', 'non_latin_characters'
+  warning_sent_at TIMESTAMP,
+  warning_count INTEGER DEFAULT 0,
+  purge_deadline TIMESTAMP,
+  purged BOOLEAN DEFAULT FALSE,
+  purged_at TIMESTAMP,
+  compliance_met_at TIMESTAMP,
+  last_checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, group_id)
+);
+
+-- Indexes for profile compliance
+CREATE INDEX IF NOT EXISTS idx_profile_compliance_user_id ON profile_compliance(user_id);
+CREATE INDEX IF NOT EXISTS idx_profile_compliance_group_id ON profile_compliance(group_id);
+CREATE INDEX IF NOT EXISTS idx_profile_compliance_purge_deadline ON profile_compliance(purge_deadline);
+CREATE INDEX IF NOT EXISTS idx_profile_compliance_purged ON profile_compliance(purged);
+CREATE INDEX IF NOT EXISTS idx_profile_compliance_compliance_issues ON profile_compliance(compliance_issues);
+
 -- Triggers for updated_at
 CREATE TRIGGER update_custom_emotes_updated_at BEFORE UPDATE ON custom_emotes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_group_settings_updated_at BEFORE UPDATE ON group_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -299,3 +326,5 @@ CREATE TRIGGER update_subscribers_updated_at BEFORE UPDATE ON subscribers FOR EA
 CREATE TRIGGER update_radio_requests_updated_at BEFORE UPDATE ON radio_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_radio_schedule_updated_at BEFORE UPDATE ON radio_schedule FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_emotes_updated_at BEFORE UPDATE ON emotes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_profile_compliance_updated_at BEFORE UPDATE ON profile_compliance FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+

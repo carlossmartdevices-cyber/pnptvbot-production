@@ -7,6 +7,7 @@ const sessionMiddleware = require('./middleware/session');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
 const usernameEnforcement = require('./middleware/usernameEnforcement');
+const profileCompliance = require('./middleware/profileCompliance');
 const moderationFilter = require('./middleware/moderationFilter');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
@@ -30,7 +31,7 @@ const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnaly
 const registerUserCallManagementHandlers = require('../handlers/user/callManagement');
 const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
-const registerZoomHandlers = require('../handlers/media/zoomV2');
+// const registerZoomHandlers = require('../handlers/media/zoomV2'); // Temporarily disabled due to missing dependencies
 // Services
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
@@ -102,6 +103,7 @@ const startBot = async () => {
     bot.use(rateLimitMiddleware());
     bot.use(chatCleanupMiddleware());
     bot.use(usernameEnforcement());
+    bot.use(profileCompliance());
     bot.use(moderationFilter());
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
@@ -123,7 +125,7 @@ const startBot = async () => {
     registerUserCallManagementHandlers(bot);
     registerCallFeedbackHandlers(bot);
     registerCallPackageHandlers(bot);
-    registerZoomHandlers(bot);
+    // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
     // Initialize call reminder service
     CallReminderService.initialize(bot);
     logger.info('✓ Call reminder service initialized');
