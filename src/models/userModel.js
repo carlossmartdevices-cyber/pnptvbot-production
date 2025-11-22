@@ -763,18 +763,20 @@ class UserModel {
         }
       }
 
-      // Search by username or first name
+      // Search by username, name, or email
       const result = await query(
         `SELECT * FROM users
          WHERE username ILIKE $1
          OR first_name ILIKE $1
          OR last_name ILIKE $1
+         OR email ILIKE $1
          OR CONCAT(first_name, ' ', last_name) ILIKE $1
          ORDER BY
            CASE
-             WHEN username ILIKE $2 THEN 1
-             WHEN first_name ILIKE $2 THEN 2
-             ELSE 3
+             WHEN email ILIKE $2 THEN 1
+             WHEN username ILIKE $2 THEN 2
+             WHEN first_name ILIKE $2 THEN 3
+             ELSE 4
            END,
            username
          LIMIT 10`,
@@ -782,7 +784,7 @@ class UserModel {
       );
 
       logger.info(`Found ${result.rows.length} users matching query: ${cleanQuery}`);
-      return result.rows;
+      return result.rows.map(row => this.convertRowToCamelCase(row));
     } catch (error) {
       logger.error('Error searching users:', error);
       return [];

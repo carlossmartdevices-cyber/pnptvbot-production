@@ -976,7 +976,8 @@ const registerAdminHandlers = (bot) => {
             + `Puedes buscar por:\n`
             + `• ID de usuario (ej: 123456789)\n`
             + `• Username (ej: @usuario o usuario)\n`
-            + `• Nombre (ej: Juan)`,
+            + `• Nombre (ej: Juan)\n`
+            + `• Email (ej: usuario@ejemplo.com)`,
             Markup.inlineKeyboard([
               [Markup.button.callback('🔍 Buscar de nuevo', 'admin_users')],
               [Markup.button.callback('◀️ Volver', 'admin_cancel')],
