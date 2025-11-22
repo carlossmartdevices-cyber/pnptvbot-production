@@ -1,0 +1,23 @@
+# This is an example configuration file
+# To learn more, see the full config.yaml reference: https://docs.continue.dev/reference
+
+name: Example Config
+version: 1.0.0
+schema: v1
+
+# Define which models can be used
+# https://docs.continue.dev/customization/models
+models:
+  - name: Le Chat
+    provider: mistral
+    model: Codestral
+    apiKey: QSKNcgj0TI4i0ArTRYQclqU704z6XZ1j
+  - uses: mistral/codestral-latest
+    with:
+      MISTRAL_API_KEY: QSKNcgj0TI4i0ArTRYQclqU704z6XZ1j
+
+
+# MCP Servers that Continue can access
+# https://docs.continue.dev/customization/mcp-tools
+#cpServers:
+  - #uses: anthropic/memory-mcp

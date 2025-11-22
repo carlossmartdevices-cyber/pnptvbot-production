@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Checkout - PNPtv</title>
     <style>
         * {
@@ -249,9 +252,25 @@
     <script src="https://checkout.epayco.co/checkout.js"></script>
 
     <script>
+        // VERSION: 2024-11-21-FIX-v3
+        console.log('🔧 CHECKOUT PAGE VERSION: 2024-11-21-FIX-v3');
+
         // Get payment ID from URL
         const pathParts = window.location.pathname.split('/');
         const paymentId = pathParts[pathParts.length - 1];
+
+        console.log('Payment ID from URL:', paymentId);
+        console.log('Full path:', window.location.pathname);
+
+        // Validate payment ID
+        if (!paymentId || paymentId === '' || paymentId === 'payment-checkout.html') {
+            console.error('Invalid payment ID:', paymentId);
+            document.addEventListener('DOMContentLoaded', function() {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').textContent = 'ID de pago inválido. Por favor, genera un nuevo enlace desde el bot.';
+                document.getElementById('error').style.display = 'block';
+            });
+        }
 
         let paymentData = null;
         let ePaycoHandler = null;
@@ -262,16 +281,25 @@
                 const response = await fetch(`/api/payment/${paymentId}`);
 
                 if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API response not OK:', response.status, errorText);
                     throw new Error('No se pudo cargar la información del pago');
                 }
 
                 const data = await response.json();
+                console.log('Payment data received:', data);
 
                 if (!data.success) {
                     throw new Error(data.error || 'Error al cargar el pago');
                 }
 
+                if (!data.payment) {
+                    console.error('No payment data in response:', data);
+                    throw new Error('Respuesta del servidor incompleta');
+                }
+
                 paymentData = data.payment;
+                console.log('Payment data set:', paymentData);
                 displayPaymentInfo();
                 initializeEpayco();
 
@@ -283,16 +311,27 @@
 
         // Display payment information
         function displayPaymentInfo() {
+            // Validate payment data structure
+            if (!paymentData) {
+                showError('Datos de pago no válidos');
+                return;
+            }
+
+            if (!paymentData.plan) {
+                showError('Información del plan no disponible');
+                return;
+            }
+
             document.getElementById('loading').style.display = 'none';
             document.getElementById('checkout-form').style.display = 'block';
 
-            // Plan info
+            // Plan info with safe defaults
             document.getElementById('plan-icon').textContent = paymentData.plan.icon || '💎';
-            document.getElementById('plan-name').textContent = paymentData.plan.name;
+            document.getElementById('plan-name').textContent = paymentData.plan.name || 'Plan Premium';
             document.getElementById('plan-sku').textContent = paymentData.plan.sku || 'EASYBOTS-PNP-030';
 
             // Duration text
-            const duration = paymentData.plan.duration;
+            const duration = paymentData.plan.duration || 30;
             let durationText;
             if (duration >= 36500) {
                 durationText = 'Acceso de por vida';
@@ -305,9 +344,11 @@
             }
             document.getElementById('plan-duration').textContent = durationText;
 
-            // Prices
-            document.getElementById('plan-price-usd').textContent = paymentData.amountUSD.toFixed(2);
-            document.getElementById('plan-price-cop').textContent = formatNumber(paymentData.amountCOP);
+            // Prices with validation
+            const amountUSD = paymentData.amountUSD || 0;
+            const amountCOP = paymentData.amountCOP || 0;
+            document.getElementById('plan-price-usd').textContent = amountUSD.toFixed(2);
+            document.getElementById('plan-price-cop').textContent = formatNumber(amountCOP);
         }
 
         // Initialize ePayco Checkout

@@ -185,8 +185,18 @@ const registerAdminHandlers = (bot) => {
 
       const lang = getLanguage(ctx);
 
+      // Initialize session properly
+      if (!ctx.session) {
+        ctx.session = {};
+      }
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
+
       // Clear any ongoing admin tasks
-      ctx.session.temp = {};
+      ctx.session.temp = {
+        broadcastMode: true,
+      };
       await ctx.saveSession();
 
       await ctx.editMessageText(
@@ -201,11 +211,12 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error in admin broadcast:', error);
+      await ctx.answerCbQuery('Error al iniciar broadcast');
     }
   });
 
   // Broadcast target selection
-  bot.action(/^broadcast_(.+)$/, async (ctx) => {
+  bot.action(/^broadcast_(all|premium|free|churned)$/, async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
@@ -218,7 +229,9 @@ const registerAdminHandlers = (bot) => {
 
       const target = ctx.match[1];
       const lang = getLanguage(ctx);
-
+      // Robust session initialization (merged logic)
+      if (!ctx.session) ctx.session = {};
+      ctx.session.temp = ctx.session.temp || {};
       ctx.session.temp.broadcastTarget = target;
       ctx.session.temp.broadcastStep = 'media';
       ctx.session.temp.broadcastData = {};
@@ -237,6 +250,11 @@ const registerAdminHandlers = (bot) => {
         },
       );
     } catch (error) {
+      // Ignore "message is not modified" errors (user clicked same button twice)
+      if (error.message && error.message.includes('message is not modified')) {
+        await ctx.answerCbQuery();
+        return;
+      }
       logger.error('Error in broadcast target:', error);
     }
   });
@@ -799,38 +817,87 @@ const registerAdminHandlers = (bot) => {
     if (ctx.session.temp?.adminSearchingUser) {
       try {
         const lang = getLanguage(ctx);
-        const query = ctx.message.text;
+        const searchQuery = ctx.message.text;
 
-        let user = null;
-        if (!Number.isNaN(parseInt(query, 10))) {
-          user = await UserModel.getById(query);
-        }
+        // Search users by ID, username, or name
+        const users = await UserModel.search(searchQuery);
 
-        if (!user) {
-          await ctx.reply(t('userNotFound', lang));
+        if (!users || users.length === 0) {
+          await ctx.reply(
+            `❌ ${t('userNotFound', lang)}\n\n`
+            + `Búsqueda: "${searchQuery}"\n\n`
+            + `Puedes buscar por:\n`
+            + `• ID de usuario (ej: 123456789)\n`
+            + `• Username (ej: @usuario o usuario)\n`
+            + `• Nombre (ej: Juan)`,
+            Markup.inlineKeyboard([
+              [Markup.button.callback('🔍 Buscar de nuevo', 'admin_users')],
+              [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+            ]),
+          );
           return;
         }
 
-        ctx.session.temp.adminSearchingUser = false;
-        ctx.session.temp.selectedUserId = user.id;
+        // If only one user found, show details directly
+        if (users.length === 1) {
+          const user = users[0];
+          ctx.session.temp.adminSearchingUser = false;
+          ctx.session.temp.selectedUserId = user.id;
+          await ctx.saveSession();
+
+          const statusEmoji = user.subscription_status === 'active' ? '💎' : '🆓';
+          const planExpiry = user.plan_expiry
+            ? `\n⏰ Expira: ${new Date(user.plan_expiry).toLocaleDateString()}`
+            : '';
+
+          await ctx.reply(
+            `✅ ${t('userFound', lang)}\n\n`
+            + `👤 ${user.first_name || ''} ${user.last_name || ''}\n`
+            + `${user.username ? `@${user.username}\n` : ''}`
+            + `🆔 ${user.id}\n`
+            + `📧 ${user.email || 'N/A'}\n`
+            + `${statusEmoji} Status: ${user.subscription_status}${planExpiry}\n`
+            + `📦 Plan: ${user.plan_id || 'N/A'}`,
+            Markup.inlineKeyboard([
+              [Markup.button.callback('✨ Activar Membresía', 'admin_activate_membership')],
+              [Markup.button.callback('📅 Extender Suscripción', 'admin_extend_sub')],
+              [Markup.button.callback('💎 Cambiar Plan', 'admin_change_plan')],
+              [Markup.button.callback('🚫 Desactivar Usuario', 'admin_deactivate')],
+              [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+            ]),
+          );
+          return;
+        }
+
+        // Multiple users found - show selection list
+        ctx.session.temp.adminSearchResults = users;
         await ctx.saveSession();
 
-        await ctx.reply(
-          `${t('userFound', lang)}\n\n`
-          + `👤 ${user.firstName || ''} ${user.lastName || ''}\n`
-          + `🆔 ${user.id}\n`
-          + `📧 ${user.email || 'N/A'}\n`
-          + `💎 Status: ${user.subscriptionStatus}\n`
-          + `📦 Plan: ${user.planId || 'N/A'}`,
-          Markup.inlineKeyboard([
-            [Markup.button.callback('📅 Extender Suscripción', 'admin_extend_sub')],
-            [Markup.button.callback('💎 Cambiar Plan', 'admin_change_plan')],
-            [Markup.button.callback('🚫 Desactivar Usuario', 'admin_deactivate')],
-            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
-          ]),
-        );
+        let message = `🔍 **Resultados de búsqueda**\n\n`;
+        message += `Encontrados ${users.length} usuarios:\n\n`;
+
+        const keyboard = [];
+        users.forEach((user, index) => {
+          const statusEmoji = user.subscription_status === 'active' ? '💎' : '🆓';
+          const displayName = `${statusEmoji} ${user.first_name || 'Usuario'} ${user.last_name || ''}`.trim();
+          const username = user.username ? `@${user.username}` : `ID: ${user.id}`;
+
+          message += `${index + 1}. ${displayName} (${username})\n`;
+          keyboard.push([
+            Markup.button.callback(
+              `${index + 1}. ${displayName.substring(0, 30)}`,
+              `admin_select_user_${user.id}`,
+            ),
+          ]);
+        });
+
+        keyboard.push([Markup.button.callback('🔍 Buscar de nuevo', 'admin_users')]);
+        keyboard.push([Markup.button.callback('◀️ Volver', 'admin_cancel')]);
+
+        await ctx.reply(message, Markup.inlineKeyboard(keyboard));
       } catch (error) {
         logger.error('Error searching user:', error);
+        await ctx.reply('Error al buscar usuario. Por favor intenta de nuevo.');
       }
       return;
     }
@@ -839,6 +906,11 @@ const registerAdminHandlers = (bot) => {
     if (ctx.session.temp?.broadcastStep === 'text_en') {
       try {
         const message = ctx.message.text;
+
+        // Initialize broadcastData if needed
+        if (!ctx.session.temp.broadcastData) {
+          ctx.session.temp.broadcastData = {};
+        }
 
         // Save English text
         ctx.session.temp.broadcastData.textEn = message;
@@ -866,7 +938,29 @@ const registerAdminHandlers = (bot) => {
       try {
         const message = ctx.message.text;
         const target = ctx.session.temp.broadcastTarget;
+
+        // Validate required data
+        if (!target) {
+          await ctx.reply('❌ Error: No se ha seleccionado el público objetivo. Por favor inicia el broadcast de nuevo.');
+          ctx.session.temp = {};
+          await ctx.saveSession();
+          return;
+        }
+
+        // Initialize broadcastData if needed
+        if (!ctx.session.temp.broadcastData) {
+          ctx.session.temp.broadcastData = {};
+        }
+
         const broadcastData = ctx.session.temp.broadcastData;
+
+        // Validate English text exists
+        if (!broadcastData.textEn) {
+          await ctx.reply('❌ Error: Falta el texto en inglés. Por favor inicia el broadcast de nuevo.');
+          ctx.session.temp = {};
+          await ctx.saveSession();
+          return;
+        }
 
         // Save Spanish text
         broadcastData.textEs = message;
@@ -890,11 +984,19 @@ const registerAdminHandlers = (bot) => {
           users = await UserModel.getChurnedUsers();
         }
 
-        // Send broadcast
+        // Send broadcast with rate limiting
         let sent = 0;
         let failed = 0;
+        const totalUsers = users.length;
+        const batchSize = 25;
+        const delayBetweenMessages = 50; // 50ms between messages
+        const delayBetweenBatches = 1000; // 1 second between batches
 
-        for (const user of users) {
+        // Helper function to delay
+        const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+        for (let i = 0; i < users.length; i++) {
+          const user = users[i];
           try {
             const userLang = user.language || 'en';
             const textToSend = userLang === 'es' ? broadcastData.textEs : broadcastData.textEn;
@@ -925,6 +1027,26 @@ const registerAdminHandlers = (bot) => {
           } catch (sendError) {
             failed += 1;
             logger.warn('Failed to send broadcast to user:', { userId: user.id, error: sendError.message });
+          }
+
+          // Rate limiting: delay between messages
+          await delay(delayBetweenMessages);
+
+          // Longer delay and progress update every batch
+          if ((i + 1) % batchSize === 0 && i + 1 < totalUsers) {
+            await delay(delayBetweenBatches);
+            // Send progress update
+            try {
+              await ctx.reply(
+                `📤 *Progreso del Broadcast*\n\n`
+                + `✓ Enviados: ${sent}\n`
+                + `✗ Fallidos: ${failed}\n`
+                + `📊 Progreso: ${i + 1}/${totalUsers} (${Math.round(((i + 1) / totalUsers) * 100)}%)`,
+                { parse_mode: 'Markdown' },
+              );
+            } catch (progressError) {
+              // Ignore progress update errors
+            }
           }
         }
 
@@ -1102,6 +1224,152 @@ const registerAdminHandlers = (bot) => {
     return next();
   });
 
+  // Handle user selection from search results
+  bot.action(/^admin_select_user_(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.match[1];
+      const user = await UserModel.getById(userId);
+      const lang = getLanguage(ctx);
+
+      if (!user) {
+        await ctx.answerCbQuery('Usuario no encontrado');
+        return;
+      }
+
+      ctx.session.temp.adminSearchingUser = false;
+      ctx.session.temp.selectedUserId = user.id;
+      await ctx.saveSession();
+
+      const statusEmoji = user.subscription_status === 'active' ? '💎' : '🆓';
+      const planExpiry = user.plan_expiry
+        ? `\n⏰ Expira: ${new Date(user.plan_expiry).toLocaleDateString()}`
+        : '';
+
+      await ctx.editMessageText(
+        `✅ ${t('userFound', lang)}\n\n`
+        + `👤 ${user.first_name || ''} ${user.last_name || ''}\n`
+        + `${user.username ? `@${user.username}\n` : ''}`
+        + `🆔 ${user.id}\n`
+        + `📧 ${user.email || 'N/A'}\n`
+        + `${statusEmoji} Status: ${user.subscription_status}${planExpiry}\n`
+        + `📦 Plan: ${user.plan_id || 'N/A'}`,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('✨ Activar Membresía', 'admin_activate_membership')],
+          [Markup.button.callback('📅 Extender Suscripción', 'admin_extend_sub')],
+          [Markup.button.callback('💎 Cambiar Plan', 'admin_change_plan')],
+          [Markup.button.callback('🚫 Desactivar Usuario', 'admin_deactivate')],
+          [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error selecting user:', error);
+      await ctx.answerCbQuery('Error al seleccionar usuario');
+    }
+  });
+
+  // Activate membership - Quick activation with default plan
+  bot.action('admin_activate_membership', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.session.temp.selectedUserId;
+      const user = await UserModel.getById(userId);
+
+      if (!user) {
+        await ctx.answerCbQuery('Usuario no encontrado');
+        return;
+      }
+
+      // Get available plans
+      const plans = await PlanModel.getAll();
+
+      let text = `✨ **Activar Membresía**\n\n`;
+      text += `👤 ${user.first_name} ${user.last_name || ''}\n`;
+      text += `${user.username ? `@${user.username}\n` : ''}`;
+      text += `💎 Status actual: ${user.subscription_status}\n\n`;
+      text += `Selecciona el plan para activar:\n`;
+
+      const keyboard = [];
+
+      // Add button for each plan
+      plans.forEach((plan) => {
+        keyboard.push([
+          Markup.button.callback(
+            `${plan.nameEs || plan.name} - $${plan.price} (${plan.duration} días)`,
+            `admin_activate_plan_${userId}_${plan.id}`,
+          ),
+        ]);
+      });
+
+      keyboard.push([Markup.button.callback('◀️ Volver', `admin_select_user_${userId}`)]);
+
+      await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
+    } catch (error) {
+      logger.error('Error showing activation options:', error);
+      await ctx.answerCbQuery('Error al mostrar opciones');
+    }
+  });
+
+  // Handle plan activation
+  bot.action(/^admin_activate_plan_(.+)_(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.match[1];
+      const planId = ctx.match[2];
+      const user = await UserModel.getById(userId);
+      const plan = await PlanModel.getById(planId);
+
+      if (!user || !plan) {
+        await ctx.answerCbQuery('Usuario o plan no encontrado');
+        return;
+      }
+
+      // Set new expiry date based on plan duration
+      const newExpiry = new Date();
+      newExpiry.setDate(newExpiry.getDate() + (plan.duration || 30));
+
+      await UserModel.updateSubscription(userId, {
+        status: 'active',
+        planId,
+        expiry: newExpiry,
+      });
+
+      let successText = `✅ **Membresía Activada**\n\n`;
+      successText += `👤 Usuario: ${user.first_name} ${user.last_name || ''}\n`;
+      successText += `${user.username ? `@${user.username}\n` : ''}`;
+      successText += `💎 Plan: ${plan.nameEs || plan.name}\n`;
+      successText += `💰 Precio: $${plan.price}\n`;
+      successText += `⏱️ Duración: ${plan.duration} días\n`;
+      successText += `📅 Expira: ${newExpiry.toLocaleDateString()}\n`;
+
+      await ctx.editMessageText(
+        successText,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('👤 Ver Usuario', `admin_select_user_${userId}`)],
+          [Markup.button.callback('◀️ Volver al Panel', 'admin_cancel')],
+        ]),
+      );
+
+      logger.info('Membership activated by admin', {
+        adminId: ctx.from.id,
+        userId,
+        planId,
+        newExpiry,
+      });
+
+      await ctx.answerCbQuery('✅ Membresía activada exitosamente');
+    } catch (error) {
+      logger.error('Error activating membership:', error);
+      await ctx.answerCbQuery('Error al activar membresía');
+    }
+  });
+
   // Extend subscription - Show duration options
   bot.action('admin_extend_sub', async (ctx) => {
     try {
@@ -1213,6 +1481,39 @@ const registerAdminHandlers = (bot) => {
         duration,
         newExpiry,
       });
+
+      // Send notification to user with plan details and PRIME channel invite
+      try {
+        const primeChannelId = process.env.PRIME_CHANNEL_ID;
+        if (primeChannelId) {
+          // Create single-use invite link
+          const inviteLink = await ctx.telegram.createChatInviteLink(primeChannelId, {
+            member_limit: 1,
+            name: `Admin activation - ${userId}`,
+          });
+
+          // Get user language for notification
+          const userLang = user.language || 'es';
+          const planName = duration === 'lifetime' ? 'Lifetime Pass' : `${durationText} extension`;
+
+          const notificationText = userLang === 'es'
+            ? `🎉 *¡Tu membresía ha sido activada!*\n\n` +
+              `📦 Plan: ${planName}\n` +
+              `${newExpiry ? `📅 Vence: ${newExpiry.toLocaleDateString()}` : '♾️ Sin vencimiento'}\n\n` +
+              `🔗 *Accede al canal PRIME:*\n${inviteLink.invite_link}\n\n` +
+              `⚠️ Este enlace es de un solo uso.`
+            : `🎉 *Your membership has been activated!*\n\n` +
+              `📦 Plan: ${planName}\n` +
+              `${newExpiry ? `📅 Expires: ${newExpiry.toLocaleDateString()}` : '♾️ No expiration'}\n\n` +
+              `🔗 *Access PRIME channel:*\n${inviteLink.invite_link}\n\n` +
+              `⚠️ This link is single-use only.`;
+
+          await ctx.telegram.sendMessage(userId, notificationText, { parse_mode: 'Markdown' });
+          logger.info('User notified of admin activation', { userId, planName });
+        }
+      } catch (notifyError) {
+        logger.warn('Could not send activation notification to user:', notifyError.message);
+      }
 
       await ctx.answerCbQuery('✅ Membresía extendida exitosamente');
     } catch (error) {
@@ -1346,6 +1647,53 @@ const registerAdminHandlers = (bot) => {
       );
 
       logger.info('Plan changed by admin', { adminId: ctx.from.id, userId, newPlan: planId });
+
+      // Send notification to user with plan details and PRIME channel invite (only for non-free plans)
+      if (planId !== 'free') {
+        try {
+          const primeChannelId = process.env.PRIME_CHANNEL_ID;
+          if (primeChannelId) {
+            const plan = await PlanModel.getById(planId);
+
+            // Create single-use invite link
+            const inviteLink = await ctx.telegram.createChatInviteLink(primeChannelId, {
+              member_limit: 1,
+              name: `Admin plan change - ${userId}`,
+            });
+
+            // Get user language and plan details
+            const userLang = user.language || 'es';
+            const planName = userLang === 'es' ? (plan?.nameEs || planId) : (plan?.name || planId);
+            const planPrice = plan?.price || 0;
+            const planDuration = plan?.duration || 30;
+
+            // Calculate expiry
+            const newExpiry = new Date();
+            newExpiry.setDate(newExpiry.getDate() + planDuration);
+
+            const notificationText = userLang === 'es'
+              ? `🎉 *¡Tu membresía ha sido activada!*\n\n` +
+                `📦 Plan: ${planName}\n` +
+                `💰 Valor: $${planPrice}\n` +
+                `⏱️ Duración: ${planDuration} días\n` +
+                `📅 Vence: ${newExpiry.toLocaleDateString()}\n\n` +
+                `🔗 *Accede al canal PRIME:*\n${inviteLink.invite_link}\n\n` +
+                `⚠️ Este enlace es de un solo uso.`
+              : `🎉 *Your membership has been activated!*\n\n` +
+                `📦 Plan: ${planName}\n` +
+                `💰 Price: $${planPrice}\n` +
+                `⏱️ Duration: ${planDuration} days\n` +
+                `📅 Expires: ${newExpiry.toLocaleDateString()}\n\n` +
+                `🔗 *Access PRIME channel:*\n${inviteLink.invite_link}\n\n` +
+                `⚠️ This link is single-use only.`;
+
+            await ctx.telegram.sendMessage(userId, notificationText, { parse_mode: 'Markdown' });
+            logger.info('User notified of admin plan change', { userId, planId, planName });
+          }
+        } catch (notifyError) {
+          logger.warn('Could not send plan change notification to user:', notifyError.message);
+        }
+      }
     } catch (error) {
       logger.error('Error changing user plan:', error);
       await ctx.answerCbQuery('Error al cambiar el plan');
