@@ -137,81 +137,85 @@ const registerMenuHandlers = (bot) => {
   });
 
   // Start group video call from menu button
-  // Sends full message to group with all details
+  // Only works in the community group
   bot.action('start_group_video_call', async (ctx) => {
     try {
       const chatType = ctx.chat?.type;
-      if (chatType !== 'group' && chatType !== 'supergroup') {
-        await ctx.answerCbQuery('❌ This feature only works in groups', { show_alert: true });
+      const communityGroupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : null;
+
+      if (!communityGroupId) {
+        await ctx.answerCbQuery('❌ Community group not configured', { show_alert: true });
         return;
       }
 
-      // Check if user is admin
-      const chatMember = await ctx.getChatMember(ctx.from.id);
-      if (!['creator', 'administrator'].includes(chatMember.status)) {
-        const lang = ctx.session?.language || 'en';
-        await ctx.answerCbQuery(
-          lang === 'es' ? '❌ Solo administradores pueden iniciar videollamadas' : '❌ Only admins can start video calls',
-          { show_alert: true }
-        );
+      // Only allow from community group
+      if (ctx.chat.id !== communityGroupId) {
+        await ctx.answerCbQuery('❌ This feature only works in the community group', { show_alert: true });
         return;
       }
 
-      // Send full details to GROUP and pin it
-      const groupName = ctx.chat.title || 'Group Video Call';
-      const groupId = ctx.chat.id;
+      // Allow any group member to start calls
       const hostId = ctx.from.id;
-      const hostName = ctx.from.first_name || 'Admin';
+      const hostName = ctx.from.first_name || 'Member';
       
-      const roomCode = `GRP_${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-      const callLink = `https://t.me/${ctx.botInfo?.username}?start=join_group_call_${roomCode}`;
+      // Start a Telegram video chat in the community group FIRST
+      let videoChatStarted = false;
+      try {
+        await ctx.telegram.requestVideoChatStart(communityGroupId);
+        videoChatStarted = true;
+        logger.info('✅ Telegram video chat started successfully from menu', { communityGroupId });
+      } catch (videoChatError) {
+        logger.error('Error requesting video chat:', videoChatError);
+        await ctx.answerCbQuery('❌ Failed to start video call');
+        return;
+      }
+
+      // Wait a moment for the video chat to initialize
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       const inviteMessage = [
         `🎥 *GROUP VIDEO CALL STARTED*`,
         ``,
         `📱 Host: @${ctx.from.username || hostName}`,
-        `👥 Group: ${groupName}`,
-        `🆔 Call Room: \`${roomCode}\``,
+        `👥 Community Video Call`,
         ``,
-        `🔗 Join the call:`,
-        `[📲 Tap to Join](${callLink})`,
+        `🔴 Video call is now LIVE!`,
         ``,
-        `⏱️ Call started at: ${new Date().toLocaleTimeString()}`,
+        `Tap the video call icon above to join directly 📲`,
         ``,
-        `👇 Or use the button below to join:`,
+        `⏱️ Started at: ${new Date().toLocaleTimeString()}`,
       ].join('\n');
 
       try {
-        // Send full message to GROUP
-        const groupMessage = await ctx.reply(inviteMessage, {
+        // Send announcement message to COMMUNITY GROUP
+        const groupMessage = await ctx.telegram.sendMessage(communityGroupId, inviteMessage, {
           parse_mode: 'Markdown',
           disable_web_page_preview: true,
           ...Markup.inlineKeyboard([
             [
-              Markup.button.url('📱 Join Video Call', callLink),
-              Markup.button.callback('❌ End Call', `end_group_call_${roomCode}`),
-            ],
-            [
-              Markup.button.callback('📊 Call Info', `group_call_info_${roomCode}`),
-              Markup.button.callback('👥 Participants', `group_call_participants_${roomCode}`),
+              Markup.button.callback('👥 Participants', `group_call_participants_live`),
+              Markup.button.callback('📊 Call Info', `group_call_info_live`),
             ],
           ]),
         });
 
-        // Pin the message in group
-        await ctx.telegram.pinChatMessage(groupId, groupMessage.message_id, { disable_notification: true });
+        // Pin the message in community group
+        try {
+          await ctx.telegram.pinChatMessage(communityGroupId, groupMessage.message_id, { disable_notification: true });
+        } catch (pinError) {
+          logger.warn('Could not pin message:', pinError.message);
+        }
 
-        logger.info('Group video call started from menu and pinned in group', {
-          groupId,
-          roomCode,
+        logger.info('Group video call started from menu', {
+          communityGroupId,
           hostId,
-          groupName,
+          videoChatStarted,
           messageId: groupMessage.message_id,
         });
 
         await ctx.answerCbQuery('✅ Video call started!');
       } catch (groupError) {
-        logger.error('Error sending to group or pinning:', groupError);
+        logger.error('Error sending to community group:', groupError);
         await ctx.answerCbQuery('❌ Error starting call');
       }
     } catch (error) {

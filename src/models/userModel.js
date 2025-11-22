@@ -54,9 +54,9 @@ class UserModel {
           if (result.rows.length === 0) {
             return null;
           }
-          const userData = result.rows[0];
+          const userData = this.convertRowToCamelCase(result.rows[0]);
           // Ensure onboardingComplete is boolean
-          userData.onboardingComplete = Boolean(userData.onboarding_complete);
+          userData.onboardingComplete = Boolean(userData.onboardingComplete);
           logger.debug(`Fetched user from PostgreSQL: ${userId}`);
           return userData;
         },
@@ -75,6 +75,32 @@ class UserModel {
    */
   static toSnakeCase(str) {
     return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+  }
+
+  /**
+   * Convert snake_case to camelCase
+   * @param {string} str - String in snake_case
+   * @returns {string} String in camelCase
+   */
+  static toCamelCase(str) {
+    return str.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+  }
+
+  /**
+   * Convert database row from snake_case to camelCase
+   * @param {Object} row - Database row with snake_case keys
+   * @returns {Object} Object with camelCase keys
+   */
+  static convertRowToCamelCase(row) {
+    if (!row) return row;
+    const converted = {};
+    for (const key in row) {
+      if (row.hasOwnProperty(key)) {
+        const camelKey = this.toCamelCase(key);
+        converted[camelKey] = row[key];
+      }
+    }
+    return converted;
   }
 
   /**
@@ -208,7 +234,7 @@ class UserModel {
         'SELECT * FROM users WHERE subscription_status = $1 AND plan_expiry <= $2',
         ['active', now]
       );
-      return result.rows;
+      return result.rows.map(row => this.convertRowToCamelCase(row));
     } catch (error) {
       logger.error('Error getting expired subscriptions:', error);
       return [];
@@ -227,7 +253,7 @@ class UserModel {
         'SELECT * FROM users WHERE subscription_status = $1 AND plan_expiry >= $2 AND plan_expiry <= $3',
         ['active', startDate, endDate]
       );
-      return result.rows;
+      return result.rows.map(row => this.convertRowToCamelCase(row));
     } catch (error) {
       logger.error('Error getting subscriptions expiring between dates:', error);
       return [];
@@ -269,7 +295,7 @@ class UserModel {
         'SELECT * FROM users WHERE subscription_status = $1',
         [status]
       );
-      return result.rows;
+      return result.rows.map(row => this.convertRowToCamelCase(row));
     } catch (error) {
       logger.error('Error getting users by subscription status:', error);
       return [];
@@ -322,7 +348,7 @@ class UserModel {
         [role]
       );
       logger.info(`Found ${result.rows.length} users with role: ${role}`);
-      return result.rows;
+      return result.rows.map(row => this.convertRowToCamelCase(row));
     } catch (error) {
       logger.error('Error getting users by role:', error);
       return [];
@@ -340,7 +366,7 @@ class UserModel {
         ['superadmin', 'admin', 'moderator']
       );
       logger.info(`Found ${result.rows.length} admin users`);
-      return result.rows;
+      return result.rows.map(row => this.convertRowToCamelCase(row));
     } catch (error) {
       logger.error('Error getting admin users:', error);
       return [];
