@@ -75,26 +75,34 @@ class PaymentController {
           paymentId: payment.id,
           paymentRef,
           userId,
+          planId,
           status: payment.status,
           amountUSD: parseFloat(plan.price),
           amountCOP: priceInCOP,
-          name: plan.display_name || plan.name,
-          sku: (() => {
-            const skuMap = {
-              'week-trial-pass': 'EASYBOTS-PNP-007',
-              'trial-week': 'EASYBOTS-PNP-007',
-              'monthly-pass': 'EASYBOTS-PNP-030',
-              'pnp-member': 'EASYBOTS-PNP-030',
-              'new-plan': 'EASYBOTS-PNP-030',
-              'existing-plan': 'EASYBOTS-PNP-030',
-              'crystal-member': 'EASYBOTS-PNP-120',
-              'crystal-pass': 'EASYBOTS-PNP-180',
-              'diamond-pass': 'EASYBOTS-PNP-365',
-              'diamond-member': 'EASYBOTS-PNP-365',
-              'lifetime-pass': 'EASYBOTS-PNP-999',
-            };
-            return skuMap[plan.id] || 'EASYBOTS-PNP-030';
-          })(),
+          plan: {
+            id: plan.id,
+            sku: (() => {
+              const skuMap = {
+                'week-trial-pass': 'EASYBOTS-PNP-007',
+                'trial-week': 'EASYBOTS-PNP-007',
+                'monthly-pass': 'EASYBOTS-PNP-030',
+                'pnp-member': 'EASYBOTS-PNP-030',
+                'new-plan': 'EASYBOTS-PNP-030',
+                'existing-plan': 'EASYBOTS-PNP-030',
+                'crystal-member': 'EASYBOTS-PNP-120',
+                'crystal-pass': 'EASYBOTS-PNP-180',
+                'diamond-pass': 'EASYBOTS-PNP-365',
+                'diamond-member': 'EASYBOTS-PNP-365',
+                'lifetime-pass': 'EASYBOTS-PNP-999',
+              };
+              return skuMap[plan.id] || plan.sku || 'EASYBOTS-PNP-030';
+            })(),
+            name: plan.display_name || plan.name,
+            description: `Suscripción ${plan.display_name || plan.name} - PNPtv`,
+            icon: plan.icon || '💎',
+            duration: plan.duration || 30,
+            features: plan.features || [],
+          },
           epaycoPublicKey,
           testMode: epaycoTestMode,
           confirmationUrl: `${webhookDomain}/api/webhooks/epayco`,

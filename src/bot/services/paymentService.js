@@ -47,6 +47,8 @@ class PaymentService {
         x_ref_payco,
         x_transaction_id,
         x_transaction_state,
+        x_cod_response, // Response code: 1=Aceptada, 2=Rechazada, 3=Pendiente, 4=Fallida
+        x_cod_transaction_state, // Transaction state code
         x_amount,
         x_currency_code,
         x_signature,
@@ -56,23 +58,97 @@ class PaymentService {
         x_extra3, // paymentId
         x_customer_email,
         x_customer_name,
+        x_response_reason_text, // Reason text for the response
       } = webhookData;
 
       logger.info('Processing ePayco webhook', {
         refPayco: x_ref_payco,
         transactionId: x_transaction_id,
         state: x_transaction_state,
+        codResponse: x_cod_response,
+        codTransactionState: x_cod_transaction_state,
+        responseReason: x_response_reason_text,
         amount: x_amount,
         paymentId: x_extra3,
       });
 
       // Verify signature if available
-      if (x_signature && process.env.EPAYCO_P_KEY) {
+      if (x_signature && process.env.EPAYCO_PRIVATE_KEY) {
         const p_cust_id_cliente = process.env.EPAYCO_P_CUST_ID || '';
+        const p_key = process.env.EPAYCO_PRIVATE_KEY;
+
+        // ePayco signature format
+        const signatureString = `${p_cust_id_cliente}^${p_key}^${x_ref_payco}^${x_transaction_id}^${x_amount}^${x_currency_code}`;
+        const expectedSignature = crypto.createHash('sha256').update(signatureString).digest('hex');
+
+        if (x_signature !== expectedSignature) {
+          logger.error('Invalid ePayco signature', {
+            received: x_signature,
+            expected: expectedSignature,
+            refPayco: x_ref_payco,
+          });
+          return { success: false, error: 'Invalid signature' };
+        }
+
+        logger.info('ePayco signature verified successfully');
+      }
+
+      const paymentId = x_extra3;
+      const userId = x_extra1;
+      const planId = x_extra2;
+
+      // Check if payment exists
+      const payment = paymentId ? await PaymentModel.getById(paymentId) : null;
+
+      if (!payment && !userId) {
+        logger.error('Payment not found and no user ID provided', { paymentId, refPayco: x_ref_payco });
+        return { success: false, error: 'Payment not found' };
+      }
+
+      // Process based on response code (x_cod_response) - primary check per ePayco docs
+      // x_cod_response: 1=Aceptada, 2=Rechazada, 3=Pendiente, 4=Fallida
+      const responseCode = parseInt(x_cod_response, 10);
+      const isApproved = responseCode === 1 || x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada';
+      const isRejected = responseCode === 2 || x_transaction_state === 'Rechazada';
+      const isPending = responseCode === 3 || x_transaction_state === 'Pendiente' || x_transaction_state === 'Colgante';
+      const isFailed = responseCode === 4 || x_transaction_state === 'Fallida';
+      const isAbandoned = x_transaction_state === 'Abandonada' || x_transaction_state === 'Cancelada';
+
+      if (isApproved) {
+        // Payment successful
+        if (payment) {
+          await PaymentModel.updateStatus(paymentId, 'completed', {
+            transaction_id: x_transaction_id,
+            approval_code: x_approval_code,
+            epayco_ref: x_ref_payco,
+          });
+        }
+
+        // Activate user subscription
+        if (userId && planId) {
+          const plan = await PlanModel.getById(planId);
+          if (plan) {
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
+
+            await UserModel.updateSubscription(userId, {
+              status: 'active',
+              planId,
+              expiry: expiryDate,
+            });
+
+            logger.info('User subscription activated via webhook', {
+              userId,
+              planId,
+              expiryDate,
+              refPayco: x_ref_payco,
+            });
+
+            // Enviar mensaje de bienvenida y datos de pago
+            try {
               const { Telegraf } = require('telegraf');
               const bot = new Telegraf(process.env.BOT_TOKEN);
-              const primeChannelEnv = process.env.PRIME_CHANNEL_ID || '';
-              const primeChannels = primeChannelEnv.split(',').map(id => id.trim()).filter(id => id);
+              const primeChannels = (process.env.PRIME_CHANNEL_ID || '').split(',').map(id => id.trim()).filter(id => id);
               const amountPaid = x_amount;
               const nextPaymentDate = expiryDate.toLocaleDateString('es-CO', {
                 year: 'numeric',
@@ -97,50 +173,7 @@ class PaymentService {
                 }
               }
 
-              // Compose welcome message (merged, supports multiple channels)
               const message = [
-                `*¡Bienvenido a PRIME${x_customer_name ? ', ' + x_customer_name : ''}!*`,
-                '',
-                `Tu pago de *${amountPaid} ${x_currency_code || 'COP'}* por el plan *${planName}* fue recibido exitosamente.`,
-                '',
-                `*Detalles de tu suscripción:*`,
-                `• Plan: ${planName}`,
-                `• Fecha de inicio: ${new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}`,
-                `• Próximo pago: *${nextPaymentDate}*`,
-                '',
-                '🔐 *Accede al canal exclusivo PRIME:*',
-                ...inviteLinks.map((inv, idx) => `👉 [Ingresar a PRIME Canal${inviteLinks.length > 1 ? ' ' + (idx + 1) : ''}](${inv.link})`),
-                '',
-                '⚠️ *Importante:* Estos enlaces son de un solo uso y expiran en 7 días.',
-                '',
-                '📅 *Te recordaremos:*',
-                '• 3 días antes de tu próximo pago',
-                '• 1 día antes de tu próximo pago',
-                '',
-                '💝 ¡Gracias por confiar en PNPtv! Disfruta todos los beneficios y novedades exclusivas.'
-              ].join('\n');
-
-              await bot.telegram.sendMessage(userId, message, {
-                parse_mode: 'Markdown',
-                disable_web_page_preview: false
-              });
-              let inviteLinkText = '';
-              if (primeChannelId) {
-                try {
-                  const inviteLink = await bot.telegram.createChatInviteLink(primeChannelId.split(',')[0].trim(), {
-                    member_limit: 1,
-                    name: `Payment - ${userId}`,
-                  });
-                  inviteLinkText = `🔗 *Accede al canal PRIME:*\n${inviteLink.invite_link}\n\n⚠️ Este enlace es de un solo uso.`;
-                } catch (linkErr) {
-                  logger.warn('Could not create invite link:', linkErr.message);
-                  inviteLinkText = `🔗 Contacta soporte para acceder al canal PRIME.`;
->>>>>>> f83c05f (chore: sync workspace changes)
-                }
-              }
-
-              const message = [
-<<<<<<< HEAD
                 `🎉 *¡Bienvenido a PRIME, ${x_customer_name || ''}!*`,
                 '',
                 `✅ Tu pago de *${amountPaid} ${x_currency_code || 'COP'}* por el plan *${planName}* fue recibido exitosamente.`,
@@ -160,17 +193,6 @@ class PaymentService {
                 '• 1 día antes de tu próximo pago',
                 '',
                 '💝 ¡Gracias por confiar en PNPtv! Disfruta todos los beneficios y novedades exclusivas.'
-=======
-                `🎉 *¡Bienvenido a PRIME${x_customer_name ? ', ' + x_customer_name : ''}!*`,
-                '',
-                `✅ Tu pago de *${amountPaid} ${x_currency_code || 'COP'}* por el plan *${planName}* fue recibido exitosamente.`,
-                '',
-                `📅 Tu membresía está activa hasta: *${nextPayment}*`,
-                '',
-                inviteLinkText,
-                '',
-                '¡Gracias por confiar en PNPtv! Disfruta todos los beneficios.'
->>>>>>> f83c05f (chore: sync workspace changes)
               ].join('\n');
 
               await bot.telegram.sendMessage(userId, message, {
@@ -267,12 +289,13 @@ class PaymentService {
         }
 
         return { success: true };
-      } else if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Fallida') {
-        // Payment failed
+      } else if (isRejected || isFailed) {
+        // Payment failed or rejected
         if (payment) {
           await PaymentModel.updateStatus(paymentId, 'failed', {
             transaction_id: x_transaction_id,
             epayco_ref: x_ref_payco,
+            response_reason: x_response_reason_text,
           });
         }
 
@@ -280,10 +303,12 @@ class PaymentService {
           paymentId,
           refPayco: x_ref_payco,
           state: x_transaction_state,
+          codResponse: x_cod_response,
+          reason: x_response_reason_text,
         });
 
         return { success: true }; // Return success to acknowledge webhook
-      } else if (x_transaction_state === 'Pendiente') {
+      } else if (isPending) {
         // Payment pending
         if (payment) {
           await PaymentModel.updateStatus(paymentId, 'pending', {
@@ -291,6 +316,29 @@ class PaymentService {
             epayco_ref: x_ref_payco,
           });
         }
+
+        logger.info('Payment pending in ePayco', {
+          paymentId,
+          refPayco: x_ref_payco,
+          state: x_transaction_state,
+          codResponse: x_cod_response,
+        });
+
+        return { success: true };
+      } else if (isAbandoned) {
+        // Payment abandoned or cancelled by user
+        if (payment) {
+          await PaymentModel.updateStatus(paymentId, 'cancelled', {
+            transaction_id: x_transaction_id,
+            epayco_ref: x_ref_payco,
+          });
+        }
+
+        logger.info('Payment abandoned by user', {
+          paymentId,
+          refPayco: x_ref_payco,
+          state: x_transaction_state,
+        });
 
         return { success: true };
       }
@@ -670,20 +718,7 @@ class PaymentService {
       // Get plan to obtain SKU (payment table doesn't store SKU, plan does)
       const planId = payment.plan_id || payment.planId;
       const plan = planId ? await PlanModel.getById(planId) : null;
-      const skuMap = {
-        'week-trial-pass': 'EASYBOTS-PNP-007',
-        'trial-week': 'EASYBOTS-PNP-007',
-        'monthly-pass': 'EASYBOTS-PNP-030',
-        'pnp-member': 'EASYBOTS-PNP-030',
-        'new-plan': 'EASYBOTS-PNP-030',
-        'existing-plan': 'EASYBOTS-PNP-030',
-        'crystal-member': 'EASYBOTS-PNP-120',
-        'crystal-pass': 'EASYBOTS-PNP-180',
-        'diamond-pass': 'EASYBOTS-PNP-365',
-        'diamond-member': 'EASYBOTS-PNP-365',
-        'lifetime-pass': 'EASYBOTS-PNP-999',
-      };
-      const planSku = skuMap[planId] || 'EASYBOTS-PNP-030';
+      const planSku = plan?.sku || 'EASYBOTS-PNP-030';
 
       await PaymentModel.updateStatus(paymentId, 'completed');
 
