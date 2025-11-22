@@ -265,49 +265,28 @@ const showMainMenu = async (ctx) => {
     return;
   }
 
-  // Texts for each type
-  let menuText = '';
-  if (isAdmin) {
-    menuText = lang === 'es'
-      ? '👑 ¡Bienvenido Admin!\nAcceso total a todas las funciones y panel de administración.'
-      : '👑 Welcome Admin!\nFull access to all features and admin panel.';
-  } else if (isPremium) {
-    menuText = t('welcomeScreenPrime', lang);
-  } else {
-    menuText = t('welcomeScreenFree', lang);
-  }
-
-  // Button builder
-  function buildButton(label, action, locked) {
-    // For Zoom Rooms and Live Streams, always lock and show 'Coming soon'
-    if (action === 'show_live' || action === 'show_zoom') {
-      return Markup.button.callback(`${label} 🚧`, action);
-    }
-    return Markup.button.callback(locked ? `${label} 🔒` : label, locked ? 'locked_feature' : action);
-  }
-
-  const buttons = [
-    [
-      Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
-      Markup.button.callback(t('myProfile', lang), 'show_profile'),
-    ],
-    [
-      Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
-      buildButton(t('liveStreams', lang), 'show_live', !isPremium && !isAdmin),
-    ],
-    [
-      Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-      buildButton(t('zoomRooms', lang), 'show_zoom', !isPremium && !isAdmin),
-    ],
-    [
-      Markup.button.callback(t('support', lang), 'show_support'),
-      Markup.button.callback(t('settings', lang), 'show_settings'),
-    ],
+  // Show full private chat menu
+  await ctx.reply(
+    t('mainMenuIntro', lang),
+    Markup.inlineKeyboard([
       [
-        Markup.button.callback(
-          lang === 'es' ? '🎟️ Invitaciones a eventos Zoom' : '🎟️ Invitations to Zoom events',
-          'show_zoom_invitations'
-        ),
+        Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
+        Markup.button.callback(t('myProfile', lang), 'show_profile'),
+      ],
+      [
+        Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
+        Markup.button.callback(t('liveStreams', lang), 'show_live'),
+      ],
+      [
+        Markup.button.callback(t('radioMenu', lang), 'show_radio'),
+        Markup.button.callback(t('playerMenu', lang), 'show_player'),
+      ],
+      [
+        Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
+        Markup.button.callback(t('support', lang), 'show_support'),
+      ],
+      [
+        Markup.button.callback(t('settings', lang), 'show_settings'),
       ],
   ];
   if (isAdmin) {
@@ -441,7 +420,30 @@ const showMainMenuEdit = async (ctx) => {
   }
 
   try {
-    await ctx.editMessageText(menuText, Markup.inlineKeyboard(buttons));
+    await ctx.editMessageText(
+      t('mainMenuIntro', lang),
+      Markup.inlineKeyboard([
+        [
+          Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
+          Markup.button.callback(t('myProfile', lang), 'show_profile'),
+        ],
+        [
+          Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
+          Markup.button.callback(t('liveStreams', lang), 'show_live'),
+        ],
+        [
+          Markup.button.callback(t('radioMenu', lang), 'show_radio'),
+          Markup.button.callback(t('playerMenu', lang), 'show_player'),
+        ],
+        [
+          Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
+          Markup.button.callback(t('support', lang), 'show_support'),
+        ],
+        [
+          Markup.button.callback(t('settings', lang), 'show_settings'),
+        ],
+      ]),
+    );
   } catch (error) {
     // If edit fails, send new message
     await showMainMenu(ctx);

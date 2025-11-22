@@ -219,21 +219,22 @@ const registerAdminHandlers = (bot) => {
   bot.action(/^broadcast_(all|premium|free|churned)$/, async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
 
       // Validate match result exists
       if (!ctx.match || !ctx.match[1]) {
         logger.error('Invalid broadcast target action format');
+        await ctx.answerCbQuery('❌ Error en formato de acción');
         return;
       }
 
       const target = ctx.match[1];
       const lang = getLanguage(ctx);
 
-      // Initialize session properly
-      if (!ctx.session) {
-        ctx.session = {};
-      }
+      // Initialize session temp if needed
       if (!ctx.session.temp) {
         ctx.session.temp = {};
       }
@@ -242,6 +243,10 @@ const registerAdminHandlers = (bot) => {
       ctx.session.temp.broadcastStep = 'media';
       ctx.session.temp.broadcastData = {};
       await ctx.saveSession();
+
+      logger.info('Broadcast target selected', { target, userId: ctx.from.id });
+
+      await ctx.answerCbQuery(`✓ Audiencia: ${target}`);
 
       await ctx.editMessageText(
         '📎 *Paso 1/4: Subir Media*\n\n'
@@ -262,6 +267,7 @@ const registerAdminHandlers = (bot) => {
         return;
       }
       logger.error('Error in broadcast target:', error);
+      await ctx.answerCbQuery('❌ Error al seleccionar audiencia').catch(() => {});
     }
   });
 
@@ -269,10 +275,22 @@ const registerAdminHandlers = (bot) => {
   bot.action('broadcast_skip_media', async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      // Validate session state
+      if (!ctx.session.temp || !ctx.session.temp.broadcastTarget) {
+        await ctx.answerCbQuery('❌ Sesión expirada. Por favor inicia de nuevo.');
+        logger.warn('Broadcast session expired or missing', { userId: ctx.from.id });
+        return;
+      }
 
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
+
+      await ctx.answerCbQuery('⏭️ Saltando media');
 
       await ctx.editMessageText(
         '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
@@ -284,8 +302,11 @@ const registerAdminHandlers = (bot) => {
           ]),
         },
       );
+
+      logger.info('Broadcast media skipped', { userId: ctx.from.id });
     } catch (error) {
       logger.error('Error skipping media:', error);
+      await ctx.answerCbQuery('❌ Error al saltar media').catch(() => {});
     }
   });
 
@@ -672,17 +693,39 @@ const registerAdminHandlers = (bot) => {
 
   // Handle media uploads for broadcast
   bot.on('photo', async (ctx, next) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
-      return next();
-    }
-
     try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      // Check if this is for broadcast
+      if (!isAdmin || !ctx.session.temp || ctx.session.temp.broadcastStep !== 'media') {
+        return next();
+      }
+
+      // Validate session state
+      if (!ctx.session.temp.broadcastTarget || !ctx.session.temp.broadcastData) {
+        logger.warn('Broadcast session incomplete when uploading photo', { userId: ctx.from.id });
+        await ctx.reply('❌ Sesión expirada. Por favor inicia el broadcast de nuevo con /admin');
+        return;
+      }
+
       const photo = ctx.message.photo[ctx.message.photo.length - 1];
+
+      if (!photo || !photo.file_id) {
+        logger.error('Invalid photo upload', { userId: ctx.from.id });
+        await ctx.reply('❌ Error al procesar la imagen. Por favor intenta de nuevo.');
+        return;
+      }
+
       ctx.session.temp.broadcastData.mediaType = 'photo';
       ctx.session.temp.broadcastData.mediaFileId = photo.file_id;
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
+
+      logger.info('Broadcast photo uploaded', {
+        userId: ctx.from.id,
+        fileId: photo.file_id,
+        target: ctx.session.temp.broadcastTarget
+      });
 
       await ctx.reply(
         '✅ Imagen guardada correctamente\n\n'
@@ -697,20 +740,44 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error handling photo for broadcast:', error);
+      await ctx.reply('❌ Error al procesar la imagen. Por favor intenta de nuevo.').catch(() => {});
     }
   });
 
   bot.on('video', async (ctx, next) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
-      return next();
-    }
-
     try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      // Check if this is for broadcast
+      if (!isAdmin || !ctx.session.temp || ctx.session.temp.broadcastStep !== 'media') {
+        return next();
+      }
+
+      // Validate session state
+      if (!ctx.session.temp.broadcastTarget || !ctx.session.temp.broadcastData) {
+        logger.warn('Broadcast session incomplete when uploading video', { userId: ctx.from.id });
+        await ctx.reply('❌ Sesión expirada. Por favor inicia el broadcast de nuevo con /admin');
+        return;
+      }
+
+      const video = ctx.message.video;
+
+      if (!video || !video.file_id) {
+        logger.error('Invalid video upload', { userId: ctx.from.id });
+        await ctx.reply('❌ Error al procesar el video. Por favor intenta de nuevo.');
+        return;
+      }
+
       ctx.session.temp.broadcastData.mediaType = 'video';
-      ctx.session.temp.broadcastData.mediaFileId = ctx.message.video.file_id;
+      ctx.session.temp.broadcastData.mediaFileId = video.file_id;
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
+
+      logger.info('Broadcast video uploaded', {
+        userId: ctx.from.id,
+        fileId: video.file_id,
+        target: ctx.session.temp.broadcastTarget
+      });
 
       await ctx.reply(
         '✅ Video guardado correctamente\n\n'
@@ -725,20 +792,44 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error handling video for broadcast:', error);
+      await ctx.reply('❌ Error al procesar el video. Por favor intenta de nuevo.').catch(() => {});
     }
   });
 
   bot.on('document', async (ctx, next) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
-      return next();
-    }
-
     try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      // Check if this is for broadcast
+      if (!isAdmin || !ctx.session.temp || ctx.session.temp.broadcastStep !== 'media') {
+        return next();
+      }
+
+      // Validate session state
+      if (!ctx.session.temp.broadcastTarget || !ctx.session.temp.broadcastData) {
+        logger.warn('Broadcast session incomplete when uploading document', { userId: ctx.from.id });
+        await ctx.reply('❌ Sesión expirada. Por favor inicia el broadcast de nuevo con /admin');
+        return;
+      }
+
+      const document = ctx.message.document;
+
+      if (!document || !document.file_id) {
+        logger.error('Invalid document upload', { userId: ctx.from.id });
+        await ctx.reply('❌ Error al procesar el documento. Por favor intenta de nuevo.');
+        return;
+      }
+
       ctx.session.temp.broadcastData.mediaType = 'document';
-      ctx.session.temp.broadcastData.mediaFileId = ctx.message.document.file_id;
+      ctx.session.temp.broadcastData.mediaFileId = document.file_id;
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
+
+      logger.info('Broadcast document uploaded', {
+        userId: ctx.from.id,
+        fileId: document.file_id,
+        target: ctx.session.temp.broadcastTarget
+      });
 
       await ctx.reply(
         '✅ Documento guardado correctamente\n\n'
@@ -753,20 +844,44 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error handling document for broadcast:', error);
+      await ctx.reply('❌ Error al procesar el documento. Por favor intenta de nuevo.').catch(() => {});
     }
   });
 
   bot.on('audio', async (ctx, next) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
-      return next();
-    }
-
     try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      // Check if this is for broadcast
+      if (!isAdmin || !ctx.session.temp || ctx.session.temp.broadcastStep !== 'media') {
+        return next();
+      }
+
+      // Validate session state
+      if (!ctx.session.temp.broadcastTarget || !ctx.session.temp.broadcastData) {
+        logger.warn('Broadcast session incomplete when uploading audio', { userId: ctx.from.id });
+        await ctx.reply('❌ Sesión expirada. Por favor inicia el broadcast de nuevo con /admin');
+        return;
+      }
+
+      const audio = ctx.message.audio;
+
+      if (!audio || !audio.file_id) {
+        logger.error('Invalid audio upload', { userId: ctx.from.id });
+        await ctx.reply('❌ Error al procesar el audio. Por favor intenta de nuevo.');
+        return;
+      }
+
       ctx.session.temp.broadcastData.mediaType = 'audio';
-      ctx.session.temp.broadcastData.mediaFileId = ctx.message.audio.file_id;
+      ctx.session.temp.broadcastData.mediaFileId = audio.file_id;
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
+
+      logger.info('Broadcast audio uploaded', {
+        userId: ctx.from.id,
+        fileId: audio.file_id,
+        target: ctx.session.temp.broadcastTarget
+      });
 
       await ctx.reply(
         '✅ Audio guardado correctamente\n\n'
@@ -781,20 +896,44 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error handling audio for broadcast:', error);
+      await ctx.reply('❌ Error al procesar el audio. Por favor intenta de nuevo.').catch(() => {});
     }
   });
 
   bot.on('voice', async (ctx, next) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
-      return next();
-    }
-
     try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      // Check if this is for broadcast
+      if (!isAdmin || !ctx.session.temp || ctx.session.temp.broadcastStep !== 'media') {
+        return next();
+      }
+
+      // Validate session state
+      if (!ctx.session.temp.broadcastTarget || !ctx.session.temp.broadcastData) {
+        logger.warn('Broadcast session incomplete when uploading voice', { userId: ctx.from.id });
+        await ctx.reply('❌ Sesión expirada. Por favor inicia el broadcast de nuevo con /admin');
+        return;
+      }
+
+      const voice = ctx.message.voice;
+
+      if (!voice || !voice.file_id) {
+        logger.error('Invalid voice upload', { userId: ctx.from.id });
+        await ctx.reply('❌ Error al procesar el mensaje de voz. Por favor intenta de nuevo.');
+        return;
+      }
+
       ctx.session.temp.broadcastData.mediaType = 'voice';
-      ctx.session.temp.broadcastData.mediaFileId = ctx.message.voice.file_id;
+      ctx.session.temp.broadcastData.mediaFileId = voice.file_id;
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
+
+      logger.info('Broadcast voice uploaded', {
+        userId: ctx.from.id,
+        fileId: voice.file_id,
+        target: ctx.session.temp.broadcastTarget
+      });
 
       await ctx.reply(
         '✅ Mensaje de voz guardado correctamente\n\n'
@@ -809,6 +948,7 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error handling voice for broadcast:', error);
+      await ctx.reply('❌ Error al procesar el mensaje de voz. Por favor intenta de nuevo.').catch(() => {});
     }
   });
 
