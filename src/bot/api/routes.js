@@ -11,7 +11,6 @@ const logger = require('../../utils/logger');
 const webhookController = require('./controllers/webhookController');
 const subscriptionController = require('./controllers/subscriptionController');
 const paymentController = require('./controllers/paymentController');
-const zoomController = require('./controllers/zoomController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -50,6 +49,21 @@ app.use(express.static(path.join(__dirname, '../../../public')));
 // app.get('/pnptv-hot-sale', (req, res) => {
 //   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
 // });
+
+// Payment checkout page with language support
+app.get('/payment/:paymentId', (req, res) => {
+  // Get language from query parameter (e.g., ?lang=en)
+  const lang = req.query.lang || 'es'; // Default to Spanish
+
+  let fileName;
+  if (lang === 'en') {
+    fileName = 'payment-checkout-en.html';
+  } else {
+    fileName = 'payment-checkout-es.html';
+  }
+
+  res.sendFile(path.join(__dirname, '../../../public', fileName));
+});
 
 // Payment checkout page with language support
 app.get('/payment/:paymentId', (req, res) => {

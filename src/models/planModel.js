@@ -142,13 +142,33 @@ class Plan {
   }
 
   /**
+   * Generate SKU for a plan
+   * SKU format: EASYBOTS-PNP-XXX where XXX is duration in days (3 digits)
+   * Example: EASYBOTS-PNP-007 (7 days), EASYBOTS-PNP-030 (30 days), EASYBOTS-PNP-000 (lifetime)
+   * @param {string} planId - Plan ID
+   * @param {number} duration - Duration in days
+   * @returns {string} Generated SKU
+   */
+  static generateSKU(planId, duration) {
+    // For lifetime plans (very large duration), use 000
+    if (duration >= 36500 || planId.includes('lifetime')) {
+      return 'EASYBOTS-PNP-000';
+    }
+
+    // Convert duration to 3-digit format with zero padding
+    const durationStr = String(duration).padStart(3, '0');
+    return `EASYBOTS-PNP-${durationStr}`;
+  }
+
+  /**
    * Get default plans (fallback if database is empty)
    * @returns {Array} Default plans
    */
   static getDefaultPlans() {
     return [
       {
-        id: 'trial-week',
+        id: 'trial_week',
+        sku: 'EASYBOTS-PNP-007',
         name: 'Trial Week',
         nameEs: 'Semana de Prueba',
         displayName: 'Trial Week',
@@ -174,7 +194,8 @@ class Plan {
         isLifetime: false,
       },
       {
-        id: 'pnp-member',
+        id: 'pnp_member',
+        sku: 'EASYBOTS-PNP-030',
         name: 'PNP Member',
         nameEs: 'Miembro PNP',
         displayName: 'PNP Member',
@@ -202,7 +223,8 @@ class Plan {
         isLifetime: false,
       },
       {
-        id: 'crystal-member',
+        id: 'crystal_member',
+        sku: 'EASYBOTS-PNP-030',
         name: 'Crystal Member',
         nameEs: 'Miembro Crystal',
         displayName: 'Crystal Member',
@@ -230,7 +252,8 @@ class Plan {
         isLifetime: false,
       },
       {
-        id: 'diamond-member',
+        id: 'diamond_member',
+        sku: 'EASYBOTS-PNP-030',
         name: 'Diamond Member',
         nameEs: 'Miembro Diamond',
         displayName: 'Diamond Member',
@@ -260,7 +283,8 @@ class Plan {
         isLifetime: false,
       },
       {
-        id: 'lifetime-pass',
+        id: 'lifetime_pass',
+        sku: 'EASYBOTS-PNP-000',
         name: 'Lifetime Pass',
         nameEs: 'Pase de por Vida',
         displayName: 'Lifetime Pass',
