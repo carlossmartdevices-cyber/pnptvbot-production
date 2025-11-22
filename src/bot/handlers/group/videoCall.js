@@ -11,7 +11,7 @@ const registerGroupVideoCallHandlers = (bot) => {
   /**
    * Start group video call
    * Usage: /startgroupcall or button click
-   * EXCEPTION: Output goes directly to bot PM and is pinned
+   * Sends full message to group with all call details
    */
   bot.command('startgroupcall', async (ctx) => {
     try {
@@ -37,7 +37,7 @@ const registerGroupVideoCallHandlers = (bot) => {
       const roomCode = `GRP_${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
       const callLink = `https://t.me/${ctx.botInfo?.username}?start=join_group_call_${roomCode}`;
 
-      // Create the invitation message
+      // Create the invitation message with full details
       const inviteMessage = [
         `🎥 *GROUP VIDEO CALL STARTED*`,
         ``,
@@ -49,62 +49,13 @@ const registerGroupVideoCallHandlers = (bot) => {
         `[📲 Tap to Join](${callLink})`,
         ``,
         `⏱️ Call started at: ${new Date().toLocaleTimeString()}`,
-        `⏱️ Call started at: ${new Date().toLocaleTimeString()}`,
         ``,
         `👇 Or use the button below to join:`,
       ].join('\n');
 
-      // EXCEPTION: Send invitation to BOT PM (not group), then pin it
+      // Send full invitation message to GROUP with all details and buttons
       try {
-        const pmMessage = await ctx.telegram.sendMessage(
-          hostId,
-          inviteMessage,
-          {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-            ...Markup.inlineKeyboard([
-              [
-                Markup.button.url('📱 Join Video Call', callLink),
-                Markup.button.callback('❌ End Call', `end_group_call_${roomCode}`),
-              ],
-              [
-                Markup.button.callback('📊 Call Info', `group_call_info_${roomCode}`),
-                Markup.button.callback('👥 Participants', `group_call_participants_${roomCode}`),
-              ],
-            ]),
-          }
-        );
-
-        // Pin the message in the bot PM for permanence
-        await ctx.telegram.pinChatMessage(hostId, pmMessage.message_id, { disable_notification: true });
-
-        logger.info('Group video call started and pinned in bot PM', {
-          groupId,
-          roomCode,
-          hostId,
-          groupName,
-          pmMessageId: pmMessage.message_id,
-        });
-
-        // Notify group that call was initiated (brief message only)
-        const groupNotification = [
-          `📱 @${ctx.from.username || hostName} started a group video call!`,
-          ``,
-          `🆔 Room: \`${roomCode}\``,
-          ``,
-          `💬 Check your bot PM for call details and join link`,
-        ].join('\n');
-
-        await ctx.reply(groupNotification, {
-          parse_mode: 'Markdown',
-          disable_web_page_preview: true,
-        });
-
-      } catch (pmError) {
-        logger.error('Error sending to bot PM or pinning:', pmError);
-        
-        // Fallback: if PM fails, send to group with warning
-        await ctx.reply(inviteMessage, {
+        const groupMessage = await ctx.reply(inviteMessage, {
           parse_mode: 'Markdown',
           disable_web_page_preview: true,
           ...Markup.inlineKeyboard([
@@ -118,6 +69,21 @@ const registerGroupVideoCallHandlers = (bot) => {
             ],
           ]),
         });
+
+        // Pin the message in group for visibility
+        await ctx.telegram.pinChatMessage(groupId, groupMessage.message_id, { disable_notification: true });
+
+        logger.info('Group video call started and pinned in group', {
+          groupId,
+          roomCode,
+          hostId,
+          groupName,
+          messageId: groupMessage.message_id,
+        });
+
+      } catch (groupError) {
+        logger.error('Error sending to group or pinning:', groupError);
+        await ctx.reply('❌ Failed to start group video call. Please try again.');
       }
 
     } catch (error) {
