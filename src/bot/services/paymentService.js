@@ -7,8 +7,136 @@ const SubscriberModel = require('../../models/subscriberModel');
 const DaimoConfig = require('../../config/daimo');
 const logger = require('../../utils/logger');
 const crypto = require('crypto');
+const { Telegraf } = require('telegraf');
 
 class PaymentService {
+    /**
+     * Send payment confirmation notification to user via Telegram bot
+     * Includes purchase details and unique invite link to PRIME channel
+     * @param {Object} params - Notification parameters
+     * @param {string} params.userId - Telegram user ID
+     * @param {Object} params.plan - Plan object
+     * @param {string} params.transactionId - Transaction/reference ID
+     * @param {number} params.amount - Payment amount
+     * @param {Date} params.expiryDate - Subscription expiry date
+     * @param {string} params.language - User language ('es' or 'en')
+     * @returns {Promise<boolean>} Success status
+     */
+    static async sendPaymentConfirmationNotification({
+      userId, plan, transactionId, amount, expiryDate, language = 'es',
+    }) {
+      try {
+        const bot = new Telegraf(process.env.BOT_TOKEN);
+        const groupId = process.env.GROUP_ID || '-1003159260496'; // PRIME channel ID
+
+        // Create unique invite link for PRIME channel
+        let inviteLink = '';
+        try {
+          const response = await bot.telegram.createChatInviteLink(groupId, {
+            member_limit: 1, // Single use
+            name: `Subscription ${transactionId}`,
+          });
+          inviteLink = response.invite_link;
+          logger.info('Unique PRIME channel invite link created', {
+            userId,
+            transactionId,
+            inviteLink,
+          });
+        } catch (linkError) {
+          logger.error('Error creating invite link, using fallback', {
+            error: linkError.message,
+            userId,
+          });
+          // Fallback: try to create a regular link
+          try {
+            const fallbackResponse = await bot.telegram.createChatInviteLink(groupId);
+            inviteLink = fallbackResponse.invite_link;
+          } catch (fallbackError) {
+            logger.error('Fallback invite link also failed', {
+              error: fallbackError.message,
+            });
+            inviteLink = 'https://t.me/PNPTV_PRIME'; // Ultimate fallback
+          }
+        }
+
+        // Format expiry date
+        const expiryDateStr = expiryDate
+          ? expiryDate.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })
+          : (language === 'es' ? 'Sin vencimiento (Lifetime)' : 'No expiration (Lifetime)');
+
+        // Build message in user's language
+        const messageEs = [
+          '🎉 *¡Pago Confirmado!*',
+          '',
+          '✅ Tu suscripción ha sido activada exitosamente.',
+          '',
+          '📋 *Detalles de la Compra:*',
+          `💎 Plan: ${plan.display_name || plan.name}`,
+          `💵 Monto: $${amount.toFixed(2)} USD`,
+          `📅 Válido hasta: ${expiryDateStr}`,
+          `🔖 ID de Transacción: ${transactionId}`,
+          '',
+          '🌟 *¡Bienvenido a PRIME!*',
+          '',
+          '👉 Accede al canal exclusivo aquí:',
+          `[🔗 Ingresar a PRIME](${inviteLink})`,
+          '',
+          '💎 Disfruta de todo el contenido premium y beneficios exclusivos.',
+          '',
+          '¡Gracias por tu suscripción! 🙏',
+        ].join('\n');
+
+        const messageEn = [
+          '🎉 *Payment Confirmed!*',
+          '',
+          '✅ Your subscription has been activated successfully.',
+          '',
+          '📋 *Purchase Details:*',
+          `💎 Plan: ${plan.display_name || plan.name}`,
+          `💵 Amount: $${amount.toFixed(2)} USD`,
+          `📅 Valid until: ${expiryDateStr}`,
+          `🔖 Transaction ID: ${transactionId}`,
+          '',
+          '🌟 *Welcome to PRIME!*',
+          '',
+          '👉 Access the exclusive channel here:',
+          `[🔗 Join PRIME](${inviteLink})`,
+          '',
+          '💎 Enjoy all premium content and exclusive benefits.',
+          '',
+          'Thank you for your subscription! 🙏',
+        ].join('\n');
+
+        const message = language === 'es' ? messageEs : messageEn;
+
+        // Send notification
+        await bot.telegram.sendMessage(userId, message, {
+          parse_mode: 'Markdown',
+          disable_web_page_preview: false,
+        });
+
+        logger.info('Payment confirmation notification sent', {
+          userId,
+          planId: plan.id,
+          transactionId,
+          language,
+        });
+
+        return true;
+      } catch (error) {
+        logger.error('Error sending payment confirmation notification:', {
+          userId,
+          error: error.message,
+          stack: error.stack,
+        });
+        return false;
+      }
+    }
+
     /**
      * Reintentar pago fallido (simulado)
      * @param {string} paymentId
@@ -47,6 +175,8 @@ class PaymentService {
         x_ref_payco,
         x_transaction_id,
         x_transaction_state,
+        x_cod_response, // Response code: 1=Aceptada, 2=Rechazada, 3=Pendiente, 4=Fallida
+        x_cod_transaction_state, // Transaction state code
         x_amount,
         x_currency_code,
         x_signature,
@@ -56,12 +186,16 @@ class PaymentService {
         x_extra3, // paymentId
         x_customer_email,
         x_customer_name,
+        x_response_reason_text, // Reason text for the response
       } = webhookData;
 
       logger.info('Processing ePayco webhook', {
         refPayco: x_ref_payco,
         transactionId: x_transaction_id,
         state: x_transaction_state,
+        codResponse: x_cod_response,
+        codTransactionState: x_cod_transaction_state,
+        responseReason: x_response_reason_text,
         amount: x_amount,
         paymentId: x_extra3,
       });
@@ -99,8 +233,16 @@ class PaymentService {
         return { success: false, error: 'Payment not found' };
       }
 
-      // Process based on transaction state
-      if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
+      // Process based on response code (x_cod_response) - primary check per ePayco docs
+      // x_cod_response: 1=Aceptada, 2=Rechazada, 3=Pendiente, 4=Fallida
+      const responseCode = parseInt(x_cod_response, 10);
+      const isApproved = responseCode === 1 || x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada';
+      const isRejected = responseCode === 2 || x_transaction_state === 'Rechazada';
+      const isPending = responseCode === 3 || x_transaction_state === 'Pendiente' || x_transaction_state === 'Colgante';
+      const isFailed = responseCode === 4 || x_transaction_state === 'Fallida';
+      const isAbandoned = x_transaction_state === 'Abandonada' || x_transaction_state === 'Cancelada';
+
+      if (isApproved) {
         // Payment successful
         if (payment) {
           await PaymentModel.updateStatus(paymentId, 'completed', {
@@ -129,6 +271,25 @@ class PaymentService {
               expiryDate,
               refPayco: x_ref_payco,
             });
+
+            // Send payment confirmation notification via bot (with PRIME channel link)
+            const user = await UserModel.getById(userId);
+            const userLanguage = user?.language || 'es';
+            try {
+              await this.sendPaymentConfirmationNotification({
+                userId,
+                plan,
+                transactionId: x_ref_payco,
+                amount: parseFloat(x_amount),
+                expiryDate,
+                language: userLanguage,
+              });
+            } catch (notifError) {
+              logger.error('Error sending payment confirmation notification (non-critical):', {
+                error: notifError.message,
+                userId,
+              });
+            }
           }
         }
 
@@ -153,9 +314,71 @@ class PaymentService {
           }
         }
 
+        // Send both emails after successful payment
+        if (x_customer_email && userId && planId) {
+          const plan = await PlanModel.getById(planId);
+          const user = await UserModel.getById(userId);
+
+          if (plan) {
+            // Get user language (from user record or default to Spanish)
+            const userLanguage = user?.language || 'es';
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
+
+            // 1. Send invoice email from easybots.store
+            try {
+              const invoiceEmailResult = await EmailService.sendInvoiceEmail({
+                to: x_customer_email,
+                customerName: x_customer_name || user?.first_name || 'Valued Customer',
+                invoiceNumber: x_ref_payco,
+                amount: parseFloat(x_amount),
+                planName: plan.display_name || plan.name,
+                invoicePdf: null, // PDF generation can be added later if needed
+              });
+
+              if (invoiceEmailResult.success) {
+                logger.info('Invoice email sent successfully', {
+                  to: x_customer_email,
+                  refPayco: x_ref_payco,
+                });
+              }
+            } catch (emailError) {
+              logger.error('Error sending invoice email (non-critical):', {
+                error: emailError.message,
+                refPayco: x_ref_payco,
+              });
+            }
+
+            // 2. Send welcome email from pnptv.app
+            try {
+              const welcomeEmailResult = await EmailService.sendWelcomeEmail({
+                to: x_customer_email,
+                customerName: x_customer_name || user?.first_name || 'Valued Customer',
+                planName: plan.display_name || plan.name,
+                duration: plan.duration,
+                expiryDate,
+                language: userLanguage,
+              });
+
+              if (welcomeEmailResult.success) {
+                logger.info('Welcome email sent successfully', {
+                  to: x_customer_email,
+                  planId,
+                  language: userLanguage,
+                });
+              }
+            } catch (emailError) {
+              logger.error('Error sending welcome email (non-critical):', {
+                error: emailError.message,
+                refPayco: x_ref_payco,
+              });
+            }
+          }
+        }
+
         return { success: true };
-      } else if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Fallida') {
-        // Payment failed
+      } else if (isRejected || isFailed) {
+        // Payment failed or rejected
         if (payment) {
           await PaymentModel.updateStatus(paymentId, 'failed', {
             transaction_id: x_transaction_id,
@@ -167,10 +390,12 @@ class PaymentService {
           paymentId,
           refPayco: x_ref_payco,
           state: x_transaction_state,
+          codResponse: x_cod_response,
+          reason: x_response_reason_text,
         });
 
         return { success: true }; // Return success to acknowledge webhook
-      } else if (x_transaction_state === 'Pendiente') {
+      } else if (isPending) {
         // Payment pending
         if (payment) {
           await PaymentModel.updateStatus(paymentId, 'pending', {
@@ -178,6 +403,12 @@ class PaymentService {
             epayco_ref: x_ref_payco,
           });
         }
+
+        logger.info('Payment abandoned by user', {
+          paymentId,
+          refPayco: x_ref_payco,
+          state: x_transaction_state,
+        });
 
         return { success: true };
       }
@@ -198,6 +429,8 @@ class PaymentService {
    * @returns {Object} { success: boolean, error?: string, alreadyProcessed?: boolean }
    */
   static async processDaimoWebhook(webhookData) {
+    const DaimoService = require('./daimoService');
+
     try {
       const {
         id,
@@ -217,6 +450,7 @@ class PaymentService {
       const userId = metadata?.userId;
       const planId = metadata?.planId;
       const paymentId = metadata?.paymentId;
+      const chatId = metadata?.chatId;
 
       if (!userId || !planId) {
         logger.error('Missing user ID or plan ID in Daimo webhook', { eventId: id });
@@ -233,17 +467,21 @@ class PaymentService {
       }
 
       // Process based on status
-      if (status === 'confirmed' || status === 'completed') {
+      if (status === 'payment_completed') {
         // Payment successful
         if (paymentId) {
           await PaymentModel.updateStatus(paymentId, 'completed', {
             transaction_id: source?.txHash || id,
             daimo_event_id: id,
+            payer_address: source?.payerAddress,
+            chain_id: source?.chainId,
           });
         }
 
         // Activate user subscription
         const plan = await PlanModel.getById(planId);
+        const user = await UserModel.getById(userId);
+
         if (plan) {
           const expiryDate = new Date();
           expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
@@ -260,10 +498,102 @@ class PaymentService {
             expiryDate,
             txHash: source?.txHash,
           });
+
+          // Send payment confirmation notification via bot (with PRIME channel link)
+          const userLanguage = user?.language || 'es';
+          const DaimoService = require('./daimoService');
+          const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
+          try {
+            await this.sendPaymentConfirmationNotification({
+              userId,
+              plan,
+              transactionId: source?.txHash || id,
+              amount: amountUSD,
+              expiryDate,
+              language: userLanguage,
+            });
+          } catch (notifError) {
+            logger.error('Error sending payment confirmation notification (non-critical):', {
+              error: notifError.message,
+              userId,
+            });
+          }
+
+          // Get customer email from user record or subscriber record
+          let customerEmail = user?.email;
+          if (!customerEmail) {
+            // Try to get from subscriber by telegram ID
+            try {
+              const subscriber = await SubscriberModel.getByTelegramId(userId);
+              customerEmail = subscriber?.email;
+            } catch (e) {
+              logger.warn('Could not find subscriber email', { userId });
+            }
+          }
+
+          // Send both emails if we have an email
+          if (customerEmail) {
+            const userLanguage = user?.language || 'es';
+            const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
+
+            // 1. Send invoice email from easybots.store
+            try {
+              const invoiceEmailResult = await EmailService.sendInvoiceEmail({
+                to: customerEmail,
+                customerName: user?.first_name || user?.username || 'Valued Customer',
+                invoiceNumber: source?.txHash || id,
+                amount: amountUSD,
+                planName: plan.display_name || plan.name,
+                invoicePdf: null,
+              });
+
+              if (invoiceEmailResult.success) {
+                logger.info('Invoice email sent successfully (Daimo)', {
+                  to: customerEmail,
+                  txHash: source?.txHash,
+                });
+              }
+            } catch (emailError) {
+              logger.error('Error sending invoice email (non-critical):', {
+                error: emailError.message,
+                eventId: id,
+              });
+            }
+
+            // 2. Send welcome email from pnptv.app
+            try {
+              const welcomeEmailResult = await EmailService.sendWelcomeEmail({
+                to: customerEmail,
+                customerName: user?.first_name || user?.username || 'Valued Customer',
+                planName: plan.display_name || plan.name,
+                duration: plan.duration,
+                expiryDate,
+                language: userLanguage,
+              });
+
+              if (welcomeEmailResult.success) {
+                logger.info('Welcome email sent successfully (Daimo)', {
+                  to: customerEmail,
+                  planId,
+                  language: userLanguage,
+                });
+              }
+            } catch (emailError) {
+              logger.error('Error sending welcome email (non-critical):', {
+                error: emailError.message,
+                eventId: id,
+              });
+            }
+          } else {
+            logger.warn('No email address found for user, skipping email notifications', {
+              userId,
+              eventId: id,
+            });
+          }
         }
 
         return { success: true };
-      } else if (status === 'failed') {
+      } else if (status === 'payment_bounced' || status === 'payment_failed') {
         // Payment failed
         if (paymentId) {
           await PaymentModel.updateStatus(paymentId, 'failed', {
@@ -272,13 +602,29 @@ class PaymentService {
           });
         }
 
-        logger.warn('Daimo payment failed', {
+        logger.warn('Daimo payment bounced', {
           paymentId,
           eventId: id,
           status,
         });
 
         return { success: true }; // Return success to acknowledge webhook
+      } else if (status === 'payment_started' || status === 'payment_unpaid') {
+        // Payment pending/started
+        if (paymentId) {
+          await PaymentModel.updateStatus(paymentId, 'pending', {
+            transaction_id: source?.txHash || id,
+            daimo_event_id: id,
+          });
+        }
+
+        logger.info('Daimo payment pending', {
+          paymentId,
+          eventId: id,
+          status,
+        });
+
+        return { success: true };
       }
 
       return { success: true };
