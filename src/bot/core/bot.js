@@ -1,6 +1,6 @@
 require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
-const { initializeFirebase } = require('../../config/firebase');
+// Firebase eliminado: no se requiere
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
@@ -30,6 +30,7 @@ const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnaly
 const registerUserCallManagementHandlers = require('../handlers/user/callManagement');
 const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
+const registerZoomHandlers = require('../handlers/media/zoomV2');
 // Services
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
@@ -46,7 +47,7 @@ let isWebhookMode = false;
  * Validate critical environment variables
  */
 const validateCriticalEnvVars = () => {
-  const criticalVars = ['BOT_TOKEN', 'FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL'];
+  const criticalVars = ['BOT_TOKEN'];
   const missing = criticalVars.filter((varName) => !process.env[varName]);
   if (missing.length > 0) {
     logger.error(`Missing critical environment variables: ${missing.join(', ')}`);
@@ -78,15 +79,7 @@ const startBot = async () => {
     } catch (error) {
       logger.warn('Sentry initialization failed, continuing without monitoring:', error.message);
     }
-    // Initialize Firebase (with fallback)
-    try {
-      initializeFirebase();
-      logger.info('✓ Firebase initialized');
-    } catch (error) {
-      logger.error('Firebase initialization failed. Bot will run in DEGRADED mode without database.');
-      logger.error('Error:', error.message);
-      logger.warn('⚠️  Bot features requiring database will not work!');
-    }
+    // Firebase eliminado: solo PostgreSQL y Redis
     // Initialize Redis (optional, will use default localhost if not configured)
     try {
       initializeRedis();
@@ -130,6 +123,7 @@ const startBot = async () => {
     registerUserCallManagementHandlers(bot);
     registerCallFeedbackHandlers(bot);
     registerCallPackageHandlers(bot);
+    registerZoomHandlers(bot);
     // Initialize call reminder service
     CallReminderService.initialize(bot);
     logger.info('✓ Call reminder service initialized');

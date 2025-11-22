@@ -5,8 +5,12 @@
 
 const translations = {
   en: {
+        groupRedirect: ({ username, command, botUsername }) =>
+          `@${username} I sent you a private message about your request. Please check it out. We do this for privacy reasons and to comply with our Group's anti-spam policy.\n\n[Open in private chat with your request](https://t.me/${botUsername}?start=${command})`,
     // General
     welcome: '👋 Welcome to PNPtv!',
+      welcomeScreen: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          Welcome to PNPtv! Premium\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThis is your control dashboard.\nFrom here, you can access all your premium features:\nopen Zoom Rooms, start live streams, watch full videos,\nexplore Nearby without limits, and join private events.`,
+      welcomeScreenFree: `PNPtv!\n------------\n\nWelcome to PNPtv!  \nEnjoy the full experience from here.\n\nUnlock all premium features:\n• Full videos  \n• Live streams  \n• Unlimited Nearby  \n• Zoom Rooms  \n• Private community events\n\nTap "Subscribe to PRIME" below to get instant access.`,
     back: '🔙 Back',
     cancel: '❌ Cancel',
     next: '➡️ Next',
@@ -14,6 +18,7 @@ const translations = {
     error: '❌ An error occurred. Please try again.',
     success: '✅ Success!',
     loading: '⏳ Loading...',
+    days: 'days',
 
     // Onboarding
     selectLanguage: 'Please select your language:',
@@ -31,7 +36,7 @@ const translations = {
 
     // Main Menu
     mainMenuIntro: '🎬 Welcome to PNPtv - Your Entertainment Hub!\n\nWhat would you like to do?',
-    subscribe: '💎 Subscribe to PRIME',
+    subscribe: `Subscribe to PNPtv PRIME\n----------------------------------\n\nJoin the most intense PNP content platform created by and for the community.\n\nPRIME gives you full access to:\n• Full-length PNP videos with real latinos smoking and slamming  \n• Exclusive releases starring Santino (x.com/pnpmethdaddy)  \n• Live streams and Zoom Rooms.\n• Unlimited Nearby to explore users around you  \n• Complete music and podcast library  \n\nChoose the plan that fits you best and complete your payment.\nYour membership will be activated automatically.\n\nPayment methods available: debit/credit card, Crypto, and most popular payment apps.`,
     myProfile: '👤 My Profile',
     nearbyUsers: '🌍 Nearby Users',
     liveStreams: '🎤 Live Streams',
@@ -40,12 +45,19 @@ const translations = {
     zoomRooms: '🎥 Zoom Rooms',
     support: '🤖 Support',
     settings: '⚙️ Settings',
-
     // Subscription
+    subscriptionHeader: 'Subscribe to PNPtv PRIME',
+    subscriptionDivider: '---------------------------------------',
+    subscriptionDescription: 'Unlock the full PNPtv! experience and dive into the hottest community of Latinos smoking & slamming on Telegram.\n\nChoose your plan to access long-session videos, weekly releases, community features, and the full videography of Santino and other sexy Latino boys. Tap a plan below to see what\'s included.',
     subscriptionPlans: '💎 Choose Your PRIME Plan:',
-    planBasic: '⭐ Basic - $9.99/month',
-    planPremium: '🌟 Premium - $19.99/month',
-    planGold: '👑 Gold - $29.99/month',
+      planCrystal: '💎 Crystal Pass - $49.99/180 days',
+      planCrystalDesc: 'Half a year of complete access to the PNPtv! community. Includes:\n\n• Unlimited access to all PNPtv! channels and groups\n• Full videography of Santino plus Latino chem sessions\n• Long-duration videos with weekly new releases\n• Invites to Zoom rooms and Live Stream PNP shows\n• Unlimited Nearby access\n• Access to community events and private sessions\n• Early access to upcoming features',
+      planDiamond: '💎 Diamond Pass - $99.99/365 days',
+      planDiamondDesc: 'One full year of the PNPtv! experience with all premium features included. Includes:\n\n• Unlimited access to every PNPtv! channel and group\n• Complete videography of Santino plus Latino smoking/slamming videos\n• Long-session videos and weekly exclusive releases\n• Invitations to Zoom rooms, private streams, and community events\n• Unlimited Nearby access\n• Ability to host and schedule your own Zoom sessions\n• VIP support and special member badges',
+      planLifetime: '♾️ Lifetime Pass - $249.99',
+      planLifetimeDesc: 'The ultimate PNPtv! pass with permanent, unlimited access. Includes:\n\n• Lifetime access to all PNPtv! channels, groups, and community features\n• Full videography of Santino plus all future videos and releases\n• Long-duration sessions with new uploads every week\n• Invitations to Zoom rooms, private shows, and exclusive events\n• Unlimited Nearby access\n• Ability to host and schedule Zoom sessions anytime\n• Permanent VIP support and lifetime member status',
+    planMonthly: '🗓️ Monthly Pass - $24.99/30 days',
+    planMonthlyDesc: 'Our most popular plan with full access and no limits. Includes:\n\n• Unlimited access to all PNPtv! channels and group\n• Full videography of Santino plus sexy Latinos smoking and slamming\n• Long-session videos with weekly new releases\n• Invites to Zoom rooms and Live Stream PNP shows\n• Unlimited Nearby access\n• Profile card with photo, badges and bio',
     planDetails: 'Plan Details:',
     selectPlan: 'Select Plan',
     paymentMethod: 'Choose payment method:',
@@ -89,6 +101,7 @@ const translations = {
     myFavorites: '⭐ My Favorites',
     noFavorites: 'You have no favorites yet.',
     blockedUsers: '🚫 Blocked Users',
+      welcomeScreenPrime: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv PRIME!\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel PRIME.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas Zoom, iniciar transmisiones en vivo, ver videos completos,\nexplorar Cercanos sin límites y unirte a eventos privados.`,
     noBlockedUsers: 'You have no blocked users.',
     shareProfile: '📤 Share Profile',
     profileShared: 'Profile card created! Tap to share it.',
@@ -422,8 +435,12 @@ const translations = {
     },
   },
   es: {
+        groupRedirect: ({ username, command, botUsername }) =>
+          `@${username} Te envié un mensaje privado sobre tu solicitud. Por favor revísalo. Esto es por privacidad y para cumplir con la política anti-spam del grupo.\n\n[Abrir en chat privado con tu solicitud](https://t.me/${botUsername}?start=${command})`,
     // General
     welcome: '👋 ¡Bienvenido a PNPtv!',
+    welcomeScreen: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv! Premium\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel de control.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas Zoom, iniciar transmisiones en vivo, ver videos completos,\nexplorar Cercanos sin límites y unirte a eventos privados.',
+    welcomeScreenFree: `PNPtv!\n------------\n\nBienvenido a PNPtv!  \nDisfruta la experiencia completa desde aquí.\n\nDesbloquea todas las funciones premium:\n• Videos completos  \n• Transmisiones en vivo  \n• Nearby ilimitado  \n• Salas Zoom  \n• Eventos privados de la comunidad\n\nToca "Suscríbete a PRIME" para obtener acceso inmediato.`,
     back: '🔙 Atrás',
     cancel: '❌ Cancelar',
     next: '➡️ Siguiente',
@@ -431,6 +448,7 @@ const translations = {
     error: '❌ Ocurrió un error. Por favor intenta de nuevo.',
     success: '✅ ¡Éxito!',
     loading: '⏳ Cargando...',
+    days: 'días',
 
     // Onboarding
     selectLanguage: 'Por favor selecciona tu idioma:',
@@ -448,7 +466,7 @@ const translations = {
 
     // Main Menu
     mainMenuIntro: '🎬 Bienvenido a PNPtv - ¡Tu Centro de Entretenimiento!\n\n¿Qué te gustaría hacer?',
-    subscribe: '💎 Suscríbete a PRIME',
+    subscribe: `Suscríbete a PNPtv PRIME\n----------------------------------\n\nÚnete a la plataforma de contenido PNP más intensa, creada por y para la comunidad.\n\nPRIME te da acceso total a:\n• Videos PNP completos con latinos reales fumando y slameando  \n• Estrenos exclusivos protagonizados por Santino (x.com/pnpmethdaddy)  \n• Transmisiones en vivo y Salas Zoom.\n• Nearby ilimitado para explorar usuarios cerca de ti  \n• Biblioteca completa de música y podcasts  \n\nElige el plan que mejor se adapte a ti y completa tu pago.\nTu membresía se activará automáticamente.\n\nMétodos de pago disponibles: tarjeta débito/crédito, Crypto y las apps de pago más populares.`,
     myProfile: '👤 Mi Perfil',
     nearbyUsers: '🌍 Usuarios Cercanos',
     liveStreams: '🎤 Transmisiones en Vivo',
@@ -457,12 +475,19 @@ const translations = {
     zoomRooms: '🎥 Salas Zoom',
     support: '🤖 Soporte',
     settings: '⚙️ Configuración',
-
     // Subscription
+    subscriptionHeader: 'Suscríbete a PNPtv PRIME',
+    subscriptionDivider: '---------------------------------------',
+    subscriptionDescription: 'Desbloquea la experiencia completa de PNPtv y sumérgete en la comunidad más intensa de Latinos fumando y slamming en Telegram.\n\nElige tu plan para acceder a videos de sesiones largas, lanzamientos semanales, funciones comunitarias y la videografía completa de Santino y otros chicos latinos sexys. Toca un plan para ver qué incluye.',
     subscriptionPlans: '💎 Elige tu Plan PRIME:',
-    planBasic: '⭐ Básico - $9.99/mes',
-    planPremium: '🌟 Premium - $19.99/mes',
-    planGold: '👑 Gold - $29.99/mes',
+      planCrystal: '💎 Pase Crystal - $49.99/180 días',
+      planCrystalDesc: 'Medio año de acceso total a la comunidad PNPtv!. Incluye:\n\n• Acceso ilimitado a todos los canales y grupos de PNPtv!\n• Videografía completa de Santino y sesiones químicas latinas\n• Videos de larga duración con estrenos semanales\n• Invitaciones a salas Zoom y shows en vivo de PNP\n• Acceso ilimitado a Cercanos\n• Acceso a eventos comunitarios y sesiones privadas\n• Acceso anticipado a nuevas funciones',
+      planDiamond: '💎 Pase Diamond - $99.99/365 días',
+      planDiamondDesc: 'Un año completo de experiencia PNPtv! con todas las funciones premium incluidas. Incluye:\n\n• Acceso ilimitado a todos los canales y grupos de PNPtv!\n• Videografía completa de Santino y videos latinos de smoking/slamming\n• Videos de larga duración y estrenos exclusivos semanales\n• Invitaciones a salas Zoom, transmisiones privadas y eventos comunitarios\n• Acceso ilimitado a Cercanos\n• Capacidad para organizar y programar tus propias sesiones Zoom\n• Soporte VIP y badges especiales de miembro',
+      planLifetime: '♾️ Pase Lifetime - $249.99',
+      planLifetimeDesc: 'El pase definitivo de PNPtv! con acceso permanente e ilimitado. Incluye:\n\n• Acceso de por vida a todos los canales, grupos y funciones comunitarias de PNPtv!\n• Videografía completa de Santino y todos los futuros videos y estrenos\n• Sesiones de larga duración con nuevas subidas cada semana\n• Invitaciones a salas Zoom, shows privados y eventos exclusivos\n• Acceso ilimitado a Cercanos\n• Capacidad para organizar y programar sesiones Zoom en cualquier momento\n• Soporte VIP permanente y estatus de miembro de por vida',
+    planMonthly: '🗓️ Pase Mensual - $24.99/30 días',
+    planMonthlyDesc: 'Nuestro plan más popular con acceso total y sin límites. Incluye:\n\n• Acceso ilimitado a todos los canales y grupo de PNPtv!\n• Videografía completa de Santino y latinos sexys fumando y slameando\n• Videos largos con estrenos semanales\n• Invitaciones a salas Zoom y shows en vivo de PNP\n• Acceso ilimitado a Cercanos\n• Tarjeta de perfil con foto, badges y bio',
     planDetails: 'Detalles del Plan:',
     selectPlan: 'Seleccionar Plan',
     paymentMethod: 'Elige método de pago:',
@@ -506,6 +531,7 @@ const translations = {
     myFavorites: '⭐ Mis Favoritos',
     noFavorites: 'Aún no tienes favoritos.',
     blockedUsers: '🚫 Usuarios Bloqueados',
+      welcomeScreenPrime: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv PRIME!\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel PRIME.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas Zoom, iniciar transmisiones en vivo, ver videos completos,\nexplorar Cercanos sin límites y unirte a eventos privados.`,
     noBlockedUsers: 'No tienes usuarios bloqueados.',
     shareProfile: '📤 Compartir Perfil',
     profileShared: '¡Tarjeta de perfil creada! Toca para compartirla.',

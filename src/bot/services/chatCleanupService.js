@@ -23,7 +23,7 @@ class ChatCleanupService {
   /**
    * Cleanup delay in milliseconds (5 minutes)
    */
-  static CLEANUP_DELAY = 5 * 60 * 1000; // 5 minutes
+  static CLEANUP_DELAY = 30 * 1000; // 30 seconds
 
   /**
    * Maximum number of messages to track per chat (prevent memory leaks)

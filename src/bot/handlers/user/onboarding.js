@@ -224,7 +224,7 @@ const showTermsAndPrivacy = async (ctx) => {
   const lang = getLanguage(ctx);
 
   await ctx.reply(
-    `${t('termsAndPrivacy', lang)}\n\n📄 Terms: https://pnptv.com/terms\n🔒 Privacy: https://pnptv.com/privacy`,
+    `${t('termsAndPrivacy', lang)}\n\n📄 Terms: https://pnptv.app/terms\n🔒 Privacy: https://pnptv.app/privacy`,
     Markup.inlineKeyboard([
       [Markup.button.callback(`✅ ${t('confirm', lang)}`, 'accept_terms')],
     ]),
@@ -283,11 +283,28 @@ const completeOnboarding = async (ctx) => {
 
     await ctx.reply(t('onboardingComplete', lang));
 
-    // Mensaje de confirmación con link al canal
+    // Crear link único para el grupo
+    const groupId = process.env.GROUP_ID || '-1003159260496';
+    const botToken = process.env.BOT_TOKEN;
+    let inviteLink = '';
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${botToken}/createChatInviteLink`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: groupId })
+      });
+      const data = await res.json();
+      if (data.ok && data.result && data.result.invite_link) {
+        inviteLink = data.result.invite_link;
+      }
+    } catch (err) {
+      logger.error('Error creating group invite link:', err);
+    }
+
     await ctx.reply(
       lang === 'es'
-        ? '✅ Registro completado. ¡Bienvenido! Únete a la comunidad aquí: https://t.me/pnptv_community'
-        : '✅ Registration complete. Welcome! Join the community here: https://t.me/pnptv_community'
+        ? `✅ Registro completado. ¡Bienvenido! Únete a la comunidad aquí: ${inviteLink || 'https://t.me/pnptv_community'}`
+        : `✅ Registration complete. Welcome! Join the community here: ${inviteLink || 'https://t.me/pnptv_community'}`
     );
 
     // Show main menu

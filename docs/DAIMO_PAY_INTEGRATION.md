@@ -11,17 +11,76 @@ This project integrates Daimo Pay to accept payments via popular payment apps (Z
 Add the following to your `.env` file:
 
 ```bash
-# Daimo Pay Configuration
-DAIMO_WEBHOOK_SECRET=your_webhook_secret_here
-DAIMO_TREASURY_ADDRESS=0xYourTreasuryAddress  # Where USDC is deposited
-DAIMO_REFUND_ADDRESS=0xYourRefundAddress      # Where failed payments are returned (optional, defaults to treasury)
+# REQUIRED VARIABLES
+DAIMO_TREASURY_ADDRESS=0xYourTreasuryWalletAddress   # Required: Optimism wallet where USDC is deposited
+DAIMO_WEBHOOK_SECRET=your_webhook_secret_here        # Required: For webhook verification
+
+# OPTIONAL VARIABLES
+DAIMO_REFUND_ADDRESS=0xYourRefundWalletAddress      # Optional: Where failed payments are returned (defaults to treasury)
+DAIMO_API_KEY=your_api_key_here                      # Optional: Only needed for direct API calls to Daimo API
+DAIMO_APP_ID=your_app_id_here                        # Optional: Only needed for SDK integration (contact founders@daimo.com)
+
+# ADVANCED CONFIGURATION (Optional - defaults to Optimism + USDC)
+# DAIMO_CHAIN_ID=10                                  # Default: 10 (Optimism)
+# DAIMO_TOKEN_ADDRESS=0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85  # Default: USDC on Optimism
+# DAIMO_TOKEN_SYMBOL=USDC                            # Default: USDC
+# DAIMO_TOKEN_DECIMALS=6                             # Default: 6
 ```
 
-### Important Notes
+### Variable Breakdown
 
-1. **Treasury Address**: This is your Optimism wallet address where all successful USDC payments will be deposited
-2. **Refund Address**: If a payment fails or bounces, it will be returned to this address
-3. **Webhook Secret**: Used to verify that webhook events are coming from Daimo (not a third party)
+#### **REQUIRED Variables**
+
+1. **`DAIMO_TREASURY_ADDRESS`** (CRITICAL)
+   - Your Optimism wallet address where all successful USDC payments will be deposited
+   - Must be a valid Ethereum/Optimism address (0x...)
+   - This is where you receive your revenue
+   - Example: `0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb`
+
+2. **`DAIMO_WEBHOOK_SECRET`** (CRITICAL)
+   - Used to verify that webhook events are coming from Daimo (not a third party)
+   - Provided by Daimo when you register your webhook
+   - Used for HMAC-SHA256 signature verification
+   - Keep this secret and never commit to git
+
+#### **OPTIONAL Variables**
+
+3. **`DAIMO_REFUND_ADDRESS`**
+   - Where failed or bounced payments are returned
+   - Defaults to `DAIMO_TREASURY_ADDRESS` if not set
+   - Usually you can use the same address as treasury
+
+4. **`DAIMO_API_KEY`**
+   - Only needed if you're making direct API calls to Daimo's REST API
+   - Currently not used (we generate payment links directly)
+   - Contact `founders@daimo.com` to get an API key
+   - Format: `pay-yourappname-xxxxxxxx`
+
+5. **`DAIMO_APP_ID`**
+   - Only needed if using Daimo Pay SDK integration
+   - Used for SDK-based implementations (React/Next.js)
+   - Contact `founders@daimo.com` to get an App ID
+   - For prototyping, you can use `pay-demo`
+
+#### **ADVANCED Configuration** (Rarely Needed)
+
+These variables allow you to use a different blockchain network or token. By default, the system uses Optimism + USDC.
+
+6. **`DAIMO_CHAIN_ID`**
+   - Default: `10` (Optimism)
+   - Change only if Daimo supports other networks in the future
+
+7. **`DAIMO_TOKEN_ADDRESS`**
+   - Default: `0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85` (USDC on Optimism)
+   - The token contract address to receive payments in
+
+8. **`DAIMO_TOKEN_SYMBOL`**
+   - Default: `USDC`
+   - Display symbol for the token
+
+9. **`DAIMO_TOKEN_DECIMALS`**
+   - Default: `6` (USDC has 6 decimals)
+   - Used for amount conversion (e.g., $10.00 = 10000000 units)
 
 ## Webhook Configuration
 
@@ -174,12 +233,34 @@ This prevents:
 
 ### Production Checklist
 
-- [ ] `DAIMO_TREASURY_ADDRESS` is set to your production Optimism wallet
-- [ ] `DAIMO_REFUND_ADDRESS` is set (or defaults to treasury)
-- [ ] `DAIMO_WEBHOOK_SECRET` is configured
-- [ ] Webhook URL is registered with Daimo: `https://easybots.store/api/daimo`
-- [ ] Test a small payment (e.g., $1) to verify end-to-end flow
+#### **Configuration**
+- [ ] `DAIMO_TREASURY_ADDRESS` is set to your production Optimism wallet (REQUIRED ✓)
+- [ ] `DAIMO_WEBHOOK_SECRET` is configured (REQUIRED ✓)
+- [ ] `DAIMO_REFUND_ADDRESS` is set or will use treasury as fallback (OPTIONAL)
+- [ ] `DAIMO_API_KEY` is set if using API calls (OPTIONAL)
+- [ ] `DAIMO_APP_ID` is set if using SDK integration (OPTIONAL)
+- [ ] `BOT_WEBHOOK_DOMAIN` is set correctly (used to build webhook URL)
+
+#### **Daimo Registration**
+- [ ] Contact `founders@daimo.com` to register your app
+- [ ] Provide webhook URL: `https://easybots.store/api/webhooks/daimo`
+- [ ] Receive and configure `DAIMO_WEBHOOK_SECRET` from Daimo
+- [ ] (Optional) Request `DAIMO_API_KEY` if using API
+- [ ] (Optional) Request `DAIMO_APP_ID` if using SDK
+
+#### **Testing**
+- [ ] Test a small payment (e.g., $1 USDC) to verify end-to-end flow
+- [ ] Verify webhook receives `payment_completed` status correctly
+- [ ] Confirm user subscription is activated after payment
+- [ ] Check that welcome message is sent to user after successful payment
+- [ ] Verify USDC arrives in your treasury address on Optimism
+- [ ] Test with multiple payment apps (Zelle, CashApp, Venmo, etc.)
+
+#### **Monitoring**
 - [ ] Monitor logs for any errors or issues
+- [ ] Set up alerts for failed webhooks
+- [ ] Track payment success/failure rates
+- [ ] Monitor treasury balance on Optimism blockchain
 
 ## Network Information
 

@@ -17,6 +17,8 @@ const initializeRedis = () => {
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379', 10),
       db: parseInt(process.env.REDIS_DB || '0', 10),
+      // Add key prefix for multi-app isolation
+      keyPrefix: process.env.REDIS_KEY_PREFIX || 'pnptv:',
       // Enable offline queue to buffer commands while connecting
       enableOfflineQueue: true,
       // Lazy connect - don't fail startup if Redis is not ready

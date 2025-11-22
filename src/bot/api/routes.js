@@ -10,13 +10,20 @@ const logger = require('../../utils/logger');
 // Controllers
 const webhookController = require('./controllers/webhookController');
 const subscriptionController = require('./controllers/subscriptionController');
+const paymentController = require('./controllers/paymentController');
+const zoomController = require('./controllers/zoomController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
-// CRITICAL: Apply body parsing FIRST for ALL routes
+// CRITICAL: Trust proxy configuration MUST come first
+// This is needed for rate limiting behind nginx/reverse proxy
+// Only trust the first proxy (nginx on localhost)
+app.set('trust proxy', 1);
+
+// CRITICAL: Apply body parsing AFTER trust proxy
 // This must be before any route registration
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -27,21 +34,36 @@ app.use(morgan('combined', { stream: logger.stream }));
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../../../public')));
 
-// Landing page routes
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
-});
+// Landing page routes (UNPUBLISHED - lifetime-pass $80)
+// app.get('/', (req, res) => {
+//   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+// });
 
-app.get('/lifetime-pass', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
-});
+// app.get('/lifetime-pass', (req, res) => {
+//   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+// });
 
-app.get('/promo', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
-});
+// app.get('/promo', (req, res) => {
+//   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+// });
 
-app.get('/pnptv-hot-sale', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+// app.get('/pnptv-hot-sale', (req, res) => {
+//   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+// });
+
+// Payment checkout page with language support
+app.get('/payment/:paymentId', (req, res) => {
+  // Get language from query parameter (e.g., ?lang=en)
+  const lang = req.query.lang || 'es'; // Default to Spanish
+
+  let fileName;
+  if (lang === 'en') {
+    fileName = 'payment-checkout-en.html';
+  } else {
+    fileName = 'payment-checkout-es.html';
+  }
+
+  res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
 
 // Function to conditionally apply middleware (skip for Telegram webhook)
@@ -71,6 +93,8 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  // Validate configuration is correct for trust proxy
+  validate: { trustProxy: false },
 });
 app.use('/api/', limiter);
 
@@ -82,6 +106,8 @@ const webhookLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false,
+  // Validate configuration is correct for trust proxy
+  validate: { trustProxy: false },
 });
 
 // Health check with dependency checks
@@ -106,16 +132,17 @@ app.get('/health', async (req, res) => {
   }
 
   try {
-    // Check Firestore connection
-    const { getFirestore } = require('../../config/firebase');
-    const db = getFirestore();
-    // Simple health check: verify we can access Firestore
-    await db.collection('_health_check').limit(1).get();
-    health.dependencies.firestore = 'ok';
+    // Check PostgreSQL connection
+    const { testConnection } = require('../../config/postgres');
+    const isConnected = await testConnection();
+    health.dependencies.postgres = isConnected ? 'ok' : 'error';
+    if (!isConnected) {
+      health.status = 'degraded';
+    }
   } catch (error) {
-    health.dependencies.firestore = 'error';
+    health.dependencies.postgres = 'error';
     health.status = 'degraded';
-    logger.error('Firestore health check failed:', error);
+    logger.error('PostgreSQL health check failed:', error);
   }
 
   const statusCode = health.status === 'ok' ? 200 : 503;
@@ -126,6 +153,9 @@ app.get('/health', async (req, res) => {
 app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
 app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
 app.get('/api/payment-response', webhookController.handlePaymentResponse);
+
+// Payment API routes
+app.get('/api/payment/:paymentId', asyncHandler(paymentController.getPaymentInfo));
 
 // Stats endpoint
 app.get('/api/stats', asyncHandler(async (req, res) => {
@@ -146,6 +176,25 @@ app.post(
 app.get('/api/subscription/payment-response', asyncHandler(subscriptionController.handlePaymentResponse));
 app.get('/api/subscription/subscriber/:identifier', asyncHandler(subscriptionController.getSubscriber));
 app.get('/api/subscription/stats', asyncHandler(subscriptionController.getStatistics));
+
+// Zoom API routes
+app.get('/api/zoom/room/:roomCode', asyncHandler(zoomController.getRoomInfo));
+app.post('/api/zoom/join', asyncHandler(zoomController.joinMeeting));
+app.post('/api/zoom/host/join', asyncHandler(zoomController.joinAsHost));
+app.post('/api/zoom/end/:roomCode', asyncHandler(zoomController.endMeeting));
+app.get('/api/zoom/participants/:roomCode', asyncHandler(zoomController.getParticipants));
+app.post('/api/zoom/participant/:participantId/action', asyncHandler(zoomController.controlParticipant));
+app.post('/api/zoom/recording/:roomCode', asyncHandler(zoomController.toggleRecording));
+app.get('/api/zoom/stats/:roomCode', asyncHandler(zoomController.getRoomStats));
+
+// Zoom web pages
+app.get('/zoom/join/:roomCode', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/zoom/join.html'));
+});
+
+app.get('/zoom/host/:roomCode', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/zoom/host.html'));
+});
 
 // Export app WITHOUT 404/error handlers
 // These will be added in bot.js AFTER the webhook callback

@@ -19,7 +19,11 @@ const sanitizeBotUsername = (username) => {
  * @returns {Object} { valid: boolean, error?: string }
  */
 const validateEpaycoPayload = (payload) => {
-  const requiredFields = ['x_ref_payco', 'x_transaction_state', 'x_extra1', 'x_extra2', 'x_extra3'];
+  // ePayco minimum required fields according to documentation
+  // x_ref_payco: ePayco transaction reference
+  // x_transaction_id: Transaction ID
+  // x_transaction_state: Transaction state (Aceptada, Rechazada, Pendiente)
+  const requiredFields = ['x_ref_payco', 'x_transaction_state'];
   const missingFields = requiredFields.filter((field) => !payload[field]);
 
   if (missingFields.length > 0) {
@@ -50,20 +54,25 @@ const validateDaimoPayload = (payload) =>
  */
 const handleEpaycoWebhook = async (req, res) => {
   try {
+    // ePayco sends data as query parameters in the URL
+    // Merge both req.query and req.body to support both methods
+    const webhookData = { ...req.query, ...req.body };
+
     logger.info('ePayco webhook received', {
-      transactionId: req.body.x_ref_payco,
-      state: req.body.x_transaction_state,
+      transactionId: webhookData.x_ref_payco,
+      state: webhookData.x_transaction_state,
+      source: Object.keys(req.query).length > 0 ? 'query' : 'body',
     });
 
     // Validate payload structure
-    const validation = validateEpaycoPayload(req.body);
+    const validation = validateEpaycoPayload(webhookData);
     if (!validation || !validation.valid) {
       const errorMsg = validation?.error || 'Invalid webhook payload';
       logger.warn('Invalid ePayco webhook payload', { error: errorMsg });
       return res.status(400).json({ success: false, error: errorMsg });
     }
 
-    const result = await PaymentService.processEpaycoWebhook(req.body);
+    const result = await PaymentService.processEpaycoWebhook(webhookData);
 
     if (result.success) {
       return res.status(200).json({ success: true });

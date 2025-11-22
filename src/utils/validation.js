@@ -127,12 +127,13 @@ const schemas = {
       .optional(),
     firstName: Joi.string().min(1).max(50).optional(),
     lastName: Joi.string().min(1).max(50).optional(),
-    email: Joi.string().email().optional(),
+    email: Joi.string().email().optional().allow(null, ''),
     age: Joi.number().integer().min(18).max(120).optional(),
     bio: Joi.string().max(500).optional().allow(''),
     interests: Joi.array().items(Joi.string().max(50)).max(10).optional(),
     photoFileId: Joi.string().optional(),
     language: Joi.string().valid('en', 'es').optional(),
+    onboardingComplete: Joi.boolean().optional(),
   }).min(1),
 
   // Location schema
