@@ -7,9 +7,13 @@
 const { getAddress } = require('viem');
 const logger = require('../utils/logger');
 
-// Optimism USDC Token Address (official)
-const OPTIMISM_USDC_ADDRESS = '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85';
-const OPTIMISM_CHAIN_ID = 10;
+// Default configuration (Optimism + USDC)
+// These can be overridden via environment variables
+const DEFAULT_CHAIN_ID = 10; // Optimism
+const DEFAULT_CHAIN_NAME = 'Optimism';
+const DEFAULT_TOKEN_ADDRESS = '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85'; // USDC on Optimism
+const DEFAULT_TOKEN_SYMBOL = 'USDC';
+const DEFAULT_TOKEN_DECIMALS = 6;
 
 // Supported payment apps (prioritized in this order)
 const SUPPORTED_PAYMENT_APPS = [
@@ -31,6 +35,16 @@ const getDaimoConfig = () => {
     ? `${process.env.BOT_WEBHOOK_DOMAIN}/api/webhooks/daimo`
     : null;
 
+  // Get chain configuration (with defaults)
+  const chainId = process.env.DAIMO_CHAIN_ID
+    ? parseInt(process.env.DAIMO_CHAIN_ID, 10)
+    : DEFAULT_CHAIN_ID;
+  const tokenAddress = process.env.DAIMO_TOKEN_ADDRESS || DEFAULT_TOKEN_ADDRESS;
+  const tokenSymbol = process.env.DAIMO_TOKEN_SYMBOL || DEFAULT_TOKEN_SYMBOL;
+  const tokenDecimals = process.env.DAIMO_TOKEN_DECIMALS
+    ? parseInt(process.env.DAIMO_TOKEN_DECIMALS, 10)
+    : DEFAULT_TOKEN_DECIMALS;
+
   // Validate critical configuration
   if (!treasuryAddress) {
     // Nunca loggear el valor de la dirección
@@ -44,14 +58,14 @@ const getDaimoConfig = () => {
   }
 
   return {
-    // Network configuration
-    chainId: OPTIMISM_CHAIN_ID,
-    chainName: 'Optimism',
+    // Network configuration (configurable via env vars)
+    chainId,
+    chainName: DEFAULT_CHAIN_NAME, // Could be made configurable if needed
 
-    // Token configuration (USDC on Optimism)
-    token: getAddress(OPTIMISM_USDC_ADDRESS),
-    tokenSymbol: 'USDC',
-    tokenDecimals: 6,
+    // Token configuration (configurable via env vars)
+    token: getAddress(tokenAddress),
+    tokenSymbol,
+    tokenDecimals,
 
     // Addresses
     treasuryAddress: getAddress(treasuryAddress),
@@ -59,6 +73,10 @@ const getDaimoConfig = () => {
 
     // Payment apps configuration
     supportedPaymentApps: SUPPORTED_PAYMENT_APPS,
+
+    // API configuration
+    apiKey: process.env.DAIMO_API_KEY, // Optional: only needed for API calls
+    appId: process.env.DAIMO_APP_ID,   // Optional: only needed for SDK integration
 
     // Webhook configuration
     webhookUrl,
@@ -203,6 +221,12 @@ module.exports = {
   mapDaimoStatus,
   formatAmountFromUnits,
   SUPPORTED_PAYMENT_APPS,
-  OPTIMISM_USDC_ADDRESS,
-  OPTIMISM_CHAIN_ID,
+  // Export defaults for backward compatibility
+  OPTIMISM_USDC_ADDRESS: DEFAULT_TOKEN_ADDRESS,
+  OPTIMISM_CHAIN_ID: DEFAULT_CHAIN_ID,
+  // Export new default constants
+  DEFAULT_CHAIN_ID,
+  DEFAULT_TOKEN_ADDRESS,
+  DEFAULT_TOKEN_SYMBOL,
+  DEFAULT_TOKEN_DECIMALS,
 };

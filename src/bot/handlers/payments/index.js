@@ -72,16 +72,57 @@ const registerPaymentHandlers = (bot) => {
 
       logger.info('Plan selected', { planId, userId: ctx.from?.id });
 
+      // Obtener detalles del plan
+      const plan = await PlanModel.getById(planId);
+      if (!plan) {
+        await ctx.editMessageText(
+          t('error', lang),
+          Markup.inlineKeyboard([
+            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
+          ]),
+        );
+        return;
+      }
+
       ctx.session.temp.selectedPlan = planId;
       await ctx.saveSession();
 
+      // Obtener descripción del plan desde i18n
+      let planDesc = '';
+      switch (plan.sku) {
+        case 'CRYSTAL':
+          planDesc = t('planCrystalDesc', lang);
+          break;
+        case 'DIAMOND':
+          planDesc = t('planDiamondDesc', lang);
+          break;
+        case 'LIFETIME':
+          planDesc = t('planLifetimeDesc', lang);
+          break;
+        case 'MONTHLY':
+          planDesc = t('planMonthlyDesc', lang);
+          break;
+        default:
+          planDesc = plan.description || '';
+      }
+
+      const planName = plan.display_name || plan.name;
+      const price = parseFloat(plan.price);
+      let planHeader = `${t('planDetails', lang)}\n`;
+      planHeader += `*${planName}* | $${price.toFixed(2)}\n\n`;
+      planHeader += `${planDesc}\n\n`;
+      planHeader += `${t('paymentMethod', lang)}`;
+
       await ctx.editMessageText(
-        t('paymentMethod', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('payWithEpayco', lang), `pay_epayco_${planId}`)],
-          [Markup.button.callback(t('payWithDaimo', lang), `pay_daimo_${planId}`)],
-          [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
-        ]),
+        planHeader,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(t('payWithEpayco', lang), `pay_epayco_${planId}`)],
+            [Markup.button.callback(t('payWithDaimo', lang), `pay_daimo_${planId}`)],
+            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
+          ]),
+        },
       );
     } catch (error) {
       logger.error('Error selecting plan:', error);
