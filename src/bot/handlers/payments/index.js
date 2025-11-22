@@ -21,26 +21,29 @@ const registerPaymentHandlers = (bot) => {
       const lang = getLanguage(ctx);
       const plans = await PlanModel.getAll();
 
-      let message = `${t('subscriptionPlans', lang)}\n\n`;
+      // Header with internationalization
+      let message = `${t('subscriptionHeader', lang)}\n`;
+      message += `${t('subscriptionDivider', lang)}\n\n`;
+      message += `${t('subscriptionDescription', lang)}\n\n\n`;
 
       const buttons = [];
       plans.forEach((plan) => {
-        // Use display_name or name, fallback to name if nameEs doesn't exist
         const planName = plan.display_name || plan.name;
-        // Features are in English, use them directly
-        const features = plan.features || [];
+        const durationText = plan.duration_days || plan.duration;
+        const price = parseFloat(plan.price);
 
-        message += `${plan.icon || '💎'} ${planName} - $${plan.price}${plan.duration <= 30 ? '/month' : ''}\n`;
-        features.forEach((feature) => {
-          message += `  ✓ ${feature}\n`;
-        });
-        message += '\n';
+        // Format buttons with i18n
+        let buttonText;
+        if (plan.is_lifetime) {
+          // Lifetime Pass without duration
+          buttonText = `${planName} | $${price.toFixed(2)}`;
+        } else {
+          // Regular plans with duration
+          buttonText = `${planName} | ${durationText} ${t('days', lang)} | $${price.toFixed(2)}`;
+        }
 
         buttons.push([
-          Markup.button.callback(
-            `${plan.icon || '💎'} ${planName}`,
-            `select_plan_${plan.id}`,
-          ),
+          Markup.button.callback(buttonText, `select_plan_${plan.id}`),
         ]);
       });
 
@@ -69,16 +72,57 @@ const registerPaymentHandlers = (bot) => {
 
       logger.info('Plan selected', { planId, userId: ctx.from?.id });
 
+      // Obtener detalles del plan
+      const plan = await PlanModel.getById(planId);
+      if (!plan) {
+        await ctx.editMessageText(
+          t('error', lang),
+          Markup.inlineKeyboard([
+            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
+          ]),
+        );
+        return;
+      }
+
       ctx.session.temp.selectedPlan = planId;
       await ctx.saveSession();
 
+      // Obtener descripción del plan desde i18n
+      let planDesc = '';
+      switch (plan.sku) {
+        case 'CRYSTAL':
+          planDesc = t('planCrystalDesc', lang);
+          break;
+        case 'DIAMOND':
+          planDesc = t('planDiamondDesc', lang);
+          break;
+        case 'LIFETIME':
+          planDesc = t('planLifetimeDesc', lang);
+          break;
+        case 'MONTHLY':
+          planDesc = t('planMonthlyDesc', lang);
+          break;
+        default:
+          planDesc = plan.description || '';
+      }
+
+      const planName = plan.display_name || plan.name;
+      const price = parseFloat(plan.price);
+      let planHeader = `${t('planDetails', lang)}\n`;
+      planHeader += `*${planName}* | $${price.toFixed(2)}\n\n`;
+      planHeader += `${planDesc}\n\n`;
+      planHeader += `${t('paymentMethod', lang)}`;
+
       await ctx.editMessageText(
-        t('paymentMethod', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('payWithEpayco', lang), `pay_epayco_${planId}`)],
-          [Markup.button.callback(t('payWithDaimo', lang), `pay_daimo_${planId}`)],
-          [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
-        ]),
+        planHeader,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(t('payWithEpayco', lang), `pay_epayco_${planId}`)],
+            [Markup.button.callback(t('payWithDaimo', lang), `pay_daimo_${planId}`)],
+            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
+          ]),
+        },
       );
     } catch (error) {
       logger.error('Error selecting plan:', error);

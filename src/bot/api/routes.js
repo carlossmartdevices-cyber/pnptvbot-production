@@ -34,21 +34,36 @@ app.use(morgan('combined', { stream: logger.stream }));
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../../../public')));
 
-// Landing page routes
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
-});
+// Landing page routes (UNPUBLISHED - lifetime-pass $80)
+// app.get('/', (req, res) => {
+//   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+// });
 
-app.get('/lifetime-pass', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
-});
+// app.get('/lifetime-pass', (req, res) => {
+//   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+// });
 
-app.get('/promo', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
-});
+// app.get('/promo', (req, res) => {
+//   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+// });
 
-app.get('/pnptv-hot-sale', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+// app.get('/pnptv-hot-sale', (req, res) => {
+//   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+// });
+
+// Payment checkout page with language support
+app.get('/payment/:paymentId', (req, res) => {
+  // Get language from query parameter (e.g., ?lang=en)
+  const lang = req.query.lang || 'es'; // Default to Spanish
+
+  let fileName;
+  if (lang === 'en') {
+    fileName = 'payment-checkout-en.html';
+  } else {
+    fileName = 'payment-checkout-es.html';
+  }
+
+  res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
 
 // Payment checkout page with language support
@@ -132,16 +147,17 @@ app.get('/health', async (req, res) => {
   }
 
   try {
-    // Check Firestore connection
-    const { getFirestore } = require('../../config/firebase');
-    const db = getFirestore();
-    // Simple health check: verify we can access Firestore
-    await db.collection('_health_check').limit(1).get();
-    health.dependencies.firestore = 'ok';
+    // Check PostgreSQL connection
+    const { testConnection } = require('../../config/postgres');
+    const isConnected = await testConnection();
+    health.dependencies.postgres = isConnected ? 'ok' : 'error';
+    if (!isConnected) {
+      health.status = 'degraded';
+    }
   } catch (error) {
-    health.dependencies.firestore = 'error';
+    health.dependencies.postgres = 'error';
     health.status = 'degraded';
-    logger.error('Firestore health check failed:', error);
+    logger.error('PostgreSQL health check failed:', error);
   }
 
   const statusCode = health.status === 'ok' ? 200 : 503;

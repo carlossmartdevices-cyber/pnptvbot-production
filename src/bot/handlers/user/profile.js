@@ -122,10 +122,21 @@ const registerProfileHandlers = (bot) => {
       const lang = getLanguage(ctx);
       ctx.session.temp.waitingForPhoto = true;
       await ctx.saveSession();
-
       await ctx.editMessageText(t('sendPhoto', lang));
     } catch (error) {
       logger.error('Error in edit photo:', error);
+    }
+  });
+
+  // Edit 'looking_for' field
+  bot.action('edit_looking_for', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      ctx.session.temp.waitingForLookingFor = true;
+      await ctx.saveSession();
+      await ctx.editMessageText(t('sendLookingFor', lang));
+    } catch (error) {
+      logger.error('Error in edit looking_for:', error);
     }
   });
 
@@ -134,7 +145,6 @@ const registerProfileHandlers = (bot) => {
       const lang = getLanguage(ctx);
       ctx.session.temp.waitingForBio = true;
       await ctx.saveSession();
-
       await ctx.editMessageText(t('sendBio', lang));
     } catch (error) {
       logger.error('Error in edit bio:', error);
@@ -167,7 +177,6 @@ const registerProfileHandlers = (bot) => {
       const lang = getLanguage(ctx);
       ctx.session.temp.waitingForInterests = true;
       await ctx.saveSession();
-
       await ctx.editMessageText(t('sendInterests', lang));
     } catch (error) {
       logger.error('Error in edit interests:', error);
@@ -269,25 +278,38 @@ const registerProfileHandlers = (bot) => {
       try {
         const lang = getLanguage(ctx);
         const bio = validateUserInput(ctx.message.text, 500);
-
         if (!bio) {
           await ctx.reply(t('invalidInput', lang));
           return;
         }
-
         await UserService.updateProfile(ctx.from.id, { bio });
-
         ctx.session.temp.waitingForBio = false;
         await ctx.saveSession();
-
         await ctx.reply(t('bioUpdated', lang));
-
-        // Small delay to ensure DB update is complete
         await new Promise(resolve => setTimeout(resolve, 500));
-
         await showProfile(ctx, ctx.from.id, false, true);
       } catch (error) {
         logger.error('Error updating bio:', error);
+      }
+      return;
+    }
+
+    if (temp?.waitingForLookingFor) {
+      try {
+        const lang = getLanguage(ctx);
+        const lookingFor = validateUserInput(ctx.message.text, 200);
+        if (!lookingFor) {
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
+        await UserService.updateProfile(ctx.from.id, { looking_for: lookingFor });
+        ctx.session.temp.waitingForLookingFor = false;
+        await ctx.saveSession();
+        await ctx.reply(t('lookingForUpdated', lang));
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await showProfile(ctx, ctx.from.id, false, true);
+      } catch (error) {
+        logger.error('Error updating looking_for:', error);
       }
       return;
     }
@@ -379,6 +401,7 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
       `👤 ${targetUser.firstName || 'User'} ${targetUser.lastName || ''}`,
       targetUser.username ? `@${targetUser.username}` : '',
       targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `📝 ${targetUser.bio}` : '',
+      targetUser.looking_for && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `${lang === 'es' ? '🔎 Buscado' : '🔎 Looking for'}: ${targetUser.looking_for}` : '',
       targetUser.interests && targetUser.interests.length > 0 && (isOwnProfile || targetUser.privacy?.showInterests !== false)
         ? `🎯 ${targetUser.interests.join(', ')}` : '',
       targetUser.location && (isOwnProfile || targetUser.privacy?.showLocation !== false) ? '📍 Location shared' : '',
@@ -424,6 +447,7 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
       keyboard.push([
         Markup.button.callback(t('editPhoto', lang), 'edit_photo'),
         Markup.button.callback(t('editBio', lang), 'edit_bio'),
+        Markup.button.callback(lang === 'es' ? 'Editar Buscado' : 'Edit Looking For', 'edit_looking_for'),
       ]);
       keyboard.push([
         Markup.button.callback(t('editLocation', lang), 'edit_location'),
@@ -761,6 +785,13 @@ const shareProfile = async (ctx) => {
       // Escape HTML special characters in bio
       const escapedBio = user.bio.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       cardText += `${escapedBio}\n\n`;
+    }
+
+    // Looking for
+    if (user.looking_for) {
+      cardText += `🔎 <b>${lang === 'es' ? 'Buscado' : 'Looking for'}</b>\n`;
+      const escapedLookingFor = user.looking_for.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      cardText += `${escapedLookingFor}\n\n`;
     }
 
     // Interests with better formatting

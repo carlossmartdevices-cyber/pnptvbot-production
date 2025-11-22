@@ -1,1 +1,0 @@
-// Simple Firebase configuration tests
