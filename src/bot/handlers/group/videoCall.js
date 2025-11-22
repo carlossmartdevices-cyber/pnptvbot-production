@@ -11,6 +11,7 @@ const registerGroupVideoCallHandlers = (bot) => {
   /**
    * Start group video call
    * Usage: /startgroupcall or button click
+   * EXCEPTION: Output goes directly to bot PM and is pinned
    */
   bot.command('startgroupcall', async (ctx) => {
     try {
@@ -48,46 +49,76 @@ const registerGroupVideoCallHandlers = (bot) => {
         `[📲 Tap to Join](${callLink})`,
         ``,
         `⏱️ Call started at: ${new Date().toLocaleTimeString()}`,
+        `⏱️ Call started at: ${new Date().toLocaleTimeString()}`,
         ``,
         `👇 Or use the button below to join:`,
       ].join('\n');
 
-      // Send invitation to group
-      await ctx.reply(inviteMessage, {
-        parse_mode: 'Markdown',
-        disable_web_page_preview: true,
-        ...Markup.inlineKeyboard([
-          [
-            Markup.button.url('📱 Join Video Call', callLink),
-            Markup.button.callback('❌ End Call', `end_group_call_${roomCode}`),
-          ],
-          [
-            Markup.button.callback('📊 Call Info', `group_call_info_${roomCode}`),
-            Markup.button.callback('👥 Participants', `group_call_participants_${roomCode}`),
-          ],
-        ]),
-      });
+      // EXCEPTION: Send invitation to BOT PM (not group), then pin it
+      try {
+        const pmMessage = await ctx.telegram.sendMessage(
+          hostId,
+          inviteMessage,
+          {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+            ...Markup.inlineKeyboard([
+              [
+                Markup.button.url('📱 Join Video Call', callLink),
+                Markup.button.callback('❌ End Call', `end_group_call_${roomCode}`),
+              ],
+              [
+                Markup.button.callback('📊 Call Info', `group_call_info_${roomCode}`),
+                Markup.button.callback('👥 Participants', `group_call_participants_${roomCode}`),
+              ],
+            ]),
+          }
+        );
 
-      logger.info('Group video call started', {
-        groupId,
-        roomCode,
-        hostId,
-        groupName,
-      });
+        // Pin the message in the bot PM for permanence
+        await ctx.telegram.pinChatMessage(hostId, pmMessage.message_id, { disable_notification: true });
 
-      // Send notification to group members (bot mentions)
-      const mentionMessage = [
-        `🎉 **Group video call is live!**`,
-        ``,
-        `🎥 Hosted by @${ctx.from.username || hostName}`,
-        ``,
-        `👆 Click the button above or [join here](${callLink})`,
-      ].join('\n');
+        logger.info('Group video call started and pinned in bot PM', {
+          groupId,
+          roomCode,
+          hostId,
+          groupName,
+          pmMessageId: pmMessage.message_id,
+        });
 
-      await ctx.reply(mentionMessage, {
-        parse_mode: 'Markdown',
-        disable_web_page_preview: true,
-      });
+        // Notify group that call was initiated (brief message only)
+        const groupNotification = [
+          `📱 @${ctx.from.username || hostName} started a group video call!`,
+          ``,
+          `🆔 Room: \`${roomCode}\``,
+          ``,
+          `💬 Check your bot PM for call details and join link`,
+        ].join('\n');
+
+        await ctx.reply(groupNotification, {
+          parse_mode: 'Markdown',
+          disable_web_page_preview: true,
+        });
+
+      } catch (pmError) {
+        logger.error('Error sending to bot PM or pinning:', pmError);
+        
+        // Fallback: if PM fails, send to group with warning
+        await ctx.reply(inviteMessage, {
+          parse_mode: 'Markdown',
+          disable_web_page_preview: true,
+          ...Markup.inlineKeyboard([
+            [
+              Markup.button.url('📱 Join Video Call', callLink),
+              Markup.button.callback('❌ End Call', `end_group_call_${roomCode}`),
+            ],
+            [
+              Markup.button.callback('📊 Call Info', `group_call_info_${roomCode}`),
+              Markup.button.callback('👥 Participants', `group_call_participants_${roomCode}`),
+            ],
+          ]),
+        });
+      }
 
     } catch (error) {
       logger.error('Error starting group video call:', error);
