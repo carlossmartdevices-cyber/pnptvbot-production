@@ -266,34 +266,32 @@ const showMainMenu = async (ctx) => {
   }
 
   // Show full private chat menu
-  await ctx.reply(
-    t('mainMenuIntro', lang),
-    Markup.inlineKeyboard([
-      [
-        Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
-        Markup.button.callback(t('myProfile', lang), 'show_profile'),
-      ],
-      [
-        Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
-        Markup.button.callback(t('liveStreams', lang), 'show_live'),
-      ],
-      [
-        Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-        Markup.button.callback(t('playerMenu', lang), 'show_player'),
-      ],
-      [
-        Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
-        Markup.button.callback(t('support', lang), 'show_support'),
-      ],
-      [
-        Markup.button.callback(t('settings', lang), 'show_settings'),
-      ],
+  const buttons = [
+    [
+      Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
+      Markup.button.callback(t('myProfile', lang), 'show_profile'),
+    ],
+    [
+      Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
+      Markup.button.callback(t('liveStreams', lang), 'show_live'),
+    ],
+    [
+      Markup.button.callback(t('radioMenu', lang), 'show_radio'),
+      Markup.button.callback(t('playerMenu', lang), 'show_player'),
+    ],
+    [
+      Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
+      Markup.button.callback(t('support', lang), 'show_support'),
+    ],
+    [
+      Markup.button.callback(t('settings', lang), 'show_settings'),
+    ],
   ];
   if (isAdmin) {
     buttons.push([Markup.button.callback('🛡️ Admin Panel', 'admin_panel')]);
   }
 
-  await ctx.reply(menuText, Markup.inlineKeyboard(buttons));
+  await ctx.reply(t('mainMenuIntro', lang), Markup.inlineKeyboard(buttons));
 }
 
 /**
