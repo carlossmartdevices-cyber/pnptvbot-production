@@ -46,17 +46,16 @@ function mediaMirrorMiddleware() {
     // Get user info
     const username = ctx.from.username || ctx.from.first_name;
     const userId = ctx.from.id;
+    const firstName = ctx.from.first_name || username;
 
-    // Try to get user's PNPtv profile link
+    // Create direct Telegram profile link
     let profileLink = '';
-    try {
-      const user = await UserModel.getById(userId.toString());
-      if (user && user.username) {
-        // Create deep link to user's profile
-        profileLink = `[Ver perfil](https://t.me/${process.env.BOT_USERNAME}?start=profile_${userId})`;
-      }
-    } catch (error) {
-      logger.debug('Could not get user profile for mirror:', error.message);
+    if (ctx.from.username) {
+      // User has username - direct link works
+      profileLink = `[${firstName}](https://t.me/${ctx.from.username})`;
+    } else {
+      // No username - use tg:// deep link
+      profileLink = `[${firstName}](tg://user?id=${userId})`;
     }
 
     const caption = message.caption || '';
