@@ -54,6 +54,28 @@ class EmailService {
     }
 
     /**
+     * Validate email address to prevent nodemailer parsing vulnerabilities
+     * Rejects quoted local-parts that could cause misrouting (CVE-style attack)
+     * @param {string} email - Email address to validate
+     * @returns {boolean} True if safe, false if potentially malicious
+     */
+    isEmailSafe(email) {
+        if (!email || typeof email !== 'string') {
+            return false;
+        }
+
+        // Reject emails with quoted local-parts containing @ (parsing vulnerability)
+        // Pattern: "anything@something"@domain
+        if (/^"[^"]*@[^"]*"@/.test(email)) {
+            return false;
+        }
+
+        // Basic email format validation
+        const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return basicEmailRegex.test(email);
+    }
+
+    /**
      * Send an email
      * @param {Object} options - Email options
      * @returns {Promise<Object>} Send result
@@ -68,6 +90,11 @@ class EmailService {
         } = options;
 
         try {
+            // Validate email address to prevent misrouting attacks
+            if (!this.isEmailSafe(to)) {
+                logger.error('Invalid or potentially malicious email address rejected:', { to });
+                throw new Error('Invalid email address format');
+            }
             // If no transporter, log email instead
             if (!this.transporter) {
                 logger.info('Email would be sent (no transporter configured):', {

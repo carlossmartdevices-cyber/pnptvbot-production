@@ -11,10 +11,10 @@ models:
   - name: Le Chat
     provider: mistral
     model: Codestral
-    apiKey: QSKNcgj0TI4i0ArTRYQclqU704z6XZ1j
+    apiKey: ${MISTRAL_API_KEY}
   - uses: mistral/codestral-latest
     with:
-      MISTRAL_API_KEY: QSKNcgj0TI4i0ArTRYQclqU704z6XZ1j
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
 
 
 # MCP Servers that Continue can access
