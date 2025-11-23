@@ -374,6 +374,58 @@ class UserModel {
   }
 
   /**
+   * Get all active users (for broadcasts)
+   * Returns users who have interacted with the bot
+   * @param {Object} options - Filter options
+   * @returns {Promise<Array>} Active users with id and chatId
+   */
+  static async getAllActive(options = {}) {
+    try {
+      const {
+        subscriptionFilter = null,
+        minActivity = null,
+        limit = null
+      } = options;
+
+      let sql = 'SELECT id, username, first_name FROM users WHERE id IS NOT NULL';
+      const params = [];
+      let paramIndex = 1;
+
+      if (subscriptionFilter) {
+        sql += ` AND subscription_status = $${paramIndex}`;
+        params.push(subscriptionFilter);
+        paramIndex++;
+      }
+
+      if (minActivity) {
+        sql += ` AND last_active >= $${paramIndex}`;
+        params.push(minActivity);
+        paramIndex++;
+      }
+
+      sql += ' ORDER BY last_active DESC NULLS LAST';
+
+      if (limit) {
+        sql += ` LIMIT $${paramIndex}`;
+        params.push(limit);
+      }
+
+      const result = await query(sql, params);
+      logger.info(`Found ${result.rows.length} active users for broadcast`);
+
+      return result.rows.map(row => ({
+        id: row.id,
+        chatId: row.id,
+        username: row.username,
+        firstName: row.first_name
+      }));
+    } catch (error) {
+      logger.error('Error getting active users:', error);
+      return [];
+    }
+  }
+
+  /**
    * Delete user
    * @param {number|string} userId - User ID
    * @returns {Promise<boolean>} Success status
