@@ -20,7 +20,7 @@ class CallService {
       if (!apiKey) {
         logger.warn('Daily.co API key not configured, using placeholder URL');
         // Fallback: return a Zoom-like generic meeting URL
-        return `https://meet.pnptv.com/${callData.callId}`;
+        return `https://meet.pnptv.app/${callData.callId}`;
       }
 
       // Create Daily.co room
