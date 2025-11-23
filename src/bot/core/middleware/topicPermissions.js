@@ -42,8 +42,11 @@ function topicPermissionsMiddleware() {
     // COMMAND BLOCKING
     // ===================================
     if (!topicConfig.allow_commands && message.text?.startsWith('/')) {
-      // Allow admins to use commands
-      if (!isAdmin) {
+      // Always allow essential commands for all users
+      const essentialCommands = ['/start', '/menu', '/help'];
+      const command = message.text.split(' ')[0].split('@')[0].toLowerCase();
+
+      if (!essentialCommands.includes(command) && !isAdmin) {
         await ctx.deleteMessage();
         const warning = lang === 'es'
           ? `⚠️ Los comandos no están permitidos en **${topicConfig.topic_name}**.`
