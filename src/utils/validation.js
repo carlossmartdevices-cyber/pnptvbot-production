@@ -10,8 +10,14 @@ const logger = require('./logger');
 const sanitizeInput = (input) => {
   if (typeof input !== 'string') return input;
 
-  // Remove HTML tags and scripts
-  let sanitized = input.replace(/<[^>]*>/g, '');
+  // Remove HTML tags and scripts - loop until no more tags found
+  // to prevent nested tag injection like <scr<script>ipt>
+  let sanitized = input;
+  let previous;
+  do {
+    previous = sanitized;
+    sanitized = sanitized.replace(/<[^>]*>/g, '');
+  } while (sanitized !== previous);
 
   // Escape special characters
   sanitized = validator.escape(sanitized);

@@ -597,7 +597,14 @@ class EmailService {
      * @returns {string} Plain text
      */
     stripHtml(html) {
-        return html.replace(/<[^>]*>/g, '');
+        // Loop until no more tags found to prevent nested tag injection
+        let result = html;
+        let previous;
+        do {
+            previous = result;
+            result = result.replace(/<[^>]*>/g, '');
+        } while (result !== previous);
+        return result;
     }
 
     /**

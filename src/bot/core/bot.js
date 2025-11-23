@@ -6,6 +6,7 @@ const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
+const allowedChatsMiddleware = require('./middleware/allowedChats');
 const usernameEnforcement = require('./middleware/usernameEnforcement');
 const profileCompliance = require('./middleware/profileCompliance');
 const moderationFilter = require('./middleware/moderationFilter');
@@ -101,6 +102,7 @@ const startBot = async () => {
     const bot = new Telegraf(process.env.BOT_TOKEN);
     // Register middleware
     bot.use(sessionMiddleware());
+    bot.use(allowedChatsMiddleware()); // Must be early to leave unauthorized chats
     bot.use(rateLimitMiddleware());
     bot.use(chatCleanupMiddleware());
     bot.use(usernameEnforcement());

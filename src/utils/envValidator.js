@@ -154,9 +154,9 @@ function isFeatureEnabled(feature) {
 function printEnvSummary() {
   console.log('\n=== Environment Configuration ===');
   console.log(`Node Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Bot Username: ${process.env.BOT_USERNAME || 'NOT SET'}`);
+  console.log(`Bot Username: ${process.env.BOT_USERNAME ? '[CONFIGURED]' : 'NOT SET'}`);
   console.log(`Webhook Mode: ${process.env.BOT_WEBHOOK_DOMAIN ? 'Yes' : 'No (polling)'}`);
-  console.log(`Redis: ${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}`);
+  console.log(`Redis: ${process.env.REDIS_HOST ? '[CONFIGURED]' : 'NOT SET'}:${process.env.REDIS_PORT || 6379}`);
   console.log('\nFeature Configuration:');
   console.log(`  - ePayco Payments: ${isFeatureEnabled('epayco') ? '✓' : '✗'}`);
   console.log(`  - Daimo Payments: ${isFeatureEnabled('daimo') ? '✓' : '✗'}`);

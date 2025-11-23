@@ -819,7 +819,7 @@ const registerSupportHandlers = (bot) => {
 
     // Check if this is a message in the support group (topic or reply)
     if (supportGroupId &&
-        ctx.chat?.id?.toString() === supportGroupId.replace('-100', '-100')) {
+        ctx.chat?.id?.toString() === supportGroupId.toString()) {
 
       // Skip if it's the bot's own message
       if (ctx.from.is_bot) return next();

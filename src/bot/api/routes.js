@@ -51,23 +51,18 @@ app.use(express.static(path.join(__dirname, '../../../public')));
 //   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
 // });
 
-// Payment checkout page with language support
-app.get('/payment/:paymentId', (req, res) => {
-  // Get language from query parameter (e.g., ?lang=en)
-  const lang = req.query.lang || 'es'; // Default to Spanish
-
-  let fileName;
-  if (lang === 'en') {
-    fileName = 'payment-checkout-en.html';
-  } else {
-    fileName = 'payment-checkout-es.html';
-  }
-
-  res.sendFile(path.join(__dirname, '../../../public', fileName));
+// Rate limiting for page routes
+const pageLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { trustProxy: false },
 });
 
 // Payment checkout page with language support
-app.get('/payment/:paymentId', (req, res) => {
+app.get('/payment/:paymentId', pageLimiter, (req, res) => {
   // Get language from query parameter (e.g., ?lang=en)
   const lang = req.query.lang || 'es'; // Default to Spanish
 
@@ -125,8 +120,18 @@ const webhookLimiter = rateLimit({
   validate: { trustProxy: false },
 });
 
+// Health check rate limiter (more permissive for monitoring)
+const healthLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 60, // Allow frequent health checks for monitoring
+  message: 'Too many health check requests.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { trustProxy: false },
+});
+
 // Health check with dependency checks
-app.get('/health', async (req, res) => {
+app.get('/health', healthLimiter, async (req, res) => {
   const health = {
     status: 'ok',
     timestamp: new Date().toISOString(),
