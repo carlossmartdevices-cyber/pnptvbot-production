@@ -121,7 +121,7 @@ const startBot = async () => {
     bot.use(allowedChatsMiddleware()); // Must be early to leave unauthorized chats
     bot.use(groupSecurityEnforcementMiddleware()); // Enforce group/channel whitelist
     bot.use(rateLimitMiddleware());
-    bot.use(usernameChangeDetectionMiddleware()); // Detect suspicious name changes early
+    // bot.use(usernameChangeDetectionMiddleware()); // DISABLED - not working properly
     bot.use(chatCleanupMiddleware());
     bot.use(commandAutoDeleteMiddleware()); // Delete commands from groups
     bot.use(usernameEnforcement());
