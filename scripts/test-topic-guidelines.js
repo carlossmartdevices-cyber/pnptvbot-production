@@ -100,14 +100,15 @@ async function testTopicGuidelines() {
     console.log('4️⃣  Checking environment variables...\n');
 
     const envVars = [
-      { name: 'GROUP_ID', value: process.env.GROUP_ID },
-      { name: 'ADMIN_USER_IDS', value: process.env.ADMIN_USER_IDS },
-      { name: 'BOT_TOKEN', value: process.env.BOT_TOKEN ? '✓ Set' : '✗ Missing' }
+      { name: 'GROUP_ID', isSet: !!process.env.GROUP_ID },
+      { name: 'ADMIN_USER_IDS', isSet: !!process.env.ADMIN_USER_IDS },
+      { name: 'BOT_TOKEN', isSet: !!process.env.BOT_TOKEN }
     ];
 
     for (const env of envVars) {
-      const value = env.name === 'BOT_TOKEN' ? env.value : (env.value || '✗ Not set');
-      console.log(`   ${env.value ? '✅' : '❌'} ${env.name}: ${value}`);
+      const status = env.isSet ? '✅' : '❌';
+      const value = env.isSet ? '✓ Set' : '✗ Not set';
+      console.log(`   ${status} ${env.name}: ${value}`);
     }
 
     console.log('');
