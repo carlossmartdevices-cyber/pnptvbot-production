@@ -13,10 +13,11 @@ const moderationFilter = require('./middleware/moderationFilter');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
 const errorHandler = require('./middleware/errorHandler');
-const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./middleware/topicPermissions');
-const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
-const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
-const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
+// TODO: These middleware files need to be created
+// const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./middleware/topicPermissions');
+// const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
+// const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
+// const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
 const logger = require('../../utils/logger');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
@@ -116,12 +117,12 @@ const startBot = async () => {
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
 
-    // Topic-specific middlewares
-    bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
-    bot.use(commandRedirectionMiddleware()); // Redirect commands to notifications
-    bot.use(mediaMirrorMiddleware()); // Mirror media to PNPtv Gallery
-    bot.use(topicPermissionsMiddleware()); // Admin-only and approval queue
-    bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery
+    // TODO: Topic-specific middlewares (files need to be created)
+    // bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
+    // bot.use(commandRedirectionMiddleware()); // Redirect commands to notifications
+    // bot.use(mediaMirrorMiddleware()); // Mirror media to PNPtv Gallery
+    // bot.use(topicPermissionsMiddleware()); // Admin-only and approval queue
+    // bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery
     // Register handlers
     registerUserHandlers(bot);
     registerAdminHandlers(bot);
@@ -142,7 +143,7 @@ const startBot = async () => {
     registerCallPackageHandlers(bot);
     registerGroupVideoCallHandlers(bot);
     registerLeaderboardHandlers(bot);
-    registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic
+    // registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic (file needs to be created)
     // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
     // Initialize call reminder service
     CallReminderService.initialize(bot);
