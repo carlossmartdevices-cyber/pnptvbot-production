@@ -19,7 +19,6 @@ const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./midd
 const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
 const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
 const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
-const { usernameChangeDetectionMiddleware, initSecurityLogsTable } = require('./middleware/usernameChangeDetection');
 const { groupSecurityEnforcementMiddleware, registerGroupSecurityHandlers } = require('./middleware/groupSecurityEnforcement');
 const logger = require('../../utils/logger');
 // Handlers
@@ -41,7 +40,6 @@ const registerUserCallManagementHandlers = require('../handlers/user/callManagem
 const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
 const { registerLeaderboardHandlers } = require('../handlers/group/leaderboard');
-const registerUsernameChangeAdminHandlers = require('../handlers/admin/usernameChangeDetectionAdmin');
 // const registerZoomHandlers = require('../handlers/media/zoomV2'); // Temporarily disabled due to missing dependencies
 // Services
 const CallReminderService = require('../services/callReminderService');
@@ -106,13 +104,6 @@ const startBot = async () => {
     } catch (error) {
       logger.warn('Redis initialization failed, continuing without cache:', error.message);
       logger.warn('⚠️  Performance may be degraded without caching');
-    }
-    // Initialize security logs table
-    try {
-      await initSecurityLogsTable();
-      logger.info('✓ Security logs table initialized');
-    } catch (error) {
-      logger.warn('Security logs table initialization failed:', error.message);
     }
     // Create bot instance
     const bot = new Telegraf(process.env.BOT_TOKEN);
