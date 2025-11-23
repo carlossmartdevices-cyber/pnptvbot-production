@@ -2,6 +2,7 @@ const { optimismUSDC } = require('@daimo/pay-common');
 const { getAddress } = require('viem');
 const crypto = require('crypto');
 const logger = require('../../utils/logger');
+const FarcasterAuthService = require('./farcasterAuthService');
 
 /**
  * Daimo Pay Service
@@ -259,6 +260,173 @@ class DaimoService {
     }
 
     return isConfigured;
+  }
+
+  /**
+   * Generate payment link with Farcaster authentication
+   * @param {Object} options - Payment options
+   * @param {string} options.userId - Telegram user ID
+   * @param {string} options.chatId - Telegram chat ID
+   * @param {string} options.planId - Plan ID
+   * @param {number} options.amount - Amount in USD
+   * @param {string} options.paymentId - Payment record ID
+   * @param {string} options.farcasterFid - Farcaster FID (optional)
+   * @returns {string} Payment link
+   */
+  generatePaymentLinkWithFarcaster({ userId, chatId, planId, amount, paymentId, farcasterFid }) {
+    try {
+      if (!this.treasuryAddress || !this.refundAddress) {
+        logger.error('Daimo addresses not configured');
+        throw new Error('Daimo payment system not configured');
+      }
+
+      // Convert amount to USDC units (6 decimals for USDC)
+      const amountInUSDC = (parseFloat(amount) * 1000000).toString();
+
+      // Create payment intent with Farcaster FID
+      const paymentIntent = {
+        toAddress: this.treasuryAddress,
+        toChain: this.chain.id,
+        toToken: this.chain.token,
+        toUnits: amountInUSDC,
+        intent: 'Pay PNPtv Subscription',
+        refundAddress: this.refundAddress,
+        metadata: {
+          userId,
+          chatId,
+          planId,
+          paymentId,
+          farcasterFid: farcasterFid || null,
+          timestamp: Date.now(),
+        },
+        paymentOptions: this.supportedPaymentApps,
+      };
+
+      // Generate payment URL
+      const encodedIntent = encodeURIComponent(JSON.stringify(paymentIntent));
+      const paymentUrl = `https://pay.daimo.com/pay?intent=${encodedIntent}`;
+
+      logger.info('Daimo payment link generated with Farcaster', {
+        paymentId,
+        userId,
+        farcasterFid,
+        amount,
+        amountInUSDC,
+        chain: this.chain.name,
+      });
+
+      return paymentUrl;
+    } catch (error) {
+      logger.error('Error generating Daimo payment link with Farcaster:', {
+        error: error.message,
+        userId,
+        farcasterFid,
+        amount,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Verify Farcaster authentication token
+   * @param {string} token - Quick Auth JWT token
+   * @returns {Promise<Object>} Verification result with FID
+   */
+  async verifyFarcasterAuth(token) {
+    try {
+      const result = await FarcasterAuthService.verifyToken(token);
+
+      if (!result.valid) {
+        logger.warn('Farcaster auth verification failed', {
+          error: result.error,
+        });
+        return result;
+      }
+
+      logger.info('Farcaster auth verified for Daimo payment', {
+        fid: result.fid,
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('Error verifying Farcaster auth:', {
+        error: error.message,
+      });
+      return {
+        valid: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Process payment with Farcaster verification
+   * @param {Object} options - Payment options
+   * @param {string} options.token - Farcaster Quick Auth token
+   * @param {string} options.userId - Telegram user ID
+   * @param {string} options.planId - Plan ID
+   * @param {number} options.amount - Amount in USD
+   * @returns {Promise<Object>} Payment result with URL
+   */
+  async createPaymentWithFarcaster({ token, userId, planId, amount, chatId, paymentId }) {
+    try {
+      // Verify Farcaster authentication
+      const authResult = await this.verifyFarcasterAuth(token);
+
+      if (!authResult.valid) {
+        return {
+          success: false,
+          error: 'Farcaster authentication failed',
+          details: authResult.error,
+        };
+      }
+
+      const fid = authResult.fid;
+
+      // Link Farcaster FID to Telegram user
+      await FarcasterAuthService.linkFarcasterToTelegram(userId, fid);
+
+      // Generate payment link with FID
+      const paymentUrl = this.generatePaymentLinkWithFarcaster({
+        userId,
+        chatId,
+        planId,
+        amount,
+        paymentId,
+        farcasterFid: fid,
+      });
+
+      logger.info('Payment created with Farcaster verification', {
+        userId,
+        fid,
+        planId,
+        amount,
+      });
+
+      return {
+        success: true,
+        paymentUrl,
+        farcasterFid: fid,
+      };
+    } catch (error) {
+      logger.error('Error creating payment with Farcaster:', {
+        error: error.message,
+        userId,
+        planId,
+      });
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Check if Farcaster authentication is configured
+   * @returns {boolean} True if configured
+   */
+  isFarcasterConfigured() {
+    return FarcasterAuthService.isConfigured();
   }
 }
 

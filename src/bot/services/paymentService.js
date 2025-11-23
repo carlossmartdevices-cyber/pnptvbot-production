@@ -845,6 +845,7 @@ class PaymentService {
       const planId = metadata?.planId;
       const paymentId = metadata?.paymentId;
       const chatId = metadata?.chatId;
+      const farcasterFid = metadata?.farcasterFid;
 
       if (!userId || !planId) {
         logger.error('Missing user ID or plan ID in Daimo webhook', { eventId: id });
@@ -881,17 +882,27 @@ class PaymentService {
           const expiryDate = new Date();
           expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
 
-          await UserModel.updateSubscription(userId, {
+          // Update subscription with Farcaster FID if available
+          const subscriptionUpdate = {
             status: 'active',
             planId,
             expiry: expiryDate,
-          });
+          };
+
+          // Store Farcaster FID if present in payment metadata
+          if (farcasterFid) {
+            subscriptionUpdate.farcaster_fid = farcasterFid;
+            subscriptionUpdate.farcaster_linked_at = new Date();
+          }
+
+          await UserModel.updateSubscription(userId, subscriptionUpdate);
 
           logger.info('User subscription activated via Daimo webhook', {
             userId,
             planId,
             expiryDate,
             txHash: source?.txHash,
+            farcasterFid: farcasterFid || null,
           });
 
           // Send payment confirmation notification via bot (with PRIME channel link)
