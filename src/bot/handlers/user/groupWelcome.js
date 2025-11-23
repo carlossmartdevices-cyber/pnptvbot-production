@@ -135,11 +135,17 @@ ${subscriptionStatus}
 
 Send /menu or /start to see what the bot can do.`;
 
-    await ctx.reply(message, { parse_mode: 'Markdown' });
+    // Send to notifications topic (3135)
+    const groupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : ctx.chat.id;
+    await ctx.telegram.sendMessage(groupId, message, {
+      parse_mode: 'Markdown',
+      message_thread_id: 3135,
+    });
 
     logger.info('Welcome message sent', {
       userId: user.userId,
       chatId: ctx.chat.id,
+      topicId: 3135,
       language: lang,
     });
   } catch (error) {
@@ -185,10 +191,16 @@ It saves instantly.`;
       ],
     ]);
 
-    await ctx.reply(message, keyboard);
+    // Send to notifications topic (3135)
+    const groupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : ctx.chat.id;
+    await ctx.telegram.sendMessage(groupId, message, {
+      ...keyboard,
+      message_thread_id: 3135,
+    });
 
     logger.info('Badge selection message sent', {
       chatId: ctx.chat.id,
+      topicId: 3135,
       language: lang,
     });
   } catch (error) {
@@ -273,11 +285,16 @@ y oficialmente parte de la familia PNPtv!`
 ${username} is a ${badge.name}
 and officially part of the PNPtv! family.`;
 
-    await ctx.reply(message);
+    // Send to notifications topic (3135)
+    const groupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : ctx.chat.id;
+    await ctx.telegram.sendMessage(groupId, message, {
+      message_thread_id: 3135,
+    });
 
     logger.info('Congrats message sent', {
       userId: ctx.from.id,
       chatId: ctx.chat.id,
+      topicId: 3135,
       badge: badge.name,
     });
   } catch (error) {
@@ -309,10 +326,16 @@ Explore everything PNPtv! has for you:`;
       )],
     ]);
 
-    await ctx.reply(message, keyboard);
+    // Send to notifications topic (3135)
+    const groupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : ctx.chat.id;
+    await ctx.telegram.sendMessage(groupId, message, {
+      ...keyboard,
+      message_thread_id: 3135,
+    });
 
     logger.info('Action buttons sent', {
       chatId: ctx.chat.id,
+      topicId: 3135,
       language: lang,
     });
   } catch (error) {
@@ -331,15 +354,22 @@ async function sendRulesMenu(ctx, lang) {
       [Markup.button.callback(buttonText, 'group_view_rules')],
     ]);
 
-    await ctx.reply(
+    // Send to notifications topic (3135)
+    const groupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : ctx.chat.id;
+    await ctx.telegram.sendMessage(
+      groupId,
       lang === 'es'
         ? '📋 Lee las reglas del grupo:'
         : '📋 Check out the group rules:',
-      keyboard
+      {
+        ...keyboard,
+        message_thread_id: 3135,
+      }
     );
 
     logger.info('Rules menu sent', {
       chatId: ctx.chat.id,
+      topicId: 3135,
       language: lang,
     });
   } catch (error) {
