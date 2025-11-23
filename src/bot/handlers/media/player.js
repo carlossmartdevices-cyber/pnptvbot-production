@@ -85,6 +85,12 @@ const registerPlayerHandlers = (bot) => {
   bot.action('player_search', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
+
+      // Initialize session temp if needed
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
+
       ctx.session.temp.waitingForMediaSearch = true;
       await ctx.saveSession();
 
@@ -103,6 +109,12 @@ const registerPlayerHandlers = (bot) => {
   bot.action('player_create_playlist', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
+
+      // Initialize session temp if needed
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
+
       ctx.session.temp.waitingForPlaylistName = true;
       await ctx.saveSession();
 
@@ -899,20 +911,22 @@ const likeMedia = async (ctx, mediaId) => {
 const viewPlaylist = async (ctx, playlistId) => {
   try {
     const lang = getLanguage(ctx);
-    const playlist = await MediaPlayerModel.getPlaylistWithItems(playlistId);
+    const db = require('../../../config/firebase').getFirestore();
+    const playlistDoc = await db.collection('media_playlists').doc(playlistId).get();
 
-    if (!playlist) {
+    if (!playlistDoc.exists) {
       await ctx.answerCbQuery(t('player.playlistNotFound', lang));
       return;
     }
 
+    const playlist = playlistDoc.data();
     let text = `📁 ${playlist.name}\n\n`;
 
     if (playlist.description) {
       text += `${playlist.description}\n\n`;
     }
 
-    text += `📀 ${playlist.media_count || 0} ${t('player.tracks', lang)}\n\n`;
+    text += `📀 ${playlist.mediaItems.length} ${t('player.tracks', lang)}\n\n`;
 
     const keyboard = Markup.inlineKeyboard([
       [
@@ -936,14 +950,17 @@ const viewPlaylist = async (ctx, playlistId) => {
 const playPlaylist = async (ctx, playlistId) => {
   try {
     const lang = getLanguage(ctx);
-    const playlist = await MediaPlayerModel.getPlaylistWithItems(playlistId);
+    const db = require('../../../config/firebase').getFirestore();
+    const playlistDoc = await db.collection('media_playlists').doc(playlistId).get();
 
-    if (!playlist) {
+    if (!playlistDoc.exists) {
       await ctx.answerCbQuery(t('player.playlistNotFound', lang));
       return;
     }
 
-    if (!playlist.mediaItems || playlist.mediaItems.length === 0) {
+    const playlist = playlistDoc.data();
+
+    if (playlist.mediaItems.length === 0) {
       await ctx.answerCbQuery(t('player.emptyPlaylist', lang));
       return;
     }

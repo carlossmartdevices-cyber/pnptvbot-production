@@ -86,7 +86,10 @@ class PaymentModel {
         completedAt: 'completed_at',
         completedBy: 'completed_by',
         manualCompletion: 'manual_completion',
-        expiresAt: 'expires_at'
+        expiresAt: 'expires_at',
+        epaycoRef: 'reference',
+        paymentReference: 'reference',
+        daimoEventId: 'reference'
       };
 
       const fields = Object.keys(metadata).map(key => fieldMap[key] || key);
@@ -94,7 +97,7 @@ class PaymentModel {
       let setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
       setClause = `status = $1${setClause ? ', ' + setClause : ''}, updated_at = $${fields.length + 2}`;
       await query(`UPDATE payments SET ${setClause} WHERE id = $${fields.length + 3}`, [status, ...values, new Date(), paymentId]);
-      logger.info('Payment status updated', { paymentId, status });
+      logger.info('Payment status updated', { paymentId, status, metadata });
       return true;
     } catch (error) {
       logger.error('Error updating payment status:', error);

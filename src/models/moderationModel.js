@@ -804,6 +804,29 @@ class ModerationModel {
   }
 
   /**
+   * Count recent username changes for a user
+   * @param {number|string} userId - User ID
+   * @param {number} hours - Time window in hours
+   * @returns {Promise<number>} Number of changes
+   */
+  static async countRecentUsernameChanges(userId, hours = 24) {
+    try {
+      const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+      const result = await query(
+        `SELECT COUNT(*) as count FROM username_history
+         WHERE user_id = $1 AND changed_at >= $2`,
+        [userId.toString(), since]
+      );
+
+      return parseInt(result.rows[0]?.count || 0, 10);
+    } catch (error) {
+      logger.error('Error counting recent username changes:', error);
+      return 0;
+    }
+  }
+
+  /**
    * Get non-compliant users in a group
    * @param {number|string} groupId - Group ID
    * @returns {Promise<Array>} Non-compliant users with pending warning

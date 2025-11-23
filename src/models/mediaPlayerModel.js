@@ -1,69 +1,125 @@
 const { query } = require('../config/postgres');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
-const { v4: uuidv4 } = require('uuid');
 
 /**
- * MediaPlayer Model - Handles music and video playback, playlists
- * Migrated from Firebase Firestore to PostgreSQL
+ * Media Player Model - Handles media library, playlists, and player state using PostgreSQL
  */
 class MediaPlayerModel {
   /**
-   * Create media item (audio or video)
-   * @param {Object} mediaData - Media data { title, artist, url, type, duration, coverUrl, category }
-   * @returns {Promise<Object|null>} Created media item
+   * Initialize database tables
+   * Run this once to create required tables
+   */
+  static async initializeTables() {
+    try {
+      // Media library table
+      await query(`
+        CREATE TABLE IF NOT EXISTS media_library (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          title VARCHAR(255) NOT NULL,
+          artist VARCHAR(255),
+          album VARCHAR(255),
+          duration INTEGER,
+          url TEXT NOT NULL,
+          thumbnail_url TEXT,
+          type VARCHAR(20) DEFAULT 'audio',
+          category VARCHAR(100),
+          play_count INTEGER DEFAULT 0,
+          likes INTEGER DEFAULT 0,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      // Playlists table
+      await query(`
+        CREATE TABLE IF NOT EXISTS media_playlists (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id VARCHAR(50) NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          description TEXT,
+          is_public BOOLEAN DEFAULT false,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      // Playlist items table (junction table)
+      await query(`
+        CREATE TABLE IF NOT EXISTS playlist_items (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          playlist_id UUID REFERENCES media_playlists(id) ON DELETE CASCADE,
+          media_id UUID REFERENCES media_library(id) ON DELETE CASCADE,
+          position INTEGER,
+          added_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(playlist_id, media_id)
+        )
+      `);
+
+      // Player states table
+      await query(`
+        CREATE TABLE IF NOT EXISTS player_states (
+          user_id VARCHAR(50) PRIMARY KEY,
+          current_media_id UUID REFERENCES media_library(id),
+          current_playlist_id UUID REFERENCES media_playlists(id),
+          position INTEGER DEFAULT 0,
+          is_playing BOOLEAN DEFAULT false,
+          volume INTEGER DEFAULT 100,
+          repeat_mode VARCHAR(20) DEFAULT 'none',
+          shuffle BOOLEAN DEFAULT false,
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      // User likes table
+      await query(`
+        CREATE TABLE IF NOT EXISTS media_likes (
+          user_id VARCHAR(50) NOT NULL,
+          media_id UUID REFERENCES media_library(id) ON DELETE CASCADE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          PRIMARY KEY (user_id, media_id)
+        )
+      `);
+
+      // Create indexes
+      await query('CREATE INDEX IF NOT EXISTS idx_media_category ON media_library(category)');
+      await query('CREATE INDEX IF NOT EXISTS idx_media_play_count ON media_library(play_count DESC)');
+      await query('CREATE INDEX IF NOT EXISTS idx_playlists_user ON media_playlists(user_id)');
+      await query('CREATE INDEX IF NOT EXISTS idx_playlist_items_playlist ON playlist_items(playlist_id)');
+
+      logger.info('Media player tables initialized successfully');
+      return true;
+    } catch (error) {
+      logger.error('Error initializing media player tables:', error);
+      throw error;
+    }
+  }
+
+  // ==================== Media Library ====================
+
+  /**
+   * Create a new media entry
    */
   static async createMedia(mediaData) {
     try {
-      const id = uuidv4();
-      const {
-        title,
-        artist,
-        url,
-        type = 'audio',
-        duration = 0,
-        category = 'general',
-        coverUrl,
-        description = '',
-        uploaderId = null,
-        uploaderName = null,
-        language = 'es',
-        isPublic = true,
-        isExplicit = false,
-        tags = [],
-        metadata = {},
-      } = mediaData;
-
       const result = await query(
-        `INSERT INTO media_library 
-         (id, title, artist, url, type, duration, category, cover_url, description, uploader_id, uploader_name, language, is_public, is_explicit, tags, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        `INSERT INTO media_library (title, artist, album, duration, url, thumbnail_url, type, category)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         [
-          id,
-          title,
-          artist,
-          url,
-          type,
-          duration,
-          category,
-          coverUrl,
-          description,
-          uploaderId,
-          uploaderName,
-          language,
-          isPublic,
-          isExplicit,
-          tags,
-          JSON.stringify(metadata),
-        ],
+          mediaData.title,
+          mediaData.artist || null,
+          mediaData.album || null,
+          mediaData.duration || 0,
+          mediaData.url,
+          mediaData.thumbnailUrl || null,
+          mediaData.type || 'audio',
+          mediaData.category || null,
+        ]
       );
 
-      // Invalidate cache
-      await cache.del('media:library');
-      await cache.del(`media:category:${category}`);
-
-      logger.info('Media created', { mediaId: id, title });
+      await cache.del('media:library:*');
+      logger.info('Media created', { id: result.rows[0].id, title: mediaData.title });
       return result.rows[0];
     } catch (error) {
       logger.error('Error creating media:', error);
@@ -72,34 +128,56 @@ class MediaPlayerModel {
   }
 
   /**
-   * Get all media items
-   * @param {string} type - Filter by type ('all', 'audio', 'video')
-   * @param {number} limit - Number of items to return
-   * @returns {Promise<Array>} Media items
+   * Get media by ID
    */
-  static async getMediaLibrary(type = 'all', limit = 50) {
+  static async getMediaById(mediaId) {
     try {
-      const cacheKey = `media:library:${type}`;
+      const cacheKey = `media:${mediaId}`;
+      return await cache.getOrSet(
+        cacheKey,
+        async () => {
+          const result = await query('SELECT * FROM media_library WHERE id = $1', [mediaId]);
+          return result.rows[0] || null;
+        },
+        300
+      );
+    } catch (error) {
+      logger.error('Error getting media:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get media library with optional filters
+   */
+  static async getMediaLibrary(options = {}) {
+    try {
+      const { category, type, limit = 50, offset = 0, orderBy = 'created_at', order = 'DESC' } = options;
+      const cacheKey = `media:library:${category || 'all'}:${type || 'all'}:${offset}:${limit}`;
 
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          let sql = 'SELECT * FROM media_library WHERE is_public = true';
+          let sql = 'SELECT * FROM media_library WHERE 1=1';
           const params = [];
+          let paramIndex = 1;
 
-          if (type !== 'all') {
-            sql += ' AND type = $1';
+          if (category) {
+            sql += ` AND category = $${paramIndex++}`;
+            params.push(category);
+          }
+          if (type) {
+            sql += ` AND type = $${paramIndex++}`;
             params.push(type);
           }
 
-          sql += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1);
-          params.push(limit);
+          sql += ` ORDER BY ${orderBy} ${order} LIMIT $${paramIndex++} OFFSET $${paramIndex}`;
+          params.push(limit, offset);
 
           const result = await query(sql, params);
-          logger.info(`Retrieved ${result.rows.length} media items (type: ${type})`);
           return result.rows;
         },
-        300, // Cache for 5 minutes
+        60
       );
     } catch (error) {
       logger.error('Error getting media library:', error);
@@ -108,81 +186,107 @@ class MediaPlayerModel {
   }
 
   /**
-   * Get media by category
-   * @param {string} category - Category name
-   * @param {number} limit - Number of items to return
-   * @returns {Promise<Array>} Media items
+   * Search media
    */
-  static async getMediaByCategory(category, limit = 20) {
+  static async searchMedia(searchQuery, limit = 20) {
     try {
-      const cacheKey = `media:category:${category}`;
-
-      return await cache.getOrSet(
-        cacheKey,
-        async () => {
-          const result = await query(
-            `SELECT * FROM media_library 
-             WHERE category = $1 AND is_public = true
-             ORDER BY created_at DESC LIMIT $2`,
-            [category, limit],
-          );
-          logger.info(`Retrieved ${result.rows.length} media items for category: ${category}`);
-          return result.rows;
-        },
-        300, // Cache for 5 minutes
+      const result = await query(
+        `SELECT * FROM media_library
+         WHERE title ILIKE $1 OR artist ILIKE $1 OR album ILIKE $1
+         ORDER BY play_count DESC
+         LIMIT $2`,
+        [`%${searchQuery}%`, limit]
       );
+      return result.rows;
     } catch (error) {
-      logger.error('Error getting media by category:', error);
+      logger.error('Error searching media:', error);
       return [];
     }
   }
 
   /**
-   * Get media item by ID
-   * @param {string} mediaId - Media ID
-   * @returns {Promise<Object|null>} Media item
+   * Get trending media (most played)
    */
-  static async getMediaById(mediaId) {
+  static async getTrendingMedia(limit = 20) {
     try {
-      const result = await query(
-        'SELECT * FROM media_library WHERE id = $1',
-        [mediaId],
+      const cacheKey = `media:trending:${limit}`;
+      return await cache.getOrSet(
+        cacheKey,
+        async () => {
+          const result = await query(
+            'SELECT * FROM media_library ORDER BY play_count DESC LIMIT $1',
+            [limit]
+          );
+          return result.rows;
+        },
+        300
       );
-      return result.rows[0] || null;
     } catch (error) {
-      logger.error('Error getting media by ID:', error);
-      return null;
+      logger.error('Error getting trending media:', error);
+      return [];
     }
   }
 
   /**
-   * Create playlist
-   * @param {string} userId - User ID
+   * Increment play count
+   */
+  static async incrementPlayCount(mediaId) {
+    try {
+      await query(
+        'UPDATE media_library SET play_count = play_count + 1, updated_at = NOW() WHERE id = $1',
+        [mediaId]
+      );
+      await cache.del(`media:${mediaId}`);
+      await cache.del('media:trending:*');
+      return true;
+    } catch (error) {
+      logger.error('Error incrementing play count:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get categories
+   */
+  static async getCategories() {
+    try {
+      const cacheKey = 'media:categories';
+      return await cache.getOrSet(
+        cacheKey,
+        async () => {
+          const result = await query(
+            'SELECT DISTINCT category FROM media_library WHERE category IS NOT NULL ORDER BY category'
+          );
+          return result.rows.map(row => row.category);
+        },
+        600
+      );
+    } catch (error) {
+      logger.error('Error getting categories:', error);
+      return [];
+    }
+  }
+
+  // ==================== Playlists ====================
+
+  /**
+   * Create a playlist
+   * @param {string|number} userId - User ID
    * @param {Object} playlistData - Playlist data { name, description, isPublic }
-   * @returns {Promise<Object|null>} Created playlist
    */
   static async createPlaylist(userId, playlistData) {
     try {
-      const id = uuidv4();
-      const {
-        name,
-        description = '',
-        isPublic = false,
-        isCollaborative = false,
-        coverUrl = null,
-      } = playlistData;
+      const { name, description = '', isPublic = false } = playlistData;
 
       const result = await query(
-        `INSERT INTO media_playlists (id, name, owner_id, description, cover_url, is_public, is_collaborative)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO media_playlists (user_id, name, description, is_public)
+         VALUES ($1, $2, $3, $4)
          RETURNING *`,
-        [id, name, userId, description, coverUrl, isPublic, isCollaborative],
+        [userId.toString(), name, description, isPublic]
       );
 
-      // Invalidate cache
       await cache.del(`playlists:user:${userId}`);
-
-      logger.info('Playlist created', { playlistId: id, name });
+      logger.info('Playlist created', { userId, name });
       return result.rows[0];
     } catch (error) {
       logger.error('Error creating playlist:', error);
@@ -191,26 +295,117 @@ class MediaPlayerModel {
   }
 
   /**
+   * Get user playlists
+   */
+  static async getUserPlaylists(userId) {
+    try {
+      const cacheKey = `playlists:user:${userId}`;
+      return await cache.getOrSet(
+        cacheKey,
+        async () => {
+          const result = await query(
+            `SELECT p.*,
+              (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
+             FROM media_playlists p
+             WHERE p.user_id = $1
+             ORDER BY p.updated_at DESC`,
+            [userId.toString()]
+          );
+          return result.rows;
+        },
+        300
+      );
+    } catch (error) {
+      logger.error('Error getting user playlists:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get public playlists
+   * @param {number} limit - Number of playlists to return
+   */
+  static async getPublicPlaylists(limit = 10) {
+    try {
+      const cacheKey = `playlists:public:${limit}`;
+      return await cache.getOrSet(
+        cacheKey,
+        async () => {
+          const result = await query(
+            `SELECT p.*,
+              (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
+             FROM media_playlists p
+             WHERE p.is_public = true
+             ORDER BY p.updated_at DESC
+             LIMIT $1`,
+            [limit]
+          );
+          return result.rows;
+        },
+        300
+      );
+    } catch (error) {
+      logger.error('Error getting public playlists:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get playlist by ID with items
+   */
+  static async getPlaylistById(playlistId) {
+    try {
+      const playlistResult = await query(
+        'SELECT * FROM media_playlists WHERE id = $1',
+        [playlistId]
+      );
+
+      if (!playlistResult.rows[0]) return null;
+
+      const itemsResult = await query(
+        `SELECT m.*, pi.position, pi.added_at
+         FROM playlist_items pi
+         JOIN media_library m ON pi.media_id = m.id
+         WHERE pi.playlist_id = $1
+         ORDER BY pi.position`,
+        [playlistId]
+      );
+
+      return {
+        ...playlistResult.rows[0],
+        items: itemsResult.rows,
+      };
+    } catch (error) {
+      logger.error('Error getting playlist:', error);
+      return null;
+    }
+  }
+
+  /**
    * Add media to playlist
-   * @param {string} playlistId - Playlist ID
-   * @param {string} mediaId - Media ID
-   * @returns {Promise<boolean>} Success status
    */
   static async addToPlaylist(playlistId, mediaId) {
     try {
-      // Get current max position
+      // Get next position
       const posResult = await query(
-        'SELECT COALESCE(MAX(position), 0) as max_pos FROM playlist_items WHERE playlist_id = $1',
-        [playlistId],
+        'SELECT COALESCE(MAX(position), 0) + 1 as next_pos FROM playlist_items WHERE playlist_id = $1',
+        [playlistId]
       );
-      const position = (posResult.rows[0]?.max_pos || 0) + 1;
 
       await query(
-        `INSERT INTO playlist_items (id, playlist_id, media_id, position)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO playlist_items (playlist_id, media_id, position)
+         VALUES ($1, $2, $3)
          ON CONFLICT (playlist_id, media_id) DO NOTHING`,
-        [uuidv4(), playlistId, mediaId, position],
+        [playlistId, mediaId, posResult.rows[0].next_pos]
       );
+
+      await query('UPDATE media_playlists SET updated_at = NOW() WHERE id = $1', [playlistId]);
+
+      // Invalidate caches
+      const playlist = await query('SELECT user_id FROM media_playlists WHERE id = $1', [playlistId]);
+      if (playlist.rows[0]) {
+        await cache.del(`playlists:user:${playlist.rows[0].user_id}`);
+      }
 
       logger.info('Media added to playlist', { playlistId, mediaId });
       return true;
@@ -222,16 +417,21 @@ class MediaPlayerModel {
 
   /**
    * Remove media from playlist
-   * @param {string} playlistId - Playlist ID
-   * @param {string} mediaId - Media ID
-   * @returns {Promise<boolean>} Success status
    */
   static async removeFromPlaylist(playlistId, mediaId) {
     try {
       await query(
         'DELETE FROM playlist_items WHERE playlist_id = $1 AND media_id = $2',
-        [playlistId, mediaId],
+        [playlistId, mediaId]
       );
+
+      await query('UPDATE media_playlists SET updated_at = NOW() WHERE id = $1', [playlistId]);
+
+      // Invalidate caches
+      const playlist = await query('SELECT user_id FROM media_playlists WHERE id = $1', [playlistId]);
+      if (playlist.rows[0]) {
+        await cache.del(`playlists:user:${playlist.rows[0].user_id}`);
+      }
 
       logger.info('Media removed from playlist', { playlistId, mediaId });
       return true;
@@ -242,351 +442,17 @@ class MediaPlayerModel {
   }
 
   /**
-   * Get user playlists
-   * @param {string} userId - User ID
-   * @returns {Promise<Array>} User playlists with media count
-   */
-  static async getUserPlaylists(userId) {
-    try {
-      const cacheKey = `playlists:user:${userId}`;
-
-      return await cache.getOrSet(
-        cacheKey,
-        async () => {
-          const result = await query(
-            `SELECT p.*, COUNT(pi.id) as media_count 
-             FROM media_playlists p
-             LEFT JOIN playlist_items pi ON p.id = pi.playlist_id
-             WHERE p.owner_id = $1
-             GROUP BY p.id
-             ORDER BY p.created_at DESC`,
-            [userId],
-          );
-          logger.info(`Retrieved ${result.rows.length} playlists for user ${userId}`);
-          return result.rows;
-        },
-        180, // Cache for 3 minutes
-      );
-    } catch (error) {
-      logger.error('Error getting user playlists:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get public playlists
-   * @param {number} limit - Number of playlists to return
-   * @returns {Promise<Array>} Public playlists
-   */
-  static async getPublicPlaylists(limit = 20) {
-    try {
-      const cacheKey = 'playlists:public';
-
-      return await cache.getOrSet(
-        cacheKey,
-        async () => {
-          const result = await query(
-            `SELECT p.*, COUNT(pi.id) as media_count 
-             FROM media_playlists p
-             LEFT JOIN playlist_items pi ON p.id = pi.playlist_id
-             WHERE p.is_public = true
-             GROUP BY p.id
-             ORDER BY p.total_plays DESC LIMIT $1`,
-            [limit],
-          );
-          logger.info(`Retrieved ${result.rows.length} public playlists`);
-          return result.rows;
-        },
-        300, // Cache for 5 minutes
-      );
-    } catch (error) {
-      logger.error('Error getting public playlists:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get playlist with media items
-   * @param {string} playlistId - Playlist ID
-   * @returns {Promise<Object|null>} Playlist with items
-   */
-  static async getPlaylistWithItems(playlistId) {
-    try {
-      const playlistResult = await query(
-        'SELECT * FROM media_playlists WHERE id = $1',
-        [playlistId],
-      );
-
-      if (!playlistResult.rows[0]) {
-        return null;
-      }
-
-      const playlist = playlistResult.rows[0];
-
-      const itemsResult = await query(
-        `SELECT m.* FROM media_library m
-         JOIN playlist_items pi ON m.id = pi.media_id
-         WHERE pi.playlist_id = $1
-         ORDER BY pi.position ASC`,
-        [playlistId],
-      );
-
-      return {
-        ...playlist,
-        mediaItems: itemsResult.rows,
-        mediaCount: itemsResult.rows.length,
-      };
-    } catch (error) {
-      logger.error('Error getting playlist with items:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Get player state for user
-   * @param {string} userId - User ID
-   * @returns {Promise<Object|null>} Player state
-   */
-  static async getPlayerState(userId) {
-    try {
-      const cacheKey = `player:state:${userId}`;
-
-      return await cache.getOrSet(
-        cacheKey,
-        async () => {
-          const result = await query(
-            'SELECT * FROM player_states WHERE user_id = $1',
-            [userId],
-          );
-
-          if (!result.rows[0]) {
-            // Return default state
-            return {
-              userId,
-              mediaId: null,
-              playlistId: null,
-              isPlaying: false,
-              currentPosition: 0,
-              lastPlayedAt: null,
-            };
-          }
-
-          return result.rows[0];
-        },
-        30, // Cache for 30 seconds
-      );
-    } catch (error) {
-      logger.error('Error getting player state:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Update player state
-   * @param {string} userId - User ID
-   * @param {Object} updates - State updates
-   * @returns {Promise<boolean>} Success status
-   */
-  static async updatePlayerState(userId, updates) {
-    try {
-      const {
-        mediaId = null,
-        playlistId = null,
-        isPlaying = false,
-        currentPosition = 0,
-      } = updates;
-
-      await query(
-        `INSERT INTO player_states (id, user_id, media_id, playlist_id, is_playing, current_position, last_played_at)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW())
-         ON CONFLICT (user_id) DO UPDATE SET
-          media_id = $3,
-          playlist_id = $4,
-          is_playing = $5,
-          current_position = $6,
-          last_played_at = NOW(),
-          updated_at = NOW()`,
-        [uuidv4(), userId, mediaId, playlistId, isPlaying, currentPosition],
-      );
-
-      // Invalidate cache
-      await cache.del(`player:state:${userId}`);
-
-      logger.info('Player state updated', { userId });
-      return true;
-    } catch (error) {
-      logger.error('Error updating player state:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Increment media play count
-   * @param {string} mediaId - Media ID
-   * @returns {Promise<boolean>} Success status
-   */
-  static async incrementPlayCount(mediaId) {
-    try {
-      await query(
-        'UPDATE media_library SET plays = plays + 1 WHERE id = $1',
-        [mediaId],
-      );
-
-      // Invalidate cache
-      await cache.del('media:library');
-
-      logger.info('Play count incremented', { mediaId });
-      return true;
-    } catch (error) {
-      logger.error('Error incrementing play count:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Like/Unlike media
-   * @param {string} userId - User ID
-   * @param {string} mediaId - Media ID
-   * @param {boolean} isLike - True to like, false to unlike
-   * @returns {Promise<boolean>} Success status
-   */
-  static async toggleLike(userId, mediaId, isLike) {
-    try {
-      if (isLike) {
-        // Add favorite
-        await query(
-          `INSERT INTO media_favorites (id, user_id, media_id)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (user_id, media_id) DO NOTHING`,
-          [uuidv4(), userId, mediaId],
-        );
-        // Increment like count
-        await query(
-          'UPDATE media_library SET likes = likes + 1 WHERE id = $1',
-          [mediaId],
-        );
-      } else {
-        // Remove favorite
-        await query(
-          'DELETE FROM media_favorites WHERE user_id = $1 AND media_id = $2',
-          [userId, mediaId],
-        );
-        // Decrement like count
-        await query(
-          'UPDATE media_library SET likes = GREATEST(likes - 1, 0) WHERE id = $1',
-          [mediaId],
-        );
-      }
-
-      logger.info(`Media ${isLike ? 'liked' : 'unliked'}`, { mediaId, userId });
-      return true;
-    } catch (error) {
-      logger.error('Error toggling like:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Search media
-   * @param {string} searchQuery - Search query
-   * @param {string} type - Media type filter
-   * @param {number} limit - Number of results
-   * @returns {Promise<Array>} Matching media
-   */
-  static async searchMedia(searchQuery, type = 'all', limit = 20) {
-    try {
-      let sql = `SELECT * FROM media_library 
-                 WHERE is_public = true 
-                 AND (title ILIKE $1 OR artist ILIKE $1)`;
-      const params = [`%${searchQuery}%`];
-
-      if (type !== 'all') {
-        sql += ' AND type = $2';
-        params.push(type);
-      }
-
-      sql += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1);
-      params.push(limit);
-
-      const result = await query(sql, params);
-      logger.info(`Found ${result.rows.length} media items matching '${searchQuery}'`);
-      return result.rows;
-    } catch (error) {
-      logger.error('Error searching media:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get trending media (most played)
-   * @param {string} type - Media type filter
-   * @param {number} limit - Number of results
-   * @returns {Promise<Array>} Trending media
-   */
-  static async getTrendingMedia(type = 'all', limit = 10) {
-    try {
-      const cacheKey = `media:trending:${type}`;
-
-      return await cache.getOrSet(
-        cacheKey,
-        async () => {
-          let sql = 'SELECT * FROM media_library WHERE is_public = true';
-          const params = [];
-
-          if (type !== 'all') {
-            sql += ' AND type = $1';
-            params.push(type);
-          }
-
-          sql += ' ORDER BY plays DESC LIMIT $' + (params.length + 1);
-          params.push(limit);
-
-          const result = await query(sql, params);
-          logger.info(`Retrieved ${result.rows.length} trending media (type: ${type})`);
-          return result.rows;
-        },
-        600, // Cache for 10 minutes
-      );
-    } catch (error) {
-      logger.error('Error getting trending media:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Delete media
-   * @param {string} mediaId - Media ID
-   * @returns {Promise<boolean>} Success status
-   */
-  static async deleteMedia(mediaId) {
-    try {
-      await query(
-        'DELETE FROM media_library WHERE id = $1',
-        [mediaId],
-      );
-
-      // Invalidate cache
-      await cache.del('media:library');
-
-      logger.info('Media deleted', { mediaId });
-      return true;
-    } catch (error) {
-      logger.error('Error deleting media:', error);
-      return false;
-    }
-  }
-
-  /**
    * Delete playlist
-   * @param {string} playlistId - Playlist ID
-   * @returns {Promise<boolean>} Success status
    */
   static async deletePlaylist(playlistId) {
     try {
-      await query(
-        'DELETE FROM media_playlists WHERE id = $1',
-        [playlistId],
-      );
+      const playlist = await query('SELECT user_id FROM media_playlists WHERE id = $1', [playlistId]);
+
+      await query('DELETE FROM media_playlists WHERE id = $1', [playlistId]);
+
+      if (playlist.rows[0]) {
+        await cache.del(`playlists:user:${playlist.rows[0].user_id}`);
+      }
 
       logger.info('Playlist deleted', { playlistId });
       return true;
@@ -597,72 +463,207 @@ class MediaPlayerModel {
   }
 
   /**
-   * Get categories list
-   * @returns {Promise<Array>} List of categories
+   * Update playlist
    */
-  static async getCategories() {
+  static async updatePlaylist(playlistId, updates) {
     try {
-      const cacheKey = 'media:categories';
+      const setClauses = [];
+      const params = [];
+      let paramIndex = 1;
 
-      return await cache.getOrSet(
-        cacheKey,
-        async () => {
-          const result = await query(
-            'SELECT DISTINCT category FROM media_library WHERE category IS NOT NULL ORDER BY category',
-          );
-          const categories = result.rows.map((row) => row.category);
-          logger.info(`Retrieved ${categories.length} categories`);
-          return categories;
-        },
-        600, // Cache for 10 minutes
+      if (updates.name) {
+        setClauses.push(`name = $${paramIndex++}`);
+        params.push(updates.name);
+      }
+      if (updates.description !== undefined) {
+        setClauses.push(`description = $${paramIndex++}`);
+        params.push(updates.description);
+      }
+      if (updates.isPublic !== undefined) {
+        setClauses.push(`is_public = $${paramIndex++}`);
+        params.push(updates.isPublic);
+      }
+
+      if (setClauses.length === 0) return true;
+
+      setClauses.push('updated_at = NOW()');
+      params.push(playlistId);
+
+      await query(
+        `UPDATE media_playlists SET ${setClauses.join(', ')} WHERE id = $${paramIndex}`,
+        params
       );
+
+      const playlist = await query('SELECT user_id FROM media_playlists WHERE id = $1', [playlistId]);
+      if (playlist.rows[0]) {
+        await cache.del(`playlists:user:${playlist.rows[0].user_id}`);
+      }
+
+      return true;
     } catch (error) {
-      logger.error('Error getting categories:', error);
-      return ['general', 'music', 'podcasts', 'radio'];
+      logger.error('Error updating playlist:', error);
+      return false;
+    }
+  }
+
+  // ==================== Player State ====================
+
+  /**
+   * Get player state
+   */
+  static async getPlayerState(userId) {
+    try {
+      const result = await query(
+        `SELECT ps.*, m.title, m.artist, m.thumbnail_url, m.url, m.duration
+         FROM player_states ps
+         LEFT JOIN media_library m ON ps.current_media_id = m.id
+         WHERE ps.user_id = $1`,
+        [userId.toString()]
+      );
+      return result.rows[0] || null;
+    } catch (error) {
+      logger.error('Error getting player state:', error);
+      return null;
     }
   }
 
   /**
-   * Add media to play history
-   * @param {string} userId - User ID
-   * @param {string} mediaId - Media ID
-   * @param {number} durationPlayed - Duration played in seconds
-   * @returns {Promise<boolean>} Success status
+   * Update player state
    */
-  static async addToPlayHistory(userId, mediaId, durationPlayed = 0) {
+  static async updatePlayerState(userId, updates) {
     try {
-      await query(
-        `INSERT INTO media_play_history (id, user_id, media_id, duration_played, completed)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [uuidv4(), userId, mediaId, durationPlayed, durationPlayed > 0],
+      const result = await query(
+        `INSERT INTO player_states (user_id, current_media_id, current_playlist_id, position, is_playing, volume, repeat_mode, shuffle)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (user_id) DO UPDATE SET
+           current_media_id = COALESCE($2, player_states.current_media_id),
+           current_playlist_id = COALESCE($3, player_states.current_playlist_id),
+           position = COALESCE($4, player_states.position),
+           is_playing = COALESCE($5, player_states.is_playing),
+           volume = COALESCE($6, player_states.volume),
+           repeat_mode = COALESCE($7, player_states.repeat_mode),
+           shuffle = COALESCE($8, player_states.shuffle),
+           updated_at = NOW()
+         RETURNING *`,
+        [
+          userId.toString(),
+          updates.currentMediaId || null,
+          updates.currentPlaylistId || null,
+          updates.position !== undefined ? updates.position : null,
+          updates.isPlaying !== undefined ? updates.isPlaying : null,
+          updates.volume !== undefined ? updates.volume : null,
+          updates.repeatMode || null,
+          updates.shuffle !== undefined ? updates.shuffle : null,
+        ]
       );
-      return true;
+      return result.rows[0];
     } catch (error) {
-      logger.error('Error adding to play history:', error);
+      logger.error('Error updating player state:', error);
+      return null;
+    }
+  }
+
+  // ==================== Likes ====================
+
+  /**
+   * Toggle like on media
+   */
+  static async toggleLike(userId, mediaId) {
+    try {
+      // Check if already liked
+      const existing = await query(
+        'SELECT 1 FROM media_likes WHERE user_id = $1 AND media_id = $2',
+        [userId.toString(), mediaId]
+      );
+
+      if (existing.rows.length > 0) {
+        // Unlike
+        await query(
+          'DELETE FROM media_likes WHERE user_id = $1 AND media_id = $2',
+          [userId.toString(), mediaId]
+        );
+        await query(
+          'UPDATE media_library SET likes = likes - 1 WHERE id = $1',
+          [mediaId]
+        );
+        await cache.del(`media:${mediaId}`);
+        return { liked: false };
+      } else {
+        // Like
+        await query(
+          'INSERT INTO media_likes (user_id, media_id) VALUES ($1, $2)',
+          [userId.toString(), mediaId]
+        );
+        await query(
+          'UPDATE media_library SET likes = likes + 1 WHERE id = $1',
+          [mediaId]
+        );
+        await cache.del(`media:${mediaId}`);
+        return { liked: true };
+      }
+    } catch (error) {
+      logger.error('Error toggling like:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if user liked media
+   */
+  static async isLiked(userId, mediaId) {
+    try {
+      const result = await query(
+        'SELECT 1 FROM media_likes WHERE user_id = $1 AND media_id = $2',
+        [userId.toString(), mediaId]
+      );
+      return result.rows.length > 0;
+    } catch (error) {
+      logger.error('Error checking like:', error);
       return false;
     }
   }
 
   /**
-   * Get user play history
-   * @param {string} userId - User ID
-   * @param {number} limit - Number of items
-   * @returns {Promise<Array>} Play history
+   * Get user's liked media
    */
-  static async getPlayHistory(userId, limit = 50) {
+  static async getLikedMedia(userId, limit = 50) {
     try {
       const result = await query(
-        `SELECT m.*, mph.played_at, mph.duration_played, mph.completed
-         FROM media_play_history mph
-         JOIN media_library m ON mph.media_id = m.id
-         WHERE mph.user_id = $1
-         ORDER BY mph.played_at DESC LIMIT $2`,
-        [userId, limit],
+        `SELECT m.* FROM media_library m
+         JOIN media_likes l ON m.id = l.media_id
+         WHERE l.user_id = $1
+         ORDER BY l.created_at DESC
+         LIMIT $2`,
+        [userId.toString(), limit]
       );
       return result.rows;
     } catch (error) {
-      logger.error('Error getting play history:', error);
+      logger.error('Error getting liked media:', error);
       return [];
+    }
+  }
+
+  // ==================== Statistics ====================
+
+  /**
+   * Get media statistics
+   */
+  static async getStatistics() {
+    try {
+      const [totalMedia, totalPlaylists, totalPlays] = await Promise.all([
+        query('SELECT COUNT(*) as count FROM media_library'),
+        query('SELECT COUNT(*) as count FROM media_playlists'),
+        query('SELECT SUM(play_count) as total FROM media_library'),
+      ]);
+
+      return {
+        totalMedia: parseInt(totalMedia.rows[0].count),
+        totalPlaylists: parseInt(totalPlaylists.rows[0].count),
+        totalPlays: parseInt(totalPlays.rows[0].total) || 0,
+      };
+    } catch (error) {
+      logger.error('Error getting statistics:', error);
+      return { totalMedia: 0, totalPlaylists: 0, totalPlays: 0 };
     }
   }
 }
