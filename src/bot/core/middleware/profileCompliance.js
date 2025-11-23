@@ -8,7 +8,6 @@ const { query } = require('../../../config/postgres');
 /**
  * Profile compliance middleware
  * - Requires users to have a valid @username
- * - Requires names to be in Latin alphabet only
  * - Sends warnings with 48-hour compliance deadline
  * - Automatically purges non-compliant users after deadline
  *
@@ -127,16 +126,9 @@ async function checkIfAdmin(ctx, userId) {
 function checkCompliance(username, firstName, lastName) {
   const issues = [];
 
-  // Check for username
+  // Check for username only
   if (!username) {
     issues.push('no_username');
-  }
-
-  // Check name for Latin characters only
-  const fullName = `${firstName || ''} ${lastName || ''}`.trim();
-
-  if (!isLatinAlphabet(fullName)) {
-    issues.push('non_latin_characters');
   }
 
   return issues;
@@ -240,8 +232,7 @@ async function sendComplianceWarning(ctx, userId, issues, firstName, groupId) {
       + `Your profile does not meet the requirements in **${ctx.chat.title}**:\n\n`
       + `${issueDescriptions}\n\n`
       + `**📋 Requirements:**\n`
-      + `✅ Must have a Telegram username (@username)\n`
-      + `✅ First and last names must use only Latin alphabet (English characters)\n\n`
+      + `✅ Must have a Telegram username (@username)\n\n`
       + `**⏰ Deadline: 48 hours**\n\n`
       + `If you do not update your profile within 48 hours, you will be automatically removed from the group.\n\n`
       + `**How to update:**\n`

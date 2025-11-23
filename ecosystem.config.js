@@ -26,7 +26,7 @@ module.exports = {
         
         // Redis configuration - Use DB 0 for pnptv-bot
         REDIS_HOST: 'localhost',
-        REDIS_PORT: 6379,
+        REDIS_PORT: 6380,
         REDIS_PASSWORD: '',
         REDIS_DB: 0,  // Database 0 for pnptv-bot
         REDIS_KEY_PREFIX: 'pnptv:',  // Prefix all keys with "pnptv:"

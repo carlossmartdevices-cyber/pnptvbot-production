@@ -850,22 +850,13 @@ async function handleSendComplianceWarnings(ctx) {
 
     const message = `📋 **Profile Compliance Requirements**\n\n`
       + `All members must have:\n\n`
-      + `✅ **A Telegram username** (@username)\n`
-      + `✅ **Name in Latin alphabet** (English characters only)\n\n`
-      + `**Why?** To ensure proper identification and prevent evasion.\n\n`
-      + `**What characters are allowed:**\n`
-      + `✅ English letters (A-Z, a-z)\n`
-      + `✅ Numbers (0-9)\n`
-      + `✅ Common punctuation (-, ', .)\n\n`
-      + `**What's NOT allowed:**\n`
-      + `❌ Russian, Arabic, Chinese, or other non-Latin scripts\n`
-      + `❌ No username (@username)\n\n`
-      + `**How to update:**\n`
+      + `✅ **A Telegram username** (@username)\n\n`
+      + `**Why?** To ensure proper identification.\n\n`
+      + `**How to set a username:**\n`
       + `1. Open Telegram Settings\n`
-      + `2. Tap "Edit Profile"\n`
-      + `3. Set your first name in English\n`
-      + `4. Set your username (@username)\n`
-      + `5. Return to this group\n\n`
+      + `2. Tap on "Username"\n`
+      + `3. Choose a unique username (@yourname)\n`
+      + `4. Return to this group\n\n`
       + `⏰ **Deadline: 48 hours**\n\n`
       + `Users who don't comply will be automatically removed from the group.`;
 
