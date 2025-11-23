@@ -399,7 +399,7 @@ const showMyPlaylists = async (ctx) => {
     if (playlists && playlists.length > 0) {
       playlists.forEach((playlist, index) => {
         text += `${index + 1}. ${playlist.name}\n`;
-        text += `   📀 ${playlist.mediaItems.length} ${t('player.tracks', lang)}\n\n`;
+        text += `   📀 ${parseInt(playlist.item_count) || 0} ${t('player.tracks', lang)}\n\n`;
       });
     } else {
       text += t('player.noPlaylists', lang);
@@ -440,8 +440,7 @@ const showPublicPlaylists = async (ctx) => {
     if (playlists && playlists.length > 0) {
       playlists.forEach((playlist, index) => {
         text += `${index + 1}. ${playlist.name}\n`;
-        text += `   📀 ${playlist.mediaItems.length} ${t('player.tracks', lang)}`;
-        text += ` | 👥 ${playlist.followers} ${t('player.followers', lang)}\n\n`;
+        text += `   📀 ${parseInt(playlist.item_count) || 0} ${t('player.tracks', lang)}\n\n`;
       });
     } else {
       text += t('player.noPublicPlaylists', lang);
@@ -476,8 +475,8 @@ const showNowPlaying = async (ctx) => {
 
     let text = `🎧 ${t('player.nowPlaying', lang)}\n\n`;
 
-    if (playerState && playerState.currentMedia) {
-      const media = await MediaPlayerModel.getMediaById(playerState.currentMedia);
+    if (playerState && playerState.current_media_id) {
+      const media = await MediaPlayerModel.getMediaById(playerState.current_media_id);
       if (media) {
         text += `🎼 ${media.title}\n`;
         if (media.artist) {
@@ -706,7 +705,7 @@ const playMedia = async (ctx, mediaId) => {
 
     // Update player state
     await MediaPlayerModel.updatePlayerState(ctx.from.id, {
-      currentMedia: mediaId,
+      currentMediaId: mediaId,
       isPlaying: true,
     });
 
@@ -773,7 +772,7 @@ const stopPlayback = async (ctx) => {
     const lang = getLanguage(ctx);
 
     await MediaPlayerModel.updatePlayerState(ctx.from.id, {
-      currentMedia: null,
+      currentMediaId: null,
       isPlaying: false,
       position: 0,
     });
@@ -798,7 +797,7 @@ const playNext = async (ctx) => {
       const nextMediaId = playerState.queue[nextIndex];
 
       await MediaPlayerModel.updatePlayerState(ctx.from.id, {
-        currentMedia: nextMediaId,
+        currentMediaId: nextMediaId,
         position: nextIndex,
         isPlaying: true,
       });
@@ -827,7 +826,7 @@ const playPrevious = async (ctx) => {
       const prevMediaId = playerState.queue[prevIndex];
 
       await MediaPlayerModel.updatePlayerState(ctx.from.id, {
-        currentMedia: prevMediaId,
+        currentMediaId: prevMediaId,
         position: prevIndex,
         isPlaying: true,
       });
@@ -911,22 +910,20 @@ const likeMedia = async (ctx, mediaId) => {
 const viewPlaylist = async (ctx, playlistId) => {
   try {
     const lang = getLanguage(ctx);
-    const db = require('../../../config/firebase').getFirestore();
-    const playlistDoc = await db.collection('media_playlists').doc(playlistId).get();
+    const playlist = await MediaPlayerModel.getPlaylistById(playlistId);
 
-    if (!playlistDoc.exists) {
+    if (!playlist) {
       await ctx.answerCbQuery(t('player.playlistNotFound', lang));
       return;
     }
 
-    const playlist = playlistDoc.data();
     let text = `📁 ${playlist.name}\n\n`;
 
     if (playlist.description) {
       text += `${playlist.description}\n\n`;
     }
 
-    text += `📀 ${playlist.mediaItems.length} ${t('player.tracks', lang)}\n\n`;
+    text += `📀 ${playlist.items ? playlist.items.length : 0} ${t('player.tracks', lang)}\n\n`;
 
     const keyboard = Markup.inlineKeyboard([
       [
@@ -950,31 +947,29 @@ const viewPlaylist = async (ctx, playlistId) => {
 const playPlaylist = async (ctx, playlistId) => {
   try {
     const lang = getLanguage(ctx);
-    const db = require('../../../config/firebase').getFirestore();
-    const playlistDoc = await db.collection('media_playlists').doc(playlistId).get();
+    const playlist = await MediaPlayerModel.getPlaylistById(playlistId);
 
-    if (!playlistDoc.exists) {
+    if (!playlist) {
       await ctx.answerCbQuery(t('player.playlistNotFound', lang));
       return;
     }
 
-    const playlist = playlistDoc.data();
-
-    if (playlist.mediaItems.length === 0) {
+    if (!playlist.items || playlist.items.length === 0) {
       await ctx.answerCbQuery(t('player.emptyPlaylist', lang));
       return;
     }
 
+    const mediaIds = playlist.items.map(item => item.id);
+
     // Set playlist as queue
     await MediaPlayerModel.updatePlayerState(ctx.from.id, {
-      currentPlaylist: playlistId,
-      queue: playlist.mediaItems,
+      currentPlaylistId: playlistId,
       position: 0,
-      currentMedia: playlist.mediaItems[0],
+      currentMediaId: mediaIds[0],
       isPlaying: true,
     });
 
-    await playMedia(ctx, playlist.mediaItems[0]);
+    await playMedia(ctx, mediaIds[0]);
     await ctx.answerCbQuery(`▶️ ${t('player.playingPlaylist', lang)}: ${playlist.name}`);
   } catch (error) {
     logger.error('Error in playPlaylist:', error);
