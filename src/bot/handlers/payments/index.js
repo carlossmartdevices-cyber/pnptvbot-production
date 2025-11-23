@@ -1,6 +1,7 @@
 const { Markup } = require('telegraf');
 const PaymentService = require('../../services/paymentService');
 const PlanModel = require('../../../models/planModel');
+const UserService = require('../../services/userService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
@@ -19,6 +20,31 @@ const registerPaymentHandlers = (bot) => {
     try {
       await ctx.answerCbQuery();
       const lang = getLanguage(ctx);
+      
+      // Check if user already has an active subscription
+      const hasActiveSubscription = await UserService.hasActiveSubscription(ctx.from.id);
+      
+      if (hasActiveSubscription) {
+        const warningMsg = lang === 'es'
+          ? '⚠️ **Ya tienes una suscripción activa**\n\n'
+            + 'No puedes comprar una nueva suscripción mientras tengas una activa.\n\n'
+            + 'Para evitar pagos duplicados, por favor espera a que tu suscripción actual expire o contacta soporte para cambiar tu plan.'
+          : '⚠️ **You already have an active subscription**\n\n'
+            + 'You cannot purchase a new subscription while you have an active one.\n\n'
+            + 'To avoid double payments, please wait until your current subscription expires or contact support to change your plan.';
+        
+        await ctx.editMessageText(
+          warningMsg,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(t('back', lang), 'back_to_main')]
+            ])
+          }
+        );
+        return;
+      }
+      
       const plans = await PlanModel.getAll();
 
       // Header with internationalization
@@ -153,6 +179,30 @@ const registerPaymentHandlers = (bot) => {
 
       const userId = ctx.from.id;
 
+      // Double-check if user has active subscription before creating payment
+      const hasActiveSubscription = await UserService.hasActiveSubscription(userId);
+      
+      if (hasActiveSubscription) {
+        const warningMsg = lang === 'es'
+          ? '⚠️ **Ya tienes una suscripción activa**\n\n'
+            + 'No puedes realizar un nuevo pago mientras tengas una suscripción activa.\n\n'
+            + 'Esto evita pagos duplicados. Si deseas cambiar tu plan, contacta soporte.'
+          : '⚠️ **You already have an active subscription**\n\n'
+            + 'You cannot make a new payment while you have an active subscription.\n\n'
+            + 'This prevents double payments. If you want to change your plan, contact support.';
+        
+        await ctx.editMessageText(
+          warningMsg,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(t('back', lang), 'back_to_main')]
+            ])
+          }
+        );
+        return;
+      }
+
       logger.info('Creating ePayco payment', { planId, userId });
 
       await ctx.editMessageText(t('loading', lang));
@@ -207,6 +257,30 @@ const registerPaymentHandlers = (bot) => {
 
       const userId = ctx.from.id;
       const chatId = ctx.chat?.id;
+
+      // Double-check if user has active subscription before creating payment
+      const hasActiveSubscription = await UserService.hasActiveSubscription(userId);
+      
+      if (hasActiveSubscription) {
+        const warningMsg = lang === 'es'
+          ? '⚠️ **Ya tienes una suscripción activa**\n\n'
+            + 'No puedes realizar un nuevo pago mientras tengas una suscripción activa.\n\n'
+            + 'Esto evita pagos duplicados. Si deseas cambiar tu plan, contacta soporte.'
+          : '⚠️ **You already have an active subscription**\n\n'
+            + 'You cannot make a new payment while you have an active subscription.\n\n'
+            + 'This prevents double payments. If you want to change your plan, contact support.';
+        
+        await ctx.editMessageText(
+          warningMsg,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(t('back', lang), 'back_to_main')]
+            ])
+          }
+        );
+        return;
+      }
 
       logger.info('Creating Daimo payment', { planId, userId });
 

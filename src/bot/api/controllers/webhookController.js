@@ -33,6 +33,16 @@ const validateEpaycoPayload = (payload) => {
     };
   }
 
+  // Check for 3DS fields (x_three_d_s, x_eci, x_cavv)
+  // These are important security fields that should be present in approved transactions
+  const has3DSFields = payload.x_three_d_s || payload.x_eci || payload.x_cavv;
+  if (!has3DSFields) {
+    console.warn('⚠️  ePayco transaction missing 3DS fields', {
+      refPayco: payload.x_ref_payco,
+      state: payload.x_transaction_state,
+    });
+  }
+
   return { valid: true };
 };
 

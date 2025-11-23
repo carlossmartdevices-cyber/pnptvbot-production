@@ -5,6 +5,7 @@ const PlanModel = require('../../models/planModel');
 const UserModel = require('../../models/userModel');
 const SubscriberModel = require('../../models/subscriberModel');
 const DaimoConfig = require('../../config/daimo');
+const FraudDetectionService = require('../../bot/services/fraudDetectionService');
 const logger = require('../../utils/logger');
 const crypto = require('crypto');
 const { Telegraf } = require('telegraf');
@@ -262,6 +263,9 @@ class PaymentService {
         x_customer_email,
         x_customer_name,
         x_response_reason_text, // Reason text for the response
+        x_three_d_s, // 3DS validation status: Y=Validated, N=Not validated
+        x_eci, // ECI flag indicating 3DS authentication
+        x_cavv, // CAVV (Cardholder Authentication Verification Value)
       } = webhookData;
 
       logger.info('Processing ePayco webhook', {
@@ -273,6 +277,8 @@ class PaymentService {
         responseReason: x_response_reason_text,
         amount: x_amount,
         paymentId: x_extra3,
+        threeDsStatus: x_three_d_s,
+        eciFlag: x_eci,
       });
 
       // Verify signature if available
@@ -317,6 +323,154 @@ class PaymentService {
       const isFailed = responseCode === 4 || x_transaction_state === 'Fallida';
       const isAbandoned = x_transaction_state === 'Abandonada' || x_transaction_state === 'Cancelada';
 
+      // ========== FRAUD DETECTION - RUN ALL CHECKS ==========
+      // Comprehensive anti-fraud validation BEFORE 3DS check
+      if (isApproved && userId) {
+        logger.info('🔒 Running comprehensive fraud detection', {
+          userId,
+          refPayco: x_ref_payco,
+          amount: x_amount,
+        });
+
+        const fraudAnalysis = await FraudDetectionService.runAllFraudChecks({
+          userId,
+          amount: parseFloat(x_amount),
+          email: x_customer_email,
+          phone: null, // Can be extracted from ePayco if available
+          cardLastFour: x_approval_code?.slice(-4), // Last 4 of approval code if available
+          cardBrand: 'Unknown', // ePayco doesn't always provide brand
+          ipAddress: null, // Extract from request headers if available
+          userAgent: null, // Extract from request headers if available
+          countryCode: null, // Extract from geolocation if available
+          location: null,
+        });
+
+        logger.info('Fraud analysis results', {
+          userId,
+          riskScore: fraudAnalysis.riskScore,
+          recommendation: fraudAnalysis.recommendation,
+          flaggedChecks: fraudAnalysis.flaggedChecks.map((c) => c.name),
+        });
+
+        // BLOCK transaction if high fraud risk
+        if (fraudAnalysis.isFraudulent) {
+          logger.error('🚨 TRANSACTION BLOCKED - FRAUD DETECTED', {
+            userId,
+            refPayco: x_ref_payco,
+            riskScore: fraudAnalysis.riskScore,
+            reasons: fraudAnalysis.flaggedChecks.map((c) => c.name),
+          });
+
+          // Cancel the fraudulent transaction
+          if (payment) {
+            await PaymentModel.updateStatus(paymentId, 'fraud_blocked', {
+              transaction_id: x_transaction_id,
+              epayco_ref: x_ref_payco,
+              epaycoRef: x_ref_payco, // Store in reference field
+              cancel_reason: `Fraud detected: ${fraudAnalysis.flaggedChecks.map((c) => c.name).join(', ')}`,
+              fraud_risk_score: fraudAnalysis.riskScore,
+              cancelled_at: new Date(),
+            });
+          }
+
+          // Notify user
+          if (userId) {
+            try {
+              const user = await UserModel.getById(userId);
+              const userLanguage = user?.language || 'es';
+              const botModule = require('../bot');
+              const bot = botModule.default || botModule;
+
+              const messageText =
+                userLanguage === 'en'
+                  ? '🚨 *Fraud Alert*\n\nYour payment was blocked due to suspicious activity. This is a security measure to protect your account.\n\nIf this was legitimate, please contact support.'
+                  : '🚨 *Alerta de Fraude*\n\nTu pago fue bloqueado por actividad sospechosa. Esta es una medida de seguridad para proteger tu cuenta.\n\nSi fue legítimo, por favor contacta a soporte.';
+
+              if (bot && bot.telegram) {
+                await bot.telegram.sendMessage(userId, messageText, { parse_mode: 'Markdown' });
+              }
+            } catch (notifError) {
+              logger.error('Error sending fraud alert notification:', {
+                error: notifError.message,
+                userId,
+              });
+            }
+          }
+
+          return { success: false, error: 'Transaction blocked due to fraud detection' };
+        }
+      }
+      // ========== END FRAUD DETECTION ==========
+
+      // ========== 3DS VALIDATION REQUIREMENT ==========
+      // All approved transactions MUST have 3DS validation
+      if (isApproved) {
+        // Check 3DS status
+        const has3DS = x_three_d_s === 'Y' || x_eci || x_cavv;
+        const is3DSValidated = x_three_d_s === 'Y';
+
+        logger.info('3DS Validation Check for ePayco transaction', {
+          refPayco: x_ref_payco,
+          threeDsStatus: x_three_d_s,
+          hasECI: !!x_eci,
+          hasCAVV: !!x_cavv,
+          is3DSValidated,
+          requires3DS: true,
+        });
+
+        // REJECT transaction if 3DS is not validated
+        if (!is3DSValidated) {
+          logger.warn('ePayco transaction REJECTED - 3DS validation failed', {
+            refPayco: x_ref_payco,
+            reason: '3DS not validated',
+            threeDsStatus: x_three_d_s,
+            transactionId: x_transaction_id,
+          });
+
+          // Cancel the payment
+          if (payment) {
+            await PaymentModel.updateStatus(paymentId, 'cancelled', {
+              transaction_id: x_transaction_id,
+              epayco_ref: x_ref_payco,
+              epaycoRef: x_ref_payco, // Store in reference field
+              cancel_reason: '3DS validation required but not completed',
+              cancelled_at: new Date(),
+            });
+          }
+
+          // Notify user that payment was cancelled due to security reasons
+          if (userId) {
+            try {
+              const user = await UserModel.getById(userId);
+              const userLanguage = user?.language || 'es';
+              const botModule = require('../bot');
+              const bot = botModule.default || botModule;
+
+              const messageText = userLanguage === 'en'
+                ? '❌ *Payment Cancelled*\n\nYour payment was cancelled because 3DS (Two-Factor Security) validation was not completed. This is a mandatory security requirement.\n\nPlease try again with a card that supports 3DS validation.'
+                : '❌ *Pago Cancelado*\n\nTu pago fue cancelado porque la validación 3DS (Seguridad de Dos Factores) no fue completada. Este es un requisito de seguridad obligatorio.\n\nIntenta de nuevo con una tarjeta que soporte validación 3DS.';
+
+              if (bot && bot.telegram) {
+                await bot.telegram.sendMessage(userId, messageText, { parse_mode: 'Markdown' });
+              }
+            } catch (notifError) {
+              logger.error('Error sending 3DS rejection notification:', {
+                error: notifError.message,
+                userId,
+              });
+            }
+          }
+
+          return { success: false, error: '3DS validation required but not provided' };
+        }
+
+        logger.info('3DS validation PASSED for ePayco transaction', {
+          refPayco: x_ref_payco,
+          threeDsStatus: x_three_d_s,
+        });
+      }
+      // ========== END 3DS VALIDATION ==========
+
       if (isApproved) {
         // Payment successful
         if (payment) {
@@ -324,6 +478,7 @@ class PaymentService {
             transaction_id: x_transaction_id,
             approval_code: x_approval_code,
             epayco_ref: x_ref_payco,
+            epaycoRef: x_ref_payco, // Store in reference field
           });
         }
 
@@ -477,6 +632,7 @@ class PaymentService {
           await PaymentModel.updateStatus(paymentId, 'failed', {
             transaction_id: x_transaction_id,
             epayco_ref: x_ref_payco,
+            epaycoRef: x_ref_payco, // Store in reference field
           });
         }
 
@@ -495,6 +651,7 @@ class PaymentService {
           await PaymentModel.updateStatus(paymentId, 'pending', {
             transaction_id: x_transaction_id,
             epayco_ref: x_ref_payco,
+            epaycoRef: x_ref_payco, // Store in reference field
           });
         }
 
@@ -567,6 +724,7 @@ class PaymentService {
           await PaymentModel.updateStatus(paymentId, 'completed', {
             transaction_id: source?.txHash || id,
             daimo_event_id: id,
+            daimoEventId: source?.txHash || id, // Store in reference field
             payer_address: source?.payerAddress,
             chain_id: source?.chainId,
           });
@@ -693,6 +851,7 @@ class PaymentService {
           await PaymentModel.updateStatus(paymentId, 'failed', {
             transaction_id: source?.txHash || id,
             daimo_event_id: id,
+            daimoEventId: source?.txHash || id, // Store in reference field
           });
         }
 
@@ -709,6 +868,7 @@ class PaymentService {
           await PaymentModel.updateStatus(paymentId, 'pending', {
             transaction_id: source?.txHash || id,
             daimo_event_id: id,
+            daimoEventId: source?.txHash || id, // Store in reference field
           });
         }
 
