@@ -322,6 +322,35 @@ class MediaPlayerModel {
   }
 
   /**
+   * Get public playlists
+   * @param {number} limit - Number of playlists to return
+   */
+  static async getPublicPlaylists(limit = 10) {
+    try {
+      const cacheKey = `playlists:public:${limit}`;
+      return await cache.getOrSet(
+        cacheKey,
+        async () => {
+          const result = await query(
+            `SELECT p.*,
+              (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
+             FROM media_playlists p
+             WHERE p.is_public = true
+             ORDER BY p.updated_at DESC
+             LIMIT $1`,
+            [limit]
+          );
+          return result.rows;
+        },
+        300
+      );
+    } catch (error) {
+      logger.error('Error getting public playlists:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get playlist by ID with items
    */
   static async getPlaylistById(playlistId) {
