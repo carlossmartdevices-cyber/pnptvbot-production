@@ -109,8 +109,7 @@ ${subscriptionStatus}
 • Música + Podcasts premium
 • Contenido que no sale en ningún otro lado
 
-Si te quieres meter más duro en la comunidad:
-👉 /subscribe`
+Envía /menu o /start para ver lo que el bot puede hacer.`
       : `👋 Hey ${username}, welcome to PNPtv!
 
 This place is simple: real people, real vibes, no filters. Before you jump in, here's how you're entering today:
@@ -134,8 +133,7 @@ ${subscriptionStatus}
 • Premium Music & Podcasts
 • Exclusive content you won't see anywhere else
 
-If you want the full experience:
-👉 /subscribe`;
+Send /menu or /start to see what the bot can do.`;
 
     await ctx.reply(message, { parse_mode: 'Markdown' });
 

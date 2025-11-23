@@ -105,11 +105,11 @@ async function handleUsernameChange(ctx, userId, oldUsername, newUsername, group
     });
 
     // Check if this is a recent change (within 24 hours)
-    const hasRecentChange = await ModerationModel.hasRecentUsernameChange(userId, 24);
+    const changeCount = await ModerationModel.countRecentUsernameChanges(userId, 24);
 
-    if (hasRecentChange) {
+    if (changeCount > 1) {
       // Notify support group admins about suspicious activity (not in group chat)
-      await notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId);
+      await notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId, changeCount);
     }
   } catch (error) {
     logger.error('Error handling username change:', error);
@@ -180,10 +180,10 @@ async function handleNoUsername(ctx, userId, groupId) {
 /**
  * Notify support group of username change
  */
-async function notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId) {
+async function notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId, changeCount) {
   try {
     const supportGroupId = process.env.SUPPORT_GROUP_ID;
-    
+
     if (!supportGroupId) {
       logger.warn('SUPPORT_GROUP_ID not configured, skipping username change notification');
       return;
@@ -197,6 +197,7 @@ async function notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsernam
       + `👥 **Group:** ${groupTitle}\n`
       + `📝 **Old:** @${oldUsername || 'none'}\n`
       + `📝 **New:** @${newUsername || 'none'}\n`
+      + `🔄 **Changes in 24h:** ${changeCount}\n`
       + `📅 **When:** ${new Date().toLocaleString()}\n\n`
       + '⚠️ This user has changed their username multiple times in the last 24 hours.\n'
       + 'This could indicate evasion attempts.\n\n'
