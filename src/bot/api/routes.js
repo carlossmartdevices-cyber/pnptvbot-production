@@ -161,6 +161,12 @@ app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoW
 app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
 app.get('/api/payment-response', webhookController.handlePaymentResponse);
 
+// Farcaster Quick Auth API routes
+app.post('/api/farcaster/verify', asyncHandler(webhookController.verifyFarcasterAuth));
+app.post('/api/farcaster/payment', asyncHandler(webhookController.createFarcasterPayment));
+app.post('/api/farcaster/link', asyncHandler(webhookController.linkFarcasterAccount));
+app.get('/api/farcaster/profile/:fid', asyncHandler(webhookController.getFarcasterProfile));
+
 // Payment API routes
 app.get('/api/payment/:paymentId', asyncHandler(paymentController.getPaymentInfo));
 

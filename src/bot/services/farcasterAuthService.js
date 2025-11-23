@@ -159,8 +159,8 @@ class FarcasterAuthService {
     try {
       const UserModel = require('../../models/userModel');
 
-      // Update user with Farcaster FID
-      await UserModel.update(telegramUserId, {
+      // Update user with Farcaster FID using updateProfile
+      await UserModel.updateProfile(telegramUserId, {
         farcaster_fid: fid,
         farcaster_linked_at: new Date(),
       });
