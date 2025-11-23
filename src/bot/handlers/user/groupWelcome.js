@@ -88,8 +88,50 @@ async function sendWelcomeMessage(ctx, username, user, lang) {
     const message = lang === 'es'
       ? `👋 Ey ${username}, bienvenidx a PNPtv!
 
+Aquí la vuelta es simple: gente real, buena vibra, cero filtro. Antes de meterte de lleno, mira cómo entras hoy:
+
+⭐ Tu membresía actual:
+
+${subscriptionStatus}
+
+🔥 Lo que tienes por ahora:
+
+• Acceso al grupo
+• Contenido corto
+• Music Library gratis
+• 3 vistas en Nearby
+
+💎 Si te haces PRIME, desbloqueas:
+
+• Videos completos de Santino, Lex y la comunidad
+• Nearby ilimitado
+• Zoom Calls + Live Performances
+• Música + Podcasts premium
+• Contenido que no sale en ningún otro lado
+
 Envía /menu o /start para ver lo que el bot puede hacer.`
       : `👋 Hey ${username}, welcome to PNPtv!
+
+This place is simple: real people, real vibes, no filters. Before you jump in, here's how you're entering today:
+
+⭐ Your current membership:
+
+${subscriptionStatus}
+
+🔥 What you get right now:
+
+• Group access
+• Short content
+• Free Music Library
+• 3 views in Nearby Members
+
+💎 If you go PRIME, you unlock:
+
+• Full-length videos from Santino, Lex, and the community
+• Unlimited Nearby Members
+• Zoom Calls + Live Performances
+• Premium Music & Podcasts
+• Exclusive content you won't see anywhere else
 
 Send /menu or /start to see what the bot can do.`;
 
