@@ -1,6 +1,6 @@
 const logger = require('../../../utils/logger');
 const TopicConfigModel = require('../../../models/topicConfigModel');
-const { getRedisClient } = require('../../../config/redis');
+const { getRedis } = require('../../../config/redis');
 const UserModel = require('../../../models/userModel');
 
 /**
@@ -433,7 +433,7 @@ async function checkUserAccess(userId, topicConfig) {
  */
 async function checkRateLimit(userId, topicId, topicConfig, message) {
   try {
-    const redis = getRedisClient();
+    const redis = getRedis();
     if (!redis) return false; // No Redis, skip rate limiting
 
     const isReply = !!message.reply_to_message;
@@ -482,7 +482,7 @@ async function checkRateLimit(userId, topicId, topicConfig, message) {
  */
 async function checkAutoMute(userId, topicId, ctx) {
   try {
-    const redis = getRedisClient();
+    const redis = getRedis();
     if (!redis) return false;
 
     const muteKey = `topic:${topicId}:user:${userId}:muted`;
@@ -535,7 +535,7 @@ async function checkAutoMute(userId, topicId, ctx) {
  */
 async function getApprovalQueue() {
   try {
-    const redis = getRedisClient();
+    const redis = getRedis();
     if (redis) {
       return {
         get: async (key) => {

@@ -4,7 +4,8 @@ const UserModel = require('../../../models/userModel');
 
 /**
  * Media Mirror Middleware
- * Auto-mirrors media from general chat to configured topics (e.g., Uncensored Room)
+ * Auto-mirrors media from general chat to configured topics (e.g., PNPtv Gallery!)
+ * Includes rich user profile information with bio and clickable profile links
  */
 function mediaMirrorMiddleware() {
   return async (ctx, next) => {
@@ -47,16 +48,38 @@ function mediaMirrorMiddleware() {
     const username = ctx.from.username || ctx.from.first_name;
     const userId = ctx.from.id;
 
-    // Try to get user's PNPtv profile link
-    let profileLink = '';
+    // Get full user's PNPtv profile with bio
+    let userProfile = null;
+    let profileInfo = '';
     try {
-      const user = await UserModel.getById(userId.toString());
-      if (user && user.username) {
+      userProfile = await UserModel.getById(userId.toString());
+      if (userProfile) {
         // Create deep link to user's profile
-        profileLink = `[Ver perfil](https://t.me/${process.env.BOT_USERNAME}?start=profile_${userId})`;
+        const botUsername = process.env.BOT_USERNAME || 'pnptvbot';
+        const profileLink = `https://t.me/${botUsername}?start=profile_${userId}`;
+
+        // Build rich profile info
+        const displayName = userProfile.firstName || username;
+        const userHandle = ctx.from.username ? `@${ctx.from.username}` : displayName;
+
+        profileInfo = `👤 **${displayName}**`;
+        if (ctx.from.username) {
+          profileInfo += ` (${userHandle})`;
+        }
+
+        // Add bio if available
+        if (userProfile.bio && userProfile.bio.trim()) {
+          profileInfo += `\n📝 ${userProfile.bio.trim()}`;
+        }
+
+        // Add profile link
+        profileInfo += `\n🔗 [View Profile](${profileLink})`;
       }
     } catch (error) {
       logger.debug('Could not get user profile for mirror:', error.message);
+      // Fallback to basic info
+      const userHandle = ctx.from.username ? `@${ctx.from.username}` : username;
+      profileInfo = `👤 ${userHandle}`;
     }
 
     const caption = message.caption || '';
@@ -64,17 +87,19 @@ function mediaMirrorMiddleware() {
     // Mirror to each configured topic
     for (const mirrorTopic of mirrorTopics) {
       try {
-        // Build mirror caption using configured format
-        let mirrorCaption = mirrorTopic.mirror_format
-          .replace('{username}', username)
-          .replace('{caption}', caption)
-          .replace('{profile}', profileLink)
-          .replace('@{username}', `@${ctx.from.username || username}`);
+        // Build rich mirror caption with profile info
+        let mirrorCaption = '📸 **Shared Media**\n\n';
 
-        // If profile link exists, add it
-        if (profileLink) {
-          mirrorCaption += `\n${profileLink}`;
+        // Add profile information
+        mirrorCaption += profileInfo;
+
+        // Add original caption if exists
+        if (caption && caption.trim()) {
+          mirrorCaption += `\n\n💬 ${caption.trim()}`;
         }
+
+        // Add separator for cleaner look
+        mirrorCaption += '\n\n───────────────';
 
         // Send media to mirror topic
         if (hasPhoto) {

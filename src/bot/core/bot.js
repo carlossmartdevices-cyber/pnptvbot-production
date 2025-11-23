@@ -19,6 +19,8 @@ const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./midd
 const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
 const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
 const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
+const { usernameChangeDetectionMiddleware, initSecurityLogsTable } = require('./middleware/usernameChangeDetection');
+const { groupSecurityEnforcementMiddleware, registerGroupSecurityHandlers } = require('./middleware/groupSecurityEnforcement');
 const logger = require('../../utils/logger');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
@@ -39,6 +41,7 @@ const registerUserCallManagementHandlers = require('../handlers/user/callManagem
 const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
 const { registerLeaderboardHandlers } = require('../handlers/group/leaderboard');
+const registerUsernameChangeAdminHandlers = require('../handlers/admin/usernameChangeDetectionAdmin');
 // const registerZoomHandlers = require('../handlers/media/zoomV2'); // Temporarily disabled due to missing dependencies
 // Services
 const CallReminderService = require('../services/callReminderService');
@@ -104,12 +107,21 @@ const startBot = async () => {
       logger.warn('Redis initialization failed, continuing without cache:', error.message);
       logger.warn('⚠️  Performance may be degraded without caching');
     }
+    // Initialize security logs table
+    try {
+      await initSecurityLogsTable();
+      logger.info('✓ Security logs table initialized');
+    } catch (error) {
+      logger.warn('Security logs table initialization failed:', error.message);
+    }
     // Create bot instance
     const bot = new Telegraf(process.env.BOT_TOKEN);
     // Register middleware
     bot.use(sessionMiddleware());
     bot.use(allowedChatsMiddleware()); // Must be early to leave unauthorized chats
+    bot.use(groupSecurityEnforcementMiddleware()); // Enforce group/channel whitelist
     bot.use(rateLimitMiddleware());
+    bot.use(usernameChangeDetectionMiddleware()); // Detect suspicious name changes early
     bot.use(chatCleanupMiddleware());
     bot.use(commandAutoDeleteMiddleware()); // Delete commands from groups
     bot.use(usernameEnforcement());
@@ -144,6 +156,8 @@ const startBot = async () => {
     registerCallPackageHandlers(bot);
     registerLeaderboardHandlers(bot);
     registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic
+    registerUsernameChangeAdminHandlers(bot); // Admin commands for username change detection
+    registerGroupSecurityHandlers(bot); // Group/channel security enforcement
     // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
     // Initialize call reminder service
     CallReminderService.initialize(bot);
