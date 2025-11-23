@@ -6,6 +6,7 @@ const UserModel = require('../../models/userModel');
 const SubscriberModel = require('../../models/subscriberModel');
 const DaimoConfig = require('../../config/daimo');
 const FraudDetectionService = require('../../bot/services/fraudDetectionService');
+const PaymentSecurityService = require('../../bot/services/paymentSecurityService');
 const logger = require('../../utils/logger');
 const crypto = require('crypto');
 const { Telegraf } = require('telegraf');
@@ -258,8 +259,7 @@ class PaymentService {
         x_signature,
         x_approval_code,
         x_extra1, // userId (telegram ID)
-        x_extra2, // planId
-        x_extra3, // paymentId
+        x_extra2, // paymentId
         x_customer_email,
         x_customer_name,
         x_response_reason_text, // Reason text for the response
@@ -276,7 +276,7 @@ class PaymentService {
         codTransactionState: x_cod_transaction_state,
         responseReason: x_response_reason_text,
         amount: x_amount,
-        paymentId: x_extra3,
+        paymentId: x_extra2,
         threeDsStatus: x_three_d_s,
         eciFlag: x_eci,
       });
@@ -302,9 +302,8 @@ class PaymentService {
         logger.info('ePayco signature verified successfully');
       }
 
-      const paymentId = x_extra3;
+      const paymentId = x_extra2;
       const userId = x_extra1;
-      const planId = x_extra2;
 
       // Check if payment exists
       const payment = paymentId ? await PaymentModel.getById(paymentId) : null;
@@ -313,6 +312,9 @@ class PaymentService {
         logger.error('Payment not found and no user ID provided', { paymentId, refPayco: x_ref_payco });
         return { success: false, error: 'Payment not found' };
       }
+
+      // Get plan ID from payment record (no longer passed as extra)
+      const planId = payment ? (payment.planId || payment.plan_id) : null;
 
       // Process based on response code (x_cod_response) - primary check per ePayco docs
       // x_cod_response: 1=Aceptada, 2=Rechazada, 3=Pendiente, 4=Fallida
@@ -323,8 +325,80 @@ class PaymentService {
       const isFailed = responseCode === 4 || x_transaction_state === 'Fallida';
       const isAbandoned = x_transaction_state === 'Abandonada' || x_transaction_state === 'Cancelada';
 
+      // ========== SECURITY LAYER 1: Rate Limiting ==========
+      if (isApproved && userId) {
+        const rateLimit = await PaymentSecurityService.checkPaymentRateLimit(userId, 10);
+        if (!rateLimit.allowed) {
+          logger.warn('🚨 Payment rate limit exceeded', { userId, attempts: rateLimit.attempts });
+          
+          if (payment) {
+            await PaymentModel.updateStatus(paymentId, 'rate_limited', {
+              transaction_id: x_transaction_id,
+              epayco_ref: x_ref_payco,
+              cancel_reason: 'Rate limit exceeded',
+              cancelled_at: new Date(),
+            });
+          }
+          
+          return { success: false, error: 'Rate limit exceeded' };
+        }
+      }
+
+      // ========== SECURITY LAYER 2: Replay Attack Prevention ==========
+      if (isApproved && x_ref_payco) {
+        const replay = await PaymentSecurityService.checkReplayAttack(x_ref_payco, 'epayco');
+        if (replay.isReplay) {
+          logger.error('🚨 REPLAY ATTACK DETECTED', { transactionId: x_ref_payco });
+          
+          if (payment) {
+            await PaymentModel.updateStatus(paymentId, 'duplicate_blocked', {
+              transaction_id: x_transaction_id,
+              epayco_ref: x_ref_payco,
+              cancel_reason: 'Duplicate transaction detected',
+              cancelled_at: new Date(),
+            });
+          }
+          
+          return { success: false, error: 'Duplicate transaction' };
+        }
+      }
+
+      // ========== SECURITY LAYER 3: Amount Integrity Validation ==========
+      if (isApproved && paymentId && x_amount) {
+        const amountValid = await PaymentSecurityService.validatePaymentAmount(paymentId, parseFloat(x_amount));
+        if (!amountValid.valid) {
+          logger.error('🚨 Amount mismatch detected', {
+            paymentId,
+            expected: amountValid.actual,
+            received: parseFloat(x_amount),
+          });
+          
+          if (payment) {
+            await PaymentModel.updateStatus(paymentId, 'amount_mismatch', {
+              transaction_id: x_transaction_id,
+              epayco_ref: x_ref_payco,
+              cancel_reason: 'Payment amount verification failed',
+              cancelled_at: new Date(),
+            });
+          }
+          
+          return { success: false, error: 'Amount mismatch' };
+        }
+      }
+
+      // ========== SECURITY LAYER 4: PCI Compliance Check ==========
+      if (isApproved) {
+        const pciCompliant = PaymentSecurityService.validatePCICompliance({
+          lastFour: x_approval_code?.slice(-4),
+        });
+        if (!pciCompliant.compliant) {
+          logger.error('🚨 PCI COMPLIANCE VIOLATION', pciCompliant);
+          return { success: false, error: 'PCI compliance check failed' };
+        }
+      }
+
       // ========== FRAUD DETECTION - RUN ALL CHECKS ==========
-      // Comprehensive anti-fraud validation BEFORE 3DS check
+      // Comprehensive anti-fraud validation AFTER security layers
       if (isApproved && userId) {
         logger.info('🔒 Running comprehensive fraud detection', {
           userId,
@@ -482,6 +556,27 @@ class PaymentService {
           });
         }
 
+        // ========== SECURITY LAYER 5: Audit Logging ==========
+        await PaymentSecurityService.logPaymentEvent({
+          paymentId: paymentId,
+          userId: userId,
+          eventType: 'completed',
+          provider: 'epayco',
+          amount: parseFloat(x_amount),
+          status: 'success',
+          ipAddress: null,
+          userAgent: null,
+          details: {
+            reference: x_ref_payco,
+            transactionId: x_transaction_id,
+            approvalCode: x_approval_code,
+            method: 'credit_card',
+            planId: planId,
+            threeDsStatus: x_three_d_s,
+            eciFlag: x_eci,
+          },
+        });
+
         // Activate user subscription
         if (userId && planId) {
           const plan = await PlanModel.getById(planId);
@@ -636,6 +731,25 @@ class PaymentService {
           });
         }
 
+        // ========== Audit Logging for Failed Payments ==========
+        await PaymentSecurityService.logPaymentEvent({
+          paymentId: paymentId,
+          userId: userId,
+          eventType: 'rejected',
+          provider: 'epayco',
+          amount: parseFloat(x_amount),
+          status: 'failed',
+          ipAddress: null,
+          userAgent: null,
+          details: {
+            reference: x_ref_payco,
+            transactionId: x_transaction_id,
+            responseCode: x_cod_response,
+            reason: x_response_reason_text,
+            transactionState: x_transaction_state,
+          },
+        });
+
         logger.warn('Payment rejected by ePayco', {
           paymentId,
           refPayco: x_ref_payco,
@@ -670,6 +784,35 @@ class PaymentService {
         error: error.message,
         stack: error.stack,
       });
+
+      // ========== SECURITY LAYER 6: Error Logging ==========
+      if (webhookData.x_extra2 && webhookData.x_extra1) {
+        await PaymentSecurityService.logPaymentError({
+          paymentId: webhookData.x_extra2,
+          userId: webhookData.x_extra1,
+          provider: 'epayco',
+          errorCode: error.code || 'PAYMENT_ERROR',
+          errorMessage: error.message,
+          stackTrace: error.stack,
+        });
+
+        await PaymentSecurityService.logPaymentEvent({
+          paymentId: webhookData.x_extra2,
+          userId: webhookData.x_extra1,
+          eventType: 'error',
+          provider: 'epayco',
+          amount: parseFloat(webhookData.x_amount) || 0,
+          status: 'failed',
+          ipAddress: null,
+          userAgent: null,
+          details: { 
+            reason: error.message,
+            reference: webhookData.x_ref_payco,
+            transactionId: webhookData.x_transaction_id,
+          },
+        });
+      }
+
       return { success: false, error: error.message };
     }
   }
@@ -702,6 +845,7 @@ class PaymentService {
       const planId = metadata?.planId;
       const paymentId = metadata?.paymentId;
       const chatId = metadata?.chatId;
+      const farcasterFid = metadata?.farcasterFid;
 
       if (!userId || !planId) {
         logger.error('Missing user ID or plan ID in Daimo webhook', { eventId: id });
@@ -738,17 +882,27 @@ class PaymentService {
           const expiryDate = new Date();
           expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
 
-          await UserModel.updateSubscription(userId, {
+          // Update subscription with Farcaster FID if available
+          const subscriptionUpdate = {
             status: 'active',
             planId,
             expiry: expiryDate,
-          });
+          };
+
+          // Store Farcaster FID if present in payment metadata
+          if (farcasterFid) {
+            subscriptionUpdate.farcaster_fid = farcasterFid;
+            subscriptionUpdate.farcaster_linked_at = new Date();
+          }
+
+          await UserModel.updateSubscription(userId, subscriptionUpdate);
 
           logger.info('User subscription activated via Daimo webhook', {
             userId,
             planId,
             expiryDate,
             txHash: source?.txHash,
+            farcasterFid: farcasterFid || null,
           });
 
           // Send payment confirmation notification via bot (with PRIME channel link)

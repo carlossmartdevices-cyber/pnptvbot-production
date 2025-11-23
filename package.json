@@ -34,6 +34,7 @@
   "dependencies": {
     "@daimo/pay": "^1.19.0",
     "@daimo/pay-common": "^1.19.0",
+    "@farcaster/quick-auth": "^0.0.8",
     "@mistralai/mistralai": "^1.10.0",
     "@sentry/node": "^7.99.0",
     "agora-access-token": "^2.0.4",
