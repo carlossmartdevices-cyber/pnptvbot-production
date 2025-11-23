@@ -105,32 +105,12 @@ async function handleUsernameChange(ctx, userId, oldUsername, newUsername, group
     });
 
     // Check if this is a recent change (within 24 hours)
-    const hasRecentChange = await ModerationModel.hasRecentUsernameChange(userId, 24);
+    const changeCount = await ModerationModel.countRecentUsernameChanges(userId, 24);
 
-    if (hasRecentChange) {
-      // Notify group admins about suspicious activity
-      await notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId);
+    if (changeCount > 1) {
+      // Notify support group admins about suspicious activity (not in group chat)
+      await notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId, changeCount);
     }
-
-    // Send notification in group (will be auto-deleted)
-    const firstName = ctx.from?.first_name || 'User';
-    const lang = ctx.session?.language || 'en';
-
-    let notificationMessage = '🔔 **Username Change Detected**\n\n';
-    notificationMessage += `👤 **User:** ${firstName}\n`;
-    notificationMessage += `📝 **Previous:** @${oldUsername || 'none'}\n`;
-    notificationMessage += `📝 **Current:** @${newUsername || 'none'}\n`;
-
-    if (hasRecentChange) {
-      notificationMessage += '\n⚠️ **Warning:** Multiple username changes detected within 24 hours.';
-    }
-
-    const sentMessage = await ctx.reply(notificationMessage, {
-      parse_mode: 'Markdown',
-    });
-
-    // Auto-delete notification after 30 seconds
-    ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30000);
   } catch (error) {
     logger.error('Error handling username change:', error);
   }
@@ -198,46 +178,49 @@ async function handleNoUsername(ctx, userId, groupId) {
 }
 
 /**
- * Notify group admins of username change
+ * Notify support group of username change
  */
-async function notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId) {
+async function notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId, changeCount) {
   try {
-    // Get group administrators
-    const admins = await ctx.getChatAdministrators();
+    const supportGroupId = process.env.SUPPORT_GROUP_ID;
+
+    if (!supportGroupId) {
+      logger.warn('SUPPORT_GROUP_ID not configured, skipping username change notification');
+      return;
+    }
 
     const firstName = ctx.from?.first_name || 'User';
+    const groupTitle = ctx.chat?.title || 'Unknown Group';
 
     const notificationMessage = '🚨 **Suspicious Username Change**\n\n'
       + `👤 **User:** ${firstName} (ID: ${userId})\n`
+      + `👥 **Group:** ${groupTitle}\n`
       + `📝 **Old:** @${oldUsername || 'none'}\n`
       + `📝 **New:** @${newUsername || 'none'}\n`
+      + `🔄 **Changes in 24h:** ${changeCount}\n`
       + `📅 **When:** ${new Date().toLocaleString()}\n\n`
       + '⚠️ This user has changed their username multiple times in the last 24 hours.\n'
       + 'This could indicate evasion attempts.\n\n'
       + `Use /userhistory ${userId} to see full history.`;
 
-    // Send to each admin via DM
-    for (const admin of admins) {
-      if (admin.user.is_bot) continue; // Skip bots
+    // Send to support group only
+    try {
+      await ctx.telegram.sendMessage(
+        supportGroupId,
+        notificationMessage,
+        { parse_mode: 'Markdown' },
+      );
 
-      try {
-        await ctx.telegram.sendMessage(
-          admin.user.id,
-          notificationMessage,
-          { parse_mode: 'Markdown' },
-        );
-
-        logger.debug('Admin notified of username change', {
-          adminId: admin.user.id,
-          userId,
-        });
-      } catch (error) {
-        // Admin hasn't started bot or blocked it
-        logger.debug(`Could not notify admin ${admin.user.id}:`, error.message);
-      }
+      logger.debug('Support group notified of suspicious username change', {
+        supportGroupId,
+        userId,
+        groupId,
+      });
+    } catch (error) {
+      logger.error('Could not send message to support group:', error.message);
     }
   } catch (error) {
-    logger.error('Error notifying admins of username change:', error);
+    logger.error('Error notifying support group of username change:', error);
   }
 }
 

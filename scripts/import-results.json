@@ -1,0 +1,718 @@
+{
+  "success": 20,
+  "skipped": 79,
+  "failed": 0,
+  "details": [
+    {
+      "username": "sluTvrspaTy",
+      "email": "chtownntucar@hotmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "jayy_kavy2912",
+      "email": "jayyykavy2912@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "smurfgjunk25",
+      "email": "iunkrafo@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "clouduba99",
+      "email": "forpomonly990@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "Rubber_masker",
+      "email": "j.tolsol@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "DelightfulFemboy",
+      "userId": "7499825802",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "Flintbucks",
+      "userId": "6951290487",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "jwentworth222",
+      "email": "andrew.thurman95@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "V3rsangel",
+      "email": "experiment798@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "BLKPersuasion",
+      "email": "eugenehill@yahoo.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "M ike myname",
+      "email": "maurizio.iapicca@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "manc_guy2",
+      "userId": "5596663624",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "remmett18",
+      "userId": "6085910448",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "DerekSub7",
+      "email": "juehnhof@me.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "Bbslam505",
+      "userId": "5899228122",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "Phillupmy4ss",
+      "email": "phillupmy4ss4fun@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "txiang58",
+      "email": "leo.h58@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "mohayiep",
+      "email": "arief.mohammadkhsa@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "sfdiver",
+      "email": "rjv65@msn.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "augustosNYC",
+      "email": "eladiaz@yahoo.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "Ron que",
+      "email": "sirdan1993@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "did12216",
+      "email": "hmarquez0079@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "StrokeTheOtter",
+      "email": "csmurphy20@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "nchaos247",
+      "email": "raunchybikdawg@proton.me",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "ajajyyyy457",
+      "email": "jay.nicholson1997@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "PiscesMoon98",
+      "userId": "6526585651",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "justhere1229",
+      "email": "caffybois@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "xtm_88",
+      "userId": "7849654881",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "email"
+    },
+    {
+      "username": "e1991",
+      "email": "ianescarcha@yahoo.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "ms60tx",
+      "email": "tx4msguy@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "panoramastitcher",
+      "email": "urs.walther@gmx.de",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "pzecve",
+      "email": "petersburggg@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "nycripepeach",
+      "userId": "5269360909",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "jeffry456",
+      "email": "jeffry456@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "Raccoone3",
+      "email": "chona.blood@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "Twinksubslutttt",
+      "userId": "7088487175",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "email"
+    },
+    {
+      "username": "daddyzapig",
+      "email": "jeviseta@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "jonsean",
+      "email": "john.shean@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "fitness_mgs",
+      "email": "miller.greg.s@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "sublars",
+      "email": "bourdonmusic@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "Nokao Boi",
+      "email": "saymorea@icloud.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "Chill_Party_bttm",
+      "userId": "7857923659",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "subbottomthai",
+      "email": "teerex2000@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "akin1007",
+      "email": "m85088@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "daren_p",
+      "email": "dazza_210975@yahoo.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "sfbayk",
+      "userId": "1033432419",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "Blueyesd510",
+      "email": "dbyoung@mac.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "Deskisd2050",
+      "email": "shaunizzkkool@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "thesedarkhours_76",
+      "userId": "6965613313",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "justlookin123",
+      "email": "calva1996@yahoo.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "christopherwai",
+      "email": "davidmok0911@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "VnxCrsntBm",
+      "email": "kdarkstar@aol.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "buddystb",
+      "email": "buddystb@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "BBearPigSub - Santino (aka Carlos) - knows",
+      "email": "bdudenude@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "galaxcuy1111",
+      "email": "aaalinda0045aaa@yahoo.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "Tallgaveyy",
+      "email": "farr75500@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "DeizApollo",
+      "email": "kingslesson90@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "3rsangel",
+      "email": "experiment798@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "UWS_Jeff",
+      "email": "jeffluvs@icloud.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "kiddsnowww",
+      "email": "micahirs@yahoo.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "lb562xxx",
+      "userId": "7416710507",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "email"
+    },
+    {
+      "username": "yoshvasp",
+      "email": "yoshivasp@yahoo.de",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "tcbcn22",
+      "email": "sayhtoduy@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "aTspnewyork",
+      "email": "Studiopigsha@outlook.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "MikeAlexander",
+      "email": "josephbutcher14@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "Oracle0218",
+      "userId": "5373548942",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "lukel02",
+      "userId": "7071683657",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "thatonepigboy",
+      "email": "whocaresnotme.kb@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "owl_who_who",
+      "userId": "5417627815",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "needybtchkitty",
+      "email": "justforonepurpose63@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "vetrate",
+      "userId": "920786645",
+      "status": "success",
+      "oldPlan": "PRIME Lifetime Pass",
+      "newPlan": "lifetime_pass",
+      "matchedBy": "username"
+    },
+    {
+      "username": "ade_ultra",
+      "email": "jsfaban007@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "lifetime_pass"
+    },
+    {
+      "username": "SUIRODEF",
+      "userId": "1071160931",
+      "status": "success",
+      "oldPlan": "PRIME Yearly Pass",
+      "newPlan": "diamond_member",
+      "matchedBy": "username"
+    },
+    {
+      "username": "downassed99",
+      "email": "rightguyyinghtnow99@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "Clytemn3stra",
+      "email": "aaandrea.tata@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "Godric wu",
+      "email": "vicjwoj@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "cjtakarai",
+      "email": "demarcodakara@yahoo.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "franken22293",
+      "email": "rankenking223@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "maksbknyc",
+      "userId": "7679106398",
+      "status": "success",
+      "oldPlan": "PRIME Yearly Pass",
+      "newPlan": "diamond_member",
+      "matchedBy": "username"
+    },
+    {
+      "username": "hanlxx",
+      "email": "borhand784@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "tml_1987",
+      "email": "agguinner87@yahoo.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "Liang Mark",
+      "email": "mark.liang_1978@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "WombatWM",
+      "email": "scottdmccoy@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "dedeeffy",
+      "email": "fleweldewi@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "sbboy1965",
+      "email": "Bryan.trumbul@proton.me",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "pnp_member"
+    },
+    {
+      "username": "PupFlip",
+      "email": "tumblejem@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "milenhigh22",
+      "email": "cakingipson@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "Leatherdom",
+      "email": "thomas.bore@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "Jaynd935",
+      "email": "jiend935@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "PupChrome",
+      "email": "naphaajohn@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "jwm1289",
+      "email": "jimmywong19890914@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "KingChaos095",
+      "userId": "7322348287",
+      "status": "success",
+      "oldPlan": "PRIME Yearly Pass",
+      "newPlan": "diamond_member",
+      "matchedBy": "username"
+    },
+    {
+      "username": "pzipglad",
+      "email": "mike.jennings279@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "nycpartyking212",
+      "email": "partyking10303@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "Bewear_the_derpybear",
+      "email": "theostogaymer@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "sttl191",
+      "email": "jdwil12@icloud.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "trial_week"
+    },
+    {
+      "username": "workingclass25",
+      "email": "john@amafilim.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "Armando Vargas",
+      "email": "vargassaarmando@gmail.com",
+      "status": "skipped",
+      "reason": "User not found in database",
+      "suggestedPlan": "diamond_member"
+    },
+    {
+      "username": "SUIRODEF",
+      "status": "skipped",
+      "reason": "Unknown plan: Perrius"
+    }
+  ]
+}

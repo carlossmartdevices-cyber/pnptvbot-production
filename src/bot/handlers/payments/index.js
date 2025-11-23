@@ -1,6 +1,7 @@
 const { Markup } = require('telegraf');
 const PaymentService = require('../../services/paymentService');
 const PlanModel = require('../../../models/planModel');
+const UserService = require('../../services/userService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
@@ -17,27 +18,58 @@ const registerPaymentHandlers = (bot) => {
   // Show subscription plans
   bot.action('show_subscription_plans', async (ctx) => {
     try {
+      await ctx.answerCbQuery();
       const lang = getLanguage(ctx);
+      
+      // Check if user already has an active subscription
+      const hasActiveSubscription = await UserService.hasActiveSubscription(ctx.from.id);
+      
+      if (hasActiveSubscription) {
+        const warningMsg = lang === 'es'
+          ? '⚠️ **Ya tienes una suscripción activa**\n\n'
+            + 'No puedes comprar una nueva suscripción mientras tengas una activa.\n\n'
+            + 'Para evitar pagos duplicados, por favor espera a que tu suscripción actual expire o contacta soporte para cambiar tu plan.'
+          : '⚠️ **You already have an active subscription**\n\n'
+            + 'You cannot purchase a new subscription while you have an active one.\n\n'
+            + 'To avoid double payments, please wait until your current subscription expires or contact support to change your plan.';
+        
+        await ctx.editMessageText(
+          warningMsg,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(t('back', lang), 'back_to_main')]
+            ])
+          }
+        );
+        return;
+      }
+      
       const plans = await PlanModel.getAll();
 
-      let message = `${t('subscriptionPlans', lang)}\n\n`;
+      // Header with internationalization
+      let message = `${t('subscriptionHeader', lang)}\n`;
+      message += `${t('subscriptionDivider', lang)}\n\n`;
+      message += `${t('subscriptionDescription', lang)}\n\n\n`;
 
       const buttons = [];
       plans.forEach((plan) => {
-        const planName = lang === 'es' ? plan.nameEs : plan.name;
-        const features = lang === 'es' ? plan.featuresEs : plan.features;
+        const planName = plan.display_name || plan.name;
+        const durationText = plan.duration_days || plan.duration;
+        const price = parseFloat(plan.price);
 
-        message += `${planName} - $${plan.price}/month\n`;
-        features.forEach((feature) => {
-          message += `  ✓ ${feature}\n`;
-        });
-        message += '\n';
+        // Format buttons with i18n
+        let buttonText;
+        if (plan.is_lifetime) {
+          // Lifetime Pass without duration
+          buttonText = `${planName} | $${price.toFixed(2)}`;
+        } else {
+          // Regular plans with duration
+          buttonText = `${planName} | ${durationText} ${t('days', lang)} | $${price.toFixed(2)}`;
+        }
 
         buttons.push([
-          Markup.button.callback(
-            `💎 ${planName}`,
-            `select_plan_${plan.id}`,
-          ),
+          Markup.button.callback(buttonText, `select_plan_${plan.id}`),
         ]);
       });
 
@@ -46,12 +78,15 @@ const registerPaymentHandlers = (bot) => {
       await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
     } catch (error) {
       logger.error('Error showing subscription plans:', error);
+      await ctx.answerCbQuery('Error loading plans. Please try again.').catch(() => {});
     }
   });
 
   // Select plan
   bot.action(/^select_plan_(.+)$/, async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+
       // Validate match result exists
       if (!ctx.match || !ctx.match[1]) {
         logger.error('Invalid plan selection action format');
@@ -61,25 +96,71 @@ const registerPaymentHandlers = (bot) => {
       const planId = ctx.match[1];
       const lang = getLanguage(ctx);
 
+      logger.info('Plan selected', { planId, userId: ctx.from?.id });
+
+      // Obtener detalles del plan
+      const plan = await PlanModel.getById(planId);
+      if (!plan) {
+        await ctx.editMessageText(
+          t('error', lang),
+          Markup.inlineKeyboard([
+            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
+          ]),
+        );
+        return;
+      }
+
       ctx.session.temp.selectedPlan = planId;
       await ctx.saveSession();
 
+      // Obtener descripción del plan desde i18n
+      let planDesc = '';
+      switch (plan.sku) {
+        case 'CRYSTAL':
+          planDesc = t('planCrystalDesc', lang);
+          break;
+        case 'DIAMOND':
+          planDesc = t('planDiamondDesc', lang);
+          break;
+        case 'LIFETIME':
+          planDesc = t('planLifetimeDesc', lang);
+          break;
+        case 'MONTHLY':
+          planDesc = t('planMonthlyDesc', lang);
+          break;
+        default:
+          planDesc = plan.description || '';
+      }
+
+      const planName = plan.display_name || plan.name;
+      const price = parseFloat(plan.price);
+      let planHeader = `${t('planDetails', lang)}\n`;
+      planHeader += `*${planName}* | $${price.toFixed(2)}\n\n`;
+      planHeader += `${planDesc}\n\n`;
+      planHeader += `${t('paymentMethod', lang)}`;
+
       await ctx.editMessageText(
-        t('paymentMethod', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('payWithEpayco', lang), `pay_epayco_${planId}`)],
-          [Markup.button.callback(t('payWithDaimo', lang), `pay_daimo_${planId}`)],
-          [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
-        ]),
+        planHeader,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(t('payWithEpayco', lang), `pay_epayco_${planId}`)],
+            [Markup.button.callback(t('payWithDaimo', lang), `pay_daimo_${planId}`)],
+            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
+          ]),
+        },
       );
     } catch (error) {
       logger.error('Error selecting plan:', error);
+      await ctx.answerCbQuery('Error selecting plan. Please try again.').catch(() => {});
     }
   });
 
   // Pay with ePayco
   bot.action(/^pay_epayco_(.+)$/, async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+
       // Validate match result exists
       if (!ctx.match || !ctx.match[1]) {
         logger.error('Invalid ePayco payment action format');
@@ -97,6 +178,32 @@ const registerPaymentHandlers = (bot) => {
       }
 
       const userId = ctx.from.id;
+
+      // Double-check if user has active subscription before creating payment
+      const hasActiveSubscription = await UserService.hasActiveSubscription(userId);
+      
+      if (hasActiveSubscription) {
+        const warningMsg = lang === 'es'
+          ? '⚠️ **Ya tienes una suscripción activa**\n\n'
+            + 'No puedes realizar un nuevo pago mientras tengas una suscripción activa.\n\n'
+            + 'Esto evita pagos duplicados. Si deseas cambiar tu plan, contacta soporte.'
+          : '⚠️ **You already have an active subscription**\n\n'
+            + 'You cannot make a new payment while you have an active subscription.\n\n'
+            + 'This prevents double payments. If you want to change your plan, contact support.';
+        
+        await ctx.editMessageText(
+          warningMsg,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(t('back', lang), 'back_to_main')]
+            ])
+          }
+        );
+        return;
+      }
+
+      logger.info('Creating ePayco payment', { planId, userId });
 
       await ctx.editMessageText(t('loading', lang));
 
@@ -130,6 +237,8 @@ const registerPaymentHandlers = (bot) => {
   // Pay with Daimo
   bot.action(/^pay_daimo_(.+)$/, async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+
       // Validate match result exists
       if (!ctx.match || !ctx.match[1]) {
         logger.error('Invalid Daimo payment action format');
@@ -148,6 +257,32 @@ const registerPaymentHandlers = (bot) => {
 
       const userId = ctx.from.id;
       const chatId = ctx.chat?.id;
+
+      // Double-check if user has active subscription before creating payment
+      const hasActiveSubscription = await UserService.hasActiveSubscription(userId);
+      
+      if (hasActiveSubscription) {
+        const warningMsg = lang === 'es'
+          ? '⚠️ **Ya tienes una suscripción activa**\n\n'
+            + 'No puedes realizar un nuevo pago mientras tengas una suscripción activa.\n\n'
+            + 'Esto evita pagos duplicados. Si deseas cambiar tu plan, contacta soporte.'
+          : '⚠️ **You already have an active subscription**\n\n'
+            + 'You cannot make a new payment while you have an active subscription.\n\n'
+            + 'This prevents double payments. If you want to change your plan, contact support.';
+        
+        await ctx.editMessageText(
+          warningMsg,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(t('back', lang), 'back_to_main')]
+            ])
+          }
+        );
+        return;
+      }
+
+      logger.info('Creating Daimo payment', { planId, userId });
 
       await ctx.editMessageText(t('loading', lang));
 
@@ -176,7 +311,7 @@ const registerPaymentHandlers = (bot) => {
 
         const message = lang === 'es'
           ? '💳 *Pago con Daimo Pay*\n\n'
-            + `Plan: ${plan.nameEs || plan.name}\n`
+            + `Plan: ${plan.display_name || plan.name}\n`
             + `Precio: $${plan.price} USDC\n\n`
             + '📱 *Puedes pagar usando:*\n'
             + '• Zelle\n'
@@ -191,7 +326,7 @@ const registerPaymentHandlers = (bot) => {
             + '4. Tu suscripción se activa inmediatamente\n\n'
             + '🔒 Seguro y rápido en la red Optimism'
           : '💳 *Pay with Daimo Pay*\n\n'
-            + `Plan: ${plan.name}\n`
+            + `Plan: ${plan.display_name || plan.name}\n`
             + `Price: $${plan.price} USDC\n\n`
             + '📱 *You can pay using:*\n'
             + '• Zelle\n'

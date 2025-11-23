@@ -1,6 +1,7 @@
 const Joi = require('joi');
 const validator = require('validator');
 const logger = require('./logger');
+const sanitizeHtml = require('sanitize-html');
 
 /**
  * Sanitize user input to prevent XSS and injection attacks
@@ -10,8 +11,8 @@ const logger = require('./logger');
 const sanitizeInput = (input) => {
   if (typeof input !== 'string') return input;
 
-  // Remove HTML tags and scripts
-  let sanitized = input.replace(/<[^>]*>/g, '');
+  // Remove HTML tags and scripts using sanitize-html library
+  let sanitized = sanitizeHtml(input, { allowedTags: [], allowedAttributes: {} });
 
   // Escape special characters
   sanitized = validator.escape(sanitized);
@@ -127,12 +128,13 @@ const schemas = {
       .optional(),
     firstName: Joi.string().min(1).max(50).optional(),
     lastName: Joi.string().min(1).max(50).optional(),
-    email: Joi.string().email().optional(),
+    email: Joi.string().email().optional().allow(null, ''),
     age: Joi.number().integer().min(18).max(120).optional(),
     bio: Joi.string().max(500).optional().allow(''),
     interests: Joi.array().items(Joi.string().max(50)).max(10).optional(),
     photoFileId: Joi.string().optional(),
     language: Joi.string().valid('en', 'es').optional(),
+    onboardingComplete: Joi.boolean().optional(),
   }).min(1),
 
   // Location schema

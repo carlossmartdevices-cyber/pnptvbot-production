@@ -1,4 +1,5 @@
 const ModerationService = require('../../services/moderationService');
+const ModerationModel = require('../../../models/moderationModel');
 const ChatCleanupService = require('../../services/chatCleanupService');
 const logger = require('../../../utils/logger');
 const { t } = require('../../../utils/i18n');
@@ -28,6 +29,19 @@ const moderationFilter = () => async (ctx, next) => {
     // Skip if message is from a bot
     if (ctx.from?.is_bot) {
       return next();
+    }
+
+    // Check for global ban first
+    const isGloballyBanned = await ModerationModel.isUserBanned(userId, 'GLOBAL');
+    if (isGloballyBanned) {
+      try {
+        await ctx.deleteMessage();
+        await ctx.kickChatMember(userId);
+        logger.info('Globally banned user removed', { userId, groupId });
+      } catch (error) {
+        logger.debug('Error removing globally banned user:', error.message);
+      }
+      return; // Don't call next() - user is blocked
     }
 
     // Check if user is admin/creator (admins bypass moderation)
