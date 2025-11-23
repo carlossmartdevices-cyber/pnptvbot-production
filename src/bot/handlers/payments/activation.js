@@ -96,17 +96,12 @@ const registerActivationHandlers = (bot) => {
           [new Date(), String(userId), ctx.from.username || null, code]
         );
 
-        // Update user subscription
-        const updates = {
-          subscriptionStatus: 'active',
-          planType: 'lifetime',
-          planExpiry: null, // Lifetime = no expiry
-          lifetimeAccess: true,
-          activatedAt: new Date(),
-          activationCode: code,
-        };
-
-        await UserModel.updateById(userId, updates);
+        // Update user subscription using the correct method
+        await UserModel.updateSubscription(userId, {
+          status: 'active',
+          planId: 'lifetime',
+          expiry: null, // Lifetime = no expiry
+        });
 
         // Log successful activation
         logger.info(`Lifetime pass activated: code=${code}, userId=${userId}, product=${product}`);
@@ -146,6 +141,36 @@ const registerActivationHandlers = (bot) => {
             + 'Welcome to the PNPtv community! 🎊';
 
         await ctx.reply(successMessage);
+
+        // Send PRIME channel invites for all channels
+        try {
+          const primeChannels = (process.env.PRIME_CHANNEL_ID || '').split(',').map(id => id.trim()).filter(id => id);
+          if (primeChannels.length > 0) {
+            const inviteLinks = [];
+            for (const channelId of primeChannels) {
+              try {
+                const inviteLink = await ctx.telegram.createChatInviteLink(channelId, {
+                  member_limit: 1,
+                  name: `Activation code - ${userId}`,
+                });
+                inviteLinks.push(inviteLink.invite_link);
+              } catch (channelError) {
+                logger.error('Error creating invite for channel:', { channelId, error: channelError.message });
+              }
+            }
+
+            if (inviteLinks.length > 0) {
+              const linksText = inviteLinks.map((link, i) => `${i + 1}. ${link}`).join('\n');
+              const inviteMessage = lang === 'es'
+                ? `🔗 *Acceso a los Canales PRIME*\n\nHaz clic en los siguientes enlaces para unirte a los canales exclusivos:\n\n${linksText}\n\n⚠️ Estos enlaces son de uso único y personal.`
+                : `🔗 *PRIME Channels Access*\n\nClick the following links to join the exclusive channels:\n\n${linksText}\n\n⚠️ These links are for single use only.`;
+
+              await ctx.reply(inviteMessage, { parse_mode: 'Markdown' });
+            }
+          }
+        } catch (inviteError) {
+          logger.error('Error creating PRIME channel invites:', inviteError);
+        }
 
         // Send follow-up message after initial response
         // Using Promise.resolve().then() instead of setTimeout to maintain context
