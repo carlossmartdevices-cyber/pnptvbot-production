@@ -1,6 +1,7 @@
 const Joi = require('joi');
 const validator = require('validator');
 const logger = require('./logger');
+const sanitizeHtml = require('sanitize-html');
 
 /**
  * Sanitize user input to prevent XSS and injection attacks
@@ -11,7 +12,7 @@ const sanitizeInput = (input) => {
   if (typeof input !== 'string') return input;
 
   // Remove HTML tags and scripts
-  let sanitized = input.replace(/<[^>]*>/g, '');
+  let sanitized = sanitizeHtml(input, { allowedTags: [], allowedAttributes: {} });
 
   // Escape special characters
   sanitized = validator.escape(sanitized);
