@@ -271,9 +271,13 @@ class MediaPlayerModel {
 
   /**
    * Create a playlist
+   * @param {string|number} userId - User ID
+   * @param {Object} playlistData - Playlist data { name, description, isPublic }
    */
-  static async createPlaylist(userId, name, description = '', isPublic = false) {
+  static async createPlaylist(userId, playlistData) {
     try {
+      const { name, description = '', isPublic = false } = playlistData;
+
       const result = await query(
         `INSERT INTO media_playlists (user_id, name, description, is_public)
          VALUES ($1, $2, $3, $4)
