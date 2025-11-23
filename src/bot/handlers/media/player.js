@@ -85,6 +85,12 @@ const registerPlayerHandlers = (bot) => {
   bot.action('player_search', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
+
+      // Initialize session temp if needed
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
+
       ctx.session.temp.waitingForMediaSearch = true;
       await ctx.saveSession();
 
@@ -103,6 +109,12 @@ const registerPlayerHandlers = (bot) => {
   bot.action('player_create_playlist', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
+
+      // Initialize session temp if needed
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
+
       ctx.session.temp.waitingForPlaylistName = true;
       await ctx.saveSession();
 
