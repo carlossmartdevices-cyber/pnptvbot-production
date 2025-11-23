@@ -37,6 +37,10 @@ function mediaOnlyValidator() {
     const hasVideo = !!message.video;
     const hasAnimation = !!message.animation;
     const hasSticker = !!message.sticker;
+    const hasDocument = !!message.document;
+    const hasVideoNote = !!message.video_note;
+    const hasVoice = !!message.voice;
+    const hasAudio = !!message.audio;
 
     // Parse allowed media from config
     const allowedMedia = JSON.parse(topicConfig.allowed_media || '[]');
@@ -45,7 +49,11 @@ function mediaOnlyValidator() {
       (hasPhoto && allowedMedia.includes('photo')) ||
       (hasVideo && allowedMedia.includes('video')) ||
       (hasAnimation && allowedMedia.includes('animation')) ||
-      (hasSticker && topicConfig.allow_stickers)
+      (hasSticker && topicConfig.allow_stickers) ||
+      (hasDocument && topicConfig.allow_documents) ||
+      (hasVideoNote && allowedMedia.includes('video')) ||
+      (hasVoice && allowedMedia.includes('voice')) ||
+      (hasAudio && allowedMedia.includes('audio'))
     );
 
     // Allow if:

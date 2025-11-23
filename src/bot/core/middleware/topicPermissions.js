@@ -1,5 +1,7 @@
 const logger = require('../../../utils/logger');
 const TopicConfigModel = require('../../../models/topicConfigModel');
+const { getRedisClient } = require('../../../config/redis');
+const UserModel = require('../../../models/userModel');
 
 /**
  * Topic Permissions Middleware
@@ -30,10 +32,76 @@ function topicPermissionsMiddleware() {
     const userId = ctx.from.id;
     const chatId = ctx.chat.id;
     const message = ctx.message;
+    const lang = ctx.from.language_code === 'es' ? 'es' : 'en';
 
     // Check if user is admin
     const member = await ctx.telegram.getChatMember(chatId, userId);
     const isAdmin = ['creator', 'administrator'].includes(member.status);
+
+    // ===================================
+    // COMMAND BLOCKING
+    // ===================================
+    if (!topicConfig.allow_commands && message.text?.startsWith('/')) {
+      // Allow admins to use commands
+      if (!isAdmin) {
+        await ctx.deleteMessage();
+        const warning = lang === 'es'
+          ? `⚠️ Los comandos no están permitidos en **${topicConfig.topic_name}**.`
+          : `⚠️ Commands are not allowed in **${topicConfig.topic_name}**.`;
+        try {
+          await ctx.telegram.sendMessage(userId, warning, { parse_mode: 'Markdown' });
+        } catch (error) { /* User blocked bot */ }
+        await TopicConfigModel.trackViolation(userId, messageThreadId, 'command_in_restricted_topic');
+        return;
+      }
+    }
+
+    // ===================================
+    // REQUIRED ROLE/SUBSCRIPTION CHECK
+    // ===================================
+    if (!isAdmin && (topicConfig.required_role !== 'user' || topicConfig.required_subscription !== 'free')) {
+      const hasAccess = await checkUserAccess(userId, topicConfig);
+      if (!hasAccess) {
+        await ctx.deleteMessage();
+        const warning = lang === 'es'
+          ? `🔒 No tienes acceso a **${topicConfig.topic_name}**.\n\n`
+            + `Requiere: ${topicConfig.required_subscription !== 'free' ? `Suscripción ${topicConfig.required_subscription}` : `Rol ${topicConfig.required_role}`}`
+          : `🔒 You don't have access to **${topicConfig.topic_name}**.\n\n`
+            + `Requires: ${topicConfig.required_subscription !== 'free' ? `${topicConfig.required_subscription} subscription` : `${topicConfig.required_role} role`}`;
+        try {
+          await ctx.telegram.sendMessage(userId, warning, { parse_mode: 'Markdown' });
+        } catch (error) { /* User blocked bot */ }
+        await TopicConfigModel.trackViolation(userId, messageThreadId, 'insufficient_access');
+        return;
+      }
+    }
+
+    // ===================================
+    // RATE LIMITING PER TOPIC
+    // ===================================
+    if (!isAdmin) {
+      const rateLimited = await checkRateLimit(userId, messageThreadId, topicConfig, message);
+      if (rateLimited) {
+        await ctx.deleteMessage();
+        const warning = lang === 'es'
+          ? `⏱️ Estás publicando demasiado rápido en **${topicConfig.topic_name}**.\n\nPor favor espera antes de publicar de nuevo.`
+          : `⏱️ You're posting too fast in **${topicConfig.topic_name}**.\n\nPlease wait before posting again.`;
+        try {
+          await ctx.telegram.sendMessage(userId, warning, { parse_mode: 'Markdown' });
+        } catch (error) { /* User blocked bot */ }
+        await TopicConfigModel.trackViolation(userId, messageThreadId, 'rate_limit_exceeded');
+        return;
+      }
+    }
+
+    // ===================================
+    // AUTO-MUTE CHECK (3-strike system)
+    // ===================================
+    const isMuted = await checkAutoMute(userId, messageThreadId, ctx);
+    if (isMuted) {
+      await ctx.deleteMessage();
+      return; // User is muted, silently delete
+    }
 
     // ===================================
     // ADMIN-ONLY POSTING (PNPtv News!)
@@ -197,10 +265,9 @@ async function handleApprovalQueue(ctx, topicConfig, message) {
       }
     }
 
-    // Store approval data in session or database
-    // For now, we'll use a simple in-memory store (should be Redis or DB in production)
-    global.approvalQueue = global.approvalQueue || new Map();
-    global.approvalQueue.set(approvalKey, approvalData);
+    // Store approval data in Redis (with fallback to in-memory)
+    const queue = await getApprovalQueue();
+    await queue.set(approvalKey, approvalData);
 
     // Notify user
     const userNotification = lang === 'es'
@@ -225,8 +292,8 @@ function registerApprovalHandlers(bot) {
   // Approve post
   bot.action(/^approve_post:(.+)$/, async (ctx) => {
     const approvalKey = ctx.match[1];
-    const approvalQueue = global.approvalQueue || new Map();
-    const approvalData = approvalQueue.get(approvalKey);
+    const queue = await getApprovalQueue();
+    const approvalData = await queue.get(approvalKey);
 
     if (!approvalData) {
       await ctx.answerCbQuery('❌ Approval request expired or already processed.');
@@ -276,7 +343,7 @@ function registerApprovalHandlers(bot) {
       );
 
       // Remove from queue
-      approvalQueue.delete(approvalKey);
+      await queue.delete(approvalKey);
 
       await ctx.answerCbQuery('✅ Post approved and published!');
 
@@ -289,8 +356,8 @@ function registerApprovalHandlers(bot) {
   // Reject post
   bot.action(/^reject_post:(.+)$/, async (ctx) => {
     const approvalKey = ctx.match[1];
-    const approvalQueue = global.approvalQueue || new Map();
-    const approvalData = approvalQueue.get(approvalKey);
+    const queue = await getApprovalQueue();
+    const approvalData = await queue.get(approvalKey);
 
     if (!approvalData) {
       await ctx.answerCbQuery('❌ Approval request expired or already processed.');
@@ -311,7 +378,7 @@ function registerApprovalHandlers(bot) {
       );
 
       // Remove from queue
-      approvalQueue.delete(approvalKey);
+      await queue.delete(approvalKey);
 
       await ctx.answerCbQuery('❌ Post rejected.');
 
@@ -320,6 +387,180 @@ function registerApprovalHandlers(bot) {
       await ctx.answerCbQuery('❌ Error rejecting post.');
     }
   });
+}
+
+/**
+ * Check if user has required role/subscription access
+ */
+async function checkUserAccess(userId, topicConfig) {
+  try {
+    // Get user subscription info
+    const user = await UserModel.findByTelegramId(userId);
+    if (!user) return false;
+
+    // Check subscription requirement
+    if (topicConfig.required_subscription && topicConfig.required_subscription !== 'free') {
+      const subscriptionLevels = { 'free': 0, 'basic': 1, 'premium': 2, 'vip': 3 };
+      const userLevel = subscriptionLevels[user.subscription_type?.toLowerCase()] || 0;
+      const requiredLevel = subscriptionLevels[topicConfig.required_subscription.toLowerCase()] || 0;
+
+      if (userLevel < requiredLevel) {
+        return false;
+      }
+    }
+
+    // Check role requirement (from env for admins)
+    if (topicConfig.required_role && topicConfig.required_role !== 'user') {
+      const adminIds = process.env.ADMIN_USER_IDS?.split(',').map(id => id.trim()) || [];
+      const superAdminId = process.env.ADMIN_ID;
+
+      if (topicConfig.required_role === 'admin' || topicConfig.required_role === 'superadmin') {
+        if (!adminIds.includes(String(userId)) && String(userId) !== superAdminId) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  } catch (error) {
+    logger.error('Error checking user access:', error);
+    return true; // Allow on error to avoid breaking
+  }
+}
+
+/**
+ * Check rate limiting for topic posts
+ */
+async function checkRateLimit(userId, topicId, topicConfig, message) {
+  try {
+    const redis = getRedisClient();
+    if (!redis) return false; // No Redis, skip rate limiting
+
+    const isReply = !!message.reply_to_message;
+    const maxPerHour = isReply ? topicConfig.max_replies_per_hour : topicConfig.max_posts_per_hour;
+    const cooldown = topicConfig.cooldown_between_posts || 0;
+
+    // Check cooldown between posts
+    if (cooldown > 0) {
+      const lastPostKey = `topic:${topicId}:user:${userId}:lastpost`;
+      const lastPost = await redis.get(lastPostKey);
+
+      if (lastPost) {
+        const elapsed = Date.now() - parseInt(lastPost);
+        if (elapsed < cooldown * 1000) {
+          return true; // Still in cooldown
+        }
+      }
+
+      // Update last post time
+      await redis.set(lastPostKey, Date.now(), 'EX', 3600);
+    }
+
+    // Check hourly rate limit
+    if (maxPerHour && maxPerHour < 100) {
+      const hourlyKey = `topic:${topicId}:user:${userId}:${isReply ? 'replies' : 'posts'}:hourly`;
+      const current = await redis.incr(hourlyKey);
+
+      if (current === 1) {
+        await redis.expire(hourlyKey, 3600); // 1 hour expiry
+      }
+
+      if (current > maxPerHour) {
+        return true; // Rate limited
+      }
+    }
+
+    return false;
+  } catch (error) {
+    logger.error('Error checking rate limit:', error);
+    return false; // Allow on error
+  }
+}
+
+/**
+ * Check if user is auto-muted due to violations (3-strike system)
+ */
+async function checkAutoMute(userId, topicId, ctx) {
+  try {
+    const redis = getRedisClient();
+    if (!redis) return false;
+
+    const muteKey = `topic:${topicId}:user:${userId}:muted`;
+    const isMuted = await redis.get(muteKey);
+
+    if (isMuted) {
+      return true;
+    }
+
+    // Check violation count in last 24 hours
+    const { query } = require('../../../config/postgres');
+    const countSql = `
+      SELECT COUNT(*) as count
+      FROM topic_violations
+      WHERE user_id = $1 AND topic_id = $2
+      AND timestamp > NOW() - INTERVAL '24 hours'
+    `;
+
+    const result = await query(countSql, [userId, topicId]);
+    const violations = parseInt(result.rows[0].count);
+
+    // Auto-mute on 3+ violations
+    if (violations >= 3) {
+      // Mute for 1 hour
+      await redis.set(muteKey, '1', 'EX', 3600);
+
+      // Notify user
+      const lang = ctx.from?.language_code === 'es' ? 'es' : 'en';
+      const muteNotice = lang === 'es'
+        ? `🔇 Has sido silenciado temporalmente en este tema por múltiples violaciones.\n\nDuración: 1 hora`
+        : `🔇 You've been temporarily muted in this topic due to multiple violations.\n\nDuration: 1 hour`;
+
+      try {
+        await ctx.telegram.sendMessage(userId, muteNotice, { parse_mode: 'Markdown' });
+      } catch (error) { /* User blocked bot */ }
+
+      logger.warn(`User ${userId} auto-muted in topic ${topicId} for violations`);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    logger.error('Error checking auto-mute:', error);
+    return false;
+  }
+}
+
+/**
+ * Get approval queue from Redis
+ */
+async function getApprovalQueue() {
+  try {
+    const redis = getRedisClient();
+    if (redis) {
+      return {
+        get: async (key) => {
+          const data = await redis.get(`approval:${key}`);
+          return data ? JSON.parse(data) : null;
+        },
+        set: async (key, data) => {
+          await redis.set(`approval:${key}`, JSON.stringify(data), 'EX', 86400); // 24h expiry
+        },
+        delete: async (key) => {
+          await redis.del(`approval:${key}`);
+        }
+      };
+    }
+  } catch (error) {
+    logger.debug('Redis not available for approval queue');
+  }
+
+  // Fallback to in-memory
+  global.approvalQueue = global.approvalQueue || new Map();
+  return {
+    get: async (key) => global.approvalQueue.get(key),
+    set: async (key, data) => global.approvalQueue.set(key, data),
+    delete: async (key) => global.approvalQueue.delete(key)
+  };
 }
 
 module.exports = {
