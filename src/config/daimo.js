@@ -179,11 +179,11 @@ const validateWebhookPayload = (payload) => {
     };
   }
 
-  // Validate metadata (paymentId is optional as it may not be returned by Daimo)
-  if (!payload.metadata?.userId || !payload.metadata?.planId) {
+  // Validate metadata
+  if (!payload.metadata?.userId || !payload.metadata?.planId || !payload.metadata?.paymentId) {
     return {
       valid: false,
-      error: 'Invalid metadata: userId and planId are required',
+      error: 'Invalid metadata: userId, planId, and paymentId are required',
     };
   }
 
