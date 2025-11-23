@@ -224,7 +224,7 @@ const showTermsAndPrivacy = async (ctx) => {
   const lang = getLanguage(ctx);
 
   await ctx.reply(
-    `${t('termsAndPrivacy', lang)}\n\n📄 Terms: https://pnptv.com/terms\n🔒 Privacy: https://pnptv.com/privacy`,
+    `${t('termsAndPrivacy', lang)}\n\n📄 Terms: https://pnptv.app/terms\n🔒 Privacy: https://pnptv.app/privacy`,
     Markup.inlineKeyboard([
       [Markup.button.callback(`✅ ${t('confirm', lang)}`, 'accept_terms')],
     ]),

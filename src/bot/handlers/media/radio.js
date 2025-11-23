@@ -6,7 +6,7 @@ const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
 // Radio streaming URL (configure in .env)
-const RADIO_STREAM_URL = process.env.RADIO_STREAM_URL || 'https://stream.pnptv.com/radio';
+const RADIO_STREAM_URL = process.env.RADIO_STREAM_URL || 'https://stream.pnptv.app/radio';
 
 /**
  * Radio handlers
