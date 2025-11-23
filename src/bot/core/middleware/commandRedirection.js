@@ -1,5 +1,5 @@
-const logger = require('../../utils/logger');
-const TopicConfigModel = require('../../models/topicConfigModel');
+const logger = require('../../../utils/logger');
+const TopicConfigModel = require('../../../models/topicConfigModel');
 
 // Group and topic IDs (should be configurable)
 const GROUP_CHAT_ID = process.env.GROUP_ID;
@@ -9,7 +9,8 @@ const NOTIFICATIONS_TOPIC_ID = 3135;
  * Command Redirection Middleware
  * Redirects bot command responses to a dedicated notifications topic
  */
-async function commandRedirectionMiddleware(ctx, next) {
+function commandRedirectionMiddleware() {
+  return async (ctx, next) => {
   const chatId = ctx.chat?.id?.toString();
   const message = ctx.message;
 
@@ -128,6 +129,7 @@ async function commandRedirectionMiddleware(ctx, next) {
     logger.error('Error in command redirection:', error);
     return next();
   }
+  };
 }
 
 /**
@@ -162,21 +164,23 @@ async function scheduleCommandDeletion(ctx, chatId, messageId, topicId) {
  * Auto-delete middleware for notifications topic
  * Enforces 5-minute auto-deletion for all messages in notifications topic
  */
-async function notificationsAutoDelete(ctx, next) {
-  const messageThreadId = ctx.message?.message_thread_id;
-  const chatId = ctx.chat?.id?.toString();
+function notificationsAutoDelete() {
+  return async (ctx, next) => {
+    const messageThreadId = ctx.message?.message_thread_id;
+    const chatId = ctx.chat?.id?.toString();
 
-  // Check if in notifications topic
-  if (messageThreadId === NOTIFICATIONS_TOPIC_ID && chatId === GROUP_CHAT_ID?.toString()) {
-    const messageId = ctx.message?.message_id;
+    // Check if in notifications topic
+    if (messageThreadId === NOTIFICATIONS_TOPIC_ID && chatId === GROUP_CHAT_ID?.toString()) {
+      const messageId = ctx.message?.message_id;
 
-    if (messageId) {
-      // Schedule deletion after 5 minutes
-      scheduleMessageDeletion(ctx, chatId, messageId, NOTIFICATIONS_TOPIC_ID, 300);
+      if (messageId) {
+        // Schedule deletion after 5 minutes
+        scheduleMessageDeletion(ctx, chatId, messageId, NOTIFICATIONS_TOPIC_ID, 300);
+      }
     }
-  }
 
-  return next();
+    return next();
+  };
 }
 
 module.exports = {

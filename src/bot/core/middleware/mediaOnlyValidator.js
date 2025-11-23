@@ -1,11 +1,12 @@
-const logger = require('../../utils/logger');
-const TopicConfigModel = require('../../models/topicConfigModel');
+const logger = require('../../../utils/logger');
+const TopicConfigModel = require('../../../models/topicConfigModel');
 
 /**
  * Media-Only Validator Middleware
  * Enforces media-only content rules for specific topics (e.g., Uncensored Room)
  */
-async function mediaOnlyValidator(ctx, next) {
+function mediaOnlyValidator() {
+  return async (ctx, next) => {
   const messageThreadId = ctx.message?.message_thread_id;
 
   if (!messageThreadId) {
@@ -125,6 +126,7 @@ async function mediaOnlyValidator(ctx, next) {
     logger.error('Error in media-only validator:', error);
     return next(); // Continue on error to avoid breaking bot
   }
+  };
 }
 
 module.exports = mediaOnlyValidator;

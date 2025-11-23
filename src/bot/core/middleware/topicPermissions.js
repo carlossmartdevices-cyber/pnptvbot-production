@@ -1,11 +1,12 @@
-const logger = require('../../utils/logger');
-const TopicConfigModel = require('../../models/topicConfigModel');
+const logger = require('../../../utils/logger');
+const TopicConfigModel = require('../../../models/topicConfigModel');
 
 /**
  * Topic Permissions Middleware
  * Enforces topic-specific posting permissions and content rules
  */
-async function topicPermissionsMiddleware(ctx, next) {
+function topicPermissionsMiddleware() {
+  return async (ctx, next) => {
   const messageThreadId = ctx.message?.message_thread_id;
 
   // Skip if not in a topic
@@ -124,6 +125,7 @@ async function topicPermissionsMiddleware(ctx, next) {
     logger.error('Error in topic permissions middleware:', error);
     return next(); // Continue on error to avoid breaking bot
   }
+  };
 }
 
 /**

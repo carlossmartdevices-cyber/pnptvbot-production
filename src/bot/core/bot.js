@@ -13,11 +13,10 @@ const moderationFilter = require('./middleware/moderationFilter');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
 const errorHandler = require('./middleware/errorHandler');
-// TODO: These middleware files need to be created
-// const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./middleware/topicPermissions');
-// const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
-// const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
-// const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
+const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./middleware/topicPermissions');
+const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
+const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
+const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
 const logger = require('../../utils/logger');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
@@ -117,7 +116,7 @@ const startBot = async () => {
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
 
-    // TODO: Topic-specific middlewares (files need to be created)
+    // TODO: Topic-specific middlewares (temporarily disabled)
     // bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
     // bot.use(commandRedirectionMiddleware()); // Redirect commands to notifications
     // bot.use(mediaMirrorMiddleware()); // Mirror media to PNPtv Gallery
@@ -143,7 +142,7 @@ const startBot = async () => {
     registerCallPackageHandlers(bot);
     registerGroupVideoCallHandlers(bot);
     registerLeaderboardHandlers(bot);
-    // registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic (file needs to be created)
+    // registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic (temporarily disabled)
     // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
     // Initialize call reminder service
     CallReminderService.initialize(bot);

@@ -1,4 +1,4 @@
-const pool = require('../config/database');
+const { query } = require('../config/postgres');
 const logger = require('../utils/logger');
 
 /**
@@ -120,8 +120,8 @@ class TopicConfigModel {
     ];
 
     try {
-      for (const query of queries) {
-        await pool.query(query);
+      for (const sql of queries) {
+        await query(sql);
       }
       logger.info('Topic configuration tables initialized');
     } catch (error) {
@@ -134,10 +134,10 @@ class TopicConfigModel {
    * Get topic configuration by thread ID
    */
   static async getByThreadId(threadId) {
-    const query = 'SELECT * FROM topic_configuration WHERE topic_id = $1';
+    const sql = 'SELECT * FROM topic_configuration WHERE topic_id = $1';
 
     try {
-      const result = await pool.query(query, [threadId]);
+      const result = await query(sql, [threadId]);
       return result.rows[0] || null;
     } catch (error) {
       logger.error('Error getting topic config:', error);
@@ -149,10 +149,10 @@ class TopicConfigModel {
    * Get all topic configurations for a group
    */
   static async getByGroupId(groupId) {
-    const query = 'SELECT * FROM topic_configuration WHERE group_id = $1';
+    const sql = 'SELECT * FROM topic_configuration WHERE group_id = $1';
 
     try {
-      const result = await pool.query(query, [groupId]);
+      const result = await query(sql, [groupId]);
       return result.rows;
     } catch (error) {
       logger.error('Error getting topic configs for group:', error);
@@ -164,7 +164,7 @@ class TopicConfigModel {
    * Create or update topic configuration
    */
   static async upsert(config) {
-    const query = `
+    const sql = `
       INSERT INTO topic_configuration (
         topic_id, group_id, topic_name, can_post, can_reply, can_react,
         media_required, allow_text_only, allow_caption, allowed_media,
@@ -241,7 +241,7 @@ class TopicConfigModel {
     ];
 
     try {
-      const result = await pool.query(query, values);
+      const result = await query(sql, values);
       logger.info('Topic configuration saved', { topic_id: config.topic_id });
       return result.rows[0];
     } catch (error) {
@@ -254,23 +254,23 @@ class TopicConfigModel {
    * Track user violation
    */
   static async trackViolation(userId, topicId, violationType) {
-    const query = `
+    const sql = `
       INSERT INTO topic_violations (user_id, topic_id, violation_type)
       VALUES ($1, $2, $3)
     `;
 
     try {
-      await pool.query(query, [userId, topicId, violationType]);
+      await query(sql, [userId, topicId, violationType]);
 
       // Get violation count in last 24 hours
-      const countQuery = `
+      const countSql = `
         SELECT COUNT(*) as count
         FROM topic_violations
         WHERE user_id = $1 AND topic_id = $2
         AND timestamp > NOW() - INTERVAL '24 hours'
       `;
 
-      const result = await pool.query(countQuery, [userId, topicId]);
+      const result = await query(countSql, [userId, topicId]);
       return parseInt(result.rows[0].count);
     } catch (error) {
       logger.error('Error tracking violation:', error);
@@ -282,7 +282,7 @@ class TopicConfigModel {
    * Update topic analytics
    */
   static async updateAnalytics(topicId, userId, username, data) {
-    const query = `
+    const sql = `
       INSERT INTO topic_analytics (
         topic_id, user_id, username,
         total_posts, total_media_shared, total_reactions_given,
@@ -311,7 +311,7 @@ class TopicConfigModel {
     ];
 
     try {
-      await pool.query(query, values);
+      await query(sql, values);
     } catch (error) {
       logger.error('Error updating topic analytics:', error);
       throw error;
@@ -332,7 +332,7 @@ class TopicConfigModel {
       orderBy = 'total_media_shared DESC';
     }
 
-    const query = `
+    const sql = `
       SELECT
         user_id,
         username,
@@ -349,7 +349,7 @@ class TopicConfigModel {
     `;
 
     try {
-      const result = await pool.query(query, [topicId, limit]);
+      const result = await query(sql, [topicId, limit]);
       return result.rows;
     } catch (error) {
       logger.error('Error getting leaderboard:', error);
@@ -361,10 +361,10 @@ class TopicConfigModel {
    * Delete topic configuration
    */
   static async delete(topicId) {
-    const query = 'DELETE FROM topic_configuration WHERE topic_id = $1';
+    const sql = 'DELETE FROM topic_configuration WHERE topic_id = $1';
 
     try {
-      await pool.query(query, [topicId]);
+      await query(sql, [topicId]);
       logger.info('Topic configuration deleted', { topic_id: topicId });
       return true;
     } catch (error) {

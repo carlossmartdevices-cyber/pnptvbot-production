@@ -1,12 +1,13 @@
-const logger = require('../../utils/logger');
-const TopicConfigModel = require('../../models/topicConfigModel');
-const UserModel = require('../../models/userModel');
+const logger = require('../../../utils/logger');
+const TopicConfigModel = require('../../../models/topicConfigModel');
+const UserModel = require('../../../models/userModel');
 
 /**
  * Media Mirror Middleware
  * Auto-mirrors media from general chat to configured topics (e.g., Uncensored Room)
  */
-async function mediaMirrorMiddleware(ctx, next) {
+function mediaMirrorMiddleware() {
+  return async (ctx, next) => {
   const chatId = ctx.chat?.id;
   const message = ctx.message;
   const currentTopicId = message?.message_thread_id;
@@ -141,6 +142,7 @@ async function mediaMirrorMiddleware(ctx, next) {
 
   // Continue processing the original message
   return next();
+  };
 }
 
 /**
