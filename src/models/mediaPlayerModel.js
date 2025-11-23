@@ -1,4 +1,4 @@
-const { query } = require('../config/database');
+const { query } = require('../config/postgres');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 const { v4: uuidv4 } = require('uuid');
