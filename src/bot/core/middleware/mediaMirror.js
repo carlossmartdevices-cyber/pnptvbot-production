@@ -47,39 +47,16 @@ function mediaMirrorMiddleware() {
     // Get user info
     const username = ctx.from.username || ctx.from.first_name;
     const userId = ctx.from.id;
+    const firstName = ctx.from.first_name || username;
 
-    // Get full user's PNPtv profile with bio
-    let userProfile = null;
-    let profileInfo = '';
-    try {
-      userProfile = await UserModel.getById(userId.toString());
-      if (userProfile) {
-        // Create deep link to user's profile
-        const botUsername = process.env.BOT_USERNAME || 'pnptvbot';
-        const profileLink = `https://t.me/${botUsername}?start=profile_${userId}`;
-
-        // Build rich profile info
-        const displayName = userProfile.firstName || username;
-        const userHandle = ctx.from.username ? `@${ctx.from.username}` : displayName;
-
-        profileInfo = `👤 **${displayName}**`;
-        if (ctx.from.username) {
-          profileInfo += ` (${userHandle})`;
-        }
-
-        // Add bio if available
-        if (userProfile.bio && userProfile.bio.trim()) {
-          profileInfo += `\n📝 ${userProfile.bio.trim()}`;
-        }
-
-        // Add profile link
-        profileInfo += `\n🔗 [View Profile](${profileLink})`;
-      }
-    } catch (error) {
-      logger.debug('Could not get user profile for mirror:', error.message);
-      // Fallback to basic info
-      const userHandle = ctx.from.username ? `@${ctx.from.username}` : username;
-      profileInfo = `👤 ${userHandle}`;
+    // Create direct Telegram profile link
+    let profileLink = '';
+    if (ctx.from.username) {
+      // User has username - direct link works
+      profileLink = `[${firstName}](https://t.me/${ctx.from.username})`;
+    } else {
+      // No username - use tg:// deep link
+      profileLink = `[${firstName}](tg://user?id=${userId})`;
     }
 
     const caption = message.caption || '';
