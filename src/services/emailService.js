@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const logger = require('../utils/logger');
+const sanitizeHtml = require('sanitize-html');
 
 /**
  * Email Service
@@ -597,14 +598,8 @@ class EmailService {
      * @returns {string} Plain text
      */
     stripHtml(html) {
-        // Loop until no more tags found to prevent nested tag injection
-        let result = html;
-        let previous;
-        do {
-            previous = result;
-            result = result.replace(/<[^>]*>/g, '');
-        } while (result !== previous);
-        return result;
+        // Use sanitize-html to remove all tags and attributes
+        return sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} });
     }
 
     /**

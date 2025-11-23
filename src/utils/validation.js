@@ -1,6 +1,7 @@
 const Joi = require('joi');
 const validator = require('validator');
 const logger = require('./logger');
+const sanitizeHtml = require('sanitize-html');
 
 /**
  * Sanitize user input to prevent XSS and injection attacks
@@ -10,14 +11,8 @@ const logger = require('./logger');
 const sanitizeInput = (input) => {
   if (typeof input !== 'string') return input;
 
-  // Remove HTML tags and scripts - loop until no more tags found
-  // to prevent nested tag injection like <scr<script>ipt>
-  let sanitized = input;
-  let previous;
-  do {
-    previous = sanitized;
-    sanitized = sanitized.replace(/<[^>]*>/g, '');
-  } while (sanitized !== previous);
+  // Remove HTML tags and scripts using sanitize-html library
+  let sanitized = sanitizeHtml(input, { allowedTags: [], allowedAttributes: {} });
 
   // Escape special characters
   sanitized = validator.escape(sanitized);
