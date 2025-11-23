@@ -122,10 +122,21 @@ const registerProfileHandlers = (bot) => {
       const lang = getLanguage(ctx);
       ctx.session.temp.waitingForPhoto = true;
       await ctx.saveSession();
-
       await ctx.editMessageText(t('sendPhoto', lang));
     } catch (error) {
       logger.error('Error in edit photo:', error);
+    }
+  });
+
+  // Edit 'looking_for' field
+  bot.action('edit_looking_for', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      ctx.session.temp.waitingForLookingFor = true;
+      await ctx.saveSession();
+      await ctx.editMessageText(t('sendLookingFor', lang));
+    } catch (error) {
+      logger.error('Error in edit looking_for:', error);
     }
   });
 
@@ -134,7 +145,6 @@ const registerProfileHandlers = (bot) => {
       const lang = getLanguage(ctx);
       ctx.session.temp.waitingForBio = true;
       await ctx.saveSession();
-
       await ctx.editMessageText(t('sendBio', lang));
     } catch (error) {
       logger.error('Error in edit bio:', error);
@@ -167,7 +177,6 @@ const registerProfileHandlers = (bot) => {
       const lang = getLanguage(ctx);
       ctx.session.temp.waitingForInterests = true;
       await ctx.saveSession();
-
       await ctx.editMessageText(t('sendInterests', lang));
     } catch (error) {
       logger.error('Error in edit interests:', error);
@@ -269,25 +278,38 @@ const registerProfileHandlers = (bot) => {
       try {
         const lang = getLanguage(ctx);
         const bio = validateUserInput(ctx.message.text, 500);
-
         if (!bio) {
           await ctx.reply(t('invalidInput', lang));
           return;
         }
-
         await UserService.updateProfile(ctx.from.id, { bio });
-
         ctx.session.temp.waitingForBio = false;
         await ctx.saveSession();
-
         await ctx.reply(t('bioUpdated', lang));
-
-        // Small delay to ensure DB update is complete
         await new Promise(resolve => setTimeout(resolve, 500));
-
         await showProfile(ctx, ctx.from.id, false, true);
       } catch (error) {
         logger.error('Error updating bio:', error);
+      }
+      return;
+    }
+
+    if (temp?.waitingForLookingFor) {
+      try {
+        const lang = getLanguage(ctx);
+        const lookingFor = validateUserInput(ctx.message.text, 200);
+        if (!lookingFor) {
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
+        await UserService.updateProfile(ctx.from.id, { looking_for: lookingFor });
+        ctx.session.temp.waitingForLookingFor = false;
+        await ctx.saveSession();
+        await ctx.reply(t('lookingForUpdated', lang));
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await showProfile(ctx, ctx.from.id, false, true);
+      } catch (error) {
+        logger.error('Error updating looking_for:', error);
       }
       return;
     }
@@ -368,99 +390,54 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
       await UserModel.incrementProfileViews(targetUserId);
     }
 
-    // Build profile text
-    let profileText = isOwnProfile ? `${t('profileTitle', lang)}\n\n` : '👤 User Profile\n\n';
-
-    // Badges (objeto-objeto, mostrar emoji y nombre)
-    if (targetUser.badges && targetUser.badges.length > 0) {
-      const badgeList = targetUser.badges.map((badge) => {
-        // Si es badge estándar
-        if (typeof badge === 'string') {
-          const badgeKey = `badges.${badge}`;
-          return t(badgeKey, lang);
-        }
-        // Si es badge personalizado (objeto)
-        if (typeof badge === 'object' && badge.icon && badge.name) {
-          return `${badge.icon} ${badge.name}`;
-        }
-        return '';
-      }).filter(Boolean).join(' ');
-      profileText += `${badgeList}\n`;
-    }
-
-    // Basic info
-    profileText += `👤 ${targetUser.firstName || 'User'} ${targetUser.lastName || ''}\n`;
-    if (targetUser.username) profileText += `@${targetUser.username}\n`;
-
-    // Bio (check privacy)
-    if (targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
-      profileText += `\n📝 ${targetUser.bio}\n`;
-    }
-
-    // Interests (check privacy)
-    if (targetUser.interests && targetUser.interests.length > 0
-      && (isOwnProfile || targetUser.privacy?.showInterests !== false)) {
-      profileText += `\n🎯 ${targetUser.interests.join(', ')}\n`;
-    }
-
-    // Location (check privacy)
-    if (targetUser.location && (isOwnProfile || targetUser.privacy?.showLocation !== false)) {
-      profileText += '\n📍 Location shared\n';
-    }
-
-    // Subscription info
-    if (targetUser.subscriptionStatus === 'active' && targetUser.planExpiry) {
-      try {
-        let expiry;
-        if (targetUser.planExpiry.toDate && typeof targetUser.planExpiry.toDate === 'function') {
-          expiry = targetUser.planExpiry.toDate();
-        } else if (targetUser.planExpiry._seconds) {
-          expiry = new Date(targetUser.planExpiry._seconds * 1000);
-        } else {
-          expiry = new Date(targetUser.planExpiry);
-        }
-
-        if (expiry && !isNaN(expiry.getTime())) {
-          profileText += `\n💎 PRIME: ${t('subscriptionActive', lang, { expiry: moment(expiry).format('MMM DD, YYYY') })}\n`;
-        } else if (isOwnProfile) {
-          profileText += '\n⭐ Free Plan\n';
-        }
-      } catch (error) {
-        logger.warn('Error parsing planExpiry date:', error);
-        if (isOwnProfile) {
-          profileText += '\n⭐ Free Plan\n';
-        }
+    // Build profile text with consistent design
+    let profileText = [
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      isOwnProfile ? '👤 My Profile' : '👤 User Profile',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      targetUser.badges && targetUser.badges.length > 0
+        ? targetUser.badges.map(badge => (typeof badge === 'object' && badge.icon ? `${badge.icon} ${badge.name}` : t(`badges.${badge}`, lang))).filter(Boolean).join(' ') : '',
+      `👤 ${targetUser.firstName || 'User'} ${targetUser.lastName || ''}`,
+      targetUser.username ? `@${targetUser.username}` : '',
+      targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `📝 ${targetUser.bio}` : '',
+      targetUser.looking_for && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `${lang === 'es' ? '🔎 Buscado' : '🔎 Looking for'}: ${targetUser.looking_for}` : '',
+      targetUser.interests && targetUser.interests.length > 0 && (isOwnProfile || targetUser.privacy?.showInterests !== false)
+        ? `🎯 ${targetUser.interests.join(', ')}` : '',
+      targetUser.location && (isOwnProfile || targetUser.privacy?.showLocation !== false) ? '📍 Location shared' : '',
+      targetUser.subscriptionStatus === 'active' && targetUser.planExpiry
+        ? (() => {
+            let expiry;
+            if (targetUser.planExpiry.toDate && typeof targetUser.planExpiry.toDate === 'function') {
+              expiry = targetUser.planExpiry.toDate();
+            } else if (targetUser.planExpiry._seconds) {
+              expiry = new Date(targetUser.planExpiry._seconds * 1000);
+            } else {
+              expiry = new Date(targetUser.planExpiry);
+            }
+            return expiry && !isNaN(expiry.getTime())
+              ? `💎 PRIME: ${t('subscriptionActive', lang, { expiry: moment(expiry).format('MMM DD, YYYY') })}`
+              : (isOwnProfile ? '⭐ Free Plan' : '');
+          })()
+        : (isOwnProfile ? '⭐ Free Plan' : ''),
+      isOwnProfile ? `${t('profileViews', lang, { views: targetUser.profileViews || 0 })}` : '',
+      ''
+    ].filter(Boolean).join('\n');
+    // Parse createdAt date
+    let createdAtDate;
+    if (targetUser.createdAt) {
+      if (typeof targetUser.createdAt === 'object' && typeof targetUser.createdAt.toDate === 'function') {
+        createdAtDate = targetUser.createdAt.toDate();
+      } else if (targetUser.createdAt._seconds) {
+        createdAtDate = new Date(targetUser.createdAt._seconds * 1000);
+      } else if (typeof targetUser.createdAt === 'string' || typeof targetUser.createdAt === 'number') {
+        createdAtDate = new Date(targetUser.createdAt);
       }
-    } else if (isOwnProfile) {
-      profileText += '\n⭐ Free Plan\n';
     }
-
-    // Profile stats (only for own profile)
-    if (isOwnProfile) {
-      const views = targetUser.profileViews || 0;
-      profileText += `\n${t('profileViews', lang, { views })}\n`;
-
-      // Parse createdAt date
-      let createdAtDate;
-      try {
-        if (targetUser.createdAt) {
-          if (typeof targetUser.createdAt === 'object' && typeof targetUser.createdAt.toDate === 'function') {
-            createdAtDate = targetUser.createdAt.toDate();
-          } else if (targetUser.createdAt._seconds) {
-            createdAtDate = new Date(targetUser.createdAt._seconds * 1000);
-          } else if (typeof targetUser.createdAt === 'string' || typeof targetUser.createdAt === 'number') {
-            createdAtDate = new Date(targetUser.createdAt);
-          }
-        }
-      } catch (error) {
-        logger.warn('Error parsing createdAt date:', error);
-      }
-
-      const validDate = createdAtDate && !isNaN(createdAtDate.getTime())
-        ? moment(createdAtDate).format('MMM DD, YYYY')
-        : 'Recently';
-      profileText += `${t('memberSince', lang, { date: validDate })}\n`;
-    }
+    const validDate = createdAtDate && !isNaN(createdAtDate.getTime())
+      ? moment(createdAtDate).format('MMM DD, YYYY')
+      : 'Recently';
+    profileText += `${t('memberSince', lang, { date: validDate })}\n`;
 
     // Build keyboard
     const keyboard = [];
@@ -470,6 +447,7 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
       keyboard.push([
         Markup.button.callback(t('editPhoto', lang), 'edit_photo'),
         Markup.button.callback(t('editBio', lang), 'edit_bio'),
+        Markup.button.callback(lang === 'es' ? 'Editar Buscado' : 'Edit Looking For', 'edit_looking_for'),
       ]);
       keyboard.push([
         Markup.button.callback(t('editLocation', lang), 'edit_location'),
@@ -506,6 +484,7 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
     } else {
       await ctx.reply(profileText, Markup.inlineKeyboard(keyboard));
     }
+
   } catch (error) {
     logger.error('Error in showProfile:', error);
     const lang = ctx.session?.language || 'en';
@@ -605,7 +584,12 @@ const showFavorites = async (ctx) => {
       return;
     }
 
-    let text = `${t('myFavorites', lang)}\n\n`;
+    let text = [
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '⭐ My Favorites',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      ''
+    ].join('\n');
     const keyboard = [];
 
     favorites.forEach((user, index) => {
@@ -640,7 +624,12 @@ const showBlockedUsers = async (ctx) => {
       return;
     }
 
-    let text = `${t('blockedUsers', lang)}\n\n`;
+    let text = [
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '🚫 Blocked Users',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      ''
+    ].join('\n');
     const keyboard = [];
 
     for (const blockedId of user.blocked) {
@@ -727,7 +716,7 @@ const unblockUser = async (ctx, targetUserId) => {
 };
 
 /**
- * Share profile - Generate Member Card
+ * Share profile - Generate Member Card with Photo
  */
 const shareProfile = async (ctx) => {
   try {
@@ -739,12 +728,14 @@ const shareProfile = async (ctx) => {
       return;
     }
 
-    // Build Member Card text
-    let cardText = '╔═══════════════════════╗\n';
-    cardText += '          💎 MEMBER CARD 💎\n';
-    cardText += '╚═══════════════════════╝\n\n';
+    await ctx.answerCbQuery();
 
-    // Badges
+    // Build enhanced Member Card text (using HTML for better parsing)
+    let cardText = '┏━━━━━━━━━━━━━━━━━━━━━━━┓\n';
+    cardText += '┃      💎 MEMBER CARD 💎      ┃\n';
+    cardText += '┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n';
+
+    // Badges - display prominently
     if (user.badges && user.badges.length > 0) {
       const badgeList = user.badges.map((badge) => {
         if (typeof badge === 'string') {
@@ -756,24 +747,15 @@ const shareProfile = async (ctx) => {
         }
         return '';
       }).filter(Boolean).join(' ');
-      cardText += `${badgeList}\n`;
+      cardText += `${badgeList}\n\n`;
     }
 
-    // Basic info
-    cardText += `\n👤 ${user.firstName || 'User'} ${user.lastName || ''}\n`;
-    if (user.username) cardText += `@${user.username}\n`;
+    // Basic info with better formatting
+    cardText += `━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    cardText += `👤 <b>${user.firstName || 'User'} ${user.lastName || ''}</b>\n`;
+    if (user.username) cardText += `📱 @${user.username}\n`;
 
-    // Bio
-    if (user.bio) {
-      cardText += `\n📝 ${user.bio}\n`;
-    }
-
-    // Interests
-    if (user.interests && user.interests.length > 0) {
-      cardText += `\n🎯 ${user.interests.join(', ')}\n`;
-    }
-
-    // Subscription status
+    // Subscription status - highlight for PRIME members
     if (user.subscriptionStatus === 'active' && user.planExpiry) {
       try {
         let expiry;
@@ -786,31 +768,75 @@ const shareProfile = async (ctx) => {
         }
 
         if (expiry && !isNaN(expiry.getTime())) {
-          cardText += `\n💎 PRIME ${t('subscriptionActive', lang, { expiry: moment(expiry).format('MMM DD, YYYY') })}\n`;
+          cardText += `💎 <b>PRIME Member</b>\n`;
+          cardText += `   Valid until: ${moment(expiry).format('MMM DD, YYYY')}\n`;
         }
       } catch (error) {
         logger.warn('Error parsing planExpiry in share:', error);
       }
+    } else {
+      cardText += `⭐ Free Member\n`;
+    }
+    cardText += `━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    // Bio
+    if (user.bio) {
+      cardText += `📝 <b>About</b>\n`;
+      // Escape HTML special characters in bio
+      const escapedBio = user.bio.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      cardText += `${escapedBio}\n\n`;
+    }
+
+    // Looking for
+    if (user.looking_for) {
+      cardText += `🔎 <b>${lang === 'es' ? 'Buscado' : 'Looking for'}</b>\n`;
+      const escapedLookingFor = user.looking_for.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      cardText += `${escapedLookingFor}\n\n`;
+    }
+
+    // Interests with better formatting
+    if (user.interests && user.interests.length > 0) {
+      cardText += `🎯 <b>Interests</b>\n`;
+      // Escape HTML special characters in interests
+      const escapedInterests = user.interests.map(i =>
+        i.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      );
+      cardText += `${escapedInterests.join(' • ')}\n\n`;
     }
 
     // Profile link (deep link to view profile)
-    cardText += `\n🔗 https://t.me/${ctx.botInfo.username}?start=viewprofile_${ctx.from.id}\n`;
+    cardText += `━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    cardText += `🔗 <b>View Full Profile:</b>\n`;
+    cardText += `https://t.me/${ctx.botInfo.username}?start=viewprofile_${ctx.from.id}\n\n`;
 
-    cardText += '\n╔═══════════════════════╗\n';
-    cardText += '    PNPtv - Entertainment Hub\n';
-    cardText += '╚═══════════════════════╝';
+    cardText += '┏━━━━━━━━━━━━━━━━━━━━━━━┓\n';
+    cardText += '┃  🎬 PNPtv! - Entertainment Hub  ┃\n';
+    cardText += '┗━━━━━━━━━━━━━━━━━━━━━━━┛';
 
-    // Send the card with inline keyboard to share
+    // Share keyboard
     const shareKeyboard = Markup.inlineKeyboard([
       [Markup.button.switchToChat(
-        t('shareProfileCard', lang),
+        t('shareProfileCard', lang) || '📤 Share Profile Card',
         cardText,
       )],
       [Markup.button.callback(t('back', lang), 'show_profile')],
     ]);
 
-    await ctx.editMessageText(cardText, shareKeyboard);
-    await ctx.answerCbQuery(t('profileShared', lang));
+    // Check if user has a profile photo
+    if (user.photoFileId) {
+      // Send with photo
+      await ctx.replyWithPhoto(user.photoFileId, {
+        caption: cardText,
+        parse_mode: 'HTML',
+        ...shareKeyboard,
+      });
+    } else {
+      // Send without photo (text only)
+      await ctx.reply(cardText, {
+        parse_mode: 'HTML',
+        ...shareKeyboard,
+      });
+    }
   } catch (error) {
     logger.error('Error sharing profile:', error);
     const lang = ctx.session?.language || 'en';

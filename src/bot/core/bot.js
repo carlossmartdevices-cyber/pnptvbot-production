@@ -1,16 +1,24 @@
 require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
-const { initializeFirebase } = require('../../config/firebase');
+// Firebase eliminado: no se requiere
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
+const allowedChatsMiddleware = require('./middleware/allowedChats');
 const usernameEnforcement = require('./middleware/usernameEnforcement');
+const profileCompliance = require('./middleware/profileCompliance');
 const moderationFilter = require('./middleware/moderationFilter');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
+const commandAutoDeleteMiddleware = require('./middleware/commandAutoDelete');
 const errorHandler = require('./middleware/errorHandler');
+// Topic middleware
+const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./middleware/topicPermissions');
+const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
+const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
+const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
 const logger = require('../../utils/logger');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
@@ -30,6 +38,8 @@ const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnaly
 const registerUserCallManagementHandlers = require('../handlers/user/callManagement');
 const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
+const { registerLeaderboardHandlers } = require('../handlers/group/leaderboard');
+// const registerZoomHandlers = require('../handlers/media/zoomV2'); // Temporarily disabled due to missing dependencies
 // Services
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
@@ -46,7 +56,7 @@ let isWebhookMode = false;
  * Validate critical environment variables
  */
 const validateCriticalEnvVars = () => {
-  const criticalVars = ['BOT_TOKEN', 'FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL'];
+  const criticalVars = ['BOT_TOKEN'];
   const missing = criticalVars.filter((varName) => !process.env[varName]);
   if (missing.length > 0) {
     logger.error(`Missing critical environment variables: ${missing.join(', ')}`);
@@ -78,15 +88,7 @@ const startBot = async () => {
     } catch (error) {
       logger.warn('Sentry initialization failed, continuing without monitoring:', error.message);
     }
-    // Initialize Firebase (with fallback)
-    try {
-      initializeFirebase();
-      logger.info('✓ Firebase initialized');
-    } catch (error) {
-      logger.error('Firebase initialization failed. Bot will run in DEGRADED mode without database.');
-      logger.error('Error:', error.message);
-      logger.warn('⚠️  Bot features requiring database will not work!');
-    }
+    // Firebase eliminado: solo PostgreSQL y Redis
     // Initialize Redis (optional, will use default localhost if not configured)
     try {
       initializeRedis();
@@ -106,12 +108,22 @@ const startBot = async () => {
     const bot = new Telegraf(process.env.BOT_TOKEN);
     // Register middleware
     bot.use(sessionMiddleware());
+    bot.use(allowedChatsMiddleware()); // Must be early to leave unauthorized chats
     bot.use(rateLimitMiddleware());
     bot.use(chatCleanupMiddleware());
+    bot.use(commandAutoDeleteMiddleware()); // Delete commands from groups
     bot.use(usernameEnforcement());
+    bot.use(profileCompliance());
     bot.use(moderationFilter());
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
+
+    // Topic-specific middlewares
+    bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
+    bot.use(commandRedirectionMiddleware()); // Redirect commands to notifications
+    bot.use(mediaMirrorMiddleware()); // Mirror media to PNPtv Gallery
+    bot.use(topicPermissionsMiddleware()); // Admin-only and approval queue
+    bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery
     // Register handlers
     registerUserHandlers(bot);
     registerAdminHandlers(bot);
@@ -130,19 +142,27 @@ const startBot = async () => {
     registerUserCallManagementHandlers(bot);
     registerCallFeedbackHandlers(bot);
     registerCallPackageHandlers(bot);
+    registerLeaderboardHandlers(bot);
+    registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic
+    // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
     // Initialize call reminder service
     CallReminderService.initialize(bot);
     logger.info('✓ Call reminder service initialized');
     // Initialize group cleanup service
     const groupCleanup = new GroupCleanupService(bot);
     groupCleanup.initialize();
+    logger.info('✓ Registering error handler...');
     // Error handling
     bot.catch(errorHandler);
+    logger.info('✓ Error handler registered');
+    logger.info(`Checking bot startup mode: NODE_ENV=${process.env.NODE_ENV}, BOT_WEBHOOK_DOMAIN=${process.env.BOT_WEBHOOK_DOMAIN}`);
     // Start bot
     if (process.env.NODE_ENV === 'production' && process.env.BOT_WEBHOOK_DOMAIN) {
+      logger.info('Setting up webhook mode...');
       // Webhook mode for production
       const webhookPath = process.env.BOT_WEBHOOK_PATH || '/webhook/telegram';
       const webhookUrl = `${process.env.BOT_WEBHOOK_DOMAIN}${webhookPath}`;
+      logger.info(`Calling Telegram API to set webhook: ${webhookUrl}`);
       await bot.telegram.setWebhook(webhookUrl);
       logger.info(`✓ Webhook set to: ${webhookUrl}`);
       // Register webhook callback

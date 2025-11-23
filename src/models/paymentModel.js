@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
-const { getFirestore } = require('../config/firebase');
+const { query } = require('../config/postgres');
 const logger = require('../utils/logger');
 
 const COLLECTION = 'payments';
@@ -15,10 +15,7 @@ class PaymentModel {
    */
   static async create(paymentData) {
     try {
-      const db = getFirestore();
       const paymentId = paymentData.paymentId || uuidv4();
-      const paymentRef = db.collection(COLLECTION).doc(paymentId);
-
       const data = {
         ...paymentData,
         status: 'pending',
@@ -26,9 +23,29 @@ class PaymentModel {
         updatedAt: new Date(),
       };
 
-      await paymentRef.set(data);
+      // Insert with plan_id and provider
+      await query(
+        `INSERT INTO payments (id, user_id, plan_id, provider, amount, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          paymentId,
+          data.userId,
+          data.planId || null,
+          data.provider || 'epayco',
+          data.amount,
+          data.status,
+          data.createdAt,
+          data.updatedAt
+        ]
+      );
 
-      logger.info('Payment created', { paymentId, userId: paymentData.userId });
+      logger.info('Payment created', {
+        paymentId,
+        userId: paymentData.userId,
+        planId: data.planId,
+        provider: data.provider
+      });
+
       return { id: paymentId, ...data };
     } catch (error) {
       logger.error('Error creating payment:', error);
@@ -43,14 +60,11 @@ class PaymentModel {
    */
   static async getById(paymentId) {
     try {
-      const db = getFirestore();
-      const doc = await db.collection(COLLECTION).doc(paymentId).get();
-
-      if (!doc.exists) {
+      const result = await query('SELECT * FROM payments WHERE id = $1', [paymentId]);
+      if (result.rows.length === 0) {
         return null;
       }
-
-      return { id: doc.id, ...doc.data() };
+      return result.rows[0];
     } catch (error) {
       logger.error('Error getting payment:', error);
       return null;
@@ -66,15 +80,20 @@ class PaymentModel {
    */
   static async updateStatus(paymentId, status, metadata = {}) {
     try {
-      const db = getFirestore();
-      const paymentRef = db.collection(COLLECTION).doc(paymentId);
+      // Map camelCase to snake_case for database columns
+      const fieldMap = {
+        transactionId: 'payment_id',
+        completedAt: 'completed_at',
+        completedBy: 'completed_by',
+        manualCompletion: 'manual_completion',
+        expiresAt: 'expires_at'
+      };
 
-      await paymentRef.update({
-        status,
-        ...metadata,
-        updatedAt: new Date(),
-      });
-
+      const fields = Object.keys(metadata).map(key => fieldMap[key] || key);
+      const values = Object.values(metadata);
+      let setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+      setClause = `status = $1${setClause ? ', ' + setClause : ''}, updated_at = $${fields.length + 2}`;
+      await query(`UPDATE payments SET ${setClause} WHERE id = $${fields.length + 3}`, [status, ...values, new Date(), paymentId]);
       logger.info('Payment status updated', { paymentId, status });
       return true;
     } catch (error) {
@@ -91,19 +110,11 @@ class PaymentModel {
    */
   static async getByUser(userId, limit = 20) {
     try {
-      const db = getFirestore();
-      const snapshot = await db.collection(COLLECTION)
-        .where('userId', '==', userId.toString())
-        .orderBy('createdAt', 'desc')
-        .limit(limit)
-        .get();
-
-      const payments = [];
-      snapshot.forEach((doc) => {
-        payments.push({ id: doc.id, ...doc.data() });
-      });
-
-      return payments;
+      const result = await query(
+        'SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2',
+        [userId.toString(), limit]
+      );
+      return result.rows;
     } catch (error) {
       logger.error('Error getting user payments:', error);
       return [];
@@ -118,19 +129,11 @@ class PaymentModel {
    */
   static async getByStatus(status, limit = 100) {
     try {
-      const db = getFirestore();
-      const snapshot = await db.collection(COLLECTION)
-        .where('status', '==', status)
-        .orderBy('createdAt', 'desc')
-        .limit(limit)
-        .get();
-
-      const payments = [];
-      snapshot.forEach((doc) => {
-        payments.push({ id: doc.id, ...doc.data() });
-      });
-
-      return payments;
+      const result = await query(
+        'SELECT * FROM payments WHERE status = $1 ORDER BY created_at DESC LIMIT $2',
+        [status, limit]
+      );
+      return result.rows;
     } catch (error) {
       logger.error('Error getting payments by status:', error);
       return [];
@@ -145,19 +148,14 @@ class PaymentModel {
    */
   static async getByTransactionId(transactionId, provider) {
     try {
-      const db = getFirestore();
-      const snapshot = await db.collection(COLLECTION)
-        .where('transactionId', '==', transactionId)
-        .where('provider', '==', provider)
-        .limit(1)
-        .get();
-
-      if (snapshot.empty) {
+      const result = await query(
+        'SELECT * FROM payments WHERE payment_id = $1 AND provider = $2 LIMIT 1',
+        [transactionId, provider]
+      );
+      if (result.rows.length === 0) {
         return null;
       }
-
-      const doc = snapshot.docs[0];
-      return { id: doc.id, ...doc.data() };
+      return result.rows[0];
     } catch (error) {
       logger.error('Error getting payment by transaction ID:', error);
       return null;
@@ -172,26 +170,23 @@ class PaymentModel {
    */
   static async getRevenue(startDate, endDate) {
     try {
-      const db = getFirestore();
-      const snapshot = await db.collection(COLLECTION)
-        .where('status', '==', 'success')
-        .where('createdAt', '>=', startDate)
-        .where('createdAt', '<=', endDate)
-        .get();
+      const result = await query(
+        'SELECT * FROM payments WHERE status = $1 AND created_at >= $2 AND created_at <= $3',
+        ['success', startDate, endDate]
+      );
 
       let total = 0;
       let count = 0;
       const byPlan = {};
       const byProvider = {};
 
-      snapshot.forEach((doc) => {
-        const payment = doc.data();
-        total += payment.amount || 0;
+      result.rows.forEach((payment) => {
+        total += parseFloat(payment.amount) || 0;
         count += 1;
 
         // Count by plan
-        if (payment.planId) {
-          byPlan[payment.planId] = (byPlan[payment.planId] || 0) + 1;
+        if (payment.plan_id) {
+          byPlan[payment.plan_id] = (byPlan[payment.plan_id] || 0) + 1;
         }
 
         // Count by provider
@@ -222,43 +217,38 @@ class PaymentModel {
    */
   static async getAll(filters = {}) {
     try {
-      const db = getFirestore();
-      let query = db.collection(COLLECTION);
+      const conditions = [];
+      const params = [];
+      let paramIndex = 1;
 
       // Apply filters
       if (filters.status) {
-        query = query.where('status', '==', filters.status);
+        conditions.push(`status = $${paramIndex++}`);
+        params.push(filters.status);
       }
 
       if (filters.provider) {
-        query = query.where('provider', '==', filters.provider);
+        conditions.push(`provider = $${paramIndex++}`);
+        params.push(filters.provider);
       }
 
       if (filters.startDate) {
-        query = query.where('createdAt', '>=', filters.startDate);
+        conditions.push(`created_at >= $${paramIndex++}`);
+        params.push(filters.startDate);
       }
 
       if (filters.endDate) {
-        query = query.where('createdAt', '<=', filters.endDate);
+        conditions.push(`created_at <= $${paramIndex++}`);
+        params.push(filters.endDate);
       }
 
-      // Order and limit
-      query = query.orderBy('createdAt', 'desc');
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const limit = filters.limit || 1000;
 
-      if (filters.limit) {
-        query = query.limit(filters.limit);
-      } else {
-        query = query.limit(1000); // Default max limit
-      }
+      const sql = `SELECT * FROM payments ${whereClause} ORDER BY created_at DESC LIMIT ${limit}`;
+      const result = await query(sql, params);
 
-      const snapshot = await query.get();
-
-      const payments = [];
-      snapshot.forEach((doc) => {
-        payments.push({ id: doc.id, ...doc.data() });
-      });
-
-      return payments;
+      return result.rows;
     } catch (error) {
       logger.error('Error getting all payments:', error);
       return [];

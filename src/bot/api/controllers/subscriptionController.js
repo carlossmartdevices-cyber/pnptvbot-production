@@ -6,6 +6,21 @@ const CurrencyConverter = require('../../../utils/currencyConverter');
 const logger = require('../../../utils/logger');
 
 /**
+ * Escape HTML special characters to prevent XSS
+ * @param {string} str - String to escape
+ * @returns {string} Escaped string
+ */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
  * Subscription Controller - Handles ePayco subscription operations
  */
 class SubscriptionController {
@@ -190,6 +205,7 @@ class SubscriptionController {
 
       const {
         x_ref_payco,
+        x_transaction_id,
         x_transaction_state,
         x_amount,
         x_currency_code,
@@ -200,13 +216,13 @@ class SubscriptionController {
       } = req.body;
 
       // Verify ePayco signature for security
-      if (x_signature && process.env.EPAYCO_PRIVATE_KEY) {
+      if (x_signature && process.env.EPAYCO_P_KEY) {
         const crypto = require('crypto');
         const p_cust_id_cliente = process.env.EPAYCO_P_CUST_ID || '';
-        const p_key = process.env.EPAYCO_PRIVATE_KEY;
+        const p_key = process.env.EPAYCO_P_KEY;
 
-        // ePayco signature format: x_cust_id_cliente^x_ref_payco^x_amount^x_currency_code
-        const signatureString = `${p_cust_id_cliente}^${p_key}^${x_ref_payco}^${x_transaction_state}^${x_amount}^${x_currency_code}`;
+        // ePayco signature format: p_cust_id_cliente^p_key^x_ref_payco^x_transaction_id^x_amount^x_currency_code
+        const signatureString = `${p_cust_id_cliente}^${p_key}^${x_ref_payco}^${x_transaction_id}^${x_amount}^${x_currency_code}`;
         const expectedSignature = crypto.createHash('sha256').update(signatureString).digest('hex');
 
         if (x_signature !== expectedSignature) {
@@ -381,7 +397,7 @@ class SubscriptionController {
       <h1>Payment Failed</h1>
       <p>We couldn't process your payment. Please try again or contact support.</p>
     `}
-    ${ref_payco ? `<div class="ref">Reference: ${ref_payco}</div>` : ''}
+    ${ref_payco ? `<div class="ref">Reference: ${escapeHtml(ref_payco)}</div>` : ''}
     <a href="/" class="button">Return to PNPtv</a>
   </div>
   <script>
