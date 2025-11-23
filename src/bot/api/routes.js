@@ -34,22 +34,9 @@ app.use(morgan('combined', { stream: logger.stream }));
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../../../public')));
 
-// Landing page routes (UNPUBLISHED - lifetime-pass $80)
-// app.get('/', (req, res) => {
-//   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
-// });
-
-// app.get('/lifetime-pass', (req, res) => {
-//   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
-// });
-
-// app.get('/promo', (req, res) => {
-//   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
-// });
-
-// app.get('/pnptv-hot-sale', (req, res) => {
-//   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
-// });
+// Landing page routes (ONLY for pnptv.app)
+// These routes are handled by Nginx for pnptv.app domain only
+// Routes commented out for easybots.store - use Nginx to serve
 
 // Rate limiting for page routes
 const pageLimiter = rateLimit({

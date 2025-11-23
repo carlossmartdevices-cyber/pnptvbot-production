@@ -97,5 +97,51 @@ module.exports = {
       // Kill timeout
       kill_timeout: 5000,
     },
+
+    {
+      // EasyBots Website
+      name: 'easybots-website',
+      script: 'server.js',
+      cwd: '/root/easybots-website',
+      instances: 1,
+      exec_mode: 'fork',
+      
+      // Auto-restart configuration
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      
+      // Environment variables for easybots-website
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3010,  // Port 3010 for EasyBots website
+        
+        // Redis configuration - Use DB 2 for easybots-website
+        REDIS_HOST: 'localhost',
+        REDIS_PORT: 6380,
+        REDIS_PASSWORD: '',
+        REDIS_DB: 2,  // Database 2 for easybots-website
+        REDIS_KEY_PREFIX: 'easybots:',  // Prefix all keys with "easybots:"
+        
+        // PostgreSQL configuration - Dedicated database (optional)
+        POSTGRES_HOST: 'localhost',
+        POSTGRES_PORT: 55432,
+        POSTGRES_DATABASE: 'easybots',
+        POSTGRES_USER: 'easybots',
+        POSTGRES_PASSWORD: 'easybots_secure_pass_2025',
+        POSTGRES_SSL: 'false',
+        POSTGRES_POOL_MIN: 2,
+        POSTGRES_POOL_MAX: 20,
+      },
+      
+      // Logging
+      error_file: '/root/.pm2/logs/easybots-website-error.log',
+      out_file: '/root/.pm2/logs/easybots-website-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      merge_logs: true,
+      
+      // Kill timeout
+      kill_timeout: 5000,
+    }
   ],
 };

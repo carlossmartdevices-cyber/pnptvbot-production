@@ -74,13 +74,28 @@ const registerMenuHandlers = (bot) => {
     bot.action(action, async (ctx, next) => {
       const chatType = ctx.chat?.type;
       if (chatType === 'group' || chatType === 'supergroup') {
-        const lang = ctx.session?.language || 'en';
-        const username = ctx.from?.username || ctx.from?.first_name || 'user';
-        const botUsername = ctx.botInfo?.username || 'pnptv_bot';
-        const redirectMsg = t('groupRedirect', lang)({ username, action, botUsername });
-        const sentMessage = await ctx.reply(redirectMsg, { parse_mode: 'Markdown', disable_web_page_preview: true });
-        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
-        return;
+        try {
+          const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'user';
+          const botUsername = ctx.botInfo?.username || 'PNPtvbot';
+
+          // Send notification in group
+          const groupMsg = `${username} I sent you a private message please check it out! 💬`;
+          const sentMessage = await ctx.reply(groupMsg);
+          ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
+
+          // Send private message with link to the feature
+          try {
+            const pmLink = `https://t.me/${botUsername}?start=${action}`;
+            const pmMsg = `You clicked on a menu button in the group! Click the link below to access this feature:\n\n${pmLink}`;
+            await ctx.telegram.sendMessage(ctx.from.id, pmMsg);
+          } catch (pmError) {
+            logger.debug('Could not send private message:', pmError.message);
+          }
+
+          return;
+        } catch (error) {
+          logger.error('Error handling group menu action:', error);
+        }
       }
       return next();
     });

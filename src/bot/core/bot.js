@@ -12,7 +12,9 @@ const profileCompliance = require('./middleware/profileCompliance');
 const moderationFilter = require('./middleware/moderationFilter');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
+const commandAutoDeleteMiddleware = require('./middleware/commandAutoDelete');
 const errorHandler = require('./middleware/errorHandler');
+// Topic middleware
 const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./middleware/topicPermissions');
 const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
 const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
@@ -110,18 +112,19 @@ const startBot = async () => {
     bot.use(allowedChatsMiddleware()); // Must be early to leave unauthorized chats
     bot.use(rateLimitMiddleware());
     bot.use(chatCleanupMiddleware());
+    bot.use(commandAutoDeleteMiddleware()); // Delete commands from groups
     bot.use(usernameEnforcement());
     bot.use(profileCompliance());
     bot.use(moderationFilter());
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
 
-    // TODO: Topic-specific middlewares (temporarily disabled)
-    // bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
-    // bot.use(commandRedirectionMiddleware()); // Redirect commands to notifications
-    // bot.use(mediaMirrorMiddleware()); // Mirror media to PNPtv Gallery
-    // bot.use(topicPermissionsMiddleware()); // Admin-only and approval queue
-    // bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery
+    // Topic-specific middlewares
+    bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
+    bot.use(commandRedirectionMiddleware()); // Redirect commands to notifications
+    bot.use(mediaMirrorMiddleware()); // Mirror media to PNPtv Gallery
+    bot.use(topicPermissionsMiddleware()); // Admin-only and approval queue
+    bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery
     // Register handlers
     registerUserHandlers(bot);
     registerAdminHandlers(bot);
@@ -142,7 +145,7 @@ const startBot = async () => {
     registerCallPackageHandlers(bot);
     registerGroupVideoCallHandlers(bot);
     registerLeaderboardHandlers(bot);
-    // registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic (temporarily disabled)
+    registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic
     // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
     // Initialize call reminder service
     CallReminderService.initialize(bot);
@@ -150,13 +153,18 @@ const startBot = async () => {
     // Initialize group cleanup service
     const groupCleanup = new GroupCleanupService(bot);
     groupCleanup.initialize();
+    logger.info('✓ Registering error handler...');
     // Error handling
     bot.catch(errorHandler);
+    logger.info('✓ Error handler registered');
+    logger.info(`Checking bot startup mode: NODE_ENV=${process.env.NODE_ENV}, BOT_WEBHOOK_DOMAIN=${process.env.BOT_WEBHOOK_DOMAIN}`);
     // Start bot
     if (process.env.NODE_ENV === 'production' && process.env.BOT_WEBHOOK_DOMAIN) {
+      logger.info('Setting up webhook mode...');
       // Webhook mode for production
       const webhookPath = process.env.BOT_WEBHOOK_PATH || '/webhook/telegram';
       const webhookUrl = `${process.env.BOT_WEBHOOK_DOMAIN}${webhookPath}`;
+      logger.info(`Calling Telegram API to set webhook: ${webhookUrl}`);
       await bot.telegram.setWebhook(webhookUrl);
       logger.info(`✓ Webhook set to: ${webhookUrl}`);
       // Register webhook callback

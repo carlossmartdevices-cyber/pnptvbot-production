@@ -102,7 +102,7 @@ const TOPIC_CONFIGURATIONS = [
   {
     topic_id: 3134,
     group_id: GROUP_ID,
-    topic_name: 'Podcasts & Thoughts',
+    topic_name: 'Contacto PNPtv!',
 
     // Access Control - APPROVAL REQUIRED
     can_post: 'approval_required',
@@ -224,7 +224,7 @@ async function initializeTopicConfigurations() {
     console.log('      - Leaderboard enabled');
     console.log('      - Rate limit: 20 posts/hour\n');
 
-    console.log('   🎙️ Podcasts & Thoughts (3134)');
+    console.log('   📞 Contacto PNPtv! (3134)');
     console.log('      - Admin approval required');
     console.log('      - All media types allowed\n');
 

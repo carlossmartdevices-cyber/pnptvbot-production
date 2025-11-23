@@ -311,6 +311,142 @@ const registerGroupVideoCallHandlers = (bot) => {
       await ctx.reply('❌ Error leaving call');
     }
   });
+
+  /**
+   * Start video call with full notifications
+   * Usage: /videocall
+   * Notifies all group members that a call is starting
+   */
+  bot.command('videocall', async (ctx) => {
+    try {
+      logger.info('📱 /videocall command received', {
+        chatId: ctx.chat?.id,
+        userId: ctx.from?.id,
+        username: ctx.from?.username,
+      });
+
+      const communityGroupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : null;
+      
+      if (!communityGroupId) {
+        logger.error('GROUP_ID environment variable not set');
+        await ctx.reply('❌ Community group not configured');
+        return;
+      }
+
+      // Only allow in community group
+      if (ctx.chat.id !== communityGroupId) {
+        await ctx.reply('❌ This command only works in the community group');
+        return;
+      }
+
+      const hostName = ctx.from.first_name || 'Host';
+      const hostUsername = ctx.from.username || 'unknown';
+      
+      try {
+        // Start video chat
+        logger.info('Starting video chat...', { communityGroupId, hostUsername });
+        await ctx.telegram.requestVideoChatStart(communityGroupId);
+        
+        // Wait for video chat to initialize
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Create notification message
+        const notificationMessage = [
+          `🎥 **VIDEO CALL STARTED** 🎥`,
+          ``,
+          `👤 **Host:** @${hostUsername}`,
+          `⏰ **Time:** ${new Date().toLocaleString()}`,
+          ``,
+          `📢 **Everyone is invited!**`,
+          ``,
+          `Tap the video call icon above ⬆️ to join instantly`,
+          ``,
+          `🎯 **Quick Actions:**`,
+        ].join('\n');
+
+        // Send notification to group
+        const msgResponse = await ctx.telegram.sendMessage(communityGroupId, notificationMessage, {
+          parse_mode: 'Markdown',
+          disable_web_page_preview: true,
+          ...Markup.inlineKeyboard([
+            [
+              Markup.button.callback('👥 Join Call', `group_call_participants_live`),
+              Markup.button.callback('📊 Call Stats', `group_call_info_live`),
+            ],
+            [
+              Markup.button.callback('🔔 Notify All', 'notify_all_videocall'),
+              Markup.button.callback('⏹️ End Call', `end_group_call_${Date.now()}`),
+            ],
+          ]),
+        });
+
+        // Pin message for visibility
+        try {
+          await ctx.telegram.pinChatMessage(communityGroupId, msgResponse.message_id, { disable_notification: true });
+          logger.info('✅ Call notification pinned', { messageId: msgResponse.message_id });
+        } catch (pinError) {
+          logger.warn('Could not pin notification:', pinError.message);
+        }
+
+        // Send confirmation to user
+        await ctx.reply('✅ Video call started! Notification sent to all group members.');
+        
+        logger.info('Video call initiated successfully', {
+          communityGroupId,
+          hostUsername,
+          messageId: msgResponse.message_id,
+        });
+
+      } catch (videoChatError) {
+        logger.error('Error starting video chat:', videoChatError);
+        await ctx.reply('❌ Failed to start video call. Please try again.');
+      }
+
+    } catch (error) {
+      logger.error('Error in /videocall command:', error);
+      await ctx.reply('❌ An error occurred. Please try again.');
+    }
+  });
+
+  /**
+   * Notify all members about active video call
+   */
+  bot.action('notify_all_videocall', async (ctx) => {
+    try {
+      const communityGroupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : null;
+      
+      if (!communityGroupId) {
+        await ctx.answerCbQuery('❌ Group not configured');
+        return;
+      }
+
+      // Send mention notification to all group members
+      const notifyMessage = [
+        `🔴 **LIVE VIDEO CALL IN PROGRESS!**`,
+        ``,
+        `Your attention is needed! A video call is currently live.`,
+        ``,
+        `👆 Tap the video call icon above to join immediately`,
+        ``,
+        `🎯 This is a live community event - don't miss out!`,
+      ].join('\n');
+
+      await ctx.telegram.sendMessage(communityGroupId, notifyMessage, {
+        parse_mode: 'Markdown',
+        disable_web_page_preview: true,
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('📲 Join Call Now', `group_call_participants_live`)],
+        ]),
+      });
+
+      await ctx.answerCbQuery('✅ Notification sent to all members!');
+      logger.info('Video call notification broadcast sent');
+
+    } catch (error) {
+      logger.error('Error broadcasting notification:', error);
+      await ctx.answerCbQuery('❌ Error sending notification');
+    }
+  });
 };
 
 module.exports = registerGroupVideoCallHandlers;
