@@ -21,6 +21,13 @@ const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
 const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
 const { usernameChangeDetectionMiddleware, initSecurityLogsTable } = require('./middleware/usernameChangeDetection');
 const { groupSecurityEnforcementMiddleware, registerGroupSecurityHandlers } = require('./middleware/groupSecurityEnforcement');
+// Group behavior rules (overrides previous rules)
+const {
+  groupBehaviorMiddleware,
+  cristinaGroupFilterMiddleware,
+  groupMenuRedirectMiddleware,
+  groupCommandDeleteMiddleware
+} = require('./middleware/groupBehavior');
 const logger = require('../../utils/logger');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
@@ -129,6 +136,12 @@ const startBot = async () => {
     bot.use(moderationFilter());
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
+
+    // Group behavior rules (OVERRIDE all previous rules)
+    bot.use(groupBehaviorMiddleware()); // Route all bot messages to topic 3135, 3-min delete
+    bot.use(cristinaGroupFilterMiddleware()); // Filter personal info from Cristina in groups
+    bot.use(groupMenuRedirectMiddleware()); // Redirect menu button clicks to private
+    bot.use(groupCommandDeleteMiddleware()); // Delete commands after 3 minutes
 
     // Topic-specific middlewares
     bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
