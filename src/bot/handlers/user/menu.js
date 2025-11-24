@@ -66,6 +66,7 @@ const registerMenuHandlers = (bot) => {
     'show_profile',
     'show_nearby',
     'show_radio',
+    'show_jitsi',
     'show_support',
     'show_settings',
     'admin_panel'
@@ -285,7 +286,7 @@ const showMainMenu = async (ctx) => {
     t('mainMenuIntro', lang),
     Markup.inlineKeyboard([
       [
-        Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
+        Markup.button.callback('👑 Suscríbete a PRIME', 'show_subscription_plans'),
         Markup.button.callback(t('myProfile', lang), 'show_profile'),
       ],
       [
@@ -297,8 +298,7 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(t('playerMenu', lang), 'show_player'),
       ],
       [
-        Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
-        Markup.button.callback('📹 Jitsi', 'show_jitsi'),
+        Markup.button.callback('📹 Video Call Rooms', 'show_jitsi'),
       ],
       [
         Markup.button.callback(t('support', lang), 'show_support'),
@@ -411,7 +411,7 @@ const showMainMenuEdit = async (ctx) => {
 
   const buttons = [
     [
-      Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
+      Markup.button.callback('👑 Suscríbete a PRIME', 'show_subscription_plans'),
       Markup.button.callback(t('myProfile', lang), 'show_profile'),
     ],
     [
@@ -420,10 +420,9 @@ const showMainMenuEdit = async (ctx) => {
     ],
     [
       Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-      buildButton(t('zoomRooms', lang), 'show_zoom', !isPremium && !isAdmin),
+      buildButton('📹 Video Call Rooms', 'show_jitsi', !isPremium && !isAdmin),
     ],
     [
-      buildButton('📹 Jitsi', 'show_jitsi', !isPremium && !isAdmin),
       Markup.button.callback(t('support', lang), 'show_support'),
     ],
     [
@@ -439,7 +438,7 @@ const showMainMenuEdit = async (ctx) => {
       t('mainMenuIntro', lang),
       Markup.inlineKeyboard([
         [
-          Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
+          Markup.button.callback('👑 Suscríbete a PRIME', 'show_subscription_plans'),
           Markup.button.callback(t('myProfile', lang), 'show_profile'),
         ],
         [
@@ -451,8 +450,7 @@ const showMainMenuEdit = async (ctx) => {
           Markup.button.callback(t('playerMenu', lang), 'show_player'),
         ],
         [
-          Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
-          Markup.button.callback('📹 Jitsi', 'show_jitsi'),
+          Markup.button.callback('📹 Video Call Rooms', 'show_jitsi'),
         ],
         [
           Markup.button.callback(t('support', lang), 'show_support'),
