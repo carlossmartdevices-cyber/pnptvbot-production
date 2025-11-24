@@ -3,6 +3,8 @@ const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const StreamingService = require('../../services/streamingService');
+const PermissionService = require('../../services/permissionService');
+const { PERMISSIONS } = require('../../../models/permissionModel');
 
 /**
  * Live Streaming handlers with JaaS (Jitsi as a Service)
@@ -39,6 +41,20 @@ const registerLiveStreamHandlers = (bot) => {
     bot.action('livestream_create', async (ctx) => {
         try {
             const lang = getLanguage(ctx);
+            const userId = ctx.from.id;
+
+            // Check if user has permission to create live streams
+            const hasPermission = await PermissionService.hasPermission(userId, PERMISSIONS.CREATE_LIVE_STREAM);
+
+            if (!hasPermission) {
+                await ctx.answerCbQuery(
+                    lang === 'es'
+                        ? '⚠️ No tienes permiso para crear transmisiones en vivo. Solo los administradores y artistas pueden crear transmisiones.'
+                        : '⚠️ You don\'t have permission to create live streams. Only admins and performers can create streams.',
+                    { show_alert: true }
+                );
+                return;
+            }
 
             ctx.session.temp = ctx.session.temp || {};
             ctx.session.temp.creatingLiveStream = true;
