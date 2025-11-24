@@ -1,6 +1,6 @@
 const axios = require('axios');
 const logger = require('../../utils/logger');
-const { cacheService } = require('./cacheService');
+const { cache } = require('../../config/redis');
 
 /**
  * Invidious Service
@@ -79,7 +79,7 @@ const searchVideos = async (query, options = {}) => {
     const cacheKey = `invidious_search_${query}`;
 
     // Check cache first
-    const cached = await cacheService.get(cacheKey);
+    const cached = await cache.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);
     }
@@ -97,7 +97,7 @@ const searchVideos = async (query, options = {}) => {
     });
 
     // Cache for 1 hour
-    await cacheService.setex(cacheKey, 3600, JSON.stringify(response.data));
+    await cache.setex(cacheKey, 3600, JSON.stringify(response.data));
 
     return response.data;
   } catch (error) {
@@ -115,7 +115,7 @@ const getVideoDetails = async (videoId) => {
     const cacheKey = `invidious_video_${videoId}`;
 
     // Check cache first
-    const cached = await cacheService.get(cacheKey);
+    const cached = await cache.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);
     }
@@ -125,7 +125,7 @@ const getVideoDetails = async (videoId) => {
     });
 
     // Cache for 24 hours
-    await cacheService.setex(cacheKey, 86400, JSON.stringify(response.data));
+    await cache.setex(cacheKey, 86400, JSON.stringify(response.data));
 
     return response.data;
   } catch (error) {
@@ -143,7 +143,7 @@ const getChannelInfo = async (channelId) => {
     const cacheKey = `invidious_channel_${channelId}`;
 
     // Check cache first
-    const cached = await cacheService.get(cacheKey);
+    const cached = await cache.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);
     }
@@ -153,7 +153,7 @@ const getChannelInfo = async (channelId) => {
     });
 
     // Cache for 24 hours
-    await cacheService.setex(cacheKey, 86400, JSON.stringify(response.data));
+    await cache.setex(cacheKey, 86400, JSON.stringify(response.data));
 
     return response.data;
   } catch (error) {
@@ -171,7 +171,7 @@ const getChannelVideos = async (channelId, options = {}) => {
     const cacheKey = `invidious_channel_videos_${channelId}_${options.page || 1}`;
 
     // Check cache first
-    const cached = await cacheService.get(cacheKey);
+    const cached = await cache.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);
     }
@@ -187,7 +187,7 @@ const getChannelVideos = async (channelId, options = {}) => {
     );
 
     // Cache for 1 hour
-    await cacheService.setex(cacheKey, 3600, JSON.stringify(response.data));
+    await cache.setex(cacheKey, 3600, JSON.stringify(response.data));
 
     return response.data;
   } catch (error) {
@@ -205,7 +205,7 @@ const getPlaylistInfo = async (playlistId) => {
     const cacheKey = `invidious_playlist_${playlistId}`;
 
     // Check cache first
-    const cached = await cacheService.get(cacheKey);
+    const cached = await cache.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);
     }
@@ -215,7 +215,7 @@ const getPlaylistInfo = async (playlistId) => {
     });
 
     // Cache for 24 hours
-    await cacheService.setex(cacheKey, 86400, JSON.stringify(response.data));
+    await cache.setex(cacheKey, 86400, JSON.stringify(response.data));
 
     return response.data;
   } catch (error) {
@@ -233,7 +233,7 @@ const getTrendingVideos = async (options = {}) => {
     const cacheKey = 'invidious_trending';
 
     // Check cache first (5 minute cache for trending)
-    const cached = await cacheService.get(cacheKey);
+    const cached = await cache.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);
     }
@@ -248,7 +248,7 @@ const getTrendingVideos = async (options = {}) => {
     });
 
     // Cache for 5 minutes
-    await cacheService.setex(cacheKey, 300, JSON.stringify(response.data));
+    await cache.setex(cacheKey, 300, JSON.stringify(response.data));
 
     return response.data;
   } catch (error) {
@@ -266,7 +266,7 @@ const getPopularVideos = async (options = {}) => {
     const cacheKey = 'invidious_popular';
 
     // Check cache first
-    const cached = await cacheService.get(cacheKey);
+    const cached = await cache.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);
     }
@@ -276,7 +276,7 @@ const getPopularVideos = async (options = {}) => {
     });
 
     // Cache for 5 minutes
-    await cacheService.setex(cacheKey, 300, JSON.stringify(response.data));
+    await cache.setex(cacheKey, 300, JSON.stringify(response.data));
 
     return response.data;
   } catch (error) {
@@ -331,7 +331,7 @@ const getSubtitles = async (videoId) => {
     const cacheKey = `invidious_subtitles_${videoId}`;
 
     // Check cache first
-    const cached = await cacheService.get(cacheKey);
+    const cached = await cache.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);
     }
@@ -341,7 +341,7 @@ const getSubtitles = async (videoId) => {
     });
 
     // Cache for 24 hours
-    await cacheService.setex(cacheKey, 86400, JSON.stringify(response.data));
+    await cache.setex(cacheKey, 86400, JSON.stringify(response.data));
 
     return response.data;
   } catch (error) {
