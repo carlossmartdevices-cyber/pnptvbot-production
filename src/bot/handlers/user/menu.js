@@ -1,7 +1,6 @@
 const { Markup } = require('telegraf');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
-const ChatCleanupService = require('../../services/chatCleanupService');
 
 /**
  * Envía mensaje de bienvenida y link de ingreso al canal PRIME
@@ -81,8 +80,7 @@ const registerMenuHandlers = (bot) => {
 
           // Send notification in group
           const groupMsg = `${username} I sent you a private message please check it out! 💬`;
-          const sentMessage = await ctx.reply(groupMsg);
-          ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
+          await ctx.reply(groupMsg);
 
           // Send private message with link to the feature
           try {
@@ -211,11 +209,6 @@ const registerMenuHandlers = (bot) => {
 
       const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
 
-      // Auto-delete menu messages in groups after 2 minutes
-      const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
-      if (isGroup) {
-        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
-      }
     } catch (error) {
       logger.error('Error in group contact admin:', error);
     }
@@ -270,11 +263,6 @@ const registerMenuHandlers = (bot) => {
 
       const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
 
-      // Auto-delete menu messages in groups after 2 minutes
-      const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
-      if (isGroup) {
-        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
-      }
     } catch (error) {
       logger.error('Error showing group rules:', error);
     }
@@ -395,9 +383,6 @@ const showGroupMenu = async (ctx) => {
       ...Markup.inlineKeyboard(keyboard),
     },
   );
-
-  // Auto-delete menu messages in groups after 2 minutes
-  ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
 };
 
 /**

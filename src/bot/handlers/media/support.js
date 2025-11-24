@@ -4,7 +4,6 @@ const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const SupportTopicModel = require('../../../models/supportTopicModel');
 const UserModel = require('../../../models/userModel');
-const ChatCleanupService = require('../../services/chatCleanupService');
 
 // Mistral AI integration
 let mistral = null;
@@ -749,10 +748,6 @@ const registerSupportHandlers = (bot) => {
               { parse_mode: 'Markdown' }
             );
 
-            // Mark Cristina's response as permanent (won't be deleted)
-            if (sentMessage && sentMessage.message_id) {
-              ChatCleanupService.markAsPermanent(ctx.chat.id, sentMessage.message_id);
-            }
           } catch (aiError) {
             logger.error('Mistral AI error:', aiError);
 
@@ -1212,10 +1207,6 @@ const registerSupportHandlers = (bot) => {
           { parse_mode: 'Markdown' }
         );
 
-        // Mark Cristina's response as permanent (won't be deleted)
-        if (sentMessage && sentMessage.message_id) {
-          ChatCleanupService.markAsPermanent(ctx.chat.id, sentMessage.message_id);
-        }
 
       } catch (aiError) {
         logger.error('Mistral AI error in /cristina:', aiError);

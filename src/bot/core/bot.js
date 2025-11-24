@@ -4,37 +4,15 @@ const { Telegraf } = require('telegraf');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
-const rateLimitMiddleware = require('./middleware/rateLimit');
-const chatCleanupMiddleware = require('./middleware/chatCleanup');
-const allowedChatsMiddleware = require('./middleware/allowedChats');
-const usernameEnforcement = require('./middleware/usernameEnforcement');
-const profileCompliance = require('./middleware/profileCompliance');
-const moderationFilter = require('./middleware/moderationFilter');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
-const groupCommandReminder = require('./middleware/groupCommandReminder');
-const commandAutoDeleteMiddleware = require('./middleware/commandAutoDelete');
 const errorHandler = require('./middleware/errorHandler');
-// Topic middleware
-const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./middleware/topicPermissions');
-const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
 const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
-const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
-const { groupSecurityEnforcementMiddleware, registerGroupSecurityHandlers } = require('./middleware/groupSecurityEnforcement');
-// Group behavior rules (overrides previous rules)
-const {
-  groupBehaviorMiddleware,
-  cristinaGroupFilterMiddleware,
-  groupMenuRedirectMiddleware,
-  groupCommandDeleteMiddleware
-} = require('./middleware/groupBehavior');
 const logger = require('../../utils/logger');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
 const registerAdminHandlers = require('../handlers/admin');
 const registerPaymentHandlers = require('../handlers/payments');
 const registerMediaHandlers = require('../handlers/media');
-const registerModerationHandlers = require('../handlers/moderation');
-const registerModerationAdminHandlers = require('../handlers/moderation/adminCommands');
 const registerCallManagementHandlers = require('../handlers/admin/callManagement');
 const registerRoleManagementHandlers = require('../handlers/admin/roleManagement');
 const registerGamificationHandlers = require('../handlers/admin/gamification');
@@ -50,7 +28,6 @@ const { registerLeaderboardHandlers } = require('../handlers/group/leaderboard')
 // const registerZoomHandlers = require('../handlers/media/zoomV2'); // Temporarily disabled due to missing dependencies
 // Services
 const CallReminderService = require('../services/callReminderService');
-const GroupCleanupService = require('../services/groupCleanupService');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
 // API Server
@@ -116,37 +93,13 @@ const startBot = async () => {
     const bot = new Telegraf(process.env.BOT_TOKEN);
     // Register middleware
     bot.use(sessionMiddleware());
-    bot.use(allowedChatsMiddleware()); // Must be early to leave unauthorized chats
-    bot.use(groupSecurityEnforcementMiddleware()); // Enforce group/channel whitelist
-    bot.use(rateLimitMiddleware());
-    // bot.use(usernameChangeDetectionMiddleware()); // DISABLED - not working properly
-    bot.use(chatCleanupMiddleware());
-    bot.use(commandAutoDeleteMiddleware()); // Delete commands from groups
-    bot.use(usernameEnforcement());
-    bot.use(profileCompliance());
-    bot.use(moderationFilter());
     bot.use(activityTrackerMiddleware());
-    bot.use(groupCommandReminder());
-
-    // Group behavior rules (OVERRIDE all previous rules)
-    bot.use(groupBehaviorMiddleware()); // Route all bot messages to topic 3135, 3-min delete
-    bot.use(cristinaGroupFilterMiddleware()); // Filter personal info from Cristina in groups
-    bot.use(groupMenuRedirectMiddleware()); // Redirect menu button clicks to private
-    bot.use(groupCommandDeleteMiddleware()); // Delete commands after 3 minutes
-
-    // Topic-specific middlewares
-    bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
-    bot.use(commandRedirectionMiddleware()); // Redirect commands to notifications
     bot.use(mediaMirrorMiddleware()); // Mirror media to PNPtv Gallery
-    bot.use(topicPermissionsMiddleware()); // Admin-only and approval queue
-    bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery
     // Register handlers
     registerUserHandlers(bot);
     registerAdminHandlers(bot);
     registerPaymentHandlers(bot);
     registerMediaHandlers(bot);
-    registerModerationHandlers(bot);
-    registerModerationAdminHandlers(bot);
     registerCallManagementHandlers(bot);
     registerRoleManagementHandlers(bot);
     registerGamificationHandlers(bot);
@@ -159,15 +112,10 @@ const startBot = async () => {
     registerCallFeedbackHandlers(bot);
     registerCallPackageHandlers(bot);
     registerLeaderboardHandlers(bot);
-    registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic
-    registerGroupSecurityHandlers(bot); // Group/channel security enforcement
     // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
     // Initialize call reminder service
     CallReminderService.initialize(bot);
     logger.info('✓ Call reminder service initialized');
-    // Initialize group cleanup service
-    const groupCleanup = new GroupCleanupService(bot);
-    groupCleanup.initialize();
     logger.info('✓ Registering error handler...');
     // Error handling
     bot.catch(errorHandler);
