@@ -68,7 +68,7 @@ function mediaMirrorMiddleware() {
         let mirrorCaption = '📸 **Shared Media**\n\n';
 
         // Add profile information
-        mirrorCaption += profileInfo;
+        mirrorCaption += profileLink;
 
         // Add original caption if exists
         if (caption && caption.trim()) {
