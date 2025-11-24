@@ -21,6 +21,13 @@ class ChatCleanupService {
   static botMessagesByChat = new Map();
 
   /**
+   * Permanent messages that should never be deleted
+   * Key: chatId
+   * Value: Set of message IDs
+   */
+  static permanentMessagesByChat = new Map();
+
+  /**
    * Cleanup delay in milliseconds (3 minutes - GROUP BEHAVIOR OVERRIDE)
    */
   static CLEANUP_DELAY = 3 * 60 * 1000; // 3 minutes
@@ -293,6 +300,36 @@ class ChatCleanupService {
   }
 
   /**
+   * Mark a message as permanent (won't be deleted)
+   * @param {number|string} chatId - Chat ID
+   * @param {number} messageId - Message ID
+   */
+  static markAsPermanent(chatId, messageId) {
+    if (!chatId || !messageId) {
+      return;
+    }
+
+    // Get or create permanent message set for this chat
+    if (!this.permanentMessagesByChat.has(chatId)) {
+      this.permanentMessagesByChat.set(chatId, new Set());
+    }
+
+    const permanentSet = this.permanentMessagesByChat.get(chatId);
+    permanentSet.add(messageId);
+
+    // Remove from regular tracking if present
+    const messageSet = this.botMessagesByChat.get(chatId);
+    if (messageSet) {
+      messageSet.delete(messageId);
+    }
+
+    logger.debug('Message marked as permanent', {
+      chatId,
+      messageId,
+    });
+  }
+
+  /**
    * Delete all previous bot messages in a chat
    * @param {Object} telegram - Telegram bot instance
    * @param {number|string} chatId - Chat ID
@@ -310,7 +347,11 @@ class ChatCleanupService {
       return 0;
     }
 
-    const messagesToDelete = Array.from(messageSet).filter((id) => id !== keepMessageId);
+    // Get permanent messages to exclude from deletion
+    const permanentSet = this.permanentMessagesByChat.get(chatId) || new Set();
+    const messagesToDelete = Array.from(messageSet).filter((id) =>
+      id !== keepMessageId && !permanentSet.has(id)
+    );
     let deletedCount = 0;
     const failedDeletes = [];
 

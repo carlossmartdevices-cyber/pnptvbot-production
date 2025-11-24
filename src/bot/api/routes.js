@@ -67,9 +67,7 @@ app.get('/payment/:paymentId', pageLimiter, (req, res) => {
 // Function to conditionally apply middleware (skip for Telegram webhook)
 const conditionalMiddleware = (middleware) => (req, res, next) => {
   // Skip middleware for Telegram webhook to prevent connection issues
-  if (req.path === '/pnp/webhook/telegram') {
-    // Telegram Webhook
-    app.post('/pnp/webhook/telegram', webhookController.handleTelegramWebhook);
+  if (req.path === '/pnp/webhook/telegram' || req.path === '/webhook/telegram') {
     return next();
   }
   return middleware(req, res, next);
@@ -79,10 +77,6 @@ const conditionalMiddleware = (middleware) => (req, res, next) => {
 app.use(conditionalMiddleware(helmet()));
 app.use(conditionalMiddleware(cors()));
 app.use(conditionalMiddleware(compression()));
-// Security middleware
-app.use(helmet());
-app.use(cors());
-app.use(compression());
 
 // Rate limiting for API
 const limiter = rateLimit({
