@@ -11,6 +11,7 @@ const logger = require('../../utils/logger');
 const webhookController = require('./controllers/webhookController');
 const subscriptionController = require('./controllers/subscriptionController');
 const paymentController = require('./controllers/paymentController');
+const materializousController = require('./controllers/materializousController');
 // const zoomController = require('./controllers/zoomController'); // Temporarily disabled
 
 // Middleware
@@ -202,6 +203,22 @@ app.get('/api/subscription/stats', asyncHandler(subscriptionController.getStatis
 // app.get('/zoom/host/:roomCode', (req, res) => {
 //   res.sendFile(path.join(__dirname, '../../../public/zoom/host.html'));
 // });
+
+// Materialious API routes
+app.get('/materialious', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/materialious/index.html'));
+});
+
+app.get('/api/materialious/search', asyncHandler(materializousController.searchVideos));
+app.get('/api/materialious/trending', asyncHandler(materializousController.getTrendingVideos));
+app.get('/api/materialious/popular', asyncHandler(materializousController.getPopularVideos));
+app.get('/api/materialious/video/:videoId', asyncHandler(materializousController.getVideoDetails));
+app.get('/api/materialious/channel/:channelId', asyncHandler(materializousController.getChannelInfo));
+app.get('/api/materialious/channel/:channelId/videos', asyncHandler(materializousController.getChannelVideos));
+app.get('/api/materialious/playlist/:playlistId', asyncHandler(materializousController.getPlaylistInfo));
+app.get('/api/materialious/subtitles/:videoId', asyncHandler(materializousController.getSubtitles));
+app.get('/api/materialious/instance/status', asyncHandler(materializousController.getInstanceStatus));
+app.post('/api/materialious/instance/configure', asyncHandler(materializousController.setCustomInstance));
 
 // Export app WITHOUT 404/error handlers
 // These will be added in bot.js AFTER the webhook callback
