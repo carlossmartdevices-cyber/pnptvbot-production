@@ -102,12 +102,28 @@ const registerMenuHandlers = (bot) => {
     });
   });
 
-  // Bloquear Zoom Rooms y Live Streams y mostrar "Coming soon"
+  // Live Streams - trigger livestream menu
   bot.action('show_live', async (ctx) => {
+    // Trigger the livestream menu handler
+    ctx.match = ['show_livestream'];
+    await ctx.answerCbQuery();
+    
     const lang = ctx.session?.language || 'en';
-    await ctx.answerCbQuery(
-      lang === 'es' ? '🚧 Próximamente: Transmisiones en vivo.' : '🚧 Coming soon: Live Streams.',
-      { show_alert: true }
+    const userId = ctx.from.id.toString();
+
+    await ctx.editMessageText(
+      lang === 'es'
+        ? '📡 *Transmisión en Vivo*\n\nCrea transmisiones en vivo interactivas para tus suscriptores.\n\n✨ Funciones:\n• Chat en tiempo real\n• Alta calidad de video\n• Sin límite de espectadores\n• Graba tu transmisión'
+        : '📡 *Live Streaming*\n\nCreate interactive live streams for your subscribers.\n\n✨ Features:\n• Real-time chat\n• High quality video\n• Unlimited viewers\n• Record your stream',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(lang === 'es' ? '🎥 Crear Transmisión' : '🎥 Create Stream', 'livestream_create')],
+          [Markup.button.callback(lang === 'es' ? '📺 Ver Transmisiones' : '📺 Watch Streams', 'livestream_browse')],
+          [Markup.button.callback(lang === 'es' ? '📊 Mis Transmisiones' : '📊 My Streams', 'livestream_my_streams')],
+          [Markup.button.callback(t('back', lang), 'back_to_main')]
+        ])
+      }
     );
   });
   bot.action('show_zoom', async (ctx) => {

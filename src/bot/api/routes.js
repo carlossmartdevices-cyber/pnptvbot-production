@@ -64,6 +64,11 @@ app.get('/payment/:paymentId', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
 
+// Daimo Pay checkout page
+app.get('/daimo/:paymentId', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'daimo-checkout.html'));
+});
+
 // Function to conditionally apply middleware (skip for Telegram webhook)
 const conditionalMiddleware = (middleware) => (req, res, next) => {
   // Skip middleware for Telegram webhook to prevent connection issues

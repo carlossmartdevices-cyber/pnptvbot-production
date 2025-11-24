@@ -1419,7 +1419,8 @@ const createLiveStream = async (ctx) => {
       return;
     }
 
-    await ctx.editMessageText(t('loading', lang));
+    // Send loading message (use reply instead of edit since this comes from text input)
+    const loadingMsg = await ctx.reply(t('loading', lang));
 
     // Create stream in database with Agora integration
     const stream = await LiveStreamModel.create({
@@ -1447,7 +1448,14 @@ const createLiveStream = async (ctx) => {
     ctx.session.temp.liveStreamPrice = null;
     await ctx.saveSession();
 
-    await ctx.editMessageText(
+    // Delete loading message and send success message
+    try {
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+    } catch (err) {
+      // Ignore if message is too old or already deleted
+    }
+
+    await ctx.reply(
       `${t('streamCreated', lang)}\n\n`
         + `🎤 ${stream.title}\n`
         + `🔴 ${t('liveNow', lang)}\n\n`

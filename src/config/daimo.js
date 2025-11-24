@@ -93,11 +93,11 @@ const getDaimoConfig = () => {
 
 /**
  * Create payment intent for Daimo Pay
- * @param {Object} params - { amount, userId, planId, chatId }
+ * @param {Object} params - { amount, userId, planId, chatId, paymentId, description }
  * @returns {Object} Payment intent object
  */
 const createPaymentIntent = ({
-  amount, userId, planId, chatId, description,
+  amount, userId, planId, chatId, paymentId, description,
 }) => {
   const config = getDaimoConfig();
 
@@ -124,6 +124,7 @@ const createPaymentIntent = ({
       chatId: chatId?.toString(),
       planId,
       amount: amount.toString(),
+      paymentId: paymentId?.toString(), // Include payment ID for webhook processing
       timestamp: new Date().toISOString(),
     },
 

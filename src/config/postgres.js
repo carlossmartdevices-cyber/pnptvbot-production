@@ -74,6 +74,14 @@ const closePool = async () => {
 };
 
 /**
+ * Get a client from the pool
+ * @returns {Promise<Object>} PostgreSQL client
+ */
+const getClient = async () => {
+  return await getPool().connect();
+};
+
+/**
  * Execute a query
  * @param {string} text - SQL query
  * @param {Array} params - Query parameters
@@ -90,6 +98,7 @@ const query = async (text, params) => {
 module.exports = {
   initializePostgres,
   getPool,
+  getClient,
   testConnection,
   closePool,
   query,

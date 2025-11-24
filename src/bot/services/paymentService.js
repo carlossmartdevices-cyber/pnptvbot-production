@@ -839,6 +839,8 @@ class PaymentService {
         txHash: source?.txHash,
         userId: metadata?.userId,
         planId: metadata?.planId,
+        paymentId: metadata?.paymentId,
+        fullMetadata: metadata,
       });
 
       const userId = metadata?.userId;
@@ -848,8 +850,23 @@ class PaymentService {
       const farcasterFid = metadata?.farcasterFid;
 
       if (!userId || !planId) {
-        logger.error('Missing user ID or plan ID in Daimo webhook', { eventId: id });
+        logger.error('Missing user ID or plan ID in Daimo webhook', { 
+          eventId: id, 
+          metadata,
+          hasUserId: !!userId,
+          hasPlanId: !!planId,
+        });
         return { success: false, error: 'Missing user ID or plan ID' };
+      }
+
+      // Warn if payment ID is missing but continue processing
+      if (!paymentId) {
+        logger.warn('Payment ID missing in Daimo webhook metadata', {
+          eventId: id,
+          userId,
+          planId,
+          metadata,
+        });
       }
 
       // Check if already processed (idempotency)
@@ -1069,11 +1086,13 @@ class PaymentService {
          amount: plan.price
        });
 
+       // Common configuration for all providers
+       const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN;
+
        // Generate ePayco payment link
        if (provider === 'epayco') {
          const epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;
          const epaycoTestMode = process.env.EPAYCO_TEST_MODE === 'true';
-         const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN;
 
          if (!epaycoPublicKey) {
            logger.error('ePayco public key not configured');
@@ -1127,32 +1146,41 @@ class PaymentService {
        // Handle Daimo payment link generation
        if (provider === 'daimo') {
          try {
-           // Create Daimo payment intent
+           // Create Daimo payment intent with paymentId
            const paymentIntent = DaimoConfig.createPaymentIntent({
              amount: plan.price,
              userId: userId,
              planId: planId,
              chatId: chatId,
+             paymentId: payment.id,
              description: `${plan.display_name || plan.name} - PNPtv Subscription`,
            });
 
-           // Add payment ID to metadata
-           paymentIntent.metadata.paymentId = payment.id;
-
            // Generate Daimo payment link
-           const paymentUrl = DaimoConfig.generatePaymentLink(paymentIntent);
+           const daimoPayLink = DaimoConfig.generatePaymentLink(paymentIntent);
 
-           logger.info('Daimo payment URL generated', {
+           // Generate checkout page URL (our hosted page with Daimo Pay SDK)
+           const checkoutUrl = `${webhookDomain}/daimo/${payment.id}`;
+
+           // Save both URLs to database
+           await PaymentModel.updateStatus(payment.id, 'pending', {
+             payment_url: daimoPayLink,
+             destination_address: DaimoConfig.getDaimoConfig().treasuryAddress,
+           });
+
+           logger.info('Daimo payment URLs generated', {
              paymentId: payment.id,
              planId: plan.id,
              userId,
              amountUSD: plan.price,
-             paymentUrl,
+             checkoutUrl,
+             daimoPayLink,
            });
 
+           // Return checkout page URL (better UX than raw Daimo link)
            return {
              success: true,
-             paymentUrl,
+             paymentUrl: checkoutUrl,
              paymentId: payment.id,
            };
          } catch (error) {

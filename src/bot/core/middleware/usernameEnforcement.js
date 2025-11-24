@@ -107,10 +107,11 @@ async function handleUsernameChange(ctx, userId, oldUsername, newUsername, group
     // Check if this is a recent change (within 24 hours)
     const changeCount = await ModerationModel.countRecentUsernameChanges(userId, 24);
 
-    if (changeCount > 1) {
-      // Notify support group admins about suspicious activity (not in group chat)
-      await notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId, changeCount);
-    }
+    // Username change notifications disabled
+    // if (changeCount > 1) {
+    //   // Notify support group admins about suspicious activity (not in group chat)
+    //   await notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId, changeCount);
+    // }
   } catch (error) {
     logger.error('Error handling username change:', error);
   }
