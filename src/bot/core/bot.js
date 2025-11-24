@@ -147,7 +147,6 @@ const startBot = async () => {
     registerCallPackageHandlers(bot);
     registerLeaderboardHandlers(bot);
     registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic
-    registerUsernameChangeAdminHandlers(bot); // Admin commands for username change detection
     registerGroupSecurityHandlers(bot); // Group/channel security enforcement
     // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
     // Initialize call reminder service
