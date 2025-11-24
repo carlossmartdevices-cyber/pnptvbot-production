@@ -331,6 +331,9 @@ const showPlayerMenu = async (ctx) => {
         Markup.button.callback(`🔍 ${t('player.search', lang)}`, 'player_search'),
         Markup.button.callback(`🎧 ${t('player.nowPlaying', lang)}`, 'player_now_playing'),
       ],
+      [
+        Markup.button.url(`✨ Materialious (Web)`, 'https://pnptv.app/materialious'),
+      ],
       [Markup.button.callback(t('back', lang), 'back_to_main')],
     ]);
 
