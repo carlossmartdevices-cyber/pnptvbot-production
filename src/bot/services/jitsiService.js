@@ -41,10 +41,15 @@ class JitsiService {
     // Plan tier mapping
     static PLAN_TIER_MAP = {
         'trial_week': 'Basic',
+        'trial-week': 'Basic',
         'pnp_member': 'PNP',
+        'pnp-member': 'PNP',
         'crystal_member': 'Crystal',
+        'crystal-member': 'Crystal',
         'diamond_member': 'Diamond',
-        'lifetime_pass': 'Premium'
+        'diamond-member': 'Diamond',
+        'lifetime_pass': 'Premium',
+        'lifetime-pass': 'Premium'
     };
 
     /**
@@ -122,11 +127,11 @@ class JitsiService {
      * Get user's plan tier
      */
     static getPlanTier(user) {
-        if (user.subscription_status !== 'active' && user.subscription_status !== 'trial') {
+        if (user.subscriptionStatus !== 'active' && user.subscriptionStatus !== 'trial') {
             return null;
         }
 
-        const planId = user.plan_id || 'trial_week';
+        const planId = user.planId || 'trial_week';
         return this.PLAN_TIER_MAP[planId] || 'Basic';
     }
 
@@ -253,7 +258,7 @@ class JitsiService {
         const user = await User.getById(userId);
         if (!user) return false;
 
-        return user.subscription_status === 'active' || user.subscription_status === 'trial';
+        return user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
     }
 
     /**
