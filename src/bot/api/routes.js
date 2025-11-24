@@ -204,30 +204,20 @@ app.get('/api/subscription/stats', asyncHandler(subscriptionController.getStatis
 //   res.sendFile(path.join(__dirname, '../../../public/zoom/host.html'));
 // });
 
-// Materialious rate limiter (prevent abuse of video API)
-const materializousLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // Limit each IP to 200 requests per windowMs
-  message: 'Too many video API requests, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: { trustProxy: false },
-});
-
 // Materialious API routes
-app.get('/materialious', pageLimiter, (req, res) => {
+app.get('/materialious', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/materialious/index.html'));
 });
 
-app.get('/api/materialious/search', materializousLimiter, asyncHandler(materializousController.searchVideos));
-app.get('/api/materialious/trending', materializousLimiter, asyncHandler(materializousController.getTrendingVideos));
-app.get('/api/materialious/popular', materializousLimiter, asyncHandler(materializousController.getPopularVideos));
-app.get('/api/materialious/video/:videoId', materializousLimiter, asyncHandler(materializousController.getVideoDetails));
-app.get('/api/materialious/channel/:channelId', materializousLimiter, asyncHandler(materializousController.getChannelInfo));
-app.get('/api/materialious/channel/:channelId/videos', materializousLimiter, asyncHandler(materializousController.getChannelVideos));
-app.get('/api/materialious/playlist/:playlistId', materializousLimiter, asyncHandler(materializousController.getPlaylistInfo));
-app.get('/api/materialious/subtitles/:videoId', materializousLimiter, asyncHandler(materializousController.getSubtitles));
-app.get('/api/materialious/instance/status', limiter, asyncHandler(materializousController.getInstanceStatus));
+app.get('/api/materialious/search', asyncHandler(materializousController.searchVideos));
+app.get('/api/materialious/trending', asyncHandler(materializousController.getTrendingVideos));
+app.get('/api/materialious/popular', asyncHandler(materializousController.getPopularVideos));
+app.get('/api/materialious/video/:videoId', asyncHandler(materializousController.getVideoDetails));
+app.get('/api/materialious/channel/:channelId', asyncHandler(materializousController.getChannelInfo));
+app.get('/api/materialious/channel/:channelId/videos', asyncHandler(materializousController.getChannelVideos));
+app.get('/api/materialious/playlist/:playlistId', asyncHandler(materializousController.getPlaylistInfo));
+app.get('/api/materialious/subtitles/:videoId', asyncHandler(materializousController.getSubtitles));
+app.get('/api/materialious/instance/status', asyncHandler(materializousController.getInstanceStatus));
 app.post('/api/materialious/instance/configure', asyncHandler(materializousController.setCustomInstance));
 
 // Export app WITHOUT 404/error handlers
