@@ -2,6 +2,8 @@ const logger = require('../../../utils/logger');
 const TopicConfigModel = require('../../../models/topicConfigModel');
 const { getRedis } = require('../../../config/redis');
 const UserModel = require('../../../models/userModel');
+const PermissionService = require('../../services/permissionService');
+const { PERMISSIONS } = require('../../../models/permissionModel');
 
 /**
  * Topic Permissions Middleware
@@ -34,9 +36,10 @@ function topicPermissionsMiddleware() {
     const message = ctx.message;
     const lang = ctx.from.language_code === 'es' ? 'es' : 'en';
 
-    // Check if user is admin
+    // Check if user is admin or performer
     const member = await ctx.telegram.getChatMember(chatId, userId);
     const isAdmin = ['creator', 'administrator'].includes(member.status);
+    const isPerformer = await PermissionService.hasPermission(userId, PERMISSIONS.POST_IN_RESTRICTED_TOPICS);
 
     // ===================================
     // COMMAND BLOCKING
@@ -110,8 +113,8 @@ function topicPermissionsMiddleware() {
     // ADMIN-ONLY POSTING (PNPtv News!)
     // ===================================
     if (topicConfig.can_post === 'admin_only') {
-      // Allow admins to post freely
-      if (isAdmin) {
+      // Allow admins and performers to post freely
+      if (isAdmin || isPerformer) {
         // Auto-pin if configured
         if (topicConfig.auto_pin_admin_messages && !message.reply_to_message) {
           try {
@@ -175,8 +178,8 @@ function topicPermissionsMiddleware() {
     // ===================================
     // APPROVAL REQUIRED (Podcasts/Thoughts)
     // ===================================
-    if (topicConfig.can_post === 'approval_required' && !isAdmin) {
-      // Non-admin posts need approval
+    if (topicConfig.can_post === 'approval_required' && !isAdmin && !isPerformer) {
+      // Non-admin, non-performer posts need approval
       const isReply = !!message.reply_to_message;
 
       // Allow replies without approval
