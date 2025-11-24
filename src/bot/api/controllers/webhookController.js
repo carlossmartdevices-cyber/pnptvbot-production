@@ -38,7 +38,7 @@ const validateEpaycoPayload = (payload) => {
   // These are important security fields that should be present in approved transactions
   const has3DSFields = payload.x_three_d_s || payload.x_eci || payload.x_cavv;
   if (!has3DSFields) {
-    console.warn('⚠️  ePayco transaction missing 3DS fields', {
+    logger.warn('⚠️  ePayco transaction missing 3DS fields', {
       refPayco: payload.x_ref_payco,
       state: payload.x_transaction_state,
     });
