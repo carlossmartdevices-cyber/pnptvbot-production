@@ -44,14 +44,7 @@ CREATE TABLE IF NOT EXISTS live_streams (
 
     -- Metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    -- Indexes for efficient querying
-    INDEX idx_stream_id (stream_id),
-    INDEX idx_host_user_id (host_user_id),
-    INDEX idx_status (status),
-    INDEX idx_scheduled_start (scheduled_start_time),
-    INDEX idx_created_at (created_at)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Stream viewers table (tracks who watched the stream)
@@ -82,12 +75,7 @@ CREATE TABLE IF NOT EXISTS stream_viewers (
     UNIQUE (stream_id, user_id, left_at),
 
     -- Foreign key
-    FOREIGN KEY (stream_id) REFERENCES live_streams(stream_id) ON DELETE CASCADE,
-
-    -- Indexes
-    INDEX idx_stream_viewers_stream (stream_id),
-    INDEX idx_stream_viewers_user (user_id),
-    INDEX idx_stream_viewers_joined (joined_at)
+    FOREIGN KEY (stream_id) REFERENCES live_streams(stream_id) ON DELETE CASCADE
 );
 
 -- Stream chat messages table
@@ -116,13 +104,7 @@ CREATE TABLE IF NOT EXISTS stream_chat_messages (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     -- Foreign key
-    FOREIGN KEY (stream_id) REFERENCES live_streams(stream_id) ON DELETE CASCADE,
-
-    -- Indexes
-    INDEX idx_chat_stream_id (stream_id),
-    INDEX idx_chat_user_id (user_id),
-    INDEX idx_chat_sent_at (sent_at),
-    INDEX idx_chat_deleted (is_deleted)
+    FOREIGN KEY (stream_id) REFERENCES live_streams(stream_id) ON DELETE CASCADE
 );
 
 -- Stream analytics table (daily aggregations)
@@ -149,11 +131,7 @@ CREATE TABLE IF NOT EXISTS stream_analytics (
     UNIQUE (stream_id, date),
 
     -- Foreign key
-    FOREIGN KEY (stream_id) REFERENCES live_streams(stream_id) ON DELETE CASCADE,
-
-    -- Indexes
-    INDEX idx_analytics_stream (stream_id),
-    INDEX idx_analytics_date (date)
+    FOREIGN KEY (stream_id) REFERENCES live_streams(stream_id) ON DELETE CASCADE
 );
 
 -- Stream moderators table (who can moderate the stream)
@@ -181,11 +159,7 @@ CREATE TABLE IF NOT EXISTS stream_moderators (
     UNIQUE (stream_id, user_id),
 
     -- Foreign key
-    FOREIGN KEY (stream_id) REFERENCES live_streams(stream_id) ON DELETE CASCADE,
-
-    -- Indexes
-    INDEX idx_moderators_stream (stream_id),
-    INDEX idx_moderators_user (user_id)
+    FOREIGN KEY (stream_id) REFERENCES live_streams(stream_id) ON DELETE CASCADE
 );
 
 -- Update timestamp trigger function
@@ -212,6 +186,33 @@ CREATE TRIGGER stream_analytics_updated_at
     BEFORE UPDATE ON stream_analytics
     FOR EACH ROW
     EXECUTE FUNCTION update_live_streams_updated_at();
+
+-- Create indexes for efficient querying
+-- live_streams table indexes
+CREATE INDEX IF NOT EXISTS idx_stream_id ON live_streams(stream_id);
+CREATE INDEX IF NOT EXISTS idx_host_user_id ON live_streams(host_user_id);
+CREATE INDEX IF NOT EXISTS idx_status ON live_streams(status);
+CREATE INDEX IF NOT EXISTS idx_scheduled_start ON live_streams(scheduled_start_time);
+CREATE INDEX IF NOT EXISTS idx_created_at ON live_streams(created_at);
+
+-- stream_viewers table indexes
+CREATE INDEX IF NOT EXISTS idx_stream_viewers_stream ON stream_viewers(stream_id);
+CREATE INDEX IF NOT EXISTS idx_stream_viewers_user ON stream_viewers(user_id);
+CREATE INDEX IF NOT EXISTS idx_stream_viewers_joined ON stream_viewers(joined_at);
+
+-- stream_chat_messages table indexes
+CREATE INDEX IF NOT EXISTS idx_chat_stream_id ON stream_chat_messages(stream_id);
+CREATE INDEX IF NOT EXISTS idx_chat_user_id ON stream_chat_messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_sent_at ON stream_chat_messages(sent_at);
+CREATE INDEX IF NOT EXISTS idx_chat_deleted ON stream_chat_messages(is_deleted);
+
+-- stream_analytics table indexes
+CREATE INDEX IF NOT EXISTS idx_analytics_stream ON stream_analytics(stream_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_date ON stream_analytics(date);
+
+-- stream_moderators table indexes
+CREATE INDEX IF NOT EXISTS idx_moderators_stream ON stream_moderators(stream_id);
+CREATE INDEX IF NOT EXISTS idx_moderators_user ON stream_moderators(user_id);
 
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_live_streams_active ON live_streams(status) WHERE status = 'live';
