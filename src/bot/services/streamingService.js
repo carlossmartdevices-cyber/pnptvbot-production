@@ -2,6 +2,7 @@ const jaasService = require('./jaasService');
 const LiveStreamModel = require('../../models/liveStreamModel');
 const User = require('../../models/userModel');
 const logger = require('../../utils/logger');
+const { query } = require('../../config/postgres');
 
 /**
  * Streaming Service
@@ -65,6 +66,13 @@ class StreamingService {
                 language: 'en'
             });
 
+            // Save JaaS room name to the stream record
+            // Store it in the channel_name field so it persists and can be retrieved
+            await query(
+                'UPDATE live_streams SET channel_name = $1 WHERE id = $2',
+                [roomName, stream.streamId]
+            );
+
             logger.info('Live stream created with JaaS', {
                 streamId: stream.streamId,
                 roomName,
@@ -121,8 +129,13 @@ class StreamingService {
                 viewerName
             );
 
-            // Extract room name from channel name
-            const roomName = stream.channelName || this.extractRoomName(stream);
+            // Get JaaS room name from the stream's channel_name field
+            // This was set when the stream was created with JaaS
+            const roomName = stream.channelName;
+
+            if (!roomName) {
+                throw new Error('Stream room name not found. This stream may not be a JaaS stream.');
+            }
 
             // Generate viewer token
             const viewerConfig = jaasService.generateViewerConfig(
@@ -381,19 +394,6 @@ class StreamingService {
         };
 
         return planTierMap[user.planId] || 'Basic';
-    }
-
-    /**
-     * Extract room name from stream
-     */
-    static extractRoomName(stream) {
-        // If channel name exists, use it
-        if (stream.channelName) {
-            return stream.channelName;
-        }
-
-        // Generate a room name based on stream ID
-        return `stream_${stream.streamId}`;
     }
 
     /**
