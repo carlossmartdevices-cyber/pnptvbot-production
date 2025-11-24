@@ -128,13 +128,16 @@ class PermissionService {
         return 'admin';
       }
 
-      // For non-admin users, check database for moderator role only
+      // For non-admin users, check database for moderator and performer roles
       const user = await UserModel.getById(userId);
       const dbRole = user?.role || 'user';
 
-      // Only allow moderator role from database, not admin/superadmin
+      // Only allow moderator and performer roles from database, not admin/superadmin
       if (dbRole === 'moderator') {
         return 'moderator';
+      }
+      if (dbRole === 'performer') {
+        return 'performer';
       }
 
       return 'user';
@@ -157,7 +160,7 @@ class PermissionService {
         return true;
       }
 
-      // Check for moderator role from database
+      // Check for moderator role from database (performer is not admin)
       const role = await this.getUserRole(userId);
       return role === 'moderator';
     } catch (error) {
