@@ -209,6 +209,91 @@ app.get('/api/subscription/stats', asyncHandler(subscriptionController.getStatis
 //   res.sendFile(path.join(__dirname, '../../../public/zoom/host.html'));
 // });
 
+// Radio API routes
+const RadioModel = require('../../models/radioModel');
+
+// Get radio configuration (stream URL)
+app.get('/api/radio/config', asyncHandler(async (req, res) => {
+  res.json({
+    success: true,
+    streamUrl: process.env.RADIO_STREAM_URL || 'https://pnptv.app/radio/stream',
+  });
+}));
+
+// Get now playing
+app.get('/api/radio/now-playing', asyncHandler(async (req, res) => {
+  const nowPlaying = await RadioModel.getNowPlaying();
+  res.json({
+    success: true,
+    nowPlaying,
+  });
+}));
+
+// Get song history
+app.get('/api/radio/history', asyncHandler(async (req, res) => {
+  const limit = parseInt(req.query.limit) || 10;
+  const history = await RadioModel.getHistory(limit);
+  res.json({
+    success: true,
+    history,
+  });
+}));
+
+// Get schedule
+app.get('/api/radio/schedule', asyncHandler(async (req, res) => {
+  const schedule = await RadioModel.getSchedule();
+  res.json({
+    success: true,
+    schedule,
+  });
+}));
+
+// Submit song request
+app.post('/api/radio/request', asyncHandler(async (req, res) => {
+  const { song, telegramId } = req.body;
+
+  if (!song || song.trim().length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'Song name is required',
+    });
+  }
+
+  // Use telegram ID if provided, otherwise use IP-based anonymous ID
+  const userId = telegramId || `web_${req.ip}`;
+
+  // Check daily limit (5 requests per day)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // For web requests, we'll allow without strict limit checking
+  // The telegram bot enforces the 5/day limit
+
+  const request = await RadioModel.requestSong(userId, song.trim());
+
+  if (request) {
+    res.json({
+      success: true,
+      message: 'Song request submitted',
+      request,
+    });
+  } else {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to submit request',
+    });
+  }
+}));
+
+// Get radio statistics (public)
+app.get('/api/radio/stats', asyncHandler(async (req, res) => {
+  const stats = await RadioModel.getStatistics();
+  res.json({
+    success: true,
+    stats,
+  });
+}));
+
 // Export app WITHOUT 404/error handlers
 // These will be added in bot.js AFTER the webhook callback
 module.exports = app;
