@@ -41,9 +41,9 @@ Update these settings:
 
 <authentication>
     <source-password>Apelo801050%</source-password>
-    <relay-password>YOUR_RELAY_PASSWORD</relay-password>
+    <relay-password>Apelo801050%</relay-password>
     <admin-user>admin</admin-user>
-    <admin-password>YOUR_ADMIN_PASSWORD</admin-password>
+    <admin-password>Apelo801050%</admin-password>
 </authentication>
 
 <paths>
