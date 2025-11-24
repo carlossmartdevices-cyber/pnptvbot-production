@@ -19,8 +19,14 @@ const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./midd
 const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
 const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
 const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
-const { usernameChangeDetectionMiddleware, initSecurityLogsTable } = require('./middleware/usernameChangeDetection');
 const { groupSecurityEnforcementMiddleware, registerGroupSecurityHandlers } = require('./middleware/groupSecurityEnforcement');
+// Group behavior rules (overrides previous rules)
+const {
+  groupBehaviorMiddleware,
+  cristinaGroupFilterMiddleware,
+  groupMenuRedirectMiddleware,
+  groupCommandDeleteMiddleware
+} = require('./middleware/groupBehavior');
 const logger = require('../../utils/logger');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
@@ -41,7 +47,6 @@ const registerUserCallManagementHandlers = require('../handlers/user/callManagem
 const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
 const { registerLeaderboardHandlers } = require('../handlers/group/leaderboard');
-const registerUsernameChangeAdminHandlers = require('../handlers/admin/usernameChangeDetectionAdmin');
 // const registerZoomHandlers = require('../handlers/media/zoomV2'); // Temporarily disabled due to missing dependencies
 // Services
 const CallReminderService = require('../services/callReminderService');
@@ -107,13 +112,6 @@ const startBot = async () => {
       logger.warn('Redis initialization failed, continuing without cache:', error.message);
       logger.warn('⚠️  Performance may be degraded without caching');
     }
-    // Initialize security logs table
-    try {
-      await initSecurityLogsTable();
-      logger.info('✓ Security logs table initialized');
-    } catch (error) {
-      logger.warn('Security logs table initialization failed:', error.message);
-    }
     // Create bot instance
     const bot = new Telegraf(process.env.BOT_TOKEN);
     // Register middleware
@@ -121,7 +119,7 @@ const startBot = async () => {
     bot.use(allowedChatsMiddleware()); // Must be early to leave unauthorized chats
     bot.use(groupSecurityEnforcementMiddleware()); // Enforce group/channel whitelist
     bot.use(rateLimitMiddleware());
-    bot.use(usernameChangeDetectionMiddleware()); // Detect suspicious name changes early
+    // bot.use(usernameChangeDetectionMiddleware()); // DISABLED - not working properly
     bot.use(chatCleanupMiddleware());
     bot.use(commandAutoDeleteMiddleware()); // Delete commands from groups
     bot.use(usernameEnforcement());
@@ -129,6 +127,12 @@ const startBot = async () => {
     bot.use(moderationFilter());
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
+
+    // Group behavior rules (OVERRIDE all previous rules)
+    bot.use(groupBehaviorMiddleware()); // Route all bot messages to topic 3135, 3-min delete
+    bot.use(cristinaGroupFilterMiddleware()); // Filter personal info from Cristina in groups
+    bot.use(groupMenuRedirectMiddleware()); // Redirect menu button clicks to private
+    bot.use(groupCommandDeleteMiddleware()); // Delete commands after 3 minutes
 
     // Topic-specific middlewares
     bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
@@ -156,7 +160,6 @@ const startBot = async () => {
     registerCallPackageHandlers(bot);
     registerLeaderboardHandlers(bot);
     registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic
-    registerUsernameChangeAdminHandlers(bot); // Admin commands for username change detection
     registerGroupSecurityHandlers(bot); // Group/channel security enforcement
     // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
     // Initialize call reminder service

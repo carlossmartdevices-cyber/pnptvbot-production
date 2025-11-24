@@ -151,94 +151,6 @@ const registerMenuHandlers = (bot) => {
     }
   });
 
-  // Start group video call from menu button
-  // Only works in the community group
-  bot.action('start_group_video_call', async (ctx) => {
-    try {
-      const chatType = ctx.chat?.type;
-      const communityGroupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : null;
-
-      if (!communityGroupId) {
-        await ctx.answerCbQuery('❌ Community group not configured', { show_alert: true });
-        return;
-      }
-
-      // Only allow from community group
-      if (ctx.chat.id !== communityGroupId) {
-        await ctx.answerCbQuery('❌ This feature only works in the community group', { show_alert: true });
-        return;
-      }
-
-      // Allow any group member to start calls
-      const hostId = ctx.from.id;
-      const hostName = ctx.from.first_name || 'Member';
-      
-      // Start a Telegram video chat in the community group FIRST
-      let videoChatStarted = false;
-      try {
-        await ctx.telegram.requestVideoChatStart(communityGroupId);
-        videoChatStarted = true;
-        logger.info('✅ Telegram video chat started successfully from menu', { communityGroupId });
-      } catch (videoChatError) {
-        logger.error('Error requesting video chat:', videoChatError);
-        await ctx.answerCbQuery('❌ Failed to start video call');
-        return;
-      }
-
-      // Wait a moment for the video chat to initialize
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const inviteMessage = [
-        `🎥 *GROUP VIDEO CALL STARTED*`,
-        ``,
-        `📱 Host: @${ctx.from.username || hostName}`,
-        `👥 Community Video Call`,
-        ``,
-        `🔴 Video call is now LIVE!`,
-        ``,
-        `Tap the video call icon above to join directly 📲`,
-        ``,
-        `⏱️ Started at: ${new Date().toLocaleTimeString()}`,
-      ].join('\n');
-
-      try {
-        // Send announcement message to COMMUNITY GROUP
-        const groupMessage = await ctx.telegram.sendMessage(communityGroupId, inviteMessage, {
-          parse_mode: 'Markdown',
-          disable_web_page_preview: true,
-          ...Markup.inlineKeyboard([
-            [
-              Markup.button.callback('👥 Participants', `group_call_participants_live`),
-              Markup.button.callback('📊 Call Info', `group_call_info_live`),
-            ],
-          ]),
-        });
-
-        // Pin the message in community group
-        try {
-          await ctx.telegram.pinChatMessage(communityGroupId, groupMessage.message_id, { disable_notification: true });
-        } catch (pinError) {
-          logger.warn('Could not pin message:', pinError.message);
-        }
-
-        logger.info('Group video call started from menu', {
-          communityGroupId,
-          hostId,
-          videoChatStarted,
-          messageId: groupMessage.message_id,
-        });
-
-        await ctx.answerCbQuery('✅ Video call started!');
-      } catch (groupError) {
-        logger.error('Error sending to community group:', groupError);
-        await ctx.answerCbQuery('❌ Error starting call');
-      }
-    } catch (error) {
-      logger.error('Error starting group video call from menu:', error);
-      await ctx.answerCbQuery('❌ Error starting call');
-    }
-  });
-
   // Back to main menu action
   bot.action('back_to_main', async (ctx) => {
     try {
@@ -386,9 +298,10 @@ const showMainMenu = async (ctx) => {
       ],
       [
         Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
-        Markup.button.callback(t('support', lang), 'show_support'),
+        Markup.button.callback('📹 Jitsi', 'show_jitsi'),
       ],
       [
+        Markup.button.callback(t('support', lang), 'show_support'),
         Markup.button.callback(t('settings', lang), 'show_settings'),
       ],
     ]),
@@ -449,13 +362,11 @@ const showGroupMenu = async (ctx) => {
 
   const keyboard = lang === 'es'
     ? [
-      [Markup.button.callback('🎥 Iniciar Video Grupal', 'start_group_video_call')],
       [Markup.button.callback('📞 Contactar a un Admin', 'group_contact_admin')],
       [Markup.button.callback('📋 Reglas de la Comunidad', 'group_show_rules')],
       [Markup.button.url(`💬 Chat Bot PNPtv!`, `https://t.me/${botUsername}?start=group_menu`)],
     ]
     : [
-      [Markup.button.callback('🎥 Start Group Video', 'start_group_video_call')],
       [Markup.button.callback('📞 Contact an Admin', 'group_contact_admin')],
       [Markup.button.callback('📋 Community Rules', 'group_show_rules')],
       [Markup.button.url(`💬 PNPtv! Bot Chat`, `https://t.me/${botUsername}?start=group_menu`)],
@@ -512,7 +423,10 @@ const showMainMenuEdit = async (ctx) => {
       buildButton(t('zoomRooms', lang), 'show_zoom', !isPremium && !isAdmin),
     ],
     [
+      buildButton('📹 Jitsi', 'show_jitsi', !isPremium && !isAdmin),
       Markup.button.callback(t('support', lang), 'show_support'),
+    ],
+    [
       Markup.button.callback(t('settings', lang), 'show_settings'),
     ],
   ];
@@ -538,9 +452,10 @@ const showMainMenuEdit = async (ctx) => {
         ],
         [
           Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
-          Markup.button.callback(t('support', lang), 'show_support'),
+          Markup.button.callback('📹 Jitsi', 'show_jitsi'),
         ],
         [
+          Markup.button.callback(t('support', lang), 'show_support'),
           Markup.button.callback(t('settings', lang), 'show_settings'),
         ],
       ]),

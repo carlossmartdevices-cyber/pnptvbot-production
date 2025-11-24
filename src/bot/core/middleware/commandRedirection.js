@@ -69,23 +69,23 @@ function commandRedirectionMiddleware() {
       }
     );
 
-    // Delete user's original command after 30 seconds (after processing)
+    // Delete user's original command after 3 minutes (GROUP BEHAVIOR OVERRIDE)
     setTimeout(async () => {
       try {
         await ctx.telegram.deleteMessage(chatId, originalMessageId);
       } catch (error) {
         logger.debug('Could not delete original command:', error.message);
       }
-    }, 30000); // 30 seconds
+    }, 180000); // 3 minutes
 
-    // Delete redirect notice after 10 seconds
+    // Delete redirect notice after 3 minutes (GROUP BEHAVIOR OVERRIDE)
     setTimeout(async () => {
       try {
         await ctx.telegram.deleteMessage(chatId, redirectMessage.message_id);
       } catch (error) {
         logger.debug('Could not delete redirect notice:', error.message);
       }
-    }, 10000); // 10 seconds
+    }, 180000); // 3 minutes
 
     // Process the command in the notifications topic
     // We need to intercept the bot's response and redirect it
@@ -111,8 +111,8 @@ function commandRedirectionMiddleware() {
           }
         );
 
-        // Schedule deletion after 5 minutes
-        scheduleMessageDeletion(ctx, chatId, botReply.message_id, NOTIFICATIONS_TOPIC_ID, 300);
+        // Schedule deletion after 3 minutes (GROUP BEHAVIOR OVERRIDE)
+        scheduleMessageDeletion(ctx, chatId, botReply.message_id, NOTIFICATIONS_TOPIC_ID, 180);
 
         return botReply;
       } catch (error) {
@@ -135,7 +135,7 @@ function commandRedirectionMiddleware() {
 /**
  * Schedule a message for deletion
  */
-function scheduleMessageDeletion(ctx, chatId, messageId, topicId, delaySeconds = 300) {
+function scheduleMessageDeletion(ctx, chatId, messageId, topicId, delaySeconds = 180) {
   setTimeout(async () => {
     try {
       await ctx.telegram.deleteMessage(chatId, messageId);
@@ -147,7 +147,7 @@ function scheduleMessageDeletion(ctx, chatId, messageId, topicId, delaySeconds =
 }
 
 /**
- * Schedule command message deletion (30 seconds)
+ * Schedule command message deletion (3 minutes - GROUP BEHAVIOR OVERRIDE)
  */
 async function scheduleCommandDeletion(ctx, chatId, messageId, topicId) {
   setTimeout(async () => {
@@ -157,7 +157,7 @@ async function scheduleCommandDeletion(ctx, chatId, messageId, topicId) {
     } catch (error) {
       logger.debug(`Could not delete command message:`, error.message);
     }
-  }, 30000); // 30 seconds
+  }, 180000); // 3 minutes
 }
 
 /**
@@ -174,8 +174,8 @@ function notificationsAutoDelete() {
       const messageId = ctx.message?.message_id;
 
       if (messageId) {
-        // Schedule deletion after 5 minutes
-        scheduleMessageDeletion(ctx, chatId, messageId, NOTIFICATIONS_TOPIC_ID, 300);
+        // Schedule deletion after 3 minutes (GROUP BEHAVIOR OVERRIDE)
+        scheduleMessageDeletion(ctx, chatId, messageId, NOTIFICATIONS_TOPIC_ID, 180);
       }
     }
 

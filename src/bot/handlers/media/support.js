@@ -250,8 +250,7 @@ const registerSupportHandlers = (bot) => {
         await initializeAgent();
       }
 
-      // Initialize chat session
-      ctx.session.temp.aiChatActive = true;
+      // Reset chat session counters
       ctx.session.temp.aiChatHistory = [];
       ctx.session.temp.aiQuestionCount = 0; // Track questions asked
       await ctx.saveSession();
@@ -265,14 +264,16 @@ const registerSupportHandlers = (bot) => {
           + '• Salud sexual y mental\n'
           + '• Recursos comunitarios\n'
           + '• Información sobre la plataforma\n\n'
-          + '_Escribe tu pregunta o inquietud. Escribe "exit" para salir._'
+          + '_✨ Ahora puedes escribirme directamente en cualquier momento. Solo envíame un mensaje y te responderé._\n\n'
+          + '_Tienes 3 preguntas antes de conectarte con soporte humano. Escribe "exit" para limpiar el historial._'
         : '💬 **Hi! I\'m Cristina**\n\n'
           + 'I\'m here to support you with:\n'
           + '• Harm reduction and safer use\n'
           + '• Sexual and mental health\n'
           + '• Community resources\n'
           + '• Platform information\n\n'
-          + '_Type your question or concern. Type "exit" to exit._';
+          + '_✨ You can now write to me directly anytime. Just send me a message and I\'ll respond._\n\n'
+          + '_You have 3 questions before connecting with human support. Type "exit" to clear history._';
 
       await ctx.editMessageText(
         greeting,
@@ -342,9 +343,16 @@ const registerSupportHandlers = (bot) => {
     }
   });
 
-  // Handle AI chat messages
+  // Handle text messages - AI chat is now automatic for all messages
   bot.on('text', async (ctx, next) => {
-    if (ctx.session.temp?.aiChatActive) {
+    // Skip commands - let them be handled by command handlers
+    if (ctx.message?.text?.startsWith('/')) {
+      return next();
+    }
+
+    // AUTO AI CHAT: Process all non-command messages through AI
+    // Special modes (contactingAdmin, requestingActivation) are handled after this block
+    if (!ctx.session.temp?.contactingAdmin && !ctx.session.temp?.requestingActivation) {
       try {
         const lang = getLanguage(ctx);
         const userId = ctx.from.id;
@@ -357,22 +365,16 @@ const registerSupportHandlers = (bot) => {
 
         const userMessage = ctx.message.text;
 
-        // Exit AI chat for any command or exit keyword
-        if (userMessage.startsWith('/') || userMessage.toLowerCase() === 'exit') {
-          ctx.session.temp.aiChatActive = false;
+        // Allow users to exit AI chat with "exit" keyword
+        if (userMessage.toLowerCase() === 'exit') {
           ctx.session.temp.aiChatHistory = null;
           ctx.session.temp.aiQuestionCount = 0;
           await ctx.saveSession();
 
-          // If it's a command other than /exit, pass it to the next handler
-          if (userMessage.startsWith('/') && !userMessage.toLowerCase().startsWith('/exit')) {
-            return next();
-          }
-
           await ctx.reply(
             lang === 'es'
-              ? '💬 Chat finalizado. Use /support para acceder al menú de soporte.'
-              : '💬 Chat ended. Use /support to access support menu.',
+              ? '💬 Chat finalizado. Puedes seguir escribiéndome cuando quieras, o usa /support para más opciones.'
+              : '💬 Chat ended. You can keep writing to me anytime, or use /support for more options.',
             Markup.inlineKeyboard([
               [Markup.button.callback(t('back', lang), 'show_support')],
             ]),
@@ -384,7 +386,7 @@ const registerSupportHandlers = (bot) => {
         const questionCount = ctx.session.temp.aiQuestionCount || 0;
 
         if (questionCount >= 3) {
-          ctx.session.temp.aiChatActive = false;
+          // Reset counters after reaching limit
           ctx.session.temp.aiChatHistory = null;
           ctx.session.temp.aiQuestionCount = 0;
           await ctx.saveSession();

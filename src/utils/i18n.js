@@ -880,12 +880,22 @@ const translations = {
  */
 const t = (key, lang = 'en', params = {}) => {
   const language = lang || 'en';
-  let text = translations[language]?.[key] || translations.en[key] || key;
+
+  // Support nested keys like 'moderation.username_required'
+  const getNestedValue = (obj, keyPath) => {
+    return keyPath.split('.').reduce((current, k) => current?.[k], obj);
+  };
+
+  let text = getNestedValue(translations[language], key)
+    || getNestedValue(translations.en, key)
+    || key;
 
   // Replace parameters
-  Object.keys(params).forEach((param) => {
-    text = text.replace(`{${param}}`, params[param]);
-  });
+  if (typeof text === 'string') {
+    Object.keys(params).forEach((param) => {
+      text = text.replace(`{${param}}`, params[param]);
+    });
+  }
 
   return text;
 };
