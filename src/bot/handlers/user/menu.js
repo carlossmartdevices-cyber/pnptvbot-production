@@ -298,9 +298,10 @@ const showMainMenu = async (ctx) => {
       ],
       [
         Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
-        Markup.button.callback(t('support', lang), 'show_support'),
+        Markup.button.callback('📹 Jitsi', 'show_jitsi'),
       ],
       [
+        Markup.button.callback(t('support', lang), 'show_support'),
         Markup.button.callback(t('settings', lang), 'show_settings'),
       ],
     ]),
@@ -422,7 +423,10 @@ const showMainMenuEdit = async (ctx) => {
       buildButton(t('zoomRooms', lang), 'show_zoom', !isPremium && !isAdmin),
     ],
     [
+      buildButton('📹 Jitsi', 'show_jitsi', !isPremium && !isAdmin),
       Markup.button.callback(t('support', lang), 'show_support'),
+    ],
+    [
       Markup.button.callback(t('settings', lang), 'show_settings'),
     ],
   ];
@@ -448,9 +452,10 @@ const showMainMenuEdit = async (ctx) => {
         ],
         [
           Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
-          Markup.button.callback(t('support', lang), 'show_support'),
+          Markup.button.callback('📹 Jitsi', 'show_jitsi'),
         ],
         [
+          Markup.button.callback(t('support', lang), 'show_support'),
           Markup.button.callback(t('settings', lang), 'show_settings'),
         ],
       ]),
