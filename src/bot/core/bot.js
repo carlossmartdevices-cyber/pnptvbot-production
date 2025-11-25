@@ -49,6 +49,7 @@ const registerUserCallManagementHandlers = require('../handlers/user/callManagem
 const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
 const { registerLeaderboardHandlers } = require('../handlers/group/leaderboard');
+const registerMenuHandlers = require('../handlers/menu');
 // const registerZoomHandlers = require('../handlers/media/zoomV2'); // Temporarily disabled due to missing dependencies
 // Services
 const CallReminderService = require('../services/callReminderService');
@@ -165,6 +166,7 @@ const startBot = async () => {
     registerCallFeedbackHandlers(bot);
     registerCallPackageHandlers(bot);
     registerLeaderboardHandlers(bot);
+    registerMenuHandlers(bot); // Menu system and Cristina AI
     registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic
     registerGroupSecurityHandlers(bot); // Group/channel security enforcement
     // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
