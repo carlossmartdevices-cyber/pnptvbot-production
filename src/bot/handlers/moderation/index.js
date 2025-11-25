@@ -1,3 +1,4 @@
+const registerModerationCommands = require('./moderationCommands');
 const logger = require('../../../utils/logger');
 
 /**
@@ -5,8 +6,10 @@ const logger = require('../../../utils/logger');
  * @param {Telegraf} bot - Bot instance
  */
 const registerModerationHandlers = (bot) => {
-  // All moderation commands have been disabled
-  logger.info('Moderation user handlers are disabled');
+  // Register all moderation commands
+  registerModerationCommands(bot);
+
+  logger.info('Moderation handlers registered successfully');
 };
 
 module.exports = registerModerationHandlers;

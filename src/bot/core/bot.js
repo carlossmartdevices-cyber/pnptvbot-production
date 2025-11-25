@@ -10,6 +10,7 @@ const allowedChatsMiddleware = require('./middleware/allowedChats');
 const usernameEnforcement = require('./middleware/usernameEnforcement');
 const profileCompliance = require('./middleware/profileCompliance');
 const moderationFilter = require('./middleware/moderationFilter');
+const autoModerationMiddleware = require('./middleware/autoModeration');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
 const commandAutoDeleteMiddleware = require('./middleware/commandAutoDelete');
@@ -125,6 +126,7 @@ const startBot = async () => {
     bot.use(usernameEnforcement());
     bot.use(profileCompliance());
     bot.use(moderationFilter());
+    bot.use(autoModerationMiddleware()); // Auto-moderation (spam, links, flooding, profanity)
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
 
