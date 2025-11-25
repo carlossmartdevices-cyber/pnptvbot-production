@@ -117,11 +117,16 @@ const showHangoutsMenu = async (ctx) => {
     let text = `🎥 ${t('hangouts.title', lang)}\n\n`;
     text += `${t('hangouts.description', lang)}\n\n`;
 
-    // Get active participants count in main room
-    const mainRoom = await MainRoomModel.getMainRoomStatus();
-    if (mainRoom) {
-      const activeCount = await MainRoomModel.getActiveParticipantsCount();
-      text += `👥 ${t('hangouts.mainRoomActive', lang)}: ${activeCount} ${t('hangouts.participants', lang)}\n\n`;
+    // Get active participants count in main room (room ID 1)
+    try {
+      const mainRoom = await MainRoomModel.getById(1);
+      if (mainRoom && mainRoom.isActive) {
+        const participants = await MainRoomModel.getParticipants(1);
+        text += `👥 ${t('hangouts.mainRoomActive', lang)}: ${participants.length} ${t('hangouts.participants', lang)}\n\n`;
+      }
+    } catch (error) {
+      // If room doesn't exist yet, skip showing count
+      logger.debug('Main room not yet initialized:', error);
     }
 
     const keyboard = Markup.inlineKeyboard([
@@ -149,25 +154,19 @@ const joinMainRoom = async (ctx) => {
     const userId = ctx.from.id;
     const username = ctx.from.username || ctx.from.first_name;
 
-    // Get or create main room
-    let mainRoom = await MainRoomModel.getMainRoomStatus();
-    if (!mainRoom || mainRoom.status === 'ended') {
-      mainRoom = await MainRoomModel.createMainRoom();
-    }
+    // Join main room (room ID 1) - joinRoom handles everything
+    const roomId = 1; // Main room is always room 1
+    const result = await MainRoomModel.joinRoom(roomId, userId, username, true); // true = as publisher (can broadcast)
 
-    // Generate Agora token for main room
-    const channelName = `main_room_${mainRoom.roomId}`;
-    const token = await AgoraTokenService.generateRTCToken(channelName, userId.toString());
+    // Get current participants count
+    const participants = await MainRoomModel.getParticipants(roomId);
 
-    // Add participant to main room
-    await MainRoomModel.addParticipant(mainRoom.roomId, userId, username);
-
-    // Create web app URL with token
-    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${channelName}&token=${token}&uid=${userId}&username=${encodeURIComponent(username)}&type=main`;
+    // Create web app URL with token from joinRoom result
+    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${result.room.channelName}&token=${result.token}&uid=${userId}&username=${encodeURIComponent(username)}&type=main`;
 
     let text = `✅ ${t('hangouts.joinedMainRoom', lang)}\n\n`;
-    text += `🎥 ${t('hangouts.roomId', lang)}: ${mainRoom.roomId}\n`;
-    text += `👥 ${t('hangouts.participants', lang)}: ${await MainRoomModel.getActiveParticipantsCount()}\n\n`;
+    text += `🎥 ${t('hangouts.roomName', lang)}: ${result.room.name}\n`;
+    text += `👥 ${t('hangouts.participants', lang)}: ${participants.length}\n\n`;
     text += `💡 ${t('hangouts.clickToJoin', lang)}`;
 
     const keyboard = Markup.inlineKeyboard([
@@ -179,7 +178,17 @@ const joinMainRoom = async (ctx) => {
   } catch (error) {
     logger.error('Error in joinMainRoom:', error);
     const lang = getLanguage(ctx);
-    await ctx.reply(t('error', lang));
+
+    // Handle specific errors
+    if (error.message.includes('full')) {
+      await ctx.reply(t('hangouts.roomFull', lang));
+    } else if (error.message.includes('not active')) {
+      await ctx.reply(t('hangouts.roomNotActive', lang));
+    } else if (error.message.includes('not found')) {
+      await ctx.reply(t('hangouts.roomNotFound', lang));
+    } else {
+      await ctx.reply(t('error', lang));
+    }
   }
 };
 
