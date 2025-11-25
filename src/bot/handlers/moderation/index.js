@@ -8,11 +8,8 @@ const { t } = require('../../../utils/i18n');
  * @param {Telegraf} bot - Bot instance
  */
 const registerModerationHandlers = (bot) => {
-  // /rules - Show group rules
-  bot.command('rules', handleRules);
-
-  // /warnings - Show my warnings
-  bot.command('warnings', handleMyWarnings);
+  // All moderation commands have been disabled
+  logger.info('Moderation user handlers are disabled');
 };
 
 /**

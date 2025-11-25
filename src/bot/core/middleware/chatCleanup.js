@@ -16,43 +16,8 @@ const logger = require('../../../utils/logger');
  * @returns {Function} Middleware function
  */
 const chatCleanupMiddleware = (delay = 5 * 60 * 1000) => async (ctx, next) => {
-  const chatType = ctx.chat?.type;
-  const chatId = ctx.chat?.id;
-
-  try {
-    // Delete previous bot messages on new user interaction (for private chats)
-    // This keeps the chat clean by removing previous bot responses
-    if (chatType === 'private' && chatId) {
-      // Delete on new message or callback query
-      if (ctx.message || ctx.callbackQuery) {
-        try {
-          await ChatCleanupService.deleteAllPreviousBotMessages(ctx.telegram, chatId);
-          logger.debug('Previous bot messages deleted on new interaction', {
-            chatId,
-            type: ctx.message ? 'message' : 'callback_query',
-          });
-        } catch (error) {
-          logger.error('Error deleting previous bot messages:', error);
-          // Don't block the flow
-        }
-      }
-    }
-
-    // Handle incoming messages (groups and supergroups)
-    if ((chatType === 'group' || chatType === 'supergroup') && ctx.message) {
-      await handleIncomingMessage(ctx, delay);
-    }
-
-    // Continue with the rest of the middleware chain
-    await next();
-
-    // Handle outgoing bot messages (all chat types)
-    await handleOutgoingMessages(ctx, delay, chatType);
-  } catch (error) {
-    logger.error('Chat cleanup middleware error:', error);
-    // Don't block the message flow
-    throw error;
-  }
+  // Chat cleanup middleware has been disabled
+  return next();
 };
 
 /**

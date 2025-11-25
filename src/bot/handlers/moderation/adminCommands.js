@@ -8,50 +8,8 @@ const { t } = require('../../../utils/i18n');
  * @param {Telegraf} bot - Bot instance
  */
 const registerModerationAdminHandlers = (bot) => {
-  // /moderation - Toggle moderation on/off
-  bot.command('moderation', handleModerationToggle);
-
-  // /ban - Ban user
-  bot.command('ban', handleBanUser);
-
-  // /unban - Unban user
-  bot.command('unban', handleUnbanUser);
-
-  // /clearwarnings - Clear user warnings
-  bot.command('clearwarnings', handleClearWarnings);
-
-  // /modlogs - View moderation logs
-  bot.command('modlogs', handleModLogs);
-
-  // /modstats - View moderation statistics
-  bot.command('modstats', handleModStats);
-
-  // /setlinks - Configure link policy
-  bot.command('setlinks', handleSetLinks);
-
-  // /userhistory - View username history
-  bot.command('userhistory', handleUserHistory);
-
-  // /usernamechanges - View recent username changes in group
-  bot.command('usernamechanges', handleUsernameChanges);
-
-  // /globalban - Ban user from all groups and channels
-  bot.command('globalban', handleGlobalBan);
-
-  // /globalunban - Unban user from all groups and channels
-  bot.command('globalunban', handleGlobalUnban);
-
-  // /globalbans - View all globally banned users
-  bot.command('globalbans', handleViewGlobalBans);
-
-  // /noncompliant - View non-compliant users in group
-  bot.command('noncompliant', handleViewNonCompliant);
-
-  // /sendcompliancewarnings - Send compliance warnings to all non-compliant users
-  bot.command('sendcompliancewarnings', handleSendComplianceWarnings);
-
-  // /purgenoncompliant - Manually purge non-compliant users (debug/override)
-  bot.command('purgenoncompliant', handlePurgeNonCompliant);
+  // All moderation admin commands have been disabled
+  logger.info('Moderation admin handlers are disabled');
 };
 
 /**

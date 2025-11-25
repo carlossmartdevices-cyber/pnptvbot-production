@@ -112,77 +112,9 @@ class CallReminderService {
    * @returns {Promise<Object>} { sent, failed }
    */
   static async checkAndSendReminders(bot) {
-    try {
-      const now = new Date();
-      const results = { sent: 0, failed: 0 };
-
-      // Get all confirmed and pending calls
-      const upcomingCalls = await CallModel.getUpcoming();
-
-      for (const call of upcomingCalls) {
-        try {
-          // Parse scheduled date/time
-          const scheduledDate = this.parseScheduledDateTime(call.scheduledDate, call.scheduledTime);
-
-          if (!scheduledDate) {
-            logger.warn('Could not parse scheduled date/time for call', {
-              callId: call.id,
-              scheduledDate: call.scheduledDate,
-              scheduledTime: call.scheduledTime,
-            });
-            continue;
-          }
-
-          const hoursUntilCall = (scheduledDate - now) / (1000 * 60 * 60);
-
-          // Check if we need to send 24h reminder
-          if (hoursUntilCall <= 24 && hoursUntilCall > 23 && !call.reminder24hSent) {
-            const success = await this.sendReminder(bot, call, 24);
-            if (success) results.sent++;
-            else results.failed++;
-          }
-
-          // Check if we need to send 1h reminder
-          if (hoursUntilCall <= 1 && hoursUntilCall > 0.5 && !call.reminder1hSent) {
-            const success = await this.sendReminder(bot, call, 1);
-            if (success) results.sent++;
-            else results.failed++;
-          }
-
-          // Check if we need to send 15min reminder
-          if (hoursUntilCall <= 0.25 && hoursUntilCall > 0 && !call.reminder15minSent) {
-            const success = await this.sendReminder(bot, call, 0.25);
-            if (success) results.sent++;
-            else results.failed++;
-          }
-
-          // Auto-complete calls that are past their end time (duration + 15 min buffer)
-          const callEndTime = new Date(scheduledDate.getTime() + ((call.duration || 45) + 15) * 60 * 1000);
-          if (now > callEndTime && call.status === 'confirmed') {
-            await CallModel.updateStatus(call.id, 'completed', {
-              completedAt: new Date(),
-              autoCompleted: true,
-            });
-            logger.info('Call auto-completed', { callId: call.id });
-          }
-        } catch (error) {
-          logger.error('Error processing call reminder:', {
-            callId: call.id,
-            error: error.message,
-          });
-          results.failed++;
-        }
-      }
-
-      if (results.sent > 0 || results.failed > 0) {
-        logger.info('Reminder check completed', results);
-      }
-
-      return results;
-    } catch (error) {
-      logger.error('Error checking reminders:', error);
-      return { sent: 0, failed: 0 };
-    }
+    // Call reminder functionality has been disabled
+    logger.info('Call reminder service is disabled (check skipped)');
+    return { sent: 0, failed: 0 };
   }
 
   /**
@@ -270,21 +202,8 @@ class CallReminderService {
    * @param {Object} bot - Telegram bot instance
    */
   static initialize(bot) {
-    // Run reminder check every 10 minutes
-    const interval = 10 * 60 * 1000; // 10 minutes
-
-    setInterval(async () => {
-      await this.checkAndSendReminders(bot);
-    }, interval);
-
-    logger.info('Call reminder service initialized', {
-      checkInterval: '10 minutes',
-    });
-
-    // Run immediately on startup
-    setTimeout(() => {
-      this.checkAndSendReminders(bot);
-    }, 5000); // Wait 5 seconds after startup
+    // Call reminder service has been disabled
+    logger.info('Call reminder service is disabled (initialization skipped)');
   }
 }
 

@@ -16,29 +16,8 @@ class GroupCleanupService {
    * Initialize the cleanup service
    */
   initialize() {
-    if (!this.isEnabled) {
-      logger.info('Group cleanup service is disabled');
-      return;
-    }
-
-    // Start message tracking
-    this.startMessageTracking();
-
-    // Schedule cleanup at 12:00 UTC (noon)
-    cron.schedule('0 12 * * *', () => {
-      this.performCleanup('12:00 UTC');
-    }, {
-      timezone: 'UTC',
-    });
-
-    // Schedule cleanup at 24:00 UTC (midnight)
-    cron.schedule('0 0 * * *', () => {
-      this.performCleanup('00:00 UTC');
-    }, {
-      timezone: 'UTC',
-    });
-
-    logger.info('✓ Group cleanup service initialized (runs at 12:00 and 00:00 UTC)');
+    // Group cleanup service has been disabled
+    logger.info('Group cleanup service is disabled');
   }
 
   /**

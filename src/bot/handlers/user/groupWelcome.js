@@ -18,18 +18,8 @@ const BADGE_OPTIONS = {
  * @param {Telegraf} bot - Bot instance
  */
 const registerGroupWelcomeHandlers = (bot) => {
-  // Handle new members joining the group
-  bot.on('new_chat_members', handleNewMembers);
-
-  // Handle badge selection
-  bot.action(/^badge_select_(.+)$/, handleBadgeSelection);
-
-  // Handle action buttons
-  bot.action('group_subscribe_prime', handleSubscribeAction);
-  bot.action('group_book_call', handleBookCallAction);
-
-  // Handle view rules button
-  bot.action('group_view_rules', handleViewRules);
+  // All group welcome functionality has been disabled
+  logger.info('Group welcome handlers are disabled');
 };
 
 /**
