@@ -6,6 +6,7 @@ const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
+const personalInfoFilterMiddleware = require('./middleware/personalInfoFilter');
 const allowedChatsMiddleware = require('./middleware/allowedChats');
 const usernameEnforcement = require('./middleware/usernameEnforcement');
 const profileCompliance = require('./middleware/profileCompliance');
@@ -129,6 +130,7 @@ const startBot = async () => {
     bot.use(profileCompliance());
     bot.use(moderationFilter());
     bot.use(autoModerationMiddleware()); // Auto-moderation (spam, links, flooding, profanity)
+    bot.use(personalInfoFilterMiddleware()); // Filter personal information and redirect to DM
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
 
