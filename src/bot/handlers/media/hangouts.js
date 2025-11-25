@@ -201,24 +201,29 @@ const createPrivateCall = async (ctx) => {
     const userId = ctx.from.id;
     const username = ctx.from.username || ctx.from.first_name;
 
-    // Create private call
-    const call = await VideoCallModel.createCall(userId, 'private');
+    // Create private call using correct API
+    const result = await VideoCallModel.create({
+      creatorId: userId,
+      creatorName: username,
+      title: `${username}'s Call`,
+      maxParticipants: 10,
+      enforceCamera: false,
+      allowGuests: true,
+      isPublic: false,
+    });
 
-    // Generate Agora token
-    const channelName = `private_${call.callId}`;
-    const token = await AgoraTokenService.generateRTCToken(channelName, userId.toString());
-
-    // Create web app URL with token
-    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${channelName}&token=${token}&uid=${userId}&username=${encodeURIComponent(username)}&type=private`;
+    // result includes call data + tokens already generated
+    // Create web app URL with the token from result
+    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${result.channelName}&token=${result.token}&uid=${userId}&username=${encodeURIComponent(username)}&type=private`;
 
     let text = `✅ ${t('hangouts.callCreated', lang)}\n\n`;
-    text += `🎥 ${t('hangouts.callId', lang)}: \`${call.callId}\`\n`;
+    text += `🎥 ${t('hangouts.callId', lang)}: \`${result.id}\`\n`;
     text += `🔗 ${t('hangouts.shareId', lang)}\n\n`;
     text += `💡 ${t('hangouts.clickToStart', lang)}`;
 
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.url(t('hangouts.openCall', lang), webAppUrl)],
-      [Markup.button.callback(t('hangouts.endCall', lang), `hangouts_end_${call.callId}`)],
+      [Markup.button.callback(t('hangouts.endCall', lang), `hangouts_end_${result.id}`)],
       [Markup.button.callback(t('back', lang), 'hangouts_menu')],
     ]);
 
@@ -239,32 +244,18 @@ const joinPrivateCallById = async (ctx, callId) => {
     const userId = ctx.from.id;
     const username = ctx.from.username || ctx.from.first_name;
 
-    // Get call details
-    const call = await VideoCallModel.getCallById(callId);
+    // Join call using correct API - joinCall handles everything
+    const result = await VideoCallModel.joinCall(callId, userId, username, false); // false = not guest
 
-    if (!call) {
-      await ctx.reply(t('hangouts.callNotFound', lang));
-      return;
-    }
+    // Get current participants count
+    const participants = await VideoCallModel.getParticipants(callId);
 
-    if (call.status === 'ended') {
-      await ctx.reply(t('hangouts.callEnded', lang));
-      return;
-    }
-
-    // Add participant
-    await VideoCallModel.addParticipant(callId, userId, username);
-
-    // Generate Agora token
-    const channelName = `private_${callId}`;
-    const token = await AgoraTokenService.generateRTCToken(channelName, userId.toString());
-
-    // Create web app URL with token
-    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${channelName}&token=${token}&uid=${userId}&username=${encodeURIComponent(username)}&type=private`;
+    // Create web app URL with token from joinCall result
+    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${result.call.channelName}&token=${result.token}&uid=${userId}&username=${encodeURIComponent(username)}&type=private`;
 
     let text = `✅ ${t('hangouts.joinedCall', lang)}\n\n`;
     text += `🎥 ${t('hangouts.callId', lang)}: ${callId}\n`;
-    text += `👥 ${t('hangouts.participants', lang)}: ${call.participants ? call.participants.length : 1}\n\n`;
+    text += `👥 ${t('hangouts.participants', lang)}: ${participants.length}\n\n`;
     text += `💡 ${t('hangouts.clickToJoin', lang)}`;
 
     const keyboard = Markup.inlineKeyboard([
@@ -276,7 +267,17 @@ const joinPrivateCallById = async (ctx, callId) => {
   } catch (error) {
     logger.error('Error in joinPrivateCallById:', error);
     const lang = getLanguage(ctx);
-    await ctx.reply(t('error', lang));
+
+    // Handle specific errors
+    if (error.message.includes('not found')) {
+      await ctx.reply(t('hangouts.callNotFound', lang));
+    } else if (error.message.includes('ended')) {
+      await ctx.reply(t('hangouts.callEnded', lang));
+    } else if (error.message.includes('full')) {
+      await ctx.reply(t('hangouts.callFull', lang));
+    } else {
+      await ctx.reply(t('error', lang));
+    }
   }
 };
 
@@ -288,17 +289,18 @@ const showMyCalls = async (ctx) => {
     const lang = getLanguage(ctx);
     const userId = ctx.from.id;
 
-    const calls = await VideoCallModel.getUserActiveCalls(userId);
+    // Use correct API method
+    const calls = await VideoCallModel.getActiveByCreator(userId);
 
     let text = `📞 ${t('hangouts.myCalls', lang)}\n\n`;
 
     if (calls && calls.length > 0) {
       calls.forEach((call, index) => {
-        const createdAt = call.createdAt.toDate ? call.createdAt.toDate() : new Date(call.createdAt);
-        text += `${index + 1}. ${t('hangouts.call', lang)} \`${call.callId}\`\n`;
-        text += `   👥 ${call.participants ? call.participants.length : 0} ${t('hangouts.participants', lang)}\n`;
+        const createdAt = call.createdAt;
+        text += `${index + 1}. ${t('hangouts.call', lang)} \`${call.id}\`\n`;
+        text += `   👥 ${call.currentParticipants || 0} ${t('hangouts.participants', lang)}\n`;
         text += `   ⏰ ${moment(createdAt).format('HH:mm')}\n`;
-        text += `   Status: ${call.status}\n\n`;
+        text += `   Status: ${call.isActive ? 'Active' : 'Ended'}\n\n`;
       });
     } else {
       text += t('hangouts.noActiveCalls', lang);
@@ -323,21 +325,21 @@ const endCall = async (ctx, callId) => {
     const lang = getLanguage(ctx);
     const userId = ctx.from.id;
 
-    // Verify user is the host
-    const call = await VideoCallModel.getCallById(callId);
+    // Verify user is the host - use correct API
+    const call = await VideoCallModel.getById(callId);
 
     if (!call) {
       await ctx.answerCbQuery(t('hangouts.callNotFound', lang));
       return;
     }
 
-    if (call.hostId !== userId) {
+    if (call.creatorId !== String(userId)) {
       await ctx.answerCbQuery(t('hangouts.notHost', lang));
       return;
     }
 
-    // End the call
-    await VideoCallModel.endCall(callId);
+    // End the call - pass creatorId
+    await VideoCallModel.endCall(callId, userId);
 
     await ctx.answerCbQuery(t('hangouts.callEndedSuccess', lang));
     await showHangoutsMenu(ctx);
