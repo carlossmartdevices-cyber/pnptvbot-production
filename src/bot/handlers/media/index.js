@@ -3,6 +3,7 @@ const zoomHandlers = require('./zoom');
 const jitsiHandlers = require('./jitsi');
 const liveHandlers = require('./live');
 const livestreamHandlers = require('./livestream');
+const hangoutsHandlers = require('./hangouts');
 const supportHandlers = require('./support');
 const playerHandlers = require('./player');
 const { registerTopicMenuHandlers } = require('./topicMenu');
@@ -17,6 +18,7 @@ const registerMediaHandlers = (bot) => {
   jitsiHandlers(bot);
   liveHandlers(bot);
   livestreamHandlers(bot);
+  hangoutsHandlers(bot);
   supportHandlers(bot);
   playerHandlers(bot);
   registerTopicMenuHandlers(bot);
