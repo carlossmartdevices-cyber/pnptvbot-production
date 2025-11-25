@@ -52,6 +52,8 @@ const { registerLeaderboardHandlers } = require('../handlers/group/leaderboard')
 // Services
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
+const SubscriptionReminderService = require('../services/subscriptionReminderService');
+const { startCronJobs } = require('../../scripts/cron');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
 // API Server
@@ -167,6 +169,9 @@ const startBot = async () => {
     // Initialize call reminder service
     CallReminderService.initialize(bot);
     logger.info('✓ Call reminder service initialized');
+    // Initialize subscription reminder service
+    SubscriptionReminderService.initialize(bot);
+    logger.info('✓ Subscription reminder service initialized');
     // Initialize group cleanup service
     const groupCleanup = new GroupCleanupService(bot);
     groupCleanup.initialize();
@@ -236,6 +241,17 @@ const startBot = async () => {
       botInstance = bot; // Asignar la instancia del bot
       botStarted = true; // Actualizar el estado
       logger.info('✓ Bot started in polling mode');
+    }
+    // Start cron jobs for automated tasks (if enabled)
+    if (process.env.ENABLE_CRON === 'true') {
+      try {
+        await startCronJobs(bot);
+        logger.info('✓ Cron jobs started successfully');
+      } catch (error) {
+        logger.error('Error starting cron jobs:', error);
+      }
+    } else {
+      logger.info('ℹ️  Cron jobs disabled (set ENABLE_CRON=true to enable)');
     }
     // Add 404 and error handlers
     const {
