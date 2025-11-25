@@ -6,12 +6,12 @@ const logger = require('../../../utils/logger');
 const GROUP_ID = process.env.GROUP_ID;
 const AUTO_DELETE_DELAY = 3 * 60 * 1000; // 3 minutes
 
-// Badge options with emojis
+// Badge options with emojis and descriptions
 const BADGE_OPTIONS = {
-  meth_alpha: { emoji: '🔥', name: 'Meth Alpha' },
-  chem_mermaids: { emoji: '🧜', name: 'Chem Mermaids' },
-  slam_slut: { emoji: '💉', name: 'Slam Slut' },
-  spun_royal: { emoji: '👑', name: 'Spun Royal' },
+  meth_alpha: { emoji: '🔥', name: 'Meth Alpha', description: 'The fire starter' },
+  chem_mermaids: { emoji: '🧜', name: 'Chem Mermaids', description: 'Flow with the current' },
+  slam_slut: { emoji: '💉', name: 'Slam Slut', description: 'Unapologetically intense' },
+  spun_royal: { emoji: '👑', name: 'Spun Royal', description: 'Elevated and exclusive' },
 };
 
 /**
@@ -116,38 +116,44 @@ async function sendBadgeSelectionMessage(ctx, user) {
 
     let message;
     if (isSpanish) {
-      message = `🎭 Bien ${username}, ¿cuál es tu vibra?
+      message = `🎭 ¿Cuál es tu vibra?
 
-Elige tu insignia y hazle saber a todos quién eres:`;
+Elige tu tribu — así es como te muestras en la comunidad.
+(No te preocupes, puedes cambiarlo en cualquier momento)
+
+Elige tu insignia abajo ⬇️`;
     } else {
-      message = `🎭 Alright ${username}, which vibe are you?
+      message = `🎭 Which vibe are you?
 
-Pick your badge and let everyone know who you are:`;
+Pick your tribe — this is how you show up in the community.
+(Don't stress, you can change it anytime)
+
+Choose your badge below ⬇️`;
     }
 
     // Create inline keyboard with badge options
     const keyboard = Markup.inlineKeyboard([
       [
         Markup.button.callback(
-          `${BADGE_OPTIONS.meth_alpha.emoji} ${BADGE_OPTIONS.meth_alpha.name}`,
+          `${BADGE_OPTIONS.meth_alpha.emoji} ${BADGE_OPTIONS.meth_alpha.name} — ${BADGE_OPTIONS.meth_alpha.description}`,
           'badge_select_meth_alpha'
         ),
       ],
       [
         Markup.button.callback(
-          `${BADGE_OPTIONS.chem_mermaids.emoji} ${BADGE_OPTIONS.chem_mermaids.name}`,
+          `${BADGE_OPTIONS.chem_mermaids.emoji} ${BADGE_OPTIONS.chem_mermaids.name} — ${BADGE_OPTIONS.chem_mermaids.description}`,
           'badge_select_chem_mermaids'
         ),
       ],
       [
         Markup.button.callback(
-          `${BADGE_OPTIONS.slam_slut.emoji} ${BADGE_OPTIONS.slam_slut.name}`,
+          `${BADGE_OPTIONS.slam_slut.emoji} ${BADGE_OPTIONS.slam_slut.name} — ${BADGE_OPTIONS.slam_slut.description}`,
           'badge_select_slam_slut'
         ),
       ],
       [
         Markup.button.callback(
-          `${BADGE_OPTIONS.spun_royal.emoji} ${BADGE_OPTIONS.spun_royal.name}`,
+          `${BADGE_OPTIONS.spun_royal.emoji} ${BADGE_OPTIONS.spun_royal.name} — ${BADGE_OPTIONS.spun_royal.description}`,
           'badge_select_spun_royal'
         ),
       ],
@@ -221,17 +227,17 @@ async function sendCongratsMessage(ctx, username, badge) {
 
     let message;
     if (isSpanish) {
-      message = `🎉 ¡Perfecto, ${username}!
+      message = `🎉 ¡Insignia reclamada!
 
-Has desbloqueado tu insignia ${badge.emoji} ${badge.name}.
+@${username} es oficialmente un ${badge.emoji} ${badge.name}
 
-Ahora todos pueden ver tu vibra. ¡Bienvenido oficialmente a la familia PNPtv! 💜`;
+¡Bienvenido a la familia! 💙`;
     } else {
-      message = `🎉 Perfect, ${username}!
+      message = `🎉 Badge claimed!
 
-You've unlocked your ${badge.emoji} ${badge.name} badge.
+@${username} is officially a ${badge.emoji} ${badge.name}
 
-Now everyone can see your vibe. Welcome to the PNPtv family officially! 💜`;
+Welcome to the family! 💙`;
     }
 
     // Send to general group chat
@@ -267,16 +273,16 @@ async function sendActionButtons(ctx, username) {
 
     let message;
     if (isSpanish) {
-      message = `👋 ${username}, aquí están tus próximos pasos:`;
+      message = `🚀 ¿Listo para más?`;
     } else {
-      message = `👋 ${username}, here are your next steps:`;
+      message = `🚀 Ready for more?`;
     }
 
     // Create inline keyboard with action buttons
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(isSpanish ? '💎 Activar PRIME' : '💎 Get PRIME', 'welcome_get_prime')],
+      [Markup.button.callback(isSpanish ? '⭐ Activar PRIME' : '⭐ Get PRIME', 'welcome_get_prime')],
       [Markup.button.callback(isSpanish ? '📞 Reservar Llamada' : '📞 Book a Call', 'welcome_book_call')],
-      [Markup.button.callback(isSpanish ? '⚙️ Configurar Perfil' : '⚙️ Setup Profile', 'welcome_setup_profile')],
+      [Markup.button.callback(isSpanish ? '👤 Configurar Perfil' : '👤 Setup Profile', 'welcome_setup_profile')],
     ]);
 
     // Send to general group chat
