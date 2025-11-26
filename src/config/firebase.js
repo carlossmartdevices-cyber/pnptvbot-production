@@ -1,113 +1,94 @@
+
+
 const admin = require('firebase-admin');
 const logger = require('../utils/logger');
 
 let db = null;
 
-/**
- * Initialize Firebase Admin SDK
- * @returns {admin.firestore.Firestore} Firestore instance
- */
-const initializeFirebase = () => {
+function initializeFirebase() {
+  if (db) return db;
   try {
-    if (db) {
-      return db;
-    }
-
-    // Initialize with environment variables
     const serviceAccount = {
       type: 'service_account',
       project_id: process.env.FIREBASE_PROJECT_ID,
       private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       client_email: process.env.FIREBASE_CLIENT_EMAIL,
     };
-
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       databaseURL: process.env.FIREBASE_DATABASE_URL,
     });
-
     db = admin.firestore();
-
-    // Configure Firestore settings
-    db.settings({
-      ignoreUndefinedProperties: true,
-      timestampsInSnapshots: true,
-    });
-
+    db.settings({ ignoreUndefinedProperties: true });
     logger.info('Firebase initialized successfully');
     return db;
   } catch (error) {
     logger.error('Failed to initialize Firebase:', error);
     throw error;
   }
-};
+}
 
-/**
- * Get Firestore instance
- * @returns {admin.firestore.Firestore}
- */
-const getFirestore = () => {
+function getFirestore() {
   if (!db) {
     return initializeFirebase();
   }
   return db;
-};
+}
 
-/**
- * Get Firebase Admin instance
- * @returns {admin.app.App}
- */
-const getAdmin = () => admin;
 
-/**
- * Create Firestore indexes (to be run during deployment)
- */
-const createIndexes = async () => {
-  const indexes = [
-    {
-      collectionGroup: 'users',
-      fields: [
-        { fieldPath: 'subscriptionStatus', order: 'ASCENDING' },
-        { fieldPath: 'planExpiry', order: 'ASCENDING' },
-      ],
-    },
-    {
-      collectionGroup: 'users',
-      fields: [
-        { fieldPath: 'location.lat', order: 'ASCENDING' },
-        { fieldPath: 'location.lng', order: 'ASCENDING' },
-      ],
-    },
-    {
-      collectionGroup: 'users',
-      fields: [
-        { fieldPath: 'interests', mode: 'ARRAY_CONTAINS' },
-        { fieldPath: 'subscriptionStatus', order: 'ASCENDING' },
-      ],
-    },
-    {
-      collectionGroup: 'payments',
-      fields: [
-        { fieldPath: 'userId', order: 'ASCENDING' },
-        { fieldPath: 'createdAt', order: 'DESCENDING' },
-      ],
-    },
-    {
-      collectionGroup: 'liveStreams',
-      fields: [
-        { fieldPath: 'status', order: 'ASCENDING' },
-        { fieldPath: 'createdAt', order: 'DESCENDING' },
-      ],
-    },
-  ];
+class PaymentModel {
+  static async createPayment({ userId, planId, provider, sku, amount, status = 'pending', invoiceId = null }) {
+    const db = getFirestore();
+    const docRef = db.collection('payments').doc();
+    await docRef.set({
+      userId,
+      planId,
+      provider,
+      sku,
+      amount,
+      status,
+      invoiceId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    return docRef.id;
+  }
 
-  logger.info('Firestore indexes configuration:', JSON.stringify(indexes, null, 2));
-  logger.info('Run: firebase deploy --only firestore:indexes');
-};
+  static async updatePayment(paymentId, updates) {
+    const db = getFirestore();
+    await db.collection('payments').doc(paymentId).update({
+      ...updates,
+      updatedAt: new Date(),
+    });
+  }
+
+  static async getPaymentById(paymentId) {
+    const db = getFirestore();
+    const doc = await db.collection('payments').doc(paymentId).get();
+    return doc.exists ? doc.data() : null;
+  }
+
+  static async getPaymentsByUser(userId) {
+    const db = getFirestore();
+    const snapshot = await db.collection('payments').where('userId', '==', userId).get();
+    return snapshot.docs.map(doc => doc.data());
+  }
+
+  static async getRevenue(startDate, endDate) {
+    const db = getFirestore();
+    const snapshot = await db.collection('payments')
+      .where('status', '==', 'completed')
+      .where('createdAt', '>=', startDate)
+      .where('createdAt', '<=', endDate)
+      .get();
+    const payments = snapshot.docs.map(doc => doc.data());
+    const total = payments.reduce((sum, p) => sum + p.amount, 0);
+    return { total, count: payments.length, average: total / payments.length };
+  }
+}
+
 
 module.exports = {
-  initializeFirebase,
   getFirestore,
-  getAdmin,
-  createIndexes,
+  PaymentModel
 };

@@ -96,111 +96,6 @@ const registerMenuHandlers = (bot) => {
       logger.error('Error showing group rules:', error);
     }
   });
-
-  bot.action('group_subscription_plans', async (ctx) => {
-    try {
-      await ctx.answerCbQuery();
-      const lang = ctx.session?.language || 'en';
-      const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'User';
-
-      const messageEs = `⭐ *PNPtv! PRIME Subscription*\n\n` +
-        `¡Hola ${username}! 👋\n\n` +
-        `Revisa todos nuestros planes premium directamente en el bot.\n\n` +
-        `Desbloquea la experiencia completa de PNPtv! con:\n` +
-        `• 🔥 Videos completos de Santino, Lex y la comunidad\n` +
-        `• 🌍 Miembros Cercanos para conectar con chicos cerca de ti\n` +
-        `• 🎧 Biblioteca de Música y Podcasts con nuevo contenido semanal\n` +
-        `• 🎥 Llamadas de Zoom y Presentaciones en Vivo exclusivas para miembros\n\n` +
-        `Toca abajo para explorar todos los planes disponibles:`;
-
-      const messageEn = `⭐ *PNPtv! PRIME Subscription*\n\n` +
-        `Hey ${username}! 👋\n\n` +
-        `Check out all our premium plans directly in the bot.\n\n` +
-        `Unlock the full PNPtv! experience with:\n` +
-        `• 🔥 Full-length videos from Santino, Lex, and the community\n` +
-        `• 🌍 Nearby Members to connect with guys near you\n` +
-        `• 🎧 Music & Podcast Library with weekly new drops\n` +
-        `• 🎥 Zoom Calls & Live Performances exclusive for members\n\n` +
-        `Tap below to explore all available plans:`;
-
-      const message = lang === 'es' ? messageEs : messageEn;
-
-      const keyboard = lang === 'es'
-        ? [
-          [Markup.button.callback('💳 Ver Planes de Suscripción', 'show_subscription_plans')],
-          [Markup.button.callback('⬅️ Volver al Menú', 'back_to_group_menu')],
-        ]
-        : [
-          [Markup.button.callback('💳 View Subscription Plans', 'show_subscription_plans')],
-          [Markup.button.callback('⬅️ Back to Menu', 'back_to_group_menu')],
-        ];
-
-      await ctx.reply(message, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(keyboard),
-      });
-    } catch (error) {
-      logger.error('Error showing group subscription plans:', error);
-    }
-  });
-
-  bot.action('group_book_call', async (ctx) => {
-    try {
-      await ctx.answerCbQuery();
-      const lang = ctx.session?.language || 'en';
-      const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'User';
-
-      const messageEs = `📞 *Reserva una Llamada con los Performers*\n\n` +
-        `Hola ${username}… 👋\n` +
-        `¿Listo para estar más cerquita? 😏\n\n` +
-        `Nuestros performers están listos para darte una experiencia privada, intensa y totalmente personal.\n\n` +
-        `🔥 *Servicios disponibles:*\n` +
-        `• 📹 Videollamadas — cara a cara, cerquita y sin filtros\n` +
-        `• 🎤 Llamadas de voz — habla, provoca y conecta\n` +
-        `• 💬 Chats privados — tú y él/ella, sin interrupciones\n` +
-        `• 🎁 Pedidos especiales — hechos solo para ti\n\n` +
-        `Toca abajo y consigue la atención que estás buscando:`;
-
-      const messageEn = `📞 *Book a Call with Performers*\n\n` +
-        `Hey ${username}… 👋\n` +
-        `Ready to get a little closer? 😏\n\n` +
-        `Our performers are waiting to give you the most intense, personal, and private experience we offer.\n\n` +
-        `🔥 *Available services:*\n` +
-        `• 📹 Video calls — face-to-face, up close, and very personal\n` +
-        `• 🎤 Voice calls — talk, tease, and connect\n` +
-        `• 💬 Private chats — one-on-one, no distractions\n` +
-        `• 🎁 Custom requests — made just for you\n\n` +
-        `Tap below and get the attention you've been craving:`;
-
-      const message = lang === 'es' ? messageEs : messageEn;
-
-      const keyboard = lang === 'es'
-        ? [
-          [Markup.button.callback('📅 Reservar Ahora', 'book_private_call')],
-          [Markup.button.callback('⬅️ Volver al Menú', 'back_to_group_menu')],
-        ]
-        : [
-          [Markup.button.callback('📅 Book a Call Now', 'book_private_call')],
-          [Markup.button.callback('⬅️ Back to Menu', 'back_to_group_menu')],
-        ];
-
-      await ctx.reply(message, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(keyboard),
-      });
-    } catch (error) {
-      logger.error('Error showing group book call:', error);
-    }
-  });
-
-  bot.action('back_to_group_menu', async (ctx) => {
-    try {
-      await ctx.answerCbQuery();
-      await showGroupMenu(ctx);
-    } catch (error) {
-      logger.error('Error in back to group menu:', error);
-    }
-  });
 };
 
 /**
@@ -232,10 +127,13 @@ const showMainMenu = async (ctx) => {
       ],
       [
         Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-        Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
+        Markup.button.callback(t('playerMenu', lang), 'show_player'),
       ],
       [
+        Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
         Markup.button.callback(t('support', lang), 'show_support'),
+      ],
+      [
         Markup.button.callback(t('settings', lang), 'show_settings'),
       ],
     ]),
@@ -263,18 +161,14 @@ const showGroupMenu = async (ctx) => {
 
   const keyboard = lang === 'es'
     ? [
-      [Markup.button.callback('⭐ Planes PRIME', 'group_subscription_plans')],
-      [Markup.button.callback('🎥 Reservar Videollamada', 'group_book_call')],
       [Markup.button.callback('📞 Contactar a un Admin', 'group_contact_admin')],
       [Markup.button.callback('📋 Reglas de la Comunidad', 'group_show_rules')],
-      [Markup.button.url(`🤖 Bot PNPtv!`, `https://t.me/${botUsername}?start=group_menu`)],
+      [Markup.button.url(`💬 Chat Bot PNPtv!`, `https://t.me/${botUsername}?start=group_menu`)],
     ]
     : [
-      [Markup.button.callback('⭐ PRIME Subscription', 'group_subscription_plans')],
-      [Markup.button.callback('🎥 Book a Video Call', 'group_book_call')],
       [Markup.button.callback('📞 Contact an Admin', 'group_contact_admin')],
       [Markup.button.callback('📋 Community Rules', 'group_show_rules')],
-      [Markup.button.url(`🤖 Bot PNPtv!`, `https://t.me/${botUsername}?start=group_menu`)],
+      [Markup.button.url(`💬 PNPtv! Bot Chat`, `https://t.me/${botUsername}?start=group_menu`)],
     ];
 
   const sentMessage = await ctx.reply(
@@ -310,10 +204,13 @@ const showMainMenuEdit = async (ctx) => {
         ],
         [
           Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-          Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
+          Markup.button.callback(t('playerMenu', lang), 'show_player'),
         ],
         [
+          Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
           Markup.button.callback(t('support', lang), 'show_support'),
+        ],
+        [
           Markup.button.callback(t('settings', lang), 'show_settings'),
         ],
       ]),

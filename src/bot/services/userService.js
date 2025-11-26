@@ -1,214 +1,225 @@
-const { getFirestore, Collections } = require('../config/firebase');
+const UserModel = require('../../models/userModel');
 const logger = require('../../utils/logger');
+const { sanitizeObject, validateSchema, schemas } = require('../../utils/validation');
 
+/**
+ * User Service - Business logic for user operations
+ */
 class UserService {
-  constructor() {
-    this.db = getFirestore();
-    this.usersCollection = this.db.collection(Collections.USERS);
-  }
-
   /**
-   * Create a new user
+   * Create or get user from Telegram context
+   * @param {Object} ctx - Telegraf context
+   * @returns {Promise<Object>} User data
    */
-  async createUser(userId, userData) {
+  static async getOrCreateFromContext(ctx) {
     try {
-      const userRef = this.usersCollection.doc(userId.toString());
-      const user = {
-        id: userId,
-        username: userData.username || null,
-        firstName: userData.firstName || null,
-        lastName: userData.lastName || null,
-        language: userData.language || 'en',
-        plan: 'free',
-        subscriptionStatus: 'inactive',
-        planExpiry: null,
-        location: null,
-        bio: null,
-        age: null,
-        termsAccepted: false,
-        onboardingCompleted: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      const { from } = ctx;
+      if (!from) {
+        throw new Error('No user data in context');
+      }
 
-      await userRef.set(user);
-      logger.info(`User created: ${userId}`);
+      let user = await UserModel.getById(from.id);
+
+      if (!user) {
+        // Create new user
+        const userData = {
+          userId: from.id,
+          username: from.username || '',
+          firstName: from.first_name || '',
+          lastName: from.last_name || '',
+          language: from.language_code || 'en',
+          subscriptionStatus: 'free',
+        };
+
+        user = await UserModel.createOrUpdate(userData);
+        logger.info('New user created', { userId: from.id });
+      }
+
       return user;
     } catch (error) {
-      logger.error(`Error creating user ${userId}:`, error);
+      logger.error('Error getting/creating user:', error);
       throw error;
     }
   }
 
   /**
-   * Get user by ID
+   * Update user profile
+   * @param {number|string} userId - User ID
+   * @param {Object} updates - Profile updates
+   * @returns {Promise<Object>} { success, error, data }
    */
-  async getUser(userId) {
+  static async updateProfile(userId, updates) {
     try {
-      const userDoc = await this.usersCollection.doc(userId.toString()).get();
-      if (!userDoc.exists) {
-        return null;
-      }
-      return { id: userDoc.id, ...userDoc.data() };
-    } catch (error) {
-      logger.error(`Error getting user ${userId}:`, error);
-      throw error;
-    }
-  }
+      // Sanitize inputs
+      const sanitized = sanitizeObject(updates, ['bio', 'username']);
 
-  /**
-   * Get or create user
-   */
-  async getOrCreateUser(userId, userData) {
-    let user = await this.getUser(userId);
-    if (!user) {
-      user = await this.createUser(userId, userData);
-    }
-    return user;
-  }
+      // Validate using the partial update schema
+      const { error, value } = validateSchema(
+        sanitized,
+        schemas.userProfileUpdate,
+      );
 
-  /**
-   * Update user data
-   */
-  async updateUser(userId, updates) {
-    try {
-      const userRef = this.usersCollection.doc(userId.toString());
-      await userRef.update({
-        ...updates,
-        updatedAt: new Date(),
-      });
-      logger.info(`User updated: ${userId}`);
-      return await this.getUser(userId);
-    } catch (error) {
-      logger.error(`Error updating user ${userId}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Update user subscription
-   */
-  async updateSubscription(userId, planId, expiryDate) {
-    try {
-      await this.updateUser(userId, {
-        plan: planId,
-        subscriptionStatus: 'active',
-        planExpiry: expiryDate,
-      });
-      logger.info(`Subscription updated for user ${userId}: ${planId}`);
-    } catch (error) {
-      logger.error(`Error updating subscription for user ${userId}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Check if user subscription is active
-   */
-  async isSubscriptionActive(userId) {
-    const user = await this.getUser(userId);
-    if (!user || user.subscriptionStatus !== 'active') {
-      return false;
-    }
-    if (user.planExpiry && new Date(user.planExpiry) < new Date()) {
-      await this.updateUser(userId, { subscriptionStatus: 'expired' });
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * Get all users (for broadcasting)
-   */
-  async getAllUsers() {
-    try {
-      const snapshot = await this.usersCollection.get();
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } catch (error) {
-      logger.error('Error getting all users:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Search users by username
-   */
-  async searchUserByUsername(username) {
-    try {
-      const snapshot = await this.usersCollection
-        .where('username', '==', username)
-        .limit(1)
-        .get();
-
-      if (snapshot.empty) {
-        return null;
+      if (error) {
+        logger.warn('Profile update validation failed:', error);
+        return { success: false, error, data: null };
       }
 
-      const doc = snapshot.docs[0];
-      return { id: doc.id, ...doc.data() };
+      const success = await UserModel.updateProfile(userId, value);
+
+      if (!success) {
+        return { success: false, error: 'Failed to update profile', data: null };
+      }
+
+      const user = await UserModel.getById(userId);
+      return { success: true, error: null, data: user };
     } catch (error) {
-      logger.error(`Error searching user by username ${username}:`, error);
-      throw error;
+      logger.error('Error in updateProfile service:', error);
+      return { success: false, error: error.message, data: null };
+    }
+  }
+
+  /**
+   * Update user location
+   * @param {number|string} userId - User ID
+   * @param {Object} location - { lat, lng, address }
+   * @returns {Promise<Object>} { success, error }
+   */
+  static async updateLocation(userId, location) {
+    try {
+      const { error } = validateSchema(location, schemas.location);
+
+      if (error) {
+        return { success: false, error };
+      }
+
+      const success = await UserModel.updateProfile(userId, { location });
+
+      return { success, error: success ? null : 'Failed to update location' };
+    } catch (error) {
+      logger.error('Error updating location:', error);
+      return { success: false, error: error.message };
     }
   }
 
   /**
    * Get nearby users
+   * @param {number|string} userId - User ID
+   * @param {number} radiusKm - Search radius in km
+   * @returns {Promise<Array>} Nearby users
    */
-  async getNearbyUsers(lat, lng, radiusKm = 10) {
+  static async getNearbyUsers(userId, radiusKm = 10) {
     try {
-      // Simple bounding box calculation
-      // For production, use geohashing or GeoFirestore
-      const latDelta = radiusKm / 111.32; // 1 degree latitude ≈ 111.32 km
-      const lngDelta = radiusKm / (111.32 * Math.cos(lat * Math.PI / 180));
+      const user = await UserModel.getById(userId);
 
-      const snapshot = await this.usersCollection
-        .where('location.lat', '>=', lat - latDelta)
-        .where('location.lat', '<=', lat + latDelta)
-        .get();
+      if (!user || !user.location) {
+        return [];
+      }
 
-      const nearbyUsers = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(user => {
-          if (!user.location) return false;
-          const userLng = user.location.lng;
-          return userLng >= lng - lngDelta && userLng <= lng + lngDelta;
-        });
+      const nearby = await UserModel.getNearby(user.location, radiusKm);
 
-      return nearbyUsers;
+      // Filter out the requesting user
+      return nearby.filter((u) => u.id !== userId.toString());
     } catch (error) {
       logger.error('Error getting nearby users:', error);
-      throw error;
+      return [];
     }
   }
 
   /**
-   * Get user statistics
+   * Check if user has active subscription
+   * @param {number|string} userId - User ID
+   * @returns {Promise<boolean>} Subscription status
    */
-  async getUserStats() {
+  static async hasActiveSubscription(userId) {
     try {
-      const allUsers = await this.getAllUsers();
-      const now = new Date();
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const user = await UserModel.getById(userId);
 
-      const stats = {
-        totalUsers: allUsers.length,
-        activeSubscriptions: allUsers.filter(u => u.subscriptionStatus === 'active').length,
-        newUsersLast30Days: allUsers.filter(u => new Date(u.createdAt) >= thirtyDaysAgo).length,
-        byPlan: {},
-      };
+      if (!user) return false;
 
-      allUsers.forEach(user => {
-        const plan = user.plan || 'free';
-        stats.byPlan[plan] = (stats.byPlan[plan] || 0) + 1;
-      });
+      if (user.subscriptionStatus !== 'active') return false;
 
-      return stats;
+      // Check if subscription is expired
+      if (user.planExpiry) {
+        const expiry = user.planExpiry.toDate ? user.planExpiry.toDate() : new Date(user.planExpiry);
+        if (expiry < new Date()) {
+          // Subscription expired, update status
+          await UserModel.updateSubscription(userId, {
+            status: 'expired',
+            planId: user.planId,
+            expiry: user.planExpiry,
+          });
+          return false;
+        }
+      }
+
+      return true;
     } catch (error) {
-      logger.error('Error getting user stats:', error);
-      throw error;
+      logger.error('Error checking subscription:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if user is admin
+   * @param {number|string} userId - User ID
+   * @returns {boolean} Admin status
+   */
+  static isAdmin(userId) {
+    const adminIds = process.env.ADMIN_USER_IDS?.split(',').map((id) => id.trim()) || [];
+    return adminIds.includes(userId.toString());
+  }
+
+  /**
+   * Get user statistics
+   * @returns {Promise<Object>} User stats
+   */
+  static async getStatistics() {
+    try {
+      const [activeUsers, freeUsers] = await Promise.all([
+        UserModel.getBySubscriptionStatus('active'),
+        UserModel.getBySubscriptionStatus('free'),
+      ]);
+
+      const total = activeUsers.length + freeUsers.length;
+
+      return {
+        total,
+        active: activeUsers.length,
+        free: freeUsers.length,
+        conversionRate: total > 0 ? (activeUsers.length / total) * 100 : 0,
+      };
+    } catch (error) {
+      logger.error('Error getting user statistics:', error);
+      return {
+        total: 0, active: 0, free: 0, conversionRate: 0,
+      };
+    }
+  }
+
+  /**
+   * Process expired subscriptions
+   * @returns {Promise<number>} Number of processed subscriptions
+   */
+  static async processExpiredSubscriptions() {
+    try {
+      const expiredUsers = await UserModel.getExpiredSubscriptions();
+
+      for (const user of expiredUsers) {
+        await UserModel.updateSubscription(user.id, {
+          status: 'expired',
+          planId: user.planId,
+          expiry: user.planExpiry,
+        });
+
+        logger.info('Subscription expired', { userId: user.id });
+      }
+
+      return expiredUsers.length;
+    } catch (error) {
+      logger.error('Error processing expired subscriptions:', error);
+      return 0;
     }
   }
 }
 
-module.exports = new UserService();
+module.exports = UserService;

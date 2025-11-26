@@ -1,83 +1,148 @@
-const { requirePrivateChat } = require('../../utils/notifications');
-const { getSettingsMenu, getLanguageMenu } = require('../../utils/menus');
-const userService = require('../../services/userService');
-const i18n = require('../../utils/i18n');
+const { Markup } = require('telegraf');
+const UserService = require('../../services/userService');
+const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
+const { getLanguage } = require('../../utils/helpers');
 
 /**
- * Handle settings command
+ * Settings handlers
+ * @param {Telegraf} bot - Bot instance
  */
-async function handleSettings(ctx) {
-  try {
-    const userId = ctx.from.id;
-    const user = await userService.getUser(userId);
-    const language = user?.language || 'en';
+const registerSettingsHandlers = (bot) => {
+  // Show settings menu
+  bot.action('show_settings', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
 
-    // Check if command is in group chat
-    const isPrivate = await requirePrivateChat(
-      ctx,
-      'Settings',
-      i18n.t('settings', language)
-    );
-
-    if (!isPrivate) {
-      return;
+      await ctx.editMessageText(
+        t('settingsTitle', lang),
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('changeLanguage', lang), 'settings_language')],
+          [Markup.button.callback(t('notifications', lang), 'settings_notifications')],
+          [Markup.button.callback(t('privacy', lang), 'settings_privacy')],
+          [Markup.button.callback(t('about', lang), 'settings_about')],
+          [Markup.button.callback(t('back', lang), 'back_to_main')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error showing settings:', error);
     }
+  });
 
-    await ctx.reply(
-      i18n.t('settings', language),
-      { reply_markup: getSettingsMenu(language) }
-    );
+  // Language settings
+  bot.action('settings_language', async (ctx) => {
+    try {
+      await ctx.editMessageText(
+        'Select Language / Seleccionar Idioma:',
+        Markup.inlineKeyboard([
+          [
+            Markup.button.callback('🇺🇸 English', 'change_lang_en'),
+            Markup.button.callback('🇪🇸 Español', 'change_lang_es'),
+          ],
+          [Markup.button.callback('← Back / Atrás', 'show_settings')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error showing language settings:', error);
+    }
+  });
 
-    logger.info(`User ${userId} accessed settings`);
-  } catch (error) {
-    logger.error('Error in settings command:', error);
-    await ctx.reply(i18n.t('error_occurred', 'en'));
-  }
-}
+  // Change language
+  bot.action(/^change_lang_(.+)$/, async (ctx) => {
+    try {
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid language change action format');
+        return;
+      }
 
-/**
- * Handle settings language change
- */
-async function handleSettingsLanguage(ctx) {
-  try {
-    const userId = ctx.from.id;
-    const user = await userService.getUser(userId);
-    const language = user?.language || 'en';
+      const newLang = ctx.match[1];
+      ctx.session.language = newLang;
+      await ctx.saveSession();
 
-    await ctx.editMessageText(
-      i18n.t('select_language', language),
-      { reply_markup: getLanguageMenu() }
-    );
+      await UserService.updateProfile(ctx.from.id, { language: newLang });
 
-    logger.info(`User ${userId} changing language in settings`);
-  } catch (error) {
-    logger.error('Error in settings language:', error);
-    await ctx.answerCbQuery(i18n.t('error_occurred', 'en'));
-  }
-}
+      const lang = newLang;
+      await ctx.editMessageText(
+        t('languageChanged', lang),
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('back', lang), 'show_settings')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error changing language:', error);
+    }
+  });
 
-/**
- * Handle language change from settings
- */
-async function handleLanguageChange(ctx) {
-  try {
-    const userId = ctx.from.id;
-    const newLanguage = ctx.callbackQuery.data.split('_')[1]; // 'lang_en' -> 'en'
+  // Notifications settings
+  bot.action('settings_notifications', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
 
-    await userService.updateUser(userId, { language: newLanguage });
+      await ctx.editMessageText(
+        `${t('notifications', lang)}\n\nNotification preferences coming soon...`,
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('back', lang), 'show_settings')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error showing notifications:', error);
+    }
+  });
 
-    await ctx.editMessageText(i18n.t('language_changed', newLanguage));
+  // Privacy settings
+  bot.action('settings_privacy', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
 
-    logger.info(`User ${userId} changed language to ${newLanguage}`);
-  } catch (error) {
-    logger.error('Error changing language:', error);
-    await ctx.answerCbQuery(i18n.t('error_occurred', 'en'));
-  }
-}
+      await ctx.editMessageText(
+        `${t('privacy', lang)}\n\nPrivacy settings coming soon...`,
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('back', lang), 'show_settings')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error showing privacy:', error);
+    }
+  });
 
-module.exports = {
-  handleSettings,
-  handleSettingsLanguage,
-  handleLanguageChange,
+  // About
+  bot.action('settings_about', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+
+      const aboutText = `${t('about', lang)}\n\n`
+        + `🎬 PNPtv Bot v1.0.0\n\n`
+        + `Your entertainment hub for live streams, radio, and more!\n\n`
+        + `🌐 Website: https://pnptv.com\n`
+        + `📧 Support: support@pnptv.com`;
+      await ctx.editMessageText(
+        aboutText,
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('back', lang), 'show_settings')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error showing about:', error);
+    }
+  });
+
+  // Language command
+  bot.command('language', async (ctx) => {
+    try {
+      await ctx.reply(
+        'Select Language / Seleccionar Idioma:',
+        Markup.inlineKeyboard([
+          [
+            Markup.button.callback('🇺🇸 English', 'change_lang_en'),
+            Markup.button.callback('🇪🇸 Español', 'change_lang_es'),
+          ],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error in /language command:', error);
+    }
+  });
 };
+
+module.exports = registerSettingsHandlers;

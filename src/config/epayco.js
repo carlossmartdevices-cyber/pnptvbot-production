@@ -24,8 +24,10 @@ const initializeEpayco = () => {
       test: process.env.EPAYCO_TEST_MODE === 'true',
     });
 
+    // Nunca loggear claves o datos sensibles
     logger.info('ePayco SDK initialized successfully', {
       test: process.env.EPAYCO_TEST_MODE === 'true',
+      // No incluir claves ni datos sensibles en logs
     });
 
     return epaycoClient;

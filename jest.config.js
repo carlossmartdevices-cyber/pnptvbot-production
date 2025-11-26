@@ -4,11 +4,18 @@ module.exports = {
   collectCoverageFrom: [
     'src/**/*.js',
     '!src/**/*.test.js',
-    '!src/index.js',
-    '!src/start.js',
+    '!src/bot/core/bot.js',
   ],
   testMatch: [
     '**/tests/**/*.test.js',
   ],
-  verbose: true,
+  coverageThreshold: {
+    global: {
+      branches: 5,
+      functions: 10,
+      lines: 8,
+      statements: 8,
+    },
+  },
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
 };

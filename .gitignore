@@ -7,6 +7,10 @@ yarn.lock
 .env
 .env.local
 .env.production
+.env.lifetime-pass
+.env.*
+!.env.example
+!.env.*.example
 
 # Logs
 logs/
@@ -14,30 +18,48 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
 
-# Firebase
-firebase-key.json
-serviceAccountKey.json
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
 
-# Testing
+# Coverage directory
 coverage/
-.nyc_output/
+*.lcov
+.nyc_output
 
-# IDE
+# Build output
+dist/
+build/
+
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
-Thumbs.db
 
-# Build
-dist/
-build/
+# Firebase
+firebase-adminsdk-*.json
+serviceAccountKey.json
 
-# Temporary files
+# Temp files
 tmp/
 temp/
+*.tmp
+
+# Testing
+.jest-cache/
+
+# Redis dumps
+dump.rdb
+
+# PM2
+.pm2/
+
+# Docker
+docker-compose.override.yml
