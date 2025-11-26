@@ -15,6 +15,7 @@ const {
   getMessage
 } = require('../../../config/menuConfig');
 const { detectLanguage } = require('../../../utils/languageDetector');
+const { showProfile } = require('../user/profile');
 
 /**
  * Check if message is in a group/supergroup
@@ -676,18 +677,8 @@ async function handleRules(ctx, lang) {
 }
 
 async function handleProfile(ctx, lang) {
-  const message = lang === 'es'
-    ? '👤 *Mi Perfil*\n\nAquí puedes ver y editar tu perfil.\n\n_Esta función estará disponible pronto._'
-    : '👤 *My Profile*\n\nHere you can view and edit your profile.\n\n_This feature is coming soon._';
-
-  const keyboard = Markup.inlineKeyboard([
-    [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
-  ]);
-
-  await ctx.editMessageText(message, {
-    parse_mode: 'Markdown',
-    ...keyboard
-  });
+  // Call the actual profile feature handler
+  await showProfile(ctx, ctx.from.id, true, true);
 }
 
 async function handleNotificationSettings(ctx, lang) {

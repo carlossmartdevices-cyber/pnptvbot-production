@@ -183,6 +183,76 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
+  // Social Media Handlers
+  bot.action('edit_social', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await showSocialMediaMenu(ctx, lang);
+    } catch (error) {
+      logger.error('Error showing social media menu:', error);
+    }
+  });
+
+  bot.action('edit_tiktok', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      ctx.session.temp.waitingForTikTok = true;
+      await ctx.saveSession();
+      await ctx.editMessageText(
+        lang === 'es'
+          ? '📱 Envía tu nombre de usuario de TikTok (sin @) o "borrar" para eliminar.\nEjemplo: miperfil'
+          : '📱 Send your TikTok username (without @) or "delete" to remove.\nExample: myprofile'
+      );
+    } catch (error) {
+      logger.error('Error in edit tiktok:', error);
+    }
+  });
+
+  bot.action('edit_twitter', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      ctx.session.temp.waitingForTwitter = true;
+      await ctx.saveSession();
+      await ctx.editMessageText(
+        lang === 'es'
+          ? '🐦 Envía tu nombre de usuario de X/Twitter (sin @) o "borrar" para eliminar.\nEjemplo: miperfil'
+          : '🐦 Send your X/Twitter username (without @) or "delete" to remove.\nExample: myprofile'
+      );
+    } catch (error) {
+      logger.error('Error in edit twitter:', error);
+    }
+  });
+
+  bot.action('edit_facebook', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      ctx.session.temp.waitingForFacebook = true;
+      await ctx.saveSession();
+      await ctx.editMessageText(
+        lang === 'es'
+          ? '📘 Envía tu nombre de usuario de Facebook o "borrar" para eliminar.\nEjemplo: miperfil'
+          : '📘 Send your Facebook username or "delete" to remove.\nExample: myprofile'
+      );
+    } catch (error) {
+      logger.error('Error in edit facebook:', error);
+    }
+  });
+
+  bot.action('edit_instagram', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      ctx.session.temp.waitingForInstagram = true;
+      await ctx.saveSession();
+      await ctx.editMessageText(
+        lang === 'es'
+          ? '📷 Envía tu nombre de usuario de Instagram (sin @) o "borrar" para eliminar.\nEjemplo: miperfil'
+          : '📷 Send your Instagram username (without @) or "delete" to remove.\nExample: myprofile'
+      );
+    } catch (error) {
+      logger.error('Error in edit instagram:', error);
+    }
+  });
+
   // Handle photo upload
   bot.on('photo', async (ctx, next) => {
     if (ctx.session.temp?.waitingForPhoto) {
@@ -352,8 +422,167 @@ const registerProfileHandlers = (bot) => {
       return;
     }
 
+    // Social Media Handlers
+    if (temp?.waitingForTikTok) {
+      try {
+        const lang = getLanguage(ctx);
+        const input = validateUserInput(ctx.message.text, 100);
+
+        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
+          await UserService.updateProfile(ctx.from.id, { tiktok: null });
+          ctx.session.temp.waitingForTikTok = false;
+          await ctx.saveSession();
+          await ctx.reply(lang === 'es' ? '✅ TikTok eliminado' : '✅ TikTok removed');
+        } else if (input) {
+          const username = input.replace('@', '').trim();
+          await UserService.updateProfile(ctx.from.id, { tiktok: username });
+          ctx.session.temp.waitingForTikTok = false;
+          await ctx.saveSession();
+          await ctx.reply(lang === 'es' ? '✅ TikTok actualizado' : '✅ TikTok updated');
+        } else {
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await showProfile(ctx, ctx.from.id, false, true);
+      } catch (error) {
+        logger.error('Error updating TikTok:', error);
+      }
+      return;
+    }
+
+    if (temp?.waitingForTwitter) {
+      try {
+        const lang = getLanguage(ctx);
+        const input = validateUserInput(ctx.message.text, 100);
+
+        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
+          await UserService.updateProfile(ctx.from.id, { twitter: null });
+          ctx.session.temp.waitingForTwitter = false;
+          await ctx.saveSession();
+          await ctx.reply(lang === 'es' ? '✅ X/Twitter eliminado' : '✅ X/Twitter removed');
+        } else if (input) {
+          const username = input.replace('@', '').trim();
+          await UserService.updateProfile(ctx.from.id, { twitter: username });
+          ctx.session.temp.waitingForTwitter = false;
+          await ctx.saveSession();
+          await ctx.reply(lang === 'es' ? '✅ X/Twitter actualizado' : '✅ X/Twitter updated');
+        } else {
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await showProfile(ctx, ctx.from.id, false, true);
+      } catch (error) {
+        logger.error('Error updating Twitter:', error);
+      }
+      return;
+    }
+
+    if (temp?.waitingForFacebook) {
+      try {
+        const lang = getLanguage(ctx);
+        const input = validateUserInput(ctx.message.text, 100);
+
+        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
+          await UserService.updateProfile(ctx.from.id, { facebook: null });
+          ctx.session.temp.waitingForFacebook = false;
+          await ctx.saveSession();
+          await ctx.reply(lang === 'es' ? '✅ Facebook eliminado' : '✅ Facebook removed');
+        } else if (input) {
+          const username = input.trim();
+          await UserService.updateProfile(ctx.from.id, { facebook: username });
+          ctx.session.temp.waitingForFacebook = false;
+          await ctx.saveSession();
+          await ctx.reply(lang === 'es' ? '✅ Facebook actualizado' : '✅ Facebook updated');
+        } else {
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await showProfile(ctx, ctx.from.id, false, true);
+      } catch (error) {
+        logger.error('Error updating Facebook:', error);
+      }
+      return;
+    }
+
+    if (temp?.waitingForInstagram) {
+      try {
+        const lang = getLanguage(ctx);
+        const input = validateUserInput(ctx.message.text, 100);
+
+        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
+          await UserService.updateProfile(ctx.from.id, { instagram: null });
+          ctx.session.temp.waitingForInstagram = false;
+          await ctx.saveSession();
+          await ctx.reply(lang === 'es' ? '✅ Instagram eliminado' : '✅ Instagram removed');
+        } else if (input) {
+          const username = input.replace('@', '').trim();
+          await UserService.updateProfile(ctx.from.id, { instagram: username });
+          ctx.session.temp.waitingForInstagram = false;
+          await ctx.saveSession();
+          await ctx.reply(lang === 'es' ? '✅ Instagram actualizado' : '✅ Instagram updated');
+        } else {
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await showProfile(ctx, ctx.from.id, false, true);
+      } catch (error) {
+        logger.error('Error updating Instagram:', error);
+      }
+      return;
+    }
+
     return next();
   });
+};
+
+/**
+ * Show social media menu
+ */
+const showSocialMediaMenu = async (ctx, lang) => {
+  try {
+    const user = await UserModel.getById(ctx.from.id);
+
+    if (!user) {
+      await ctx.reply(t('error', lang));
+      return;
+    }
+
+    let text = lang === 'es'
+      ? '📱 *Redes Sociales*\n\nEdita tus redes sociales:\n\n'
+      : '📱 *Social Media*\n\nEdit your social media:\n\n';
+
+    text += user.tiktok ? `📱 TikTok: @${user.tiktok}\n` : '📱 TikTok: -\n';
+    text += user.twitter ? `🐦 X: @${user.twitter}\n` : '🐦 X: -\n';
+    text += user.facebook ? `📘 Facebook: ${user.facebook}\n` : '📘 Facebook: -\n';
+    text += user.instagram ? `📷 Instagram: @${user.instagram}\n` : '📷 Instagram: -\n';
+
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback('📱 TikTok', 'edit_tiktok'),
+        Markup.button.callback('🐦 X', 'edit_twitter'),
+      ],
+      [
+        Markup.button.callback('📘 Facebook', 'edit_facebook'),
+        Markup.button.callback('📷 Instagram', 'edit_instagram'),
+      ],
+      [Markup.button.callback(t('back', lang), 'show_profile')],
+    ]);
+
+    await ctx.editMessageText(text, {
+      parse_mode: 'Markdown',
+      ...keyboard,
+    });
+  } catch (error) {
+    logger.error('Error showing social media menu:', error);
+  }
 };
 
 /**
@@ -423,6 +652,16 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
       isOwnProfile ? `${t('profileViews', lang, { views: targetUser.profileViews || 0 })}` : '',
       ''
     ].filter(Boolean).join('\n');
+
+    // Add social media section (only show if any are filled)
+    const hasSocialMedia = targetUser.tiktok || targetUser.twitter || targetUser.facebook || targetUser.instagram;
+    if (hasSocialMedia) {
+      profileText += '\n📱 Social Media:\n';
+      if (targetUser.tiktok) profileText += `  TikTok: @${targetUser.tiktok}\n`;
+      if (targetUser.twitter) profileText += `  X: @${targetUser.twitter}\n`;
+      if (targetUser.facebook) profileText += `  Facebook: ${targetUser.facebook}\n`;
+      if (targetUser.instagram) profileText += `  Instagram: @${targetUser.instagram}\n`;
+    }
     // Parse createdAt date
     let createdAtDate;
     if (targetUser.createdAt) {
@@ -452,6 +691,9 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
       keyboard.push([
         Markup.button.callback(t('editLocation', lang), 'edit_location'),
         Markup.button.callback(t('editInterests', lang), 'edit_interests'),
+      ]);
+      keyboard.push([
+        Markup.button.callback(lang === 'es' ? '📱 Redes Sociales' : '📱 Social Media', 'edit_social'),
       ]);
       keyboard.push([
         Markup.button.callback(t('privacySettings', lang), 'privacy_settings'),
@@ -716,7 +958,7 @@ const unblockUser = async (ctx, targetUserId) => {
 };
 
 /**
- * Share profile - Generate Member Card with Photo
+ * Share profile - Generate Member Card with Photo (Pseudo-code format)
  */
 const shareProfile = async (ctx) => {
   try {
@@ -730,12 +972,15 @@ const shareProfile = async (ctx) => {
 
     await ctx.answerCbQuery();
 
-    // Build enhanced Member Card text (using HTML for better parsing)
-    let cardText = '┏━━━━━━━━━━━━━━━━━━━━━━━┓\n';
-    cardText += '┃      💎 MEMBER CARD 💎      ┃\n';
-    cardText += '┗━━━━━━━━━━━━━━━━━━━━━━━┛\n\n';
+    // Build clean pseudo-code style Member Card
+    let cardText = '';
 
-    // Badges - display prominently
+    // Header
+    cardText += `╔════════════════════════════════╗\n`;
+    cardText += `║      💎  MEMBER  PROFILE      ║\n`;
+    cardText += `╚════════════════════════════════╝\n\n`;
+
+    // Badges section
     if (user.badges && user.badges.length > 0) {
       const badgeList = user.badges.map((badge) => {
         if (typeof badge === 'string') {
@@ -746,16 +991,16 @@ const shareProfile = async (ctx) => {
           return `${badge.icon} ${badge.name}`;
         }
         return '';
-      }).filter(Boolean).join(' ');
+      }).filter(Boolean).join('  ');
       cardText += `${badgeList}\n\n`;
     }
 
-    // Basic info with better formatting
-    cardText += `━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    cardText += `👤 <b>${user.firstName || 'User'} ${user.lastName || ''}</b>\n`;
-    if (user.username) cardText += `📱 @${user.username}\n`;
+    // Main Profile Section
+    cardText += `<b>// USER IDENTITY</b>\n`;
+    cardText += `name: "${user.firstName || 'User'}${user.lastName ? ' ' + user.lastName : ''}"\n`;
+    if (user.username) cardText += `handle: "@${user.username}"\n`;
 
-    // Subscription status - highlight for PRIME members
+    // Membership status
     if (user.subscriptionStatus === 'active' && user.planExpiry) {
       try {
         let expiry;
@@ -768,50 +1013,64 @@ const shareProfile = async (ctx) => {
         }
 
         if (expiry && !isNaN(expiry.getTime())) {
-          cardText += `💎 <b>PRIME Member</b>\n`;
-          cardText += `   Valid until: ${moment(expiry).format('MMM DD, YYYY')}\n`;
+          cardText += `status: "💎 PRIME"\n`;
+          cardText += `expires: "${moment(expiry).format('MMM DD, YYYY')}"\n`;
         }
       } catch (error) {
         logger.warn('Error parsing planExpiry in share:', error);
+        cardText += `status: "⭐ FREE"\n`;
       }
     } else {
-      cardText += `⭐ Free Member\n`;
+      cardText += `status: "⭐ FREE"\n`;
     }
-    cardText += `━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-    // Bio
+    // Bio section
     if (user.bio) {
-      cardText += `📝 <b>About</b>\n`;
-      // Escape HTML special characters in bio
+      cardText += `\n<b>// ABOUT</b>\n`;
       const escapedBio = user.bio.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      cardText += `${escapedBio}\n\n`;
+      cardText += `bio: "${escapedBio}"\n`;
     }
 
-    // Looking for
+    // Looking for section
     if (user.looking_for) {
-      cardText += `🔎 <b>${lang === 'es' ? 'Buscado' : 'Looking for'}</b>\n`;
+      cardText += `\n<b>// SEEKING</b>\n`;
       const escapedLookingFor = user.looking_for.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      cardText += `${escapedLookingFor}\n\n`;
+      cardText += `looking_for: "${escapedLookingFor}"\n`;
     }
 
-    // Interests with better formatting
+    // Interests section
     if (user.interests && user.interests.length > 0) {
-      cardText += `🎯 <b>Interests</b>\n`;
-      // Escape HTML special characters in interests
+      cardText += `\n<b>// INTERESTS</b>\n`;
       const escapedInterests = user.interests.map(i =>
         i.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       );
-      cardText += `${escapedInterests.join(' • ')}\n\n`;
+      cardText += `interests: [\n`;
+      escapedInterests.forEach((interest, index) => {
+        const comma = index < escapedInterests.length - 1 ? ',' : '';
+        cardText += `  "${interest}"${comma}\n`;
+      });
+      cardText += `]\n`;
     }
 
-    // Profile link (deep link to view profile)
-    cardText += `━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    cardText += `🔗 <b>View Full Profile:</b>\n`;
-    cardText += `https://t.me/${ctx.botInfo.username}?start=viewprofile_${ctx.from.id}\n\n`;
+    // Social media section (only show if any are filled)
+    const hasSocialMedia = user.tiktok || user.twitter || user.facebook || user.instagram;
+    if (hasSocialMedia) {
+      cardText += `\n<b>// SOCIAL MEDIA</b>\n`;
+      cardText += `connect: {\n`;
+      if (user.tiktok) cardText += `  tiktok: "@${user.tiktok}",\n`;
+      if (user.twitter) cardText += `  x: "@${user.twitter}",\n`;
+      if (user.facebook) cardText += `  facebook: "${user.facebook}",\n`;
+      if (user.instagram) cardText += `  instagram: "@${user.instagram}",\n`;
+      cardText += `}\n`;
+    }
 
-    cardText += '┏━━━━━━━━━━━━━━━━━━━━━━━┓\n';
-    cardText += '┃  🎬 PNPtv! - Entertainment Hub  ┃\n';
-    cardText += '┗━━━━━━━━━━━━━━━━━━━━━━━┛';
+    // Footer with profile link
+    cardText += `\n<b>// ACTIONS</b>\n`;
+    cardText += `view_profile() {\n`;
+    cardText += `  url: "https://t.me/${ctx.botInfo.username}?start=viewprofile_${ctx.from.id}"\n`;
+    cardText += `}\n\n`;
+    cardText += `─────────────────────────────────\n`;
+    cardText += `🎬 <b>PNPtv!</b> | Entertainment Hub`;
 
     // Share keyboard
     const shareKeyboard = Markup.inlineKeyboard([
