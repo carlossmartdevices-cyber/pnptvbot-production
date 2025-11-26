@@ -11,10 +11,15 @@ describe('PostgreSQL Database Integration Tests', () => {
 
   beforeAll(async () => {
     // Initialize pool
-    initializePostgres();
-    pool = getPool();
-    // Get a client from the pool for transactions
-    client = await getClient();
+    try {
+      initializePostgres();
+      pool = getPool();
+      // Get a client from the pool for transactions
+      client = await getClient();
+    } catch (error) {
+      console.error('Failed to initialize PostgreSQL for tests:', error);
+      throw error;
+    }
   });
 
   afterAll(async () => {
