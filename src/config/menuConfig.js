@@ -3,7 +3,7 @@
  * Defines all menu options, categories, and display settings
  */
 
-const config = require('./config');
+// const config = require('./config'); // Removed: file does not exist, use process.env or direct values if needed
 
 const MENU_CONFIG = {
   // Main menu categories (displayed in private chat and group /menu)
@@ -269,7 +269,7 @@ const MENU_CONFIG = {
   },
 
   // Deep link base URL
-  BOT_USERNAME: config.BOT_USERNAME || 'your_bot_username',
+  BOT_USERNAME: process.env.BOT_USERNAME || 'your_bot_username',
 
   // Topic configuration
   TOPICS: {

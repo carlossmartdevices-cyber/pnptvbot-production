@@ -47,19 +47,15 @@ class PermissionService {
   }
   /**
    * Check if user has a specific permission
+   * SECURITY: Properly checks env-based admin roles first
    * @param {number|string} userId - User ID
    * @param {string} permission - Permission to check
    * @returns {Promise<boolean>} True if user has permission
    */
   static async hasPermission(userId, permission) {
     try {
-      const user = await UserModel.getById(userId);
-      if (!user) {
-        logger.warn(`User not found for permission check: ${userId}`);
-        return false;
-      }
-
-      const userRole = user.role || 'user';
+      // Use getUserRole() which properly checks env vars first
+      const userRole = await this.getUserRole(userId);
       const hasPermission = PermissionModel.roleHasPermission(userRole, permission);
 
       logger.debug(`Permission check: ${userId} (${userRole}) - ${permission}: ${hasPermission}`);
@@ -72,18 +68,15 @@ class PermissionService {
 
   /**
    * Check if user has any of the given permissions
+   * SECURITY: Properly checks env-based admin roles first
    * @param {number|string} userId - User ID
    * @param {Array<string>} permissions - Permissions to check
    * @returns {Promise<boolean>} True if user has at least one permission
    */
   static async hasAnyPermission(userId, permissions) {
     try {
-      const user = await UserModel.getById(userId);
-      if (!user) {
-        return false;
-      }
-
-      const userRole = user.role || 'user';
+      // Use getUserRole() which properly checks env vars first
+      const userRole = await this.getUserRole(userId);
       return PermissionModel.roleHasAnyPermission(userRole, permissions);
     } catch (error) {
       logger.error('Error checking any permission:', error);
@@ -93,18 +86,15 @@ class PermissionService {
 
   /**
    * Check if user has all of the given permissions
+   * SECURITY: Properly checks env-based admin roles first
    * @param {number|string} userId - User ID
    * @param {Array<string>} permissions - Permissions to check
    * @returns {Promise<boolean>} True if user has all permissions
    */
   static async hasAllPermissions(userId, permissions) {
     try {
-      const user = await UserModel.getById(userId);
-      if (!user) {
-        return false;
-      }
-
-      const userRole = user.role || 'user';
+      // Use getUserRole() which properly checks env vars first
+      const userRole = await this.getUserRole(userId);
       return PermissionModel.roleHasAllPermissions(userRole, permissions);
     } catch (error) {
       logger.error('Error checking all permissions:', error);

@@ -9,21 +9,26 @@ const ChatCleanupService = require('../../services/chatCleanupService');
  * @param {string|number} userId - Telegram user ID
  */
 const sendPrimeWelcome = async (bot, userId) => {
-  const primeChannelLink = 'https://t.me/PNPTV_PRIME'; // Actualiza si el link es diferente
-  const message = [
-    '🎉 ¡Bienvenido a PRIME!',
+  const messageEs = [
+    '🎉 ¡Bienvenido a PNPtv!',
     '',
-    'Tu suscripción Lifetime está activa.',
-    '',
-    'Accede al canal exclusivo aquí:',
-    `👉 [Ingresar a PRIME](${primeChannelLink})`,
+    'Para explorar PNPtv, pulsa /menu',
     '',
     'Disfruta todos los beneficios y novedades.'
   ].join('\n');
+  const messageEn = [
+    '🎉 Welcome to PNPtv!',
+    '',
+    'To explore PNPtv, press /menu',
+    '',
+    'Enjoy all the benefits and updates.'
+  ].join('\n');
+  const lang = (bot.language || 'es').toLowerCase();
+  const message = lang === 'en' ? messageEn : messageEs;
   try {
     await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown' });
   } catch (error) {
-    logger.error('Error enviando bienvenida PRIME:', error);
+    logger.error('Error enviando bienvenida PNPtv:', error);
   }
 };
 
@@ -172,38 +177,6 @@ const registerMenuHandlers = (bot) => {
   bot.action('group_show_rules', async (ctx) => {
     logger.info('Group menu actions have been disabled');
     await ctx.answerCbQuery('This feature has been disabled');
-  });
-        '📋 *PNPtv! Community Rules*',
-        '',
-        '1️⃣ *Respect:* Treat all members with respect and courtesy',
-        '',
-        '2️⃣ *No Spam:* Avoid spam, unauthorized advertising or repetitive content',
-        '',
-        '3️⃣ *Privacy:* Do not share personal information of other members without their consent',
-        '',
-        '4️⃣ *Appropriate Content:* Content must be appropriate for the community',
-        '',
-        '5️⃣ *No Harassment:* Harassment, bullying or hostile behavior will not be tolerated',
-        '',
-        '6️⃣ *Bot Usage:* Use the bot privately for personal features (profile, subscriptions, payments)',
-        '',
-        '⚠️ *Breaking these rules may result in warnings, restrictions or expulsion from the group.*',
-        '',
-        'Thank you for keeping our community safe and enjoyable! 🙏'
-      ].join('\n');
-
-      const message = lang === 'es' ? rulesEs : rulesEn;
-
-      const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
-
-      // Auto-delete menu messages in groups after 2 minutes
-      const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
-      if (isGroup) {
-        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
-      }
-    } catch (error) {
-      logger.error('Error showing group rules:', error);
-    }
   });
 };
 

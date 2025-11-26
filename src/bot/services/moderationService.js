@@ -86,9 +86,19 @@ class ModerationService {
 
     try {
       const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`);
-      const domain = urlObj.hostname.replace('www.', '');
+      const domain = urlObj.hostname.toLowerCase();
 
-      return allowedDomains.some((allowed) => domain.includes(allowed));
+      // Check if domain matches allowed domains (exact match or subdomain)
+      return allowedDomains.some((allowed) => {
+        const allowedLower = allowed.toLowerCase();
+        // Exact match (with or without www)
+        if (domain === allowedLower || domain === `www.${allowedLower}`) {
+          return true;
+        }
+        // Subdomain match (e.g., m.facebook.com matches facebook.com)
+        // Must end with .allowedDomain to prevent scams like facebook.com.scam.com
+        return domain.endsWith(`.${allowedLower}`);
+      });
     } catch {
       return false;
     }
