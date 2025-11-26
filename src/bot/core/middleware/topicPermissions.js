@@ -4,6 +4,10 @@ const ApprovalService = require('../../../services/approvalService');
 const UserModel = require('../../../models/userModel');
 const PermissionService = require('../../services/permissionService');
 const { PERMISSIONS } = require('../../../models/permissionModel');
+const logger = require('../../../utils/logger');
+const ACCESS_CONTROL_CONFIG = require('../../../config/accessControlConfig');
+const GROUP_ID = process.env.GROUP_ID;
+const rateLimitTracker = new Map();
 
 /**
  * Clean up old rate limit entries
@@ -11,7 +15,6 @@ const { PERMISSIONS } = require('../../../models/permissionModel');
 setInterval(() => {
   const now = Date.now();
   const cutoff = now - (60 * 60 * 1000); // 1 hour
-
   for (const [key, timestamps] of rateLimitTracker.entries()) {
     const filtered = timestamps.filter(t => t > cutoff);
     if (filtered.length === 0) {
@@ -89,15 +92,34 @@ function formatDuration(ms) {
   return `${seconds} second${seconds > 1 ? 's' : ''}`;
 }
 
+// Topic permissions middleware
+async function topicPermissionsMiddleware(ctx, next) {
+  try {
     const userId = ctx.from.id;
     const chatId = ctx.chat.id;
     const message = ctx.message;
     const lang = ctx.from.language_code === 'es' ? 'es' : 'en';
 
+    // Only process in configured group
+    if (GROUP_ID && ctx.chat.id.toString() !== GROUP_ID) {
+      return next();
+    }
+
+    // Get topic ID (message_thread_id)
+    const topicId = ctx.message.message_thread_id;
+    if (!topicId || !ACCESS_CONTROL_CONFIG.TOPIC_PERMISSIONS[topicId]) {
+      return next();
+    }
+    const topicConfig = ACCESS_CONTROL_CONFIG.TOPIC_PERMISSIONS[topicId];
+    const messageId = ctx.message.message_id;
+
     // Check if user is admin or performer
     const member = await ctx.telegram.getChatMember(chatId, userId);
     const isAdmin = ['creator', 'administrator'].includes(member.status);
     const isPerformer = await PermissionService.hasPermission(userId, PERMISSIONS.POST_IN_RESTRICTED_TOPICS);
+    const hasPermission = topicConfig.allowedRoles
+      ? await PermissionService.hasAnyRole(userId, topicConfig.allowedRoles)
+      : true;
 
     // ===================================
     // COMMAND BLOCKING
@@ -106,7 +128,6 @@ function formatDuration(ms) {
       // Always allow essential commands for all users
       const essentialCommands = ['/start', '/menu', '/help'];
       const command = message.text.split(' ')[0].split('@')[0].toLowerCase();
-
       if (!essentialCommands.includes(command) && !isAdmin) {
         await ctx.deleteMessage();
         const warning = lang === 'es'
@@ -115,26 +136,10 @@ function formatDuration(ms) {
         try {
           await ctx.telegram.sendMessage(userId, warning, { parse_mode: 'Markdown' });
         } catch (error) { /* User blocked bot */ }
-        await TopicConfigModel.trackViolation(userId, messageThreadId, 'command_in_restricted_topic');
+        // await TopicConfigModel.trackViolation(userId, topicId, 'command_in_restricted_topic');
         return;
       }
-
-      // Only process in configured group
-      if (GROUP_ID && ctx.chat.id.toString() !== GROUP_ID) {
-        return next();
-      }
-
-      // Get topic ID (message_thread_id)
-      const topicId = ctx.message.message_thread_id;
-
-      // If not in a topic, or topic not configured, allow
-      if (!topicId || !ACCESS_CONTROL_CONFIG.TOPIC_PERMISSIONS[topicId]) {
-        return next();
-      }
-
-      const topicConfig = ACCESS_CONTROL_CONFIG.TOPIC_PERMISSIONS[topicId];
-      const userId = ctx.from.id;
-      const messageId = ctx.message.message_id;
+    }
 
     // ===================================
     // ADMIN-ONLY POSTING (PNPtv News!)
@@ -149,14 +154,11 @@ function formatDuration(ms) {
           } catch (error) {
             logger.debug('Could not delete message:', error.message);
           }
-
           // Send subscription required message
           const userLang = ctx.from.language_code || 'en';
           const isSpanish = userLang.startsWith('es');
-          const message = ACCESS_CONTROL_CONFIG.MESSAGES.subscriptionRequired[isSpanish ? 'es' : 'en'];
-
-          const sentMessage = await ctx.reply(message);
-
+          const msg = ACCESS_CONTROL_CONFIG.MESSAGES.subscriptionRequired[isSpanish ? 'es' : 'en'];
+          const sentMessage = await ctx.reply(msg);
           // Auto-delete warning
           setTimeout(async () => {
             try {
@@ -165,10 +167,10 @@ function formatDuration(ms) {
               logger.debug('Could not delete warning:', error.message);
             }
           }, ACCESS_CONTROL_CONFIG.AUTO_DELETE.warningDelay);
-
           return; // Don't proceed
         }
       }
+    }
 
       // Check rate limit
       if (topicConfig.rateLimit) {
