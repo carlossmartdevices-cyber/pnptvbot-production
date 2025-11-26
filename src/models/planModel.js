@@ -172,6 +172,8 @@ class Plan {
         sku: 'EASYBOTS-PNP-007',
         name: 'Trial Week',
         nameEs: 'Semana de Prueba',
+        displayName: 'Trial Week',
+        tier: 'Basic',
         price: 14.99,
         currency: 'USD',
         duration: 7,
@@ -182,9 +184,10 @@ class Plan {
         ],
         featuresEs: [
           'Acceso a canales premium',
-          'Acceso a función Miembros Cercanos',
+          'Acceso a la función Miembros Cercanos',
           'Acceso a reuniones Zoom: 1 por semana',
         ],
+        icon: '🎯',
         active: true,
       },
       {
@@ -192,7 +195,9 @@ class Plan {
         sku: 'EASYBOTS-PNP-030',
         name: 'PNP Member',
         nameEs: 'Miembro PNP',
-        price: 29.99,
+        displayName: 'PNP Member',
+        tier: 'PNP',
+        price: 24.99,
         currency: 'USD',
         duration: 30,
         features: [
@@ -202,11 +207,12 @@ class Plan {
           'Priority customer support',
         ],
         featuresEs: [
-          'Todo en Semana de Prueba',
+          'Todo lo de Semana de Prueba',
           'Acceso ilimitado a canales premium',
           'Acceso a reuniones Zoom: 2 por semana',
-          'Soporte prioritario al cliente',
+          'Soporte al cliente prioritario',
         ],
+        icon: '⭐',
         active: true,
       },
       {
@@ -214,7 +220,9 @@ class Plan {
         sku: 'EASYBOTS-PNP-030',
         name: 'Crystal Member',
         nameEs: 'Miembro Crystal',
-        price: 59.99,
+        displayName: 'Crystal Member',
+        tier: 'Crystal',
+        price: 49.99,
         currency: 'USD',
         duration: 30,
         features: [
@@ -224,11 +232,12 @@ class Plan {
           'Early access to new features',
         ],
         featuresEs: [
-          'Todo en Miembro PNP',
+          'Todo lo de Miembro PNP',
           'Acceso a reuniones Zoom: 4 por semana',
           'Acceso a contenido exclusivo',
           'Acceso anticipado a nuevas funciones',
         ],
+        icon: '💎',
         active: true,
       },
       {
@@ -236,7 +245,9 @@ class Plan {
         sku: 'EASYBOTS-PNP-030',
         name: 'Diamond Member',
         nameEs: 'Miembro Diamond',
-        price: 89.99,
+        displayName: 'Diamond Member',
+        tier: 'Diamond',
+        price: 99.99,
         currency: 'USD',
         duration: 30,
         features: [
@@ -247,12 +258,13 @@ class Plan {
           'Access to exclusive events',
         ],
         featuresEs: [
-          'Todo en Miembro Crystal',
+          'Todo lo de Miembro Crystal',
           'Acceso ilimitado a reuniones Zoom',
-          'Soporte VIP al cliente',
+          'Soporte al cliente VIP',
           'Insignia de perfil personalizada',
           'Acceso a eventos exclusivos',
         ],
+        icon: '👑',
         active: true,
       },
       {
@@ -260,7 +272,9 @@ class Plan {
         sku: 'EASYBOTS-PNP-000',
         name: 'Lifetime Pass',
         nameEs: 'Pase de por Vida',
-        price: 499.99,
+        displayName: 'Lifetime Pass',
+        tier: 'Premium',
+        price: 249.99,
         currency: 'USD',
         duration: 36500, // 100 years
         features: [
@@ -271,12 +285,13 @@ class Plan {
           'Priority feature requests',
         ],
         featuresEs: [
-          'Todo en Miembro Diamond',
+          'Todo lo de Miembro Diamond',
           'Acceso de por vida a todas las funciones',
-          'Nunca vuelvas a pagar',
+          'No pagues nunca más',
           'Insignia de fundador',
           'Solicitudes de funciones prioritarias',
         ],
+        icon: '♾️',
         active: true,
       },
     ];
