@@ -7,8 +7,11 @@ const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
-// Web app URL for Hangouts
+// Web app URL for Hangouts (Main Rooms use Agora)
 const HANGOUTS_WEB_URL = process.env.HANGOUTS_WEB_URL || 'https://pnptv.app/hangouts';
+
+// Jitsi Meet URL for private calls
+const JITSI_MEET_URL = process.env.JITSI_MEET_URL || 'https://meet.jit.si';
 
 /**
  * Hangouts (Video Calls) handlers
@@ -24,10 +27,20 @@ const registerHangoutsHandlers = (bot) => {
     }
   });
 
-  // Join main room
+  // Show main rooms list
   bot.action('hangouts_join_main', async (ctx) => {
     try {
-      await joinMainRoom(ctx);
+      await showMainRoomsList(ctx);
+    } catch (error) {
+      logger.error('Error showing main rooms list:', error);
+    }
+  });
+
+  // Join specific main room
+  bot.action(/hangouts_join_room_(\d+)/, async (ctx) => {
+    try {
+      const roomId = parseInt(ctx.match[1]);
+      await joinMainRoom(ctx, roomId);
     } catch (error) {
       logger.error('Error joining main room:', error);
     }
@@ -130,7 +143,7 @@ const showHangoutsMenu = async (ctx) => {
     }
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(t('hangouts.joinMainRoom', lang), 'hangouts_join_main')],
+      [Markup.button.callback('🏠 Join PNPtv! Main Rooms', 'hangouts_join_main')],
       [
         Markup.button.callback(t('hangouts.createPrivate', lang), 'hangouts_create_private'),
         Markup.button.callback(t('hangouts.joinPrivate', lang), 'hangouts_join_private'),
@@ -146,16 +159,64 @@ const showHangoutsMenu = async (ctx) => {
 };
 
 /**
- * Join main room
+ * Show list of main rooms with active participants
  */
-const joinMainRoom = async (ctx) => {
+const showMainRoomsList = async (ctx) => {
+  try {
+    const lang = getLanguage(ctx);
+
+    // Get all main rooms
+    const rooms = await MainRoomModel.getAll();
+
+    let text = `🏠 ${t('hangouts.mainRoomsTitle', lang) || 'Join PNPtv! Main Rooms'}\n\n`;
+    text += `${t('hangouts.selectRoom', lang) || 'Select a room to join:'}\n\n`;
+
+    // Build buttons for each room
+    const buttons = [];
+
+    for (const room of rooms) {
+      if (room.isActive) {
+        // Get participant count
+        let participantCount = 0;
+        try {
+          const participants = await MainRoomModel.getParticipants(room.id);
+          participantCount = participants.length;
+        } catch (error) {
+          logger.debug(`Could not get participants for room ${room.id}:`, error);
+        }
+
+        const roomText = `${room.name} (${participantCount}/${room.maxParticipants})`;
+        text += `🎥 ${roomText}\n`;
+        buttons.push([
+          Markup.button.callback(roomText, `hangouts_join_room_${room.id}`)
+        ]);
+      }
+    }
+
+    // Add back button
+    buttons.push([Markup.button.callback(t('back', lang), 'hangouts_menu')]);
+
+    const keyboard = Markup.inlineKeyboard(buttons);
+
+    await ctx.editMessageText(text, keyboard);
+  } catch (error) {
+    logger.error('Error in showMainRoomsList:', error);
+    const lang = getLanguage(ctx);
+    await ctx.reply(t('error', lang));
+  }
+};
+
+/**
+ * Join main room
+ * @param {number} roomId - Room ID to join (1, 2, or 3)
+ */
+const joinMainRoom = async (ctx, roomId = 1) => {
   try {
     const lang = getLanguage(ctx);
     const userId = ctx.from.id;
     const username = ctx.from.username || ctx.from.first_name;
 
-    // Join main room (room ID 1) - joinRoom handles everything
-    const roomId = 1; // Main room is always room 1
+    // Join the specified main room - joinRoom handles everything
     const result = await MainRoomModel.joinRoom(roomId, userId, username, true); // true = as publisher (can broadcast)
 
     // Get current participants count
@@ -212,17 +273,18 @@ const createPrivateCall = async (ctx) => {
       isPublic: false,
     });
 
-    // result includes call data + tokens already generated
-    // Create web app URL with the token from result
-    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${result.channelName}&token=${result.token}&uid=${userId}&username=${encodeURIComponent(username)}&type=private`;
+    // Generate Jitsi Meet URL for private calls (instead of Agora)
+    // Use the channel name as the Jitsi room ID
+    const jitsiUrl = `${JITSI_MEET_URL}/${result.channelName}#config.prejoinPageEnabled=false&userInfo.displayName="${encodeURIComponent(username)}"`;
 
     let text = `✅ ${t('hangouts.callCreated', lang)}\n\n`;
     text += `🎥 ${t('hangouts.callId', lang)}: \`${result.id}\`\n`;
     text += `🔗 ${t('hangouts.shareId', lang)}\n\n`;
-    text += `💡 ${t('hangouts.clickToStart', lang)}`;
+    text += `💡 Click "Open Call" to join via Jitsi Meet\n`;
+    text += `🎯 Room: ${result.channelName}`;
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.url(t('hangouts.openCall', lang), webAppUrl)],
+      [Markup.button.url('🎥 Open Call (Jitsi)', jitsiUrl)],
       [Markup.button.callback(t('hangouts.endCall', lang), `hangouts_end_${result.id}`)],
       [Markup.button.callback(t('back', lang), 'hangouts_menu')],
     ]);
@@ -250,16 +312,17 @@ const joinPrivateCallById = async (ctx, callId) => {
     // Get current participants count
     const participants = await VideoCallModel.getParticipants(callId);
 
-    // Create web app URL with token from joinCall result
-    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${result.call.channelName}&token=${result.token}&uid=${userId}&username=${encodeURIComponent(username)}&type=private`;
+    // Generate Jitsi Meet URL for private calls (instead of Agora)
+    const jitsiUrl = `${JITSI_MEET_URL}/${result.call.channelName}#config.prejoinPageEnabled=false&userInfo.displayName="${encodeURIComponent(username)}"`;
 
     let text = `✅ ${t('hangouts.joinedCall', lang)}\n\n`;
     text += `🎥 ${t('hangouts.callId', lang)}: ${callId}\n`;
     text += `👥 ${t('hangouts.participants', lang)}: ${participants.length}\n\n`;
-    text += `💡 ${t('hangouts.clickToJoin', lang)}`;
+    text += `💡 Click "Open Call" to join via Jitsi Meet\n`;
+    text += `🎯 Room: ${result.call.channelName}`;
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.url(t('hangouts.openCall', lang), webAppUrl)],
+      [Markup.button.url('🎥 Open Call (Jitsi)', jitsiUrl)],
       [Markup.button.callback(t('back', lang), 'hangouts_menu')],
     ]);
 
