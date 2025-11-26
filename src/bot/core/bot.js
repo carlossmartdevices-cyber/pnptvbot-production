@@ -55,7 +55,7 @@ const registerMenuHandlers = require('../handlers/menu');
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
 const SubscriptionReminderService = require('../services/subscriptionReminderService');
-const { startCronJobs } = require(require('path').resolve(__dirname, '../../scripts/cron'));
+const { startCronJobs } = require(require('path').resolve(__dirname, '../../../scripts/cron'));
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
 // API Server
