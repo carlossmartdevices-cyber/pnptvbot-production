@@ -146,9 +146,15 @@ class JitsiService {
         const params = new URLSearchParams();
 
         if (room.settings) {
-            const settings = typeof room.settings === 'string'
-                ? JSON.parse(room.settings)
-                : room.settings;
+            let settings;
+            try {
+                settings = typeof room.settings === 'string'
+                    ? JSON.parse(room.settings)
+                    : room.settings;
+            } catch (err) {
+                logger.warn('Error parsing Jitsi room settings:', err);
+                settings = {};
+            }
 
             if (settings.start_with_audio_muted) {
                 params.append('config.startWithAudioMuted', 'true');

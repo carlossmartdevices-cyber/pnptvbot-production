@@ -19,5 +19,12 @@ models:
 
 # MCP Servers that Continue can access
 # https://docs.continue.dev/customization/mcp-tools
-#cpServers:
-  - #uses: anthropic/memory-mcp
+mcpServers:
+  # Local fabrica-de-bots MCP server
+  - command: node
+    args: ["${FABRICA_DE_BOTS_PATH}/dist/index.js"]
+    env:
+      FABRICA_DE_BOTS_PATH: "${FABRICA_DE_BOTS_PATH}"
+  
+  # Optional: Anthropic memory MCP
+  - uses: anthropic/memory-mcp
