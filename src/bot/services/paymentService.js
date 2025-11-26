@@ -1063,6 +1063,23 @@ class PaymentService {
   }
   static async createPayment({ userId, planId, provider, sku, chatId, language }) {
     try {
+      // Validate and normalize input parameters
+      const numericUserId = parseInt(userId, 10);
+      if (!userId || Number.isNaN(numericUserId) || numericUserId <= 0) {
+        logger.error('Invalid userId provided', { userId });
+        throw new Error('ID de usuario inválido.');
+      }
+
+      if (!planId || typeof planId !== 'string') {
+        logger.error('Invalid planId provided', { planId });
+        throw new Error('ID de plan inválido.');
+      }
+
+      if (!provider || !['epayco', 'daimo'].includes(provider)) {
+        logger.error('Invalid provider provided', { provider });
+        throw new Error('Proveedor de pago inválido.');
+      }
+
       const plan = await PlanModel.getById(planId);
       if (!plan || !plan.active) {
         logger.error('Plan inválido o inactivo', { planId });
@@ -1070,7 +1087,7 @@ class PaymentService {
       }
 
        const payment = await PaymentModel.create({
-         userId,
+         userId: numericUserId,
          planId,
          provider,
          sku,
@@ -1080,7 +1097,7 @@ class PaymentService {
 
        logger.info('Payment created', {
          paymentId: payment.id,
-         userId,
+         userId: numericUserId,
          planId,
          provider,
          amount: plan.price
