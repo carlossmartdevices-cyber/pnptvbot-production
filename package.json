@@ -80,7 +80,7 @@
     "viem": "^2.22.0",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^4.7.1",
-    "zod": "^3.23.8",
+    "zod": "^3.25.76",
     "zoomus": "^0.1.5"
   },
   "devDependencies": {
