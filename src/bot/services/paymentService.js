@@ -1,6 +1,10 @@
-const axios = require('axios');
-const { getFirestore, Collections } = require('../config/firebase');
-const { config } = require('../config/botConfig');
+const PaymentModel = require('../../models/paymentModel');
+const InvoiceService = require('../../bot/services/invoiceservice');
+const EmailService = require('../../bot/services/emailservice');
+const PlanModel = require('../../models/planModel');
+const UserModel = require('../../models/userModel');
+const SubscriberModel = require('../../models/subscriberModel');
+const DaimoConfig = require('../../config/daimo');
 const logger = require('../../utils/logger');
 const userService = require('./userService');
 
@@ -45,6 +49,198 @@ class PaymentService {
             'Authorization': `Bearer ${privateKey}`,
           },
         }
+      }
+
+      // Process based on status
+      if (status === 'confirmed' || status === 'completed') {
+        // Payment successful
+        if (paymentId) {
+          await PaymentModel.updateStatus(paymentId, 'completed', {
+            transaction_id: source?.txHash || id,
+            daimo_event_id: id,
+          });
+        }
+
+        // Activate user subscription
+        const plan = await PlanModel.getById(planId);
+        if (plan) {
+          const expiryDate = new Date();
+          expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
+
+          await UserModel.updateSubscription(userId, {
+            status: 'active',
+            planId,
+            expiry: expiryDate,
+          });
+
+          logger.info('User subscription activated via Daimo webhook', {
+            userId,
+            planId,
+            expiryDate,
+            txHash: source?.txHash,
+          });
+        }
+
+        return { success: true };
+      } else if (status === 'failed') {
+        // Payment failed
+        if (paymentId) {
+          await PaymentModel.updateStatus(paymentId, 'failed', {
+            transaction_id: source?.txHash || id,
+            daimo_event_id: id,
+          });
+        }
+
+        logger.warn('Daimo payment failed', {
+          paymentId,
+          eventId: id,
+          status,
+        });
+
+        return { success: true }; // Return success to acknowledge webhook
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error('Error processing Daimo webhook:', {
+        error: error.message,
+        stack: error.stack,
+      });
+      return { success: false, error: error.message };
+    }
+  }
+  static async createPayment({ userId, planId, provider, sku, chatId, language }) {
+    try {
+      const plan = await PlanModel.getById(planId);
+      if (!plan || !plan.active) {
+        logger.error('Plan inválido o inactivo', { planId });
+        throw new Error('El plan seleccionado no existe o está inactivo.');
+      }
+
+       const payment = await PaymentModel.create({
+         userId,
+         planId,
+         provider,
+         sku,
+         amount: plan.price,
+         status: 'pending',
+       });
+
+       logger.info('Payment created', {
+         paymentId: payment.id,
+         userId,
+         planId,
+         provider,
+         amount: plan.price
+       });
+
+       // Generate ePayco payment link
+       if (provider === 'epayco') {
+         const epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;
+         const epaycoTestMode = process.env.EPAYCO_TEST_MODE === 'true';
+         const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN;
+
+         if (!epaycoPublicKey) {
+           logger.error('ePayco public key not configured');
+           throw new Error('Configuración de pago incompleta. Contacta soporte.');
+         }
+
+         if (!webhookDomain) {
+           logger.error('BOT_WEBHOOK_DOMAIN not configured');
+           throw new Error('Configuración de pago incompleta. Contacta soporte.');
+         }
+
+         // Use price in Colombian pesos for ePayco
+         const priceInCOP = plan.price_in_cop || (parseFloat(plan.price) * 4000); // Fallback conversion
+
+         // Validate price in COP
+         if (!priceInCOP || priceInCOP <= 0) {
+           logger.error('Invalid price in COP', { planId: plan.id, price_in_cop: plan.price_in_cop });
+           throw new Error('Precio inválido para este plan. Contacta soporte.');
+         }
+
+         // Create payment reference
+         const paymentRef = `PAY-${payment.id.substring(0, 8).toUpperCase()}`;
+
+         // Determine language code (default to Spanish)
+         const lang = language && language.toLowerCase().startsWith('en') ? 'en' : 'es';
+
+         // Generate URL to landing page with language parameter
+         // The landing page will handle the ePayco checkout with SDK
+         const paymentUrl = `${webhookDomain}/payment/${payment.id}?lang=${lang}`;
+
+         logger.info('ePayco payment URL generated (landing page)', {
+           paymentId: payment.id,
+           paymentRef,
+           planId: plan.id,
+           userId,
+           amountUSD: plan.price,
+           amountCOP: priceInCOP,
+           testMode: epaycoTestMode,
+           language: lang,
+           paymentUrl,
+         });
+
+         return {
+           success: true,
+           paymentUrl,
+           paymentId: payment.id,
+           paymentRef
+         };
+       }
+
+       // Handle Daimo payment link generation
+       if (provider === 'daimo') {
+         try {
+           // Create Daimo payment intent
+           const paymentIntent = DaimoConfig.createPaymentIntent({
+             amount: plan.price,
+             userId: userId,
+             planId: planId,
+             chatId: chatId,
+             description: `${plan.display_name || plan.name} - PNPtv Subscription`,
+           });
+
+           // Add payment ID to metadata
+           paymentIntent.metadata.paymentId = payment.id;
+
+           // Generate Daimo payment link
+           const paymentUrl = DaimoConfig.generatePaymentLink(paymentIntent);
+
+           logger.info('Daimo payment URL generated', {
+             paymentId: payment.id,
+             planId: plan.id,
+             userId,
+             amountUSD: plan.price,
+             paymentUrl,
+           });
+
+           return {
+             success: true,
+             paymentUrl,
+             paymentId: payment.id,
+           };
+         } catch (error) {
+           logger.error('Error generating Daimo payment link:', {
+             error: error.message,
+             stack: error.stack,
+             paymentId: payment.id,
+           });
+           throw new Error('No se pudo generar el enlace de pago con Daimo. Por favor, intenta más tarde o contacta soporte.');
+         }
+       }
+
+       // For other providers
+       const paymentUrl = `https://${provider}.com/pay?paymentId=${payment.id}`;
+       return { success: true, paymentUrl, paymentId: payment.id };
+    } catch (error) {
+      logger.error('Error creando pago:', { error: error.message, planId, provider });
+      throw new Error(
+        error.message.includes('plan') || error.message.includes('inactivo')
+          ? 'El plan seleccionado no existe o está inactivo.'
+          : error.message.includes('Configuración')
+          ? error.message
+          : 'El proveedor de pago no está disponible, intente más tarde. Si el problema persiste, contacta soporte.'
       );
 
       // Log payment intent
