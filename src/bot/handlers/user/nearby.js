@@ -15,7 +15,7 @@ const registerNearbyHandlers = (bot) => {
       const lang = getLanguage(ctx);
 
       await ctx.editMessageText(
-        `${t('nearbyTitle', lang)}\n\n${t('selectRadius', lang)}`,
+        t('nearbyTitle', lang) + '\n\n' + t('selectRadius', lang),
         Markup.inlineKeyboard([
           [
             Markup.button.callback(t('radius5km', lang), 'nearby_radius_5'),
@@ -60,7 +60,7 @@ const registerNearbyHandlers = (bot) => {
       }
 
       // Show list of nearby users
-      let message = `${t('nearbyUsersFound', lang, { count: nearbyUsers.length })}\n\n`;
+      let message = t('nearbyUsersFound', lang, { count: nearbyUsers.length }) + '\n\n';
 
       const buttons = [];
       nearbyUsers.slice(0, 10).forEach((user, index) => {

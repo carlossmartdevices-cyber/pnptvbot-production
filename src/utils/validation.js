@@ -1,7 +1,6 @@
 const Joi = require('joi');
 const validator = require('validator');
 const logger = require('./logger');
-const sanitizeHtml = require('sanitize-html');
 
 /**
  * Sanitize user input to prevent XSS and injection attacks
@@ -11,8 +10,8 @@ const sanitizeHtml = require('sanitize-html');
 const sanitizeInput = (input) => {
   if (typeof input !== 'string') return input;
 
-  // Remove HTML tags and scripts using sanitize-html library
-  let sanitized = sanitizeHtml(input, { allowedTags: [], allowedAttributes: {} });
+  // Remove HTML tags and scripts
+  let sanitized = input.replace(/<[^>]*>/g, '');
 
   // Escape special characters
   sanitized = validator.escape(sanitized);
@@ -109,33 +108,15 @@ const schemas = {
   // User profile schema
   userProfile: Joi.object({
     userId: Joi.number().integer().positive().required(),
-    username: Joi.string().min(3).max(30).pattern(/^[a-zA-Z0-9_-]+$/)
-      .optional(),
+    username: Joi.string().min(3).max(30).pattern(/^[a-zA-Z0-9_-]+$/).optional(),
     firstName: Joi.string().min(1).max(50).required(),
     lastName: Joi.string().min(1).max(50).optional(),
     email: Joi.string().email().optional(),
-    age: Joi.number().integer().min(18).max(120)
-      .required(),
+    age: Joi.number().integer().min(18).max(120).required(),
     bio: Joi.string().max(500).optional(),
     interests: Joi.array().items(Joi.string().max(50)).max(10).optional(),
     language: Joi.string().valid('en', 'es').default('en'),
   }),
-
-  // User profile update schema (for partial updates)
-  userProfileUpdate: Joi.object({
-    userId: Joi.number().integer().positive().optional(),
-    username: Joi.string().min(3).max(30).pattern(/^[a-zA-Z0-9_-]+$/)
-      .optional(),
-    firstName: Joi.string().min(1).max(50).optional(),
-    lastName: Joi.string().min(1).max(50).optional(),
-    email: Joi.string().email().optional().allow(null, ''),
-    age: Joi.number().integer().min(18).max(120).optional(),
-    bio: Joi.string().max(500).optional().allow(''),
-    interests: Joi.array().items(Joi.string().max(50)).max(10).optional(),
-    photoFileId: Joi.string().optional(),
-    language: Joi.string().valid('en', 'es').optional(),
-    onboardingComplete: Joi.boolean().optional(),
-  }).min(1),
 
   // Location schema
   location: Joi.object({
@@ -157,8 +138,7 @@ const schemas = {
   zoomRoom: Joi.object({
     roomName: Joi.string().min(3).max(100).required(),
     privacy: Joi.string().valid('public', 'private').required(),
-    duration: Joi.number().integer().min(15).max(480)
-      .default(60),
+    duration: Joi.number().integer().min(15).max(480).default(60),
     password: Joi.string().min(6).max(20).optional(),
   }),
 

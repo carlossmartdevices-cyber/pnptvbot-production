@@ -11,15 +11,11 @@ module.exports = {
   ],
   coverageThreshold: {
     global: {
-      branches: 5,
-      functions: 10,
-      lines: 8,
-      statements: 8,
+      branches: 70,
+      functions: 70,
+      lines: 70,
+      statements: 70,
     },
   },
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
-  testTimeout: 30000,
-  forceExit: true,
-  detectOpenHandles: false,
-  maxWorkers: '50%',
 };

@@ -1,6 +1,14 @@
-const { query } = require('../config/postgres');
+const { getFirestore } = require('../config/firebase');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
+
+const COLLECTIONS = {
+  GROUP_SETTINGS: 'groupSettings',
+  USER_WARNINGS: 'userWarnings',
+  BANNED_USERS: 'bannedUsers',
+  MODERATION_LOGS: 'moderationLogs',
+  USERNAME_HISTORY: 'usernameHistory',
+};
 
 /**
  * Moderation Model - Handles all moderation data operations
@@ -20,12 +28,10 @@ class ModerationModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query(
-            'SELECT * FROM group_settings WHERE group_id = $1',
-            [groupId.toString()]
-          );
+          const db = getFirestore();
+          const doc = await db.collection(COLLECTIONS.GROUP_SETTINGS).doc(groupId.toString()).get();
 
-          if (result.rows.length === 0) {
+          if (!doc.exists) {
             // Create default settings
             const defaultSettings = {
               groupId: groupId.toString(),
@@ -43,49 +49,15 @@ class ModerationModel {
               updatedAt: new Date(),
             };
 
-            await query(
-              `INSERT INTO group_settings (group_id, anti_links_enabled, anti_spam_enabled,
-               anti_flood_enabled, profanity_filter_enabled, max_warnings, flood_limit,
-               flood_window, mute_duration, allowed_domains, banned_words, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-              [
-                defaultSettings.groupId,
-                defaultSettings.antiLinksEnabled,
-                defaultSettings.antiSpamEnabled,
-                defaultSettings.antiFloodEnabled,
-                defaultSettings.profanityFilterEnabled,
-                defaultSettings.maxWarnings,
-                defaultSettings.floodLimit,
-                defaultSettings.floodWindow,
-                defaultSettings.muteDuration,
-                defaultSettings.allowedDomains,
-                defaultSettings.bannedWords,
-                defaultSettings.createdAt,
-                defaultSettings.updatedAt,
-              ]
-            );
+            await db.collection(COLLECTIONS.GROUP_SETTINGS)
+              .doc(groupId.toString())
+              .set(defaultSettings);
 
             logger.info('Created default group settings', { groupId });
             return defaultSettings;
           }
 
-          const row = result.rows[0];
-          return {
-            id: row.id,
-            groupId: row.group_id,
-            antiLinksEnabled: row.anti_links_enabled,
-            antiSpamEnabled: row.anti_spam_enabled,
-            antiFloodEnabled: row.anti_flood_enabled,
-            profanityFilterEnabled: row.profanity_filter_enabled,
-            maxWarnings: row.max_warnings,
-            floodLimit: row.flood_limit,
-            floodWindow: row.flood_window,
-            muteDuration: row.mute_duration,
-            allowedDomains: row.allowed_domains || [],
-            bannedWords: row.banned_words || [],
-            createdAt: row.created_at,
-            updatedAt: row.updated_at,
-          };
+          return { id: doc.id, ...doc.data() };
         },
         600, // Cache for 10 minutes
       );
@@ -103,47 +75,13 @@ class ModerationModel {
    */
   static async updateGroupSettings(groupId, updates) {
     try {
-      // Map camelCase to snake_case for database columns
-      const fieldMap = {
-        antiLinksEnabled: 'anti_links_enabled',
-        antiSpamEnabled: 'anti_spam_enabled',
-        antiFloodEnabled: 'anti_flood_enabled',
-        profanityFilterEnabled: 'profanity_filter_enabled',
-        maxWarnings: 'max_warnings',
-        floodLimit: 'flood_limit',
-        floodWindow: 'flood_window',
-        muteDuration: 'mute_duration',
-        allowedDomains: 'allowed_domains',
-        bannedWords: 'banned_words',
-      };
+      const db = getFirestore();
+      const groupRef = db.collection(COLLECTIONS.GROUP_SETTINGS).doc(groupId.toString());
 
-      const dbFields = [];
-      const values = [];
-      let paramIndex = 1;
-
-      Object.keys(updates).forEach((key) => {
-        const dbField = fieldMap[key] || key;
-        dbFields.push(`${dbField} = $${paramIndex}`);
-        values.push(updates[key]);
-        paramIndex++;
+      await groupRef.update({
+        ...updates,
+        updatedAt: new Date(),
       });
-
-      if (dbFields.length === 0) {
-        return true;
-      }
-
-      // Add updated_at
-      dbFields.push(`updated_at = $${paramIndex}`);
-      values.push(new Date());
-      paramIndex++;
-
-      // Add groupId for WHERE clause
-      values.push(groupId.toString());
-
-      await query(
-        `UPDATE group_settings SET ${dbFields.join(', ')} WHERE group_id = $${paramIndex}`,
-        values
-      );
 
       // Invalidate cache
       await cache.del(`moderation:settings:${groupId}`);
@@ -166,35 +104,15 @@ class ModerationModel {
    */
   static async getUserWarnings(userId, groupId) {
     try {
-      const result = await query(
-        `SELECT * FROM user_warnings
-         WHERE user_id = $1 AND group_id = $2
-         ORDER BY timestamp DESC`,
-        [userId.toString(), groupId.toString()]
-      );
+      const db = getFirestore();
+      const docId = `${groupId}_${userId}`;
+      const doc = await db.collection(COLLECTIONS.USER_WARNINGS).doc(docId).get();
 
-      if (result.rows.length === 0) {
+      if (!doc.exists) {
         return null;
       }
 
-      // Aggregate warnings into the expected format
-      const warnings = result.rows.map(row => ({
-        reason: row.reason,
-        details: row.details,
-        timestamp: row.timestamp,
-      }));
-
-      const lastWarning = result.rows[0];
-
-      return {
-        id: `${groupId}_${userId}`,
-        userId: userId.toString(),
-        groupId: groupId.toString(),
-        warnings,
-        totalWarnings: result.rows.length,
-        lastWarningAt: lastWarning.timestamp,
-        createdAt: result.rows[result.rows.length - 1].timestamp,
-      };
+      return { id: doc.id, ...doc.data() };
     } catch (error) {
       logger.error('Error getting user warnings:', error);
       return null;
@@ -211,19 +129,48 @@ class ModerationModel {
    */
   static async addWarning(userId, groupId, reason, details = '') {
     try {
-      const timestamp = new Date();
+      const db = getFirestore();
+      const docId = `${groupId}_${userId}`;
+      const warningRef = db.collection(COLLECTIONS.USER_WARNINGS).doc(docId);
 
-      // Insert new warning
-      await query(
-        `INSERT INTO user_warnings (user_id, group_id, reason, details, timestamp)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [userId.toString(), groupId.toString(), reason, details, timestamp]
-      );
+      const warning = {
+        reason,
+        details,
+        timestamp: new Date(),
+      };
 
-      logger.info('Warning added to user', { userId, groupId, reason });
+      const doc = await warningRef.get();
 
-      // Return updated warnings data
-      return await this.getUserWarnings(userId, groupId);
+      if (!doc.exists) {
+        // Create new warnings document
+        const newData = {
+          userId: userId.toString(),
+          groupId: groupId.toString(),
+          warnings: [warning],
+          totalWarnings: 1,
+          lastWarningAt: new Date(),
+          createdAt: new Date(),
+        };
+
+        await warningRef.set(newData);
+        logger.info('Created user warnings', { userId, groupId, reason });
+        return newData;
+      }
+
+      // Add to existing warnings
+      const currentData = doc.data();
+      const updatedWarnings = [...currentData.warnings, warning];
+
+      const updatedData = {
+        warnings: updatedWarnings,
+        totalWarnings: updatedWarnings.length,
+        lastWarningAt: new Date(),
+      };
+
+      await warningRef.update(updatedData);
+
+      logger.info('Warning added to user', { userId, groupId, reason, total: updatedWarnings.length });
+      return { ...currentData, ...updatedData };
     } catch (error) {
       logger.error('Error adding warning:', error);
       throw error;
@@ -238,10 +185,10 @@ class ModerationModel {
    */
   static async clearWarnings(userId, groupId) {
     try {
-      await query(
-        'DELETE FROM user_warnings WHERE user_id = $1 AND group_id = $2',
-        [userId.toString(), groupId.toString()]
-      );
+      const db = getFirestore();
+      const docId = `${groupId}_${userId}`;
+
+      await db.collection(COLLECTIONS.USER_WARNINGS).doc(docId).delete();
 
       logger.info('User warnings cleared', { userId, groupId });
       return true;
@@ -259,29 +206,17 @@ class ModerationModel {
    */
   static async getGroupWarnings(groupId, limit = 50) {
     try {
-      // Get all warnings for the group, grouped by user
-      const result = await query(
-        `SELECT user_id, group_id,
-                array_agg(json_build_object('reason', reason, 'details', details, 'timestamp', timestamp)
-                         ORDER BY timestamp DESC) as warnings,
-                COUNT(*) as total_warnings,
-                MAX(timestamp) as last_warning_at
-         FROM user_warnings
-         WHERE group_id = $1
-         GROUP BY user_id, group_id
-         ORDER BY MAX(timestamp) DESC
-         LIMIT $2`,
-        [groupId.toString(), limit]
-      );
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTIONS.USER_WARNINGS)
+        .where('groupId', '==', groupId.toString())
+        .orderBy('lastWarningAt', 'desc')
+        .limit(limit)
+        .get();
 
-      const warnings = result.rows.map(row => ({
-        id: `${row.group_id}_${row.user_id}`,
-        userId: row.user_id,
-        groupId: row.group_id,
-        warnings: row.warnings,
-        totalWarnings: parseInt(row.total_warnings),
-        lastWarningAt: row.last_warning_at,
-      }));
+      const warnings = [];
+      snapshot.forEach((doc) => {
+        warnings.push({ id: doc.id, ...doc.data() });
+      });
 
       return warnings;
     } catch (error) {
@@ -302,30 +237,23 @@ class ModerationModel {
    */
   static async banUser(userId, groupId, reason, bannedBy) {
     try {
-      const bannedAt = new Date();
+      const db = getFirestore();
+      const docId = `${groupId}_${userId}`;
 
       const banData = {
         userId: userId.toString(),
         groupId: groupId.toString(),
         reason,
         bannedBy: bannedBy.toString(),
-        bannedAt,
+        bannedAt: new Date(),
       };
 
-      await query(
-        `INSERT INTO banned_users (user_id, group_id, reason, banned_by, banned_at)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (user_id, group_id) DO UPDATE
-         SET reason = $3, banned_by = $4, banned_at = $5`,
-        [banData.userId, banData.groupId, reason, banData.bannedBy, bannedAt]
-      );
+      await db.collection(COLLECTIONS.BANNED_USERS).doc(docId).set(banData);
 
       // Clear warnings when banned
       await this.clearWarnings(userId, groupId);
 
-      logger.info('User banned', {
-        userId, groupId, reason, bannedBy,
-      });
+      logger.info('User banned', { userId, groupId, reason, bannedBy });
       return banData;
     } catch (error) {
       logger.error('Error banning user:', error);
@@ -341,10 +269,10 @@ class ModerationModel {
    */
   static async unbanUser(userId, groupId) {
     try {
-      await query(
-        'DELETE FROM banned_users WHERE user_id = $1 AND group_id = $2',
-        [userId.toString(), groupId.toString()]
-      );
+      const db = getFirestore();
+      const docId = `${groupId}_${userId}`;
+
+      await db.collection(COLLECTIONS.BANNED_USERS).doc(docId).delete();
 
       logger.info('User unbanned', { userId, groupId });
       return true;
@@ -362,12 +290,11 @@ class ModerationModel {
    */
   static async isUserBanned(userId, groupId) {
     try {
-      const result = await query(
-        'SELECT 1 FROM banned_users WHERE user_id = $1 AND group_id = $2',
-        [userId.toString(), groupId.toString()]
-      );
+      const db = getFirestore();
+      const docId = `${groupId}_${userId}`;
+      const doc = await db.collection(COLLECTIONS.BANNED_USERS).doc(docId).get();
 
-      return result.rows.length > 0;
+      return doc.exists;
     } catch (error) {
       logger.error('Error checking if user is banned:', error);
       return false;
@@ -381,21 +308,16 @@ class ModerationModel {
    */
   static async getBannedUsers(groupId) {
     try {
-      const result = await query(
-        `SELECT * FROM banned_users
-         WHERE group_id = $1
-         ORDER BY banned_at DESC`,
-        [groupId.toString()]
-      );
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTIONS.BANNED_USERS)
+        .where('groupId', '==', groupId.toString())
+        .orderBy('bannedAt', 'desc')
+        .get();
 
-      const bannedUsers = result.rows.map(row => ({
-        id: `${row.group_id}_${row.user_id}`,
-        userId: row.user_id,
-        groupId: row.group_id,
-        reason: row.reason,
-        bannedBy: row.banned_by,
-        bannedAt: row.banned_at,
-      }));
+      const bannedUsers = [];
+      snapshot.forEach((doc) => {
+        bannedUsers.push({ id: doc.id, ...doc.data() });
+      });
 
       return bannedUsers;
     } catch (error) {
@@ -413,26 +335,22 @@ class ModerationModel {
    */
   static async addLog(logData) {
     try {
+      const db = getFirestore();
+
       const log = {
         action: logData.action,
-        userId: logData.userId?.toString() || null,
-        groupId: logData.groupId?.toString() || null,
+        userId: logData.userId?.toString(),
+        groupId: logData.groupId?.toString(),
         reason: logData.reason || '',
         details: logData.details || '',
         moderatorId: logData.moderatorId?.toString() || 'system',
         timestamp: new Date(),
       };
 
-      const result = await query(
-        `INSERT INTO moderation_logs (action, user_id, group_id, reason, details, moderator_id, timestamp)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id`,
-        [log.action, log.userId, log.groupId, log.reason, log.details, log.moderatorId, log.timestamp]
-      );
+      const docRef = await db.collection(COLLECTIONS.MODERATION_LOGS).add(log);
 
-      const logId = result.rows[0].id;
-      logger.info('Moderation log added', { logId, action: log.action });
-      return logId.toString();
+      logger.info('Moderation log added', { logId: docRef.id, action: log.action });
+      return docRef.id;
     } catch (error) {
       logger.error('Error adding moderation log:', error);
       throw error;
@@ -447,24 +365,17 @@ class ModerationModel {
    */
   static async getGroupLogs(groupId, limit = 50) {
     try {
-      const result = await query(
-        `SELECT * FROM moderation_logs
-         WHERE group_id = $1
-         ORDER BY timestamp DESC
-         LIMIT $2`,
-        [groupId.toString(), limit]
-      );
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTIONS.MODERATION_LOGS)
+        .where('groupId', '==', groupId.toString())
+        .orderBy('timestamp', 'desc')
+        .limit(limit)
+        .get();
 
-      const logs = result.rows.map(row => ({
-        id: row.id.toString(),
-        action: row.action,
-        userId: row.user_id,
-        groupId: row.group_id,
-        reason: row.reason,
-        details: row.details,
-        moderatorId: row.moderator_id,
-        timestamp: row.timestamp,
-      }));
+      const logs = [];
+      snapshot.forEach((doc) => {
+        logs.push({ id: doc.id, ...doc.data() });
+      });
 
       return logs;
     } catch (error) {
@@ -482,24 +393,18 @@ class ModerationModel {
    */
   static async getUserLogs(userId, groupId, limit = 20) {
     try {
-      const result = await query(
-        `SELECT * FROM moderation_logs
-         WHERE group_id = $1 AND user_id = $2
-         ORDER BY timestamp DESC
-         LIMIT $3`,
-        [groupId.toString(), userId.toString(), limit]
-      );
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTIONS.MODERATION_LOGS)
+        .where('groupId', '==', groupId.toString())
+        .where('userId', '==', userId.toString())
+        .orderBy('timestamp', 'desc')
+        .limit(limit)
+        .get();
 
-      const logs = result.rows.map(row => ({
-        id: row.id.toString(),
-        action: row.action,
-        userId: row.user_id,
-        groupId: row.group_id,
-        reason: row.reason,
-        details: row.details,
-        moderatorId: row.moderator_id,
-        timestamp: row.timestamp,
-      }));
+      const logs = [];
+      snapshot.forEach((doc) => {
+        logs.push({ id: doc.id, ...doc.data() });
+      });
 
       return logs;
     } catch (error) {
@@ -520,40 +425,40 @@ class ModerationModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          // Get total warnings count
-          const warningsResult = await query(
-            'SELECT COUNT(*) as total FROM user_warnings WHERE group_id = $1',
-            [groupId.toString()]
-          );
-          const totalWarnings = parseInt(warningsResult.rows[0].total);
+          const db = getFirestore();
 
-          // Get number of users with warnings
-          const usersWithWarningsResult = await query(
-            'SELECT COUNT(DISTINCT user_id) as count FROM user_warnings WHERE group_id = $1',
-            [groupId.toString()]
-          );
-          const usersWithWarnings = parseInt(usersWithWarningsResult.rows[0].count);
+          // Get total warnings
+          const warningsSnapshot = await db.collection(COLLECTIONS.USER_WARNINGS)
+            .where('groupId', '==', groupId.toString())
+            .get();
+
+          let totalWarnings = 0;
+          warningsSnapshot.forEach((doc) => {
+            totalWarnings += doc.data().totalWarnings || 0;
+          });
 
           // Get total bans
-          const bansResult = await query(
-            'SELECT COUNT(*) as total FROM banned_users WHERE group_id = $1',
-            [groupId.toString()]
-          );
-          const totalBans = parseInt(bansResult.rows[0].total);
+          const bansSnapshot = await db.collection(COLLECTIONS.BANNED_USERS)
+            .where('groupId', '==', groupId.toString())
+            .count()
+            .get();
+
+          const totalBans = bansSnapshot.data().count;
 
           // Get recent actions (last 24 hours)
           const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-          const recentLogsResult = await query(
-            'SELECT COUNT(*) as total FROM moderation_logs WHERE group_id = $1 AND timestamp >= $2',
-            [groupId.toString(), yesterday]
-          );
-          const recentActions = parseInt(recentLogsResult.rows[0].total);
+          const recentLogsSnapshot = await db.collection(COLLECTIONS.MODERATION_LOGS)
+            .where('groupId', '==', groupId.toString())
+            .where('timestamp', '>=', yesterday)
+            .get();
+
+          const recentActions = recentLogsSnapshot.size;
 
           const stats = {
             totalWarnings,
             totalBans,
             recentActions,
-            usersWithWarnings,
+            usersWithWarnings: warningsSnapshot.size,
             timestamp: new Date().toISOString(),
           };
 
@@ -602,16 +507,18 @@ class ModerationModel {
    */
   static async recordUsernameChange(userId, oldUsername, newUsername, groupId = null) {
     try {
-      const changedAt = new Date();
+      const db = getFirestore();
 
-      const result = await query(
-        `INSERT INTO username_history (user_id, old_username, new_username, group_id, changed_at, flagged)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id`,
-        [userId.toString(), oldUsername || null, newUsername || null, groupId ? groupId.toString() : null, changedAt, false]
-      );
+      const record = {
+        userId: userId.toString(),
+        oldUsername: oldUsername || null,
+        newUsername: newUsername || null,
+        groupId: groupId ? groupId.toString() : null,
+        changedAt: new Date(),
+        flagged: false, // Can be flagged by admins if suspicious
+      };
 
-      const recordId = result.rows[0].id.toString();
+      const docRef = await db.collection(COLLECTIONS.USERNAME_HISTORY).add(record);
 
       // Also log it
       await this.addLog({
@@ -627,10 +534,10 @@ class ModerationModel {
         oldUsername,
         newUsername,
         groupId,
-        recordId,
+        recordId: docRef.id,
       });
 
-      return recordId;
+      return docRef.id;
     } catch (error) {
       logger.error('Error recording username change:', error);
       throw error;
@@ -645,26 +552,17 @@ class ModerationModel {
    */
   static async getUsernameHistory(userId, limit = 20) {
     try {
-      const result = await query(
-        `SELECT * FROM username_history
-         WHERE user_id = $1
-         ORDER BY changed_at DESC
-         LIMIT $2`,
-        [userId.toString(), limit]
-      );
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTIONS.USERNAME_HISTORY)
+        .where('userId', '==', userId.toString())
+        .orderBy('changedAt', 'desc')
+        .limit(limit)
+        .get();
 
-      const history = result.rows.map(row => ({
-        id: row.id.toString(),
-        userId: row.user_id,
-        oldUsername: row.old_username,
-        newUsername: row.new_username,
-        groupId: row.group_id,
-        changedAt: row.changed_at,
-        flagged: row.flagged,
-        flaggedBy: row.flagged_by,
-        flaggedAt: row.flagged_at,
-        flagReason: row.flag_reason,
-      }));
+      const history = [];
+      snapshot.forEach((doc) => {
+        history.push({ id: doc.id, ...doc.data() });
+      });
 
       return history;
     } catch (error) {
@@ -681,26 +579,17 @@ class ModerationModel {
    */
   static async getRecentUsernameChanges(groupId, limit = 50) {
     try {
-      const result = await query(
-        `SELECT * FROM username_history
-         WHERE group_id = $1
-         ORDER BY changed_at DESC
-         LIMIT $2`,
-        [groupId.toString(), limit]
-      );
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTIONS.USERNAME_HISTORY)
+        .where('groupId', '==', groupId.toString())
+        .orderBy('changedAt', 'desc')
+        .limit(limit)
+        .get();
 
-      const changes = result.rows.map(row => ({
-        id: row.id.toString(),
-        userId: row.user_id,
-        oldUsername: row.old_username,
-        newUsername: row.new_username,
-        groupId: row.group_id,
-        changedAt: row.changed_at,
-        flagged: row.flagged,
-        flaggedBy: row.flagged_by,
-        flaggedAt: row.flagged_at,
-        flagReason: row.flag_reason,
-      }));
+      const changes = [];
+      snapshot.forEach((doc) => {
+        changes.push({ id: doc.id, ...doc.data() });
+      });
 
       return changes;
     } catch (error) {
@@ -718,12 +607,13 @@ class ModerationModel {
    */
   static async flagUsernameChange(recordId, flaggedBy, reason = '') {
     try {
-      await query(
-        `UPDATE username_history
-         SET flagged = $1, flagged_by = $2, flagged_at = $3, flag_reason = $4
-         WHERE id = $5`,
-        [true, flaggedBy.toString(), new Date(), reason, recordId]
-      );
+      const db = getFirestore();
+      await db.collection(COLLECTIONS.USERNAME_HISTORY).doc(recordId).update({
+        flagged: true,
+        flaggedBy: flaggedBy.toString(),
+        flaggedAt: new Date(),
+        flagReason: reason,
+      });
 
       logger.info('Username change flagged', { recordId, flaggedBy, reason });
       return true;
@@ -740,37 +630,21 @@ class ModerationModel {
    */
   static async getFlaggedUsernameChanges(groupId = null) {
     try {
-      let result;
+      const db = getFirestore();
+      let query = db.collection(COLLECTIONS.USERNAME_HISTORY)
+        .where('flagged', '==', true)
+        .orderBy('flaggedAt', 'desc');
+
       if (groupId) {
-        result = await query(
-          `SELECT * FROM username_history
-           WHERE flagged = true AND group_id = $1
-           ORDER BY flagged_at DESC
-           LIMIT 100`,
-          [groupId.toString()]
-        );
-      } else {
-        result = await query(
-          `SELECT * FROM username_history
-           WHERE flagged = true
-           ORDER BY flagged_at DESC
-           LIMIT 100`,
-          []
-        );
+        query = query.where('groupId', '==', groupId.toString());
       }
 
-      const flagged = result.rows.map(row => ({
-        id: row.id.toString(),
-        userId: row.user_id,
-        oldUsername: row.old_username,
-        newUsername: row.new_username,
-        groupId: row.group_id,
-        changedAt: row.changed_at,
-        flagged: row.flagged,
-        flaggedBy: row.flagged_by,
-        flaggedAt: row.flagged_at,
-        flagReason: row.flag_reason,
-      }));
+      const snapshot = await query.limit(100).get();
+
+      const flagged = [];
+      snapshot.forEach((doc) => {
+        flagged.push({ id: doc.id, ...doc.data() });
+      });
 
       return flagged;
     } catch (error) {
@@ -787,127 +661,18 @@ class ModerationModel {
    */
   static async hasRecentUsernameChange(userId, hours = 24) {
     try {
+      const db = getFirestore();
       const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-      const result = await query(
-        `SELECT 1 FROM username_history
-         WHERE user_id = $1 AND changed_at >= $2
-         LIMIT 1`,
-        [userId.toString(), since]
-      );
+      const snapshot = await db.collection(COLLECTIONS.USERNAME_HISTORY)
+        .where('userId', '==', userId.toString())
+        .where('changedAt', '>=', since)
+        .limit(1)
+        .get();
 
-      return result.rows.length > 0;
+      return !snapshot.empty;
     } catch (error) {
       logger.error('Error checking recent username change:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Count recent username changes for a user
-   * @param {number|string} userId - User ID
-   * @param {number} hours - Time window in hours
-   * @returns {Promise<number>} Number of changes
-   */
-  static async countRecentUsernameChanges(userId, hours = 24) {
-    try {
-      const since = new Date(Date.now() - hours * 60 * 60 * 1000);
-
-      const result = await query(
-        `SELECT COUNT(*) as count FROM username_history
-         WHERE user_id = $1 AND changed_at >= $2`,
-        [userId.toString(), since]
-      );
-
-      return parseInt(result.rows[0]?.count || 0, 10);
-    } catch (error) {
-      logger.error('Error counting recent username changes:', error);
-      return 0;
-    }
-  }
-
-  /**
-   * Get non-compliant users in a group
-   * @param {number|string} groupId - Group ID
-   * @returns {Promise<Array>} Non-compliant users with pending warning
-   */
-  static async getNonCompliantUsers(groupId) {
-    try {
-      const result = await query(
-        `SELECT * FROM profile_compliance
-         WHERE group_id = $1 AND warning_sent_at IS NOT NULL AND compliance_met_at IS NULL
-         ORDER BY purge_deadline ASC`,
-        [groupId.toString()]
-      );
-
-      return result.rows.map(row => ({
-        id: row.id.toString(),
-        userId: row.user_id,
-        groupId: row.group_id,
-        usernameValid: row.username_valid,
-        nameValid: row.name_valid,
-        complianceIssues: row.compliance_issues,
-        warningSentAt: row.warning_sent_at,
-        warningCount: row.warning_count,
-        purgeDeadline: row.purge_deadline,
-        purged: row.purged,
-        purgedAt: row.purged_at,
-        complianceMet: row.compliance_met_at,
-        createdAt: row.created_at,
-      }));
-    } catch (error) {
-      logger.error('Error getting non-compliant users:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get all users pending purge (deadline passed, not purged yet)
-   * @returns {Promise<Array>} Users pending purge
-   */
-  static async getUsersPendingPurge() {
-    try {
-      const now = new Date();
-
-      const result = await query(
-        `SELECT * FROM profile_compliance
-         WHERE purge_deadline <= $1 AND purged = false AND compliance_met_at IS NULL
-         ORDER BY purge_deadline ASC`,
-        [now]
-      );
-
-      return result.rows.map(row => ({
-        id: row.id.toString(),
-        userId: row.user_id,
-        groupId: row.group_id,
-        complianceIssues: row.compliance_issues,
-        purgeDeadline: row.purge_deadline,
-      }));
-    } catch (error) {
-      logger.error('Error getting users pending purge:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Mark user compliance as met
-   * @param {number|string} userId - User ID
-   * @param {number|string} groupId - Group ID
-   * @returns {Promise<boolean>} Success status
-   */
-  static async markComplianceMet(userId, groupId) {
-    try {
-      await query(
-        `UPDATE profile_compliance
-         SET compliance_met_at = $1, username_valid = true, name_valid = true
-         WHERE user_id = $2 AND group_id = $3`,
-        [new Date(), userId.toString(), groupId.toString()]
-      );
-
-      logger.info('User marked as compliant', { userId, groupId });
-      return true;
-    } catch (error) {
-      logger.error('Error marking compliance as met:', error);
       return false;
     }
   }

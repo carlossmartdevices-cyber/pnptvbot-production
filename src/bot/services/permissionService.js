@@ -5,57 +5,23 @@ const logger = require('../../utils/logger');
 
 /**
  * Permission Service - Handles permission checks and role management
- *
- * SECURITY: Admin/superadmin status is ONLY determined by environment variables.
- * Database roles are ignored for admin/superadmin to prevent privilege escalation.
  */
 class PermissionService {
   /**
-   * Get admin user IDs from environment variables
-   * @returns {Array<string>} Array of admin user IDs
-   */
-  static getEnvAdminIds() {
-    return (process.env.ADMIN_USER_IDS || '').split(',').map(id => id.trim()).filter(id => id);
-  }
-
-  /**
-   * Get super admin user ID from environment variable
-   * @returns {string|null} Super admin user ID
-   */
-  static getEnvSuperAdminId() {
-    return process.env.ADMIN_ID?.trim() || null;
-  }
-
-  /**
-   * Check if user is super admin (ONLY from env var)
-   * @param {number|string} userId - User ID
-   * @returns {boolean} True if user is super admin
-   */
-  static isEnvSuperAdmin(userId) {
-    const superAdminId = this.getEnvSuperAdminId();
-    return superAdminId && userId.toString() === superAdminId;
-  }
-
-  /**
-   * Check if user is admin (from env vars)
-   * @param {number|string} userId - User ID
-   * @returns {boolean} True if user is in admin list
-   */
-  static isEnvAdmin(userId) {
-    const adminIds = this.getEnvAdminIds();
-    return adminIds.includes(userId.toString());
-  }
-  /**
    * Check if user has a specific permission
-   * SECURITY: Properly checks env-based admin roles first
    * @param {number|string} userId - User ID
    * @param {string} permission - Permission to check
    * @returns {Promise<boolean>} True if user has permission
    */
   static async hasPermission(userId, permission) {
     try {
-      // Use getUserRole() which properly checks env vars first
-      const userRole = await this.getUserRole(userId);
+      const user = await UserModel.getById(userId);
+      if (!user) {
+        logger.warn(`User not found for permission check: ${userId}`);
+        return false;
+      }
+
+      const userRole = user.role || 'user';
       const hasPermission = PermissionModel.roleHasPermission(userRole, permission);
 
       logger.debug(`Permission check: ${userId} (${userRole}) - ${permission}: ${hasPermission}`);
@@ -68,15 +34,18 @@ class PermissionService {
 
   /**
    * Check if user has any of the given permissions
-   * SECURITY: Properly checks env-based admin roles first
    * @param {number|string} userId - User ID
    * @param {Array<string>} permissions - Permissions to check
    * @returns {Promise<boolean>} True if user has at least one permission
    */
   static async hasAnyPermission(userId, permissions) {
     try {
-      // Use getUserRole() which properly checks env vars first
-      const userRole = await this.getUserRole(userId);
+      const user = await UserModel.getById(userId);
+      if (!user) {
+        return false;
+      }
+
+      const userRole = user.role || 'user';
       return PermissionModel.roleHasAnyPermission(userRole, permissions);
     } catch (error) {
       logger.error('Error checking any permission:', error);
@@ -86,15 +55,18 @@ class PermissionService {
 
   /**
    * Check if user has all of the given permissions
-   * SECURITY: Properly checks env-based admin roles first
    * @param {number|string} userId - User ID
    * @param {Array<string>} permissions - Permissions to check
    * @returns {Promise<boolean>} True if user has all permissions
    */
   static async hasAllPermissions(userId, permissions) {
     try {
-      // Use getUserRole() which properly checks env vars first
-      const userRole = await this.getUserRole(userId);
+      const user = await UserModel.getById(userId);
+      if (!user) {
+        return false;
+      }
+
+      const userRole = user.role || 'user';
       return PermissionModel.roleHasAllPermissions(userRole, permissions);
     } catch (error) {
       logger.error('Error checking all permissions:', error);
@@ -104,33 +76,13 @@ class PermissionService {
 
   /**
    * Get user's role
-   * SECURITY: Admin/superadmin roles are ONLY determined by environment variables
    * @param {number|string} userId - User ID
    * @returns {Promise<string>} User role
    */
   static async getUserRole(userId) {
     try {
-      // SECURITY: Check env vars first for admin/superadmin
-      if (this.isEnvSuperAdmin(userId)) {
-        return 'superadmin';
-      }
-      if (this.isEnvAdmin(userId)) {
-        return 'admin';
-      }
-
-      // For non-admin users, check database for moderator and performer roles
       const user = await UserModel.getById(userId);
-      const dbRole = user?.role || 'user';
-
-      // Only allow moderator and performer roles from database, not admin/superadmin
-      if (dbRole === 'moderator') {
-        return 'moderator';
-      }
-      if (dbRole === 'performer') {
-        return 'performer';
-      }
-
-      return 'user';
+      return user?.role || 'user';
     } catch (error) {
       logger.error('Error getting user role:', error);
       return 'user';
@@ -139,20 +91,13 @@ class PermissionService {
 
   /**
    * Check if user is admin (any admin role)
-   * SECURITY: Admin/superadmin status ONLY from env vars
    * @param {number|string} userId - User ID
    * @returns {Promise<boolean>} True if user is admin
    */
   static async isAdmin(userId) {
     try {
-      // SECURITY: Only env vars determine admin/superadmin
-      if (this.isEnvSuperAdmin(userId) || this.isEnvAdmin(userId)) {
-        return true;
-      }
-
-      // Check for moderator role from database (performer is not admin)
       const role = await this.getUserRole(userId);
-      return role === 'moderator';
+      return PermissionModel.isAdminRole(role);
     } catch (error) {
       logger.error('Error checking if user is admin:', error);
       return false;
@@ -161,13 +106,17 @@ class PermissionService {
 
   /**
    * Check if user is super admin
-   * SECURITY: ONLY determined by ADMIN_ID environment variable
    * @param {number|string} userId - User ID
    * @returns {Promise<boolean>} True if user is super admin
    */
   static async isSuperAdmin(userId) {
-    // SECURITY: Only env var determines super admin
-    return this.isEnvSuperAdmin(userId);
+    try {
+      const role = await this.getUserRole(userId);
+      return role === 'superadmin';
+    } catch (error) {
+      logger.error('Error checking if user is super admin:', error);
+      return false;
+    }
   }
 
   /**
@@ -184,15 +133,6 @@ class PermissionService {
         return {
           success: false,
           message: `Invalid role: ${role}`,
-        };
-      }
-
-      // SECURITY: Block assignment of admin/superadmin roles via bot
-      // These can ONLY be set via environment variables
-      if (role === 'superadmin' || role === 'admin') {
-        return {
-          success: false,
-          message: `Cannot assign ${role} role. Admin roles are only configured via environment variables.`,
         };
       }
 
@@ -213,6 +153,14 @@ class PermissionService {
         return {
           success: false,
           message: 'User not found',
+        };
+      }
+
+      // Prevent assigning superadmin role (only manual DB update should do this)
+      if (role === 'superadmin' && assignerRole !== 'superadmin') {
+        return {
+          success: false,
+          message: 'Cannot assign super admin role',
         };
       }
 

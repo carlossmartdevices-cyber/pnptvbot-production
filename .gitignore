@@ -7,10 +7,6 @@ yarn.lock
 .env
 .env.local
 .env.production
-.env.lifetime-pass
-.env.*
-!.env.example
-!.env.*.example
 
 # Logs
 logs/
@@ -63,6 +59,3 @@ dump.rdb
 
 # Docker
 docker-compose.override.yml
-
-# Invoice PDFs (generated dynamically)
-invoices/*.pdf

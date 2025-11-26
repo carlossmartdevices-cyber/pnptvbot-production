@@ -53,14 +53,13 @@ class UserService {
       // Sanitize inputs
       const sanitized = sanitizeObject(updates, ['bio', 'username']);
 
-      // Validate using the partial update schema
+      // Validate
       const { error, value } = validateSchema(
-        sanitized,
-        schemas.userProfileUpdate,
+        { userId: parseInt(userId, 10), ...sanitized },
+        schemas.userProfile,
       );
 
       if (error) {
-        logger.warn('Profile update validation failed:', error);
         return { success: false, error, data: null };
       }
 
@@ -202,102 +201,16 @@ class UserService {
    */
   static async processExpiredSubscriptions() {
     try {
-      const { Telegraf } = require('telegraf');
-      const PlanModel = require('../../models/planModel');
-      const EmailService = require('../../services/emailService');
-      const bot = new Telegraf(process.env.BOT_TOKEN);
-      const primeChannels = (process.env.PRIME_CHANNEL_ID || '').split(',').map(id => id.trim()).filter(id => id);
-
       const expiredUsers = await UserModel.getExpiredSubscriptions();
 
       for (const user of expiredUsers) {
-        try {
-          // Update subscription status to expired
-          await UserModel.updateSubscription(user.id, {
-            status: 'expired',
-            planId: user.plan_id,
-            expiry: user.plan_expiry,
-          });
+        await UserModel.updateSubscription(user.id, {
+          status: 'expired',
+          planId: user.planId,
+          expiry: user.planExpiry,
+        });
 
-          logger.info('Subscription expired', { userId: user.id });
-
-          // Get plan name for messages
-          const plan = await PlanModel.getById(user.plan_id);
-          const planName = plan?.display_name || plan?.name || 'PRIME';
-
-          // Remove user from PRIME channels
-          for (const channelId of primeChannels) {
-            try {
-              await bot.telegram.banChatMember(channelId, user.id);
-              // Immediately unban so they can rejoin if they resubscribe
-              await bot.telegram.unbanChatMember(channelId, user.id);
-              logger.info('User removed from PRIME channel', { userId: user.id, channelId });
-            } catch (channelErr) {
-              logger.error('Error removing user from PRIME channel:', {
-                userId: user.id,
-                channelId,
-                error: channelErr.message
-              });
-            }
-          }
-
-          // Send farewell message via bot
-          try {
-            const farewellMessage = [
-              '💔 *Te vamos a extrañar*',
-              '',
-              `Hola ${user.first_name || 'Usuario'},`,
-              '',
-              `Tu suscripción *${planName}* ha expirado y has sido removido de los canales PRIME.`,
-              '',
-              '❌ *Has perdido acceso a:*',
-              '• Canales exclusivos PRIME',
-              '• Contenido premium sin publicidad',
-              '• Salas Zoom ilimitadas',
-              '• Transmisiones en vivo exclusivas',
-              '• Soporte prioritario',
-              '',
-              '🎁 *¡Vuelve a PRIME!*',
-              'Renueva hoy y recupera todos tus beneficios inmediatamente. Te estamos esperando.',
-              '',
-              '👉 Siempre serás bienvenido de vuelta. La familia PNPtv te extraña.'
-            ].join('\n');
-
-            await bot.telegram.sendMessage(user.id, farewellMessage, {
-              parse_mode: 'Markdown',
-              reply_markup: {
-                inline_keyboard: [[
-                  {
-                    text: '💎 Volver a PRIME',
-                    url: `${process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store'}/subscription/plans`
-                  }
-                ]]
-              }
-            });
-
-            logger.info('Sent farewell bot message', { userId: user.id });
-          } catch (botErr) {
-            logger.error('Error sending farewell bot message:', { userId: user.id, error: botErr.message });
-          }
-
-          // Send farewell email if user has email
-          if (user.email) {
-            try {
-              await EmailService.sendSubscriptionExpired({
-                email: user.email,
-                name: user.first_name || 'Usuario',
-                planName,
-                renewUrl: `${process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store'}/subscription/plans`
-              });
-
-              logger.info('Sent farewell email', { userId: user.id, email: user.email });
-            } catch (emailErr) {
-              logger.error('Error sending farewell email:', { userId: user.id, error: emailErr.message });
-            }
-          }
-        } catch (userErr) {
-          logger.error('Error processing expired user:', { userId: user.id, error: userErr.message });
-        }
+        logger.info('Subscription expired', { userId: user.id });
       }
 
       return expiredUsers.length;

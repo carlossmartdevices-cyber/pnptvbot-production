@@ -1,6 +1,4 @@
 name: CI/CD Pipeline
-permissions:
-  contents: read
 
 on:
   push:
@@ -26,14 +24,13 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run linter
         run: npm run lint
 
       - name: Run tests
         run: npm test
-        continue-on-error: true
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3

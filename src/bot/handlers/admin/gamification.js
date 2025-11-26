@@ -169,18 +169,22 @@ const showGamificationMenu = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
 
-    // Clear any ongoing admin tasks
-    ctx.session.temp = {};
-    await ctx.saveSession();
-
     const text = `${t('gamification.title', lang)}\n\n${t('gamification.description', lang)}`;
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('🏆 Ranking Semanal', 'gamification_weekly_leaderboard')],
-      [Markup.button.callback('🌟 Ranking Histórico', 'gamification_alltime_leaderboard')],
-      [Markup.button.callback('📊 Estadísticas', 'gamification_statistics')],
-      [Markup.button.callback('🏅 Gestión de Insignias', 'gamification_badges')],
-      [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+      [
+        Markup.button.callback(t('gamification.weeklyLeaderboard', lang), 'gamification_weekly_leaderboard'),
+      ],
+      [
+        Markup.button.callback(t('gamification.allTimeLeaderboard', lang), 'gamification_alltime_leaderboard'),
+      ],
+      [
+        Markup.button.callback(t('gamification.statistics', lang), 'gamification_statistics'),
+      ],
+      [
+        Markup.button.callback(t('gamification.badgeManagement', lang), 'gamification_badges'),
+      ],
+      [Markup.button.callback(t('back', lang), 'admin_panel')],
     ]);
 
     await ctx.editMessageText(text, keyboard);
@@ -200,7 +204,7 @@ const showWeeklyLeaderboard = async (ctx) => {
     if (!leaderboard || leaderboard.length === 0) {
       await ctx.editMessageText(
         t('gamification.noActivityThisWeek', lang),
-        Markup.inlineKeyboard([[Markup.button.callback('◀️ Volver', 'admin_gamification')]]),
+        Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'admin_gamification')]]),
       );
       return;
     }
@@ -221,8 +225,8 @@ const showWeeklyLeaderboard = async (ctx) => {
     }
 
     const keyboard = [
-      [Markup.button.callback('🔄 Actualizar', 'gamification_weekly_leaderboard')],
-      [Markup.button.callback('◀️ Volver', 'admin_gamification')],
+      [Markup.button.callback(t('refresh', lang), 'gamification_weekly_leaderboard')],
+      [Markup.button.callback(t('back', lang), 'admin_gamification')],
     ];
 
     await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
@@ -242,7 +246,7 @@ const showAllTimeLeaderboard = async (ctx) => {
     if (!leaderboard || leaderboard.length === 0) {
       await ctx.editMessageText(
         t('gamification.noActivity', lang),
-        Markup.inlineKeyboard([[Markup.button.callback('◀️ Volver', 'admin_gamification')]]),
+        Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'admin_gamification')]]),
       );
       return;
     }
@@ -263,8 +267,8 @@ const showAllTimeLeaderboard = async (ctx) => {
     }
 
     const keyboard = [
-      [Markup.button.callback('🔄 Actualizar', 'gamification_alltime_leaderboard')],
-      [Markup.button.callback('◀️ Volver', 'admin_gamification')],
+      [Markup.button.callback(t('refresh', lang), 'gamification_alltime_leaderboard')],
+      [Markup.button.callback(t('back', lang), 'admin_gamification')],
     ];
 
     await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
@@ -284,7 +288,7 @@ const showActivityStatistics = async (ctx) => {
     const allTimeBreakdown = await GamificationModel.getActivityBreakdown('alltime');
 
     let text = `📊 ${t('gamification.statistics', lang)}\n\n`;
-    text += '📅 **This Week:**\n';
+    text += `📅 **This Week:**\n`;
     text += `👥 Active Users: ${stats.activeUsersThisWeek}\n`;
     text += `💎 Total Points: ${weeklyBreakdown.totalPoints}\n`;
     text += `💬 Messages: ${weeklyBreakdown.totalMessages}\n`;
@@ -292,7 +296,7 @@ const showActivityStatistics = async (ctx) => {
     text += `👍 Likes: ${weeklyBreakdown.totalLikes}\n`;
     text += `🔄 Interactions: ${weeklyBreakdown.totalInteractions}\n\n`;
 
-    text += '🌍 **All Time:**\n';
+    text += `🌍 **All Time:**\n`;
     text += `💎 Total Points: ${allTimeBreakdown.totalPoints}\n`;
     text += `💬 Messages: ${allTimeBreakdown.totalMessages}\n`;
     text += `📤 Shares: ${allTimeBreakdown.totalShares}\n`;
@@ -300,8 +304,8 @@ const showActivityStatistics = async (ctx) => {
     text += `🔄 Interactions: ${allTimeBreakdown.totalInteractions}\n`;
 
     const keyboard = [
-      [Markup.button.callback('🔄 Actualizar', 'gamification_statistics')],
-      [Markup.button.callback('◀️ Volver', 'admin_gamification')],
+      [Markup.button.callback(t('refresh', lang), 'gamification_statistics')],
+      [Markup.button.callback(t('back', lang), 'admin_gamification')],
     ];
 
     await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
@@ -320,10 +324,10 @@ const showBadgeManagement = async (ctx) => {
     const text = `🏅 ${t('gamification.badgeManagement', lang)}\n\n${t('gamification.badgeDescription', lang)}`;
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('➕ Crear Insignia', 'gamification_create_badge')],
-      [Markup.button.callback('📋 Ver Insignias', 'gamification_list_badges')],
-      [Markup.button.callback('🎯 Asignar Insignia', 'gamification_assign_badge')],
-      [Markup.button.callback('◀️ Volver', 'admin_gamification')],
+      [Markup.button.callback(t('gamification.createBadge', lang), 'gamification_create_badge')],
+      [Markup.button.callback(t('gamification.listBadges', lang), 'gamification_list_badges')],
+      [Markup.button.callback(t('gamification.assignBadge', lang), 'gamification_assign_badge')],
+      [Markup.button.callback(t('back', lang), 'admin_gamification')],
     ]);
 
     await ctx.editMessageText(text, keyboard);
@@ -360,7 +364,7 @@ const showCustomBadges = async (ctx) => {
       ]);
     });
 
-    keyboard.push([Markup.button.callback('◀️ Volver', 'gamification_badges')]);
+    keyboard.push([Markup.button.callback(t('back', lang), 'gamification_badges')]);
 
     await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
   } catch (error) {
@@ -450,11 +454,11 @@ const handleBadgeAssignmentInput = async (ctx) => {
     const text = `${t('gamification.selectBadge', lang)}\n\n👤 ${user.firstName} ${user.lastName || ''}`;
 
     const keyboard = [
-      [Markup.button.callback('✅ Verificado', `assign_badge_${userId}_verified`)],
+      [Markup.button.callback('✅ Verified', `assign_badge_${userId}_verified`)],
       [Markup.button.callback('💎 Premium', `assign_badge_${userId}_premium`)],
       [Markup.button.callback('👑 VIP', `assign_badge_${userId}_vip`)],
-      [Markup.button.callback('🛡️ Moderador', `assign_badge_${userId}_moderator`)],
-      [Markup.button.callback('👨‍💼 Administrador', `assign_badge_${userId}_admin`)],
+      [Markup.button.callback('🛡️ Moderator', `assign_badge_${userId}_moderator`)],
+      [Markup.button.callback('👨‍💼 Admin', `assign_badge_${userId}_admin`)],
     ];
 
     // Add custom badges
@@ -465,7 +469,7 @@ const handleBadgeAssignmentInput = async (ctx) => {
       ]);
     });
 
-    keyboard.push([Markup.button.callback('❌ Cancelar', 'gamification_badges')]);
+    keyboard.push([Markup.button.callback(t('cancel', lang), 'gamification_badges')]);
 
     await ctx.reply(text, Markup.inlineKeyboard(keyboard));
   }
@@ -487,7 +491,7 @@ const assignBadgeToUser = async (ctx, userId, badgeType) => {
     await ctx.answerCbQuery(t('gamification.badgeAssigned', lang));
     await ctx.editMessageText(
       t('gamification.badgeAssignedSuccess', lang, { name: user.firstName, badge: badgeType }),
-      Markup.inlineKeyboard([[Markup.button.callback('◀️ Volver', 'gamification_badges')]]),
+      Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'gamification_badges')]]),
     );
   } catch (error) {
     logger.error('Error assigning badge:', error);
@@ -549,7 +553,7 @@ const showUserActivity = async (ctx, userId) => {
       text += `\n🏅 Badges: ${user.badges.join(', ')}\n`;
     }
 
-    const keyboard = [[Markup.button.callback('◀️ Volver', 'admin_gamification')]];
+    const keyboard = [[Markup.button.callback(t('back', lang), 'admin_gamification')]];
 
     await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
   } catch (error) {

@@ -1,35 +1,19 @@
-require('dotenv-safe').config({ allowEmptyValues: true });
+require('dotenv').config();
 const { Telegraf } = require('telegraf');
-// Firebase eliminado: no se requiere
+const express = require('express');
+const { initializeFirebase } = require('../../config/firebase');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
-const personalInfoFilterMiddleware = require('./middleware/personalInfoFilter');
-const allowedChatsMiddleware = require('./middleware/allowedChats');
 const usernameEnforcement = require('./middleware/usernameEnforcement');
-const profileCompliance = require('./middleware/profileCompliance');
 const moderationFilter = require('./middleware/moderationFilter');
-const autoModerationMiddleware = require('./middleware/autoModeration');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
-const commandAutoDeleteMiddleware = require('./middleware/commandAutoDelete');
 const errorHandler = require('./middleware/errorHandler');
-// Topic middleware
-const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./middleware/topicPermissions');
-const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
-const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
-const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
-const { groupSecurityEnforcementMiddleware, registerGroupSecurityHandlers } = require('./middleware/groupSecurityEnforcement');
-// Group behavior rules (overrides previous rules)
-const {
-  groupBehaviorMiddleware,
-  cristinaGroupFilterMiddleware,
-  groupMenuRedirectMiddleware,
-  groupCommandDeleteMiddleware
-} = require('./middleware/groupBehavior');
 const logger = require('../../utils/logger');
+
 // Handlers
 const registerUserHandlers = require('../handlers/user');
 const registerAdminHandlers = require('../handlers/admin');
@@ -38,39 +22,30 @@ const registerMediaHandlers = require('../handlers/media');
 const registerModerationHandlers = require('../handlers/moderation');
 const registerModerationAdminHandlers = require('../handlers/moderation/adminCommands');
 const registerCallManagementHandlers = require('../handlers/admin/callManagement');
-const registerRoleManagementHandlers = require('../handlers/admin/roleManagement');
-const registerGamificationHandlers = require('../handlers/admin/gamification');
-const registerLiveStreamManagementHandlers = require('../handlers/admin/liveStreamManagement');
-const registerRadioManagementHandlers = require('../handlers/admin/radioManagement');
 const registerPrivateCallHandlers = require('../handlers/user/privateCalls');
 const registerPaymentHistoryHandlers = require('../handlers/user/paymentHistory');
 const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnalytics');
 const registerUserCallManagementHandlers = require('../handlers/user/callManagement');
 const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
-const { registerLeaderboardHandlers } = require('../handlers/group/leaderboard');
-const registerMenuHandlers = require('../handlers/menu');
-// const registerZoomHandlers = require('../handlers/media/zoomV2'); // Temporarily disabled due to missing dependencies
+
 // Services
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
-const SubscriptionReminderService = require('../services/subscriptionReminderService');
-const { startCronJobs } = require('../../../scripts/cron');
+
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
+
 // API Server
 const apiApp = require('../api/routes');
-// Variable de estado para saber si el bot está iniciado
-let botStarted = false;
-let botInstance = null;
-let isWebhookMode = false;
 
 /**
  * Validate critical environment variables
  */
 const validateCriticalEnvVars = () => {
-  const criticalVars = ['BOT_TOKEN'];
+  const criticalVars = ['BOT_TOKEN', 'FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL'];
   const missing = criticalVars.filter((varName) => !process.env[varName]);
+
   if (missing.length > 0) {
     logger.error(`Missing critical environment variables: ${missing.join(', ')}`);
     logger.error('Please configure these variables in your .env file');
@@ -84,16 +59,17 @@ const validateCriticalEnvVars = () => {
 const startBot = async () => {
   try {
     logger.info('Starting PNPtv Telegram Bot...');
+
     // Validate critical environment variables
     try {
       validateCriticalEnvVars();
       logger.info('✓ Environment variables validated');
     } catch (error) {
-      logger.error('CRITICAL: Missing environment variables, cannot start bot');
+      logger.error('CRITICAL: Missing environment variables, but attempting to continue...');
       logger.error(error.message);
-      logger.error('Please configure all required environment variables in your .env file');
-      process.exit(1);
+      // Continuar de todos modos, el bot puede fallar después pero al menos intentamos
     }
+
     // Initialize Sentry (optional)
     try {
       initSentry();
@@ -101,11 +77,23 @@ const startBot = async () => {
     } catch (error) {
       logger.warn('Sentry initialization failed, continuing without monitoring:', error.message);
     }
-    // Firebase eliminado: solo PostgreSQL y Redis
+
+    // Initialize Firebase (with fallback)
+    try {
+      initializeFirebase();
+      logger.info('✓ Firebase initialized');
+    } catch (error) {
+      logger.error('Firebase initialization failed. Bot will run in DEGRADED mode without database.');
+      logger.error('Error:', error.message);
+      logger.warn('⚠️  Bot features requiring database will not work!');
+      // NO hacemos throw, permitimos que el bot continúe
+    }
+
     // Initialize Redis (optional, will use default localhost if not configured)
     try {
       initializeRedis();
       logger.info('✓ Redis initialized');
+
       // Prewarm cache with critical data
       try {
         await PlanModel.prewarmCache();
@@ -117,101 +105,87 @@ const startBot = async () => {
       logger.warn('Redis initialization failed, continuing without cache:', error.message);
       logger.warn('⚠️  Performance may be degraded without caching');
     }
+
     // Create bot instance
     const bot = new Telegraf(process.env.BOT_TOKEN);
+
     // Register middleware
     bot.use(sessionMiddleware());
-    bot.use(allowedChatsMiddleware()); // Must be early to leave unauthorized chats
-    bot.use(groupSecurityEnforcementMiddleware()); // Enforce group/channel whitelist
     bot.use(rateLimitMiddleware());
-    // bot.use(usernameChangeDetectionMiddleware()); // DISABLED - not working properly
-    bot.use(chatCleanupMiddleware());
-    bot.use(commandAutoDeleteMiddleware()); // Delete commands from groups
-    bot.use(usernameEnforcement());
-    bot.use(profileCompliance());
-    bot.use(moderationFilter());
-    bot.use(autoModerationMiddleware()); // Auto-moderation (spam, links, flooding, profanity)
-    bot.use(personalInfoFilterMiddleware()); // Filter personal information and redirect to DM
-    bot.use(activityTrackerMiddleware());
-    bot.use(groupCommandReminder());
+    bot.use(chatCleanupMiddleware()); // Auto-delete bot messages, commands, and system messages after 5 min
+    bot.use(usernameEnforcement()); // Require username and track changes
+    bot.use(moderationFilter()); // Moderation filter for group messages
+    bot.use(activityTrackerMiddleware()); // Track user activity for gamification
+    bot.use(groupCommandReminder()); // Remind users to use bot in private when using commands in groups
 
-    // Group behavior rules (OVERRIDE all previous rules)
-    bot.use(groupBehaviorMiddleware()); // Route all bot messages to topic 3135, 3-min delete
-    bot.use(cristinaGroupFilterMiddleware()); // Filter personal info from Cristina in groups
-    bot.use(groupMenuRedirectMiddleware()); // Redirect menu button clicks to private
-    bot.use(groupCommandDeleteMiddleware()); // Delete commands after 3 minutes
-
-    // Topic-specific middlewares
-    bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
-    bot.use(commandRedirectionMiddleware()); // Redirect commands to notifications
-    bot.use(mediaMirrorMiddleware()); // Mirror media to PNPtv Gallery
-    bot.use(topicPermissionsMiddleware()); // Admin-only and approval queue
-    bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery
     // Register handlers
     registerUserHandlers(bot);
     registerAdminHandlers(bot);
     registerPaymentHandlers(bot);
     registerMediaHandlers(bot);
-    registerModerationHandlers(bot);
-    registerModerationAdminHandlers(bot);
-    registerCallManagementHandlers(bot);
-    registerRoleManagementHandlers(bot);
-    registerGamificationHandlers(bot);
-    registerLiveStreamManagementHandlers(bot);
-    registerRadioManagementHandlers(bot);
-    registerPrivateCallHandlers(bot);
-    registerPaymentHistoryHandlers(bot);
-    registerPaymentAnalyticsHandlers(bot);
-    registerUserCallManagementHandlers(bot);
-    registerCallFeedbackHandlers(bot);
-    registerCallPackageHandlers(bot);
-    registerLeaderboardHandlers(bot);
-    registerMenuHandlers(bot); // Menu system and Cristina AI
-    registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic
-    registerGroupSecurityHandlers(bot); // Group/channel security enforcement
-    // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
-    // Initialize call reminder service
+    registerModerationHandlers(bot); // User moderation commands
+    registerModerationAdminHandlers(bot); // Admin moderation commands
+    registerCallManagementHandlers(bot); // Admin call management
+    registerPrivateCallHandlers(bot); // User private call booking
+    registerPaymentHistoryHandlers(bot); // User payment history and receipts
+    registerPaymentAnalyticsHandlers(bot); // Admin payment analytics dashboard
+    registerUserCallManagementHandlers(bot); // User call management (reschedule, cancel)
+    registerCallFeedbackHandlers(bot); // Post-call feedback and ratings
+    registerCallPackageHandlers(bot); // Call packages (bulk pricing)
+
+    // Initialize call reminder service (automated reminders)
     CallReminderService.initialize(bot);
     logger.info('✓ Call reminder service initialized');
-    // Initialize subscription reminder service
-    SubscriptionReminderService.initialize(bot);
-    logger.info('✓ Subscription reminder service initialized');
-    // Initialize group cleanup service
+
+    // Initialize group cleanup service (spam removal at 12:00 and 00:00 UTC)
     const groupCleanup = new GroupCleanupService(bot);
     groupCleanup.initialize();
-    logger.info('✓ Registering error handler...');
+
     // Error handling
     bot.catch(errorHandler);
-    logger.info('✓ Error handler registered');
-    logger.info(`Checking bot startup mode: NODE_ENV=${process.env.NODE_ENV}, BOT_WEBHOOK_DOMAIN=${process.env.BOT_WEBHOOK_DOMAIN}`);
+
     // Start bot
     if (process.env.NODE_ENV === 'production' && process.env.BOT_WEBHOOK_DOMAIN) {
-      logger.info('Setting up webhook mode...');
       // Webhook mode for production
       const webhookPath = process.env.BOT_WEBHOOK_PATH || '/webhook/telegram';
       const webhookUrl = `${process.env.BOT_WEBHOOK_DOMAIN}${webhookPath}`;
-      logger.info(`Calling Telegram API to set webhook: ${webhookUrl}`);
+
       await bot.telegram.setWebhook(webhookUrl);
       logger.info(`✓ Webhook set to: ${webhookUrl}`);
-      // Register webhook callback
+
+      // Register webhook callback BEFORE 404 handler
+      // Use bot.handleUpdate() directly since express.json() already parses the body
+      // bot.webhookCallback() expects raw body, but express.json() consumes it
       apiApp.post(webhookPath, async (req, res) => {
+        // Disable response timeout for this specific route
         req.setTimeout(0);
         res.setTimeout(0);
+
+        // Set headers for stable connection
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('Content-Type', 'application/json');
+
         try {
           logger.info('Telegram webhook received:', {
             hasBody: !!req.body,
-            bodySize: req.body ? JSON.stringify(req.body).length : 0,
+            bodyKeys: req.body ? Object.keys(req.body) : [],
             contentType: req.headers['content-type'],
             method: req.method,
             path: req.path,
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
           });
+
+          // Validate that we have a body
           if (!req.body || Object.keys(req.body).length === 0) {
             logger.warn('Webhook received empty body');
             return res.status(200).json({ ok: true, message: 'Empty body received' });
           }
+
+          // Process the update
           await bot.handleUpdate(req.body);
+
+          // Send success response
           res.status(200).json({ ok: true });
           logger.info('Webhook processed successfully');
         } catch (error) {
@@ -220,10 +194,15 @@ const startBot = async () => {
             stack: error.stack,
             body: req.body,
           });
+
+          // Always send a response to prevent connection reset
+          // Telegram expects a response even on errors
           res.status(200).json({ ok: false, error: error.message });
         }
       });
       logger.info(`✓ Webhook callback registered at: ${webhookPath}`);
+
+      // Add a test endpoint to verify webhook configuration
       apiApp.get(webhookPath, (req, res) => {
         res.status(200).json({
           status: 'ok',
@@ -234,51 +213,53 @@ const startBot = async () => {
         });
       });
       logger.info(`✓ Webhook test endpoint registered at: ${webhookPath} (GET)`);
-      botInstance = bot; // Asignar la instancia del bot
-      botStarted = true; // Actualizar el estado
-      isWebhookMode = true; // Marcar que estamos en modo webhook
-      logger.info('✓ Bot started in webhook mode');
     } else {
       // Polling mode for development
       await bot.telegram.deleteWebhook();
       await bot.launch();
-      botInstance = bot; // Asignar la instancia del bot
-      botStarted = true; // Actualizar el estado
       logger.info('✓ Bot started in polling mode');
     }
-    // Start cron jobs for automated tasks (if enabled)
-    if (process.env.ENABLE_CRON === 'true') {
-      try {
-        await startCronJobs(bot);
-        logger.info('✓ Cron jobs started successfully');
-      } catch (error) {
-        logger.error('Error starting cron jobs:', error);
-      }
-    } else {
-      logger.info('ℹ️  Cron jobs disabled (set ENABLE_CRON=true to enable)');
-    }
-    // Add 404 and error handlers
-    const {
-      errorHandler: expressErrorHandler,
-      notFoundHandler: expressNotFoundHandler
-    } = require('../api/middleware/errorHandler');
+
+    // Add 404 and error handlers AFTER webhook callback
+    const { errorHandler: expressErrorHandler, notFoundHandler: expressNotFoundHandler } = require('../api/middleware/errorHandler');
     apiApp.use(expressNotFoundHandler);
     apiApp.use(expressErrorHandler);
     logger.info('✓ Error handlers registered');
-    // Start API server
+
+    // Start API server with proper connection handling
     const PORT = process.env.PORT || 3000;
     const server = apiApp.listen(PORT, () => {
       logger.info(`✓ API server running on port ${PORT}`);
     });
-    server.keepAliveTimeout = 65000;
-    server.headersTimeout = 66000;
-    server.timeout = 120000;
+
+    // Configure server timeouts and keepalive to prevent connection resets
+    server.keepAliveTimeout = 65000; // Slightly higher than nginx timeout
+    server.headersTimeout = 66000; // Higher than keepAliveTimeout
+    server.timeout = 120000; // 2 minutes total timeout for long requests
+
     logger.info('🚀 PNPtv Telegram Bot is running!');
+
+    // Graceful shutdown
+    process.once('SIGINT', () => {
+      logger.info('Received SIGINT, stopping bot...');
+      bot.stop('SIGINT');
+    });
+
+    process.once('SIGTERM', () => {
+      logger.info('Received SIGTERM, stopping bot...');
+      bot.stop('SIGTERM');
+    });
   } catch (error) {
     logger.error('❌ CRITICAL ERROR during bot startup:', error);
     logger.error('Stack trace:', error.stack);
     logger.warn('⚠️  Bot encountered a critical error but will attempt to keep process alive');
     logger.warn('⚠️  Some features may not work properly. Check logs above for details.');
+
+    // NO hacemos process.exit(1) para que el proceso no muera
+    // En Railway/Render esto evita reinicios infinitos
+    // El proceso se mantiene vivo pero en estado degradado
+
+    // Intentar mantener el proceso vivo con un servidor mínimo
     try {
       const PORT = process.env.PORT || 3000;
       apiApp.listen(PORT, () => {
@@ -287,59 +268,25 @@ const startBot = async () => {
       });
     } catch (apiError) {
       logger.error('Failed to start emergency API server:', apiError);
+      // Como último recurso, mantener el proceso vivo sin hacer nada
       logger.warn('Process will stay alive but non-functional. Manual intervention required.');
     }
   }
 };
 
-// Manejadores de señales corregidos
-process.once('SIGINT', async () => {
-  logger.info('Received SIGINT, stopping bot...');
-  if (botStarted && botInstance && !isWebhookMode) {
-    // Solo llamar stop() en modo polling, no en webhook
-    try {
-      await botInstance.stop('SIGINT');
-      logger.info('Bot stopped successfully (SIGINT)');
-    } catch (err) {
-      logger.error('Error stopping bot:', err);
-    }
-  } else if (isWebhookMode) {
-    logger.info('Bot running in webhook mode, graceful shutdown (SIGINT)');
-  } else {
-    logger.warn('SIGINT received but bot was not started, skipping stop()');
-  }
-  process.exit(0);
-});
-
-process.once('SIGTERM', async () => {
-  logger.info('Received SIGTERM, stopping bot...');
-  if (botStarted && botInstance && !isWebhookMode) {
-    // Solo llamar stop() en modo polling, no en webhook
-    try {
-      await botInstance.stop('SIGTERM');
-      logger.info('Bot stopped successfully (SIGTERM)');
-    } catch (err) {
-      logger.error('Error stopping bot:', err);
-    }
-  } else if (isWebhookMode) {
-    logger.info('Bot running in webhook mode, graceful shutdown (SIGTERM)');
-  } else {
-    logger.warn('SIGTERM received but bot was not started, skipping stop()');
-  }
-  process.exit(0);
-});
-
-// Manejadores globales de errores
+// Manejadores globales de errores para evitar que el proceso muera
 process.on('uncaughtException', (error) => {
   logger.error('❌ UNCAUGHT EXCEPTION:', error);
   logger.error('Stack:', error.stack);
   logger.warn('Process will continue despite uncaught exception');
+  // NO hacer process.exit(), mantener el proceso vivo
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('❌ UNHANDLED PROMISE REJECTION:', reason);
   logger.error('Promise:', promise);
   logger.warn('Process will continue despite unhandled rejection');
+  // NO hacer process.exit(), mantener el proceso vivo
 });
 
 // Start the bot
@@ -347,6 +294,7 @@ if (require.main === module) {
   startBot().catch((err) => {
     logger.error('Unhandled error in startBot():', err);
     logger.warn('Process will stay alive despite error');
+    // No hacer nada más, mantener proceso vivo
   });
 }
 

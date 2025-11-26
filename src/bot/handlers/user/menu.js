@@ -1,153 +1,12 @@
 const { Markup } = require('telegraf');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
-const ChatCleanupService = require('../../services/chatCleanupService');
-
-/**
- * Envía mensaje de bienvenida y link de ingreso al canal PRIME
- * @param {Telegraf} bot - Bot instance
- * @param {string|number} userId - Telegram user ID
- */
-const sendPrimeWelcome = async (bot, userId) => {
-  const messageEs = [
-    '🎉 ¡Bienvenido a PNPtv!',
-    '',
-    'Para explorar PNPtv, pulsa /menu',
-    '',
-    'Disfruta todos los beneficios y novedades.'
-  ].join('\n');
-  const messageEn = [
-    '🎉 Welcome to PNPtv!',
-    '',
-    'To explore PNPtv, press /menu',
-    '',
-    'Enjoy all the benefits and updates.'
-  ].join('\n');
-  const lang = (bot.language || 'es').toLowerCase();
-  const message = lang === 'en' ? messageEn : messageEs;
-  try {
-    await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown' });
-  } catch (error) {
-    logger.error('Error enviando bienvenida PNPtv:', error);
-  }
-};
-
-module.exports.sendPrimeWelcome = sendPrimeWelcome;
 
 /**
  * Main menu handlers
  * @param {Telegraf} bot - Bot instance
  */
 const registerMenuHandlers = (bot) => {
-    // /cristina command: starts AI support chat, message stays in chat (no autodelete)
-    bot.command('cristina', async (ctx) => {
-      try {
-        // Activate AI chat session
-        ctx.session.temp = ctx.session.temp || {};
-        ctx.session.temp.aiChatActive = true;
-        await ctx.saveSession();
-        const lang = ctx.session?.language || 'en';
-        await ctx.reply(
-          lang === 'es'
-            ? '🤖 Cristina está lista para ayudarte. Escribe tu pregunta o mensaje.'
-            : '🤖 Cristina is ready to help you. Type your question or message.'
-        );
-      } catch (error) {
-        logger.error('Error starting Cristina AI chat:', error);
-      }
-    });
-  // /menu command opens the same menu as /start
-  bot.command('menu', async (ctx) => {
-    try {
-      await showMainMenu(ctx);
-    } catch (error) {
-      logger.error('Error showing menu:', error);
-    }
-  });
-
-  // Intercept main menu button actions in group and show redirect message
-  const mainMenuActions = [
-    'show_subscription_plans',
-    'show_profile',
-    'show_nearby',
-    'show_radio',
-    'show_jitsi',
-    'show_support',
-    'show_settings',
-    'admin_panel'
-  ];
-  mainMenuActions.forEach(action => {
-    bot.action(action, async (ctx, next) => {
-      const chatType = ctx.chat?.type;
-      if (chatType === 'group' || chatType === 'supergroup') {
-        try {
-          const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'user';
-          const botUsername = ctx.botInfo?.username || 'PNPtvbot';
-
-          // Send notification in group
-          const groupMsg = `${username} I sent you a private message please check it out! 💬`;
-          const sentMessage = await ctx.reply(groupMsg);
-          ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
-
-          // Send private message with link to the feature
-          try {
-            const pmLink = `https://t.me/${botUsername}?start=${action}`;
-            const pmMsg = `You clicked on a menu button in the group! Click the link below to access this feature:\n\n${pmLink}`;
-            await ctx.telegram.sendMessage(ctx.from.id, pmMsg);
-          } catch (pmError) {
-            logger.debug('Could not send private message:', pmError.message);
-          }
-
-          return;
-        } catch (error) {
-          logger.error('Error handling group menu action:', error);
-        }
-      }
-      return next();
-    });
-  });
-
-  // Live Streams - Coming Soon
-  bot.action('show_live', async (ctx) => {
-    const lang = ctx.session?.language || 'en';
-    await ctx.answerCbQuery(
-      lang === 'es' ? '🚧 Próximamente: Transmisiones en Vivo.' : '🚧 Coming Soon: Live Streaming.',
-      { show_alert: true }
-    );
-  });
-  bot.action('show_zoom', async (ctx) => {
-    const lang = ctx.session?.language || 'en';
-    await ctx.answerCbQuery(
-      lang === 'es' ? '🚧 Próximamente: Salas Zoom.' : '🚧 Coming soon: Zoom Rooms.',
-      { show_alert: true }
-    );
-  });
-    // Locked feature handler for free users
-    bot.action('locked_feature', async (ctx) => {
-      const lang = ctx.session?.language || 'en';
-      await ctx.answerCbQuery(
-        lang === 'es'
-          ? '🔒 Función solo para usuarios premium. Suscríbete para acceder.'
-          : '🔒 Feature for premium users only. Subscribe to unlock.',
-        { show_alert: true }
-      );
-    });
-    // Admin panel handler: only superadmins can access role management
-    bot.action('admin_panel', async (ctx) => {
-      try {
-        // PermissionService is required from roleManagement.js
-        const PermissionService = require('../admin/../../services/permissionService');
-        const showRoleManagement = require('../admin/roleManagement.js').showRoleManagement;
-        const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
-        if (!isSuperAdmin) {
-          await ctx.answerCbQuery('❌ Solo Super Administradores pueden acceder');
-          return;
-        }
-        await showRoleManagement(ctx);
-      } catch (error) {
-        logger.error('Error in admin panel:', error);
-      }
-    });
   // Menu command
   bot.command('menu', async (ctx) => {
     try {
@@ -166,17 +25,63 @@ const registerMenuHandlers = (bot) => {
     }
   });
 
-  // Note: show_subscription_plans handler is in payments/index.js
-
-  // Group menu actions have been disabled
+  // Group menu actions
   bot.action('group_contact_admin', async (ctx) => {
-    logger.info('Group menu actions have been disabled');
-    await ctx.answerCbQuery('This feature has been disabled');
+    try {
+      await ctx.answerCbQuery();
+      const lang = ctx.session?.language || 'en';
+
+      const messageEs = `📞 *Contactar a un Admin*\n\n` +
+        `Para contactar a un administrador del grupo, por favor:\n\n` +
+        `1. Menciona a uno de los administradores en el chat del grupo\n` +
+        `2. O envía un mensaje directo al bot con tu consulta usando el botón "Chat Bot PNPtv!"\n\n` +
+        `Los administradores responderán lo antes posible.`;
+
+      const messageEn = `📞 *Contact an Admin*\n\n` +
+        `To contact a group administrator, please:\n\n` +
+        `1. Mention one of the administrators in the group chat\n` +
+        `2. Or send a direct message to the bot with your query using the "PNPtv! Bot Chat" button\n\n` +
+        `Administrators will respond as soon as possible.`;
+
+      const message = lang === 'es' ? messageEs : messageEn;
+
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      logger.error('Error in group contact admin:', error);
+    }
   });
 
   bot.action('group_show_rules', async (ctx) => {
-    logger.info('Group menu actions have been disabled');
-    await ctx.answerCbQuery('This feature has been disabled');
+    try {
+      await ctx.answerCbQuery();
+      const lang = ctx.session?.language || 'en';
+
+      const rulesEs = `📋 *Reglas de la Comunidad PNPtv!*\n\n` +
+        `1️⃣ *Respeto:* Trata a todos los miembros con respeto y cortesía\n\n` +
+        `2️⃣ *No Spam:* Evita el spam, publicidad no autorizada o contenido repetitivo\n\n` +
+        `3️⃣ *Privacidad:* No compartas información personal de otros miembros sin su consentimiento\n\n` +
+        `4️⃣ *Contenido Apropiado:* El contenido debe ser apropiado para la comunidad\n\n` +
+        `5️⃣ *No Acoso:* El acoso, bullying o comportamiento hostil no será tolerado\n\n` +
+        `6️⃣ *Uso del Bot:* Usa el bot en privado para funciones personales (perfil, suscripciones, pagos)\n\n` +
+        `⚠️ *Incumplir estas reglas puede resultar en advertencias, restricciones o expulsión del grupo.*\n\n` +
+        `¡Gracias por mantener nuestra comunidad segura y agradable! 🙏`;
+
+      const rulesEn = `📋 *PNPtv! Community Rules*\n\n` +
+        `1️⃣ *Respect:* Treat all members with respect and courtesy\n\n` +
+        `2️⃣ *No Spam:* Avoid spam, unauthorized advertising or repetitive content\n\n` +
+        `3️⃣ *Privacy:* Do not share personal information of other members without their consent\n\n` +
+        `4️⃣ *Appropriate Content:* Content must be appropriate for the community\n\n` +
+        `5️⃣ *No Harassment:* Harassment, bullying or hostile behavior will not be tolerated\n\n` +
+        `6️⃣ *Bot Usage:* Use the bot privately for personal features (profile, subscriptions, payments)\n\n` +
+        `⚠️ *Breaking these rules may result in warnings, restrictions or expulsion from the group.*\n\n` +
+        `Thank you for keeping our community safe and enjoyable! 🙏`;
+
+      const message = lang === 'es' ? rulesEs : rulesEn;
+
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      logger.error('Error showing group rules:', error);
+    }
   });
 };
 
@@ -187,11 +92,10 @@ const registerMenuHandlers = (bot) => {
 const showMainMenu = async (ctx) => {
   const lang = ctx.session?.language || 'en';
   const chatType = ctx.chat?.type;
-  const user = ctx.session?.user || {};
-  const isPremium = user.subscriptionStatus === 'active';
-  const isAdmin = user.role === 'admin';
 
+  // Check if this is a group or supergroup
   if (chatType === 'group' || chatType === 'supergroup') {
+    // Show limited group menu
     await showGroupMenu(ctx);
     return;
   }
@@ -201,7 +105,7 @@ const showMainMenu = async (ctx) => {
     t('mainMenuIntro', lang),
     Markup.inlineKeyboard([
       [
-        Markup.button.callback('👑 Suscríbete a PRIME', 'show_subscription_plans'),
+        Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
         Markup.button.callback(t('myProfile', lang), 'show_profile'),
       ],
       [
@@ -209,11 +113,8 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(t('liveStreams', lang), 'show_live'),
       ],
       [
-        Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-        Markup.button.callback(t('playerMenu', lang), 'show_player'),
-      ],
-      [
-        Markup.button.callback('📹 Video Call Rooms', 'show_jitsi'),
+        Markup.button.callback(t('radio', lang), 'show_radio'),
+        Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
       ],
       [
         Markup.button.callback(t('support', lang), 'show_support'),
@@ -228,8 +129,41 @@ const showMainMenu = async (ctx) => {
  * @param {Context} ctx - Telegraf context
  */
 const showGroupMenu = async (ctx) => {
-  // Group menu has been disabled
-  logger.info('Group menu functionality has been disabled');
+  const lang = ctx.session?.language || 'en';
+  const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'User';
+  const botUsername = ctx.botInfo?.username || 'pnptv_bot';
+
+  const messageEs = `✨ Hola ${username}! Gracias por usar el Panel Rápido para Miembros del Grupo.\n\n` +
+    `🔒 Recuerda que para usar todas las funciones de PNPtv! debes hacerlo directamente desde el chat del bot, ` +
+    `por protección de tu privacidad y para cumplir con las políticas anti-spam de la comunidad.\n\n` +
+    `Desde este panel puedes acceder a estas opciones:`;
+
+  const messageEn = `✨ Hi ${username}! Thanks for using the Quick Member Panel!\n\n` +
+    `🔒 Remember that to use all PNPtv! features you must do it directly through the bot chat, ` +
+    `to protect your privacy and comply with our community anti-spam policies.\n\n` +
+    `From this panel, you can still access these options:`;
+
+  const message = lang === 'es' ? messageEs : messageEn;
+
+  const keyboard = lang === 'es'
+    ? [
+      [Markup.button.callback('📞 Contactar a un Admin', 'group_contact_admin')],
+      [Markup.button.callback('📋 Reglas de la Comunidad', 'group_show_rules')],
+      [Markup.button.url(`💬 Chat Bot PNPtv!`, `https://t.me/${botUsername}?start=group_menu`)],
+    ]
+    : [
+      [Markup.button.callback('📞 Contact an Admin', 'group_contact_admin')],
+      [Markup.button.callback('📋 Community Rules', 'group_show_rules')],
+      [Markup.button.url(`💬 PNPtv! Bot Chat`, `https://t.me/${botUsername}?start=group_menu`)],
+    ];
+
+  await ctx.reply(
+    message,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard(keyboard),
+    },
+  );
 };
 
 /**
@@ -238,55 +172,13 @@ const showGroupMenu = async (ctx) => {
  */
 const showMainMenuEdit = async (ctx) => {
   const lang = ctx.session?.language || 'en';
-  const user = ctx.session?.user || {};
-  const isPremium = user.subscriptionStatus === 'active';
-  const isAdmin = user.role === 'admin';
-
-  let menuText = '';
-  if (isAdmin) {
-    menuText = lang === 'es'
-      ? '👑 ¡Bienvenido Admin!\nAcceso total a todas las funciones y panel de administración.'
-      : '👑 Welcome Admin!\nFull access to all features and admin panel.';
-  } else if (isPremium) {
-    menuText = t('welcomeScreenPrime', lang);
-  } else {
-    menuText = t('welcomeScreenFree', lang);
-  }
-
-  function buildButton(label, action, locked) {
-    return Markup.button.callback(locked ? `${label} 🔒` : label, locked ? 'locked_feature' : action);
-  }
-
-  const buttons = [
-    [
-      Markup.button.callback('👑 Suscríbete a PRIME', 'show_subscription_plans'),
-      Markup.button.callback(t('myProfile', lang), 'show_profile'),
-    ],
-    [
-      Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
-      buildButton(t('liveStreams', lang), 'show_live', !isPremium && !isAdmin),
-    ],
-    [
-      Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-      buildButton('📹 Video Call Rooms', 'show_jitsi', !isPremium && !isAdmin),
-    ],
-    [
-      Markup.button.callback(t('support', lang), 'show_support'),
-    ],
-    [
-      Markup.button.callback(t('settings', lang), 'show_settings'),
-    ],
-  ];
-  if (isAdmin) {
-    buttons.push([Markup.button.callback('🛡️ Admin Panel', 'admin_panel')]);
-  }
 
   try {
     await ctx.editMessageText(
       t('mainMenuIntro', lang),
       Markup.inlineKeyboard([
         [
-          Markup.button.callback('👑 Suscríbete a PRIME', 'show_subscription_plans'),
+          Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
           Markup.button.callback(t('myProfile', lang), 'show_profile'),
         ],
         [
@@ -294,11 +186,8 @@ const showMainMenuEdit = async (ctx) => {
           Markup.button.callback(t('liveStreams', lang), 'show_live'),
         ],
         [
-          Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-          Markup.button.callback(t('playerMenu', lang), 'show_player'),
-        ],
-        [
-          Markup.button.callback('📹 Video Call Rooms', 'show_jitsi'),
+          Markup.button.callback(t('radio', lang), 'show_radio'),
+          Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
         ],
         [
           Markup.button.callback(t('support', lang), 'show_support'),
@@ -312,10 +201,6 @@ const showMainMenuEdit = async (ctx) => {
   }
 };
 
-// Export as default function for consistency with other handlers
 module.exports = registerMenuHandlers;
-
-// Also export named functions for direct imports
 module.exports.showMainMenu = showMainMenu;
 module.exports.showMainMenuEdit = showMainMenuEdit;
-module.exports.sendPrimeWelcome = sendPrimeWelcome;

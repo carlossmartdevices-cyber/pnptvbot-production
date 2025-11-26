@@ -2,8 +2,6 @@
  * Custom Error Classes for Better Error Handling
  */
 
-/* eslint-disable max-classes-per-file */
-
 /**
  * Base Application Error
  */

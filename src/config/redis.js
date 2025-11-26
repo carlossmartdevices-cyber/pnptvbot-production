@@ -17,39 +17,11 @@ const initializeRedis = () => {
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379', 10),
       db: parseInt(process.env.REDIS_DB || '0', 10),
-      // Add key prefix for multi-app isolation
-      keyPrefix: process.env.REDIS_KEY_PREFIX || 'pnptv:',
-      // Enable offline queue to buffer commands while connecting
-      enableOfflineQueue: true,
-      // Lazy connect - don't fail startup if Redis is not ready
-      lazyConnect: false,
-      // More aggressive retry strategy with exponential backoff
       retryStrategy: (times) => {
-        if (times > 20) {
-          // After 20 attempts (~2 minutes), give up
-          logger.error('Redis connection failed after 20 retry attempts');
-          return null; // Stop retrying
-        }
-        // Exponential backoff: 200ms, 400ms, 800ms, 1600ms, up to 5s
-        const delay = Math.min(times * 200, 5000);
-        logger.info(`Redis retry attempt ${times}, waiting ${delay}ms`);
+        const delay = Math.min(times * 50, 2000);
         return delay;
       },
-      // Allow more retries per request
-      maxRetriesPerRequest: 10,
-      // Connection timeout
-      connectTimeout: 10000,
-      // Keep connection alive
-      keepAlive: 30000,
-      // Reconnect on error
-      reconnectOnError: (err) => {
-        const targetError = 'READONLY';
-        if (err.message.includes(targetError)) {
-          // Reconnect on READONLY errors
-          return true;
-        }
-        return false;
-      },
+      maxRetriesPerRequest: 3,
     };
 
     if (process.env.REDIS_PASSWORD) {

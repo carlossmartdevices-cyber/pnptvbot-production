@@ -28,9 +28,7 @@ class RedisMock {
   }
 
   async keys(pattern) {
-    // Escape special regex characters except *, then convert * to .*
-    const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-    const regex = new RegExp(`^${escaped}$`);
+    const regex = new RegExp(pattern.replace('*', '.*'));
     return Array.from(this.data.keys()).filter(key => regex.test(key));
   }
 

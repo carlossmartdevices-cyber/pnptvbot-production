@@ -1,6 +1,7 @@
 const PaymentService = require('../../services/paymentService');
 const CallService = require('../../services/callService');
 const logger = require('../../../utils/logger');
+const config = require('../../../config/config');
 
 /**
  * Payment Analytics Handlers - Admin dashboard for payment analytics
@@ -10,7 +11,7 @@ function registerPaymentAnalyticsHandlers(bot) {
    * Check if user is admin
    */
   function isAdmin(userId) {
-    const adminIds = (process.env.ADMIN_USER_IDS || '').split(',').map(id => parseInt(id.trim()));
+    const adminIds = (config.ADMIN_IDS || '').split(',').map(id => parseInt(id.trim()));
     return adminIds.includes(userId);
   }
 

@@ -43,8 +43,9 @@ echo "📋 Checking required environment variables..."
 required_vars=(
     "BOT_TOKEN"
     "FIREBASE_PROJECT_ID"
-    "FIREBASE_PRIVATE_KEY"
-    "FIREBASE_CLIENT_EMAIL"
+    "DB_HOST"
+    "DB_USER"
+    "DB_PASSWORD"
     "REDIS_HOST"
 )
 
@@ -82,34 +83,21 @@ echo ""
 echo "🛑 Stopping existing containers..."
 docker-compose down || print_warning "No existing containers to stop"
 
-# Clean up Docker system if requested or having issues
-echo ""
-echo "🧹 Cleaning up Docker system..."
-docker system prune -af --volumes
-
-# Remove cached images to ensure fresh build
-echo "🗑️ Removing old Node images to force fresh download..."
-docker rmi node:18-alpine node:18-alpine3.20 2>/dev/null || true
-
 # Pull latest changes (if in git repo)
 if [ -d .git ]; then
     echo ""
     echo "📥 Pulling latest changes..."
-    git fetch origin $(git branch --show-current)
     git pull origin $(git branch --show-current)
     print_success "Repository updated"
 fi
 
-# Build Docker images with NO CACHE and PULL latest base images
+# Build Docker images
 echo ""
-echo "🔨 Building Docker images (this may take a few minutes)..."
-if docker-compose build --no-cache --pull; then
+echo "🔨 Building Docker images..."
+if docker-compose build; then
     print_success "Docker images built successfully"
 else
     print_error "Docker build failed"
-    echo ""
-    echo "📋 Last 50 lines of Docker build output:"
-    docker-compose logs
     exit 1
 fi
 
@@ -160,6 +148,7 @@ health_check() {
 
 # Check each service
 health_check "redis"
+health_check "postgres"
 
 # Check bot health endpoint
 echo ""
@@ -219,8 +208,8 @@ echo ""
 echo "🔗 Access Points:"
 echo "  Bot API: http://localhost:3000"
 echo "  Health Check: http://localhost:3000/health"
+echo "  PostgreSQL: localhost:5432"
 echo "  Redis: localhost:6379"
-echo "  Firebase: Cloud Firestore (via Google Cloud)"
 echo ""
 echo "📋 Useful Commands:"
 echo "  View logs: docker-compose logs -f bot"

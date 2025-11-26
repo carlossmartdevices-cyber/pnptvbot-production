@@ -8,6 +8,9 @@ const logger = require('./logger');
 const REQUIRED_ENV_VARS = [
   'BOT_TOKEN',
   'BOT_USERNAME',
+  'FIREBASE_PROJECT_ID',
+  'FIREBASE_CLIENT_EMAIL',
+  'FIREBASE_PRIVATE_KEY',
   'REDIS_HOST',
   'REDIS_PORT',
 ];
@@ -24,12 +27,7 @@ const OPTIONAL_ENV_VARS = [
   'EPAYCO_PRIVATE_KEY',
   'EPAYCO_TEST_MODE',
   'DAIMO_API_KEY',
-  'DAIMO_APP_ID',
   'DAIMO_WEBHOOK_SECRET',
-  'DAIMO_TREASURY_ADDRESS',
-  'DAIMO_REFUND_ADDRESS',
-  'DAIMO_CHAIN_ID',
-  'DAIMO_TOKEN_ADDRESS',
   'SENTRY_DSN',
   'ZOOM_API_KEY',
   'ZOOM_API_SECRET',
@@ -38,12 +36,7 @@ const OPTIONAL_ENV_VARS = [
 
 const ENV_VAR_GROUPS = {
   payment_epayco: ['EPAYCO_PUBLIC_KEY', 'EPAYCO_PRIVATE_KEY'],
-  payment_daimo: [
-    'DAIMO_TREASURY_ADDRESS', // Required for Daimo Pay
-    'DAIMO_WEBHOOK_SECRET',   // Required for webhook verification
-    'DAIMO_API_KEY',          // Optional: only needed for API calls
-    'DAIMO_APP_ID',           // Optional: only needed for SDK integration
-  ],
+  payment_daimo: ['DAIMO_API_KEY', 'DAIMO_WEBHOOK_SECRET'],
   monitoring: ['SENTRY_DSN'],
   zoom: ['ZOOM_API_KEY', 'ZOOM_API_SECRET'],
   ai: ['OPENAI_API_KEY'],
@@ -154,10 +147,10 @@ function isFeatureEnabled(feature) {
 function printEnvSummary() {
   console.log('\n=== Environment Configuration ===');
   console.log(`Node Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Bot Username: ${process.env.BOT_USERNAME ? '[CONFIGURED]' : 'NOT SET'}`);
+  console.log(`Bot Username: ${process.env.BOT_USERNAME || 'NOT SET'}`);
   console.log(`Webhook Mode: ${process.env.BOT_WEBHOOK_DOMAIN ? 'Yes' : 'No (polling)'}`);
-  console.log(`Redis: ${process.env.REDIS_HOST ? '[CONFIGURED]' : 'NOT SET'}:${process.env.REDIS_PORT || 6379}`);
-  console.log('\nFeature Configuration:');
+  console.log(`Redis: ${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}`);
+  console.log(`\nFeature Configuration:`);
   console.log(`  - ePayco Payments: ${isFeatureEnabled('epayco') ? '✓' : '✗'}`);
   console.log(`  - Daimo Payments: ${isFeatureEnabled('daimo') ? '✓' : '✗'}`);
   console.log(`  - Sentry Monitoring: ${isFeatureEnabled('sentry') ? '✓' : '✗'}`);
