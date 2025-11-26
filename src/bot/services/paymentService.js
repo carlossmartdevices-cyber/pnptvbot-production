@@ -1245,6 +1245,148 @@ class PaymentService {
       throw new Error('No se pudo completar el pago. Intenta más tarde o contacta soporte.');
     }
   }
+
+  /**
+   * Verify ePayco webhook signature
+   * @param {Object} webhookData - ePayco webhook data
+   * @returns {boolean} Verification result
+   */
+  static verifyEpaycoSignature(webhookData) {
+    try {
+      const { x_signature, x_ref_payco, x_transaction_id, x_amount, x_currency_code } = webhookData;
+
+      if (!x_signature) {
+        logger.warn('ePayco signature missing');
+        return false;
+      }
+
+      const privateKey = process.env.EPAYCO_PRIVATE_KEY;
+      if (!privateKey) {
+        const isProduction = process.env.NODE_ENV === 'production';
+        if (isProduction) {
+          throw new Error('EPAYCO_PRIVATE_KEY must be configured in production');
+        }
+        logger.warn('ePayco private key not configured, skipping verification in development');
+        return true;
+      }
+
+      const p_cust_id_cliente = process.env.EPAYCO_P_CUST_ID || '';
+      const signatureString = `${p_cust_id_cliente}^${privateKey}^${x_ref_payco}^${x_transaction_id}^${x_amount}^${x_currency_code}`;
+      const expectedSignature = crypto.createHash('sha256').update(signatureString).digest('hex');
+
+      const isValid = x_signature === expectedSignature;
+      if (!isValid) {
+        logger.error('Invalid ePayco signature', {
+          received: x_signature,
+          expected: expectedSignature,
+        });
+      }
+
+      return isValid;
+    } catch (error) {
+      logger.error('Error verifying ePayco signature:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verify Daimo webhook signature
+   * @param {Object} webhookData - Daimo webhook data
+   * @returns {boolean} Verification result
+   */
+  static verifyDaimoSignature(webhookData) {
+    try {
+      const { signature } = webhookData;
+
+      if (!signature) {
+        logger.warn('Daimo signature missing');
+        return false;
+      }
+
+      const webhookSecret = process.env.DAIMO_WEBHOOK_SECRET;
+      if (!webhookSecret) {
+        const isProduction = process.env.NODE_ENV === 'production';
+        if (isProduction) {
+          throw new Error('DAIMO_WEBHOOK_SECRET must be configured in production');
+        }
+        logger.warn('Daimo webhook secret not configured, skipping verification in development');
+        return true;
+      }
+
+      const payloadString = JSON.stringify({
+        id: webhookData.id,
+        type: webhookData.type,
+        source: webhookData.source,
+        metadata: webhookData.metadata,
+      });
+
+      const expectedSignature = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(payloadString)
+        .digest('hex');
+
+      const isValid = crypto.timingSafeEqual(
+        Buffer.from(signature),
+        Buffer.from(expectedSignature)
+      );
+
+      if (!isValid) {
+        logger.error('Invalid Daimo signature');
+      }
+
+      return isValid;
+    } catch (error) {
+      logger.error('Error verifying Daimo signature:', error);
+      if (error.message && (error.message.includes('DAIMO_WEBHOOK_SECRET') || error.message.includes('production'))) {
+        throw error;
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Retry operation with exponential backoff
+   * @param {Function} operation - Operation to retry
+   * @param {number} maxRetries - Maximum number of retries
+   * @param {string} operationName - Name of the operation for logging
+   * @returns {Promise} Result of the operation
+   */
+  static async retryWithBackoff(operation, maxRetries = 3, operationName = 'operation') {
+    let lastError;
+    const maxDelay = 10000; // 10 seconds cap
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        logger.info(`Attempting ${operationName}`, { attempt: attempt + 1, maxRetries: maxRetries + 1 });
+        const result = await operation();
+        if (attempt > 0) {
+          logger.info(`${operationName} succeeded after ${attempt} retries`);
+        }
+        return result;
+      } catch (error) {
+        lastError = error;
+        logger.warn(`${operationName} failed`, {
+          attempt: attempt + 1,
+          maxRetries: maxRetries + 1,
+          error: error.message,
+        });
+
+        if (attempt < maxRetries) {
+          const baseDelay = 1000;
+          const exponentialDelay = baseDelay * Math.pow(2, attempt);
+          const delay = Math.min(exponentialDelay, maxDelay);
+
+          logger.info(`Retrying ${operationName} in ${delay}ms`, { attempt: attempt + 1 });
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    logger.error(`${operationName} failed after ${maxRetries + 1} attempts`, {
+      error: lastError.message,
+    });
+    throw lastError;
+  }
 }
 
 module.exports = PaymentService;

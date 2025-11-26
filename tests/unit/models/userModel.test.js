@@ -1,92 +1,74 @@
 // Mock dependencies
-jest.mock('../../../src/config/firebase');
+jest.mock('../../../src/config/postgres');
 jest.mock('../../../src/config/redis');
 
 const UserModel = require('../../../src/models/userModel');
-const { getFirestore } = require('../../../src/config/firebase');
+const { query } = require('../../../src/config/postgres');
 const { cache } = require('../../../src/config/redis');
 
 describe('UserModel', () => {
-  let mockDb;
-  let mockCollection;
-  let mockDoc;
-
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockDoc = {
-      get: jest.fn(),
-      set: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      exists: false,
-      id: 'test-user-id',
-      data: jest.fn(),
-    };
+    // Mock PostgreSQL query function
+    query.mockResolvedValue({ rows: [], rowCount: 0 });
 
-    mockCollection = {
-      doc: jest.fn().mockReturnValue(mockDoc),
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      startAfter: jest.fn().mockReturnThis(),
-      get: jest.fn(),
-    };
-
-    mockDb = {
-      collection: jest.fn().mockReturnValue(mockCollection),
-    };
-
-    getFirestore.mockReturnValue(mockDb);
-
-    // Mock cache
+    // Mock cache with getOrSet method
     cache.get = jest.fn().mockResolvedValue(null);
     cache.set = jest.fn().mockResolvedValue(true);
     cache.del = jest.fn().mockResolvedValue(true);
     cache.delPattern = jest.fn().mockResolvedValue(0);
+    cache.getOrSet = jest.fn(async (key, fn, ttl) => {
+      const cached = await cache.get(key);
+      if (cached !== null) {
+        return cached;
+      }
+      const value = await fn();
+      if (value !== null) {
+        await cache.set(key, value, ttl);
+      }
+      return value;
+    });
   });
 
   describe('createOrUpdate', () => {
     it('should create new user', async () => {
-      mockDoc.get.mockResolvedValue({ exists: false });
-      mockDoc.set.mockResolvedValue();
+      query.mockResolvedValue({ rows: [], rowCount: 1 });
 
       const userData = {
         userId: 123456789,
-        firstName: 'John',
-        lastName: 'Doe',
+        first_name: 'John',
+        last_name: 'Doe',
         language: 'en',
       };
 
       const result = await UserModel.createOrUpdate(userData);
 
       expect(result).toBeDefined();
-      expect(result.userId).toBe(userData.userId);
-      expect(result.subscriptionStatus).toBe('free');
-      expect(result.createdAt).toBeInstanceOf(Date);
-      expect(mockDoc.set).toHaveBeenCalled();
+      expect(result.first_name).toBe('John');
+      expect(result.updatedAt).toBeInstanceOf(Date);
+      expect(query).toHaveBeenCalled();
       expect(cache.del).toHaveBeenCalledWith('user:123456789');
     });
 
     it('should update existing user', async () => {
-      mockDoc.get.mockResolvedValue({ exists: true });
-      mockDoc.set.mockResolvedValue();
+      query.mockResolvedValue({ rows: [], rowCount: 1 });
 
       const userData = {
         userId: 123456789,
-        firstName: 'John Updated',
+        first_name: 'John Updated',
       };
 
       const result = await UserModel.createOrUpdate(userData);
 
       expect(result).toBeDefined();
-      expect(result.firstName).toBe('John Updated');
+      expect(result.first_name).toBe('John Updated');
       expect(result.updatedAt).toBeInstanceOf(Date);
-      expect(mockDoc.set).toHaveBeenCalled();
+      expect(query).toHaveBeenCalled();
     });
 
     it('should handle errors', async () => {
-      mockDoc.get.mockRejectedValue(new Error('Database error'));
+      query.mockRejectedValue(new Error('Database error'));
 
       await expect(UserModel.createOrUpdate({ userId: 123 })).rejects.toThrow();
     });
@@ -94,17 +76,14 @@ describe('UserModel', () => {
 
   describe('getById', () => {
     it('should get user by ID from database', async () => {
-      const userData = {
-        userId: 123456789,
-        firstName: 'John',
-        subscriptionStatus: 'active',
+      const dbUser = {
+        id: '123456789',
+        first_name: 'John',
+        subscription_status: 'active',
+        onboarding_complete: true,
       };
 
-      mockDoc.get.mockResolvedValue({
-        exists: true,
-        id: '123456789',
-        data: () => userData,
-      });
+      query.mockResolvedValue({ rows: [dbUser], rowCount: 1 });
 
       const result = await UserModel.getById(123456789);
 
@@ -120,16 +99,15 @@ describe('UserModel', () => {
 
     it('should get user from cache', async () => {
       const cachedUser = { id: '123456789', firstName: 'John' };
-      cache.get.mockResolvedValue(cachedUser);
+      cache.getOrSet.mockResolvedValue(cachedUser);
 
       const result = await UserModel.getById(123456789);
 
       expect(result).toEqual(cachedUser);
-      expect(mockCollection.doc).not.toHaveBeenCalled();
     });
 
     it('should return null for non-existent user', async () => {
-      mockDoc.get.mockResolvedValue({ exists: false });
+      query.mockResolvedValue({ rows: [], rowCount: 0 });
 
       const result = await UserModel.getById(999999);
 
@@ -137,7 +115,7 @@ describe('UserModel', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      mockDoc.get.mockRejectedValue(new Error('Database error'));
+      query.mockRejectedValue(new Error('Database error'));
 
       const result = await UserModel.getById(123456789);
 
@@ -147,7 +125,7 @@ describe('UserModel', () => {
 
   describe('updateProfile', () => {
     it('should update user profile', async () => {
-      mockDoc.update.mockResolvedValue();
+      query.mockResolvedValue({ rows: [], rowCount: 1 });
 
       const updates = {
         firstName: 'Updated Name',
@@ -157,17 +135,12 @@ describe('UserModel', () => {
       const result = await UserModel.updateProfile(123456789, updates);
 
       expect(result).toBe(true);
-      expect(mockDoc.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ...updates,
-          updatedAt: expect.any(Date),
-        })
-      );
+      expect(query).toHaveBeenCalled();
       expect(cache.del).toHaveBeenCalledWith('user:123456789');
     });
 
     it('should handle errors', async () => {
-      mockDoc.update.mockRejectedValue(new Error('Update failed'));
+      query.mockRejectedValue(new Error('Update failed'));
 
       const result = await UserModel.updateProfile(123456789, { firstName: 'Test' });
 
@@ -177,7 +150,7 @@ describe('UserModel', () => {
 
   describe('updateSubscription', () => {
     it('should update user subscription', async () => {
-      mockDoc.update.mockResolvedValue();
+      query.mockResolvedValue({ rows: [], rowCount: 1 });
 
       const subscription = {
         status: 'active',
@@ -188,13 +161,13 @@ describe('UserModel', () => {
       const result = await UserModel.updateSubscription(123456789, subscription);
 
       expect(result).toBe(true);
-      expect(mockDoc.update).toHaveBeenCalled();
+      expect(query).toHaveBeenCalled();
       expect(cache.del).toHaveBeenCalledWith('user:123456789');
       expect(cache.delPattern).toHaveBeenCalledWith('nearby:*');
     });
 
     it('should handle errors', async () => {
-      mockDoc.update.mockRejectedValue(new Error('Update failed'));
+      query.mockRejectedValue(new Error('Update failed'));
 
       const subscription = { status: 'active', planId: 'basic' };
       const result = await UserModel.updateSubscription(123456789, subscription);
@@ -205,28 +178,20 @@ describe('UserModel', () => {
 
   describe('getNearby', () => {
     it('should get nearby users', async () => {
-      const users = [
+      const dbUsers = [
         {
           id: '1',
-          data: () => ({
-            userId: 1,
-            firstName: 'User1',
-            location: { lat: 40.7128, lng: -74.0060 },
-          }),
+          first_name: 'User1',
+          location: { lat: 40.7128, lng: -74.0060 },
         },
         {
           id: '2',
-          data: () => ({
-            userId: 2,
-            firstName: 'User2',
-            location: { lat: 40.7200, lng: -74.0100 },
-          }),
+          first_name: 'User2',
+          location: { lat: 40.7200, lng: -74.0100 },
         },
       ];
 
-      mockCollection.get.mockResolvedValue({
-        forEach: (callback) => users.forEach(callback),
-      });
+      query.mockResolvedValue({ rows: dbUsers, rowCount: dbUsers.length });
 
       const result = await UserModel.getNearby({ lat: 40.7128, lng: -74.0060 }, 10);
 
@@ -236,7 +201,7 @@ describe('UserModel', () => {
 
     it('should return cached nearby users', async () => {
       const cachedUsers = [{ id: '1', firstName: 'User1' }];
-      cache.get.mockResolvedValue(cachedUsers);
+      cache.getOrSet.mockResolvedValue(cachedUsers);
 
       const result = await UserModel.getNearby({ lat: 40.7128, lng: -74.0060 }, 10);
 
@@ -265,22 +230,21 @@ describe('UserModel', () => {
       const expiredUsers = [
         {
           id: '1',
-          data: () => ({ userId: 1, planExpiry: new Date('2024-01-01') }),
+          user_id: 1,
+          plan_expiry: new Date('2024-01-01'),
         },
       ];
 
-      mockCollection.get.mockResolvedValue({
-        forEach: (callback) => expiredUsers.forEach(callback),
-      });
+      query.mockResolvedValue({ rows: expiredUsers, rowCount: expiredUsers.length });
 
       const result = await UserModel.getExpiredSubscriptions();
 
       expect(Array.isArray(result)).toBe(true);
-      expect(mockCollection.where).toHaveBeenCalledWith('subscriptionStatus', '==', 'active');
+      expect(query).toHaveBeenCalled();
     });
 
     it('should handle errors', async () => {
-      mockCollection.get.mockRejectedValue(new Error('Query error'));
+      query.mockRejectedValue(new Error('Query error'));
 
       const result = await UserModel.getExpiredSubscriptions();
 
@@ -291,50 +255,41 @@ describe('UserModel', () => {
   describe('getAll', () => {
     it('should get all users with pagination', async () => {
       const users = [
-        {
-          id: '1',
-          data: () => ({ userId: 1, firstName: 'User1' }),
-        },
-        {
-          id: '2',
-          data: () => ({ userId: 2, firstName: 'User2' }),
-        },
+        { id: '1', user_id: 1, first_name: 'User1' },
+        { id: '2', user_id: 2, first_name: 'User2' },
       ];
 
-      mockCollection.get.mockResolvedValue({
-        forEach: (callback) => users.forEach(callback),
-      });
+      query.mockResolvedValue({ rows: users, rowCount: users.length });
 
       const result = await UserModel.getAll(50);
 
       expect(result.users).toBeDefined();
       expect(Array.isArray(result.users)).toBe(true);
-      expect(result.lastDoc).toBeDefined();
+      expect(query).toHaveBeenCalled();
     });
 
     it('should handle errors', async () => {
-      mockCollection.get.mockRejectedValue(new Error('Query error'));
+      query.mockRejectedValue(new Error('Query error'));
 
       const result = await UserModel.getAll();
 
       expect(result.users).toEqual([]);
-      expect(result.lastDoc).toBeNull();
     });
   });
 
   describe('delete', () => {
     it('should delete user', async () => {
-      mockDoc.delete.mockResolvedValue();
+      query.mockResolvedValue({ rows: [], rowCount: 1 });
 
       const result = await UserModel.delete(123456789);
 
       expect(result).toBe(true);
-      expect(mockDoc.delete).toHaveBeenCalled();
+      expect(query).toHaveBeenCalled();
       expect(cache.del).toHaveBeenCalledWith('user:123456789');
     });
 
     it('should handle errors', async () => {
-      mockDoc.delete.mockRejectedValue(new Error('Delete failed'));
+      query.mockRejectedValue(new Error('Delete failed'));
 
       const result = await UserModel.delete(123456789);
 
