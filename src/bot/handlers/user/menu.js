@@ -178,38 +178,6 @@ const registerMenuHandlers = (bot) => {
     logger.info('Group menu actions have been disabled');
     await ctx.answerCbQuery('This feature has been disabled');
   });
-        '📋 *PNPtv! Community Rules*',
-        '',
-        '1️⃣ *Respect:* Treat all members with respect and courtesy',
-        '',
-        '2️⃣ *No Spam:* Avoid spam, unauthorized advertising or repetitive content',
-        '',
-        '3️⃣ *Privacy:* Do not share personal information of other members without their consent',
-        '',
-        '4️⃣ *Appropriate Content:* Content must be appropriate for the community',
-        '',
-        '5️⃣ *No Harassment:* Harassment, bullying or hostile behavior will not be tolerated',
-        '',
-        '6️⃣ *Bot Usage:* Use the bot privately for personal features (profile, subscriptions, payments)',
-        '',
-        '⚠️ *Breaking these rules may result in warnings, restrictions or expulsion from the group.*',
-        '',
-        'Thank you for keeping our community safe and enjoyable! 🙏'
-      ].join('\n');
-
-      const message = lang === 'es' ? rulesEs : rulesEn;
-
-      const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
-
-      // Auto-delete menu messages in groups after 2 minutes
-      const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
-      if (isGroup) {
-        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
-      }
-    } catch (error) {
-      logger.error('Error showing group rules:', error);
-    }
-  });
 };
 
 /**

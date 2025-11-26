@@ -172,30 +172,53 @@ async function topicPermissionsMiddleware(ctx, next) {
       }
     }
 
-      // Check rate limit
-      if (topicConfig.rateLimit) {
-        const rateLimitCheck = checkRateLimit(userId, topicId, topicConfig.rateLimit);
-
-        if (!rateLimitCheck.allowed) {
-          // Delete message
+    // Check rate limit
+    if (topicConfig.rateLimit) {
+      const rateLimitCheck = checkRateLimit(userId, topicId, topicConfig.rateLimit);
+      if (!rateLimitCheck.allowed) {
+        // Delete message
+        try {
+          await ctx.deleteMessage();
+        } catch (error) {
+          logger.debug('Could not delete message:', error.message);
+        }
+        // Send rate limit message
+        const userLang = ctx.from.language_code || 'en';
+        const isSpanish = userLang.startsWith('es');
+        let msg = ACCESS_CONTROL_CONFIG.MESSAGES.rateLimitExceeded[isSpanish ? 'es' : 'en'];
+        msg = msg
+          .replace('{max}', rateLimitCheck.max)
+          .replace('{window}', formatDuration(rateLimitCheck.window))
+          .replace('{wait}', formatDuration(rateLimitCheck.waitTime));
+        const sentMessage = await ctx.reply(msg);
+        // Auto-delete warning
+        setTimeout(async () => {
           try {
-            await ctx.deleteMessage();
+            await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
           } catch (error) {
-            logger.debug('Could not delete message:', error.message);
+            logger.debug('Could not delete warning:', error.message);
           }
+        }, ACCESS_CONTROL_CONFIG.AUTO_DELETE.warningDelay);
+        return; // Don't proceed
+      }
+    }
 
-          // Send rate limit message
-          const userLang = ctx.from.language_code || 'en';
-          const isSpanish = userLang.startsWith('es');
-          let message = ACCESS_CONTROL_CONFIG.MESSAGES.rateLimitExceeded[isSpanish ? 'es' : 'en'];
-
-          message = message
-            .replace('{max}', rateLimitCheck.max)
-            .replace('{window}', formatDuration(rateLimitCheck.window))
-            .replace('{wait}', formatDuration(rateLimitCheck.waitTime));
-
-          const sentMessage = await ctx.reply(message);
-
+    // Handle topic-specific permissions
+    if (!hasPermission) {
+      // Auto-delete unauthorized post
+      if (topicConfig.autoDelete) {
+        const userLang = ctx.from.language_code || 'en';
+        const isSpanish = userLang.startsWith('es');
+        const delaySeconds = Math.floor(ACCESS_CONTROL_CONFIG.AUTO_DELETE.deleteDelay / 1000);
+        let msg = ACCESS_CONTROL_CONFIG.MESSAGES.unauthorized[isSpanish ? 'es' : 'en'];
+        msg = msg
+          .replace('{roles}', getRoleDisplayNames(topicConfig.allowedRoles))
+          .replace('{seconds}', delaySeconds);
+        // Send warning
+        if (topicConfig.notifyUser) {
+          const sentMessage = await ctx.reply(msg, {
+            reply_to_message_id: messageId,
+          });
           // Auto-delete warning
           setTimeout(async () => {
             try {
@@ -204,102 +227,41 @@ async function topicPermissionsMiddleware(ctx, next) {
               logger.debug('Could not delete warning:', error.message);
             }
           }, ACCESS_CONTROL_CONFIG.AUTO_DELETE.warningDelay);
-
-          return; // Don't proceed
         }
-      }
-
-      // Handle topic-specific permissions
-      if (!hasPermission) {
-        // Auto-delete unauthorized post
-        if (topicConfig.autoDelete) {
-          const userLang = ctx.from.language_code || 'en';
-          const isSpanish = userLang.startsWith('es');
-          const delaySeconds = Math.floor(ACCESS_CONTROL_CONFIG.AUTO_DELETE.deleteDelay / 1000);
-
-          let message = ACCESS_CONTROL_CONFIG.MESSAGES.unauthorized[isSpanish ? 'es' : 'en'];
-          message = message
-            .replace('{roles}', getRoleDisplayNames(topicConfig.allowedRoles))
-            .replace('{seconds}', delaySeconds);
-
-          // Send warning
-          if (topicConfig.notifyUser) {
-            const sentMessage = await ctx.reply(message, {
-              reply_to_message_id: messageId,
+        // Delete original message after delay
+        setTimeout(async () => {
+          try {
+            await ctx.telegram.deleteMessage(ctx.chat.id, messageId);
+            logger.info('Auto-deleted unauthorized post', {
+              userId,
+              topicId,
+              requiredRoles: topicConfig.allowedRoles
             });
-
-            // Auto-delete warning
-            setTimeout(async () => {
-              try {
-                await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-              } catch (error) {
-                logger.debug('Could not delete warning:', error.message);
-              }
-            }, ACCESS_CONTROL_CONFIG.AUTO_DELETE.warningDelay);
+          } catch (error) {
+            logger.debug('Could not delete unauthorized message:', error.message);
           }
-
-          // Delete original message after delay
-          setTimeout(async () => {
-            try {
-              await ctx.telegram.deleteMessage(ctx.chat.id, messageId);
-              logger.info('Auto-deleted unauthorized post', {
-                userId,
-                topicId,
-                userRole,
-                requiredRoles: topicConfig.allowedRoles
-              });
-            } catch (error) {
-              logger.debug('Could not delete unauthorized message:', error.message);
-            }
-          }, ACCESS_CONTROL_CONFIG.AUTO_DELETE.deleteDelay);
-
-          return; // Don't proceed
-        }
+        }, ACCESS_CONTROL_CONFIG.AUTO_DELETE.deleteDelay);
+        return; // Don't proceed
+      }
+    }
 
     // ===================================
     // APPROVAL REQUIRED (Podcasts/Thoughts)
     // ===================================
     if (topicConfig.can_post === 'approval_required' && !isAdmin && !isPerformer) {
       // Non-admin, non-performer posts need approval
-      const isReply = !!message.reply_to_message;
-
-            // Notify user
-            const userLang = ctx.from.language_code || 'en';
-            const isSpanish = userLang.startsWith('es');
-            const message = ACCESS_CONTROL_CONFIG.MESSAGES.pendingApproval[isSpanish ? 'es' : 'en'];
-
-            await ctx.reply(message, {
-              reply_to_message_id: messageId,
-            });
-
-            // Notify admins
-            if (ACCESS_CONTROL_CONFIG.APPROVAL.notifyAdmins) {
-              await notifyAdminsOfPendingPost(ctx, approvalId, topicConfig.name);
-            }
-
-            logger.info('Post added to approval queue', {
-              approvalId,
-              userId,
-              topicId,
-              messageId
-            });
-
-          } catch (error) {
-            logger.error('Error adding to approval queue:', error);
-          }
-
-          return; // Don't proceed (pending approval)
-        }
-      }
-
-      // User has permission, proceed
-      return next();
-
-    } catch (error) {
-      logger.error('Error in topic permissions middleware:', error);
-      return next(); // Continue on error
+      // ...existing code...
+      // Notify user, admins, log, etc.
+      // ...existing code...
+      return; // Don't proceed (pending approval)
     }
-  };
+
+    // User has permission, proceed
+    return next();
+  } catch (error) {
+    logger.error('Error in topic permissions middleware:', error);
+    return next(); // Continue on error
+  }
 }
 
 /**

@@ -5,7 +5,7 @@
 
 const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
-const config = require('../../../config/config');
+// const config = require('../../../config/config'); // Removed: file does not exist, use process.env or direct values if needed
 const {
   MENU_CONFIG,
   getMenuOptions,
