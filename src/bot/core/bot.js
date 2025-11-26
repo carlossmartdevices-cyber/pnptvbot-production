@@ -1,312 +1,320 @@
-require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
-const { initializeFirebase } = require('../../config/firebase');
-const { initializeRedis } = require('../../config/redis');
-const { initSentry } = require('./plugins/sentry');
+const { config, validateConfig } = require('../config/botConfig');
+const { initializeFirebase } = require('../config/firebase');
+const { initializeSentry, sentryErrorHandler } = require('./plugins/sentry');
+const { chatTypeMiddleware } = require('./middleware/chatType');
+const { checkAdminStatus, adminOnly } = require('./middleware/admin');
+const { rateLimitMiddleware } = require('./middleware/rateLimit');
 const sessionMiddleware = require('./middleware/session');
-const rateLimitMiddleware = require('./middleware/rateLimit');
-const chatCleanupMiddleware = require('./middleware/chatCleanup');
-const usernameEnforcement = require('./middleware/usernameEnforcement');
-const moderationFilter = require('./middleware/moderationFilter');
-const activityTrackerMiddleware = require('./middleware/activityTracker');
-const groupCommandReminder = require('./middleware/groupCommandReminder');
-const errorHandler = require('./middleware/errorHandler');
+const i18n = require('../utils/i18n');
 const logger = require('../../utils/logger');
+const userService = require('../services/userService');
 
-// Handlers
-const registerUserHandlers = require('../handlers/user');
-const registerAdminHandlers = require('../handlers/admin');
-const registerPaymentHandlers = require('../handlers/payments');
-const registerMediaHandlers = require('../handlers/media');
-const registerModerationHandlers = require('../handlers/moderation');
-const registerModerationAdminHandlers = require('../handlers/moderation/adminCommands');
-const registerCallManagementHandlers = require('../handlers/admin/callManagement');
-const registerRoleManagementHandlers = require('../handlers/admin/roleManagement');
-const registerGamificationHandlers = require('../handlers/admin/gamification');
-const registerLiveStreamManagementHandlers = require('../handlers/admin/liveStreamManagement');
-const registerRadioManagementHandlers = require('../handlers/admin/radioManagement');
-const registerPrivateCallHandlers = require('../handlers/user/privateCalls');
-const registerPaymentHistoryHandlers = require('../handlers/user/paymentHistory');
-const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnalytics');
-const registerUserCallManagementHandlers = require('../handlers/user/callManagement');
-const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
-const registerCallPackageHandlers = require('../handlers/user/callPackages');
+// Import handlers
+const {
+  handleStart,
+  handleLanguageSelection,
+  handleAgeVerification,
+  handleTermsAcceptance,
+  handleUsernameInput,
+  handleBioInput,
+  handleLocationInput,
+} = require('../handlers/user/start');
 
-// Services
-const CallReminderService = require('../services/callReminderService');
-const GroupCleanupService = require('../services/groupCleanupService');
+const { handleSubscribe, handlePlanSelection, handlePaymentMethod } = require('../handlers/user/subscribe');
+const { handleProfile, handleEditProfile, handleEditField, handleProfileUpdate } = require('../handlers/user/profile');
+const { handleNearby } = require('../handlers/user/nearby');
+const { handleSupport } = require('../handlers/user/support');
+const { handleSettings, handleSettingsLanguage, handleLanguageChange } = require('../handlers/user/settings');
 
-// Models for cache prewarming
-const PlanModel = require('../../models/planModel');
+const { handleLiveStreams } = require('../handlers/group/liveStreams');
+const { handleRadio } = require('../handlers/group/radio');
+const { handleZoomRooms } = require('../handlers/group/zoomRooms');
 
-// API Server
-const apiApp = require('../api/routes');
+const { handleAdminDashboard } = require('../handlers/admin/dashboard');
+const {
+  handleBroadcastMenu,
+  handleBroadcastType,
+  handleBroadcastInput,
+  handleBroadcastConfirm,
+} = require('../handlers/admin/broadcast');
+const { handleUserManagement, handleUserSearch, handleExtendSubscription } = require('../handlers/admin/users');
+const {
+  handleAnalytics,
+  handleUserGrowthAnalytics,
+  handleRevenueAnalytics,
+  handlePlanDistributionAnalytics,
+} = require('../handlers/admin/analytics');
 
-/**
- * Validate critical environment variables
- */
-const validateCriticalEnvVars = () => {
-  const criticalVars = ['BOT_TOKEN', 'FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL'];
-  const missing = criticalVars.filter((varName) => !process.env[varName]);
-
-  if (missing.length > 0) {
-    logger.error(`Missing critical environment variables: ${missing.join(', ')}`);
-    logger.error('Please configure these variables in your .env file');
-    throw new Error(`Missing critical environment variables: ${missing.join(', ')}`);
-  }
-};
+const { getMainMenu } = require('../utils/menus');
 
 /**
- * Initialize and start the bot
+ * Initialize and configure the bot
  */
-const startBot = async () => {
+function createBot() {
   try {
-    logger.info('Starting PNPtv Telegram Bot...');
+    // Validate configuration
+    validateConfig();
 
-    // Validate critical environment variables
-    try {
-      validateCriticalEnvVars();
-      logger.info('✓ Environment variables validated');
-    } catch (error) {
-      logger.error('CRITICAL: Missing environment variables, cannot start bot');
-      logger.error(error.message);
-      logger.error('Please configure all required environment variables in your .env file');
-      process.exit(1);
-    }
+    // Initialize Firebase
+    initializeFirebase();
 
-    // Initialize Sentry (optional)
-    try {
-      initSentry();
-      logger.info('✓ Sentry initialized');
-    } catch (error) {
-      logger.warn('Sentry initialization failed, continuing without monitoring:', error.message);
-    }
-
-    // Initialize Firebase (with fallback)
-    try {
-      initializeFirebase();
-      logger.info('✓ Firebase initialized');
-    } catch (error) {
-      logger.error('Firebase initialization failed. Bot will run in DEGRADED mode without database.');
-      logger.error('Error:', error.message);
-      logger.warn('⚠️  Bot features requiring database will not work!');
-      // NO hacemos throw, permitimos que el bot continúe
-    }
-
-    // Initialize Redis (optional, will use default localhost if not configured)
-    try {
-      initializeRedis();
-      logger.info('✓ Redis initialized');
-
-      // Prewarm cache with critical data
-      try {
-        await PlanModel.prewarmCache();
-        logger.info('✓ Cache prewarmed successfully');
-      } catch (cacheError) {
-        logger.warn('Cache prewarming failed, continuing:', cacheError.message);
-      }
-    } catch (error) {
-      logger.warn('Redis initialization failed, continuing without cache:', error.message);
-      logger.warn('⚠️  Performance may be degraded without caching');
-    }
+    // Initialize Sentry
+    initializeSentry();
 
     // Create bot instance
-    const bot = new Telegraf(process.env.BOT_TOKEN);
+    const bot = new Telegraf(config.botToken);
+
+    logger.info('Bot instance created successfully');
 
     // Register middleware
-    bot.use(sessionMiddleware());
-    bot.use(rateLimitMiddleware());
-    bot.use(chatCleanupMiddleware()); // Auto-delete bot messages, commands, and system messages after 5 min
-    bot.use(usernameEnforcement()); // Require username and track changes
-    bot.use(moderationFilter()); // Moderation filter for group messages
-    bot.use(activityTrackerMiddleware()); // Track user activity for gamification
-    bot.use(groupCommandReminder()); // Remind users to use bot in private when using commands in groups
+    registerMiddleware(bot);
 
     // Register handlers
-    registerUserHandlers(bot);
-    registerAdminHandlers(bot);
-    registerPaymentHandlers(bot);
-    registerMediaHandlers(bot);
-    registerModerationHandlers(bot); // User moderation commands
-    registerModerationAdminHandlers(bot); // Admin moderation commands
-    registerCallManagementHandlers(bot); // Admin call management
-    registerRoleManagementHandlers(bot); // Admin role management (superadmin only)
-    registerGamificationHandlers(bot); // Admin gamification management
-    registerLiveStreamManagementHandlers(bot); // Admin live stream management
-    registerRadioManagementHandlers(bot); // Admin radio management
-    registerPrivateCallHandlers(bot); // User private call booking
-    registerPaymentHistoryHandlers(bot); // User payment history and receipts
-    registerPaymentAnalyticsHandlers(bot); // Admin payment analytics dashboard
-    registerUserCallManagementHandlers(bot); // User call management (reschedule, cancel)
-    registerCallFeedbackHandlers(bot); // Post-call feedback and ratings
-    registerCallPackageHandlers(bot); // Call packages (bulk pricing)
-
-    // Initialize call reminder service (automated reminders)
-    CallReminderService.initialize(bot);
-    logger.info('✓ Call reminder service initialized');
-
-    // Initialize group cleanup service (spam removal at 12:00 and 00:00 UTC)
-    const groupCleanup = new GroupCleanupService(bot);
-    groupCleanup.initialize();
+    registerHandlers(bot);
 
     // Error handling
-    bot.catch(errorHandler);
-
-    // Start bot
-    if (process.env.NODE_ENV === 'production' && process.env.BOT_WEBHOOK_DOMAIN) {
-      // Webhook mode for production
-      const webhookPath = process.env.BOT_WEBHOOK_PATH || '/webhook/telegram';
-      const webhookUrl = `${process.env.BOT_WEBHOOK_DOMAIN}${webhookPath}`;
-
-      await bot.telegram.setWebhook(webhookUrl);
-      logger.info(`✓ Webhook set to: ${webhookUrl}`);
-
-      // Register webhook callback BEFORE 404 handler
-      // Use bot.handleUpdate() directly since express.json() already parses the body
-      // bot.webhookCallback() expects raw body, but express.json() consumes it
-      apiApp.post(webhookPath, async (req, res) => {
-        // Disable response timeout for this specific route
-        req.setTimeout(0);
-        res.setTimeout(0);
-
-        // Set headers for stable connection
-        res.setHeader('Connection', 'keep-alive');
-        res.setHeader('Content-Type', 'application/json');
-
-        try {
-          logger.info('Telegram webhook received:', {
-            hasBody: !!req.body,
-            bodySize: req.body ? JSON.stringify(req.body).length : 0,
-            contentType: req.headers['content-type'],
-            method: req.method,
-            path: req.path,
-            // Do not log IP or User-Agent for privacy
-            // Do not log bodyKeys as they may contain sensitive field names
-          });
-
-          // Validate that we have a body
-          if (!req.body || Object.keys(req.body).length === 0) {
-            logger.warn('Webhook received empty body');
-            return res.status(200).json({ ok: true, message: 'Empty body received' });
-          }
-
-          // Process the update
-          await bot.handleUpdate(req.body);
-
-          // Send success response
-          res.status(200).json({ ok: true });
-          logger.info('Webhook processed successfully');
-        } catch (error) {
-          logger.error('Error processing Telegram webhook:', {
-            error: error.message,
-            stack: error.stack,
-            body: req.body,
-          });
-
-          // Always send a response to prevent connection reset
-          // Telegram expects a response even on errors
-          res.status(200).json({ ok: false, error: error.message });
-        }
+    bot.catch((error, ctx) => {
+      logger.error('Bot error:', error);
+      sentryErrorHandler()(ctx, async () => {
+        throw error;
       });
-      logger.info(`✓ Webhook callback registered at: ${webhookPath}`);
-
-      // Add a test endpoint to verify webhook configuration
-      apiApp.get(webhookPath, (req, res) => {
-        res.status(200).json({
-          status: 'ok',
-          message: 'Telegram webhook endpoint is active',
-          path: webhookPath,
-          webhookUrl,
-          note: 'This endpoint only accepts POST requests from Telegram',
-        });
-      });
-      logger.info(`✓ Webhook test endpoint registered at: ${webhookPath} (GET)`);
-    } else {
-      // Polling mode for development
-      await bot.telegram.deleteWebhook();
-      await bot.launch();
-      logger.info('✓ Bot started in polling mode');
-    }
-
-    // Add 404 and error handlers AFTER webhook callback
-    const {
-      errorHandler: expressErrorHandler,
-      notFoundHandler: expressNotFoundHandler
-    } = require('../api/middleware/errorHandler');
-    apiApp.use(expressNotFoundHandler);
-    apiApp.use(expressErrorHandler);
-    logger.info('✓ Error handlers registered');
-
-    // Start API server with proper connection handling
-    const PORT = process.env.PORT || 3000;
-    const server = apiApp.listen(PORT, () => {
-      logger.info(`✓ API server running on port ${PORT}`);
     });
 
-    // Configure server timeouts and keepalive to prevent connection resets
-    server.keepAliveTimeout = 65000; // Slightly higher than nginx timeout
-    server.headersTimeout = 66000; // Higher than keepAliveTimeout
-    server.timeout = 120000; // 2 minutes total timeout for long requests
-
-    logger.info('🚀 PNPtv Telegram Bot is running!');
-
-    // Graceful shutdown
-    process.once('SIGINT', () => {
-      logger.info('Received SIGINT, stopping bot...');
-      bot.stop('SIGINT');
-    });
-
-    process.once('SIGTERM', () => {
-      logger.info('Received SIGTERM, stopping bot...');
-      bot.stop('SIGTERM');
-    });
+    return bot;
   } catch (error) {
-    logger.error('❌ CRITICAL ERROR during bot startup:', error);
-    logger.error('Stack trace:', error.stack);
-    logger.warn('⚠️  Bot encountered a critical error but will attempt to keep process alive');
-    logger.warn('⚠️  Some features may not work properly. Check logs above for details.');
-
-    // NO hacemos process.exit(1) para que el proceso no muera
-    // En Railway/Render esto evita reinicios infinitos
-    // El proceso se mantiene vivo pero en estado degradado
-
-    // Intentar mantener el proceso vivo con un servidor mínimo
-    try {
-      const PORT = process.env.PORT || 3000;
-      apiApp.listen(PORT, () => {
-        logger.info(`⚠️  Emergency API server running on port ${PORT} (degraded mode)`);
-        logger.info('Bot is NOT fully functional. Fix configuration and restart.');
-      });
-    } catch (apiError) {
-      logger.error('Failed to start emergency API server:', apiError);
-      // Como último recurso, mantener el proceso vivo sin hacer nada
-      logger.warn('Process will stay alive but non-functional. Manual intervention required.');
-    }
+    logger.error('Failed to create bot:', error);
+    throw error;
   }
-};
-
-// Manejadores globales de errores para evitar que el proceso muera
-process.on('uncaughtException', (error) => {
-  logger.error('❌ UNCAUGHT EXCEPTION:', error);
-  logger.error('Stack:', error.stack);
-  logger.warn('Process will continue despite uncaught exception');
-  // NO hacer process.exit(), mantener el proceso vivo
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('❌ UNHANDLED PROMISE REJECTION:', reason);
-  logger.error('Promise:', promise);
-  logger.warn('Process will continue despite unhandled rejection');
-  // NO hacer process.exit(), mantener el proceso vivo
-});
-
-// Start the bot
-if (require.main === module) {
-  startBot().catch((err) => {
-    logger.error('Unhandled error in startBot():', err);
-    logger.warn('Process will stay alive despite error');
-    // No hacer nada más, mantener proceso vivo
-  });
 }
 
-module.exports = { startBot };
+/**
+ * Register middleware
+ */
+function registerMiddleware(bot) {
+  // Chat type detection
+  bot.use(chatTypeMiddleware());
+
+  // Session management
+  bot.use(sessionMiddleware.middleware());
+
+  // Rate limiting
+  bot.use(rateLimitMiddleware());
+
+  // Admin status check
+  bot.use(checkAdminStatus());
+
+  // User context middleware
+  bot.use(async (ctx, next) => {
+    if (ctx.from) {
+      ctx.user = await userService.getUser(ctx.from.id);
+    }
+    return next();
+  });
+
+  // i18n middleware
+  bot.use(i18n.middleware());
+
+  logger.info('Middleware registered');
+}
+
+/**
+ * Register all command and callback handlers
+ */
+function registerHandlers(bot) {
+  // ===== USER COMMANDS =====
+  bot.command('start', handleStart);
+  bot.command('profile', handleProfile);
+  bot.command('subscribe', handleSubscribe);
+  bot.command('nearby', handleNearby);
+  bot.command('support', handleSupport);
+  bot.command('settings', handleSettings);
+
+  // ===== GROUP COMMANDS =====
+  bot.hears(/live streams?|transmisiones/i, handleLiveStreams);
+  bot.hears(/radio/i, handleRadio);
+  bot.hears(/zoom rooms?|salas zoom/i, handleZoomRooms);
+
+  // ===== ADMIN COMMANDS =====
+  bot.command('admin', adminOnly(), handleAdminDashboard);
+
+  // ===== CALLBACK QUERY HANDLERS =====
+
+  // Language selection
+  bot.action(/^lang_/, handleLanguageSelection);
+
+  // Onboarding callbacks
+  bot.action(/^accept_terms$/, handleTermsAcceptance);
+  bot.action(/^decline_terms$/, handleTermsAcceptance);
+
+  // Main menu callbacks
+  bot.action('menu_profile', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleProfile(ctx);
+  });
+
+  bot.action('menu_subscribe', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleSubscribe(ctx);
+  });
+
+  bot.action('menu_nearby', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleNearby(ctx);
+  });
+
+  bot.action('menu_streams', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleLiveStreams(ctx);
+  });
+
+  bot.action('menu_radio', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleRadio(ctx);
+  });
+
+  bot.action('menu_zoom', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleZoomRooms(ctx);
+  });
+
+  bot.action('menu_support', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleSupport(ctx);
+  });
+
+  bot.action('menu_settings', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleSettings(ctx);
+  });
+
+  // Profile callbacks
+  bot.action('edit_profile', handleEditProfile);
+  bot.action(/^edit_(username|bio|location)$/, handleEditField);
+
+  // Subscription callbacks
+  bot.action(/^plan_/, handlePlanSelection);
+  bot.action(/^pay_(epayco|daimo)_/, handlePaymentMethod);
+
+  // Settings callbacks
+  bot.action('settings_language', handleSettingsLanguage);
+
+  // Admin callbacks
+  bot.action('admin_broadcast', handleBroadcastMenu);
+  bot.action(/^broadcast_(text|photo|video)$/, handleBroadcastType);
+  bot.action(/^confirm_broadcast$/, async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleBroadcastConfirm(ctx, bot);
+  });
+  bot.action(/^cancel_broadcast$/, async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleBroadcastConfirm(ctx, bot);
+  });
+
+  bot.action('admin_users', handleUserManagement);
+  bot.action(/^admin_extend_sub_/, handleExtendSubscription);
+
+  bot.action('admin_analytics', handleAnalytics);
+  bot.action('analytics_users', handleUserGrowthAnalytics);
+  bot.action('analytics_revenue', handleRevenueAnalytics);
+  bot.action('analytics_plans', handlePlanDistributionAnalytics);
+
+  // Back navigation callbacks
+  bot.action('back_main', async (ctx) => {
+    await ctx.answerCbQuery();
+    const user = await userService.getUser(ctx.from.id);
+    const language = user?.language || 'en';
+    await ctx.editMessageText(
+      i18n.t('welcome', language),
+      { reply_markup: getMainMenu(language) }
+    );
+  });
+
+  bot.action('back_admin', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleAdminDashboard(ctx);
+  });
+
+  bot.action('back_plans', async (ctx) => {
+    await ctx.answerCbQuery();
+    await handleSubscribe(ctx);
+  });
+
+  // ===== TEXT MESSAGE HANDLERS =====
+  bot.on('text', async (ctx) => {
+    const session = ctx.session || {};
+
+    // Handle onboarding steps
+    if (session.step === 'age_verification') {
+      await handleAgeVerification(ctx);
+      return;
+    }
+
+    if (session.step === 'username_input') {
+      await handleUsernameInput(ctx);
+      return;
+    }
+
+    if (session.step === 'bio_input') {
+      await handleBioInput(ctx);
+      return;
+    }
+
+    // Handle admin broadcast input
+    if (session.waitingForBroadcast) {
+      const handled = await handleBroadcastInput(ctx, bot);
+      if (handled) return;
+    }
+
+    // Handle admin user search
+    if (session.waitingForUserSearch) {
+      const handled = await handleUserSearch(ctx);
+      if (handled) return;
+    }
+
+    // Handle profile editing
+    if (session.editingField) {
+      await handleProfileUpdate(ctx, session.editingField, ctx.message.text);
+      return;
+    }
+
+    // Default: ignore or show help
+    // (Optional: show a help message for unrecognized commands)
+  });
+
+  // ===== LOCATION HANDLER =====
+  bot.on('location', async (ctx) => {
+    const session = ctx.session || {};
+
+    if (session.step === 'location_input') {
+      await handleLocationInput(ctx);
+      return;
+    }
+
+    // Update user location if they share it anytime
+    try {
+      const { latitude, longitude } = ctx.message.location;
+      await userService.updateUser(ctx.from.id, {
+        location: { lat: latitude, lng: longitude },
+      });
+      await ctx.reply('✅ Location updated!');
+    } catch (error) {
+      logger.error('Error updating location:', error);
+    }
+  });
+
+  // ===== PHOTO/VIDEO HANDLERS (for broadcast) =====
+  bot.on(['photo', 'video'], async (ctx) => {
+    const session = ctx.session || {};
+
+    if (session.waitingForBroadcast) {
+      await handleBroadcastInput(ctx, bot);
+    }
+  });
+
+  logger.info('Handlers registered');
+}
+
+module.exports = {
+  createBot,
+};
