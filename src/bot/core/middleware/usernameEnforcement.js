@@ -16,12 +16,14 @@ const usernameEnforcement = () => {
   // Cache to track last known usernames
   const usernameCache = new Map();
 
+  let nextCalled = false;
   return async (ctx, next) => {
     const chatType = ctx.chat?.type;
 
     // Only apply to groups and supergroups
     if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
-      return next();
+      if (!nextCalled) { nextCalled = true; await next(); }
+      return;
     }
 
     const userId = ctx.from?.id;
@@ -29,7 +31,8 @@ const usernameEnforcement = () => {
     const groupId = ctx.chat.id;
 
     if (!userId) {
-      return next();
+      if (!nextCalled) { nextCalled = true; await next(); }
+      return;
     }
 
     try {
@@ -62,11 +65,11 @@ const usernameEnforcement = () => {
       }
 
       // Continue with message processing
-      await next();
+      if (!nextCalled) { nextCalled = true; await next(); }
     } catch (error) {
       logger.error('Username enforcement error:', error);
       // On error, allow message through to avoid blocking legitimate users
-      return next();
+      if (!nextCalled) { nextCalled = true; await next(); }
     }
   };
 };
@@ -129,7 +132,11 @@ async function handleNoUsername(ctx, userId, groupId) {
     try {
       await ctx.deleteMessage();
     } catch (error) {
-      logger.debug('Could not delete message from user without username:', error.message);
+      if (error.message && error.message.includes('message to delete not found')) {
+        logger.debug('Message to delete not found, ignoring.');
+      } else {
+        logger.debug('Could not delete message from user without username:', error.message);
+      }
     }
 
     // Send warning message
@@ -143,6 +150,8 @@ async function handleNoUsername(ctx, userId, groupId) {
     warningMessage += '4. Return to this group once set\n\n';
     warningMessage += 'Your messages will be deleted until you set a username.';
 
+    // Sanitize warningMessage for Markdown
+    warningMessage = warningMessage.replace(/([*_`])/g, '\\$1');
     const sentMessage = await ctx.reply(warningMessage, {
       parse_mode: 'Markdown',
     });
@@ -152,11 +161,13 @@ async function handleNoUsername(ctx, userId, groupId) {
 
     // Try to send private message
     try {
+      let pmMsg = '⚠️ **Username Required**\n\n'
+        + `You need to set a Telegram username (@username) to participate in **${ctx.chat.title}**.\n\n`
+        + 'Please set your username in Settings and return to the group.';
+      pmMsg = pmMsg.replace(/([*_`])/g, '\\$1');
       await ctx.telegram.sendMessage(
         userId,
-        '⚠️ **Username Required**\n\n'
-        + `You need to set a Telegram username (@username) to participate in **${ctx.chat.title}**.\n\n`
-        + 'Please set your username in Settings and return to the group.',
+        pmMsg,
         { parse_mode: 'Markdown' },
       );
     } catch (error) {
