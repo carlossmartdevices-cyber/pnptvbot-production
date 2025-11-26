@@ -1,118 +1,19 @@
-const { Markup } = require('telegraf');
-const moment = require('moment');
-const UserService = require('../../services/userService');
-const UserModel = require('../../../models/userModel');
-const { t } = require('../../../utils/i18n');
+const { requirePrivateChat } = require('../../utils/notifications');
+const { getBackButton } = require('../../utils/menus');
+const userService = require('../../services/userService');
+const i18n = require('../../utils/i18n');
 const logger = require('../../../utils/logger');
-const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
 /**
- * Profile handlers
- * @param {Telegraf} bot - Bot instance
+ * Handle profile command
  */
 const registerProfileHandlers = (bot) => {
-  // Show own profile
+  // Show profile
   bot.action('show_profile', async (ctx) => {
     try {
-      await showProfile(ctx, ctx.from.id, true, true);
+      await showProfile(ctx, true);
     } catch (error) {
       logger.error('Error showing profile:', error);
-    }
-  });
-
-  // Show privacy settings
-  bot.action('privacy_settings', async (ctx) => {
-    try {
-      await showPrivacySettings(ctx);
-    } catch (error) {
-      logger.error('Error showing privacy settings:', error);
-    }
-  });
-
-  // Toggle privacy settings
-  bot.action(/^privacy_toggle_(.+)$/, async (ctx) => {
-    try {
-      const setting = ctx.match[1];
-      await togglePrivacySetting(ctx, setting);
-    } catch (error) {
-      logger.error('Error toggling privacy setting:', error);
-    }
-  });
-
-  // Show favorites
-  bot.action('show_favorites', async (ctx) => {
-    try {
-      await showFavorites(ctx);
-    } catch (error) {
-      logger.error('Error showing favorites:', error);
-    }
-  });
-
-  // Show blocked users
-  bot.action('show_blocked', async (ctx) => {
-    try {
-      await showBlockedUsers(ctx);
-    } catch (error) {
-      logger.error('Error showing blocked users:', error);
-    }
-  });
-
-  // View user profile
-  bot.action(/^view_user_(\d+)$/, async (ctx) => {
-    try {
-      const targetUserId = ctx.match[1];
-      await showProfile(ctx, targetUserId, true, false);
-    } catch (error) {
-      logger.error('Error viewing user profile:', error);
-    }
-  });
-
-  // Add to favorites
-  bot.action(/^add_favorite_(\d+)$/, async (ctx) => {
-    try {
-      const targetUserId = ctx.match[1];
-      await addToFavorites(ctx, targetUserId);
-    } catch (error) {
-      logger.error('Error adding to favorites:', error);
-    }
-  });
-
-  // Remove from favorites
-  bot.action(/^remove_favorite_(\d+)$/, async (ctx) => {
-    try {
-      const targetUserId = ctx.match[1];
-      await removeFromFavorites(ctx, targetUserId);
-    } catch (error) {
-      logger.error('Error removing from favorites:', error);
-    }
-  });
-
-  // Block user
-  bot.action(/^block_user_(\d+)$/, async (ctx) => {
-    try {
-      const targetUserId = ctx.match[1];
-      await blockUser(ctx, targetUserId);
-    } catch (error) {
-      logger.error('Error blocking user:', error);
-    }
-  });
-
-  // Unblock user
-  bot.action(/^unblock_user_(\d+)$/, async (ctx) => {
-    try {
-      const targetUserId = ctx.match[1];
-      await unblockUser(ctx, targetUserId);
-    } catch (error) {
-      logger.error('Error unblocking user:', error);
-    }
-  });
-
-  // Share profile
-  bot.action('share_profile', async (ctx) => {
-    try {
-      await shareProfile(ctx);
-    } catch (error) {
-      logger.error('Error sharing profile:', error);
     }
   });
 
@@ -122,21 +23,10 @@ const registerProfileHandlers = (bot) => {
       const lang = getLanguage(ctx);
       ctx.session.temp.waitingForPhoto = true;
       await ctx.saveSession();
+
       await ctx.editMessageText(t('sendPhoto', lang));
     } catch (error) {
       logger.error('Error in edit photo:', error);
-    }
-  });
-
-  // Edit 'looking_for' field
-  bot.action('edit_looking_for', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      ctx.session.temp.waitingForLookingFor = true;
-      await ctx.saveSession();
-      await ctx.editMessageText(t('sendLookingFor', lang));
-    } catch (error) {
-      logger.error('Error in edit looking_for:', error);
     }
   });
 
@@ -145,6 +35,7 @@ const registerProfileHandlers = (bot) => {
       const lang = getLanguage(ctx);
       ctx.session.temp.waitingForBio = true;
       await ctx.saveSession();
+
       await ctx.editMessageText(t('sendBio', lang));
     } catch (error) {
       logger.error('Error in edit bio:', error);
@@ -157,15 +48,11 @@ const registerProfileHandlers = (bot) => {
       ctx.session.temp.waitingForLocation = true;
       await ctx.saveSession();
 
-      await ctx.answerCbQuery();
-
-      // Send new message with location request keyboard
-      await ctx.reply(
+      await ctx.editMessageText(
         t('sendLocation', lang),
-        Markup.keyboard([
-          [Markup.button.locationRequest(lang === 'es' ? '📍 Compartir Ubicación' : '📍 Share Location')],
-          [lang === 'es' ? '❌ Cancelar' : '❌ Cancel'],
-        ]).resize(),
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('back', lang), 'show_profile')],
+        ]),
       );
     } catch (error) {
       logger.error('Error in edit location:', error);
@@ -177,6 +64,7 @@ const registerProfileHandlers = (bot) => {
       const lang = getLanguage(ctx);
       ctx.session.temp.waitingForInterests = true;
       await ctx.saveSession();
+
       await ctx.editMessageText(t('sendInterests', lang));
     } catch (error) {
       logger.error('Error in edit interests:', error);
@@ -258,14 +146,6 @@ const registerProfileHandlers = (bot) => {
     if (ctx.session.temp?.waitingForPhoto) {
       try {
         const lang = getLanguage(ctx);
-
-        // Validate photo exists
-        if (!ctx.message?.photo || ctx.message.photo.length === 0) {
-          logger.warn('Photo handler triggered but no photo found');
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-
         const photo = ctx.message.photo[ctx.message.photo.length - 1];
 
         await UserService.updateProfile(ctx.from.id, {
@@ -276,7 +156,7 @@ const registerProfileHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(t('photoUpdated', lang));
-        await showProfile(ctx, ctx.from.id, false, true);
+        await showProfile(ctx, false);
       } catch (error) {
         logger.error('Error updating photo:', error);
       }
@@ -289,16 +169,8 @@ const registerProfileHandlers = (bot) => {
   // Handle location
   bot.on('location', async (ctx, next) => {
     if (ctx.session.temp?.waitingForLocation) {
-      const lang = getLanguage(ctx);
-
       try {
-        // Validate location exists
-        if (!ctx.message?.location || !ctx.message.location.latitude || !ctx.message.location.longitude) {
-          logger.warn('Location handler triggered but no valid location found');
-          await ctx.reply(t('invalidInput', lang), Markup.removeKeyboard());
-          return;
-        }
-
+        const lang = getLanguage(ctx);
         const { latitude, longitude } = ctx.message.location;
 
         const result = await UserService.updateLocation(ctx.from.id, {
@@ -310,14 +182,13 @@ const registerProfileHandlers = (bot) => {
         await ctx.saveSession();
 
         if (result.success) {
-          await ctx.reply(t('locationUpdated', lang), Markup.removeKeyboard());
-          await showProfile(ctx, ctx.from.id, false, true);
+          await ctx.reply(t('locationUpdated', lang));
+          await showProfile(ctx, false);
         } else {
-          await ctx.reply(t('error', lang), Markup.removeKeyboard());
+          await ctx.reply(t('error', lang));
         }
       } catch (error) {
         logger.error('Error updating location:', error);
-        await ctx.reply(t('error', lang), Markup.removeKeyboard());
       }
       return;
     }
@@ -325,61 +196,29 @@ const registerProfileHandlers = (bot) => {
     return next();
   });
 
-  // Handle text inputs (bio, interests, cancel)
+  // Handle text inputs (bio, interests)
   bot.on('text', async (ctx, next) => {
     const { temp } = ctx.session;
-
-    // Handle cancel for location
-    if (temp?.waitingForLocation && (ctx.message.text === '❌ Cancelar' || ctx.message.text === '❌ Cancel')) {
-      try {
-        const lang = getLanguage(ctx);
-        ctx.session.temp.waitingForLocation = false;
-        await ctx.saveSession();
-
-        await ctx.reply(t('operationCancelled', lang) || 'Operation cancelled', Markup.removeKeyboard());
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error cancelling location update:', error);
-      }
-      return;
-    }
 
     if (temp?.waitingForBio) {
       try {
         const lang = getLanguage(ctx);
-        const bio = validateUserInput(ctx.message.text, 500);
+        const bio = validateUserInput(ctx.message.text, 1000);
+
         if (!bio) {
           await ctx.reply(t('invalidInput', lang));
           return;
         }
+
         await UserService.updateProfile(ctx.from.id, { bio });
+
         ctx.session.temp.waitingForBio = false;
         await ctx.saveSession();
+
         await ctx.reply(t('bioUpdated', lang));
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
+        await showProfile(ctx, false);
       } catch (error) {
         logger.error('Error updating bio:', error);
-      }
-      return;
-    }
-
-    if (temp?.waitingForLookingFor) {
-      try {
-        const lang = getLanguage(ctx);
-        const lookingFor = validateUserInput(ctx.message.text, 200);
-        if (!lookingFor) {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-        await UserService.updateProfile(ctx.from.id, { looking_for: lookingFor });
-        ctx.session.temp.waitingForLookingFor = false;
-        await ctx.saveSession();
-        await ctx.reply(t('lookingForUpdated', lang));
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating looking_for:', error);
       }
       return;
     }
@@ -411,11 +250,7 @@ const registerProfileHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(t('interestsUpdated', lang));
-
-        // Small delay to ensure DB update is complete
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        await showProfile(ctx, ctx.from.id, false, true);
+        await showProfile(ctx, false);
       } catch (error) {
         logger.error('Error updating interests:', error);
       }
@@ -588,36 +423,25 @@ const showSocialMediaMenu = async (ctx, lang) => {
 /**
  * Show user profile
  * @param {Context} ctx - Telegraf context
- * @param {string|number} targetUserId - User ID to show
  * @param {boolean} edit - Whether to edit existing message
- * @param {boolean} isOwnProfile - Whether this is the user's own profile
  */
-const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false) => {
+const showProfile = async (ctx, edit = true) => {
   try {
-    const lang = getLanguage(ctx);
-    const viewerId = ctx.from.id;
+    const userId = ctx.from.id;
+    const user = await userService.getUser(userId);
+    const language = user?.language || 'en';
 
-    // Get target user
-    const targetUser = await UserModel.getById(targetUserId);
-
-    if (!targetUser) {
-      await ctx.reply(t('userNotFound', lang));
+    if (!user) {
+      await ctx.reply('User not found. Please /start first.');
       return;
     }
 
-    // Check if viewer is blocked
-    if (!isOwnProfile) {
-      const isBlocked = await UserModel.isBlocked(targetUserId, viewerId);
-      const hasBlockedTarget = await UserModel.isBlocked(viewerId, targetUserId);
-
-      if (isBlocked || hasBlockedTarget) {
-        await ctx.reply(t('cannotViewProfile', lang));
-        return;
-      }
-
-      // Increment profile views
-      await UserModel.incrementProfileViews(targetUserId);
-    }
+    // Check if command is in group chat
+    const isPrivate = await requirePrivateChat(
+      ctx,
+      'My Profile',
+      '' // Will be set below
+    );
 
     // Build profile text with consistent design
     let profileText = [
@@ -717,250 +541,171 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
         keyboard.push([Markup.button.callback(t('addToFavorites', lang), `add_favorite_${targetUserId}`)]);
       }
 
-      keyboard.push([Markup.button.callback(t('blockUser', lang), `block_user_${targetUserId}`)]);
-      keyboard.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
-    }
+    // Format profile message
+    const profileMessage = formatProfileMessage(user, language);
 
-    if (edit) {
-      await ctx.editMessageText(profileText, Markup.inlineKeyboard(keyboard));
-    } else {
-      await ctx.reply(profileText, Markup.inlineKeyboard(keyboard));
-    }
-
-  } catch (error) {
-    logger.error('Error in showProfile:', error);
-    const lang = ctx.session?.language || 'en';
-    await ctx.reply(t('error', lang));
-  }
-};
-
-/**
- * Show privacy settings
- */
-const showPrivacySettings = async (ctx) => {
-  try {
-    const lang = getLanguage(ctx);
-    const user = await UserModel.getById(ctx.from.id);
-
-    if (!user) {
-      await ctx.reply(t('error', lang));
-      return;
-    }
-
-    const privacy = user.privacy || {
-      showLocation: true,
-      showInterests: true,
-      showBio: true,
-      allowMessages: true,
-      showOnline: true,
-    };
-
-    let text = `${t('privacyTitle', lang)}\n\n`;
-    text += `${privacy.showLocation ? '✅' : '❌'} ${t('showLocation', lang)}\n`;
-    text += `${privacy.showInterests ? '✅' : '❌'} ${t('showInterests', lang)}\n`;
-    text += `${privacy.showBio ? '✅' : '❌'} ${t('showBio', lang)}\n`;
-    text += `${privacy.allowMessages ? '✅' : '❌'} ${t('allowMessages', lang)}\n`;
-    text += `${privacy.showOnline ? '✅' : '❌'} ${t('showOnline', lang)}\n`;
-
-    const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(`${privacy.showLocation ? '✅' : '❌'} ${t('showLocation', lang)}`, 'privacy_toggle_showLocation')],
-      [Markup.button.callback(`${privacy.showInterests ? '✅' : '❌'} ${t('showInterests', lang)}`, 'privacy_toggle_showInterests')],
-      [Markup.button.callback(`${privacy.showBio ? '✅' : '❌'} ${t('showBio', lang)}`, 'privacy_toggle_showBio')],
-      [Markup.button.callback(`${privacy.allowMessages ? '✅' : '❌'} ${t('allowMessages', lang)}`, 'privacy_toggle_allowMessages')],
-      [Markup.button.callback(`${privacy.showOnline ? '✅' : '❌'} ${t('showOnline', lang)}`, 'privacy_toggle_showOnline')],
-      [Markup.button.callback(t('back', lang), 'show_profile')],
-    ]);
-
-    await ctx.editMessageText(text, keyboard);
-  } catch (error) {
-    logger.error('Error showing privacy settings:', error);
-  }
-};
-
-/**
- * Toggle privacy setting
- */
-const togglePrivacySetting = async (ctx, setting) => {
-  try {
-    const lang = getLanguage(ctx);
-    const user = await UserModel.getById(ctx.from.id);
-
-    if (!user) {
-      await ctx.reply(t('error', lang));
-      return;
-    }
-
-    const privacy = user.privacy || {
-      showLocation: true,
-      showInterests: true,
-      showBio: true,
-      allowMessages: true,
-      showOnline: true,
-    };
-
-    // Toggle the setting
-    privacy[setting] = !privacy[setting];
-
-    await UserModel.updatePrivacy(ctx.from.id, privacy);
-
-    await ctx.answerCbQuery(t('privacyUpdated', lang));
-    await showPrivacySettings(ctx);
-  } catch (error) {
-    logger.error('Error toggling privacy setting:', error);
-  }
-};
-
-/**
- * Show favorites list
- */
-const showFavorites = async (ctx) => {
-  try {
-    const lang = getLanguage(ctx);
-    const favorites = await UserModel.getFavorites(ctx.from.id);
-
-    if (!favorites || favorites.length === 0) {
-      await ctx.editMessageText(
-        t('noFavorites', lang),
-        Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'show_profile')]]),
-      );
-      return;
-    }
-
-    let text = [
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      '⭐ My Favorites',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      ''
-    ].join('\n');
-    const keyboard = [];
-
-    favorites.forEach((user, index) => {
-      text += `${index + 1}. ${user.firstName} ${user.lastName || ''}${user.username ? ` (@${user.username})` : ''}\n`;
-      keyboard.push([
-        Markup.button.callback(`👁️ ${user.firstName}`, `view_user_${user.id}`),
-        Markup.button.callback('❌', `remove_favorite_${user.id}`),
-      ]);
+    await ctx.reply(profileMessage, {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: language === 'es' ? '✏️ Editar Perfil' : '✏️ Edit Profile', callback_data: 'edit_profile' }],
+          [{ text: language === 'es' ? '🔙 Menú Principal' : '🔙 Main Menu', callback_data: 'back_main' }],
+        ],
+      },
     });
 
-    keyboard.push([Markup.button.callback(t('back', lang), 'show_profile')]);
-
-    await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
+    logger.info(`User ${userId} viewed profile`);
   } catch (error) {
-    logger.error('Error showing favorites:', error);
+    logger.error('Error in profile command:', error);
+    await ctx.reply(i18n.t('error_occurred', 'en'));
   }
-};
+}
 
 /**
- * Show blocked users list
+ * Format profile message
  */
-const showBlockedUsers = async (ctx) => {
-  try {
-    const lang = getLanguage(ctx);
-    const user = await UserModel.getById(ctx.from.id);
+function formatProfileMessage(user, language) {
+  const labels = {
+    en: {
+      title: '👤 **Your Profile**',
+      username: 'Username',
+      bio: 'Bio',
+      age: 'Age',
+      plan: 'Plan',
+      status: 'Subscription Status',
+      expiry: 'Expires',
+      location: 'Location',
+      joined: 'Joined',
+    },
+    es: {
+      title: '👤 **Tu Perfil**',
+      username: 'Nombre de usuario',
+      bio: 'Biografía',
+      age: 'Edad',
+      plan: 'Plan',
+      status: 'Estado de Suscripción',
+      expiry: 'Expira',
+      location: 'Ubicación',
+      joined: 'Se unió',
+    },
+  };
 
-    if (!user || !user.blocked || user.blocked.length === 0) {
-      await ctx.editMessageText(
-        t('noBlockedUsers', lang),
-        Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'show_profile')]]),
-      );
-      return;
-    }
+  const l = labels[language] || labels.en;
+  const planName = user.plan ? user.plan.charAt(0).toUpperCase() + user.plan.slice(1) : 'Free';
+  const status = user.subscriptionStatus || 'inactive';
+  const statusEmoji = status === 'active' ? '✅' : '❌';
 
-    let text = [
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      '🚫 Blocked Users',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      ''
-    ].join('\n');
-    const keyboard = [];
+  let message = `${l.title}\n\n`;
+  message += `**${l.username}:** ${user.username || 'Not set'}\n`;
+  message += `**${l.bio}:** ${user.bio || 'Not set'}\n`;
+  message += `**${l.age}:** ${user.age || 'Not set'}\n`;
+  message += `**${l.plan}:** ${planName}\n`;
+  message += `**${l.status}:** ${statusEmoji} ${status}\n`;
 
-    for (const blockedId of user.blocked) {
-      const blockedUser = await UserModel.getById(blockedId);
-      if (blockedUser) {
-        text += `• ${blockedUser.firstName} ${blockedUser.lastName || ''}${blockedUser.username ? ` (@${blockedUser.username})` : ''}\n`;
-        keyboard.push([
-          Markup.button.callback(`✅ Unblock ${blockedUser.firstName}`, `unblock_user_${blockedId}`),
-        ]);
-      }
-    }
-
-    keyboard.push([Markup.button.callback(t('back', lang), 'show_profile')]);
-
-    await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
-  } catch (error) {
-    logger.error('Error showing blocked users:', error);
+  if (user.planExpiry) {
+    const expiryDate = new Date(user.planExpiry).toLocaleDateString();
+    message += `**${l.expiry}:** ${expiryDate}\n`;
   }
-};
+
+  if (user.location) {
+    message += `**${l.location}:** ${language === 'es' ? 'Compartido' : 'Shared'}\n`;
+  }
+
+  if (user.createdAt) {
+    const joinedDate = new Date(user.createdAt).toLocaleDateString();
+    message += `**${l.joined}:** ${joinedDate}\n`;
+  }
+
+  return message;
+}
 
 /**
- * Add user to favorites
+ * Handle edit profile
  */
-const addToFavorites = async (ctx, targetUserId) => {
+async function handleEditProfile(ctx) {
   try {
-    const lang = getLanguage(ctx);
-    await UserModel.addToFavorites(ctx.from.id, targetUserId);
-    await ctx.answerCbQuery(t('addedToFavorites', lang));
-    await showProfile(ctx, targetUserId, true, false);
+    const userId = ctx.from.id;
+    const user = await userService.getUser(userId);
+    const language = user?.language || 'en';
+
+    const labels = {
+      en: {
+        message: 'What would you like to edit?',
+        username: '✏️ Username',
+        bio: '✏️ Bio',
+        location: '📍 Location',
+        back: '🔙 Back to Profile',
+      },
+      es: {
+        message: '¿Qué te gustaría editar?',
+        username: '✏️ Nombre de usuario',
+        bio: '✏️ Biografía',
+        location: '📍 Ubicación',
+        back: '🔙 Volver al Perfil',
+      },
+    };
+
+    const l = labels[language] || labels.en;
+
+    await ctx.editMessageText(l.message, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: l.username, callback_data: 'edit_username' }],
+          [{ text: l.bio, callback_data: 'edit_bio' }],
+          [{ text: l.location, callback_data: 'edit_location' }],
+          [{ text: l.back, callback_data: 'menu_profile' }],
+        ],
+      },
+    });
+
+    logger.info(`User ${userId} entered profile edit mode`);
   } catch (error) {
-    logger.error('Error adding to favorites:', error);
+    logger.error('Error in edit profile:', error);
+    await ctx.answerCbQuery(i18n.t('error_occurred', 'en'));
   }
-};
+}
 
 /**
- * Remove user from favorites
+ * Handle edit field selection
  */
-const removeFromFavorites = async (ctx, targetUserId) => {
+async function handleEditField(ctx) {
   try {
-    const lang = getLanguage(ctx);
-    await UserModel.removeFromFavorites(ctx.from.id, targetUserId);
-    await ctx.answerCbQuery(t('removedFromFavorites', lang));
+    const userId = ctx.from.id;
+    const field = ctx.callbackQuery.data.split('_')[1]; // 'edit_username' -> 'username'
+    const user = await userService.getUser(userId);
+    const language = user?.language || 'en';
 
-    // Check if we're in the favorites list view or profile view
-    if (ctx.callbackQuery?.message?.text?.includes(t('myFavorites', lang))) {
-      await showFavorites(ctx);
-    } else {
-      await showProfile(ctx, targetUserId, true, false);
-    }
-  } catch (error) {
-    logger.error('Error removing from favorites:', error);
-  }
-};
+    const prompts = {
+      en: {
+        username: 'Enter your new username:',
+        bio: 'Enter your new bio:',
+        location: 'Share your new location:',
+      },
+      es: {
+        username: 'Ingresa tu nuevo nombre de usuario:',
+        bio: 'Ingresa tu nueva biografía:',
+        location: 'Comparte tu nueva ubicación:',
+      },
+    };
 
-/**
- * Block user
- */
-const blockUser = async (ctx, targetUserId) => {
-  try {
-    const lang = getLanguage(ctx);
-    await UserModel.blockUser(ctx.from.id, targetUserId);
-    await ctx.answerCbQuery(t('userBlocked', lang));
-    await ctx.editMessageText(
-      t('userBlocked', lang),
-      Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'back_to_main')]]),
-    );
-  } catch (error) {
-    logger.error('Error blocking user:', error);
-  }
-};
+    const prompt = prompts[language]?.[field] || prompts.en[field];
 
-/**
- * Unblock user
- */
-const unblockUser = async (ctx, targetUserId) => {
-  try {
-    const lang = getLanguage(ctx);
-    await UserModel.unblockUser(ctx.from.id, targetUserId);
-    await ctx.answerCbQuery(t('userUnblocked', lang));
-    await showBlockedUsers(ctx);
+    await ctx.editMessageText(prompt);
+
+    // Save session state
+    await ctx.saveSession({ editingField: field, language });
+
+    logger.info(`User ${userId} editing field: ${field}`);
   } catch (error) {
-    logger.error('Error unblocking user:', error);
+    logger.error('Error in edit field:', error);
+    await ctx.answerCbQuery(i18n.t('error_occurred', 'en'));
   }
-};
+}
 
 /**
  * Share profile - Generate Member Card with Photo (Pseudo-code format)
  */
-const shareProfile = async (ctx) => {
+async function handleProfileUpdate(ctx, field, value) {
   try {
     const lang = getLanguage(ctx);
     const user = await UserModel.getById(ctx.from.id);
@@ -1097,11 +842,15 @@ const shareProfile = async (ctx) => {
       });
     }
   } catch (error) {
-    logger.error('Error sharing profile:', error);
-    const lang = ctx.session?.language || 'en';
-    await ctx.reply(t('error', lang));
+    logger.error('Error updating profile:', error);
+    await ctx.reply(i18n.t('error_occurred', 'en'));
   }
-};
+}
 
-module.exports = registerProfileHandlers;
-module.exports.showProfile = showProfile;
+module.exports = {
+  handleProfile,
+  handleEditProfile,
+  handleEditField,
+  handleProfileUpdate,
+  formatProfileMessage,
+};

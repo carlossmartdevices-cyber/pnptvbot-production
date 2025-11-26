@@ -25,7 +25,11 @@ const initializePostgres = () => {
     }
     pool = new Pool({
       connectionString,
-      ssl: process.env.POSTGRES_SSL === 'true' || (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false),
+      ssl: process.env.POSTGRES_SSL === 'true'
+        ? (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'test'
+            ? { rejectUnauthorized: false }
+            : true)
+        : false,
       max: process.env.POSTGRES_POOL_MAX ? parseInt(process.env.POSTGRES_POOL_MAX) : 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
@@ -77,18 +81,28 @@ const testConnection = async () => {
  */
 const closePool = async () => {
   if (pool) {
-    await pool.end();
-    pool = null;
-    logger.info('PostgreSQL pool closed');
+    try {
+      await pool.end();
+      pool = null;
+      logger.info('PostgreSQL pool closed');
+    } catch (error) {
+      logger.error('Error closing PostgreSQL pool:', error);
+    }
   }
 };
 
 /**
- * Get a client from the pool
+ * Get a client from the pool with error handling
  * @returns {Promise<Object>} PostgreSQL client
  */
 const getClient = async () => {
-  return await getPool().connect();
+  try {
+    const client = await getPool().connect();
+    return client;
+  } catch (error) {
+    logger.error('Failed to get PostgreSQL client:', error);
+    throw new Error('Database connection error');
+  }
 };
 
 /**
@@ -101,7 +115,7 @@ const query = async (text, params) => {
   const start = Date.now();
   const result = await getPool().query(text, params);
   const duration = Date.now() - start;
-  logger.debug('Executed query', { text, duration, rows: result.rowCount });
+  logger.debug('Executed query', { duration, rows: result.rowCount });
   return result;
 };
 

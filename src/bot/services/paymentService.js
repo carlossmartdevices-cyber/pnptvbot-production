@@ -5,8 +5,6 @@ const PlanModel = require('../../models/planModel');
 const UserModel = require('../../models/userModel');
 const SubscriberModel = require('../../models/subscriberModel');
 const DaimoConfig = require('../../config/daimo');
-const FraudDetectionService = require('../../bot/services/fraudDetectionService');
-const PaymentSecurityService = require('../../bot/services/paymentSecurityService');
 const logger = require('../../utils/logger');
 const crypto = require('crypto');
 const { Telegraf } = require('telegraf');
@@ -140,81 +138,6 @@ class PaymentService {
     }
 
     /**
-     * Send notification to support group about new paid member
-     * @param {Object} params - Notification parameters
-     * @param {string} params.userId - Telegram user ID
-     * @param {string} params.customerName - Customer name
-     * @param {string} params.customerEmail - Customer email
-     * @param {Object} params.plan - Plan object
-     * @param {number} params.amount - Payment amount
-     * @param {string} params.currency - Currency code
-     * @param {string} params.transactionId - Transaction reference
-     * @param {Date} params.expiryDate - Subscription expiry date
-     * @returns {Promise<boolean>} Success status
-     */
-    static async sendSupportGroupNotification({
-      userId, customerName, customerEmail, plan, amount, currency, transactionId, expiryDate,
-    }) {
-      try {
-        const bot = new Telegraf(process.env.BOT_TOKEN);
-        const supportGroupId = process.env.SUPPORT_GROUP_ID;
-
-        if (!supportGroupId) {
-          logger.warn('SUPPORT_GROUP_ID not configured, skipping notification');
-          return false;
-        }
-
-        const planName = plan?.display_name || plan?.name || 'Unknown Plan';
-        const formattedDate = expiryDate?.toLocaleDateString('es-CO', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        }) || 'N/A';
-
-        const message = [
-          '🎉 *NUEVO PAGO RECIBIDO*',
-          '',
-          '👤 *Usuario:*',
-          `• Telegram ID: \`${userId}\``,
-          `• Nombre: ${customerName || 'No proporcionado'}`,
-          `• Email: ${customerEmail || 'No proporcionado'}`,
-          '',
-          '💳 *Detalles del Pago:*',
-          `• Plan: *${planName}*`,
-          `• Monto: *${amount} ${currency}*`,
-          `• Referencia: \`${transactionId}\``,
-          '',
-          '📅 *Suscripción:*',
-          `• Vence: ${formattedDate}`,
-          '',
-          '⚠️ *Acción requerida:* Contactar al usuario para confirmar que todo funciona correctamente.',
-          '',
-          `👉 [Abrir chat con usuario](tg://user?id=${userId})`,
-        ].join('\n');
-
-        await bot.telegram.sendMessage(supportGroupId, message, {
-          parse_mode: 'Markdown',
-          disable_web_page_preview: true,
-        });
-
-        logger.info('Support group notification sent', {
-          userId,
-          transactionId,
-          supportGroupId,
-        });
-
-        return true;
-      } catch (error) {
-        logger.error('Error sending support group notification:', {
-          userId,
-          error: error.message,
-          stack: error.stack,
-        });
-        return false;
-      }
-    }
-
-    /**
      * Reintentar pago fallido (simulado)
      * @param {string} paymentId
      * @param {number} maxRetries
@@ -252,33 +175,23 @@ class PaymentService {
         x_ref_payco,
         x_transaction_id,
         x_transaction_state,
-        x_cod_response, // Response code: 1=Aceptada, 2=Rechazada, 3=Pendiente, 4=Fallida
-        x_cod_transaction_state, // Transaction state code
         x_amount,
         x_currency_code,
         x_signature,
         x_approval_code,
         x_extra1, // userId (telegram ID)
-        x_extra2, // paymentId
+        x_extra2, // planId
+        x_extra3, // paymentId
         x_customer_email,
         x_customer_name,
-        x_response_reason_text, // Reason text for the response
-        x_three_d_s, // 3DS validation status: Y=Validated, N=Not validated
-        x_eci, // ECI flag indicating 3DS authentication
-        x_cavv, // CAVV (Cardholder Authentication Verification Value)
       } = webhookData;
 
       logger.info('Processing ePayco webhook', {
         refPayco: x_ref_payco,
         transactionId: x_transaction_id,
         state: x_transaction_state,
-        codResponse: x_cod_response,
-        codTransactionState: x_cod_transaction_state,
-        responseReason: x_response_reason_text,
         amount: x_amount,
-        paymentId: x_extra2,
-        threeDsStatus: x_three_d_s,
-        eciFlag: x_eci,
+        paymentId: x_extra3,
       });
 
       // Verify signature if available
@@ -302,8 +215,9 @@ class PaymentService {
         logger.info('ePayco signature verified successfully');
       }
 
-      const paymentId = x_extra2;
+      const paymentId = x_extra3;
       const userId = x_extra1;
+      const planId = x_extra2;
 
       // Check if payment exists
       const payment = paymentId ? await PaymentModel.getById(paymentId) : null;
@@ -313,269 +227,16 @@ class PaymentService {
         return { success: false, error: 'Payment not found' };
       }
 
-      // Get plan ID from payment record (no longer passed as extra)
-      const planId = payment ? (payment.planId || payment.plan_id) : null;
-
-      // Process based on response code (x_cod_response) - primary check per ePayco docs
-      // x_cod_response: 1=Aceptada, 2=Rechazada, 3=Pendiente, 4=Fallida
-      const responseCode = parseInt(x_cod_response, 10);
-      const isApproved = responseCode === 1 || x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada';
-      const isRejected = responseCode === 2 || x_transaction_state === 'Rechazada';
-      const isPending = responseCode === 3 || x_transaction_state === 'Pendiente' || x_transaction_state === 'Colgante';
-      const isFailed = responseCode === 4 || x_transaction_state === 'Fallida';
-      const isAbandoned = x_transaction_state === 'Abandonada' || x_transaction_state === 'Cancelada';
-
-      // ========== SECURITY LAYER 1: Rate Limiting ==========
-      if (isApproved && userId) {
-        const rateLimit = await PaymentSecurityService.checkPaymentRateLimit(userId, 10);
-        if (!rateLimit.allowed) {
-          logger.warn('🚨 Payment rate limit exceeded', { userId, attempts: rateLimit.attempts });
-          
-          if (payment) {
-            await PaymentModel.updateStatus(paymentId, 'rate_limited', {
-              transaction_id: x_transaction_id,
-              epayco_ref: x_ref_payco,
-              cancel_reason: 'Rate limit exceeded',
-              cancelled_at: new Date(),
-            });
-          }
-          
-          return { success: false, error: 'Rate limit exceeded' };
-        }
-      }
-
-      // ========== SECURITY LAYER 2: Replay Attack Prevention ==========
-      if (isApproved && x_ref_payco) {
-        const replay = await PaymentSecurityService.checkReplayAttack(x_ref_payco, 'epayco');
-        if (replay.isReplay) {
-          logger.error('🚨 REPLAY ATTACK DETECTED', { transactionId: x_ref_payco });
-          
-          if (payment) {
-            await PaymentModel.updateStatus(paymentId, 'duplicate_blocked', {
-              transaction_id: x_transaction_id,
-              epayco_ref: x_ref_payco,
-              cancel_reason: 'Duplicate transaction detected',
-              cancelled_at: new Date(),
-            });
-          }
-          
-          return { success: false, error: 'Duplicate transaction' };
-        }
-      }
-
-      // ========== SECURITY LAYER 3: Amount Integrity Validation ==========
-      if (isApproved && paymentId && x_amount) {
-        const amountValid = await PaymentSecurityService.validatePaymentAmount(paymentId, parseFloat(x_amount));
-        if (!amountValid.valid) {
-          logger.error('🚨 Amount mismatch detected', {
-            paymentId,
-            expected: amountValid.actual,
-            received: parseFloat(x_amount),
-          });
-          
-          if (payment) {
-            await PaymentModel.updateStatus(paymentId, 'amount_mismatch', {
-              transaction_id: x_transaction_id,
-              epayco_ref: x_ref_payco,
-              cancel_reason: 'Payment amount verification failed',
-              cancelled_at: new Date(),
-            });
-          }
-          
-          return { success: false, error: 'Amount mismatch' };
-        }
-      }
-
-      // ========== SECURITY LAYER 4: PCI Compliance Check ==========
-      if (isApproved) {
-        const pciCompliant = PaymentSecurityService.validatePCICompliance({
-          lastFour: x_approval_code?.slice(-4),
-        });
-        if (!pciCompliant.compliant) {
-          logger.error('🚨 PCI COMPLIANCE VIOLATION', pciCompliant);
-          return { success: false, error: 'PCI compliance check failed' };
-        }
-      }
-
-      // ========== FRAUD DETECTION - RUN ALL CHECKS ==========
-      // Comprehensive anti-fraud validation AFTER security layers
-      if (isApproved && userId) {
-        logger.info('🔒 Running comprehensive fraud detection', {
-          userId,
-          refPayco: x_ref_payco,
-          amount: x_amount,
-        });
-
-        const fraudAnalysis = await FraudDetectionService.runAllFraudChecks({
-          userId,
-          amount: parseFloat(x_amount),
-          email: x_customer_email,
-          phone: null, // Can be extracted from ePayco if available
-          cardLastFour: x_approval_code?.slice(-4), // Last 4 of approval code if available
-          cardBrand: 'Unknown', // ePayco doesn't always provide brand
-          ipAddress: null, // Extract from request headers if available
-          userAgent: null, // Extract from request headers if available
-          countryCode: null, // Extract from geolocation if available
-          location: null,
-        });
-
-        logger.info('Fraud analysis results', {
-          userId,
-          riskScore: fraudAnalysis.riskScore,
-          recommendation: fraudAnalysis.recommendation,
-          flaggedChecks: fraudAnalysis.flaggedChecks.map((c) => c.name),
-        });
-
-        // BLOCK transaction if high fraud risk
-        if (fraudAnalysis.isFraudulent) {
-          logger.error('🚨 TRANSACTION BLOCKED - FRAUD DETECTED', {
-            userId,
-            refPayco: x_ref_payco,
-            riskScore: fraudAnalysis.riskScore,
-            reasons: fraudAnalysis.flaggedChecks.map((c) => c.name),
-          });
-
-          // Cancel the fraudulent transaction
-          if (payment) {
-            await PaymentModel.updateStatus(paymentId, 'fraud_blocked', {
-              transaction_id: x_transaction_id,
-              epayco_ref: x_ref_payco,
-              epaycoRef: x_ref_payco, // Store in reference field
-              cancel_reason: `Fraud detected: ${fraudAnalysis.flaggedChecks.map((c) => c.name).join(', ')}`,
-              fraud_risk_score: fraudAnalysis.riskScore,
-              cancelled_at: new Date(),
-            });
-          }
-
-          // Notify user
-          if (userId) {
-            try {
-              const user = await UserModel.getById(userId);
-              const userLanguage = user?.language || 'es';
-              const botModule = require('../bot');
-              const bot = botModule.default || botModule;
-
-              const messageText =
-                userLanguage === 'en'
-                  ? '🚨 *Fraud Alert*\n\nYour payment was blocked due to suspicious activity. This is a security measure to protect your account.\n\nIf this was legitimate, please contact support.'
-                  : '🚨 *Alerta de Fraude*\n\nTu pago fue bloqueado por actividad sospechosa. Esta es una medida de seguridad para proteger tu cuenta.\n\nSi fue legítimo, por favor contacta a soporte.';
-
-              if (bot && bot.telegram) {
-                await bot.telegram.sendMessage(userId, messageText, { parse_mode: 'Markdown' });
-              }
-            } catch (notifError) {
-              logger.error('Error sending fraud alert notification:', {
-                error: notifError.message,
-                userId,
-              });
-            }
-          }
-
-          return { success: false, error: 'Transaction blocked due to fraud detection' };
-        }
-      }
-      // ========== END FRAUD DETECTION ==========
-
-      // ========== 3DS VALIDATION REQUIREMENT ==========
-      // All approved transactions MUST have 3DS validation
-      if (isApproved) {
-        // Check 3DS status
-        const has3DS = x_three_d_s === 'Y' || x_eci || x_cavv;
-        const is3DSValidated = x_three_d_s === 'Y';
-
-        logger.info('3DS Validation Check for ePayco transaction', {
-          refPayco: x_ref_payco,
-          threeDsStatus: x_three_d_s,
-          hasECI: !!x_eci,
-          hasCAVV: !!x_cavv,
-          is3DSValidated,
-          requires3DS: true,
-        });
-
-        // REJECT transaction if 3DS is not validated
-        if (!is3DSValidated) {
-          logger.warn('ePayco transaction REJECTED - 3DS validation failed', {
-            refPayco: x_ref_payco,
-            reason: '3DS not validated',
-            threeDsStatus: x_three_d_s,
-            transactionId: x_transaction_id,
-          });
-
-          // Cancel the payment
-          if (payment) {
-            await PaymentModel.updateStatus(paymentId, 'cancelled', {
-              transaction_id: x_transaction_id,
-              epayco_ref: x_ref_payco,
-              epaycoRef: x_ref_payco, // Store in reference field
-              cancel_reason: '3DS validation required but not completed',
-              cancelled_at: new Date(),
-            });
-          }
-
-          // Notify user that payment was cancelled due to security reasons
-          if (userId) {
-            try {
-              const user = await UserModel.getById(userId);
-              const userLanguage = user?.language || 'es';
-              const botModule = require('../bot');
-              const bot = botModule.default || botModule;
-
-              const messageText = userLanguage === 'en'
-                ? '❌ *Payment Cancelled*\n\nYour payment was cancelled because 3DS (Two-Factor Security) validation was not completed. This is a mandatory security requirement.\n\nPlease try again with a card that supports 3DS validation.'
-                : '❌ *Pago Cancelado*\n\nTu pago fue cancelado porque la validación 3DS (Seguridad de Dos Factores) no fue completada. Este es un requisito de seguridad obligatorio.\n\nIntenta de nuevo con una tarjeta que soporte validación 3DS.';
-
-              if (bot && bot.telegram) {
-                await bot.telegram.sendMessage(userId, messageText, { parse_mode: 'Markdown' });
-              }
-            } catch (notifError) {
-              logger.error('Error sending 3DS rejection notification:', {
-                error: notifError.message,
-                userId,
-              });
-            }
-          }
-
-          return { success: false, error: '3DS validation required but not provided' };
-        }
-
-        logger.info('3DS validation PASSED for ePayco transaction', {
-          refPayco: x_ref_payco,
-          threeDsStatus: x_three_d_s,
-        });
-      }
-      // ========== END 3DS VALIDATION ==========
-
-      if (isApproved) {
+      // Process based on transaction state
+      if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
         // Payment successful
         if (payment) {
           await PaymentModel.updateStatus(paymentId, 'completed', {
             transaction_id: x_transaction_id,
             approval_code: x_approval_code,
             epayco_ref: x_ref_payco,
-            epaycoRef: x_ref_payco, // Store in reference field
           });
         }
-
-        // ========== SECURITY LAYER 5: Audit Logging ==========
-        await PaymentSecurityService.logPaymentEvent({
-          paymentId: paymentId,
-          userId: userId,
-          eventType: 'completed',
-          provider: 'epayco',
-          amount: parseFloat(x_amount),
-          status: 'success',
-          ipAddress: null,
-          userAgent: null,
-          details: {
-            reference: x_ref_payco,
-            transactionId: x_transaction_id,
-            approvalCode: x_approval_code,
-            method: 'credit_card',
-            planId: planId,
-            threeDsStatus: x_three_d_s,
-            eciFlag: x_eci,
-          },
-        });
 
         // Activate user subscription
         if (userId && planId) {
@@ -612,25 +273,6 @@ class PaymentService {
             } catch (notifError) {
               logger.error('Error sending payment confirmation notification (non-critical):', {
                 error: notifError.message,
-                userId,
-              });
-            }
-
-            // Send notification to support group for manual follow-up
-            try {
-              await this.sendSupportGroupNotification({
-                userId,
-                customerName: x_customer_name,
-                customerEmail: x_customer_email,
-                plan,
-                amount: parseFloat(x_amount),
-                currency: x_currency_code || 'COP',
-                transactionId: x_ref_payco,
-                expiryDate,
-              });
-            } catch (supportNotifError) {
-              logger.error('Error sending support group notification (non-critical):', {
-                error: supportNotifError.message,
                 userId,
               });
             }
@@ -721,59 +363,30 @@ class PaymentService {
         }
 
         return { success: true };
-      } else if (isRejected || isFailed) {
-        // Payment failed or rejected
+      } else if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Fallida') {
+        // Payment failed
         if (payment) {
           await PaymentModel.updateStatus(paymentId, 'failed', {
             transaction_id: x_transaction_id,
             epayco_ref: x_ref_payco,
-            epaycoRef: x_ref_payco, // Store in reference field
           });
         }
-
-        // ========== Audit Logging for Failed Payments ==========
-        await PaymentSecurityService.logPaymentEvent({
-          paymentId: paymentId,
-          userId: userId,
-          eventType: 'rejected',
-          provider: 'epayco',
-          amount: parseFloat(x_amount),
-          status: 'failed',
-          ipAddress: null,
-          userAgent: null,
-          details: {
-            reference: x_ref_payco,
-            transactionId: x_transaction_id,
-            responseCode: x_cod_response,
-            reason: x_response_reason_text,
-            transactionState: x_transaction_state,
-          },
-        });
 
         logger.warn('Payment rejected by ePayco', {
           paymentId,
           refPayco: x_ref_payco,
           state: x_transaction_state,
-          codResponse: x_cod_response,
-          reason: x_response_reason_text,
         });
 
         return { success: true }; // Return success to acknowledge webhook
-      } else if (isPending) {
+      } else if (x_transaction_state === 'Pendiente') {
         // Payment pending
         if (payment) {
           await PaymentModel.updateStatus(paymentId, 'pending', {
             transaction_id: x_transaction_id,
             epayco_ref: x_ref_payco,
-            epaycoRef: x_ref_payco, // Store in reference field
           });
         }
-
-        logger.info('Payment abandoned by user', {
-          paymentId,
-          refPayco: x_ref_payco,
-          state: x_transaction_state,
-        });
 
         return { success: true };
       }
@@ -784,89 +397,46 @@ class PaymentService {
         error: error.message,
         stack: error.stack,
       });
-
-      // ========== SECURITY LAYER 6: Error Logging ==========
-      if (webhookData.x_extra2 && webhookData.x_extra1) {
-        await PaymentSecurityService.logPaymentError({
-          paymentId: webhookData.x_extra2,
-          userId: webhookData.x_extra1,
-          provider: 'epayco',
-          errorCode: error.code || 'PAYMENT_ERROR',
-          errorMessage: error.message,
-          stackTrace: error.stack,
-        });
-
-        await PaymentSecurityService.logPaymentEvent({
-          paymentId: webhookData.x_extra2,
-          userId: webhookData.x_extra1,
-          eventType: 'error',
-          provider: 'epayco',
-          amount: parseFloat(webhookData.x_amount) || 0,
-          status: 'failed',
-          ipAddress: null,
-          userAgent: null,
-          details: { 
-            reason: error.message,
-            reference: webhookData.x_ref_payco,
-            transactionId: webhookData.x_transaction_id,
-          },
-        });
-      }
-
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Process Daimo webhook confirmation
-   * @param {Object} webhookData - Daimo webhook data
-   * @returns {Object} { success: boolean, error?: string, alreadyProcessed?: boolean }
+   * Create ePayco payment link
    */
   static async processDaimoWebhook(webhookData) {
     const DaimoService = require('./daimoService');
 
     try {
-      const {
-        id,
-        status,
-        source,
-        metadata,
-      } = webhookData;
+      const { publicKey, privateKey, testMode } = config.payments.epayco;
 
-      logger.info('Processing Daimo webhook', {
-        eventId: id,
-        status,
-        txHash: source?.txHash,
-        userId: metadata?.userId,
-        planId: metadata?.planId,
-        paymentId: metadata?.paymentId,
-        fullMetadata: metadata,
-      });
+      const paymentData = {
+        name: planData.name,
+        description: `PNPtv ${planData.name} Subscription`,
+        invoice: `PNPTV-${userId}-${Date.now()}`,
+        currency: 'USD',
+        amount: planData.price,
+        tax_base: '0',
+        tax: '0',
+        country: 'CO',
+        lang: 'en',
+        external: 'false',
+        extra1: userId.toString(),
+        extra2: planId,
+        extra3: 'subscription',
+        confirmation: `${process.env.WEBHOOK_URL || 'https://your-domain.com'}/webhook/epayco`,
+        response: `${process.env.BOT_URL || 'https://t.me/' + config.botUsername}`,
+        test: testMode ? 'true' : 'false',
+      };
 
       const userId = metadata?.userId;
       const planId = metadata?.planId;
       const paymentId = metadata?.paymentId;
       const chatId = metadata?.chatId;
-      const farcasterFid = metadata?.farcasterFid;
 
       if (!userId || !planId) {
-        logger.error('Missing user ID or plan ID in Daimo webhook', { 
-          eventId: id, 
-          metadata,
-          hasUserId: !!userId,
-          hasPlanId: !!planId,
-        });
+        logger.error('Missing user ID or plan ID in Daimo webhook', { eventId: id });
         return { success: false, error: 'Missing user ID or plan ID' };
-      }
-
-      // Warn if payment ID is missing but continue processing
-      if (!paymentId) {
-        logger.warn('Payment ID missing in Daimo webhook metadata', {
-          eventId: id,
-          userId,
-          planId,
-          metadata,
-        });
       }
 
       // Check if already processed (idempotency)
@@ -885,7 +455,6 @@ class PaymentService {
           await PaymentModel.updateStatus(paymentId, 'completed', {
             transaction_id: source?.txHash || id,
             daimo_event_id: id,
-            daimoEventId: source?.txHash || id, // Store in reference field
             payer_address: source?.payerAddress,
             chain_id: source?.chainId,
           });
@@ -899,27 +468,17 @@ class PaymentService {
           const expiryDate = new Date();
           expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
 
-          // Update subscription with Farcaster FID if available
-          const subscriptionUpdate = {
+          await UserModel.updateSubscription(userId, {
             status: 'active',
             planId,
             expiry: expiryDate,
-          };
-
-          // Store Farcaster FID if present in payment metadata
-          if (farcasterFid) {
-            subscriptionUpdate.farcaster_fid = farcasterFid;
-            subscriptionUpdate.farcaster_linked_at = new Date();
-          }
-
-          await UserModel.updateSubscription(userId, subscriptionUpdate);
+          });
 
           logger.info('User subscription activated via Daimo webhook', {
             userId,
             planId,
             expiryDate,
             txHash: source?.txHash,
-            farcasterFid: farcasterFid || null,
           });
 
           // Send payment confirmation notification via bot (with PRIME channel link)
@@ -1022,11 +581,10 @@ class PaymentService {
           await PaymentModel.updateStatus(paymentId, 'failed', {
             transaction_id: source?.txHash || id,
             daimo_event_id: id,
-            daimoEventId: source?.txHash || id, // Store in reference field
           });
         }
 
-        logger.warn('Daimo payment bounced', {
+        logger.warn('Daimo payment failed', {
           paymentId,
           eventId: id,
           status,
@@ -1039,7 +597,6 @@ class PaymentService {
           await PaymentModel.updateStatus(paymentId, 'pending', {
             transaction_id: source?.txHash || id,
             daimo_event_id: id,
-            daimoEventId: source?.txHash || id, // Store in reference field
           });
         }
 
@@ -1086,13 +643,11 @@ class PaymentService {
          amount: plan.price
        });
 
-       // Common configuration for all providers
-       const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN;
-
        // Generate ePayco payment link
        if (provider === 'epayco') {
          const epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;
          const epaycoTestMode = process.env.EPAYCO_TEST_MODE === 'true';
+         const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN;
 
          if (!epaycoPublicKey) {
            logger.error('ePayco public key not configured');
@@ -1143,59 +698,52 @@ class PaymentService {
          };
        }
 
-       // Handle Daimo payment link generation
+       // Generate Daimo payment link
        if (provider === 'daimo') {
+         const DaimoService = require('./daimoService');
+
+         if (!DaimoService.isConfigured()) {
+           logger.error('Daimo not configured');
+           throw new Error('Configuración de pago incompleta. Contacta soporte.');
+         }
+
          try {
-           // Create Daimo payment intent with paymentId
-           const paymentIntent = DaimoConfig.createPaymentIntent({
+           const paymentUrl = DaimoService.generatePaymentLink({
+             userId,
+             chatId,
+             planId,
              amount: plan.price,
-             userId: userId,
-             planId: planId,
-             chatId: chatId,
              paymentId: payment.id,
-             description: `${plan.display_name || plan.name} - PNPtv Subscription`,
            });
 
-           // Generate Daimo payment link
-           const daimoPayLink = DaimoConfig.generatePaymentLink(paymentIntent);
-
-           // Generate checkout page URL (our hosted page with Daimo Pay SDK)
-           const checkoutUrl = `${webhookDomain}/daimo/${payment.id}`;
-
-           // Save both URLs to database
-           await PaymentModel.updateStatus(payment.id, 'pending', {
-             payment_url: daimoPayLink,
-             destination_address: DaimoConfig.getDaimoConfig().treasuryAddress,
-           });
-
-           logger.info('Daimo payment URLs generated', {
+           logger.info('Daimo payment URL generated', {
              paymentId: payment.id,
              planId: plan.id,
              userId,
              amountUSD: plan.price,
-             checkoutUrl,
-             daimoPayLink,
+             chain: 'Optimism',
+             token: 'USDC',
            });
 
-           // Return checkout page URL (better UX than raw Daimo link)
            return {
              success: true,
-             paymentUrl: checkoutUrl,
+             paymentUrl,
              paymentId: payment.id,
+             paymentRef: `DAIMO-${payment.id.substring(0, 8).toUpperCase()}`,
            };
          } catch (error) {
            logger.error('Error generating Daimo payment link:', {
              error: error.message,
-             stack: error.stack,
-             paymentId: payment.id,
+             userId,
+             planId,
            });
-           throw new Error('No se pudo generar el enlace de pago con Daimo. Por favor, intenta más tarde o contacta soporte.');
+           throw new Error('No se pudo generar el link de pago. Contacta soporte.');
          }
        }
 
        // For other providers
-       const paymentUrl = `https://${provider}.com/pay?paymentId=${payment.id}`;
-       return { success: true, paymentUrl, paymentId: payment.id };
+       logger.error('Unknown payment provider', { provider });
+       throw new Error('Proveedor de pago no soportado.');
     } catch (error) {
       logger.error('Error creando pago:', { error: error.message, planId, provider });
       throw new Error(
@@ -1205,10 +753,31 @@ class PaymentService {
           ? error.message
           : 'El proveedor de pago no está disponible, intente más tarde. Si el problema persiste, contacta soporte.'
       );
+
+      // Log payment intent
+      await this.paymentsCollection.add({
+        userId,
+        planId,
+        amount: planData.price,
+        currency: 'USD',
+        provider: 'epayco',
+        status: 'pending',
+        paymentUrl: response.data.url,
+        createdAt: new Date(),
+      });
+
+      logger.info(`ePayco payment link created for user ${userId}`);
+      return response.data.url;
+    } catch (error) {
+      logger.error('Error creating ePayco payment link:', error);
+      throw new Error('Failed to create payment link. Please try again.');
     }
   }
 
-  static async completePayment(paymentId) {
+  /**
+   * Create Daimo Pay payment link
+   */
+  async createDaimoPayLink(userId, planId, planData) {
     try {
       const payment = await PaymentModel.getById(paymentId);
       if (!payment) {
@@ -1241,10 +810,106 @@ class PaymentService {
 
       return { success: true };
     } catch (error) {
-      logger.error('Error completando pago:', { error: error.message, paymentId });
-      throw new Error('No se pudo completar el pago. Intenta más tarde o contacta soporte.');
+      logger.error('Error creating Daimo Pay payment link:', error);
+      throw new Error('Failed to create crypto payment link. Please try again.');
+    }
+  }
+
+  /**
+   * Handle successful payment
+   */
+  async handlePaymentSuccess(userId, planId, provider, transactionId) {
+    try {
+      // Get plan details
+      const planDoc = await this.db.collection(Collections.PLANS).doc(planId).get();
+      if (!planDoc.exists) {
+        throw new Error('Plan not found');
+      }
+
+      const plan = planDoc.data();
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + (plan.durationDays || 30));
+
+      // Update user subscription
+      await userService.updateSubscription(userId, planId, expiryDate);
+
+      // Update payment record
+      const paymentQuery = await this.paymentsCollection
+        .where('userId', '==', userId)
+        .where('planId', '==', planId)
+        .where('status', '==', 'pending')
+        .orderBy('createdAt', 'desc')
+        .limit(1)
+        .get();
+
+      if (!paymentQuery.empty) {
+        await paymentQuery.docs[0].ref.update({
+          status: 'completed',
+          transactionId,
+          completedAt: new Date(),
+        });
+      }
+
+      logger.info(`Payment successful for user ${userId}, plan ${planId}`);
+      return true;
+    } catch (error) {
+      logger.error('Error handling payment success:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get payment history for user
+   */
+  async getUserPayments(userId) {
+    try {
+      const snapshot = await this.paymentsCollection
+        .where('userId', '==', userId)
+        .orderBy('createdAt', 'desc')
+        .get();
+
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      logger.error(`Error getting payments for user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get revenue statistics
+   */
+  async getRevenueStats() {
+    try {
+      const payments = await this.paymentsCollection
+        .where('status', '==', 'completed')
+        .get();
+
+      const stats = {
+        totalRevenue: 0,
+        paymentsByProvider: {},
+        paymentsByPlan: {},
+        totalTransactions: payments.size,
+      };
+
+      payments.docs.forEach(doc => {
+        const payment = doc.data();
+        stats.totalRevenue += payment.amount || 0;
+
+        const provider = payment.provider || 'unknown';
+        stats.paymentsByProvider[provider] =
+          (stats.paymentsByProvider[provider] || 0) + (payment.amount || 0);
+
+        const planId = payment.planId || 'unknown';
+        stats.paymentsByPlan[planId] =
+          (stats.paymentsByPlan[planId] || 0) + (payment.amount || 0);
+      });
+
+      return stats;
+    } catch (error) {
+      logger.error('Error getting revenue stats:', error);
+      throw error;
     }
   }
 }
 
-module.exports = PaymentService;
+module.exports = new PaymentService();

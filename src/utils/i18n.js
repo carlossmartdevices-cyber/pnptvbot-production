@@ -5,12 +5,8 @@
 
 const translations = {
   en: {
-        groupRedirect: ({ username, command, botUsername }) =>
-          `@${username} I sent you a private message about your request. Please check it out. We do this for privacy reasons and to comply with our Group's anti-spam policy.\n\n[Open in private chat with your request](https://t.me/${botUsername}?start=${command})`,
     // General
     welcome: '👋 Welcome to PNPtv!',
-      welcomeScreen: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          Welcome to PNPtv! Premium\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThis is your control dashboard.\nFrom here, you can access all your premium features:\nopen Zoom Rooms, start live streams, watch full videos,\nexplore Nearby without limits, and join private events.`,
-      welcomeScreenFree: `PNPtv!\n------------\n\nWelcome to PNPtv!  \nEnjoy the full experience from here.\n\nUnlock all premium features:\n• Full videos  \n• Live streams  \n• Unlimited Nearby  \n• Zoom Rooms  \n• Private community events\n\nTap "Subscribe to PRIME" below to get instant access.`,
     back: '🔙 Back',
     cancel: '❌ Cancel',
     next: '➡️ Next',
@@ -18,46 +14,59 @@ const translations = {
     error: '❌ An error occurred. Please try again.',
     success: '✅ Success!',
     loading: '⏳ Loading...',
-    days: 'days',
 
     // Onboarding
     selectLanguage: 'Please select your language:',
     languageSelected: 'Language set to English 🇺🇸',
-    ageConfirmation: 'Are you 18 years or older?',
-    ageConfirmYes: 'Yes, I am 18+',
-    ageConfirmNo: 'No',
+    ageVerification: '🔞 Age Verification Required\n\nYou must be 18 or older to use this service.\n\nAre you 18 years or older?',
+    confirmAge: 'Yes, I am 18+',
+    ageVerificationSuccess: '✅ Age verified successfully!',
+    ageVerificationReminder: '🔄 Age Re-Verification Required\n\nFor security purposes, please confirm your age again (required every 7 days).',
     underAge: 'Sorry, you must be 18 or older to use this service.',
-    termsAndPrivacy: 'Please read and accept our Terms of Service and Privacy Policy:',
-    termsAccepted: 'Terms and Privacy Policy accepted ✅',
-    emailPrompt: 'Would you like to provide your email for updates? (Optional)',
-    emailReceived: 'Email saved successfully!',
+
+    // Terms and Privacy
+    terms: '📄 Terms & Conditions\n\nPlease read and accept our Terms of Service to continue:',
+    termsAccepted: '✅ Terms of Service accepted!',
+    termsDeclined: '❌ You must accept the Terms of Service to use this bot.',
+    privacy: '🔒 Privacy Policy\n\nPlease read and accept our Privacy Policy to continue:',
+    privacyAccepted: '✅ Privacy Policy accepted!',
+    privacyDeclined: '❌ You must accept the Privacy Policy to use this bot.',
+    accept: 'Accept & Continue',
+    decline: 'Decline',
+
+    // Email Collection
+    emailPrompt: '📧 Email Address (Optional)\n\nWould you like to provide your email for updates and notifications?',
+    emailInstructions: 'Please send your email address or click Skip to continue.',
+    emailConfirmed: '✅ Email saved successfully!',
+    emailInvalid: '❌ Invalid email format. Please try again.',
     skipEmail: 'Skip',
+
+    // Free Channel Invite
+    freeChannelInvite: '🎉 Welcome to PNPtv!\n\nJoin our free community:',
+    freeChannel: 'Free Channel',
+    freeGroup: 'Free Group',
+    freeChannelInviteFailed: '✅ Onboarding complete! You can now access all features.',
+
+    // Profile Creation
+    profileCreated: '🎉 Your profile has been created successfully!',
     onboardingComplete: '🎉 Welcome aboard! Your profile is all set. Use /menu to get started.',
 
     // Main Menu
     mainMenuIntro: '🎬 Welcome to PNPtv - Your Entertainment Hub!\n\nWhat would you like to do?',
-    subscribe: `Subscribe to PNPtv PRIME\n----------------------------------\n\nJoin the most intense PNP content platform created by and for the community.\n\nPRIME gives you full access to:\n• Full-length PNP videos with real latinos smoking and slamming  \n• Exclusive releases starring Santino (x.com/pnpmethdaddy)  \n• Live streams and Zoom Rooms.\n• Unlimited Nearby to explore users around you  \n• Complete music and podcast library  \n\nChoose the plan that fits you best and complete your payment.\nYour membership will be activated automatically.\n\nPayment methods available: debit/credit card, Crypto, and most popular payment apps.`,
+    subscribe: '💎 Subscribe to PRIME',
     myProfile: '👤 My Profile',
     nearbyUsers: '🌍 Nearby Users',
     liveStreams: '🎤 Live Streams',
     radioMenu: '📻 Radio',
-    playerMenu: '🎵 Media Player',
     zoomRooms: '🎥 Zoom Rooms',
     support: '🤖 Support',
     settings: '⚙️ Settings',
+
     // Subscription
-    subscriptionHeader: 'Subscribe to PNPtv PRIME',
-    subscriptionDivider: '---------------------------------------',
-    subscriptionDescription: 'Unlock the full PNPtv! experience and dive into the hottest community of Latinos smoking & slamming on Telegram.\n\nChoose your plan to access long-session videos, weekly releases, community features, and the full videography of Santino and other sexy Latino boys. Tap a plan below to see what\'s included.',
     subscriptionPlans: '💎 Choose Your PRIME Plan:',
-      planCrystal: '💎 Crystal Pass - $49.99/180 days',
-      planCrystalDesc: 'Half a year of complete access to the PNPtv! community. Includes:\n\n• Unlimited access to all PNPtv! channels and groups\n• Full videography of Santino plus Latino chem sessions\n• Long-duration videos with weekly new releases\n• Invites to Zoom rooms and Live Stream PNP shows\n• Unlimited Nearby access\n• Access to community events and private sessions\n• Early access to upcoming features',
-      planDiamond: '💎 Diamond Pass - $99.99/365 days',
-      planDiamondDesc: 'One full year of the PNPtv! experience with all premium features included. Includes:\n\n• Unlimited access to every PNPtv! channel and group\n• Complete videography of Santino plus Latino smoking/slamming videos\n• Long-session videos and weekly exclusive releases\n• Invitations to Zoom rooms, private streams, and community events\n• Unlimited Nearby access\n• Ability to host and schedule your own Zoom sessions\n• VIP support and special member badges',
-      planLifetime: '♾️ Lifetime Pass - $249.99',
-      planLifetimeDesc: 'The ultimate PNPtv! pass with permanent, unlimited access. Includes:\n\n• Lifetime access to all PNPtv! channels, groups, and community features\n• Full videography of Santino plus all future videos and releases\n• Long-duration sessions with new uploads every week\n• Invitations to Zoom rooms, private shows, and exclusive events\n• Unlimited Nearby access\n• Ability to host and schedule Zoom sessions anytime\n• Permanent VIP support and lifetime member status',
-    planMonthly: '🗓️ Monthly Pass - $24.99/30 days',
-    planMonthlyDesc: 'Our most popular plan with full access and no limits. Includes:\n\n• Unlimited access to all PNPtv! channels and group\n• Full videography of Santino plus sexy Latinos smoking and slamming\n• Long-session videos with weekly new releases\n• Invites to Zoom rooms and Live Stream PNP shows\n• Unlimited Nearby access\n• Profile card with photo, badges and bio',
+    planBasic: '⭐ Basic - $9.99/month',
+    planPremium: '🌟 Premium - $19.99/month',
+    planGold: '👑 Gold - $29.99/month',
     planDetails: 'Plan Details:',
     selectPlan: 'Select Plan',
     paymentMethod: 'Choose payment method:',
@@ -82,7 +91,7 @@ const translations = {
     privacySettings: '🔒 Privacy Settings',
     sendPhoto: 'Please send your new profile photo:',
     photoUpdated: 'Profile photo updated successfully!',
-    sendBio: 'Please send your new bio (max 500 characters):',
+    sendBio: 'Please send your new bio (max 1000 characters):',
     bioUpdated: 'Bio updated successfully!',
     sendLocation: 'Please share your location:',
     locationUpdated: 'Location updated successfully!',
@@ -101,11 +110,7 @@ const translations = {
     myFavorites: '⭐ My Favorites',
     noFavorites: 'You have no favorites yet.',
     blockedUsers: '🚫 Blocked Users',
-      welcomeScreenPrime: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv PRIME!\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel PRIME.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas Zoom, iniciar transmisiones en vivo, ver videos completos,\nexplorar Cercanos sin límites y unirte a eventos privados.`,
     noBlockedUsers: 'You have no blocked users.',
-    shareProfile: '📤 Share Profile',
-    profileShared: 'Profile card created! Tap to share it.',
-    shareProfileCard: 'Share My Profile Card',
     privacyTitle: '🔒 Privacy Settings',
     showLocation: '📍 Show my location',
     showInterests: '🎯 Show my interests',
@@ -274,56 +279,6 @@ const translations = {
       },
     },
 
-    // Media Player
-    player: {
-      title: 'PNP Media Player',
-      description: 'Your complete music and video player',
-      browseMusic: 'Music',
-      browseVideo: 'Videos',
-      myPlaylists: 'My Playlists',
-      publicPlaylists: 'Public Playlists',
-      trending: 'Trending',
-      categories: 'Categories',
-      search: 'Search',
-      nowPlaying: 'Now Playing',
-      music: 'Music',
-      video: 'Videos',
-      library: 'Library',
-      plays: 'plays',
-      likes: 'likes',
-      tracks: 'tracks',
-      followers: 'followers',
-      noMedia: 'No media available yet.',
-      noPlaylists: 'You don\'t have any playlists yet.',
-      noPublicPlaylists: 'No public playlists available.',
-      noTrending: 'No trending media at the moment.',
-      noCategoryMedia: 'No media in this category.',
-      noResults: 'No results found.',
-      createPlaylist: 'Create Playlist',
-      playlistCreated: 'Playlist created successfully!',
-      enterPlaylistName: 'Enter a name for your playlist:',
-      enterSearchQuery: 'Enter your search query:',
-      searchResults: 'Search Results',
-      selectCategory: 'Select a category to browse:',
-      mediaNotFound: 'Media not found.',
-      playlistNotFound: 'Playlist not found.',
-      emptyPlaylist: 'This playlist is empty.',
-      nothingPlaying: 'Nothing is playing right now.',
-      playing: 'Playing',
-      paused: 'Paused',
-      stopped: 'Stopped',
-      resumed: 'Resumed',
-      controls: 'Controls',
-      shuffle: 'Shuffle',
-      repeat: 'Repeat',
-      volume: 'Volume',
-      like: 'Like',
-      liked: 'Liked!',
-      playPlaylist: 'Play Playlist',
-      playingPlaylist: 'Playing playlist',
-      noQueue: 'No queue available.',
-    },
-
     // Zoom Rooms
     zoomTitle: '🎥 Zoom Rooms',
     createRoom: '➕ Create Room',
@@ -363,7 +318,7 @@ const translations = {
     broadcast: '📢 Broadcast Message',
     planManagement: '💎 Plan Management',
     analytics: '📊 Analytics',
-    searchUser: 'Enter user ID, username, name, or email to search:',
+    searchUser: 'Enter user ID or username to search:',
     userFound: 'User found:',
     extendSubscription: '⏰ Extend Subscription',
     deactivateUser: '🚫 Deactivate User',
@@ -435,12 +390,8 @@ const translations = {
     },
   },
   es: {
-        groupRedirect: ({ username, command, botUsername }) =>
-          `@${username} Te envié un mensaje privado sobre tu solicitud. Por favor revísalo. Esto es por privacidad y para cumplir con la política anti-spam del grupo.\n\n[Abrir en chat privado con tu solicitud](https://t.me/${botUsername}?start=${command})`,
     // General
     welcome: '👋 ¡Bienvenido a PNPtv!',
-    welcomeScreen: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv! Premium\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel de control.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas Zoom, iniciar transmisiones en vivo, ver videos completos,\nexplorar Cercanos sin límites y unirte a eventos privados.',
-    welcomeScreenFree: `PNPtv!\n------------\n\nBienvenido a PNPtv!  \nDisfruta la experiencia completa desde aquí.\n\nDesbloquea todas las funciones premium:\n• Videos completos  \n• Transmisiones en vivo  \n• Nearby ilimitado  \n• Salas Zoom  \n• Eventos privados de la comunidad\n\nToca "Suscríbete a PRIME" para obtener acceso inmediato.`,
     back: '🔙 Atrás',
     cancel: '❌ Cancelar',
     next: '➡️ Siguiente',
@@ -448,46 +399,59 @@ const translations = {
     error: '❌ Ocurrió un error. Por favor intenta de nuevo.',
     success: '✅ ¡Éxito!',
     loading: '⏳ Cargando...',
-    days: 'días',
 
     // Onboarding
     selectLanguage: 'Por favor selecciona tu idioma:',
     languageSelected: 'Idioma configurado a Español 🇪🇸',
-    ageConfirmation: '¿Tienes 18 años o más?',
-    ageConfirmYes: 'Sí, tengo 18+',
-    ageConfirmNo: 'No',
+    ageVerification: '🔞 Verificación de Edad Requerida\n\nDebes tener 18 años o más para usar este servicio.\n\n¿Tienes 18 años o más?',
+    confirmAge: 'Sí, tengo 18+',
+    ageVerificationSuccess: '✅ ¡Edad verificada exitosamente!',
+    ageVerificationReminder: '🔄 Re-Verificación de Edad Requerida\n\nPor seguridad, por favor confirma tu edad nuevamente (requerido cada 7 días).',
     underAge: 'Lo sentimos, debes tener 18 años o más para usar este servicio.',
-    termsAndPrivacy: 'Por favor lee y acepta nuestros Términos de Servicio y Política de Privacidad:',
-    termsAccepted: 'Términos y Política de Privacidad aceptados ✅',
-    emailPrompt: '¿Deseas proporcionar tu correo para actualizaciones? (Opcional)',
-    emailReceived: '¡Correo guardado exitosamente!',
+
+    // Terms and Privacy
+    terms: '📄 Términos y Condiciones\n\nPor favor lee y acepta nuestros Términos de Servicio para continuar:',
+    termsAccepted: '✅ ¡Términos de Servicio aceptados!',
+    termsDeclined: '❌ Debes aceptar los Términos de Servicio para usar este bot.',
+    privacy: '🔒 Política de Privacidad\n\nPor favor lee y acepta nuestra Política de Privacidad para continuar:',
+    privacyAccepted: '✅ ¡Política de Privacidad aceptada!',
+    privacyDeclined: '❌ Debes aceptar la Política de Privacidad para usar este bot.',
+    accept: 'Aceptar y Continuar',
+    decline: 'Rechazar',
+
+    // Email Collection
+    emailPrompt: '📧 Correo Electrónico (Opcional)\n\n¿Deseas proporcionar tu correo para actualizaciones y notificaciones?',
+    emailInstructions: 'Por favor envía tu dirección de correo o haz clic en Omitir para continuar.',
+    emailConfirmed: '✅ ¡Correo guardado exitosamente!',
+    emailInvalid: '❌ Formato de correo inválido. Por favor intenta de nuevo.',
     skipEmail: 'Omitir',
+
+    // Free Channel Invite
+    freeChannelInvite: '🎉 ¡Bienvenido a PNPtv!\n\nÚnete a nuestra comunidad gratuita:',
+    freeChannel: 'Canal Gratuito',
+    freeGroup: 'Grupo Gratuito',
+    freeChannelInviteFailed: '✅ ¡Onboarding completado! Ahora puedes acceder a todas las funciones.',
+
+    // Profile Creation
+    profileCreated: '🎉 ¡Tu perfil ha sido creado exitosamente!',
     onboardingComplete: '🎉 ¡Bienvenido! Tu perfil está configurado. Usa /menu para comenzar.',
 
     // Main Menu
     mainMenuIntro: '🎬 Bienvenido a PNPtv - ¡Tu Centro de Entretenimiento!\n\n¿Qué te gustaría hacer?',
-    subscribe: `Suscríbete a PNPtv PRIME\n----------------------------------\n\nÚnete a la plataforma de contenido PNP más intensa, creada por y para la comunidad.\n\nPRIME te da acceso total a:\n• Videos PNP completos con latinos reales fumando y slameando  \n• Estrenos exclusivos protagonizados por Santino (x.com/pnpmethdaddy)  \n• Transmisiones en vivo y Salas Zoom.\n• Nearby ilimitado para explorar usuarios cerca de ti  \n• Biblioteca completa de música y podcasts  \n\nElige el plan que mejor se adapte a ti y completa tu pago.\nTu membresía se activará automáticamente.\n\nMétodos de pago disponibles: tarjeta débito/crédito, Crypto y las apps de pago más populares.`,
+    subscribe: '💎 Suscríbete a PRIME',
     myProfile: '👤 Mi Perfil',
     nearbyUsers: '🌍 Usuarios Cercanos',
     liveStreams: '🎤 Transmisiones en Vivo',
     radioMenu: '📻 Radio',
-    playerMenu: '🎵 Reproductor',
     zoomRooms: '🎥 Salas Zoom',
     support: '🤖 Soporte',
     settings: '⚙️ Configuración',
+
     // Subscription
-    subscriptionHeader: 'Suscríbete a PNPtv PRIME',
-    subscriptionDivider: '---------------------------------------',
-    subscriptionDescription: 'Desbloquea la experiencia completa de PNPtv y sumérgete en la comunidad más intensa de Latinos fumando y slamming en Telegram.\n\nElige tu plan para acceder a videos de sesiones largas, lanzamientos semanales, funciones comunitarias y la videografía completa de Santino y otros chicos latinos sexys. Toca un plan para ver qué incluye.',
     subscriptionPlans: '💎 Elige tu Plan PRIME:',
-      planCrystal: '💎 Pase Crystal - $49.99/180 días',
-      planCrystalDesc: 'Medio año de acceso total a la comunidad PNPtv!. Incluye:\n\n• Acceso ilimitado a todos los canales y grupos de PNPtv!\n• Videografía completa de Santino y sesiones químicas latinas\n• Videos de larga duración con estrenos semanales\n• Invitaciones a salas Zoom y shows en vivo de PNP\n• Acceso ilimitado a Cercanos\n• Acceso a eventos comunitarios y sesiones privadas\n• Acceso anticipado a nuevas funciones',
-      planDiamond: '💎 Pase Diamond - $99.99/365 días',
-      planDiamondDesc: 'Un año completo de experiencia PNPtv! con todas las funciones premium incluidas. Incluye:\n\n• Acceso ilimitado a todos los canales y grupos de PNPtv!\n• Videografía completa de Santino y videos latinos de smoking/slamming\n• Videos de larga duración y estrenos exclusivos semanales\n• Invitaciones a salas Zoom, transmisiones privadas y eventos comunitarios\n• Acceso ilimitado a Cercanos\n• Capacidad para organizar y programar tus propias sesiones Zoom\n• Soporte VIP y badges especiales de miembro',
-      planLifetime: '♾️ Pase Lifetime - $249.99',
-      planLifetimeDesc: 'El pase definitivo de PNPtv! con acceso permanente e ilimitado. Incluye:\n\n• Acceso de por vida a todos los canales, grupos y funciones comunitarias de PNPtv!\n• Videografía completa de Santino y todos los futuros videos y estrenos\n• Sesiones de larga duración con nuevas subidas cada semana\n• Invitaciones a salas Zoom, shows privados y eventos exclusivos\n• Acceso ilimitado a Cercanos\n• Capacidad para organizar y programar sesiones Zoom en cualquier momento\n• Soporte VIP permanente y estatus de miembro de por vida',
-    planMonthly: '🗓️ Pase Mensual - $24.99/30 días',
-    planMonthlyDesc: 'Nuestro plan más popular con acceso total y sin límites. Incluye:\n\n• Acceso ilimitado a todos los canales y grupo de PNPtv!\n• Videografía completa de Santino y latinos sexys fumando y slameando\n• Videos largos con estrenos semanales\n• Invitaciones a salas Zoom y shows en vivo de PNP\n• Acceso ilimitado a Cercanos\n• Tarjeta de perfil con foto, badges y bio',
+    planBasic: '⭐ Básico - $9.99/mes',
+    planPremium: '🌟 Premium - $19.99/mes',
+    planGold: '👑 Gold - $29.99/mes',
     planDetails: 'Detalles del Plan:',
     selectPlan: 'Seleccionar Plan',
     paymentMethod: 'Elige método de pago:',
@@ -512,7 +476,7 @@ const translations = {
     privacySettings: '🔒 Configuración de Privacidad',
     sendPhoto: 'Por favor envía tu nueva foto de perfil:',
     photoUpdated: '¡Foto de perfil actualizada exitosamente!',
-    sendBio: 'Por favor envía tu nueva biografía (máx 500 caracteres):',
+    sendBio: 'Por favor envía tu nueva biografía (máx 1000 caracteres):',
     bioUpdated: '¡Biografía actualizada exitosamente!',
     sendLocation: 'Por favor comparte tu ubicación:',
     locationUpdated: '¡Ubicación actualizada exitosamente!',
@@ -531,11 +495,7 @@ const translations = {
     myFavorites: '⭐ Mis Favoritos',
     noFavorites: 'Aún no tienes favoritos.',
     blockedUsers: '🚫 Usuarios Bloqueados',
-      welcomeScreenPrime: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv PRIME!\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel PRIME.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas Zoom, iniciar transmisiones en vivo, ver videos completos,\nexplorar Cercanos sin límites y unirte a eventos privados.`,
     noBlockedUsers: 'No tienes usuarios bloqueados.',
-    shareProfile: '📤 Compartir Perfil',
-    profileShared: '¡Tarjeta de perfil creada! Toca para compartirla.',
-    shareProfileCard: 'Compartir Mi Tarjeta de Perfil',
     privacyTitle: '🔒 Configuración de Privacidad',
     showLocation: '📍 Mostrar mi ubicación',
     showInterests: '🎯 Mostrar mis intereses',
@@ -708,56 +668,6 @@ const translations = {
       },
     },
 
-    // Media Player
-    player: {
-      title: 'Reproductor PNP',
-      description: 'Tu reproductor completo de música y video',
-      browseMusic: 'Música',
-      browseVideo: 'Videos',
-      myPlaylists: 'Mis Listas',
-      publicPlaylists: 'Listas Públicas',
-      trending: 'Tendencias',
-      categories: 'Categorías',
-      search: 'Buscar',
-      nowPlaying: 'Reproduciendo',
-      music: 'Música',
-      video: 'Videos',
-      library: 'Biblioteca',
-      plays: 'reproducciones',
-      likes: 'me gusta',
-      tracks: 'pistas',
-      followers: 'seguidores',
-      noMedia: 'No hay contenido disponible aún.',
-      noPlaylists: 'Aún no tienes listas de reproducción.',
-      noPublicPlaylists: 'No hay listas públicas disponibles.',
-      noTrending: 'No hay tendencias en este momento.',
-      noCategoryMedia: 'No hay contenido en esta categoría.',
-      noResults: 'No se encontraron resultados.',
-      createPlaylist: 'Crear Lista',
-      playlistCreated: '¡Lista creada exitosamente!',
-      enterPlaylistName: 'Ingresa un nombre para tu lista:',
-      enterSearchQuery: 'Ingresa tu búsqueda:',
-      searchResults: 'Resultados de Búsqueda',
-      selectCategory: 'Selecciona una categoría para explorar:',
-      mediaNotFound: 'Contenido no encontrado.',
-      playlistNotFound: 'Lista no encontrada.',
-      emptyPlaylist: 'Esta lista está vacía.',
-      nothingPlaying: 'No se está reproduciendo nada ahora.',
-      playing: 'Reproduciendo',
-      paused: 'En Pausa',
-      stopped: 'Detenido',
-      resumed: 'Reanudado',
-      controls: 'Controles',
-      shuffle: 'Aleatorio',
-      repeat: 'Repetir',
-      volume: 'Volumen',
-      like: 'Me Gusta',
-      liked: '¡Me gusta!',
-      playPlaylist: 'Reproducir Lista',
-      playingPlaylist: 'Reproduciendo lista',
-      noQueue: 'No hay cola disponible.',
-    },
-
     // Zoom Rooms
     zoomTitle: '🎥 Salas Zoom',
     createRoom: '➕ Crear Sala',
@@ -798,7 +708,7 @@ const translations = {
     broadcast: '📢 Mensaje de Difusión',
     planManagement: '💎 Gestión de Planes',
     analytics: '📊 Analíticas',
-    searchUser: 'Ingresa ID, usuario, nombre o email para buscar:',
+    searchUser: 'Ingresa ID o nombre de usuario para buscar:',
     userFound: 'Usuario encontrado:',
     extendSubscription: '⏰ Extender Suscripción',
     deactivateUser: '🚫 Desactivar Usuario',
@@ -880,22 +790,12 @@ const translations = {
  */
 const t = (key, lang = 'en', params = {}) => {
   const language = lang || 'en';
-
-  // Support nested keys like 'moderation.username_required'
-  const getNestedValue = (obj, keyPath) => {
-    return keyPath.split('.').reduce((current, k) => current?.[k], obj);
-  };
-
-  let text = getNestedValue(translations[language], key)
-    || getNestedValue(translations.en, key)
-    || key;
+  let text = translations[language]?.[key] || translations.en[key] || key;
 
   // Replace parameters
-  if (typeof text === 'string') {
-    Object.keys(params).forEach((param) => {
-      text = text.replace(`{${param}}`, params[param]);
-    });
-  }
+  Object.keys(params).forEach((param) => {
+    text = text.replace(`{${param}}`, params[param]);
+  });
 
   return text;
 };

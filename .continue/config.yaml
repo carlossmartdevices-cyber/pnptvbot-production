@@ -1,0 +1,37 @@
+name: PNPtv Bot Development
+version: 1.0.0
+schema: v1
+
+# Define which models can be used
+# https://docs.continue.dev/customization/models
+models:
+  # Primary AI model for code generation
+  - name: Claude Sonnet
+    provider: anthropic
+    model: claude-sonnet-4-20250514
+    apiKey: ${ANTHROPIC_API_KEY}
+
+  # Fast model for quick tasks
+  - name: Claude Haiku
+    provider: anthropic
+    model: claude-3-5-haiku-20241022
+    apiKey: ${ANTHROPIC_API_KEY}
+
+# MCP Servers that Continue can access
+# https://docs.continue.dev/customization/mcp-tools
+mcpServers:
+  # PNPtv Custom MCP Server - Bot Development Tools
+  - name: pnptv-mcp-server
+    command: node
+    args:
+      - "scripts/pnptv-mcp-server.mjs"
+    env:
+      NODE_OPTIONS: "--experimental-vm-modules"
+      BOT_TOKEN: ${BOT_TOKEN}
+      LOG_LEVEL: "info"
+
+# Tab autocomplete settings
+tabAutocompleteModel:
+  provider: anthropic
+  model: claude-3-5-haiku-20241022
+  apiKey: ${ANTHROPIC_API_KEY}

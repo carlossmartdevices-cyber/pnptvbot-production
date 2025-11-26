@@ -1,6 +1,9 @@
 const { v4: uuidv4 } = require('uuid');
+const { getFirestore } = require('../config/firebase');
 const logger = require('../utils/logger');
-const { query } = require('../config/postgres');
+
+const COLLECTION = 'privateCalls';
+const AVAILABILITY_COLLECTION = 'callAvailability';
 
 /**
  * Call Model - Manages 1:1 private calls
@@ -8,68 +11,37 @@ const { query } = require('../config/postgres');
 class CallModel {
   /**
    * Create a new call booking
-   * @param {Object} callData - { callerId, callerUsername, receiverId, receiverUsername, userName, paymentId, scheduledDate, scheduledTime, scheduledAt, duration, performer, callType }
+   * @param {Object} callData - { userId, userName, paymentId, scheduledDate, scheduledTime, duration, performer }
    * @returns {Promise<Object>} Created call
    */
   static async create(callData) {
     try {
-      const id = uuidv4();
-      const now = new Date();
+      const db = getFirestore();
+      const callId = uuidv4();
+      const callRef = db.collection(COLLECTION).doc(callId);
 
-      const result = await query(
-        `INSERT INTO private_calls (
-          id, caller_id, caller_username, receiver_id, receiver_username,
-          user_name, payment_id, scheduled_date, scheduled_time, scheduled_at,
-          duration, performer, status, call_type, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-        RETURNING *`,
-        [
-          id,
-          callData.callerId || callData.userId,
-          callData.callerUsername || null,
-          callData.receiverId || null,
-          callData.receiverUsername || null,
-          callData.userName || null,
-          callData.paymentId || null,
-          callData.scheduledDate || null,
-          callData.scheduledTime || null,
-          callData.scheduledAt || null,
-          callData.duration || 30,
-          callData.performer || null,
-          'pending',
-          callData.callType || 'private',
-          now,
-          now
-        ]
-      );
-
-      const call = result.rows[0];
-      logger.info('Call booking created', { callId: id });
-
-      return {
-        id: call.id,
-        callerId: call.caller_id,
-        callerUsername: call.caller_username,
-        receiverId: call.receiver_id,
-        receiverUsername: call.receiver_username,
-        userName: call.user_name,
-        paymentId: call.payment_id,
-        scheduledDate: call.scheduled_date,
-        scheduledTime: call.scheduled_time,
-        scheduledAt: call.scheduled_at,
-        duration: call.duration,
-        performer: call.performer,
-        status: call.status,
-        callType: call.call_type,
-        startedAt: call.started_at,
-        endedAt: call.ended_at,
-        callerRating: call.caller_rating,
-        receiverRating: call.receiver_rating,
-        callerFeedback: call.caller_feedback,
-        receiverFeedback: call.receiver_feedback,
-        createdAt: call.created_at,
-        updatedAt: call.updated_at,
+      const data = {
+        ...callData,
+        status: 'pending', // pending, confirmed, completed, cancelled
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        meetingUrl: null,
+        reminderSent: false,
+        reminder24hSent: false,
+        reminder1hSent: false,
+        reminder15minSent: false,
+        feedbackSubmitted: false,
+        performer: callData.performer || 'Santino', // Default performer
       };
+
+      await callRef.set(data);
+
+      logger.info('Private call booking created', {
+        callId,
+        userId: callData.userId,
+        performer: data.performer,
+      });
+      return { id: callId, ...data };
     } catch (error) {
       logger.error('Error creating call booking:', error);
       throw error;
@@ -83,42 +55,16 @@ class CallModel {
    */
   static async getById(callId) {
     try {
-      const result = await query(
-        `SELECT * FROM private_calls WHERE id = $1`,
-        [callId]
-      );
+      const db = getFirestore();
+      const doc = await db.collection(COLLECTION).doc(callId).get();
 
-      if (result.rows.length === 0) {
+      if (!doc.exists) {
         return null;
       }
 
-      const call = result.rows[0];
-      return {
-        id: call.id,
-        callerId: call.caller_id,
-        callerUsername: call.caller_username,
-        receiverId: call.receiver_id,
-        receiverUsername: call.receiver_username,
-        userName: call.user_name,
-        paymentId: call.payment_id,
-        scheduledDate: call.scheduled_date,
-        scheduledTime: call.scheduled_time,
-        scheduledAt: call.scheduled_at,
-        duration: call.duration,
-        performer: call.performer,
-        status: call.status,
-        callType: call.call_type,
-        startedAt: call.started_at,
-        endedAt: call.ended_at,
-        callerRating: call.caller_rating,
-        receiverRating: call.receiver_rating,
-        callerFeedback: call.caller_feedback,
-        receiverFeedback: call.receiver_feedback,
-        createdAt: call.created_at,
-        updatedAt: call.updated_at,
-      };
+      return { id: doc.id, ...doc.data() };
     } catch (error) {
-      logger.error('Error getting call by ID:', error);
+      logger.error('Error getting call:', error);
       return null;
     }
   }
@@ -131,40 +77,21 @@ class CallModel {
    */
   static async getByUser(userId, limit = 20) {
     try {
-      const result = await query(
-        `SELECT * FROM private_calls
-         WHERE caller_id = $1 OR receiver_id = $1
-         ORDER BY scheduled_at DESC NULLS LAST, created_at DESC
-         LIMIT $2`,
-        [userId, limit]
-      );
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTION)
+        .where('userId', '==', userId.toString())
+        .orderBy('createdAt', 'desc')
+        .limit(limit)
+        .get();
 
-      return result.rows.map(call => ({
-        id: call.id,
-        callerId: call.caller_id,
-        callerUsername: call.caller_username,
-        receiverId: call.receiver_id,
-        receiverUsername: call.receiver_username,
-        userName: call.user_name,
-        paymentId: call.payment_id,
-        scheduledDate: call.scheduled_date,
-        scheduledTime: call.scheduled_time,
-        scheduledAt: call.scheduled_at,
-        duration: call.duration,
-        performer: call.performer,
-        status: call.status,
-        callType: call.call_type,
-        startedAt: call.started_at,
-        endedAt: call.ended_at,
-        callerRating: call.caller_rating,
-        receiverRating: call.receiver_rating,
-        callerFeedback: call.caller_feedback,
-        receiverFeedback: call.receiver_feedback,
-        createdAt: call.created_at,
-        updatedAt: call.updated_at,
-      }));
+      const calls = [];
+      snapshot.forEach((doc) => {
+        calls.push({ id: doc.id, ...doc.data() });
+      });
+
+      return calls;
     } catch (error) {
-      logger.error('Error getting calls by user:', error);
+      logger.error('Error getting user calls:', error);
       return [];
     }
   }
@@ -177,38 +104,19 @@ class CallModel {
    */
   static async getByStatus(status, limit = 100) {
     try {
-      const result = await query(
-        `SELECT * FROM private_calls
-         WHERE status = $1
-         ORDER BY scheduled_at ASC NULLS LAST, created_at ASC
-         LIMIT $2`,
-        [status, limit]
-      );
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTION)
+        .where('status', '==', status)
+        .orderBy('scheduledDate', 'asc')
+        .limit(limit)
+        .get();
 
-      return result.rows.map(call => ({
-        id: call.id,
-        callerId: call.caller_id,
-        callerUsername: call.caller_username,
-        receiverId: call.receiver_id,
-        receiverUsername: call.receiver_username,
-        userName: call.user_name,
-        paymentId: call.payment_id,
-        scheduledDate: call.scheduled_date,
-        scheduledTime: call.scheduled_time,
-        scheduledAt: call.scheduled_at,
-        duration: call.duration,
-        performer: call.performer,
-        status: call.status,
-        callType: call.call_type,
-        startedAt: call.started_at,
-        endedAt: call.ended_at,
-        callerRating: call.caller_rating,
-        receiverRating: call.receiver_rating,
-        callerFeedback: call.caller_feedback,
-        receiverFeedback: call.receiver_feedback,
-        createdAt: call.created_at,
-        updatedAt: call.updated_at,
-      }));
+      const calls = [];
+      snapshot.forEach((doc) => {
+        calls.push({ id: doc.id, ...doc.data() });
+      });
+
+      return calls;
     } catch (error) {
       logger.error('Error getting calls by status:', error);
       return [];
@@ -219,57 +127,21 @@ class CallModel {
    * Update call status
    * @param {string} callId - Call ID
    * @param {string} status - New status
-   * @param {Object} metadata - Additional metadata (startedAt, endedAt, callerRating, receiverRating, callerFeedback, receiverFeedback, etc.)
+   * @param {Object} metadata - Additional metadata
    * @returns {Promise<boolean>} Success status
    */
   static async updateStatus(callId, status, metadata = {}) {
     try {
-      // Build dynamic UPDATE query based on metadata
-      const updates = ['status = $1', 'updated_at = $2'];
-      const values = [status, new Date()];
-      let paramCounter = 3;
+      const db = getFirestore();
+      const callRef = db.collection(COLLECTION).doc(callId);
 
-      // Map camelCase metadata keys to snake_case database columns
-      const fieldMapping = {
-        startedAt: 'started_at',
-        endedAt: 'ended_at',
-        callerRating: 'caller_rating',
-        receiverRating: 'receiver_rating',
-        callerFeedback: 'caller_feedback',
-        receiverFeedback: 'receiver_feedback',
-        duration: 'duration',
-        callType: 'call_type',
-        performer: 'performer',
-        receiverId: 'receiver_id',
-        receiverUsername: 'receiver_username',
-        callerId: 'caller_id',
-        callerUsername: 'caller_username',
-        userName: 'user_name',
-        paymentId: 'payment_id',
-        scheduledDate: 'scheduled_date',
-        scheduledTime: 'scheduled_time',
-        scheduledAt: 'scheduled_at',
-      };
-
-      // Add metadata fields to update query
-      Object.keys(metadata).forEach(key => {
-        const dbField = fieldMapping[key] || key;
-        updates.push(`${dbField} = $${paramCounter}`);
-        values.push(metadata[key]);
-        paramCounter++;
+      await callRef.update({
+        status,
+        ...metadata,
+        updatedAt: new Date(),
       });
 
-      values.push(callId); // Add callId as the last parameter
-
-      const updateQuery = `
-        UPDATE private_calls
-        SET ${updates.join(', ')}
-        WHERE id = $${paramCounter}
-      `;
-
-      await query(updateQuery, values);
-
-      logger.info('Call status updated', { callId, status, metadata });
+      logger.info('Call status updated', { callId, status });
       return true;
     } catch (error) {
       logger.error('Error updating call status:', error);
@@ -284,92 +156,52 @@ class CallModel {
    */
   static async setAvailability(availabilityData) {
     try {
-      const now = new Date();
+      const db = getFirestore();
+      const availabilityRef = db.collection(AVAILABILITY_COLLECTION).doc('current');
 
-      // Use UPSERT (INSERT ... ON CONFLICT UPDATE) to handle both create and update
-      const result = await query(
-        `INSERT INTO call_availability (
-          id, admin_id, available, message, valid_until, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (admin_id)
-        DO UPDATE SET
-          available = EXCLUDED.available,
-          message = EXCLUDED.message,
-          valid_until = EXCLUDED.valid_until,
-          updated_at = EXCLUDED.updated_at
-        RETURNING *`,
-        [
-          uuidv4(),
-          availabilityData.adminId,
-          availabilityData.available !== undefined ? availabilityData.available : true,
-          availabilityData.message || null,
-          availabilityData.validUntil || null,
-          now,
-          now
-        ]
-      );
-
-      const availability = result.rows[0];
-      logger.info('Admin availability set', { adminId: availabilityData.adminId });
-
-      return {
-        id: availability.id,
-        adminId: availability.admin_id,
-        available: availability.available,
-        message: availability.message,
-        validUntil: availability.valid_until,
-        createdAt: availability.created_at,
-        updatedAt: availability.updated_at,
+      const data = {
+        ...availabilityData,
+        updatedAt: new Date(),
       };
+
+      await availabilityRef.set(data, { merge: true });
+
+      logger.info('Call availability updated', {
+        adminId: availabilityData.adminId,
+        available: availabilityData.available,
+      });
+
+      return data;
     } catch (error) {
-      logger.error('Error setting admin availability:', error);
+      logger.error('Error setting availability:', error);
       throw error;
     }
   }
 
   /**
-   * Get admin availability
-   * @param {string} adminId - Admin ID (optional, if not provided returns latest)
+   * Get current availability
    * @returns {Promise<Object|null>} Current availability
    */
-  static async getAvailability(adminId = null) {
+  static async getAvailability() {
     try {
-      let result;
+      const db = getFirestore();
+      const doc = await db.collection(AVAILABILITY_COLLECTION).doc('current').get();
 
-      if (adminId) {
-        result = await query(
-          `SELECT * FROM call_availability
-           WHERE admin_id = $1
-           ORDER BY created_at DESC
-           LIMIT 1`,
-          [adminId]
-        );
-      } else {
-        // Get the most recent availability record
-        result = await query(
-          `SELECT * FROM call_availability
-           ORDER BY created_at DESC
-           LIMIT 1`
-        );
+      if (!doc.exists) {
+        return { available: false, message: 'Not available' };
       }
 
-      if (result.rows.length === 0) {
-        return null;
+      const data = doc.data();
+
+      // Check if availability has expired
+      if (data.validUntil && new Date(data.validUntil.toDate()) < new Date()) {
+        return { available: false, message: 'Availability expired' };
       }
 
-      const availability = result.rows[0];
-      return {
-        id: availability.id,
-        adminId: availability.admin_id,
-        available: availability.available,
-        message: availability.message,
-        validUntil: availability.valid_until,
-        createdAt: availability.created_at,
-        updatedAt: availability.updated_at,
-      };
+      return data;
     } catch (error) {
-      logger.error('Error getting admin availability:', error);
-      return null;
+      logger.error('Error getting availability:', error);
+      return { available: false, message: 'Error checking availability' };
     }
   }
 
@@ -380,42 +212,23 @@ class CallModel {
    */
   static async getUpcoming(fromDate = new Date()) {
     try {
-      const result = await query(
-        `SELECT * FROM private_calls
-         WHERE scheduled_at >= $1
-           AND status = 'pending'
-         ORDER BY scheduled_at ASC
-         LIMIT 100`,
-        [fromDate]
-      );
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTION)
+        .where('status', 'in', ['pending', 'confirmed'])
+        .where('scheduledDate', '>=', fromDate)
+        .orderBy('scheduledDate', 'asc')
+        .limit(50)
+        .get();
 
-      return result.rows.map(call => ({
-        id: call.id,
-        callerId: call.caller_id,
-        callerUsername: call.caller_username,
-        receiverId: call.receiver_id,
-        receiverUsername: call.receiver_username,
-        userName: call.user_name,
-        paymentId: call.payment_id,
-        scheduledDate: call.scheduled_date,
-        scheduledTime: call.scheduled_time,
-        scheduledAt: call.scheduled_at,
-        duration: call.duration,
-        performer: call.performer,
-        status: call.status,
-        callType: call.call_type,
-        startedAt: call.started_at,
-        endedAt: call.ended_at,
-        callerRating: call.caller_rating,
-        receiverRating: call.receiver_rating,
-        callerFeedback: call.caller_feedback,
-        receiverFeedback: call.receiver_feedback,
-        createdAt: call.created_at,
-        updatedAt: call.updated_at,
-      }));
+      const calls = [];
+      snapshot.forEach((doc) => {
+        calls.push({ id: doc.id, ...doc.data() });
+      });
+
+      return calls;
     } catch (error) {
       logger.error('Error getting upcoming calls:', error);
-      return []; // Return empty array instead of throwing
+      return [];
     }
   }
 
@@ -425,41 +238,37 @@ class CallModel {
    */
   static async getStatistics() {
     try {
-      const result = await query(
-        `SELECT
-          COUNT(*) FILTER (WHERE status = 'pending') as pending_count,
-          COUNT(*) FILTER (WHERE status = 'completed') as completed_count,
-          COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled_count,
-          COUNT(*) FILTER (WHERE status = 'active') as active_count,
-          COUNT(*) as total_count,
-          AVG(duration) FILTER (WHERE status = 'completed') as avg_duration,
-          AVG(caller_rating) FILTER (WHERE caller_rating IS NOT NULL) as avg_caller_rating,
-          AVG(receiver_rating) FILTER (WHERE receiver_rating IS NOT NULL) as avg_receiver_rating
-         FROM private_calls`
-      );
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTION).get();
 
-      const stats = result.rows[0];
-      return {
-        pending: parseInt(stats.pending_count) || 0,
-        completed: parseInt(stats.completed_count) || 0,
-        cancelled: parseInt(stats.cancelled_count) || 0,
-        active: parseInt(stats.active_count) || 0,
-        total: parseInt(stats.total_count) || 0,
-        avgDuration: parseFloat(stats.avg_duration) || 0,
-        avgCallerRating: parseFloat(stats.avg_caller_rating) || 0,
-        avgReceiverRating: parseFloat(stats.avg_receiver_rating) || 0,
+      const stats = {
+        total: 0,
+        pending: 0,
+        confirmed: 0,
+        completed: 0,
+        cancelled: 0,
+        revenue: 0,
       };
+
+      snapshot.forEach((doc) => {
+        const call = doc.data();
+        stats.total += 1;
+        stats[call.status] = (stats[call.status] || 0) + 1;
+        if (call.status === 'completed') {
+          stats.revenue += call.amount || 100; // Default $100
+        }
+      });
+
+      return stats;
     } catch (error) {
       logger.error('Error getting call statistics:', error);
       return {
+        total: 0,
         pending: 0,
+        confirmed: 0,
         completed: 0,
         cancelled: 0,
-        active: 0,
-        total: 0,
-        avgDuration: 0,
-        avgCallerRating: 0,
-        avgReceiverRating: 0,
+        revenue: 0,
       };
     }
   }

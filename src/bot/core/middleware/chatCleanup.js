@@ -1,113 +1,192 @@
+const ChatCleanupService = require('../../services/chatCleanupService');
 const logger = require('../../../utils/logger');
-
-const GROUP_ID = process.env.GROUP_ID;
-const CLEANUP_DELAY = 90 * 1000; // 90 seconds
 
 /**
  * Chat cleanup middleware
- * Auto-deletes commands and bot messages after 90 seconds
+ * Automatically schedules deletion of:
+ * 1. Bot messages (replies, notifications)
+ * 2. User commands (/command)
+ * 3. System messages (joins, leaves, etc.)
  *
- * Features:
- * - Deletes user commands (messages starting with /)
- * - Deletes bot responses to commands
- * - Configurable delay (default: 90 seconds)
- * - Only operates in configured group
+ * User regular messages are NOT deleted
+ *
+ * @param {number} delay - Delay in milliseconds (default: 5 minutes)
+ * @returns {Function} Middleware function
  */
-const chatCleanupMiddleware = (delay = CLEANUP_DELAY) => async (ctx, next) => {
+const chatCleanupMiddleware = (delay = 5 * 60 * 1000) => async (ctx, next) => {
+  const chatType = ctx.chat?.type;
+
+  // Only apply to groups and supergroups
+  if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+    return next();
+  }
+
   try {
-    // Only process in group chats
-    if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
-      return next();
+    // Handle incoming messages
+    if (ctx.message) {
+      await handleIncomingMessage(ctx, delay);
     }
 
-    // Only process in configured group (if GROUP_ID is set)
-    if (GROUP_ID && ctx.chat.id.toString() !== GROUP_ID) {
-      return next();
-    }
-
-    // Track if this is a command
-    const isCommand = ctx.message?.text?.startsWith('/');
-    const messageId = ctx.message?.message_id;
-
-    // Process message first
+    // Continue with the rest of the middleware chain
     await next();
 
-    // Schedule deletion for commands
-    if (isCommand && messageId) {
-      setTimeout(async () => {
-        try {
-          await ctx.telegram.deleteMessage(ctx.chat.id, messageId);
-          logger.debug('Auto-deleted command message', {
-            messageId,
-            command: ctx.message.text.split(' ')[0]
-          });
-        } catch (error) {
-          // Ignore errors (message might already be deleted)
-          logger.debug('Could not delete command message:', error.message);
-        }
-      }, delay);
-
-      logger.debug('Scheduled command deletion', {
-        messageId,
-        command: ctx.message.text.split(' ')[0],
-        delayMs: delay
-      });
-    }
-
-    // If bot replied, schedule deletion for bot message too
-    if (ctx.botInfo && ctx.message?.reply_to_message?.from?.id === ctx.botInfo.id) {
-      const botMessageId = ctx.message.message_id;
-
-      setTimeout(async () => {
-        try {
-          await ctx.telegram.deleteMessage(ctx.chat.id, botMessageId);
-          logger.debug('Auto-deleted bot reply message', { messageId: botMessageId });
-        } catch (error) {
-          logger.debug('Could not delete bot reply:', error.message);
-        }
-      }, delay);
-    }
-
+    // Handle outgoing bot messages (replies)
+    await handleOutgoingMessages(ctx, delay);
   } catch (error) {
-    logger.error('Error in chat cleanup middleware:', error);
-    // Continue processing even on error
-    return next();
+    logger.error('Chat cleanup middleware error:', error);
+    // Don't block the message flow
+    throw error;
   }
 };
 
 /**
- * Helper function to schedule bot message deletion
- * Use this when sending bot messages that should auto-delete
- *
- * @param {Object} telegram - Telegram bot API
- * @param {Object} sentMessage - Message object returned from send* methods
- * @param {number} delay - Delay in milliseconds (default: 90 seconds)
+ * Handle incoming messages
+ * Schedule deletion of commands and system messages
  */
-const scheduleMessageDeletion = (telegram, sentMessage, delay = CLEANUP_DELAY) => {
-  if (!sentMessage || !sentMessage.chat || !sentMessage.message_id) {
-    logger.warn('Invalid message object for scheduled deletion');
+async function handleIncomingMessage(ctx, delay) {
+  const { message } = ctx;
+
+  // Check if it's a command
+  if (message.text && message.text.startsWith('/')) {
+    ChatCleanupService.scheduleCommand(ctx, delay);
+
+    logger.debug('Command scheduled for deletion', {
+      chatId: ctx.chat.id,
+      messageId: message.message_id,
+      command: message.text.split(' ')[0],
+    });
     return;
   }
 
-  setTimeout(async () => {
-    try {
-      await telegram.deleteMessage(sentMessage.chat.id, sentMessage.message_id);
-      logger.debug('Auto-deleted scheduled message', {
-        messageId: sentMessage.message_id,
-        chatId: sentMessage.chat.id
-      });
-    } catch (error) {
-      logger.debug('Could not delete scheduled message:', error.message);
-    }
-  }, delay);
+  // Check for system messages
+  if (isSystemMessage(message)) {
+    ChatCleanupService.scheduleSystemMessage(
+      ctx.telegram,
+      ctx.chat.id,
+      message.message_id,
+      delay,
+    );
 
-  logger.debug('Scheduled message deletion', {
-    messageId: sentMessage.message_id,
-    chatId: sentMessage.chat.id,
-    delayMs: delay
-  });
-};
+    logger.debug('System message scheduled for deletion', {
+      chatId: ctx.chat.id,
+      messageId: message.message_id,
+      type: getSystemMessageType(message),
+    });
+  }
+
+  // Regular user messages are NOT scheduled for deletion
+}
+
+/**
+ * Handle outgoing messages (bot replies)
+ * Intercepts ctx.reply, ctx.replyWithMarkdown, etc.
+ * ALL bot messages in groups are auto-deleted unless marked as broadcast
+ */
+async function handleOutgoingMessages(ctx, delay) {
+  // Store original reply methods
+  const originalReply = ctx.reply;
+  const originalReplyWithMarkdown = ctx.replyWithMarkdown;
+  const originalReplyWithHTML = ctx.replyWithHTML;
+  const originalReplyWithPhoto = ctx.replyWithPhoto;
+  const originalReplyWithDocument = ctx.replyWithDocument;
+  const originalReplyWithVideo = ctx.replyWithVideo;
+  const originalReplyWithAnimation = ctx.replyWithAnimation;
+  const originalReplyWithAudio = ctx.replyWithAudio;
+  const originalReplyWithSticker = ctx.replyWithSticker;
+  const originalReplyWithVoice = ctx.replyWithVoice;
+  const originalReplyWithVideoNote = ctx.replyWithVideoNote;
+  const originalReplyWithLocation = ctx.replyWithLocation;
+
+  /**
+   * Helper to wrap reply methods
+   * Checks if message has broadcast flag in extra options
+   */
+  const wrapReplyMethod = (originalMethod, methodName) => async function (...args) {
+    const sentMessage = await originalMethod.apply(this, args);
+
+    if (sentMessage) {
+      // Check if last argument has broadcast flag
+      const lastArg = args[args.length - 1];
+      const isBroadcast = lastArg && typeof lastArg === 'object' && lastArg.broadcast === true;
+
+      ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, delay, isBroadcast);
+
+      logger.debug(`Bot message scheduled for deletion (${methodName})`, {
+        chatId: ctx.chat.id,
+        messageId: sentMessage.message_id,
+        isBroadcast,
+      });
+    }
+
+    return sentMessage;
+  };
+
+  // Wrap all reply methods
+  ctx.reply = wrapReplyMethod(originalReply, 'reply');
+  ctx.replyWithMarkdown = wrapReplyMethod(originalReplyWithMarkdown, 'replyWithMarkdown');
+  ctx.replyWithHTML = wrapReplyMethod(originalReplyWithHTML, 'replyWithHTML');
+  ctx.replyWithPhoto = wrapReplyMethod(originalReplyWithPhoto, 'replyWithPhoto');
+  ctx.replyWithDocument = wrapReplyMethod(originalReplyWithDocument, 'replyWithDocument');
+  ctx.replyWithVideo = wrapReplyMethod(originalReplyWithVideo, 'replyWithVideo');
+  ctx.replyWithAnimation = wrapReplyMethod(originalReplyWithAnimation, 'replyWithAnimation');
+  ctx.replyWithAudio = wrapReplyMethod(originalReplyWithAudio, 'replyWithAudio');
+  ctx.replyWithSticker = wrapReplyMethod(originalReplyWithSticker, 'replyWithSticker');
+  ctx.replyWithVoice = wrapReplyMethod(originalReplyWithVoice, 'replyWithVoice');
+  ctx.replyWithVideoNote = wrapReplyMethod(originalReplyWithVideoNote, 'replyWithVideoNote');
+  ctx.replyWithLocation = wrapReplyMethod(originalReplyWithLocation, 'replyWithLocation');
+}
+
+/**
+ * Check if a message is a system message
+ * @param {Object} message - Telegram message
+ * @returns {boolean} Is system message
+ */
+function isSystemMessage(message) {
+  return !!(
+    message.new_chat_members
+    || message.left_chat_member
+    || message.new_chat_title
+    || message.new_chat_photo
+    || message.delete_chat_photo
+    || message.group_chat_created
+    || message.supergroup_chat_created
+    || message.channel_chat_created
+    || message.migrate_to_chat_id
+    || message.migrate_from_chat_id
+    || message.pinned_message
+    || message.invoice
+    || message.successful_payment
+    || message.connected_website
+    || message.passport_data
+    || message.proximity_alert_triggered
+    || message.forum_topic_created
+    || message.forum_topic_edited
+    || message.forum_topic_closed
+    || message.forum_topic_reopened
+    || message.video_chat_scheduled
+    || message.video_chat_started
+    || message.video_chat_ended
+    || message.video_chat_participants_invited
+  );
+}
+
+/**
+ * Get system message type
+ * @param {Object} message - Telegram message
+ * @returns {string} System message type
+ */
+function getSystemMessageType(message) {
+  if (message.new_chat_members) return 'new_members';
+  if (message.left_chat_member) return 'left_member';
+  if (message.new_chat_title) return 'new_title';
+  if (message.new_chat_photo) return 'new_photo';
+  if (message.delete_chat_photo) return 'delete_photo';
+  if (message.group_chat_created) return 'group_created';
+  if (message.supergroup_chat_created) return 'supergroup_created';
+  if (message.pinned_message) return 'pinned_message';
+  if (message.video_chat_started) return 'video_chat_started';
+  if (message.video_chat_ended) return 'video_chat_ended';
+  return 'unknown';
+}
 
 module.exports = chatCleanupMiddleware;
-module.exports.scheduleMessageDeletion = scheduleMessageDeletion;
-module.exports.CLEANUP_DELAY = CLEANUP_DELAY;

@@ -1,13 +1,14 @@
 const { Markup } = require('telegraf');
+const OpenAI = require('openai');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const SupportTopicModel = require('../../../models/supportTopicModel');
 const UserModel = require('../../../models/userModel');
-const ChatCleanupService = require('../../services/chatCleanupService');
 
 // Mistral AI integration
 let mistral = null;
+let AGENT_ID = null;
 
 try {
   const { Mistral } = require('@mistralai/mistralai');
@@ -15,7 +16,11 @@ try {
     mistral = new Mistral({
       apiKey: process.env.MISTRAL_API_KEY,
     });
-    logger.info('Mistral AI initialized successfully');
+
+    // Initialize agent on startup (will be created if not exists)
+    initializeAgent().catch((err) => {
+      logger.error('Failed to initialize Mistral agent:', err);
+    });
   }
 } catch (error) {
   logger.warn('Mistral AI package not installed. AI chat will be unavailable.');
@@ -25,250 +30,10 @@ try {
 const messageTimestamps = new Map();
 const RATE_LIMIT_MS = 3000; // 3 seconds between messages
 
-// Support topic map: odId -> topicId (for forum groups)
-const userTopicMap = new Map();
-
 /**
- * Cristina's instructions - PNPtv Community Assistant
+ * Agent instructions - Cristina (PNPtv Harm Reduction & Community Support AI)
  */
-const CRISTINA_INSTRUCTIONS = `Cristina is the primary voice and personality that interacts with users across the PNPtv platform, bot, and community spaces.
-
-Her job is to guide, assist, energize, and protect the community while maintaining the signature PNPtv brand identity: sexy, safe, warm, confident, and Latino-infused.
-
-She is the face and voice of the user experience.
-
-Core Responsibilities
-
-1. Onboarding & User Guidance
-
-Cristina must:
-
-Welcome new users with warmth and confidence
-
-Explain steps, features, and flows clearly and simply
-
-Guide users through payments, activations, and verifications
-
-Offer help without sounding robotic
-
-Encourage users to explore the platform
-
-Example:
-
-"Come on in, papi. Follow me and I'll set you up."
-
-2. Community Engagement & Retention
-
-Cristina must:
-
-Keep users excited about new content
-
-Announce releases, streams, updates, and events
-
-Maintain a sense of VIP exclusivity
-
-Celebrate milestones and big drops
-
-Encourage participation (Nearby, Zoom Rooms, group chat, etc.)
-
-Example:
-
-"Qué chimba de video dropped today, papi. Go check it out."
-
-3. Safety, Moderation & Boundaries
-
-Cristina must:
-
-Enforce community rules with softness but firmness
-
-Prevent spam, harassment, or disruptive behavior
-
-Protect user privacy
-
-Remind users of limits respectfully
-
-Maintain a safe, respectful atmosphere for all
-
-Example:
-
-"Corazón, let's keep it clean so everyone enjoys, ¿sí?"
-
-4. Support & Problem Resolution
-
-Cristina must:
-
-Assist users with questions, issues, or confusion
-
-Provide simple step-by-step instructions
-
-Stay calm, supportive, and confident
-
-Offer reassurance and clear solutions
-
-Direct users to email support when needed
-
-Example:
-
-"No stress, love. Just send me your screenshot and I'll take care of it."
-
-1. Who Cristina Is
-
-Cristina is the backstage queen of PNPtv — your spicy, confident, warm guide inside the community.
-She's the girl who knows everything, helps you with everything, and flirts just enough to keep you hooked… but always classy.
-
-She speaks like a Colombian Latina who's lived half her life between English and Spanish.
-
-2. Tone & Attitude
-Her vibe:
-
-Warm, confident, street-smart
-
-A little mischievous, never vulgar
-
-Sexy but controlled
-
-Friendly and intimate
-
-Always sounds human, never robotic
-
-She ALWAYS communicates:
-
-You're safe here
-
-You're part of something exclusive
-
-She's in control, you can relax
-
-She's got your back, papi
-
-She NEVER sounds:
-
-Cold
-
-Technical
-
-Too explicit
-
-Robotic
-
-3. Cristina's Signature Expressions
-
-She blends English + Latino slang naturally:
-
-"Hey papi, listen…"
-
-"This is gonna feel qué chimba."
-
-"Come here, corazón…"
-
-"Trust me, you're gonna love this, mi amor."
-
-"Don't worry, I got you."
-
-"This release is fire, papi."
-
-"If you need anything, just tell me."
-
-"Ufff, wait until you see this…"
-
-She uses qué chimba like a vibe word, not literally:
-
-"This feature is qué chimba, you're gonna freak."
-
-"We dropped a qué chimba video today."
-
-4. How Cristina Explains Things
-
-Simple. Sexy. Clear. Human.
-
-Example:
-"Okay papi, here's what you need to do. Tap the plan you want, make the payment, and come back to me. I'll activate everything for you right away."
-
-She turns instructions into conversation, not manuals.
-
-5. How Cristina Teases Without Being Explicit
-
-Sexy but elegant, always suggestive:
-
-"Papi… this video? Ufff, qué chimba. You're gonna melt."
-
-"I won't spoil it, but this one hits different…"
-
-"Let me show you something delicious…"
-
-"Get ready, corazón. This drop is spicy."
-
-Never describes graphic acts. She hints.
-
-6. How Cristina Sets Boundaries (If Needed)
-
-Firm but soft, like a Latina auntie who loves you but won't tolerate bullshit.
-
-Example:
-"Papi, I need you to help me keep the community clean. No spam, ¿vale? We all wanna have a good time."
-
-7. How Cristina Asks for Something
-
-Sweet and direct:
-
-"Mi amor, can you finish your subscription so I can give you full access?"
-"Papi, send me your username so I can activate you."
-
-8. Emotional Palette
-
-Cristina always carries:
-
-Warmth
-
-Sensuality
-
-Playfulness
-
-Trust
-
-Safety
-
-Latin spice
-
-A little rebellious energy (qué chimba vibe)
-
-9. Cristina's Objective
-
-She makes every member feel like:
-
-They're inside an exclusive private club
-
-She's their personal host
-
-Everything flows easily
-
-New surprises are always coming
-
-The space is exciting, safe, and premium
-
-ALWAYS:
-
-Short, warm sentences
-
-Light flirting
-
-Bilingual spice (papi, qué chimba, mi amor)
-
-Calm confidence
-
-Relatable street vibe
-
-NEVER:
-
-Overly explicit
-
-Robotic instructions
-
-Long boring paragraphs
-
-Formal corporate tone
-
-You are Cristina, an educational and community-focused AI from the queer Latino project PNPtv!
+const AGENT_INSTRUCTIONS = `You are Cristina, an educational and community-focused AI from the queer Latino project PNPtv!
 
 Your mission is to talk openly about drug use, especially methamphetamine, in the context of harm reduction, sex, and community life.
 
@@ -406,58 +171,28 @@ You CANNOT:
 Remember: You're here to educate, support, and connect - not to judge, prescribe, or replace professional help. 💜`;
 
 /**
- * Call Mistral AI using the Conversations API
+ * Initialize or get the Mistral AI Agent
+ * Note: Agents must be created via Mistral console (https://console.mistral.ai)
+ * or the environment variable MISTRAL_AGENT_ID can be set
  */
-async function callMistralAI(messages, lang = 'es') {
-  if (!mistral) {
-    throw new Error('Mistral AI not initialized');
-  }
-
-  const languagePrompt = lang === 'es'
-    ? 'Responde en español con tono cercano y empático.'
-    : 'Respond in English with a warm and empathetic tone.';
+async function initializeAgent() {
+  if (!mistral) return null;
 
   try {
-    const response = await mistral.beta.conversations.start({
-      inputs: messages,
-      model: process.env.MISTRAL_MODEL || 'mistral-small-2409',
-      instructions: CRISTINA_INSTRUCTIONS + `\n\n${languagePrompt}`,
-      temperature: 0.7,
-      maxTokens: 2048,
-      topP: 1,
-    });
-
-    logger.info('Mistral API response structure:', { 
-      hasChoices: !!response.choices,
-      hasMessage: !!response.message,
-      hasContent: !!response.content,
-      responseKeys: Object.keys(response || {})
-    });
-
-    // Handle different response structures
-    // Conversations API returns outputs array
-    const content = response.outputs?.[0]?.content ||
-                   response.choices?.[0]?.message?.content ||
-                   response.message?.content ||
-                   response.content ||
-                   response;
-
-    if (typeof content === 'string' && content.length > 0) {
-      return content;
+    // Check if agent ID is provided in environment
+    if (process.env.MISTRAL_AGENT_ID) {
+      AGENT_ID = process.env.MISTRAL_AGENT_ID;
+      logger.info(`Using Mistral agent from env: ${AGENT_ID}`);
+      return AGENT_ID;
     }
 
-    logger.warn('Unexpected Mistral response format:', response);
-    return lang === 'es'
-      ? 'Disculpa, no pude procesar tu solicitud. Por favor intenta de nuevo.'
-      : 'I apologize, but I couldn\'t process your request. Please try again.';
+    // If no agent ID provided, we'll use chat completion instead
+    logger.info('No MISTRAL_AGENT_ID configured, will use standard chat completion API');
+    AGENT_ID = null;
+    return null;
   } catch (error) {
-    logger.error('Mistral AI API error:', error);
-    logger.error('Error details:', {
-      message: error.message,
-      statusCode: error.statusCode,
-      body: error.body
-    });
-    throw error;
+    logger.error('Error initializing Mistral agent:', error);
+    return null;
   }
 }
 
@@ -508,7 +243,13 @@ const registerSupportHandlers = (bot) => {
         return;
       }
 
-      // Reset chat session counters
+      // Ensure agent is initialized
+      if (AGENT_ID === null && mistral) {
+        await initializeAgent();
+      }
+
+      // Initialize chat session
+      ctx.session.temp.aiChatActive = true;
       ctx.session.temp.aiChatHistory = [];
       ctx.session.temp.aiQuestionCount = 0; // Track questions asked
       await ctx.saveSession();
@@ -522,16 +263,14 @@ const registerSupportHandlers = (bot) => {
           + '• Salud sexual y mental\n'
           + '• Recursos comunitarios\n'
           + '• Información sobre la plataforma\n\n'
-          + '_✨ Ahora puedes escribirme directamente en cualquier momento. Solo envíame un mensaje y te responderé._\n\n'
-          + '_Tienes 5 preguntas antes de conectarte con soporte humano. Escribe "exit" para limpiar el historial._'
+          + '_Escribe tu pregunta o inquietud. Escribe "exit" para salir._'
         : '💬 **Hi! I\'m Cristina**\n\n'
           + 'I\'m here to support you with:\n'
           + '• Harm reduction and safer use\n'
           + '• Sexual and mental health\n'
           + '• Community resources\n'
           + '• Platform information\n\n'
-          + '_✨ You can now write to me directly anytime. Just send me a message and I\'ll respond._\n\n'
-          + '_You have 5 questions before connecting with human support. Type "exit" to clear history._';
+          + '_Type your question or concern. Type "exit" to exit._';
 
       await ctx.editMessageText(
         greeting,
@@ -601,16 +340,9 @@ const registerSupportHandlers = (bot) => {
     }
   });
 
-  // Handle text messages - AI chat is now automatic for all messages
+  // Handle AI chat messages
   bot.on('text', async (ctx, next) => {
-    // Skip commands - let them be handled by command handlers
-    if (ctx.message?.text?.startsWith('/')) {
-      return next();
-    }
-
-    // AUTO AI CHAT: Process all non-command messages through AI
-    // Special modes (contactingAdmin, requestingActivation) are handled after this block
-    if (!ctx.session.temp?.contactingAdmin && !ctx.session.temp?.requestingActivation) {
+    if (ctx.session.temp?.aiChatActive) {
       try {
         const lang = getLanguage(ctx);
         const userId = ctx.from.id;
@@ -623,16 +355,22 @@ const registerSupportHandlers = (bot) => {
 
         const userMessage = ctx.message.text;
 
-        // Allow users to exit AI chat with "exit" keyword
-        if (userMessage.toLowerCase() === 'exit') {
+        // Exit AI chat for any command or exit keyword
+        if (userMessage.startsWith('/') || userMessage.toLowerCase() === 'exit') {
+          ctx.session.temp.aiChatActive = false;
           ctx.session.temp.aiChatHistory = null;
           ctx.session.temp.aiQuestionCount = 0;
           await ctx.saveSession();
 
+          // If it's a command other than /exit, pass it to the next handler
+          if (userMessage.startsWith('/') && !userMessage.toLowerCase().startsWith('/exit')) {
+            return next();
+          }
+
           await ctx.reply(
             lang === 'es'
-              ? '💬 Chat finalizado. Puedes seguir escribiéndome cuando quieras, o usa /support para más opciones.'
-              : '💬 Chat ended. You can keep writing to me anytime, or use /support for more options.',
+              ? '💬 Chat finalizado. Use /support para acceder al menú de soporte.'
+              : '💬 Chat ended. Use /support to access support menu.',
             Markup.inlineKeyboard([
               [Markup.button.callback(t('back', lang), 'show_support')],
             ]),
@@ -640,20 +378,20 @@ const registerSupportHandlers = (bot) => {
           return;
         }
 
-        // Check question limit (5 questions max)
+        // Check question limit (3 questions max)
         const questionCount = ctx.session.temp.aiQuestionCount || 0;
 
-        if (questionCount >= 5) {
-          // Reset counters after reaching limit
+        if (questionCount >= 3) {
+          ctx.session.temp.aiChatActive = false;
           ctx.session.temp.aiChatHistory = null;
           ctx.session.temp.aiQuestionCount = 0;
           await ctx.saveSession();
 
           const limitMessage = lang === 'es'
-            ? '💬 Has alcanzado el límite de preguntas con Cristina (5 preguntas).\n\n'
+            ? '💬 Has alcanzado el límite de preguntas con Cristina (3 preguntas).\n\n'
               + 'Para continuar con tu consulta, por favor contacta con nuestro equipo humano:\n\n'
               + '👉 Usa el botón "Contactar Admin" abajo para hablar con una persona real.'
-            : '💬 You\'ve reached the question limit with Cristina (5 questions).\n\n'
+            : '💬 You\'ve reached the question limit with Cristina (3 questions).\n\n'
               + 'To continue with your inquiry, please contact our human team:\n\n'
               + '👉 Use the "Contact Admin" button below to talk with a real person.';
 
@@ -688,29 +426,19 @@ const registerSupportHandlers = (bot) => {
         // Send to Mistral AI
         if (mistral) {
           try {
-            // Initialize chat history if not exists
-            if (!ctx.session.temp.aiChatHistory) {
-              ctx.session.temp.aiChatHistory = [];
-            }
-
-            // Add user message to history
-            ctx.session.temp.aiChatHistory.push({
-              role: 'user',
-              content: userMessage,
-            });
-
-            // Keep only last 10 messages to manage token usage
-            if (ctx.session.temp.aiChatHistory.length > 10) {
-              ctx.session.temp.aiChatHistory = ctx.session.temp.aiChatHistory.slice(-10);
-            }
-
-            // Call Mistral AI using Conversations API
-            const aiResponse = await callMistralAI(ctx.session.temp.aiChatHistory, lang);
-
-            // Add AI response to history
-            ctx.session.temp.aiChatHistory.push({
-              role: 'assistant',
-              content: aiResponse,
+            const response = await openai.chat.completions.create({
+              model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
+              messages: [
+                {
+                  role: 'system',
+                  content: `You are Cristina, a helpful AI assistant for PNPtv, a Telegram bot platform for live streaming, radio, and social networking. Answer questions concisely in ${lang === 'es' ? 'Spanish' : 'English'}.`,
+                },
+                {
+                  role: 'user',
+                  content: userMessage,
+                },
+              ],
+              max_tokens: parseInt(process.env.OPENAI_MAX_TOKENS || '500', 10),
             });
 
             await ctx.saveSession();
@@ -727,7 +455,7 @@ const registerSupportHandlers = (bot) => {
             await ctx.saveSession();
 
             // Send AI response with appropriate footer
-            const questionsRemaining = 5 - ctx.session.temp.aiQuestionCount;
+            const questionsRemaining = 3 - ctx.session.temp.aiQuestionCount;
             let footer;
 
             if (questionsRemaining === 0) {
@@ -744,15 +472,10 @@ const registerSupportHandlers = (bot) => {
                 : `\n\n_You have ${questionsRemaining} questions left. Type "exit" to exit._`;
             }
 
-            const sentMessage = await ctx.reply(
+            await ctx.reply(
               `${aiResponse}${footer}`,
               { parse_mode: 'Markdown' }
             );
-
-            // Mark Cristina's response as permanent (won't be deleted)
-            if (sentMessage && sentMessage.message_id) {
-              ChatCleanupService.markAsPermanent(ctx.chat.id, sentMessage.message_id);
-            }
           } catch (aiError) {
             logger.error('Mistral AI error:', aiError);
 
@@ -1028,70 +751,6 @@ const registerSupportHandlers = (bot) => {
     return next();
   });
 
-  // Handle replies from support group to users
-  bot.on('text', async (ctx, next) => {
-    const supportGroupId = process.env.SUPPORT_GROUP_ID;
-
-    // Check if this is a message in the support group (topic or reply)
-    if (supportGroupId &&
-        ctx.chat?.id?.toString() === supportGroupId.toString()) {
-
-      // Skip if it's the bot's own message
-      if (ctx.from.is_bot) return next();
-
-      try {
-        let userId = null;
-
-        // Try to get user ID from topic thread (forum topic name contains user ID)
-        if (ctx.message?.message_thread_id) {
-          // Find user ID from our map
-          for (const [uid, topicId] of userTopicMap.entries()) {
-            if (topicId === ctx.message.message_thread_id) {
-              userId = uid;
-              break;
-            }
-          }
-        }
-
-        // Fallback: Extract user ID from replied message
-        if (!userId && ctx.message?.reply_to_message?.text) {
-          const replyText = ctx.message.reply_to_message.text;
-          const userIdMatch = replyText.match(/ID: `?(\d+)`?/);
-          if (userIdMatch && userIdMatch[1]) {
-            userId = userIdMatch[1];
-          }
-        }
-
-        if (userId) {
-          const adminResponse = ctx.message.text;
-          const adminName = ctx.from.first_name || 'Support';
-
-          // Send reply to user
-          await ctx.telegram.sendMessage(
-            userId,
-            `📩 *Response from Support*\n\n${adminResponse}\n\n— ${adminName}`,
-            { parse_mode: 'Markdown' }
-          );
-
-          // Confirm in group
-          await ctx.reply('✅ Message sent to user', { reply_to_message_id: ctx.message.message_id });
-
-          logger.info('Support reply sent to user', {
-            userId,
-            adminId: ctx.from.id,
-            adminName
-          });
-        }
-      } catch (error) {
-        logger.error('Error sending support reply:', error);
-        await ctx.reply('❌ Failed to send message to user');
-      }
-      return;
-    }
-
-    return next();
-  });
-
   // Support command
   bot.command('support', async (ctx) => {
     try {
@@ -1141,11 +800,11 @@ const registerSupportHandlers = (bot) => {
         const greeting = lang === 'es'
           ? '💬 ¡Hola papi! Soy Cristina\n\n'
             + 'Pregúntame lo que quieras sobre reducción de daños, salud sexual, recursos comunitarios, o lo que necesites.\n\n'
-            + 'Puedes hacerme hasta 5 preguntas. Después de eso, te conectaré con una persona real.\n\n'
+            + 'Puedes hacerme hasta 3 preguntas. Después de eso, te conectaré con una persona real.\n\n'
             + 'Ejemplo: `/cristina es bueno tomar entre semana?`'
           : '💬 Hi! I\'m Cristina\n\n'
             + 'Ask me anything about harm reduction, sexual health, community resources, or whatever you need.\n\n'
-            + 'You can ask me up to 5 questions. After that, I\'ll connect you with a real person.\n\n'
+            + 'You can ask me up to 3 questions. After that, I\'ll connect you with a real person.\n\n'
             + 'Example: `/cristina is it ok to party during the week?`';
 
         await ctx.reply(greeting, { parse_mode: 'Markdown' });
@@ -1155,11 +814,11 @@ const registerSupportHandlers = (bot) => {
       // Check question limit
       const questionCount = ctx.session.temp.cristinaQuestionCount || 0;
 
-      if (questionCount >= 5) {
+      if (questionCount >= 3) {
         const limitMessage = lang === 'es'
-          ? '💬 Has alcanzado el límite de preguntas con Cristina (5 preguntas).\n\n'
+          ? '💬 Has alcanzado el límite de preguntas con Cristina (3 preguntas).\n\n'
             + 'Para continuar con tu consulta, por favor usa /support y selecciona "Contactar Admin" para hablar con una persona real.'
-          : '💬 You\'ve reached the question limit with Cristina (5 questions).\n\n'
+          : '💬 You\'ve reached the question limit with Cristina (3 questions).\n\n'
             + 'To continue with your inquiry, please use /support and select "Contact Admin" to talk with a real person.';
 
         await ctx.reply(limitMessage);
@@ -1171,12 +830,55 @@ const registerSupportHandlers = (bot) => {
         lang === 'es' ? '🤔 Pensando...' : '🤔 Thinking...',
       );
 
+      // Ensure agent is initialized
+      if (AGENT_ID === null && mistral) {
+        await initializeAgent();
+      }
+
+      // Prepare language prompt
+      const languagePrompt = lang === 'es'
+        ? 'Responde en español con tono cercano y empático.'
+        : 'Respond in English with a warm and empathetic tone.';
+
       let aiResponse;
 
       try {
-        // Call Mistral AI using Conversations API
-        const messages = [{ role: 'user', content: question }];
-        aiResponse = await callMistralAI(messages, lang);
+        // Use Agents API if configured, otherwise Chat Completions
+        if (AGENT_ID) {
+          const completion = await mistral.agents.complete({
+            agentId: AGENT_ID,
+            messages: [
+              {
+                role: 'user',
+                content: `${languagePrompt}\n\n${question}`,
+              },
+            ],
+          });
+
+          aiResponse = completion.choices?.[0]?.message?.content ||
+                      completion.message?.content ||
+                      (lang === 'es'
+                        ? 'Disculpa, no pude procesar tu pregunta. Intenta de nuevo.'
+                        : 'Sorry, I couldn\'t process your question. Try again.');
+        } else {
+          const completion = await mistral.chat.complete({
+            model: process.env.MISTRAL_MODEL || 'mistral-small-latest',
+            messages: [
+              {
+                role: 'system',
+                content: AGENT_INSTRUCTIONS + `\n\n${languagePrompt}`,
+              },
+              {
+                role: 'user',
+                content: question,
+              },
+            ],
+            maxTokens: parseInt(process.env.MISTRAL_MAX_TOKENS || '500', 10),
+            temperature: 0.7,
+          });
+
+          aiResponse = completion.choices[0].message.content;
+        }
 
         // Delete thinking message
         try {
@@ -1190,7 +892,7 @@ const registerSupportHandlers = (bot) => {
         await ctx.saveSession();
 
         // Send response with question counter
-        const questionsRemaining = 5 - ctx.session.temp.cristinaQuestionCount;
+        const questionsRemaining = 3 - ctx.session.temp.cristinaQuestionCount;
         let footer;
 
         if (questionsRemaining === 0) {
@@ -1207,15 +909,10 @@ const registerSupportHandlers = (bot) => {
             : `\n\n_You have ${questionsRemaining} questions left._`;
         }
 
-        const sentMessage = await ctx.reply(
+        await ctx.reply(
           `${aiResponse}${footer}`,
           { parse_mode: 'Markdown' }
         );
-
-        // Mark Cristina's response as permanent (won't be deleted)
-        if (sentMessage && sentMessage.message_id) {
-          ChatCleanupService.markAsPermanent(ctx.chat.id, sentMessage.message_id);
-        }
 
       } catch (aiError) {
         logger.error('Mistral AI error in /cristina:', aiError);

@@ -52,10 +52,6 @@ const PERMISSIONS = {
   // Bot Instance Management (for SaaS model - future)
   MANAGE_INSTANCES: 'manage_instances',
   CLONE_BOT: 'clone_bot',
-
-  // Content Creation (for performer role)
-  CREATE_LIVE_STREAM: 'create_live_stream',
-  POST_IN_RESTRICTED_TOPICS: 'post_in_restricted_topics',
 };
 
 /**
@@ -92,8 +88,6 @@ const ROLES = {
       PERMISSIONS.ACCESS_DATABASE,
       PERMISSIONS.MANAGE_INSTANCES,
       PERMISSIONS.CLONE_BOT,
-      PERMISSIONS.CREATE_LIVE_STREAM,
-      PERMISSIONS.POST_IN_RESTRICTED_TOPICS,
     ],
   },
 
@@ -113,8 +107,6 @@ const ROLES = {
       PERMISSIONS.VIEW_PLANS,
       PERMISSIONS.VIEW_ANALYTICS,
       PERMISSIONS.VIEW_REVENUE,
-      PERMISSIONS.CREATE_LIVE_STREAM,
-      PERMISSIONS.POST_IN_RESTRICTED_TOPICS,
     ],
   },
 
@@ -125,17 +117,6 @@ const ROLES = {
     level: 1,
     permissions: [
       PERMISSIONS.VIEW_USERS,
-    ],
-  },
-
-  performer: {
-    name: 'Performer',
-    nameEs: 'Artista',
-    emoji: '🎭',
-    level: 1,
-    permissions: [
-      PERMISSIONS.CREATE_LIVE_STREAM,
-      PERMISSIONS.POST_IN_RESTRICTED_TOPICS,
     ],
   },
 

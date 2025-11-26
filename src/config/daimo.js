@@ -7,13 +7,9 @@
 const { getAddress } = require('viem');
 const logger = require('../utils/logger');
 
-// Default configuration (Optimism + USDC)
-// These can be overridden via environment variables
-const DEFAULT_CHAIN_ID = 10; // Optimism
-const DEFAULT_CHAIN_NAME = 'Optimism';
-const DEFAULT_TOKEN_ADDRESS = '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85'; // USDC on Optimism
-const DEFAULT_TOKEN_SYMBOL = 'USDC';
-const DEFAULT_TOKEN_DECIMALS = 6;
+// Optimism USDC Token Address (official)
+const OPTIMISM_USDC_ADDRESS = '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85';
+const OPTIMISM_CHAIN_ID = 10;
 
 // Supported payment apps (prioritized in this order)
 const SUPPORTED_PAYMENT_APPS = [
@@ -35,37 +31,25 @@ const getDaimoConfig = () => {
     ? `${process.env.BOT_WEBHOOK_DOMAIN}/api/webhooks/daimo`
     : null;
 
-  // Get chain configuration (with defaults)
-  const chainId = process.env.DAIMO_CHAIN_ID
-    ? parseInt(process.env.DAIMO_CHAIN_ID, 10)
-    : DEFAULT_CHAIN_ID;
-  const tokenAddress = process.env.DAIMO_TOKEN_ADDRESS || DEFAULT_TOKEN_ADDRESS;
-  const tokenSymbol = process.env.DAIMO_TOKEN_SYMBOL || DEFAULT_TOKEN_SYMBOL;
-  const tokenDecimals = process.env.DAIMO_TOKEN_DECIMALS
-    ? parseInt(process.env.DAIMO_TOKEN_DECIMALS, 10)
-    : DEFAULT_TOKEN_DECIMALS;
-
   // Validate critical configuration
   if (!treasuryAddress) {
-    // Nunca loggear el valor de la dirección
     logger.error('DAIMO_TREASURY_ADDRESS not configured');
     throw new Error('DAIMO_TREASURY_ADDRESS is required for Daimo Pay');
   }
 
   if (!refundAddress) {
-    // Nunca loggear el valor de la dirección
     logger.warn('DAIMO_REFUND_ADDRESS not configured, using treasury address as fallback');
   }
 
   return {
-    // Network configuration (configurable via env vars)
-    chainId,
-    chainName: DEFAULT_CHAIN_NAME, // Could be made configurable if needed
+    // Network configuration
+    chainId: OPTIMISM_CHAIN_ID,
+    chainName: 'Optimism',
 
-    // Token configuration (configurable via env vars)
-    token: getAddress(tokenAddress),
-    tokenSymbol,
-    tokenDecimals,
+    // Token configuration (USDC on Optimism)
+    token: getAddress(OPTIMISM_USDC_ADDRESS),
+    tokenSymbol: 'USDC',
+    tokenDecimals: 6,
 
     // Addresses
     treasuryAddress: getAddress(treasuryAddress),
@@ -73,10 +57,6 @@ const getDaimoConfig = () => {
 
     // Payment apps configuration
     supportedPaymentApps: SUPPORTED_PAYMENT_APPS,
-
-    // API configuration
-    apiKey: process.env.DAIMO_API_KEY, // Optional: only needed for API calls
-    appId: process.env.DAIMO_APP_ID,   // Optional: only needed for SDK integration
 
     // Webhook configuration
     webhookUrl,
@@ -93,11 +73,11 @@ const getDaimoConfig = () => {
 
 /**
  * Create payment intent for Daimo Pay
- * @param {Object} params - { amount, userId, planId, chatId, paymentId, description }
+ * @param {Object} params - { amount, userId, planId, chatId }
  * @returns {Object} Payment intent object
  */
 const createPaymentIntent = ({
-  amount, userId, planId, chatId, paymentId, description,
+  amount, userId, planId, chatId, description,
 }) => {
   const config = getDaimoConfig();
 
@@ -124,7 +104,6 @@ const createPaymentIntent = ({
       chatId: chatId?.toString(),
       planId,
       amount: amount.toString(),
-      paymentId: paymentId?.toString(), // Include payment ID for webhook processing
       timestamp: new Date().toISOString(),
     },
 
@@ -181,10 +160,10 @@ const validateWebhookPayload = (payload) => {
   }
 
   // Validate metadata
-  if (!payload.metadata?.userId || !payload.metadata?.planId || !payload.metadata?.paymentId) {
+  if (!payload.metadata?.userId || !payload.metadata?.planId) {
     return {
       valid: false,
-      error: 'Invalid metadata: userId, planId, and paymentId are required',
+      error: 'Invalid metadata: userId and planId are required',
     };
   }
 
@@ -222,12 +201,6 @@ module.exports = {
   mapDaimoStatus,
   formatAmountFromUnits,
   SUPPORTED_PAYMENT_APPS,
-  // Export defaults for backward compatibility
-  OPTIMISM_USDC_ADDRESS: DEFAULT_TOKEN_ADDRESS,
-  OPTIMISM_CHAIN_ID: DEFAULT_CHAIN_ID,
-  // Export new default constants
-  DEFAULT_CHAIN_ID,
-  DEFAULT_TOKEN_ADDRESS,
-  DEFAULT_TOKEN_SYMBOL,
-  DEFAULT_TOKEN_DECIMALS,
+  OPTIMISM_USDC_ADDRESS,
+  OPTIMISM_CHAIN_ID,
 };

@@ -211,7 +211,14 @@ class ZoomPollModel {
             }
 
             // Calculate results
-            const options = JSON.parse(poll.options);
+            let options;
+            try {
+                options = JSON.parse(poll.options);
+            } catch (err) {
+                logger.error('Invalid JSON in poll.options:', { pollId, error: err.message });
+                throw new Error('Invalid poll options format');
+            }
+
             const results = options.map(option => ({
                 ...option,
                 votes: 0,
@@ -220,13 +227,22 @@ class ZoomPollModel {
 
             // Count votes
             responses.forEach(response => {
-                const selectedOptions = JSON.parse(response.selected_options);
-                selectedOptions.forEach(optionId => {
-                    const resultOption = results.find(r => r.id === optionId);
-                    if (resultOption) {
-                        resultOption.votes++;
-                    }
-                });
+                let selectedOptions;
+                try {
+                    selectedOptions = JSON.parse(response.selected_options);
+                } catch (err) {
+                    logger.warn('Invalid JSON in response.selected_options:', { pollId, error: err.message });
+                    selectedOptions = [];
+                }
+                
+                if (Array.isArray(selectedOptions)) {
+                    selectedOptions.forEach(optionId => {
+                        const resultOption = results.find(r => r.id === optionId);
+                        if (resultOption) {
+                            resultOption.votes++;
+                        }
+                    });
+                }
             });
 
             // Calculate percentages
@@ -250,8 +266,14 @@ class ZoomPollModel {
             `;
 
             const totalResponses = responses.reduce((sum, r) => {
-                const selected = JSON.parse(r.selected_options);
-                return sum + selected.length;
+                let selected;
+                try {
+                    selected = JSON.parse(r.selected_options);
+                } catch (err) {
+                    logger.warn('Invalid JSON in reduce.selected_options:', { error: err.message });
+                    selected = [];
+                }
+                return sum + (Array.isArray(selected) ? selected.length : 0);
             }, 0);
 
             const result = await pool.query(query, [

@@ -1,6 +1,10 @@
-const { query } = require('../config/postgres');
+const { db } = require('../config/firebase');
 const logger = require('../utils/logger');
 const { v4: uuidv4 } = require('uuid');
+
+const COLLECTION = 'emotes';
+const CUSTOM_EMOTES_COLLECTION = 'custom_emotes';
+const EMOTE_USAGE_COLLECTION = 'emote_usage';
 
 /**
  * Default platform-wide emotes available to all users
@@ -95,40 +99,27 @@ class EmoteModel {
       }
 
       const emoteId = uuidv4();
-      const status = requiresApproval ? 'pending' : 'approved';
-      const timestamp = new Date();
-      const approvedAt = requiresApproval ? null : timestamp;
-      const approvedBy = requiresApproval ? null : 'auto';
-
-      await query(
-        `INSERT INTO custom_emotes (
-          id, user_id, name, emoji, status, usage_count, is_active,
-          created_at, updated_at, approved_at, approved_by, streamer_name, image_url
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-        [
-          emoteId, String(streamerId), code, '', status, 0, true,
-          timestamp, timestamp, approvedAt, approvedBy, streamerName, imageUrl
-        ]
-      );
-
-      logger.info('Custom emote created', { emoteId, streamerId, code });
-
-      return {
+      const emote = {
         emoteId,
         streamerId: String(streamerId),
         streamerName,
         code,
         imageUrl,
-        status,
+        status: requiresApproval ? 'pending' : 'approved',
         usageCount: 0,
         isActive: true,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        approvedAt,
-        approvedBy,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        approvedAt: requiresApproval ? null : new Date(),
+        approvedBy: requiresApproval ? null : 'auto',
         rejectedAt: null,
         rejectionReason: null,
       };
+
+      await db.collection(CUSTOM_EMOTES_COLLECTION).doc(emoteId).set(emote);
+      logger.info('Custom emote created', { emoteId, streamerId, code });
+
+      return emote;
     } catch (error) {
       logger.error('Error creating custom emote:', error);
       throw error;
@@ -143,26 +134,23 @@ class EmoteModel {
    */
   static async getStreamerEmotes(streamerId, activeOnly = true) {
     try {
-      let queryStr = `
-        SELECT
-          id as "emoteId", user_id as "streamerId", streamer_name as "streamerName",
-          name as code, image_url as "imageUrl", status, usage_count as "usageCount",
-          is_active as "isActive", created_at as "createdAt", updated_at as "updatedAt",
-          approved_at as "approvedAt", approved_by as "approvedBy",
-          rejected_at as "rejectedAt", rejection_reason as "rejectionReason"
-        FROM custom_emotes
-        WHERE user_id = $1 AND status = 'approved'
-      `;
-      const params = [String(streamerId)];
+      let query = db
+        .collection(CUSTOM_EMOTES_COLLECTION)
+        .where('streamerId', '==', String(streamerId))
+        .where('status', '==', 'approved');
 
       if (activeOnly) {
-        queryStr += ' AND is_active = true';
+        query = query.where('isActive', '==', true);
       }
 
-      queryStr += ' ORDER BY created_at DESC';
+      const snapshot = await query.orderBy('createdAt', 'desc').get();
+      const emotes = [];
 
-      const result = await query(queryStr, params);
-      return result.rows;
+      snapshot.forEach((doc) => {
+        emotes.push({ id: doc.id, ...doc.data() });
+      });
+
+      return emotes;
     } catch (error) {
       logger.error('Error fetching streamer emotes:', error);
       return [];
@@ -266,20 +254,24 @@ class EmoteModel {
    */
   static async incrementEmoteUsage(emoteId) {
     try {
-      // Update usage count
-      await query(
-        `UPDATE custom_emotes
-         SET usage_count = usage_count + 1, updated_at = $1
-         WHERE id = $2`,
-        [new Date(), emoteId]
-      );
+      const emoteRef = db.collection(CUSTOM_EMOTES_COLLECTION).doc(emoteId);
+
+      await db.runTransaction(async (transaction) => {
+        const doc = await transaction.get(emoteRef);
+        if (!doc.exists) return;
+
+        const currentCount = doc.data().usageCount || 0;
+        transaction.update(emoteRef, {
+          usageCount: currentCount + 1,
+          updatedAt: new Date(),
+        });
+      });
 
       // Log usage for analytics
-      await query(
-        `INSERT INTO emote_usage (emote_id, used_at)
-         VALUES ($1, $2)`,
-        [emoteId, new Date()]
-      );
+      await db.collection(EMOTE_USAGE_COLLECTION).add({
+        emoteId,
+        timestamp: new Date(),
+      });
     } catch (error) {
       logger.error('Error incrementing emote usage:', error);
       throw error;
@@ -295,47 +287,32 @@ class EmoteModel {
    */
   static async updateEmote(emoteId, streamerId, updates) {
     try {
-      // Check if emote exists and belongs to streamer
-      const result = await query(
-        'SELECT user_id FROM custom_emotes WHERE id = $1',
-        [emoteId]
-      );
+      const emoteRef = db.collection(CUSTOM_EMOTES_COLLECTION).doc(emoteId);
+      const doc = await emoteRef.get();
 
-      if (result.rows.length === 0) {
+      if (!doc.exists) {
         throw new Error('Emote not found');
       }
 
-      if (result.rows[0].user_id !== String(streamerId)) {
+      const emote = doc.data();
+      if (emote.streamerId !== String(streamerId)) {
         throw new Error('Unauthorized to update this emote');
       }
 
-      const allowedUpdates = { isActive: 'is_active', imageUrl: 'image_url' };
-      const updateParts = [];
-      const updateValues = [];
-      let paramIndex = 1;
+      const allowedUpdates = ['isActive', 'imageUrl'];
+      const safeUpdates = {};
 
       Object.keys(updates).forEach((key) => {
-        if (allowedUpdates[key]) {
-          updateParts.push(`${allowedUpdates[key]} = $${paramIndex}`);
-          updateValues.push(updates[key]);
-          paramIndex++;
+        if (allowedUpdates.includes(key)) {
+          safeUpdates[key] = updates[key];
         }
       });
 
-      if (updateParts.length === 0) {
-        return true;
-      }
+      safeUpdates.updatedAt = new Date();
 
-      updateParts.push(`updated_at = $${paramIndex}`);
-      updateValues.push(new Date());
-      updateValues.push(emoteId);
+      await emoteRef.update(safeUpdates);
+      logger.info('Emote updated', { emoteId, streamerId, updates: safeUpdates });
 
-      await query(
-        `UPDATE custom_emotes SET ${updateParts.join(', ')} WHERE id = $${paramIndex + 1}`,
-        updateValues
-      );
-
-      logger.info('Emote updated', { emoteId, streamerId, updates });
       return true;
     } catch (error) {
       logger.error('Error updating emote:', error);
@@ -351,21 +328,19 @@ class EmoteModel {
    */
   static async deleteEmote(emoteId, streamerId) {
     try {
-      // Check if emote exists and belongs to streamer
-      const result = await query(
-        'SELECT user_id FROM custom_emotes WHERE id = $1',
-        [emoteId]
-      );
+      const emoteRef = db.collection(CUSTOM_EMOTES_COLLECTION).doc(emoteId);
+      const doc = await emoteRef.get();
 
-      if (result.rows.length === 0) {
+      if (!doc.exists) {
         throw new Error('Emote not found');
       }
 
-      if (result.rows[0].user_id !== String(streamerId)) {
+      const emote = doc.data();
+      if (emote.streamerId !== String(streamerId)) {
         throw new Error('Unauthorized to delete this emote');
       }
 
-      await query('DELETE FROM custom_emotes WHERE id = $1', [emoteId]);
+      await emoteRef.delete();
       logger.info('Emote deleted', { emoteId, streamerId });
 
       return true;
@@ -382,19 +357,19 @@ class EmoteModel {
    */
   static async getPendingEmotes(limit = 50) {
     try {
-      const result = await query(
-        `SELECT
-          id, user_id as "streamerId", streamer_name as "streamerName",
-          name as code, image_url as "imageUrl", status, usage_count as "usageCount",
-          is_active as "isActive", created_at as "createdAt", updated_at as "updatedAt"
-        FROM custom_emotes
-        WHERE status = 'pending'
-        ORDER BY created_at ASC
-        LIMIT $1`,
-        [limit]
-      );
+      const snapshot = await db
+        .collection(CUSTOM_EMOTES_COLLECTION)
+        .where('status', '==', 'pending')
+        .orderBy('createdAt', 'asc')
+        .limit(limit)
+        .get();
 
-      return result.rows;
+      const emotes = [];
+      snapshot.forEach((doc) => {
+        emotes.push({ id: doc.id, ...doc.data() });
+      });
+
+      return emotes;
     } catch (error) {
       logger.error('Error fetching pending emotes:', error);
       return [];
@@ -409,22 +384,19 @@ class EmoteModel {
    */
   static async approveEmote(emoteId, adminId) {
     try {
-      const result = await query(
-        'SELECT id FROM custom_emotes WHERE id = $1',
-        [emoteId]
-      );
+      const emoteRef = db.collection(CUSTOM_EMOTES_COLLECTION).doc(emoteId);
+      const doc = await emoteRef.get();
 
-      if (result.rows.length === 0) {
+      if (!doc.exists) {
         throw new Error('Emote not found');
       }
 
-      const timestamp = new Date();
-      await query(
-        `UPDATE custom_emotes
-         SET status = 'approved', approved_at = $1, approved_by = $2, updated_at = $3
-         WHERE id = $4`,
-        [timestamp, String(adminId), timestamp, emoteId]
-      );
+      await emoteRef.update({
+        status: 'approved',
+        approvedAt: new Date(),
+        approvedBy: String(adminId),
+        updatedAt: new Date(),
+      });
 
       logger.info('Emote approved', { emoteId, adminId });
       return true;
@@ -443,22 +415,19 @@ class EmoteModel {
    */
   static async rejectEmote(emoteId, adminId, reason = 'Inappropriate content') {
     try {
-      const result = await query(
-        'SELECT id FROM custom_emotes WHERE id = $1',
-        [emoteId]
-      );
+      const emoteRef = db.collection(CUSTOM_EMOTES_COLLECTION).doc(emoteId);
+      const doc = await emoteRef.get();
 
-      if (result.rows.length === 0) {
+      if (!doc.exists) {
         throw new Error('Emote not found');
       }
 
-      const timestamp = new Date();
-      await query(
-        `UPDATE custom_emotes
-         SET status = 'rejected', rejected_at = $1, rejection_reason = $2, updated_at = $3
-         WHERE id = $4`,
-        [timestamp, reason, timestamp, emoteId]
-      );
+      await emoteRef.update({
+        status: 'rejected',
+        rejectedAt: new Date(),
+        rejectionReason: reason,
+        updatedAt: new Date(),
+      });
 
       logger.info('Emote rejected', { emoteId, adminId, reason });
       return true;
