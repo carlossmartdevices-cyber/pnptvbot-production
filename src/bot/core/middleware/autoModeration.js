@@ -1,6 +1,5 @@
 const WarningService = require('../../../services/warningService');
 const UserModel = require('../../../models/userModel');
-const ModerationService = require('../../services/moderationService');
 const logger = require('../../../utils/logger');
 const MODERATION_CONFIG = require('../../../config/moderationConfig');
 
@@ -93,29 +92,25 @@ function checkFlood(userId) {
 
 /**
  * Check for unauthorized links
- * SECURITY: Uses proper URL parsing to prevent bypass attacks like:
- * - Substring matches: scamx.com bypassing x.com whitelist
- * - Fake domains: fb.com.evil.io bypassing fb.com whitelist
- * - Path injection: evil.com/fb.com bypassing fb.com whitelist
  */
 function checkLinks(messageText) {
   if (!MODERATION_CONFIG.FILTERS.LINKS.enabled) {
     return false;
   }
 
-  const { allowedDomains } = MODERATION_CONFIG.FILTERS.LINKS;
+  // URL regex pattern
+  const urlPattern = /(https?:\/\/[^\s]+)/gi;
+  const urls = messageText.match(urlPattern);
 
-  // Use ModerationService to detect and validate links with secure parsing
-  const { hasLinks, links } = ModerationService.detectLinks(messageText);
-
-  if (!hasLinks) {
+  if (!urls) {
     return false;
   }
 
-  // Check if any URL is not in allowed domains using secure validation
-  // Only exact domain or valid subdomain matches are allowed
-  for (const link of links) {
-    const isAllowed = ModerationService.isAllowedDomain(link, allowedDomains);
+  const { allowedDomains } = MODERATION_CONFIG.FILTERS.LINKS;
+
+  // Check if any URL is not in allowed domains
+  for (const url of urls) {
+    const isAllowed = allowedDomains.some((domain) => url.includes(domain));
     if (!isAllowed) {
       return true; // Found unauthorized link
     }

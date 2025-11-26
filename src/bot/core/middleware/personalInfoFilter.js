@@ -17,24 +17,26 @@ const GROUP_ID = process.env.GROUP_ID;
  */
 
 // Regex patterns for personal information
+// NOTE: No global flag (/g) - we only use .test() once per pattern per message
+// Global flag would cause lastIndex to persist between messages, missing detections
 const PATTERNS = {
   // Phone numbers (various formats)
-  phone: /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g,
+  phone: /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/,
 
   // Email addresses
-  email: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
+  email: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/,
 
   // Credit card numbers (16 digits with optional spaces/dashes)
-  creditCard: /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g,
+  creditCard: /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/,
 
   // Social security numbers (XXX-XX-XXXX)
-  ssn: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g,
+  ssn: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/,
 
   // Home addresses (simplified - looks for street numbers and keywords)
-  address: /\b\d{1,5}\s+[\w\s]{1,50}(street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|way|court|ct)\b/gi,
+  address: /\b\d{1,5}\s+[\w\s]{1,50}(street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|way|court|ct)\b/i,
 
   // Common personal info keywords
-  personalKeywords: /(my\s+)?(phone|email|address|credit\s+card|ssn|social\s+security|home\s+address|contact\s+me|call\s+me|text\s+me)/gi,
+  personalKeywords: /(my\s+)?(phone|email|address|credit\s+card|ssn|social\s+security|home\s+address|contact\s+me|call\s+me|text\s+me)/i,
 };
 
 /**
