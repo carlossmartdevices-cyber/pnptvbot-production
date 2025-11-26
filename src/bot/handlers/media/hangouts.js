@@ -46,76 +46,51 @@ const registerHangoutsHandlers = (bot) => {
     }
   });
 
-  // Create private call
+  // Create private room
   bot.action('hangouts_create_private', async (ctx) => {
     try {
-      await createPrivateCall(ctx);
+      await createPrivateRoom(ctx);
     } catch (error) {
-      logger.error('Error creating private call:', error);
+      logger.error('Error creating private room:', error);
     }
   });
 
-  // Join private call with ID
+  // Show list of private rooms
   bot.action('hangouts_join_private', async (ctx) => {
     try {
-      const lang = getLanguage(ctx);
-      ctx.session.temp.waitingForCallId = true;
-      await ctx.saveSession();
-
-      await ctx.editMessageText(
-        t('hangouts.enterCallId', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('cancel', lang), 'hangouts_menu')],
-        ]),
-      );
+      await showPrivateRoomsList(ctx);
     } catch (error) {
-      logger.error('Error starting join private call:', error);
+      logger.error('Error showing private rooms list:', error);
     }
   });
 
-  // My active calls
-  bot.action('hangouts_my_calls', async (ctx) => {
+  // Join specific private room
+  bot.action(/hangouts_join_private_(\w+)/, async (ctx) => {
     try {
-      await showMyCalls(ctx);
+      const roomId = ctx.match[1];
+      await joinPrivateRoomById(ctx, roomId);
     } catch (error) {
-      logger.error('Error showing my calls:', error);
+      logger.error('Error joining private room:', error);
     }
   });
 
-  // End call action
+  // My active rooms
+  bot.action('hangouts_my_rooms', async (ctx) => {
+    try {
+      await showMyRooms(ctx);
+    } catch (error) {
+      logger.error('Error showing my rooms:', error);
+    }
+  });
+
+  // End room action
   bot.action(/hangouts_end_(.+)/, async (ctx) => {
     try {
-      const callId = ctx.match[1];
-      await endCall(ctx, callId);
+      const roomId = ctx.match[1];
+      await endRoom(ctx, roomId);
     } catch (error) {
-      logger.error('Error ending call:', error);
+      logger.error('Error ending room:', error);
     }
-  });
-
-  // Handle text input for call ID
-  bot.on('text', async (ctx, next) => {
-    if (ctx.session.temp?.waitingForCallId) {
-      try {
-        const lang = getLanguage(ctx);
-        const callId = validateUserInput(ctx.message.text, 50);
-
-        if (!callId) {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-
-        ctx.session.temp.waitingForCallId = false;
-        await ctx.saveSession();
-
-        // Try to join the call
-        await joinPrivateCallById(ctx, callId);
-      } catch (error) {
-        logger.error('Error processing call ID:', error);
-      }
-      return;
-    }
-
-    return next();
   });
 };
 
@@ -145,10 +120,10 @@ const showHangoutsMenu = async (ctx) => {
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.callback('🏠 Join PNPtv! Main Rooms', 'hangouts_join_main')],
       [
-        Markup.button.callback(t('hangouts.createPrivate', lang), 'hangouts_create_private'),
-        Markup.button.callback(t('hangouts.joinPrivate', lang), 'hangouts_join_private'),
+        Markup.button.callback('➕ Create Private Room', 'hangouts_create_private'),
+        Markup.button.callback('🚪 Join Private Room', 'hangouts_join_private'),
       ],
-      [Markup.button.callback(t('hangouts.myCalls', lang), 'hangouts_my_calls')],
+      [Markup.button.callback('📱 My Active Rooms', 'hangouts_my_rooms')],
       [Markup.button.callback(t('back', lang), 'back_to_main')],
     ]);
 
@@ -207,6 +182,58 @@ const showMainRoomsList = async (ctx) => {
 };
 
 /**
+ * Show list of private rooms
+ */
+const showPrivateRoomsList = async (ctx) => {
+  try {
+    const lang = getLanguage(ctx);
+
+    // Get all active private rooms (public or available)
+    const allRooms = await VideoCallModel.getAll();
+    const activeRooms = allRooms.filter(room => room.isActive);
+
+    let text = `🚪 Join Private Room\n\n`;
+    text += `Select a room to join:\n\n`;
+
+    // Build buttons for each active room
+    const buttons = [];
+
+    if (activeRooms && activeRooms.length > 0) {
+      for (const room of activeRooms) {
+        // Get participant count
+        let participantCount = 0;
+        try {
+          const participants = await VideoCallModel.getParticipants(room.id);
+          participantCount = participants.length;
+        } catch (error) {
+          logger.debug(`Could not get participants for room ${room.id}:`, error);
+        }
+
+        const roomText = `${room.title} (${participantCount}/${room.maxParticipants})`;
+        text += `🎥 ${roomText}\n`;
+        text += `   👤 Host: ${room.creatorName}\n\n`;
+        buttons.push([
+          Markup.button.callback(roomText, `hangouts_join_private_${room.id}`)
+        ]);
+      }
+    } else {
+      text += `No active private rooms available.\n`;
+    }
+
+    // Add back button
+    buttons.push([Markup.button.callback(t('back', lang), 'hangouts_menu')]);
+
+    const keyboard = Markup.inlineKeyboard(buttons);
+
+    await ctx.editMessageText(text, keyboard);
+  } catch (error) {
+    logger.error('Error in showPrivateRoomsList:', error);
+    const lang = getLanguage(ctx);
+    await ctx.reply(t('error', lang));
+  }
+};
+
+/**
  * Join main room
  * @param {number} roomId - Room ID to join (1, 2, or 3)
  */
@@ -225,14 +252,14 @@ const joinMainRoom = async (ctx, roomId = 1) => {
     // Create web app URL with token from joinRoom result
     const webAppUrl = `${HANGOUTS_WEB_URL}?room=${result.room.channelName}&token=${result.token}&uid=${userId}&username=${encodeURIComponent(username)}&type=main`;
 
-    let text = `✅ ${t('hangouts.joinedMainRoom', lang)}\n\n`;
-    text += `🎥 ${t('hangouts.roomName', lang)}: ${result.room.name}\n`;
-    text += `👥 ${t('hangouts.participants', lang)}: ${participants.length}\n\n`;
-    text += `💡 ${t('hangouts.clickToJoin', lang)}`;
+    let text = `✅ Joined Main Room!\n\n`;
+    text += `🎥 Room: ${result.room.name}\n`;
+    text += `👥 Participants: ${participants.length}\n\n`;
+    text += `💡 Click "Open Room" to join`;
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.url(t('hangouts.openCall', lang), webAppUrl)],
-      [Markup.button.callback(t('hangouts.leaveRoom', lang), 'hangouts_menu')],
+      [Markup.button.url('🎥 Open Room', webAppUrl)],
+      [Markup.button.callback('🔙 Back to Menu', 'hangouts_menu')],
     ]);
 
     await ctx.editMessageText(text, keyboard);
@@ -254,90 +281,90 @@ const joinMainRoom = async (ctx, roomId = 1) => {
 };
 
 /**
- * Create private call
+ * Create private room
  */
-const createPrivateCall = async (ctx) => {
+const createPrivateRoom = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
     const userId = ctx.from.id;
     const username = ctx.from.username || ctx.from.first_name;
 
-    // Create private call using correct API
+    // Create private room using correct API
     const result = await VideoCallModel.create({
       creatorId: userId,
       creatorName: username,
-      title: `${username}'s Call`,
+      title: `${username}'s Room`,
       maxParticipants: 10,
       enforceCamera: false,
       allowGuests: true,
       isPublic: false,
     });
 
-    // Generate Jitsi Meet URL for private calls (instead of Agora)
+    // Generate Jitsi Meet URL for private rooms (instead of Agora)
     // Use the channel name as the Jitsi room ID
     const jitsiUrl = `${JITSI_MEET_URL}/${result.channelName}#config.prejoinPageEnabled=false&userInfo.displayName="${encodeURIComponent(username)}"`;
 
-    let text = `✅ ${t('hangouts.callCreated', lang)}\n\n`;
-    text += `🎥 ${t('hangouts.callId', lang)}: \`${result.id}\`\n`;
-    text += `🔗 ${t('hangouts.shareId', lang)}\n\n`;
-    text += `💡 Click "Open Call" to join via Jitsi Meet\n`;
+    let text = `✅ Private Room Created!\n\n`;
+    text += `🎥 Room ID: \`${result.id}\`\n`;
+    text += `🔗 Share this ID with others to invite them\n\n`;
+    text += `💡 Click "Open Room" to join via Jitsi Meet\n`;
     text += `🎯 Room: ${result.channelName}`;
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.url('🎥 Open Call (Jitsi)', jitsiUrl)],
-      [Markup.button.callback(t('hangouts.endCall', lang), `hangouts_end_${result.id}`)],
-      [Markup.button.callback(t('back', lang), 'hangouts_menu')],
+      [Markup.button.url('🎥 Open Room (Jitsi)', jitsiUrl)],
+      [Markup.button.callback('🚪 End Room', `hangouts_end_${result.id}`)],
+      [Markup.button.callback('🔙 Back to Menu', 'hangouts_menu')],
     ]);
 
     await ctx.editMessageText(text, keyboard);
   } catch (error) {
-    logger.error('Error in createPrivateCall:', error);
+    logger.error('Error in createPrivateRoom:', error);
     const lang = getLanguage(ctx);
     await ctx.reply(t('error', lang));
   }
 };
 
 /**
- * Join private call by ID
+ * Join private room by ID
  */
-const joinPrivateCallById = async (ctx, callId) => {
+const joinPrivateRoomById = async (ctx, roomId) => {
   try {
     const lang = getLanguage(ctx);
     const userId = ctx.from.id;
     const username = ctx.from.username || ctx.from.first_name;
 
-    // Join call using correct API - joinCall handles everything
-    const result = await VideoCallModel.joinCall(callId, userId, username, false); // false = not guest
+    // Join room using correct API - joinCall handles everything
+    const result = await VideoCallModel.joinCall(roomId, userId, username, false); // false = not guest
 
     // Get current participants count
-    const participants = await VideoCallModel.getParticipants(callId);
+    const participants = await VideoCallModel.getParticipants(roomId);
 
-    // Generate Jitsi Meet URL for private calls (instead of Agora)
+    // Generate Jitsi Meet URL for private rooms (instead of Agora)
     const jitsiUrl = `${JITSI_MEET_URL}/${result.call.channelName}#config.prejoinPageEnabled=false&userInfo.displayName="${encodeURIComponent(username)}"`;
 
-    let text = `✅ ${t('hangouts.joinedCall', lang)}\n\n`;
-    text += `🎥 ${t('hangouts.callId', lang)}: ${callId}\n`;
-    text += `👥 ${t('hangouts.participants', lang)}: ${participants.length}\n\n`;
-    text += `💡 Click "Open Call" to join via Jitsi Meet\n`;
+    let text = `✅ Joined Private Room!\n\n`;
+    text += `🎥 Room ID: ${roomId}\n`;
+    text += `👥 Participants: ${participants.length}\n\n`;
+    text += `💡 Click "Open Room" to join via Jitsi Meet\n`;
     text += `🎯 Room: ${result.call.channelName}`;
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.url('🎥 Open Call (Jitsi)', jitsiUrl)],
-      [Markup.button.callback(t('back', lang), 'hangouts_menu')],
+      [Markup.button.url('🎥 Open Room (Jitsi)', jitsiUrl)],
+      [Markup.button.callback('🔙 Back to Menu', 'hangouts_menu')],
     ]);
 
     await ctx.reply(text, keyboard);
   } catch (error) {
-    logger.error('Error in joinPrivateCallById:', error);
+    logger.error('Error in joinPrivateRoomById:', error);
     const lang = getLanguage(ctx);
 
     // Handle specific errors
     if (error.message.includes('not found')) {
-      await ctx.reply(t('hangouts.callNotFound', lang));
+      await ctx.reply('Room not found. Please check the Room ID.');
     } else if (error.message.includes('ended')) {
-      await ctx.reply(t('hangouts.callEnded', lang));
+      await ctx.reply('This room has ended.');
     } else if (error.message.includes('full')) {
-      await ctx.reply(t('hangouts.callFull', lang));
+      await ctx.reply('This room is full.');
     } else {
       await ctx.reply(t('error', lang));
     }
@@ -345,69 +372,70 @@ const joinPrivateCallById = async (ctx, callId) => {
 };
 
 /**
- * Show my active calls
+ * Show my active rooms
  */
-const showMyCalls = async (ctx) => {
+const showMyRooms = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
     const userId = ctx.from.id;
 
     // Use correct API method
-    const calls = await VideoCallModel.getActiveByCreator(userId);
+    const rooms = await VideoCallModel.getActiveByCreator(userId);
 
-    let text = `📞 ${t('hangouts.myCalls', lang)}\n\n`;
+    let text = `📱 My Active Rooms\n\n`;
 
-    if (calls && calls.length > 0) {
-      calls.forEach((call, index) => {
-        const createdAt = call.createdAt;
-        text += `${index + 1}. ${t('hangouts.call', lang)} \`${call.id}\`\n`;
-        text += `   👥 ${call.currentParticipants || 0} ${t('hangouts.participants', lang)}\n`;
+    if (rooms && rooms.length > 0) {
+      rooms.forEach((room, index) => {
+        const createdAt = room.createdAt;
+        text += `${index + 1}. Room \`${room.id}\`\n`;
+        text += `   📝 ${room.title}\n`;
+        text += `   👥 ${room.currentParticipants || 0} participants\n`;
         text += `   ⏰ ${moment(createdAt).format('HH:mm')}\n`;
-        text += `   Status: ${call.isActive ? 'Active' : 'Ended'}\n\n`;
+        text += `   Status: ${room.isActive ? 'Active' : 'Ended'}\n\n`;
       });
     } else {
-      text += t('hangouts.noActiveCalls', lang);
+      text += 'No active rooms found.';
     }
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(t('refresh', lang), 'hangouts_my_calls')],
-      [Markup.button.callback(t('back', lang), 'hangouts_menu')],
+      [Markup.button.callback('🔄 Refresh', 'hangouts_my_rooms')],
+      [Markup.button.callback('🔙 Back to Menu', 'hangouts_menu')],
     ]);
 
     await ctx.editMessageText(text, keyboard);
   } catch (error) {
-    logger.error('Error in showMyCalls:', error);
+    logger.error('Error in showMyRooms:', error);
   }
 };
 
 /**
- * End a call
+ * End a room
  */
-const endCall = async (ctx, callId) => {
+const endRoom = async (ctx, roomId) => {
   try {
     const lang = getLanguage(ctx);
     const userId = ctx.from.id;
 
     // Verify user is the host - use correct API
-    const call = await VideoCallModel.getById(callId);
+    const room = await VideoCallModel.getById(roomId);
 
-    if (!call) {
-      await ctx.answerCbQuery(t('hangouts.callNotFound', lang));
+    if (!room) {
+      await ctx.answerCbQuery('Room not found');
       return;
     }
 
-    if (call.creatorId !== String(userId)) {
-      await ctx.answerCbQuery(t('hangouts.notHost', lang));
+    if (room.creatorId !== String(userId)) {
+      await ctx.answerCbQuery('Only the host can end this room');
       return;
     }
 
-    // End the call - pass creatorId
-    await VideoCallModel.endCall(callId, userId);
+    // End the room - pass creatorId
+    await VideoCallModel.endCall(roomId, userId);
 
-    await ctx.answerCbQuery(t('hangouts.callEndedSuccess', lang));
+    await ctx.answerCbQuery('Room ended successfully');
     await showHangoutsMenu(ctx);
   } catch (error) {
-    logger.error('Error in endCall:', error);
+    logger.error('Error in endRoom:', error);
     const lang = getLanguage(ctx);
     await ctx.answerCbQuery(t('error', lang));
   }
