@@ -9,21 +9,26 @@ const ChatCleanupService = require('../../services/chatCleanupService');
  * @param {string|number} userId - Telegram user ID
  */
 const sendPrimeWelcome = async (bot, userId) => {
-  const primeChannelLink = 'https://t.me/PNPTV_PRIME'; // Actualiza si el link es diferente
-  const message = [
-    '🎉 ¡Bienvenido a PRIME!',
+  const messageEs = [
+    '🎉 ¡Bienvenido a PNPtv!',
     '',
-    'Tu suscripción Lifetime está activa.',
-    '',
-    'Accede al canal exclusivo aquí:',
-    `👉 [Ingresar a PRIME](${primeChannelLink})`,
+    'Para explorar PNPtv, pulsa /menu',
     '',
     'Disfruta todos los beneficios y novedades.'
   ].join('\n');
+  const messageEn = [
+    '🎉 Welcome to PNPtv!',
+    '',
+    'To explore PNPtv, press /menu',
+    '',
+    'Enjoy all the benefits and updates.'
+  ].join('\n');
+  const lang = (bot.language || 'es').toLowerCase();
+  const message = lang === 'en' ? messageEn : messageEs;
   try {
     await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown' });
   } catch (error) {
-    logger.error('Error enviando bienvenida PRIME:', error);
+    logger.error('Error enviando bienvenida PNPtv:', error);
   }
 };
 

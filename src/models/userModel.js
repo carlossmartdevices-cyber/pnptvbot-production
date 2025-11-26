@@ -705,7 +705,10 @@ class UserModel {
     try {
       const result = await query('SELECT badges FROM users WHERE id = $1', [userId.toString()]);
       if (result.rows.length === 0) return false;
-      const badges = result.rows[0].badges || [];
+      let badges = result.rows[0].badges || [];
+      if (typeof badges === 'string') {
+        try { badges = JSON.parse(badges); } catch { badges = []; }
+      }
       // Only add if not already present (by name)
       if (!badges.some(b => b.name === badge.name)) {
         badges.push(badge);

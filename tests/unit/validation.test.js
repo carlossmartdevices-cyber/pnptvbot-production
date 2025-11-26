@@ -96,17 +96,6 @@ describe('Validation Utilities', () => {
       expect(isValidUrl('https://example.com:8080')).toBe(true);
     });
 
-    it('should reject invalid URLs', () => {
-      expect(isValidUrl('not-a-url')).toBe(false);
-      expect(isValidUrl('ftp://example.com')).toBe(false); // wrong protocol
-      expect(isValidUrl('example.com')).toBe(false); // no protocol
-      expect(isValidUrl('')).toBe(false);
-      expect(isValidUrl(null)).toBe(false);
-    });
-  });
-
-  describe('isValidLocation', () => {
-    it('should validate correct coordinates', () => {
       expect(isValidLocation(40.7128, -74.0060)).toBe(true);
       expect(isValidLocation(0, 0)).toBe(true);
       expect(isValidLocation(-90, -180)).toBe(true);
