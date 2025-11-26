@@ -1,4 +1,5 @@
 const { Markup } = require('telegraf');
+const OpenAI = require('openai');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
@@ -7,123 +8,11 @@ const { getLanguage } = require('../../utils/helpers');
 let mistral = null;
 let AGENT_ID = null;
 
-try {
-  const { Mistral } = require('@mistralai/mistralai');
-  if (process.env.MISTRAL_API_KEY) {
-    mistral = new Mistral({
-      apiKey: process.env.MISTRAL_API_KEY,
-    });
-
-    // Initialize agent on startup (will be created if not exists)
-    initializeAgent().catch(err => {
-      logger.error('Failed to initialize Mistral agent:', err);
-    });
-  }
-} catch (error) {
-  logger.warn('Mistral AI package not installed. AI chat will be unavailable.');
-}
-
-// Rate limiting map: userId -> lastMessageTime
-const messageTimestamps = new Map();
-const RATE_LIMIT_MS = 3000; // 3 seconds between messages
-
-/**
- * Agent instructions - Cristina Customer Support AI
- */
-const AGENT_INSTRUCTIONS = `You are Cristina, the PNPtv Customer Support AI Assistant
-- a professional, helpful, and friendly support chatbot.
-
-🎯 YOUR ROLE
-
-You are the official customer support assistant for PNPtv, providing:
-- Technical assistance with subscriptions, payments, and account access
-- Information about membership plans and features
-- Privacy, security, and legal information
-- Community guidelines and wellness support
-- General questions about the PNPtv experience
-
-💬 COMMUNICATION STYLE
-
-- Professional, friendly, and helpful
-- Clear and concise responses
-- Empathetic and non-judgmental
-- Respond in the user's language (detect: English, Spanish, French, Portuguese,
-  German, Italian, Arabic, Hindi, Chinese, Russian)
-- Use emojis sparingly for clarity
-- Always promote safety, consent, and well-being
-
-🔑 KEY INFORMATION
-
-**Membership Plans:**
-- Basic ($9.99/month): Access to radio, Basic Zoom rooms, Profile customization
-- Premium ($19.99/month): Everything in Basic + Unlimited Zoom rooms, Live streaming, Priority support
-- Gold ($29.99/month): Everything in Premium + Advanced analytics, Custom branding, API access, Dedicated support
-
-**Payment Methods:**
-- ePayco (credit/debit cards)
-- Daimo (USDC cryptocurrency payments)
-
-**Support:**
-- Email: support@pnptv.app
-- Terms: https://pnptv.app/terms-en (English) / https://pnptv.app/terms-es (Spanish)
-- Platform: 18+ adult community on Telegram
-- Location: Optional geolocation for finding nearby members
-- Features: Live shows, events, premium content
-
-⚠️ IMPORTANT POLICIES
-
-- PNPtv is an 18+ adult platform
-- All content and participation must be consensual and legal
-- We do not promote illegal substances or risky behaviors
-- User privacy and security are top priorities
-- For formal complaints or legal matters, direct users to support@pnptv.app
-
-📋 RESPONSE FORMAT
-
-1. Acknowledge the user's question
-2. Provide clear, helpful information
-3. Offer next steps or additional assistance
-4. Always recommend membership upgrades when relevant (sales-focused)
-
-🚫 LIMITATIONS
-
-You CANNOT:
-- Provide explicit, pornographic, or violent content
-- Promote illegal activities or substances
-- Offer medical diagnoses or advice
-- Share private user information
-- Process payments directly (direct users to payment links instead)
-
-✅ ALWAYS:
-- Promote safety, consent, and well-being
-- Recommend premium membership plans when appropriate
-- Direct complex issues to support@pnptv.app
-- Keep responses concise (max 3-4 paragraphs)`;
-
-/**
- * Initialize or get the Mistral AI Agent
- * Note: Agents must be created via Mistral console (https://console.mistral.ai)
- * or the environment variable MISTRAL_AGENT_ID can be set
- */
-async function initializeAgent() {
-  if (!mistral) return null;
-
-  try {
-    // Check if agent ID is provided in environment
-    if (process.env.MISTRAL_AGENT_ID) {
-      AGENT_ID = process.env.MISTRAL_AGENT_ID;
-      logger.info(`Using Mistral agent from env: ${AGENT_ID}`);
-      return AGENT_ID;
-    }
-
-    // If no agent ID provided, we'll use chat completion instead
-    logger.info('No MISTRAL_AGENT_ID configured, will use standard chat completion API');
-    AGENT_ID = null;
-    return null;
-  } catch (error) {
-    logger.error('Error initializing Mistral agent:', error);
-    return null;
-  }
+// Initialize OpenAI (v4 API)
+if (process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
 }
 
 /**
@@ -303,98 +192,23 @@ const registerSupportHandlers = (bot) => {
         // Send to Mistral AI
         if (mistral) {
           try {
-            // Ensure agent is initialized
-            if (AGENT_ID === null && mistral) {
-              await initializeAgent();
-            }
-
-            // Initialize chat history if not exists
-            if (!ctx.session.temp.aiChatHistory) {
-              ctx.session.temp.aiChatHistory = [];
-            }
-
-            // Add user message to history
-            ctx.session.temp.aiChatHistory.push({
-              role: 'user',
-              content: userMessage,
-            });
-
-            // Keep only last 20 messages to manage token usage
-            if (ctx.session.temp.aiChatHistory.length > 20) {
-              ctx.session.temp.aiChatHistory = ctx.session.temp.aiChatHistory.slice(-20);
-            }
-
-            // Prepare messages with language preference
-            const languagePrompt = lang === 'es'
-              ? 'Responde en español.'
-              : 'Respond in English.';
-
-            let completion;
-            let aiResponse;
-
-            // Use Agents API if agent ID is configured
-            if (AGENT_ID) {
-              const messages = [
-                ...ctx.session.temp.aiChatHistory.slice(-10), // Last 10 messages for context
-                {
-                  role: 'user',
-                  content: `${languagePrompt}\n\n${userMessage}`,
-                },
-              ];
-
-              completion = await mistral.agents.complete({
-                agentId: AGENT_ID,
-                messages: messages,
-              });
-
-              aiResponse = completion.choices?.[0]?.message?.content ||
-                          completion.message?.content ||
-                          (lang === 'es'
-                            ? 'Disculpa, no pude procesar tu solicitud. Por favor intenta de nuevo.'
-                            : 'I apologize, but I couldn\'t process your request. Please try again.');
-            } else {
-              // Fall back to Chat Completions API
-              const messages = [
+            const response = await openai.chat.completions.create({
+              model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
+              messages: [
                 {
                   role: 'system',
-                  content: AGENT_INSTRUCTIONS + `\n\n${languagePrompt}`,
+                  content: `You are Cristina, a helpful AI assistant for PNPtv, a Telegram bot platform for live streaming, radio, and social networking. Answer questions concisely in ${lang === 'es' ? 'Spanish' : 'English'}.`,
                 },
-                ...ctx.session.temp.aiChatHistory.slice(-10), // Last 10 messages
-              ];
-
-              completion = await mistral.chat.complete({
-                model: process.env.MISTRAL_MODEL || 'mistral-small-latest',
-                messages: messages,
-                maxTokens: parseInt(process.env.MISTRAL_MAX_TOKENS || '500', 10),
-                temperature: 0.7,
-              });
-
-              aiResponse = completion.choices[0].message.content;
-            }
-
-            // Add AI response to history
-            ctx.session.temp.aiChatHistory.push({
-              role: 'assistant',
-              content: aiResponse,
+                {
+                  role: 'user',
+                  content: userMessage,
+                },
+              ],
+              max_tokens: parseInt(process.env.OPENAI_MAX_TOKENS || '500', 10),
             });
 
-            await ctx.saveSession();
-
-            // Delete "thinking" message
-            try {
-              await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id);
-            } catch (e) {
-              // Ignore if deletion fails
-            }
-
-            // Send AI response
-            const exitMessage = lang === 'es'
-              ? 'Escribe "exit" para finalizar el chat'
-              : 'Type "exit" to end chat';
-            await ctx.reply(
-              `🤖 Cristina: ${aiResponse}\n\n_${exitMessage}_`,
-              { parse_mode: 'Markdown' }
-            );
+            const aiResponse = response.choices[0].message.content;
+            await ctx.reply(`🤖 Cristina: ${aiResponse}\n\n_Type "exit" to end chat_`);
           } catch (aiError) {
             logger.error('Mistral AI error:', aiError);
 
