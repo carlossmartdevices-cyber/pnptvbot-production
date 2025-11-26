@@ -69,19 +69,18 @@ describe('PaymentService Security Tests', () => {
     it('should verify valid ePayco signature correctly', () => {
       const secret = 'test-secret-key';
       process.env.EPAYCO_PRIVATE_KEY = secret;
+      process.env.EPAYCO_P_CUST_ID = 'cust123';
 
       const webhookData = {
-        x_cust_id_cliente: 'cust123',
         x_ref_payco: 'ref456',
         x_transaction_id: 'txn789',
         x_amount: '19.99',
+        x_currency_code: 'USD',
       };
 
-      // Generate valid signature
-      const signatureString = `${webhookData.x_cust_id_cliente}^${secret}^${webhookData.x_ref_payco}^${webhookData.x_transaction_id}^${webhookData.x_amount}`;
-      const hmac = crypto.createHmac('sha256', secret);
-      hmac.update(signatureString);
-      const validSignature = hmac.digest('hex');
+      // Generate valid signature using SHA256 hash (not HMAC)
+      const signatureString = `${process.env.EPAYCO_P_CUST_ID}^${secret}^${webhookData.x_ref_payco}^${webhookData.x_transaction_id}^${webhookData.x_amount}^${webhookData.x_currency_code}`;
+      const validSignature = crypto.createHash('sha256').update(signatureString).digest('hex');
 
       webhookData.x_signature = validSignature;
 
@@ -182,8 +181,12 @@ describe('PaymentService Security Tests', () => {
       process.env.DAIMO_WEBHOOK_SECRET = secret;
 
       const webhookData = {
-        transaction_id: 'txn123',
-        status: 'completed',
+        id: 'evt_123',
+        type: 'transaction.confirmed',
+        source: {
+          txHash: '0xabc123',
+          amountUnits: '1000000',
+        },
         metadata: {
           paymentId: 'pay123',
           userId: 'user456',
@@ -193,8 +196,9 @@ describe('PaymentService Security Tests', () => {
 
       // Generate valid signature
       const payload = JSON.stringify({
-        transaction_id: webhookData.transaction_id,
-        status: webhookData.status,
+        id: webhookData.id,
+        type: webhookData.type,
+        source: webhookData.source,
         metadata: webhookData.metadata,
       });
       const hmac = crypto.createHmac('sha256', secret);
