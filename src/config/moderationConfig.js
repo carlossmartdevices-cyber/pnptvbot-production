@@ -56,6 +56,7 @@ const MODERATION_CONFIG = {
     },
 
     // Link Filtering
+    // Only admins are exempt (checked in middleware, not here)
     LINKS: {
       enabled: true,
       allowedDomains: [
@@ -65,8 +66,6 @@ const MODERATION_CONFIG = {
         'spotify.com',
         'soundcloud.com',
       ],
-      // Admins and prime members can post any links
-      exemptPrime: true,
     },
 
     // Profanity Filter (basic - can be expanded)
