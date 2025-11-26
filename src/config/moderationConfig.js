@@ -56,71 +56,23 @@ const MODERATION_CONFIG = {
     },
 
     // Link Filtering
+    // Only admins are exempt (checked in middleware, not here)
     LINKS: {
       enabled: true,
       allowedDomains: [
-        // PNPtv official
         'pnptv.com',
-        'pnptv.app',
-        // Social media (official domains only)
-        'x.com',
-        'twitter.com',
-        'facebook.com',
-        'fb.com',
-        'instagram.com',
-        'tiktok.com',
-        // Media platforms
         'youtube.com',
         'youtu.be',
         'spotify.com',
         'soundcloud.com',
-        // Note: Only official domains are allowed to prevent scams
-        // Shortened URLs and suspicious domains will be blocked
       ],
-      // Admins and prime members can post any links
-      exemptPrime: true,
     },
 
-    // Profanity Filter - allows adult language but bans illegal activity terms
+    // Profanity Filter (basic - can be expanded)
     PROFANITY: {
-      enabled: true, // Enabled to block illegal activity terms
+      enabled: false, // Disabled by default - this is an adult community
       blacklist: [
-        // Illegal activities - zero tolerance
-        // Pedophilia related
-        'pedophilia', 'pedofilia', 'paedophilia', 'pedophile',
-        'child porn', 'childporn', 'child sex', 'childsex',
-        'child abuse', 'childabuse',
-        'loli', 'lolita', 'lolicon', 'shota', 'shotacon',
-        'preteen', 'pre-teen', 'preteens', 'pre teen',
-        'underaged', 'under aged', 'underage sex',
-        'minor sex', 'teen porn', 'kid sex', 'kids sex',
-        'jailbait', 'jail bait', 'kiddie porn', 'kiddies',
-        'pthc', 'r@ygold', 'raygold',
-        // Zoophilia related
-        'zoophilia', 'zoofilia', 'zoophile', 'bestiality', 'beastiality',
-        'animal sex', 'animalsex', 'dog sex', 'dogsex',
-        'zoosex', 'animal abuse', 'animalabuse',
-        'horse sex', 'horsesex',
-        // Non-consent / Violence
-        'rape porn', 'raping', 'rapist',
-        'violacion', 'violar', 'violada',
-        'non-consent', 'non consent', 'nonconsent',
-        'roofie', 'roofied', 'date rape',
-        'forced sex', 'drugged sex',
-        // Incest
-        'incest', 'incesto', 'incestuous',
-        'daughter sex', 'son sex',
-        'sister sex', 'brother sex',
-        'father daughter', 'mother son',
-        // Extreme violence
-        'snuff', 'snuff film', 'murder porn',
-        'torture porn', 'gore porn',
-        'necrophilia', 'necro porn',
-        // Trafficking / Slavery
-        'human trafficking', 'sex trafficking',
-        'sex slave', 'sexslave',
-        // Note: Adult language and normal profanity is allowed
-        // This list only blocks illegal activities and harmful content
+        // Add prohibited words here if needed
       ],
     },
 

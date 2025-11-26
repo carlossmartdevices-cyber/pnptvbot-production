@@ -5,7 +5,7 @@
 
 const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
-// const config = require('../../../config/config'); // Removed: file does not exist, use process.env or direct values if needed
+const config = require('../../../config/config');
 const {
   MENU_CONFIG,
   getMenuOptions,
@@ -657,9 +657,13 @@ async function handleCristinaAI(ctx, lang) {
 
 async function handleRules(ctx, lang) {
   // Import moderation config to get rules
-  const { MODERATION_CONFIG } = require('../../../config/moderationConfig');
+  const MODERATION_CONFIG = require('../../../config/moderationConfig');
 
-  const rulesText = MODERATION_CONFIG.RULES[lang.toUpperCase()] || MODERATION_CONFIG.RULES.EN;
+  // Get rules in user's language (keys are lowercase: 'en', 'es')
+  const rules = MODERATION_CONFIG.RULES[lang] || MODERATION_CONFIG.RULES.en;
+
+  // Format rules as numbered list
+  const rulesText = `📜 *Community Rules*\n\n${rules.map((rule, i) => `${i + 1}. ${rule}`).join('\n\n')}`;
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]

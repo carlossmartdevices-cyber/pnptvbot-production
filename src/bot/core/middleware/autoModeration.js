@@ -1,5 +1,4 @@
 const WarningService = require('../../../services/warningService');
-const UserModel = require('../../../models/userModel');
 const logger = require('../../../utils/logger');
 const MODERATION_CONFIG = require('../../../config/moderationConfig');
 
@@ -8,6 +7,7 @@ const userMessageHistory = new Map();
 
 /**
  * Check if user is exempt from auto-moderation
+ * Only admins are exempt
  */
 async function isExempt(ctx) {
   try {
@@ -15,14 +15,6 @@ async function isExempt(ctx) {
     const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
     if (['creator', 'administrator'].includes(member.status)) {
       return true;
-    }
-
-    // Check if user is PRIME (if enabled)
-    if (MODERATION_CONFIG.FILTERS.LINKS.exemptPrime) {
-      const user = await UserModel.getById(ctx.from.id);
-      if (user?.subscription?.isPrime) {
-        return true;
-      }
     }
 
     return false;
