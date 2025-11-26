@@ -9,7 +9,7 @@ const { query } = require('./src/config/postgres');
         icon: '👑',
         assignedAt: new Date(),
         reason: 'Early adopter',
-        benefits: 'Full access to nearby, zoom, live for 6 months'
+         benefits: 'Full access to nearby, live for 6 months'
       });
       await query('UPDATE users SET badges = $1 WHERE id = $2', [JSON.stringify(badges), user.id]);
     }
