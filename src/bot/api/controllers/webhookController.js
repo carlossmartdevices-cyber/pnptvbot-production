@@ -1,7 +1,6 @@
 const PaymentService = require('../../services/paymentService');
 const logger = require('../../../utils/logger');
 const DaimoConfig = require('../../../config/daimo');
-const FarcasterAuthService = require('../../services/farcasterAuthService');
 
 /**
  * Sanitize bot username for safe HTML insertion
@@ -20,11 +19,7 @@ const sanitizeBotUsername = (username) => {
  * @returns {Object} { valid: boolean, error?: string }
  */
 const validateEpaycoPayload = (payload) => {
-  // ePayco minimum required fields according to documentation
-  // x_ref_payco: ePayco transaction reference
-  // x_transaction_id: Transaction ID
-  // x_transaction_state: Transaction state (Aceptada, Rechazada, Pendiente)
-  const requiredFields = ['x_ref_payco', 'x_transaction_state'];
+  const requiredFields = ['x_ref_payco', 'x_transaction_state', 'x_extra1', 'x_extra2', 'x_extra3'];
   const missingFields = requiredFields.filter((field) => !payload[field]);
 
   if (missingFields.length > 0) {
@@ -32,16 +27,6 @@ const validateEpaycoPayload = (payload) => {
       valid: false,
       error: `Missing required fields: ${missingFields.join(', ')}`,
     };
-  }
-
-  // Check for 3DS fields (x_three_d_s, x_eci, x_cavv)
-  // These are important security fields that should be present in approved transactions
-  const has3DSFields = payload.x_three_d_s || payload.x_eci || payload.x_cavv;
-  if (!has3DSFields) {
-    logger.warn('⚠️  ePayco transaction missing 3DS fields', {
-      refPayco: payload.x_ref_payco,
-      state: payload.x_transaction_state,
-    });
   }
 
   return { valid: true };
@@ -65,25 +50,20 @@ const validateDaimoPayload = (payload) =>
  */
 const handleEpaycoWebhook = async (req, res) => {
   try {
-    // ePayco sends data as query parameters in the URL
-    // Merge both req.query and req.body to support both methods
-    const webhookData = { ...req.query, ...req.body };
-
     logger.info('ePayco webhook received', {
-      transactionId: webhookData.x_ref_payco,
-      state: webhookData.x_transaction_state,
-      source: Object.keys(req.query).length > 0 ? 'query' : 'body',
+      transactionId: req.body.x_ref_payco,
+      state: req.body.x_transaction_state,
     });
 
     // Validate payload structure
-    const validation = validateEpaycoPayload(webhookData);
+    const validation = validateEpaycoPayload(req.body);
     if (!validation || !validation.valid) {
       const errorMsg = validation?.error || 'Invalid webhook payload';
       logger.warn('Invalid ePayco webhook payload', { error: errorMsg });
       return res.status(400).json({ success: false, error: errorMsg });
     }
 
-    const result = await PaymentService.processEpaycoWebhook(webhookData);
+    const result = await PaymentService.processEpaycoWebhook(req.body);
 
     if (result.success) {
       return res.status(200).json({ success: true });
@@ -310,254 +290,8 @@ const handlePaymentResponse = async (req, res) => {
   }
 };
 
-/**
- * Verify Farcaster Quick Auth token
- * @param {Request} req - Express request
- * @param {Response} res - Express response
- */
-const verifyFarcasterAuth = async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(400).json({
-        success: false,
-        error: 'Authorization header with Bearer token required',
-      });
-    }
-
-    const result = await FarcasterAuthService.verifyAuthHeader(authHeader);
-
-    if (!result.valid) {
-      return res.status(401).json({
-        success: false,
-        error: result.error || 'Invalid token',
-      });
-    }
-
-    logger.info('Farcaster token verified', { fid: result.fid });
-
-    return res.status(200).json({
-      success: true,
-      fid: result.fid,
-    });
-  } catch (error) {
-    logger.error('Error verifying Farcaster auth:', {
-      error: error.message,
-    });
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-    });
-  }
-};
-
-/**
- * Create Daimo payment with Farcaster authentication
- * @param {Request} req - Express request
- * @param {Response} res - Express response
- */
-const createFarcasterPayment = async (req, res) => {
-  const DaimoService = require('../../services/daimoService');
-
-  try {
-    const authHeader = req.headers.authorization;
-    const { userId, planId, chatId } = req.body;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(400).json({
-        success: false,
-        error: 'Authorization header with Bearer token required',
-      });
-    }
-
-    if (!userId || !planId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId and planId are required',
-      });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-
-    // Get plan details
-    const PlanModel = require('../../../models/planModel');
-    const plan = await PlanModel.getById(planId);
-
-    if (!plan || !plan.active) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid or inactive plan',
-      });
-    }
-
-    // Create payment record first
-    const PaymentModel = require('../../../models/paymentModel');
-    const payment = await PaymentModel.create({
-      userId,
-      planId,
-      provider: 'daimo',
-      amount: plan.price,
-      status: 'pending',
-    });
-
-    // Create payment with Farcaster verification
-    const result = await DaimoService.createPaymentWithFarcaster({
-      token,
-      userId,
-      planId,
-      amount: plan.price,
-      chatId,
-      paymentId: payment.id,
-    });
-
-    if (!result.success) {
-      return res.status(400).json({
-        success: false,
-        error: result.error,
-        details: result.details,
-      });
-    }
-
-    logger.info('Farcaster payment created', {
-      userId,
-      planId,
-      fid: result.farcasterFid,
-      paymentId: payment.id,
-    });
-
-    return res.status(200).json({
-      success: true,
-      paymentUrl: result.paymentUrl,
-      paymentId: payment.id,
-      farcasterFid: result.farcasterFid,
-    });
-  } catch (error) {
-    logger.error('Error creating Farcaster payment:', {
-      error: error.message,
-      stack: error.stack,
-    });
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-    });
-  }
-};
-
-/**
- * Link Farcaster account to Telegram user
- * @param {Request} req - Express request
- * @param {Response} res - Express response
- */
-const linkFarcasterAccount = async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    const { telegramUserId } = req.body;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(400).json({
-        success: false,
-        error: 'Authorization header with Bearer token required',
-      });
-    }
-
-    if (!telegramUserId) {
-      return res.status(400).json({
-        success: false,
-        error: 'telegramUserId is required',
-      });
-    }
-
-    // Verify token first
-    const verifyResult = await FarcasterAuthService.verifyAuthHeader(authHeader);
-
-    if (!verifyResult.valid) {
-      return res.status(401).json({
-        success: false,
-        error: verifyResult.error || 'Invalid token',
-      });
-    }
-
-    // Link accounts
-    const linkResult = await FarcasterAuthService.linkFarcasterToTelegram(
-      telegramUserId,
-      verifyResult.fid
-    );
-
-    if (!linkResult.success) {
-      return res.status(400).json({
-        success: false,
-        error: linkResult.error,
-      });
-    }
-
-    logger.info('Farcaster account linked', {
-      telegramUserId,
-      fid: verifyResult.fid,
-    });
-
-    return res.status(200).json({
-      success: true,
-      telegramUserId,
-      farcasterFid: verifyResult.fid,
-    });
-  } catch (error) {
-    logger.error('Error linking Farcaster account:', {
-      error: error.message,
-    });
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-    });
-  }
-};
-
-/**
- * Get Farcaster user profile
- * @param {Request} req - Express request
- * @param {Response} res - Express response
- */
-const getFarcasterProfile = async (req, res) => {
-  try {
-    const { fid } = req.params;
-
-    if (!fid) {
-      return res.status(400).json({
-        success: false,
-        error: 'FID is required',
-      });
-    }
-
-    const result = await FarcasterAuthService.getFarcasterProfile(fid);
-
-    if (!result.success) {
-      return res.status(400).json({
-        success: false,
-        error: result.error,
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      profile: result.profile,
-    });
-  } catch (error) {
-    logger.error('Error getting Farcaster profile:', {
-      error: error.message,
-    });
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-    });
-  }
-};
-
 module.exports = {
   handleEpaycoWebhook,
   handleDaimoWebhook,
   handlePaymentResponse,
-  verifyFarcasterAuth,
-  createFarcasterPayment,
-  linkFarcasterAccount,
-  getFarcasterProfile,
 };

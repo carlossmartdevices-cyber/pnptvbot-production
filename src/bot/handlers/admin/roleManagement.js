@@ -81,8 +81,6 @@ async function showRoleManagement(ctx, edit = false) {
   }
 }
 
-module.exports.showRoleManagement = showRoleManagement;
-
 /**
  * Role Management Handlers - SuperAdmin only
  * @param {Telegraf} bot - Bot instance

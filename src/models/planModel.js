@@ -1,4 +1,4 @@
-const { query } = require('../config/postgres');
+const { getFirestore } = require('../config/firebase');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
@@ -15,15 +15,26 @@ class Plan {
   static async getAll() {
     try {
       const cacheKey = 'plans:all';
+
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query('SELECT * FROM plans WHERE active = true ORDER BY price ASC');
-          const plans = result.rows;
-          logger.info(`Fetched ${plans.length} plans from PostgreSQL`);
+          const db = getFirestore();
+          const snapshot = await db
+            .collection(this.COLLECTION)
+            .where('active', '==', true)
+            .orderBy('price', 'asc')
+            .get();
+
+          const plans = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+
+          logger.info(`Fetched ${plans.length} plans from Firestore`);
           return plans.length > 0 ? plans : this.getDefaultPlans();
         },
-        3600,
+        3600, // Cache for 1 hour
       );
     } catch (error) {
       logger.error('Error getting plans:', error);
@@ -39,18 +50,25 @@ class Plan {
   static async getById(planId) {
     try {
       const cacheKey = `plan:${planId}`;
+
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query('SELECT * FROM plans WHERE id = $1', [planId]);
-          if (result.rows.length === 0) {
+          const db = getFirestore();
+          const doc = await db.collection(this.COLLECTION).doc(planId).get();
+
+          if (!doc.exists) {
             logger.warn(`Plan not found: ${planId}`);
             return null;
           }
-          logger.info(`Fetched plan from PostgreSQL: ${planId}`);
-          return result.rows[0];
+
+          logger.info(`Fetched plan from Firestore: ${planId}`);
+          return {
+            id: doc.id,
+            ...doc.data(),
+          };
         },
-        3600,
+        3600, // Cache for 1 hour
       );
     } catch (error) {
       logger.error('Error getting plan:', error);
@@ -66,57 +84,36 @@ class Plan {
    */
   static async createOrUpdate(planId, planData) {
     try {
+      // Auto-generate SKU if not provided
       const data = { ...planData };
+      if (!data.sku && data.duration) {
+        data.sku = this.generateSKU(planId, data.duration);
+        logger.info(`Auto-generated SKU: ${data.sku} for plan: ${planId}`);
+      }
 
-      await query(`INSERT INTO plans (id, name, display_name, tier, price, price_in_cop, currency, duration, duration_days, description, features, icon, active, recommended, is_lifetime, requires_manual_activation, payment_method, wompi_payment_link, crypto_bonus, updated_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
-        ON CONFLICT (id) DO UPDATE SET
-          name = $2,
-          display_name = $3,
-          tier = $4,
-          price = $5,
-          price_in_cop = $6,
-          currency = $7,
-          duration = $8,
-          duration_days = $9,
-          description = $10,
-          features = $11,
-          icon = $12,
-          active = $13,
-          recommended = $14,
-          is_lifetime = $15,
-          requires_manual_activation = $16,
-          payment_method = $17,
-          wompi_payment_link = $18,
-          crypto_bonus = $19,
-          updated_at = $20`,
-        [
-          planId,
-          data.name,
-          data.displayName || data.name,
-          data.tier || 'Basic',
-          data.price,
-          data.priceInCop || null,
-          data.currency || 'USD',
-          data.duration || 30,
-          data.durationDays || data.duration || 30,
-          data.description || null,
-          JSON.stringify(data.features || []),
-          data.icon || null,
-          data.active !== undefined ? data.active : true,
-          data.recommended || false,
-          data.isLifetime || false,
-          data.requiresManualActivation || false,
-          data.paymentMethod || null,
-          data.wompiPaymentLink || null,
-          data.cryptoBonus ? JSON.stringify(data.cryptoBonus) : null,
-          new Date()
-        ]
-      );
+      const db = getFirestore();
+      const planDoc = {
+        id: planId,
+        sku: data.sku,
+        name: data.name,
+        nameEs: data.nameEs,
+        price: data.price,
+        currency: data.currency || 'USD',
+        duration: data.duration || 30,
+        features: data.features || [],
+        featuresEs: data.featuresEs || [],
+        active: data.active !== undefined ? data.active : true,
+        updatedAt: new Date(),
+      };
+
+      await db.collection(this.COLLECTION).doc(planId).set(planDoc, { merge: true });
+
+      // Invalidate cache
       await cache.del(`plan:${planId}`);
       await cache.del('plans:all');
-      logger.info('Plan created/updated', { planId, tier: data.tier });
-      return data;
+
+      logger.info('Plan created/updated', { planId, sku: data.sku });
+      return planDoc;
     } catch (error) {
       logger.error('Error creating/updating plan:', error);
       throw error;
@@ -130,9 +127,13 @@ class Plan {
    */
   static async delete(planId) {
     try {
-      await query('DELETE FROM plans WHERE id = $1', [planId]);
+      const db = getFirestore();
+      await db.collection(this.COLLECTION).doc(planId).delete();
+
+      // Invalidate cache
       await cache.del(`plan:${planId}`);
       await cache.del('plans:all');
+
       logger.info('Plan deleted', { planId });
       return true;
     } catch (error) {
@@ -176,8 +177,6 @@ class Plan {
         price: 14.99,
         currency: 'USD',
         duration: 7,
-        durationDays: 7,
-        description: 'Try premium features for one week',
         features: [
           'Premium channel access',
           'Access to Nearby Members feature',
@@ -190,8 +189,6 @@ class Plan {
         ],
         icon: '🎯',
         active: true,
-        recommended: false,
-        isLifetime: false,
       },
       {
         id: 'pnp_member',
@@ -203,8 +200,6 @@ class Plan {
         price: 24.99,
         currency: 'USD',
         duration: 30,
-        durationDays: 30,
-        description: 'Full access to all premium features',
         features: [
           'Everything in Trial Week',
           'Unlimited premium channel access',
@@ -219,8 +214,6 @@ class Plan {
         ],
         icon: '⭐',
         active: true,
-        recommended: true,
-        isLifetime: false,
       },
       {
         id: 'crystal_member',
@@ -231,9 +224,7 @@ class Plan {
         tier: 'Crystal',
         price: 49.99,
         currency: 'USD',
-        duration: 120,
-        durationDays: 120,
-        description: 'Extended membership with exclusive benefits',
+        duration: 30,
         features: [
           'Everything in PNP Member',
           'Zoom meeting access: 4 per week',
@@ -248,8 +239,6 @@ class Plan {
         ],
         icon: '💎',
         active: true,
-        recommended: false,
-        isLifetime: false,
       },
       {
         id: 'diamond_member',
@@ -260,9 +249,7 @@ class Plan {
         tier: 'Diamond',
         price: 99.99,
         currency: 'USD',
-        duration: 365,
-        durationDays: 365,
-        description: 'Annual membership with VIP benefits',
+        duration: 30,
         features: [
           'Everything in Crystal Member',
           'Unlimited Zoom meeting access',
@@ -279,8 +266,6 @@ class Plan {
         ],
         icon: '👑',
         active: true,
-        recommended: false,
-        isLifetime: false,
       },
       {
         id: 'lifetime_pass',
@@ -292,8 +277,6 @@ class Plan {
         price: 249.99,
         currency: 'USD',
         duration: 36500, // 100 years
-        durationDays: 36500,
-        description: 'One-time payment for lifetime access',
         features: [
           'Everything in Diamond Member',
           'Lifetime access to all features',
@@ -310,8 +293,6 @@ class Plan {
         ],
         icon: '♾️',
         active: true,
-        recommended: false,
-        isLifetime: true,
       },
     ];
   }

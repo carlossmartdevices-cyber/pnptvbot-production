@@ -1,123 +1,78 @@
-const { Markup } = require('telegraf');
-const UserService = require('../../services/userService');
-const { t } = require('../../../utils/i18n');
+const { requirePrivateChat } = require('../../utils/notifications');
+const userService = require('../../services/userService');
+const i18n = require('../../utils/i18n');
 const logger = require('../../../utils/logger');
-const { getLanguage } = require('../../utils/helpers');
 
 /**
- * Nearby users handlers
- * @param {Telegraf} bot - Bot instance
+ * Handle nearby users command
  */
-const registerNearbyHandlers = (bot) => {
-  // Show nearby users menu
-  bot.action('show_nearby', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
+async function handleNearby(ctx) {
+  try {
+    const userId = ctx.from.id;
+    const user = await userService.getUser(userId);
+    const language = user?.language || 'en';
 
-      await ctx.editMessageText(
-        `${t('nearbyTitle', lang)}\n\n${t('selectRadius', lang)}`,
-        Markup.inlineKeyboard([
-          [
-            Markup.button.callback(t('radius5km', lang), 'nearby_radius_5'),
-            Markup.button.callback(t('radius10km', lang), 'nearby_radius_10'),
-          ],
-          [Markup.button.callback(t('radius25km', lang), 'nearby_radius_25')],
-          [Markup.button.callback(t('back', lang), 'back_to_main')],
-        ]),
+    // Check if command is in group chat
+    const isPrivate = await requirePrivateChat(
+      ctx,
+      'Nearby Users',
+      i18n.t('nearby_users', language)
+    );
+
+    if (!isPrivate) {
+      return;
+    }
+
+    // Check if user has shared location
+    if (!user.location) {
+      await ctx.reply(
+        language === 'es'
+          ? '📍 Por favor comparte tu ubicación primero para ver usuarios cercanos.\n\nUsa /start para configurar tu perfil.'
+          : '📍 Please share your location first to see nearby users.\n\nUse /start to set up your profile.',
+        {
+          reply_markup: {
+            keyboard: [
+              [{ text: language === 'es' ? '📍 Compartir Ubicación' : '📍 Share Location', request_location: true }],
+            ],
+            resize_keyboard: true,
+            one_time_keyboard: true,
+          },
+        }
       );
-    } catch (error) {
-      logger.error('Error showing nearby menu:', error);
+      return;
     }
-  });
 
-  // Handle radius selection
-  bot.action(/^nearby_radius_(\d+)$/, async (ctx) => {
-    try {
-      const radius = parseInt(ctx.match[1], 10);
-      const lang = getLanguage(ctx);
+    // Get nearby users
+    const nearbyUsers = await userService.getNearbyUsers(
+      user.location.lat,
+      user.location.lng,
+      10 // 10km radius
+    );
 
-      // Validate user context exists
-      if (!ctx.from?.id) {
-        logger.error('Missing user context in nearby users search');
-        await ctx.reply(t('error', lang));
-        return;
-      }
-
-      const userId = ctx.from.id;
-
-      await ctx.editMessageText(t('loading', lang));
-
-      const nearbyUsers = await UserService.getNearbyUsers(userId, radius);
-
-      if (nearbyUsers.length === 0) {
-        await ctx.editMessageText(
-          t('noNearbyUsers', lang),
-          Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'show_nearby')],
-          ]),
-        );
-        return;
-      }
-
-      // Show list of nearby users
-      let message = `${t('nearbyUsersFound', lang, { count: nearbyUsers.length })}\n\n`;
-
-      const buttons = [];
-      nearbyUsers.slice(0, 10).forEach((user, index) => {
-        const name = user.firstName || 'User';
-        const distance = user.distance.toFixed(1);
-        message += `${index + 1}. ${name} - ${t('distance', lang, { distance })}\n`;
-
-        buttons.push([
-          Markup.button.callback(
-            `👁️ ${name}`,
-            `view_user_${user.id}`,
-          ),
-        ]);
-      });
-
-      buttons.push([Markup.button.callback(t('back', lang), 'show_nearby')]);
-
-      await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
-    } catch (error) {
-      logger.error('Error showing nearby users:', error);
-      const lang = getLanguage(ctx);
-      await ctx.reply(t('error', lang));
+    if (nearbyUsers.length === 0) {
+      await ctx.reply(i18n.t('no_nearby_users', language));
+      return;
     }
-  });
 
-  // View user profile
-  bot.action(/^view_user_(.+)$/, async (ctx) => {
-    try {
-      // Validate match result exists
-      if (!ctx.match || !ctx.match[1]) {
-        logger.error('Invalid view user action format');
-        return;
+    // Format nearby users list
+    let message = `📍 **${i18n.t('nearby_users', language)}** (${nearbyUsers.length})\n\n`;
+    nearbyUsers.slice(0, 10).forEach((nearbyUser, index) => {
+      message += `${index + 1}. ${nearbyUser.username || nearbyUser.firstName || 'User'}\n`;
+      if (nearbyUser.bio) {
+        message += `   ${nearbyUser.bio.substring(0, 50)}...\n`;
       }
+      message += `\n`;
+    });
 
-      const targetUserId = ctx.match[1];
-      const lang = getLanguage(ctx);
+    await ctx.reply(message, { parse_mode: 'Markdown' });
 
-      const user = await UserService.getOrCreateFromContext({ from: { id: targetUserId } });
+    logger.info(`User ${userId} viewed nearby users`);
+  } catch (error) {
+    logger.error('Error in nearby command:', error);
+    await ctx.reply(i18n.t('error_occurred', 'en'));
+  }
+}
 
-      let profileText = `👤 ${user.firstName || 'User'} ${user.lastName || ''}\n`;
-      if (user.username) profileText += `@${user.username}\n`;
-      if (user.bio) profileText += `\n${user.bio}\n`;
-      if (user.interests && user.interests.length > 0) {
-        profileText += `\n🎯 ${user.interests.join(', ')}\n`;
-      }
-
-      await ctx.editMessageText(
-        profileText,
-        Markup.inlineKeyboard([
-          [Markup.button.url(t('sendMessage', lang), `https://t.me/${user.username || targetUserId}`)],
-          [Markup.button.callback(t('back', lang), 'show_nearby')],
-        ]),
-      );
-    } catch (error) {
-      logger.error('Error viewing user profile:', error);
-    }
-  });
+module.exports = {
+  handleNearby,
 };
-
-module.exports = registerNearbyHandlers;

@@ -3,7 +3,6 @@ const logger = require('../../utils/logger');
 /**
  * Chat Cleanup Service
  * Automatically deletes bot messages, commands, and system messages after a delay
- * Also provides immediate cleanup of previous bot messages on new interactions
  */
 class ChatCleanupService {
   /**
@@ -14,28 +13,9 @@ class ChatCleanupService {
   static scheduledDeletions = new Map();
 
   /**
-   * Bot messages tracking by chat
-   * Key: chatId
-   * Value: Set of message IDs sent by the bot
+   * Cleanup delay in milliseconds (5 minutes)
    */
-  static botMessagesByChat = new Map();
-
-  /**
-   * Permanent messages that should never be deleted
-   * Key: chatId
-   * Value: Set of message IDs
-   */
-  static permanentMessagesByChat = new Map();
-
-  /**
-   * Cleanup delay in milliseconds (3 minutes - GROUP BEHAVIOR OVERRIDE)
-   */
-  static CLEANUP_DELAY = 3 * 60 * 1000; // 3 minutes
-
-  /**
-   * Maximum number of messages to track per chat (prevent memory leaks)
-   */
-  static MAX_MESSAGES_PER_CHAT = 50;
+  static CLEANUP_DELAY = 5 * 60 * 1000; // 5 minutes
 
   /**
    * Schedule a message for deletion
@@ -259,180 +239,6 @@ class ChatCleanupService {
     if (before !== after) {
       logger.debug(`Cleanup: removed ${before - after} old scheduled deletions`);
     }
-  }
-
-  /**
-   * Track a bot message for potential cleanup
-   * @param {number|string} chatId - Chat ID
-   * @param {number} messageId - Message ID
-   */
-  static trackBotMessage(chatId, messageId) {
-    if (!chatId || !messageId) {
-      return;
-    }
-
-    // Get or create message set for this chat
-    if (!this.botMessagesByChat.has(chatId)) {
-      this.botMessagesByChat.set(chatId, new Set());
-    }
-
-    const messageSet = this.botMessagesByChat.get(chatId);
-    messageSet.add(messageId);
-
-    // Prevent memory leaks - keep only the most recent messages
-    if (messageSet.size > this.MAX_MESSAGES_PER_CHAT) {
-      const messagesArray = Array.from(messageSet);
-      const toRemove = messagesArray.slice(0, messagesArray.length - this.MAX_MESSAGES_PER_CHAT);
-      toRemove.forEach((id) => messageSet.delete(id));
-
-      logger.debug('Trimmed old tracked messages', {
-        chatId,
-        removed: toRemove.length,
-        remaining: messageSet.size,
-      });
-    }
-
-    logger.debug('Bot message tracked', {
-      chatId,
-      messageId,
-      totalTracked: messageSet.size,
-    });
-  }
-
-  /**
-   * Mark a message as permanent (won't be deleted)
-   * @param {number|string} chatId - Chat ID
-   * @param {number} messageId - Message ID
-   */
-  static markAsPermanent(chatId, messageId) {
-    if (!chatId || !messageId) {
-      return;
-    }
-
-    // Get or create permanent message set for this chat
-    if (!this.permanentMessagesByChat.has(chatId)) {
-      this.permanentMessagesByChat.set(chatId, new Set());
-    }
-
-    const permanentSet = this.permanentMessagesByChat.get(chatId);
-    permanentSet.add(messageId);
-
-    // Remove from regular tracking if present
-    const messageSet = this.botMessagesByChat.get(chatId);
-    if (messageSet) {
-      messageSet.delete(messageId);
-    }
-
-    logger.debug('Message marked as permanent', {
-      chatId,
-      messageId,
-    });
-  }
-
-  /**
-   * Delete all previous bot messages in a chat
-   * @param {Object} telegram - Telegram bot instance
-   * @param {number|string} chatId - Chat ID
-   * @param {number} keepMessageId - Optional message ID to keep (e.g., the current message)
-   * @returns {Promise<number>} Number of messages deleted
-   */
-  static async deleteAllPreviousBotMessages(telegram, chatId, keepMessageId = null) {
-    if (!telegram || !chatId) {
-      return 0;
-    }
-
-    const messageSet = this.botMessagesByChat.get(chatId);
-    if (!messageSet || messageSet.size === 0) {
-      logger.debug('No previous bot messages to delete', { chatId });
-      return 0;
-    }
-
-    // Get permanent messages to exclude from deletion
-    const permanentSet = this.permanentMessagesByChat.get(chatId) || new Set();
-    const messagesToDelete = Array.from(messageSet).filter((id) =>
-      id !== keepMessageId && !permanentSet.has(id)
-    );
-    let deletedCount = 0;
-    const failedDeletes = [];
-
-    // Delete messages sequentially to avoid rate limiting
-    for (const messageId of messagesToDelete) {
-      try {
-        await telegram.deleteMessage(chatId, messageId);
-        messageSet.delete(messageId);
-        deletedCount++;
-
-        logger.debug('Previous bot message deleted', {
-          chatId,
-          messageId,
-        });
-
-        // Small delay to avoid hitting Telegram rate limits
-        await new Promise((resolve) => { setTimeout(resolve, 50); });
-      } catch (error) {
-        // Message might already be deleted or too old
-        if (error.response?.error_code === 400) {
-          // Remove from tracking since it's already gone
-          messageSet.delete(messageId);
-          logger.debug('Message already deleted or not found', { chatId, messageId });
-        } else {
-          logger.debug('Error deleting previous bot message', {
-            chatId,
-            messageId,
-            error: error.message,
-          });
-          failedDeletes.push(messageId);
-        }
-      }
-    }
-
-    // Clean up empty sets
-    if (messageSet.size === 0 || (messageSet.size === 1 && keepMessageId && messageSet.has(keepMessageId))) {
-      this.botMessagesByChat.delete(chatId);
-    }
-
-    logger.info('Previous bot messages cleanup completed', {
-      chatId,
-      deleted: deletedCount,
-      failed: failedDeletes.length,
-      remaining: messageSet?.size || 0,
-    });
-
-    return deletedCount;
-  }
-
-  /**
-   * Clear all tracked bot messages for a chat
-   * @param {number|string} chatId - Chat ID
-   */
-  static clearTrackedMessages(chatId) {
-    if (!chatId) {
-      return;
-    }
-
-    const deleted = this.botMessagesByChat.delete(chatId);
-    if (deleted) {
-      logger.debug('Cleared all tracked messages for chat', { chatId });
-    }
-  }
-
-  /**
-   * Get statistics about tracked bot messages
-   * @returns {Object} Statistics
-   */
-  static getTrackedMessagesStats() {
-    const stats = {
-      totalChats: this.botMessagesByChat.size,
-      totalMessages: 0,
-      byChat: {},
-    };
-
-    for (const [chatId, messageSet] of this.botMessagesByChat.entries()) {
-      stats.totalMessages += messageSet.size;
-      stats.byChat[chatId] = messageSet.size;
-    }
-
-    return stats;
   }
 }
 

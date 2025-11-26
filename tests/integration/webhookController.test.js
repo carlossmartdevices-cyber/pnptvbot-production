@@ -4,11 +4,9 @@ const crypto = require('crypto');
 
 // Mock dependencies
 jest.mock('../../src/bot/services/paymentService');
-jest.mock('../../src/bot/services/daimoService');
 jest.mock('../../src/utils/logger');
 
 const PaymentService = require('../../src/bot/services/paymentService');
-const DaimoService = require('../../src/bot/services/daimoService');
 const webhookController = require('../../src/bot/api/controllers/webhookController');
 
 describe('Webhook Controller Integration Tests', () => {
@@ -16,9 +14,6 @@ describe('Webhook Controller Integration Tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-
-    // Mock signature verification to always return true in tests
-    DaimoService.verifyWebhookSignature = jest.fn().mockReturnValue(true);
 
     // Setup Express app with webhook routes
     app = express();
@@ -199,16 +194,8 @@ describe('Webhook Controller Integration Tests', () => {
 
       it('should reject webhook with invalid metadata structure', async () => {
         const invalidPayload = {
-          id: 'test-123',
-          status: 'payment_completed',
-          source: {
-            payerAddress: '0x123',
-            txHash: 'tx_123',
-          },
-          destination: {
-            toAddress: '0x456',
-            toToken: 'USDC',
-          },
+          transaction_id: 'test-123',
+          status: 'completed',
           metadata: {
             // Missing paymentId, userId, planId
             someOtherField: 'value',
@@ -220,21 +207,13 @@ describe('Webhook Controller Integration Tests', () => {
           .send(invalidPayload);
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toContain('Invalid metadata');
+        expect(response.body.error).toContain('Invalid metadata structure');
       });
 
       it('should reject webhook with missing paymentId in metadata', async () => {
         const invalidPayload = {
-          id: 'test-123',
-          status: 'payment_completed',
-          source: {
-            payerAddress: '0x123',
-            txHash: 'tx_123',
-          },
-          destination: {
-            toAddress: '0x456',
-            toToken: 'USDC',
-          },
+          transaction_id: 'test-123',
+          status: 'completed',
           metadata: {
             userId: 'user-123',
             planId: 'plan-456',
@@ -247,7 +226,7 @@ describe('Webhook Controller Integration Tests', () => {
           .send(invalidPayload);
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toContain('Invalid metadata');
+        expect(response.body.error).toContain('Invalid metadata structure');
       });
 
       it('should accept webhook with all required fields and valid metadata', async () => {
@@ -256,16 +235,9 @@ describe('Webhook Controller Integration Tests', () => {
         });
 
         const validPayload = {
-          id: 'test-123',
-          status: 'payment_completed',
-          source: {
-            payerAddress: '0x123',
-            txHash: 'tx_123',
-          },
-          destination: {
-            toAddress: '0x456',
-            toToken: 'USDC',
-          },
+          transaction_id: 'test-123',
+          status: 'completed',
+          signature: 'test-signature',
           metadata: {
             paymentId: 'payment-123',
             userId: 'user-456',
@@ -291,16 +263,8 @@ describe('Webhook Controller Integration Tests', () => {
         });
 
         const validPayload = {
-          id: 'test-123',
-          status: 'payment_completed',
-          source: {
-            payerAddress: '0x123',
-            txHash: 'tx_123',
-          },
-          destination: {
-            toAddress: '0x456',
-            toToken: 'USDC',
-          },
+          transaction_id: 'test-123',
+          status: 'completed',
           metadata: {
             paymentId: 'payment-123',
             userId: 'user-456',
@@ -325,16 +289,8 @@ describe('Webhook Controller Integration Tests', () => {
         );
 
         const validPayload = {
-          id: 'test-123',
-          status: 'payment_completed',
-          source: {
-            payerAddress: '0x123',
-            txHash: 'tx_123',
-          },
-          destination: {
-            toAddress: '0x456',
-            toToken: 'USDC',
-          },
+          transaction_id: 'test-123',
+          status: 'completed',
           metadata: {
             paymentId: 'payment-123',
             userId: 'user-456',
@@ -361,16 +317,8 @@ describe('Webhook Controller Integration Tests', () => {
         });
 
         const validPayload = {
-          id: 'test-123',
-          status: 'payment_completed',
-          source: {
-            payerAddress: '0x123',
-            txHash: 'tx_123',
-          },
-          destination: {
-            toAddress: '0x456',
-            toToken: 'USDC',
-          },
+          transaction_id: 'test-123',
+          status: 'completed',
           metadata: {
             paymentId: 'payment-123',
             userId: 'user-456',

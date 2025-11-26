@@ -1,311 +1,214 @@
-const UserModel = require('../../models/userModel');
+const { getFirestore, Collections } = require('../config/firebase');
 const logger = require('../../utils/logger');
-const { sanitizeObject, validateSchema, schemas } = require('../../utils/validation');
 
-/**
- * User Service - Business logic for user operations
- */
 class UserService {
+  constructor() {
+    this.db = getFirestore();
+    this.usersCollection = this.db.collection(Collections.USERS);
+  }
+
   /**
-   * Create or get user from Telegram context
-   * @param {Object} ctx - Telegraf context
-   * @returns {Promise<Object>} User data
+   * Create a new user
    */
-  static async getOrCreateFromContext(ctx) {
+  async createUser(userId, userData) {
     try {
-      const { from } = ctx;
-      if (!from) {
-        throw new Error('No user data in context');
-      }
+      const userRef = this.usersCollection.doc(userId.toString());
+      const user = {
+        id: userId,
+        username: userData.username || null,
+        firstName: userData.firstName || null,
+        lastName: userData.lastName || null,
+        language: userData.language || 'en',
+        plan: 'free',
+        subscriptionStatus: 'inactive',
+        planExpiry: null,
+        location: null,
+        bio: null,
+        age: null,
+        termsAccepted: false,
+        onboardingCompleted: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
 
-      let user = await UserModel.getById(from.id);
-
-      if (!user) {
-        // Create new user
-        const userData = {
-          userId: from.id,
-          username: from.username || '',
-          firstName: from.first_name || '',
-          lastName: from.last_name || '',
-          language: from.language_code || 'en',
-          subscriptionStatus: 'free',
-        };
-
-        user = await UserModel.createOrUpdate(userData);
-        logger.info('New user created', { userId: from.id });
-      }
-
+      await userRef.set(user);
+      logger.info(`User created: ${userId}`);
       return user;
     } catch (error) {
-      logger.error('Error getting/creating user:', error);
+      logger.error(`Error creating user ${userId}:`, error);
       throw error;
     }
   }
 
   /**
-   * Update user profile
-   * @param {number|string} userId - User ID
-   * @param {Object} updates - Profile updates
-   * @returns {Promise<Object>} { success, error, data }
+   * Get user by ID
    */
-  static async updateProfile(userId, updates) {
+  async getUser(userId) {
     try {
-      // Sanitize inputs
-      const sanitized = sanitizeObject(updates, ['bio', 'username']);
-
-      // Validate using the partial update schema
-      const { error, value } = validateSchema(
-        sanitized,
-        schemas.userProfileUpdate,
-      );
-
-      if (error) {
-        logger.warn('Profile update validation failed:', error);
-        return { success: false, error, data: null };
+      const userDoc = await this.usersCollection.doc(userId.toString()).get();
+      if (!userDoc.exists) {
+        return null;
       }
-
-      const success = await UserModel.updateProfile(userId, value);
-
-      if (!success) {
-        return { success: false, error: 'Failed to update profile', data: null };
-      }
-
-      const user = await UserModel.getById(userId);
-      return { success: true, error: null, data: user };
+      return { id: userDoc.id, ...userDoc.data() };
     } catch (error) {
-      logger.error('Error in updateProfile service:', error);
-      return { success: false, error: error.message, data: null };
+      logger.error(`Error getting user ${userId}:`, error);
+      throw error;
     }
   }
 
   /**
-   * Update user location
-   * @param {number|string} userId - User ID
-   * @param {Object} location - { lat, lng, address }
-   * @returns {Promise<Object>} { success, error }
+   * Get or create user
    */
-  static async updateLocation(userId, location) {
-    try {
-      const { error } = validateSchema(location, schemas.location);
+  async getOrCreateUser(userId, userData) {
+    let user = await this.getUser(userId);
+    if (!user) {
+      user = await this.createUser(userId, userData);
+    }
+    return user;
+  }
 
-      if (error) {
-        return { success: false, error };
+  /**
+   * Update user data
+   */
+  async updateUser(userId, updates) {
+    try {
+      const userRef = this.usersCollection.doc(userId.toString());
+      await userRef.update({
+        ...updates,
+        updatedAt: new Date(),
+      });
+      logger.info(`User updated: ${userId}`);
+      return await this.getUser(userId);
+    } catch (error) {
+      logger.error(`Error updating user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update user subscription
+   */
+  async updateSubscription(userId, planId, expiryDate) {
+    try {
+      await this.updateUser(userId, {
+        plan: planId,
+        subscriptionStatus: 'active',
+        planExpiry: expiryDate,
+      });
+      logger.info(`Subscription updated for user ${userId}: ${planId}`);
+    } catch (error) {
+      logger.error(`Error updating subscription for user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if user subscription is active
+   */
+  async isSubscriptionActive(userId) {
+    const user = await this.getUser(userId);
+    if (!user || user.subscriptionStatus !== 'active') {
+      return false;
+    }
+    if (user.planExpiry && new Date(user.planExpiry) < new Date()) {
+      await this.updateUser(userId, { subscriptionStatus: 'expired' });
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Get all users (for broadcasting)
+   */
+  async getAllUsers() {
+    try {
+      const snapshot = await this.usersCollection.get();
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      logger.error('Error getting all users:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Search users by username
+   */
+  async searchUserByUsername(username) {
+    try {
+      const snapshot = await this.usersCollection
+        .where('username', '==', username)
+        .limit(1)
+        .get();
+
+      if (snapshot.empty) {
+        return null;
       }
 
-      const success = await UserModel.updateProfile(userId, { location });
-
-      return { success, error: success ? null : 'Failed to update location' };
+      const doc = snapshot.docs[0];
+      return { id: doc.id, ...doc.data() };
     } catch (error) {
-      logger.error('Error updating location:', error);
-      return { success: false, error: error.message };
+      logger.error(`Error searching user by username ${username}:`, error);
+      throw error;
     }
   }
 
   /**
    * Get nearby users
-   * @param {number|string} userId - User ID
-   * @param {number} radiusKm - Search radius in km
-   * @returns {Promise<Array>} Nearby users
    */
-  static async getNearbyUsers(userId, radiusKm = 10) {
+  async getNearbyUsers(lat, lng, radiusKm = 10) {
     try {
-      const user = await UserModel.getById(userId);
+      // Simple bounding box calculation
+      // For production, use geohashing or GeoFirestore
+      const latDelta = radiusKm / 111.32; // 1 degree latitude ≈ 111.32 km
+      const lngDelta = radiusKm / (111.32 * Math.cos(lat * Math.PI / 180));
 
-      if (!user || !user.location) {
-        return [];
-      }
+      const snapshot = await this.usersCollection
+        .where('location.lat', '>=', lat - latDelta)
+        .where('location.lat', '<=', lat + latDelta)
+        .get();
 
-      const nearby = await UserModel.getNearby(user.location, radiusKm);
+      const nearbyUsers = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(user => {
+          if (!user.location) return false;
+          const userLng = user.location.lng;
+          return userLng >= lng - lngDelta && userLng <= lng + lngDelta;
+        });
 
-      // Filter out the requesting user
-      return nearby.filter((u) => u.id !== userId.toString());
+      return nearbyUsers;
     } catch (error) {
       logger.error('Error getting nearby users:', error);
-      return [];
+      throw error;
     }
-  }
-
-  /**
-   * Check if user has active subscription
-   * @param {number|string} userId - User ID
-   * @returns {Promise<boolean>} Subscription status
-   */
-  static async hasActiveSubscription(userId) {
-    try {
-      const user = await UserModel.getById(userId);
-
-      if (!user) return false;
-
-      if (user.subscriptionStatus !== 'active') return false;
-
-      // Check if subscription is expired
-      if (user.planExpiry) {
-        const expiry = user.planExpiry.toDate ? user.planExpiry.toDate() : new Date(user.planExpiry);
-        if (expiry < new Date()) {
-          // Subscription expired, update status
-          await UserModel.updateSubscription(userId, {
-            status: 'expired',
-            planId: user.planId,
-            expiry: user.planExpiry,
-          });
-          return false;
-        }
-      }
-
-      return true;
-    } catch (error) {
-      logger.error('Error checking subscription:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Check if user is admin
-   * @param {number|string} userId - User ID
-   * @returns {boolean} Admin status
-   */
-  static isAdmin(userId) {
-    const adminIds = process.env.ADMIN_USER_IDS?.split(',').map((id) => id.trim()) || [];
-    return adminIds.includes(userId.toString());
   }
 
   /**
    * Get user statistics
-   * @returns {Promise<Object>} User stats
    */
-  static async getStatistics() {
+  async getUserStats() {
     try {
-      const [activeUsers, freeUsers] = await Promise.all([
-        UserModel.getBySubscriptionStatus('active'),
-        UserModel.getBySubscriptionStatus('free'),
-      ]);
+      const allUsers = await this.getAllUsers();
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-      const total = activeUsers.length + freeUsers.length;
-
-      return {
-        total,
-        active: activeUsers.length,
-        free: freeUsers.length,
-        conversionRate: total > 0 ? (activeUsers.length / total) * 100 : 0,
+      const stats = {
+        totalUsers: allUsers.length,
+        activeSubscriptions: allUsers.filter(u => u.subscriptionStatus === 'active').length,
+        newUsersLast30Days: allUsers.filter(u => new Date(u.createdAt) >= thirtyDaysAgo).length,
+        byPlan: {},
       };
+
+      allUsers.forEach(user => {
+        const plan = user.plan || 'free';
+        stats.byPlan[plan] = (stats.byPlan[plan] || 0) + 1;
+      });
+
+      return stats;
     } catch (error) {
-      logger.error('Error getting user statistics:', error);
-      return {
-        total: 0, active: 0, free: 0, conversionRate: 0,
-      };
-    }
-  }
-
-  /**
-   * Process expired subscriptions
-   * @returns {Promise<number>} Number of processed subscriptions
-   */
-  static async processExpiredSubscriptions() {
-    try {
-      const { Telegraf } = require('telegraf');
-      const PlanModel = require('../../models/planModel');
-      const EmailService = require('../../services/emailService');
-      const bot = new Telegraf(process.env.BOT_TOKEN);
-      const primeChannels = (process.env.PRIME_CHANNEL_ID || '').split(',').map(id => id.trim()).filter(id => id);
-
-      const expiredUsers = await UserModel.getExpiredSubscriptions();
-
-      for (const user of expiredUsers) {
-        try {
-          // Update subscription status to expired
-          await UserModel.updateSubscription(user.id, {
-            status: 'expired',
-            planId: user.plan_id,
-            expiry: user.plan_expiry,
-          });
-
-          logger.info('Subscription expired', { userId: user.id });
-
-          // Get plan name for messages
-          const plan = await PlanModel.getById(user.plan_id);
-          const planName = plan?.display_name || plan?.name || 'PRIME';
-
-          // Remove user from PRIME channels
-          for (const channelId of primeChannels) {
-            try {
-              await bot.telegram.banChatMember(channelId, user.id);
-              // Immediately unban so they can rejoin if they resubscribe
-              await bot.telegram.unbanChatMember(channelId, user.id);
-              logger.info('User removed from PRIME channel', { userId: user.id, channelId });
-            } catch (channelErr) {
-              logger.error('Error removing user from PRIME channel:', {
-                userId: user.id,
-                channelId,
-                error: channelErr.message
-              });
-            }
-          }
-
-          // Send farewell message via bot
-          try {
-            const farewellMessage = [
-              '💔 *Te vamos a extrañar*',
-              '',
-              `Hola ${user.first_name || 'Usuario'},`,
-              '',
-              `Tu suscripción *${planName}* ha expirado y has sido removido de los canales PRIME.`,
-              '',
-              '❌ *Has perdido acceso a:*',
-              '• Canales exclusivos PRIME',
-              '• Contenido premium sin publicidad',
-              '• Salas Zoom ilimitadas',
-              '• Transmisiones en vivo exclusivas',
-              '• Soporte prioritario',
-              '',
-              '🎁 *¡Vuelve a PRIME!*',
-              'Renueva hoy y recupera todos tus beneficios inmediatamente. Te estamos esperando.',
-              '',
-              '👉 Siempre serás bienvenido de vuelta. La familia PNPtv te extraña.'
-            ].join('\n');
-
-            await bot.telegram.sendMessage(user.id, farewellMessage, {
-              parse_mode: 'Markdown',
-              reply_markup: {
-                inline_keyboard: [[
-                  {
-                    text: '💎 Volver a PRIME',
-                    url: `${process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store'}/subscription/plans`
-                  }
-                ]]
-              }
-            });
-
-            logger.info('Sent farewell bot message', { userId: user.id });
-          } catch (botErr) {
-            logger.error('Error sending farewell bot message:', { userId: user.id, error: botErr.message });
-          }
-
-          // Send farewell email if user has email
-          if (user.email) {
-            try {
-              await EmailService.sendSubscriptionExpired({
-                email: user.email,
-                name: user.first_name || 'Usuario',
-                planName,
-                renewUrl: `${process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store'}/subscription/plans`
-              });
-
-              logger.info('Sent farewell email', { userId: user.id, email: user.email });
-            } catch (emailErr) {
-              logger.error('Error sending farewell email:', { userId: user.id, error: emailErr.message });
-            }
-          }
-        } catch (userErr) {
-          logger.error('Error processing expired user:', { userId: user.id, error: userErr.message });
-        }
-      }
-
-      return expiredUsers.length;
-    } catch (error) {
-      logger.error('Error processing expired subscriptions:', error);
-      return 0;
+      logger.error('Error getting user stats:', error);
+      throw error;
     }
   }
 }
 
-module.exports = UserService;
+module.exports = new UserService();

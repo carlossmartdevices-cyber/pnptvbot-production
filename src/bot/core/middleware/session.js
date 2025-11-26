@@ -1,101 +1,88 @@
-const { cache } = require('../../../config/redis');
+const { getFirestore, Collections } = require('../../config/firebase');
 const logger = require('../../../utils/logger');
 
 /**
- * Session middleware for Telegraf
- * Uses Redis for session storage, falls back to in-memory
+ * Simple session middleware using Firestore
  */
-
-// In-memory session fallback
-const memoryStore = new Map();
-
-/**
- * Get session key for user
- * @param {Object} ctx - Telegraf context
- * @returns {string} Session key
- */
-const getSessionKey = (ctx) => {
-  const userId = ctx.from?.id || ctx.chat?.id;
-  return `session:${userId}`;
-};
-
-/**
- * Session middleware
- * @returns {Function} Middleware function
- */
-const sessionMiddleware = () => async (ctx, next) => {
-  const sessionKey = getSessionKey(ctx);
-
-  try {
-    // Try to load session from Redis, fallback to memory
-    let session;
-    try {
-      session = await cache.get(sessionKey);
-    } catch (redisError) {
-      logger.warn('Redis unavailable, using in-memory session:', redisError.message);
-      session = memoryStore.get(sessionKey);
-    }
-
-    if (!session) {
-      session = {
-        language: ctx.from?.language_code || 'en',
-        userId: ctx.from?.id,
-        temp: {}, // Temporary data for multi-step flows
-      };
-    }
-
-    // Attach session to context
-    ctx.session = session;
-
-    // Save session method
-    ctx.saveSession = async () => {
-      try {
-        const ttl = parseInt(process.env.SESSION_TTL || '86400', 10);
-        try {
-          await cache.set(sessionKey, ctx.session, ttl);
-        } catch (_redisError) {
-          // Fallback to in-memory storage
-          memoryStore.set(sessionKey, ctx.session);
-        }
-      } catch (error) {
-        logger.error('Error saving session:', error);
-      }
-    };
-
-    // Clear session method
-    ctx.clearSession = async () => {
-      try {
-        try {
-          await cache.del(sessionKey);
-        } catch (_redisError) {
-          memoryStore.delete(sessionKey);
-        }
-        ctx.session = {
-          language: ctx.from?.language_code || 'en',
-          userId: ctx.from?.id,
-          temp: {},
-        };
-      } catch (error) {
-        logger.error('Error clearing session:', error);
-      }
-    };
-
-    // Use try-finally to ensure session is always saved
-    try {
-      // Execute next middleware
-      await next();
-    } finally {
-      // Auto-save session after processing (always executes)
-      try {
-        await ctx.saveSession();
-      } catch (saveError) {
-        logger.error('Failed to save session after middleware:', saveError);
-      }
-    }
-  } catch (error) {
-    logger.error('Session middleware error:', error);
-    throw error;
+class SessionMiddleware {
+  constructor() {
+    this.db = getFirestore();
+    this.sessionsCollection = this.db.collection('sessions');
   }
-};
 
-module.exports = sessionMiddleware;
+  /**
+   * Get session for user
+   */
+  async getSession(userId) {
+    try {
+      const sessionDoc = await this.sessionsCollection.doc(userId.toString()).get();
+      if (!sessionDoc.exists) {
+        return {};
+      }
+      return sessionDoc.data();
+    } catch (error) {
+      logger.error(`Error getting session for user ${userId}:`, error);
+      return {};
+    }
+  }
+
+  /**
+   * Update session for user
+   */
+  async updateSession(userId, data) {
+    try {
+      await this.sessionsCollection.doc(userId.toString()).set(
+        {
+          ...data,
+          updatedAt: new Date(),
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      logger.error(`Error updating session for user ${userId}:`, error);
+    }
+  }
+
+  /**
+   * Clear session for user
+   */
+  async clearSession(userId) {
+    try {
+      await this.sessionsCollection.doc(userId.toString()).delete();
+    } catch (error) {
+      logger.error(`Error clearing session for user ${userId}:`, error);
+    }
+  }
+
+  /**
+   * Middleware function
+   */
+  middleware() {
+    return async (ctx, next) => {
+      const userId = ctx.from?.id;
+
+      if (!userId) {
+        return next();
+      }
+
+      // Load session
+      ctx.session = await this.getSession(userId);
+
+      // Helper to save session
+      ctx.saveSession = async (data) => {
+        ctx.session = { ...ctx.session, ...data };
+        await this.updateSession(userId, ctx.session);
+      };
+
+      // Helper to clear session
+      ctx.clearSession = async () => {
+        ctx.session = {};
+        await this.clearSession(userId);
+      };
+
+      return next();
+    };
+  }
+}
+
+module.exports = new SessionMiddleware();

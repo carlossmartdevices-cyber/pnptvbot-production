@@ -1,5 +1,5 @@
 const CallModel = require('../../../models/callModel');
-const { query } = require('../../../config/postgres');
+const { getFirestore } = require('../../../config/firebase');
 const logger = require('../../../utils/logger');
 
 /**
@@ -208,6 +208,8 @@ function registerCallFeedbackHandlers(bot) {
    */
   async function submitFeedback(callId, userId, rating, comment) {
     try {
+      const db = getFirestore();
+
       // Update call with feedback
       await CallModel.updateStatus(callId, 'completed', {
         feedbackSubmitted: true,
@@ -216,12 +218,14 @@ function registerCallFeedbackHandlers(bot) {
         feedbackSubmittedAt: new Date(),
       });
 
-      // Store feedback in separate table for analytics
-      await query(
-        `INSERT INTO call_feedback (call_id, user_id, rating, comment, created_at)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [callId, String(userId), rating, comment || null, new Date()]
-      );
+      // Store feedback in separate collection for analytics
+      await db.collection('callFeedback').add({
+        callId,
+        userId: userId.toString(),
+        rating,
+        comment,
+        createdAt: new Date(),
+      });
 
       logger.info('Feedback saved to database', {
         callId,

@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
-const { query } = require('../config/postgres');
+const { getFirestore } = require('../config/firebase');
 const logger = require('../utils/logger');
 
 const COLLECTION = 'payments';
@@ -15,7 +15,10 @@ class PaymentModel {
    */
   static async create(paymentData) {
     try {
+      const db = getFirestore();
       const paymentId = paymentData.paymentId || uuidv4();
+      const paymentRef = db.collection(COLLECTION).doc(paymentId);
+
       const data = {
         ...paymentData,
         status: 'pending',
@@ -60,11 +63,14 @@ class PaymentModel {
    */
   static async getById(paymentId) {
     try {
-      const result = await query('SELECT * FROM payments WHERE id = $1', [paymentId]);
-      if (result.rows.length === 0) {
+      const db = getFirestore();
+      const doc = await db.collection(COLLECTION).doc(paymentId).get();
+
+      if (!doc.exists) {
         return null;
       }
-      return result.rows[0];
+
+      return { id: doc.id, ...doc.data() };
     } catch (error) {
       logger.error('Error getting payment:', error);
       return null;
@@ -86,10 +92,7 @@ class PaymentModel {
         completedAt: 'completed_at',
         completedBy: 'completed_by',
         manualCompletion: 'manual_completion',
-        expiresAt: 'expires_at',
-        epaycoRef: 'reference',
-        paymentReference: 'reference',
-        daimoEventId: 'reference'
+        expiresAt: 'expires_at'
       };
 
       const fields = Object.keys(metadata).map(key => fieldMap[key] || key);
@@ -97,7 +100,7 @@ class PaymentModel {
       let setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
       setClause = `status = $1${setClause ? ', ' + setClause : ''}, updated_at = $${fields.length + 2}`;
       await query(`UPDATE payments SET ${setClause} WHERE id = $${fields.length + 3}`, [status, ...values, new Date(), paymentId]);
-      logger.info('Payment status updated', { paymentId, status, metadata });
+      logger.info('Payment status updated', { paymentId, status });
       return true;
     } catch (error) {
       logger.error('Error updating payment status:', error);

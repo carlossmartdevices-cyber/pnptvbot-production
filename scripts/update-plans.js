@@ -18,79 +18,83 @@ const updatePlans = async () => {
       throw new Error('Failed to connect to PostgreSQL');
     }
 
-    // New PNPtv subscription plans (updated to match database schema)
+    // New PNPtv subscription plans
     const newPlans = [
       {
-        id: 'trial-week',
+        id: 'trial_week',
+        sku: 'EASYBOT-PNP-7D',
         name: 'Trial Week',
-        displayName: 'Trial Week',
-        tier: 'Basic',
+        nameEs: 'Semana de Prueba',
         price: 14.99,
         currency: 'USD',
         duration: 7,
-        durationDays: 7,
-        description: 'Try premium features for one week',
         features: [
           'Premium channel access',
           'Access to Nearby Members feature',
           'Zoom meeting access: 1 per week'
         ],
-        icon: '🎯',
+        featuresEs: [
+          'Acceso a canales premium',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 1 por semana'
+        ],
         active: true,
-        recommended: false,
-        isLifetime: false,
       },
       {
-        id: 'pnp-member',
+        id: 'pnp_member',
+        sku: 'EASYBOT-PNP-30D',
         name: 'PNP Member',
-        displayName: 'PNP Member',
-        tier: 'PNP',
+        nameEs: 'Miembro PNP',
         price: 24.99,
         currency: 'USD',
         duration: 30,
-        durationDays: 30,
-        description: 'Full access to all premium features',
+        features: [
           'Premium channel access',
           'Basic support',
           'Access to Nearby Members feature',
           'Zoom meeting access: 3 per month'
         ],
-        icon: '⭐',
+        featuresEs: [
+          'Acceso a canales premium',
+          'Soporte básico',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 3 por mes'
+        ],
         active: true,
-        recommended: true,
-        isLifetime: false,
       },
       {
-        id: 'crystal-member',
+        id: 'crystal_member',
+        sku: 'EASYBOT-PNP-120D',
         name: 'Crystal Member',
-        displayName: 'Crystal Member',
-        tier: 'Crystal',
+        nameEs: 'Miembro Crystal',
         price: 49.99,
         currency: 'USD',
         duration: 120,
-        durationDays: 120,
-        description: 'Extended membership with exclusive benefits',
+        features: [
           'All premium features',
           'Video calls',
           'Priority support',
           'Access to Nearby Members feature',
           'Zoom meeting access: 5 per month'
         ],
-        icon: '💎',
+        featuresEs: [
+          'Todas las características premium',
+          'Llamadas de video',
+          'Soporte prioritario',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 5 por mes'
+        ],
         active: true,
-        recommended: false,
-        isLifetime: false,
       },
       {
-        id: 'diamond-member',
+        id: 'diamond_member',
+        sku: 'EASYBOT-PNP-365D',
         name: 'Diamond Member',
-        displayName: 'Diamond Member',
-        tier: 'Diamond',
+        nameEs: 'Miembro Diamond',
         price: 99.99,
         currency: 'USD',
         duration: 365,
-        durationDays: 365,
-        description: 'Annual membership with VIP benefits',
+        features: [
           'All premium features',
           'Video calls',
           'VIP access',
@@ -99,21 +103,26 @@ const updatePlans = async () => {
           'Access to Nearby Members feature',
           'Zoom meeting access: 5 per month'
         ],
-        icon: '👑',
+        featuresEs: [
+          'Todas las características premium',
+          'Llamadas de video',
+          'Acceso VIP',
+          'Soporte prioritario',
+          'Contenido exclusivo',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 5 por mes'
+        ],
         active: true,
-        recommended: false,
-        isLifetime: false,
       },
       {
-        id: 'lifetime-pass',
+        id: 'lifetime_pass',
+        sku: 'EASYBOT-PNP-LIFE',
         name: 'Lifetime Pass',
-        displayName: 'Lifetime Pass',
-        tier: 'Premium',
+        nameEs: 'Pase de por Vida',
         price: 249.99,
         currency: 'USD',
         duration: 36500, // 100 years as "lifetime"
-        durationDays: 36500,
-        description: 'One-time payment for lifetime access',
+        features: [
           'All premium features',
           'Video calls',
           'VIP access',
@@ -124,10 +133,18 @@ const updatePlans = async () => {
           'Zoom meeting access: 5 per month',
           'Exclusive: Live streaming with Santino'
         ],
-        icon: '♾️',
+        featuresEs: [
+          'Todas las características premium',
+          'Llamadas de video',
+          'Acceso VIP',
+          'Soporte prioritario',
+          'Contenido exclusivo',
+          'Acceso de por vida',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 5 por mes',
+          'Exclusivo: Transmisión en vivo con Santino'
+        ],
         active: true,
-        recommended: false,
-        isLifetime: true,
       },
     ];
 
@@ -138,7 +155,8 @@ const updatePlans = async () => {
     // Create new plans
     logger.info('Creating new plans...');
     for (const plan of newPlans) {
-      logger.info(`✓ Plan created: ${plan.name} - Tier: ${plan.tier} - $${plan.price} (${plan.duration} days)`);
+      await Plan.createOrUpdate(plan.id, plan);
+      logger.info(`✓ Plan created: ${plan.name} - SKU: ${plan.sku} - $${plan.price} (${plan.duration} days)`);
     }
 
     logger.info('✓ Subscription plans updated successfully');
