@@ -1,4 +1,4 @@
-require('dotenv-safe').config();
+require('dotenv-safe').config({ allowEmptyValues: true });
 const cron = require('node-cron');
 const { initializeRedis } = require('../src/config/redis');
 const SubscriptionReminderService = require('../src/bot/services/subscriptionReminderService');
