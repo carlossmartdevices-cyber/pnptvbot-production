@@ -43,9 +43,10 @@ A comprehensive, easy-to-use moderation system for the PNPtv Telegram bot.
 - Exempts admins and PRIME members
 
 #### Profanity Filter
-- Disabled by default (adult community)
-- Easy to enable with custom blacklist
-- Auto-warns violators
+- Enabled to block illegal activity terms
+- Allows adult language but bans words related to illegal activities (zoophilia, pedophilia, etc.)
+- Custom blacklist for zero-tolerance terms
+- Auto-warns violators and deletes messages
 
 ### ✅ Username Enforcement
 - Validates usernames against moderation rules:
@@ -94,7 +95,7 @@ FILTERS: {
   SPAM: { enabled: true, ... },
   FLOOD: { enabled: true, ... },
   LINKS: { enabled: true, allowedDomains: [...], ... },
-  PROFANITY: { enabled: false, blacklist: [...], ... },
+  PROFANITY: { enabled: true, blacklist: [illegal activity terms], ... },
   USERNAME: { enabled: true, blacklist: [...], ... },
 }
 ```
