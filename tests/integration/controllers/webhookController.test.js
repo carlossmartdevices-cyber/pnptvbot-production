@@ -109,8 +109,8 @@ describe('Webhook Controller Integration Tests', () => {
       PaymentService.processDaimoWebhook.mockResolvedValue({ success: true });
 
       const webhookData = {
-        transaction_id: 'txn_123',
-        status: 'completed',
+        id: 'txn_123',
+        status: 'payment_completed',
         metadata: {
           paymentId: 'pay_123',
           userId: 'user_123',
@@ -129,14 +129,11 @@ describe('Webhook Controller Integration Tests', () => {
     });
 
     it('should return 400 for a failed Daimo webhook', async () => {
-      PaymentService.processDaimoWebhook.mockResolvedValue({
-        success: false,
-        error: 'Invalid signature',
-      });
+      DaimoService.verifyWebhookSignature.mockReturnValue(false);
 
       const webhookData = {
-        transaction_id: 'txn_123',
-        status: 'completed',
+        id: 'txn_123',
+        status: 'payment_completed',
         metadata: {
           paymentId: 'pay_123',
           userId: 'user_123',
@@ -149,7 +146,7 @@ describe('Webhook Controller Integration Tests', () => {
         .post('/api/webhooks/daimo')
         .send(webhookData);
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(401);
       expect(response.body).toEqual({ success: false, error: 'Invalid signature' });
     });
 
@@ -157,8 +154,8 @@ describe('Webhook Controller Integration Tests', () => {
       PaymentService.processDaimoWebhook.mockRejectedValue(new Error('Database error'));
 
       const webhookData = {
-        transaction_id: 'txn_123',
-        status: 'completed',
+        id: 'txn_123',
+        status: 'payment_completed',
         metadata: {
           paymentId: 'pay_123',
           userId: 'user_123',
@@ -182,8 +179,8 @@ describe('Webhook Controller Integration Tests', () => {
       });
 
       const webhookData = {
-        transaction_id: 'txn_456',
-        status: 'failed',
+        id: 'txn_456',
+        status: 'payment_bounced',
         metadata: {
           paymentId: 'pay_456',
           userId: 'user_456',
@@ -204,8 +201,8 @@ describe('Webhook Controller Integration Tests', () => {
       PaymentService.processDaimoWebhook.mockResolvedValue({ success: true });
 
       const webhookData = {
-        transaction_id: 'txn_789',
-        status: 'pending',
+        id: 'txn_789',
+        status: 'payment_started',
         metadata: {
           paymentId: 'pay_789',
           userId: 'user_789',

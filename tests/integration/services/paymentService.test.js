@@ -88,8 +88,10 @@ describe('PaymentService Integration Tests', () => {
       // Mock PaymentModel.updateStatus
       PaymentModel.updateStatus.mockResolvedValue(true);
 
-      // Set environment variables
+      // Set environment variables - need treasury address for Daimo
       process.env.DAIMO_API_KEY = 'test_api_key';
+      process.env.DAIMO_TREASURY_ADDRESS = '0xcaf17dbbccc0e9ac87dad1af1f2fe3ba3a4d0613';
+      process.env.DAIMO_REFUND_ADDRESS = '0xcaf17dbbccc0e9ac87dad1af1f2fe3ba3a4d0613';
       process.env.BOT_WEBHOOK_DOMAIN = 'https://example.com';
 
       const result = await PaymentService.createPayment({

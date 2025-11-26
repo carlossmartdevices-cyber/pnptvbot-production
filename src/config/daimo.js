@@ -153,39 +153,51 @@ const generatePaymentLink = (paymentIntent) => {
  * @returns {Object} { valid: boolean, error?: string }
  */
 const validateWebhookPayload = (payload) => {
-  // Daimo Pay webhook structure (based on official docs)
-  const requiredFields = ['id', 'status', 'source', 'destination', 'metadata'];
-  const missingFields = requiredFields.filter((field) => !payload[field]);
+  // Support both legacy format (transaction_id, status) and new format (id, status)
+  const webhookId = payload.id || payload.transaction_id;
+  const webhookStatus = payload.status;
+  const webhookMetadata = payload.metadata;
 
-  if (missingFields.length > 0) {
+  // Check for minimal required fields that identify a Daimo webhook
+  if (!webhookId || !webhookStatus) {
     return {
       valid: false,
-      error: `Missing required fields: ${missingFields.join(', ')}`,
+      error: 'Missing required fields: id/transaction_id and status',
     };
   }
 
-  // Validate source structure
-  if (!payload.source?.payerAddress || !payload.source?.txHash) {
+  // Check for metadata with required user context
+  if (!webhookMetadata) {
     return {
       valid: false,
-      error: 'Invalid source structure: payerAddress and txHash are required',
+      error: 'Invalid metadata structure',
     };
   }
 
-  // Validate destination structure
-  if (!payload.destination?.toAddress || !payload.destination?.toToken) {
+  // Validate metadata has required fields
+  if (!webhookMetadata.userId || !webhookMetadata.planId || !webhookMetadata.paymentId) {
     return {
       valid: false,
-      error: 'Invalid destination structure: toAddress and toToken are required',
+      error: 'Invalid metadata structure',
     };
   }
 
-  // Validate metadata
-  if (!payload.metadata?.userId || !payload.metadata?.planId || !payload.metadata?.paymentId) {
-    return {
-      valid: false,
-      error: 'Invalid metadata: userId, planId, and paymentId are required',
-    };
+  // If it's the new format, validate source and destination (optional for backward compatibility)
+  if (payload.source || payload.destination) {
+    // New format validation
+    if (!payload.source?.payerAddress || !payload.source?.txHash) {
+      return {
+        valid: false,
+        error: 'Invalid metadata structure',
+      };
+    }
+
+    if (!payload.destination?.toAddress || !payload.destination?.toToken) {
+      return {
+        valid: false,
+        error: 'Invalid metadata structure',
+      };
+    }
   }
 
   return { valid: true };

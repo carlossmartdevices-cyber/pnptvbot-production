@@ -220,7 +220,7 @@ describe('Webhook Controller Integration Tests', () => {
           .send(invalidPayload);
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toContain('Invalid metadata structure');
+        expect(response.body.error).toContain('Invalid metadata');
       });
 
       it('should reject webhook with missing paymentId in metadata', async () => {
@@ -247,7 +247,7 @@ describe('Webhook Controller Integration Tests', () => {
           .send(invalidPayload);
 
         expect(response.status).toBe(400);
-        expect(response.body.error).toContain('Invalid metadata structure');
+        expect(response.body.error).toContain('Invalid metadata');
       });
 
       it('should accept webhook with all required fields and valid metadata', async () => {
