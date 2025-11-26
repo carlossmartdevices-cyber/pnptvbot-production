@@ -10,7 +10,6 @@ const logger = require('../../utils/logger');
 // Controllers
 const webhookController = require('./controllers/webhookController');
 const subscriptionController = require('./controllers/subscriptionController');
-const paymentController = require('./controllers/paymentController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -43,21 +42,6 @@ app.get('/promo', (req, res) => {
 
 app.get('/pnptv-hot-sale', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
-});
-
-// Payment checkout page with language support
-app.get('/payment/:paymentId', (req, res) => {
-  // Get language from query parameter (e.g., ?lang=en)
-  const lang = req.query.lang || 'es'; // Default to Spanish
-
-  let fileName;
-  if (lang === 'en') {
-    fileName = 'payment-checkout-en.html';
-  } else {
-    fileName = 'payment-checkout-es.html';
-  }
-
-  res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
 
 // Function to conditionally apply middleware (skip for Telegram webhook)
@@ -142,9 +126,6 @@ app.get('/health', async (req, res) => {
 app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
 app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
 app.get('/api/payment-response', webhookController.handlePaymentResponse);
-
-// Payment API routes
-app.get('/api/payment/:paymentId', asyncHandler(paymentController.getPaymentInfo));
 
 // Stats endpoint
 app.get('/api/stats', asyncHandler(async (req, res) => {

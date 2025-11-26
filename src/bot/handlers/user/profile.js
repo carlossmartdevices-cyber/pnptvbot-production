@@ -1,19 +1,118 @@
-const { requirePrivateChat } = require('../../utils/notifications');
-const { getBackButton } = require('../../utils/menus');
-const userService = require('../../services/userService');
-const i18n = require('../../utils/i18n');
+const { Markup } = require('telegraf');
+const moment = require('moment');
+const UserService = require('../../services/userService');
+const UserModel = require('../../../models/userModel');
+const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
+const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
 /**
- * Handle profile command
+ * Profile handlers
+ * @param {Telegraf} bot - Bot instance
  */
 const registerProfileHandlers = (bot) => {
-  // Show profile
+  // Show own profile
   bot.action('show_profile', async (ctx) => {
     try {
-      await showProfile(ctx, true);
+      await showProfile(ctx, ctx.from.id, true, true);
     } catch (error) {
       logger.error('Error showing profile:', error);
+    }
+  });
+
+  // Show privacy settings
+  bot.action('privacy_settings', async (ctx) => {
+    try {
+      await showPrivacySettings(ctx);
+    } catch (error) {
+      logger.error('Error showing privacy settings:', error);
+    }
+  });
+
+  // Toggle privacy settings
+  bot.action(/^privacy_toggle_(.+)$/, async (ctx) => {
+    try {
+      const setting = ctx.match[1];
+      await togglePrivacySetting(ctx, setting);
+    } catch (error) {
+      logger.error('Error toggling privacy setting:', error);
+    }
+  });
+
+  // Show favorites
+  bot.action('show_favorites', async (ctx) => {
+    try {
+      await showFavorites(ctx);
+    } catch (error) {
+      logger.error('Error showing favorites:', error);
+    }
+  });
+
+  // Show blocked users
+  bot.action('show_blocked', async (ctx) => {
+    try {
+      await showBlockedUsers(ctx);
+    } catch (error) {
+      logger.error('Error showing blocked users:', error);
+    }
+  });
+
+  // View user profile
+  bot.action(/^view_user_(\d+)$/, async (ctx) => {
+    try {
+      const targetUserId = ctx.match[1];
+      await showProfile(ctx, targetUserId, true, false);
+    } catch (error) {
+      logger.error('Error viewing user profile:', error);
+    }
+  });
+
+  // Add to favorites
+  bot.action(/^add_favorite_(\d+)$/, async (ctx) => {
+    try {
+      const targetUserId = ctx.match[1];
+      await addToFavorites(ctx, targetUserId);
+    } catch (error) {
+      logger.error('Error adding to favorites:', error);
+    }
+  });
+
+  // Remove from favorites
+  bot.action(/^remove_favorite_(\d+)$/, async (ctx) => {
+    try {
+      const targetUserId = ctx.match[1];
+      await removeFromFavorites(ctx, targetUserId);
+    } catch (error) {
+      logger.error('Error removing from favorites:', error);
+    }
+  });
+
+  // Block user
+  bot.action(/^block_user_(\d+)$/, async (ctx) => {
+    try {
+      const targetUserId = ctx.match[1];
+      await blockUser(ctx, targetUserId);
+    } catch (error) {
+      logger.error('Error blocking user:', error);
+    }
+  });
+
+  // Unblock user
+  bot.action(/^unblock_user_(\d+)$/, async (ctx) => {
+    try {
+      const targetUserId = ctx.match[1];
+      await unblockUser(ctx, targetUserId);
+    } catch (error) {
+      logger.error('Error unblocking user:', error);
+    }
+  });
+
+  // Share profile
+  bot.action('share_profile', async (ctx) => {
+    try {
+      await shareProfile(ctx);
+    } catch (error) {
+      logger.error('Error sharing profile:', error);
     }
   });
 
@@ -48,11 +147,15 @@ const registerProfileHandlers = (bot) => {
       ctx.session.temp.waitingForLocation = true;
       await ctx.saveSession();
 
-      await ctx.editMessageText(
+      await ctx.answerCbQuery();
+
+      // Send new message with location request keyboard
+      await ctx.reply(
         t('sendLocation', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('back', lang), 'show_profile')],
-        ]),
+        Markup.keyboard([
+          [Markup.button.locationRequest(lang === 'es' ? '📍 Compartir Ubicación' : '📍 Share Location')],
+          [lang === 'es' ? '❌ Cancelar' : '❌ Cancel'],
+        ]).resize(),
       );
     } catch (error) {
       logger.error('Error in edit location:', error);
@@ -71,81 +174,19 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
-  // Social Media Handlers
-  bot.action('edit_social', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      await showSocialMediaMenu(ctx, lang);
-    } catch (error) {
-      logger.error('Error showing social media menu:', error);
-    }
-  });
-
-  bot.action('edit_tiktok', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      ctx.session.temp.waitingForTikTok = true;
-      await ctx.saveSession();
-      await ctx.editMessageText(
-        lang === 'es'
-          ? '📱 Envía tu nombre de usuario de TikTok (sin @) o "borrar" para eliminar.\nEjemplo: miperfil'
-          : '📱 Send your TikTok username (without @) or "delete" to remove.\nExample: myprofile'
-      );
-    } catch (error) {
-      logger.error('Error in edit tiktok:', error);
-    }
-  });
-
-  bot.action('edit_twitter', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      ctx.session.temp.waitingForTwitter = true;
-      await ctx.saveSession();
-      await ctx.editMessageText(
-        lang === 'es'
-          ? '🐦 Envía tu nombre de usuario de X/Twitter (sin @) o "borrar" para eliminar.\nEjemplo: miperfil'
-          : '🐦 Send your X/Twitter username (without @) or "delete" to remove.\nExample: myprofile'
-      );
-    } catch (error) {
-      logger.error('Error in edit twitter:', error);
-    }
-  });
-
-  bot.action('edit_facebook', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      ctx.session.temp.waitingForFacebook = true;
-      await ctx.saveSession();
-      await ctx.editMessageText(
-        lang === 'es'
-          ? '📘 Envía tu nombre de usuario de Facebook o "borrar" para eliminar.\nEjemplo: miperfil'
-          : '📘 Send your Facebook username or "delete" to remove.\nExample: myprofile'
-      );
-    } catch (error) {
-      logger.error('Error in edit facebook:', error);
-    }
-  });
-
-  bot.action('edit_instagram', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      ctx.session.temp.waitingForInstagram = true;
-      await ctx.saveSession();
-      await ctx.editMessageText(
-        lang === 'es'
-          ? '📷 Envía tu nombre de usuario de Instagram (sin @) o "borrar" para eliminar.\nEjemplo: miperfil'
-          : '📷 Send your Instagram username (without @) or "delete" to remove.\nExample: myprofile'
-      );
-    } catch (error) {
-      logger.error('Error in edit instagram:', error);
-    }
-  });
-
   // Handle photo upload
   bot.on('photo', async (ctx, next) => {
     if (ctx.session.temp?.waitingForPhoto) {
       try {
         const lang = getLanguage(ctx);
+
+        // Validate photo exists
+        if (!ctx.message?.photo || ctx.message.photo.length === 0) {
+          logger.warn('Photo handler triggered but no photo found');
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
+
         const photo = ctx.message.photo[ctx.message.photo.length - 1];
 
         await UserService.updateProfile(ctx.from.id, {
@@ -156,7 +197,7 @@ const registerProfileHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(t('photoUpdated', lang));
-        await showProfile(ctx, false);
+        await showProfile(ctx, ctx.from.id, false, true);
       } catch (error) {
         logger.error('Error updating photo:', error);
       }
@@ -169,8 +210,16 @@ const registerProfileHandlers = (bot) => {
   // Handle location
   bot.on('location', async (ctx, next) => {
     if (ctx.session.temp?.waitingForLocation) {
+      const lang = getLanguage(ctx);
+
       try {
-        const lang = getLanguage(ctx);
+        // Validate location exists
+        if (!ctx.message?.location || !ctx.message.location.latitude || !ctx.message.location.longitude) {
+          logger.warn('Location handler triggered but no valid location found');
+          await ctx.reply(t('invalidInput', lang), Markup.removeKeyboard());
+          return;
+        }
+
         const { latitude, longitude } = ctx.message.location;
 
         const result = await UserService.updateLocation(ctx.from.id, {
@@ -182,13 +231,14 @@ const registerProfileHandlers = (bot) => {
         await ctx.saveSession();
 
         if (result.success) {
-          await ctx.reply(t('locationUpdated', lang));
-          await showProfile(ctx, false);
+          await ctx.reply(t('locationUpdated', lang), Markup.removeKeyboard());
+          await showProfile(ctx, ctx.from.id, false, true);
         } else {
-          await ctx.reply(t('error', lang));
+          await ctx.reply(t('error', lang), Markup.removeKeyboard());
         }
       } catch (error) {
         logger.error('Error updating location:', error);
+        await ctx.reply(t('error', lang), Markup.removeKeyboard());
       }
       return;
     }
@@ -196,14 +246,29 @@ const registerProfileHandlers = (bot) => {
     return next();
   });
 
-  // Handle text inputs (bio, interests)
+  // Handle text inputs (bio, interests, cancel)
   bot.on('text', async (ctx, next) => {
     const { temp } = ctx.session;
+
+    // Handle cancel for location
+    if (temp?.waitingForLocation && (ctx.message.text === '❌ Cancelar' || ctx.message.text === '❌ Cancel')) {
+      try {
+        const lang = getLanguage(ctx);
+        ctx.session.temp.waitingForLocation = false;
+        await ctx.saveSession();
+
+        await ctx.reply(t('operationCancelled', lang) || 'Operation cancelled', Markup.removeKeyboard());
+        await showProfile(ctx, ctx.from.id, false, true);
+      } catch (error) {
+        logger.error('Error cancelling location update:', error);
+      }
+      return;
+    }
 
     if (temp?.waitingForBio) {
       try {
         const lang = getLanguage(ctx);
-        const bio = validateUserInput(ctx.message.text, 1000);
+        const bio = validateUserInput(ctx.message.text, 500);
 
         if (!bio) {
           await ctx.reply(t('invalidInput', lang));
@@ -216,7 +281,11 @@ const registerProfileHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(t('bioUpdated', lang));
-        await showProfile(ctx, false);
+
+        // Small delay to ensure DB update is complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        await showProfile(ctx, ctx.from.id, false, true);
       } catch (error) {
         logger.error('Error updating bio:', error);
       }
@@ -250,126 +319,13 @@ const registerProfileHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(t('interestsUpdated', lang));
-        await showProfile(ctx, false);
+
+        // Small delay to ensure DB update is complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        await showProfile(ctx, ctx.from.id, false, true);
       } catch (error) {
         logger.error('Error updating interests:', error);
-      }
-      return;
-    }
-
-    // Social Media Handlers
-    if (temp?.waitingForTikTok) {
-      try {
-        const lang = getLanguage(ctx);
-        const input = validateUserInput(ctx.message.text, 100);
-
-        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
-          await UserService.updateProfile(ctx.from.id, { tiktok: null });
-          ctx.session.temp.waitingForTikTok = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ TikTok eliminado' : '✅ TikTok removed');
-        } else if (input) {
-          const username = input.replace('@', '').trim();
-          await UserService.updateProfile(ctx.from.id, { tiktok: username });
-          ctx.session.temp.waitingForTikTok = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ TikTok actualizado' : '✅ TikTok updated');
-        } else {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating TikTok:', error);
-      }
-      return;
-    }
-
-    if (temp?.waitingForTwitter) {
-      try {
-        const lang = getLanguage(ctx);
-        const input = validateUserInput(ctx.message.text, 100);
-
-        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
-          await UserService.updateProfile(ctx.from.id, { twitter: null });
-          ctx.session.temp.waitingForTwitter = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ X/Twitter eliminado' : '✅ X/Twitter removed');
-        } else if (input) {
-          const username = input.replace('@', '').trim();
-          await UserService.updateProfile(ctx.from.id, { twitter: username });
-          ctx.session.temp.waitingForTwitter = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ X/Twitter actualizado' : '✅ X/Twitter updated');
-        } else {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating Twitter:', error);
-      }
-      return;
-    }
-
-    if (temp?.waitingForFacebook) {
-      try {
-        const lang = getLanguage(ctx);
-        const input = validateUserInput(ctx.message.text, 100);
-
-        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
-          await UserService.updateProfile(ctx.from.id, { facebook: null });
-          ctx.session.temp.waitingForFacebook = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ Facebook eliminado' : '✅ Facebook removed');
-        } else if (input) {
-          const username = input.trim();
-          await UserService.updateProfile(ctx.from.id, { facebook: username });
-          ctx.session.temp.waitingForFacebook = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ Facebook actualizado' : '✅ Facebook updated');
-        } else {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating Facebook:', error);
-      }
-      return;
-    }
-
-    if (temp?.waitingForInstagram) {
-      try {
-        const lang = getLanguage(ctx);
-        const input = validateUserInput(ctx.message.text, 100);
-
-        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
-          await UserService.updateProfile(ctx.from.id, { instagram: null });
-          ctx.session.temp.waitingForInstagram = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ Instagram eliminado' : '✅ Instagram removed');
-        } else if (input) {
-          const username = input.replace('@', '').trim();
-          await UserService.updateProfile(ctx.from.id, { instagram: username });
-          ctx.session.temp.waitingForInstagram = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ Instagram actualizado' : '✅ Instagram updated');
-        } else {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating Instagram:', error);
       }
       return;
     }
@@ -379,128 +335,132 @@ const registerProfileHandlers = (bot) => {
 };
 
 /**
- * Show social media menu
- */
-const showSocialMediaMenu = async (ctx, lang) => {
-  try {
-    const user = await UserModel.getById(ctx.from.id);
-
-    if (!user) {
-      await ctx.reply(t('error', lang));
-      return;
-    }
-
-    let text = lang === 'es'
-      ? '📱 *Redes Sociales*\n\nEdita tus redes sociales:\n\n'
-      : '📱 *Social Media*\n\nEdit your social media:\n\n';
-
-    text += user.tiktok ? `📱 TikTok: @${user.tiktok}\n` : '📱 TikTok: -\n';
-    text += user.twitter ? `🐦 X: @${user.twitter}\n` : '🐦 X: -\n';
-    text += user.facebook ? `📘 Facebook: ${user.facebook}\n` : '📘 Facebook: -\n';
-    text += user.instagram ? `📷 Instagram: @${user.instagram}\n` : '📷 Instagram: -\n';
-
-    const keyboard = Markup.inlineKeyboard([
-      [
-        Markup.button.callback('📱 TikTok', 'edit_tiktok'),
-        Markup.button.callback('🐦 X', 'edit_twitter'),
-      ],
-      [
-        Markup.button.callback('📘 Facebook', 'edit_facebook'),
-        Markup.button.callback('📷 Instagram', 'edit_instagram'),
-      ],
-      [Markup.button.callback(t('back', lang), 'show_profile')],
-    ]);
-
-    await ctx.editMessageText(text, {
-      parse_mode: 'Markdown',
-      ...keyboard,
-    });
-  } catch (error) {
-    logger.error('Error showing social media menu:', error);
-  }
-};
-
-/**
  * Show user profile
  * @param {Context} ctx - Telegraf context
+ * @param {string|number} targetUserId - User ID to show
  * @param {boolean} edit - Whether to edit existing message
+ * @param {boolean} isOwnProfile - Whether this is the user's own profile
  */
-const showProfile = async (ctx, edit = true) => {
+const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false) => {
   try {
-    const userId = ctx.from.id;
-    const user = await userService.getUser(userId);
-    const language = user?.language || 'en';
+    const lang = getLanguage(ctx);
+    const viewerId = ctx.from.id;
 
-    if (!user) {
-      await ctx.reply('User not found. Please /start first.');
+    // Get target user
+    const targetUser = await UserModel.getById(targetUserId);
+
+    if (!targetUser) {
+      await ctx.reply(t('userNotFound', lang));
       return;
     }
 
-    // Check if command is in group chat
-    const isPrivate = await requirePrivateChat(
-      ctx,
-      'My Profile',
-      '' // Will be set below
-    );
+    // Check if viewer is blocked
+    if (!isOwnProfile) {
+      const isBlocked = await UserModel.isBlocked(targetUserId, viewerId);
+      const hasBlockedTarget = await UserModel.isBlocked(viewerId, targetUserId);
 
-    // Build profile text with consistent design
-    let profileText = [
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      isOwnProfile ? '👤 My Profile' : '👤 User Profile',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      '',
-      targetUser.badges && targetUser.badges.length > 0
-        ? targetUser.badges.map(badge => (typeof badge === 'object' && badge.icon ? `${badge.icon} ${badge.name}` : t(`badges.${badge}`, lang))).filter(Boolean).join(' ') : '',
-      `👤 ${targetUser.firstName || 'User'} ${targetUser.lastName || ''}`,
-      targetUser.username ? `@${targetUser.username}` : '',
-      targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `📝 ${targetUser.bio}` : '',
-      targetUser.looking_for && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `${lang === 'es' ? '🔎 Buscado' : '🔎 Looking for'}: ${targetUser.looking_for}` : '',
-      targetUser.interests && targetUser.interests.length > 0 && (isOwnProfile || targetUser.privacy?.showInterests !== false)
-        ? `🎯 ${targetUser.interests.join(', ')}` : '',
-      targetUser.location && (isOwnProfile || targetUser.privacy?.showLocation !== false) ? '📍 Location shared' : '',
-      targetUser.subscriptionStatus === 'active' && targetUser.planExpiry
-        ? (() => {
-            let expiry;
-            if (targetUser.planExpiry.toDate && typeof targetUser.planExpiry.toDate === 'function') {
-              expiry = targetUser.planExpiry.toDate();
-            } else if (targetUser.planExpiry._seconds) {
-              expiry = new Date(targetUser.planExpiry._seconds * 1000);
-            } else {
-              expiry = new Date(targetUser.planExpiry);
-            }
-            return expiry && !isNaN(expiry.getTime())
-              ? `💎 PRIME: ${t('subscriptionActive', lang, { expiry: moment(expiry).format('MMM DD, YYYY') })}`
-              : (isOwnProfile ? '⭐ Free Plan' : '');
-          })()
-        : (isOwnProfile ? '⭐ Free Plan' : ''),
-      isOwnProfile ? `${t('profileViews', lang, { views: targetUser.profileViews || 0 })}` : '',
-      ''
-    ].filter(Boolean).join('\n');
-
-    // Add social media section (only show if any are filled)
-    const hasSocialMedia = targetUser.tiktok || targetUser.twitter || targetUser.facebook || targetUser.instagram;
-    if (hasSocialMedia) {
-      profileText += '\n📱 Social Media:\n';
-      if (targetUser.tiktok) profileText += `  TikTok: @${targetUser.tiktok}\n`;
-      if (targetUser.twitter) profileText += `  X: @${targetUser.twitter}\n`;
-      if (targetUser.facebook) profileText += `  Facebook: ${targetUser.facebook}\n`;
-      if (targetUser.instagram) profileText += `  Instagram: @${targetUser.instagram}\n`;
-    }
-    // Parse createdAt date
-    let createdAtDate;
-    if (targetUser.createdAt) {
-      if (typeof targetUser.createdAt === 'object' && typeof targetUser.createdAt.toDate === 'function') {
-        createdAtDate = targetUser.createdAt.toDate();
-      } else if (targetUser.createdAt._seconds) {
-        createdAtDate = new Date(targetUser.createdAt._seconds * 1000);
-      } else if (typeof targetUser.createdAt === 'string' || typeof targetUser.createdAt === 'number') {
-        createdAtDate = new Date(targetUser.createdAt);
+      if (isBlocked || hasBlockedTarget) {
+        await ctx.reply(t('cannotViewProfile', lang));
+        return;
       }
+
+      // Increment profile views
+      await UserModel.incrementProfileViews(targetUserId);
     }
-    const validDate = createdAtDate && !isNaN(createdAtDate.getTime())
-      ? moment(createdAtDate).format('MMM DD, YYYY')
-      : 'Recently';
-    profileText += `${t('memberSince', lang, { date: validDate })}\n`;
+
+    // Build profile text
+    let profileText = isOwnProfile ? `${t('profileTitle', lang)}\n\n` : '👤 User Profile\n\n';
+
+    // Badges (objeto-objeto, mostrar emoji y nombre)
+    if (targetUser.badges && targetUser.badges.length > 0) {
+      const badgeList = targetUser.badges.map((badge) => {
+        // Si es badge estándar
+        if (typeof badge === 'string') {
+          const badgeKey = `badges.${badge}`;
+          return t(badgeKey, lang);
+        }
+        // Si es badge personalizado (objeto)
+        if (typeof badge === 'object' && badge.icon && badge.name) {
+          return `${badge.icon} ${badge.name}`;
+        }
+        return '';
+      }).filter(Boolean).join(' ');
+      profileText += `${badgeList}\n`;
+    }
+
+    // Basic info
+    profileText += `👤 ${targetUser.firstName || 'User'} ${targetUser.lastName || ''}\n`;
+    if (targetUser.username) profileText += `@${targetUser.username}\n`;
+
+    // Bio (check privacy)
+    if (targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
+      profileText += `\n📝 ${targetUser.bio}\n`;
+    }
+
+    // Interests (check privacy)
+    if (targetUser.interests && targetUser.interests.length > 0
+      && (isOwnProfile || targetUser.privacy?.showInterests !== false)) {
+      profileText += `\n🎯 ${targetUser.interests.join(', ')}\n`;
+    }
+
+    // Location (check privacy)
+    if (targetUser.location && (isOwnProfile || targetUser.privacy?.showLocation !== false)) {
+      profileText += '\n📍 Location shared\n';
+    }
+
+    // Subscription info
+    if (targetUser.subscriptionStatus === 'active' && targetUser.planExpiry) {
+      try {
+        let expiry;
+        if (targetUser.planExpiry.toDate && typeof targetUser.planExpiry.toDate === 'function') {
+          expiry = targetUser.planExpiry.toDate();
+        } else if (targetUser.planExpiry._seconds) {
+          expiry = new Date(targetUser.planExpiry._seconds * 1000);
+        } else {
+          expiry = new Date(targetUser.planExpiry);
+        }
+
+        if (expiry && !isNaN(expiry.getTime())) {
+          profileText += `\n💎 PRIME: ${t('subscriptionActive', lang, { expiry: moment(expiry).format('MMM DD, YYYY') })}\n`;
+        } else if (isOwnProfile) {
+          profileText += '\n⭐ Free Plan\n';
+        }
+      } catch (error) {
+        logger.warn('Error parsing planExpiry date:', error);
+        if (isOwnProfile) {
+          profileText += '\n⭐ Free Plan\n';
+        }
+      }
+    } else if (isOwnProfile) {
+      profileText += '\n⭐ Free Plan\n';
+    }
+
+    // Profile stats (only for own profile)
+    if (isOwnProfile) {
+      const views = targetUser.profileViews || 0;
+      profileText += `\n${t('profileViews', lang, { views })}\n`;
+
+      // Parse createdAt date
+      let createdAtDate;
+      try {
+        if (targetUser.createdAt) {
+          if (typeof targetUser.createdAt === 'object' && typeof targetUser.createdAt.toDate === 'function') {
+            createdAtDate = targetUser.createdAt.toDate();
+          } else if (targetUser.createdAt._seconds) {
+            createdAtDate = new Date(targetUser.createdAt._seconds * 1000);
+          } else if (typeof targetUser.createdAt === 'string' || typeof targetUser.createdAt === 'number') {
+            createdAtDate = new Date(targetUser.createdAt);
+          }
+        }
+      } catch (error) {
+        logger.warn('Error parsing createdAt date:', error);
+      }
+
+      const validDate = createdAtDate && !isNaN(createdAtDate.getTime())
+        ? moment(createdAtDate).format('MMM DD, YYYY')
+        : 'Recently';
+      profileText += `${t('memberSince', lang, { date: validDate })}\n`;
+    }
 
     // Build keyboard
     const keyboard = [];
@@ -510,14 +470,10 @@ const showProfile = async (ctx, edit = true) => {
       keyboard.push([
         Markup.button.callback(t('editPhoto', lang), 'edit_photo'),
         Markup.button.callback(t('editBio', lang), 'edit_bio'),
-        Markup.button.callback(lang === 'es' ? 'Editar Buscado' : 'Edit Looking For', 'edit_looking_for'),
       ]);
       keyboard.push([
         Markup.button.callback(t('editLocation', lang), 'edit_location'),
         Markup.button.callback(t('editInterests', lang), 'edit_interests'),
-      ]);
-      keyboard.push([
-        Markup.button.callback(lang === 'es' ? '📱 Redes Sociales' : '📱 Social Media', 'edit_social'),
       ]);
       keyboard.push([
         Markup.button.callback(t('privacySettings', lang), 'privacy_settings'),
@@ -541,171 +497,26 @@ const showProfile = async (ctx, edit = true) => {
         keyboard.push([Markup.button.callback(t('addToFavorites', lang), `add_favorite_${targetUserId}`)]);
       }
 
-    // Format profile message
-    const profileMessage = formatProfileMessage(user, language);
+      keyboard.push([Markup.button.callback(t('blockUser', lang), `block_user_${targetUserId}`)]);
+      keyboard.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
+    }
 
-    await ctx.reply(profileMessage, {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: language === 'es' ? '✏️ Editar Perfil' : '✏️ Edit Profile', callback_data: 'edit_profile' }],
-          [{ text: language === 'es' ? '🔙 Menú Principal' : '🔙 Main Menu', callback_data: 'back_main' }],
-        ],
-      },
-    });
-
-    logger.info(`User ${userId} viewed profile`);
+    if (edit) {
+      await ctx.editMessageText(profileText, Markup.inlineKeyboard(keyboard));
+    } else {
+      await ctx.reply(profileText, Markup.inlineKeyboard(keyboard));
+    }
   } catch (error) {
-    logger.error('Error in profile command:', error);
-    await ctx.reply(i18n.t('error_occurred', 'en'));
+    logger.error('Error in showProfile:', error);
+    const lang = ctx.session?.language || 'en';
+    await ctx.reply(t('error', lang));
   }
-}
+};
 
 /**
- * Format profile message
+ * Show privacy settings
  */
-function formatProfileMessage(user, language) {
-  const labels = {
-    en: {
-      title: '👤 **Your Profile**',
-      username: 'Username',
-      bio: 'Bio',
-      age: 'Age',
-      plan: 'Plan',
-      status: 'Subscription Status',
-      expiry: 'Expires',
-      location: 'Location',
-      joined: 'Joined',
-    },
-    es: {
-      title: '👤 **Tu Perfil**',
-      username: 'Nombre de usuario',
-      bio: 'Biografía',
-      age: 'Edad',
-      plan: 'Plan',
-      status: 'Estado de Suscripción',
-      expiry: 'Expira',
-      location: 'Ubicación',
-      joined: 'Se unió',
-    },
-  };
-
-  const l = labels[language] || labels.en;
-  const planName = user.plan ? user.plan.charAt(0).toUpperCase() + user.plan.slice(1) : 'Free';
-  const status = user.subscriptionStatus || 'inactive';
-  const statusEmoji = status === 'active' ? '✅' : '❌';
-
-  let message = `${l.title}\n\n`;
-  message += `**${l.username}:** ${user.username || 'Not set'}\n`;
-  message += `**${l.bio}:** ${user.bio || 'Not set'}\n`;
-  message += `**${l.age}:** ${user.age || 'Not set'}\n`;
-  message += `**${l.plan}:** ${planName}\n`;
-  message += `**${l.status}:** ${statusEmoji} ${status}\n`;
-
-  if (user.planExpiry) {
-    const expiryDate = new Date(user.planExpiry).toLocaleDateString();
-    message += `**${l.expiry}:** ${expiryDate}\n`;
-  }
-
-  if (user.location) {
-    message += `**${l.location}:** ${language === 'es' ? 'Compartido' : 'Shared'}\n`;
-  }
-
-  if (user.createdAt) {
-    const joinedDate = new Date(user.createdAt).toLocaleDateString();
-    message += `**${l.joined}:** ${joinedDate}\n`;
-  }
-
-  return message;
-}
-
-/**
- * Handle edit profile
- */
-async function handleEditProfile(ctx) {
-  try {
-    const userId = ctx.from.id;
-    const user = await userService.getUser(userId);
-    const language = user?.language || 'en';
-
-    const labels = {
-      en: {
-        message: 'What would you like to edit?',
-        username: '✏️ Username',
-        bio: '✏️ Bio',
-        location: '📍 Location',
-        back: '🔙 Back to Profile',
-      },
-      es: {
-        message: '¿Qué te gustaría editar?',
-        username: '✏️ Nombre de usuario',
-        bio: '✏️ Biografía',
-        location: '📍 Ubicación',
-        back: '🔙 Volver al Perfil',
-      },
-    };
-
-    const l = labels[language] || labels.en;
-
-    await ctx.editMessageText(l.message, {
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: l.username, callback_data: 'edit_username' }],
-          [{ text: l.bio, callback_data: 'edit_bio' }],
-          [{ text: l.location, callback_data: 'edit_location' }],
-          [{ text: l.back, callback_data: 'menu_profile' }],
-        ],
-      },
-    });
-
-    logger.info(`User ${userId} entered profile edit mode`);
-  } catch (error) {
-    logger.error('Error in edit profile:', error);
-    await ctx.answerCbQuery(i18n.t('error_occurred', 'en'));
-  }
-}
-
-/**
- * Handle edit field selection
- */
-async function handleEditField(ctx) {
-  try {
-    const userId = ctx.from.id;
-    const field = ctx.callbackQuery.data.split('_')[1]; // 'edit_username' -> 'username'
-    const user = await userService.getUser(userId);
-    const language = user?.language || 'en';
-
-    const prompts = {
-      en: {
-        username: 'Enter your new username:',
-        bio: 'Enter your new bio:',
-        location: 'Share your new location:',
-      },
-      es: {
-        username: 'Ingresa tu nuevo nombre de usuario:',
-        bio: 'Ingresa tu nueva biografía:',
-        location: 'Comparte tu nueva ubicación:',
-      },
-    };
-
-    const prompt = prompts[language]?.[field] || prompts.en[field];
-
-    await ctx.editMessageText(prompt);
-
-    // Save session state
-    await ctx.saveSession({ editingField: field, language });
-
-    logger.info(`User ${userId} editing field: ${field}`);
-  } catch (error) {
-    logger.error('Error in edit field:', error);
-    await ctx.answerCbQuery(i18n.t('error_occurred', 'en'));
-  }
-}
-
-/**
- * Share profile - Generate Member Card with Photo (Pseudo-code format)
- */
-async function handleProfileUpdate(ctx, field, value) {
+const showPrivacySettings = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
     const user = await UserModel.getById(ctx.from.id);
@@ -715,17 +526,225 @@ async function handleProfileUpdate(ctx, field, value) {
       return;
     }
 
-    await ctx.answerCbQuery();
+    const privacy = user.privacy || {
+      showLocation: true,
+      showInterests: true,
+      showBio: true,
+      allowMessages: true,
+      showOnline: true,
+    };
 
-    // Build clean pseudo-code style Member Card
-    let cardText = '';
+    let text = `${t('privacyTitle', lang)}\n\n`;
+    text += `${privacy.showLocation ? '✅' : '❌'} ${t('showLocation', lang)}\n`;
+    text += `${privacy.showInterests ? '✅' : '❌'} ${t('showInterests', lang)}\n`;
+    text += `${privacy.showBio ? '✅' : '❌'} ${t('showBio', lang)}\n`;
+    text += `${privacy.allowMessages ? '✅' : '❌'} ${t('allowMessages', lang)}\n`;
+    text += `${privacy.showOnline ? '✅' : '❌'} ${t('showOnline', lang)}\n`;
 
-    // Header
-    cardText += `╔════════════════════════════════╗\n`;
-    cardText += `║      💎  MEMBER  PROFILE      ║\n`;
-    cardText += `╚════════════════════════════════╝\n\n`;
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback(`${privacy.showLocation ? '✅' : '❌'} ${t('showLocation', lang)}`, 'privacy_toggle_showLocation')],
+      [Markup.button.callback(`${privacy.showInterests ? '✅' : '❌'} ${t('showInterests', lang)}`, 'privacy_toggle_showInterests')],
+      [Markup.button.callback(`${privacy.showBio ? '✅' : '❌'} ${t('showBio', lang)}`, 'privacy_toggle_showBio')],
+      [Markup.button.callback(`${privacy.allowMessages ? '✅' : '❌'} ${t('allowMessages', lang)}`, 'privacy_toggle_allowMessages')],
+      [Markup.button.callback(`${privacy.showOnline ? '✅' : '❌'} ${t('showOnline', lang)}`, 'privacy_toggle_showOnline')],
+      [Markup.button.callback(t('back', lang), 'show_profile')],
+    ]);
 
-    // Badges section
+    await ctx.editMessageText(text, keyboard);
+  } catch (error) {
+    logger.error('Error showing privacy settings:', error);
+  }
+};
+
+/**
+ * Toggle privacy setting
+ */
+const togglePrivacySetting = async (ctx, setting) => {
+  try {
+    const lang = getLanguage(ctx);
+    const user = await UserModel.getById(ctx.from.id);
+
+    if (!user) {
+      await ctx.reply(t('error', lang));
+      return;
+    }
+
+    const privacy = user.privacy || {
+      showLocation: true,
+      showInterests: true,
+      showBio: true,
+      allowMessages: true,
+      showOnline: true,
+    };
+
+    // Toggle the setting
+    privacy[setting] = !privacy[setting];
+
+    await UserModel.updatePrivacy(ctx.from.id, privacy);
+
+    await ctx.answerCbQuery(t('privacyUpdated', lang));
+    await showPrivacySettings(ctx);
+  } catch (error) {
+    logger.error('Error toggling privacy setting:', error);
+  }
+};
+
+/**
+ * Show favorites list
+ */
+const showFavorites = async (ctx) => {
+  try {
+    const lang = getLanguage(ctx);
+    const favorites = await UserModel.getFavorites(ctx.from.id);
+
+    if (!favorites || favorites.length === 0) {
+      await ctx.editMessageText(
+        t('noFavorites', lang),
+        Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'show_profile')]]),
+      );
+      return;
+    }
+
+    let text = `${t('myFavorites', lang)}\n\n`;
+    const keyboard = [];
+
+    favorites.forEach((user, index) => {
+      text += `${index + 1}. ${user.firstName} ${user.lastName || ''}${user.username ? ` (@${user.username})` : ''}\n`;
+      keyboard.push([
+        Markup.button.callback(`👁️ ${user.firstName}`, `view_user_${user.id}`),
+        Markup.button.callback('❌', `remove_favorite_${user.id}`),
+      ]);
+    });
+
+    keyboard.push([Markup.button.callback(t('back', lang), 'show_profile')]);
+
+    await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
+  } catch (error) {
+    logger.error('Error showing favorites:', error);
+  }
+};
+
+/**
+ * Show blocked users list
+ */
+const showBlockedUsers = async (ctx) => {
+  try {
+    const lang = getLanguage(ctx);
+    const user = await UserModel.getById(ctx.from.id);
+
+    if (!user || !user.blocked || user.blocked.length === 0) {
+      await ctx.editMessageText(
+        t('noBlockedUsers', lang),
+        Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'show_profile')]]),
+      );
+      return;
+    }
+
+    let text = `${t('blockedUsers', lang)}\n\n`;
+    const keyboard = [];
+
+    for (const blockedId of user.blocked) {
+      const blockedUser = await UserModel.getById(blockedId);
+      if (blockedUser) {
+        text += `• ${blockedUser.firstName} ${blockedUser.lastName || ''}${blockedUser.username ? ` (@${blockedUser.username})` : ''}\n`;
+        keyboard.push([
+          Markup.button.callback(`✅ Unblock ${blockedUser.firstName}`, `unblock_user_${blockedId}`),
+        ]);
+      }
+    }
+
+    keyboard.push([Markup.button.callback(t('back', lang), 'show_profile')]);
+
+    await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
+  } catch (error) {
+    logger.error('Error showing blocked users:', error);
+  }
+};
+
+/**
+ * Add user to favorites
+ */
+const addToFavorites = async (ctx, targetUserId) => {
+  try {
+    const lang = getLanguage(ctx);
+    await UserModel.addToFavorites(ctx.from.id, targetUserId);
+    await ctx.answerCbQuery(t('addedToFavorites', lang));
+    await showProfile(ctx, targetUserId, true, false);
+  } catch (error) {
+    logger.error('Error adding to favorites:', error);
+  }
+};
+
+/**
+ * Remove user from favorites
+ */
+const removeFromFavorites = async (ctx, targetUserId) => {
+  try {
+    const lang = getLanguage(ctx);
+    await UserModel.removeFromFavorites(ctx.from.id, targetUserId);
+    await ctx.answerCbQuery(t('removedFromFavorites', lang));
+
+    // Check if we're in the favorites list view or profile view
+    if (ctx.callbackQuery?.message?.text?.includes(t('myFavorites', lang))) {
+      await showFavorites(ctx);
+    } else {
+      await showProfile(ctx, targetUserId, true, false);
+    }
+  } catch (error) {
+    logger.error('Error removing from favorites:', error);
+  }
+};
+
+/**
+ * Block user
+ */
+const blockUser = async (ctx, targetUserId) => {
+  try {
+    const lang = getLanguage(ctx);
+    await UserModel.blockUser(ctx.from.id, targetUserId);
+    await ctx.answerCbQuery(t('userBlocked', lang));
+    await ctx.editMessageText(
+      t('userBlocked', lang),
+      Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'back_to_main')]]),
+    );
+  } catch (error) {
+    logger.error('Error blocking user:', error);
+  }
+};
+
+/**
+ * Unblock user
+ */
+const unblockUser = async (ctx, targetUserId) => {
+  try {
+    const lang = getLanguage(ctx);
+    await UserModel.unblockUser(ctx.from.id, targetUserId);
+    await ctx.answerCbQuery(t('userUnblocked', lang));
+    await showBlockedUsers(ctx);
+  } catch (error) {
+    logger.error('Error unblocking user:', error);
+  }
+};
+
+/**
+ * Share profile - Generate Member Card
+ */
+const shareProfile = async (ctx) => {
+  try {
+    const lang = getLanguage(ctx);
+    const user = await UserModel.getById(ctx.from.id);
+
+    if (!user) {
+      await ctx.reply(t('error', lang));
+      return;
+    }
+
+    // Build Member Card text
+    let cardText = '╔═══════════════════════╗\n';
+    cardText += '          💎 MEMBER CARD 💎\n';
+    cardText += '╚═══════════════════════╝\n\n';
+
+    // Badges
     if (user.badges && user.badges.length > 0) {
       const badgeList = user.badges.map((badge) => {
         if (typeof badge === 'string') {
@@ -736,16 +755,25 @@ async function handleProfileUpdate(ctx, field, value) {
           return `${badge.icon} ${badge.name}`;
         }
         return '';
-      }).filter(Boolean).join('  ');
-      cardText += `${badgeList}\n\n`;
+      }).filter(Boolean).join(' ');
+      cardText += `${badgeList}\n`;
     }
 
-    // Main Profile Section
-    cardText += `<b>// USER IDENTITY</b>\n`;
-    cardText += `name: "${user.firstName || 'User'}${user.lastName ? ' ' + user.lastName : ''}"\n`;
-    if (user.username) cardText += `handle: "@${user.username}"\n`;
+    // Basic info
+    cardText += `\n👤 ${user.firstName || 'User'} ${user.lastName || ''}\n`;
+    if (user.username) cardText += `@${user.username}\n`;
 
-    // Membership status
+    // Bio
+    if (user.bio) {
+      cardText += `\n📝 ${user.bio}\n`;
+    }
+
+    // Interests
+    if (user.interests && user.interests.length > 0) {
+      cardText += `\n🎯 ${user.interests.join(', ')}\n`;
+    }
+
+    // Subscription status
     if (user.subscriptionStatus === 'active' && user.planExpiry) {
       try {
         let expiry;
@@ -758,99 +786,37 @@ async function handleProfileUpdate(ctx, field, value) {
         }
 
         if (expiry && !isNaN(expiry.getTime())) {
-          cardText += `status: "💎 PRIME"\n`;
-          cardText += `expires: "${moment(expiry).format('MMM DD, YYYY')}"\n`;
+          cardText += `\n💎 PRIME ${t('subscriptionActive', lang, { expiry: moment(expiry).format('MMM DD, YYYY') })}\n`;
         }
       } catch (error) {
         logger.warn('Error parsing planExpiry in share:', error);
-        cardText += `status: "⭐ FREE"\n`;
       }
-    } else {
-      cardText += `status: "⭐ FREE"\n`;
     }
 
-    // Bio section
-    if (user.bio) {
-      cardText += `\n<b>// ABOUT</b>\n`;
-      const escapedBio = user.bio.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      cardText += `bio: "${escapedBio}"\n`;
-    }
+    // Profile link (deep link to view profile)
+    cardText += `\n🔗 https://t.me/${ctx.botInfo.username}?start=viewprofile_${ctx.from.id}\n`;
 
-    // Looking for section
-    if (user.looking_for) {
-      cardText += `\n<b>// SEEKING</b>\n`;
-      const escapedLookingFor = user.looking_for.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      cardText += `looking_for: "${escapedLookingFor}"\n`;
-    }
+    cardText += '\n╔═══════════════════════╗\n';
+    cardText += '    PNPtv - Entertainment Hub\n';
+    cardText += '╚═══════════════════════╝';
 
-    // Interests section
-    if (user.interests && user.interests.length > 0) {
-      cardText += `\n<b>// INTERESTS</b>\n`;
-      const escapedInterests = user.interests.map(i =>
-        i.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      );
-      cardText += `interests: [\n`;
-      escapedInterests.forEach((interest, index) => {
-        const comma = index < escapedInterests.length - 1 ? ',' : '';
-        cardText += `  "${interest}"${comma}\n`;
-      });
-      cardText += `]\n`;
-    }
-
-    // Social media section (only show if any are filled)
-    const hasSocialMedia = user.tiktok || user.twitter || user.facebook || user.instagram;
-    if (hasSocialMedia) {
-      cardText += `\n<b>// SOCIAL MEDIA</b>\n`;
-      cardText += `connect: {\n`;
-      if (user.tiktok) cardText += `  tiktok: "@${user.tiktok}",\n`;
-      if (user.twitter) cardText += `  x: "@${user.twitter}",\n`;
-      if (user.facebook) cardText += `  facebook: "${user.facebook}",\n`;
-      if (user.instagram) cardText += `  instagram: "@${user.instagram}",\n`;
-      cardText += `}\n`;
-    }
-
-    // Footer with profile link
-    cardText += `\n<b>// ACTIONS</b>\n`;
-    cardText += `view_profile() {\n`;
-    cardText += `  url: "https://t.me/${ctx.botInfo.username}?start=viewprofile_${ctx.from.id}"\n`;
-    cardText += `}\n\n`;
-    cardText += `─────────────────────────────────\n`;
-    cardText += `🎬 <b>PNPtv!</b> | Entertainment Hub`;
-
-    // Share keyboard
+    // Send the card with inline keyboard to share
     const shareKeyboard = Markup.inlineKeyboard([
       [Markup.button.switchToChat(
-        t('shareProfileCard', lang) || '📤 Share Profile Card',
+        t('shareProfileCard', lang),
         cardText,
       )],
       [Markup.button.callback(t('back', lang), 'show_profile')],
     ]);
 
-    // Check if user has a profile photo
-    if (user.photoFileId) {
-      // Send with photo
-      await ctx.replyWithPhoto(user.photoFileId, {
-        caption: cardText,
-        parse_mode: 'HTML',
-        ...shareKeyboard,
-      });
-    } else {
-      // Send without photo (text only)
-      await ctx.reply(cardText, {
-        parse_mode: 'HTML',
-        ...shareKeyboard,
-      });
-    }
+    await ctx.editMessageText(cardText, shareKeyboard);
+    await ctx.answerCbQuery(t('profileShared', lang));
   } catch (error) {
-    logger.error('Error updating profile:', error);
-    await ctx.reply(i18n.t('error_occurred', 'en'));
+    logger.error('Error sharing profile:', error);
+    const lang = ctx.session?.language || 'en';
+    await ctx.reply(t('error', lang));
   }
-}
-
-module.exports = {
-  handleProfile,
-  handleEditProfile,
-  handleEditField,
-  handleProfileUpdate,
-  formatProfileMessage,
 };
+
+module.exports = registerProfileHandlers;
+module.exports.showProfile = showProfile;

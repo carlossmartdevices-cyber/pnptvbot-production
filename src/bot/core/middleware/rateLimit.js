@@ -1,30 +1,41 @@
-const NodeCache = require('node-cache');
-const { config } = require('../../config/botConfig');
+const { RateLimiterRedis } = require('rate-limiter-flexible');
+const { getRedis } = require('../../../config/redis');
 const logger = require('../../../utils/logger');
 const { t } = require('../../../utils/i18n');
-const UserService = require('../../services/userService');
 
-// In-memory cache for rate limiting
-const rateLimitCache = new NodeCache({
-  stdTTL: config.rateLimit.windowMs / 1000,
-  checkperiod: 10,
-});
+let rateLimiter = null;
+
+/**
+ * Initialize rate limiter
+ * @returns {RateLimiterRedis} Rate limiter instance
+ */
+const initRateLimiter = () => {
+  if (rateLimiter) return rateLimiter;
+
+  const redisClient = getRedis();
+
+  rateLimiter = new RateLimiterRedis({
+    storeClient: redisClient,
+    keyPrefix: 'ratelimit',
+    points: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '30', 10),
+    duration: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10) / 1000,
+    blockDuration: 60, // Block for 60 seconds if limit exceeded
+  });
+
+  return rateLimiter;
+};
 
 /**
  * Rate limiting middleware
+ * @returns {Function} Middleware function
  */
 const rateLimitMiddleware = () => {
-  const { windowMs, maxRequests } = config.rateLimit;
+  const limiter = initRateLimiter();
 
   return async (ctx, next) => {
-    const userId = ctx.from?.id?.toString();
+    const userId = ctx.from?.id;
 
     if (!userId) {
-      return next();
-    }
-
-    // Exempt admin users from rate limiting
-    if (UserService.isAdmin(userId)) {
       return next();
     }
 
@@ -34,35 +45,24 @@ const rateLimitMiddleware = () => {
     } catch (rejRes) {
       const lang = ctx.session?.language || 'en';
 
-    // Filter out old timestamps
-    const recentRequests = timestamps.filter(t => t > windowStart);
+      if (rejRes instanceof Error) {
+        logger.error('Rate limiter error:', rejRes);
+        return next();
+      }
 
-    if (recentRequests.length >= maxRequests) {
-      logger.warn(`Rate limit exceeded for user ${userId}`);
-      return ctx.reply(
-        '⚠️ You\'re sending commands too quickly. Please wait a moment and try again.',
-        { reply_to_message_id: ctx.message?.message_id }
+      // Rate limit exceeded
+      const retryAfter = Math.round(rejRes.msBeforeNext / 1000) || 60;
+
+      logger.warn('Rate limit exceeded', {
+        userId,
+        retryAfter,
+      });
+
+      await ctx.reply(
+        `⚠️ ${t('error', lang)}\n\nToo many requests. Please wait ${retryAfter} seconds.`,
       );
     }
-
-    // Add current timestamp
-    recentRequests.push(now);
-    rateLimitCache.set(key, recentRequests);
-
-    return next();
   };
 };
 
-/**
- * Clear rate limit for a user (useful for admins)
- */
-const clearRateLimit = (userId) => {
-  const key = `ratelimit:${userId}`;
-  rateLimitCache.del(key);
-  logger.info(`Rate limit cleared for user ${userId}`);
-};
-
-module.exports = {
-  rateLimitMiddleware,
-  clearRateLimit,
-};
+module.exports = rateLimitMiddleware;
