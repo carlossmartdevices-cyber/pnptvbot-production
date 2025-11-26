@@ -3,12 +3,65 @@ const UserModel = require('../../../models/userModel');
 const ChatCleanupService = require('../../services/chatCleanupService');
 const logger = require('../../../utils/logger');
 const { t } = require('../../../utils/i18n');
+const MODERATION_CONFIG = require('../../../config/moderationConfig');
+
+/**
+ * Validate username against moderation rules
+ */
+function validateUsername(username, firstName) {
+  if (!MODERATION_CONFIG.FILTERS.USERNAME.enabled) {
+    return { valid: true };
+  }
+
+  const displayName = username || firstName || '';
+  const config = MODERATION_CONFIG.FILTERS.USERNAME;
+
+  // Check length
+  if (displayName.length < config.minLength) {
+    return {
+      valid: false,
+      reason: `Username too short (min ${config.minLength} characters)`,
+    };
+  }
+
+  if (displayName.length > config.maxLength) {
+    return {
+      valid: false,
+      reason: `Username too long (max ${config.maxLength} characters)`,
+    };
+  }
+
+  // Check blacklist
+  const lowerName = displayName.toLowerCase();
+  for (const blacklisted of config.blacklist) {
+    if (lowerName.includes(blacklisted.toLowerCase())) {
+      return {
+        valid: false,
+        reason: 'Username contains prohibited words',
+      };
+    }
+  }
+
+  // Check for emoji (if not allowed)
+  if (!config.allowEmojis) {
+    const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
+    if (emojiRegex.test(displayName)) {
+      return {
+        valid: false,
+        reason: 'Emojis are not allowed in usernames',
+      };
+    }
+  }
+
+  return { valid: true };
+}
 
 /**
  * Username enforcement middleware
  * - Requires users to have a username in groups
  * - Detects and logs username changes
  * - Notifies admins of suspicious changes
+ * - Validates usernames against moderation rules
  *
  * @returns {Function} Middleware function
  */
@@ -16,12 +69,14 @@ const usernameEnforcement = () => {
   // Cache to track last known usernames
   const usernameCache = new Map();
 
+  let nextCalled = false;
   return async (ctx, next) => {
     const chatType = ctx.chat?.type;
 
     // Only apply to groups and supergroups
     if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
-      return next();
+      if (!nextCalled) { nextCalled = true; await next(); }
+      return;
     }
 
     const userId = ctx.from?.id;
@@ -29,7 +84,8 @@ const usernameEnforcement = () => {
     const groupId = ctx.chat.id;
 
     if (!userId) {
-      return next();
+      if (!nextCalled) { nextCalled = true; await next(); }
+      return;
     }
 
     try {
@@ -61,12 +117,20 @@ const usernameEnforcement = () => {
         return;
       }
 
+      // Validate username against moderation rules
+      const validation = validateUsername(currentUsername, ctx.from?.first_name);
+      if (!validation.valid && !isAdmin) {
+        await handleInvalidUsername(ctx, userId, currentUsername, validation.reason, groupId);
+        // Don't call next() - block the message
+        return;
+      }
+
       // Continue with message processing
-      await next();
+      if (!nextCalled) { nextCalled = true; await next(); }
     } catch (error) {
       logger.error('Username enforcement error:', error);
       // On error, allow message through to avoid blocking legitimate users
-      return next();
+      if (!nextCalled) { nextCalled = true; await next(); }
     }
   };
 };
@@ -129,7 +193,11 @@ async function handleNoUsername(ctx, userId, groupId) {
     try {
       await ctx.deleteMessage();
     } catch (error) {
-      logger.debug('Could not delete message from user without username:', error.message);
+      if (error.message && error.message.includes('message to delete not found')) {
+        logger.debug('Message to delete not found, ignoring.');
+      } else {
+        logger.debug('Could not delete message from user without username:', error.message);
+      }
     }
 
     // Send warning message
@@ -143,6 +211,8 @@ async function handleNoUsername(ctx, userId, groupId) {
     warningMessage += '4. Return to this group once set\n\n';
     warningMessage += 'Your messages will be deleted until you set a username.';
 
+    // Sanitize warningMessage for Markdown
+    warningMessage = warningMessage.replace(/([*_`])/g, '\\$1');
     const sentMessage = await ctx.reply(warningMessage, {
       parse_mode: 'Markdown',
     });
@@ -152,11 +222,13 @@ async function handleNoUsername(ctx, userId, groupId) {
 
     // Try to send private message
     try {
+      let pmMsg = '⚠️ **Username Required**\n\n'
+        + `You need to set a Telegram username (@username) to participate in **${ctx.chat.title}**.\n\n`
+        + 'Please set your username in Settings and return to the group.';
+      pmMsg = pmMsg.replace(/([*_`])/g, '\\$1');
       await ctx.telegram.sendMessage(
         userId,
-        '⚠️ **Username Required**\n\n'
-        + `You need to set a Telegram username (@username) to participate in **${ctx.chat.title}**.\n\n`
-        + 'Please set your username in Settings and return to the group.',
+        pmMsg,
         { parse_mode: 'Markdown' },
       );
     } catch (error) {
@@ -175,6 +247,64 @@ async function handleNoUsername(ctx, userId, groupId) {
     logger.info('User without username warned', { userId, groupId, firstName });
   } catch (error) {
     logger.error('Error handling user without username:', error);
+  }
+}
+
+/**
+ * Handle invalid username (against moderation rules)
+ */
+async function handleInvalidUsername(ctx, userId, username, reason, groupId) {
+  try {
+    const firstName = ctx.from?.first_name || 'User';
+
+    // Delete the message
+    try {
+      await ctx.deleteMessage();
+    } catch (error) {
+      logger.debug('Could not delete message from user with invalid username:', error.message);
+    }
+
+    // Send warning message
+    let warningMessage = `⚠️ **Username Policy Violation**\n\n`;
+    warningMessage += `👤 @${username || firstName}\n\n`;
+    warningMessage += `Your username doesn't meet our community guidelines:\n`;
+    warningMessage += `**Reason:** ${reason}\n\n`;
+    warningMessage += 'Please update your Telegram username to comply with our rules.\n';
+    warningMessage += 'Your messages will be deleted until you change it.';
+
+    const sentMessage = await ctx.reply(warningMessage, {
+      parse_mode: 'Markdown',
+    });
+
+    // Delete warning after 60 seconds
+    ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 60000);
+
+    // Try to send private message
+    try {
+      await ctx.telegram.sendMessage(
+        userId,
+        '⚠️ **Username Policy Violation**\n\n'
+        + `Your username (@${username}) doesn't meet the guidelines for **${ctx.chat.title}**.\n\n`
+        + `**Reason:** ${reason}\n\n`
+        + 'Please update your username in Settings to continue participating in the group.',
+        { parse_mode: 'Markdown' },
+      );
+    } catch (error) {
+      logger.debug('Could not send private message about invalid username:', error.message);
+    }
+
+    // Log the event
+    await ModerationModel.addLog({
+      action: 'invalid_username_warning',
+      userId,
+      groupId,
+      reason: `Username policy violation: ${reason}`,
+      details: `Username: ${username}, User: ${firstName}`,
+    });
+
+    logger.info('User with invalid username warned', { userId, groupId, username, reason });
+  } catch (error) {
+    logger.error('Error handling invalid username:', error);
   }
 }
 

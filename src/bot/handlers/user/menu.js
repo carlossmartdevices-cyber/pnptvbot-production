@@ -9,21 +9,26 @@ const ChatCleanupService = require('../../services/chatCleanupService');
  * @param {string|number} userId - Telegram user ID
  */
 const sendPrimeWelcome = async (bot, userId) => {
-  const primeChannelLink = 'https://t.me/PNPTV_PRIME'; // Actualiza si el link es diferente
-  const message = [
-    '🎉 ¡Bienvenido a PRIME!',
+  const messageEs = [
+    '🎉 ¡Bienvenido a PNPtv!',
     '',
-    'Tu suscripción Lifetime está activa.',
-    '',
-    'Accede al canal exclusivo aquí:',
-    `👉 [Ingresar a PRIME](${primeChannelLink})`,
+    'Para explorar PNPtv, pulsa /menu',
     '',
     'Disfruta todos los beneficios y novedades.'
   ].join('\n');
+  const messageEn = [
+    '🎉 Welcome to PNPtv!',
+    '',
+    'To explore PNPtv, press /menu',
+    '',
+    'Enjoy all the benefits and updates.'
+  ].join('\n');
+  const lang = (bot.language || 'es').toLowerCase();
+  const message = lang === 'en' ? messageEn : messageEs;
   try {
     await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown' });
   } catch (error) {
-    logger.error('Error enviando bienvenida PRIME:', error);
+    logger.error('Error enviando bienvenida PNPtv:', error);
   }
 };
 
@@ -102,28 +107,12 @@ const registerMenuHandlers = (bot) => {
     });
   });
 
-  // Live Streams - trigger livestream menu
+  // Live Streams - Coming Soon
   bot.action('show_live', async (ctx) => {
-    // Trigger the livestream menu handler
-    ctx.match = ['show_livestream'];
-    await ctx.answerCbQuery();
-    
     const lang = ctx.session?.language || 'en';
-    const userId = ctx.from.id.toString();
-
-    await ctx.editMessageText(
-      lang === 'es'
-        ? '📡 *Transmisión en Vivo*\n\nCrea transmisiones en vivo interactivas para tus suscriptores.\n\n✨ Funciones:\n• Chat en tiempo real\n• Alta calidad de video\n• Sin límite de espectadores\n• Graba tu transmisión'
-        : '📡 *Live Streaming*\n\nCreate interactive live streams for your subscribers.\n\n✨ Features:\n• Real-time chat\n• High quality video\n• Unlimited viewers\n• Record your stream',
-      {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback(lang === 'es' ? '🎥 Crear Transmisión' : '🎥 Create Stream', 'livestream_create')],
-          [Markup.button.callback(lang === 'es' ? '📺 Ver Transmisiones' : '📺 Watch Streams', 'livestream_browse')],
-          [Markup.button.callback(lang === 'es' ? '📊 Mis Transmisiones' : '📊 My Streams', 'livestream_my_streams')],
-          [Markup.button.callback(t('back', lang), 'back_to_main')]
-        ])
-      }
+    await ctx.answerCbQuery(
+      lang === 'es' ? '🚧 Próximamente: Transmisiones en Vivo.' : '🚧 Coming Soon: Live Streaming.',
+      { show_alert: true }
     );
   });
   bot.action('show_zoom', async (ctx) => {
@@ -179,105 +168,15 @@ const registerMenuHandlers = (bot) => {
 
   // Note: show_subscription_plans handler is in payments/index.js
 
-  // Group menu actions
+  // Group menu actions have been disabled
   bot.action('group_contact_admin', async (ctx) => {
-    try {
-      await ctx.answerCbQuery();
-      const lang = ctx.session?.language || 'en';
-
-      const messageEs = [
-        '📞 *Contactar a un Admin*',
-        '',
-        'Para contactar a un administrador del grupo, por favor:',
-        '',
-        '1. Menciona a uno de los administradores en el chat del grupo',
-        '2. O envía un mensaje directo al bot con tu consulta usando el botón "Chat Bot PNPtv!"',
-        '',
-        'Los administradores responderán lo antes posible.'
-      ].join('\n');
-
-      const messageEn = [
-        '📞 *Contact an Admin*',
-        '',
-        'To contact a group administrator, please:',
-        '',
-        '1. Mention one of the administrators in the group chat',
-        '2. Or send a direct message to the bot with your query using the "PNPtv! Bot Chat" button',
-        '',
-        'Administrators will respond as soon as possible.'
-      ].join('\n');
-
-      const message = lang === 'es' ? messageEs : messageEn;
-
-      const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
-
-      // Auto-delete menu messages in groups after 2 minutes
-      const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
-      if (isGroup) {
-        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
-      }
-    } catch (error) {
-      logger.error('Error in group contact admin:', error);
-    }
+    logger.info('Group menu actions have been disabled');
+    await ctx.answerCbQuery('This feature has been disabled');
   });
 
   bot.action('group_show_rules', async (ctx) => {
-    try {
-      await ctx.answerCbQuery();
-      const lang = ctx.session?.language || 'en';
-
-      const rulesEs = [
-        '📋 *Reglas de la Comunidad PNPtv!*',
-        '',
-        '1️⃣ *Respeto:* Trata a todos los miembros con respeto y cortesía',
-        '',
-        '2️⃣ *No Spam:* Evita el spam, publicidad no autorizada o contenido repetitivo',
-        '',
-        '3️⃣ *Privacidad:* No compartas información personal de otros miembros sin su consentimiento',
-        '',
-        '4️⃣ *Contenido Apropiado:* El contenido debe ser apropiado para la comunidad',
-        '',
-        '5️⃣ *No Acoso:* El acoso, bullying o comportamiento hostil no será tolerado',
-        '',
-        '6️⃣ *Uso del Bot:* Usa el bot en privado para funciones personales (perfil, suscripciones, pagos)',
-        '',
-        '⚠️ *Incumplir estas reglas puede resultar en advertencias, restricciones o expulsión del grupo.*',
-        '',
-        '¡Gracias por mantener nuestra comunidad segura y agradable! 🙏'
-      ].join('\n');
-
-      const rulesEn = [
-        '📋 *PNPtv! Community Rules*',
-        '',
-        '1️⃣ *Respect:* Treat all members with respect and courtesy',
-        '',
-        '2️⃣ *No Spam:* Avoid spam, unauthorized advertising or repetitive content',
-        '',
-        '3️⃣ *Privacy:* Do not share personal information of other members without their consent',
-        '',
-        '4️⃣ *Appropriate Content:* Content must be appropriate for the community',
-        '',
-        '5️⃣ *No Harassment:* Harassment, bullying or hostile behavior will not be tolerated',
-        '',
-        '6️⃣ *Bot Usage:* Use the bot privately for personal features (profile, subscriptions, payments)',
-        '',
-        '⚠️ *Breaking these rules may result in warnings, restrictions or expulsion from the group.*',
-        '',
-        'Thank you for keeping our community safe and enjoyable! 🙏'
-      ].join('\n');
-
-      const message = lang === 'es' ? rulesEs : rulesEn;
-
-      const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
-
-      // Auto-delete menu messages in groups after 2 minutes
-      const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
-      if (isGroup) {
-        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
-      }
-    } catch (error) {
-      logger.error('Error showing group rules:', error);
-    }
+    logger.info('Group menu actions have been disabled');
+    await ctx.answerCbQuery('This feature has been disabled');
   });
 };
 
@@ -329,75 +228,8 @@ const showMainMenu = async (ctx) => {
  * @param {Context} ctx - Telegraf context
  */
 const showGroupMenu = async (ctx) => {
-  const lang = ctx.session?.language || 'en';
-  let username = ctx.from?.username ? `@${ctx.from.username}` : 'papi';
-  const botUsername = ctx.botInfo?.username || 'pnptv_bot';
-
-  // Mensaje de notificación en grupo
-  const notifyText = `${username} I sent a private message. Please check it out.`;
-  await ctx.reply(notifyText);
-
-  // Menú compacto con link al handle
-  const menuLink = `https://t.me/${botUsername}?start=group_menu`;
-  const menuText = lang === 'es'
-    ? `Menú rápido: [Abrir Bot](${menuLink})`
-    : `Quick menu: [Open Bot](${menuLink})`;
-  await ctx.reply(menuText, { parse_mode: 'Markdown' });
-
-  const messageEs = [
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    `👋 ¡Hola ${username}!`,
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    '',
-    '🙌 Este es tu panel rápido de miembros.',
-    '',
-    '🔒 Recuerda: las funciones principales de PNPtv! se manejan directamente desde el chat del bot para proteger tu privacidad.',
-    '',
-    'Desde aquí puedes:',
-    '• 📞 Contactar a un Admin',
-    '• 📋 Ver reglas de la comunidad',
-    '• 💬 Acceder al chat del bot',
-  ].join('\n');
-
-  const messageEn = [
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    `👋 Hey ${username}!`,
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    '',
-    '🙌 This is your quick member panel.',
-    '',
-    '🔒 Reminder: all core PNPtv! features work through the bot chat to protect your privacy.',
-    '',
-    'From here you can:',
-    '• 📞 Contact an Admin',
-    '• 📋 View community rules',
-    '• 💬 Access the bot chat',
-  ].join('\n');
-
-  const message = lang === 'es' ? messageEs : messageEn;
-
-  const keyboard = lang === 'es'
-    ? [
-      [Markup.button.callback('📞 Contactar a un Admin', 'group_contact_admin')],
-      [Markup.button.callback('📋 Reglas de la Comunidad', 'group_show_rules')],
-      [Markup.button.url(`💬 Chat Bot PNPtv!`, `https://t.me/${botUsername}?start=group_menu`)],
-    ]
-    : [
-      [Markup.button.callback('📞 Contact an Admin', 'group_contact_admin')],
-      [Markup.button.callback('📋 Community Rules', 'group_show_rules')],
-      [Markup.button.url(`💬 PNPtv! Bot Chat`, `https://t.me/${botUsername}?start=group_menu`)],
-    ];
-
-  const sentMessage = await ctx.reply(
-    message,
-    {
-      parse_mode: 'Markdown',
-      ...Markup.inlineKeyboard(keyboard),
-    },
-  );
-
-  // Auto-delete menu messages in groups after 2 minutes
-  ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30 * 1000, false);
+  // Group menu has been disabled
+  logger.info('Group menu functionality has been disabled');
 };
 
 /**
