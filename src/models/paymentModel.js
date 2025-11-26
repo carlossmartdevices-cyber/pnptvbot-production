@@ -26,9 +26,29 @@ class PaymentModel {
         updatedAt: new Date(),
       };
 
-      await paymentRef.set(data);
+      // Insert with plan_id and provider
+      await query(
+        `INSERT INTO payments (id, user_id, plan_id, provider, amount, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          paymentId,
+          data.userId,
+          data.planId || null,
+          data.provider || 'epayco',
+          data.amount,
+          data.status,
+          data.createdAt,
+          data.updatedAt
+        ]
+      );
 
-      logger.info('Payment created', { paymentId, userId: paymentData.userId });
+      logger.info('Payment created', {
+        paymentId,
+        userId: paymentData.userId,
+        planId: data.planId,
+        provider: data.provider
+      });
+
       return { id: paymentId, ...data };
     } catch (error) {
       logger.error('Error creating payment:', error);

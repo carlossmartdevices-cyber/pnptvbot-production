@@ -278,7 +278,7 @@ const translations = {
     chatWithCristina: '💬 Chat with Cristina (AI)',
     contactAdmin: '👨‍💼 Contact Admin',
     faq: '❓ FAQ',
-    cristinaGreeting: 'Hi! I\'m Cristina, your AI assistant. How can I help you today?',
+    cristinaGreeting: 'Hi! I\'m Cristina. How can I help you today?',
     adminMessage: 'Please type your message for our support team:',
     messageSent: 'Your message has been sent to our support team. We\'ll get back to you soon!',
 
@@ -646,7 +646,7 @@ const translations = {
     chatWithCristina: '💬 Chat con Cristina (IA)',
     contactAdmin: '👨‍💼 Contactar Admin',
     faq: '❓ Preguntas Frecuentes',
-    cristinaGreeting: '¡Hola! Soy Cristina, tu asistente IA. ¿Cómo puedo ayudarte hoy?',
+    cristinaGreeting: '¡Hola! Soy Cristina. ¿Cómo puedo ayudarte hoy?',
     adminMessage: 'Por favor escribe tu mensaje para nuestro equipo de soporte:',
     messageSent: '¡Tu mensaje ha sido enviado a nuestro equipo de soporte! Te responderemos pronto.',
 
