@@ -8,87 +8,85 @@ const { t } = require('../../../utils/i18n');
  * Filters messages in groups based on moderation rules
  * @returns {Function} Middleware function
  */
-const moderationFilter = () => {
-  return async (ctx, next) => {
-    try {
-      // Only moderate group/supergroup messages
-      const chatType = ctx.chat?.type;
-      if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
-        return next();
-      }
-
-      const groupId = ctx.chat.id;
-      const userId = ctx.from?.id;
-      const message = ctx.message || ctx.editedMessage;
-
-      // Skip if no message or user
-      if (!message || !userId) {
-        return next();
-      }
-
-      // Skip if message is from a bot
-      if (ctx.from?.is_bot) {
-        return next();
-      }
-
-      // Check if user is admin/creator (admins bypass moderation)
-      try {
-        const chatMember = await ctx.getChatMember(userId);
-        const isAdmin = ['creator', 'administrator'].includes(chatMember.status);
-
-        if (isAdmin) {
-          return next();
-        }
-      } catch (error) {
-        logger.error('Error checking chat member status:', error);
-        // Continue with moderation if we can't verify admin status
-      }
-
-      // Process message through moderation service
-      const result = await ModerationService.processMessage(message, groupId);
-
-      if (!result.shouldModerate) {
-        return next();
-      }
-
-      // Get language
-      const lang = ctx.session?.language || 'en';
-
-      // Handle moderation action
-      switch (result.action) {
-        case 'delete':
-          await handleDelete(ctx, result, lang);
-          break;
-
-        case 'warn':
-          await handleWarn(ctx, result, lang);
-          break;
-
-        case 'warn_and_delete':
-          await handleWarnAndDelete(ctx, result, lang);
-          break;
-
-        default:
-          logger.warn('Unknown moderation action', { action: result.action });
-          return next();
-      }
-
-      // Don't call next() - message has been moderated
-    } catch (error) {
-      logger.error('Moderation filter error:', error);
-      // On error, allow message through
+const moderationFilter = () => async (ctx, next) => {
+  try {
+    // Only moderate group/supergroup messages
+    const chatType = ctx.chat?.type;
+    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
       return next();
     }
-  };
+
+    const groupId = ctx.chat.id;
+    const userId = ctx.from?.id;
+    const message = ctx.message || ctx.editedMessage;
+
+    // Skip if no message or user
+    if (!message || !userId) {
+      return next();
+    }
+
+    // Skip if message is from a bot
+    if (ctx.from?.is_bot) {
+      return next();
+    }
+
+    // Check if user is admin/creator (admins bypass moderation)
+    try {
+      const chatMember = await ctx.getChatMember(userId);
+      const isAdmin = ['creator', 'administrator'].includes(chatMember.status);
+
+      if (isAdmin) {
+        return next();
+      }
+    } catch (error) {
+      logger.error('Error checking chat member status:', error);
+      // Continue with moderation if we can't verify admin status
+    }
+
+    // Process message through moderation service
+    const result = await ModerationService.processMessage(message, groupId);
+
+    if (!result.shouldModerate) {
+      return next();
+    }
+
+    // Get language
+    const lang = ctx.session?.language || 'en';
+
+    // Handle moderation action
+    switch (result.action) {
+      case 'delete':
+        await handleDelete(ctx, result, lang);
+        break;
+
+      case 'warn':
+        await handleWarn(ctx, result, lang);
+        break;
+
+      case 'warn_and_delete':
+        await handleWarnAndDelete(ctx, result, lang);
+        break;
+
+      default:
+        logger.warn('Unknown moderation action', { action: result.action });
+        return next();
+    }
+
+    // Don't call next() - message has been moderated
+  } catch (error) {
+    logger.error('Moderation filter error:', error);
+    // On error, allow message through
+    return next();
+  }
 };
 
 /**
  * Handle delete action (banned users)
  * @param {Object} ctx - Telegraf context
  * @param {Object} result - Moderation result
- * @param {string} lang - Language code
+ * @param {string} _lang - Language code (unused)
  */
-async function handleDelete(ctx, result, lang) {
+async function handleDelete(ctx, result, _lang) {
   try {
     // Delete the message
     await ctx.deleteMessage();
@@ -245,10 +243,10 @@ async function kickUser(ctx, userId, groupId, reason, lang) {
 
     // Notify group
     const userName = ctx.from.first_name || 'User';
-    const kickMessage = `🚫 ${t('moderation.user_kicked', lang)}\n\n` +
-      `👤 **${userName}** has been removed from the group.\n` +
-      `📋 **Reason:** ${t(`moderation.reason.${reason}`, lang)}\n` +
-      `⚠️ Maximum warnings (3) reached.`;
+    const kickMessage = `🚫 ${t('moderation.user_kicked', lang)}\n\n`
+      + `👤 **${userName}** has been removed from the group.\n`
+      + `📋 **Reason:** ${t(`moderation.reason.${reason}`, lang)}\n`
+      + '⚠️ Maximum warnings (3) reached.';
 
     const sentMessage = await ctx.reply(kickMessage, { parse_mode: 'Markdown' });
 
@@ -282,7 +280,7 @@ function formatWarningMessage(user, warningResult, reason, lang) {
     const remaining = maxWarnings - warningCount;
     message += `You have ${remaining} warning(s) remaining before being removed from the group.`;
   } else {
-    message += `Maximum warnings reached. You will be removed from the group.`;
+    message += 'Maximum warnings reached. You will be removed from the group.';
   }
 
   return message;
@@ -307,9 +305,9 @@ function formatPrivateWarningMessage(warningResult, reason, groupTitle, lang) {
   if (warningCount < maxWarnings) {
     const remaining = maxWarnings - warningCount;
     message += `You have **${remaining} warning(s)** remaining.\n\n`;
-    message += `Please follow the group rules to avoid being removed.`;
+    message += 'Please follow the group rules to avoid being removed.';
   } else {
-    message += `⛔ You have reached the maximum number of warnings and will be removed from the group.`;
+    message += '⛔ You have reached the maximum number of warnings and will be removed from the group.';
   }
 
   return message;

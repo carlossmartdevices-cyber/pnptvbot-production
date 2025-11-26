@@ -3,6 +3,7 @@ const menuHandlers = require('./menu');
 const profileHandlers = require('./profile');
 const nearbyHandlers = require('./nearby');
 const settingsHandlers = require('./settings');
+const groupWelcomeHandlers = require('./groupWelcome');
 
 /**
  * Register all user handlers
@@ -14,6 +15,7 @@ const registerUserHandlers = (bot) => {
   profileHandlers(bot);
   nearbyHandlers(bot);
   settingsHandlers(bot);
+  groupWelcomeHandlers(bot);
 };
 
 module.exports = registerUserHandlers;

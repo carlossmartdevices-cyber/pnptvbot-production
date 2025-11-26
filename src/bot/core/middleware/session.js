@@ -53,7 +53,7 @@ const sessionMiddleware = () => async (ctx, next) => {
         const ttl = parseInt(process.env.SESSION_TTL || '86400', 10);
         try {
           await cache.set(sessionKey, ctx.session, ttl);
-        } catch (redisError) {
+        } catch (_redisError) {
           // Fallback to in-memory storage
           memoryStore.set(sessionKey, ctx.session);
         }
@@ -67,7 +67,7 @@ const sessionMiddleware = () => async (ctx, next) => {
       try {
         try {
           await cache.del(sessionKey);
-        } catch (redisError) {
+        } catch (_redisError) {
           memoryStore.delete(sessionKey);
         }
         ctx.session = {

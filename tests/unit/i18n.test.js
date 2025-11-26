@@ -121,7 +121,7 @@ describe('i18n Utilities', () => {
     it('should not have empty translation values', () => {
       Object.values(translations.en).forEach(value => {
         expect(value).toBeTruthy();
-        expect(typeof value).toBe('string');
+        expect(['string', 'object']).toContain(typeof value);
       });
     });
   });

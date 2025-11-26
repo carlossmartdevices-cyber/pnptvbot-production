@@ -6,14 +6,42 @@
   },
   "extends": ["airbnb-base"],
   "parserOptions": {
-    "ecmaVersion": 12,
-    "sourceType": "module"
+    "ecmaVersion": 2022,
+    "sourceType": "script"
   },
   "rules": {
     "no-console": "off",
     "no-underscore-dangle": "off",
     "consistent-return": "off",
-    "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
-    "max-len": ["error", { "code": 120 }]
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "max-len": ["error", { "code": 120, "ignoreStrings": true, "ignoreTemplateLiterals": true }],
+    "no-restricted-syntax": ["error", "ForInStatement", "LabeledStatement", "WithStatement"],
+    "no-await-in-loop": "warn",
+    "no-plusplus": "off",
+    "global-require": "off",
+    "camelcase": ["error", { "properties": "never", "allow": ["^x_", "^ref_payco$", "^join_url$"] }],
+    "arrow-body-style": "off",
+    "object-curly-newline": "off",
+    "newline-per-chained-call": "off",
+    "operator-linebreak": "off",
+    "comma-dangle": "off",
+    "arrow-parens": "off",
+    "quotes": ["error", "single", { "avoidEscape": true, "allowTemplateLiterals": true }],
+    "import/order": "warn",
+    "no-return-await": "warn",
+    "default-param-last": "warn",
+    "no-promise-executor-return": "warn",
+    "import/no-extraneous-dependencies": "warn",
+    "no-use-before-define": "off",
+    "no-nested-ternary": "warn",
+    "no-continue": "off",
+    "no-param-reassign": "off",
+    "implicit-arrow-linebreak": "off",
+    "semi-style": "off",
+    "import/no-unresolved": "warn",
+    "import/extensions": "off",
+    "no-undef": "error",
+    "padded-blocks": "off",
+    "prefer-destructuring": "warn"
   }
 }

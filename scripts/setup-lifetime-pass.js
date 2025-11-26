@@ -6,6 +6,7 @@
  */
 
 require('dotenv').config();
+const { initializeFirebase, getFirestore } = require('../src/config/firebase');
 const logger = require('../src/utils/logger');
 const crypto = require('crypto');
 

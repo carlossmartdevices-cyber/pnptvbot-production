@@ -3,7 +3,6 @@ const CallModel = require('../../models/callModel');
 const PaymentModel = require('../../models/paymentModel');
 const UserModel = require('../../models/userModel');
 const logger = require('../../utils/logger');
-const { ConfigurationError } = require('../../utils/errors');
 
 /**
  * Call Service - Business logic for private 1:1 calls
@@ -224,12 +223,12 @@ class CallService {
    */
   static async sendCallReminder(bot, call, minutesBefore = 15) {
     try {
-      const message = `🔔 *Reminder: Private Call in ${minutesBefore} minutes*\n\n` +
-        `📅 Date: ${call.scheduledDate}\n` +
-        `⏰ Time: ${call.scheduledTime}\n` +
-        `⏱ Duration: ${call.duration} minutes\n\n` +
-        `🔗 Join here: ${call.meetingUrl}\n\n` +
-        `See you soon! 👋`;
+      const message = `🔔 *Reminder: Private Call in ${minutesBefore} minutes*\n\n`
+        + `📅 Date: ${call.scheduledDate}\n`
+        + `⏰ Time: ${call.scheduledTime}\n`
+        + `⏱ Duration: ${call.duration} minutes\n\n`
+        + `🔗 Join here: ${call.meetingUrl}\n\n`
+        + 'See you soon! 👋';
 
       await bot.telegram.sendMessage(call.userId, message, {
         parse_mode: 'Markdown',

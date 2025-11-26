@@ -111,8 +111,13 @@ const registerSettingsHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
 
+      const aboutText = `${t('about', lang)}\n\n`
+        + `🎬 PNPtv Bot v1.0.0\n\n`
+        + `Your entertainment hub for live streams, radio, and more!\n\n`
+        + `🌐 Website: https://pnptv.com\n`
+        + `📧 Support: support@pnptv.com`;
       await ctx.editMessageText(
-        `${t('about', lang)}\n\n🎬 PNPtv Bot v1.0.0\n\nYour entertainment hub for live streams, radio, and more!\n\n🌐 Website: https://pnptv.com\n📧 Support: support@pnptv.com`,
+        aboutText,
         Markup.inlineKeyboard([
           [Markup.button.callback(t('back', lang), 'show_settings')],
         ]),

@@ -1,6 +1,7 @@
 const { Markup } = require('telegraf');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
+const ChatCleanupService = require('../../services/chatCleanupService');
 
 /**
  * Main menu handlers
@@ -45,7 +46,13 @@ const registerMenuHandlers = (bot) => {
 
       const message = lang === 'es' ? messageEs : messageEn;
 
-      await ctx.reply(message, { parse_mode: 'Markdown' });
+      const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
+
+      // Auto-delete menu messages in groups after 2 minutes
+      const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+      if (isGroup) {
+        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000, false);
+      }
     } catch (error) {
       logger.error('Error in group contact admin:', error);
     }
@@ -78,7 +85,13 @@ const registerMenuHandlers = (bot) => {
 
       const message = lang === 'es' ? rulesEs : rulesEn;
 
-      await ctx.reply(message, { parse_mode: 'Markdown' });
+      const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
+
+      // Auto-delete menu messages in groups after 2 minutes
+      const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+      if (isGroup) {
+        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000, false);
+      }
     } catch (error) {
       logger.error('Error showing group rules:', error);
     }
@@ -113,7 +126,7 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(t('liveStreams', lang), 'show_live'),
       ],
       [
-        Markup.button.callback(t('radio', lang), 'show_radio'),
+        Markup.button.callback(t('radioMenu', lang), 'show_radio'),
         Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
       ],
       [
@@ -133,15 +146,13 @@ const showGroupMenu = async (ctx) => {
   const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'User';
   const botUsername = ctx.botInfo?.username || 'pnptv_bot';
 
-  const messageEs = `✨ Hola ${username}! Gracias por usar el Panel Rápido para Miembros del Grupo.\n\n` +
-    `🔒 Recuerda que para usar todas las funciones de PNPtv! debes hacerlo directamente desde el chat del bot, ` +
-    `por protección de tu privacidad y para cumplir con las políticas anti-spam de la comunidad.\n\n` +
-    `Desde este panel puedes acceder a estas opciones:`;
+  const messageEs = `✨ ¡Hola ${username}!\nGracias por pasarte por el Panel Rápido para Miembros 🙌\n\n` +
+    `🔒 Solo un recordatorio: las funciones principales de PNPtv! se manejan directamente desde el chat del bot. Así protegemos tu privacidad y mantenemos la comunidad limpia y libre de spam.\n\n` +
+    `Igual, desde este panel puedes acceder a las opciones esenciales:`;
 
-  const messageEn = `✨ Hi ${username}! Thanks for using the Quick Member Panel!\n\n` +
-    `🔒 Remember that to use all PNPtv! features you must do it directly through the bot chat, ` +
-    `to protect your privacy and comply with our community anti-spam policies.\n\n` +
-    `From this panel, you can still access these options:`;
+  const messageEn = `✨ Hey ${username}!\nThanks for stopping by the Quick Member Panel 🙌\n\n` +
+    `🔒 Just a heads-up: all core PNPtv! features work exclusively through the bot chat. This keeps your activity private and helps us maintain a clean, spam-free community for everyone.\n\n` +
+    `But no worries — from this panel you can still jump into the essentials:`;
 
   const message = lang === 'es' ? messageEs : messageEn;
 
@@ -157,13 +168,16 @@ const showGroupMenu = async (ctx) => {
       [Markup.button.url(`💬 PNPtv! Bot Chat`, `https://t.me/${botUsername}?start=group_menu`)],
     ];
 
-  await ctx.reply(
+  const sentMessage = await ctx.reply(
     message,
     {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard(keyboard),
     },
   );
+
+  // Auto-delete menu messages in groups after 2 minutes
+  ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000, false);
 };
 
 /**
@@ -186,7 +200,7 @@ const showMainMenuEdit = async (ctx) => {
           Markup.button.callback(t('liveStreams', lang), 'show_live'),
         ],
         [
-          Markup.button.callback(t('radio', lang), 'show_radio'),
+          Markup.button.callback(t('radioMenu', lang), 'show_radio'),
           Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
         ],
         [

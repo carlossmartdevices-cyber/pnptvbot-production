@@ -5,19 +5,22 @@ const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const DaimoConfig = require('../../../config/daimo');
+const registerActivationHandlers = require('./activation');
 
 /**
  * Payment handlers
  * @param {Telegraf} bot - Bot instance
  */
 const registerPaymentHandlers = (bot) => {
+  // Register activation code handlers
+  registerActivationHandlers(bot);
   // Show subscription plans
   bot.action('show_subscription_plans', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
       const plans = await PlanModel.getAll();
 
-      let message = t('subscriptionPlans', lang) + '\n\n';
+      let message = `${t('subscriptionPlans', lang)}\n\n`;
 
       const buttons = [];
       plans.forEach((plan) => {
@@ -172,36 +175,36 @@ const registerPaymentHandlers = (bot) => {
         const paymentApps = DaimoConfig.SUPPORTED_PAYMENT_APPS.join(', ');
 
         const message = lang === 'es'
-          ? `💳 *Pago con Daimo Pay*\n\n` +
-            `Plan: ${plan.nameEs || plan.name}\n` +
-            `Precio: $${plan.price} USDC\n\n` +
-            `📱 *Puedes pagar usando:*\n` +
-            `• Zelle\n` +
-            `• CashApp\n` +
-            `• Venmo\n` +
-            `• Revolut\n` +
-            `• Wise\n\n` +
-            `💡 *Cómo funciona:*\n` +
-            `1. Haz clic en "Pagar Ahora"\n` +
-            `2. Elige tu app de pago preferida\n` +
-            `3. El pago se convierte automáticamente a USDC\n` +
-            `4. Tu suscripción se activa inmediatamente\n\n` +
-            `🔒 Seguro y rápido en la red Optimism`
-          : `💳 *Pay with Daimo Pay*\n\n` +
-            `Plan: ${plan.name}\n` +
-            `Price: $${plan.price} USDC\n\n` +
-            `📱 *You can pay using:*\n` +
-            `• Zelle\n` +
-            `• CashApp\n` +
-            `• Venmo\n` +
-            `• Revolut\n` +
-            `• Wise\n\n` +
-            `💡 *How it works:*\n` +
-            `1. Click "Pay Now"\n` +
-            `2. Choose your preferred payment app\n` +
-            `3. Payment is automatically converted to USDC\n` +
-            `4. Your subscription activates immediately\n\n` +
-            `🔒 Secure and fast on Optimism network`;
+          ? '💳 *Pago con Daimo Pay*\n\n'
+            + `Plan: ${plan.nameEs || plan.name}\n`
+            + `Precio: $${plan.price} USDC\n\n`
+            + '📱 *Puedes pagar usando:*\n'
+            + '• Zelle\n'
+            + '• CashApp\n'
+            + '• Venmo\n'
+            + '• Revolut\n'
+            + '• Wise\n\n'
+            + '💡 *Cómo funciona:*\n'
+            + '1. Haz clic en "Pagar Ahora"\n'
+            + '2. Elige tu app de pago preferida\n'
+            + '3. El pago se convierte automáticamente a USDC\n'
+            + '4. Tu suscripción se activa inmediatamente\n\n'
+            + '🔒 Seguro y rápido en la red Optimism'
+          : '💳 *Pay with Daimo Pay*\n\n'
+            + `Plan: ${plan.name}\n`
+            + `Price: $${plan.price} USDC\n\n`
+            + '📱 *You can pay using:*\n'
+            + '• Zelle\n'
+            + '• CashApp\n'
+            + '• Venmo\n'
+            + '• Revolut\n'
+            + '• Wise\n\n'
+            + '💡 *How it works:*\n'
+            + '1. Click "Pay Now"\n'
+            + '2. Choose your preferred payment app\n'
+            + '3. Payment is automatically converted to USDC\n'
+            + '4. Your subscription activates immediately\n\n'
+            + '🔒 Secure and fast on Optimism network';
 
         await ctx.editMessageText(
           message,

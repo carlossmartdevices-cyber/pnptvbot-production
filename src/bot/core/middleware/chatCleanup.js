@@ -13,32 +13,30 @@ const logger = require('../../../utils/logger');
  * @param {number} delay - Delay in milliseconds (default: 5 minutes)
  * @returns {Function} Middleware function
  */
-const chatCleanupMiddleware = (delay = 5 * 60 * 1000) => {
-  return async (ctx, next) => {
-    const chatType = ctx.chat?.type;
+const chatCleanupMiddleware = (delay = 5 * 60 * 1000) => async (ctx, next) => {
+  const chatType = ctx.chat?.type;
 
-    // Only apply to groups and supergroups
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
-      return next();
+  // Only apply to groups and supergroups
+  if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+    return next();
+  }
+
+  try {
+    // Handle incoming messages
+    if (ctx.message) {
+      await handleIncomingMessage(ctx, delay);
     }
 
-    try {
-      // Handle incoming messages
-      if (ctx.message) {
-        await handleIncomingMessage(ctx, delay);
-      }
+    // Continue with the rest of the middleware chain
+    await next();
 
-      // Continue with the rest of the middleware chain
-      await next();
-
-      // Handle outgoing bot messages (replies)
-      await handleOutgoingMessages(ctx, delay);
-    } catch (error) {
-      logger.error('Chat cleanup middleware error:', error);
-      // Don't block the message flow
-      throw error;
-    }
-  };
+    // Handle outgoing bot messages (replies)
+    await handleOutgoingMessages(ctx, delay);
+  } catch (error) {
+    logger.error('Chat cleanup middleware error:', error);
+    // Don't block the message flow
+    throw error;
+  }
 };
 
 /**
@@ -46,7 +44,7 @@ const chatCleanupMiddleware = (delay = 5 * 60 * 1000) => {
  * Schedule deletion of commands and system messages
  */
 async function handleIncomingMessage(ctx, delay) {
-  const message = ctx.message;
+  const { message } = ctx;
 
   // Check if it's a command
   if (message.text && message.text.startsWith('/')) {
@@ -82,6 +80,7 @@ async function handleIncomingMessage(ctx, delay) {
 /**
  * Handle outgoing messages (bot replies)
  * Intercepts ctx.reply, ctx.replyWithMarkdown, etc.
+ * ALL bot messages in groups are auto-deleted unless marked as broadcast
  */
 async function handleOutgoingMessages(ctx, delay) {
   // Store original reply methods
@@ -90,66 +89,51 @@ async function handleOutgoingMessages(ctx, delay) {
   const originalReplyWithHTML = ctx.replyWithHTML;
   const originalReplyWithPhoto = ctx.replyWithPhoto;
   const originalReplyWithDocument = ctx.replyWithDocument;
+  const originalReplyWithVideo = ctx.replyWithVideo;
+  const originalReplyWithAnimation = ctx.replyWithAnimation;
+  const originalReplyWithAudio = ctx.replyWithAudio;
+  const originalReplyWithSticker = ctx.replyWithSticker;
+  const originalReplyWithVoice = ctx.replyWithVoice;
+  const originalReplyWithVideoNote = ctx.replyWithVideoNote;
+  const originalReplyWithLocation = ctx.replyWithLocation;
 
-  // Wrap reply method
-  ctx.reply = async function (...args) {
-    const sentMessage = await originalReply.apply(this, args);
+  /**
+   * Helper to wrap reply methods
+   * Checks if message has broadcast flag in extra options
+   */
+  const wrapReplyMethod = (originalMethod, methodName) => async function (...args) {
+    const sentMessage = await originalMethod.apply(this, args);
 
     if (sentMessage) {
-      ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, delay);
+      // Check if last argument has broadcast flag
+      const lastArg = args[args.length - 1];
+      const isBroadcast = lastArg && typeof lastArg === 'object' && lastArg.broadcast === true;
 
-      logger.debug('Bot message scheduled for deletion', {
+      ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, delay, isBroadcast);
+
+      logger.debug(`Bot message scheduled for deletion (${methodName})`, {
         chatId: ctx.chat.id,
         messageId: sentMessage.message_id,
+        isBroadcast,
       });
     }
 
     return sentMessage;
   };
 
-  // Wrap replyWithMarkdown
-  ctx.replyWithMarkdown = async function (...args) {
-    const sentMessage = await originalReplyWithMarkdown.apply(this, args);
-
-    if (sentMessage) {
-      ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, delay);
-    }
-
-    return sentMessage;
-  };
-
-  // Wrap replyWithHTML
-  ctx.replyWithHTML = async function (...args) {
-    const sentMessage = await originalReplyWithHTML.apply(this, args);
-
-    if (sentMessage) {
-      ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, delay);
-    }
-
-    return sentMessage;
-  };
-
-  // Wrap replyWithPhoto
-  ctx.replyWithPhoto = async function (...args) {
-    const sentMessage = await originalReplyWithPhoto.apply(this, args);
-
-    if (sentMessage) {
-      ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, delay);
-    }
-
-    return sentMessage;
-  };
-
-  // Wrap replyWithDocument
-  ctx.replyWithDocument = async function (...args) {
-    const sentMessage = await originalReplyWithDocument.apply(this, args);
-
-    if (sentMessage) {
-      ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, delay);
-    }
-
-    return sentMessage;
-  };
+  // Wrap all reply methods
+  ctx.reply = wrapReplyMethod(originalReply, 'reply');
+  ctx.replyWithMarkdown = wrapReplyMethod(originalReplyWithMarkdown, 'replyWithMarkdown');
+  ctx.replyWithHTML = wrapReplyMethod(originalReplyWithHTML, 'replyWithHTML');
+  ctx.replyWithPhoto = wrapReplyMethod(originalReplyWithPhoto, 'replyWithPhoto');
+  ctx.replyWithDocument = wrapReplyMethod(originalReplyWithDocument, 'replyWithDocument');
+  ctx.replyWithVideo = wrapReplyMethod(originalReplyWithVideo, 'replyWithVideo');
+  ctx.replyWithAnimation = wrapReplyMethod(originalReplyWithAnimation, 'replyWithAnimation');
+  ctx.replyWithAudio = wrapReplyMethod(originalReplyWithAudio, 'replyWithAudio');
+  ctx.replyWithSticker = wrapReplyMethod(originalReplyWithSticker, 'replyWithSticker');
+  ctx.replyWithVoice = wrapReplyMethod(originalReplyWithVoice, 'replyWithVoice');
+  ctx.replyWithVideoNote = wrapReplyMethod(originalReplyWithVideoNote, 'replyWithVideoNote');
+  ctx.replyWithLocation = wrapReplyMethod(originalReplyWithLocation, 'replyWithLocation');
 }
 
 /**

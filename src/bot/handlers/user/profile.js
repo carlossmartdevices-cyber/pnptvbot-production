@@ -1,9 +1,9 @@
 const { Markup } = require('telegraf');
+const moment = require('moment');
 const UserService = require('../../services/userService');
 const UserModel = require('../../../models/userModel');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
-const moment = require('moment');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
 /**
@@ -353,7 +353,8 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
     }
 
     // Interests (check privacy)
-    if (targetUser.interests && targetUser.interests.length > 0 && (isOwnProfile || targetUser.privacy?.showInterests !== false)) {
+    if (targetUser.interests && targetUser.interests.length > 0
+      && (isOwnProfile || targetUser.privacy?.showInterests !== false)) {
       profileText += `\n🎯 ${targetUser.interests.join(', ')}\n`;
     }
 

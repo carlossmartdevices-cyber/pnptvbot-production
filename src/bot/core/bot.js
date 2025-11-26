@@ -1,6 +1,5 @@
-require('dotenv').config();
+require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
-const express = require('express');
 const { initializeFirebase } = require('../../config/firebase');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
@@ -22,6 +21,10 @@ const registerMediaHandlers = require('../handlers/media');
 const registerModerationHandlers = require('../handlers/moderation');
 const registerModerationAdminHandlers = require('../handlers/moderation/adminCommands');
 const registerCallManagementHandlers = require('../handlers/admin/callManagement');
+const registerRoleManagementHandlers = require('../handlers/admin/roleManagement');
+const registerGamificationHandlers = require('../handlers/admin/gamification');
+const registerLiveStreamManagementHandlers = require('../handlers/admin/liveStreamManagement');
+const registerRadioManagementHandlers = require('../handlers/admin/radioManagement');
 const registerPrivateCallHandlers = require('../handlers/user/privateCalls');
 const registerPaymentHistoryHandlers = require('../handlers/user/paymentHistory');
 const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnalytics');
@@ -65,9 +68,10 @@ const startBot = async () => {
       validateCriticalEnvVars();
       logger.info('✓ Environment variables validated');
     } catch (error) {
-      logger.error('CRITICAL: Missing environment variables, but attempting to continue...');
+      logger.error('CRITICAL: Missing environment variables, cannot start bot');
       logger.error(error.message);
-      // Continuar de todos modos, el bot puede fallar después pero al menos intentamos
+      logger.error('Please configure all required environment variables in your .env file');
+      process.exit(1);
     }
 
     // Initialize Sentry (optional)
@@ -126,6 +130,10 @@ const startBot = async () => {
     registerModerationHandlers(bot); // User moderation commands
     registerModerationAdminHandlers(bot); // Admin moderation commands
     registerCallManagementHandlers(bot); // Admin call management
+    registerRoleManagementHandlers(bot); // Admin role management (superadmin only)
+    registerGamificationHandlers(bot); // Admin gamification management
+    registerLiveStreamManagementHandlers(bot); // Admin live stream management
+    registerRadioManagementHandlers(bot); // Admin radio management
     registerPrivateCallHandlers(bot); // User private call booking
     registerPaymentHistoryHandlers(bot); // User payment history and receipts
     registerPaymentAnalyticsHandlers(bot); // Admin payment analytics dashboard
@@ -168,12 +176,12 @@ const startBot = async () => {
         try {
           logger.info('Telegram webhook received:', {
             hasBody: !!req.body,
-            bodyKeys: req.body ? Object.keys(req.body) : [],
+            bodySize: req.body ? JSON.stringify(req.body).length : 0,
             contentType: req.headers['content-type'],
             method: req.method,
             path: req.path,
-            ip: req.ip,
-            userAgent: req.headers['user-agent'],
+            // Do not log IP or User-Agent for privacy
+            // Do not log bodyKeys as they may contain sensitive field names
           });
 
           // Validate that we have a body
@@ -221,7 +229,10 @@ const startBot = async () => {
     }
 
     // Add 404 and error handlers AFTER webhook callback
-    const { errorHandler: expressErrorHandler, notFoundHandler: expressNotFoundHandler } = require('../api/middleware/errorHandler');
+    const {
+      errorHandler: expressErrorHandler,
+      notFoundHandler: expressNotFoundHandler
+    } = require('../api/middleware/errorHandler');
     apiApp.use(expressNotFoundHandler);
     apiApp.use(expressErrorHandler);
     logger.info('✓ Error handlers registered');

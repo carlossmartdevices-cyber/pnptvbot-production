@@ -139,7 +139,7 @@ const registerOnboardingHandlers = (bot) => {
       // Validate message text exists
       if (!ctx.message?.text) {
         logger.warn('Email handler received message without text');
-        await ctx.reply(t('invalidInput', lang) + '\nPlease send a valid email address.');
+        await ctx.reply(`${t('invalidInput', lang)}\nPlease send a valid email address.`);
         return;
       }
 
@@ -148,7 +148,7 @@ const registerOnboardingHandlers = (bot) => {
 
       // Check email length (emails shouldn't exceed 254 characters per RFC)
       if (rawEmail.length > 254 || rawEmail.length < 5) {
-        await ctx.reply(t('invalidInput', lang) + '\nEmail must be between 5 and 254 characters.');
+        await ctx.reply(`${t('invalidInput', lang)}\nEmail must be between 5 and 254 characters.`);
         return;
       }
 
@@ -160,7 +160,7 @@ const registerOnboardingHandlers = (bot) => {
         await ctx.reply(t('emailReceived', lang));
         await completeOnboarding(ctx);
       } else {
-        await ctx.reply(t('invalidInput', lang) + '\nPlease send a valid email address (e.g., user@example.com).');
+        await ctx.reply(`${t('invalidInput', lang)}\nPlease send a valid email address (e.g., user@example.com).`);
       }
       return;
     }
@@ -209,9 +209,9 @@ const showTermsAndPrivacy = async (ctx) => {
   const lang = getLanguage(ctx);
 
   await ctx.reply(
-    t('termsAndPrivacy', lang) + '\n\n📄 Terms: https://pnptv.com/terms\n🔒 Privacy: https://pnptv.com/privacy',
+    `${t('termsAndPrivacy', lang)}\n\n📄 Terms: https://pnptv.com/terms\n🔒 Privacy: https://pnptv.com/privacy`,
     Markup.inlineKeyboard([
-      [Markup.button.callback('✅ ' + t('confirm', lang), 'accept_terms')],
+      [Markup.button.callback(`✅ ${t('confirm', lang)}`, 'accept_terms')],
     ]),
   );
 };

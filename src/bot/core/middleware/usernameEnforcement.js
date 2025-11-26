@@ -116,13 +116,13 @@ async function handleUsernameChange(ctx, userId, oldUsername, newUsername, group
     const firstName = ctx.from?.first_name || 'User';
     const lang = ctx.session?.language || 'en';
 
-    let notificationMessage = `🔔 **Username Change Detected**\n\n`;
+    let notificationMessage = '🔔 **Username Change Detected**\n\n';
     notificationMessage += `👤 **User:** ${firstName}\n`;
     notificationMessage += `📝 **Previous:** @${oldUsername || 'none'}\n`;
     notificationMessage += `📝 **Current:** @${newUsername || 'none'}\n`;
 
     if (hasRecentChange) {
-      notificationMessage += `\n⚠️ **Warning:** Multiple username changes detected within 24 hours.`;
+      notificationMessage += '\n⚠️ **Warning:** Multiple username changes detected within 24 hours.';
     }
 
     const sentMessage = await ctx.reply(notificationMessage, {
@@ -154,13 +154,13 @@ async function handleNoUsername(ctx, userId, groupId) {
     // Send warning message
     let warningMessage = `⚠️ **${t('moderation.username_required', lang)}**\n\n`;
     warningMessage += `👤 ${firstName}\n\n`;
-    warningMessage += `This group requires all members to have a Telegram username (@username).\n\n`;
-    warningMessage += `**How to set a username:**\n`;
-    warningMessage += `1. Open Telegram Settings\n`;
-    warningMessage += `2. Tap on "Username"\n`;
-    warningMessage += `3. Choose a unique username\n`;
-    warningMessage += `4. Return to this group once set\n\n`;
-    warningMessage += `Your messages will be deleted until you set a username.`;
+    warningMessage += 'This group requires all members to have a Telegram username (@username).\n\n';
+    warningMessage += '**How to set a username:**\n';
+    warningMessage += '1. Open Telegram Settings\n';
+    warningMessage += '2. Tap on "Username"\n';
+    warningMessage += '3. Choose a unique username\n';
+    warningMessage += '4. Return to this group once set\n\n';
+    warningMessage += 'Your messages will be deleted until you set a username.';
 
     const sentMessage = await ctx.reply(warningMessage, {
       parse_mode: 'Markdown',
@@ -173,9 +173,9 @@ async function handleNoUsername(ctx, userId, groupId) {
     try {
       await ctx.telegram.sendMessage(
         userId,
-        `⚠️ **Username Required**\n\n` +
-        `You need to set a Telegram username (@username) to participate in **${ctx.chat.title}**.\n\n` +
-        `Please set your username in Settings and return to the group.`,
+        '⚠️ **Username Required**\n\n'
+        + `You need to set a Telegram username (@username) to participate in **${ctx.chat.title}**.\n\n`
+        + 'Please set your username in Settings and return to the group.',
         { parse_mode: 'Markdown' },
       );
     } catch (error) {
@@ -207,14 +207,14 @@ async function notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsernam
 
     const firstName = ctx.from?.first_name || 'User';
 
-    const notificationMessage = `🚨 **Suspicious Username Change**\n\n` +
-      `👤 **User:** ${firstName} (ID: ${userId})\n` +
-      `📝 **Old:** @${oldUsername || 'none'}\n` +
-      `📝 **New:** @${newUsername || 'none'}\n` +
-      `📅 **When:** ${new Date().toLocaleString()}\n\n` +
-      `⚠️ This user has changed their username multiple times in the last 24 hours.\n` +
-      `This could indicate evasion attempts.\n\n` +
-      `Use /userhistory ${userId} to see full history.`;
+    const notificationMessage = '🚨 **Suspicious Username Change**\n\n'
+      + `👤 **User:** ${firstName} (ID: ${userId})\n`
+      + `📝 **Old:** @${oldUsername || 'none'}\n`
+      + `📝 **New:** @${newUsername || 'none'}\n`
+      + `📅 **When:** ${new Date().toLocaleString()}\n\n`
+      + '⚠️ This user has changed their username multiple times in the last 24 hours.\n'
+      + 'This could indicate evasion attempts.\n\n'
+      + `Use /userhistory ${userId} to see full history.`;
 
     // Send to each admin via DM
     for (const admin of admins) {

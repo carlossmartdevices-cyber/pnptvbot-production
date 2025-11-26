@@ -141,6 +141,7 @@ class SubscriptionController {
       }
 
       // Create checkout data for frontend
+      const baseUrl = process.env.BOT_WEBHOOK_DOMAIN || 'http://localhost:3000';
       const checkoutData = {
         planId,
         planName: plan.name,
@@ -154,8 +155,8 @@ class SubscriptionController {
         docType,
         publicKey: process.env.EPAYCO_PUBLIC_KEY,
         test: process.env.EPAYCO_TEST_MODE === 'true',
-        confirmationUrl: `${process.env.BOT_WEBHOOK_DOMAIN || 'http://localhost:3000'}/api/subscription/epayco/confirmation`,
-        responseUrl: `${process.env.BOT_WEBHOOK_DOMAIN || 'http://localhost:3000'}/api/subscription/payment-response`,
+        confirmationUrl: `${baseUrl}/api/subscription/epayco/confirmation`,
+        responseUrl: `${baseUrl}/api/subscription/payment-response`,
       };
 
       logger.info('Checkout session created', {
@@ -198,8 +199,29 @@ class SubscriptionController {
         x_extra3, // planId
       } = req.body;
 
-      // Verify signature (basic verification)
-      // In production, implement proper signature verification using EPAYCO_PRIVATE_KEY
+      // Verify ePayco signature for security
+      if (x_signature && process.env.EPAYCO_PRIVATE_KEY) {
+        const crypto = require('crypto');
+        const p_cust_id_cliente = process.env.EPAYCO_P_CUST_ID || '';
+        const p_key = process.env.EPAYCO_PRIVATE_KEY;
+
+        // ePayco signature format: x_cust_id_cliente^x_ref_payco^x_amount^x_currency_code
+        const signatureString = `${p_cust_id_cliente}^${p_key}^${x_ref_payco}^${x_transaction_state}^${x_amount}^${x_currency_code}`;
+        const expectedSignature = crypto.createHash('sha256').update(signatureString).digest('hex');
+
+        if (x_signature !== expectedSignature) {
+          logger.error('Invalid ePayco signature', {
+            received: x_signature,
+            expected: expectedSignature,
+            transactionId: x_ref_payco,
+          });
+          return res.status(400).send('Invalid signature');
+        }
+
+        logger.info('ePayco signature verified successfully');
+      } else {
+        logger.warn('ePayco signature verification skipped (missing signature or private key)');
+      }
 
       if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
         // Payment successful

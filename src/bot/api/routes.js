@@ -27,17 +27,32 @@ app.use(morgan('combined', { stream: logger.stream }));
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../../../public')));
 
+// Landing page routes
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+});
+
+app.get('/lifetime-pass', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+});
+
+app.get('/promo', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+});
+
+app.get('/pnptv-hot-sale', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+});
+
 // Function to conditionally apply middleware (skip for Telegram webhook)
-const conditionalMiddleware = (middleware) => {
-  return (req, res, next) => {
-    // Skip middleware for Telegram webhook to prevent connection issues
-    if (req.path === '/pnp/webhook/telegram') {
-      // Telegram Webhook
-      app.post('/pnp/webhook/telegram', webhookController.handleTelegramWebhook);
-      return next();
-    }
-    return middleware(req, res, next);
-  };
+const conditionalMiddleware = (middleware) => (req, res, next) => {
+  // Skip middleware for Telegram webhook to prevent connection issues
+  if (req.path === '/pnp/webhook/telegram') {
+    // Telegram Webhook
+    app.post('/pnp/webhook/telegram', webhookController.handleTelegramWebhook);
+    return next();
+  }
+  return middleware(req, res, next);
 };
 
 // Security middleware (conditionally applied, skips Telegram webhook)
@@ -123,7 +138,11 @@ app.get('/api/stats', asyncHandler(async (req, res) => {
 app.get('/api/subscription/plans', asyncHandler(subscriptionController.getPlans));
 app.post('/api/subscription/create-plan', asyncHandler(subscriptionController.createEpaycoPlan));
 app.post('/api/subscription/create-checkout', asyncHandler(subscriptionController.createCheckout));
-app.post('/api/subscription/epayco/confirmation', webhookLimiter, asyncHandler(subscriptionController.handleEpaycoConfirmation));
+app.post(
+  '/api/subscription/epayco/confirmation',
+  webhookLimiter,
+  asyncHandler(subscriptionController.handleEpaycoConfirmation)
+);
 app.get('/api/subscription/payment-response', asyncHandler(subscriptionController.handlePaymentResponse));
 app.get('/api/subscription/subscriber/:identifier', asyncHandler(subscriptionController.getSubscriber));
 app.get('/api/subscription/stats', asyncHandler(subscriptionController.getStatistics));
