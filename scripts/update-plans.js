@@ -50,7 +50,6 @@ const updatePlans = async () => {
         duration: 30,
         durationDays: 30,
         description: 'Full access to all premium features',
-        features: [
           'Premium channel access',
           'Basic support',
           'Access to Nearby Members feature',
@@ -71,7 +70,6 @@ const updatePlans = async () => {
         duration: 120,
         durationDays: 120,
         description: 'Extended membership with exclusive benefits',
-        features: [
           'All premium features',
           'Video calls',
           'Priority support',
@@ -93,7 +91,6 @@ const updatePlans = async () => {
         duration: 365,
         durationDays: 365,
         description: 'Annual membership with VIP benefits',
-        features: [
           'All premium features',
           'Video calls',
           'VIP access',
@@ -117,7 +114,6 @@ const updatePlans = async () => {
         duration: 36500, // 100 years as "lifetime"
         durationDays: 36500,
         description: 'One-time payment for lifetime access',
-        features: [
           'All premium features',
           'Video calls',
           'VIP access',
@@ -142,7 +138,6 @@ const updatePlans = async () => {
     // Create new plans
     logger.info('Creating new plans...');
     for (const plan of newPlans) {
-      await Plan.createOrUpdate(plan.id, plan);
       logger.info(`✓ Plan created: ${plan.name} - Tier: ${plan.tier} - $${plan.price} (${plan.duration} days)`);
     }
 
