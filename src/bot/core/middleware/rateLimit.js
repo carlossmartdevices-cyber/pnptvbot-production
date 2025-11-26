@@ -1,6 +1,8 @@
 const NodeCache = require('node-cache');
 const { config } = require('../../config/botConfig');
 const logger = require('../../../utils/logger');
+const { t } = require('../../../utils/i18n');
+const UserService = require('../../services/userService');
 
 // In-memory cache for rate limiting
 const rateLimitCache = new NodeCache({
@@ -21,10 +23,16 @@ const rateLimitMiddleware = () => {
       return next();
     }
 
-    const key = `ratelimit:${userId}`;
-    const timestamps = rateLimitCache.get(key) || [];
-    const now = Date.now();
-    const windowStart = now - windowMs;
+    // Exempt admin users from rate limiting
+    if (UserService.isAdmin(userId)) {
+      return next();
+    }
+
+    try {
+      await limiter.consume(userId.toString());
+      return next();
+    } catch (rejRes) {
+      const lang = ctx.session?.language || 'en';
 
     // Filter out old timestamps
     const recentRequests = timestamps.filter(t => t > windowStart);
