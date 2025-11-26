@@ -10,12 +10,14 @@ models:
     provider: anthropic
     model: claude-sonnet-4-20250514
     apiKey: ${ANTHROPIC_API_KEY}
+    apiBase: https://api.anthropic.com
 
   # Fast model for quick tasks
   - name: Claude Haiku
     provider: anthropic
     model: claude-3-5-haiku-20241022
     apiKey: ${ANTHROPIC_API_KEY}
+    apiBase: https://api.anthropic.com
 
 # MCP Servers that Continue can access
 # https://docs.continue.dev/customization/mcp-tools
@@ -35,3 +37,4 @@ tabAutocompleteModel:
   provider: anthropic
   model: claude-3-5-haiku-20241022
   apiKey: ${ANTHROPIC_API_KEY}
+  apiBase: https://api.anthropic.com
