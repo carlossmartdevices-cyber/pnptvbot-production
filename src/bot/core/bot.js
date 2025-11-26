@@ -6,10 +6,12 @@ const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
+const personalInfoFilterMiddleware = require('./middleware/personalInfoFilter');
 const allowedChatsMiddleware = require('./middleware/allowedChats');
 const usernameEnforcement = require('./middleware/usernameEnforcement');
 const profileCompliance = require('./middleware/profileCompliance');
 const moderationFilter = require('./middleware/moderationFilter');
+const autoModerationMiddleware = require('./middleware/autoModeration');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
 const commandAutoDeleteMiddleware = require('./middleware/commandAutoDelete');
@@ -47,10 +49,13 @@ const registerUserCallManagementHandlers = require('../handlers/user/callManagem
 const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
 const { registerLeaderboardHandlers } = require('../handlers/group/leaderboard');
+const registerMenuHandlers = require('../handlers/menu');
 // const registerZoomHandlers = require('../handlers/media/zoomV2'); // Temporarily disabled due to missing dependencies
 // Services
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
+const SubscriptionReminderService = require('../services/subscriptionReminderService');
+const { startCronJobs } = require('../../scripts/cron');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
 // API Server
@@ -125,6 +130,8 @@ const startBot = async () => {
     bot.use(usernameEnforcement());
     bot.use(profileCompliance());
     bot.use(moderationFilter());
+    bot.use(autoModerationMiddleware()); // Auto-moderation (spam, links, flooding, profanity)
+    bot.use(personalInfoFilterMiddleware()); // Filter personal information and redirect to DM
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
 
@@ -159,12 +166,16 @@ const startBot = async () => {
     registerCallFeedbackHandlers(bot);
     registerCallPackageHandlers(bot);
     registerLeaderboardHandlers(bot);
+    registerMenuHandlers(bot); // Menu system and Cristina AI
     registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic
     registerGroupSecurityHandlers(bot); // Group/channel security enforcement
     // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
     // Initialize call reminder service
     CallReminderService.initialize(bot);
     logger.info('✓ Call reminder service initialized');
+    // Initialize subscription reminder service
+    SubscriptionReminderService.initialize(bot);
+    logger.info('✓ Subscription reminder service initialized');
     // Initialize group cleanup service
     const groupCleanup = new GroupCleanupService(bot);
     groupCleanup.initialize();
@@ -234,6 +245,17 @@ const startBot = async () => {
       botInstance = bot; // Asignar la instancia del bot
       botStarted = true; // Actualizar el estado
       logger.info('✓ Bot started in polling mode');
+    }
+    // Start cron jobs for automated tasks (if enabled)
+    if (process.env.ENABLE_CRON === 'true') {
+      try {
+        await startCronJobs(bot);
+        logger.info('✓ Cron jobs started successfully');
+      } catch (error) {
+        logger.error('Error starting cron jobs:', error);
+      }
+    } else {
+      logger.info('ℹ️  Cron jobs disabled (set ENABLE_CRON=true to enable)');
     }
     // Add 404 and error handlers
     const {
