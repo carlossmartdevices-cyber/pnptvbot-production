@@ -149,7 +149,7 @@ class WarningService {
          WHERE user_id = $1
          AND group_id = $2
          AND action = 'mute'
-         AND (created_at + (duration || ' milliseconds')::interval) > NOW()
+         AND (created_at + duration * interval '1 millisecond') > NOW()
          ORDER BY created_at DESC
          LIMIT 1`,
         [userId.toString(), groupId.toString()]
@@ -190,7 +190,7 @@ class WarningService {
          WHERE user_id = $1
          AND group_id = $2
          AND action = 'mute'
-         AND (created_at + (duration || ' milliseconds')::interval) > NOW()`,
+         AND (created_at + duration * interval '1 millisecond') > NOW()`,
         [userId.toString(), groupId.toString()]
       );
 
