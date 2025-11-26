@@ -142,12 +142,12 @@ app.get('/health', healthLimiter, async (req, res) => {
     // Check PostgreSQL connection
     const { testConnection } = require('../../config/postgres');
     const isConnected = await testConnection();
-    health.dependencies.postgres = isConnected ? 'ok' : 'error';
+    health.dependencies.database = isConnected ? 'ok' : 'error';
     if (!isConnected) {
       health.status = 'degraded';
     }
   } catch (error) {
-    health.dependencies.postgres = 'error';
+    health.dependencies.database = 'error';
     health.status = 'degraded';
     logger.error('PostgreSQL health check failed:', error);
   }

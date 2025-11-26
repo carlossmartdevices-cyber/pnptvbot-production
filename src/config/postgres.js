@@ -25,7 +25,11 @@ const initializePostgres = () => {
     }
     pool = new Pool({
       connectionString,
-      ssl: process.env.POSTGRES_SSL === 'true' || (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false),
+      ssl: process.env.POSTGRES_SSL === 'true'
+        ? (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'test'
+            ? { rejectUnauthorized: false }
+            : true)
+        : false,
       max: process.env.POSTGRES_POOL_MAX ? parseInt(process.env.POSTGRES_POOL_MAX) : 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,

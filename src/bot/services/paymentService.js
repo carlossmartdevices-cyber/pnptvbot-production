@@ -1345,6 +1345,20 @@ class PaymentService {
   }
 
   /**
+   * Get payment history for a user
+   * @param {string} userId - User ID
+   * @returns {Promise<Array>} Payment history
+   */
+  static async getPaymentHistory(userId) {
+    try {
+      return await PaymentModel.getByUser(userId);
+    } catch (error) {
+      logger.error('Error fetching payment history:', { userId, error: error.message });
+      return [];
+    }
+  }
+
+  /**
    * Retry operation with exponential backoff
    * @param {Function} operation - Operation to retry
    * @param {number} maxRetries - Maximum number of retries

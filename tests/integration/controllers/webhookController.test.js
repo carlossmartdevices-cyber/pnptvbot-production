@@ -1,14 +1,18 @@
 const request = require('supertest');
 
-// Mock PaymentService
+// Mock PaymentService and DaimoService
 jest.mock('../../../src/bot/services/paymentService');
+jest.mock('../../../src/bot/services/daimoService');
 
 const app = require('../../../src/bot/api/routes');
 const PaymentService = require('../../../src/bot/services/paymentService');
+const DaimoService = require('../../../src/bot/services/daimoService');
 
 describe('Webhook Controller Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Mock signature verification to always return true in tests
+    DaimoService.verifyWebhookSignature = jest.fn().mockReturnValue(true);
   });
 
   describe('POST /api/webhooks/epayco', () => {
