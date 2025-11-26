@@ -21,7 +21,7 @@ const registerTopicMenuHandlers = (bot) => {
 
       // Only work in groups/supergroups with specific topic
       if ((chatType === 'group' || chatType === 'supergroup') && messageThreadId === VIDEOCALL_TOPIC_ID) {
-        await showVideoCallMenu(ctx);
+        await showVideoCallMenu(ctx, VIDEOCALL_TOPIC_ID);
       } else {
         // Silently ignore if not in the correct topic
         logger.debug(`/startcall ignored - not in topic ${VIDEOCALL_TOPIC_ID} (current: ${messageThreadId})`);
@@ -34,7 +34,7 @@ const registerTopicMenuHandlers = (bot) => {
   // Handle video call menu actions in topic
   bot.action('topic_video_menu', async (ctx) => {
     try {
-      await showVideoCallMenu(ctx);
+      await showVideoCallMenu(ctx, VIDEOCALL_TOPIC_ID);
     } catch (error) {
       logger.error('Error showing topic video menu:', error);
     }
@@ -101,8 +101,9 @@ const registerTopicMenuHandlers = (bot) => {
 /**
  * Show video call menu in topic 3809
  * @param {Context} ctx - Telegraf context
+ * @param {number} topicId - Topic ID to reply in
  */
-async function showVideoCallMenu(ctx) {
+async function showVideoCallMenu(ctx, topicId) {
   const message = [
     '📹 *Video Call Rooms Menu*',
     '',
@@ -118,16 +119,19 @@ async function showVideoCallMenu(ctx) {
     [Markup.button.callback('❌ Close Menu', 'topic_close_menu')]
   ]);
 
+  const replyOptions = {
+    parse_mode: 'Markdown',
+    message_thread_id: topicId,
+    ...keyboard
+  };
+
   if (ctx.callbackQuery) {
     await ctx.editMessageText(message, {
       parse_mode: 'Markdown',
       ...keyboard
     });
   } else {
-    await ctx.reply(message, {
-      parse_mode: 'Markdown',
-      ...keyboard
-    });
+    await ctx.reply(message, replyOptions);
   }
 }
 

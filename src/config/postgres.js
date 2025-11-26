@@ -13,10 +13,20 @@ const initializePostgres = () => {
   }
 
   try {
+    // Build connection string if DATABASE_URL is not set
+    let connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      const host = process.env.POSTGRES_HOST || 'localhost';
+      const port = process.env.POSTGRES_PORT || '5432';
+      const database = process.env.POSTGRES_DATABASE || 'pnptvbot';
+      const user = process.env.POSTGRES_USER || 'pnptvbot';
+      const password = process.env.POSTGRES_PASSWORD || '';
+      connectionString = `postgresql://${user}:${password}@${host}:${port}/${database}`;
+    }
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      max: 20,
+      connectionString,
+      ssl: process.env.POSTGRES_SSL === 'true' || (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false),
+      max: process.env.POSTGRES_POOL_MAX ? parseInt(process.env.POSTGRES_POOL_MAX) : 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
     });
@@ -74,6 +84,14 @@ const closePool = async () => {
 };
 
 /**
+ * Get a client from the pool
+ * @returns {Promise<Object>} PostgreSQL client
+ */
+const getClient = async () => {
+  return await getPool().connect();
+};
+
+/**
  * Execute a query
  * @param {string} text - SQL query
  * @param {Array} params - Query parameters
@@ -90,6 +108,7 @@ const query = async (text, params) => {
 module.exports = {
   initializePostgres,
   getPool,
+  getClient,
   testConnection,
   closePool,
   query,
