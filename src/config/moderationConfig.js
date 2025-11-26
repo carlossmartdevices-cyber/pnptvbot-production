@@ -59,11 +59,23 @@ const MODERATION_CONFIG = {
     LINKS: {
       enabled: true,
       allowedDomains: [
+        // PNPtv official
         'pnptv.com',
+        'pnptv.app',
+        // Social media (official domains only)
+        'x.com',
+        'twitter.com',
+        'facebook.com',
+        'fb.com',
+        'instagram.com',
+        'tiktok.com',
+        // Media platforms
         'youtube.com',
         'youtu.be',
         'spotify.com',
         'soundcloud.com',
+        // Note: Only official domains are allowed to prevent scams
+        // Shortened URLs and suspicious domains will be blocked
       ],
       // Admins and prime members can post any links
       exemptPrime: true,

@@ -39,7 +39,8 @@ A comprehensive, easy-to-use moderation system for the PNPtv Telegram bot.
 
 #### Link Filtering
 - Blocks unauthorized external links
-- Whitelist for approved domains
+- Whitelist for approved domains (official social media, PNPtv, media platforms)
+- Prevents scam links and shortened URLs
 - Exempts admins and PRIME members
 
 #### Profanity Filter
