@@ -2,6 +2,7 @@ const { Markup } = require('telegraf');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const ChatCleanupService = require('../../services/chatCleanupService');
+const PermissionService = require('../../services/permissionService');
 
 /**
  * Envía mensaje de bienvenida y link de ingreso al canal PRIME
@@ -260,7 +261,8 @@ const showMainMenu = async (ctx) => {
   const chatType = ctx.chat?.type;
   const user = ctx.session?.user || {};
   const isPremium = user.subscriptionStatus === 'active';
-  const isAdmin = user.role === 'admin';
+  const userId = ctx.from?.id;
+  const isAdmin = user.role === 'admin' || PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId);
   const username = ctx.from?.username || ctx.from?.first_name || 'Member';
 
   if (chatType === 'group' || chatType === 'supergroup') {
@@ -360,7 +362,8 @@ const showMainMenuEdit = async (ctx) => {
   const lang = ctx.session?.language || 'en';
   const user = ctx.session?.user || {};
   const isPremium = user.subscriptionStatus === 'active';
-  const isAdmin = user.role === 'admin';
+  const userId = ctx.from?.id;
+  const isAdmin = user.role === 'admin' || PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId);
   const username = ctx.from?.username || ctx.from?.first_name || 'Member';
 
   let menuText;
@@ -450,7 +453,8 @@ const showMainMenuEdit = async (ctx) => {
 const showLiveRadioTopicMenu = async (ctx) => {
   const user = ctx.session?.user || {};
   const isPremium = user.subscriptionStatus === 'active';
-  const isAdmin = user.role === 'admin';
+  const userId = ctx.from?.id;
+  const isAdmin = user.role === 'admin' || PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId);
   const firstName = ctx.from?.first_name || 'friend';
   const botUsername = ctx.botInfo?.username || 'PNPtvbot';
 

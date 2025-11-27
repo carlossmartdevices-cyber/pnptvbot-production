@@ -2,6 +2,7 @@ const { Markup } = require('telegraf');
 const RoleService = require('../../../services/roleService');
 const ApprovalService = require('../../../services/approvalService');
 const UserModel = require('../../../models/userModel');
+const PermissionService = require('../../services/permissionService');
 const logger = require('../../../utils/logger');
 const ACCESS_CONTROL_CONFIG = require('../../../config/accessControlConfig');
 
@@ -126,6 +127,12 @@ function topicPermissionsMiddleware() {
       // Check if Telegram admin (always allow)
       const isAdmin = await isTelegramAdmin(ctx);
       if (isAdmin) {
+        return next();
+      }
+
+      // Check if env-based admin/superadmin (always allow)
+      if (PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId)) {
+        logger.debug('Admin/SuperAdmin bypass: topic permissions skipped', { userId });
         return next();
       }
 
