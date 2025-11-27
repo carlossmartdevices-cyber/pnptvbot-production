@@ -1,14 +1,34 @@
 const logger = require('../../../utils/logger');
 const ChatCleanupService = require('../../services/chatCleanupService');
+const PermissionService = require('../../services/permissionService');
 
 const GROUP_ID = process.env.GROUP_ID;
 const AUTO_DELETE_DELAY = 5 * 60 * 1000; // 5 minutes
 
 /**
+ * Check if a message is from Cristina AI
+ * @param {string} text - Message text
+ * @returns {boolean}
+ */
+function isCristinaResponse(text) {
+  if (!text) return false;
+  // Cristina responses typically contain these patterns
+  return text.includes('Cristina') || 
+         text.includes('💜') ||
+         text.includes('Yes papi') ||
+         text.includes('Sí papi') ||
+         text.includes('¿Sí papi');
+}
+
+/**
  * Group Message Auto-Delete Middleware
  * 
- * Automatically schedules all bot messages sent to groups
+ * Automatically schedules bot messages sent to groups
  * for deletion after 5 minutes.
+ * 
+ * EXCEPTIONS (not auto-deleted):
+ * - Cristina AI responses
+ * - Messages triggered by admins
  * 
  * This keeps the group clean and focused on user content.
  */
@@ -21,11 +41,21 @@ function groupMessageAutoDeleteMiddleware() {
     // Check if this is a group context
     const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
     
+    // Check if user is admin (don't auto-delete responses to admins)
+    const userId = ctx.from?.id;
+    const isAdmin = userId && (
+      PermissionService.isEnvSuperAdmin(userId) || 
+      PermissionService.isEnvAdmin(userId)
+    );
+    
     // Override ctx.reply for groups
     ctx.reply = async (text, extra = {}) => {
       const message = await originalReply(text, extra);
       
-      if (isGroup && message) {
+      // Skip auto-delete for:
+      // 1. Admin-triggered messages
+      // 2. Cristina AI responses
+      if (isGroup && message && !isAdmin && !isCristinaResponse(text)) {
         // Schedule deletion after 5 minutes
         ChatCleanupService.scheduleDelete(
           ctx.telegram,
@@ -54,7 +84,10 @@ function groupMessageAutoDeleteMiddleware() {
       const chatIdStr = chatId.toString();
       const isTargetGroup = GROUP_ID ? chatIdStr === GROUP_ID : chatIdStr.startsWith('-');
       
-      if (isTargetGroup && message) {
+      // Skip auto-delete for:
+      // 1. Admin-triggered messages
+      // 2. Cristina AI responses
+      if (isTargetGroup && message && !isAdmin && !isCristinaResponse(text)) {
         // Schedule deletion after 5 minutes
         ChatCleanupService.scheduleDelete(
           ctx.telegram,
