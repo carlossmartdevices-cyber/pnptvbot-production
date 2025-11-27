@@ -15,11 +15,7 @@ const registerSettingsHandlers = (bot) => {
       const lang = getLanguage(ctx);
 
       const settingsText = 
-        '```\n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
-        '      ⚙️ Settings         \n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
-        '```\n\n' +
+        '`⚙️ Settings`\n\n' +
         'Customize your PNPtv! experience.\n\n' +
         '_Choose an option below:_';
 
@@ -45,11 +41,7 @@ const registerSettingsHandlers = (bot) => {
   bot.action('settings_language', async (ctx) => {
     try {
       const langText = 
-        '```\n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
-        '      🌐 Language         \n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
-        '```\n\n' +
+        '`🌐 Language`\n\n' +
         'Select your preferred language:\n' +
         '_Selecciona tu idioma preferido:_';
 
@@ -104,11 +96,7 @@ const registerSettingsHandlers = (bot) => {
       const lang = getLanguage(ctx);
 
       const notifText = 
-        '```\n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
-        '    🔔 Notifications      \n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
-        '```\n\n' +
+        '`🔔 Notifications`\n\n' +
         '_Coming soon..._\n\n' +
         'You\'ll be able to customize:\n' +
         '• Message alerts\n' +
@@ -136,11 +124,7 @@ const registerSettingsHandlers = (bot) => {
       const lang = getLanguage(ctx);
 
       const privacyText = 
-        '```\n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
-        '       🔒 Privacy         \n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
-        '```\n\n' +
+        '`🔒 Privacy`\n\n' +
         '_Coming soon..._\n\n' +
         'You\'ll be able to control:\n' +
         '• Who sees your profile\n' +
@@ -168,22 +152,14 @@ const registerSettingsHandlers = (bot) => {
       const lang = getLanguage(ctx);
 
       const aboutText = 
-        '```\n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
-        '       ℹ️ About           \n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
-        '```\n\n' +
+        '`ℹ️ About`\n\n' +
         '🎬 **PNPtv Bot** v1.0.0\n\n' +
         'Your entertainment hub for:\n' +
         '• Live streams & shows\n' +
         '• Radio & podcasts\n' +
         '• Community connections\n' +
         '• And much more!\n\n' +
-        '```\n' +
-        '┌─────────────────────────┐\n' +
-        '│  Made with 💜 by PNPtv  │\n' +
-        '└─────────────────────────┘\n' +
-        '```\n\n' +
+        '`Made with 💜 by PNPtv`\n\n' +
         '🌐 pnptv.app\n' +
         '📧 support@pnptv.app';
 

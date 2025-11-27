@@ -78,9 +78,9 @@ function mediaMirrorMiddleware() {
 
         // Header box
         mirrorCaption += '```\n';
-        mirrorCaption += '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n';
+        mirrorCaption += '──────────────────────────────┐\n';
         mirrorCaption += '    🔥 HOT PROFILE 🔥     \n';
-        mirrorCaption += '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n';
+        mirrorCaption += '──────────────────────────────┘\n';
         mirrorCaption += '```\n\n';
 
         // Username with looking for text (no bold, just plain text)

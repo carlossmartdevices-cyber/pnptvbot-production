@@ -934,58 +934,39 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
     if (isOwnProfile) {
       // New header design for own profile
       profileText = lang === 'es'
-        ? [
-            '```',
-            '━━━━━━━━━━━━━━━━━━━━━━━━━━┐',
-            '     📸 Mi Perfil PNPtv   ',
-            '━━━━━━━━━━━━━━━━━━━━━━━━━━┘',
-            '```',
-            '',
-            'Tu perfil es tu identidad en la comunidad.',
-            'Se mostrará bajo cada foto que compartas,',
-            'ayudando a otros a conectar contigo.',
-            '',
-            '```',
-            '┌─────────────────────────┐',
-            '│  Edita tu info abajo   │',
-            '└─────────────────────────┘',
-            '```',
-            '',
-          ].join('\n')
-        : [
-            '```',
-            '━━━━━━━━━━━━━━━━━━━━━━━━━━┐',
-            '    📸 My PNPtv Profile   ',
-            '━━━━━━━━━━━━━━━━━━━━━━━━━━┘',
-            '```',
-            '',
-            'Your profile is your identity in the community.',
-            'It shows under every photo you share,',
-            'helping others connect with you.',
-            '',
-            '```',
-            '┌─────────────────────────┐',
-            '│  Edit your info below  │',
-            '└─────────────────────────┘',
-            '```',
-            '',
-          ].join('\n');
+        ? '`📸 Mi Perfil PNPtv`\n\n' +
+          'Tu perfil es tu identidad en la comunidad.\n' +
+          'Se mostrará bajo cada foto que compartas,\n' +
+          'ayudando a otros a conectar contigo.\n\n' +
+          '`Edita tu info abajo`\n\n'
+        : '`📸 My PNPtv Profile`\n\n' +
+          'Your profile is your identity in the community.\n' +
+          'It shows under every photo you share,\n' +
+          'helping others connect with you.\n\n' +
+          '`Edit your info below`\n\n';
     } else {
       // Standard header for viewing other profiles
-      profileText = [
-        '```',
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐',
-        '      👤 User Profile     ',
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘',
-        '```',
-        '',
-      ].join('\n');
+      profileText = '`👤 User Profile`\n\n';
     }
 
     // Add user info section
+    const badgesLine = targetUser.badges && targetUser.badges.length > 0
+      ? targetUser.badges.map(badge => {
+          if (typeof badge === 'string') {
+            return t(`badges.${badge}`, lang) || badge;
+          }
+          if (typeof badge === 'object' && badge.emoji && badge.name) {
+            return `${badge.emoji} ${badge.name}`;
+          }
+          if (typeof badge === 'object' && badge.icon && badge.name) {
+            return `${badge.icon} ${badge.name}`;
+          }
+          return '';
+        }).filter(Boolean).join(' ')
+      : '';
+
     const userInfoLines = [
-      targetUser.badges && targetUser.badges.length > 0
-        ? targetUser.badges.map(badge => (typeof badge === 'object' && badge.icon ? `${badge.icon} ${badge.name}` : t(`badges.${badge}`, lang))).filter(Boolean).join(' ') : '',
+      badgesLine,
       `👤 ${targetUser.firstName || 'User'} ${targetUser.lastName || ''}`,
       targetUser.username ? `@${targetUser.username}` : '',
       targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `📝 ${targetUser.bio}` : '',
@@ -1046,7 +1027,7 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
     if (isOwnProfile) {
       // New button layout matching the design
       // Options header
-      profileText += `\n${lang === 'es' ? 'Opciones' : 'Options'} ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      profileText += `\n\`${lang === 'es' ? 'Opciones' : 'Options'}\`\n`;
 
       // Row 1: Update Profile | Update Picture
       keyboard.push([
@@ -1371,14 +1352,19 @@ const shareProfile = async (ctx) => {
       const badgeList = user.badges.map((badge) => {
         if (typeof badge === 'string') {
           const badgeKey = `badges.${badge}`;
-          return t(badgeKey, lang);
+          return t(badgeKey, lang) || badge;
+        }
+        if (typeof badge === 'object' && badge.emoji && badge.name) {
+          return `${badge.emoji} ${badge.name}`;
         }
         if (typeof badge === 'object' && badge.icon && badge.name) {
           return `${badge.icon} ${badge.name}`;
         }
         return '';
       }).filter(Boolean).join('  ');
-      cardText += `${badgeList}\n\n`;
+      if (badgeList) {
+        cardText += `${badgeList}\n\n`;
+      }
     }
 
     // Main Profile Section

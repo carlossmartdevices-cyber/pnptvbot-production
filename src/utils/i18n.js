@@ -67,11 +67,7 @@ Tap "Subscribe to PRIME" below to get instant access.`,
     support: '🤖 Support',
     settings: '⚙️ Settings',
     // Subscription
-    subscriptionHeader: `\`\`\`
-━━━━━━━━━━━━━━━━━━━━━━━━━━┐
-    💎 Unlock PRIME! 💎    
-━━━━━━━━━━━━━━━━━━━━━━━━━━┘
-\`\`\``,
+    subscriptionHeader: '`💎 Unlock PRIME! 💎`',
     subscriptionDivider: '',
     subscriptionDescription: `Unlock the full PNPtv experience and join
 the hottest Latino PnP community! 🔥
@@ -86,11 +82,7 @@ the hottest Latino PnP community! 🔥
 
 **Choose your plan below:**
 
-\`\`\`
-┌─────────────────────────┐
-│  Let's get cloudy! ☁️  │
-└─────────────────────────┘
-\`\`\``,
+\`Let's get cloudy! ☁️\``,
     subscriptionPlans: '💎 Choose Your PRIME Plan:',
     planTrial: '🧪 Trial Week',
     planTrialDesc: '7 days to explore the full PNPtv! experience. Perfect to try before you commit.',
@@ -273,7 +265,7 @@ explore Nearby without limits, and join private events.`,
     yourEmotes: 'Your Emotes',
 
     // Radio
-    radioTitle: '```\n━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n    📻 PNPtv Radio 24/7   \n━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n```',
+    radioTitle: '`📻 PNPtv Radio 24/7`',
     listenNow: '🎧 Listen Now',
     requestSong: '🎵 Request Song',
     nowPlaying: '🎵 Now Playing',
@@ -548,11 +540,7 @@ Toca "Suscribete a PRIME" para obtener acceso inmediato.`,
     support: '🤖 Soporte',
     settings: '⚙️ Configuración',
     // Subscription
-    subscriptionHeader: `\`\`\`
-━━━━━━━━━━━━━━━━━━━━━━━━━━┐
-   💎 Desbloquea PRIME! 💎  
-━━━━━━━━━━━━━━━━━━━━━━━━━━┘
-\`\`\``,
+    subscriptionHeader: '`💎 Desbloquea PRIME! 💎`',
     subscriptionDivider: '',
     subscriptionDescription: `Desbloquea la experiencia completa de PNPtv
 y únete a la comunidad Latina más hot! 🔥
@@ -567,11 +555,7 @@ y únete a la comunidad Latina más hot! 🔥
 
 **Elige tu plan abajo:**
 
-\`\`\`
-┌─────────────────────────┐
-│   Vamos a volar! ☁️    │
-└─────────────────────────┘
-\`\`\``,
+\`Vamos a volar! ☁️\``,
     subscriptionPlans: '💎 Elige tu Plan PRIME:',
     planTrial: '🧪 Semana de Prueba',
     planTrialDesc: '7 días para explorar la experiencia completa de PNPtv!. Perfecto para probar antes de comprometerte.',
@@ -757,7 +741,7 @@ explorar Cercanos sin limites y unirte a eventos privados.`,
     yourEmotes: 'Tus Emotes',
 
     // Radio
-    radioTitle: '```\n━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n   📻 Radio PNPtv 24/7    \n━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n```',
+    radioTitle: '`📻 Radio PNPtv 24/7`',
     listenNow: '🎧 Escuchar Ahora',
     requestSong: '🎵 Pedir Canción',
     nowPlaying: '🎵 Sonando Ahora',

@@ -137,11 +137,7 @@ const registerSupportHandlers = (bot) => {
       const lang = getLanguage(ctx);
 
       const supportText = 
-        '```\n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
-        '       🆘 Help Center     \n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
-        '```\n\n' +
+        '`🆘 Help Center`\n\n' +
         'Need help? We got you! 💜\n\n' +
         '**Cristina** is our AI assistant —\n' +
         'she can answer questions about:\n' +
@@ -179,11 +175,7 @@ const registerSupportHandlers = (bot) => {
       if (!mistral) {
         await ctx.answerCbQuery();
         const errorText = 
-          '```\n' +
-          '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
-          '       ❌ Unavailable     \n' +
-          '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
-          '```\n\n' +
+          '`❌ Unavailable`\n\n' +
           'AI chat is not available right now.\n' +
           'Please contact Santino directly.';
 
@@ -202,28 +194,20 @@ const registerSupportHandlers = (bot) => {
       // Reset chat session counters
       ctx.session.temp.aiChatHistory = [];
       ctx.session.temp.aiQuestionCount = 0; // Track questions asked
+      ctx.session.temp.aiChatActive = true; // Activate AI chat mode
       await ctx.saveSession();
 
       await ctx.answerCbQuery();
 
       const greeting = 
-        '```\n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
-        '   🤖 Cristina AI Chat    \n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
-        '```\n\n' +
+        '`🤖 Cristina AI Chat`\n\n' +
         '**Hey! I\'m Cristina** 💜\n\n' +
         'I\'m here to help you with:\n' +
         '• 🛡️ Harm reduction & safer use\n' +
         '• 💗 Sexual & mental health\n' +
         '• 🏠 Community resources\n' +
         '• 📱 Platform help\n\n' +
-        '```\n' +
-        '┌─────────────────────────┐\n' +
-        '│  Just type your message │\n' +
-        '│  and I\'ll respond! 💬  │\n' +
-        '└─────────────────────────┘\n' +
-        '```\n\n' +
+        '`Just type your message and I\'ll respond! 💬`\n\n' +
         '_5 questions before human support.\n' +
         'Tap on /exit to clear history._';
 
@@ -265,11 +249,7 @@ const registerSupportHandlers = (bot) => {
       const lang = getLanguage(ctx);
 
       const faqText = 
-        '```\n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
-        '         ❓ FAQ           \n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
-        '```\n\n' +
+        '`❓ FAQ`\n\n' +
         '**1. How do I get PRIME?**\n' +
         '→ Menu > Unlock PRIME > Choose plan\n\n' +
         '**2. How do I update my profile?**\n' +
@@ -280,12 +260,7 @@ const registerSupportHandlers = (bot) => {
         '→ Requires PRIME > Members Area > Streams\n\n' +
         '**5. How do I contact support?**\n' +
         '→ Chat with Cristina or contact Santino\n\n' +
-        '```\n' +
-        '┌─────────────────────────┐\n' +
-        '│  Still need help? 💬   │\n' +
-        '│  Chat with Cristina!   │\n' +
-        '└─────────────────────────┘\n' +
-        '```';
+        '`Still need help? 💬 Chat with Cristina!`';
 
       await ctx.editMessageText(
         faqText,
@@ -302,32 +277,68 @@ const registerSupportHandlers = (bot) => {
     }
   });
 
-  // Handle text messages - AI chat is now automatic for all messages
+  // Handle text messages for AI chat
   bot.on('text', async (ctx, next) => {
     // Skip commands - let them be handled by command handlers
     if (ctx.message?.text?.startsWith('/')) {
       return next();
     }
 
-    // AUTO AI CHAT: Process all non-command messages through AI
+    const chatType = ctx.chat?.type;
+    const isGroup = chatType === 'group' || chatType === 'supergroup';
+    const userMessage = ctx.message?.text || '';
+
+    // IN GROUPS: Only respond if message mentions "Cristina" (case insensitive)
+    if (isGroup) {
+      const mentionsCristina = /\bcristina\b/i.test(userMessage);
+      if (!mentionsCristina) {
+        return next(); // Don't respond in groups unless Cristina is mentioned
+      }
+      // Remove "Cristina" from the message before processing
+      const cleanedMessage = userMessage.replace(/\bcristina\b/i, '').trim();
+      if (!cleanedMessage) {
+        // Just said "Cristina" with no question
+        const lang = getLanguage(ctx);
+        await ctx.reply(
+          lang === 'es'
+            ? '¿Sí papi? ¿Qué necesitas? 💜'
+            : 'Yes papi? What do you need? 💜',
+          { reply_to_message_id: ctx.message.message_id }
+        );
+        return;
+      }
+      // Store cleaned message for processing
+      ctx.cristinaMessage = cleanedMessage;
+    } else {
+      // IN PRIVATE: Only process when AI chat session is active
+      if (!ctx.session.temp?.aiChatActive) {
+        return next();
+      }
+      ctx.cristinaMessage = userMessage;
+    }
+
+    // AI CHAT: Process messages
     // Special modes (contactingAdmin, requestingActivation) are handled after this block
     if (!ctx.session.temp?.contactingAdmin && !ctx.session.temp?.requestingActivation) {
       try {
         const lang = getLanguage(ctx);
         const userId = ctx.from.id;
+        const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+
+        // Use cleaned message (without "Cristina") or original
+        const messageToProcess = ctx.cristinaMessage || ctx.message?.text;
 
         // Validate message text exists
-        if (!ctx.message?.text) {
+        if (!messageToProcess) {
           logger.warn('AI chat received message without text');
           return next();
         }
 
-        const userMessage = ctx.message.text;
-
-        // Allow users to exit AI chat with "exit" or "/exit"
-        if (userMessage.toLowerCase() === 'exit' || userMessage.toLowerCase() === '/exit') {
+        // Allow users to exit AI chat with "exit" or "/exit" (only in private)
+        if (!isGroup && (messageToProcess.toLowerCase() === 'exit' || messageToProcess.toLowerCase() === '/exit')) {
           ctx.session.temp.aiChatHistory = null;
           ctx.session.temp.aiQuestionCount = 0;
+          ctx.session.temp.aiChatActive = false; // Deactivate AI chat
           await ctx.saveSession();
 
           await ctx.reply(
@@ -348,6 +359,7 @@ const registerSupportHandlers = (bot) => {
           // Reset counters after reaching limit
           ctx.session.temp.aiChatHistory = null;
           ctx.session.temp.aiQuestionCount = 0;
+          ctx.session.temp.aiChatActive = false; // Deactivate AI chat
           await ctx.saveSession();
 
           const limitMessage = lang === 'es'
@@ -397,7 +409,7 @@ const registerSupportHandlers = (bot) => {
             // Add user message to history
             ctx.session.temp.aiChatHistory.push({
               role: 'user',
-              content: userMessage,
+              content: messageToProcess,
             });
 
             // Keep only last 10 messages to manage token usage
@@ -427,27 +439,35 @@ const registerSupportHandlers = (bot) => {
             ctx.session.temp.aiQuestionCount = (ctx.session.temp.aiQuestionCount || 0) + 1;
             await ctx.saveSession();
 
-            // Send AI response with appropriate footer
-            const questionsRemaining = 5 - ctx.session.temp.aiQuestionCount;
-            let footer;
+            // For groups, don't show question count footer
+            let footer = '';
+            if (!isGroup) {
+              const questionsRemaining = 5 - ctx.session.temp.aiQuestionCount;
 
-            if (questionsRemaining === 0) {
-              footer = lang === 'es'
-                ? '\n\n_Esta fue tu última pregunta. La próxima te conectaré con un humano._'
-                : '\n\n_This was your last question. Next time I\'ll connect you with a human._';
-            } else if (questionsRemaining === 1) {
-              footer = lang === 'es'
-                ? '\n\n_Te queda 1 pregunta más. Toca /exit para salir._'
-                : '\n\n_You have 1 question left. Tap on /exit to leave._';
-            } else {
-              footer = lang === 'es'
-                ? `\n\n_Te quedan ${questionsRemaining} preguntas. Toca /exit para salir._`
-                : `\n\n_You have ${questionsRemaining} questions left. Tap on /exit to leave._`;
+              if (questionsRemaining === 0) {
+                footer = lang === 'es'
+                  ? '\n\n_Esta fue tu última pregunta. La próxima te conectaré con un humano._'
+                  : '\n\n_This was your last question. Next time I\'ll connect you with a human._';
+              } else if (questionsRemaining === 1) {
+                footer = lang === 'es'
+                  ? '\n\n_Te queda 1 pregunta más. Toca /exit para salir._'
+                  : '\n\n_You have 1 question left. Tap on /exit to leave._';
+              } else {
+                footer = lang === 'es'
+                  ? `\n\n_Te quedan ${questionsRemaining} preguntas. Toca /exit para salir._`
+                  : `\n\n_You have ${questionsRemaining} questions left. Tap on /exit to leave._`;
+              }
+            }
+
+            // Reply to message in groups for context
+            const replyOptions = { parse_mode: 'Markdown' };
+            if (isGroup) {
+              replyOptions.reply_to_message_id = ctx.message.message_id;
             }
 
             const sentMessage = await ctx.reply(
               `${aiResponse}${footer}`,
-              { parse_mode: 'Markdown' }
+              replyOptions
             );
 
             // Mark Cristina's response as permanent (won't be deleted)

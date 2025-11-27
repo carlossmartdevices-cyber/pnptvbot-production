@@ -6,6 +6,20 @@ const logger = require('../../../utils/logger');
 const GROUP_ID = process.env.GROUP_ID;
 const AUTO_DELETE_DELAY = 3 * 60 * 1000; // 3 minutes
 
+// Deduplication: track recently processed joins to avoid duplicate welcomes
+const recentJoins = new Map(); // Map<`${chatId}_${userId}`, timestamp>
+const DEDUPE_WINDOW = 60 * 1000; // 60 seconds window to prevent duplicates
+
+// Cleanup old entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of recentJoins.entries()) {
+    if (now - timestamp > DEDUPE_WINDOW) {
+      recentJoins.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
 // Badge options with emojis and descriptions
 const BADGE_OPTIONS = {
   meth_alpha: { emoji: '🔥', name: 'Meth Alpha', description: 'The fire starter' },
@@ -312,12 +326,11 @@ async function handleGetPrimeAction(ctx) {
     const userLang = ctx.from.language_code || 'en';
     const isSpanish = userLang.startsWith('es');
 
-    const message = `\`\`\`
-Unlock PRIME
+    const message = `\`💎 Unlock PRIME\`
 
 Unlock the full PNPtv! experience and join the hottest Latino PnP community on Telegram — unfiltered, intimate, raw, and always active.
 
-As a PRIME member, you get instant access to:
+**As a PRIME member, you get instant access to:**
 
 • Full-length videos (Santino + sexy Latino performers)
 • Weekly new content drops
@@ -329,12 +342,8 @@ As a PRIME member, you get instant access to:
 
 Choose the plan that fits you best.
 Pay with debit/credit card, crypto, popular pay apps — and soon PayPal.
-Once payment is completed, you'll receive a private message with your member access, plus an email with your invoice and onboarding instructions.
 
-If you need help, send a message and Cristina, our intelligent chatbot agent, will guide you instantly — or connect you directly with Santino.
-
-Membership Plans
-\`\`\``;
+\`Membership Plans\``;
 
     // Create inline keyboard with plan buttons
     const keyboard = Markup.inlineKeyboard([
@@ -384,15 +393,13 @@ Membership Plans
  */
 async function handleBookCallAction(ctx) {
   try {
-    const message = `\`\`\`
-Book a Video Call
+    const message = `\`📹 Book a Video Call\`
 
-Coming This Weekend!
+**Coming This Weekend!**
 
 Private 1:1 video calls with Santino and other hot performers will be available very soon.
 
-Stay tuned — this feature drops this weekend!
-\`\`\``;
+_Stay tuned — this feature drops this weekend!_`;
 
     // Answer the callback query
     await ctx.answerCbQuery('Coming this weekend! 🔥', { show_alert: true });
@@ -427,21 +434,19 @@ Stay tuned — this feature drops this weekend!
  */
 async function handleSetupProfileAction(ctx) {
   try {
-    const message = `\`\`\`
-My PNPtv Profile
+    const message = `\`👤 My PNPtv Profile\`
 
 Your PNPtv! profile is your identity inside the community.
 It will be automatically linked under every photo you share in the group, helping other members discover who you are and connect with you.
 
 This section also shows your subscription status and the benefits included in your current membership tier.
 
-Your profile includes:
+**Your profile includes:**
 • Bio, interests, tribe & what you're looking for
 • Your profile picture
 • Your social links
 • Your membership tier and perks
-• A shareable community profile card
-\`\`\``;
+• A shareable community profile card`;
 
     // Create inline keyboard with profile options
     const keyboard = Markup.inlineKeyboard([
@@ -504,12 +509,30 @@ async function handleNewMembers(ctx) {
     }
 
     const newMembers = ctx.message.new_chat_members;
+    const chatId = ctx.chat.id;
 
     for (const member of newMembers) {
       // Skip if the new member is a bot
       if (member.is_bot) {
         continue;
       }
+
+      // Deduplication check - prevent duplicate welcome messages
+      const dedupeKey = `${chatId}_${member.id}`;
+      const lastJoinTime = recentJoins.get(dedupeKey);
+      const now = Date.now();
+
+      if (lastJoinTime && (now - lastJoinTime) < DEDUPE_WINDOW) {
+        logger.debug('Skipping duplicate welcome message', { 
+          userId: member.id, 
+          chatId,
+          timeSinceLastJoin: now - lastJoinTime 
+        });
+        continue;
+      }
+
+      // Mark this join as processed
+      recentJoins.set(dedupeKey, now);
 
       // Create or update user in database
       try {

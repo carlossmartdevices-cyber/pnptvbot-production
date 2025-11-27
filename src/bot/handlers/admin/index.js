@@ -2233,6 +2233,120 @@ const registerAdminHandlers = (bot) => {
       await ctx.answerCbQuery('Error al mostrar opciones');
     }
   });
+
+  // =====================================================
+  // PINNED MENU COMMAND FOR GROUP TOPICS
+  // Usage: /sendmenu <topic_type>
+  // topic_type: general, wall, news
+  // =====================================================
+  bot.command('sendmenu', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.reply('❌ Solo administradores pueden usar este comando.');
+        return;
+      }
+
+      const args = ctx.message.text.split(' ').slice(1);
+      const topicType = args[0]?.toLowerCase();
+
+      if (!topicType) {
+        await ctx.reply(
+          '📌 **Enviar Menú Fijable a Topic**\n\n' +
+          'Uso: `/sendmenu <tipo>`\n\n' +
+          '**Tipos disponibles:**\n' +
+          '• `general` - Menú General → /menu\n' +
+          '• `wall` - Wall of Fame → /nearby + /cristina\n' +
+          '• `news` - News & Updates → /help\n\n' +
+          'Ejemplo: `/sendmenu general`',
+          { parse_mode: 'Markdown' }
+        );
+        return;
+      }
+
+      const botUsername = ctx.botInfo?.username || 'PNPtvbot';
+      let menuMessage;
+      let keyboard;
+
+      switch (topicType) {
+        case 'general':
+          // General topic - /menu button
+          menuMessage = 
+            '`📌 PNPtv Bot Menu`\n\n' +
+            '👋 Hey! Tap the button below to open your personal menu.\n\n' +
+            '• View your profile\n' +
+            '• Check subscription status\n' +
+            '• Access all bot features\n' +
+            '• Talk to Cristina AI\n\n' +
+            '`Tap below to start! 👇`';
+
+          keyboard = Markup.inlineKeyboard([
+            [Markup.button.url('📱 Open Menu', `https://t.me/${botUsername}?start=menu`)],
+          ]);
+          break;
+
+        case 'wall':
+          // Wall of Fame - /nearby + /cristina
+          menuMessage = 
+            '`🏆 Wall of Fame`\n\n' +
+            '🌟 Welcome to the Wall of Fame!\n\n' +
+            '**Find & Connect:**\n' +
+            '• 📍 Tap **Nearby** to find members close to you\n' +
+            '• 🤖 Tap **Cristina** to chat with our AI assistant\n\n' +
+            '`Share your profile and connect! 💜`';
+
+          keyboard = Markup.inlineKeyboard([
+            [
+              Markup.button.url('📍 Nearby', `https://t.me/${botUsername}?start=show_nearby`),
+              Markup.button.url('🤖 Cristina', `https://t.me/${botUsername}?start=cristina`),
+            ],
+          ]);
+          break;
+
+        case 'news':
+          // News - /help
+          menuMessage = 
+            '`📰 News & Updates`\n\n' +
+            '📢 Stay updated with the latest from PNPtv!\n\n' +
+            '**Need Help?**\n' +
+            '• Tap **Help** for support and FAQs\n' +
+            '• Learn about features and how to use them\n\n' +
+            '`Questions? We\'re here for you! 🆘`';
+
+          keyboard = Markup.inlineKeyboard([
+            [Markup.button.url('🆘 Help & Support', `https://t.me/${botUsername}?start=show_support`)],
+          ]);
+          break;
+
+        default:
+          await ctx.reply(
+            '❌ Tipo no reconocido.\n\n' +
+            'Tipos válidos: `general`, `wall`, `news`',
+            { parse_mode: 'Markdown' }
+          );
+          return;
+      }
+
+      // Send the menu message
+      await ctx.reply(menuMessage, {
+        parse_mode: 'Markdown',
+        ...keyboard,
+      });
+
+      // Delete the command message
+      try {
+        await ctx.deleteMessage();
+      } catch (e) {
+        // Ignore if can't delete
+      }
+
+      logger.info('Pinned menu sent', { topicType, adminId: ctx.from.id, chatId: ctx.chat.id });
+
+    } catch (error) {
+      logger.error('Error sending pinned menu:', error);
+      await ctx.reply('❌ Error al enviar el menú.');
+    }
+  });
 };
 
 module.exports = registerAdminHandlers;

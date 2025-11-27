@@ -16,19 +16,13 @@ const registerNearbyHandlers = (bot) => {
 
       // Sexy monospace design
       const headerText = 
-        '```\n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
-        '   🔥 Find Nearby Users   \n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
-        '```\n\n' +
+        '`🔥 Find Nearby Users`\n\n' +
         'Looking for that meth alpha, that cloudy papi,\n' +
         'or a slam slut close to you?\n\n' +
         '💡 _Complete your PNPtv! profile so the right\n' +
         'guys can spot you, hit you up, and get the\n' +
         'fun started fast._\n\n' +
-        '```\n' +
-        '📍 Distance ━━━━━━━━━━━━━━━━━\n' +
-        '```';
+        '`📍 Select distance:`';
 
       await ctx.editMessageText(
         headerText,
@@ -73,11 +67,7 @@ const registerNearbyHandlers = (bot) => {
 
       if (nearbyUsers.length === 0) {
         const noResultsText = 
-          '```\n' +
-          '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
-          '      😢 No Results       \n' +
-          '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
-          '```\n\n' +
+          '`😢 No Results`\n\n' +
           `No users found within ${radius} km 😔\n\n` +
           '_Try a larger radius or check back later!_';
 
@@ -96,11 +86,7 @@ const registerNearbyHandlers = (bot) => {
 
       // Show list of nearby users with sexy design
       let message = 
-        '```\n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
-        '   🔥 Nearby Hotties 🔥   \n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
-        '```\n\n' +
+        '`🔥 Nearby Hotties 🔥`\n\n' +
         `Found **${nearbyUsers.length}** users within ${radius} km 👀\n\n`;
 
       const buttons = [];
@@ -149,11 +135,7 @@ const registerNearbyHandlers = (bot) => {
 
       // Build sexy profile card
       let profileText = 
-        '```\n' +
-        '╔════════════════════════╗\n' +
-        '║    👤 PROFILE CARD     ║\n' +
-        '╚════════════════════════╝\n' +
-        '```\n\n';
+        '`👤 PROFILE CARD`\n\n';
 
       const displayName = user.firstName || 'Anonymous';
       profileText += `**${displayName}**`;
@@ -185,11 +167,7 @@ const registerNearbyHandlers = (bot) => {
       }
 
       profileText += 
-        '```\n' +
-        '┌─────────────────────────┐\n' +
-        '│  Don\'t be shy... DM!   │\n' +
-        '└─────────────────────────┘\n' +
-        '```';
+        '`Don\'t be shy... DM! 💬`';
 
       // Build DM button
       let dmButton;
