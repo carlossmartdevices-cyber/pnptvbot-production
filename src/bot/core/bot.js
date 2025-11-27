@@ -29,6 +29,7 @@ const {
   groupMenuRedirectMiddleware,
   groupCommandDeleteMiddleware
 } = require('./middleware/groupBehavior');
+const { groupMessageAutoDeleteMiddleware } = require('./middleware/groupMessageAutoDelete');
 const logger = require('../../utils/logger');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
@@ -137,6 +138,7 @@ const startBot = async () => {
     bot.use(groupCommandReminder());
 
     // Group behavior rules (OVERRIDE all previous rules)
+    bot.use(groupMessageAutoDeleteMiddleware()); // Auto-delete ALL bot messages in groups after 5 minutes
     bot.use(groupBehaviorMiddleware()); // Route all bot messages to topic 3135, 3-min delete
     bot.use(cristinaGroupFilterMiddleware()); // Filter personal info from Cristina in groups
     bot.use(groupMenuRedirectMiddleware()); // Redirect menu button clicks to private
