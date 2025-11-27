@@ -2,6 +2,18 @@ const logger = require('../utils/logger');
 const UserModel = require('../models/userModel');
 
 /**
+ * Helper to check if user is admin/superadmin from env vars
+ * @param {string|number} userId - User ID
+ * @returns {boolean}
+ */
+function isEnvAdminOrSuperAdmin(userId) {
+  const superAdminId = process.env.ADMIN_ID?.trim();
+  const adminIds = (process.env.ADMIN_USER_IDS || '').split(',').map(id => id.trim()).filter(id => id);
+  const userIdStr = String(userId);
+  return (superAdminId && userIdStr === superAdminId) || adminIds.includes(userIdStr);
+}
+
+/**
  * User Service - Handles user-related operations
  */
 class UserService {
@@ -38,11 +50,18 @@ class UserService {
 
   /**
    * Check if user is premium
+   * Admin/SuperAdmin users ALWAYS have access (bypass premium check)
    * @param {string|number} userId - Telegram user ID
    * @returns {Promise<boolean>}
    */
   static async isPremium(userId) {
     try {
+      // BYPASS: Admin and SuperAdmin always have premium access
+      if (isEnvAdminOrSuperAdmin(userId)) {
+        logger.debug('Admin/SuperAdmin bypass: premium check skipped', { userId });
+        return true;
+      }
+      
       const user = await UserModel.findByTelegramId(userId);
       return user && user.subscriptionStatus === 'active';
     } catch (error) {

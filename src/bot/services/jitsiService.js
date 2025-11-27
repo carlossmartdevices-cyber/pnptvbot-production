@@ -1,6 +1,7 @@
 const JitsiRoomModel = require('../../models/jitsiRoomModel');
 const User = require('../../models/userModel');
 const logger = require('../../utils/logger');
+const PermissionService = require('./permissionService');
 
 /**
  * Jitsi Service
@@ -125,8 +126,14 @@ class JitsiService {
 
     /**
      * Get user's plan tier
+     * Admins get Premium tier regardless of subscription
      */
     static getPlanTier(user) {
+        // Admins always get Premium tier
+        if (user.telegramId && (PermissionService.isEnvSuperAdmin(user.telegramId) || PermissionService.isEnvAdmin(user.telegramId))) {
+            return 'Premium';
+        }
+        
         if (user.subscriptionStatus !== 'active' && user.subscriptionStatus !== 'trial') {
             return null;
         }
@@ -223,8 +230,24 @@ class JitsiService {
 
     /**
      * Get available tiers for a user based on their plan
+     * Admins get all tiers with unlimited usage
      */
     static async getAvailableTiers(userId) {
+        // Admins get all tiers with unlimited usage
+        if (PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId)) {
+            return Object.keys(this.TIER_INFO).map(tier => ({
+                tier,
+                info: this.TIER_INFO[tier],
+                maxRoomsPerDay: 999,
+                roomsUsed: 0,
+                roomsRemaining: 999,
+                maxDuration: 999,
+                canRecord: true,
+                canSetPassword: true,
+                canCreatePrivate: true
+            }));
+        }
+        
         const user = await User.getById(userId);
         if (!user) {
             return [];
@@ -259,8 +282,14 @@ class JitsiService {
 
     /**
      * Check if user has premium access
+     * Admins always have premium access
      */
     static async hasPremiumAccess(userId) {
+        // Admins always have premium access
+        if (PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId)) {
+            return true;
+        }
+        
         const user = await User.getById(userId);
         if (!user) return false;
 

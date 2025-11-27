@@ -44,6 +44,30 @@ app.get('/pnptv-hot-sale', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
 });
 
+// Lifetime Pass landing page ($100)
+app.get('/lifetime100', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'lifetime-pass.html'));
+});
+
+// Terms and Conditions / Privacy Policy
+app.get('/terms', pageLimiter, (req, res) => {
+  const lang = req.query.lang || 'en';
+  const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
+  res.sendFile(path.join(__dirname, '../../../public', fileName));
+});
+
+app.get('/privacy', pageLimiter, (req, res) => {
+  const lang = req.query.lang || 'en';
+  const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
+  res.sendFile(path.join(__dirname, '../../../public', fileName));
+});
+
+app.get('/policies', pageLimiter, (req, res) => {
+  const lang = req.query.lang || 'en';
+  const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
+  res.sendFile(path.join(__dirname, '../../../public', fileName));
+});
+
 // Function to conditionally apply middleware (skip for Telegram webhook)
 const conditionalMiddleware = (middleware) => (req, res, next) => {
   // Skip middleware for Telegram webhook to prevent connection issues

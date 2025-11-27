@@ -18,18 +18,31 @@ const registerLiveHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
 
+      const liveText = lang === 'es'
+        ? '`🎤 Transmisiones en Vivo`\n\n' +
+          '¡Mira o inicia tu propio show en vivo! 🔥\n\n' +
+          '**Cristina**, nuestra asistente IA, está aquí para ayudarte.\n\n' +
+          '`Elige una opción abajo 💜`'
+        : '`🎤 Live Streams`\n\n' +
+          'Watch or start your own live show! 🔥\n\n' +
+          '**Cristina**, our AI assistant, is here to help.\n\n' +
+          '`Choose an option below 💜`';
+
       await ctx.editMessageText(
-        t('liveTitle', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('startLive', lang), 'live_start')],
-          [Markup.button.callback(t('viewStreams', lang), 'live_view')],
-          [
-            Markup.button.callback('📁 Browse Categories', 'live_browse_categories'),
-            Markup.button.callback('🎬 VODs', 'live_view_vods'),
-          ],
-          [Markup.button.callback(t('myStreams', lang), 'live_my_streams')],
-          [Markup.button.callback(t('back', lang), 'back_to_main')],
-        ]),
+        liveText,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(t('startLive', lang), 'live_start')],
+            [Markup.button.callback(t('viewStreams', lang), 'live_view')],
+            [
+              Markup.button.callback(lang === 'es' ? '📁 Categorías' : '📁 Browse Categories', 'live_browse_categories'),
+              Markup.button.callback('🎬 VODs', 'live_view_vods'),
+            ],
+            [Markup.button.callback(t('myStreams', lang), 'live_my_streams')],
+            [Markup.button.callback(t('back', lang), 'back_to_main')],
+          ]),
+        }
       );
     } catch (error) {
       logger.error('Error showing live menu:', error);

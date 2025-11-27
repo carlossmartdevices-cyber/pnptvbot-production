@@ -11,6 +11,19 @@ const moderationFilter = require('./middleware/moderationFilter');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
 const errorHandler = require('./middleware/errorHandler');
+// Topic middleware
+const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./middleware/topicPermissions');
+const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
+const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
+const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
+const { groupSecurityEnforcementMiddleware, registerGroupSecurityHandlers } = require('./middleware/groupSecurityEnforcement');
+// Group behavior rules (overrides previous rules)
+const {
+  groupBehaviorMiddleware,
+  cristinaGroupFilterMiddleware,
+  groupMenuRedirectMiddleware,
+  groupCommandDeleteMiddleware
+} = require('./middleware/groupBehavior');
 const logger = require('../../utils/logger');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
@@ -104,6 +117,7 @@ const startBot = async () => {
     }
     // Create bot instance
     const bot = new Telegraf(process.env.BOT_TOKEN);
+    
     // Register middleware
     bot.use(sessionMiddleware());
     bot.use(rateLimitMiddleware());
@@ -112,6 +126,19 @@ const startBot = async () => {
     bot.use(moderationFilter());
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
+
+    // Group behavior rules (OVERRIDE all previous rules)
+    bot.use(groupBehaviorMiddleware()); // Route all bot messages to topic 3135, 3-min delete
+    bot.use(cristinaGroupFilterMiddleware()); // Filter personal info from Cristina in groups
+    bot.use(groupMenuRedirectMiddleware()); // Redirect menu button clicks to private
+    bot.use(groupCommandDeleteMiddleware()); // Delete commands after 3 minutes
+
+    // Topic-specific middlewares
+    bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
+    bot.use(commandRedirectionMiddleware()); // Redirect commands to notifications
+    bot.use(mediaMirrorMiddleware()); // Mirror media to PNPtv Gallery
+    bot.use(topicPermissionsMiddleware()); // Admin-only and approval queue
+    bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery
     // Register handlers
     registerUserHandlers(bot);
     registerAdminHandlers(bot);
@@ -162,6 +189,13 @@ const startBot = async () => {
           if (!req.body || Object.keys(req.body).length === 0) {
             logger.warn('Webhook received empty body');
             return res.status(200).json({ ok: true, message: 'Empty body received' });
+          }
+          // Log the callback query data if present
+          if (req.body.callback_query) {
+            logger.info(`>>> CALLBACK_QUERY received: data=${req.body.callback_query.data}, from=${req.body.callback_query.from?.id}`);
+          }
+          if (req.body.message) {
+            logger.info(`>>> MESSAGE received: text=${req.body.message.text || 'N/A'}, from=${req.body.message.from?.id}`);
           }
           await bot.handleUpdate(req.body);
           res.status(200).json({ ok: true });

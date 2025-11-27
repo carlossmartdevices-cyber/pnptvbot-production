@@ -14,16 +14,32 @@ const registerNearbyHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
 
+      // Sexy monospace design
+      const headerText = 
+        '`🔥 Find Nearby Users`\n\n' +
+        'Looking for that meth alpha, that cloudy papi,\n' +
+        'or a slam slut close to you?\n\n' +
+        '💡 _Complete your PNPtv! profile so the right\n' +
+        'guys can spot you, hit you up, and get the\n' +
+        'fun started fast._\n\n' +
+        '`📍 Select distance:`';
+
       await ctx.editMessageText(
-        `${t('nearbyTitle', lang)}\n\n${t('selectRadius', lang)}`,
-        Markup.inlineKeyboard([
-          [
-            Markup.button.callback(t('radius5km', lang), 'nearby_radius_5'),
-            Markup.button.callback(t('radius10km', lang), 'nearby_radius_10'),
-          ],
-          [Markup.button.callback(t('radius25km', lang), 'nearby_radius_25')],
-          [Markup.button.callback(t('back', lang), 'back_to_main')],
-        ]),
+        headerText,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [
+              Markup.button.callback('📍 5 km', 'nearby_radius_5'),
+              Markup.button.callback('📍 10 km', 'nearby_radius_10'),
+            ],
+            [
+              Markup.button.callback('📍 25 km', 'nearby_radius_25'),
+              Markup.button.callback('📍 50 km', 'nearby_radius_50'),
+            ],
+            [Markup.button.callback('🔙 Back', 'back_to_main')],
+          ]),
+        }
       );
     } catch (error) {
       logger.error('Error showing nearby menu:', error);
@@ -45,40 +61,57 @@ const registerNearbyHandlers = (bot) => {
 
       const userId = ctx.from.id;
 
-      await ctx.editMessageText(t('loading', lang));
+      await ctx.editMessageText('🔍 _Scanning your area..._', { parse_mode: 'Markdown' });
 
       const nearbyUsers = await UserService.getNearbyUsers(userId, radius);
 
       if (nearbyUsers.length === 0) {
+        const noResultsText = 
+          '`😢 No Results`\n\n' +
+          `No users found within ${radius} km 😔\n\n` +
+          '_Try a larger radius or check back later!_';
+
         await ctx.editMessageText(
-          t('noNearbyUsers', lang),
-          Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'show_nearby')],
-          ]),
+          noResultsText,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('🔄 Try Again', 'show_nearby')],
+              [Markup.button.callback('🔙 Back', 'back_to_main')],
+            ]),
+          }
         );
         return;
       }
 
-      // Show list of nearby users
-      let message = `${t('nearbyUsersFound', lang, { count: nearbyUsers.length })}\n\n`;
+      // Show list of nearby users with sexy design
+      let message = 
+        '`🔥 Nearby Hotties 🔥`\n\n' +
+        `Found **${nearbyUsers.length}** users within ${radius} km 👀\n\n`;
 
       const buttons = [];
       nearbyUsers.slice(0, 10).forEach((user, index) => {
-        const name = user.firstName || 'User';
+        const name = user.firstName || 'Anonymous';
         const distance = user.distance.toFixed(1);
-        message += `${index + 1}. ${name} - ${t('distance', lang, { distance })}\n`;
+        const emoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
+        message += `${emoji} **${name}** - _${distance} km away_\n`;
 
         buttons.push([
           Markup.button.callback(
-            `👁️ ${name}`,
+            `👁️ View ${name}`,
             `view_user_${user.id}`,
           ),
         ]);
       });
 
-      buttons.push([Markup.button.callback(t('back', lang), 'show_nearby')]);
+      message += '\n_Tap to view profile & slide into their DMs_ 😏';
 
-      await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
+      buttons.push([Markup.button.callback('🔙 Change Radius', 'show_nearby')]);
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons),
+      });
     } catch (error) {
       logger.error('Error showing nearby users:', error);
       const lang = getLanguage(ctx);
@@ -100,19 +133,59 @@ const registerNearbyHandlers = (bot) => {
 
       const user = await UserService.getOrCreateFromContext({ from: { id: targetUserId } });
 
-      let profileText = `👤 ${user.firstName || 'User'} ${user.lastName || ''}\n`;
-      if (user.username) profileText += `@${user.username}\n`;
-      if (user.bio) profileText += `\n${user.bio}\n`;
+      // Build sexy profile card
+      let profileText = 
+        '`👤 PROFILE CARD`\n\n';
+
+      const displayName = user.firstName || 'Anonymous';
+      profileText += `**${displayName}**`;
+      if (user.lastName) profileText += ` ${user.lastName}`;
+      profileText += '\n';
+      
+      if (user.username) {
+        profileText += `@${user.username}\n`;
+      }
+
+      profileText += '\n';
+
+      if (user.bio) {
+        profileText += `💭 _"${user.bio}"_\n\n`;
+      }
+
       if (user.interests && user.interests.length > 0) {
-        profileText += `\n🎯 ${user.interests.join(', ')}\n`;
+        profileText += `🎯 **Into:** ${user.interests.join(', ')}\n\n`;
+      }
+
+      // Add social media if available
+      const socials = [];
+      if (user.twitter) socials.push(`𝕏 ${user.twitter}`);
+      if (user.instagram) socials.push(`IG ${user.instagram}`);
+      if (user.tiktok) socials.push(`TT ${user.tiktok}`);
+      
+      if (socials.length > 0) {
+        profileText += `🔗 ${socials.join(' • ')}\n\n`;
+      }
+
+      profileText += 
+        '`Don\'t be shy... DM! 💬`';
+
+      // Build DM button
+      let dmButton;
+      if (user.username) {
+        dmButton = Markup.button.url(`💬 Message ${displayName}`, `https://t.me/${user.username}`);
+      } else {
+        dmButton = Markup.button.url(`💬 Message ${displayName}`, `tg://user?id=${targetUserId}`);
       }
 
       await ctx.editMessageText(
         profileText,
-        Markup.inlineKeyboard([
-          [Markup.button.url(t('sendMessage', lang), `https://t.me/${user.username || targetUserId}`)],
-          [Markup.button.callback(t('back', lang), 'show_nearby')],
-        ]),
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [dmButton],
+            [Markup.button.callback('🔙 Back to List', 'show_nearby')],
+          ]),
+        }
       );
     } catch (error) {
       logger.error('Error viewing user profile:', error);

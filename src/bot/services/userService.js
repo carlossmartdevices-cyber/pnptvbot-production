@@ -1,6 +1,7 @@
 const UserModel = require('../../models/userModel');
 const logger = require('../../utils/logger');
 const { sanitizeObject, validateSchema, schemas } = require('../../utils/validation');
+const PermissionService = require('./permissionService');
 
 /**
  * User Service - Business logic for user operations
@@ -127,11 +128,18 @@ class UserService {
 
   /**
    * Check if user has active subscription
+   * Admin/SuperAdmin users ALWAYS have access (bypass subscription check)
    * @param {number|string} userId - User ID
    * @returns {Promise<boolean>} Subscription status
    */
   static async hasActiveSubscription(userId) {
     try {
+      // BYPASS: Admin and SuperAdmin always have access to everything
+      if (PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId)) {
+        logger.debug('Admin/SuperAdmin bypass: subscription check skipped', { userId });
+        return true;
+      }
+
       const user = await UserModel.getById(userId);
 
       if (!user) return false;

@@ -3,6 +3,7 @@ const LiveStreamModel = require('../../models/liveStreamModel');
 const User = require('../../models/userModel');
 const logger = require('../../utils/logger');
 const { query } = require('../../config/postgres');
+const PermissionService = require('./permissionService');
 
 /**
  * Streaming Service
@@ -342,9 +343,15 @@ class StreamingService {
 
     /**
      * Check if viewer has access to stream
+     * Admins always have access
      */
     static async checkViewerAccess(stream, viewer) {
         try {
+            // Admins always have full access
+            if (viewer.telegramId && (PermissionService.isEnvSuperAdmin(viewer.telegramId) || PermissionService.isEnvAdmin(viewer.telegramId))) {
+                return { allowed: true };
+            }
+            
             // If stream is public and not subscribers-only, allow access
             if (!stream.isPaid && !stream.isSubscribersOnly) {
                 return { allowed: true };

@@ -17,7 +17,7 @@ function extractMenuIdFromAction(action) {
     show_nearby: 'nearby',
     show_live: 'live',
     show_radio: 'radio',
-    show_zoom: 'zoom',
+    show_jitsi: 'jitsi',
     show_support: 'support',
     show_settings: 'settings',
   };
