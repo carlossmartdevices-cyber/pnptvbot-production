@@ -116,6 +116,9 @@ const registerPaymentHandlers = (bot) => {
       // Obtener descripción del plan desde i18n
       let planDesc = '';
       switch (plan.sku) {
+        case 'TRIAL':
+          planDesc = t('planTrialDesc', lang);
+          break;
         case 'CRYSTAL':
           planDesc = t('planCrystalDesc', lang);
           break;
@@ -138,6 +141,7 @@ const registerPaymentHandlers = (bot) => {
       planHeader += `*${planName}* | $${price.toFixed(2)}\n\n`;
       planHeader += `${planDesc}\n\n`;
       planHeader += `${t('paymentMethod', lang)}`;
+      planHeader += `${t('paymentFooter', lang)}`;
 
       await ctx.editMessageText(
         planHeader,
@@ -310,36 +314,34 @@ const registerPaymentHandlers = (bot) => {
         const paymentApps = DaimoConfig.SUPPORTED_PAYMENT_APPS.join(', ');
 
         const message = lang === 'es'
-          ? '💳 *Pago con Daimo Pay*\n\n'
+          ? '🪙 *Paga en Crypto con Daimo Pay*\n\n'
             + `Plan: ${plan.display_name || plan.name}\n`
             + `Precio: $${plan.price} USDC\n\n`
-            + '📱 *Puedes pagar usando:*\n'
-            + '• Zelle\n'
-            + '• CashApp\n'
-            + '• Venmo\n'
-            + '• Revolut\n'
-            + '• Wise\n\n'
-            + '💡 *Cómo funciona:*\n'
-            + '1. Haz clic en "Pagar Ahora"\n'
-            + '2. Elige tu app de pago preferida\n'
-            + '3. El pago se convierte automáticamente a USDC\n'
-            + '4. Tu suscripción se activa inmediatamente\n\n'
-            + '🔒 Seguro y rápido en la red Optimism'
-          : '💳 *Pay with Daimo Pay*\n\n'
+            + 'Completa tu suscripción usando crypto a través de nuestro checkout de Daimo Pay — rápido, seguro, discreto y perfecto para miembros que prefieren pagos privados y sin fronteras.\n\n'
+            + '💳 *Daimo Pay acepta USDC, y puedes pagar usando wallets populares como:*\n'
+            + 'Binance • Coinbase Wallet • MetaMask • Trust Wallet • Kraken Wallet • OKX Wallet • Bybit Wallet, y más.\n\n'
+            + '📱 *O paga usando las apps de pago más populares:*\n'
+            + 'Cash App, Venmo, Revolut, MercadoPago y Zelle.\n\n'
+            + 'Solo elige tu wallet o app, confirma la transacción, y listo.\n\n'
+            + '✅ *Una vez confirmado tu pago, recibirás automáticamente:*\n'
+            + '• Tu mensaje de acceso PRIME\n'
+            + '• Tu factura\n'
+            + '• Tus instrucciones de onboarding\n\n'
+            + '💬 Si necesitas ayuda durante el checkout, escríbele a Cristina, nuestra asistente AI — ella te guiará paso a paso o te conectará con Santino si es necesario.'
+          : '🪙 *Pay in Crypto with Daimo Pay*\n\n'
             + `Plan: ${plan.display_name || plan.name}\n`
             + `Price: $${plan.price} USDC\n\n`
-            + '📱 *You can pay using:*\n'
-            + '• Zelle\n'
-            + '• CashApp\n'
-            + '• Venmo\n'
-            + '• Revolut\n'
-            + '• Wise\n\n'
-            + '💡 *How it works:*\n'
-            + '1. Click "Pay Now"\n'
-            + '2. Choose your preferred payment app\n'
-            + '3. Payment is automatically converted to USDC\n'
-            + '4. Your subscription activates immediately\n\n'
-            + '🔒 Secure and fast on Optimism network';
+            + 'You can complete your subscription using crypto through our Daimo Pay checkout — fast, secure, discreet, and perfect for members who prefer private, borderless payments.\n\n'
+            + '💳 *Daimo Pay accepts USDC, and you can pay using popular wallets such as:*\n'
+            + 'Binance • Coinbase Wallet • MetaMask • Trust Wallet • Kraken Wallet • OKX Wallet • Bybit Wallet, and more.\n\n'
+            + '📱 *Or pay using the most popular payment apps, including:*\n'
+            + 'Cash App, Venmo, Revolut, MercadoPago, and Zelle.\n\n'
+            + 'Just choose your wallet or app, confirm the transaction, and you\'re done.\n\n'
+            + '✅ *Once your payment is confirmed, you\'ll automatically receive:*\n'
+            + '• Your PRIME access message\n'
+            + '• Your invoice\n'
+            + '• Your onboarding instructions\n\n'
+            + '💬 If you need help during checkout, just message Cristina, our AI assistant — she\'ll guide you step by step or pass you to Santino if needed.';
 
         await ctx.editMessageText(
           message,

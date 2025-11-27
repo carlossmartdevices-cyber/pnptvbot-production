@@ -67,41 +67,52 @@ Tap "Subscribe to PRIME" below to get instant access.`,
     support: '🤖 Support',
     settings: '⚙️ Settings',
     // Subscription
-    subscriptionHeader: '`💎 Unlock PRIME! 💎`',
+    subscriptionHeader: '`💎 Membership Plans`',
     subscriptionDivider: '',
-    subscriptionDescription: `Unlock the full PNPtv experience and join
-the hottest Latino PnP community! 🔥
+    subscriptionDescription: `Subscribe to PRIME and unlock the full PNPtv! experience and join the hottest Latino PnP community on Telegram — unfiltered, intimate, raw and always active. 🔥
 
-**PRIME members get instant access to:**
+**By becoming a PRIME member, you get instant access to:**
 
-• Full-length videos (Santino + performers)
+• Full-length videos (Santino + sexy Latino performers)
 • Weekly new content drops
 • Unlimited Nearby access
-• Video Calls & Live Streams
-• Member-only events & perks
+• Your community profile card
+• Video Calls & Live Streams with hot performers
+• All PNPtv! channels + the community group
+• Member-only perks and exclusive features
 
-**Choose your plan below:**
+**Cristina**, our chatbot customer support agent, is here to help if you need any assistance.
 
-\`Let's get cloudy! ☁️\``,
+\`Choose your plan below! 💜\``,
     subscriptionPlans: '💎 Choose Your PRIME Plan:',
-    planTrial: '🧪 Trial Week',
-    planTrialDesc: '7 days to explore the full PNPtv! experience. Perfect to try before you commit.',
-    planCrystal: '💠 Crystal PRIME',
-    planCrystalDesc: '30 days of complete access to the PNPtv! community with all premium features.',
-    planDiamond: '🔥 Diamond PRIME',
-    planDiamondDesc: '30 days of the ultimate PNPtv! experience with all premium features and VIP support.',
-    planLifetime: '♾️ Lifetime PRIME',
-    planLifetimeDesc: 'Permanent, unlimited access forever. One payment, lifetime membership.',
-    planMonthly: '💎 Monthly PRIME',
-    planMonthlyDesc: '30 days of full access with all premium features. Our most popular plan.',
+    planTrial: '⭐ Trial Week',
+    planTrialDesc: '7 days of pure PNP bliss.\nUnlimited access to videos, weekly drops, Nearby, profile tools, radio, hangouts, lives, and video rooms.\n💜 Perfect for first-timers — try EVERYTHING before committing.',
+    planCrystal: '⭐ Crystal PRIME',
+    planCrystalDesc: '180 days with premium glamour.\nFull videos, weekly drops, unlimited Nearby, priority tools, exclusive Crystal events, lives, radio, hangouts, and early feature access.\n✨ Best balance of value + status — shine brighter in the community.',
+    planDiamond: '⭐ Diamond PRIME',
+    planDiamondDesc: 'The elite PNPtv! experience.\nFull video library, premium releases, boosted visibility, Diamond badges, priority Santino access, exclusive streams, hangouts, radio, and private pop-ups.\n💎 For elite members only — the highest-tier, VIP-level access.',
+    planLifetime: '⭐ Lifetime PRIME',
+    planLifetimeDesc: 'Forever access. One single payment.\nFull videos forever, all weekly drops unlocked, unlimited Nearby, all lives, all hangouts, all radio, all video rooms, all events — permanent PRIME badge included.\n♾️ Best deal ever — no renewals, no limits, no expiration, just one time payment.',
+    planMonthly: '⭐ Monthly PRIME',
+    planMonthlyDesc: '30 days of full PNPtv! power.\nFull video access, weekly drops, Nearby, boosted profile, lives, hangouts, radio, and premium tools.\n🔥 Most popular — the standard PRIME experience everyone loves.',
     planDetails: 'Plan Details:',
     selectPlan: 'Select Plan',
     paymentMethod: 'Choose payment method:',
-    payWithEpayco: '💳 Pay with ePayco (USD)',
-    payWithDaimo: '💰 Pay with Daimo (USDC)',
-    paymentInstructions: '💳 Payment Instructions:\n\n'
-      + 'Please click the link below to complete your payment:\n\n{paymentUrl}\n\n'
-      + 'Once payment is confirmed, your subscription will be activated automatically.',
+    payWithEpayco: '💳 Pay with Debit/Credit Card',
+    payWithDaimo: '🪙 Pay with Crypto and Payment Apps',
+    paymentFooter: '',
+    paymentInstructions: '💳 *Payment Instructions*\n\n'
+      + 'Please tap the button below to go to the checkout page.\n'
+      + 'There you\'ll be able to review the price, plan details, and all benefits included before confirming your purchase.\n\n'
+      + 'After confirming, you will be redirected to ePayco\'s secure payment gateway, where you can pay using:\n\n'
+      + '• Debit card\n'
+      + '• Credit card\n'
+      + '• PayPal (via integrated checkout)\n\n'
+      + '*Please remember:*\n\n'
+      + '• The charge will appear on your bank statement as Easy Bots\n'
+      + '• You can review our Terms, Conditions, and Refund Policy at:\n'
+      + 'www.pnptv.app/terms\n\n'
+      + 'If you need help, Cristina — our AI assistant — is here to guide you.',
     paymentSuccess: '✅ Payment successful! Your PRIME subscription is now active. '
       + 'Enjoy premium features!',
     paymentFailed: '❌ Payment failed. Please try again or contact support.',
@@ -180,7 +191,7 @@ explore Nearby without limits, and join private events.`,
     distance: 'Distance: {distance} km',
 
     // Live Streams
-    liveTitle: '🎤 Live Streams',
+    liveTitle: '`🎤 Live Streams`',
     startLive: '▶️ Start Live Stream',
     viewStreams: '👁️ View Active Streams',
     myStreams: '📹 My Streams',
@@ -368,7 +379,7 @@ explore Nearby without limits, and join private events.`,
     },
 
     // Zoom Rooms
-    zoomTitle: '🎥 Zoom Rooms',
+    zoomTitle: '`🎥 Zoom Rooms`',
     createRoom: '➕ Create Room',
     joinRoom: '▶️ Join Room',
     myRooms: '📋 My Rooms',
@@ -384,7 +395,7 @@ explore Nearby without limits, and join private events.`,
     noActiveRooms: 'No active rooms available.',
 
     // Support
-    supportTitle: '🤖 Support Center',
+    supportTitle: '`🆘 Help Center`',
     chatWithCristina: '💬 Chat with Cristina (AI)',
     contactAdmin: '👨‍💼 Contact Admin',
     faq: '❓ FAQ',
@@ -393,7 +404,7 @@ explore Nearby without limits, and join private events.`,
     messageSent: 'Your message has been sent to our support team. We\'ll get back to you soon!',
 
     // Settings
-    settingsTitle: '⚙️ Settings',
+    settingsTitle: '`⚙️ Settings`',
     changeLanguage: '🌐 Change Language',
     notifications: '🔔 Notifications',
     privacy: '🔒 Privacy',
@@ -540,41 +551,52 @@ Toca "Suscribete a PRIME" para obtener acceso inmediato.`,
     support: '🤖 Soporte',
     settings: '⚙️ Configuración',
     // Subscription
-    subscriptionHeader: '`💎 Desbloquea PRIME! 💎`',
+    subscriptionHeader: '`💎 Planes de Membresía`',
     subscriptionDivider: '',
-    subscriptionDescription: `Desbloquea la experiencia completa de PNPtv
-y únete a la comunidad Latina más hot! 🔥
+    subscriptionDescription: `Suscríbete a PRIME y desbloquea la experiencia completa de PNPtv! y únete a la comunidad Latina PnP más hot de Telegram — sin filtros, íntima, cruda y siempre activa. 🔥
 
-**Como miembro PRIME obtienes:**
+**Al convertirte en miembro PRIME, obtienes acceso instantáneo a:**
 
-• Videos completos (Santino + performers)
-• Contenido nuevo cada semana
+• Videos completos (Santino + sexy performers Latinos)
+• Nuevo contenido cada semana
 • Acceso ilimitado a Cercanos
-• Video Llamadas y Transmisiones en Vivo
-• Eventos exclusivos y beneficios
+• Tu tarjeta de perfil comunitario
+• Video Llamadas y Transmisiones en Vivo con performers hot
+• Todos los canales de PNPtv! + el grupo de la comunidad
+• Beneficios exclusivos y funciones especiales
 
-**Elige tu plan abajo:**
+**Cristina**, nuestra agente de soporte chatbot, está aquí para ayudarte si necesitas asistencia.
 
-\`Vamos a volar! ☁️\``,
+\`¡Elige tu plan abajo! 💜\``,
     subscriptionPlans: '💎 Elige tu Plan PRIME:',
-    planTrial: '🧪 Semana de Prueba',
-    planTrialDesc: '7 días para explorar la experiencia completa de PNPtv!. Perfecto para probar antes de comprometerte.',
-    planCrystal: '💠 Crystal PRIME',
-    planCrystalDesc: '30 días de acceso completo a la comunidad PNPtv! con todas las funciones premium.',
-    planDiamond: '🔥 Diamond PRIME',
-    planDiamondDesc: '30 días de la experiencia definitiva PNPtv! con todas las funciones premium y soporte VIP.',
-    planLifetime: '♾️ Lifetime PRIME',
-    planLifetimeDesc: 'Acceso permanente e ilimitado para siempre. Un solo pago, membresía de por vida.',
-    planMonthly: '💎 Monthly PRIME',
-    planMonthlyDesc: '30 días de acceso completo con todas las funciones premium. Nuestro plan más popular.',
+    planTrial: '⭐ Semana de Prueba',
+    planTrialDesc: '7 días de puro placer PNP.\nAcceso ilimitado a videos, estrenos semanales, Cercanos, herramientas de perfil, radio, hangouts, lives y salas de video.\n💜 Perfecto para nuevos — prueba TODO antes de comprometerte.',
+    planCrystal: '⭐ Crystal PRIME',
+    planCrystalDesc: '180 días con glamour premium.\nVideos completos, estrenos semanales, Cercanos ilimitado, herramientas prioritarias, eventos Crystal exclusivos, lives, radio, hangouts y acceso anticipado a funciones.\n✨ Mejor balance de valor + estatus — brilla más en la comunidad.',
+    planDiamond: '⭐ Diamond PRIME',
+    planDiamondDesc: 'La experiencia elite de PNPtv!\nBiblioteca completa de videos, estrenos premium, visibilidad aumentada, insignias Diamond, acceso prioritario a Santino, streams exclusivos, hangouts, radio y pop-ups privados.\n💎 Solo para miembros elite — el acceso de más alto nivel VIP.',
+    planLifetime: '⭐ Lifetime PRIME',
+    planLifetimeDesc: 'Acceso para siempre. Un solo pago.\nVideos completos para siempre, todos los estrenos semanales, Cercanos ilimitado, todos los lives, hangouts, radio, salas de video, eventos — insignia PRIME permanente incluida.\n♾️ Mejor oferta — sin renovaciones, sin límites, sin expiración, solo un pago.',
+    planMonthly: '⭐ Monthly PRIME',
+    planMonthlyDesc: '30 días de poder completo PNPtv!\nAcceso completo a videos, estrenos semanales, Cercanos, perfil mejorado, lives, hangouts, radio y herramientas premium.\n🔥 Más popular — la experiencia PRIME estándar que todos aman.',
     planDetails: 'Detalles del Plan:',
     selectPlan: 'Seleccionar Plan',
     paymentMethod: 'Elige método de pago:',
-    payWithEpayco: '💳 Pagar con ePayco (USD)',
-    payWithDaimo: '💰 Pagar con Daimo (USDC)',
-    paymentInstructions: '💳 Instrucciones de Pago:\n\n'
-      + 'Por favor haz clic en el enlace para completar tu pago:\n\n{paymentUrl}\n\n'
-      + 'Una vez confirmado el pago, tu suscripción se activará automáticamente.',
+    payWithEpayco: '💳 Pagar con Tarjeta Débito/Crédito',
+    payWithDaimo: '🪙 Pagar con Crypto y Apps de Pago',
+    paymentFooter: '',
+    paymentInstructions: '💳 *Instrucciones de Pago*\n\n'
+      + 'Por favor toca el botón de abajo para ir a la página de checkout.\n'
+      + 'Ahí podrás revisar el precio, los detalles del plan y todos los beneficios incluidos antes de confirmar tu compra.\n\n'
+      + 'Después de confirmar, serás redirigido a la pasarela de pago segura de ePayco, donde puedes pagar usando:\n\n'
+      + '• Tarjeta de débito\n'
+      + '• Tarjeta de crédito\n'
+      + '• PayPal (vía checkout integrado)\n\n'
+      + '*Por favor recuerda:*\n\n'
+      + '• El cargo aparecerá en tu estado de cuenta bancario como Easy Bots\n'
+      + '• Puedes revisar nuestros Términos, Condiciones y Política de Reembolso en:\n'
+      + 'www.pnptv.app/terms\n\n'
+      + 'Si necesitas ayuda, Cristina — nuestra asistente AI — está aquí para guiarte.',
     paymentSuccess: '✅ ¡Pago exitoso! Tu suscripción PRIME está activa. '
       + '¡Disfruta las funciones premium!',
     paymentFailed: '❌ Pago fallido. Por favor intenta de nuevo o contacta soporte.',
@@ -653,7 +675,7 @@ explorar Cercanos sin limites y unirte a eventos privados.`,
     distance: 'Distancia: {distance} km',
 
     // Live Streams
-    liveTitle: '🎤 Transmisiones en Vivo',
+    liveTitle: '`🎤 Transmisiones en Vivo`',
     startLive: '▶️ Iniciar Transmisión',
     viewStreams: '👁️ Ver Transmisiones Activas',
     myStreams: '📹 Mis Transmisiones',
@@ -845,7 +867,7 @@ explorar Cercanos sin limites y unirte a eventos privados.`,
     },
 
     // Zoom Rooms
-    zoomTitle: '🎥 Salas Zoom',
+    zoomTitle: '`🎥 Salas Zoom`',
     createRoom: '➕ Crear Sala',
     joinRoom: '▶️ Unirse a Sala',
     myRooms: '📋 Mis Salas',
@@ -862,7 +884,7 @@ explorar Cercanos sin limites y unirte a eventos privados.`,
     noActiveRooms: 'No hay salas activas disponibles.',
 
     // Support
-    supportTitle: '🤖 Centro de Soporte',
+    supportTitle: '`🆘 Centro de Ayuda`',
     chatWithCristina: '💬 Chat con Cristina (IA)',
     contactAdmin: '👨‍💼 Contactar Admin',
     faq: '❓ Preguntas Frecuentes',
@@ -871,7 +893,7 @@ explorar Cercanos sin limites y unirte a eventos privados.`,
     messageSent: '¡Tu mensaje ha sido enviado a nuestro equipo de soporte! Te responderemos pronto.',
 
     // Settings
-    settingsTitle: '⚙️ Configuración',
+    settingsTitle: '`⚙️ Configuración`',
     changeLanguage: '🌐 Cambiar Idioma',
     notifications: '🔔 Notificaciones',
     privacy: '🔒 Privacidad',

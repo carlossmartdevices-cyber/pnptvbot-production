@@ -15,14 +15,27 @@ const registerZoomHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
 
+      const zoomText = lang === 'es'
+        ? '`🎥 Salas Zoom`\n\n' +
+          '¡Crea o únete a salas de video con otros miembros! 🔥\n\n' +
+          '**Cristina**, nuestra asistente IA, está aquí para ayudarte.\n\n' +
+          '`Elige una opción abajo 💜`'
+        : '`🎥 Zoom Rooms`\n\n' +
+          'Create or join video rooms with other members! 🔥\n\n' +
+          '**Cristina**, our AI assistant, is here to help.\n\n' +
+          '`Choose an option below 💜`';
+
       await ctx.editMessageText(
-        t('zoomTitle', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('createRoom', lang), 'zoom_create')],
-          [Markup.button.callback(t('joinRoom', lang), 'zoom_join')],
-          [Markup.button.callback(t('myRooms', lang), 'zoom_my_rooms')],
-          [Markup.button.callback(t('back', lang), 'back_to_main')],
-        ]),
+        zoomText,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(t('createRoom', lang), 'zoom_create')],
+            [Markup.button.callback(t('joinRoom', lang), 'zoom_join')],
+            [Markup.button.callback(t('myRooms', lang), 'zoom_my_rooms')],
+            [Markup.button.callback(t('back', lang), 'back_to_main')],
+          ]),
+        }
       );
     } catch (error) {
       logger.error('Error showing zoom menu:', error);

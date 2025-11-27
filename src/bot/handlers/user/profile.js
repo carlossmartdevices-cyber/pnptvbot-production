@@ -936,66 +936,79 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
       profileText = lang === 'es'
         ? '`📸 Mi Perfil PNPtv`\n\n' +
           'Tu perfil es tu identidad en la comunidad.\n' +
-          'Se mostrará bajo cada foto que compartas,\n' +
-          'ayudando a otros a conectar contigo.\n\n' +
-          '`Edita tu info abajo`\n\n'
+          'Se mostrará junto a cada foto que compartas,\n' +
+          'ayudando a otros a conectar contigo.\n\n'
         : '`📸 My PNPtv Profile`\n\n' +
           'Your profile is your identity in the community.\n' +
-          'It shows under every photo you share,\n' +
-          'helping others connect with you.\n\n' +
-          '`Edit your info below`\n\n';
-    } else {
-      // Standard header for viewing other profiles
-      profileText = '`👤 User Profile`\n\n';
+          'It shows alongside every photo you share,\n' +
+          'helping others connect with you.\n\n';
     }
 
-    // Add user info section
-    const badgesLine = targetUser.badges && targetUser.badges.length > 0
-      ? targetUser.badges.map(badge => {
-          if (typeof badge === 'string') {
-            return t(`badges.${badge}`, lang) || badge;
-          }
-          if (typeof badge === 'object' && badge.emoji && badge.name) {
-            return `${badge.emoji} ${badge.name}`;
-          }
-          if (typeof badge === 'object' && badge.icon && badge.name) {
-            return `${badge.icon} ${badge.name}`;
-          }
-          return '';
-        }).filter(Boolean).join(' ')
-      : '';
+    // Username header
+    const displayName = targetUser.username 
+      ? `@${targetUser.username}` 
+      : targetUser.firstName || 'User';
+    profileText += `**${displayName}**\n`;
+    profileText += '______________________________\n\n';
 
-    const userInfoLines = [
-      badgesLine,
-      `👤 ${targetUser.firstName || 'User'} ${targetUser.lastName || ''}`,
-      targetUser.username ? `@${targetUser.username}` : '',
-      targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `📝 ${targetUser.bio}` : '',
-      targetUser.looking_for && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `${lang === 'es' ? '🔎 Buscando' : '🔎 Looking for'}: ${targetUser.looking_for}` : '',
-      targetUser.tribe && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `🏳️‍🌈 ${lang === 'es' ? 'Tribu' : 'Tribe'}: ${targetUser.tribe}` : '',
-      targetUser.interests && targetUser.interests.length > 0 && (isOwnProfile || targetUser.privacy?.showInterests !== false)
-        ? `🎯 ${targetUser.interests.join(', ')}` : '',
-      targetUser.location && (isOwnProfile || targetUser.privacy?.showLocation !== false) ? '📍 Location shared' : '',
-      targetUser.subscriptionStatus === 'active' && targetUser.planExpiry
-        ? (() => {
-            let expiry;
-            if (targetUser.planExpiry.toDate && typeof targetUser.planExpiry.toDate === 'function') {
-              expiry = targetUser.planExpiry.toDate();
-            } else if (targetUser.planExpiry._seconds) {
-              expiry = new Date(targetUser.planExpiry._seconds * 1000);
-            } else {
-              expiry = new Date(targetUser.planExpiry);
-            }
-            return expiry && !isNaN(expiry.getTime())
-              ? `💎 PRIME: ${t('subscriptionActive', lang, { expiry: moment(expiry).format('MMM DD, YYYY') })}`
-              : (isOwnProfile ? '⭐ Free Plan' : '');
-          })()
-        : (isOwnProfile ? '⭐ Free Plan' : ''),
-      isOwnProfile ? `${t('profileViews', lang, { views: targetUser.profileViews || 0 })}` : '',
-    ].filter(Boolean);
+    // Badges line (emojis only)
+    if (targetUser.badges && targetUser.badges.length > 0) {
+      const badgeEmojis = targetUser.badges.map(badge => {
+        if (typeof badge === 'string') {
+          // Map known badge names to emojis
+          const badgeEmojiMap = {
+            'verified': '✅',
+            'premium': '💎',
+            'vip': '👑',
+            'moderator': '🛡️',
+            'admin': '👨‍💼',
+            'trailblazer': '🏆',
+            'Trailblazer': '🏆',
+          };
+          return badgeEmojiMap[badge] || '⭐';
+        }
+        if (typeof badge === 'object' && badge.emoji) {
+          return badge.emoji;
+        }
+        if (typeof badge === 'object' && badge.icon) {
+          return badge.icon;
+        }
+        return '';
+      }).filter(Boolean).join(' ');
+      
+      if (badgeEmojis) {
+        profileText += `${badgeEmojis}\n\n`;
+      }
+    }
 
-    profileText += userInfoLines.join('\n') + '\n';
+    // Bio
+    if (targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
+      profileText += `📝 ${targetUser.bio}\n`;
+    }
 
-    // Add social media section (only show if any are filled)
+    // Location
+    if (targetUser.location && (isOwnProfile || targetUser.privacy?.showLocation !== false)) {
+      profileText += `📍 ${lang === 'es' ? 'Ubicación compartida' : 'Location shared'}\n`;
+    }
+
+    // Looking for
+    if (targetUser.looking_for && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
+      profileText += `🔎 ${lang === 'es' ? 'Buscando' : 'Looking for'}: ${targetUser.looking_for}\n`;
+    }
+
+    // Tribe
+    if (targetUser.tribe && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
+      profileText += `🏳️‍🌈 ${lang === 'es' ? 'Tribu' : 'Tribe'}: ${targetUser.tribe}\n`;
+    }
+
+    // Interests
+    if (targetUser.interests && targetUser.interests.length > 0 && (isOwnProfile || targetUser.privacy?.showInterests !== false)) {
+      profileText += `🎯 ${targetUser.interests.join(', ')}\n`;
+    }
+
+    profileText += '______________________________\n';
+
+    // Social media section
     const hasSocialMedia = targetUser.tiktok || targetUser.twitter || targetUser.facebook || targetUser.instagram;
     if (hasSocialMedia) {
       profileText += `\n📱 ${lang === 'es' ? 'Redes Sociales' : 'Social Media'}:\n`;
@@ -1005,7 +1018,24 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
       if (targetUser.instagram) profileText += `  Instagram: @${targetUser.instagram}\n`;
     }
 
-    // Parse createdAt date
+    // Subscription status
+    if (targetUser.subscriptionStatus === 'active' && targetUser.planExpiry) {
+      let expiry;
+      if (targetUser.planExpiry.toDate && typeof targetUser.planExpiry.toDate === 'function') {
+        expiry = targetUser.planExpiry.toDate();
+      } else if (targetUser.planExpiry._seconds) {
+        expiry = new Date(targetUser.planExpiry._seconds * 1000);
+      } else {
+        expiry = new Date(targetUser.planExpiry);
+      }
+      if (expiry && !isNaN(expiry.getTime())) {
+        profileText += `\n💎 PRIME ${lang === 'es' ? 'hasta' : 'until'} ${moment(expiry).format('MMM DD, YYYY')}\n`;
+      }
+    } else if (isOwnProfile) {
+      profileText += `\n⭐ ${lang === 'es' ? 'Plan Gratis' : 'Free Plan'}\n`;
+    }
+
+    // Member since
     let createdAtDate;
     if (targetUser.createdAt) {
       if (typeof targetUser.createdAt === 'object' && typeof targetUser.createdAt.toDate === 'function') {
@@ -1018,16 +1048,20 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
     }
     const validDate = createdAtDate && !isNaN(createdAtDate.getTime())
       ? moment(createdAtDate).format('MMM DD, YYYY')
-      : 'Recently';
-    profileText += `\n${t('memberSince', lang, { date: validDate })}\n`;
+      : lang === 'es' ? 'Recientemente' : 'Recently';
+    profileText += `${lang === 'es' ? 'Miembro desde' : 'Member since'}: ${validDate}\n`;
+
+    // Profile views (only for own profile)
+    if (isOwnProfile) {
+      profileText += `👁️ ${lang === 'es' ? 'Vistas' : 'Views'}: ${targetUser.profileViews || 0}\n`;
+    }
 
     // Build keyboard
     const keyboard = [];
 
     if (isOwnProfile) {
-      // New button layout matching the design
-      // Options header
-      profileText += `\n\`${lang === 'es' ? 'Opciones' : 'Options'}\`\n`;
+      // Options footer
+      profileText += `\n\`${lang === 'es' ? 'Edita tu perfil abajo 💜' : 'Edit your profile below 💜'}\`\n`;
 
       // Row 1: Update Profile | Update Picture
       keyboard.push([

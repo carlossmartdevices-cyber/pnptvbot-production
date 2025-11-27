@@ -698,7 +698,7 @@ class UserModel {
   /**
    * Add badge to user
    * @param {number|string} userId - User ID
-   * @param {string|object} badge - Badge name or badge object
+   * @param {string|object} badge - Badge name string like "🏆 Trailblazer" or badge object with icon and name
    * @returns {Promise<boolean>} Success status
    */
   static async addBadge(userId, badge) {
@@ -713,30 +713,22 @@ class UserModel {
         try { badges = JSON.parse(badges); } catch { badges = []; }
       }
       
-      // Normalize badge to object format
-      let badgeObj;
+      // Normalize badge to simple string format like "🏆 Trailblazer"
+      let badgeString;
       if (typeof badge === 'string') {
-        badgeObj = { id: badge, name: badge };
+        // If it's already a string with emoji (like "🏆 Trailblazer"), use as is
+        badgeString = badge;
+      } else if (badge && badge.icon && badge.name) {
+        // If it's an object with icon and name, combine them
+        badgeString = `${badge.icon} ${badge.name}`;
+      } else if (badge && badge.name) {
+        badgeString = badge.name;
       } else {
-        badgeObj = badge;
+        badgeString = String(badge);
       }
       
-      // Convert badge object to JSON string for storage in TEXT[] array
-      const badgeString = JSON.stringify(badgeObj);
-      
-      // Check if badge already exists (compare by id or name)
-      const badgeId = badgeObj.id || badgeObj.name;
-      const alreadyHas = badges.some(b => {
-        if (typeof b === 'string') {
-          try {
-            const parsed = JSON.parse(b);
-            return parsed.id === badgeId || parsed.name === badgeId;
-          } catch {
-            return b === badgeId;
-          }
-        }
-        return b.id === badgeId || b.name === badgeId;
-      });
+      // Check if badge already exists
+      const alreadyHas = badges.some(b => b === badgeString || b.includes(badgeString.replace(/^[^\w\s]+\s*/, '')));
       
       if (!alreadyHas) {
         // Use array_append for PostgreSQL TEXT[] column
@@ -745,7 +737,7 @@ class UserModel {
           [badgeString, new Date(), userId.toString()]
         );
         await cache.del(`user:${userId}`);
-        logger.info('Badge added to user', { userId, badge: badgeId });
+        logger.info('Badge added to user', { userId, badge: badgeString });
       }
       return true;
     } catch (error) {
@@ -757,7 +749,7 @@ class UserModel {
   /**
    * Remove badge from user
    * @param {number|string} userId - User ID
-   * @param {string} badgeName - Badge name to remove
+   * @param {string} badgeName - Badge name to remove (like "🏆 Trailblazer" or just "Trailblazer")
    * @returns {Promise<boolean>} Success status
    */
   static async removeBadge(userId, badgeName) {
@@ -768,28 +760,16 @@ class UserModel {
 
       const badges = result.rows[0].badges || [];
       
-      // Filter out the badge by name/id (handle both string and parsed formats)
+      // Filter out the badge by name (handles both with and without emoji prefix)
+      const nameWithoutEmoji = badgeName.replace(/^[^\w\s]+\s*/, '');
       const updatedBadges = badges.filter(b => {
-        if (typeof b === 'string') {
-          try {
-            const parsed = JSON.parse(b);
-            return parsed.id !== badgeName && parsed.name !== badgeName;
-          } catch {
-            return b !== badgeName;
-          }
-        }
-        return b.id !== badgeName && b.name !== badgeName;
-      });
-
-      // Convert back to proper format for PostgreSQL TEXT[]
-      const badgeStrings = updatedBadges.map(b => {
-        if (typeof b === 'string') return b;
-        return JSON.stringify(b);
+        const bWithoutEmoji = b.replace(/^[^\w\s]+\s*/, '');
+        return b !== badgeName && bWithoutEmoji !== nameWithoutEmoji;
       });
 
       await query(
         'UPDATE users SET badges = $1::TEXT[], updated_at = $2 WHERE id = $3',
-        [badgeStrings, new Date(), userId.toString()]
+        [updatedBadges, new Date(), userId.toString()]
       );
 
       await cache.del(`user:${userId}`);
