@@ -1163,8 +1163,8 @@ class PaymentService {
        // Handle Daimo payment link generation
        if (provider === 'daimo') {
          try {
-           // Create Daimo payment intent with paymentId
-           const paymentIntent = DaimoConfig.createPaymentIntent({
+           // Use official Daimo Pay API to create payment
+           const daimoResult = await DaimoConfig.createDaimoPayment({
              amount: plan.price,
              userId: userId,
              planId: planId,
@@ -1173,31 +1173,34 @@ class PaymentService {
              description: `${plan.display_name || plan.name} - PNPtv Subscription`,
            });
 
-           // Generate Daimo payment link
-           const daimoPayLink = DaimoConfig.generatePaymentLink(paymentIntent);
+           if (!daimoResult.success) {
+             logger.error('Daimo API payment creation failed', {
+               error: daimoResult.error,
+               paymentId: payment.id,
+             });
+             throw new Error('Error creating Daimo payment');
+           }
 
-           // Generate checkout page URL (our hosted page with Daimo Pay SDK)
-           const checkoutUrl = `${webhookDomain}/daimo/${payment.id}`;
-
-           // Save both URLs to database
+           // Save Daimo payment URL to database
            await PaymentModel.updateStatus(payment.id, 'pending', {
-             payment_url: daimoPayLink,
+             payment_url: daimoResult.paymentUrl,
+             daimo_payment_id: daimoResult.daimoPaymentId,
              destination_address: DaimoConfig.getDaimoConfig().treasuryAddress,
            });
 
-           logger.info('Daimo payment URLs generated', {
+           logger.info('Daimo payment created via API', {
              paymentId: payment.id,
+             daimoPaymentId: daimoResult.daimoPaymentId,
              planId: plan.id,
              userId,
              amountUSD: plan.price,
-             checkoutUrl,
-             daimoPayLink,
+             paymentUrl: daimoResult.paymentUrl,
            });
 
-           // Return checkout page URL (better UX than raw Daimo link)
+           // Return the official Daimo checkout URL
            return {
              success: true,
-             paymentUrl: checkoutUrl,
+             paymentUrl: daimoResult.paymentUrl,
              paymentId: payment.id,
            };
          } catch (error) {

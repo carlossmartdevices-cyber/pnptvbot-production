@@ -8,9 +8,9 @@ const AUTO_DELETE_DELAY = 3 * 60 * 1000; // 3 minutes
 
 // Deduplication: track recently processed joins to avoid duplicate welcomes
 const recentJoins = new Map(); // Map<`${chatId}_${userId}`, timestamp>
-const DEDUPE_WINDOW = 60 * 1000; // 60 seconds window to prevent duplicates
+const DEDUPE_WINDOW = 5 * 60 * 1000; // 5 minutes window to prevent duplicates (increased from 60s)
 
-// Cleanup old entries every 5 minutes
+// Cleanup old entries every 10 minutes
 setInterval(() => {
   const now = Date.now();
   for (const [key, timestamp] of recentJoins.entries()) {
@@ -18,7 +18,7 @@ setInterval(() => {
       recentJoins.delete(key);
     }
   }
-}, 5 * 60 * 1000);
+}, 10 * 60 * 1000);
 
 // Badge options with emojis and descriptions
 const BADGE_OPTIONS = {
@@ -510,10 +510,19 @@ async function handleNewMembers(ctx) {
 
     const newMembers = ctx.message.new_chat_members;
     const chatId = ctx.chat.id;
+    const updateId = ctx.update?.update_id;
+
+    logger.info('New chat members event received', {
+      chatId,
+      updateId,
+      memberCount: newMembers?.length,
+      members: newMembers?.map(m => ({ id: m.id, name: m.first_name }))
+    });
 
     for (const member of newMembers) {
       // Skip if the new member is a bot
       if (member.is_bot) {
+        logger.debug('Skipping bot member', { botId: member.id });
         continue;
       }
 
@@ -523,16 +532,24 @@ async function handleNewMembers(ctx) {
       const now = Date.now();
 
       if (lastJoinTime && (now - lastJoinTime) < DEDUPE_WINDOW) {
-        logger.debug('Skipping duplicate welcome message', { 
+        logger.warn('DUPLICATE WELCOME PREVENTED', { 
           userId: member.id, 
           chatId,
-          timeSinceLastJoin: now - lastJoinTime 
+          updateId,
+          timeSinceLastJoin: now - lastJoinTime,
+          dedupeKey
         });
         continue;
       }
 
-      // Mark this join as processed
+      // Mark this join as processed BEFORE sending messages
       recentJoins.set(dedupeKey, now);
+      logger.info('Processing new member welcome', { 
+        userId: member.id, 
+        username: member.first_name,
+        dedupeKey,
+        updateId
+      });
 
       // Create or update user in database
       try {

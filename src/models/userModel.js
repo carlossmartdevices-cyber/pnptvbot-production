@@ -698,23 +698,54 @@ class UserModel {
   /**
    * Add badge to user
    * @param {number|string} userId - User ID
-   * @param {string} badge - Badge name (verified, premium, vip, moderator, etc.)
+   * @param {string|object} badge - Badge name or badge object
    * @returns {Promise<boolean>} Success status
    */
   static async addBadge(userId, badge) {
     try {
       const result = await query('SELECT badges FROM users WHERE id = $1', [userId.toString()]);
       if (result.rows.length === 0) return false;
+      
       let badges = result.rows[0].badges || [];
+      
+      // Handle if badges is a string (shouldn't be, but just in case)
       if (typeof badges === 'string') {
         try { badges = JSON.parse(badges); } catch { badges = []; }
       }
-      // Only add if not already present (by name)
-      if (!badges.some(b => b.name === badge.name)) {
-        badges.push(badge);
-        await query('UPDATE users SET badges = $1, updated_at = $2 WHERE id = $3', [JSON.stringify(badges), new Date(), userId.toString()]);
+      
+      // Normalize badge to object format
+      let badgeObj;
+      if (typeof badge === 'string') {
+        badgeObj = { id: badge, name: badge };
+      } else {
+        badgeObj = badge;
+      }
+      
+      // Convert badge object to JSON string for storage in TEXT[] array
+      const badgeString = JSON.stringify(badgeObj);
+      
+      // Check if badge already exists (compare by id or name)
+      const badgeId = badgeObj.id || badgeObj.name;
+      const alreadyHas = badges.some(b => {
+        if (typeof b === 'string') {
+          try {
+            const parsed = JSON.parse(b);
+            return parsed.id === badgeId || parsed.name === badgeId;
+          } catch {
+            return b === badgeId;
+          }
+        }
+        return b.id === badgeId || b.name === badgeId;
+      });
+      
+      if (!alreadyHas) {
+        // Use array_append for PostgreSQL TEXT[] column
+        await query(
+          'UPDATE users SET badges = array_append(badges, $1), updated_at = $2 WHERE id = $3',
+          [badgeString, new Date(), userId.toString()]
+        );
         await cache.del(`user:${userId}`);
-        logger.info('Badge added to user', { userId, badge });
+        logger.info('Badge added to user', { userId, badge: badgeId });
       }
       return true;
     } catch (error) {
@@ -736,12 +767,29 @@ class UserModel {
       if (result.rows.length === 0) return false;
 
       const badges = result.rows[0].badges || [];
-      // Filter out the badge by name
-      const updatedBadges = badges.filter(b => b.name !== badgeName);
+      
+      // Filter out the badge by name/id (handle both string and parsed formats)
+      const updatedBadges = badges.filter(b => {
+        if (typeof b === 'string') {
+          try {
+            const parsed = JSON.parse(b);
+            return parsed.id !== badgeName && parsed.name !== badgeName;
+          } catch {
+            return b !== badgeName;
+          }
+        }
+        return b.id !== badgeName && b.name !== badgeName;
+      });
+
+      // Convert back to proper format for PostgreSQL TEXT[]
+      const badgeStrings = updatedBadges.map(b => {
+        if (typeof b === 'string') return b;
+        return JSON.stringify(b);
+      });
 
       await query(
-        'UPDATE users SET badges = $1, updated_at = $2 WHERE id = $3',
-        [JSON.stringify(updatedBadges), new Date(), userId.toString()]
+        'UPDATE users SET badges = $1::TEXT[], updated_at = $2 WHERE id = $3',
+        [badgeStrings, new Date(), userId.toString()]
       );
 
       await cache.del(`user:${userId}`);
