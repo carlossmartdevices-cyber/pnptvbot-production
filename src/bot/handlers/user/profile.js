@@ -14,6 +14,8 @@ const registerProfileHandlers = (bot) => {
   // Show own profile
   bot.action('show_profile', async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+      logger.info(`>>> show_profile action triggered for user ${ctx.from.id}`);
       await showProfile(ctx, ctx.from.id, true, true);
     } catch (error) {
       logger.error('Error showing profile:', error);
@@ -190,6 +192,52 @@ const registerProfileHandlers = (bot) => {
       await showSocialMediaMenu(ctx, lang);
     } catch (error) {
       logger.error('Error showing social media menu:', error);
+    }
+  });
+
+  // Edit Profile Info (Bio, Interests, Tribe, Looking For)
+  bot.action('edit_profile_info', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await showEditProfileMenu(ctx, lang);
+    } catch (error) {
+      logger.error('Error showing edit profile menu:', error);
+    }
+  });
+
+  // Edit Tribe
+  bot.action('edit_tribe', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      ctx.session.temp.waitingForTribe = true;
+      await ctx.saveSession();
+      await ctx.editMessageText(
+        lang === 'es'
+          ? '🏳️‍🌈 ¿Cuál es tu tribu?\n\nEjemplos: Bear, Otter, Jock, Twink, Daddy, etc.\n\nEnvía tu tribu o "borrar" para eliminar:'
+          : '🏳️‍🌈 What\'s your tribe?\n\nExamples: Bear, Otter, Jock, Twink, Daddy, etc.\n\nSend your tribe or "delete" to remove:'
+      );
+    } catch (error) {
+      logger.error('Error in edit tribe:', error);
+    }
+  });
+
+  // Apply to PNP Contacto!
+  bot.action('apply_pnp_contacto', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await showPnpContactoApplication(ctx, lang);
+    } catch (error) {
+      logger.error('Error showing PNP Contacto application:', error);
+    }
+  });
+
+  // Confirm PNP Contacto Application
+  bot.action('confirm_pnp_contacto', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await submitPnpContactoApplication(ctx, lang);
+    } catch (error) {
+      logger.error('Error submitting PNP Contacto application:', error);
     }
   });
 
@@ -380,6 +428,34 @@ const registerProfileHandlers = (bot) => {
         await showProfile(ctx, ctx.from.id, false, true);
       } catch (error) {
         logger.error('Error updating looking_for:', error);
+      }
+      return;
+    }
+
+    if (temp?.waitingForTribe) {
+      try {
+        const lang = getLanguage(ctx);
+        const input = validateUserInput(ctx.message.text, 100);
+
+        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
+          await UserService.updateProfile(ctx.from.id, { tribe: null });
+          ctx.session.temp.waitingForTribe = false;
+          await ctx.saveSession();
+          await ctx.reply(lang === 'es' ? '✅ Tribu eliminada' : '✅ Tribe removed');
+        } else if (input) {
+          await UserService.updateProfile(ctx.from.id, { tribe: input });
+          ctx.session.temp.waitingForTribe = false;
+          await ctx.saveSession();
+          await ctx.reply(lang === 'es' ? '✅ Tribu actualizada' : '✅ Tribe updated');
+        } else {
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await showProfile(ctx, ctx.from.id, false, true);
+      } catch (error) {
+        logger.error('Error updating tribe:', error);
       }
       return;
     }
@@ -586,6 +662,239 @@ const showSocialMediaMenu = async (ctx, lang) => {
 };
 
 /**
+ * Show edit profile menu (Bio, Interests, Tribe, Looking For)
+ */
+const showEditProfileMenu = async (ctx, lang) => {
+  try {
+    const user = await UserModel.getById(ctx.from.id);
+
+    if (!user) {
+      await ctx.reply(t('error', lang));
+      return;
+    }
+
+    let text = lang === 'es'
+      ? [
+          '📝 *Actualizar Perfil*',
+          '',
+          'Edita la información de tu perfil:',
+          '',
+          `📝 Bio: ${user.bio || '-'}`,
+          `🎯 Intereses: ${user.interests?.join(', ') || '-'}`,
+          `🏳️‍🌈 Tribu: ${user.tribe || '-'}`,
+          `🔎 Buscando: ${user.looking_for || '-'}`,
+          '',
+          'Selecciona qué deseas actualizar:',
+        ].join('\n')
+      : [
+          '📝 *Update Profile*',
+          '',
+          'Edit your profile information:',
+          '',
+          `📝 Bio: ${user.bio || '-'}`,
+          `🎯 Interests: ${user.interests?.join(', ') || '-'}`,
+          `🏳️‍🌈 Tribe: ${user.tribe || '-'}`,
+          `🔎 Looking for: ${user.looking_for || '-'}`,
+          '',
+          'Select what you want to update:',
+        ].join('\n');
+
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback(lang === 'es' ? '📝 Bio' : '📝 Bio', 'edit_bio'),
+        Markup.button.callback(lang === 'es' ? '🎯 Intereses' : '🎯 Interests', 'edit_interests'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '🏳️‍🌈 Tribu' : '🏳️‍🌈 Tribe', 'edit_tribe'),
+        Markup.button.callback(lang === 'es' ? '🔎 Buscando' : '🔎 Looking For', 'edit_looking_for'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '📍 Ubicación' : '📍 Location', 'edit_location'),
+      ],
+      [Markup.button.callback(t('back', lang), 'show_profile')],
+    ]);
+
+    await ctx.editMessageText(text, {
+      parse_mode: 'Markdown',
+      ...keyboard,
+    });
+  } catch (error) {
+    logger.error('Error showing edit profile menu:', error);
+  }
+};
+
+/**
+ * Show PNP Contacto! application page
+ */
+const showPnpContactoApplication = async (ctx, lang) => {
+  try {
+    const user = await UserModel.getById(ctx.from.id);
+
+    if (!user) {
+      await ctx.reply(t('error', lang));
+      return;
+    }
+
+    // Check if already applied
+    const alreadyApplied = user.pnpContactoStatus === 'pending' || user.pnpContactoStatus === 'approved';
+
+    let text = lang === 'es'
+      ? [
+          '⭐ *Aplicar a PNP Contacto!*',
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+          '',
+          'PNP Contacto! es el roster de performers de PNPtv!',
+          '',
+          'Como miembro de PNP Contacto! podrás:',
+          '• Aparecer en el directorio de performers',
+          '• Recibir solicitudes de shows en vivo',
+          '• Conectar con otros performers',
+          '• Acceso a eventos exclusivos',
+          '• Badge especial en tu perfil',
+          '',
+          '*Requisitos:*',
+          '• Perfil completo con foto',
+          '• Membresía PRIME activa',
+          '• Bio y descripción de servicios',
+          '',
+        ].join('\n')
+      : [
+          '⭐ *Apply to PNP Contacto!*',
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+          '',
+          'PNP Contacto! is PNPtv!\'s performer roster!',
+          '',
+          'As a PNP Contacto! member you can:',
+          '• Appear in the performers directory',
+          '• Receive live show requests',
+          '• Connect with other performers',
+          '• Access to exclusive events',
+          '• Special badge on your profile',
+          '',
+          '*Requirements:*',
+          '• Complete profile with photo',
+          '• Active PRIME membership',
+          '• Bio and service description',
+          '',
+        ].join('\n');
+
+    let keyboard;
+
+    if (alreadyApplied) {
+      const statusText = user.pnpContactoStatus === 'approved'
+        ? (lang === 'es' ? '✅ Ya eres miembro de PNP Contacto!' : '✅ You\'re already a PNP Contacto! member')
+        : (lang === 'es' ? '⏳ Tu aplicación está pendiente de revisión' : '⏳ Your application is pending review');
+
+      text += `\n${statusText}`;
+
+      keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback(t('back', lang), 'show_profile')],
+      ]);
+    } else {
+      // Check requirements
+      const hasPhoto = !!user.photoFileId;
+      const hasBio = !!user.bio;
+      const isPrime = user.subscriptionStatus === 'active';
+
+      text += lang === 'es'
+        ? [
+            '*Tu estado:*',
+            `${hasPhoto ? '✅' : '❌'} Foto de perfil`,
+            `${hasBio ? '✅' : '❌'} Bio completada`,
+            `${isPrime ? '✅' : '❌'} Membresía PRIME`,
+          ].join('\n')
+        : [
+            '*Your status:*',
+            `${hasPhoto ? '✅' : '❌'} Profile photo`,
+            `${hasBio ? '✅' : '❌'} Bio completed`,
+            `${isPrime ? '✅' : '❌'} PRIME membership`,
+          ].join('\n');
+
+      const canApply = hasPhoto && hasBio && isPrime;
+
+      if (canApply) {
+        keyboard = Markup.inlineKeyboard([
+          [Markup.button.callback(
+            lang === 'es' ? '✨ Enviar Aplicación' : '✨ Submit Application',
+            'confirm_pnp_contacto'
+          )],
+          [Markup.button.callback(t('back', lang), 'show_profile')],
+        ]);
+      } else {
+        text += lang === 'es'
+          ? '\n\n⚠️ Completa los requisitos antes de aplicar.'
+          : '\n\n⚠️ Complete the requirements before applying.';
+
+        keyboard = Markup.inlineKeyboard([
+          [Markup.button.callback(t('back', lang), 'show_profile')],
+        ]);
+      }
+    }
+
+    await ctx.editMessageText(text, {
+      parse_mode: 'Markdown',
+      ...keyboard,
+    });
+  } catch (error) {
+    logger.error('Error showing PNP Contacto application:', error);
+  }
+};
+
+/**
+ * Submit PNP Contacto! application
+ */
+const submitPnpContactoApplication = async (ctx, lang) => {
+  try {
+    // Update user's PNP Contacto status
+    await UserService.updateProfile(ctx.from.id, {
+      pnpContactoStatus: 'pending',
+      pnpContactoAppliedAt: new Date(),
+    });
+
+    const text = lang === 'es'
+      ? [
+          '✅ *¡Aplicación Enviada!*',
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+          '',
+          'Tu aplicación a PNP Contacto! ha sido recibida.',
+          '',
+          'Nuestro equipo revisará tu perfil y te notificaremos',
+          'cuando tu aplicación sea aprobada.',
+          '',
+          '¡Gracias por tu interés en unirte al roster de performers!',
+        ].join('\n')
+      : [
+          '✅ *Application Submitted!*',
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+          '',
+          'Your application to PNP Contacto! has been received.',
+          '',
+          'Our team will review your profile and notify you',
+          'when your application is approved.',
+          '',
+          'Thank you for your interest in joining the performer roster!',
+        ].join('\n');
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback(t('back', lang), 'show_profile')],
+    ]);
+
+    await ctx.editMessageText(text, {
+      parse_mode: 'Markdown',
+      ...keyboard,
+    });
+
+    await ctx.answerCbQuery(lang === 'es' ? '✅ Aplicación enviada' : '✅ Application submitted');
+  } catch (error) {
+    logger.error('Error submitting PNP Contacto application:', error);
+  }
+};
+
+/**
  * Show user profile
  * @param {Context} ctx - Telegraf context
  * @param {string|number} targetUserId - User ID to show
@@ -619,18 +928,69 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
       await UserModel.incrementProfileViews(targetUserId);
     }
 
-    // Build profile text with consistent design
-    let profileText = [
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      isOwnProfile ? '👤 My Profile' : '👤 User Profile',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      '',
+    // Build profile text with new design
+    let profileText = '';
+
+    if (isOwnProfile) {
+      // New header design for own profile
+      profileText = lang === 'es'
+        ? [
+            '```',
+            '━━━━━━━━━━━━━━━━━━━━━━━━━━┐',
+            '     📸 Mi Perfil PNPtv   ',
+            '━━━━━━━━━━━━━━━━━━━━━━━━━━┘',
+            '```',
+            '',
+            'Tu perfil es tu identidad en la comunidad.',
+            'Se mostrará bajo cada foto que compartas,',
+            'ayudando a otros a conectar contigo.',
+            '',
+            '```',
+            '┌─────────────────────────┐',
+            '│  Edita tu info abajo   │',
+            '└─────────────────────────┘',
+            '```',
+            '',
+          ].join('\n')
+        : [
+            '```',
+            '━━━━━━━━━━━━━━━━━━━━━━━━━━┐',
+            '    📸 My PNPtv Profile   ',
+            '━━━━━━━━━━━━━━━━━━━━━━━━━━┘',
+            '```',
+            '',
+            'Your profile is your identity in the community.',
+            'It shows under every photo you share,',
+            'helping others connect with you.',
+            '',
+            '```',
+            '┌─────────────────────────┐',
+            '│  Edit your info below  │',
+            '└─────────────────────────┘',
+            '```',
+            '',
+          ].join('\n');
+    } else {
+      // Standard header for viewing other profiles
+      profileText = [
+        '```',
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐',
+        '      👤 User Profile     ',
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘',
+        '```',
+        '',
+      ].join('\n');
+    }
+
+    // Add user info section
+    const userInfoLines = [
       targetUser.badges && targetUser.badges.length > 0
         ? targetUser.badges.map(badge => (typeof badge === 'object' && badge.icon ? `${badge.icon} ${badge.name}` : t(`badges.${badge}`, lang))).filter(Boolean).join(' ') : '',
       `👤 ${targetUser.firstName || 'User'} ${targetUser.lastName || ''}`,
       targetUser.username ? `@${targetUser.username}` : '',
       targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `📝 ${targetUser.bio}` : '',
-      targetUser.looking_for && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `${lang === 'es' ? '🔎 Buscado' : '🔎 Looking for'}: ${targetUser.looking_for}` : '',
+      targetUser.looking_for && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `${lang === 'es' ? '🔎 Buscando' : '🔎 Looking for'}: ${targetUser.looking_for}` : '',
+      targetUser.tribe && (isOwnProfile || targetUser.privacy?.showBio !== false) ? `🏳️‍🌈 ${lang === 'es' ? 'Tribu' : 'Tribe'}: ${targetUser.tribe}` : '',
       targetUser.interests && targetUser.interests.length > 0 && (isOwnProfile || targetUser.privacy?.showInterests !== false)
         ? `🎯 ${targetUser.interests.join(', ')}` : '',
       targetUser.location && (isOwnProfile || targetUser.privacy?.showLocation !== false) ? '📍 Location shared' : '',
@@ -650,18 +1010,20 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
           })()
         : (isOwnProfile ? '⭐ Free Plan' : ''),
       isOwnProfile ? `${t('profileViews', lang, { views: targetUser.profileViews || 0 })}` : '',
-      ''
-    ].filter(Boolean).join('\n');
+    ].filter(Boolean);
+
+    profileText += userInfoLines.join('\n') + '\n';
 
     // Add social media section (only show if any are filled)
     const hasSocialMedia = targetUser.tiktok || targetUser.twitter || targetUser.facebook || targetUser.instagram;
     if (hasSocialMedia) {
-      profileText += '\n📱 Social Media:\n';
+      profileText += `\n📱 ${lang === 'es' ? 'Redes Sociales' : 'Social Media'}:\n`;
       if (targetUser.tiktok) profileText += `  TikTok: @${targetUser.tiktok}\n`;
       if (targetUser.twitter) profileText += `  X: @${targetUser.twitter}\n`;
       if (targetUser.facebook) profileText += `  Facebook: ${targetUser.facebook}\n`;
       if (targetUser.instagram) profileText += `  Instagram: @${targetUser.instagram}\n`;
     }
+
     // Parse createdAt date
     let createdAtDate;
     if (targetUser.createdAt) {
@@ -676,35 +1038,59 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
     const validDate = createdAtDate && !isNaN(createdAtDate.getTime())
       ? moment(createdAtDate).format('MMM DD, YYYY')
       : 'Recently';
-    profileText += `${t('memberSince', lang, { date: validDate })}\n`;
+    profileText += `\n${t('memberSince', lang, { date: validDate })}\n`;
 
     // Build keyboard
     const keyboard = [];
 
     if (isOwnProfile) {
-      // Own profile - edit options
+      // New button layout matching the design
+      // Options header
+      profileText += `\n${lang === 'es' ? 'Opciones' : 'Options'} ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+
+      // Row 1: Update Profile | Update Picture
       keyboard.push([
-        Markup.button.callback(t('editPhoto', lang), 'edit_photo'),
-        Markup.button.callback(t('editBio', lang), 'edit_bio'),
-        Markup.button.callback(lang === 'es' ? 'Editar Buscado' : 'Edit Looking For', 'edit_looking_for'),
+        Markup.button.callback(
+          lang === 'es' ? '📝 Actualizar Perfil' : '📝 Update Profile',
+          'edit_profile_info'
+        ),
+        Markup.button.callback(
+          lang === 'es' ? '📸 Actualizar Foto' : '📸 Update Picture',
+          'edit_photo'
+        ),
       ]);
+
+      // Row 2: Social Media | Profile Settings
       keyboard.push([
-        Markup.button.callback(t('editLocation', lang), 'edit_location'),
-        Markup.button.callback(t('editInterests', lang), 'edit_interests'),
+        Markup.button.callback(
+          lang === 'es' ? '🔗 Redes Sociales' : '🔗 Social Media',
+          'edit_social'
+        ),
+        Markup.button.callback(
+          lang === 'es' ? '⚙️ Ajustes de Perfil' : '⚙️ Profile Settings',
+          'privacy_settings'
+        ),
       ]);
+
+      // Row 3: Print My Profile | Apply to PNP Contacto!
       keyboard.push([
-        Markup.button.callback(lang === 'es' ? '📱 Redes Sociales' : '📱 Social Media', 'edit_social'),
+        Markup.button.callback(
+          lang === 'es' ? '🖨️ Imprimir Mi Perfil' : '🖨️ Print My Profile',
+          'share_profile'
+        ),
+        Markup.button.callback(
+          lang === 'es' ? '⭐ Aplicar a PNP Contacto!' : '⭐ Apply to PNP Contacto!',
+          'apply_pnp_contacto'
+        ),
       ]);
-      keyboard.push([
-        Markup.button.callback(t('privacySettings', lang), 'privacy_settings'),
-      ]);
-      keyboard.push([
-        Markup.button.callback(t('shareProfile', lang), 'share_profile'),
-      ]);
+
+      // Row 4: Favorites | Blocked
       keyboard.push([
         Markup.button.callback(t('myFavorites', lang), 'show_favorites'),
         Markup.button.callback(t('blockedUsers', lang), 'show_blocked'),
       ]);
+
+      // Back button
       keyboard.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
     } else {
       // Other user's profile - interaction options

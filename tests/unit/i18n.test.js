@@ -118,10 +118,18 @@ describe('i18n Utilities', () => {
       });
     });
 
-    it('should not have empty translation values', () => {
-      Object.values(translations.en).forEach(value => {
-        expect(value).toBeTruthy();
-        expect(['string', 'object', 'function']).toContain(typeof value);
+    it('should not have empty translation values (except intentional dividers)', () => {
+      // List of keys that are intentionally empty (visual dividers/spacers)
+      const allowedEmptyKeys = ['subscriptionDivider'];
+      
+      Object.entries(translations.en).forEach(([key, value]) => {
+        if (allowedEmptyKeys.includes(key)) {
+          // These keys are allowed to be empty
+          expect(typeof value).toBe('string');
+        } else {
+          expect(value).toBeTruthy();
+          expect(['string', 'object', 'function']).toContain(typeof value);
+        }
       });
     });
   });

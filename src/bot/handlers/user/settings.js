@@ -14,15 +14,27 @@ const registerSettingsHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
 
+      const settingsText = 
+        '```\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
+        '      ⚙️ Settings         \n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
+        '```\n\n' +
+        'Customize your PNPtv! experience.\n\n' +
+        '_Choose an option below:_';
+
       await ctx.editMessageText(
-        t('settingsTitle', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('changeLanguage', lang), 'settings_language')],
-          [Markup.button.callback(t('notifications', lang), 'settings_notifications')],
-          [Markup.button.callback(t('privacy', lang), 'settings_privacy')],
-          [Markup.button.callback(t('about', lang), 'settings_about')],
-          [Markup.button.callback(t('back', lang), 'back_to_main')],
-        ]),
+        settingsText,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🌐 Language', 'settings_language')],
+            [Markup.button.callback('🔔 Notifications', 'settings_notifications')],
+            [Markup.button.callback('🔒 Privacy', 'settings_privacy')],
+            [Markup.button.callback('ℹ️ About', 'settings_about')],
+            [Markup.button.callback('🔙 Back', 'back_to_main')],
+          ]),
+        }
       );
     } catch (error) {
       logger.error('Error showing settings:', error);
@@ -32,15 +44,27 @@ const registerSettingsHandlers = (bot) => {
   // Language settings
   bot.action('settings_language', async (ctx) => {
     try {
+      const langText = 
+        '```\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
+        '      🌐 Language         \n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
+        '```\n\n' +
+        'Select your preferred language:\n' +
+        '_Selecciona tu idioma preferido:_';
+
       await ctx.editMessageText(
-        'Select Language / Seleccionar Idioma:',
-        Markup.inlineKeyboard([
-          [
-            Markup.button.callback('🇺🇸 English', 'change_lang_en'),
-            Markup.button.callback('🇪🇸 Español', 'change_lang_es'),
-          ],
-          [Markup.button.callback('← Back / Atrás', 'show_settings')],
-        ]),
+        langText,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [
+              Markup.button.callback('🇺🇸 English', 'change_lang_en'),
+              Markup.button.callback('🇪🇸 Español', 'change_lang_es'),
+            ],
+            [Markup.button.callback('🔙 Back', 'show_settings')],
+          ]),
+        }
       );
     } catch (error) {
       logger.error('Error showing language settings:', error);
@@ -79,11 +103,27 @@ const registerSettingsHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
 
+      const notifText = 
+        '```\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
+        '    🔔 Notifications      \n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
+        '```\n\n' +
+        '_Coming soon..._\n\n' +
+        'You\'ll be able to customize:\n' +
+        '• Message alerts\n' +
+        '• New content notifications\n' +
+        '• Nearby user alerts\n' +
+        '• Promotional updates';
+
       await ctx.editMessageText(
-        `${t('notifications', lang)}\n\nNotification preferences coming soon...`,
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('back', lang), 'show_settings')],
-        ]),
+        notifText,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Back', 'show_settings')],
+          ]),
+        }
       );
     } catch (error) {
       logger.error('Error showing notifications:', error);
@@ -95,11 +135,27 @@ const registerSettingsHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
 
+      const privacyText = 
+        '```\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
+        '       🔒 Privacy         \n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
+        '```\n\n' +
+        '_Coming soon..._\n\n' +
+        'You\'ll be able to control:\n' +
+        '• Who sees your profile\n' +
+        '• Location sharing\n' +
+        '• Online status visibility\n' +
+        '• Message requests';
+
       await ctx.editMessageText(
-        `${t('privacy', lang)}\n\nPrivacy settings coming soon...`,
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('back', lang), 'show_settings')],
-        ]),
+        privacyText,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Back', 'show_settings')],
+          ]),
+        }
       );
     } catch (error) {
       logger.error('Error showing privacy:', error);
@@ -111,16 +167,35 @@ const registerSettingsHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
 
-      const aboutText = `${t('about', lang)}\n\n`
-        + `🎬 PNPtv Bot v1.0.0\n\n`
-        + `Your entertainment hub for live streams, radio, and more!\n\n`
-        + `🌐 Website: https://pnptv.app\n`
-        + `📧 Support: support@pnptv.app`;
+      const aboutText = 
+        '```\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
+        '       ℹ️ About           \n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
+        '```\n\n' +
+        '🎬 **PNPtv Bot** v1.0.0\n\n' +
+        'Your entertainment hub for:\n' +
+        '• Live streams & shows\n' +
+        '• Radio & podcasts\n' +
+        '• Community connections\n' +
+        '• And much more!\n\n' +
+        '```\n' +
+        '┌─────────────────────────┐\n' +
+        '│  Made with 💜 by PNPtv  │\n' +
+        '└─────────────────────────┘\n' +
+        '```\n\n' +
+        '🌐 pnptv.app\n' +
+        '📧 support@pnptv.app';
+
       await ctx.editMessageText(
         aboutText,
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('back', lang), 'show_settings')],
-        ]),
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.url('🌐 Visit Website', 'https://pnptv.app')],
+            [Markup.button.callback('🔙 Back', 'show_settings')],
+          ]),
+        }
       );
     } catch (error) {
       logger.error('Error showing about:', error);

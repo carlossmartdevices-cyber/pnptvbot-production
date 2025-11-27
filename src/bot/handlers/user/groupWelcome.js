@@ -312,32 +312,56 @@ async function handleGetPrimeAction(ctx) {
     const userLang = ctx.from.language_code || 'en';
     const isSpanish = userLang.startsWith('es');
 
-    let message;
-    if (isSpanish) {
-      message = `💎 ¿Listo para activar PRIME?
+    const message = `\`\`\`
+Unlock PRIME
 
-Desbloquea todo: videos completos, presentaciones en vivo, llamadas privadas, y más.
+Unlock the full PNPtv! experience and join the hottest Latino PnP community on Telegram — unfiltered, intimate, raw, and always active.
 
-Escribe /prime para ver las opciones de membresía.`;
-    } else {
-      message = `💎 Ready to go PRIME?
+As a PRIME member, you get instant access to:
 
-Unlock everything: full videos, live shows, private calls, and more.
+• Full-length videos (Santino + sexy Latino performers)
+• Weekly new content drops
+• Unlimited Nearby access
+• Your interactive community profile
+• Video Calls & Live Streams with hot performers
+• The ability to host radio podcasts, video call rooms, or live stream shows directly from our platform
+• Member-only perks, exclusive events, and premium tools
 
-Type /prime to see membership options.`;
-    }
+Choose the plan that fits you best.
+Pay with debit/credit card, crypto, popular pay apps — and soon PayPal.
+Once payment is completed, you'll receive a private message with your member access, plus an email with your invoice and onboarding instructions.
+
+If you need help, send a message and Cristina, our intelligent chatbot agent, will guide you instantly — or connect you directly with Santino.
+
+Membership Plans
+\`\`\``;
+
+    // Create inline keyboard with plan buttons
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('🧪 Trial Week — $14.99 — 7 Days', 'plan_trial')],
+      [Markup.button.callback('💎 Monthly PRIME — $24.99 — 30 Days', 'plan_monthly')],
+      [Markup.button.callback('💠 Crystal PRIME — $49.99 — 90 Days', 'plan_crystal')],
+      [Markup.button.callback('🔥 Diamond PRIME — $99.99 — 180 Days', 'plan_diamond')],
+      [Markup.button.callback('♾️ Lifetime PRIME — $249.99 Promo — Forever', 'plan_lifetime')],
+    ]);
 
     // Answer the callback query
     await ctx.answerCbQuery();
 
-    // Try to send private message
+    // Try to send private message with buttons
     try {
-      await ctx.telegram.sendMessage(userId, message);
+      await ctx.telegram.sendMessage(userId, message, {
+        parse_mode: 'Markdown',
+        ...keyboard
+      });
     } catch (error) {
       logger.debug('Could not send private message:', error.message);
 
       // If can't send PM, inform in group
-      const sentMessage = await ctx.reply(message);
+      const sentMessage = await ctx.reply(message, {
+        parse_mode: 'Markdown',
+        ...keyboard
+      });
 
       // Auto-delete after 3 minutes
       setTimeout(async () => {
@@ -360,36 +384,27 @@ Type /prime to see membership options.`;
  */
 async function handleBookCallAction(ctx) {
   try {
-    const userId = ctx.from.id;
-    const userLang = ctx.from.language_code || 'en';
-    const isSpanish = userLang.startsWith('es');
+    const message = `\`\`\`
+Book a Video Call
 
-    let message;
-    if (isSpanish) {
-      message = `📞 ¡Reserva una Videollamada 1:1!
+Coming This Weekend!
 
-Conéctate directamente con Santino o Lex para una sesión privada.
+Private 1:1 video calls with Santino and other hot performers will be available very soon.
 
-Escribe /call para reservar tu espacio.`;
-    } else {
-      message = `📞 Book a 1:1 Video Call!
-
-Connect directly with Santino or Lex for a private session.
-
-Type /call to book your spot.`;
-    }
+Stay tuned — this feature drops this weekend!
+\`\`\``;
 
     // Answer the callback query
-    await ctx.answerCbQuery();
+    await ctx.answerCbQuery('Coming this weekend! 🔥', { show_alert: true });
 
     // Try to send private message
     try {
-      await ctx.telegram.sendMessage(userId, message);
+      await ctx.telegram.sendMessage(ctx.from.id, message, { parse_mode: 'Markdown' });
     } catch (error) {
       logger.debug('Could not send private message:', error.message);
 
       // If can't send PM, inform in group
-      const sentMessage = await ctx.reply(message);
+      const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
 
       // Auto-delete after 3 minutes
       setTimeout(async () => {
@@ -412,36 +427,55 @@ Type /call to book your spot.`;
  */
 async function handleSetupProfileAction(ctx) {
   try {
-    const userId = ctx.from.id;
-    const userLang = ctx.from.language_code || 'en';
-    const isSpanish = userLang.startsWith('es');
+    const message = `\`\`\`
+My PNPtv Profile
 
-    let message;
-    if (isSpanish) {
-      message = `⚙️ ¡Configura tu Perfil!
+Your PNPtv! profile is your identity inside the community.
+It will be automatically linked under every photo you share in the group, helping other members discover who you are and connect with you.
 
-Personaliza tu experiencia, actualiza tu ubicación y preferencias.
+This section also shows your subscription status and the benefits included in your current membership tier.
 
-Escribe /profile para comenzar.`;
-    } else {
-      message = `⚙️ Setup Your Profile!
+Your profile includes:
+• Bio, interests, tribe & what you're looking for
+• Your profile picture
+• Your social links
+• Your membership tier and perks
+• A shareable community profile card
+\`\`\``;
 
-Customize your experience, update your location and preferences.
-
-Type /profile to get started.`;
-    }
+    // Create inline keyboard with profile options
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback('📝 Update Profile', 'profile_update_bio'),
+        Markup.button.callback('📸 Update Picture', 'profile_update_picture')
+      ],
+      [
+        Markup.button.callback('🔗 Social Media', 'profile_social_links'),
+        Markup.button.callback('⚙️ Profile Settings', 'profile_settings')
+      ],
+      [
+        Markup.button.callback('🖨️ Print My Profile', 'profile_print_card'),
+        Markup.button.callback('⭐ Apply to PNP Contacto!', 'profile_apply_contacto')
+      ]
+    ]);
 
     // Answer the callback query
     await ctx.answerCbQuery();
 
-    // Try to send private message
+    // Try to send private message with buttons
     try {
-      await ctx.telegram.sendMessage(userId, message);
+      await ctx.telegram.sendMessage(ctx.from.id, message, {
+        parse_mode: 'Markdown',
+        ...keyboard
+      });
     } catch (error) {
       logger.debug('Could not send private message:', error.message);
 
       // If can't send PM, inform in group
-      const sentMessage = await ctx.reply(message);
+      const sentMessage = await ctx.reply(message, {
+        parse_mode: 'Markdown',
+        ...keyboard
+      });
 
       // Auto-delete after 3 minutes
       setTimeout(async () => {

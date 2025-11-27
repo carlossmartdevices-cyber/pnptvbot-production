@@ -56,9 +56,23 @@ const registerMenuHandlers = (bot) => {
         logger.error('Error starting Cristina AI chat:', error);
       }
     });
+
+  // Special topic IDs for Live & Radio updates
+  const LIVE_RADIO_TOPIC_ID = 3809;
+  const PRIME_CHAT_ID = -1003291737499;
+
   // /menu command opens the same menu as /start
   bot.command('menu', async (ctx) => {
     try {
+      const chatId = ctx.chat?.id;
+      const topicId = ctx.message?.message_thread_id;
+      
+      // Special handling for Live & Radio topic
+      if (chatId === PRIME_CHAT_ID && topicId === LIVE_RADIO_TOPIC_ID) {
+        await showLiveRadioTopicMenu(ctx);
+        return;
+      }
+      
       await showMainMenu(ctx);
     } catch (error) {
       logger.error('Error showing menu:', error);
@@ -132,6 +146,60 @@ const registerMenuHandlers = (bot) => {
         { show_alert: true }
       );
     });
+
+    // Already PRIME handler
+    bot.action('already_prime', async (ctx) => {
+      await ctx.answerCbQuery('✅ You are already a PRIME member! Enjoy all features.', { show_alert: true });
+    });
+
+    // Members Area handler
+    bot.action('show_members_area', async (ctx) => {
+      try {
+        await ctx.answerCbQuery();
+        const message = 
+          '```\n' +
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
+          '    🧑‍💼 Members Area      \n' +
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
+          '```\n\n' +
+          'Welcome to the **PRIME Members Area**! 💎\n\n' +
+          'You have exclusive access to:\n\n' +
+          '**Available Now:**\n' +
+          '• 📹 Full-length Videos\n' +
+          '• 📍 Nearby Members\n' +
+          '• 👤 Community Profiles\n' +
+          '• 🎙️ Radio & Podcasts\n\n' +
+          '**Coming Soon:**\n' +
+          '• 📞 Video Calls with Performers\n' +
+          '• 🎬 Live Streams\n' +
+          '• 🎉 Exclusive Events\n\n' +
+          '```\n' +
+          '┌─────────────────────────┐\n' +
+          '│  Enjoy being PRIME! 💜 │\n' +
+          '└─────────────────────────┘\n' +
+          '```';
+
+        const keyboard = Markup.inlineKeyboard([
+          [Markup.button.callback('📹 Watch Videos', 'members_videos')],
+          [Markup.button.callback('📍 Who Is Nearby?', 'show_nearby')],
+          [Markup.button.callback('🎙️ Radio & Podcasts', 'show_radio')],
+          [Markup.button.callback('🔙 Back to Menu', 'back_to_main')],
+        ]);
+
+        await ctx.editMessageText(message, {
+          parse_mode: 'Markdown',
+          ...keyboard
+        });
+      } catch (error) {
+        logger.error('Error showing members area:', error);
+      }
+    });
+
+    // Members videos handler (placeholder)
+    bot.action('members_videos', async (ctx) => {
+      await ctx.answerCbQuery('🎬 Videos section coming soon!', { show_alert: true });
+    });
+
     // Admin panel handler: only superadmins can access role management
     bot.action('admin_panel', async (ctx) => {
       try {
@@ -190,37 +258,91 @@ const showMainMenu = async (ctx) => {
   const user = ctx.session?.user || {};
   const isPremium = user.subscriptionStatus === 'active';
   const isAdmin = user.role === 'admin';
+  const username = ctx.from?.username || ctx.from?.first_name || 'Member';
 
   if (chatType === 'group' || chatType === 'supergroup') {
     await showGroupMenu(ctx);
     return;
   }
 
-  // Show full private chat menu
-  await ctx.reply(
-    t('mainMenuIntro', lang),
-    Markup.inlineKeyboard([
+  let menuText;
+  let keyboard;
+
+  if (isPremium || isAdmin) {
+    // PRIME MEMBER VERSION
+    menuText = 
+      '```\n' +
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
+      '   💎 You are PRIME! 💎   \n' +
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
+      '```\n\n' +
+      'Thank you for being PRIME, papi! 🔥\n\n' +
+      'Hit **Members Area** and enjoy everything\n' +
+      'we\'ve prepared for you — videos, Nearby,\n' +
+      'hangouts, lives, shows, and more.\n\n' +
+      '**Cristina**, our AI assistant, is always\n' +
+      'here to help you with anything you need.\n\n' +
+      '```\n' +
+      '┌─────────────────────────┐\n' +
+      '│   That\'s so hot! 🔥    │\n' +
+      '└─────────────────────────┘\n' +
+      '```';
+
+    keyboard = Markup.inlineKeyboard([
       [
-        Markup.button.callback('👑 Suscríbete a PRIME', 'show_subscription_plans'),
-        Markup.button.callback(t('myProfile', lang), 'show_profile'),
+        Markup.button.callback('💎 PRIME ✓', 'already_prime'),
+        Markup.button.callback('📸 My Profile', 'show_profile'),
       ],
       [
-        Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
-        Markup.button.callback(t('liveStreams', lang), 'show_live'),
+        Markup.button.callback('📍 Who Is Nearby?', 'show_nearby'),
+        Markup.button.callback('🧑‍💼 Members Area', 'show_members_area'),
       ],
       [
-        Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-        Markup.button.callback(t('playerMenu', lang), 'show_player'),
+        Markup.button.callback('🆘 Help', 'show_support'),
+        Markup.button.callback('⚙️ Settings', 'show_settings'),
+      ],
+    ]);
+  } else {
+    // FREE MEMBER VERSION
+    menuText = 
+      '```\n' +
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
+      '   🎬 Welcome to PNPtv!   \n' +
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
+      '```\n\n' +
+      `@${username} we love having you\n` +
+      'in the PNPtv Community! 💜\n\n' +
+      'Hit **Unlock PRIME** to get even more\n' +
+      'cloudy fun — full-length videos, lives,\n' +
+      'hangouts, Nearby, and all member features.\n\n' +
+      '**Cristina**, our AI assistant, is here\n' +
+      'to guide you and answer questions.\n\n' +
+      '```\n' +
+      '┌─────────────────────────┐\n' +
+      '│  Unlock the fun! 🔓    │\n' +
+      '└─────────────────────────┘\n' +
+      '```';
+
+    keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback('🔓 Unlock PRIME', 'show_subscription_plans'),
+        Markup.button.callback('📸 My Profile', 'show_profile'),
       ],
       [
-        Markup.button.callback('📹 Video Call Rooms', 'show_jitsi'),
+        Markup.button.callback('📍 Who Is Nearby?', 'show_nearby'),
+        Markup.button.callback('🧑‍💼 Members Area 🔒', 'locked_feature'),
       ],
       [
-        Markup.button.callback(t('support', lang), 'show_support'),
-        Markup.button.callback(t('settings', lang), 'show_settings'),
+        Markup.button.callback('🆘 Help', 'show_support'),
+        Markup.button.callback('⚙️ Settings', 'show_settings'),
       ],
-    ]),
-  );
+    ]);
+  }
+
+  await ctx.reply(menuText, {
+    parse_mode: 'Markdown',
+    ...keyboard
+  });
 };
 
 /**
@@ -241,74 +363,240 @@ const showMainMenuEdit = async (ctx) => {
   const user = ctx.session?.user || {};
   const isPremium = user.subscriptionStatus === 'active';
   const isAdmin = user.role === 'admin';
+  const username = ctx.from?.username || ctx.from?.first_name || 'Member';
 
-  let menuText = '';
-  if (isAdmin) {
-    menuText = lang === 'es'
-      ? '👑 ¡Bienvenido Admin!\nAcceso total a todas las funciones y panel de administración.'
-      : '👑 Welcome Admin!\nFull access to all features and admin panel.';
-  } else if (isPremium) {
-    menuText = t('welcomeScreenPrime', lang);
+  let menuText;
+  let keyboard;
+
+  if (isPremium || isAdmin) {
+    // PRIME MEMBER VERSION
+    menuText = 
+      '```\n' +
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
+      '   💎 You are PRIME! 💎   \n' +
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
+      '```\n\n' +
+      'Thank you for being PRIME, papi! 🔥\n\n' +
+      'Hit **Members Area** and enjoy everything\n' +
+      'we\'ve prepared for you — videos, Nearby,\n' +
+      'hangouts, lives, shows, and more.\n\n' +
+      '**Cristina**, our AI assistant, is always\n' +
+      'here to help you with anything you need.\n\n' +
+      '```\n' +
+      '┌─────────────────────────┐\n' +
+      '│   That\'s so hot! 🔥    │\n' +
+      '└─────────────────────────┘\n' +
+      '```';
+
+    keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback('💎 PRIME ✓', 'already_prime'),
+        Markup.button.callback('📸 My Profile', 'show_profile'),
+      ],
+      [
+        Markup.button.callback('📍 Who Is Nearby?', 'show_nearby'),
+        Markup.button.callback('🧑‍💼 Members Area', 'show_members_area'),
+      ],
+      [
+        Markup.button.callback('🆘 Help', 'show_support'),
+        Markup.button.callback('⚙️ Settings', 'show_settings'),
+      ],
+    ]);
   } else {
-    menuText = t('welcomeScreenFree', lang);
-  }
+    // FREE MEMBER VERSION
+    menuText = 
+      '```\n' +
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
+      '   🎬 Welcome to PNPtv!   \n' +
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
+      '```\n\n' +
+      `@${username} we love having you\n` +
+      'in the PNPtv Community! 💜\n\n' +
+      'Hit **Unlock PRIME** to get even more\n' +
+      'cloudy fun — full-length videos, lives,\n' +
+      'hangouts, Nearby, and all member features.\n\n' +
+      '**Cristina**, our AI assistant, is here\n' +
+      'to guide you and answer questions.\n\n' +
+      '```\n' +
+      '┌─────────────────────────┐\n' +
+      '│  Unlock the fun! 🔓    │\n' +
+      '└─────────────────────────┘\n' +
+      '```';
 
-  function buildButton(label, action, locked) {
-    return Markup.button.callback(locked ? `${label} 🔒` : label, locked ? 'locked_feature' : action);
-  }
-
-  const buttons = [
-    [
-      Markup.button.callback('👑 Suscríbete a PRIME', 'show_subscription_plans'),
-      Markup.button.callback(t('myProfile', lang), 'show_profile'),
-    ],
-    [
-      Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
-      buildButton(t('liveStreams', lang), 'show_live', !isPremium && !isAdmin),
-    ],
-    [
-      Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-      buildButton('📹 Video Call Rooms', 'show_jitsi', !isPremium && !isAdmin),
-    ],
-    [
-      Markup.button.callback(t('support', lang), 'show_support'),
-    ],
-    [
-      Markup.button.callback(t('settings', lang), 'show_settings'),
-    ],
-  ];
-  if (isAdmin) {
-    buttons.push([Markup.button.callback('🛡️ Admin Panel', 'admin_panel')]);
+    keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback('🔓 Unlock PRIME', 'show_subscription_plans'),
+        Markup.button.callback('📸 My Profile', 'show_profile'),
+      ],
+      [
+        Markup.button.callback('📍 Who Is Nearby?', 'show_nearby'),
+        Markup.button.callback('🧑‍💼 Members Area 🔒', 'locked_feature'),
+      ],
+      [
+        Markup.button.callback('🆘 Help', 'show_support'),
+        Markup.button.callback('⚙️ Settings', 'show_settings'),
+      ],
+    ]);
   }
 
   try {
-    await ctx.editMessageText(
-      t('mainMenuIntro', lang),
-      Markup.inlineKeyboard([
-        [
-          Markup.button.callback('👑 Suscríbete a PRIME', 'show_subscription_plans'),
-          Markup.button.callback(t('myProfile', lang), 'show_profile'),
-        ],
-        [
-          Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
-          Markup.button.callback(t('liveStreams', lang), 'show_live'),
-        ],
-        [
-          Markup.button.callback(t('radioMenu', lang), 'show_radio'),
-          Markup.button.callback(t('playerMenu', lang), 'show_player'),
-        ],
-        [
-          Markup.button.callback('📹 Video Call Rooms', 'show_jitsi'),
-        ],
-        [
-          Markup.button.callback(t('support', lang), 'show_support'),
-          Markup.button.callback(t('settings', lang), 'show_settings'),
-        ],
-      ]),
-    );
+    await ctx.editMessageText(menuText, {
+      parse_mode: 'Markdown',
+      ...keyboard
+    });
   } catch (error) {
     // If edit fails, send new message
     await showMainMenu(ctx);
+  }
+};
+
+/**
+ * Show special menu for Live & Radio topic
+ * Shows subscription invite for free users or quick links for PRIME members
+ */
+const showLiveRadioTopicMenu = async (ctx) => {
+  const user = ctx.session?.user || {};
+  const isPremium = user.subscriptionStatus === 'active';
+  const isAdmin = user.role === 'admin';
+  const firstName = ctx.from?.first_name || 'friend';
+  const botUsername = ctx.botInfo?.username || 'PNPtvbot';
+
+  let menuText;
+  let keyboard;
+
+  if (isPremium || isAdmin) {
+    // PRIME member - show quick links
+    menuText = 
+      '```\n' +
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
+      '  📻 LIVE & RADIO HUB 🎙️  \n' +
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
+      '```\n\n' +
+      `Hey ${firstName}! 🔥\n\n` +
+      'This is where all the action happens!\n' +
+      'Shows, calls, radio updates — right here.\n\n' +
+      '**Quick Access:**\n' +
+      '• 📻 Radio — 24/7 cloudy beats\n' +
+      '• 🎥 Hangouts — Video calls with members\n' +
+      '• 🎬 Live Shows — Performers streaming\n\n' +
+      '```\n' +
+      '┌─────────────────────────┐\n' +
+      '│  Stay tuned papi! 🎧   │\n' +
+      '└─────────────────────────┘\n' +
+      '```';
+
+    keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.url('📻 Radio', `https://t.me/${botUsername}?start=show_radio`),
+        Markup.button.url('🎥 Hangouts', `https://t.me/${botUsername}?start=show_jitsi`),
+      ],
+      [
+        Markup.button.url('🎬 Live Shows', `https://t.me/${botUsername}?start=show_live`),
+        Markup.button.url('📍 Nearby', `https://t.me/${botUsername}?start=show_nearby`),
+      ],
+      [
+        Markup.button.url('💬 Full Menu', `https://t.me/${botUsername}?start=menu`),
+      ],
+    ]);
+  } else {
+    // FREE user - show subscription invite
+    menuText = 
+      '```\n' +
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
+      '  🔒 PRIME MEMBERS ONLY   \n' +
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
+      '```\n\n' +
+      `Hey ${firstName}! 👋\n\n` +
+      'This topic is for **PRIME members** to get\n' +
+      'live updates on shows, calls & radio!\n\n' +
+      '**With PRIME you get:**\n' +
+      '• 📻 24/7 Radio access\n' +
+      '• 🎥 Join video hangouts\n' +
+      '• 🎬 Watch live performer shows\n' +
+      '• 📍 Find nearby cloudy papis\n' +
+      '• 📹 Full-length videos\n\n' +
+      '```\n' +
+      '┌─────────────────────────┐\n' +
+      '│  Unlock the fun! 🔓    │\n' +
+      '└─────────────────────────┘\n' +
+      '```';
+
+    keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.url('💎 Unlock PRIME', `https://t.me/${botUsername}?start=show_subscription_plans`),
+      ],
+      [
+        Markup.button.url('❓ Learn More', `https://t.me/${botUsername}?start=show_support`),
+      ],
+    ]);
+  }
+
+  await ctx.reply(menuText, {
+    parse_mode: 'Markdown',
+    ...keyboard
+  });
+};
+
+/**
+ * Send notification to Live & Radio topic about new events
+ * @param {Telegram} telegram - Telegram instance
+ * @param {string} eventType - Type of event: 'radio_show', 'hangout', 'live_stream'
+ * @param {object} eventData - Event details { title, host, description, link }
+ */
+const notifyLiveRadioTopic = async (telegram, eventType, eventData) => {
+  const LIVE_RADIO_TOPIC_ID = 3809;
+  const PRIME_CHAT_ID = -1003291737499;
+
+  let emoji, eventTitle;
+  switch (eventType) {
+    case 'radio_show':
+      emoji = '📻';
+      eventTitle = 'RADIO SHOW';
+      break;
+    case 'hangout':
+      emoji = '🎥';
+      eventTitle = 'VIDEO HANGOUT';
+      break;
+    case 'live_stream':
+      emoji = '🎬';
+      eventTitle = 'LIVE SHOW';
+      break;
+    default:
+      emoji = '🔔';
+      eventTitle = 'NEW EVENT';
+  }
+
+  const message = 
+    '```\n' +
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━┐\n' +
+    `  ${emoji} ${eventTitle} NOW! ${emoji}  \n` +
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━┘\n' +
+    '```\n\n' +
+    `🔥 **${eventData.title || 'Something hot is happening!'}**\n\n` +
+    (eventData.host ? `👤 Host: ${eventData.host}\n\n` : '') +
+    (eventData.description ? `${eventData.description}\n\n` : '') +
+    '```\n' +
+    '┌─────────────────────────┐\n' +
+    '│   Join now papi! 🔥    │\n' +
+    '└─────────────────────────┘\n' +
+    '```';
+
+  let keyboard;
+  if (eventData.link) {
+    keyboard = Markup.inlineKeyboard([
+      [Markup.button.url('🚀 Join Now', eventData.link)]
+    ]);
+  }
+
+  try {
+    await telegram.sendMessage(PRIME_CHAT_ID, message, {
+      message_thread_id: LIVE_RADIO_TOPIC_ID,
+      parse_mode: 'Markdown',
+      ...keyboard
+    });
+    logger.info('Live/Radio topic notification sent', { eventType, title: eventData.title });
+  } catch (error) {
+    logger.error('Error sending Live/Radio topic notification:', error);
   }
 };
 
@@ -319,3 +607,5 @@ module.exports = registerMenuHandlers;
 module.exports.showMainMenu = showMainMenu;
 module.exports.showMainMenuEdit = showMainMenuEdit;
 module.exports.sendPrimeWelcome = sendPrimeWelcome;
+module.exports.showLiveRadioTopicMenu = showLiveRadioTopicMenu;
+module.exports.notifyLiveRadioTopic = notifyLiveRadioTopic;

@@ -13,6 +13,7 @@ const registerGamificationHandlers = (bot) => {
   // Main gamification menu
   bot.action('admin_gamification', async (ctx) => {
     try {
+      await ctx.answerCbQuery();
       await showGamificationMenu(ctx);
     } catch (error) {
       logger.error('Error showing gamification menu:', error);

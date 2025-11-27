@@ -13,6 +13,7 @@ const registerRadioManagementHandlers = (bot) => {
   // Main radio admin menu
   bot.action('admin_radio', async (ctx) => {
     try {
+      await ctx.answerCbQuery();
       await showRadioAdminMenu(ctx);
     } catch (error) {
       logger.error('Error showing radio admin menu:', error);

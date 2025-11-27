@@ -279,6 +279,7 @@ async function handleDeepLinkStart(ctx) {
 async function handleMenuCallback(ctx) {
   try {
     const callbackData = ctx.callbackQuery?.data || '';
+    logger.info(`>>> handleMenuCallback called with data: ${callbackData}`);
     const lang = await getUserLanguage(ctx);
 
     // Acknowledge the callback
@@ -286,6 +287,7 @@ async function handleMenuCallback(ctx) {
 
     // Parse callback data
     const [prefix, action] = callbackData.split(':');
+    logger.info(`>>> Menu callback parsed: prefix=${prefix}, action=${action}`);
 
     if (prefix !== 'menu') {
       return;
@@ -374,6 +376,7 @@ async function handleMenuCallback(ctx) {
         break;
 
       case 'profile':
+        logger.info(`>>> Calling handleProfile for user ${ctx.from.id}`);
         await handleProfile(ctx, lang);
         break;
 

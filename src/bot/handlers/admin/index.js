@@ -156,6 +156,8 @@ const registerAdminHandlers = (bot) => {
   // User management
   bot.action('admin_users', async (ctx) => {
     try {
+      await ctx.answerCbQuery(); // Answer immediately
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -181,8 +183,13 @@ const registerAdminHandlers = (bot) => {
   // Broadcast
   bot.action('admin_broadcast', async (ctx) => {
     try {
+      await ctx.answerCbQuery(); // Answer immediately to prevent timeout
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
+      if (!isAdmin) {
+        logger.warn('Non-admin tried to access broadcast:', { userId: ctx.from.id });
+        return;
+      }
 
       const lang = getLanguage(ctx);
 
@@ -212,7 +219,11 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error in admin broadcast:', error);
-      await ctx.answerCbQuery('Error al iniciar broadcast');
+      try {
+        await ctx.answerCbQuery('Error al iniciar broadcast');
+      } catch (e) {
+        // Already answered
+      }
     }
   });
 
@@ -314,6 +325,8 @@ const registerAdminHandlers = (bot) => {
   // Plan management - List all plans
   bot.action('admin_plans', async (ctx) => {
     try {
+      await ctx.answerCbQuery(); // Answer immediately
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -639,6 +652,8 @@ const registerAdminHandlers = (bot) => {
   // Analytics
   bot.action('admin_analytics', async (ctx) => {
     try {
+      await ctx.answerCbQuery(); // Answer immediately
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -680,6 +695,8 @@ const registerAdminHandlers = (bot) => {
   // Admin cancel / back to main panel
   bot.action('admin_cancel', async (ctx) => {
     try {
+      await ctx.answerCbQuery(); // Answer immediately
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -1055,6 +1072,27 @@ const registerAdminHandlers = (bot) => {
       try {
         const message = ctx.message.text;
 
+        // Validate message length
+        // Telegram caption limit is 1024 chars for media, 4096 for text-only
+        // Use 1020 to leave room for the "📢 " prefix and safety margin
+        const hasMedia = ctx.session.temp.broadcastData?.mediaFileId;
+        const maxLength = hasMedia ? 1020 : 4000;
+        const charCount = message.length;
+        
+        if (charCount > maxLength) {
+          const excessChars = charCount - maxLength;
+          await ctx.reply(
+            `❌ *Mensaje demasiado largo*\n\n`
+            + `📏 Tu mensaje: ${charCount} caracteres\n`
+            + `📏 Límite máximo: ${maxLength} caracteres\n`
+            + `⚠️ Exceso: ${excessChars} caracteres\n\n`
+            + `${hasMedia ? '⚠️ *Nota:* Los mensajes con foto/video tienen un límite de 1024 caracteres en Telegram.\n\n' : ''}`
+            + `Por favor acorta tu mensaje y envíalo de nuevo.`,
+            { parse_mode: 'Markdown' },
+          );
+          return;
+        }
+
         // Initialize broadcastData if needed
         if (!ctx.session.temp.broadcastData) {
           ctx.session.temp.broadcastData = {};
@@ -1101,6 +1139,27 @@ const registerAdminHandlers = (bot) => {
         }
 
         const broadcastData = ctx.session.temp.broadcastData;
+
+        // Validate message length
+        // Telegram caption limit is 1024 chars for media, 4096 for text-only
+        // Use 1020 to leave room for the "📢 " prefix and safety margin
+        const hasMedia = broadcastData.mediaFileId;
+        const maxLength = hasMedia ? 1020 : 4000;
+        const charCount = message.length;
+        
+        if (charCount > maxLength) {
+          const excessChars = charCount - maxLength;
+          await ctx.reply(
+            `❌ *Mensaje demasiado largo*\n\n`
+            + `📏 Tu mensaje: ${charCount} caracteres\n`
+            + `📏 Límite máximo: ${maxLength} caracteres\n`
+            + `⚠️ Exceso: ${excessChars} caracteres\n\n`
+            + `${hasMedia ? '⚠️ *Nota:* Los mensajes con foto/video tienen un límite de 1024 caracteres en Telegram.\n\n' : ''}`
+            + `Por favor acorta tu mensaje y envíalo de nuevo.`,
+            { parse_mode: 'Markdown' },
+          );
+          return;
+        }
 
         // Validate English text exists
         if (!broadcastData.textEn) {
@@ -1162,19 +1221,37 @@ const registerAdminHandlers = (bot) => {
               if (sendMethod) {
                 await ctx.telegram[sendMethod](user.id, broadcastData.mediaFileId, {
                   caption: `📢 ${textToSend}`,
+                  parse_mode: 'Markdown',
                 });
               } else {
-                await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`);
+                await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`, { parse_mode: 'Markdown' });
               }
             } else {
               // Text only
-              await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`);
+              await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`, { parse_mode: 'Markdown' });
             }
 
             sent += 1;
           } catch (sendError) {
             failed += 1;
-            logger.warn('Failed to send broadcast to user:', { userId: user.id, error: sendError.message });
+            const errorMsg = sendError.message || '';
+            
+            // Log specific error types
+            if (errorMsg.includes('caption is too long')) {
+              logger.error('Broadcast caption too long - should have been caught by validation', { 
+                userId: user.id, 
+                textLength: textToSend?.length,
+                hasMedia: !!broadcastData.mediaType 
+              });
+            } else if (errorMsg.includes('bot was blocked') || errorMsg.includes('user is deactivated')) {
+              // User blocked bot or deactivated account - this is expected
+              logger.debug('User unavailable for broadcast:', { userId: user.id });
+            } else if (errorMsg.includes('chat not found')) {
+              // Chat doesn't exist - user never started the bot
+              logger.debug('Chat not found for broadcast:', { userId: user.id });
+            } else {
+              logger.warn('Failed to send broadcast to user:', { userId: user.id, error: errorMsg });
+            }
           }
 
           // Rate limiting: delay between messages
@@ -1967,37 +2044,6 @@ const registerAdminHandlers = (bot) => {
 
   // ====== MANUAL MEMBERSHIP ACTIVATION ======
 
-  // Start membership activation flow
-  bot.action('admin_activate_membership', async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      const lang = getLanguage(ctx);
-
-      // Clear any ongoing admin tasks
-      ctx.session.temp = {
-        activatingMembership: true,
-        activationStep: 'search_user',
-      };
-      await ctx.saveSession();
-
-      await ctx.editMessageText(
-        '🎁 **Activar Membresía Manualmente**\n\n'
-        + '👤 Por favor envía el **ID de Telegram** del usuario al que deseas activar la membresía.\n\n'
-        + '💡 Puedes encontrar el ID pidiendo al usuario que use /start en el bot.',
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
-          ]),
-        },
-      );
-    } catch (error) {
-      logger.error('Error starting membership activation:', error);
-    }
-  });
-
   // Handle membership type selection
   bot.action(/^admin_activate_type_(.+)_(plan|courtesy)$/, async (ctx) => {
     try {
@@ -2144,113 +2190,6 @@ const registerAdminHandlers = (bot) => {
     } catch (error) {
       logger.error('Error activating courtesy pass:', error);
       await ctx.answerCbQuery('Error al activar pase de cortesía');
-    }
-  });
-
-  // Activate specific plan
-  bot.action(/^admin_activate_plan_(.+)_(.+)$/, async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      const userId = ctx.match[1];
-      const planId = ctx.match[2];
-
-      const user = await UserModel.getById(userId);
-      if (!user) {
-        await ctx.answerCbQuery('Usuario no encontrado');
-        return;
-      }
-
-      const plan = await PlanModel.getById(planId);
-      if (!plan) {
-        await ctx.answerCbQuery('Plan no encontrado');
-        return;
-      }
-
-      // Calculate expiry date based on plan duration
-      let expiryDate;
-      if (plan.isLifetime || plan.duration >= 36500) {
-        expiryDate = null; // Lifetime = no expiry
-      } else {
-        expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + plan.duration);
-      }
-
-      // Activate subscription
-      await UserModel.updateSubscription(userId, {
-        status: 'active',
-        planId: plan.id,
-        expiry: expiryDate,
-      });
-
-      const lang = user.language || 'es';
-      const planName = lang === 'es' ? (plan.nameEs || plan.name) : plan.name;
-
-      let successText = '✅ **Membresía Activada**\n\n';
-      successText += `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`;
-      successText += `🆔 ID: ${userId}\n`;
-      successText += `💎 Plan: ${planName}\n`;
-      successText += `⏱️ Duración: ${plan.isLifetime || plan.duration >= 36500 ? 'Lifetime' : `${plan.duration} días`}\n`;
-      if (expiryDate) {
-        successText += `📅 Expira: ${expiryDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}\n`;
-      } else {
-        successText += `♾️ Sin vencimiento (Lifetime)\n`;
-      }
-      successText += `💰 Valor: $${plan.price} ${plan.currency}\n`;
-      successText += `📊 Estado: Activo\n\n`;
-      successText += '📨 El usuario ha sido notificado por el bot.';
-
-      await ctx.editMessageText(
-        successText,
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('◀️ Volver al Panel Admin', 'admin_cancel')],
-          ]),
-        },
-      );
-
-      // Send notification to user via bot
-      try {
-        const durationText = plan.isLifetime || plan.duration >= 36500
-          ? (lang === 'es' ? 'acceso de por vida' : 'lifetime access')
-          : (lang === 'es' ? `${plan.duration} días` : `${plan.duration} days`);
-
-        const expiryText = expiryDate
-          ? (lang === 'es'
-            ? `hasta el **${expiryDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}**`
-            : `until **${expiryDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}**`)
-          : (lang === 'es' ? '**sin vencimiento**' : '**no expiration**');
-
-        const welcomeMessage = lang === 'es'
-          ? `🎉 **¡Membresía Activada!**\n\n` +
-            `Has recibido el plan **${planName}** con ${durationText}.\n\n` +
-            `✅ Tu membresía está activa ${expiryText}\n\n` +
-            `💎 Disfruta de todo el contenido premium de PNPtv!`
-          : `🎉 **Membership Activated!**\n\n` +
-            `You have received the **${planName}** plan with ${durationText}.\n\n` +
-            `✅ Your membership is active ${expiryText}\n\n` +
-            `💎 Enjoy all premium PNPtv content!`;
-
-        await ctx.telegram.sendMessage(userId, welcomeMessage, { parse_mode: 'Markdown' });
-      } catch (notifyError) {
-        logger.warn('Could not notify user about plan activation', { userId, error: notifyError.message });
-      }
-
-      logger.info('Plan activated manually by admin', {
-        adminId: ctx.from.id,
-        userId,
-        planId: plan.id,
-        planName,
-        duration: plan.duration,
-        expiryDate,
-      });
-
-      await ctx.answerCbQuery('✅ Membresía activada');
-    } catch (error) {
-      logger.error('Error activating plan:', error);
-      await ctx.answerCbQuery('Error al activar membresía');
     }
   });
 

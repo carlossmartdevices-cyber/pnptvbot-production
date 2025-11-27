@@ -14,9 +14,10 @@ const registerLiveStreamManagementHandlers = (bot) => {
   // Main live stream management menu
   bot.action('admin_live_streams', async (ctx) => {
     try {
+      await ctx.answerCbQuery(); // Answer immediately
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) {
-        await ctx.answerCbQuery(t('unauthorized', getLanguage(ctx)));
         return;
       }
 
@@ -1032,6 +1033,20 @@ const registerLiveStreamManagementHandlers = (bot) => {
                 }
               );
 
+              // Notify Live & Radio topic about scheduled stream
+              try {
+                const { notifyLiveRadioTopic } = require('../../handlers/user/menu');
+                const botUsername = ctx.botInfo?.username || 'PNPtvbot';
+                await notifyLiveRadioTopic(ctx.telegram, 'live_stream', {
+                  title: `📅 SCHEDULED: ${newStream.title}`,
+                  host: newStream.hostName,
+                  description: `Coming ${scheduledDate.toLocaleString()}`,
+                  link: `https://t.me/${botUsername}?start=show_live`
+                });
+              } catch (notifyTopicError) {
+                logger.debug('Could not notify Live/Radio topic:', notifyTopicError.message);
+              }
+
               logger.info('Scheduled stream created by admin', {
                 adminId: ctx.from.id,
                 streamId: newStream.streamId,
@@ -1322,6 +1337,20 @@ const registerLiveStreamManagementHandlers = (bot) => {
           );
         } catch (notifyError) {
           logger.warn('Failed to notify stream host:', { hostId: newStream.hostId });
+        }
+
+        // Notify Live & Radio topic about new stream
+        try {
+          const { notifyLiveRadioTopic } = require('../../handlers/user/menu');
+          const botUsername = ctx.botInfo?.username || 'PNPtvbot';
+          await notifyLiveRadioTopic(ctx.telegram, 'live_stream', {
+            title: newStream.title,
+            host: newStream.hostName,
+            description: `📂 ${categories[newStream.category] || newStream.category}${newStream.isPaid ? ` • 💰 $${newStream.price}` : ' • FREE'}`,
+            link: `https://t.me/${botUsername}?start=show_live`
+          });
+        } catch (notifyTopicError) {
+          logger.debug('Could not notify Live/Radio topic:', notifyTopicError.message);
         }
 
         logger.info('Stream created by admin', {

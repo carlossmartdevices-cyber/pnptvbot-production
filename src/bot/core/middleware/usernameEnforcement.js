@@ -69,14 +69,12 @@ const usernameEnforcement = () => {
   // Cache to track last known usernames
   const usernameCache = new Map();
 
-  let nextCalled = false;
   return async (ctx, next) => {
     const chatType = ctx.chat?.type;
 
     // Only apply to groups and supergroups
     if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
-      if (!nextCalled) { nextCalled = true; await next(); }
-      return;
+      return next();
     }
 
     const userId = ctx.from?.id;
@@ -84,8 +82,7 @@ const usernameEnforcement = () => {
     const groupId = ctx.chat.id;
 
     if (!userId) {
-      if (!nextCalled) { nextCalled = true; await next(); }
-      return;
+      return next();
     }
 
     try {
@@ -126,11 +123,11 @@ const usernameEnforcement = () => {
       }
 
       // Continue with message processing
-      if (!nextCalled) { nextCalled = true; await next(); }
+      return next();
     } catch (error) {
       logger.error('Username enforcement error:', error);
       // On error, allow message through to avoid blocking legitimate users
-      if (!nextCalled) { nextCalled = true; await next(); }
+      return next();
     }
   };
 };
