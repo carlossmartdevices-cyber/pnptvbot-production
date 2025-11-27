@@ -130,13 +130,6 @@ const registerMenuHandlers = (bot) => {
       { show_alert: true }
     );
   });
-  bot.action('show_zoom', async (ctx) => {
-    const lang = ctx.session?.language || 'en';
-    await ctx.answerCbQuery(
-      lang === 'es' ? '🚧 Próximamente: Salas Zoom.' : '🚧 Coming soon: Zoom Rooms.',
-      { show_alert: true }
-    );
-  });
 
   // Creator Program - Coming Soon
   bot.action('creator_coming_soon', async (ctx) => {

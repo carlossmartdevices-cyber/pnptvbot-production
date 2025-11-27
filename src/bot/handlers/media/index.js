@@ -1,5 +1,4 @@
 const radioHandlers = require('./radio');
-const zoomHandlers = require('./zoom');
 const jitsiHandlers = require('./jitsi');
 const liveHandlers = require('./live');
 const livestreamHandlers = require('./livestream');
@@ -14,7 +13,6 @@ const { registerTopicMenuHandlers } = require('./topicMenu');
  */
 const registerMediaHandlers = (bot) => {
   radioHandlers(bot);
-  zoomHandlers(bot);
   jitsiHandlers(bot);
   liveHandlers(bot);
   livestreamHandlers(bot);
