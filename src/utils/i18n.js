@@ -38,6 +38,7 @@ const translations = {
     radioMenu: '📻 Radio',
     playerMenu: '🎵 Media Player',
     zoomRooms: '🎥 Zoom Rooms',
+    primeMembersArea: '💎 PRIME Members Area',
     support: '🤖 Support',
     settings: '⚙️ Settings',
 
@@ -455,6 +456,7 @@ const translations = {
     radioMenu: '📻 Radio',
     playerMenu: '🎵 Reproductor',
     zoomRooms: '🎥 Salas Zoom',
+    primeMembersArea: '💎 Área de Miembros PRIME',
     support: '🤖 Soporte',
     settings: '⚙️ Configuración',
 
