@@ -1591,7 +1591,6 @@ const registerAdminHandlers = (bot) => {
       await ctx.answerCbQuery('Error al cambiar el plan');
     }
   });
->>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1
 };
 
 module.exports = registerAdminHandlers;

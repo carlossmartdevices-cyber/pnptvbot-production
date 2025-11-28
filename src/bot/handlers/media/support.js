@@ -506,9 +506,3 @@ const registerSupportHandlers = (bot) => {
 };
 
 module.exports = registerSupportHandlers;
-      logger.error('Error in /support command:', error);
-    }
-  });
-};
-
-module.exports = registerSupportHandlers;

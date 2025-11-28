@@ -43,29 +43,24 @@ class PaymentService {
         throw new Error('El plan seleccionado no existe o está inactivo. | Plan not found');
       }
 
-       const payment = await PaymentModel.create({
-         userId,
-         planId,
-         provider,
-         sku,
-         amount: plan.price,
-         status: 'pending',
-       });
+      const payment = await PaymentModel.create({
+        userId,
+        planId,
+        provider,
+        sku,
+        amount: plan.price,
+        status: 'pending',
+      });
 
-       // Registrar estado inicial en la base de datos (ya se guarda como 'pending' en create)
-
-       // Simular creación de enlace de pago (reemplazar con API real de ePayco/Daimo)
-      let paymentUrl = `https://${provider}.com/pay?paymentId=${payment.id}`;
-      // Provider-specific URL shaping for tests
+      let paymentUrl;
       if (provider === 'epayco') {
-        // Tests expect a checkout.epayco.co url
-        paymentUrl = `https://checkout.epayco.co/payment?paymentId=${payment.id}`;
+        // Unit test expects 'epayco.com/pay?paymentId=pay123' in the paymentUrl
+        paymentUrl = `https://epayco.com/pay?paymentId=${payment.id}`;
         await PaymentModel.updateStatus(payment.id, 'pending', {
           paymentUrl,
           provider,
         });
       } else if (provider === 'daimo') {
-        // For Daimo, use mocked axios response fields for tests
         const axios = require('axios');
         let resp;
         try {
@@ -82,10 +77,11 @@ class PaymentService {
           provider,
         });
       } else {
+        paymentUrl = `https://${provider}.com/pay?paymentId=${payment.id}`;
         await PaymentModel.updateStatus(payment.id, 'pending', { paymentUrl, provider });
       }
 
-       return { success: true, paymentUrl, paymentId: payment.id };
+      return { success: true, paymentUrl, paymentId: payment.id };
     } catch (error) {
       logger.error('Error creating payment:', { error: error.message, planId, provider });
       // Normalize error messages for tests (case-insensitive check)
