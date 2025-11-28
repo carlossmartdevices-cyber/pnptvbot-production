@@ -93,7 +93,6 @@ class UserModel {
         if (maybeCached !== undefined) return maybeCached;
         // otherwise fallthrough to the explicit fetch below
       }
-      }
 
       // Fallback for tests that mock cache.get / cache.set
       const cached = await cache.get(cacheKey);
