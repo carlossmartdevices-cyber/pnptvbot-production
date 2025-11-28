@@ -3,6 +3,7 @@ const jitsiHandlers = require('./jitsi');
 const liveHandlers = require('./live');
 const supportHandlers = require('./support');
 const playerHandlers = require('./player');
+const membersAreaHandlers = require('./membersArea');
 
 /**
  * Register all media handlers
@@ -14,6 +15,7 @@ const registerMediaHandlers = (bot) => {
   liveHandlers(bot);
   supportHandlers(bot);
   playerHandlers(bot);
+  membersAreaHandlers(bot);
 };
 
 module.exports = registerMediaHandlers;

@@ -123,17 +123,13 @@ const showMainMenu = async (ctx) => {
       ],
       [
         Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
-        Markup.button.callback(t('liveStreams', lang), 'show_live'),
-      ],
-      [
-        Markup.button.callback(t('radioMenu', lang), 'show_radio'),
         Markup.button.callback(t('playerMenu', lang), 'show_player'),
       ],
       [
-        Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
-        Markup.button.callback(t('support', lang), 'show_support'),
+        Markup.button.callback(t('primeMembersArea', lang), 'show_members_area'),
       ],
       [
+        Markup.button.callback(t('support', lang), 'show_support'),
         Markup.button.callback(t('settings', lang), 'show_settings'),
       ],
     ]),
@@ -200,17 +196,13 @@ const showMainMenuEdit = async (ctx) => {
         ],
         [
           Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
-          Markup.button.callback(t('liveStreams', lang), 'show_live'),
-        ],
-        [
-          Markup.button.callback(t('radioMenu', lang), 'show_radio'),
           Markup.button.callback(t('playerMenu', lang), 'show_player'),
         ],
         [
-          Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
-          Markup.button.callback(t('support', lang), 'show_support'),
+          Markup.button.callback(t('primeMembersArea', lang), 'show_members_area'),
         ],
         [
+          Markup.button.callback(t('support', lang), 'show_support'),
           Markup.button.callback(t('settings', lang), 'show_settings'),
         ],
       ]),
