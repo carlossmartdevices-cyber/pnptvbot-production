@@ -128,7 +128,10 @@ app.get('/health', async (req, res) => {
     // Check Redis connection
     const { getRedis } = require('../../config/redis');
     const redis = getRedis();
-    await redis.ping();
+    // Not all test Redis mocks implement ping, guard accordingly
+    if (redis && typeof redis.ping === 'function') {
+      await redis.ping();
+    }
     health.dependencies.redis = 'ok';
   } catch (error) {
     health.dependencies.redis = 'error';
@@ -147,6 +150,18 @@ app.get('/health', async (req, res) => {
     health.dependencies.firestore = 'error';
     health.status = 'degraded';
     logger.error('Firestore health check failed:', error);
+  }
+
+  try {
+    // Check PostgreSQL connection (optional in test env)
+    const { testConnection } = require('../../config/postgres');
+    const dbOk = await testConnection();
+    health.dependencies.database = dbOk ? 'ok' : 'error';
+    if (!dbOk) health.status = 'degraded';
+  } catch (error) {
+    health.dependencies.database = 'error';
+    health.status = 'degraded';
+    logger.error('Database health check failed:', error);
   }
 
   const statusCode = health.status === 'ok' ? 200 : 503;

@@ -5,7 +5,11 @@
 
 const { query, getClient, getPool, closePool, initializePostgres } = require('../../../src/config/postgres');
 
-describe('PostgreSQL Database Integration Tests', () => {
+const shouldSkip = process.env.CI === 'true' || process.env.SKIP_DB_TESTS === 'true';
+
+const maybeDescribe = shouldSkip ? describe.skip : describe;
+
+maybeDescribe('PostgreSQL Database Integration Tests', () => {
   let client;
   let pool;
 

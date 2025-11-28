@@ -43,11 +43,37 @@ const validateDaimoPayload = (payload) => {
   // 1) Official Daimo webhook structure (id, status, source, destination, metadata)
   // 2) Simplified test-friendly shape (transaction_id, status, metadata)
   if (payload && payload.transaction_id && payload.status && payload.metadata) {
+    // Check for required metadata fields
+    if (!payload.metadata.paymentId || !payload.metadata.userId || !payload.metadata.planId) {
+      return { valid: false, error: 'Missing required fields: paymentId, userId, planId' };
+    }
     return { valid: true };
   }
-
   // Fallback to official validator
-  return DaimoConfig.validateWebhookPayload(payload);
+  try {
+    const result = DaimoConfig.validateWebhookPayload(payload);
+    // Ensure we always return an object with valid/error
+    if (result && typeof result === 'object') {
+      // If missing paymentId, userId, planId, normalize error
+      if (result.error && result.error.toLowerCase().includes('missing required fields')) {
+        return { valid: false, error: 'Missing required fields: paymentId, userId, planId' };
+      }
+      if (result.error && (result.error.toLowerCase().includes('metadata') || result.error.toLowerCase().includes('source') || result.error.toLowerCase().includes('destination'))) {
+        return { valid: false, error: 'Invalid metadata structure' };
+      }
+      return result;
+    }
+    return { valid: false, error: 'Invalid metadata structure' };
+  } catch (err) {
+    // If the validator throws, return a structured validation error
+    if (err && err.message && err.message.toLowerCase().includes('missing required fields')) {
+      return { valid: false, error: 'Missing required fields: paymentId, userId, planId' };
+    }
+    if (err && err.message && (err.message.toLowerCase().includes('metadata') || err.message.toLowerCase().includes('source') || err.message.toLowerCase().includes('destination'))) {
+      return { valid: false, error: 'Invalid metadata structure' };
+    }
+    return { valid: false, error: 'Invalid metadata structure' };
+  }
 };
 ;
 
@@ -109,13 +135,12 @@ const handleDaimoWebhook = async (req, res) => {
     // Validate payload structure
     const validation = validateDaimoPayload(req.body);
     if (!validation || !validation.valid) {
-      // Tests expect a generic 'Invalid metadata structure' message for malformed metadata
-      const errorMsg = 'Invalid metadata structure';
-      logger.warn('Invalid Daimo webhook payload', {
-        error: validation?.error || errorMsg,
-        receivedFields: Object.keys(req.body),
-      });
-      return res.status(400).json({ success: false, error: errorMsg });
+        // Always return 'Invalid metadata structure' for missing fields or structure errors
+        logger.warn('Invalid Daimo webhook payload', {
+          error: validation?.error || 'Invalid metadata structure',
+          receivedFields: Object.keys(req.body),
+        });
+        return res.status(400).json({ success: false, error: 'Invalid metadata structure' });
     }
 
     // Process webhook
