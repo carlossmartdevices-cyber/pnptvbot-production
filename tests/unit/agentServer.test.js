@@ -18,7 +18,9 @@ jest.mock('redis', () => {
     }
     async lRange(key, start, end) {
       const arr = this.lists.get(key) || [];
-      return arr.slice(start, end + 1);
+      // Support negative end like Redis (e.g., -1 means last element)
+      const realEnd = end < 0 ? arr.length - 1 : end;
+      return arr.slice(start, realEnd + 1);
     }
     async set(key, value) { this.store.set(key, value); return 'OK'; }
     async get(key) { return this.store.get(key) || null; }

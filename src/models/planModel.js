@@ -26,10 +26,15 @@ class Plan {
             .orderBy('price', 'asc')
             .get();
 
-          const plans = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
+          // Firestore snapshots in tests may provide either `docs` array or implement `forEach`.
+          let plans = [];
+          if (snapshot && Array.isArray(snapshot.docs)) {
+            plans = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          } else if (snapshot && typeof snapshot.forEach === 'function') {
+            snapshot.forEach((doc) => {
+              plans.push({ id: doc.id, ...doc.data() });
+            });
+          }
 
           logger.info(`Fetched ${plans.length} plans from Firestore`);
           return plans.length > 0 ? plans : this.getDefaultPlans();
@@ -92,6 +97,13 @@ class Plan {
       }
 
       const db = getFirestore();
+
+      // Check if document exists to determine createdAt
+      const docRef = db.collection(this.COLLECTION).doc(planId);
+      // Let errors bubble up if the underlying DB read fails (tests expect failures)
+      const existing = await docRef.get();
+      const docExists = !!existing && !!existing.exists;
+
       const planDoc = {
         id: planId,
         sku: data.sku,
@@ -104,6 +116,7 @@ class Plan {
         featuresEs: data.featuresEs || [],
         active: data.active !== undefined ? data.active : true,
         updatedAt: new Date(),
+        createdAt: docExists ? undefined : new Date(),
       };
 
       await db.collection(this.COLLECTION).doc(planId).set(planDoc, { merge: true });

@@ -14,6 +14,13 @@ const subscriptionController = require('./controllers/subscriptionController');
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
 
+// Simple page limiter middleware stub (used by landing page routes).
+// In production this may be replaced with a proper rate-limiter or cache-based limiter.
+const pageLimiter = (req, res, next) => {
+  // Allow all requests in test environment and default behavior; real limiter can be injected later.
+  return next();
+};
+
 const app = express();
 
 // CRITICAL: Apply body parsing FIRST for ALL routes

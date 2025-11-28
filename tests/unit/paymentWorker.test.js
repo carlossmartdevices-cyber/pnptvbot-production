@@ -38,42 +38,6 @@ const axios = require('axios');
 const MockAdapter = require('axios-mock-adapter');
 const PaymentWorker = require('../../src/workers/paymentWorker');
 
-class FakeRedisWorker {
-  constructor() {
-    this.lists = new Map();
-    this.store = new Map();
-    this._blocked = [];
-  }
-  async connect() { return; }
-  on() { }
-  async lPush(key, value) {
-    const arr = this.lists.get(key) || [];
-    arr.unshift(value);
-    this.lists.set(key, arr);
-    if (this._blocked.length) {
-      const cb = this._blocked.shift();
-      cb();
-    }
-    return arr.length;
-  }
-  async brPop(key, timeout) {
-    const arr = this.lists.get(key) || [];
-    if (arr.length) {
-      const element = arr.pop();
-      return { key, element };
-    }
-    await new Promise((resolve) => this._blocked.push(resolve));
-    const arr2 = this.lists.get(key) || [];
-    const element = arr2.pop();
-    return { key, element };
-  }
-  async set(key, value) { this.store.set(key, value); return 'OK'; }
-  async get(key) { return this.store.get(key) || null; }
-  async quit() {}
-}
-
-jest.mock('redis', () => ({ createClient: () => new FakeRedisWorker() }));
-
 describe('PaymentWorker', () => {
   let worker;
   let mockAxios;

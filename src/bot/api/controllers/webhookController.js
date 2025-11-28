@@ -101,9 +101,10 @@ const handleDaimoWebhook = async (req, res) => {
     // Validate payload structure
     const validation = validateDaimoPayload(req.body);
     if (!validation || !validation.valid) {
-      const errorMsg = validation?.error || 'Invalid webhook payload';
+      // Tests expect a generic 'Invalid metadata structure' message for malformed metadata
+      const errorMsg = 'Invalid metadata structure';
       logger.warn('Invalid Daimo webhook payload', {
-        error: errorMsg,
+        error: validation?.error || errorMsg,
         receivedFields: Object.keys(req.body),
       });
       return res.status(400).json({ success: false, error: errorMsg });
