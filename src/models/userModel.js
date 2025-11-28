@@ -71,7 +71,9 @@ class UserModel {
 
       // Support cache implementations that provide getOrSet or a simple get/set API (tests mock get)
       if (cache.getOrSet && typeof cache.getOrSet === 'function') {
-        return await cache.getOrSet(
+        // Some test mocks auto-mock this function and return undefined by default.
+        // Call it, but if it returns undefined, fall back to fetching directly.
+        const maybeCached = await cache.getOrSet(
           cacheKey,
           async () => {
             const db = getFirestore();
@@ -87,6 +89,10 @@ class UserModel {
           },
           600, // Cache for 10 minutes
         );
+
+        if (maybeCached !== undefined) return maybeCached;
+        // otherwise fallthrough to the explicit fetch below
+      }
       }
 
       // Fallback for tests that mock cache.get / cache.set

@@ -3,6 +3,7 @@ const InvoiceService = require('../../bot/services/invoiceservice');
 const EmailService = require('../../bot/services/emailservice');
 const PlanModel = require('../../models/planModel');
 const UserModel = require('../../models/userModel');
+const { cache } = require('../../config/redis');
 const logger = require('../../utils/logger');
 
 class PaymentService {
@@ -37,7 +38,8 @@ class PaymentService {
       const plan = await PlanModel.getById(planId);
       if (!plan || !plan.active) {
         logger.error('Invalid or inactive plan', { planId });
-        throw new Error('Plan not found');
+        // Keep original Spanish message expected by tests
+        throw new Error('El plan seleccionado no existe o está inactivo.');
       }
 
        const payment = await PaymentModel.create({
@@ -82,7 +84,7 @@ class PaymentService {
       logger.error('Error creating payment:', { error: error.message, planId, provider });
       // Normalize error messages for tests (case-insensitive check)
       if (error.message && error.message.toLowerCase().includes('plan')) {
-        throw new Error('Plan not found');
+        throw new Error('El plan seleccionado no existe o está inactivo.');
       }
       throw new Error('Internal server error');
     }
