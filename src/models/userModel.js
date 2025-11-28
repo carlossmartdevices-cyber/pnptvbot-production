@@ -1,4 +1,4 @@
-const { query } = require('../config/postgres');
+const { getFirestore } = require('../config/firebase');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
@@ -15,22 +15,43 @@ class UserModel {
    */
   static async createOrUpdate(userData) {
     try {
+      const db = getFirestore();
       const userId = userData.userId.toString();
+      const userRef = db.collection(COLLECTION).doc(userId);
+
       const timestamp = new Date();
       const data = {
         ...userData,
-        first_name: userData.first_name ?? '',
-        last_name: userData.last_name ?? '',
-        onboardingComplete: typeof userData.onboardingComplete === 'boolean' ? userData.onboardingComplete : false,
         updatedAt: timestamp,
       };
-      // Upsert user in PostgreSQL
-      await query(`INSERT INTO users (id, username, first_name, last_name, email, role, privacy, profile_views, favorites, blocked, badges, subscription_status, plan_id, plan_expiry, language, created_at, updated_at, onboarding_complete)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-        ON CONFLICT (id) DO UPDATE SET username = $2, first_name = $3, last_name = $4, email = $5, role = $6, privacy = $7, profile_views = $8, favorites = $9, blocked = $10, badges = $11, subscription_status = $12, plan_id = $13, plan_expiry = $14, language = $15, updated_at = $17, onboarding_complete = $18`,
-        [userId, data.username, data.first_name, data.last_name, data.email, data.role || 'user', JSON.stringify(data.privacy), data.profileViews || 0, data.favorites || [], data.blocked || [], data.badges || [], data.subscriptionStatus || 'free', data.planId, data.planExpiry, data.language || 'en', data.createdAt || timestamp, timestamp, data.onboardingComplete]
-      );
+
+      const doc = await userRef.get();
+      if (!doc.exists) {
+        data.createdAt = timestamp;
+        data.subscriptionStatus = 'free';
+        data.language = userData.language || 'en';
+        // Default role for new users
+        data.role = userData.role || 'user';
+        // Default privacy settings
+        data.privacy = {
+          showLocation: true,
+          showInterests: true,
+          showBio: true,
+          allowMessages: true,
+          showOnline: true,
+        };
+        // Initialize counters
+        data.profileViews = 0;
+        data.favorites = [];
+        data.blocked = [];
+        data.badges = [];
+      }
+
+      await userRef.set(data, { merge: true });
+
+      // Invalidate cache
       await cache.del(`user:${userId}`);
+
       logger.info('User created/updated', { userId, role: data.role });
       return data;
     } catch (error) {
@@ -47,60 +68,27 @@ class UserModel {
   static async getById(userId) {
     try {
       const cacheKey = `user:${userId}`;
+
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query('SELECT * FROM users WHERE id = $1', [userId.toString()]);
-          if (result.rows.length === 0) {
+          const db = getFirestore();
+          const doc = await db.collection(COLLECTION).doc(userId.toString()).get();
+
+          if (!doc.exists) {
             return null;
           }
-          const userData = this.convertRowToCamelCase(result.rows[0]);
-          // Ensure onboardingComplete is boolean
-          userData.onboardingComplete = Boolean(userData.onboardingComplete);
-          logger.debug(`Fetched user from PostgreSQL: ${userId}`);
+
+          const userData = { id: doc.id, ...doc.data() };
+          logger.debug(`Fetched user from database: ${userId}`);
           return userData;
         },
-        600,
+        600, // Cache for 10 minutes
       );
     } catch (error) {
       logger.error('Error getting user:', error);
       return null;
     }
-  }
-
-  /**
-   * Convert camelCase to snake_case
-   * @param {string} str - String in camelCase
-   * @returns {string} String in snake_case
-   */
-  static toSnakeCase(str) {
-    return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
-  }
-
-  /**
-   * Convert snake_case to camelCase
-   * @param {string} str - String in snake_case
-   * @returns {string} String in camelCase
-   */
-  static toCamelCase(str) {
-    return str.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
-  }
-
-  /**
-   * Convert database row from snake_case to camelCase
-   * @param {Object} row - Database row with snake_case keys
-   * @returns {Object} Object with camelCase keys
-   */
-  static convertRowToCamelCase(row) {
-    if (!row) return row;
-    const converted = {};
-    for (const key in row) {
-      if (row.hasOwnProperty(key)) {
-        const camelKey = this.toCamelCase(key);
-        converted[camelKey] = row[key];
-      }
-    }
-    return converted;
   }
 
   /**
@@ -111,19 +99,17 @@ class UserModel {
    */
   static async updateProfile(userId, updates) {
     try {
-      // Convert camelCase keys to snake_case for PostgreSQL
-      const snakeCaseUpdates = {};
-      Object.keys(updates).forEach((key) => {
-        const snakeKey = this.toSnakeCase(key);
-        snakeCaseUpdates[snakeKey] = updates[key];
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      await userRef.update({
+        ...updates,
+        updatedAt: new Date(),
       });
 
-      const fields = Object.keys(snakeCaseUpdates);
-      const values = Object.values(snakeCaseUpdates);
-      const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
-      values.push(new Date());
-      await query(`UPDATE users SET ${setClause}, updated_at = $${fields.length + 1} WHERE id = $${fields.length + 2}`, [...values, userId.toString()]);
+      // Invalidate cache
       await cache.del(`user:${userId}`);
+
       logger.info('User profile updated', { userId, updates });
       return true;
     } catch (error) {
@@ -140,12 +126,20 @@ class UserModel {
    */
   static async updateSubscription(userId, subscription) {
     try {
-      await query(
-        'UPDATE users SET subscription_status = $1, plan_id = $2, plan_expiry = $3, updated_at = $4 WHERE id = $5',
-        [subscription.status, subscription.planId, subscription.expiry, new Date(), userId.toString()]
-      );
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      await userRef.update({
+        subscriptionStatus: subscription.status,
+        planId: subscription.planId,
+        planExpiry: subscription.expiry,
+        updatedAt: new Date(),
+      });
+
+      // Invalidate cache
       await cache.del(`user:${userId}`);
-      await cache.delPattern('nearby:*');
+      await cache.delPattern('nearby:*'); // Invalidate nearby queries
+
       logger.info('User subscription updated', { userId, subscription });
       return true;
     } catch (error) {
@@ -162,15 +156,27 @@ class UserModel {
    */
   static async getNearby(location, radiusKm = 10) {
     try {
+      // Round coordinates to reduce cache fragmentation
       const lat = Math.round(location.lat * 100) / 100;
       const lng = Math.round(location.lng * 100) / 100;
       const cacheKey = `nearby:${lat},${lng}:${radiusKm}`;
+
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query('SELECT * FROM users WHERE location IS NOT NULL AND subscription_status IN ($1, $2)', ['active', 'free']);
+          const db = getFirestore();
+
+          // Simple approach: Get all users with location and filter by distance
+          // In production, use Geohash or Google Maps API for better performance
+          const snapshot = await db.collection(COLLECTION)
+            .where('location', '!=', null)
+            .where('subscriptionStatus', 'in', ['active', 'free'])
+            .limit(100)
+            .get();
+
           const users = [];
-          for (const userData of result.rows) {
+          snapshot.forEach((doc) => {
+            const userData = { id: doc.id, ...doc.data() };
             if (userData.location) {
               const distance = this.calculateDistance(
                 location.lat,
@@ -182,12 +188,15 @@ class UserModel {
                 users.push({ ...userData, distance });
               }
             }
-          }
+          });
+
+          // Sort by distance
           users.sort((a, b) => a.distance - b.distance);
+
           logger.info(`Found ${users.length} nearby users within ${radiusKm}km`);
           return users;
         },
-        300,
+        300, // Cache for 5 minutes
       );
     } catch (error) {
       logger.error('Error getting nearby users:', error);
@@ -229,33 +238,22 @@ class UserModel {
    */
   static async getExpiredSubscriptions() {
     try {
+      const db = getFirestore();
       const now = new Date();
-      const result = await query(
-        'SELECT * FROM users WHERE subscription_status = $1 AND plan_expiry <= $2',
-        ['active', now]
-      );
-      return result.rows.map(row => this.convertRowToCamelCase(row));
+
+      const snapshot = await db.collection(COLLECTION)
+        .where('subscriptionStatus', '==', 'active')
+        .where('planExpiry', '<=', now)
+        .get();
+
+      const users = [];
+      snapshot.forEach((doc) => {
+        users.push({ id: doc.id, ...doc.data() });
+      });
+
+      return users;
     } catch (error) {
       logger.error('Error getting expired subscriptions:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get subscriptions expiring between two dates
-   * @param {Date} startDate - Start date
-   * @param {Date} endDate - End date
-   * @returns {Promise<Array>} Users with subscriptions expiring in date range
-   */
-  static async getSubscriptionsExpiringBetween(startDate, endDate) {
-    try {
-      const result = await query(
-        'SELECT * FROM users WHERE subscription_status = $1 AND plan_expiry >= $2 AND plan_expiry <= $3',
-        ['active', startDate, endDate]
-      );
-      return result.rows.map(row => this.convertRowToCamelCase(row));
-    } catch (error) {
-      logger.error('Error getting subscriptions expiring between dates:', error);
       return [];
     }
   }
@@ -268,15 +266,23 @@ class UserModel {
    */
   static async getAll(limit = 50, startAfter = null) {
     try {
-      let sql = 'SELECT * FROM users ORDER BY created_at DESC LIMIT $1';
-      let params = [limit];
+      const db = getFirestore();
+      let query = db.collection(COLLECTION).orderBy('createdAt', 'desc').limit(limit);
+
       if (startAfter) {
-        sql = 'SELECT * FROM users WHERE id > $2 ORDER BY created_at DESC LIMIT $1';
-        params = [limit, startAfter];
+        const lastDoc = await db.collection(COLLECTION).doc(startAfter).get();
+        query = query.startAfter(lastDoc);
       }
-      const result = await query(sql, params);
-      const users = result.rows;
-      const lastDoc = users.length > 0 ? users[users.length - 1].id : null;
+
+      const snapshot = await query.get();
+      const users = [];
+      let lastDoc = null;
+
+      snapshot.forEach((doc) => {
+        users.push({ id: doc.id, ...doc.data() });
+        lastDoc = doc.id;
+      });
+
       return { users, lastDoc };
     } catch (error) {
       logger.error('Error getting all users:', error);
@@ -291,11 +297,17 @@ class UserModel {
    */
   static async getBySubscriptionStatus(status) {
     try {
-      const result = await query(
-        'SELECT * FROM users WHERE subscription_status = $1',
-        [status]
-      );
-      return result.rows.map(row => this.convertRowToCamelCase(row));
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTION)
+        .where('subscriptionStatus', '==', status)
+        .get();
+
+      const users = [];
+      snapshot.forEach((doc) => {
+        users.push({ id: doc.id, ...doc.data() });
+      });
+
+      return users;
     } catch (error) {
       logger.error('Error getting users by subscription status:', error);
       return [];
@@ -305,25 +317,21 @@ class UserModel {
   /**
    * Update user role
    * @param {number|string} userId - User ID
-  * @param {string} role - New role (superadmin, admin, moderator, user, influencer)
+   * @param {string} role - New role (superadmin, admin, moderator, user)
    * @param {number|string} assignedBy - Admin userId who assigned the role
    * @returns {Promise<boolean>} Success status
    */
   static async updateRole(userId, role, assignedBy) {
     try {
-      // Only superadmin can assign influencer role
-      if (role === 'influencer' && assignedBy) {
-        const assignerResult = await query('SELECT role FROM users WHERE id = $1', [assignedBy.toString()]);
-        if (assignerResult.rows.length === 0 || assignerResult.rows[0].role !== 'superadmin') {
-          logger.warn('Only superadmin can assign influencer role');
-          return false;
-        }
-      }
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
 
-      await query(
-        'UPDATE users SET role = $1, assigned_by = $2, role_assigned_at = $3, updated_at = $4 WHERE id = $5',
-        [role, assignedBy ? assignedBy.toString() : null, new Date(), new Date(), userId.toString()]
-      );
+      await userRef.update({
+        role,
+        assignedBy: assignedBy ? assignedBy.toString() : null,
+        roleAssignedAt: new Date(),
+        updatedAt: new Date(),
+      });
 
       // Invalidate cache
       await cache.del(`user:${userId}`);
@@ -343,12 +351,18 @@ class UserModel {
    */
   static async getByRole(role) {
     try {
-      const result = await query(
-        'SELECT * FROM users WHERE role = $1',
-        [role]
-      );
-      logger.info(`Found ${result.rows.length} users with role: ${role}`);
-      return result.rows.map(row => this.convertRowToCamelCase(row));
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTION)
+        .where('role', '==', role)
+        .get();
+
+      const users = [];
+      snapshot.forEach((doc) => {
+        users.push({ id: doc.id, ...doc.data() });
+      });
+
+      logger.info(`Found ${users.length} users with role: ${role}`);
+      return users;
     } catch (error) {
       logger.error('Error getting users by role:', error);
       return [];
@@ -361,66 +375,20 @@ class UserModel {
    */
   static async getAllAdmins() {
     try {
-      const result = await query(
-        'SELECT * FROM users WHERE role IN ($1, $2, $3)',
-        ['superadmin', 'admin', 'moderator']
-      );
-      logger.info(`Found ${result.rows.length} admin users`);
-      return result.rows.map(row => this.convertRowToCamelCase(row));
+      const db = getFirestore();
+      const snapshot = await db.collection(COLLECTION)
+        .where('role', 'in', ['superadmin', 'admin', 'moderator'])
+        .get();
+
+      const admins = [];
+      snapshot.forEach((doc) => {
+        admins.push({ id: doc.id, ...doc.data() });
+      });
+
+      logger.info(`Found ${admins.length} admin users`);
+      return admins;
     } catch (error) {
       logger.error('Error getting admin users:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get all active users (for broadcasts)
-   * Returns users who have interacted with the bot
-   * @param {Object} options - Filter options
-   * @returns {Promise<Array>} Active users with id and chatId
-   */
-  static async getAllActive(options = {}) {
-    try {
-      const {
-        subscriptionFilter = null,
-        minActivity = null,
-        limit = null
-      } = options;
-
-      let sql = 'SELECT id, username, first_name FROM users WHERE id IS NOT NULL';
-      const params = [];
-      let paramIndex = 1;
-
-      if (subscriptionFilter) {
-        sql += ` AND subscription_status = $${paramIndex}`;
-        params.push(subscriptionFilter);
-        paramIndex++;
-      }
-
-      if (minActivity) {
-        sql += ` AND last_active >= $${paramIndex}`;
-        params.push(minActivity);
-        paramIndex++;
-      }
-
-      sql += ' ORDER BY last_active DESC NULLS LAST';
-
-      if (limit) {
-        sql += ` LIMIT $${paramIndex}`;
-        params.push(limit);
-      }
-
-      const result = await query(sql, params);
-      logger.info(`Found ${result.rows.length} active users for broadcast`);
-
-      return result.rows.map(row => ({
-        id: row.id,
-        chatId: row.id,
-        username: row.username,
-        firstName: row.first_name
-      }));
-    } catch (error) {
-      logger.error('Error getting active users:', error);
       return [];
     }
   }
@@ -432,10 +400,8 @@ class UserModel {
    */
   static async delete(userId) {
     try {
-      await query(
-        'DELETE FROM users WHERE id = $1',
-        [userId.toString()]
-      );
+      const db = getFirestore();
+      await db.collection(COLLECTION).doc(userId.toString()).delete();
 
       // Invalidate cache
       await cache.del(`user:${userId}`);
@@ -459,15 +425,18 @@ class UserModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
+          const db = getFirestore();
+
           // Get total users
-          const totalResult = await query('SELECT COUNT(*) as count FROM users');
-          const total = parseInt(totalResult.rows[0].count);
+          const totalSnapshot = await db.collection(COLLECTION).count().get();
+          const total = totalSnapshot.data().count;
 
           // Get premium users
-          const premiumResult = await query(
-            "SELECT COUNT(*) as count FROM users WHERE subscription_status = 'active'"
-          );
-          const premium = parseInt(premiumResult.rows[0].count);
+          const premiumSnapshot = await db.collection(COLLECTION)
+            .where('subscriptionStatus', '==', 'active')
+            .count()
+            .get();
+          const premium = premiumSnapshot.data().count;
 
           const free = total - premium;
           const conversionRate = total > 0 ? (premium / total) * 100 : 0;
@@ -476,14 +445,20 @@ class UserModel {
             total,
             premium,
             free,
-            conversionRate,
+            conversionRate: Math.round(conversionRate * 100) / 100,
+            timestamp: new Date().toISOString(),
           };
+
+          logger.info('User statistics calculated', stats);
           return stats;
-        }
+        },
+        60, // Cache for 1 minute (stats change frequently)
       );
     } catch (error) {
       logger.error('Error getting user statistics:', error);
-      return { total: 0, premium: 0, free: 0, conversionRate: 0 };
+      return {
+        total: 0, premium: 0, free: 0, conversionRate: 0,
+      };
     }
   }
 
@@ -513,10 +488,13 @@ class UserModel {
    */
   static async updatePrivacy(userId, privacy) {
     try {
-      await query(
-        'UPDATE users SET privacy = $1, updated_at = $2 WHERE id = $3',
-        [JSON.stringify(privacy), new Date(), userId.toString()]
-      );
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      await userRef.update({
+        privacy,
+        updatedAt: new Date(),
+      });
 
       await cache.del(`user:${userId}`);
 
@@ -535,14 +513,21 @@ class UserModel {
    */
   static async incrementProfileViews(userId) {
     try {
-      await query(
-        'UPDATE users SET profile_views = profile_views + 1, updated_at = $1 WHERE id = $2',
-        [new Date(), userId.toString()]
-      );
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const currentViews = doc.data().profileViews || 0;
+      await userRef.update({
+        profileViews: currentViews + 1,
+        updatedAt: new Date(),
+      });
 
       await cache.del(`user:${userId}`);
 
-      logger.info('Profile views incremented', { userId });
+      logger.info('Profile views incremented', { userId, views: currentViews + 1 });
       return true;
     } catch (error) {
       logger.error('Error incrementing profile views:', error);
@@ -558,16 +543,24 @@ class UserModel {
    */
   static async addToFavorites(userId, targetUserId) {
     try {
-      // Use PostgreSQL array functions to add without duplicates
-      await query(
-        `UPDATE users
-         SET favorites = array_append(favorites, $1), updated_at = $2
-         WHERE id = $3 AND NOT ($1 = ANY(favorites))`,
-        [targetUserId.toString(), new Date(), userId.toString()]
-      );
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
 
-      await cache.del(`user:${userId}`);
-      logger.info('User added to favorites', { userId, targetUserId });
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const favorites = doc.data().favorites || [];
+      if (!favorites.includes(targetUserId.toString())) {
+        favorites.push(targetUserId.toString());
+        await userRef.update({
+          favorites,
+          updatedAt: new Date(),
+        });
+
+        await cache.del(`user:${userId}`);
+        logger.info('User added to favorites', { userId, targetUserId });
+      }
+
       return true;
     } catch (error) {
       logger.error('Error adding to favorites:', error);
@@ -583,15 +576,23 @@ class UserModel {
    */
   static async removeFromFavorites(userId, targetUserId) {
     try {
-      await query(
-        `UPDATE users
-         SET favorites = array_remove(favorites, $1), updated_at = $2
-         WHERE id = $3`,
-        [targetUserId.toString(), new Date(), userId.toString()]
-      );
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const favorites = doc.data().favorites || [];
+      const updatedFavorites = favorites.filter((id) => id !== targetUserId.toString());
+
+      await userRef.update({
+        favorites: updatedFavorites,
+        updatedAt: new Date(),
+      });
 
       await cache.del(`user:${userId}`);
       logger.info('User removed from favorites', { userId, targetUserId });
+
       return true;
     } catch (error) {
       logger.error('Error removing from favorites:', error);
@@ -607,18 +608,30 @@ class UserModel {
    */
   static async blockUser(userId, targetUserId) {
     try {
-      // Add to blocked and remove from favorites in one query
-      await query(
-        `UPDATE users
-         SET blocked = array_append(blocked, $1),
-             favorites = array_remove(favorites, $1),
-             updated_at = $2
-         WHERE id = $3 AND NOT ($1 = ANY(blocked))`,
-        [targetUserId.toString(), new Date(), userId.toString()]
-      );
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
 
-      await cache.del(`user:${userId}`);
-      logger.info('User blocked', { userId, targetUserId });
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const blocked = doc.data().blocked || [];
+      if (!blocked.includes(targetUserId.toString())) {
+        blocked.push(targetUserId.toString());
+
+        // Remove from favorites if present
+        const favorites = doc.data().favorites || [];
+        const updatedFavorites = favorites.filter((id) => id !== targetUserId.toString());
+
+        await userRef.update({
+          blocked,
+          favorites: updatedFavorites,
+          updatedAt: new Date(),
+        });
+
+        await cache.del(`user:${userId}`);
+        logger.info('User blocked', { userId, targetUserId });
+      }
+
       return true;
     } catch (error) {
       logger.error('Error blocking user:', error);
@@ -634,15 +647,23 @@ class UserModel {
    */
   static async unblockUser(userId, targetUserId) {
     try {
-      await query(
-        `UPDATE users
-         SET blocked = array_remove(blocked, $1), updated_at = $2
-         WHERE id = $3`,
-        [targetUserId.toString(), new Date(), userId.toString()]
-      );
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const blocked = doc.data().blocked || [];
+      const updatedBlocked = blocked.filter((id) => id !== targetUserId.toString());
+
+      await userRef.update({
+        blocked: updatedBlocked,
+        updatedAt: new Date(),
+      });
 
       await cache.del(`user:${userId}`);
       logger.info('User unblocked', { userId, targetUserId });
+
       return true;
     } catch (error) {
       logger.error('Error unblocking user:', error);
@@ -681,14 +702,18 @@ class UserModel {
         return [];
       }
 
-      // Get all favorite users in one query
-      const result = await query(
-        'SELECT * FROM users WHERE id = ANY($1::text[])',
-        [user.favorites]
-      );
+      const db = getFirestore();
+      const favorites = [];
 
-      logger.info(`Retrieved ${result.rows.length} favorites for user ${userId}`);
-      return result.rows;
+      for (const favoriteId of user.favorites) {
+        const doc = await db.collection(COLLECTION).doc(favoriteId).get();
+        if (doc.exists) {
+          favorites.push({ id: doc.id, ...doc.data() });
+        }
+      }
+
+      logger.info(`Retrieved ${favorites.length} favorites for user ${userId}`);
+      return favorites;
     } catch (error) {
       logger.error('Error getting favorites:', error);
       return [];
@@ -698,47 +723,29 @@ class UserModel {
   /**
    * Add badge to user
    * @param {number|string} userId - User ID
-   * @param {string|object} badge - Badge name string like "🏆 Trailblazer" or badge object with icon and name
+   * @param {string} badge - Badge name (verified, premium, vip, moderator, etc.)
    * @returns {Promise<boolean>} Success status
    */
   static async addBadge(userId, badge) {
     try {
-      const result = await query('SELECT badges FROM users WHERE id = $1', [userId.toString()]);
-      if (result.rows.length === 0) return false;
-      
-      let badges = result.rows[0].badges || [];
-      
-      // Handle if badges is a string (shouldn't be, but just in case)
-      if (typeof badges === 'string') {
-        try { badges = JSON.parse(badges); } catch { badges = []; }
-      }
-      
-      // Normalize badge to simple string format like "🏆 Trailblazer"
-      let badgeString;
-      if (typeof badge === 'string') {
-        // If it's already a string with emoji (like "🏆 Trailblazer"), use as is
-        badgeString = badge;
-      } else if (badge && badge.icon && badge.name) {
-        // If it's an object with icon and name, combine them
-        badgeString = `${badge.icon} ${badge.name}`;
-      } else if (badge && badge.name) {
-        badgeString = badge.name;
-      } else {
-        badgeString = String(badge);
-      }
-      
-      // Check if badge already exists
-      const alreadyHas = badges.some(b => b === badgeString || b.includes(badgeString.replace(/^[^\w\s]+\s*/, '')));
-      
-      if (!alreadyHas) {
-        // Use array_append for PostgreSQL TEXT[] column
-        await query(
-          'UPDATE users SET badges = array_append(badges, $1), updated_at = $2 WHERE id = $3',
-          [badgeString, new Date(), userId.toString()]
-        );
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
+
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const badges = doc.data().badges || [];
+      if (!badges.includes(badge)) {
+        badges.push(badge);
+        await userRef.update({
+          badges,
+          updatedAt: new Date(),
+        });
+
         await cache.del(`user:${userId}`);
-        logger.info('Badge added to user', { userId, badge: badgeString });
+        logger.info('Badge added to user', { userId, badge });
       }
+
       return true;
     } catch (error) {
       logger.error('Error adding badge:', error);
@@ -749,31 +756,28 @@ class UserModel {
   /**
    * Remove badge from user
    * @param {number|string} userId - User ID
-   * @param {string} badgeName - Badge name to remove (like "🏆 Trailblazer" or just "Trailblazer")
+   * @param {string} badge - Badge name to remove
    * @returns {Promise<boolean>} Success status
    */
-  static async removeBadge(userId, badgeName) {
+  static async removeBadge(userId, badge) {
     try {
-      // Get current badges
-      const result = await query('SELECT badges FROM users WHERE id = $1', [userId.toString()]);
-      if (result.rows.length === 0) return false;
+      const db = getFirestore();
+      const userRef = db.collection(COLLECTION).doc(userId.toString());
 
-      const badges = result.rows[0].badges || [];
-      
-      // Filter out the badge by name (handles both with and without emoji prefix)
-      const nameWithoutEmoji = badgeName.replace(/^[^\w\s]+\s*/, '');
-      const updatedBadges = badges.filter(b => {
-        const bWithoutEmoji = b.replace(/^[^\w\s]+\s*/, '');
-        return b !== badgeName && bWithoutEmoji !== nameWithoutEmoji;
+      const doc = await userRef.get();
+      if (!doc.exists) return false;
+
+      const badges = doc.data().badges || [];
+      const updatedBadges = badges.filter((b) => b !== badge);
+
+      await userRef.update({
+        badges: updatedBadges,
+        updatedAt: new Date(),
       });
 
-      await query(
-        'UPDATE users SET badges = $1::TEXT[], updated_at = $2 WHERE id = $3',
-        [updatedBadges, new Date(), userId.toString()]
-      );
-
       await cache.del(`user:${userId}`);
-      logger.info('Badge removed from user', { userId, badgeName });
+      logger.info('Badge removed from user', { userId, badge });
+
       return true;
     } catch (error) {
       logger.error('Error removing badge:', error);
@@ -788,88 +792,36 @@ class UserModel {
    */
   static async getChurnedUsers() {
     try {
-      // Get free users who have successful payment history
-      const result = await query(
-        `SELECT DISTINCT u.*
-         FROM users u
-         INNER JOIN payments p ON u.id = p.user_id
-         WHERE u.subscription_status = 'free'
-         AND p.status = 'success'`
-      );
+      const db = getFirestore();
 
-      logger.info(`Found ${result.rows.length} churned users`);
-      return result.rows;
-    } catch (error) {
-      logger.error('Error getting churned users:', error);
-      return [];
-    }
-  }
+      // Get all free users
+      const freeUsersSnapshot = await db.collection(COLLECTION)
+        .where('subscriptionStatus', '==', 'free')
+        .get();
 
-  /**
-   * Search users by username (partial match, case insensitive)
-   * @param {string} username - Username to search (with or without @)
-   * @returns {Promise<Array>} Matching users
-   */
-  static async searchByUsername(username) {
-    try {
-      // Remove @ if present
-      const cleanUsername = username.replace(/^@/, '');
+      const churnedUsers = [];
 
-      // Search with ILIKE for case-insensitive partial match
-      const result = await query(
-        'SELECT * FROM users WHERE username ILIKE $1 ORDER BY username LIMIT 10',
-        [`%${cleanUsername}%`]
-      );
+      // Check which free users have payment history
+      for (const doc of freeUsersSnapshot.docs) {
+        const userId = doc.id;
 
-      logger.info(`Found ${result.rows.length} users matching username: ${cleanUsername}`);
-      return result.rows;
-    } catch (error) {
-      logger.error('Error searching users by username:', error);
-      return [];
-    }
-  }
+        // Check if user has any successful payments
+        const paymentsSnapshot = await db.collection('payments')
+          .where('userId', '==', userId)
+          .where('status', '==', 'success')
+          .limit(1)
+          .get();
 
-  /**
-   * Search users by ID, username, or first name
-   * @param {string} query - Search query
-   * @returns {Promise<Array>} Matching users
-   */
-  static async search(searchQuery) {
-    try {
-      const cleanQuery = searchQuery.trim().replace(/^@/, '');
-
-      // Try to parse as ID first
-      if (!Number.isNaN(parseInt(cleanQuery, 10))) {
-        const user = await this.getById(cleanQuery);
-        if (user) {
-          return [user];
+        // If user has payment history, they are churned
+        if (!paymentsSnapshot.empty) {
+          churnedUsers.push({ id: doc.id, ...doc.data() });
         }
       }
 
-      // Search by username, name, or email
-      const result = await query(
-        `SELECT * FROM users
-         WHERE username ILIKE $1
-         OR first_name ILIKE $1
-         OR last_name ILIKE $1
-         OR email ILIKE $1
-         OR CONCAT(first_name, ' ', last_name) ILIKE $1
-         ORDER BY
-           CASE
-             WHEN email ILIKE $2 THEN 1
-             WHEN username ILIKE $2 THEN 2
-             WHEN first_name ILIKE $2 THEN 3
-             ELSE 4
-           END,
-           username
-         LIMIT 10`,
-        [`%${cleanQuery}%`, `${cleanQuery}%`]
-      );
-
-      logger.info(`Found ${result.rows.length} users matching query: ${cleanQuery}`);
-      return result.rows.map(row => this.convertRowToCamelCase(row));
+      logger.info(`Found ${churnedUsers.length} churned users`);
+      return churnedUsers;
     } catch (error) {
-      logger.error('Error searching users:', error);
+      logger.error('Error getting churned users:', error);
       return [];
     }
   }

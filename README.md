@@ -1,439 +1,399 @@
-# 🤖 PNPtv Bot - Plataforma Premium de Telegram
+# PNPtv Telegram Bot - Production Ready
 
-> **Bot de Telegram avanzado con sistema integrado de pagos, suscripciones premium, videollamadas, streaming en vivo y radio en línea.**
+A comprehensive, production-ready Telegram bot for PNPtv featuring live streaming, radio, Zoom rooms, subscription payments, and more.
 
-[![Node.js](https://img.shields.io/badge/Node.js-v20.19.5-green?logo=node.js)](https://nodejs.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-v17-blue?logo=postgresql)](https://www.postgresql.org/)
-[![Redis](https://img.shields.io/badge/Redis-6+-red?logo=redis)](https://redis.io/)
-[![Tests Passing](https://img.shields.io/badge/Tests-244%2F244-brightgreen)](./tests)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](./LICENSE)
+## 🌟 Features
 
----
+### Core Functionality
+- ✅ **User Onboarding**: Multi-step onboarding with language selection, age verification, and terms acceptance
+- 👤 **Profile Management**: Customizable profiles with photos, bios, locations, and interests
+- 🌍 **Nearby Users**: Geolocation-based user discovery with radius filtering
+- 💎 **Subscription System**: Premium plans with ePayco (USD) and Daimo (USDC) payment integration
+- 📻 **Radio Streaming**: 24/7 radio with song requests and now playing info
+- 🎥 **Zoom Rooms**: Create and join video conference rooms
+- 🎤 **Live Streaming**: Start and view live streams (premium feature)
+- 🤖 **AI Support**: Cristina AI assistant powered by OpenAI GPT-4
+- 👨‍💼 **Admin Panel**: User management, broadcasts, analytics, and plan management
 
-## 🌟 Características Principales
+### Technical Features
+- 🔒 **Security**: Input validation, rate limiting, Helmet.js, secure sessions
+- 🌐 **i18n**: Full English/Spanish support with dynamic language switching
+- 📊 **Analytics**: User statistics, revenue tracking, and insights
+- 🚨 **Error Tracking**: Sentry integration for production monitoring
+- ⚡ **Performance**: Redis caching, optimized PostgreSQL queries with indexes
+- 🗄️ **Database**: PostgreSQL with Sequelize ORM for robust data management
+- 🐳 **Containerization**: Docker and Docker Compose ready
+- 🔄 **CI/CD**: GitHub Actions workflow for automated testing and deployment
+- 📝 **Logging**: Structured logging with Winston and daily log rotation
+- ✅ **Testing**: Jest unit tests with coverage reporting
 
-### 💳 Sistema de Pagos Integrado
-- **ePayco**: Transferencias bancarias directas en COP
-- **Daimo Pay**: Pagos en USDC (Venmo, CashApp, Zelle, Revolut, Wise)
-- Validación automática de transacciones
-- Gestión de suscripciones automáticas
+## 📋 Prerequisites
 
-### 👥 Gestión Avanzada de Usuarios
-- Perfiles personalizados con ubicación
-- Sistema de búsqueda de usuarios cercanos
-- Historial de actividad
-- Seguimiento de suscripción
+- Node.js 18.x or higher
+- npm 9.x or higher
+- PostgreSQL 14.x or higher
+- Redis 7.x
+- Telegram Bot Token (from @BotFather)
+- (Optional) Sentry account for error tracking
+- (Optional) OpenAI API key for AI support
+- (Optional) Zoom API credentials
+- (Optional) ePayco and Daimo payment provider accounts
 
-### 📞 Videollamadas Privadas
-- Llamadas 1-a-1 encriptadas
-- Videollamadas grupales
-- Sistema de reserva de horarios
-- Notificaciones automáticas
+## 🚀 Quick Start
 
-### 🎬 Streaming en Vivo
-- Transmisión desde Hangouts y Zoom
-- Chat en tiempo real
-- Control de participantes
-- Grabación de sesiones
-
-### 📻 Radio en Línea
-- Streaming de música 24/7
-- Control remoto de reproducción
-- Notificaciones de canciones
-- Biblioteca personalizada
-
-### 🛡️ Moderación Automática
-- Detección inteligente de spam
-- Bloqueo de usuarios no autorizados
-- Límites de mensajes por minuto
-- Sistema de baneos globales
-- Validación de perfiles
-
-### 🎮 Gamificación
-- Sistema de puntos y recompensas
-- Logros y badges
-- Leaderboards globales
-- Promociones especiales
-
----
-
-## 📊 Estadísticas del Proyecto
-
-```
-📁 Líneas de Código: 50,000+
-✅ Tests: 244/244 pasando (100%)
-🔒 Endpoints Seguros: 15+
-⚡ Response Time: <100ms (promedio)
-🚀 Uptime: 99.9%
-💾 BD: PostgreSQL 17
-📦 Dependencias: 45+
-```
-
----
-
-## 🚀 Inicio Rápido
-
-### Requisitos Previos
-```
-Node.js v20.19.5
-PostgreSQL 17 (puerto 55432)
-Redis 6+ (puerto 6380)
-Nginx (para reverse proxy)
-```
-
-### Instalación en 5 minutos
+### 1. Clone and Install
 
 ```bash
-# 1. Clonar repositorio
-git clone https://github.com/carlossmartdevices-cyber/pnptvbot-production.git
-cd pnptvbot-production
-
-# 2. Instalar dependencias
+git clone https://github.com/yourusername/pnptv-bot.git
+cd pnptv-bot
 npm install
-
-# 3. Configurar variables de entorno
-cp .env.example .env
-# Editar .env con tus credenciales
-
-# 4. Inicializar base de datos
-npm run db:init
-
-# 5. Ejecutar tests
-npm test
-
-# 6. Iniciar bot
-npm run dev
-# O en producción con PM2:
-pm2 start ecosystem.config.js
 ```
 
-**¡Listo!** El bot debería estar conectado en ~30 segundos.
+### 2. Environment Configuration
 
----
+Copy the example environment file and configure:
 
-## 📚 Documentación
+```bash
+cp .env.example .env
+```
 
-| Documento | Descripción | Tiempo |
-|-----------|-------------|--------|
-| [📖 Documentación Completa](./DOCUMENTACION_COMPLETA.md) | Guía de referencia exhaustiva | 20 min |
-| [🚀 Quick Start Deploy](./QUICK_START_DEPLOY.md) | Comandos para deploy rápido | 5 min |
-| [🏗️ Arquitectura](./CODEBASE_ARCHITECTURE.md) | Estructura del código | 15 min |
-| [💳 Sistema de Pagos](./DAIMO_IMPLEMENTATION_SUMMARY.md) | Integración de pagos | 15 min |
-| [📦 Deploy Producción](./DEPLOYMENT_GUIDE.md) | Guía completa de deployment | 30 min |
-| [🔒 Seguridad](./ADDITIONAL_SECURITY_MEASURES.md) | Medidas de seguridad | 15 min |
-| [📋 Índice Completo](./DOCUMENTATION_INDEX.md) | Todos los documentos | - |
+Edit `.env` with your credentials (see Environment Variables section below).
 
-**¿Primer día?** Comienza con: [INICIO_AQUI.md](./INICIO_AQUI.md)
+### 3. Setup Database
 
----
+Run migrations and seed data:
 
-## 📁 Estructura del Proyecto
+```bash
+# Run database migrations
+npm run db:migrate
+
+# Seed default plans
+npm run db:seed
+```
+
+### 4. Run Development Server
+
+```bash
+npm run dev
+```
+
+### 5. Run with Docker
+
+```bash
+# Start all services (PostgreSQL, Redis, Bot)
+docker-compose up -d
+
+# Run migrations
+docker-compose exec bot npm run db:migrate
+
+# Seed database
+docker-compose exec bot npm run db:seed
+```
+
+## 🔧 Environment Variables
+
+### Required Variables
+
+```env
+BOT_TOKEN=your_telegram_bot_token
+NODE_ENV=development
+PORT=3000
+
+# PostgreSQL
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=pnptv_bot
+DB_USER=postgres
+DB_PASSWORD=your_secure_password
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+```
+
+### Optional Variables
+
+See `.env.example` for the complete list of configuration options including:
+- Payment providers (ePayco, Daimo)
+- Zoom API credentials
+- OpenAI API key
+- Sentry DSN
+- Admin user IDs
+- Rate limiting settings
+
+## 📁 Project Structure
 
 ```
 pnptvbot-production/
 ├── src/
-│   ├── bot/                    # Núcleo del bot
-│   │   ├── api/               # Rutas y controllers HTTP
-│   │   ├── handlers/          # Manejadores de eventos
-│   │   ├── middleware/        # Autenticación, autorización
-│   │   ├── services/          # Lógica de negocio
-│   │   └── core/              # Núcleo del bot
-│   ├── config/                # Configuraciones (DB, Pagos, etc)
-│   ├── models/                # Modelos de datos
-│   └── utils/                 # Funciones de utilidad
-├── tests/                     # Tests unitarios e integración
-├── database/                  # Scripts y migraciones de BD
-├── public/                    # Archivos estáticos (HTML, CSS)
-├── .env                       # Variables de entorno
-├── package.json               # Dependencias
-└── jest.config.js             # Configuración de tests
+│   ├── bot/
+│   │   ├── core/              # Bot initialization and middleware
+│   │   │   ├── bot.js         # Main bot entry point
+│   │   │   ├── middleware/    # Session, rate limiting, error handling
+│   │   │   └── plugins/       # Sentry integration
+│   │   ├── handlers/          # Command and callback handlers
+│   │   │   ├── admin/         # Admin panel
+│   │   │   ├── user/          # User commands (onboarding, profile, menu)
+│   │   │   ├── payments/      # Payment processing
+│   │   │   └── media/         # Radio, Zoom, live streams, support
+│   │   ├── services/          # Business logic layer
+│   │   │   ├── userService.js
+│   │   │   └── paymentService.js
+│   │   └── api/               # REST API and webhooks
+│   │       ├── routes.js
+│   │       └── controllers/
+│   ├── models/                # Data models (PostgreSQL/Sequelize)
+│   │   ├── userModel.js
+│   │   ├── planModel.js
+│   │   └── paymentModel.js
+│   ├── utils/                 # Utilities
+│   │   ├── i18n.js           # Internationalization
+│   │   ├── validation.js     # Input validation
+│   │   └── logger.js         # Logging
+│   └── config/                # Configuration
+│       ├── database.js
+│       └── redis.js
+├── scripts/                   # Utility scripts
+│   ├── cron.js               # Scheduled tasks
+│   └── seed.js               # Database seeding
+├── tests/                     # Test files
+│   ├── unit/
+│   └── integration/
+├── logs/                      # Application logs
+├── docs/                      # Documentation
+├── Dockerfile
+├── docker-compose.yml
+├── package.json
+└── README.md
 ```
 
----
+## 🎮 Bot Commands
 
-## 🔧 Comandos Principales
+### User Commands
+- `/start` - Start the bot and begin onboarding
+- `/menu` - Show main menu
+- `/language` - Change language
+- `/support` - Access support center
 
-```bash
-# Desarrollo
-npm run dev              # Inicia en modo desarrollo con auto-reload
-npm test                 # Ejecuta todos los tests
-npm run lint             # Valida código con ESLint
+### Admin Commands
+- `/admin` - Access admin panel (requires admin privileges)
 
-# Base de datos
-npm run db:init          # Inicializa base de datos
-npm run db:migrate       # Ejecuta migraciones
-npm run db:seed          # Carga datos de prueba
+## 📱 Main Menu Options
 
-# Producción
-pm2 start ecosystem.config.js    # Inicia con PM2
-pm2 logs pnptvbot                # Ver logs en tiempo real
-pm2 status                       # Ver estado de procesos
-pm2 monit                        # Monitorear recursos
+1. **💎 Subscribe to PRIME** - View and purchase subscription plans
+2. **👤 My Profile** - Manage profile, photos, bio, location
+3. **🌍 Nearby Users** - Find users within selected radius
+4. **🎤 Live Streams** - Start or view live streams
+5. **📻 Radio** - Listen to radio, request songs
+6. **🎥 Zoom Rooms** - Create or join video rooms
+7. **🤖 Support** - AI chat, contact admin, FAQs
+8. **⚙️ Settings** - Language, notifications, privacy
 
-# Deployment
-npm run build            # Construir para producción
-npm run deploy           # Deploy a producción
-npm run redeploy         # Redeploy con limpieza de cache
-```
+## 🔐 Security Features
 
----
-
-## 🌐 Endpoints Principales
-
-### Public
-```
-GET  /health                        # Health check
-POST /api/webhooks/telegram         # Webhook de Telegram
-```
-
-### Pagos
-```
-POST /api/payments/create           # Crear pago
-POST /api/webhooks/epayco           # Webhook ePayco
-POST /api/webhooks/daimo            # Webhook Daimo
-```
-
-### Usuarios
-```
-GET  /api/users/:userId             # Obtener usuario
-POST /api/users/update              # Actualizar perfil
-GET  /api/users/nearby              # Usuarios cercanos
-```
-
----
-
-## 💳 Sistema de Pagos
-
-### Flujo de Pago Daimo Pay
-
-```
-1. Usuario selecciona plan premium
-2. Se genera payment intent con metadata
-3. Usuario redirigido a Daimo Pay checkout
-4. Selecciona app (Venmo, CashApp, Zelle, etc)
-5. Completa pago en USDC
-6. Webhook valida y activa suscripción
-7. Bot confirma al usuario
-```
-
-### Planes Disponibles
-| Plan | Precio | Duración | Características |
-|------|--------|----------|-----------------|
-| PREMIUM | $10 USD / 40k COP | 30 días | Videollamadas, Live TV, Radio |
-| LIFETIME | $99 USD | Indefinido | Todos los premium + prioridad |
-
----
-
-## 🔒 Seguridad
-
-### ✅ Medidas Implementadas
-- ✅ Validación HMAC-SHA256 de webhooks
-- ✅ Encriptación SSL/TLS en todas las conexiones
-- ✅ Rate limiting (30 req/min por usuario)
-- ✅ Prevención de SQL injection
-- ✅ Sanitización de inputs
-- ✅ JWT tokens para API
-- ✅ Control de acceso basado en roles (RBAC)
-- ✅ Audit logging de todas las transacciones
-- ✅ Verificación de usuario de Telegram
-- ✅ IP whitelist para endpoints críticos
-
----
-
-## 📊 Monitoreo y Logs
-
-### Acceso a Logs
-```bash
-# Logs en tiempo real
-pm2 logs pnptvbot
-
-# Últimos 100 líneas
-tail -100 all_logs.txt
-
-# Filtrar por error
-pm2 logs pnptvbot | grep -i error
-
-# Logs de pago específico
-pm2 logs pnptvbot | grep "pay_"
-```
-
-### Archivos de Log
-- `all_logs.txt` - Todos los eventos
-- `bot_logs.txt` - Logs del bot de Telegram
-- `latest-100-logs.txt` - Últimos 100 eventos
-
----
+- **Input Sanitization**: All user inputs are sanitized to prevent XSS and injection attacks
+- **Rate Limiting**: Protection against spam and abuse
+- **Session Management**: Secure Redis-based sessions with TTL
+- **Payment Verification**: Webhook signature verification for payments
+- **Admin Authorization**: Role-based access control
+- **Environment Variables**: Sensitive data stored securely
+- **Helmet.js**: Security headers for API endpoints
 
 ## 🧪 Testing
 
-### Ejecutar Tests
+Run tests:
+
 ```bash
-# Todos los tests
+# Unit tests
 npm test
 
-# Tests específicos
-npm test -- paymentService
+# Watch mode
+npm run test:watch
 
-# Con coverage
+# Integration tests
+npm run test:integration
+
+# Coverage
 npm test -- --coverage
-
-# En modo watch
-npm test -- --watch
 ```
 
-### Resultados Esperados
-```
-Test Suites: 16 passed, 16 total
-Tests:       244 passed, 244 total
-Snapshots:   0 total
-Time:        8.456 s
+## 📊 Monitoring and Logging
+
+### Logging
+
+Logs are stored in the `logs/` directory:
+- `combined-YYYY-MM-DD.log` - All logs
+- `error-YYYY-MM-DD.log` - Error logs only
+
+Logs rotate daily and are kept for 14 days.
+
+### Error Tracking
+
+Sentry integration provides:
+- Real-time error tracking
+- User context (ID, username, action)
+- Stack traces and breadcrumbs
+- Performance monitoring
+
+### Health Check
+
+```bash
+curl http://localhost:3000/health
 ```
 
----
+## 🚢 Deployment
+
+### Docker Deployment
+
+1. Build and run with Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+2. View logs:
+
+```bash
+docker-compose logs -f bot
+```
+
+3. Stop:
+
+```bash
+docker-compose down
+```
+
+### Production Deployment
+
+1. Set environment to production in `.env`:
+
+```env
+NODE_ENV=production
+BOT_WEBHOOK_DOMAIN=https://yourdomain.com
+BOT_WEBHOOK_PATH=/pnp/webhook/telegram
+```
+
+2. Configure webhook mode in production for better performance
+
+3. Set up GitHub Actions secrets for CI/CD:
+   - `DOCKER_USERNAME`
+   - `DOCKER_PASSWORD`
+   - `PRODUCTION_HOST`
+   - `PRODUCTION_USER`
+   - `PRODUCTION_SSH_KEY`
+
+4. Push to main branch to trigger deployment
+
+## 📈 Scaling Considerations
+
+- **Redis Cluster**: For high availability and horizontal scaling
+- **Load Balancer**: Distribute traffic across multiple bot instances
+- **PostgreSQL Optimization**: Use composite indexes, connection pooling, and query optimization
+- **CDN**: Serve static assets (images, media) via CDN
+- **Caching Strategy**: Cache frequently accessed data with appropriate TTLs
+- **Queue System**: Implement message queue for broadcasts and background jobs
+
+## 🛠️ Maintenance
+
+### Cron Jobs
+
+The bot includes automated cron jobs (configured in `scripts/cron.js`):
+
+- **Subscription Expiry Check**: Runs daily at midnight
+- Processes expired subscriptions and updates user status
+
+### Database Maintenance
+
+- Regularly review and optimize PostgreSQL indexes
+- Monitor database performance with pg_stat_statements
+- Implement regular backup strategy (pg_dump or continuous archiving)
+- Monitor database size and implement data retention policies
 
 ## 🐛 Troubleshooting
 
-### Bot no inicia
-```bash
-# Verificar logs
-pm2 logs pnptvbot
+### Bot Not Responding
 
-# Verificar PostgreSQL
-pg_isready -h localhost -p 55432
+1. Check logs: `docker-compose logs -f bot`
+2. Verify bot token is correct
+3. Check Redis connection
+4. Verify webhook is set correctly (production)
 
-# Reiniciar
-pm2 restart pnptvbot
+### Payment Issues
+
+1. Check webhook configuration and URLs
+2. Verify payment provider credentials
+3. Review payment logs in PostgreSQL database
+4. Check webhook signature verification
+
+### Performance Issues
+
+1. Monitor Redis cache hit rate
+2. Review PostgreSQL query performance with EXPLAIN ANALYZE
+3. Check for memory leaks
+4. Analyze error rates in Sentry
+
+## 📝 API Documentation
+
+### Webhooks
+
+#### ePayco Webhook
+```
+POST /api/webhooks/epayco
 ```
 
-### Webhooks no se reciben
-```bash
-# Verificar Nginx
-sudo nginx -t
+Receives payment confirmation from ePayco.
 
-# Ver configuración
-sudo cat /etc/nginx/sites-enabled/default | grep webhook
-
-# Reiniciar Nginx
-sudo systemctl reload nginx
+#### Daimo Webhook
+```
+POST /api/webhooks/daimo
 ```
 
-### Tests fallando
-```bash
-# Limpiar cache
-npm cache clean --force
-rm -rf node_modules
-npm install
+Receives payment confirmation from Daimo.
 
-# Reiniciar BD de pruebas
-npm run db:seed:test
+### Public Endpoints
 
-# Ejecutar tests
-npm test
+#### Health Check
+```
+GET /health
 ```
 
-👉 **¿Más problemas?** Ver sección Troubleshooting en [DOCUMENTACION_COMPLETA.md](./DOCUMENTACION_COMPLETA.md)
+Returns bot health status.
+
+#### Statistics
+```
+GET /api/stats
+```
+
+Returns user statistics (public).
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/new-feature`
+3. Commit changes: `git commit -am 'Add new feature'`
+4. Push to branch: `git push origin feature/new-feature`
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 👥 Support
+
+For support and questions:
+- Email: support@pnptv.com
+- Telegram: @pnptv_support
+- Documentation: https://docs.pnptv.com
+
+## 🙏 Acknowledgments
+
+- Telegraf.js - Modern Telegram Bot Framework
+- PostgreSQL - Robust relational database
+- Sequelize - ORM for database operations
+- Redis - Caching and sessions
+- OpenAI - AI assistant
+- Sentry - Error tracking
 
 ---
 
-## 🤝 Contribuyendo
-
-1. Fork el repositorio
-2. Crea una rama: `git checkout -b feature/nueva-caracteristica`
-3. Commit cambios: `git commit -m 'Agrega nueva caracteristica'`
-4. Push a rama: `git push origin feature/nueva-caracteristica`
-5. Abre un Pull Request
-
-**Por favor asegúrate de:**
-- ✅ Pasar todos los tests (`npm test`)
-- ✅ Seguir convenciones de código
-- ✅ Documentar cambios
-
-Ver [CONTRIBUTING.md](./CONTRIBUTING.md) para más detalles.
-
----
-
-## 📞 Soporte
-
-- 📧 **Email**: support@pnptv.app
-- 🐛 **Issues**: [GitHub Issues](https://github.com/carlossmartdevices-cyber/pnptvbot-production/issues)
-- 💬 **Telegram**: [@PNPtvbot](https://t.me/PNPtvbot)
-
----
-
-## 📄 Licencia
-
-Este proyecto está bajo la licencia MIT. Ver [LICENSE](./LICENSE) para más detalles.
-
----
-
-## ✨ Cambios Recientes
-
-### v1.0.0 (26 Nov 2025)
-- ✨ Integración completa de Daimo Pay (USDC)
-- ✨ Migración Firebase → PostgreSQL completada
-- ✨ 244/244 tests pasando
-- ✨ Sistema de seguridad de pagos implementado
-- 🐛 Correcciones de webhook Daimo
-- 📚 Documentación completa
-
-### v0.9.0
-- Soporte para ePayco
-- Sistema de moderación automática
-- Radio en línea
-- Streaming en vivo desde Hangouts
-
----
-
-## 📈 Roadmap
-
-### Q1 2025
-- [ ] Integración con Stripe
-- [ ] Soporte para criptomonedas adicionales
-- [ ] Analytics dashboard
-- [ ] Mobile app iOS
-
-### Q2 2025
-- [ ] AI chatbot assistant
-- [ ] Machine learning para moderación
-- [ ] Integración con Discord
-- [ ] API pública v2
-
----
-
-## 🌟 Stats
-
-- ⭐ **Stars**: [Ver en GitHub](https://github.com/carlossmartdevices-cyber/pnptvbot-production)
-- 📦 **Descargas**: Disponible via GitHub
-- 👥 **Contribuidores**: Activos
-- 📅 **Última Actualización**: 26 Nov 2025
-
----
-
-## 🎯 ¿Próximos Pasos?
-
-**Para Nuevos Desarrolladores:**
-1. Lee [INICIO_AQUI.md](./INICIO_AQUI.md)
-2. Configura tu entorno local
-3. Ejecuta `npm test` para verificar todo funciona
-4. Comienza a explorar el código
-
-**Para Deployment:**
-1. Lee [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
-2. Ejecuta [QUICK_START_DEPLOY.md](./QUICK_START_DEPLOY.md)
-3. Verifica con health check: `curl https://easybots.store/health`
-
-**Para Integración de Pagos:**
-1. Lee [DAIMO_IMPLEMENTATION_SUMMARY.md](./DAIMO_IMPLEMENTATION_SUMMARY.md)
-2. Configura variables de entorno
-3. Ejecuta tests de pago
-4. Deploy a producción
-
----
-
-<div align="center">
-
-**Made with ❤️ for the PNPtv community**
-
-[⬆ Volver al Inicio](#-pnptv-bot---plataforma-premium-de-telegram)
-
-</div>
+Built with ❤️ for PNPtv

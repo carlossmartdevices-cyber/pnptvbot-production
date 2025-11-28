@@ -439,7 +439,17 @@ const registerLiveHandlers = (bot) => {
           return;
         }
 
-        // Price is now selected via buttons, no text input needed
+        if (step === 'price') {
+          const price = parseFloat(ctx.message.text);
+          if (Number.isNaN(price) || price <= 0) {
+            await ctx.reply(t('invalidInput', lang));
+            return;
+          }
+
+          ctx.session.temp.liveStreamPrice = price;
+          await createLiveStream(ctx);
+          return;
+        }
       } catch (error) {
         logger.error('Error in live stream creation:', error);
       }
@@ -536,27 +546,10 @@ const registerLiveHandlers = (bot) => {
       await ctx.saveSession();
 
       await ctx.editMessageText(
-        '💰 *Select Show Type*\n\n'
-        + '🎭 *Regular Show* - $10\n'
-        + '⏰ Duration: 6-8 hours\n'
-        + '👥 Standard access\n\n'
-        + '👑 *VIP Show* - $20\n'
-        + '⏰ Duration: 6-8 hours\n'
-        + '⭐ VIP exclusive content\n'
-        + '💎 Premium experience\n\n'
-        + 'Choose your show type:',
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [
-              Markup.button.callback('🎭 Regular Show - $10', 'live_price_10'),
-            ],
-            [
-              Markup.button.callback('👑 VIP Show - $20', 'live_price_20'),
-            ],
-            [Markup.button.callback(t('cancel', lang), 'show_live')],
-          ]),
-        },
+        t('streamPrice', lang),
+        Markup.inlineKeyboard([
+          [Markup.button.callback(t('cancel', lang), 'show_live')],
+        ]),
       );
     } catch (error) {
       logger.error('Error in paid stream:', error);
@@ -567,38 +560,11 @@ const registerLiveHandlers = (bot) => {
     try {
       ctx.session.temp.liveStreamIsPaid = false;
       ctx.session.temp.liveStreamPrice = 0;
-      ctx.session.temp.liveStreamShowType = 'free';
       await ctx.saveSession();
 
       await createLiveStream(ctx);
     } catch (error) {
       logger.error('Error in free stream:', error);
-    }
-  });
-
-  // Handle price selection for Regular Show ($10)
-  bot.action('live_price_10', async (ctx) => {
-    try {
-      ctx.session.temp.liveStreamPrice = 10;
-      ctx.session.temp.liveStreamShowType = 'regular';
-      await ctx.saveSession();
-
-      await createLiveStream(ctx);
-    } catch (error) {
-      logger.error('Error in regular show selection:', error);
-    }
-  });
-
-  // Handle price selection for VIP Show ($20)
-  bot.action('live_price_20', async (ctx) => {
-    try {
-      ctx.session.temp.liveStreamPrice = 20;
-      ctx.session.temp.liveStreamShowType = 'vip';
-      await ctx.saveSession();
-
-      await createLiveStream(ctx);
-    } catch (error) {
-      logger.error('Error in VIP show selection:', error);
     }
   });
 
@@ -1466,8 +1432,7 @@ const createLiveStream = async (ctx) => {
       return;
     }
 
-    // Send loading message (use reply instead of edit since this comes from text input)
-    const loadingMsg = await ctx.reply(t('loading', lang));
+    await ctx.editMessageText(t('loading', lang));
 
     // Create stream in database with Agora integration
     const stream = await LiveStreamModel.create({
@@ -1488,59 +1453,23 @@ const createLiveStream = async (ctx) => {
     // Generate stream URL with host token
     const streamUrl = `https://stream.pnptv.com/live/${stream.streamId}?token=${stream.hostToken}`;
 
-    // Store show type before clearing session
-    const showType = ctx.session.temp.liveStreamShowType;
-
     // Clear session temp data
     ctx.session.temp.creatingLiveStream = false;
     ctx.session.temp.liveStreamTitle = null;
     ctx.session.temp.liveStreamIsPaid = null;
     ctx.session.temp.liveStreamPrice = null;
-    ctx.session.temp.liveStreamShowType = null;
     await ctx.saveSession();
 
-    // Delete loading message and send success message
-    try {
-      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-    } catch (err) {
-      // Ignore if message is too old or already deleted
-    }
-
-    // Build show type description
-    let showDescription = '';
-    if (showType === 'regular') {
-      showDescription = '\n🎭 *Regular Show* - $10\n⏰ Duration: 6-8 hours\n';
-    } else if (showType === 'vip') {
-      showDescription = '\n👑 *VIP Show* - $20\n⏰ Duration: 6-8 hours\n⭐ Premium experience\n';
-    }
-
-    // Prepare buttons
-    const buttons = [
-      [Markup.button.url('🎥 Start Broadcasting', streamUrl)],
-    ];
-
-    // Add payment button if paid stream
-    if (isPaid && price > 0) {
-      const paymentUrl = `${process.env.BOT_WEBHOOK_DOMAIN}/stream-payment/${stream.streamId}`;
-      buttons.push([Markup.button.url(`💳 Payment Link ($${price})`, paymentUrl)]);
-    }
-
-    buttons.push(
-      [Markup.button.callback('⚙️ Manage', `live_manage_${stream.streamId}`)],
-      [Markup.button.callback(t('back', lang), 'show_live')]
-    );
-
-    await ctx.reply(
+    await ctx.editMessageText(
       `${t('streamCreated', lang)}\n\n`
         + `🎤 ${stream.title}\n`
-        + showDescription
         + `🔴 ${t('liveNow', lang)}\n\n`
-        + `${t('streamHostInstructions', lang)}`
-        + (isPaid ? `\n\n💰 *Ticket Price:* $${price}\n📎 Share the payment link with your audience!` : ''),
-      {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(buttons),
-      },
+        + `${t('streamHostInstructions', lang)}`,
+      Markup.inlineKeyboard([
+        [Markup.button.url('🎥 Start Broadcasting', streamUrl)],
+        [Markup.button.callback('⚙️ Manage', `live_manage_${stream.streamId}`)],
+        [Markup.button.callback(t('back', lang), 'show_live')],
+      ]),
     );
 
     // Notify followers asynchronously (don't await to not block user)

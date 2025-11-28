@@ -1,11 +1,12 @@
 const radioHandlers = require('./radio');
+<<<<<<< HEAD
+const zoomHandlers = require('./zoom');
+=======
 const jitsiHandlers = require('./jitsi');
+>>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1
 const liveHandlers = require('./live');
-const livestreamHandlers = require('./livestream');
-const hangoutsHandlers = require('./hangouts');
 const supportHandlers = require('./support');
 const playerHandlers = require('./player');
-const { registerTopicMenuHandlers } = require('./topicMenu');
 
 /**
  * Register all media handlers
@@ -13,13 +14,14 @@ const { registerTopicMenuHandlers } = require('./topicMenu');
  */
 const registerMediaHandlers = (bot) => {
   radioHandlers(bot);
+<<<<<<< HEAD
+  zoomHandlers(bot);
+=======
   jitsiHandlers(bot);
+>>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1
   liveHandlers(bot);
-  livestreamHandlers(bot);
-  hangoutsHandlers(bot);
   supportHandlers(bot);
   playerHandlers(bot);
-  registerTopicMenuHandlers(bot);
 };
 
 module.exports = registerMediaHandlers;

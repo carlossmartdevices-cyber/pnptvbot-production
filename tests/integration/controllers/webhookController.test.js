@@ -1,18 +1,14 @@
 const request = require('supertest');
 
-// Mock PaymentService and DaimoService
+// Mock PaymentService
 jest.mock('../../../src/bot/services/paymentService');
-jest.mock('../../../src/bot/services/daimoService');
 
 const app = require('../../../src/bot/api/routes');
 const PaymentService = require('../../../src/bot/services/paymentService');
-const DaimoService = require('../../../src/bot/services/daimoService');
 
 describe('Webhook Controller Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Mock signature verification to always return true in tests
-    DaimoService.verifyWebhookSignature = jest.fn().mockReturnValue(true);
   });
 
   describe('POST /api/webhooks/epayco', () => {
@@ -109,8 +105,8 @@ describe('Webhook Controller Integration Tests', () => {
       PaymentService.processDaimoWebhook.mockResolvedValue({ success: true });
 
       const webhookData = {
-        id: 'txn_123',
-        status: 'payment_completed',
+        transaction_id: 'txn_123',
+        status: 'completed',
         metadata: {
           paymentId: 'pay_123',
           userId: 'user_123',
@@ -129,11 +125,14 @@ describe('Webhook Controller Integration Tests', () => {
     });
 
     it('should return 400 for a failed Daimo webhook', async () => {
-      DaimoService.verifyWebhookSignature.mockReturnValue(false);
+      PaymentService.processDaimoWebhook.mockResolvedValue({
+        success: false,
+        error: 'Invalid signature',
+      });
 
       const webhookData = {
-        id: 'txn_123',
-        status: 'payment_completed',
+        transaction_id: 'txn_123',
+        status: 'completed',
         metadata: {
           paymentId: 'pay_123',
           userId: 'user_123',
@@ -146,7 +145,7 @@ describe('Webhook Controller Integration Tests', () => {
         .post('/api/webhooks/daimo')
         .send(webhookData);
 
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(400);
       expect(response.body).toEqual({ success: false, error: 'Invalid signature' });
     });
 
@@ -154,8 +153,8 @@ describe('Webhook Controller Integration Tests', () => {
       PaymentService.processDaimoWebhook.mockRejectedValue(new Error('Database error'));
 
       const webhookData = {
-        id: 'txn_123',
-        status: 'payment_completed',
+        transaction_id: 'txn_123',
+        status: 'completed',
         metadata: {
           paymentId: 'pay_123',
           userId: 'user_123',
@@ -179,8 +178,8 @@ describe('Webhook Controller Integration Tests', () => {
       });
 
       const webhookData = {
-        id: 'txn_456',
-        status: 'payment_bounced',
+        transaction_id: 'txn_456',
+        status: 'failed',
         metadata: {
           paymentId: 'pay_456',
           userId: 'user_456',
@@ -201,8 +200,8 @@ describe('Webhook Controller Integration Tests', () => {
       PaymentService.processDaimoWebhook.mockResolvedValue({ success: true });
 
       const webhookData = {
-        id: 'txn_789',
-        status: 'payment_started',
+        transaction_id: 'txn_789',
+        status: 'pending',
         metadata: {
           paymentId: 'pay_789',
           userId: 'user_789',

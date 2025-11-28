@@ -21,21 +21,9 @@ class ChatCleanupService {
   static botMessagesByChat = new Map();
 
   /**
-   * Permanent messages that should never be deleted
-   * Key: chatId
-   * Value: Set of message IDs
-   */
-  static permanentMessagesByChat = new Map();
-
-  /**
-   * Cleanup delay in milliseconds (5 minutes for all group messages)
+   * Cleanup delay in milliseconds (5 minutes)
    */
   static CLEANUP_DELAY = 5 * 60 * 1000; // 5 minutes
-
-  /**
-   * Group cleanup delay - all bot messages in groups deleted after this time
-   */
-  static GROUP_CLEANUP_DELAY = 5 * 60 * 1000; // 5 minutes
 
   /**
    * Maximum number of messages to track per chat (prevent memory leaks)
@@ -204,75 +192,6 @@ class ChatCleanupService {
   }
 
   /**
-   * Schedule deletion for a group message (5 minutes)
-   * Use this for all bot messages sent to groups
-   * @param {Object} telegram - Telegram bot instance
-   * @param {number|string} chatId - Chat ID
-   * @param {number} messageId - Message ID
-   * @returns {number} Timeout ID
-   */
-  static scheduleGroupMessage(telegram, chatId, messageId) {
-    return this.scheduleDelete(telegram, chatId, messageId, 'group', this.GROUP_CLEANUP_DELAY);
-  }
-
-  /**
-   * Helper to send a message to a group and auto-schedule deletion
-   * @param {Object} telegram - Telegram bot instance
-   * @param {number|string} chatId - Chat ID
-   * @param {string} text - Message text
-   * @param {Object} options - Message options (parse_mode, reply_markup, etc)
-   * @returns {Promise<Object>} Sent message object
-   */
-  static async sendGroupMessage(telegram, chatId, text, options = {}) {
-    try {
-      const message = await telegram.sendMessage(chatId, text, options);
-      
-      // Schedule deletion after 5 minutes
-      this.scheduleGroupMessage(telegram, chatId, message.message_id);
-      
-      logger.debug('Group message sent and scheduled for deletion', {
-        chatId,
-        messageId: message.message_id,
-        deleteIn: '5 minutes',
-      });
-      
-      return message;
-    } catch (error) {
-      logger.error('Error sending group message:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Helper to reply in a group context and auto-schedule deletion
-   * @param {Object} ctx - Telegraf context
-   * @param {string} text - Message text
-   * @param {Object} options - Message options
-   * @returns {Promise<Object>} Sent message object
-   */
-  static async replyInGroup(ctx, text, options = {}) {
-    try {
-      const message = await ctx.reply(text, options);
-      
-      // Only schedule deletion for groups
-      if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
-        this.scheduleGroupMessage(ctx.telegram, ctx.chat.id, message.message_id);
-        
-        logger.debug('Group reply sent and scheduled for deletion', {
-          chatId: ctx.chat.id,
-          messageId: message.message_id,
-          deleteIn: '5 minutes',
-        });
-      }
-      
-      return message;
-    } catch (error) {
-      logger.error('Error replying in group:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Get statistics about scheduled deletions
    * @returns {Object} Statistics
    */
@@ -374,36 +293,6 @@ class ChatCleanupService {
   }
 
   /**
-   * Mark a message as permanent (won't be deleted)
-   * @param {number|string} chatId - Chat ID
-   * @param {number} messageId - Message ID
-   */
-  static markAsPermanent(chatId, messageId) {
-    if (!chatId || !messageId) {
-      return;
-    }
-
-    // Get or create permanent message set for this chat
-    if (!this.permanentMessagesByChat.has(chatId)) {
-      this.permanentMessagesByChat.set(chatId, new Set());
-    }
-
-    const permanentSet = this.permanentMessagesByChat.get(chatId);
-    permanentSet.add(messageId);
-
-    // Remove from regular tracking if present
-    const messageSet = this.botMessagesByChat.get(chatId);
-    if (messageSet) {
-      messageSet.delete(messageId);
-    }
-
-    logger.debug('Message marked as permanent', {
-      chatId,
-      messageId,
-    });
-  }
-
-  /**
    * Delete all previous bot messages in a chat
    * @param {Object} telegram - Telegram bot instance
    * @param {number|string} chatId - Chat ID
@@ -421,11 +310,7 @@ class ChatCleanupService {
       return 0;
     }
 
-    // Get permanent messages to exclude from deletion
-    const permanentSet = this.permanentMessagesByChat.get(chatId) || new Set();
-    const messagesToDelete = Array.from(messageSet).filter((id) =>
-      id !== keepMessageId && !permanentSet.has(id)
-    );
+    const messagesToDelete = Array.from(messageSet).filter((id) => id !== keepMessageId);
     let deletedCount = 0;
     const failedDeletes = [];
 

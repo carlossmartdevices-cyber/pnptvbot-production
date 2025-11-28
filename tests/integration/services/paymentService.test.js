@@ -33,7 +33,6 @@ describe('PaymentService Integration Tests', () => {
         price: 10,
         currency: 'USD',
         duration: 30,
-        active: true,
       });
 
       // Mock PaymentModel.create
@@ -60,8 +59,12 @@ describe('PaymentService Integration Tests', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.paymentUrl).toContain('/payment/pay_123');
+      expect(result.paymentUrl).toContain('checkout.epayco.co');
       expect(result.paymentId).toBe('pay_123');
+      expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_123', 'pending', expect.objectContaining({
+        paymentUrl: expect.stringContaining('checkout.epayco.co'),
+        provider: 'epayco',
+      }));
     });
 
     it('should create a payment with Daimo provider', async () => {
@@ -72,7 +75,6 @@ describe('PaymentService Integration Tests', () => {
         price: 10,
         currency: 'USDC',
         duration: 30,
-        active: true,
       });
 
       // Mock PaymentModel.create
@@ -88,10 +90,16 @@ describe('PaymentService Integration Tests', () => {
       // Mock PaymentModel.updateStatus
       PaymentModel.updateStatus.mockResolvedValue(true);
 
-      // Set environment variables - need treasury address for Daimo
+      // Mock Daimo API response
+      axios.post.mockResolvedValue({
+        data: {
+          payment_url: 'https://mock.daimo.com/pay/123',
+          transaction_id: 'txn_123',
+        },
+      });
+
+      // Set environment variables
       process.env.DAIMO_API_KEY = 'test_api_key';
-      process.env.DAIMO_TREASURY_ADDRESS = '0xcaf17dbbccc0e9ac87dad1af1f2fe3ba3a4d0613';
-      process.env.DAIMO_REFUND_ADDRESS = '0xcaf17dbbccc0e9ac87dad1af1f2fe3ba3a4d0613';
       process.env.BOT_WEBHOOK_DOMAIN = 'https://example.com';
 
       const result = await PaymentService.createPayment({
@@ -101,8 +109,13 @@ describe('PaymentService Integration Tests', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.paymentUrl).toContain('/daimo/pay_456');
+      expect(result.paymentUrl).toBe('https://mock.daimo.com/pay/123');
       expect(result.paymentId).toBe('pay_456');
+      expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_456', 'pending', {
+        paymentUrl: 'https://mock.daimo.com/pay/123',
+        transactionId: 'txn_123',
+        provider: 'daimo',
+      });
     });
 
     it('should throw error when plan is not found', async () => {
@@ -112,7 +125,7 @@ describe('PaymentService Integration Tests', () => {
         userId: 123,
         planId: 'invalid_plan',
         provider: 'epayco',
-      })).rejects.toThrow('El plan seleccionado no existe o está inactivo');
+      })).rejects.toThrow('Plan not found');
     });
 
     it('should throw error for invalid payment data', async () => {
@@ -123,7 +136,6 @@ describe('PaymentService Integration Tests', () => {
         price: 10,
         currency: 'USD',
         duration: 30,
-        active: true,
       });
 
       await expect(PaymentService.createPayment({
@@ -140,7 +152,6 @@ describe('PaymentService Integration Tests', () => {
         price: 10,
         currency: 'USDC',
         duration: 30,
-        active: true,
       });
 
       PaymentModel.create.mockResolvedValue({
@@ -152,11 +163,8 @@ describe('PaymentService Integration Tests', () => {
         provider: 'daimo',
       });
 
-      // Mock DaimoConfig to throw an error
-      const DaimoConfig = require('../../../src/config/daimo');
-      jest.spyOn(DaimoConfig, 'createPaymentIntent').mockImplementation(() => {
-        throw new Error('Daimo configuration error');
-      });
+      // Mock Daimo API error
+      axios.post.mockRejectedValue(new Error('Internal server error'));
 
       process.env.DAIMO_API_KEY = 'test_api_key';
       process.env.BOT_WEBHOOK_DOMAIN = 'https://example.com';
@@ -165,9 +173,7 @@ describe('PaymentService Integration Tests', () => {
         userId: 456,
         planId: 'plan_456',
         provider: 'daimo',
-      })).rejects.toThrow();
-
-      DaimoConfig.createPaymentIntent.mockRestore();
+      })).rejects.toThrow('Internal server error');
     }, 15000); // Increase timeout for retry mechanism
   });
 
@@ -195,13 +201,6 @@ describe('PaymentService Integration Tests', () => {
         price: 10,
         currency: 'USDC',
         duration: 30,
-        active: true,
-      });
-
-      // Mock UserModel.getById
-      UserModel.getById.mockResolvedValue({
-        id: 'user_123',
-        language: 'es',
       });
 
       // Mock UserModel.updateSubscription
@@ -217,11 +216,8 @@ describe('PaymentService Integration Tests', () => {
       // Create valid signature
       const crypto = require('crypto');
       const webhookData = {
-        id: 'txn_123',
-        status: 'payment_completed',
-        source: {
-          txHash: 'txn_123',
-        },
+        transaction_id: 'txn_123',
+        status: 'completed',
         metadata: {
           paymentId: 'pay_123',
           userId: 'user_123',
@@ -244,27 +240,28 @@ describe('PaymentService Integration Tests', () => {
         planId: 'plan_123',
         expiry: expect.any(Date),
       });
-      expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_123', 'completed', expect.objectContaining({
-        transaction_id: 'txn_123',
-      }));
+      expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_123', 'success', {
+        transactionId: 'txn_123',
+        completedAt: expect.any(Date),
+      });
+      expect(cache.releaseLock).toHaveBeenCalled();
     });
 
     it('should handle idempotency (duplicate webhooks)', async () => {
-      // Mock payment already processed (status: completed)
       PaymentModel.getById.mockResolvedValue({
         id: 'pay_123',
         userId: 'user_123',
         planId: 'plan_123',
-        status: 'completed',
+        status: 'pending',
       });
+
+      // Simulate lock already acquired
+      cache.acquireLock.mockResolvedValue(false);
 
       const crypto = require('crypto');
       const webhookData = {
-        id: 'txn_123',
-        status: 'payment_completed',
-        source: {
-          txHash: 'txn_123',
-        },
+        transaction_id: 'txn_123',
+        status: 'completed',
         metadata: {
           paymentId: 'pay_123',
           userId: 'user_123',
@@ -281,8 +278,8 @@ describe('PaymentService Integration Tests', () => {
 
       const result = await PaymentService.processDaimoWebhook(webhookData);
 
-      expect(result.success).toBe(true);
-      expect(result.alreadyProcessed).toBe(true);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('pay_123');
     });
   });
 

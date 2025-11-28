@@ -10,21 +10,13 @@ const logger = require('../../utils/logger');
 // Controllers
 const webhookController = require('./controllers/webhookController');
 const subscriptionController = require('./controllers/subscriptionController');
-const paymentController = require('./controllers/paymentController');
-const materializousController = require('./controllers/materializousController');
-// const zoomController = require('./controllers/zoomController'); // Temporarily disabled
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
-// CRITICAL: Trust proxy configuration MUST come first
-// This is needed for rate limiting behind nginx/reverse proxy
-// Only trust the first proxy (nginx on localhost)
-app.set('trust proxy', 1);
-
-// CRITICAL: Apply body parsing AFTER trust proxy
+// CRITICAL: Apply body parsing FIRST for ALL routes
 // This must be before any route registration
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -35,38 +27,21 @@ app.use(morgan('combined', { stream: logger.stream }));
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../../../public')));
 
-// Landing page routes (ONLY for pnptv.app)
-// These routes are handled by Nginx for pnptv.app domain only
-// Routes commented out for easybots.store - use Nginx to serve
-
-// Rate limiting for page routes
-const pageLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: { trustProxy: false },
+// Landing page routes
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
 });
 
-// Payment checkout page with language support
-app.get('/payment/:paymentId', pageLimiter, (req, res) => {
-  // Get language from query parameter (e.g., ?lang=en)
-  const lang = req.query.lang || 'es'; // Default to Spanish
-
-  let fileName;
-  if (lang === 'en') {
-    fileName = 'payment-checkout-en.html';
-  } else {
-    fileName = 'payment-checkout-es.html';
-  }
-
-  res.sendFile(path.join(__dirname, '../../../public', fileName));
+app.get('/lifetime-pass', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
 });
 
-// Daimo Pay checkout page
-app.get('/daimo/:paymentId', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public', 'daimo-checkout.html'));
+app.get('/promo', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+});
+
+app.get('/pnptv-hot-sale', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
 });
 
 // Lifetime Pass landing page ($100)
@@ -96,7 +71,9 @@ app.get('/policies', pageLimiter, (req, res) => {
 // Function to conditionally apply middleware (skip for Telegram webhook)
 const conditionalMiddleware = (middleware) => (req, res, next) => {
   // Skip middleware for Telegram webhook to prevent connection issues
-  if (req.path === '/pnp/webhook/telegram' || req.path === '/webhook/telegram') {
+  if (req.path === '/pnp/webhook/telegram') {
+    // Telegram Webhook
+    app.post('/pnp/webhook/telegram', webhookController.handleTelegramWebhook);
     return next();
   }
   return middleware(req, res, next);
@@ -106,6 +83,10 @@ const conditionalMiddleware = (middleware) => (req, res, next) => {
 app.use(conditionalMiddleware(helmet()));
 app.use(conditionalMiddleware(cors()));
 app.use(conditionalMiddleware(compression()));
+// Security middleware
+app.use(helmet());
+app.use(cors());
+app.use(compression());
 
 // Rate limiting for API
 const limiter = rateLimit({
@@ -114,8 +95,6 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
-  // Validate configuration is correct for trust proxy
-  validate: { trustProxy: false },
 });
 app.use('/api/', limiter);
 
@@ -127,22 +106,10 @@ const webhookLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false,
-  // Validate configuration is correct for trust proxy
-  validate: { trustProxy: false },
-});
-
-// Health check rate limiter (more permissive for monitoring)
-const healthLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 60, // Allow frequent health checks for monitoring
-  message: 'Too many health check requests.',
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: { trustProxy: false },
 });
 
 // Health check with dependency checks
-app.get('/health', healthLimiter, async (req, res) => {
+app.get('/health', async (req, res) => {
   const health = {
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -163,17 +130,16 @@ app.get('/health', healthLimiter, async (req, res) => {
   }
 
   try {
-    // Check PostgreSQL connection
-    const { testConnection } = require('../../config/postgres');
-    const isConnected = await testConnection();
-    health.dependencies.database = isConnected ? 'ok' : 'error';
-    if (!isConnected) {
-      health.status = 'degraded';
-    }
+    // Check Firestore connection
+    const { getFirestore } = require('../../config/firebase');
+    const db = getFirestore();
+    // Simple health check: verify we can access Firestore
+    await db.collection('_health_check').limit(1).get();
+    health.dependencies.firestore = 'ok';
   } catch (error) {
-    health.dependencies.database = 'error';
+    health.dependencies.firestore = 'error';
     health.status = 'degraded';
-    logger.error('PostgreSQL health check failed:', error);
+    logger.error('Firestore health check failed:', error);
   }
 
   const statusCode = health.status === 'ok' ? 200 : 503;
@@ -184,15 +150,6 @@ app.get('/health', healthLimiter, async (req, res) => {
 app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
 app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
 app.get('/api/payment-response', webhookController.handlePaymentResponse);
-
-// Farcaster Quick Auth API routes
-app.post('/api/farcaster/verify', asyncHandler(webhookController.verifyFarcasterAuth));
-app.post('/api/farcaster/payment', asyncHandler(webhookController.createFarcasterPayment));
-app.post('/api/farcaster/link', asyncHandler(webhookController.linkFarcasterAccount));
-app.get('/api/farcaster/profile/:fid', asyncHandler(webhookController.getFarcasterProfile));
-
-// Payment API routes
-app.get('/api/payment/:paymentId', asyncHandler(paymentController.getPaymentInfo));
 
 // Stats endpoint
 app.get('/api/stats', asyncHandler(async (req, res) => {
@@ -213,41 +170,6 @@ app.post(
 app.get('/api/subscription/payment-response', asyncHandler(subscriptionController.handlePaymentResponse));
 app.get('/api/subscription/subscriber/:identifier', asyncHandler(subscriptionController.getSubscriber));
 app.get('/api/subscription/stats', asyncHandler(subscriptionController.getStatistics));
-
-// Zoom API routes - TEMPORARILY DISABLED
-// app.get('/api/zoom/room/:roomCode', asyncHandler(zoomController.getRoomInfo));
-// app.post('/api/zoom/join', asyncHandler(zoomController.joinMeeting));
-// app.post('/api/zoom/host/join', asyncHandler(zoomController.joinAsHost));
-// app.post('/api/zoom/end/:roomCode', asyncHandler(zoomController.endMeeting));
-// app.get('/api/zoom/participants/:roomCode', asyncHandler(zoomController.getParticipants));
-// app.post('/api/zoom/participant/:participantId/action', asyncHandler(zoomController.controlParticipant));
-// app.post('/api/zoom/recording/:roomCode', asyncHandler(zoomController.toggleRecording));
-// app.get('/api/zoom/stats/:roomCode', asyncHandler(zoomController.getRoomStats));
-
-// Zoom web pages - TEMPORARILY DISABLED
-// app.get('/zoom/join/:roomCode', (req, res) => {
-//   res.sendFile(path.join(__dirname, '../../../public/zoom/join.html'));
-// });
-
-// app.get('/zoom/host/:roomCode', (req, res) => {
-//   res.sendFile(path.join(__dirname, '../../../public/zoom/host.html'));
-// });
-
-// Materialious API routes
-app.get('/materialious', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/materialious/index.html'));
-});
-
-app.get('/api/materialious/search', asyncHandler(materializousController.searchVideos));
-app.get('/api/materialious/trending', asyncHandler(materializousController.getTrendingVideos));
-app.get('/api/materialious/popular', asyncHandler(materializousController.getPopularVideos));
-app.get('/api/materialious/video/:videoId', asyncHandler(materializousController.getVideoDetails));
-app.get('/api/materialious/channel/:channelId', asyncHandler(materializousController.getChannelInfo));
-app.get('/api/materialious/channel/:channelId/videos', asyncHandler(materializousController.getChannelVideos));
-app.get('/api/materialious/playlist/:playlistId', asyncHandler(materializousController.getPlaylistInfo));
-app.get('/api/materialious/subtitles/:videoId', asyncHandler(materializousController.getSubtitles));
-app.get('/api/materialious/instance/status', asyncHandler(materializousController.getInstanceStatus));
-app.post('/api/materialious/instance/configure', asyncHandler(materializousController.setCustomInstance));
 
 // Export app WITHOUT 404/error handlers
 // These will be added in bot.js AFTER the webhook callback

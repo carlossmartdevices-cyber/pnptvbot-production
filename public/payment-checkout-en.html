@@ -347,7 +347,8 @@
 
                 // Extra data for webhook (no customer data - ePayco will collect it)
                 extra1: paymentData.userId.toString(),
-                extra2: paymentData.paymentId,
+                extra2: paymentData.planId,
+                extra3: paymentData.paymentId,
 
                 // URLs
                 confirmation: paymentData.confirmationUrl,

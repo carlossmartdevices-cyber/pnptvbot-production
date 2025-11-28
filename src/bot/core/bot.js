@@ -1,20 +1,15 @@
 require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
-// Firebase eliminado: no se requiere
+const { initializeFirebase } = require('../../config/firebase');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
-const personalInfoFilterMiddleware = require('./middleware/personalInfoFilter');
-const allowedChatsMiddleware = require('./middleware/allowedChats');
 const usernameEnforcement = require('./middleware/usernameEnforcement');
-const profileCompliance = require('./middleware/profileCompliance');
 const moderationFilter = require('./middleware/moderationFilter');
-const autoModerationMiddleware = require('./middleware/autoModeration');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
-const commandAutoDeleteMiddleware = require('./middleware/commandAutoDelete');
 const errorHandler = require('./middleware/errorHandler');
 // Topic middleware
 const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./middleware/topicPermissions');
@@ -29,7 +24,6 @@ const {
   groupMenuRedirectMiddleware,
   groupCommandDeleteMiddleware
 } = require('./middleware/groupBehavior');
-const { groupMessageAutoDeleteMiddleware } = require('./middleware/groupMessageAutoDelete');
 const logger = require('../../utils/logger');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
@@ -49,14 +43,9 @@ const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnaly
 const registerUserCallManagementHandlers = require('../handlers/user/callManagement');
 const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
-const { registerLeaderboardHandlers } = require('../handlers/group/leaderboard');
-const registerMenuHandlers = require('../handlers/menu');
-// const registerZoomHandlers = require('../handlers/media/zoomV2'); // Temporarily disabled due to missing dependencies
 // Services
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
-const SubscriptionReminderService = require('../services/subscriptionReminderService');
-const { startCronJobs } = require('../../../scripts/cron');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
 // API Server
@@ -70,7 +59,7 @@ let isWebhookMode = false;
  * Validate critical environment variables
  */
 const validateCriticalEnvVars = () => {
-  const criticalVars = ['BOT_TOKEN'];
+  const criticalVars = ['BOT_TOKEN', 'FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL'];
   const missing = criticalVars.filter((varName) => !process.env[varName]);
   if (missing.length > 0) {
     logger.error(`Missing critical environment variables: ${missing.join(', ')}`);
@@ -102,7 +91,15 @@ const startBot = async () => {
     } catch (error) {
       logger.warn('Sentry initialization failed, continuing without monitoring:', error.message);
     }
-    // Firebase eliminado: solo PostgreSQL y Redis
+    // Initialize Firebase (with fallback)
+    try {
+      initializeFirebase();
+      logger.info('✓ Firebase initialized');
+    } catch (error) {
+      logger.error('Firebase initialization failed. Bot will run in DEGRADED mode without database.');
+      logger.error('Error:', error.message);
+      logger.warn('⚠️  Bot features requiring database will not work!');
+    }
     // Initialize Redis (optional, will use default localhost if not configured)
     try {
       initializeRedis();
@@ -123,22 +120,14 @@ const startBot = async () => {
     
     // Register middleware
     bot.use(sessionMiddleware());
-    bot.use(allowedChatsMiddleware()); // Must be early to leave unauthorized chats
-    bot.use(groupSecurityEnforcementMiddleware()); // Enforce group/channel whitelist
     bot.use(rateLimitMiddleware());
-    // bot.use(usernameChangeDetectionMiddleware()); // DISABLED - not working properly
     bot.use(chatCleanupMiddleware());
-    bot.use(commandAutoDeleteMiddleware()); // Delete commands from groups
     bot.use(usernameEnforcement());
-    bot.use(profileCompliance());
     bot.use(moderationFilter());
-    bot.use(autoModerationMiddleware()); // Auto-moderation (spam, links, flooding, profanity)
-    bot.use(personalInfoFilterMiddleware()); // Filter personal information and redirect to DM
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
 
     // Group behavior rules (OVERRIDE all previous rules)
-    bot.use(groupMessageAutoDeleteMiddleware()); // Auto-delete ALL bot messages in groups after 5 minutes
     bot.use(groupBehaviorMiddleware()); // Route all bot messages to topic 3135, 3-min delete
     bot.use(cristinaGroupFilterMiddleware()); // Filter personal info from Cristina in groups
     bot.use(groupMenuRedirectMiddleware()); // Redirect menu button clicks to private
@@ -150,7 +139,6 @@ const startBot = async () => {
     bot.use(mediaMirrorMiddleware()); // Mirror media to PNPtv Gallery
     bot.use(topicPermissionsMiddleware()); // Admin-only and approval queue
     bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery
-    
     // Register handlers
     registerUserHandlers(bot);
     registerAdminHandlers(bot);
@@ -169,32 +157,19 @@ const startBot = async () => {
     registerUserCallManagementHandlers(bot);
     registerCallFeedbackHandlers(bot);
     registerCallPackageHandlers(bot);
-    registerLeaderboardHandlers(bot);
-    registerMenuHandlers(bot); // Menu system and Cristina AI
-    registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic
-    registerGroupSecurityHandlers(bot); // Group/channel security enforcement
-    // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
     // Initialize call reminder service
     CallReminderService.initialize(bot);
     logger.info('✓ Call reminder service initialized');
-    // Initialize subscription reminder service
-    SubscriptionReminderService.initialize(bot);
-    logger.info('✓ Subscription reminder service initialized');
     // Initialize group cleanup service
     const groupCleanup = new GroupCleanupService(bot);
     groupCleanup.initialize();
-    logger.info('✓ Registering error handler...');
     // Error handling
     bot.catch(errorHandler);
-    logger.info('✓ Error handler registered');
-    logger.info(`Checking bot startup mode: NODE_ENV=${process.env.NODE_ENV}, BOT_WEBHOOK_DOMAIN=${process.env.BOT_WEBHOOK_DOMAIN}`);
     // Start bot
     if (process.env.NODE_ENV === 'production' && process.env.BOT_WEBHOOK_DOMAIN) {
-      logger.info('Setting up webhook mode...');
       // Webhook mode for production
       const webhookPath = process.env.BOT_WEBHOOK_PATH || '/webhook/telegram';
       const webhookUrl = `${process.env.BOT_WEBHOOK_DOMAIN}${webhookPath}`;
-      logger.info(`Calling Telegram API to set webhook: ${webhookUrl}`);
       await bot.telegram.setWebhook(webhookUrl);
       logger.info(`✓ Webhook set to: ${webhookUrl}`);
       // Register webhook callback
@@ -256,17 +231,6 @@ const startBot = async () => {
       botInstance = bot; // Asignar la instancia del bot
       botStarted = true; // Actualizar el estado
       logger.info('✓ Bot started in polling mode');
-    }
-    // Start cron jobs for automated tasks (if enabled)
-    if (process.env.ENABLE_CRON === 'true') {
-      try {
-        await startCronJobs(bot);
-        logger.info('✓ Cron jobs started successfully');
-      } catch (error) {
-        logger.error('Error starting cron jobs:', error);
-      }
-    } else {
-      logger.info('ℹ️  Cron jobs disabled (set ENABLE_CRON=true to enable)');
     }
     // Add 404 and error handlers
     const {

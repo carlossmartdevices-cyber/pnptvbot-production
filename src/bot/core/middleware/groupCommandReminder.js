@@ -21,7 +21,7 @@ const groupCommandReminder = () => {
       const command = commandText.replace('@', '').split('/')[1]; // Remove bot username if present
 
       // Exceptions - these commands can work in groups
-      const allowedCommands = ['menu', 'start', 'help', 'startgroupcall'];
+      const allowedCommands = ['menu', 'start', 'help'];
       if (allowedCommands.includes(command)) {
         return next();
       }
