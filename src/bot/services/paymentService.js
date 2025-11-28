@@ -84,13 +84,6 @@ class PaymentService {
       } else {
         await PaymentModel.updateStatus(payment.id, 'pending', { paymentUrl, provider });
       }
-          paymentUrl,
-          transactionId,
-          provider,
-        });
-      } else {
-        await PaymentModel.updateStatus(payment.id, 'pending', { paymentUrl, provider });
-      }
 
        return { success: true, paymentUrl, paymentId: payment.id };
     } catch (error) {
