@@ -5,6 +5,7 @@
   "main": "src/bot/core/bot.js",
   "scripts": {
     "start": "node src/bot/core/bot.js",
+    "agent": "node scripts/agent-run.js",
     "dev": "nodemon src/bot/core/bot.js",
     "test": "jest --coverage",
     "test:unit": "jest --testMatch='**/unit/**/*.test.js' --coverage",

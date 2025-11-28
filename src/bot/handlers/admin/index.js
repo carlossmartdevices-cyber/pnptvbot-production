@@ -208,14 +208,11 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error in admin broadcast:', error);
-<<<<<<< HEAD
-=======
       try {
         await ctx.answerCbQuery('Error al iniciar broadcast');
       } catch (e) {
         // Already answered
       }
->>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1
     }
   });
 
@@ -1001,15 +998,13 @@ const registerAdminHandlers = (bot) => {
       try {
         const message = ctx.message.text;
 
-<<<<<<< HEAD
-=======
         // Validate message length
         // Telegram caption limit is 1024 chars for media, 4096 for text-only
         // Use 1020 to leave room for the "📢 " prefix and safety margin
         const hasMedia = ctx.session.temp.broadcastData?.mediaFileId;
         const maxLength = hasMedia ? 1020 : 4000;
         const charCount = message.length;
-        
+
         if (charCount > maxLength) {
           const excessChars = charCount - maxLength;
           await ctx.reply(
@@ -1028,8 +1023,6 @@ const registerAdminHandlers = (bot) => {
         if (!ctx.session.temp.broadcastData) {
           ctx.session.temp.broadcastData = {};
         }
-
->>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1
         // Save English text
         ctx.session.temp.broadcastData.textEn = message;
         ctx.session.temp.broadcastStep = 'text_es';
@@ -1058,15 +1051,13 @@ const registerAdminHandlers = (bot) => {
         const target = ctx.session.temp.broadcastTarget;
         const broadcastData = ctx.session.temp.broadcastData;
 
-<<<<<<< HEAD
-=======
         // Validate message length
         // Telegram caption limit is 1024 chars for media, 4096 for text-only
         // Use 1020 to leave room for the "📢 " prefix and safety margin
         const hasMedia = broadcastData.mediaFileId;
         const maxLength = hasMedia ? 1020 : 4000;
         const charCount = message.length;
-        
+
         if (charCount > maxLength) {
           const excessChars = charCount - maxLength;
           await ctx.reply(
@@ -1088,8 +1079,6 @@ const registerAdminHandlers = (bot) => {
           await ctx.saveSession();
           return;
         }
-
->>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1
         // Save Spanish text
         broadcastData.textEs = message;
 
@@ -1121,6 +1110,12 @@ const registerAdminHandlers = (bot) => {
             const userLang = user.language || 'en';
             const textToSend = userLang === 'es' ? broadcastData.textEs : broadcastData.textEn;
 
+            const replyMarkup = Markup.inlineKeyboard([
+              Markup.button.callback(t('subscribe', userLang), 'show_subscription_plans'),
+              Markup.button.callback(t('support', userLang), 'show_support'),
+              Markup.button.callback(userLang === 'es' ? 'Menú Principal' : 'Main Menu', 'back_to_main')
+            ]);
+
             // Send with media if available
             if (broadcastData.mediaType && broadcastData.mediaFileId) {
               const sendMethod = {
@@ -1135,13 +1130,18 @@ const registerAdminHandlers = (bot) => {
                 await ctx.telegram[sendMethod](user.id, broadcastData.mediaFileId, {
                   caption: `📢 ${textToSend}`,
                   parse_mode: 'Markdown',
+                  reply_markup: replyMarkup
                 });
               } else {
-                await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`, { parse_mode: 'Markdown' });
+                logger.warn(`Invalid media type for broadcast: ${broadcastData.mediaType}`);
+                continue;
               }
             } else {
               // Text only
-              await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`, { parse_mode: 'Markdown' });
+              await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`, { 
+                parse_mode: 'Markdown',
+                reply_markup: replyMarkup 
+              });
             }
 
             sent += 1;
@@ -1589,314 +1589,6 @@ const registerAdminHandlers = (bot) => {
     } catch (error) {
       logger.error('Error changing user plan:', error);
       await ctx.answerCbQuery('Error al cambiar el plan');
-    }
-  });
-<<<<<<< HEAD
-=======
-
-  // ====== MANUAL MEMBERSHIP ACTIVATION ======
-
-  // Handle membership type selection
-  bot.action(/^admin_activate_type_(.+)_(plan|courtesy)$/, async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      const userId = ctx.match[1];
-      const type = ctx.match[2];
-
-      const user = await UserModel.getById(userId);
-      if (!user) {
-        await ctx.answerCbQuery('Usuario no encontrado');
-        return;
-      }
-
-      if (type === 'courtesy') {
-        // Show courtesy pass options
-        let text = '🎁 **Pase de Cortesía**\n\n';
-        text += `👤 ${user.firstName} ${user.lastName || ''}\n`;
-        text += `🆔 ${userId}\n\n`;
-        text += 'Selecciona la duración del pase de cortesía:';
-
-        await ctx.editMessageText(
-          text,
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback('📅 2 Días', `admin_activate_courtesy_${userId}_2`)],
-              [Markup.button.callback('📅 7 Días (1 Semana)', `admin_activate_courtesy_${userId}_7`)],
-              [Markup.button.callback('📅 14 Días (2 Semanas)', `admin_activate_courtesy_${userId}_14`)],
-              [Markup.button.callback('◀️ Volver', `admin_activate_select_type_${userId}`)],
-            ]),
-          },
-        );
-      } else {
-        // Show available plans
-        const plans = await PlanModel.getAll();
-
-        let text = '💎 **Seleccionar Plan**\n\n';
-        text += `👤 ${user.firstName} ${user.lastName || ''}\n`;
-        text += `🆔 ${userId}\n\n`;
-        text += 'Selecciona el plan a activar:';
-
-        const keyboard = [];
-
-        // Add button for each active plan
-        plans.filter((p) => p.active).forEach((plan) => {
-          const lang = user.language || 'es';
-          const planName = lang === 'es' ? (plan.nameEs || plan.name) : plan.name;
-          keyboard.push([
-            Markup.button.callback(
-              `${planName} - $${plan.price} (${plan.duration} días)`,
-              `admin_activate_plan_${userId}_${plan.id}`,
-            ),
-          ]);
-        });
-
-        keyboard.push([Markup.button.callback('◀️ Volver', `admin_activate_select_type_${userId}`)]);
-
-        await ctx.editMessageText(text, {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard(keyboard),
-        });
-      }
-    } catch (error) {
-      logger.error('Error showing membership type options:', error);
-      await ctx.answerCbQuery('Error al mostrar opciones');
-    }
-  });
-
-  // Activate courtesy pass
-  bot.action(/^admin_activate_courtesy_(.+)_(\d+)$/, async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      const userId = ctx.match[1];
-      const days = parseInt(ctx.match[2], 10);
-
-      const user = await UserModel.getById(userId);
-      if (!user) {
-        await ctx.answerCbQuery('Usuario no encontrado');
-        return;
-      }
-
-      // Calculate expiry date
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + days);
-
-      // Activate subscription with courtesy pass plan
-      await UserModel.updateSubscription(userId, {
-        status: 'active',
-        planId: `courtesy_${days}d`,
-        expiry: expiryDate,
-      });
-
-      const lang = user.language || 'es';
-      const durationText = days === 2 ? '2 días' : days === 7 ? '1 semana (7 días)' : '2 semanas (14 días)';
-
-      let successText = '✅ **Pase de Cortesía Activado**\n\n';
-      successText += `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`;
-      successText += `🆔 ID: ${userId}\n`;
-      successText += `🎁 Tipo: Pase de Cortesía\n`;
-      successText += `⏱️ Duración: ${durationText}\n`;
-      successText += `📅 Expira: ${expiryDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}\n`;
-      successText += `💎 Estado: Activo\n\n`;
-      successText += '📨 El usuario ha sido notificado por el bot.';
-
-      await ctx.editMessageText(
-        successText,
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('◀️ Volver al Panel Admin', 'admin_cancel')],
-          ]),
-        },
-      );
-
-      // Send notification to user via bot
-      try {
-        const welcomeMessage = lang === 'es'
-          ? `🎉 **¡Membresía Activada!**\n\n` +
-            `Has recibido un **pase de cortesía** de **${durationText}**.\n\n` +
-            `✅ Tu membresía está activa hasta el **${expiryDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}**\n\n` +
-            `💎 Disfruta de todo el contenido premium de PNPtv!`
-          : `🎉 **Membership Activated!**\n\n` +
-            `You have received a **courtesy pass** for **${days} days**.\n\n` +
-            `✅ Your membership is active until **${expiryDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}**\n\n` +
-            `💎 Enjoy all premium PNPtv content!`;
-
-        await ctx.telegram.sendMessage(userId, welcomeMessage, { parse_mode: 'Markdown' });
-      } catch (notifyError) {
-        logger.warn('Could not notify user about courtesy pass', { userId, error: notifyError.message });
-      }
-
-      logger.info('Courtesy pass activated by admin', {
-        adminId: ctx.from.id,
-        userId,
-        days,
-        expiryDate,
-      });
-
-      await ctx.answerCbQuery('✅ Pase de cortesía activado');
-    } catch (error) {
-      logger.error('Error activating courtesy pass:', error);
-      await ctx.answerCbQuery('Error al activar pase de cortesía');
-    }
-  });
-
-  // Show type selection (plan or courtesy)
-  bot.action(/^admin_activate_select_type_(.+)$/, async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      const userId = ctx.match[1];
-      const user = await UserModel.getById(userId);
-
-      if (!user) {
-        await ctx.answerCbQuery('Usuario no encontrado');
-        return;
-      }
-
-      let text = '🎁 **Activar Membresía**\n\n';
-      text += `👤 ${user.firstName} ${user.lastName || ''}\n`;
-      text += `🆔 ${userId}\n`;
-      text += `📧 ${user.email || 'Sin email'}\n`;
-      text += `💎 Estado actual: ${user.subscriptionStatus || 'free'}\n`;
-      if (user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date()) {
-        text += `⏰ Expira: ${new Date(user.subscriptionExpiry).toLocaleDateString('es-ES')}\n`;
-      }
-      text += '\n¿Qué tipo de membresía deseas activar?\n';
-
-      await ctx.editMessageText(
-        text,
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('💎 Plan Existente', `admin_activate_type_${userId}_plan`)],
-            [Markup.button.callback('🎁 Pase de Cortesía', `admin_activate_type_${userId}_courtesy`)],
-            [Markup.button.callback('◀️ Volver', 'admin_activate_membership')],
-          ]),
-        },
-      );
-    } catch (error) {
-      logger.error('Error showing type selection:', error);
-      await ctx.answerCbQuery('Error al mostrar opciones');
-    }
-  });
-
-  // =====================================================
-  // PINNED MENU COMMAND FOR GROUP TOPICS
-  // Usage: /sendmenu <topic_type>
-  // topic_type: general, wall, news
-  // =====================================================
-  bot.command('sendmenu', async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) {
-        await ctx.reply('❌ Solo administradores pueden usar este comando.');
-        return;
-      }
-
-      const args = ctx.message.text.split(' ').slice(1);
-      const topicType = args[0]?.toLowerCase();
-
-      if (!topicType) {
-        await ctx.reply(
-          '📌 **Enviar Menú Fijable a Topic**\n\n' +
-          'Uso: `/sendmenu <tipo>`\n\n' +
-          '**Tipos disponibles:**\n' +
-          '• `general` - Menú General → /menu\n' +
-          '• `wall` - Wall of Fame → /nearby + /cristina\n' +
-          '• `news` - News & Updates → /help\n\n' +
-          'Ejemplo: `/sendmenu general`',
-          { parse_mode: 'Markdown' }
-        );
-        return;
-      }
-
-      const botUsername = ctx.botInfo?.username || 'PNPtvbot';
-      let menuMessage;
-      let keyboard;
-
-      switch (topicType) {
-        case 'general':
-          // General topic - /menu button
-          menuMessage = 
-            '`📌 PNPtv Bot Menu`\n\n' +
-            '👋 Hey! Tap the button below to open your personal menu.\n\n' +
-            '• View your profile\n' +
-            '• Check subscription status\n' +
-            '• Access all bot features\n' +
-            '• Talk to Cristina AI\n\n' +
-            '`Tap below to start! 👇`';
-
-          keyboard = Markup.inlineKeyboard([
-            [Markup.button.url('📱 Open Menu', `https://t.me/${botUsername}?start=menu`)],
-          ]);
-          break;
-
-        case 'wall':
-          // Wall of Fame - /nearby + /cristina
-          menuMessage = 
-            '`🏆 Wall of Fame`\n\n' +
-            '🌟 Welcome to the Wall of Fame!\n\n' +
-            '**Find & Connect:**\n' +
-            '• 📍 Tap **Nearby** to find members close to you\n' +
-            '• 🤖 Tap **Cristina** to chat with our AI assistant\n\n' +
-            '`Share your profile and connect! 💜`';
-
-          keyboard = Markup.inlineKeyboard([
-            [
-              Markup.button.url('📍 Nearby', `https://t.me/${botUsername}?start=show_nearby`),
-              Markup.button.url('🤖 Cristina', `https://t.me/${botUsername}?start=cristina`),
-            ],
-          ]);
-          break;
-
-        case 'news':
-          // News - /help
-          menuMessage = 
-            '`📰 News & Updates`\n\n' +
-            '📢 Stay updated with the latest from PNPtv!\n\n' +
-            '**Need Help?**\n' +
-            '• Tap **Help** for support and FAQs\n' +
-            '• Learn about features and how to use them\n\n' +
-            '`Questions? We\'re here for you! 🆘`';
-
-          keyboard = Markup.inlineKeyboard([
-            [Markup.button.url('🆘 Help & Support', `https://t.me/${botUsername}?start=show_support`)],
-          ]);
-          break;
-
-        default:
-          await ctx.reply(
-            '❌ Tipo no reconocido.\n\n' +
-            'Tipos válidos: `general`, `wall`, `news`',
-            { parse_mode: 'Markdown' }
-          );
-          return;
-      }
-
-      // Send the menu message
-      await ctx.reply(menuMessage, {
-        parse_mode: 'Markdown',
-        ...keyboard,
-      });
-
-      // Delete the command message
-      try {
-        await ctx.deleteMessage();
-      } catch (e) {
-        // Ignore if can't delete
-      }
-
-      logger.info('Pinned menu sent', { topicType, adminId: ctx.from.id, chatId: ctx.chat.id });
-
-    } catch (error) {
-      logger.error('Error sending pinned menu:', error);
-      await ctx.reply('❌ Error al enviar el menú.');
     }
   });
 >>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1

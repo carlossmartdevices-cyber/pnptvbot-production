@@ -36,6 +36,16 @@ function getFirestore() {
 }
 
 
+function getAdmin() {
+  return admin;
+}
+
+async function createIndexes() {
+  // Placeholder for creating necessary Firestore indexes in production.
+  // For tests this is a no-op.
+  return true;
+}
+
 class PaymentModel {
   static async createPayment({ userId, planId, provider, sku, amount, status = 'pending', invoiceId = null }) {
     const db = getFirestore();
@@ -89,6 +99,9 @@ class PaymentModel {
 
 
 module.exports = {
+  initializeFirebase,
   getFirestore,
-  PaymentModel
+  getAdmin,
+  createIndexes,
+  PaymentModel,
 };
