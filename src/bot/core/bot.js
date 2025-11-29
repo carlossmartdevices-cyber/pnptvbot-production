@@ -190,6 +190,23 @@ const startBot = async () => {
             logger.warn('Webhook received empty body');
             return res.status(200).json({ ok: true, message: 'Empty body received' });
           }
+
+          // Deduplicate incoming webhook updates using Redis
+          try {
+            const { cache } = require('../../config/redis');
+            const updateId = req.body.update_id;
+            if (updateId) {
+              const key = `telegram:processed_update:${updateId}`;
+              const set = await cache.setNX(key, true, 60); // keep for 60s
+              if (!set) {
+                logger.warn('Duplicate webhook update ignored', { updateId });
+                return res.status(200).json({ ok: true, message: 'Duplicate update ignored' });
+              }
+            }
+          } catch (err) {
+            // If Redis fails we don't want to block processing — log and continue
+            logger.warn('Failed to dedupe update via Redis, continuing', { error: err.message });
+          }
           // Log the callback query data if present
           if (req.body.callback_query) {
             logger.info(`>>> CALLBACK_QUERY received: data=${req.body.callback_query.data}, from=${req.body.callback_query.from?.id}`);

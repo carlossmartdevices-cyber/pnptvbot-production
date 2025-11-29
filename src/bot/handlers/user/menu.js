@@ -288,6 +288,7 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
       ],
       [
+<<<<<<< HEAD
         Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
         Markup.button.callback(lang === 'es' ? '🧑‍💼 Área Miembros' : '🧑‍💼 Members Area', 'show_members_area'),
       ],
@@ -321,6 +322,17 @@ const showMainMenu = async (ctx) => {
       [
         Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
         Markup.button.callback(lang === 'es' ? '🧑‍💼 Área Miembros 🔒' : '🧑‍💼 Members Area 🔒', 'locked_feature'),
+=======
+        Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
+        Markup.button.callback(t('playerMenu', lang), 'show_player'),
+      ],
+      [
+        Markup.button.callback(t('primeMembersArea', lang), 'show_members_area'),
+      ],
+      [
+        Markup.button.callback(t('support', lang), 'show_support'),
+        Markup.button.callback(t('settings', lang), 'show_settings'),
+>>>>>>> af5436623d53181fab156fb2f09f63893a56c5cc
       ],
       [
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
@@ -429,10 +441,33 @@ const showMainMenuEdit = async (ctx) => {
   }
 
   try {
+<<<<<<< HEAD
     await ctx.editMessageText(menuText, {
       parse_mode: 'Markdown',
       ...keyboard
     });
+=======
+    await ctx.editMessageText(
+      t('mainMenuIntro', lang),
+      Markup.inlineKeyboard([
+        [
+          Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
+          Markup.button.callback(t('myProfile', lang), 'show_profile'),
+        ],
+        [
+          Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
+          Markup.button.callback(t('playerMenu', lang), 'show_player'),
+        ],
+        [
+          Markup.button.callback(t('primeMembersArea', lang), 'show_members_area'),
+        ],
+        [
+          Markup.button.callback(t('support', lang), 'show_support'),
+          Markup.button.callback(t('settings', lang), 'show_settings'),
+        ],
+      ]),
+    );
+>>>>>>> af5436623d53181fab156fb2f09f63893a56c5cc
   } catch (error) {
     // If edit fails, send new message
     await showMainMenu(ctx);

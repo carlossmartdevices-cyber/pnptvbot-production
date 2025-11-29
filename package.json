@@ -5,6 +5,7 @@
   "main": "src/bot/core/bot.js",
   "scripts": {
     "start": "node src/bot/core/bot.js",
+    "agent": "node scripts/agent-run.js",
     "dev": "nodemon src/bot/core/bot.js",
     "test": "jest --coverage",
     "test:unit": "jest --testMatch='**/unit/**/*.test.js' --coverage",
@@ -62,6 +63,7 @@
     "node-geocoder": "^4.3.0",
     "openai": "^4.24.7",
     "pdfkit": "^0.17.2",
+    "pg": "^8.16.3",
     "qrcode": "^1.5.3",
     "rate-limiter-flexible": "^5.0.0",
     "redis": "^4.6.12",

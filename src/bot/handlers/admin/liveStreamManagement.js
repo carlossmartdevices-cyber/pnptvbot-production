@@ -602,8 +602,6 @@ const registerLiveStreamManagementHandlers = (bot) => {
       await ctx.reply('Error rejecting emote');
     }
   });
-<<<<<<< HEAD
-=======
 
   // ============= CREATE STREAM =============
   // Create stream - Step 1: Ask for host ID
@@ -1375,7 +1373,6 @@ const registerLiveStreamManagementHandlers = (bot) => {
       logger.error('Error in immediate stream creation:', error);
     }
   });
->>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1
 };
 
 module.exports = registerLiveStreamManagementHandlers;
