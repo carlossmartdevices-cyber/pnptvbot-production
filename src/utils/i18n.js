@@ -5,8 +5,33 @@
 
 const translations = {
   en: {
+        groupRedirect: ({ username, command, botUsername }) =>
+          `@${username} I sent you a private message about your request. Please check it out. We do this for privacy reasons and to comply with our Group's anti-spam policy.\n\n[Open in private chat with your request](https://t.me/${botUsername}?start=${command})`,
     // General
     welcome: '👋 Welcome to PNPtv!',
+      welcomeScreen: `-----------------------------]
+        Welcome to PNPtv! Premium
+-------------------------------]
+
+This is your control dashboard.
+From here, you can access all your premium features:
+open Zoom Rooms, start live streams, watch full videos,
+explore Nearby without limits, and join private events.`,
+      welcomeScreenFree: `-----------------------------]
+            PNPtv!
+-------------------------------]
+
+Welcome to PNPtv!  
+Enjoy the full experience from here.
+
+Unlock all premium features:
+• Full videos  
+• Live streams  
+• Unlimited Nearby  
+• Zoom Rooms  
+• Private community events
+
+Tap "Subscribe to PRIME" below to get instant access.`,
     back: '🔙 Back',
     cancel: '❌ Cancel',
     next: '➡️ Next',
@@ -14,6 +39,7 @@ const translations = {
     error: '❌ An error occurred. Please try again.',
     success: '✅ Success!',
     loading: '⏳ Loading...',
+    days: 'days',
 
     // Onboarding
     selectLanguage: 'Please select your language:',
@@ -31,7 +57,7 @@ const translations = {
 
     // Main Menu
     mainMenuIntro: '🎬 Welcome to PNPtv - Your Entertainment Hub!\n\nWhat would you like to do?',
-    subscribe: '💎 Subscribe to PRIME',
+    subscribe: `Subscribe to PNPtv PRIME\n----------------------------------\n\nJoin the most intense PNP content platform created by and for the community.\n\nPRIME gives you full access to:\n• Full-length PNP videos with real latinos smoking and slamming  \n• Exclusive releases starring Santino (x.com/pnpmethdaddy)  \n• Live streams and Zoom Rooms.\n• Unlimited Nearby to explore users around you  \n• Complete music and podcast library  \n\nChoose the plan that fits you best and complete your payment.\nYour membership will be activated automatically.\n\nPayment methods available: debit/credit card, Crypto, and most popular payment apps.`,
     myProfile: '👤 My Profile',
     nearbyUsers: '🌍 Nearby Users',
     liveStreams: '🎤 Live Streams',
@@ -40,20 +66,53 @@ const translations = {
     zoomRooms: '🎥 Zoom Rooms',
     support: '🤖 Support',
     settings: '⚙️ Settings',
-
     // Subscription
+    subscriptionHeader: '`💎 Membership Plans`',
+    subscriptionDivider: '',
+    subscriptionDescription: `Subscribe to PRIME and unlock the full PNPtv! experience and join the hottest Latino PnP community on Telegram — unfiltered, intimate, raw and always active. 🔥
+
+**By becoming a PRIME member, you get instant access to:**
+
+• Full-length videos (Santino + sexy Latino performers)
+• Weekly new content drops
+• Unlimited Nearby access
+• Your community profile card
+• Video Calls & Live Streams with hot performers
+• All PNPtv! channels + the community group
+• Member-only perks and exclusive features
+
+**Cristina**, our chatbot customer support agent, is here to help if you need any assistance.
+
+\`Choose your plan below! 💜\``,
     subscriptionPlans: '💎 Choose Your PRIME Plan:',
-    planBasic: '⭐ Basic - $9.99/month',
-    planPremium: '🌟 Premium - $19.99/month',
-    planGold: '👑 Gold - $29.99/month',
+    planTrial: '⭐ Trial Week',
+    planTrialDesc: '7 days of pure PNP bliss.\nUnlimited access to videos, weekly drops, Nearby, profile tools, radio, hangouts, lives, and video rooms.\n💜 Perfect for first-timers — try EVERYTHING before committing.',
+    planCrystal: '⭐ Crystal PRIME',
+    planCrystalDesc: '180 days with premium glamour.\nFull videos, weekly drops, unlimited Nearby, priority tools, exclusive Crystal events, lives, radio, hangouts, and early feature access.\n✨ Best balance of value + status — shine brighter in the community.',
+    planDiamond: '⭐ Diamond PRIME',
+    planDiamondDesc: 'The elite PNPtv! experience.\nFull video library, premium releases, boosted visibility, Diamond badges, priority Santino access, exclusive streams, hangouts, radio, and private pop-ups.\n💎 For elite members only — the highest-tier, VIP-level access.',
+    planLifetime: '⭐ Lifetime PRIME',
+    planLifetimeDesc: 'Forever access. One single payment.\nFull videos forever, all weekly drops unlocked, unlimited Nearby, all lives, all hangouts, all radio, all video rooms, all events — permanent PRIME badge included.\n♾️ Best deal ever — no renewals, no limits, no expiration, just one time payment.',
+    planMonthly: '⭐ Monthly PRIME',
+    planMonthlyDesc: '30 days of full PNPtv! power.\nFull video access, weekly drops, Nearby, boosted profile, lives, hangouts, radio, and premium tools.\n🔥 Most popular — the standard PRIME experience everyone loves.',
     planDetails: 'Plan Details:',
     selectPlan: 'Select Plan',
     paymentMethod: 'Choose payment method:',
-    payWithEpayco: '💳 Pay with ePayco (USD)',
-    payWithDaimo: '💰 Pay with Daimo (USDC)',
-    paymentInstructions: '💳 Payment Instructions:\n\n'
-      + 'Please click the link below to complete your payment:\n\n{paymentUrl}\n\n'
-      + 'Once payment is confirmed, your subscription will be activated automatically.',
+    payWithEpayco: '💳 Pay with Debit/Credit Card',
+    payWithDaimo: '🪙 Pay with Crypto and Payment Apps',
+    paymentFooter: '',
+    paymentInstructions: '💳 *Payment Instructions*\n\n'
+      + 'Please tap the button below to go to the checkout page.\n'
+      + 'There you\'ll be able to review the price, plan details, and all benefits included before confirming your purchase.\n\n'
+      + 'After confirming, you will be redirected to ePayco\'s secure payment gateway, where you can pay using:\n\n'
+      + '• Debit card\n'
+      + '• Credit card\n'
+      + '• PayPal (via integrated checkout)\n\n'
+      + '*Please remember:*\n\n'
+      + '• The charge will appear on your bank statement as Easy Bots\n'
+      + '• You can review our Terms, Conditions, and Refund Policy at:\n'
+      + 'www.pnptv.app/terms\n\n'
+      + 'If you need help, Cristina — our AI assistant — is here to guide you.',
     paymentSuccess: '✅ Payment successful! Your PRIME subscription is now active. '
       + 'Enjoy premium features!',
     paymentFailed: '❌ Payment failed. Please try again or contact support.',
@@ -89,6 +148,14 @@ const translations = {
     myFavorites: '⭐ My Favorites',
     noFavorites: 'You have no favorites yet.',
     blockedUsers: '🚫 Blocked Users',
+      welcomeScreenPrime: `-----------------------------]
+       Welcome to PNPtv PRIME!
+-------------------------------]
+
+This is your PRIME dashboard.
+From here you can access all your premium features:
+open Zoom Rooms, start live streams, watch full videos,
+explore Nearby without limits, and join private events.`,
     noBlockedUsers: 'You have no blocked users.',
     shareProfile: '📤 Share Profile',
     profileShared: 'Profile card created! Tap to share it.',
@@ -124,7 +191,7 @@ const translations = {
     distance: 'Distance: {distance} km',
 
     // Live Streams
-    liveTitle: '🎤 Live Streams',
+    liveTitle: '`🎤 Live Streams`',
     startLive: '▶️ Start Live Stream',
     viewStreams: '👁️ View Active Streams',
     myStreams: '📹 My Streams',
@@ -209,7 +276,7 @@ const translations = {
     yourEmotes: 'Your Emotes',
 
     // Radio
-    radioTitle: '📻 PNPtv Radio - 24/7',
+    radioTitle: '`📻 PNPtv Radio 24/7`',
     listenNow: '🎧 Listen Now',
     requestSong: '🎵 Request Song',
     nowPlaying: '🎵 Now Playing',
@@ -218,7 +285,7 @@ const translations = {
     songRequested: 'Song request received! We\'ll play it soon.',
     enterSongName: 'Enter song name to request:',
     radio: {
-      description: 'Your 24/7 music streaming experience',
+      description: 'Stream beats, chill vibes, and cloudy tunes all day long! 🎵☁️',
       onAir: 'On Air',
       liveNow: 'Live Now',
       tip: 'Tap the button below to open the stream in your favorite player',
@@ -312,7 +379,7 @@ const translations = {
     },
 
     // Zoom Rooms
-    zoomTitle: '🎥 Zoom Rooms',
+    zoomTitle: '`🎥 Zoom Rooms`',
     createRoom: '➕ Create Room',
     joinRoom: '▶️ Join Room',
     myRooms: '📋 My Rooms',
@@ -328,16 +395,16 @@ const translations = {
     noActiveRooms: 'No active rooms available.',
 
     // Support
-    supportTitle: '🤖 Support Center',
+    supportTitle: '`🆘 Help Center`',
     chatWithCristina: '💬 Chat with Cristina (AI)',
     contactAdmin: '👨‍💼 Contact Admin',
     faq: '❓ FAQ',
-    cristinaGreeting: 'Hi! I\'m Cristina, your AI assistant. How can I help you today?',
+    cristinaGreeting: 'Hi! I\'m Cristina. How can I help you today?',
     adminMessage: 'Please type your message for our support team:',
     messageSent: 'Your message has been sent to our support team. We\'ll get back to you soon!',
 
     // Settings
-    settingsTitle: '⚙️ Settings',
+    settingsTitle: '`⚙️ Settings`',
     changeLanguage: '🌐 Change Language',
     notifications: '🔔 Notifications',
     privacy: '🔒 Privacy',
@@ -350,7 +417,7 @@ const translations = {
     broadcast: '📢 Broadcast Message',
     planManagement: '💎 Plan Management',
     analytics: '📊 Analytics',
-    searchUser: 'Enter user ID or username to search:',
+    searchUser: 'Enter user ID, username, name, or email to search:',
     userFound: 'User found:',
     extendSubscription: '⏰ Extend Subscription',
     deactivateUser: '🚫 Deactivate User',
@@ -422,8 +489,33 @@ const translations = {
     },
   },
   es: {
+        groupRedirect: ({ username, command, botUsername }) =>
+          `@${username} Te envié un mensaje privado sobre tu solicitud. Por favor revísalo. Esto es por privacidad y para cumplir con la política anti-spam del grupo.\n\n[Abrir en chat privado con tu solicitud](https://t.me/${botUsername}?start=${command})`,
     // General
     welcome: '👋 ¡Bienvenido a PNPtv!',
+    welcomeScreen: `-----------------------------]
+      Bienvenido a PNPtv! Premium
+-------------------------------]
+
+Este es tu panel de control.
+Desde aqui puedes acceder a todas tus funciones premium:
+abrir Salas Zoom, iniciar transmisiones en vivo, ver videos completos,
+explorar Cercanos sin limites y unirte a eventos privados.`,
+    welcomeScreenFree: `-----------------------------]
+              PNPtv!
+-------------------------------]
+
+Bienvenido a PNPtv!  
+Disfruta la experiencia completa desde aqui.
+
+Desbloquea todas las funciones premium:
+• Videos completos  
+• Transmisiones en vivo  
+• Nearby ilimitado  
+• Salas Zoom  
+• Eventos privados de la comunidad
+
+Toca "Suscribete a PRIME" para obtener acceso inmediato.`,
     back: '🔙 Atrás',
     cancel: '❌ Cancelar',
     next: '➡️ Siguiente',
@@ -431,6 +523,7 @@ const translations = {
     error: '❌ Ocurrió un error. Por favor intenta de nuevo.',
     success: '✅ ¡Éxito!',
     loading: '⏳ Cargando...',
+    days: 'días',
 
     // Onboarding
     selectLanguage: 'Por favor selecciona tu idioma:',
@@ -448,7 +541,7 @@ const translations = {
 
     // Main Menu
     mainMenuIntro: '🎬 Bienvenido a PNPtv - ¡Tu Centro de Entretenimiento!\n\n¿Qué te gustaría hacer?',
-    subscribe: '💎 Suscríbete a PRIME',
+    subscribe: `Suscríbete a PNPtv PRIME\n----------------------------------\n\nÚnete a la plataforma de contenido PNP más intensa, creada por y para la comunidad.\n\nPRIME te da acceso total a:\n• Videos PNP completos con latinos reales fumando y slameando  \n• Estrenos exclusivos protagonizados por Santino (x.com/pnpmethdaddy)  \n• Transmisiones en vivo y Salas Zoom.\n• Nearby ilimitado para explorar usuarios cerca de ti  \n• Biblioteca completa de música y podcasts  \n\nElige el plan que mejor se adapte a ti y completa tu pago.\nTu membresía se activará automáticamente.\n\nMétodos de pago disponibles: tarjeta débito/crédito, Crypto y las apps de pago más populares.`,
     myProfile: '👤 Mi Perfil',
     nearbyUsers: '🌍 Usuarios Cercanos',
     liveStreams: '🎤 Transmisiones en Vivo',
@@ -457,20 +550,53 @@ const translations = {
     zoomRooms: '🎥 Salas Zoom',
     support: '🤖 Soporte',
     settings: '⚙️ Configuración',
-
     // Subscription
+    subscriptionHeader: '`💎 Planes de Membresía`',
+    subscriptionDivider: '',
+    subscriptionDescription: `Suscríbete a PRIME y desbloquea la experiencia completa de PNPtv! y únete a la comunidad Latina PnP más hot de Telegram — sin filtros, íntima, cruda y siempre activa. 🔥
+
+**Al convertirte en miembro PRIME, obtienes acceso instantáneo a:**
+
+• Videos completos (Santino + sexy performers Latinos)
+• Nuevo contenido cada semana
+• Acceso ilimitado a Cercanos
+• Tu tarjeta de perfil comunitario
+• Video Llamadas y Transmisiones en Vivo con performers hot
+• Todos los canales de PNPtv! + el grupo de la comunidad
+• Beneficios exclusivos y funciones especiales
+
+**Cristina**, nuestra agente de soporte chatbot, está aquí para ayudarte si necesitas asistencia.
+
+\`¡Elige tu plan abajo! 💜\``,
     subscriptionPlans: '💎 Elige tu Plan PRIME:',
-    planBasic: '⭐ Básico - $9.99/mes',
-    planPremium: '🌟 Premium - $19.99/mes',
-    planGold: '👑 Gold - $29.99/mes',
+    planTrial: '⭐ Semana de Prueba',
+    planTrialDesc: '7 días de puro placer PNP.\nAcceso ilimitado a videos, estrenos semanales, Cercanos, herramientas de perfil, radio, hangouts, lives y salas de video.\n💜 Perfecto para nuevos — prueba TODO antes de comprometerte.',
+    planCrystal: '⭐ Crystal PRIME',
+    planCrystalDesc: '180 días con glamour premium.\nVideos completos, estrenos semanales, Cercanos ilimitado, herramientas prioritarias, eventos Crystal exclusivos, lives, radio, hangouts y acceso anticipado a funciones.\n✨ Mejor balance de valor + estatus — brilla más en la comunidad.',
+    planDiamond: '⭐ Diamond PRIME',
+    planDiamondDesc: 'La experiencia elite de PNPtv!\nBiblioteca completa de videos, estrenos premium, visibilidad aumentada, insignias Diamond, acceso prioritario a Santino, streams exclusivos, hangouts, radio y pop-ups privados.\n💎 Solo para miembros elite — el acceso de más alto nivel VIP.',
+    planLifetime: '⭐ Lifetime PRIME',
+    planLifetimeDesc: 'Acceso para siempre. Un solo pago.\nVideos completos para siempre, todos los estrenos semanales, Cercanos ilimitado, todos los lives, hangouts, radio, salas de video, eventos — insignia PRIME permanente incluida.\n♾️ Mejor oferta — sin renovaciones, sin límites, sin expiración, solo un pago.',
+    planMonthly: '⭐ Monthly PRIME',
+    planMonthlyDesc: '30 días de poder completo PNPtv!\nAcceso completo a videos, estrenos semanales, Cercanos, perfil mejorado, lives, hangouts, radio y herramientas premium.\n🔥 Más popular — la experiencia PRIME estándar que todos aman.',
     planDetails: 'Detalles del Plan:',
     selectPlan: 'Seleccionar Plan',
     paymentMethod: 'Elige método de pago:',
-    payWithEpayco: '💳 Pagar con ePayco (USD)',
-    payWithDaimo: '💰 Pagar con Daimo (USDC)',
-    paymentInstructions: '💳 Instrucciones de Pago:\n\n'
-      + 'Por favor haz clic en el enlace para completar tu pago:\n\n{paymentUrl}\n\n'
-      + 'Una vez confirmado el pago, tu suscripción se activará automáticamente.',
+    payWithEpayco: '💳 Pagar con Tarjeta Débito/Crédito',
+    payWithDaimo: '🪙 Pagar con Crypto y Apps de Pago',
+    paymentFooter: '',
+    paymentInstructions: '💳 *Instrucciones de Pago*\n\n'
+      + 'Por favor toca el botón de abajo para ir a la página de checkout.\n'
+      + 'Ahí podrás revisar el precio, los detalles del plan y todos los beneficios incluidos antes de confirmar tu compra.\n\n'
+      + 'Después de confirmar, serás redirigido a la pasarela de pago segura de ePayco, donde puedes pagar usando:\n\n'
+      + '• Tarjeta de débito\n'
+      + '• Tarjeta de crédito\n'
+      + '• PayPal (vía checkout integrado)\n\n'
+      + '*Por favor recuerda:*\n\n'
+      + '• El cargo aparecerá en tu estado de cuenta bancario como Easy Bots\n'
+      + '• Puedes revisar nuestros Términos, Condiciones y Política de Reembolso en:\n'
+      + 'www.pnptv.app/terms\n\n'
+      + 'Si necesitas ayuda, Cristina — nuestra asistente AI — está aquí para guiarte.',
     paymentSuccess: '✅ ¡Pago exitoso! Tu suscripción PRIME está activa. '
       + '¡Disfruta las funciones premium!',
     paymentFailed: '❌ Pago fallido. Por favor intenta de nuevo o contacta soporte.',
@@ -506,6 +632,14 @@ const translations = {
     myFavorites: '⭐ Mis Favoritos',
     noFavorites: 'Aún no tienes favoritos.',
     blockedUsers: '🚫 Usuarios Bloqueados',
+      welcomeScreenPrime: `-----------------------------]
+      Bienvenido a PNPtv PRIME!
+-------------------------------]
+
+Este es tu panel PRIME.
+Desde aqui puedes acceder a todas tus funciones premium:
+abrir Salas Zoom, iniciar transmisiones en vivo, ver videos completos,
+explorar Cercanos sin limites y unirte a eventos privados.`,
     noBlockedUsers: 'No tienes usuarios bloqueados.',
     shareProfile: '📤 Compartir Perfil',
     profileShared: '¡Tarjeta de perfil creada! Toca para compartirla.',
@@ -541,7 +675,7 @@ const translations = {
     distance: 'Distancia: {distance} km',
 
     // Live Streams
-    liveTitle: '🎤 Transmisiones en Vivo',
+    liveTitle: '`🎤 Transmisiones en Vivo`',
     startLive: '▶️ Iniciar Transmisión',
     viewStreams: '👁️ Ver Transmisiones Activas',
     myStreams: '📹 Mis Transmisiones',
@@ -629,7 +763,7 @@ const translations = {
     yourEmotes: 'Tus Emotes',
 
     // Radio
-    radioTitle: '📻 Radio PNPtv - 24/7',
+    radioTitle: '`📻 Radio PNPtv 24/7`',
     listenNow: '🎧 Escuchar Ahora',
     requestSong: '🎵 Pedir Canción',
     nowPlaying: '🎵 Sonando Ahora',
@@ -638,7 +772,7 @@ const translations = {
     songRequested: '¡Solicitud de canción recibida! La reproduciremos pronto.',
     enterSongName: 'Ingresa el nombre de la canción:',
     radio: {
-      description: 'Tu experiencia de streaming musical 24/7',
+      description: '¡Música, vibes relajantes y tonos cloudys todo el día! 🎵☁️',
       onAir: 'Al Aire',
       liveNow: 'En Vivo Ahora',
       tip: 'Toca el botón de abajo para abrir el stream en tu '
@@ -733,7 +867,7 @@ const translations = {
     },
 
     // Zoom Rooms
-    zoomTitle: '🎥 Salas Zoom',
+    zoomTitle: '`🎥 Salas Zoom`',
     createRoom: '➕ Crear Sala',
     joinRoom: '▶️ Unirse a Sala',
     myRooms: '📋 Mis Salas',
@@ -750,16 +884,16 @@ const translations = {
     noActiveRooms: 'No hay salas activas disponibles.',
 
     // Support
-    supportTitle: '🤖 Centro de Soporte',
+    supportTitle: '`🆘 Centro de Ayuda`',
     chatWithCristina: '💬 Chat con Cristina (IA)',
     contactAdmin: '👨‍💼 Contactar Admin',
     faq: '❓ Preguntas Frecuentes',
-    cristinaGreeting: '¡Hola! Soy Cristina, tu asistente IA. ¿Cómo puedo ayudarte hoy?',
+    cristinaGreeting: '¡Hola! Soy Cristina. ¿Cómo puedo ayudarte hoy?',
     adminMessage: 'Por favor escribe tu mensaje para nuestro equipo de soporte:',
     messageSent: '¡Tu mensaje ha sido enviado a nuestro equipo de soporte! Te responderemos pronto.',
 
     // Settings
-    settingsTitle: '⚙️ Configuración',
+    settingsTitle: '`⚙️ Configuración`',
     changeLanguage: '🌐 Cambiar Idioma',
     notifications: '🔔 Notificaciones',
     privacy: '🔒 Privacidad',
@@ -772,7 +906,7 @@ const translations = {
     broadcast: '📢 Mensaje de Difusión',
     planManagement: '💎 Gestión de Planes',
     analytics: '📊 Analíticas',
-    searchUser: 'Ingresa ID o nombre de usuario para buscar:',
+    searchUser: 'Ingresa ID, usuario, nombre o email para buscar:',
     userFound: 'Usuario encontrado:',
     extendSubscription: '⏰ Extender Suscripción',
     deactivateUser: '🚫 Desactivar Usuario',
@@ -854,12 +988,22 @@ const translations = {
  */
 const t = (key, lang = 'en', params = {}) => {
   const language = lang || 'en';
-  let text = translations[language]?.[key] || translations.en[key] || key;
+
+  // Support nested keys like 'moderation.username_required'
+  const getNestedValue = (obj, keyPath) => {
+    return keyPath.split('.').reduce((current, k) => current?.[k], obj);
+  };
+
+  let text = getNestedValue(translations[language], key)
+    || getNestedValue(translations.en, key)
+    || key;
 
   // Replace parameters
-  Object.keys(params).forEach((param) => {
-    text = text.replace(`{${param}}`, params[param]);
-  });
+  if (typeof text === 'string') {
+    Object.keys(params).forEach((param) => {
+      text = text.replace(`{${param}}`, params[param]);
+    });
+  }
 
   return text;
 };
