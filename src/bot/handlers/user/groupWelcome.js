@@ -1,119 +1,145 @@
 const { Markup } = require('telegraf');
 const UserModel = require('../../../models/userModel');
+const ChatCleanupService = require('../../services/chatCleanupService');
 const logger = require('../../../utils/logger');
 
-// Configuration
-const GROUP_ID = process.env.GROUP_ID;
-const AUTO_DELETE_DELAY = 3 * 60 * 1000; // 3 minutes
-
-// Deduplication: track recently processed joins to avoid duplicate welcomes
-const recentJoins = new Map(); // Map<`${chatId}_${userId}`, timestamp>
-const DEDUPE_WINDOW = 5 * 60 * 1000; // 5 minutes window to prevent duplicates (increased from 60s)
-
-// Cleanup old entries every 10 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, timestamp] of recentJoins.entries()) {
-    if (now - timestamp > DEDUPE_WINDOW) {
-      recentJoins.delete(key);
-    }
-  }
-}, 10 * 60 * 1000);
-
-// Badge options with emojis and descriptions
+/**
+ * Badge options for "Which vibe are you?"
+ */
 const BADGE_OPTIONS = {
-  meth_alpha: { emoji: '🔥', name: 'Meth Alpha', description: 'The fire starter' },
-  chem_mermaids: { emoji: '🧜', name: 'Chem Mermaids', description: 'Flow with the current' },
-  slam_slut: { emoji: '💉', name: 'Slam Slut', description: 'Unapologetically intense' },
-  spun_royal: { emoji: '👑', name: 'Spun Royal', description: 'Elevated and exclusive' },
+  meth_alpha: { emoji: '🔥', name: 'Meth Alpha' },
+  chem_mermaids: { emoji: '🧜', name: 'Chem Mermaids' },
+  slam_slut: { emoji: '💉', name: 'Slam Slut' },
+  spun_royal: { emoji: '👑', name: 'Spun Royal' },
 };
 
 /**
- * Send welcome message to new member
+ * Register group welcome handlers
+ * @param {Telegraf} bot - Bot instance
  */
-async function sendWelcomeMessage(ctx, newMember) {
+const registerGroupWelcomeHandlers = (bot) => {
+  // Handle new members joining the group
+  bot.on('new_chat_members', handleNewMembers);
+
+  // Handle badge selection
+  bot.action(/^badge_select_(.+)$/, handleBadgeSelection);
+
+  // Handle view rules button
+  bot.action('group_view_rules', handleViewRules);
+};
+
+/**
+ * Handle new members joining the group
+ */
+async function handleNewMembers(ctx) {
   try {
-    const username = newMember.first_name || 'there';
-    const userId = newMember.id;
+    const chatType = ctx.chat?.type;
 
-    // Get user's subscription status
-    let subscriptionStatus = 'FREE Member';
-    try {
-      const user = await UserModel.findByTelegramId(userId);
-      if (user?.subscription?.isPrime) {
-        subscriptionStatus = '💎 PRIME Member';
-      }
-    } catch (error) {
-      logger.debug('Could not fetch user subscription status:', error.message);
+    // Only works in groups
+    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+      return;
     }
 
-    // Detect language (default to English)
-    const userLang = newMember.language_code || 'en';
-    const isSpanish = userLang.startsWith('es');
+    const newMembers = ctx.message?.new_chat_members || [];
 
-    let message;
-    if (isSpanish) {
-      message = `👋 Hola ${username}, ¡bienvenido a PNPtv!
+    // Process each new member
+    for (const member of newMembers) {
+      // Skip bots
+      if (member.is_bot) continue;
 
-Te acabas de unir a una de las comunidades más reales que existen — sin filtros, sin juicios, solo vibras.
+      // Get or create user
+      const user = await UserModel.createOrUpdate({
+        userId: member.id,
+        username: member.username,
+        firstName: member.first_name,
+        lastName: member.last_name,
+      });
 
-⭐ TU MEMBRESÍA: ${subscriptionStatus}
+      if (!user) {
+        logger.error('Failed to get/create user for new member', { userId: member.id });
+        continue;
+      }
 
-🎁 Lo que obtienes ahora mismo:
-• Acceso completo al grupo
-• Biblioteca de música gratis
-• 3 vistas de Miembros Cercanos por día
-• Vistas previas de videos cortos
+      const lang = user.language || 'en';
+      const username = member.username ? `@${member.username}` : member.first_name;
 
-💎 ¿Quieres más? Activa PRIME y desbloquea:
-• Miembros Cercanos ilimitados
-• Videos exclusivos completos de Santino, Lex y el equipo
-• Presentaciones en vivo + llamadas privadas de Zoom
-• Música y podcasts premium
-• Cero anuncios, acceso total
+      // Send welcome message
+      await sendWelcomeMessage(ctx, username, user, lang);
 
-Escribe /menu para explorar todo 🚀`;
-    } else {
-      message = `👋 Hey ${username}, welcome to PNPtv!
+      // Send badge selection message
+      await sendBadgeSelectionMessage(ctx, username, lang);
+    }
+  } catch (error) {
+    logger.error('Error handling new members:', error);
+  }
+}
 
-You just joined one of the realest communities out there — no filters, no judgment, just vibes.
+/**
+ * Send welcome message with membership info
+ */
+async function sendWelcomeMessage(ctx, username, user, lang) {
+  try {
+    const subscriptionStatus = user.subscriptionStatus === 'active' ? 'PRIME Member' : 'Free Member';
 
-⭐ YOUR MEMBERSHIP: ${subscriptionStatus}
+    const message = lang === 'es'
+      ? `👋 Ey ${username}, bienvenidx a PNPtv!
 
-🎁 What you get right now:
-• Full group access
-• Free music library
-• 3 Nearby Member views per day
-• Short video previews
+Aquí la vuelta es simple: gente real, buena vibra, cero filtro. Antes de meterte de lleno, mira cómo entras hoy:
 
-💎 Want more? Go PRIME and unlock:
+⭐ Tu membresía actual:
+
+${subscriptionStatus}
+
+🔥 Lo que tienes por ahora:
+
+• Acceso al grupo
+• Contenido corto
+• Music Library gratis
+• 3 vistas en Nearby
+
+💎 Si te haces PRIME, desbloqueas:
+
+• Videos completos de Santino, Lex y la comunidad
+• Nearby ilimitado
+• Zoom Calls + Live Performances
+• Música + Podcasts premium
+• Contenido que no sale en ningún otro lado
+
+Si te quieres meter más duro en la comunidad:
+👉 /subscribe`
+      : `👋 Hey ${username}, welcome to PNPtv!
+
+This place is simple: real people, real vibes, no filters. Before you jump in, here's how you're entering today:
+
+⭐ Your current membership:
+
+${subscriptionStatus}
+
+🔥 What you get right now:
+
+• Group access
+• Short content
+• Free Music Library
+• 3 views in Nearby Members
+
+💎 If you go PRIME, you unlock:
+
+• Full-length videos from Santino, Lex, and the community
 • Unlimited Nearby Members
-• Full-length exclusive videos from Santino, Lex & the crew
-• Live performances + private Zoom calls
-• Premium music & podcasts
-• Zero ads, all access
+• Zoom Calls + Live Performances
+• Premium Music & Podcasts
+• Exclusive content you won't see anywhere else
 
-Type /menu to explore everything 🚀`;
-    }
+If you want the full experience:
+👉 /subscribe`;
 
-    // Send to general group chat
-    const sentMessage = await ctx.reply(message);
+    await ctx.reply(message, { parse_mode: 'Markdown' });
 
-    // Auto-delete after 3 minutes
-    setTimeout(async () => {
-      try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-        logger.debug('Welcome message auto-deleted', { messageId: sentMessage.message_id });
-      } catch (error) {
-        logger.debug('Could not delete welcome message:', error.message);
-      }
-    }, AUTO_DELETE_DELAY);
-
-    // Send badge selection after a short delay
-    setTimeout(() => {
-      sendBadgeSelectionMessage(ctx, newMember);
-    }, 2000);
-
+    logger.info('Welcome message sent', {
+      userId: user.userId,
+      chatId: ctx.chat.id,
+      language: lang,
+    });
   } catch (error) {
     logger.error('Error sending welcome message:', error);
   }
@@ -122,70 +148,45 @@ Type /menu to explore everything 🚀`;
 /**
  * Send badge selection message
  */
-async function sendBadgeSelectionMessage(ctx, user) {
+async function sendBadgeSelectionMessage(ctx, username, lang) {
   try {
-    const username = user.first_name || 'there';
-    const userLang = user.language_code || 'en';
-    const isSpanish = userLang.startsWith('es');
+    const message = lang === 'es'
+      ? `👑 Ahora dinos… qué vibra eres tú?
 
-    let message;
-    if (isSpanish) {
-      message = `🎭 ¿Cuál es tu vibra?
+Escoge tu energía y te damos tu primera insignia. Se guarda al instante.`
+      : `👑 Tell us… what's your vibe?
 
-Elige tu tribu — así es como te muestras en la comunidad.
-(No te preocupes, puedes cambiarlo en cualquier momento)
+Pick your energy and get your first badge. It saves instantly.`;
 
-Elige tu insignia abajo ⬇️`;
-    } else {
-      message = `🎭 Which vibe are you?
-
-Pick your tribe — this is how you show up in the community.
-(Don't stress, you can change it anytime)
-
-Choose your badge below ⬇️`;
-    }
-
-    // Create inline keyboard with badge options
     const keyboard = Markup.inlineKeyboard([
       [
         Markup.button.callback(
-          `${BADGE_OPTIONS.meth_alpha.emoji} ${BADGE_OPTIONS.meth_alpha.name} — ${BADGE_OPTIONS.meth_alpha.description}`,
+          `${BADGE_OPTIONS.meth_alpha.emoji} ${BADGE_OPTIONS.meth_alpha.name}`,
           'badge_select_meth_alpha'
         ),
-      ],
-      [
         Markup.button.callback(
-          `${BADGE_OPTIONS.chem_mermaids.emoji} ${BADGE_OPTIONS.chem_mermaids.name} — ${BADGE_OPTIONS.chem_mermaids.description}`,
+          `${BADGE_OPTIONS.chem_mermaids.emoji} ${BADGE_OPTIONS.chem_mermaids.name}`,
           'badge_select_chem_mermaids'
         ),
       ],
       [
         Markup.button.callback(
-          `${BADGE_OPTIONS.slam_slut.emoji} ${BADGE_OPTIONS.slam_slut.name} — ${BADGE_OPTIONS.slam_slut.description}`,
+          `${BADGE_OPTIONS.slam_slut.emoji} ${BADGE_OPTIONS.slam_slut.name}`,
           'badge_select_slam_slut'
         ),
-      ],
-      [
         Markup.button.callback(
-          `${BADGE_OPTIONS.spun_royal.emoji} ${BADGE_OPTIONS.spun_royal.name} — ${BADGE_OPTIONS.spun_royal.description}`,
+          `${BADGE_OPTIONS.spun_royal.emoji} ${BADGE_OPTIONS.spun_royal.name}`,
           'badge_select_spun_royal'
         ),
       ],
     ]);
 
-    // Send to general group chat
-    const sentMessage = await ctx.reply(message, keyboard);
+    await ctx.reply(message, keyboard);
 
-    // Auto-delete after 3 minutes
-    setTimeout(async () => {
-      try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-        logger.debug('Badge selection message auto-deleted', { messageId: sentMessage.message_id });
-      } catch (error) {
-        logger.debug('Could not delete badge selection message:', error.message);
-      }
-    }, AUTO_DELETE_DELAY);
-
+    logger.info('Badge selection message sent', {
+      chatId: ctx.chat.id,
+      language: lang,
+    });
   } catch (error) {
     logger.error('Error sending badge selection message:', error);
   }
@@ -196,400 +197,159 @@ Choose your badge below ⬇️`;
  */
 async function handleBadgeSelection(ctx) {
   try {
-    const userId = ctx.from.id;
-    const username = ctx.from.first_name || 'Member';
-    const badgeKey = ctx.match[1]; // Extract badge key from callback data
-
-    if (!BADGE_OPTIONS[badgeKey]) {
-      logger.warn('Invalid badge selection:', badgeKey);
+    if (!ctx.match || !ctx.match[1]) {
+      logger.error('Invalid badge selection format');
       return;
     }
 
+    const badgeKey = ctx.match[1];
     const badge = BADGE_OPTIONS[badgeKey];
 
-    // Save badge to user profile
-    try {
-      await UserModel.addBadge(userId, badgeKey);
-      logger.info('Badge added to user profile', { userId, badge: badgeKey });
-    } catch (error) {
-      logger.error('Error saving badge to user profile:', error);
+    if (!badge) {
+      logger.error('Invalid badge key:', badgeKey);
+      return;
     }
 
-    // Answer the callback query to remove loading state
-    await ctx.answerCbQuery();
+    const userId = ctx.from.id;
+    const user = await UserModel.getById(userId);
+
+    if (!user) {
+      await ctx.answerCbQuery('Error: User not found. Please use /start first.');
+      return;
+    }
+
+    const lang = user.language || 'en';
+    const username = ctx.from.username ? `@${ctx.from.username}` : ctx.from.first_name;
+
+    // Save badge to user profile
+    await UserModel.addBadge(userId, badgeKey);
+
+    // Delete the badge selection message (optional)
+    try {
+      await ctx.deleteMessage();
+    } catch (error) {
+      logger.warn('Could not delete badge selection message:', error);
+    }
 
     // Send congratulations message
-    await sendCongratsMessage(ctx, username, badge);
+    await sendCongratsMessage(ctx, username, badge, lang);
 
+    // Send rules menu
+    await sendRulesMenu(ctx, lang);
+
+    // Answer the callback query
+    await ctx.answerCbQuery(`${badge.emoji} Badge saved!`);
+
+    logger.info('Badge selected and saved', {
+      userId,
+      badge: badgeKey,
+      chatId: ctx.chat.id,
+    });
   } catch (error) {
     logger.error('Error handling badge selection:', error);
-    try {
-      await ctx.answerCbQuery('An error occurred. Please try again.');
-    } catch (cbError) {
-      logger.debug('Could not answer callback query:', cbError.message);
-    }
+    await ctx.answerCbQuery('An error occurred. Please try again.');
   }
 }
 
 /**
  * Send congratulations message after badge selection
  */
-async function sendCongratsMessage(ctx, username, badge) {
+async function sendCongratsMessage(ctx, username, badge, lang) {
   try {
-    const userLang = ctx.from.language_code || 'en';
-    const isSpanish = userLang.startsWith('es');
+    const message = lang === 'es'
+      ? `${badge.emoji} Listo ${username}, ya tienes tu primera insignia.
 
-    let message;
-    if (isSpanish) {
-      message = `🎉 ¡Insignia reclamada!
+Eres ${badge.name} y oficialmente parte de la familia PNPtv!. Aquí ya entraste de verdad.`
+      : `${badge.emoji} Nice ${username} — you just earned your first badge.
 
-@${username} es oficialmente un ${badge.emoji} ${badge.name}
+You're officially a ${badge.name} and now part of the PNPtv! family for real.`;
 
-¡Bienvenido a la familia! 💙`;
-    } else {
-      message = `🎉 Badge claimed!
+    await ctx.reply(message);
 
-@${username} is officially a ${badge.emoji} ${badge.name}
-
-Welcome to the family! 💙`;
-    }
-
-    // Send to general group chat
-    const sentMessage = await ctx.reply(message);
-
-    // Auto-delete after 3 minutes
-    setTimeout(async () => {
-      try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-        logger.debug('Congrats message auto-deleted', { messageId: sentMessage.message_id });
-      } catch (error) {
-        logger.debug('Could not delete congrats message:', error.message);
-      }
-    }, AUTO_DELETE_DELAY);
-
-    // Send action buttons after a short delay
-    setTimeout(() => {
-      sendActionButtons(ctx, username);
-    }, 2000);
-
+    logger.info('Congrats message sent', {
+      userId: ctx.from.id,
+      chatId: ctx.chat.id,
+      badge: badge.name,
+    });
   } catch (error) {
-    logger.error('Error sending congratulations message:', error);
+    logger.error('Error sending congrats message:', error);
   }
 }
 
 /**
- * Send action buttons for next steps
+ * Send rules menu with inline button
  */
-async function sendActionButtons(ctx, username) {
+async function sendRulesMenu(ctx, lang) {
   try {
-    const userLang = ctx.from.language_code || 'en';
-    const isSpanish = userLang.startsWith('es');
+    const buttonText = lang === 'es' ? '📘 Ver Reglas del Grupo' : '📘 View Group Rules';
 
-    let message;
-    if (isSpanish) {
-      message = `🚀 ¿Listo para más?`;
-    } else {
-      message = `🚀 Ready for more?`;
-    }
-
-    // Create inline keyboard with action buttons
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(isSpanish ? '⭐ Activar PRIME' : '⭐ Get PRIME', 'welcome_get_prime')],
-      [Markup.button.callback(isSpanish ? '📞 Reservar Llamada' : '📞 Book a Call', 'welcome_book_call')],
-      [Markup.button.callback(isSpanish ? '👤 Configurar Perfil' : '👤 Setup Profile', 'welcome_setup_profile')],
+      [Markup.button.callback(buttonText, 'group_view_rules')],
     ]);
 
-    // Send to general group chat
-    const sentMessage = await ctx.reply(message, keyboard);
+    await ctx.reply(
+      lang === 'es'
+        ? '📋 Lee las reglas del grupo:'
+        : '📋 Check out the group rules:',
+      keyboard
+    );
 
-    // Auto-delete after 3 minutes
-    setTimeout(async () => {
-      try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-        logger.debug('Action buttons message auto-deleted', { messageId: sentMessage.message_id });
-      } catch (error) {
-        logger.debug('Could not delete action buttons message:', error.message);
-      }
-    }, AUTO_DELETE_DELAY);
-
+    logger.info('Rules menu sent', {
+      chatId: ctx.chat.id,
+      language: lang,
+    });
   } catch (error) {
-    logger.error('Error sending action buttons:', error);
+    logger.error('Error sending rules menu:', error);
   }
 }
 
 /**
- * Handle "Get PRIME" action
+ * Handle view rules button click
  */
-async function handleGetPrimeAction(ctx) {
+async function handleViewRules(ctx) {
   try {
     const userId = ctx.from.id;
-    const userLang = ctx.from.language_code || 'en';
-    const isSpanish = userLang.startsWith('es');
+    const user = await UserModel.getById(userId);
+    const lang = user?.language || 'en';
 
-    const message = `\`💎 Unlock PRIME\`
+    const rulesMessage = lang === 'es'
+      ? `📘 Reglas rápidas del grupo:
 
-Unlock the full PNPtv! experience and join the hottest Latino PnP community on Telegram — unfiltered, intimate, raw, and always active.
+• Respeto
+• Nada de spam
+• Consentimiento siempre
+• No ventas externas
+• Cuídate y cuida a los demás`
+      : `📘 Quick Rules:
 
-**As a PRIME member, you get instant access to:**
+• Respect people
+• No spam
+• Consent always
+• No external selling
+• Take care of yourself and others`;
 
-• Full-length videos (Santino + sexy Latino performers)
-• Weekly new content drops
-• Unlimited Nearby access
-• Your interactive community profile
-• Video Calls & Live Streams with hot performers
-• The ability to host radio podcasts, video call rooms, or live stream shows directly from our platform
-• Member-only perks, exclusive events, and premium tools
+    // Send rules as a reply or edit the message
+    try {
+      await ctx.editMessageText(rulesMessage, { parse_mode: 'Markdown' });
+    } catch {
+      // If editing fails, send as new message
+      const sentMessage = await ctx.reply(rulesMessage, { parse_mode: 'Markdown' });
 
-Choose the plan that fits you best.
-Pay with debit/credit card, crypto, popular pay apps — and soon PayPal.
+      // Auto-delete after 2 minutes
+      ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000);
+    }
 
-\`Membership Plans\``;
-
-    // Create inline keyboard with plan buttons
-    const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('🧪 Trial Week — $14.99 — 7 Days', 'plan_trial')],
-      [Markup.button.callback('💎 Monthly PRIME — $24.99 — 30 Days', 'plan_monthly')],
-      [Markup.button.callback('💠 Crystal PRIME — $49.99 — 90 Days', 'plan_crystal')],
-      [Markup.button.callback('🔥 Diamond PRIME — $99.99 — 180 Days', 'plan_diamond')],
-      [Markup.button.callback('♾️ Lifetime PRIME — $249.99 Promo — Forever', 'plan_lifetime')],
-    ]);
-
-    // Answer the callback query
     await ctx.answerCbQuery();
 
-    // Try to send private message with buttons
-    try {
-      await ctx.telegram.sendMessage(userId, message, {
-        parse_mode: 'Markdown',
-        ...keyboard
-      });
-    } catch (error) {
-      logger.debug('Could not send private message:', error.message);
-
-      // If can't send PM, inform in group
-      const sentMessage = await ctx.reply(message, {
-        parse_mode: 'Markdown',
-        ...keyboard
-      });
-
-      // Auto-delete after 3 minutes
-      setTimeout(async () => {
-        try {
-          await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-          logger.debug('Get PRIME message auto-deleted', { messageId: sentMessage.message_id });
-        } catch (delError) {
-          logger.debug('Could not delete message:', delError.message);
-        }
-      }, AUTO_DELETE_DELAY);
-    }
-
-  } catch (error) {
-    logger.error('Error handling Get PRIME action:', error);
-  }
-}
-
-/**
- * Handle "Book a Call" action
- */
-async function handleBookCallAction(ctx) {
-  try {
-    const message = `\`📹 Book a Video Call\`
-
-**Coming This Weekend!**
-
-Private 1:1 video calls with Santino and other hot performers will be available very soon.
-
-_Stay tuned — this feature drops this weekend!_`;
-
-    // Answer the callback query
-    await ctx.answerCbQuery('Coming this weekend! 🔥', { show_alert: true });
-
-    // Try to send private message
-    try {
-      await ctx.telegram.sendMessage(ctx.from.id, message, { parse_mode: 'Markdown' });
-    } catch (error) {
-      logger.debug('Could not send private message:', error.message);
-
-      // If can't send PM, inform in group
-      const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
-
-      // Auto-delete after 3 minutes
-      setTimeout(async () => {
-        try {
-          await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-          logger.debug('Book Call message auto-deleted', { messageId: sentMessage.message_id });
-        } catch (delError) {
-          logger.debug('Could not delete message:', delError.message);
-        }
-      }, AUTO_DELETE_DELAY);
-    }
-
-  } catch (error) {
-    logger.error('Error handling Book Call action:', error);
-  }
-}
-
-/**
- * Handle "Setup Profile" action
- */
-async function handleSetupProfileAction(ctx) {
-  try {
-    const message = `\`👤 My PNPtv Profile\`
-
-Your PNPtv! profile is your identity inside the community.
-It will be automatically linked under every photo you share in the group, helping other members discover who you are and connect with you.
-
-This section also shows your subscription status and the benefits included in your current membership tier.
-
-**Your profile includes:**
-• Bio, interests, tribe & what you're looking for
-• Your profile picture
-• Your social links
-• Your membership tier and perks
-• A shareable community profile card`;
-
-    // Create inline keyboard with profile options
-    const keyboard = Markup.inlineKeyboard([
-      [
-        Markup.button.callback('📝 Update Profile', 'profile_update_bio'),
-        Markup.button.callback('📸 Update Picture', 'profile_update_picture')
-      ],
-      [
-        Markup.button.callback('🔗 Social Media', 'profile_social_links'),
-        Markup.button.callback('⚙️ Profile Settings', 'profile_settings')
-      ],
-      [
-        Markup.button.callback('🖨️ Print My Profile', 'profile_print_card'),
-        Markup.button.callback('⭐ Apply to PNP Contacto!', 'profile_apply_contacto')
-      ]
-    ]);
-
-    // Answer the callback query
-    await ctx.answerCbQuery();
-
-    // Try to send private message with buttons
-    try {
-      await ctx.telegram.sendMessage(ctx.from.id, message, {
-        parse_mode: 'Markdown',
-        ...keyboard
-      });
-    } catch (error) {
-      logger.debug('Could not send private message:', error.message);
-
-      // If can't send PM, inform in group
-      const sentMessage = await ctx.reply(message, {
-        parse_mode: 'Markdown',
-        ...keyboard
-      });
-
-      // Auto-delete after 3 minutes
-      setTimeout(async () => {
-        try {
-          await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-          logger.debug('Setup Profile message auto-deleted', { messageId: sentMessage.message_id });
-        } catch (delError) {
-          logger.debug('Could not delete message:', delError.message);
-        }
-      }, AUTO_DELETE_DELAY);
-    }
-
-  } catch (error) {
-    logger.error('Error handling Setup Profile action:', error);
-  }
-}
-
-/**
- * Handle new members joining the group
- */
-async function handleNewMembers(ctx) {
-  try {
-    // Only process in the configured group
-    if (GROUP_ID && ctx.chat.id.toString() !== GROUP_ID) {
-      return;
-    }
-
-    const newMembers = ctx.message.new_chat_members;
-    const chatId = ctx.chat.id;
-    const updateId = ctx.update?.update_id;
-
-    logger.info('New chat members event received', {
-      chatId,
-      updateId,
-      memberCount: newMembers?.length,
-      members: newMembers?.map(m => ({ id: m.id, name: m.first_name }))
+    logger.info('Rules displayed', {
+      userId,
+      chatId: ctx.chat.id,
+      language: lang,
     });
-
-    for (const member of newMembers) {
-      // Skip if the new member is a bot
-      if (member.is_bot) {
-        logger.debug('Skipping bot member', { botId: member.id });
-        continue;
-      }
-
-      // Deduplication check - prevent duplicate welcome messages
-      const dedupeKey = `${chatId}_${member.id}`;
-      const lastJoinTime = recentJoins.get(dedupeKey);
-      const now = Date.now();
-
-      if (lastJoinTime && (now - lastJoinTime) < DEDUPE_WINDOW) {
-        logger.warn('DUPLICATE WELCOME PREVENTED', { 
-          userId: member.id, 
-          chatId,
-          updateId,
-          timeSinceLastJoin: now - lastJoinTime,
-          dedupeKey
-        });
-        continue;
-      }
-
-      // Mark this join as processed BEFORE sending messages
-      recentJoins.set(dedupeKey, now);
-      logger.info('Processing new member welcome', { 
-        userId: member.id, 
-        username: member.first_name,
-        dedupeKey,
-        updateId
-      });
-
-      // Create or update user in database
-      try {
-        await UserModel.createOrUpdate({
-          telegramId: member.id,
-          username: member.username,
-          firstName: member.first_name,
-          lastName: member.last_name,
-        });
-        logger.info('User created/updated on join', { userId: member.id });
-      } catch (error) {
-        logger.error('Error creating/updating user:', error);
-      }
-
-      // Send welcome message
-      await sendWelcomeMessage(ctx, member);
-    }
-
   } catch (error) {
-    logger.error('Error handling new members:', error);
+    logger.error('Error handling view rules:', error);
+    await ctx.answerCbQuery('Error loading rules. Please try again.');
   }
 }
-
-/**
- * Register group welcome handlers
- * @param {Telegraf} bot - Bot instance
- */
-const registerGroupWelcomeHandlers = (bot) => {
-  // Handle new members joining
-  bot.on('new_chat_members', handleNewMembers);
-
-  // Handle badge selection callbacks
-  bot.action(/^badge_select_(.+)$/, handleBadgeSelection);
-
-  // Handle action button callbacks
-  bot.action('welcome_get_prime', handleGetPrimeAction);
-  bot.action('welcome_book_call', handleBookCallAction);
-  bot.action('welcome_setup_profile', handleSetupProfileAction);
-
-  logger.info('Group welcome handlers registered');
-};
 
 module.exports = registerGroupWelcomeHandlers;

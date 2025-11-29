@@ -30,10 +30,8 @@ const registerLiveStreamManagementHandlers = (bot) => {
       await ctx.editMessageText(
         '📺 Gestión de Transmisiones en Vivo',
         Markup.inlineKeyboard([
-          [Markup.button.callback('➕ Crear Transmisión', 'admin_live_create')],
           [Markup.button.callback('🔴 Transmisiones Activas', 'admin_live_active')],
           [Markup.button.callback('📊 Estadísticas', 'admin_live_stats')],
-          [Markup.button.callback('📹 VODs Grabados', 'admin_live_vods')],
           [Markup.button.callback('🗑 Gestionar Todas', 'admin_live_all')],
           [Markup.button.callback('🎭 Aprobar Emotes', 'admin_emote_approval')],
           [Markup.button.callback('◀️ Volver', 'admin_cancel')],
@@ -227,7 +225,6 @@ const registerLiveStreamManagementHandlers = (bot) => {
         buttons.push([Markup.button.callback('🛑 Finalizar Transmisión', `admin_stream_end_${streamId}`)]);
       }
 
-      buttons.push([Markup.button.callback('✏️ Editar Transmisión', `admin_stream_edit_${streamId}`)]);
       buttons.push([Markup.button.callback('🗑 Eliminar Transmisión', `admin_stream_delete_${streamId}`)]);
       buttons.push([Markup.button.callback('◀️ Volver', 'admin_live_active')]);
 
@@ -605,6 +602,8 @@ const registerLiveStreamManagementHandlers = (bot) => {
       await ctx.reply('Error rejecting emote');
     }
   });
+<<<<<<< HEAD
+=======
 
   // ============= CREATE STREAM =============
   // Create stream - Step 1: Ask for host ID
@@ -1376,6 +1375,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
       logger.error('Error in immediate stream creation:', error);
     }
   });
+>>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1
 };
 
 module.exports = registerLiveStreamManagementHandlers;

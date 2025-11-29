@@ -1,42 +1,13 @@
-const { query } = require('../config/postgres');
+const { getFirestore } = require('../config/firebase');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
-const TABLE = 'menu_configs';
+const COLLECTION = 'menu_configs';
 
 /**
  * Menu Config Model - Handles menu configuration and customization
  */
 class MenuConfigModel {
-  /**
-   * Convert database row to API format (camelCase)
-   * @param {Object} row - Database row
-   * @returns {Object} Formatted menu config
-   */
-  static formatMenuConfig(row) {
-    if (!row) return null;
-
-    return {
-      id: row.id,
-      menuId: row.menu_id,
-      name: row.name,
-      nameEs: row.name_es,
-      parentId: row.parent_id,
-      status: row.status,
-      allowedTiers: row.allowed_tiers || [],
-      order: row.order_position,
-      icon: row.icon,
-      action: row.action,
-      type: row.type,
-      actionType: row.action_type,
-      actionData: row.action_data || {},
-      customizable: row.customizable,
-      deletable: row.deletable,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    };
-  }
-
   /**
    * Get all menu configurations (with caching)
    * @returns {Promise<Array>} All menu configs
@@ -48,12 +19,15 @@ class MenuConfigModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query(
-            `SELECT * FROM ${TABLE} ORDER BY order_position ASC`,
-            []
-          );
+          const db = getFirestore();
+          const snapshot = await db.collection(COLLECTION)
+            .orderBy('order', 'asc')
+            .get();
 
-          const menus = result.rows.map(row => this.formatMenuConfig(row));
+          const menus = [];
+          snapshot.forEach((doc) => {
+            menus.push({ id: doc.id, ...doc.data() });
+          });
 
           logger.info(`Fetched ${menus.length} menu configs from database`);
 
@@ -80,17 +54,15 @@ class MenuConfigModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query(
-            `SELECT * FROM ${TABLE} WHERE id = $1`,
-            [menuId]
-          );
+          const db = getFirestore();
+          const doc = await db.collection(COLLECTION).doc(menuId).get();
 
-          if (result.rows.length === 0) {
+          if (!doc.exists) {
             logger.warn(`Menu config not found: ${menuId}`);
             return null;
           }
 
-          return this.formatMenuConfig(result.rows[0]);
+          return { id: doc.id, ...doc.data() };
         },
         1800, // Cache for 30 minutes
       );
@@ -108,80 +80,26 @@ class MenuConfigModel {
    */
   static async createOrUpdate(menuId, menuData) {
     try {
-      const now = new Date();
+      const db = getFirestore();
+      const menuRef = db.collection(COLLECTION).doc(menuId);
 
-      // Prepare data with proper field names
       const data = {
-        id: menuId,
-        menu_id: menuData.menuId || menuId,
-        name: menuData.name,
-        name_es: menuData.nameEs || menuData.name_es,
-        parent_id: menuData.parentId || menuData.parent_id || null,
-        status: menuData.status || 'active',
-        allowed_tiers: menuData.allowedTiers || menuData.allowed_tiers || [],
-        order_position: menuData.order || menuData.order_position || 0,
-        icon: menuData.icon || null,
-        action: menuData.action || null,
-        type: menuData.type || 'default',
-        action_type: menuData.actionType || menuData.action_type || null,
-        action_data: menuData.actionData || menuData.action_data || {},
-        customizable: menuData.customizable !== undefined ? menuData.customizable : true,
-        deletable: menuData.deletable !== undefined ? menuData.deletable : true,
-        updated_at: now,
+        ...menuData,
+        updatedAt: new Date(),
       };
 
-      // Use INSERT ... ON CONFLICT UPDATE for upsert
-      const result = await query(
-        `INSERT INTO ${TABLE} (
-          id, menu_id, name, name_es, parent_id, status, allowed_tiers,
-          order_position, icon, action, type, action_type, action_data,
-          customizable, deletable, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          menu_id = EXCLUDED.menu_id,
-          name = EXCLUDED.name,
-          name_es = EXCLUDED.name_es,
-          parent_id = EXCLUDED.parent_id,
-          status = EXCLUDED.status,
-          allowed_tiers = EXCLUDED.allowed_tiers,
-          order_position = EXCLUDED.order_position,
-          icon = EXCLUDED.icon,
-          action = EXCLUDED.action,
-          type = EXCLUDED.type,
-          action_type = EXCLUDED.action_type,
-          action_data = EXCLUDED.action_data,
-          customizable = EXCLUDED.customizable,
-          deletable = EXCLUDED.deletable,
-          updated_at = EXCLUDED.updated_at
-        RETURNING *`,
-        [
-          data.id,
-          data.menu_id,
-          data.name,
-          data.name_es,
-          data.parent_id,
-          data.status,
-          data.allowed_tiers,
-          data.order_position,
-          data.icon,
-          data.action,
-          data.type,
-          data.action_type,
-          data.action_data,
-          data.customizable,
-          data.deletable,
-          now, // created_at
-          data.updated_at,
-        ]
-      );
+      const doc = await menuRef.get();
+      if (!doc.exists) {
+        data.createdAt = new Date();
+      }
+
+      await menuRef.set(data, { merge: true });
 
       // Invalidate cache
       await this.invalidateCache();
 
       logger.info('Menu config created/updated', { menuId });
-      return this.formatMenuConfig(result.rows[0]);
+      return { id: menuId, ...data };
     } catch (error) {
       logger.error('Error creating/updating menu config:', error);
       throw error;
@@ -202,16 +120,14 @@ class MenuConfigModel {
         return false;
       }
 
-      const result = await query(
-        `DELETE FROM ${TABLE} WHERE id = $1`,
-        [menuId]
-      );
+      const db = getFirestore();
+      await db.collection(COLLECTION).doc(menuId).delete();
 
       // Invalidate cache
       await this.invalidateCache();
 
       logger.info('Menu config deleted', { menuId });
-      return result.rowCount > 0;
+      return true;
     } catch (error) {
       logger.error('Error deleting menu config:', error);
       return false;
@@ -464,15 +380,17 @@ class MenuConfigModel {
    */
   static async reorderMenus(menuIds) {
     try {
+      const db = getFirestore();
+
       // Update order for each menu
       for (let i = 0; i < menuIds.length; i++) {
         const menuId = menuIds[i];
-        await query(
-          `UPDATE ${TABLE}
-           SET order_position = $1, updated_at = $2
-           WHERE id = $3`,
-          [i + 1, new Date(), menuId]
-        );
+        const menuRef = db.collection(COLLECTION).doc(menuId);
+
+        await menuRef.update({
+          order: i + 1,
+          updatedAt: new Date(),
+        });
       }
 
       // Invalidate cache

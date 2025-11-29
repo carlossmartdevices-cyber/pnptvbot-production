@@ -3,65 +3,12 @@ const UserModel = require('../../../models/userModel');
 const ChatCleanupService = require('../../services/chatCleanupService');
 const logger = require('../../../utils/logger');
 const { t } = require('../../../utils/i18n');
-const MODERATION_CONFIG = require('../../../config/moderationConfig');
-
-/**
- * Validate username against moderation rules
- */
-function validateUsername(username, firstName) {
-  if (!MODERATION_CONFIG.FILTERS.USERNAME.enabled) {
-    return { valid: true };
-  }
-
-  const displayName = username || firstName || '';
-  const config = MODERATION_CONFIG.FILTERS.USERNAME;
-
-  // Check length
-  if (displayName.length < config.minLength) {
-    return {
-      valid: false,
-      reason: `Username too short (min ${config.minLength} characters)`,
-    };
-  }
-
-  if (displayName.length > config.maxLength) {
-    return {
-      valid: false,
-      reason: `Username too long (max ${config.maxLength} characters)`,
-    };
-  }
-
-  // Check blacklist
-  const lowerName = displayName.toLowerCase();
-  for (const blacklisted of config.blacklist) {
-    if (lowerName.includes(blacklisted.toLowerCase())) {
-      return {
-        valid: false,
-        reason: 'Username contains prohibited words',
-      };
-    }
-  }
-
-  // Check for emoji (if not allowed)
-  if (!config.allowEmojis) {
-    const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
-    if (emojiRegex.test(displayName)) {
-      return {
-        valid: false,
-        reason: 'Emojis are not allowed in usernames',
-      };
-    }
-  }
-
-  return { valid: true };
-}
 
 /**
  * Username enforcement middleware
  * - Requires users to have a username in groups
  * - Detects and logs username changes
  * - Notifies admins of suspicious changes
- * - Validates usernames against moderation rules
  *
  * @returns {Function} Middleware function
  */
@@ -114,16 +61,12 @@ const usernameEnforcement = () => {
         return;
       }
 
-      // Validate username against moderation rules
-      const validation = validateUsername(currentUsername, ctx.from?.first_name);
-      if (!validation.valid && !isAdmin) {
-        await handleInvalidUsername(ctx, userId, currentUsername, validation.reason, groupId);
-        // Don't call next() - block the message
-        return;
-      }
-
       // Continue with message processing
+<<<<<<< HEAD
+      await next();
+=======
       return next();
+>>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1
     } catch (error) {
       logger.error('Username enforcement error:', error);
       // On error, allow message through to avoid blocking legitimate users
@@ -166,13 +109,32 @@ async function handleUsernameChange(ctx, userId, oldUsername, newUsername, group
     });
 
     // Check if this is a recent change (within 24 hours)
-    const changeCount = await ModerationModel.countRecentUsernameChanges(userId, 24);
+    const hasRecentChange = await ModerationModel.hasRecentUsernameChange(userId, 24);
 
-    // Username change notifications disabled
-    // if (changeCount > 1) {
-    //   // Notify support group admins about suspicious activity (not in group chat)
-    //   await notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId, changeCount);
-    // }
+    if (hasRecentChange) {
+      // Notify group admins about suspicious activity
+      await notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId);
+    }
+
+    // Send notification in group (will be auto-deleted)
+    const firstName = ctx.from?.first_name || 'User';
+    const lang = ctx.session?.language || 'en';
+
+    let notificationMessage = '🔔 **Username Change Detected**\n\n';
+    notificationMessage += `👤 **User:** ${firstName}\n`;
+    notificationMessage += `📝 **Previous:** @${oldUsername || 'none'}\n`;
+    notificationMessage += `📝 **Current:** @${newUsername || 'none'}\n`;
+
+    if (hasRecentChange) {
+      notificationMessage += '\n⚠️ **Warning:** Multiple username changes detected within 24 hours.';
+    }
+
+    const sentMessage = await ctx.reply(notificationMessage, {
+      parse_mode: 'Markdown',
+    });
+
+    // Auto-delete notification after 30 seconds
+    ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 30000);
   } catch (error) {
     logger.error('Error handling username change:', error);
   }
@@ -190,11 +152,7 @@ async function handleNoUsername(ctx, userId, groupId) {
     try {
       await ctx.deleteMessage();
     } catch (error) {
-      if (error.message && error.message.includes('message to delete not found')) {
-        logger.debug('Message to delete not found, ignoring.');
-      } else {
-        logger.debug('Could not delete message from user without username:', error.message);
-      }
+      logger.debug('Could not delete message from user without username:', error.message);
     }
 
     // Send warning message
@@ -208,8 +166,6 @@ async function handleNoUsername(ctx, userId, groupId) {
     warningMessage += '4. Return to this group once set\n\n';
     warningMessage += 'Your messages will be deleted until you set a username.';
 
-    // Sanitize warningMessage for Markdown
-    warningMessage = warningMessage.replace(/([*_`])/g, '\\$1');
     const sentMessage = await ctx.reply(warningMessage, {
       parse_mode: 'Markdown',
     });
@@ -219,13 +175,11 @@ async function handleNoUsername(ctx, userId, groupId) {
 
     // Try to send private message
     try {
-      let pmMsg = '⚠️ **Username Required**\n\n'
-        + `You need to set a Telegram username (@username) to participate in **${ctx.chat.title}**.\n\n`
-        + 'Please set your username in Settings and return to the group.';
-      pmMsg = pmMsg.replace(/([*_`])/g, '\\$1');
       await ctx.telegram.sendMessage(
         userId,
-        pmMsg,
+        '⚠️ **Username Required**\n\n'
+        + `You need to set a Telegram username (@username) to participate in **${ctx.chat.title}**.\n\n`
+        + 'Please set your username in Settings and return to the group.',
         { parse_mode: 'Markdown' },
       );
     } catch (error) {
@@ -248,107 +202,46 @@ async function handleNoUsername(ctx, userId, groupId) {
 }
 
 /**
- * Handle invalid username (against moderation rules)
+ * Notify group admins of username change
  */
-async function handleInvalidUsername(ctx, userId, username, reason, groupId) {
+async function notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId) {
   try {
-    const firstName = ctx.from?.first_name || 'User';
-
-    // Delete the message
-    try {
-      await ctx.deleteMessage();
-    } catch (error) {
-      logger.debug('Could not delete message from user with invalid username:', error.message);
-    }
-
-    // Send warning message
-    let warningMessage = `⚠️ **Username Policy Violation**\n\n`;
-    warningMessage += `👤 @${username || firstName}\n\n`;
-    warningMessage += `Your username doesn't meet our community guidelines:\n`;
-    warningMessage += `**Reason:** ${reason}\n\n`;
-    warningMessage += 'Please update your Telegram username to comply with our rules.\n';
-    warningMessage += 'Your messages will be deleted until you change it.';
-
-    const sentMessage = await ctx.reply(warningMessage, {
-      parse_mode: 'Markdown',
-    });
-
-    // Delete warning after 60 seconds
-    ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 60000);
-
-    // Try to send private message
-    try {
-      await ctx.telegram.sendMessage(
-        userId,
-        '⚠️ **Username Policy Violation**\n\n'
-        + `Your username (@${username}) doesn't meet the guidelines for **${ctx.chat.title}**.\n\n`
-        + `**Reason:** ${reason}\n\n`
-        + 'Please update your username in Settings to continue participating in the group.',
-        { parse_mode: 'Markdown' },
-      );
-    } catch (error) {
-      logger.debug('Could not send private message about invalid username:', error.message);
-    }
-
-    // Log the event
-    await ModerationModel.addLog({
-      action: 'invalid_username_warning',
-      userId,
-      groupId,
-      reason: `Username policy violation: ${reason}`,
-      details: `Username: ${username}, User: ${firstName}`,
-    });
-
-    logger.info('User with invalid username warned', { userId, groupId, username, reason });
-  } catch (error) {
-    logger.error('Error handling invalid username:', error);
-  }
-}
-
-/**
- * Notify support group of username change
- */
-async function notifyAdminsOfUsernameChange(ctx, userId, oldUsername, newUsername, groupId, changeCount) {
-  try {
-    const supportGroupId = process.env.SUPPORT_GROUP_ID;
-
-    if (!supportGroupId) {
-      logger.warn('SUPPORT_GROUP_ID not configured, skipping username change notification');
-      return;
-    }
+    // Get group administrators
+    const admins = await ctx.getChatAdministrators();
 
     const firstName = ctx.from?.first_name || 'User';
-    const groupTitle = ctx.chat?.title || 'Unknown Group';
 
     const notificationMessage = '🚨 **Suspicious Username Change**\n\n'
       + `👤 **User:** ${firstName} (ID: ${userId})\n`
-      + `👥 **Group:** ${groupTitle}\n`
       + `📝 **Old:** @${oldUsername || 'none'}\n`
       + `📝 **New:** @${newUsername || 'none'}\n`
-      + `🔄 **Changes in 24h:** ${changeCount}\n`
       + `📅 **When:** ${new Date().toLocaleString()}\n\n`
       + '⚠️ This user has changed their username multiple times in the last 24 hours.\n'
       + 'This could indicate evasion attempts.\n\n'
       + `Use /userhistory ${userId} to see full history.`;
 
-    // Send to support group only
-    try {
-      await ctx.telegram.sendMessage(
-        supportGroupId,
-        notificationMessage,
-        { parse_mode: 'Markdown' },
-      );
+    // Send to each admin via DM
+    for (const admin of admins) {
+      if (admin.user.is_bot) continue; // Skip bots
 
-      logger.debug('Support group notified of suspicious username change', {
-        supportGroupId,
-        userId,
-        groupId,
-      });
-    } catch (error) {
-      logger.error('Could not send message to support group:', error.message);
+      try {
+        await ctx.telegram.sendMessage(
+          admin.user.id,
+          notificationMessage,
+          { parse_mode: 'Markdown' },
+        );
+
+        logger.debug('Admin notified of username change', {
+          adminId: admin.user.id,
+          userId,
+        });
+      } catch (error) {
+        // Admin hasn't started bot or blocked it
+        logger.debug(`Could not notify admin ${admin.user.id}:`, error.message);
+      }
     }
   } catch (error) {
-    logger.error('Error notifying support group of username change:', error);
+    logger.error('Error notifying admins of username change:', error);
   }
 }
 

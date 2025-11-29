@@ -85,12 +85,6 @@ const registerPlayerHandlers = (bot) => {
   bot.action('player_search', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
-
-      // Initialize session temp if needed
-      if (!ctx.session.temp) {
-        ctx.session.temp = {};
-      }
-
       ctx.session.temp.waitingForMediaSearch = true;
       await ctx.saveSession();
 
@@ -109,12 +103,6 @@ const registerPlayerHandlers = (bot) => {
   bot.action('player_create_playlist', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
-
-      // Initialize session temp if needed
-      if (!ctx.session.temp) {
-        ctx.session.temp = {};
-      }
-
       ctx.session.temp.waitingForPlaylistName = true;
       await ctx.saveSession();
 
@@ -331,9 +319,6 @@ const showPlayerMenu = async (ctx) => {
         Markup.button.callback(`🔍 ${t('player.search', lang)}`, 'player_search'),
         Markup.button.callback(`🎧 ${t('player.nowPlaying', lang)}`, 'player_now_playing'),
       ],
-      [
-        Markup.button.url(`✨ Materialious (Web)`, 'https://pnptv.app/materialious'),
-      ],
       [Markup.button.callback(t('back', lang), 'back_to_main')],
     ]);
 
@@ -402,7 +387,7 @@ const showMyPlaylists = async (ctx) => {
     if (playlists && playlists.length > 0) {
       playlists.forEach((playlist, index) => {
         text += `${index + 1}. ${playlist.name}\n`;
-        text += `   📀 ${parseInt(playlist.item_count) || 0} ${t('player.tracks', lang)}\n\n`;
+        text += `   📀 ${playlist.mediaItems.length} ${t('player.tracks', lang)}\n\n`;
       });
     } else {
       text += t('player.noPlaylists', lang);
@@ -443,7 +428,8 @@ const showPublicPlaylists = async (ctx) => {
     if (playlists && playlists.length > 0) {
       playlists.forEach((playlist, index) => {
         text += `${index + 1}. ${playlist.name}\n`;
-        text += `   📀 ${parseInt(playlist.item_count) || 0} ${t('player.tracks', lang)}\n\n`;
+        text += `   📀 ${playlist.mediaItems.length} ${t('player.tracks', lang)}`;
+        text += ` | 👥 ${playlist.followers} ${t('player.followers', lang)}\n\n`;
       });
     } else {
       text += t('player.noPublicPlaylists', lang);
@@ -478,8 +464,8 @@ const showNowPlaying = async (ctx) => {
 
     let text = `🎧 ${t('player.nowPlaying', lang)}\n\n`;
 
-    if (playerState && playerState.current_media_id) {
-      const media = await MediaPlayerModel.getMediaById(playerState.current_media_id);
+    if (playerState && playerState.currentMedia) {
+      const media = await MediaPlayerModel.getMediaById(playerState.currentMedia);
       if (media) {
         text += `🎼 ${media.title}\n`;
         if (media.artist) {
@@ -708,7 +694,7 @@ const playMedia = async (ctx, mediaId) => {
 
     // Update player state
     await MediaPlayerModel.updatePlayerState(ctx.from.id, {
-      currentMediaId: mediaId,
+      currentMedia: mediaId,
       isPlaying: true,
     });
 
@@ -775,7 +761,7 @@ const stopPlayback = async (ctx) => {
     const lang = getLanguage(ctx);
 
     await MediaPlayerModel.updatePlayerState(ctx.from.id, {
-      currentMediaId: null,
+      currentMedia: null,
       isPlaying: false,
       position: 0,
     });
@@ -800,7 +786,7 @@ const playNext = async (ctx) => {
       const nextMediaId = playerState.queue[nextIndex];
 
       await MediaPlayerModel.updatePlayerState(ctx.from.id, {
-        currentMediaId: nextMediaId,
+        currentMedia: nextMediaId,
         position: nextIndex,
         isPlaying: true,
       });
@@ -829,7 +815,7 @@ const playPrevious = async (ctx) => {
       const prevMediaId = playerState.queue[prevIndex];
 
       await MediaPlayerModel.updatePlayerState(ctx.from.id, {
-        currentMediaId: prevMediaId,
+        currentMedia: prevMediaId,
         position: prevIndex,
         isPlaying: true,
       });
@@ -913,20 +899,22 @@ const likeMedia = async (ctx, mediaId) => {
 const viewPlaylist = async (ctx, playlistId) => {
   try {
     const lang = getLanguage(ctx);
-    const playlist = await MediaPlayerModel.getPlaylistById(playlistId);
+    const db = require('../../../config/firebase').getFirestore();
+    const playlistDoc = await db.collection('media_playlists').doc(playlistId).get();
 
-    if (!playlist) {
+    if (!playlistDoc.exists) {
       await ctx.answerCbQuery(t('player.playlistNotFound', lang));
       return;
     }
 
+    const playlist = playlistDoc.data();
     let text = `📁 ${playlist.name}\n\n`;
 
     if (playlist.description) {
       text += `${playlist.description}\n\n`;
     }
 
-    text += `📀 ${playlist.items ? playlist.items.length : 0} ${t('player.tracks', lang)}\n\n`;
+    text += `📀 ${playlist.mediaItems.length} ${t('player.tracks', lang)}\n\n`;
 
     const keyboard = Markup.inlineKeyboard([
       [
@@ -950,29 +938,31 @@ const viewPlaylist = async (ctx, playlistId) => {
 const playPlaylist = async (ctx, playlistId) => {
   try {
     const lang = getLanguage(ctx);
-    const playlist = await MediaPlayerModel.getPlaylistById(playlistId);
+    const db = require('../../../config/firebase').getFirestore();
+    const playlistDoc = await db.collection('media_playlists').doc(playlistId).get();
 
-    if (!playlist) {
+    if (!playlistDoc.exists) {
       await ctx.answerCbQuery(t('player.playlistNotFound', lang));
       return;
     }
 
-    if (!playlist.items || playlist.items.length === 0) {
+    const playlist = playlistDoc.data();
+
+    if (playlist.mediaItems.length === 0) {
       await ctx.answerCbQuery(t('player.emptyPlaylist', lang));
       return;
     }
 
-    const mediaIds = playlist.items.map(item => item.id);
-
     // Set playlist as queue
     await MediaPlayerModel.updatePlayerState(ctx.from.id, {
-      currentPlaylistId: playlistId,
+      currentPlaylist: playlistId,
+      queue: playlist.mediaItems,
       position: 0,
-      currentMediaId: mediaIds[0],
+      currentMedia: playlist.mediaItems[0],
       isPlaying: true,
     });
 
-    await playMedia(ctx, mediaIds[0]);
+    await playMedia(ctx, playlist.mediaItems[0]);
     await ctx.answerCbQuery(`▶️ ${t('player.playingPlaylist', lang)}: ${playlist.name}`);
   } catch (error) {
     logger.error('Error in playPlaylist:', error);

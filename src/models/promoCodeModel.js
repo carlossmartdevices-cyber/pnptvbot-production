@@ -1,5 +1,8 @@
-const { query } = require('../config/postgres');
+const { getFirestore } = require('../config/firebase');
 const logger = require('../utils/logger');
+
+const COLLECTION = 'promoCodes';
+const USAGE_COLLECTION = 'promoCodeUsage';
 
 /**
  * Promo Code Model - Manages discount/promo codes
@@ -12,6 +15,9 @@ class PromoCodeModel {
    */
   static async create(codeData) {
     try {
+      const db = getFirestore();
+      const codeRef = db.collection(COLLECTION).doc(codeData.code.toUpperCase());
+
       const data = {
         code: codeData.code.toUpperCase(),
         discount: codeData.discount, // Percentage (10 = 10%) or fixed amount
@@ -26,24 +32,7 @@ class PromoCodeModel {
         createdBy: codeData.createdBy,
       };
 
-      await query(
-        `INSERT INTO promo_codes (code, discount, discount_type, max_uses, current_uses,
-         valid_until, min_amount, applicable_plans, active, created_at, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [
-          data.code,
-          data.discount,
-          data.discountType,
-          data.maxUses,
-          data.currentUses,
-          data.validUntil,
-          data.minAmount,
-          data.applicablePlans,
-          data.active,
-          data.createdAt,
-          data.createdBy,
-        ]
-      );
+      await codeRef.set(data);
 
       logger.info('Promo code created', {
         code: data.code,
@@ -65,30 +54,14 @@ class PromoCodeModel {
    */
   static async getByCode(code) {
     try {
-      const result = await query(
-        'SELECT * FROM promo_codes WHERE code = $1',
-        [code.toUpperCase()]
-      );
+      const db = getFirestore();
+      const doc = await db.collection(COLLECTION).doc(code.toUpperCase()).get();
 
-      if (result.rows.length === 0) {
+      if (!doc.exists) {
         return null;
       }
 
-      const row = result.rows[0];
-      return {
-        code: row.code,
-        discount: parseFloat(row.discount),
-        discountType: row.discount_type,
-        maxUses: row.max_uses,
-        currentUses: row.current_uses,
-        validUntil: row.valid_until,
-        minAmount: parseFloat(row.min_amount),
-        applicablePlans: row.applicable_plans || [],
-        active: row.active,
-        createdAt: row.created_at,
-        createdBy: row.created_by,
-        deactivatedAt: row.deactivated_at,
-      };
+      return doc.data();
     } catch (error) {
       logger.error('Error getting promo code:', error);
       return null;
@@ -117,7 +90,7 @@ class PromoCodeModel {
 
       // Check expiry
       if (promoCode.validUntil) {
-        const validUntil = new Date(promoCode.validUntil);
+        const validUntil = promoCode.validUntil.toDate ? promoCode.validUntil.toDate() : new Date(promoCode.validUntil);
         if (validUntil < new Date()) {
           return { valid: false, error: 'Promo code has expired' };
         }
@@ -172,23 +145,26 @@ class PromoCodeModel {
    */
   static async apply(code, userId, paymentId, discountAmount) {
     try {
-      const upperCode = code.toUpperCase();
+      const db = getFirestore();
+      const codeRef = db.collection(COLLECTION).doc(code.toUpperCase());
 
       // Increment usage count
-      await query(
-        'UPDATE promo_codes SET current_uses = current_uses + 1 WHERE code = $1',
-        [upperCode]
-      );
+      await codeRef.update({
+        currentUses: db.FieldValue.increment(1),
+      });
 
       // Record usage
-      await query(
-        `INSERT INTO promo_code_usage (code, user_id, payment_id, discount_amount, used_at)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [upperCode, userId.toString(), paymentId, discountAmount, new Date()]
-      );
+      const usageRef = db.collection(USAGE_COLLECTION).doc();
+      await usageRef.set({
+        code: code.toUpperCase(),
+        userId: userId.toString(),
+        paymentId,
+        discountAmount,
+        usedAt: new Date(),
+      });
 
       logger.info('Promo code applied', {
-        code: upperCode,
+        code: code.toUpperCase(),
         userId,
         discount: discountAmount,
       });
@@ -207,10 +183,13 @@ class PromoCodeModel {
    */
   static async deactivate(code) {
     try {
-      await query(
-        'UPDATE promo_codes SET active = $1, deactivated_at = $2 WHERE code = $3',
-        [false, new Date(), code.toUpperCase()]
-      );
+      const db = getFirestore();
+      const codeRef = db.collection(COLLECTION).doc(code.toUpperCase());
+
+      await codeRef.update({
+        active: false,
+        deactivatedAt: new Date(),
+      });
 
       logger.info('Promo code deactivated', { code: code.toUpperCase() });
       return true;
@@ -227,32 +206,19 @@ class PromoCodeModel {
    */
   static async getAll(activeOnly = false) {
     try {
-      let sql = 'SELECT * FROM promo_codes';
-      const params = [];
+      const db = getFirestore();
+      let query = db.collection(COLLECTION);
 
       if (activeOnly) {
-        sql += ' WHERE active = $1';
-        params.push(true);
+        query = query.where('active', '==', true);
       }
 
-      sql += ' ORDER BY created_at DESC';
+      const snapshot = await query.get();
 
-      const result = await query(sql, params);
-
-      const codes = result.rows.map(row => ({
-        code: row.code,
-        discount: parseFloat(row.discount),
-        discountType: row.discount_type,
-        maxUses: row.max_uses,
-        currentUses: row.current_uses,
-        validUntil: row.valid_until,
-        minAmount: parseFloat(row.min_amount),
-        applicablePlans: row.applicable_plans || [],
-        active: row.active,
-        createdAt: row.created_at,
-        createdBy: row.created_by,
-        deactivatedAt: row.deactivated_at,
-      }));
+      const codes = [];
+      snapshot.forEach((doc) => {
+        codes.push(doc.data());
+      });
 
       return codes;
     } catch (error) {
@@ -268,21 +234,24 @@ class PromoCodeModel {
    */
   static async getUsageStats(code) {
     try {
-      const result = await query(
-        `SELECT COUNT(*) as total_uses,
-                COUNT(DISTINCT user_id) as unique_users,
-                SUM(discount_amount) as total_discount
-         FROM promo_code_usage
-         WHERE code = $1`,
-        [code.toUpperCase()]
-      );
+      const db = getFirestore();
+      const snapshot = await db.collection(USAGE_COLLECTION)
+        .where('code', '==', code.toUpperCase())
+        .get();
 
-      const row = result.rows[0];
+      let totalDiscount = 0;
+      const users = new Set();
+
+      snapshot.forEach((doc) => {
+        const usage = doc.data();
+        totalDiscount += usage.discountAmount || 0;
+        users.add(usage.userId);
+      });
 
       return {
-        totalUses: parseInt(row.total_uses),
-        uniqueUsers: parseInt(row.unique_users),
-        totalDiscount: parseFloat(row.total_discount) || 0,
+        totalUses: snapshot.size,
+        uniqueUsers: users.size,
+        totalDiscount,
       };
     } catch (error) {
       logger.error('Error getting promo code usage stats:', error);

@@ -1,4 +1,4 @@
-const { query } = require('../../../config/postgres');
+const { getFirestore } = require('../../../config/firebase');
 const UserModel = require('../../../models/userModel');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
@@ -47,13 +47,12 @@ const registerActivationHandlers = (bot) => {
           : '⏳ Verifying code...',
       );
 
-      // Verify code in PostgreSQL
-      const codeResult = await query(
-        'SELECT * FROM activation_codes WHERE code = $1',
-        [code]
-      );
+      // Verify code in Firestore
+      const db = getFirestore();
+      const codeRef = db.collection('activationCodes').doc(code);
+      const codeDoc = await codeRef.get();
 
-      if (codeResult.rows.length === 0) {
+      if (!codeDoc.exists) {
         logger.warn(`Invalid activation code attempted: ${code} by user ${userId}`);
         return ctx.reply(
           lang === 'es'
@@ -62,7 +61,7 @@ const registerActivationHandlers = (bot) => {
         );
       }
 
-      const codeData = codeResult.rows[0];
+      const codeData = codeDoc.data();
 
       // Check if code is already used
       if (codeData.used) {
@@ -75,7 +74,7 @@ const registerActivationHandlers = (bot) => {
       }
 
       // Check if code has expired (if expiration date is set)
-      if (codeData.expires_at && new Date(codeData.expires_at) < new Date()) {
+      if (codeData.expiresAt && codeData.expiresAt.toDate() < new Date()) {
         logger.warn(`Expired activation code attempted: ${code} by user ${userId}`);
         return ctx.reply(
           lang === 'es'
@@ -89,29 +88,37 @@ const registerActivationHandlers = (bot) => {
 
       try {
         // Mark code as used
-        await query(
-          `UPDATE activation_codes
-           SET used = true, used_at = $1, used_by = $2, used_by_username = $3
-           WHERE code = $4`,
-          [new Date(), String(userId), ctx.from.username || null, code]
-        );
-
-        // Update user subscription using the correct method
-        await UserModel.updateSubscription(userId, {
-          status: 'active',
-          planId: 'lifetime',
-          expiry: null, // Lifetime = no expiry
+        await codeRef.update({
+          used: true,
+          usedAt: new Date(),
+          usedBy: userId,
+          usedByUsername: ctx.from.username || null,
         });
+
+        // Update user subscription
+        const updates = {
+          subscriptionStatus: 'active',
+          planType: 'lifetime',
+          planExpiry: null, // Lifetime = no expiry
+          lifetimeAccess: true,
+          activatedAt: new Date(),
+          activationCode: code,
+        };
+
+        await UserModel.updateById(userId, updates);
 
         // Log successful activation
         logger.info(`Lifetime pass activated: code=${code}, userId=${userId}, product=${product}`);
 
-        // Log activation event to PostgreSQL
-        await query(
-          `INSERT INTO activation_logs (user_id, username, code, product, activated_at, success)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [String(userId), ctx.from.username || null, code, product, new Date(), true]
-        );
+        // Log activation event to Firestore
+        await db.collection('activationLogs').add({
+          userId,
+          username: ctx.from.username || null,
+          code,
+          product,
+          activatedAt: new Date(),
+          success: true,
+        });
 
         // Send success message with enhanced formatting
         const successMessage = lang === 'es'
@@ -142,36 +149,6 @@ const registerActivationHandlers = (bot) => {
 
         await ctx.reply(successMessage);
 
-        // Send PRIME channel invites for all channels
-        try {
-          const primeChannels = (process.env.PRIME_CHANNEL_ID || '').split(',').map(id => id.trim()).filter(id => id);
-          if (primeChannels.length > 0) {
-            const inviteLinks = [];
-            for (const channelId of primeChannels) {
-              try {
-                const inviteLink = await ctx.telegram.createChatInviteLink(channelId, {
-                  member_limit: 1,
-                  name: `Activation code - ${userId}`,
-                });
-                inviteLinks.push(inviteLink.invite_link);
-              } catch (channelError) {
-                logger.error('Error creating invite for channel:', { channelId, error: channelError.message });
-              }
-            }
-
-            if (inviteLinks.length > 0) {
-              const linksText = inviteLinks.map((link, i) => `${i + 1}. ${link}`).join('\n');
-              const inviteMessage = lang === 'es'
-                ? `🔗 *Acceso a los Canales PRIME*\n\nHaz clic en los siguientes enlaces para unirte a los canales exclusivos:\n\n${linksText}\n\n⚠️ Estos enlaces son de uso único y personal.`
-                : `🔗 *PRIME Channels Access*\n\nClick the following links to join the exclusive channels:\n\n${linksText}\n\n⚠️ These links are for single use only.`;
-
-              await ctx.reply(inviteMessage, { parse_mode: 'Markdown' });
-            }
-          }
-        } catch (inviteError) {
-          logger.error('Error creating PRIME channel invites:', inviteError);
-        }
-
         // Send follow-up message after initial response
         // Using Promise.resolve().then() instead of setTimeout to maintain context
         Promise.resolve().then(async () => {
@@ -191,12 +168,12 @@ const registerActivationHandlers = (bot) => {
         logger.error('Error updating user after activation:', updateError);
 
         try {
-          await query(
-            `UPDATE activation_codes
-             SET used = false, used_at = NULL, used_by = NULL, used_by_username = NULL
-             WHERE code = $1`,
-            [code]
-          );
+          await codeRef.update({
+            used: false,
+            usedAt: null,
+            usedBy: null,
+            usedByUsername: null,
+          });
         } catch (rollbackError) {
           logger.error('Error rolling back code usage:', rollbackError);
         }
@@ -243,16 +220,15 @@ const registerActivationHandlers = (bot) => {
 
       const code = parts[1].trim().toUpperCase();
 
-      const codeResult = await query(
-        'SELECT * FROM activation_codes WHERE code = $1',
-        [code]
-      );
+      const db = getFirestore();
+      const codeRef = db.collection('activationCodes').doc(code);
+      const codeDoc = await codeRef.get();
 
-      if (codeResult.rows.length === 0) {
+      if (!codeDoc.exists) {
         return ctx.reply('❌ Code does not exist in database.');
       }
 
-      const codeData = codeResult.rows[0];
+      const codeData = codeDoc.data();
 
       let status = '📊 Code Information:\n\n';
       status += `Code: ${code}\n`;
@@ -260,18 +236,18 @@ const registerActivationHandlers = (bot) => {
       status += `Used: ${codeData.used ? 'Yes' : 'No'}\n`;
 
       if (codeData.used) {
-        status += `Used At: ${codeData.used_at ? new Date(codeData.used_at).toISOString() : 'Unknown'}\n`;
-        status += `Used By: ${codeData.used_by || 'Unknown'}\n`;
-        status += `Username: ${codeData.used_by_username || 'Unknown'}\n`;
+        status += `Used At: ${codeData.usedAt?.toDate()?.toISOString() || 'Unknown'}\n`;
+        status += `Used By: ${codeData.usedBy || 'Unknown'}\n`;
+        status += `Username: ${codeData.usedByUsername || 'Unknown'}\n`;
       }
 
-      if (codeData.created_at) {
-        status += `Created At: ${new Date(codeData.created_at).toISOString()}\n`;
+      if (codeData.createdAt) {
+        status += `Created At: ${codeData.createdAt.toDate().toISOString()}\n`;
       }
 
-      if (codeData.expires_at) {
-        status += `Expires At: ${new Date(codeData.expires_at).toISOString()}\n`;
-        status += `Expired: ${new Date(codeData.expires_at) < new Date() ? 'Yes' : 'No'}\n`;
+      if (codeData.expiresAt) {
+        status += `Expires At: ${codeData.expiresAt.toDate().toISOString()}\n`;
+        status += `Expired: ${codeData.expiresAt.toDate() < new Date() ? 'Yes' : 'No'}\n`;
       }
 
       if (codeData.email) {
