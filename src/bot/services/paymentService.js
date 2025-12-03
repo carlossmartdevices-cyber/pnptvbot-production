@@ -8,6 +8,52 @@ const logger = require('../../utils/logger');
 const DaimoService = require('./daimoService');
 
 /**
+ * Send payment notification to support group
+ * @param {string} userId - Telegram user ID
+ * @param {string} planName - Name of the plan
+ * @param {number} amount - Payment amount
+ * @param {string} provider - Payment provider (epayco, daimo, etc.)
+ * @param {string} source - Source description
+ * @returns {Promise<boolean>} Success status
+ */
+async function sendPaymentNotification(userId, planName, amount, provider = 'unknown', source = 'system') {
+  try {
+    const { getBotInstance } = require('../core/bot');
+    const bot = getBotInstance();
+
+    if (!bot) {
+      logger.warn('Bot instance not available for payment notification', { userId, source });
+      return false;
+    }
+
+    const supportGroupId = process.env.SUPPORT_GROUP_ID || '-1003365565562';
+    const user = await UserModel.getById(userId);
+    const userName = user?.firstName || user?.username || 'Unknown';
+    const userHandle = user?.username ? `@${user.username}` : `ID: ${userId}`;
+
+    const message = [
+      '💰 *PAGO COMPLETADO*',
+      '',
+      `👤 *Usuario:* ${userName}`,
+      `🆔 *Telegram:* ${userHandle}`,
+      `📦 *Plan:* ${planName}`,
+      `💵 *Monto:* $${parseFloat(amount).toFixed(2)}`,
+      `🏦 *Proveedor:* ${provider}`,
+      `📅 *Fecha:* ${new Date().toLocaleString('es-ES')}`,
+      '',
+      '✅ Usuario activado y enlace PRIME enviado.'
+    ].join('\n');
+
+    await bot.telegram.sendMessage(supportGroupId, message, { parse_mode: 'Markdown' });
+    logger.info('Payment notification sent to support group', { userId, planName, amount, provider });
+    return true;
+  } catch (error) {
+    logger.error('Error sending payment notification', { userId, planName, error: error.message });
+    return false;
+  }
+}
+
+/**
  * Send PRIME confirmation message with unique invite link
  * @param {string} userId - Telegram user ID
  * @param {string} planName - Name of the plan
@@ -316,9 +362,6 @@ class PaymentService {
 
       // Activate user subscription and send confirmation
       if (userId && planId) {
-        const PlanModel = require('../models/planModel');
-        const UserModel = require('../../models/userModel');
-
         const plan = await PlanModel.getById(planId);
         const durationDays = plan?.duration || 30;
         const expiry = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
@@ -334,6 +377,10 @@ class PaymentService {
 
         // Send confirmation message with PRIME invite link
         await sendPrimeConfirmation(userId, planName, expiry, 'epayco');
+
+        // Send payment notification to support group
+        const amount = payment.amount || plan?.price || 0;
+        await sendPaymentNotification(userId, planName, amount, 'ePayco', 'epayco-webhook');
       }
 
       return { success: true };
@@ -397,6 +444,10 @@ class PaymentService {
         // Send confirmation message with PRIME invite link
         await sendPrimeConfirmation(userId, planName, expiry, 'daimo');
 
+        // Send payment notification to support group
+        const amount = payment.amount || plan?.price || 0;
+        await sendPaymentNotification(userId, planName, amount, 'Daimo', 'daimo-webhook');
+
         await cache.releaseLock(lockKey);
         return { success: true };
       } catch (err) {
@@ -422,3 +473,4 @@ class PaymentService {
 
 module.exports = PaymentService;
 module.exports.sendPrimeConfirmation = sendPrimeConfirmation;
+module.exports.sendPaymentNotification = sendPaymentNotification;

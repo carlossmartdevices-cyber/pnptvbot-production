@@ -15,7 +15,79 @@ const registerActivationHandlers = require('./activation');
 const registerPaymentHandlers = (bot) => {
   // Register activation code handlers
   registerActivationHandlers(bot);
-  // Show subscription plans
+
+  // /subscribe command - shows subscription plans directly
+  bot.command('subscribe', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+
+      // Check if user already has an active subscription
+      const hasActiveSubscription = await UserService.hasActiveSubscription(ctx.from.id);
+
+      if (hasActiveSubscription) {
+        const warningMsg = lang === 'es'
+          ? '⚠️ **Ya tienes una suscripción activa**\n\n'
+            + 'No puedes comprar una nueva suscripción mientras tengas una activa.\n\n'
+            + 'Para evitar pagos duplicados, por favor espera a que tu suscripción actual expire o contacta soporte para cambiar tu plan.'
+          : '⚠️ **You already have an active subscription**\n\n'
+            + 'You cannot purchase a new subscription while you have an active one.\n\n'
+            + 'To avoid double payments, please wait until your current subscription expires or contact support to change your plan.';
+
+        await ctx.reply(
+          warningMsg,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(t('back', lang), 'back_to_main')]
+            ])
+          }
+        );
+        return;
+      }
+
+      const plans = await PlanModel.getAll();
+
+      // Header with internationalization
+      let message = `${t('subscriptionHeader', lang)}\n`;
+      message += `${t('subscriptionDivider', lang)}\n\n`;
+      message += `${t('subscriptionDescription', lang)}\n\n\n`;
+
+      const buttons = [];
+      plans.forEach((plan) => {
+        const planName = plan.display_name || plan.name;
+        const durationText = plan.duration_days || plan.duration;
+        const price = parseFloat(plan.price);
+
+        // Format buttons with i18n
+        let buttonText;
+        if (plan.is_lifetime) {
+          // Lifetime Pass without duration
+          buttonText = `${planName} | $${price.toFixed(2)}`;
+        } else {
+          // Regular plans with duration
+          buttonText = `${planName} | ${durationText} ${t('days', lang)} | $${price.toFixed(2)}`;
+        }
+
+        buttons.push([
+          Markup.button.callback(buttonText, `select_plan_${plan.id}`),
+        ]);
+      });
+
+      buttons.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
+
+      await ctx.reply(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons)
+      });
+
+      logger.info('User viewed subscription plans via /subscribe', { userId: ctx.from.id });
+    } catch (error) {
+      logger.error('Error in /subscribe command:', error);
+      await ctx.reply('Error loading plans. Please try again.');
+    }
+  });
+
+  // Show subscription plans (callback action)
   bot.action('show_subscription_plans', async (ctx) => {
     try {
       await ctx.answerCbQuery();
