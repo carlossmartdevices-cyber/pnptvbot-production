@@ -68,6 +68,20 @@ class PaymentController {
 
       // Handle both camelCase and snake_case from payment
       const userId = payment.userId || payment.user_id;
+      const provider = payment.provider || 'epayco';
+
+      // Daimo config
+      const daimoConfig = {
+        toAddress: process.env.DAIMO_TREASURY_ADDRESS,
+        toChain: 10, // Optimism
+        toToken: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85', // USDC on Optimism
+        toUnits: (parseFloat(plan.price) * 1000000).toString(), // USDC has 6 decimals
+        metadata: {
+          paymentId: payment.id,
+          userId,
+          planId,
+        },
+      };
 
       const responseData = {
         success: true,
@@ -77,6 +91,7 @@ class PaymentController {
           userId,
           planId,
           status: payment.status,
+          provider,
           amountUSD: parseFloat(plan.price),
           amountCOP: priceInCOP,
           plan: {
@@ -88,10 +103,15 @@ class PaymentController {
             duration: plan.duration || 30,
             features: plan.features || [],
           },
+          // ePayco config
           epaycoPublicKey,
           testMode: epaycoTestMode,
           confirmationUrl: `${webhookDomain}/api/webhooks/epayco`,
           responseUrl: `${webhookDomain}/api/payment-response`,
+          // Daimo config
+          daimoConfig,
+          paymentUrl: payment.paymentUrl || null,
+          daimoLink: payment.daimoLink || payment.daimo_link || null,
         },
       };
 

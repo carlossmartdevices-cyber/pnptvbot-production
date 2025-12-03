@@ -64,27 +64,24 @@ Tap "Subscribe to PRIME" below to get instant access.`,
     radioMenu: '📻 Radio',
     playerMenu: '🎵 Media Player',
     zoomRooms: '🎥 Zoom Rooms',
-    primeMembersArea: '💎 PRIME Members Area',
     support: '🤖 Support',
     settings: '⚙️ Settings',
     // Subscription
-    subscriptionHeader: '`💎 Membership Plans`',
+    subscriptionHeader: '`💎 Subscribe to PNPtv! PRIME`',
     subscriptionDivider: '',
-    subscriptionDescription: `Subscribe to PRIME and unlock the full PNPtv! experience and join the hottest Latino PnP community on Telegram — unfiltered, intimate, raw and always active. 🔥
+    subscriptionDescription: `Unlock the full PNPtv! experience and join the hottest Latino community smoking & slamming on Telegram.
+Choose your plan and get instant access to all premium features:
 
-**By becoming a PRIME member, you get instant access to:**
+🔥 Full access to all PRIME channels
+🔥 PNPtv Community Group
+🔥 Long-session videos + weekly new releases
+🔥 Santino's full videography
+🔥 Nearby feature (unlimited)
+🔥 Live Streams & Zoom Rooms
+🔥 Profile Card with photo, badges & bio
+🔥 Instant support through the bot
 
-• Full-length videos (Santino + sexy Latino performers)
-• Weekly new content drops
-• Unlimited Nearby access
-• Your community profile card
-• Video Calls & Live Streams with hot performers
-• All PNPtv! channels + the community group
-• Member-only perks and exclusive features
-
-**Cristina**, our chatbot customer support agent, is here to help if you need any assistance.
-
-\`Choose your plan below! 💜\``,
+\`Tap a plan below to activate your membership instantly. 💜\``,
     subscriptionPlans: '💎 Choose Your PRIME Plan:',
     planTrial: '⭐ Trial Week',
     planTrialDesc: '7 days of pure PNP bliss.\nUnlimited access to videos, weekly drops, Nearby, profile tools, radio, hangouts, lives, and video rooms.\n💜 Perfect for first-timers — try EVERYTHING before committing.',
@@ -549,27 +546,24 @@ Toca "Suscribete a PRIME" para obtener acceso inmediato.`,
     radioMenu: '📻 Radio',
     playerMenu: '🎵 Reproductor',
     zoomRooms: '🎥 Salas Zoom',
-    primeMembersArea: '💎 Área de Miembros PRIME',
     support: '🤖 Soporte',
     settings: '⚙️ Configuración',
     // Subscription
-    subscriptionHeader: '`💎 Planes de Membresía`',
+    subscriptionHeader: '`💎 Suscríbete a PNPtv! PRIME`',
     subscriptionDivider: '',
-    subscriptionDescription: `Suscríbete a PRIME y desbloquea la experiencia completa de PNPtv! y únete a la comunidad Latina PnP más hot de Telegram — sin filtros, íntima, cruda y siempre activa. 🔥
+    subscriptionDescription: `Desbloquea la experiencia completa de PNPtv! y únete a la comunidad latina más caliente fumando & slammeando en Telegram.
+Elige tu plan y obtén acceso inmediato a todas las funciones premium:
 
-**Al convertirte en miembro PRIME, obtienes acceso instantáneo a:**
+🔥 Acceso total a todos los canales PRIME
+🔥 Grupo comunitario PNPtv
+🔥 Videos de larga duración + estrenos semanales
+🔥 Videografía completa de Santino
+🔥 Nearby ilimitado
+🔥 Transmisiones en vivo y salas Zoom
+🔥 Tarjeta de perfil con foto, badges y bio
+🔥 Soporte instantáneo desde el bot
 
-• Videos completos (Santino + sexy performers Latinos)
-• Nuevo contenido cada semana
-• Acceso ilimitado a Cercanos
-• Tu tarjeta de perfil comunitario
-• Video Llamadas y Transmisiones en Vivo con performers hot
-• Todos los canales de PNPtv! + el grupo de la comunidad
-• Beneficios exclusivos y funciones especiales
-
-**Cristina**, nuestra agente de soporte chatbot, está aquí para ayudarte si necesitas asistencia.
-
-\`¡Elige tu plan abajo! 💜\``,
+\`Toca un plan para activar tu membresía al instante. 💜\``,
     subscriptionPlans: '💎 Elige tu Plan PRIME:',
     planTrial: '⭐ Semana de Prueba',
     planTrialDesc: '7 días de puro placer PNP.\nAcceso ilimitado a videos, estrenos semanales, Cercanos, herramientas de perfil, radio, hangouts, lives y salas de video.\n💜 Perfecto para nuevos — prueba TODO antes de comprometerte.',

@@ -124,14 +124,14 @@ const schemas = {
   userProfileUpdate: Joi.object({
     userId: Joi.number().integer().positive().optional(),
     username: Joi.string().min(3).max(30).pattern(/^[a-zA-Z0-9_-]+$/)
-      .optional(),
-    firstName: Joi.string().min(1).max(50).optional(),
-    lastName: Joi.string().min(1).max(50).optional(),
-    email: Joi.string().email().optional(),
-    age: Joi.number().integer().min(18).max(120).optional(),
-    bio: Joi.string().max(500).optional().allow(''),
+      .optional().allow(null),
+    firstName: Joi.string().min(1).max(50).optional().allow(null),
+    lastName: Joi.string().min(1).max(50).optional().allow(null),
+    email: Joi.string().email().optional().allow(null, ''),
+    age: Joi.number().integer().min(18).max(120).optional().allow(null),
+    bio: Joi.string().max(500).optional().allow('', null),
     interests: Joi.array().items(Joi.string().max(50)).max(10).optional(),
-    photoFileId: Joi.string().optional(),
+    photoFileId: Joi.string().optional().allow(null),
     language: Joi.string().valid('en', 'es').optional(),
   }).min(1),
 

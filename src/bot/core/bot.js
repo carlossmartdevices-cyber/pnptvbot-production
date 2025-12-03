@@ -1,6 +1,6 @@
 require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
-const { initializeFirebase } = require('../../config/firebase');
+const { initializePostgres, testConnection } = require('../../config/postgres');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
@@ -59,7 +59,8 @@ let isWebhookMode = false;
  * Validate critical environment variables
  */
 const validateCriticalEnvVars = () => {
-  const criticalVars = ['BOT_TOKEN', 'FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL'];
+  // Only BOT_TOKEN is critical - PostgreSQL can use defaults or DATABASE_URL
+  const criticalVars = ['BOT_TOKEN'];
   const missing = criticalVars.filter((varName) => !process.env[varName]);
   if (missing.length > 0) {
     logger.error(`Missing critical environment variables: ${missing.join(', ')}`);
@@ -91,12 +92,17 @@ const startBot = async () => {
     } catch (error) {
       logger.warn('Sentry initialization failed, continuing without monitoring:', error.message);
     }
-    // Initialize Firebase (with fallback)
+    // Initialize PostgreSQL
     try {
-      initializeFirebase();
-      logger.info('✓ Firebase initialized');
+      initializePostgres();
+      const connected = await testConnection();
+      if (connected) {
+        logger.info('✓ PostgreSQL initialized');
+      } else {
+        logger.warn('⚠️ PostgreSQL connection test failed, but will retry on first query');
+      }
     } catch (error) {
-      logger.error('Firebase initialization failed. Bot will run in DEGRADED mode without database.');
+      logger.error('PostgreSQL initialization failed. Bot will run in DEGRADED mode without database.');
       logger.error('Error:', error.message);
       logger.warn('⚠️  Bot features requiring database will not work!');
     }
@@ -342,4 +348,10 @@ if (require.main === module) {
   });
 }
 
-module.exports = { startBot };
+/**
+ * Get the bot instance for sending messages from services
+ * @returns {Telegraf|null} The bot instance or null if not started
+ */
+const getBotInstance = () => botInstance;
+
+module.exports = { startBot, getBotInstance };

@@ -5,6 +5,19 @@ const ChatCleanupService = require('../../services/chatCleanupService');
 const PermissionService = require('../../services/permissionService');
 
 /**
+ * Sanitize text for Telegram Markdown to prevent parsing errors
+ * Ensures backticks are properly matched and no newlines inside monospace
+ * @param {string} text - Text to sanitize
+ * @returns {string} Sanitized text
+ */
+const sanitizeMarkdown = (text) => {
+  if (!text) return '';
+  // Replace any backtick followed immediately by newline with backtick + space + newline
+  // This prevents Telegram from failing to find the end of monospace entity
+  return text.replace(/`\n/g, '` \n').replace(/\n`/g, '\n `');
+};
+
+/**
  * Envía mensaje de bienvenida y link de ingreso al canal PRIME
  * @param {Telegraf} bot - Bot instance
  * @param {string|number} userId - Telegram user ID
@@ -246,6 +259,40 @@ const registerMenuHandlers = (bot) => {
 };
 
 /**
+ * Get the effective view mode for admin preview
+ * @param {Context} ctx - Telegraf context
+ * @returns {Object} { isPremium, isAdmin, viewMode }
+ */
+const getEffectiveViewMode = (ctx) => {
+  const user = ctx.session?.user || {};
+  const userId = ctx.from?.id;
+  const actualIsAdmin = user.role === 'admin' || PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId);
+  const actualIsPremium = user.subscriptionStatus === 'active';
+
+  // Check if admin has set a view mode
+  const adminViewMode = ctx.session?.adminViewMode;
+
+  if (actualIsAdmin && adminViewMode) {
+    // Admin is previewing as a specific user type
+    return {
+      isPremium: adminViewMode === 'prime',
+      isAdmin: false, // Don't show admin features when previewing
+      viewMode: adminViewMode,
+      isPreviewMode: true,
+      actualIsAdmin: true
+    };
+  }
+
+  return {
+    isPremium: actualIsPremium,
+    isAdmin: actualIsAdmin,
+    viewMode: null,
+    isPreviewMode: false,
+    actualIsAdmin: actualIsAdmin
+  };
+};
+
+/**
  * Show main menu (new message)
  * @param {Context} ctx - Telegraf context
  */
@@ -253,9 +300,6 @@ const showMainMenu = async (ctx) => {
   const lang = ctx.session?.language || 'en';
   const chatType = ctx.chat?.type;
   const user = ctx.session?.user || {};
-  const isPremium = user.subscriptionStatus === 'active';
-  const userId = ctx.from?.id;
-  const isAdmin = user.role === 'admin' || PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId);
   const username = ctx.from?.username || ctx.from?.first_name || 'Member';
 
   if (chatType === 'group' || chatType === 'supergroup') {
@@ -263,14 +307,30 @@ const showMainMenu = async (ctx) => {
     return;
   }
 
+  // Get effective view mode (handles admin preview)
+  const viewState = getEffectiveViewMode(ctx);
+  const { isPremium, isAdmin, isPreviewMode, viewMode, actualIsAdmin } = viewState;
+
   let menuText;
   let keyboard;
 
   const creatorBtnText = lang === 'es' ? '🎬 ¡Sé Creador! - Próximamente' : '🎬 Be a Creator! - Coming Soon';
 
+  // Add preview mode indicator for admins
+  let previewBanner = '';
+  if (isPreviewMode) {
+    const modeLabel = viewMode === 'prime'
+      ? (lang === 'es' ? '👁️ VISTA PRIME' : '👁️ PRIME VIEW')
+      : (lang === 'es' ? '👁️ VISTA FREE' : '👁️ FREE VIEW');
+    previewBanner = `\`${modeLabel}\`\n\n`;
+  }
+
+  // Build keyboard buttons array
+  let buttons = [];
+
   if (isPremium || isAdmin) {
     // PRIME MEMBER VERSION
-    menuText = lang === 'es'
+    menuText = previewBanner + (lang === 'es'
       ? '`🎬 ¡Eres PRIME!`\n\n' +
         '¡Gracias por ser PRIME, papi! 🔥\n\n' +
         'Pulsa **Área de Miembros** y disfruta todo lo que hemos preparado para ti — videos, Nearby, hangouts, lives, shows, y más.\n\n' +
@@ -280,9 +340,9 @@ const showMainMenu = async (ctx) => {
         'Thank you for being PRIME, papi! 🔥\n\n' +
         'Hit **Members Area** and enjoy everything we\'ve prepared for you — videos, Nearby, hangouts, lives, shows, and more.\n\n' +
         '**Cristina**, our AI assistant, is here to guide you and answer questions.\n\n' +
-        '`That\'s so hot! 🔥`';
+        '`That\'s so hot! 🔥`');
 
-    keyboard = Markup.inlineKeyboard([
+    buttons = [
       [
         Markup.button.callback('💎 PRIME ✓', 'already_prime'),
         Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
@@ -298,10 +358,10 @@ const showMainMenu = async (ctx) => {
       [
         Markup.button.callback(creatorBtnText, 'creator_coming_soon'),
       ],
-    ]);
+    ];
   } else {
     // FREE MEMBER VERSION
-    menuText = lang === 'es'
+    menuText = previewBanner + (lang === 'es'
       ? '`🎬 ¡Bienvenido a PNPtv!`\n\n' +
         `@${username} ¡nos encanta tenerte en la Comunidad PNPtv! 💜\n\n` +
         'Pulsa **Desbloquear PRIME** para más diversión — videos completos, lives, hangouts, Nearby, y todas las funciones de miembro.\n\n' +
@@ -311,9 +371,9 @@ const showMainMenu = async (ctx) => {
         `@${username} we love having you in the PNPtv Community! 💜\n\n` +
         'Hit **Unlock PRIME** to get even more cloudy fun — full-length videos, lives, hangouts, Nearby, and all member features.\n\n' +
         '**Cristina**, our AI assistant, is here to guide you and answer questions.\n\n' +
-        '`Unlock the fun! 🔓`';
+        '`Unlock the fun! 🔓`');
 
-    keyboard = Markup.inlineKeyboard([
+    buttons = [
       [
         Markup.button.callback(lang === 'es' ? '🔓 Desbloquear PRIME' : '🔓 Unlock PRIME', 'show_subscription_plans'),
         Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
@@ -329,13 +389,28 @@ const showMainMenu = async (ctx) => {
       [
         Markup.button.callback(creatorBtnText, 'creator_coming_soon'),
       ],
+    ];
+  }
+
+  // Add exit preview button if in preview mode
+  if (isPreviewMode && actualIsAdmin) {
+    buttons.push([
+      Markup.button.callback(lang === 'es' ? '🔙 Salir Vista Previa' : '🔙 Exit Preview', 'admin_exit_preview'),
     ]);
   }
 
-  await ctx.reply(menuText, {
-    parse_mode: 'Markdown',
-    ...keyboard
-  });
+  keyboard = Markup.inlineKeyboard(buttons);
+
+  try {
+    await ctx.reply(sanitizeMarkdown(menuText), {
+      parse_mode: 'Markdown',
+      ...keyboard
+    });
+  } catch (error) {
+    // Fallback to plain text if Markdown parsing fails
+    logger.warn('Markdown parsing failed in showMainMenu, falling back to plain text:', error.message);
+    await ctx.reply(menuText.replace(/`/g, '').replace(/\*\*/g, ''), keyboard);
+  }
 };
 
 /**
@@ -354,19 +429,29 @@ const showGroupMenu = async (ctx) => {
 const showMainMenuEdit = async (ctx) => {
   const lang = ctx.session?.language || 'en';
   const user = ctx.session?.user || {};
-  const isPremium = user.subscriptionStatus === 'active';
-  const userId = ctx.from?.id;
-  const isAdmin = user.role === 'admin' || PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId);
   const username = ctx.from?.username || ctx.from?.first_name || 'Member';
 
+  // Get effective view mode (handles admin preview)
+  const viewState = getEffectiveViewMode(ctx);
+  const { isPremium, isAdmin, isPreviewMode, viewMode, actualIsAdmin } = viewState;
+
   let menuText;
-  let keyboard;
+  let buttons = [];
 
   const creatorBtnText = lang === 'es' ? '🎬 ¡Sé Creador! - Próximamente' : '🎬 Be a Creator! - Coming Soon';
 
+  // Add preview mode indicator for admins
+  let previewBanner = '';
+  if (isPreviewMode) {
+    const modeLabel = viewMode === 'prime'
+      ? (lang === 'es' ? '👁️ VISTA PRIME' : '👁️ PRIME VIEW')
+      : (lang === 'es' ? '👁️ VISTA FREE' : '👁️ FREE VIEW');
+    previewBanner = `\`${modeLabel}\`\n\n`;
+  }
+
   if (isPremium || isAdmin) {
     // PRIME MEMBER VERSION
-    menuText = lang === 'es'
+    menuText = previewBanner + (lang === 'es'
       ? '`🎬 ¡Eres PRIME!`\n\n' +
         '¡Gracias por ser PRIME, papi! 🔥\n\n' +
         'Pulsa **Área de Miembros** y disfruta todo lo que hemos preparado para ti — videos, Nearby, hangouts, lives, shows, y más.\n\n' +
@@ -376,9 +461,9 @@ const showMainMenuEdit = async (ctx) => {
         'Thank you for being PRIME, papi! 🔥\n\n' +
         'Hit **Members Area** and enjoy everything we\'ve prepared for you — videos, Nearby, hangouts, lives, shows, and more.\n\n' +
         '**Cristina**, our AI assistant, is here to guide you and answer questions.\n\n' +
-        '`That\'s so hot! 🔥`';
+        '`That\'s so hot! 🔥`');
 
-    keyboard = Markup.inlineKeyboard([
+    buttons = [
       [
         Markup.button.callback('💎 PRIME ✓', 'already_prime'),
         Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
@@ -394,10 +479,10 @@ const showMainMenuEdit = async (ctx) => {
       [
         Markup.button.callback(creatorBtnText, 'creator_coming_soon'),
       ],
-    ]);
+    ];
   } else {
     // FREE MEMBER VERSION
-    menuText = lang === 'es'
+    menuText = previewBanner + (lang === 'es'
       ? '`🎬 ¡Bienvenido a PNPtv!`\n\n' +
         `@${username} ¡nos encanta tenerte en la Comunidad PNPtv! 💜\n\n` +
         'Pulsa **Desbloquear PRIME** para más diversión — videos completos, lives, hangouts, Nearby, y todas las funciones de miembro.\n\n' +
@@ -407,9 +492,9 @@ const showMainMenuEdit = async (ctx) => {
         `@${username} we love having you in the PNPtv Community! 💜\n\n` +
         'Hit **Unlock PRIME** to get even more cloudy fun — full-length videos, lives, hangouts, Nearby, and all member features.\n\n' +
         '**Cristina**, our AI assistant, is here to guide you and answer questions.\n\n' +
-        '`Unlock the fun! 🔓`';
+        '`Unlock the fun! 🔓`');
 
-    keyboard = Markup.inlineKeyboard([
+    buttons = [
       [
         Markup.button.callback(lang === 'es' ? '🔓 Desbloquear PRIME' : '🔓 Unlock PRIME', 'show_subscription_plans'),
         Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
@@ -425,17 +510,31 @@ const showMainMenuEdit = async (ctx) => {
       [
         Markup.button.callback(creatorBtnText, 'creator_coming_soon'),
       ],
+    ];
+  }
+
+  // Add exit preview button if in preview mode
+  if (isPreviewMode && actualIsAdmin) {
+    buttons.push([
+      Markup.button.callback(lang === 'es' ? '🔙 Salir Vista Previa' : '🔙 Exit Preview', 'admin_exit_preview'),
     ]);
   }
 
+  const keyboard = Markup.inlineKeyboard(buttons);
+
   try {
-    await ctx.editMessageText(menuText, {
+    await ctx.editMessageText(sanitizeMarkdown(menuText), {
       parse_mode: 'Markdown',
       ...keyboard
     });
   } catch (error) {
-    // If edit fails, send new message
-    await showMainMenu(ctx);
+    // If edit fails due to Markdown, try plain text; otherwise send new message
+    logger.warn('Error in showMainMenuEdit:', error.message);
+    try {
+      await ctx.editMessageText(menuText.replace(/`/g, '').replace(/\*\*/g, ''), keyboard);
+    } catch {
+      await showMainMenu(ctx);
+    }
   }
 };
 

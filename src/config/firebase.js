@@ -1,102 +1,52 @@
-
-
-const admin = require('firebase-admin');
+/**
+ * Firebase stub - Firebase is not used in this project.
+ * All data is stored in PostgreSQL.
+ * This file is kept for backwards compatibility with any code that may still reference it.
+ */
 const logger = require('../utils/logger');
 
-let db = null;
-
 function initializeFirebase() {
-  if (db) return db;
-  try {
-    const serviceAccount = {
-      type: 'service_account',
-      project_id: process.env.FIREBASE_PROJECT_ID,
-      private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      client_email: process.env.FIREBASE_CLIENT_EMAIL,
-    };
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      databaseURL: process.env.FIREBASE_DATABASE_URL,
-    });
-    db = admin.firestore();
-    db.settings({ ignoreUndefinedProperties: true });
-    logger.info('Firebase initialized successfully');
-    return db;
-  } catch (error) {
-    logger.error('Failed to initialize Firebase:', error);
-    throw error;
-  }
+  logger.info('Firebase is disabled - using PostgreSQL instead');
+  return null;
 }
 
 function getFirestore() {
-  if (!db) {
-    return initializeFirebase();
-  }
-  return db;
+  logger.warn('getFirestore called but Firebase is disabled - use PostgreSQL instead');
+  return null;
 }
 
-
 function getAdmin() {
-  return admin;
+  logger.warn('getAdmin called but Firebase is disabled');
+  return null;
 }
 
 async function createIndexes() {
-  // Placeholder for creating necessary Firestore indexes in production.
-  // For tests this is a no-op.
+  // No-op - Firebase is not used
   return true;
 }
 
+// PaymentModel stub - the real implementation should be in models/paymentModel.js using PostgreSQL
 class PaymentModel {
-  static async createPayment({ userId, planId, provider, sku, amount, status = 'pending', invoiceId = null }) {
-    const db = getFirestore();
-    const docRef = db.collection('payments').doc();
-    await docRef.set({
-      userId,
-      planId,
-      provider,
-      sku,
-      amount,
-      status,
-      invoiceId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    return docRef.id;
+  static async createPayment() {
+    throw new Error('Firebase PaymentModel is deprecated. Use PostgreSQL PaymentModel instead.');
   }
 
-  static async updatePayment(paymentId, updates) {
-    const db = getFirestore();
-    await db.collection('payments').doc(paymentId).update({
-      ...updates,
-      updatedAt: new Date(),
-    });
+  static async updatePayment() {
+    throw new Error('Firebase PaymentModel is deprecated. Use PostgreSQL PaymentModel instead.');
   }
 
-  static async getPaymentById(paymentId) {
-    const db = getFirestore();
-    const doc = await db.collection('payments').doc(paymentId).get();
-    return doc.exists ? doc.data() : null;
+  static async getPaymentById() {
+    throw new Error('Firebase PaymentModel is deprecated. Use PostgreSQL PaymentModel instead.');
   }
 
-  static async getPaymentsByUser(userId) {
-    const db = getFirestore();
-    const snapshot = await db.collection('payments').where('userId', '==', userId).get();
-    return snapshot.docs.map(doc => doc.data());
+  static async getPaymentsByUser() {
+    throw new Error('Firebase PaymentModel is deprecated. Use PostgreSQL PaymentModel instead.');
   }
 
-  static async getRevenue(startDate, endDate) {
-    const db = getFirestore();
-    const snapshot = await db.collection('payments')
-      .where('status', '==', 'completed')
-      .where('createdAt', '>=', startDate)
-      .where('createdAt', '<=', endDate)
-      .get();
-    const payments = snapshot.docs.map(doc => doc.data());
-    const total = payments.reduce((sum, p) => sum + p.amount, 0);
-    return { total, count: payments.length, average: total / payments.length };
+  static async getRevenue() {
+    throw new Error('Firebase PaymentModel is deprecated. Use PostgreSQL PaymentModel instead.');
   }
 }
-
 
 module.exports = {
   initializeFirebase,

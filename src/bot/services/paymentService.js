@@ -5,6 +5,7 @@ const PlanModel = require('../../models/planModel');
 const UserModel = require('../../models/userModel');
 const { cache } = require('../../config/redis');
 const logger = require('../../utils/logger');
+const DaimoService = require('./daimoService');
 
 class PaymentService {
     /**
@@ -33,7 +34,7 @@ class PaymentService {
       }
       return success;
     }
-  static async createPayment({ userId, planId, provider, sku }) {
+  static async createPayment({ userId, planId, provider, sku, chatId }) {
     try {
       const plan = await PlanModel.getById(planId);
       if (!plan || !plan.active) {
@@ -54,26 +55,30 @@ class PaymentService {
 
       let paymentUrl;
       if (provider === 'epayco') {
-        // Unit test expects 'epayco.com/pay?paymentId=pay123' in the paymentUrl
-        paymentUrl = `https://epayco.com/pay?paymentId=${payment.id}`;
+        // Generate checkout URL at easybots.store for ePayco
+        const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
+        paymentUrl = `${webhookDomain}/checkout/${payment.id}`;
         await PaymentModel.updateStatus(payment.id, 'pending', {
           paymentUrl,
           provider,
         });
       } else if (provider === 'daimo') {
-        const axios = require('axios');
-        let resp;
-        try {
-          resp = await axios.post('https://api.daimo.test/create', { sku, amount: plan.price });
-        } catch (err) {
-          // Daimo API failures should throw 'Internal server error'
-          throw new Error('Internal server error');
-        }
-        paymentUrl = resp.data.payment_url;
-        const transactionId = resp.data.transaction_id;
+        // Generate checkout URL at easybots.store for Daimo (similar to ePayco)
+        const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
+        paymentUrl = `${webhookDomain}/daimo/${payment.id}`;
+
+        // Generate the direct Daimo Pay link via API for the checkout page
+        const daimoDirectLink = await DaimoService.generatePaymentLink({
+          userId,
+          chatId,
+          planId,
+          amount: plan.price,
+          paymentId: payment.id,
+        });
+
         await PaymentModel.updateStatus(payment.id, 'pending', {
           paymentUrl,
-          transactionId,
+          daimoLink: daimoDirectLink,
           provider,
         });
       } else {
@@ -200,19 +205,120 @@ class PaymentService {
   // Process ePayco webhook payload (lightweight for tests)
   static async processEpaycoWebhook(body) {
     try {
-      const txId = body.data?.id || body?.transactionId || null;
+      // ePayco sends data in x_ prefixed fields
+      const txId = body.x_ref_payco || body.data?.id || body?.transactionId || null;
+      const paymentId = body.x_extra3; // We store our payment ID in x_extra3
+      const userId = body.x_extra1;
+      const planId = body.x_extra2;
+      const transactionState = body.x_transaction_state || body.x_respuesta;
       const provider = 'epayco';
-      if (!txId) return { success: false };
-      const existing = await PaymentModel.getByTransactionId(txId, provider);
-      if (existing) {
-        // mark completed
-        await PaymentModel.updateStatus(existing.id || existing.paymentId || txId, 'completed');
+
+      logger.info('Processing ePayco webhook', { txId, paymentId, userId, planId, transactionState });
+
+      // Only process approved/accepted transactions
+      const approvedStates = ['Aceptada', 'Aprobada', 'Approved', 'Accepted'];
+      if (!approvedStates.includes(transactionState)) {
+        logger.info('ePayco transaction not approved', { transactionState });
+        return { success: true }; // Return success to stop retries for non-approved
+      }
+
+      // Try to find payment by our payment ID first, then by transaction ID
+      let payment = paymentId ? await PaymentModel.getById(paymentId) : null;
+      if (!payment && txId) {
+        payment = await PaymentModel.getByTransactionId(txId, provider);
+      }
+
+      if (!payment) {
+        logger.warn('Payment not found for ePayco webhook', { txId, paymentId });
+        return { success: false, error: 'Payment not found' };
+      }
+
+      // Check if already completed (idempotency)
+      if (payment.status === 'completed' || payment.status === 'success') {
+        logger.info('Payment already completed, skipping', { paymentId, txId });
         return { success: true };
       }
-      return { success: false };
+
+      // Update payment status
+      await PaymentModel.updateStatus(payment.id || payment.paymentId, 'completed', {
+        reference: txId,
+        completedAt: new Date(),
+      });
+
+      // Activate user subscription and send confirmation
+      if (userId && planId) {
+        const PlanModel = require('../models/planModel');
+        const UserModel = require('../../models/userModel');
+        const { getBotInstance } = require('../core/bot');
+
+        const plan = await PlanModel.getById(planId);
+        const durationDays = plan?.duration || 30;
+        const expiry = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+
+        await UserModel.updateSubscription(userId, {
+          status: 'active',
+          planId: planId,
+          expiry: expiry
+        });
+
+        logger.info('User subscription activated via ePayco', { userId, planId, expiry });
+
+        // Send confirmation message with PRIME invite link
+        try {
+          const bot = getBotInstance();
+          if (bot) {
+            const primeChannelId = process.env.PRIME_CHANNEL_ID || '-1002997324714';
+            const user = await UserModel.getById(userId);
+            const userName = user?.firstName || user?.username || 'Usuario';
+            const planName = plan?.name || planId;
+
+            // Format expiry date
+            const expiryDate = expiry.toLocaleDateString('es-ES', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric'
+            });
+
+            // Create one-time use invite link
+            const inviteLink = await bot.telegram.createChatInviteLink(primeChannelId, {
+              member_limit: 1,
+              name: `${planName} - User ${userId}`,
+              expire_date: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) // 7 days
+            });
+
+            // Send confirmation message
+            const message = [
+              `🎉 *¡Bienvenido a PNPtv PRIME, ${userName}!*`,
+              '',
+              `✅ Tu pago por el plan *${planName}* fue recibido exitosamente.`,
+              '',
+              `📋 *Detalles de tu suscripción:*`,
+              `• Plan: ${planName}`,
+              `• Vence: ${expiryDate}`,
+              '',
+              `🔐 *Accede al canal exclusivo PRIME:*`,
+              `👉 [Ingresar a PRIME](${inviteLink.invite_link})`,
+              '',
+              `⚠️ *Importante:* Este enlace es de un solo uso y expira en 7 días.`,
+              '',
+              `💎 ¡Gracias por confiar en PNPtv! Disfruta todos los beneficios exclusivos.`
+            ].join('\n');
+
+            await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown' });
+            logger.info('Payment confirmation message sent', { userId, planId, inviteLink: inviteLink.invite_link });
+          } else {
+            logger.warn('Bot instance not available, skipping confirmation message', { userId });
+          }
+        } catch (msgError) {
+          // Don't fail the webhook if message sending fails
+          logger.error('Error sending payment confirmation message', { userId, error: msgError.message });
+        }
+      }
+
+      return { success: true };
     } catch (error) {
       logger.error('Error processing ePayco webhook', error);
-      return { success: false };
+      return { success: false, error: error.message };
     }
   }
 

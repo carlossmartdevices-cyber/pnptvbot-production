@@ -21,35 +21,64 @@ async function showAdminPanel(ctx, edit = false) {
     const userRole = await PermissionService.getUserRole(userId);
     const roleDisplay = await PermissionService.getUserRoleDisplay(userId, lang);
 
-    // Build menu based on role
+    // Build menu based on role with organized sections
     const buttons = [];
 
-    // Common for all admin roles
-    buttons.push([Markup.button.callback('👥 Usuarios', 'admin_users')]);
+    // ═══ USER MANAGEMENT ═══
+    buttons.push([
+      Markup.button.callback('👥 ' + (lang === 'es' ? 'Usuarios' : 'Users'), 'admin_users'),
+      Markup.button.callback('📊 ' + (lang === 'es' ? 'Analíticas' : 'Analytics'), 'admin_analytics'),
+    ]);
 
     // Admin and SuperAdmin features
     if (userRole === 'superadmin' || userRole === 'admin') {
-      buttons.push([Markup.button.callback('📢 Difusión', 'admin_broadcast')]);
-      buttons.push([Markup.button.callback('📊 Analíticas', 'admin_analytics')]);
-      buttons.push([Markup.button.callback('🎮 Gamificación', 'admin_gamification')]);
-      buttons.push([Markup.button.callback('📻 Radio', 'admin_radio')]);
-      buttons.push([Markup.button.callback('📺 Transmisiones', 'admin_live_streams')]);
+      // ═══ CONTENT & MEDIA ═══
+      buttons.push([
+        Markup.button.callback('📻 Radio', 'admin_radio'),
+        Markup.button.callback('📺 ' + (lang === 'es' ? 'En Vivo' : 'Live'), 'admin_live_streams'),
+      ]);
+
+      // ═══ ENGAGEMENT ═══
+      buttons.push([
+        Markup.button.callback('📢 ' + (lang === 'es' ? 'Difusión' : 'Broadcast'), 'admin_broadcast'),
+        Markup.button.callback('🎮 ' + (lang === 'es' ? 'Gamificación' : 'Gamification'), 'admin_gamification'),
+      ]);
+
+      // ═══ PREVIEW MODE ═══
+      buttons.push([
+        Markup.button.callback('👁️ ' + (lang === 'es' ? 'Vista Previa' : 'Preview Mode'), 'admin_view_mode'),
+      ]);
     }
 
     // SuperAdmin only features
     if (userRole === 'superadmin') {
-      buttons.push([Markup.button.callback('📋 Menús', 'admin_menus')]);
-      buttons.push([Markup.button.callback('👑 Roles', 'admin_roles')]);
-      buttons.push([Markup.button.callback('💎 Planes', 'admin_plans')]);
-      buttons.push([Markup.button.callback('📜 Logs', 'admin_logs')]);
+      // ═══ SYSTEM CONFIG ═══
+      buttons.push([
+        Markup.button.callback('💎 ' + (lang === 'es' ? 'Planes' : 'Plans'), 'admin_plans'),
+        Markup.button.callback('👑 Roles', 'admin_roles'),
+      ]);
+      buttons.push([
+        Markup.button.callback('📋 ' + (lang === 'es' ? 'Menús' : 'Menus'), 'admin_menus'),
+        Markup.button.callback('📜 Logs', 'admin_logs'),
+      ]);
     }
 
-    const message = `${roleDisplay}\n\n${t('adminPanel', lang)}`;
+    // Build styled message
+    const header = lang === 'es' ? '`⚙️ Panel de Administración`' : '`⚙️ Admin Panel`';
+    const divider = '━━━━━━━━━━━━━━━━━━━━';
+    const footer = lang === 'es' ? '`Selecciona una opción 💜`' : '`Choose an option 💜`';
+
+    const message = `${header}\n${divider}\n\n${roleDisplay}\n\n${footer}`;
+
+    const options = {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard(buttons),
+    };
 
     if (edit) {
-      await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
+      await ctx.editMessageText(message, options);
     } else {
-      await ctx.reply(message, Markup.inlineKeyboard(buttons));
+      await ctx.reply(message, options);
     }
   } catch (error) {
     logger.error('Error showing admin panel:', error);
@@ -85,6 +114,65 @@ const registerAdminHandlers = (bot) => {
       await showAdminPanel(ctx, false);
     } catch (error) {
       logger.error('Error in /admin command:', error);
+    }
+  });
+
+  // Quick view mode command: /viewas free | /viewas prime | /viewas normal
+  bot.command('viewas', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.reply(t('unauthorized', getLanguage(ctx)));
+        return;
+      }
+
+      const lang = getLanguage(ctx);
+      const args = ctx.message.text.split(' ');
+      const mode = args[1]?.toLowerCase();
+
+      if (!mode || !['free', 'prime', 'normal'].includes(mode)) {
+        const helpMsg = lang === 'es'
+          ? '👁️ **Comando de Vista Previa**\n\n' +
+            'Uso: `/viewas <modo>`\n\n' +
+            'Modos disponibles:\n' +
+            '• `free` - Ver como usuario FREE\n' +
+            '• `prime` - Ver como usuario PRIME\n' +
+            '• `normal` - Vista normal (admin)\n\n' +
+            'Ejemplo: `/viewas free`'
+          : '👁️ **Preview Mode Command**\n\n' +
+            'Usage: `/viewas <mode>`\n\n' +
+            'Available modes:\n' +
+            '• `free` - View as FREE user\n' +
+            '• `prime` - View as PRIME user\n' +
+            '• `normal` - Normal view (admin)\n\n' +
+            'Example: `/viewas free`';
+        await ctx.reply(helpMsg, { parse_mode: 'Markdown' });
+        return;
+      }
+
+      if (mode === 'normal') {
+        delete ctx.session.adminViewMode;
+      } else {
+        ctx.session.adminViewMode = mode;
+      }
+      await ctx.saveSession();
+
+      const modeText = mode === 'free'
+        ? (lang === 'es' ? '🆓 FREE' : '🆓 FREE')
+        : mode === 'prime'
+        ? (lang === 'es' ? '💎 PRIME' : '💎 PRIME')
+        : (lang === 'es' ? '🔙 Normal' : '🔙 Normal');
+
+      await ctx.reply(
+        lang === 'es'
+          ? `👁️ Vista activada: ${modeText}\n\nUsa /menu para ver el menú.`
+          : `👁️ View activated: ${modeText}\n\nUse /menu to see the menu.`,
+        { parse_mode: 'Markdown' }
+      );
+
+      logger.info('Admin view mode changed via command', { userId: ctx.from.id, mode });
+    } catch (error) {
+      logger.error('Error in /viewas command:', error);
     }
   });
 
@@ -176,6 +264,146 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error in admin users:', error);
+    }
+  });
+
+  // View Mode - Show options to preview as Free or Prime
+  bot.action('admin_view_mode', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const lang = getLanguage(ctx);
+      const currentMode = ctx.session?.adminViewMode;
+
+      let statusText = '';
+      if (currentMode === 'free') {
+        statusText = lang === 'es' ? '\n\n_Actualmente: Vista FREE_' : '\n\n_Currently: FREE View_';
+      } else if (currentMode === 'prime') {
+        statusText = lang === 'es' ? '\n\n_Actualmente: Vista PRIME_' : '\n\n_Currently: PRIME View_';
+      } else {
+        statusText = lang === 'es' ? '\n\n_Actualmente: Vista Normal (Admin)_' : '\n\n_Currently: Normal View (Admin)_';
+      }
+
+      const message = lang === 'es'
+        ? '👁️ **Vista Previa de Menú**\n\nSelecciona cómo quieres ver el menú para probar la experiencia del usuario:' + statusText
+        : '👁️ **Menu Preview Mode**\n\nSelect how you want to view the menu to test the user experience:' + statusText;
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback(lang === 'es' ? '🆓 Ver como FREE' : '🆓 View as FREE', 'admin_view_as_free'),
+            Markup.button.callback(lang === 'es' ? '💎 Ver como PRIME' : '💎 View as PRIME', 'admin_view_as_prime'),
+          ],
+          [
+            Markup.button.callback(lang === 'es' ? '🔙 Vista Normal' : '🔙 Normal View', 'admin_view_as_normal'),
+          ],
+          [
+            Markup.button.callback(lang === 'es' ? '↩️ Volver' : '↩️ Back', 'admin_cancel'),
+          ],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in admin view mode:', error);
+    }
+  });
+
+  // Set view mode to FREE
+  bot.action('admin_view_as_free', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      ctx.session.adminViewMode = 'free';
+      await ctx.saveSession();
+
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(lang === 'es' ? '👁️ Vista FREE activada' : '👁️ FREE View activated');
+
+      // Show menu with new view mode
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error setting free view mode:', error);
+    }
+  });
+
+  // Set view mode to PRIME
+  bot.action('admin_view_as_prime', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      ctx.session.adminViewMode = 'prime';
+      await ctx.saveSession();
+
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(lang === 'es' ? '👁️ Vista PRIME activada' : '👁️ PRIME View activated');
+
+      // Show menu with new view mode
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error setting prime view mode:', error);
+    }
+  });
+
+  // Set view mode back to Normal (admin)
+  bot.action('admin_view_as_normal', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      delete ctx.session.adminViewMode;
+      await ctx.saveSession();
+
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(lang === 'es' ? '🔙 Vista Normal activada' : '🔙 Normal View activated');
+
+      // Show menu with normal view
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error setting normal view mode:', error);
+    }
+  });
+
+  // Exit preview mode (from menu button)
+  bot.action('admin_exit_preview', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      delete ctx.session.adminViewMode;
+      await ctx.saveSession();
+
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(lang === 'es' ? '🔙 Vista Normal' : '🔙 Normal View');
+
+      // Show menu with normal view
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error exiting preview mode:', error);
     }
   });
 

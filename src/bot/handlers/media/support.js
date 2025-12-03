@@ -10,29 +10,6 @@ let AGENT_ID = null;
 try {
   const { Mistral } = require('@mistralai/mistralai');
   if (process.env.MISTRAL_API_KEY) {
-    mistral = new Mistral({
-      apiKey: process.env.MISTRAL_API_KEY,
-    });
-
-    // Initialize agent on startup (will be created if not exists)
-    initializeAgent().catch(err => {
-      logger.error('Failed to initialize Mistral agent:', err);
-    });
-  }
-} catch (error) {
-  logger.warn('Mistral AI package not installed. AI chat will be unavailable.');
-const { Markup } = require('telegraf');
-const { t } = require('../../../utils/i18n');
-const logger = require('../../../utils/logger');
-const { getLanguage } = require('../../utils/helpers');
-
-// Mistral AI integration
-let mistral = null;
-let AGENT_ID = null;
-
-try {
-  const { Mistral } = require('@mistralai/mistralai');
-  if (process.env.MISTRAL_API_KEY) {
     mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
 
     // Initialize agent on startup (will be created if not exists)

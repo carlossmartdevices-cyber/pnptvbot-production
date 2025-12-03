@@ -322,6 +322,26 @@ class PermissionService {
       return '👤 User';
     }
   }
+
+  /**
+   * Check if user is the super admin from environment variable
+   * @param {number|string} userId - User ID
+   * @returns {boolean} True if user is super admin
+   */
+  static isEnvSuperAdmin(userId) {
+    const superAdminId = process.env.ADMIN_ID?.trim();
+    return superAdminId && String(userId) === superAdminId;
+  }
+
+  /**
+   * Check if user is an admin from environment variable
+   * @param {number|string} userId - User ID
+   * @returns {boolean} True if user is admin
+   */
+  static isEnvAdmin(userId) {
+    const adminIds = (process.env.ADMIN_USER_IDS || '').split(',').map(id => id.trim()).filter(id => id);
+    return adminIds.includes(String(userId));
+  }
 }
 
 module.exports = PermissionService;

@@ -13,26 +13,24 @@ const initializePostgres = () => {
   }
 
   try {
-    // Build connection string if DATABASE_URL is not set
-    let connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      const host = process.env.POSTGRES_HOST || 'localhost';
-      const port = process.env.POSTGRES_PORT || '5432';
-      const database = process.env.POSTGRES_DATABASE || 'pnptvbot';
-      const user = process.env.POSTGRES_USER || 'pnptvbot';
-      const password = process.env.POSTGRES_PASSWORD || '';
-      connectionString = `postgresql://${user}:${password}@${host}:${port}/${database}`;
-    }
+    // Use individual connection parameters instead of connection string
+    // to avoid URL encoding issues with special characters in password
+    const host = process.env.POSTGRES_HOST || 'localhost';
+    const port = parseInt(process.env.POSTGRES_PORT || '5432');
+    const database = process.env.POSTGRES_DATABASE || 'pnptvbot';
+    const user = process.env.POSTGRES_USER || 'pnptvbot';
+    const password = process.env.POSTGRES_PASSWORD || '';
+
     pool = new Pool({
-      connectionString,
-      ssl: process.env.POSTGRES_SSL === 'true'
-        ? (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'test'
-            ? { rejectUnauthorized: false }
-            : true)
-        : false,
+      host,
+      port,
+      database,
+      user,
+      password,
+      ssl: false, // Local PostgreSQL doesn't use SSL
       max: process.env.POSTGRES_POOL_MAX ? parseInt(process.env.POSTGRES_POOL_MAX) : 20,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
+      connectionTimeoutMillis: 10000,
     });
 
     pool.on('error', (err) => {

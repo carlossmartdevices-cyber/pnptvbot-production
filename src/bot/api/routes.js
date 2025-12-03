@@ -10,6 +10,7 @@ const logger = require('../../utils/logger');
 // Controllers
 const webhookController = require('./controllers/webhookController');
 const subscriptionController = require('./controllers/subscriptionController');
+const paymentController = require('./controllers/paymentController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -22,6 +23,10 @@ const pageLimiter = (req, res, next) => {
 };
 
 const app = express();
+
+// Trust proxy - required for rate limiting behind reverse proxy (nginx, etc.)
+// Setting to 1 trusts the first proxy (direct connection from nginx)
+app.set('trust proxy', 1);
 
 // CRITICAL: Apply body parsing FIRST for ALL routes
 // This must be before any route registration
@@ -40,14 +45,6 @@ app.get('/', (req, res) => {
 });
 
 app.get('/lifetime-pass', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
-});
-
-app.get('/promo', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
-});
-
-app.get('/pnptv-hot-sale', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
 });
 
@@ -74,6 +71,19 @@ app.get('/policies', pageLimiter, (req, res) => {
   const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
   res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
+
+// ePayco Checkout page - serves payment-checkout.html for /checkout/:paymentId
+app.get('/checkout/:paymentId', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'payment-checkout.html'));
+});
+
+// Daimo Checkout page - serves daimo-checkout.html for /daimo/:paymentId
+app.get('/daimo/:paymentId', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'daimo-checkout.html'));
+});
+
+// Payment info API - used by checkout page
+app.get('/api/payment/:paymentId', asyncHandler(paymentController.getPaymentInfo));
 
 // Function to conditionally apply middleware (skip for Telegram webhook)
 const conditionalMiddleware = (middleware) => (req, res, next) => {

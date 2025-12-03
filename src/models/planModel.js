@@ -1,12 +1,12 @@
-const { getFirestore } = require('../config/firebase');
+const { query } = require('../config/postgres');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
 /**
- * Plan Model - Handles subscription plan data with Firestore
+ * Plan Model - Handles subscription plan data with PostgreSQL
  */
 class Plan {
-  static COLLECTION = 'plans';
+  static TABLE = 'plans';
 
   /**
    * Get all active plans (with caching)
@@ -19,24 +19,13 @@ class Plan {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const db = getFirestore();
-          const snapshot = await db
-            .collection(this.COLLECTION)
-            .where('active', '==', true)
-            .orderBy('price', 'asc')
-            .get();
+          const result = await query(
+            `SELECT * FROM ${this.TABLE} WHERE active = true ORDER BY price ASC`
+          );
 
-          // Firestore snapshots in tests may provide either `docs` array or implement `forEach`.
-          let plans = [];
-          if (snapshot && Array.isArray(snapshot.docs)) {
-            plans = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          } else if (snapshot && typeof snapshot.forEach === 'function') {
-            snapshot.forEach((doc) => {
-              plans.push({ id: doc.id, ...doc.data() });
-            });
-          }
+          const plans = result.rows.map((row) => this.mapRowToPlan(row));
 
-          logger.info(`Fetched ${plans.length} plans from Firestore`);
+          logger.info(`Fetched ${plans.length} plans from PostgreSQL`);
           return plans.length > 0 ? plans : this.getDefaultPlans();
         },
         3600, // Cache for 1 hour
@@ -59,19 +48,18 @@ class Plan {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const db = getFirestore();
-          const doc = await db.collection(this.COLLECTION).doc(planId).get();
+          const result = await query(
+            `SELECT * FROM ${this.TABLE} WHERE id = $1`,
+            [planId]
+          );
 
-          if (!doc.exists) {
+          if (result.rows.length === 0) {
             logger.warn(`Plan not found: ${planId}`);
             return null;
           }
 
-          logger.info(`Fetched plan from Firestore: ${planId}`);
-          return {
-            id: doc.id,
-            ...doc.data(),
-          };
+          logger.info(`Fetched plan from PostgreSQL: ${planId}`);
+          return this.mapRowToPlan(result.rows[0]);
         },
         3600, // Cache for 1 hour
       );
@@ -79,6 +67,29 @@ class Plan {
       logger.error('Error getting plan:', error);
       return null;
     }
+  }
+
+  /**
+   * Map database row to plan object
+   * @param {Object} row - Database row
+   * @returns {Object} Plan object
+   */
+  static mapRowToPlan(row) {
+    return {
+      id: row.id,
+      sku: row.sku,
+      name: row.name || row.display_name,
+      nameEs: row.name_es,
+      price: parseFloat(row.price),
+      currency: row.currency || 'USD',
+      duration: row.duration_days || row.duration || 30,
+      features: row.features || [],
+      featuresEs: row.features_es || [],
+      active: row.active,
+      isLifetime: row.is_lifetime || false,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
 
   /**
@@ -96,37 +107,42 @@ class Plan {
         logger.info(`Auto-generated SKU: ${data.sku} for plan: ${planId}`);
       }
 
-      const db = getFirestore();
+      const sql = `
+        INSERT INTO ${this.TABLE} (id, sku, name, name_es, price, currency, duration_days, features, features_es, active, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          sku = EXCLUDED.sku,
+          name = EXCLUDED.name,
+          name_es = EXCLUDED.name_es,
+          price = EXCLUDED.price,
+          currency = EXCLUDED.currency,
+          duration_days = EXCLUDED.duration_days,
+          features = EXCLUDED.features,
+          features_es = EXCLUDED.features_es,
+          active = EXCLUDED.active,
+          updated_at = NOW()
+        RETURNING *
+      `;
 
-      // Check if document exists to determine createdAt
-      const docRef = db.collection(this.COLLECTION).doc(planId);
-      // Let errors bubble up if the underlying DB read fails (tests expect failures)
-      const existing = await docRef.get();
-      const docExists = !!existing && !!existing.exists;
-
-      const planDoc = {
-        id: planId,
-        sku: data.sku,
-        name: data.name,
-        nameEs: data.nameEs,
-        price: data.price,
-        currency: data.currency || 'USD',
-        duration: data.duration || 30,
-        features: data.features || [],
-        featuresEs: data.featuresEs || [],
-        active: data.active !== undefined ? data.active : true,
-        updatedAt: new Date(),
-        createdAt: docExists ? undefined : new Date(),
-      };
-
-      await db.collection(this.COLLECTION).doc(planId).set(planDoc, { merge: true });
+      const result = await query(sql, [
+        planId,
+        data.sku,
+        data.name,
+        data.nameEs,
+        data.price,
+        data.currency || 'USD',
+        data.duration || 30,
+        JSON.stringify(data.features || []),
+        JSON.stringify(data.featuresEs || []),
+        data.active !== undefined ? data.active : true,
+      ]);
 
       // Invalidate cache
       await cache.del(`plan:${planId}`);
       await cache.del('plans:all');
 
       logger.info('Plan created/updated', { planId, sku: data.sku });
-      return planDoc;
+      return this.mapRowToPlan(result.rows[0]);
     } catch (error) {
       logger.error('Error creating/updating plan:', error);
       throw error;
@@ -140,8 +156,7 @@ class Plan {
    */
   static async delete(planId) {
     try {
-      const db = getFirestore();
-      await db.collection(this.COLLECTION).doc(planId).delete();
+      await query(`DELETE FROM ${this.TABLE} WHERE id = $1`, [planId]);
 
       // Invalidate cache
       await cache.del(`plan:${planId}`);
