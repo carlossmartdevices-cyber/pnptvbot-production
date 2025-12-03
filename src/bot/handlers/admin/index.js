@@ -5,6 +5,7 @@ const { PERMISSIONS } = require('../../../models/permissionModel');
 const UserModel = require('../../../models/userModel');
 const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
+const { sendPrimeConfirmation } = require('../../services/paymentService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
@@ -1653,11 +1654,16 @@ const registerAdminHandlers = (bot) => {
         }
       }
 
+      const planName = user.planId || 'premium';
+
       await UserModel.updateSubscription(userId, {
         status: 'active',
-        planId: user.planId || 'premium',
+        planId: planName,
         expiry: newExpiry,
       });
+
+      // Send PRIME confirmation with invite link to user
+      await sendPrimeConfirmation(userId, planName, newExpiry, 'admin-extend');
 
       let successText = `✅ **Membresía Extendida**\n\n`;
       successText += `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`;
@@ -1667,6 +1673,7 @@ const registerAdminHandlers = (bot) => {
       } else {
         successText += `♾️ Membresía Lifetime activada\n`;
       }
+      successText += `\n📨 Se envió confirmación con enlace PRIME al usuario`;
 
       await ctx.editMessageText(
         successText,
@@ -1779,12 +1786,16 @@ const registerAdminHandlers = (bot) => {
       }
 
       // Set new plan
+      let newExpiry = null;
+      let planName = 'Gratis';
+
       if (planId === 'free') {
         await UserModel.updateSubscription(userId, {
           status: 'free',
           planId: null,
           expiry: null,
         });
+        // No PRIME confirmation for free plan
       } else {
         const plan = await PlanModel.getById(planId);
         if (!plan) {
@@ -1792,8 +1803,10 @@ const registerAdminHandlers = (bot) => {
           return;
         }
 
+        planName = plan.name || planId;
+
         // Set new expiry date based on plan duration
-        const newExpiry = new Date();
+        newExpiry = new Date();
         newExpiry.setDate(newExpiry.getDate() + (plan.duration || 30));
 
         await UserModel.updateSubscription(userId, {
@@ -1801,13 +1814,22 @@ const registerAdminHandlers = (bot) => {
           planId,
           expiry: newExpiry,
         });
+
+        // Send PRIME confirmation with invite link to user
+        await sendPrimeConfirmation(userId, planName, newExpiry, 'admin-plan-change');
+      }
+
+      let successMsg = `✅ Plan actualizado exitosamente\n\n`
+        + `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`
+        + `💎 Nuevo Plan: ${planId === 'free' ? 'Gratis' : planName}\n`
+        + `📅 Estado: ${planId === 'free' ? 'free' : 'active'}`;
+
+      if (planId !== 'free') {
+        successMsg += `\n\n📨 Se envió confirmación con enlace PRIME al usuario`;
       }
 
       await ctx.editMessageText(
-        `✅ Plan actualizado exitosamente\n\n`
-        + `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`
-        + `💎 Nuevo Plan: ${planId === 'free' ? 'Gratis' : planId}\n`
-        + `📅 Estado: ${planId === 'free' ? 'free' : 'active'}`,
+        successMsg,
         Markup.inlineKeyboard([
           [Markup.button.callback('◀️ Volver', 'admin_cancel')],
         ]),

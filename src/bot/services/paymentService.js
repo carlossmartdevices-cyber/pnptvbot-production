@@ -7,6 +7,75 @@ const { cache } = require('../../config/redis');
 const logger = require('../../utils/logger');
 const DaimoService = require('./daimoService');
 
+/**
+ * Send PRIME confirmation message with unique invite link
+ * @param {string} userId - Telegram user ID
+ * @param {string} planName - Name of the plan
+ * @param {Date|null} expiry - Expiry date (null for lifetime)
+ * @param {string} source - Source of the subscription change (e.g., 'epayco', 'admin', 'daimo')
+ * @returns {Promise<boolean>} Success status
+ */
+async function sendPrimeConfirmation(userId, planName, expiry, source = 'system') {
+  try {
+    const { getBotInstance } = require('../core/bot');
+    const bot = getBotInstance();
+
+    if (!bot) {
+      logger.warn('Bot instance not available for PRIME confirmation', { userId, source });
+      return false;
+    }
+
+    const primeChannelId = process.env.PRIME_CHANNEL_ID || '-1002997324714';
+    const user = await UserModel.getById(userId);
+    const userName = user?.firstName || user?.username || 'Usuario';
+
+    // Format expiry date
+    let expiryText;
+    if (expiry === null) {
+      expiryText = 'Lifetime (sin vencimiento)';
+    } else {
+      const expiryDate = new Date(expiry);
+      expiryText = expiryDate.toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    }
+
+    // Create one-time use invite link
+    const inviteLink = await bot.telegram.createChatInviteLink(primeChannelId, {
+      member_limit: 1,
+      name: `${planName} - User ${userId}`,
+      expire_date: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) // 7 days
+    });
+
+    // Send confirmation message
+    const message = [
+      `🎉 *¡Bienvenido a PNPtv PRIME, ${userName}!*`,
+      '',
+      `✅ Tu suscripción al plan *${planName}* ha sido activada exitosamente.`,
+      '',
+      `📋 *Detalles de tu suscripción:*`,
+      `• Plan: ${planName}`,
+      `• Vence: ${expiryText}`,
+      '',
+      `🔐 *Accede al canal exclusivo PRIME:*`,
+      `👉 [Ingresar a PRIME](${inviteLink.invite_link})`,
+      '',
+      `⚠️ *Importante:* Este enlace es de un solo uso y expira en 7 días.`,
+      '',
+      `💎 ¡Gracias por confiar en PNPtv! Disfruta todos los beneficios exclusivos.`
+    ].join('\n');
+
+    await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown' });
+    logger.info('PRIME confirmation message sent', { userId, planName, source, inviteLink: inviteLink.invite_link });
+    return true;
+  } catch (error) {
+    logger.error('Error sending PRIME confirmation message', { userId, planName, source, error: error.message });
+    return false;
+  }
+}
+
 class PaymentService {
     /**
      * Reintentar pago fallido (simulado)
@@ -249,11 +318,11 @@ class PaymentService {
       if (userId && planId) {
         const PlanModel = require('../models/planModel');
         const UserModel = require('../../models/userModel');
-        const { getBotInstance } = require('../core/bot');
 
         const plan = await PlanModel.getById(planId);
         const durationDays = plan?.duration || 30;
         const expiry = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+        const planName = plan?.name || planId;
 
         await UserModel.updateSubscription(userId, {
           status: 'active',
@@ -264,55 +333,7 @@ class PaymentService {
         logger.info('User subscription activated via ePayco', { userId, planId, expiry });
 
         // Send confirmation message with PRIME invite link
-        try {
-          const bot = getBotInstance();
-          if (bot) {
-            const primeChannelId = process.env.PRIME_CHANNEL_ID || '-1002997324714';
-            const user = await UserModel.getById(userId);
-            const userName = user?.firstName || user?.username || 'Usuario';
-            const planName = plan?.name || planId;
-
-            // Format expiry date
-            const expiryDate = expiry.toLocaleDateString('es-ES', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric'
-            });
-
-            // Create one-time use invite link
-            const inviteLink = await bot.telegram.createChatInviteLink(primeChannelId, {
-              member_limit: 1,
-              name: `${planName} - User ${userId}`,
-              expire_date: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) // 7 days
-            });
-
-            // Send confirmation message
-            const message = [
-              `🎉 *¡Bienvenido a PNPtv PRIME, ${userName}!*`,
-              '',
-              `✅ Tu pago por el plan *${planName}* fue recibido exitosamente.`,
-              '',
-              `📋 *Detalles de tu suscripción:*`,
-              `• Plan: ${planName}`,
-              `• Vence: ${expiryDate}`,
-              '',
-              `🔐 *Accede al canal exclusivo PRIME:*`,
-              `👉 [Ingresar a PRIME](${inviteLink.invite_link})`,
-              '',
-              `⚠️ *Importante:* Este enlace es de un solo uso y expira en 7 días.`,
-              '',
-              `💎 ¡Gracias por confiar en PNPtv! Disfruta todos los beneficios exclusivos.`
-            ].join('\n');
-
-            await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown' });
-            logger.info('Payment confirmation message sent', { userId, planId, inviteLink: inviteLink.invite_link });
-          } else {
-            logger.warn('Bot instance not available, skipping confirmation message', { userId });
-          }
-        } catch (msgError) {
-          // Don't fail the webhook if message sending fails
-          logger.error('Error sending payment confirmation message', { userId, error: msgError.message });
-        }
+        await sendPrimeConfirmation(userId, planName, expiry, 'epayco');
       }
 
       return { success: true };
@@ -354,14 +375,27 @@ class PaymentService {
           return { success: false, error: 'Payment not found' };
         }
 
+        // Check if already completed (idempotency)
+        if (payment.status === 'completed' || payment.status === 'success') {
+          await cache.releaseLock(lockKey);
+          logger.info('Payment already completed, skipping', { paymentId });
+          return { success: true, alreadyProcessed: true };
+        }
+
         // Update user subscription
         const plan = await PlanModel.getById(planId);
         const expiry = new Date(Date.now() + ((plan && plan.duration) || 30) * 24 * 60 * 60 * 1000);
+        const planName = plan?.name || planId;
 
         await UserModel.updateSubscription(userId, { status: 'active', planId, expiry });
 
         // Mark payment as success
         await PaymentModel.updateStatus(paymentId, 'success', { transactionId: body.transaction_id, completedAt: new Date() });
+
+        logger.info('User subscription activated via Daimo', { userId, planId, expiry });
+
+        // Send confirmation message with PRIME invite link
+        await sendPrimeConfirmation(userId, planName, expiry, 'daimo');
 
         await cache.releaseLock(lockKey);
         return { success: true };
@@ -387,3 +421,4 @@ class PaymentService {
 }
 
 module.exports = PaymentService;
+module.exports.sendPrimeConfirmation = sendPrimeConfirmation;
