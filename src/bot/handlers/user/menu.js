@@ -415,11 +415,35 @@ const showMainMenu = async (ctx) => {
 
 /**
  * Show limited group menu (for privacy and anti-spam)
+ * Redirects user to private chat for full menu
  * @param {Context} ctx - Telegraf context
  */
 const showGroupMenu = async (ctx) => {
-  // Group menu has been disabled
-  logger.info('Group menu functionality has been disabled');
+  const lang = ctx.session?.language || 'en';
+  const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'friend';
+  const botUsername = ctx.botInfo?.username || 'PNPtvbot';
+
+  const message = lang === 'es'
+    ? `👋 ¡Hola ${username}!\n\n` +
+      `El menú completo está disponible en nuestro chat privado.\n\n` +
+      `Presiona el botón para abrirlo 👇`
+    : `👋 Hey ${username}!\n\n` +
+      `The full menu is available in our private chat.\n\n` +
+      `Tap the button to open it 👇`;
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.url(
+      lang === 'es' ? '💬 Abrir Chat Privado' : '💬 Open Private Chat',
+      `https://t.me/${botUsername}?start=menu`
+    )]
+  ]);
+
+  try {
+    await ctx.reply(message, keyboard);
+    logger.info('Group menu redirect sent', { userId: ctx.from?.id, chatId: ctx.chat?.id });
+  } catch (error) {
+    logger.error('Error sending group menu redirect:', error);
+  }
 };
 
 /**
