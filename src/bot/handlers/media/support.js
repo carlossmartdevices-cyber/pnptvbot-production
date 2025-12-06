@@ -452,14 +452,34 @@ const registerSupportHandlers = (bot) => {
         // Exit contact admin mode if user sends a command
         if (message.startsWith('/')) { ctx.session.temp.contactingAdmin = false; await ctx.saveSession(); return next(); }
 
-        // Send to admin users
-        const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
-        if (adminIds.length === 0) {
-          logger.error('No admin users configured for support messages');
-          await ctx.reply(lang === 'es' ? 'Sistema de soporte no configurado. Por favor contacta con nosotros vía email.' : 'Support system not configured. Please contact us via email.');
-          ctx.session.temp.contactingAdmin = false; return;
+        // Build support message
+        const userId = ctx.from.id;
+        const username = ctx.from.username ? `@${ctx.from.username}` : 'No username';
+        const firstName = ctx.from.first_name || 'Unknown';
+
+        const supportMessage = `📬 *SOLICITUD DE SOPORTE*
+
+👤 *Usuario:* ${firstName}
+🆔 *Telegram:* ${username}
+🔢 *User ID:* \`${userId}\`
+📅 *Fecha:* ${new Date().toLocaleString('es-ES')}
+
+💬 *Mensaje:*
+${message}`;
+
+        // Send to support group
+        const supportGroupId = process.env.SUPPORT_GROUP_ID;
+        if (supportGroupId) {
+          try {
+            await ctx.telegram.sendMessage(supportGroupId, supportMessage, { parse_mode: 'Markdown' });
+            logger.info(`Support request sent to support group`, { userId, username });
+          } catch (groupError) {
+            logger.error('Error sending to support group:', groupError);
+          }
         }
 
+        // Also send to admin users as backup
+        const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
         for (const adminId of adminIds) {
           try { await ctx.telegram.sendMessage(adminId.trim(), `📬 Support Message from User ${ctx.from.id} (@${ctx.from.username || 'no username'}):\n\n${message}`); } catch (sendError) { logger.error('Error sending to admin:', sendError); }
         }
