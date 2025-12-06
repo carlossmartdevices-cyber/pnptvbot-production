@@ -146,8 +146,11 @@ const handleDaimoWebhook = async (req, res) => {
         return res.status(400).json({ success: false, error: 'Invalid metadata structure' });
     }
 
-    // Process webhook
-    const result = await PaymentService.processDaimoWebhook(req.body);
+    // Get signature from header (Daimo sends it as x-daimo-signature)
+    const signature = req.headers['x-daimo-signature'] || req.body.signature;
+
+    // Process webhook with signature
+    const result = await PaymentService.processDaimoWebhook(req.body, signature);
 
     if (result.success) {
       logger.info('Daimo webhook processed successfully', {
