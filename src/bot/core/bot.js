@@ -46,6 +46,7 @@ const registerCallPackageHandlers = require('../handlers/user/callPackages');
 // Services
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
+const broadcastScheduler = require('../../services/broadcastScheduler');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
 // API Server
@@ -169,6 +170,14 @@ const startBot = async () => {
     // Initialize group cleanup service
     const groupCleanup = new GroupCleanupService(bot);
     groupCleanup.initialize();
+    // Initialize broadcast scheduler service
+    try {
+      broadcastScheduler.initialize(bot);
+      broadcastScheduler.start();
+      logger.info('✓ Broadcast scheduler initialized and started');
+    } catch (error) {
+      logger.warn('Broadcast scheduler initialization failed, continuing without scheduler:', error.message);
+    }
     // Error handling
     bot.catch(errorHandler);
     // Start bot

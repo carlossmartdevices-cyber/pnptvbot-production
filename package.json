@@ -38,6 +38,7 @@
     "@mistralai/mistralai": "^1.10.0",
     "@sentry/node": "^7.99.0",
     "agora-access-token": "^2.0.4",
+    "aws-sdk": "^2.1691.0",
     "axios": "^1.13.2",
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",
