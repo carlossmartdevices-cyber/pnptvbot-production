@@ -270,13 +270,11 @@ const showLanguageSelection = async (ctx) => {
 const showAgeConfirmation = async (ctx) => {
   const lang = getLanguage(ctx);
 
-  await ctx.reply(
-    t('ageConfirmation', lang),
-    Markup.inlineKeyboard([
-      [Markup.button.callback(t('ageConfirmYes', lang), 'age_confirm_yes')],
-      [Markup.button.callback(t('ageConfirmNo', lang), 'age_confirm_no')],
-    ]),
-  );
+  // Import age verification handler
+  const { showAgeVerificationOptions } = require('./ageVerificationHandler');
+
+  // Show new AI-based age verification options
+  await showAgeVerificationOptions(ctx);
 };
 
 /**
@@ -362,3 +360,4 @@ const completeOnboarding = async (ctx) => {
 };
 
 module.exports = registerOnboardingHandlers;
+module.exports.showTermsAndPrivacy = showTermsAndPrivacy;
