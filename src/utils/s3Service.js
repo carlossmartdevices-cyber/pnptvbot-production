@@ -18,7 +18,7 @@ const s3 = new AWS.S3({
 
 // Default S3 bucket
 const DEFAULT_BUCKET = config.AWS_S3_BUCKET;
-const BROADCAST_FOLDER = 'broadcasts';
+const BROADCAST_FOLDER = config.AWS_S3_BROADCASTS_FOLDER || 'broadcasts';
 
 /**
  * Generate a unique file key for S3
