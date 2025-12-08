@@ -6,6 +6,7 @@ const UserModel = require('../../models/userModel');
 const { cache } = require('../../config/redis');
 const logger = require('../../utils/logger');
 const DaimoService = require('./daimoService');
+const PayPalService = require('./paypalService');
 
 /**
  * Send payment notification to support group
@@ -194,6 +195,15 @@ class PaymentService {
         await PaymentModel.updateStatus(payment.id, 'pending', {
           paymentUrl,
           daimoLink: daimoDirectLink,
+          provider,
+        });
+      } else if (provider === 'paypal') {
+        // Generate checkout URL at easybots.store for PayPal
+        const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
+        paymentUrl = `${webhookDomain}/paypal/${payment.id}`;
+
+        await PaymentModel.updateStatus(payment.id, 'pending', {
+          paymentUrl,
           provider,
         });
       } else {
@@ -471,6 +481,82 @@ class PaymentService {
       }
     } catch (error) {
       logger.error('Error processing Daimo webhook', error);
+      return { success: false, error: 'Internal server error' };
+    }
+  }
+
+  // Process PayPal webhook payload
+  static async processPayPalWebhook(body, headers) {
+    try {
+      const eventType = body.event_type;
+
+      // Handle different PayPal webhook events
+      if (eventType === 'PAYMENT.CAPTURE.COMPLETED') {
+        const capture = body.resource;
+        const paymentId = capture.custom_id || capture.invoice_id;
+        const orderId = capture.supplementary_data?.related_ids?.order_id;
+
+        if (!paymentId) {
+          logger.warn('PayPal webhook missing payment ID', { eventType, captureId: capture.id });
+          return { success: false, error: 'Missing payment ID' };
+        }
+
+        // Idempotency lock
+        const lockKey = `processing:payment:${paymentId}`;
+        const acquired = await cache.acquireLock(lockKey);
+        if (!acquired) {
+          return { success: false, error: `Already processing ${paymentId}` };
+        }
+
+        try {
+          const payment = await PaymentModel.getById(paymentId);
+          if (!payment) {
+            await cache.releaseLock(lockKey);
+            return { success: false, error: 'Payment not found' };
+          }
+
+          // Check if already completed (idempotency)
+          if (payment.status === 'completed' || payment.status === 'success') {
+            await cache.releaseLock(lockKey);
+            logger.info('Payment already completed, skipping', { paymentId });
+            return { success: true, alreadyProcessed: true };
+          }
+
+          // Update user subscription
+          const plan = await PlanModel.getById(payment.planId);
+          const expiry = new Date(Date.now() + ((plan && plan.duration) || 30) * 24 * 60 * 60 * 1000);
+          const planName = plan?.name || payment.planId;
+
+          await UserModel.updateSubscription(payment.userId, { status: 'active', planId: payment.planId, expiry });
+
+          // Mark payment as success
+          await PaymentModel.updateStatus(paymentId, 'success', {
+            transactionId: capture.id,
+            orderId: orderId,
+            completedAt: new Date()
+          });
+
+          logger.info('User subscription activated via PayPal', { userId: payment.userId, planId: payment.planId, expiry });
+
+          // Send confirmation message with PRIME invite link
+          await sendPrimeConfirmation(payment.userId, planName, expiry, 'paypal');
+
+          // Send payment notification to support group
+          const amount = payment.amount || plan?.price || 0;
+          await sendPaymentNotification(payment.userId, planName, amount, 'PayPal', 'paypal-webhook');
+
+          await cache.releaseLock(lockKey);
+          return { success: true };
+        } catch (err) {
+          await cache.releaseLock(lockKey);
+          throw err;
+        }
+      }
+
+      // For other event types, just acknowledge
+      return { success: true, eventType };
+    } catch (error) {
+      logger.error('Error processing PayPal webhook', error);
       return { success: false, error: 'Internal server error' };
     }
   }

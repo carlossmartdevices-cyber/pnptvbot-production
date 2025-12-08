@@ -82,6 +82,19 @@ app.get('/daimo/:paymentId', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', 'daimo-checkout.html'));
 });
 
+// PayPal Checkout page - serves paypal-checkout.html for /paypal/:paymentId
+app.get('/paypal/:paymentId', pageLimiter, (req, res) => {
+  const fs = require('fs');
+  const filePath = path.join(__dirname, '../../../public', 'paypal-checkout.html');
+  let html = fs.readFileSync(filePath, 'utf8');
+
+  // Inject PayPal Client ID
+  const clientId = process.env.PAYPAL_CLIENT_ID || '';
+  html = html.replace('CLIENT_ID_PLACEHOLDER', clientId);
+
+  res.send(html);
+});
+
 // Payment info API - used by checkout page
 app.get('/api/payment/:paymentId', asyncHandler(paymentController.getPaymentInfo));
 
@@ -181,7 +194,12 @@ app.get('/health', async (req, res) => {
 // API routes
 app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
 app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
+app.post('/api/webhooks/paypal', webhookLimiter, webhookController.handlePayPalWebhook);
 app.get('/api/payment-response', webhookController.handlePaymentResponse);
+
+// PayPal API routes
+app.post('/api/paypal/create-order', asyncHandler(paymentController.createPayPalOrder));
+app.post('/api/paypal/capture-order', asyncHandler(paymentController.capturePayPalOrder));
 
 // Stats endpoint
 app.get('/api/stats', asyncHandler(async (req, res) => {
