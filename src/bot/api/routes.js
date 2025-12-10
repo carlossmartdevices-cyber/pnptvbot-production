@@ -72,6 +72,11 @@ app.get('/policies', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
 
+// Video Rooms landing page
+app.get('/video-rooms', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'video-rooms.html'));
+});
+
 // ePayco Checkout page - serves payment-checkout.html for /checkout/:paymentId
 app.get('/checkout/:paymentId', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', 'payment-checkout.html'));
