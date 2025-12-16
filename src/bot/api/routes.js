@@ -40,10 +40,12 @@ app.use(morgan('combined', { stream: logger.stream }));
 app.use(express.static(path.join(__dirname, '../../../public')));
 
 // Landing page routes
+// Home page
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+  res.sendFile(path.join(__dirname, '../../../public/index.html'));
 });
 
+// Lifetime Pass landing page
 app.get('/lifetime-pass', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
 });
