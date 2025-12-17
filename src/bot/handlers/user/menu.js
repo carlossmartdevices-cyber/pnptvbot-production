@@ -135,22 +135,11 @@ const registerMenuHandlers = (bot) => {
     });
   });
 
-  // Live Streams - Coming Soon
+  // Bloquear Live Streams y mostrar "Coming soon"
   bot.action('show_live', async (ctx) => {
     const lang = ctx.session?.language || 'en';
     await ctx.answerCbQuery(
       lang === 'es' ? '🚧 Próximamente: Transmisiones en Vivo.' : '🚧 Coming Soon: Live Streaming.',
-      { show_alert: true }
-    );
-  });
-
-  // Creator Program - Coming Soon
-  bot.action('creator_coming_soon', async (ctx) => {
-    const lang = ctx.session?.language || 'en';
-    await ctx.answerCbQuery(
-      lang === 'es' 
-        ? '🎬 ¡Próximamente! Sé un creador independiente con PNPtv y gana dinero con tu contenido.' 
-        : '🎬 Coming Soon! Be an independent creator with PNPtv and earn money from your content.',
       { show_alert: true }
     );
   });
