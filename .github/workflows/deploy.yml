@@ -1,3 +1,40 @@
+name: Deploy to server (PM2)
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: false
+        default: 'main'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.8.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy via SSH
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR }}
+          BRANCH: ${{ github.event.inputs.branch || 'main' }}
+        run: |
+          set -euo pipefail
+          echo "Deploying $BRANCH to $REMOTE_USER@$REMOTE_HOST:$REMOTE_APP_DIR"
+          ssh -o StrictHostKeyChecking=no "$REMOTE_USER@$REMOTE_HOST" "cd $REMOTE_APP_DIR && git fetch --all --prune && git checkout $BRANCH && git reset --hard origin/$BRANCH && if [ -f package-lock.json ]; then npm ci --production; else npm install --production; fi && if pm2 describe pnptv-bot >/dev/null 2>&1; then pm2 reload ecosystem.config.js --env production || pm2 restart pnptv-bot; else pm2 start ecosystem.config.js --env production; fi && pm2 save"
+
+      - name: Done
+        run: echo "Deploy finished"
 name: Deploy PNPtv Bot
 
 on:
