@@ -125,19 +125,25 @@ These branches with unrelated histories are likely from different repositories o
 
 ## Next Steps
 
-All merge conflicts have been resolved locally. The changes are committed on each respective branch. To push these changes to the remote repository, you can run the push script included in this directory.
+All merge conflicts have been resolved locally. The changes are committed on each respective branch.
 
-### Option 1: Push All Fixed Branches
+### ⚠️ Important Note About Pushing
 
-Run the included push script:
+Due to Claude Code session restrictions, the automated push failed with 403 errors. Claude can only push to branches ending with the current session ID (`VdiZH`). The fixed branches need to be pushed manually by a user with appropriate permissions.
+
+### How to Push the Fixed Branches
+
+You have several options:
+
+#### Option 1: Manual Push (Recommended)
+
+If you have appropriate git permissions, push each branch manually:
+
 ```bash
-bash push_all_fixed_branches.sh
-```
+# Fetch all changes first
+git fetch origin
 
-### Option 2: Push Individual Branches
-
-Push each branch manually:
-```bash
+# Push each fixed branch
 git push origin claude/broadcast-scheduling-s3-upload-01JZm8SxDzTGaASdsF3fjSWT
 git push origin claude/create-pnptv-landing-page-013FFARMn68woKkCvGCwZTQc
 git push origin claude/enhance-members-area-menu-018BULpqhDpAkG2U1NZh3kmB
@@ -145,6 +151,40 @@ git push origin claude/remove-zoom-01Rs6A2re6pjGD5ow6j37EvL
 git push origin claude/rules-menus-documentation-01YM2F89QcrdG8dcfCEpec9z
 git push origin claude/termux-deployment-guide-01C6w5sQE7SAwoQkPZLy7g11
 ```
+
+#### Option 2: Use Git Patches
+
+If you prefer to review changes before pushing, you can create and apply patches:
+
+```bash
+# Create patches for each branch (already committed locally)
+git checkout claude/broadcast-scheduling-s3-upload-01JZm8SxDzTGaASdsF3fjSWT
+git format-patch origin/claude/broadcast-scheduling-s3-upload-01JZm8SxDzTGaASdsF3fjSWT
+
+# Repeat for other branches...
+```
+
+#### Option 3: Verify Locally First
+
+Review the merge commits on each branch:
+
+```bash
+# Check the merge commit for each branch
+git checkout claude/broadcast-scheduling-s3-upload-01JZm8SxDzTGaASdsF3fjSWT
+git log -1
+
+git checkout claude/create-pnptv-landing-page-013FFARMn68woKkCvGCwZTQc
+git log -1
+
+# ... and so on for other branches
+```
+
+### Current Status
+
+- ✅ All conflicts resolved locally
+- ✅ Merge commits created on each branch
+- ⏳ Awaiting manual push to remote
+- 📄 Documentation and scripts committed to `claude/fix-merge-conflicts-VdiZH`
 
 ---
 
