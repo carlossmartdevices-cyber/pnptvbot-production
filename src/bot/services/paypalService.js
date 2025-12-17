@@ -1,0 +1,200 @@
+const paypal = require('@paypal/checkout-server-sdk');
+const logger = require('../../utils/logger');
+
+/**
+ * PayPal Service for handling payments
+ */
+class PayPalService {
+  constructor() {
+    this.environment = this.getEnvironment();
+    this.client = new paypal.core.PayPalHttpClient(this.environment);
+  }
+
+  /**
+   * Get PayPal environment (Sandbox or Live)
+   */
+  getEnvironment() {
+    const clientId = process.env.PAYPAL_CLIENT_ID;
+    const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+    const mode = process.env.PAYPAL_MODE || 'sandbox'; // 'sandbox' or 'live'
+
+    if (!clientId || !clientSecret) {
+      throw new Error('PayPal credentials not configured');
+    }
+
+    if (mode === 'live') {
+      return new paypal.core.LiveEnvironment(clientId, clientSecret);
+    }
+    return new paypal.core.SandboxEnvironment(clientId, clientSecret);
+  }
+
+  /**
+   * Create PayPal order
+   * @param {Object} params - Order parameters
+   * @param {string} params.paymentId - Internal payment ID
+   * @param {number} params.amount - Amount in USD
+   * @param {string} params.planName - Plan name for description
+   * @param {string} params.returnUrl - Success return URL
+   * @param {string} params.cancelUrl - Cancel return URL
+   * @returns {Promise<Object>} Order details with approval URL
+   */
+  async createOrder({ paymentId, amount, planName, returnUrl, cancelUrl }) {
+    try {
+      const request = new paypal.orders.OrdersCreateRequest();
+      request.prefer('return=representation');
+      request.requestBody({
+        intent: 'CAPTURE',
+        purchase_units: [
+          {
+            reference_id: paymentId,
+            description: `PNPtv ${planName} Subscription`,
+            custom_id: paymentId,
+            amount: {
+              currency_code: 'USD',
+              value: parseFloat(amount).toFixed(2),
+            },
+          },
+        ],
+        application_context: {
+          brand_name: 'PNPtv',
+          landing_page: 'BILLING',
+          user_action: 'PAY_NOW',
+          return_url: returnUrl,
+          cancel_url: cancelUrl,
+        },
+      });
+
+      const order = await this.client.execute(request);
+
+      // Get approval URL
+      const approvalUrl = order.result.links.find(link => link.rel === 'approve')?.href;
+
+      logger.info('PayPal order created', {
+        orderId: order.result.id,
+        paymentId,
+        amount,
+        status: order.result.status,
+      });
+
+      return {
+        success: true,
+        orderId: order.result.id,
+        approvalUrl,
+        status: order.result.status,
+      };
+    } catch (error) {
+      logger.error('Error creating PayPal order', {
+        error: error.message,
+        paymentId,
+        amount,
+      });
+      throw new Error('Failed to create PayPal order');
+    }
+  }
+
+  /**
+   * Capture payment for an approved order
+   * @param {string} orderId - PayPal order ID
+   * @returns {Promise<Object>} Capture result
+   */
+  async captureOrder(orderId) {
+    try {
+      const request = new paypal.orders.OrdersCaptureRequest(orderId);
+      request.requestBody({});
+
+      const capture = await this.client.execute(request);
+
+      logger.info('PayPal order captured', {
+        orderId,
+        captureId: capture.result.purchase_units[0]?.payments?.captures[0]?.id,
+        status: capture.result.status,
+      });
+
+      return {
+        success: true,
+        orderId: capture.result.id,
+        status: capture.result.status,
+        captureId: capture.result.purchase_units[0]?.payments?.captures[0]?.id,
+        paymentId: capture.result.purchase_units[0]?.reference_id,
+        amount: capture.result.purchase_units[0]?.payments?.captures[0]?.amount?.value,
+      };
+    } catch (error) {
+      logger.error('Error capturing PayPal order', {
+        error: error.message,
+        orderId,
+      });
+      throw new Error('Failed to capture PayPal payment');
+    }
+  }
+
+  /**
+   * Get order details
+   * @param {string} orderId - PayPal order ID
+   * @returns {Promise<Object>} Order details
+   */
+  async getOrder(orderId) {
+    try {
+      const request = new paypal.orders.OrdersGetRequest(orderId);
+      const order = await this.client.execute(request);
+
+      return {
+        success: true,
+        orderId: order.result.id,
+        status: order.result.status,
+        paymentId: order.result.purchase_units[0]?.reference_id,
+        amount: order.result.purchase_units[0]?.amount?.value,
+      };
+    } catch (error) {
+      logger.error('Error getting PayPal order', {
+        error: error.message,
+        orderId,
+      });
+      throw new Error('Failed to get PayPal order details');
+    }
+  }
+
+  /**
+   * Verify webhook signature
+   * @param {Object} webhookEvent - Webhook event data
+   * @param {Object} headers - Request headers
+   * @returns {Promise<boolean>} Verification result
+   */
+  async verifyWebhook(webhookEvent, headers) {
+    try {
+      const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+
+      if (!webhookId) {
+        logger.warn('PAYPAL_WEBHOOK_ID not configured, skipping verification');
+        return true; // Allow in development
+      }
+
+      const request = new paypal.notifications.WebhookVerifySignatureRequest();
+      request.requestBody({
+        auth_algo: headers['paypal-auth-algo'],
+        cert_url: headers['paypal-cert-url'],
+        transmission_id: headers['paypal-transmission-id'],
+        transmission_sig: headers['paypal-transmission-sig'],
+        transmission_time: headers['paypal-transmission-time'],
+        webhook_id: webhookId,
+        webhook_event: webhookEvent,
+      });
+
+      const response = await this.client.execute(request);
+      const verified = response.result.verification_status === 'SUCCESS';
+
+      logger.info('PayPal webhook verification', {
+        verified,
+        eventType: webhookEvent.event_type,
+      });
+
+      return verified;
+    } catch (error) {
+      logger.error('Error verifying PayPal webhook', {
+        error: error.message,
+      });
+      return false;
+    }
+  }
+}
+
+module.exports = new PayPalService();

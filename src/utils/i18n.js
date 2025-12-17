@@ -108,6 +108,7 @@ Choose your plan and get instant access to all premium features:
     paymentMethod: 'Choose payment method:',
     payWithEpayco: '💳 Pay with Debit/Credit Card',
     payWithDaimo: '🪙 Pay with Crypto and Payment Apps',
+    payWithPayPal: '💰 Pay with PayPal',
     paymentFooter: '',
     paymentInstructions: '💳 *Payment Instructions*\n\n'
       + 'Please tap the button below to go to the checkout page.\n'
@@ -603,6 +604,7 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
     paymentMethod: 'Elige método de pago:',
     payWithEpayco: '💳 Pagar con Tarjeta Débito/Crédito',
     payWithDaimo: '🪙 Pagar con Crypto y Apps de Pago',
+    payWithPayPal: '💰 Pagar con PayPal',
     paymentFooter: '',
     paymentInstructions: '💳 *Instrucciones de Pago*\n\n'
       + 'Por favor toca el botón de abajo para ir a la página de checkout.\n'
