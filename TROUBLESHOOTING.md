@@ -80,6 +80,13 @@ For production, use PM2 to manage the process:
 # Start with PM2
 npx pm2 start ecosystem.config.js
 
+# Save process list (will restore on reboot)
+npx pm2 save
+
+# Configure auto-start on boot
+npx pm2 startup
+# This creates a systemd service that will start PM2 on boot
+
 # Check status
 npx pm2 status
 
@@ -89,7 +96,28 @@ npx pm2 logs pnptv-bot
 # Restart
 npx pm2 restart pnptv-bot
 
-# Enable startup on boot
-npx pm2 startup
-npx pm2 save
+# Stop
+npx pm2 stop pnptv-bot
+
+# Monitor in real-time
+npx pm2 monit
+```
+
+### Deployment Status Check
+After deployment, verify everything is working:
+```bash
+# 1. Check PM2 status
+npx pm2 status
+# Should show: status: online
+
+# 2. Test endpoint locally
+curl -I http://localhost:3000/video-rooms
+# Should return: HTTP/1.1 200 OK
+
+# 3. View recent logs
+npx pm2 logs pnptv-bot --lines 20
+
+# 4. Check if PM2 will restart on boot
+systemctl status pm2-root
+# Should show: active (running)
 ```
