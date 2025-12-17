@@ -235,7 +235,8 @@ class BroadcastService {
               user.id,
               broadcast.media_type,
               broadcast.media_url,
-              message
+              message,
+              broadcast.s3_key // Pass S3 key for presigned URL generation
             );
           } else {
             const result = await bot.telegram.sendMessage(user.id, message, {
@@ -317,30 +318,47 @@ class BroadcastService {
    * @param {string} mediaType - Media type
    * @param {string} mediaUrl - Media URL (S3 URL or Telegram file_id)
    * @param {string} caption - Message caption
+   * @param {string} s3Key - S3 key (optional, for generating presigned URLs)
    * @returns {Promise<number>} Message ID
    */
-  async sendMediaMessage(bot, userId, mediaType, mediaUrl, caption) {
+  async sendMediaMessage(bot, userId, mediaType, mediaUrl, caption, s3Key = null) {
     const options = {
       caption,
       parse_mode: 'Markdown',
     };
 
+    // If we have an S3 key and the URL is an S3 URL, generate a presigned URL
+    // Telegram cannot access private S3 URLs directly
+    let urlToSend = mediaUrl;
+    if (s3Key && (mediaUrl.includes('s3.amazonaws.com') || mediaUrl.includes('s3://'))) {
+      try {
+        // Generate presigned URL valid for 1 hour
+        urlToSend = await s3Service.getPresignedUrl(s3Key, {
+          expiresIn: 3600, // 1 hour
+        });
+        logger.info(`Generated presigned URL for broadcast media: ${s3Key}`);
+      } catch (error) {
+        logger.warn(`Failed to generate presigned URL for ${s3Key}, falling back to direct URL: ${error.message}`);
+        // Fall back to mediaUrl (might be Telegram file_id)
+      }
+    }
+
     let result;
     switch (mediaType) {
       case 'photo':
-        result = await bot.telegram.sendPhoto(userId, mediaUrl, options);
+        result = await bot.telegram.sendPhoto(userId, urlToSend, options);
         break;
       case 'video':
-        result = await bot.telegram.sendVideo(userId, mediaUrl, options);
+        result = await bot.telegram.sendVideo(userId, urlToSend, options);
         break;
       case 'document':
-        result = await bot.telegram.sendDocument(userId, mediaUrl, options);
+        result = await bot.telegram.sendDocument(userId, urlToSend, options);
         break;
       case 'audio':
-        result = await bot.telegram.sendAudio(userId, mediaUrl, options);
+        result = await bot.telegram.sendAudio(userId, urlToSend, options);
         break;
       case 'voice':
-        result = await bot.telegram.sendVoice(userId, mediaUrl, options);
+        result = await bot.telegram.sendVoice(userId, urlToSend, options);
         break;
       default:
         throw new Error(`Unsupported media type: ${mediaType}`);
