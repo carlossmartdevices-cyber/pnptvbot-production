@@ -38,6 +38,74 @@ const isDryRun = process.argv.includes('--dry-run');
 const targetCollection = process.argv.find(arg => arg.startsWith('--collection='))?.split('=')[1];
 
 /**
+ * Normalize tier value to ensure consistent capitalization
+ */
+function normalizeTier(tier) {
+  if (!tier) return 'Free';
+
+  const tierMap = {
+    'free': 'Free',
+    'basic': 'Basic',
+    'premium': 'Premium',
+    'crystal': 'Crystal',
+    'diamond': 'Diamond',
+    'pnp': 'PNP'
+  };
+
+  return tierMap[tier.toLowerCase()] || 'Free';
+}
+
+/**
+ * Determine subscription status based on available data
+ * This prevents losing premium status during migration
+ */
+function determineSubscriptionStatus(data) {
+  // If explicitly set, use it
+  if (data.subscriptionStatus) {
+    return data.subscriptionStatus;
+  }
+
+  // If user has a premium tier, they should be active
+  const tier = normalizeTier(data.tier);
+  if (['Premium', 'Crystal', 'Diamond', 'PNP', 'Basic'].includes(tier)) {
+    console.log(`   ℹ️  User ${data.username || 'unknown'} has tier ${tier} but no subscriptionStatus, setting to 'active'`);
+    return 'active';
+  }
+
+  // If they have a valid planExpiry in the future, they should be active
+  if (data.planExpiry?.toDate) {
+    const expiryDate = data.planExpiry.toDate();
+    if (expiryDate > new Date()) {
+      console.log(`   ℹ️  User ${data.username || 'unknown'} has valid planExpiry, setting to 'active'`);
+      return 'active';
+    }
+  }
+
+  // Default to free
+  return 'free';
+}
+
+/**
+ * Determine plan_id based on tier if not provided
+ */
+function determinePlanId(data) {
+  if (data.planId) {
+    return data.planId;
+  }
+
+  const tier = normalizeTier(data.tier);
+  const tierToPlan = {
+    'Premium': 'lifetime-pass',
+    'Crystal': 'crystal-member',
+    'Diamond': 'diamond-member',
+    'PNP': 'pnp-member',
+    'Basic': 'trial-week'
+  };
+
+  return tierToPlan[tier] || null;
+}
+
+/**
  * Migrate users collection
  */
 async function migrateUsers() {
@@ -58,6 +126,11 @@ async function migrateUsers() {
         const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
         const updatedAt = data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date();
 
+        // Use helper functions to ensure data consistency
+        const normalizedTier = normalizeTier(data.tier);
+        const subscriptionStatus = determineSubscriptionStatus(data);
+        const planId = determinePlanId(data);
+
         const userRecord = {
           id: doc.id,
           username: data.username || null,
@@ -74,10 +147,10 @@ async function migrateUsers() {
           location_name: data.locationName || null,
           location_geohash: data.locationGeohash || null,
           location_updated_at: data.locationUpdatedAt?.toDate ? data.locationUpdatedAt.toDate() : null,
-          subscription_status: data.subscriptionStatus || 'free',
-          plan_id: data.planId || null,
+          subscription_status: subscriptionStatus,
+          plan_id: planId,
           plan_expiry: data.planExpiry?.toDate ? data.planExpiry.toDate() : null,
-          tier: data.tier || 'free',
+          tier: normalizedTier,
           role: data.role || 'user',
           assigned_by: data.assignedBy || null,
           role_assigned_at: data.roleAssignedAt?.toDate ? data.roleAssignedAt.toDate() : null,
@@ -351,6 +424,71 @@ async function migratePayments() {
 }
 
 /**
+ * Run post-migration validation
+ */
+async function runPostMigrationValidation() {
+  console.log('\n📊 Running post-migration validation...\n');
+
+  try {
+    let hasIssues = false;
+
+    // Check for premium tiers without active subscription
+    const premiumInactiveResult = await query(`
+      SELECT COUNT(*) as count
+      FROM users
+      WHERE tier IN ('Premium', 'Crystal', 'Diamond', 'PNP', 'Basic')
+      AND subscription_status NOT IN ('active')
+    `);
+
+    if (parseInt(premiumInactiveResult.rows[0].count) > 0) {
+      console.log(`   ⚠️  Warning: ${premiumInactiveResult.rows[0].count} premium users have inactive subscriptions`);
+      hasIssues = true;
+    } else {
+      console.log('   ✅ All premium users have active subscriptions');
+    }
+
+    // Check for paid users without active subscription
+    const paidInactiveResult = await query(`
+      SELECT COUNT(DISTINCT u.id) as count
+      FROM users u
+      JOIN payments p ON u.id::text = p.user_id
+      WHERE p.status = 'payment_completed'
+      AND u.subscription_status NOT IN ('active')
+    `);
+
+    if (parseInt(paidInactiveResult.rows[0].count) > 0) {
+      console.log(`   ⚠️  Warning: ${paidInactiveResult.rows[0].count} users with completed payments have inactive subscriptions`);
+      hasIssues = true;
+    } else {
+      console.log('   ✅ All paid users have active subscriptions');
+    }
+
+    // Check for tier capitalization issues
+    const tierCapResult = await query(`
+      SELECT COUNT(*) as count
+      FROM users
+      WHERE tier NOT IN ('Free', 'Basic', 'Premium', 'Crystal', 'Diamond', 'PNP')
+    `);
+
+    if (parseInt(tierCapResult.rows[0].count) > 0) {
+      console.log(`   ⚠️  Warning: ${tierCapResult.rows[0].count} users have incorrect tier capitalization`);
+      hasIssues = true;
+    } else {
+      console.log('   ✅ All tier values have correct capitalization');
+    }
+
+    if (hasIssues) {
+      console.log('\n   💡 Run validation script to fix issues:');
+      console.log('      node scripts/validate-user-data.js --fix\n');
+    } else {
+      console.log('\n   ✅ All validation checks passed!\n');
+    }
+  } catch (error) {
+    console.error('   ❌ Validation failed:', error.message);
+  }
+}
+
+/**
  * Main execution
  */
 (async () => {
@@ -387,9 +525,16 @@ async function migratePayments() {
     console.log('✅ MIGRATION COMPLETE!');
     console.log('='.repeat(70) + '\n');
 
+    // Run post-migration validation (only in live mode)
+    if (!isDryRun) {
+      await runPostMigrationValidation();
+    }
+
     if (isDryRun) {
       console.log('💡 Run without --dry-run to apply changes:\n');
       console.log('   node scripts/migrate-firestore-to-postgres.js\n');
+    } else {
+      console.log('✅ Migration completed successfully!\n');
     }
 
     process.exit(0);

@@ -1,6 +1,6 @@
 require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
-// Firebase eliminado: no se requiere
+const { initializePostgres, testConnection } = require('../../config/postgres');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
@@ -11,6 +11,19 @@ const moderationFilter = require('./middleware/moderationFilter');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
 const errorHandler = require('./middleware/errorHandler');
+// Topic middleware
+const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./middleware/topicPermissions');
+const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
+const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
+const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
+const { groupSecurityEnforcementMiddleware, registerGroupSecurityHandlers } = require('./middleware/groupSecurityEnforcement');
+// Group behavior rules (overrides previous rules)
+const {
+  groupBehaviorMiddleware,
+  cristinaGroupFilterMiddleware,
+  groupMenuRedirectMiddleware,
+  groupCommandDeleteMiddleware
+} = require('./middleware/groupBehavior');
 const logger = require('../../utils/logger');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
@@ -33,6 +46,9 @@ const registerCallPackageHandlers = require('../handlers/user/callPackages');
 // Services
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
+const broadcastScheduler = require('../../services/broadcastScheduler');
+const SubscriptionReminderService = require('../services/subscriptionReminderService');
+const { startCronJobs } = require('../../../scripts/cron');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
 // API Server
@@ -46,6 +62,7 @@ let isWebhookMode = false;
  * Validate critical environment variables
  */
 const validateCriticalEnvVars = () => {
+  // Only BOT_TOKEN is critical - PostgreSQL can use defaults or DATABASE_URL
   const criticalVars = ['BOT_TOKEN'];
   const missing = criticalVars.filter((varName) => !process.env[varName]);
   if (missing.length > 0) {
@@ -78,7 +95,20 @@ const startBot = async () => {
     } catch (error) {
       logger.warn('Sentry initialization failed, continuing without monitoring:', error.message);
     }
-    // Firebase eliminado: solo PostgreSQL y Redis
+    // Initialize PostgreSQL
+    try {
+      initializePostgres();
+      const connected = await testConnection();
+      if (connected) {
+        logger.info('✓ PostgreSQL initialized');
+      } else {
+        logger.warn('⚠️ PostgreSQL connection test failed, but will retry on first query');
+      }
+    } catch (error) {
+      logger.error('PostgreSQL initialization failed. Bot will run in DEGRADED mode without database.');
+      logger.error('Error:', error.message);
+      logger.warn('⚠️  Bot features requiring database will not work!');
+    }
     // Initialize Redis (optional, will use default localhost if not configured)
     try {
       initializeRedis();
@@ -96,6 +126,7 @@ const startBot = async () => {
     }
     // Create bot instance
     const bot = new Telegraf(process.env.BOT_TOKEN);
+    
     // Register middleware
     bot.use(sessionMiddleware());
     bot.use(rateLimitMiddleware());
@@ -104,6 +135,19 @@ const startBot = async () => {
     bot.use(moderationFilter());
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
+
+    // Group behavior rules (OVERRIDE all previous rules)
+    bot.use(groupBehaviorMiddleware()); // Route all bot messages to topic 3135, 3-min delete
+    bot.use(cristinaGroupFilterMiddleware()); // Filter personal info from Cristina in groups
+    bot.use(groupMenuRedirectMiddleware()); // Redirect menu button clicks to private
+    bot.use(groupCommandDeleteMiddleware()); // Delete commands after 3 minutes
+
+    // Topic-specific middlewares
+    bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
+    bot.use(commandRedirectionMiddleware()); // Redirect commands to notifications
+    bot.use(mediaMirrorMiddleware()); // Mirror media to PNPtv Gallery
+    bot.use(topicPermissionsMiddleware()); // Admin-only and approval queue
+    bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery
     // Register handlers
     registerUserHandlers(bot);
     registerAdminHandlers(bot);
@@ -128,6 +172,14 @@ const startBot = async () => {
     // Initialize group cleanup service
     const groupCleanup = new GroupCleanupService(bot);
     groupCleanup.initialize();
+    // Initialize broadcast scheduler service
+    try {
+      broadcastScheduler.initialize(bot);
+      broadcastScheduler.start();
+      logger.info('✓ Broadcast scheduler initialized and started');
+    } catch (error) {
+      logger.warn('Broadcast scheduler initialization failed, continuing without scheduler:', error.message);
+    }
     // Error handling
     bot.catch(errorHandler);
     // Start bot
@@ -154,6 +206,30 @@ const startBot = async () => {
           if (!req.body || Object.keys(req.body).length === 0) {
             logger.warn('Webhook received empty body');
             return res.status(200).json({ ok: true, message: 'Empty body received' });
+          }
+
+          // Deduplicate incoming webhook updates using Redis
+          try {
+            const { cache } = require('../../config/redis');
+            const updateId = req.body.update_id;
+            if (updateId) {
+              const key = `telegram:processed_update:${updateId}`;
+              const set = await cache.setNX(key, true, 60); // keep for 60s
+              if (!set) {
+                logger.warn('Duplicate webhook update ignored', { updateId });
+                return res.status(200).json({ ok: true, message: 'Duplicate update ignored' });
+              }
+            }
+          } catch (err) {
+            // If Redis fails we don't want to block processing — log and continue
+            logger.warn('Failed to dedupe update via Redis, continuing', { error: err.message });
+          }
+          // Log the callback query data if present
+          if (req.body.callback_query) {
+            logger.info(`>>> CALLBACK_QUERY received: data=${req.body.callback_query.data}, from=${req.body.callback_query.from?.id}`);
+          }
+          if (req.body.message) {
+            logger.info(`>>> MESSAGE received: text=${req.body.message.text || 'N/A'}, from=${req.body.message.from?.id}`);
           }
           await bot.handleUpdate(req.body);
           res.status(200).json({ ok: true });
@@ -283,4 +359,10 @@ if (require.main === module) {
   });
 }
 
-module.exports = { startBot };
+/**
+ * Get the bot instance for sending messages from services
+ * @returns {Telegraf|null} The bot instance or null if not started
+ */
+const getBotInstance = () => botInstance;
+
+module.exports = { startBot, getBotInstance };

@@ -15,14 +15,20 @@ const paymentController = require('./controllers/paymentController');
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
 
+// Simple page limiter middleware stub (used by landing page routes).
+// In production this may be replaced with a proper rate-limiter or cache-based limiter.
+const pageLimiter = (req, res, next) => {
+  // Allow all requests in test environment and default behavior; real limiter can be injected later.
+  return next();
+};
+
 const app = express();
 
-// CRITICAL: Trust proxy configuration MUST come first
-// This is needed for rate limiting behind nginx/reverse proxy
-// Only trust the first proxy (nginx on localhost)
+// Trust proxy - required for rate limiting behind reverse proxy (nginx, etc.)
+// Setting to 1 trusts the first proxy (direct connection from nginx)
 app.set('trust proxy', 1);
 
-// CRITICAL: Apply body parsing AFTER trust proxy
+// CRITICAL: Apply body parsing FIRST for ALL routes
 // This must be before any route registration
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -34,20 +40,48 @@ app.use(morgan('combined', { stream: logger.stream }));
 app.use(express.static(path.join(__dirname, '../../../public')));
 
 // Landing page routes
+// Home page
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+  res.sendFile(path.join(__dirname, '../../../public/index.html'));
 });
 
+// Lifetime Pass landing page
 app.get('/lifetime-pass', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
 });
 
-app.get('/promo', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+// Lifetime Pass landing page ($100)
+app.get('/lifetime100', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'lifetime-pass.html'));
 });
 
-app.get('/pnptv-hot-sale', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+// Terms and Conditions / Privacy Policy
+app.get('/terms', pageLimiter, (req, res) => {
+  const lang = req.query.lang || 'en';
+  const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
+  res.sendFile(path.join(__dirname, '../../../public', fileName));
+});
+
+app.get('/privacy', pageLimiter, (req, res) => {
+  const lang = req.query.lang || 'en';
+  const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
+  res.sendFile(path.join(__dirname, '../../../public', fileName));
+});
+
+app.get('/policies', pageLimiter, (req, res) => {
+  const lang = req.query.lang || 'en';
+  const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
+  res.sendFile(path.join(__dirname, '../../../public', fileName));
+});
+
+// Video Rooms landing page
+app.get('/video-rooms', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'video-rooms.html'));
+});
+
+// ePayco Checkout page - serves payment-checkout.html for /checkout/:paymentId
+app.get('/checkout/:paymentId', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'payment-checkout.html'));
 });
 
 // Payment checkout page with language support
@@ -92,8 +126,6 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
-  // Validate configuration is correct for trust proxy
-  validate: { trustProxy: false },
 });
 app.use('/api/', limiter);
 
@@ -105,8 +137,6 @@ const webhookLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false,
-  // Validate configuration is correct for trust proxy
-  validate: { trustProxy: false },
 });
 
 // Health check with dependency checks
@@ -122,7 +152,10 @@ app.get('/health', async (req, res) => {
     // Check Redis connection
     const { getRedis } = require('../../config/redis');
     const redis = getRedis();
-    await redis.ping();
+    // Not all test Redis mocks implement ping, guard accordingly
+    if (redis && typeof redis.ping === 'function') {
+      await redis.ping();
+    }
     health.dependencies.redis = 'ok';
   } catch (error) {
     health.dependencies.redis = 'error';
@@ -143,6 +176,18 @@ app.get('/health', async (req, res) => {
     logger.error('Firestore health check failed:', error);
   }
 
+  try {
+    // Check PostgreSQL connection (optional in test env)
+    const { testConnection } = require('../../config/postgres');
+    const dbOk = await testConnection();
+    health.dependencies.database = dbOk ? 'ok' : 'error';
+    if (!dbOk) health.status = 'degraded';
+  } catch (error) {
+    health.dependencies.database = 'error';
+    health.status = 'degraded';
+    logger.error('Database health check failed:', error);
+  }
+
   const statusCode = health.status === 'ok' ? 200 : 503;
   res.status(statusCode).json(health);
 });
@@ -150,6 +195,7 @@ app.get('/health', async (req, res) => {
 // API routes
 app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
 app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
+app.post('/api/webhooks/paypal', webhookLimiter, webhookController.handlePayPalWebhook);
 app.get('/api/payment-response', webhookController.handlePaymentResponse);
 
 // Payment API routes

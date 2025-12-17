@@ -17,28 +17,6 @@
           "order": "ASCENDING"
         }
       ]
-    },
-    {
-      "collectionGroup": "live_streams",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "recordStream",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "endedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ]
     }
   ],
   "fieldOverrides": []

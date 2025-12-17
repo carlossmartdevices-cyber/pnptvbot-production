@@ -217,7 +217,7 @@ const registerSupportHandlers = (bot) => {
           [Markup.button.callback(t('faq', lang), 'support_faq')],
           [Markup.button.callback(t('back', lang), 'back_to_main')],
         ]),
-      );
+      });
     } catch (error) {
       logger.error('Error showing support menu:', error);
     }
@@ -231,14 +231,12 @@ const registerSupportHandlers = (bot) => {
       // Check if Mistral AI is available
       if (!mistral) {
         await ctx.answerCbQuery();
-        await ctx.editMessageText(
-          lang === 'es'
-            ? '❌ El chat de IA no está disponible en este momento. Por favor, contacta con el administrador.'
-            : '❌ AI chat is not available at the moment. Please contact the administrator.',
-          Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'show_support')],
-          ]),
-        );
+        const errorText = '`❌ Unavailable`\n\nAI chat is not available right now.\nPlease contact Santino directly.';
+
+        await ctx.editMessageText(errorText, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Back', 'show_support')]]),
+        });
         return;
       }
 
@@ -248,7 +246,9 @@ const registerSupportHandlers = (bot) => {
       }
 
       // Initialize chat session
-      ctx.session.temp.aiChatActive = true;
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.aiQuestionCount = 0; // Track questions asked
+      ctx.session.temp.aiChatActive = true; // Activate AI chat mode
       ctx.session.temp.aiChatHistory = [];
       ctx.session.temp.aiQuestionCount = 0; // Track questions asked
       await ctx.saveSession();
@@ -289,15 +289,11 @@ const registerSupportHandlers = (bot) => {
   bot.action('support_contact_admin', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
+      ctx.session.temp = ctx.session.temp || {};
       ctx.session.temp.contactingAdmin = true;
       await ctx.saveSession();
 
-      await ctx.editMessageText(
-        t('adminMessage', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('cancel', lang), 'show_support')],
-        ]),
-      );
+      await ctx.editMessageText(t('adminMessage', lang), Markup.inlineKeyboard([[Markup.button.callback(t('cancel', lang), 'show_support')]]));
     } catch (error) {
       logger.error('Error in contact admin:', error);
     }
@@ -308,55 +304,83 @@ const registerSupportHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
 
-      const faq = lang === 'es'
-        ? '❓ Preguntas Frecuentes:\n\n'
-          + '1. ¿Cómo me suscribo a PRIME?\n'
-          + '   → Use /menu y seleccione "Suscribirse a PRIME"\n\n'
-          + '2. ¿Cómo actualizo mi perfil?\n'
-          + '   → Use /menu → "Mi Perfil" → "Editar Perfil"\n\n'
-          + '3. ¿Cómo encuentro usuarios cercanos?\n'
-          + '   → Comparta su ubicación en "Usuarios Cercanos"\n\n'
-          + '4. ¿Cómo inicio una transmisión en vivo?\n'
-          + '   → Necesita suscripción PRIME → "Transmisiones en Vivo"'
-        : '❓ Frequently Asked Questions:\n\n'
-          + '1. How do I subscribe to PRIME?\n'
-          + '   → Use /menu and select "Subscribe to PRIME"\n\n'
-          + '2. How do I update my profile?\n'
-          + '   → Use /menu → "My Profile" → "Edit Profile"\n\n'
-          + '3. How do I find nearby users?\n'
-          + '   → Share your location in "Nearby Users"\n\n'
-          + '4. How do I start a live stream?\n'
-          + '   → Requires PRIME subscription → "Live Streams"';
+      const faqText =
+        '`❓ FAQ`\n\n' +
+        '**1. How do I get PRIME?**\n' +
+        '→ Menu > Unlock PRIME > Choose plan\n\n' +
+        '**2. How do I update my profile?**\n' +
+        '→ Menu > My Profile > Update Profile\n\n' +
+        '**3. How do I find nearby users?**\n' +
+        '→ Menu > Who Is Nearby? > Share location\n\n' +
+        '**4. How do I start streaming?**\n' +
+        '→ Requires PRIME > Members Area > Streams\n\n' +
+        '**5. How do I contact support?**\n' +
+        '→ Chat with Cristina or contact Santino\n\n' +
+        '`Still need help? 💬 Chat with Cristina!`';
 
-      await ctx.editMessageText(
-        faq,
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('back', lang), 'show_support')],
-        ]),
-      );
+      await ctx.editMessageText(faqText, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([[Markup.button.callback('🤖 Chat with Cristina', 'support_ai_chat')], [Markup.button.callback('🔙 Back', 'show_support')]]),
+      });
     } catch (error) {
       logger.error('Error showing FAQ:', error);
     }
   });
 
-  // Handle AI chat messages
+  // Handle text messages for AI chat
   bot.on('text', async (ctx, next) => {
-    if (ctx.session.temp?.aiChatActive) {
+    // Skip commands - let them be handled by command handlers
+    if (ctx.message?.text?.startsWith('/')) {
+      return next();
+    }
+
+    const chatType = ctx.chat?.type;
+    const isGroup = chatType === 'group' || chatType === 'supergroup';
+    const rawUserMessage = ctx.message?.text || '';
+
+    // IN GROUPS: Only respond if message mentions "Cristina" (case insensitive)
+    if (isGroup) {
+      const mentionsCristina = /\bcristina\b/i.test(rawUserMessage);
+      if (!mentionsCristina) {
+        return next(); // Don't respond in groups unless Cristina is mentioned
+      }
+      // Remove "Cristina" from the message before processing
+      const cleanedMessage = rawUserMessage.replace(/\bcristina\b/i, '').trim();
+      if (!cleanedMessage) {
+        // Just said "Cristina" with no question
+        const lang = getLanguage(ctx);
+        await ctx.reply(lang === 'es' ? '¿Sí papi? ¿Qué necesitas? 💜' : 'Yes papi? What do you need? 💜', { reply_to_message_id: ctx.message.message_id });
+        return;
+      }
+      // Store cleaned message for processing
+      ctx.cristinaMessage = cleanedMessage;
+    } else {
+      // IN PRIVATE: Only process when AI chat session is active
+      if (!ctx.session.temp?.aiChatActive) {
+        return next();
+      }
+      ctx.cristinaMessage = rawUserMessage;
+    }
+
+    // AI CHAT: Process messages
+    // Special modes (contactingAdmin, requestingActivation) are handled after this block
+    if (!ctx.session.temp?.contactingAdmin && !ctx.session.temp?.requestingActivation) {
       try {
         const lang = getLanguage(ctx);
         const userId = ctx.from.id;
 
+        // Use cleaned message (without "Cristina") or original
+        const messageToProcess = ctx.cristinaMessage || ctx.message?.text;
+        const userMessage = messageToProcess;
+
         // Validate message text exists
-        if (!ctx.message?.text) {
+        if (!messageToProcess) {
           logger.warn('AI chat received message without text');
           return next();
         }
 
-        const userMessage = ctx.message.text;
-
-        // Exit AI chat for any command or exit keyword
-        if (userMessage.startsWith('/') || userMessage.toLowerCase() === 'exit') {
-          ctx.session.temp.aiChatActive = false;
+        // Allow users to exit AI chat with "exit" or "/exit" (only in private)
+        if (!isGroup && (messageToProcess.toLowerCase() === 'exit' || messageToProcess.toLowerCase() === '/exit')) {
           ctx.session.temp.aiChatHistory = null;
           ctx.session.temp.aiQuestionCount = 0;
           await ctx.saveSession();
@@ -366,14 +390,22 @@ const registerSupportHandlers = (bot) => {
             return next();
           }
 
-          await ctx.reply(
-            lang === 'es'
-              ? '💬 Chat finalizado. Use /support para acceder al menú de soporte.'
-              : '💬 Chat ended. Use /support to access support menu.',
-            Markup.inlineKeyboard([
-              [Markup.button.callback(t('back', lang), 'show_support')],
-            ]),
-          );
+          await ctx.reply(lang === 'es' ? '💬 Chat finalizado. Usa /support si necesitas más ayuda.' : '💬 Chat ended. Use /support if you need more help.', Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'show_support')]]));
+          return;
+        }
+
+        // Check question limit (5 questions max)
+        const questionCount = ctx.session.temp.aiQuestionCount || 0;
+        if (questionCount >= 5) {
+          // Reset counters after reaching limit
+          ctx.session.temp.aiChatHistory = null;
+          ctx.session.temp.aiQuestionCount = 0;
+          ctx.session.temp.aiChatActive = false; // Deactivate AI chat
+          await ctx.saveSession();
+
+          const limitMessage = lang === 'es' ? '💬 Has alcanzado el límite de preguntas con Cristina (5 preguntas).\n\nPara continuar con tu consulta, por favor contacta con nuestro equipo humano:\n\n👉 Usa el botón "Contactar Admin" abajo para hablar con una persona real.' : '💬 You\'ve reached the question limit with Cristina (5 questions).\n\nTo continue with your inquiry, please contact our human team:\n\n👉 Use the "Contact Admin" button below to talk with a real person.';
+
+          await ctx.reply(limitMessage, Markup.inlineKeyboard([[Markup.button.callback(t('contactAdmin', lang), 'support_contact_admin')], [Markup.button.callback(t('back', lang), 'show_support')]]));
           return;
         }
 
@@ -408,11 +440,7 @@ const registerSupportHandlers = (bot) => {
         const now = Date.now();
         const lastMessageTime = messageTimestamps.get(userId) || 0;
         if (now - lastMessageTime < RATE_LIMIT_MS) {
-          await ctx.reply(
-            lang === 'es'
-              ? '⏳ Por favor espera unos segundos antes de enviar otro mensaje.'
-              : '⏳ Please wait a few seconds before sending another message.',
-          );
+          await ctx.reply(lang === 'es' ? '⏳ Por favor espera unos segundos antes de enviar otro mensaje.' : '⏳ Please wait a few seconds before sending another message.');
           return;
         }
         messageTimestamps.set(userId, now);
@@ -436,10 +464,7 @@ const registerSupportHandlers = (bot) => {
             }
 
             // Add user message to history
-            ctx.session.temp.aiChatHistory.push({
-              role: 'user',
-              content: userMessage,
-            });
+            ctx.session.temp.aiChatHistory.push({ role: 'user', content: messageToProcess });
 
             // Keep only last 20 messages to manage token usage
             if (ctx.session.temp.aiChatHistory.length > 20) {
@@ -447,9 +472,7 @@ const registerSupportHandlers = (bot) => {
             }
 
             // Prepare messages with language preference
-            const languagePrompt = lang === 'es'
-              ? 'Responde en español.'
-              : 'Respond in English.';
+            const languagePrompt = lang === 'es' ? 'Responde en español.' : 'Respond in English.';
 
             let completion;
             let aiResponse;
@@ -458,56 +481,31 @@ const registerSupportHandlers = (bot) => {
             if (AGENT_ID) {
               const messages = [
                 ...ctx.session.temp.aiChatHistory.slice(-10), // Last 10 messages for context
-                {
-                  role: 'user',
-                  content: `${languagePrompt}\n\n${userMessage}`,
-                },
+                { role: 'user', content: `${languagePrompt}\n\n${userMessage}` },
               ];
 
-              completion = await mistral.agents.complete({
-                agentId: AGENT_ID,
-                messages: messages,
-              });
+              completion = await mistral.agents.complete({ agentId: AGENT_ID, messages });
 
-              aiResponse = completion.choices?.[0]?.message?.content ||
-                          completion.message?.content ||
-                          (lang === 'es'
-                            ? 'Disculpa, no pude procesar tu solicitud. Por favor intenta de nuevo.'
-                            : 'I apologize, but I couldn\'t process your request. Please try again.');
+              aiResponse = completion.choices?.[0]?.message?.content || completion.message?.content || (lang === 'es' ? 'Disculpa, no pude procesar tu solicitud. Por favor intenta de nuevo.' : 'I apologize, but I couldn\'t process your request. Please try again.');
             } else {
               // Fall back to Chat Completions API
               const messages = [
-                {
-                  role: 'system',
-                  content: AGENT_INSTRUCTIONS + `\n\n${languagePrompt}`,
-                },
+                { role: 'system', content: AGENT_INSTRUCTIONS + `\n\n${languagePrompt}` },
                 ...ctx.session.temp.aiChatHistory.slice(-10), // Last 10 messages
               ];
 
-              completion = await mistral.chat.complete({
-                model: process.env.MISTRAL_MODEL || 'mistral-small-latest',
-                messages: messages,
-                maxTokens: parseInt(process.env.MISTRAL_MAX_TOKENS || '500', 10),
-                temperature: 0.7,
-              });
+              completion = await mistral.chat.complete({ model: process.env.MISTRAL_MODEL || 'mistral-small-latest', messages, maxTokens: parseInt(process.env.MISTRAL_MAX_TOKENS || '500', 10), temperature: 0.7 });
 
               aiResponse = completion.choices[0].message.content;
             }
 
             // Add AI response to history
-            ctx.session.temp.aiChatHistory.push({
-              role: 'assistant',
-              content: aiResponse,
-            });
+            ctx.session.temp.aiChatHistory.push({ role: 'assistant', content: aiResponse });
 
             await ctx.saveSession();
 
             // Delete "thinking" message
-            try {
-              await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id);
-            } catch (e) {
-              // Ignore if deletion fails
-            }
+            try { await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id); } catch (e) { /* ignore */ }
 
             // Increment question count
             ctx.session.temp.aiQuestionCount = (ctx.session.temp.aiQuestionCount || 0) + 1;
@@ -538,33 +536,28 @@ const registerSupportHandlers = (bot) => {
           } catch (aiError) {
             logger.error('Mistral AI error:', aiError);
 
-            // Delete "thinking" message
-            try {
-              await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id);
-            } catch (e) {
-              // Ignore if deletion fails
+            // For groups, don't show question count footer
+            let footer = '';
+            if (!isGroup) {
+              const questionsRemaining = 5 - ctx.session.temp.aiQuestionCount;
+              if (questionsRemaining === 0) footer = lang === 'es' ? '\n\n_Esta fue tu última pregunta. La próxima te conectaré con un humano._' : '\n\n_This was your last question. Next time I\'ll connect you with a human._';
+              else if (questionsRemaining === 1) footer = lang === 'es' ? '\n\n_Te queda 1 pregunta más. Toca /exit para salir._' : '\n\n_You have 1 question left. Tap on /exit to leave._';
+              else footer = lang === 'es' ? `\n\n_Te quedan ${questionsRemaining} preguntas. Toca /exit para salir._` : `\n\n_You have ${questionsRemaining} questions left. Tap on /exit to leave._`;
             }
 
-            await ctx.reply(
-              lang === 'es'
-                ? '❌ Lo siento, encontré un error. Por favor intenta de nuevo.'
-                : '❌ Sorry, I encountered an error. Please try again.',
-            );
+            // Reply to message in groups for context
+            const replyOptions = { parse_mode: 'Markdown' };
+            if (isGroup) replyOptions.reply_to_message_id = ctx.message.message_id;
+
+            await ctx.reply(`${aiResponse}${footer}`, replyOptions);
+          } catch (aiError) {
+            logger.error('Mistral AI error:', aiError);
+            try { await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id); } catch (e) { /* ignore */ }
+            await ctx.reply(lang === 'es' ? '❌ Lo siento, encontré un error. Por favor intenta de nuevo.' : '❌ Sorry, I encountered an error. Please try again.');
           }
         } else {
-          // Delete "thinking" message
-          try {
-            await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id);
-          } catch (e) {
-            // Ignore if deletion fails
-          }
-
-          // Fallback response if Mistral AI not configured
-          const fallbackMessage = lang === 'es'
-            ? '🤖 Cristina: Estoy aquí para ayudarte. '
-              + 'Por favor usa /support para acceder al menú de soporte para asistencia específica.'
-            : '🤖 Cristina: I\'m here to help! '
-              + 'Please use /support to access the support menu for specific assistance.';
+          try { await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id); } catch (e) { /* ignore */ }
+          const fallbackMessage = lang === 'es' ? '🤖 Cristina: Estoy aquí para ayudarte. Por favor usa /support para acceder al menú de soporte para asistencia específica.' : '🤖 Cristina: I\'m here to help! Please use /support to access the support menu for specific assistance.';
           await ctx.reply(fallbackMessage);
         }
       } catch (error) {
@@ -578,19 +571,12 @@ const registerSupportHandlers = (bot) => {
         const lang = getLanguage(ctx);
 
         // Validate message text exists
-        if (!ctx.message?.text) {
-          logger.warn('Contact admin received message without text');
-          return next();
-        }
+        if (!ctx.message?.text) { logger.warn('Contact admin received message without text'); return next(); }
 
         const message = ctx.message.text;
 
         // Exit contact admin mode if user sends a command
-        if (message.startsWith('/')) {
-          ctx.session.temp.contactingAdmin = false;
-          await ctx.saveSession();
-          return next();
-        }
+        if (message.startsWith('/')) { ctx.session.temp.contactingAdmin = false; await ctx.saveSession(); return next(); }
 
         const supportGroupId = process.env.SUPPORT_GROUP_ID;
 
@@ -697,8 +683,11 @@ const registerSupportHandlers = (bot) => {
           });
         }
 
-        ctx.session.temp.contactingAdmin = false;
-        await ctx.saveSession();
+        // Also send to admin users as backup
+        const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
+        for (const adminId of adminIds) {
+          try { await ctx.telegram.sendMessage(adminId.trim(), `📬 Support Message from User ${ctx.from.id} (@${ctx.from.username || 'no username'}):\n\n${message}`); } catch (sendError) { logger.error('Error sending to admin:', sendError); }
+        }
 
         await ctx.reply(
           lang === 'es'

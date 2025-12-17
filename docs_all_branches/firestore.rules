@@ -1,0 +1,190 @@
+rules_version = '2';
+
+/**
+ * Firestore Security Rules for PNPtv Lifetime Pass
+ *
+ * IMPORTANTE: Estas reglas deben ser configuradas en Firebase Console
+ * Firebase Console → Firestore Database → Rules
+ *
+ * OPCIONES DE SEGURIDAD:
+ *
+ * Opción 1: Server-side only (MÁS SEGURO - RECOMENDADO)
+ * - Todas las operaciones se hacen desde el backend
+ * - El cliente solo lee datos
+ * - Requiere implementar endpoints API
+ *
+ * Opción 2: Client-side con autenticación anónima
+ * - Permite updates desde el cliente
+ * - Requiere Firebase Anonymous Auth
+ * - Menos seguro pero más simple
+ *
+ * Opción 3: Desarrollo/Testing
+ * - Permite acceso completo
+ * - NUNCA usar en producción
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // OPCIÓN 1: SERVER-SIDE ONLY (RECOMENDADO PARA PRODUCCIÓN)
+    // ============================================================
+
+    // Payment Links - Solo lectura desde cliente
+    match /paymentLinks/{linkId} {
+      // Permitir lectura para mostrar enlaces disponibles
+      allow read: if true;
+
+      // Escritura solo desde servidor (Firebase Admin SDK)
+      allow write: if false;
+    }
+
+    // Activation Codes - Sin acceso directo desde cliente
+    match /activationCodes/{code} {
+      // Sin acceso desde cliente
+      // Todas las operaciones desde servidor
+      allow read, write: if false;
+    }
+
+    // Activation Logs - Sin acceso directo desde cliente
+    match /activationLogs/{logId} {
+      // Sin acceso desde cliente
+      allow read, write: if false;
+    }
+
+    // Users - Solo el propio usuario puede leer/escribir
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    /*
+    // ============================================================
+    // OPCIÓN 2: CLIENT-SIDE CON AUTENTICACIÓN ANÓNIMA
+    // ============================================================
+    //
+    // Descomenta esta sección si quieres permitir updates desde el cliente
+    // Requiere habilitar Anonymous Auth en Firebase Console
+    //
+
+    // Payment Links - Lectura pública, escritura autenticada
+    match /paymentLinks/{linkId} {
+      // Permitir lectura pública
+      allow read: if true;
+
+      // Permitir update solo del campo 'used' por usuarios autenticados
+      allow update: if request.auth != null
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['used', 'usedAt'])
+                    && request.resource.data.used == true
+                    && resource.data.used == false;
+
+      // No permitir create ni delete
+      allow create, delete: if false;
+    }
+
+    // Activation Codes - Solo backend puede acceder
+    match /activationCodes/{code} {
+      allow read, write: if false;
+    }
+
+    // Activation Logs - Solo backend puede escribir
+    match /activationLogs/{logId} {
+      allow read: if false;
+      allow write: if false;
+    }
+    */
+
+    /*
+    // ============================================================
+    // OPCIÓN 3: DESARROLLO/TESTING
+    // ============================================================
+    //
+    // ⚠️ ADVERTENCIA: NUNCA usar estas reglas en producción
+    // Solo para desarrollo y testing
+    //
+
+    match /{document=**} {
+      allow read, write: if true;
+    }
+    */
+  }
+}
+
+/**
+ * NOTAS DE IMPLEMENTACIÓN:
+ *
+ * 1. OPCIÓN 1 (Recomendada):
+ *    - Modifica lifetime-pass.html para NO actualizar 'used' desde cliente
+ *    - Crea un Cloud Function o endpoint API para marcar enlaces como usados
+ *    - Ejemplo:
+ *
+ *      // En el servidor (Node.js)
+ *      app.post('/api/mark-link-used', async (req, res) => {
+ *        const { linkId } = req.body;
+ *        await db.collection('paymentLinks').doc(linkId).update({
+ *          used: true,
+ *          usedAt: admin.firestore.FieldValue.serverTimestamp()
+ *        });
+ *        res.json({ success: true });
+ *      });
+ *
+ * 2. OPCIÓN 2:
+ *    - Habilita Anonymous Auth en Firebase Console:
+ *      Authentication → Sign-in method → Anonymous → Enable
+ *
+ *    - Agrega autenticación anónima a lifetime-pass.html:
+ *
+ *      firebase.auth().signInAnonymously()
+ *        .then(() => {
+ *          console.log('Authenticated anonymously');
+ *          loadPaymentLinks();
+ *        })
+ *        .catch((error) => {
+ *          console.error('Auth error:', error);
+ *        });
+ *
+ * 3. OPCIÓN 3:
+ *    - Solo para desarrollo
+ *    - Cambia las reglas cuando vayas a producción
+ *
+ * TESTING:
+ *
+ * Puedes probar las reglas en Firebase Console:
+ * Firestore Database → Rules → Rules Playground
+ *
+ * Ejemplo de test:
+ *
+ * Operation: get
+ * Location: /paymentLinks/abc123
+ * Authenticated: No
+ *
+ * Debería: ALLOW (con las reglas actuales)
+ *
+ * Operation: update
+ * Location: /paymentLinks/abc123
+ * Authenticated: No
+ *
+ * Debería: DENY (con las reglas actuales)
+ */
+
+/**
+ * ÍNDICES RECOMENDADOS:
+ *
+ * Collection: paymentLinks
+ * - used (ASC) + product (ASC) + createdAt (DESC)
+ *
+ * Collection: activationCodes
+ * - used (ASC) + product (ASC)
+ *
+ * Collection: activationLogs
+ * - userId (ASC) + activatedAt (DESC)
+ * - success (ASC) + activatedAt (DESC)
+ *
+ * Firebase creará automáticamente índices simples.
+ * Para índices compuestos, ve a:
+ * Firebase Console → Firestore → Indexes
+ *
+ * O usa el Firebase CLI:
+ * firebase deploy --only firestore:indexes
+ */

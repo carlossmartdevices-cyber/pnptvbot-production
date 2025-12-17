@@ -62,7 +62,7 @@ const usernameEnforcement = () => {
       }
 
       // Continue with message processing
-      await next();
+      return next();
     } catch (error) {
       logger.error('Username enforcement error:', error);
       // On error, allow message through to avoid blocking legitimate users

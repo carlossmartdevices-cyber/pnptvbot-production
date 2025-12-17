@@ -5,6 +5,7 @@ const { PERMISSIONS } = require('../../../models/permissionModel');
 const UserModel = require('../../../models/userModel');
 const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
+const { sendPrimeConfirmation } = require('../../services/paymentService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
@@ -21,7 +22,7 @@ async function showAdminPanel(ctx, edit = false) {
     const userRole = await PermissionService.getUserRole(userId);
     const roleDisplay = await PermissionService.getUserRoleDisplay(userId, lang);
 
-    // Build menu based on role
+    // Build menu based on role with organized sections
     const buttons = [];
 
     // Common for all admin roles
@@ -30,27 +31,53 @@ async function showAdminPanel(ctx, edit = false) {
 
     // Admin and SuperAdmin features
     if (userRole === 'superadmin' || userRole === 'admin') {
-      buttons.push([Markup.button.callback('📢 Difusión', 'admin_broadcast')]);
-      buttons.push([Markup.button.callback('📊 Analíticas', 'admin_analytics')]);
-      buttons.push([Markup.button.callback('🎮 Gamificación', 'admin_gamification')]);
-      buttons.push([Markup.button.callback('📻 Radio', 'admin_radio')]);
-      buttons.push([Markup.button.callback('📺 Transmisiones', 'admin_live_streams')]);
+      // ═══ CONTENT & MEDIA ═══
+      buttons.push([
+        Markup.button.callback('📻 Radio', 'admin_radio'),
+        Markup.button.callback('📺 ' + (lang === 'es' ? 'En Vivo' : 'Live'), 'admin_live_streams'),
+      ]);
+
+      // ═══ ENGAGEMENT ═══
+      buttons.push([
+        Markup.button.callback('📢 ' + (lang === 'es' ? 'Difusión' : 'Broadcast'), 'admin_broadcast'),
+        Markup.button.callback('🎮 ' + (lang === 'es' ? 'Gamificación' : 'Gamification'), 'admin_gamification'),
+      ]);
+
+      // ═══ PREVIEW MODE ═══
+      buttons.push([
+        Markup.button.callback('👁️ ' + (lang === 'es' ? 'Vista Previa' : 'Preview Mode'), 'admin_view_mode'),
+      ]);
     }
 
     // SuperAdmin only features
     if (userRole === 'superadmin') {
-      buttons.push([Markup.button.callback('📋 Menús', 'admin_menus')]);
-      buttons.push([Markup.button.callback('👑 Roles', 'admin_roles')]);
-      buttons.push([Markup.button.callback('💎 Planes', 'admin_plans')]);
-      buttons.push([Markup.button.callback('📜 Logs', 'admin_logs')]);
+      // ═══ SYSTEM CONFIG ═══
+      buttons.push([
+        Markup.button.callback('💎 ' + (lang === 'es' ? 'Planes' : 'Plans'), 'admin_plans'),
+        Markup.button.callback('👑 Roles', 'admin_roles'),
+      ]);
+      buttons.push([
+        Markup.button.callback('📋 ' + (lang === 'es' ? 'Menús' : 'Menus'), 'admin_menus'),
+        Markup.button.callback('📜 Logs', 'admin_logs'),
+      ]);
     }
 
-    const message = `${roleDisplay}\n\n${t('adminPanel', lang)}`;
+    // Build styled message
+    const header = lang === 'es' ? '`⚙️ Panel de Administración`' : '`⚙️ Admin Panel`';
+    const divider = '━━━━━━━━━━━━━━━━━━━━';
+    const footer = lang === 'es' ? '`Selecciona una opción 💜`' : '`Choose an option 💜`';
+
+    const message = `${header}\n${divider}\n\n${roleDisplay}\n\n${footer}`;
+
+    const options = {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard(buttons),
+    };
 
     if (edit) {
-      await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
+      await ctx.editMessageText(message, options);
     } else {
-      await ctx.reply(message, Markup.inlineKeyboard(buttons));
+      await ctx.reply(message, options);
     }
   } catch (error) {
     logger.error('Error showing admin panel:', error);
@@ -86,6 +113,65 @@ const registerAdminHandlers = (bot) => {
       await showAdminPanel(ctx, false);
     } catch (error) {
       logger.error('Error in /admin command:', error);
+    }
+  });
+
+  // Quick view mode command: /viewas free | /viewas prime | /viewas normal
+  bot.command('viewas', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.reply(t('unauthorized', getLanguage(ctx)));
+        return;
+      }
+
+      const lang = getLanguage(ctx);
+      const args = ctx.message.text.split(' ');
+      const mode = args[1]?.toLowerCase();
+
+      if (!mode || !['free', 'prime', 'normal'].includes(mode)) {
+        const helpMsg = lang === 'es'
+          ? '👁️ **Comando de Vista Previa**\n\n' +
+            'Uso: `/viewas <modo>`\n\n' +
+            'Modos disponibles:\n' +
+            '• `free` - Ver como usuario FREE\n' +
+            '• `prime` - Ver como usuario PRIME\n' +
+            '• `normal` - Vista normal (admin)\n\n' +
+            'Ejemplo: `/viewas free`'
+          : '👁️ **Preview Mode Command**\n\n' +
+            'Usage: `/viewas <mode>`\n\n' +
+            'Available modes:\n' +
+            '• `free` - View as FREE user\n' +
+            '• `prime` - View as PRIME user\n' +
+            '• `normal` - Normal view (admin)\n\n' +
+            'Example: `/viewas free`';
+        await ctx.reply(helpMsg, { parse_mode: 'Markdown' });
+        return;
+      }
+
+      if (mode === 'normal') {
+        delete ctx.session.adminViewMode;
+      } else {
+        ctx.session.adminViewMode = mode;
+      }
+      await ctx.saveSession();
+
+      const modeText = mode === 'free'
+        ? (lang === 'es' ? '🆓 FREE' : '🆓 FREE')
+        : mode === 'prime'
+        ? (lang === 'es' ? '💎 PRIME' : '💎 PRIME')
+        : (lang === 'es' ? '🔙 Normal' : '🔙 Normal');
+
+      await ctx.reply(
+        lang === 'es'
+          ? `👁️ Vista activada: ${modeText}\n\nUsa /menu para ver el menú.`
+          : `👁️ View activated: ${modeText}\n\nUse /menu to see the menu.`,
+        { parse_mode: 'Markdown' }
+      );
+
+      logger.info('Admin view mode changed via command', { userId: ctx.from.id, mode });
+    } catch (error) {
+      logger.error('Error in /viewas command:', error);
     }
   });
 
@@ -156,6 +242,8 @@ const registerAdminHandlers = (bot) => {
   // User management
   bot.action('admin_users', async (ctx) => {
     try {
+      await ctx.answerCbQuery(); // Answer immediately
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -178,11 +266,156 @@ const registerAdminHandlers = (bot) => {
     }
   });
 
+  // View Mode - Show options to preview as Free or Prime
+  bot.action('admin_view_mode', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const lang = getLanguage(ctx);
+      const currentMode = ctx.session?.adminViewMode;
+
+      let statusText = '';
+      if (currentMode === 'free') {
+        statusText = lang === 'es' ? '\n\n_Actualmente: Vista FREE_' : '\n\n_Currently: FREE View_';
+      } else if (currentMode === 'prime') {
+        statusText = lang === 'es' ? '\n\n_Actualmente: Vista PRIME_' : '\n\n_Currently: PRIME View_';
+      } else {
+        statusText = lang === 'es' ? '\n\n_Actualmente: Vista Normal (Admin)_' : '\n\n_Currently: Normal View (Admin)_';
+      }
+
+      const message = lang === 'es'
+        ? '👁️ **Vista Previa de Menú**\n\nSelecciona cómo quieres ver el menú para probar la experiencia del usuario:' + statusText
+        : '👁️ **Menu Preview Mode**\n\nSelect how you want to view the menu to test the user experience:' + statusText;
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback(lang === 'es' ? '🆓 Ver como FREE' : '🆓 View as FREE', 'admin_view_as_free'),
+            Markup.button.callback(lang === 'es' ? '💎 Ver como PRIME' : '💎 View as PRIME', 'admin_view_as_prime'),
+          ],
+          [
+            Markup.button.callback(lang === 'es' ? '🔙 Vista Normal' : '🔙 Normal View', 'admin_view_as_normal'),
+          ],
+          [
+            Markup.button.callback(lang === 'es' ? '↩️ Volver' : '↩️ Back', 'admin_cancel'),
+          ],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in admin view mode:', error);
+    }
+  });
+
+  // Set view mode to FREE
+  bot.action('admin_view_as_free', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      ctx.session.adminViewMode = 'free';
+      await ctx.saveSession();
+
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(lang === 'es' ? '👁️ Vista FREE activada' : '👁️ FREE View activated');
+
+      // Show menu with new view mode
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error setting free view mode:', error);
+    }
+  });
+
+  // Set view mode to PRIME
+  bot.action('admin_view_as_prime', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      ctx.session.adminViewMode = 'prime';
+      await ctx.saveSession();
+
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(lang === 'es' ? '👁️ Vista PRIME activada' : '👁️ PRIME View activated');
+
+      // Show menu with new view mode
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error setting prime view mode:', error);
+    }
+  });
+
+  // Set view mode back to Normal (admin)
+  bot.action('admin_view_as_normal', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      delete ctx.session.adminViewMode;
+      await ctx.saveSession();
+
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(lang === 'es' ? '🔙 Vista Normal activada' : '🔙 Normal View activated');
+
+      // Show menu with normal view
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error setting normal view mode:', error);
+    }
+  });
+
+  // Exit preview mode (from menu button)
+  bot.action('admin_exit_preview', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      delete ctx.session.adminViewMode;
+      await ctx.saveSession();
+
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(lang === 'es' ? '🔙 Vista Normal' : '🔙 Normal View');
+
+      // Show menu with normal view
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error exiting preview mode:', error);
+    }
+  });
+
   // Broadcast
   bot.action('admin_broadcast', async (ctx) => {
     try {
+      await ctx.answerCbQuery(); // Answer immediately to prevent timeout
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
+      if (!isAdmin) {
+        logger.warn('Non-admin tried to access broadcast:', { userId: ctx.from.id });
+        return;
+      }
 
       const lang = getLanguage(ctx);
 
@@ -202,6 +435,11 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error in admin broadcast:', error);
+      try {
+        await ctx.answerCbQuery('Error al iniciar broadcast');
+      } catch (e) {
+        // Already answered
+      }
     }
   });
 
@@ -209,21 +447,34 @@ const registerAdminHandlers = (bot) => {
   bot.action(/^broadcast_(.+)$/, async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
 
       // Validate match result exists
       if (!ctx.match || !ctx.match[1]) {
         logger.error('Invalid broadcast target action format');
+        await ctx.answerCbQuery('❌ Error en formato de acción');
         return;
       }
 
       const target = ctx.match[1];
       const lang = getLanguage(ctx);
 
+      // Initialize session temp if needed
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
+
       ctx.session.temp.broadcastTarget = target;
       ctx.session.temp.broadcastStep = 'media';
       ctx.session.temp.broadcastData = {};
       await ctx.saveSession();
+
+      logger.info('Broadcast target selected', { target, userId: ctx.from.id });
+
+      await ctx.answerCbQuery(`✓ Audiencia: ${target}`);
 
       await ctx.editMessageText(
         '📎 *Paso 1/4: Subir Media*\n\n'
@@ -239,6 +490,7 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error in broadcast target:', error);
+      await ctx.answerCbQuery('❌ Error al seleccionar audiencia').catch(() => {});
     }
   });
 
@@ -246,10 +498,22 @@ const registerAdminHandlers = (bot) => {
   bot.action('broadcast_skip_media', async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      // Validate session state
+      if (!ctx.session.temp || !ctx.session.temp.broadcastTarget) {
+        await ctx.answerCbQuery('❌ Sesión expirada. Por favor inicia de nuevo.');
+        logger.warn('Broadcast session expired or missing', { userId: ctx.from.id });
+        return;
+      }
 
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
+
+      await ctx.answerCbQuery('⏭️ Saltando media');
 
       await ctx.editMessageText(
         '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
@@ -261,14 +525,19 @@ const registerAdminHandlers = (bot) => {
           ]),
         },
       );
+
+      logger.info('Broadcast media skipped', { userId: ctx.from.id });
     } catch (error) {
       logger.error('Error skipping media:', error);
+      await ctx.answerCbQuery('❌ Error al saltar media').catch(() => {});
     }
   });
 
   // Plan management - List all plans
   bot.action('admin_plans', async (ctx) => {
     try {
+      await ctx.answerCbQuery(); // Answer immediately
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -586,6 +855,8 @@ const registerAdminHandlers = (bot) => {
   // Analytics
   bot.action('admin_analytics', async (ctx) => {
     try {
+      await ctx.answerCbQuery(); // Answer immediately
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -627,6 +898,8 @@ const registerAdminHandlers = (bot) => {
   // Admin cancel / back to main panel
   bot.action('admin_cancel', async (ctx) => {
     try {
+      await ctx.answerCbQuery(); // Answer immediately
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -641,17 +914,39 @@ const registerAdminHandlers = (bot) => {
 
   // Handle media uploads for broadcast
   bot.on('photo', async (ctx, next) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
-      return next();
-    }
-
     try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      // Check if this is for broadcast
+      if (!isAdmin || !ctx.session.temp || ctx.session.temp.broadcastStep !== 'media') {
+        return next();
+      }
+
+      // Validate session state
+      if (!ctx.session.temp.broadcastTarget || !ctx.session.temp.broadcastData) {
+        logger.warn('Broadcast session incomplete when uploading photo', { userId: ctx.from.id });
+        await ctx.reply('❌ Sesión expirada. Por favor inicia el broadcast de nuevo con /admin');
+        return;
+      }
+
       const photo = ctx.message.photo[ctx.message.photo.length - 1];
+
+      if (!photo || !photo.file_id) {
+        logger.error('Invalid photo upload', { userId: ctx.from.id });
+        await ctx.reply('❌ Error al procesar la imagen. Por favor intenta de nuevo.');
+        return;
+      }
+
       ctx.session.temp.broadcastData.mediaType = 'photo';
       ctx.session.temp.broadcastData.mediaFileId = photo.file_id;
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
+
+      logger.info('Broadcast photo uploaded', {
+        userId: ctx.from.id,
+        fileId: photo.file_id,
+        target: ctx.session.temp.broadcastTarget
+      });
 
       await ctx.reply(
         '✅ Imagen guardada correctamente\n\n'
@@ -666,20 +961,44 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error handling photo for broadcast:', error);
+      await ctx.reply('❌ Error al procesar la imagen. Por favor intenta de nuevo.').catch(() => {});
     }
   });
 
   bot.on('video', async (ctx, next) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
-      return next();
-    }
-
     try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      // Check if this is for broadcast
+      if (!isAdmin || !ctx.session.temp || ctx.session.temp.broadcastStep !== 'media') {
+        return next();
+      }
+
+      // Validate session state
+      if (!ctx.session.temp.broadcastTarget || !ctx.session.temp.broadcastData) {
+        logger.warn('Broadcast session incomplete when uploading video', { userId: ctx.from.id });
+        await ctx.reply('❌ Sesión expirada. Por favor inicia el broadcast de nuevo con /admin');
+        return;
+      }
+
+      const video = ctx.message.video;
+
+      if (!video || !video.file_id) {
+        logger.error('Invalid video upload', { userId: ctx.from.id });
+        await ctx.reply('❌ Error al procesar el video. Por favor intenta de nuevo.');
+        return;
+      }
+
       ctx.session.temp.broadcastData.mediaType = 'video';
-      ctx.session.temp.broadcastData.mediaFileId = ctx.message.video.file_id;
+      ctx.session.temp.broadcastData.mediaFileId = video.file_id;
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
+
+      logger.info('Broadcast video uploaded', {
+        userId: ctx.from.id,
+        fileId: video.file_id,
+        target: ctx.session.temp.broadcastTarget
+      });
 
       await ctx.reply(
         '✅ Video guardado correctamente\n\n'
@@ -694,20 +1013,44 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error handling video for broadcast:', error);
+      await ctx.reply('❌ Error al procesar el video. Por favor intenta de nuevo.').catch(() => {});
     }
   });
 
   bot.on('document', async (ctx, next) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
-      return next();
-    }
-
     try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      // Check if this is for broadcast
+      if (!isAdmin || !ctx.session.temp || ctx.session.temp.broadcastStep !== 'media') {
+        return next();
+      }
+
+      // Validate session state
+      if (!ctx.session.temp.broadcastTarget || !ctx.session.temp.broadcastData) {
+        logger.warn('Broadcast session incomplete when uploading document', { userId: ctx.from.id });
+        await ctx.reply('❌ Sesión expirada. Por favor inicia el broadcast de nuevo con /admin');
+        return;
+      }
+
+      const document = ctx.message.document;
+
+      if (!document || !document.file_id) {
+        logger.error('Invalid document upload', { userId: ctx.from.id });
+        await ctx.reply('❌ Error al procesar el documento. Por favor intenta de nuevo.');
+        return;
+      }
+
       ctx.session.temp.broadcastData.mediaType = 'document';
-      ctx.session.temp.broadcastData.mediaFileId = ctx.message.document.file_id;
+      ctx.session.temp.broadcastData.mediaFileId = document.file_id;
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
+
+      logger.info('Broadcast document uploaded', {
+        userId: ctx.from.id,
+        fileId: document.file_id,
+        target: ctx.session.temp.broadcastTarget
+      });
 
       await ctx.reply(
         '✅ Documento guardado correctamente\n\n'
@@ -722,20 +1065,44 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error handling document for broadcast:', error);
+      await ctx.reply('❌ Error al procesar el documento. Por favor intenta de nuevo.').catch(() => {});
     }
   });
 
   bot.on('audio', async (ctx, next) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
-      return next();
-    }
-
     try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      // Check if this is for broadcast
+      if (!isAdmin || !ctx.session.temp || ctx.session.temp.broadcastStep !== 'media') {
+        return next();
+      }
+
+      // Validate session state
+      if (!ctx.session.temp.broadcastTarget || !ctx.session.temp.broadcastData) {
+        logger.warn('Broadcast session incomplete when uploading audio', { userId: ctx.from.id });
+        await ctx.reply('❌ Sesión expirada. Por favor inicia el broadcast de nuevo con /admin');
+        return;
+      }
+
+      const audio = ctx.message.audio;
+
+      if (!audio || !audio.file_id) {
+        logger.error('Invalid audio upload', { userId: ctx.from.id });
+        await ctx.reply('❌ Error al procesar el audio. Por favor intenta de nuevo.');
+        return;
+      }
+
       ctx.session.temp.broadcastData.mediaType = 'audio';
-      ctx.session.temp.broadcastData.mediaFileId = ctx.message.audio.file_id;
+      ctx.session.temp.broadcastData.mediaFileId = audio.file_id;
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
+
+      logger.info('Broadcast audio uploaded', {
+        userId: ctx.from.id,
+        fileId: audio.file_id,
+        target: ctx.session.temp.broadcastTarget
+      });
 
       await ctx.reply(
         '✅ Audio guardado correctamente\n\n'
@@ -750,20 +1117,44 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error handling audio for broadcast:', error);
+      await ctx.reply('❌ Error al procesar el audio. Por favor intenta de nuevo.').catch(() => {});
     }
   });
 
   bot.on('voice', async (ctx, next) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin || ctx.session.temp?.broadcastStep !== 'media') {
-      return next();
-    }
-
     try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      // Check if this is for broadcast
+      if (!isAdmin || !ctx.session.temp || ctx.session.temp.broadcastStep !== 'media') {
+        return next();
+      }
+
+      // Validate session state
+      if (!ctx.session.temp.broadcastTarget || !ctx.session.temp.broadcastData) {
+        logger.warn('Broadcast session incomplete when uploading voice', { userId: ctx.from.id });
+        await ctx.reply('❌ Sesión expirada. Por favor inicia el broadcast de nuevo con /admin');
+        return;
+      }
+
+      const voice = ctx.message.voice;
+
+      if (!voice || !voice.file_id) {
+        logger.error('Invalid voice upload', { userId: ctx.from.id });
+        await ctx.reply('❌ Error al procesar el mensaje de voz. Por favor intenta de nuevo.');
+        return;
+      }
+
       ctx.session.temp.broadcastData.mediaType = 'voice';
-      ctx.session.temp.broadcastData.mediaFileId = ctx.message.voice.file_id;
+      ctx.session.temp.broadcastData.mediaFileId = voice.file_id;
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
+
+      logger.info('Broadcast voice uploaded', {
+        userId: ctx.from.id,
+        fileId: voice.file_id,
+        target: ctx.session.temp.broadcastTarget
+      });
 
       await ctx.reply(
         '✅ Mensaje de voz guardado correctamente\n\n'
@@ -778,6 +1169,7 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error handling voice for broadcast:', error);
+      await ctx.reply('❌ Error al procesar el mensaje de voz. Por favor intenta de nuevo.').catch(() => {});
     }
   });
 
@@ -833,6 +1225,31 @@ const registerAdminHandlers = (bot) => {
       try {
         const message = ctx.message.text;
 
+        // Validate message length
+        // Telegram caption limit is 1024 chars for media, 4096 for text-only
+        // Use 1020 to leave room for the "📢 " prefix and safety margin
+        const hasMedia = ctx.session.temp.broadcastData?.mediaFileId;
+        const maxLength = hasMedia ? 1020 : 4000;
+        const charCount = message.length;
+
+        if (charCount > maxLength) {
+          const excessChars = charCount - maxLength;
+          await ctx.reply(
+            `❌ *Mensaje demasiado largo*\n\n`
+            + `📏 Tu mensaje: ${charCount} caracteres\n`
+            + `📏 Límite máximo: ${maxLength} caracteres\n`
+            + `⚠️ Exceso: ${excessChars} caracteres\n\n`
+            + `${hasMedia ? '⚠️ *Nota:* Los mensajes con foto/video tienen un límite de 1024 caracteres en Telegram.\n\n' : ''}`
+            + `Por favor acorta tu mensaje y envíalo de nuevo.`,
+            { parse_mode: 'Markdown' },
+          );
+          return;
+        }
+
+        // Initialize broadcastData if needed
+        if (!ctx.session.temp.broadcastData) {
+          ctx.session.temp.broadcastData = {};
+        }
         // Save English text
         ctx.session.temp.broadcastData.textEn = message;
         ctx.session.temp.broadcastStep = 'text_es';
@@ -861,6 +1278,34 @@ const registerAdminHandlers = (bot) => {
         const target = ctx.session.temp.broadcastTarget;
         const broadcastData = ctx.session.temp.broadcastData;
 
+        // Validate message length
+        // Telegram caption limit is 1024 chars for media, 4096 for text-only
+        // Use 1020 to leave room for the "📢 " prefix and safety margin
+        const hasMedia = broadcastData.mediaFileId;
+        const maxLength = hasMedia ? 1020 : 4000;
+        const charCount = message.length;
+
+        if (charCount > maxLength) {
+          const excessChars = charCount - maxLength;
+          await ctx.reply(
+            `❌ *Mensaje demasiado largo*\n\n`
+            + `📏 Tu mensaje: ${charCount} caracteres\n`
+            + `📏 Límite máximo: ${maxLength} caracteres\n`
+            + `⚠️ Exceso: ${excessChars} caracteres\n\n`
+            + `${hasMedia ? '⚠️ *Nota:* Los mensajes con foto/video tienen un límite de 1024 caracteres en Telegram.\n\n' : ''}`
+            + `Por favor acorta tu mensaje y envíalo de nuevo.`,
+            { parse_mode: 'Markdown' },
+          );
+          return;
+        }
+
+        // Validate English text exists
+        if (!broadcastData.textEn) {
+          await ctx.reply('❌ Error: Falta el texto en inglés. Por favor inicia el broadcast de nuevo.');
+          ctx.session.temp = {};
+          await ctx.saveSession();
+          return;
+        }
         // Save Spanish text
         broadcastData.textEs = message;
 
@@ -892,6 +1337,12 @@ const registerAdminHandlers = (bot) => {
             const userLang = user.language || 'en';
             const textToSend = userLang === 'es' ? broadcastData.textEs : broadcastData.textEn;
 
+            const replyMarkup = Markup.inlineKeyboard([
+              Markup.button.callback(t('subscribe', userLang), 'show_subscription_plans'),
+              Markup.button.callback(t('support', userLang), 'show_support'),
+              Markup.button.callback(userLang === 'es' ? 'Menú Principal' : 'Main Menu', 'back_to_main')
+            ]);
+
             // Send with media if available
             if (broadcastData.mediaType && broadcastData.mediaFileId) {
               const sendMethod = {
@@ -905,19 +1356,42 @@ const registerAdminHandlers = (bot) => {
               if (sendMethod) {
                 await ctx.telegram[sendMethod](user.id, broadcastData.mediaFileId, {
                   caption: `📢 ${textToSend}`,
+                  parse_mode: 'Markdown',
+                  reply_markup: replyMarkup
                 });
               } else {
-                await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`);
+                logger.warn(`Invalid media type for broadcast: ${broadcastData.mediaType}`);
+                continue;
               }
             } else {
               // Text only
-              await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`);
+              await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`, { 
+                parse_mode: 'Markdown',
+                reply_markup: replyMarkup 
+              });
             }
 
             sent += 1;
           } catch (sendError) {
             failed += 1;
-            logger.warn('Failed to send broadcast to user:', { userId: user.id, error: sendError.message });
+            const errorMsg = sendError.message || '';
+            
+            // Log specific error types
+            if (errorMsg.includes('caption is too long')) {
+              logger.error('Broadcast caption too long - should have been caught by validation', { 
+                userId: user.id, 
+                textLength: textToSend?.length,
+                hasMedia: !!broadcastData.mediaType 
+              });
+            } else if (errorMsg.includes('bot was blocked') || errorMsg.includes('user is deactivated')) {
+              // User blocked bot or deactivated account - this is expected
+              logger.debug('User unavailable for broadcast:', { userId: user.id });
+            } else if (errorMsg.includes('chat not found')) {
+              // Chat doesn't exist - user never started the bot
+              logger.debug('Chat not found for broadcast:', { userId: user.id });
+            } else {
+              logger.warn('Failed to send broadcast to user:', { userId: user.id, error: errorMsg });
+            }
           }
         }
 
@@ -1234,11 +1708,16 @@ const registerAdminHandlers = (bot) => {
         }
       }
 
+      const planName = user.planId || 'premium';
+
       await UserModel.updateSubscription(userId, {
         status: 'active',
-        planId: user.planId || 'premium',
+        planId: planName,
         expiry: newExpiry,
       });
+
+      // Send PRIME confirmation with invite link to user
+      await sendPrimeConfirmation(userId, planName, newExpiry, 'admin-extend');
 
       let successText = `✅ **Membresía Extendida**\n\n`;
       successText += `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`;
@@ -1248,6 +1727,7 @@ const registerAdminHandlers = (bot) => {
       } else {
         successText += `♾️ Membresía Lifetime activada\n`;
       }
+      successText += `\n📨 Se envió confirmación con enlace PRIME al usuario`;
 
       await ctx.editMessageText(
         successText,
@@ -1360,12 +1840,16 @@ const registerAdminHandlers = (bot) => {
       }
 
       // Set new plan
+      let newExpiry = null;
+      let planName = 'Gratis';
+
       if (planId === 'free') {
         await UserModel.updateSubscription(userId, {
           status: 'free',
           planId: null,
           expiry: null,
         });
+        // No PRIME confirmation for free plan
       } else {
         const plan = await PlanModel.getById(planId);
         if (!plan) {
@@ -1373,8 +1857,10 @@ const registerAdminHandlers = (bot) => {
           return;
         }
 
+        planName = plan.name || planId;
+
         // Set new expiry date based on plan duration
-        const newExpiry = new Date();
+        newExpiry = new Date();
         newExpiry.setDate(newExpiry.getDate() + (plan.duration || 30));
 
         await UserModel.updateSubscription(userId, {
@@ -1382,13 +1868,22 @@ const registerAdminHandlers = (bot) => {
           planId,
           expiry: newExpiry,
         });
+
+        // Send PRIME confirmation with invite link to user
+        await sendPrimeConfirmation(userId, planName, newExpiry, 'admin-plan-change');
+      }
+
+      let successMsg = `✅ Plan actualizado exitosamente\n\n`
+        + `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`
+        + `💎 Nuevo Plan: ${planId === 'free' ? 'Gratis' : planName}\n`
+        + `📅 Estado: ${planId === 'free' ? 'free' : 'active'}`;
+
+      if (planId !== 'free') {
+        successMsg += `\n\n📨 Se envió confirmación con enlace PRIME al usuario`;
       }
 
       await ctx.editMessageText(
-        `✅ Plan actualizado exitosamente\n\n`
-        + `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`
-        + `💎 Nuevo Plan: ${planId === 'free' ? 'Gratis' : planId}\n`
-        + `📅 Estado: ${planId === 'free' ? 'free' : 'active'}`,
+        successMsg,
         Markup.inlineKeyboard([
           [Markup.button.callback('◀️ Volver', 'admin_cancel')],
         ]),
