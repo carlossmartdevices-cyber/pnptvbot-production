@@ -101,18 +101,11 @@ const registerMenuHandlers = (bot) => {
     });
   });
 
-  // Bloquear Zoom Rooms y Live Streams y mostrar "Coming soon"
+  // Bloquear Live Streams y mostrar "Coming soon"
   bot.action('show_live', async (ctx) => {
     const lang = ctx.session?.language || 'en';
     await ctx.answerCbQuery(
       lang === 'es' ? '🚧 Próximamente: Transmisiones en vivo.' : '🚧 Coming soon: Live Streams.',
-      { show_alert: true }
-    );
-  });
-  bot.action('show_zoom', async (ctx) => {
-    const lang = ctx.session?.language || 'en';
-    await ctx.answerCbQuery(
-      lang === 'es' ? '🚧 Próximamente: Salas Zoom.' : '🚧 Coming soon: Zoom Rooms.',
       { show_alert: true }
     );
   });
