@@ -13,12 +13,24 @@ const initializePostgres = () => {
   }
 
   try {
+    // Use individual connection parameters instead of connection string
+    // to avoid URL encoding issues with special characters in password
+    const host = process.env.POSTGRES_HOST || 'localhost';
+    const port = parseInt(process.env.POSTGRES_PORT || '5432');
+    const database = process.env.POSTGRES_DATABASE || 'pnptvbot';
+    const user = process.env.POSTGRES_USER || 'pnptvbot';
+    const password = process.env.POSTGRES_PASSWORD || '';
+
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      max: 20,
+      host,
+      port,
+      database,
+      user,
+      password,
+      ssl: false, // Local PostgreSQL doesn't use SSL
+      max: process.env.POSTGRES_POOL_MAX ? parseInt(process.env.POSTGRES_POOL_MAX) : 20,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
+      connectionTimeoutMillis: 10000,
     });
 
     pool.on('error', (err) => {
@@ -67,9 +79,27 @@ const testConnection = async () => {
  */
 const closePool = async () => {
   if (pool) {
-    await pool.end();
-    pool = null;
-    logger.info('PostgreSQL pool closed');
+    try {
+      await pool.end();
+      pool = null;
+      logger.info('PostgreSQL pool closed');
+    } catch (error) {
+      logger.error('Error closing PostgreSQL pool:', error);
+    }
+  }
+};
+
+/**
+ * Get a client from the pool with error handling
+ * @returns {Promise<Object>} PostgreSQL client
+ */
+const getClient = async () => {
+  try {
+    const client = await getPool().connect();
+    return client;
+  } catch (error) {
+    logger.error('Failed to get PostgreSQL client:', error);
+    throw new Error('Database connection error');
   }
 };
 
@@ -83,13 +113,14 @@ const query = async (text, params) => {
   const start = Date.now();
   const result = await getPool().query(text, params);
   const duration = Date.now() - start;
-  logger.debug('Executed query', { text, duration, rows: result.rowCount });
+  logger.debug('Executed query', { duration, rows: result.rowCount });
   return result;
 };
 
 module.exports = {
   initializePostgres,
   getPool,
+  getClient,
   testConnection,
   closePool,
   query,

@@ -13,6 +13,7 @@ const registerGamificationHandlers = (bot) => {
   // Main gamification menu
   bot.action('admin_gamification', async (ctx) => {
     try {
+      await ctx.answerCbQuery();
       await showGamificationMenu(ctx);
     } catch (error) {
       logger.error('Error showing gamification menu:', error);
@@ -446,22 +447,18 @@ const handleBadgeAssignmentInput = async (ctx) => {
     waitingForBadgeAssignment.step = 'badge';
     await ctx.saveSession();
 
-    // Show badge selection
+    // Show badge selection - get all badges from database
     const text = `${t('gamification.selectBadge', lang)}\n\n👤 ${user.firstName} ${user.lastName || ''}`;
 
-    const keyboard = [
-      [Markup.button.callback('✅ Verificado', `assign_badge_${userId}_verified`)],
-      [Markup.button.callback('💎 Premium', `assign_badge_${userId}_premium`)],
-      [Markup.button.callback('👑 VIP', `assign_badge_${userId}_vip`)],
-      [Markup.button.callback('🛡️ Moderador', `assign_badge_${userId}_moderator`)],
-      [Markup.button.callback('👨‍💼 Administrador', `assign_badge_${userId}_admin`)],
-    ];
+    const keyboard = [];
 
-    // Add custom badges
+    // Get all custom badges from database
     const customBadges = await GamificationModel.getCustomBadges();
     customBadges.forEach((badge) => {
+      // Format: "icon name" like "🏆 Trailblazer"
+      const badgeDisplay = `${badge.icon} ${badge.name}`;
       keyboard.push([
-        Markup.button.callback(`${badge.icon} ${badge.name}`, `assign_badge_${userId}_custom_${badge.id}`),
+        Markup.button.callback(badgeDisplay, `assign_badge_${userId}_${badge.id}`),
       ]);
     });
 
@@ -474,11 +471,21 @@ const handleBadgeAssignmentInput = async (ctx) => {
 /**
  * Assign badge to user
  */
-const assignBadgeToUser = async (ctx, userId, badgeType) => {
+const assignBadgeToUser = async (ctx, userId, badgeId) => {
   try {
     const lang = getLanguage(ctx);
 
-    await UserModel.addBadge(userId, badgeType);
+    // Get badge from database
+    const badge = await GamificationModel.getBadgeById(badgeId);
+    if (!badge) {
+      await ctx.answerCbQuery('Badge not found');
+      return;
+    }
+
+    // Format badge as "icon name" like "🏆 Trailblazer"
+    const badgeString = `${badge.icon} ${badge.name}`;
+    
+    await UserModel.addBadge(userId, badgeString);
 
     delete ctx.session.temp.waitingForBadgeAssignment;
     await ctx.saveSession();
@@ -486,7 +493,7 @@ const assignBadgeToUser = async (ctx, userId, badgeType) => {
     const user = await UserModel.getById(userId);
     await ctx.answerCbQuery(t('gamification.badgeAssigned', lang));
     await ctx.editMessageText(
-      t('gamification.badgeAssignedSuccess', lang, { name: user.firstName, badge: badgeType }),
+      t('gamification.badgeAssignedSuccess', lang, { name: user.firstName, badge: badgeString }),
       Markup.inlineKeyboard([[Markup.button.callback('◀️ Volver', 'gamification_badges')]]),
     );
   } catch (error) {

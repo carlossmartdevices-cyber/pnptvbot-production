@@ -7,13 +7,9 @@
 const { getAddress } = require('viem');
 const logger = require('../utils/logger');
 
-// Default configuration (Optimism + USDC)
-// These can be overridden via environment variables
-const DEFAULT_CHAIN_ID = 10; // Optimism
-const DEFAULT_CHAIN_NAME = 'Optimism';
-const DEFAULT_TOKEN_ADDRESS = '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85'; // USDC on Optimism
-const DEFAULT_TOKEN_SYMBOL = 'USDC';
-const DEFAULT_TOKEN_DECIMALS = 6;
+// Optimism USDC Token Address (official)
+const OPTIMISM_USDC_ADDRESS = '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85';
+const OPTIMISM_CHAIN_ID = 10;
 
 // Supported payment apps (prioritized in this order)
 const SUPPORTED_PAYMENT_APPS = [
@@ -35,16 +31,6 @@ const getDaimoConfig = () => {
     ? `${process.env.BOT_WEBHOOK_DOMAIN}/api/webhooks/daimo`
     : null;
 
-  // Get chain configuration (with defaults)
-  const chainId = process.env.DAIMO_CHAIN_ID
-    ? parseInt(process.env.DAIMO_CHAIN_ID, 10)
-    : DEFAULT_CHAIN_ID;
-  const tokenAddress = process.env.DAIMO_TOKEN_ADDRESS || DEFAULT_TOKEN_ADDRESS;
-  const tokenSymbol = process.env.DAIMO_TOKEN_SYMBOL || DEFAULT_TOKEN_SYMBOL;
-  const tokenDecimals = process.env.DAIMO_TOKEN_DECIMALS
-    ? parseInt(process.env.DAIMO_TOKEN_DECIMALS, 10)
-    : DEFAULT_TOKEN_DECIMALS;
-
   // Validate critical configuration
   if (!treasuryAddress) {
     // Nunca loggear el valor de la dirección
@@ -58,14 +44,14 @@ const getDaimoConfig = () => {
   }
 
   return {
-    // Network configuration (configurable via env vars)
-    chainId,
-    chainName: DEFAULT_CHAIN_NAME, // Could be made configurable if needed
+    // Network configuration
+    chainId: OPTIMISM_CHAIN_ID,
+    chainName: 'Optimism',
 
-    // Token configuration (configurable via env vars)
-    token: getAddress(tokenAddress),
-    tokenSymbol,
-    tokenDecimals,
+    // Token configuration (USDC on Optimism)
+    token: getAddress(OPTIMISM_USDC_ADDRESS),
+    tokenSymbol: 'USDC',
+    tokenDecimals: 6,
 
     // Addresses
     treasuryAddress: getAddress(treasuryAddress),
@@ -73,10 +59,6 @@ const getDaimoConfig = () => {
 
     // Payment apps configuration
     supportedPaymentApps: SUPPORTED_PAYMENT_APPS,
-
-    // API configuration
-    apiKey: process.env.DAIMO_API_KEY, // Optional: only needed for API calls
-    appId: process.env.DAIMO_APP_ID,   // Optional: only needed for SDK integration
 
     // Webhook configuration
     webhookUrl,
@@ -133,9 +115,10 @@ const createPaymentIntent = ({
 };
 
 /**
- * Generate Daimo Pay link
+ * Generate Daimo Pay link (DEPRECATED - use createDaimoPayment instead)
  * @param {Object} paymentIntent - Payment intent object
  * @returns {string} Payment URL
+ * @deprecated Use createDaimoPayment for the official API
  */
 const generatePaymentLink = (paymentIntent) => {
   const baseUrl = 'https://pay.daimo.com/pay';
@@ -144,6 +127,102 @@ const generatePaymentLink = (paymentIntent) => {
   });
 
   return `${baseUrl}?${params.toString()}`;
+};
+
+/**
+ * Create a payment using Daimo Pay API (Official method)
+ * @param {Object} params - Payment parameters
+ * @returns {Promise<Object>} { success, paymentUrl, daimoPaymentId, error }
+ */
+const createDaimoPayment = async ({
+  amount, userId, planId, chatId, paymentId, description,
+}) => {
+  const config = getDaimoConfig();
+  
+  if (!config.apiKey) {
+    logger.error('DAIMO_API_KEY not configured');
+    return { success: false, error: 'Daimo API key not configured' };
+  }
+
+  try {
+    // Format amount as string with 2 decimals (e.g., "14.99")
+    const amountUnits = parseFloat(amount).toFixed(2);
+    
+    const requestBody = {
+      display: {
+        intent: description || `PNPtv ${planId} Subscription`,
+        paymentOptions: ['AllWallets', 'AllExchanges', 'AllPaymentApps'],
+        preferredChains: [config.chainId],
+      },
+      destination: {
+        destinationAddress: config.treasuryAddress,
+        chainId: config.chainId,
+        tokenAddress: config.token,
+        amountUnits: amountUnits,
+      },
+      refundAddress: config.refundAddress,
+      metadata: {
+        userId: userId.toString(),
+        chatId: chatId?.toString() || '',
+        planId: planId,
+        paymentId: paymentId,
+        source: 'pnptv-bot',
+      },
+    };
+
+    logger.info('Creating Daimo payment via API', {
+      paymentId,
+      planId,
+      amountUnits,
+    });
+
+    const response = await fetch('https://pay.daimo.com/api/payment', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Api-Key': config.apiKey,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error('Daimo API error', {
+        status: response.status,
+        error: errorText,
+        paymentId,
+      });
+      return { 
+        success: false, 
+        error: `Daimo API error: ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+
+    logger.info('Daimo payment created successfully', {
+      paymentId,
+      daimoPaymentId: data.id,
+      url: data.url,
+    });
+
+    return {
+      success: true,
+      paymentUrl: data.url,
+      daimoPaymentId: data.id,
+      payment: data.payment,
+    };
+
+  } catch (error) {
+    logger.error('Error creating Daimo payment', {
+      error: error.message,
+      paymentId,
+    });
+    return { 
+      success: false, 
+      error: error.message,
+    };
+  }
 };
 
 /**
@@ -180,10 +259,10 @@ const validateWebhookPayload = (payload) => {
   }
 
   // Validate metadata
-  if (!payload.metadata?.userId || !payload.metadata?.planId || !payload.metadata?.paymentId) {
+  if (!payload.metadata?.userId || !payload.metadata?.planId) {
     return {
       valid: false,
-      error: 'Invalid metadata: userId, planId, and paymentId are required',
+      error: 'Invalid metadata: userId and planId are required',
     };
   }
 
@@ -217,16 +296,11 @@ module.exports = {
   getDaimoConfig,
   createPaymentIntent,
   generatePaymentLink,
+  createDaimoPayment,
   validateWebhookPayload,
   mapDaimoStatus,
   formatAmountFromUnits,
   SUPPORTED_PAYMENT_APPS,
-  // Export defaults for backward compatibility
-  OPTIMISM_USDC_ADDRESS: DEFAULT_TOKEN_ADDRESS,
-  OPTIMISM_CHAIN_ID: DEFAULT_CHAIN_ID,
-  // Export new default constants
-  DEFAULT_CHAIN_ID,
-  DEFAULT_TOKEN_ADDRESS,
-  DEFAULT_TOKEN_SYMBOL,
-  DEFAULT_TOKEN_DECIMALS,
+  OPTIMISM_USDC_ADDRESS,
+  OPTIMISM_CHAIN_ID,
 };

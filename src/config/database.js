@@ -1,21 +1,81 @@
-/**
- * Database module - Re-exports PostgreSQL functions
- * This module provides a unified database interface
- */
-const postgres = require('./postgres');
+const { initializeFirebase, getFirestore } = require('./firebase');
+const logger = require('../utils/logger');
 
-// Export pool-like interface for models that use pool.query()
-const pool = {
-  query: postgres.query,
-  connect: async () => postgres.getPool().connect(),
-  end: postgres.closePool
+/**
+ * Initialize Database (uses Firestore)
+ * This function initializes the Firestore connection
+ * @returns {admin.firestore.Firestore} Firestore instance
+ */
+const initializeDatabase = () => {
+  try {
+    const db = initializeFirebase();
+    logger.info('Firestore database initialized successfully');
+    return db;
+  } catch (error) {
+    logger.error('Failed to initialize database:', error);
+    throw error;
+  }
 };
 
-module.exports = pool;
+/**
+ * Get Firestore instance
+ * Creates connection if not already created
+ * @returns {admin.firestore.Firestore}
+ */
+const getDatabase = () => {
+  return getFirestore();
+};
 
-// Also export named functions for flexibility
-module.exports.query = postgres.query;
-module.exports.getPool = postgres.getPool;
-module.exports.testConnection = postgres.testConnection;
-module.exports.closePool = postgres.closePool;
-module.exports.initializePostgres = postgres.initializePostgres;
+/**
+ * Test database connection
+ * @returns {Promise<boolean>} true if connection successful
+ */
+const testConnection = async () => {
+  try {
+    const db = getFirestore();
+    // Test Firestore connection by doing a simple query
+    await db.collection('_test').doc('_test').get();
+    logger.info('Firestore database connection successful');
+    return true;
+  } catch (error) {
+    logger.error('Database connection failed:', error);
+    return false;
+  }
+};
+
+/**
+ * Firestore doesn't require sync like relational databases
+ * This is a no-op function for compatibility
+ * @returns {Promise<void>}
+ */
+const syncDatabase = async () => {
+  try {
+    logger.info('Firestore does not require schema synchronization');
+    return true;
+  } catch (error) {
+    logger.error('Failed to sync database:', error);
+    throw error;
+  }
+};
+
+/**
+ * Close database connection
+ * @returns {Promise<void>}
+ */
+const closeDatabase = async () => {
+  try {
+    const db = getFirestore();
+    await db.terminate();
+    logger.info('Firestore connection closed');
+  } catch (error) {
+    logger.error('Error closing database connection:', error);
+  }
+};
+
+module.exports = {
+  initializeDatabase,
+  getDatabase,
+  testConnection,
+  syncDatabase,
+  closeDatabase,
+};

@@ -3,7 +3,6 @@ const cron = require('node-cron');
 const { initializeFirebase } = require('../src/config/firebase');
 const { initializeRedis } = require('../src/config/redis');
 const UserService = require('../src/bot/services/userService');
-const SubscriptionReminderService = require('../src/bot/services/subscriptionReminderService');
 const logger = require('../src/utils/logger');
 
 /**
@@ -28,32 +27,7 @@ const startCronJobs = async () => {
       }
     });
 
-    // Send 3-day reminders daily at 10 AM
-    cron.schedule(process.env.REMINDER_3DAY_CRON || '0 10 * * *', async () => {
-      try {
-        logger.info('Running 3-day subscription reminder check...');
-        const sent = await SubscriptionReminderService.send3DayReminders();
-        logger.info(`Sent ${sent} 3-day reminders`);
-      } catch (error) {
-        logger.error('Error in 3-day reminder cron:', error);
-      }
-    });
-
-    // Send 1-day reminders daily at 10 AM
-    cron.schedule(process.env.REMINDER_1DAY_CRON || '0 10 * * *', async () => {
-      try {
-        logger.info('Running 1-day subscription reminder check...');
-        const sent = await SubscriptionReminderService.send1DayReminders();
-        logger.info(`Sent ${sent} 1-day reminders`);
-      } catch (error) {
-        logger.error('Error in 1-day reminder cron:', error);
-      }
-    });
-
     logger.info('✓ Cron jobs started successfully');
-    logger.info('  - Subscription expiry check: Daily at midnight');
-    logger.info('  - 3-day reminders: Daily at 10 AM');
-    logger.info('  - 1-day reminders: Daily at 10 AM');
   } catch (error) {
     logger.error('Failed to start cron jobs:', error);
     process.exit(1);

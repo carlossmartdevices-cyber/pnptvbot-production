@@ -3,10 +3,10 @@ const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
 /**
- * Plan Model - Handles subscription plan data with Firestore
+ * Plan Model - Handles subscription plan data with PostgreSQL
  */
 class Plan {
-  static COLLECTION = 'plans';
+  static TABLE = 'plans';
 
   /**
    * Get all active plans (with caching)
@@ -15,15 +15,20 @@ class Plan {
   static async getAll() {
     try {
       const cacheKey = 'plans:all';
+
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query('SELECT * FROM plans WHERE active = true ORDER BY price ASC');
-          const plans = result.rows;
+          const result = await query(
+            `SELECT * FROM ${this.TABLE} WHERE active = true ORDER BY price ASC`
+          );
+
+          const plans = result.rows.map((row) => this.mapRowToPlan(row));
+
           logger.info(`Fetched ${plans.length} plans from PostgreSQL`);
           return plans.length > 0 ? plans : this.getDefaultPlans();
         },
-        3600,
+        3600, // Cache for 1 hour
       );
     } catch (error) {
       logger.error('Error getting plans:', error);
@@ -39,23 +44,52 @@ class Plan {
   static async getById(planId) {
     try {
       const cacheKey = `plan:${planId}`;
+
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query('SELECT * FROM plans WHERE id = $1', [planId]);
+          const result = await query(
+            `SELECT * FROM ${this.TABLE} WHERE id = $1`,
+            [planId]
+          );
+
           if (result.rows.length === 0) {
             logger.warn(`Plan not found: ${planId}`);
             return null;
           }
+
           logger.info(`Fetched plan from PostgreSQL: ${planId}`);
-          return result.rows[0];
+          return this.mapRowToPlan(result.rows[0]);
         },
-        3600,
+        3600, // Cache for 1 hour
       );
     } catch (error) {
       logger.error('Error getting plan:', error);
       return null;
     }
+  }
+
+  /**
+   * Map database row to plan object
+   * @param {Object} row - Database row
+   * @returns {Object} Plan object
+   */
+  static mapRowToPlan(row) {
+    return {
+      id: row.id,
+      sku: row.sku,
+      name: row.name || row.display_name,
+      nameEs: row.name_es,
+      price: parseFloat(row.price),
+      currency: row.currency || 'USD',
+      duration: row.duration_days || row.duration || 30,
+      features: row.features || [],
+      featuresEs: row.features_es || [],
+      active: row.active,
+      isLifetime: row.is_lifetime || false,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
 
   /**
@@ -66,57 +100,49 @@ class Plan {
    */
   static async createOrUpdate(planId, planData) {
     try {
+      // Auto-generate SKU if not provided
       const data = { ...planData };
+      if (!data.sku && data.duration) {
+        data.sku = this.generateSKU(planId, data.duration);
+        logger.info(`Auto-generated SKU: ${data.sku} for plan: ${planId}`);
+      }
 
-      await query(`INSERT INTO plans (id, name, display_name, tier, price, price_in_cop, currency, duration, duration_days, description, features, icon, active, recommended, is_lifetime, requires_manual_activation, payment_method, wompi_payment_link, crypto_bonus, updated_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+      const sql = `
+        INSERT INTO ${this.TABLE} (id, sku, name, name_es, price, currency, duration_days, features, features_es, active, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
         ON CONFLICT (id) DO UPDATE SET
-          name = $2,
-          display_name = $3,
-          tier = $4,
-          price = $5,
-          price_in_cop = $6,
-          currency = $7,
-          duration = $8,
-          duration_days = $9,
-          description = $10,
-          features = $11,
-          icon = $12,
-          active = $13,
-          recommended = $14,
-          is_lifetime = $15,
-          requires_manual_activation = $16,
-          payment_method = $17,
-          wompi_payment_link = $18,
-          crypto_bonus = $19,
-          updated_at = $20`,
-        [
-          planId,
-          data.name,
-          data.displayName || data.name,
-          data.tier || 'Basic',
-          data.price,
-          data.priceInCop || null,
-          data.currency || 'USD',
-          data.duration || 30,
-          data.durationDays || data.duration || 30,
-          data.description || null,
-          JSON.stringify(data.features || []),
-          data.icon || null,
-          data.active !== undefined ? data.active : true,
-          data.recommended || false,
-          data.isLifetime || false,
-          data.requiresManualActivation || false,
-          data.paymentMethod || null,
-          data.wompiPaymentLink || null,
-          data.cryptoBonus ? JSON.stringify(data.cryptoBonus) : null,
-          new Date()
-        ]
-      );
+          sku = EXCLUDED.sku,
+          name = EXCLUDED.name,
+          name_es = EXCLUDED.name_es,
+          price = EXCLUDED.price,
+          currency = EXCLUDED.currency,
+          duration_days = EXCLUDED.duration_days,
+          features = EXCLUDED.features,
+          features_es = EXCLUDED.features_es,
+          active = EXCLUDED.active,
+          updated_at = NOW()
+        RETURNING *
+      `;
+
+      const result = await query(sql, [
+        planId,
+        data.sku,
+        data.name,
+        data.nameEs,
+        data.price,
+        data.currency || 'USD',
+        data.duration || 30,
+        JSON.stringify(data.features || []),
+        JSON.stringify(data.featuresEs || []),
+        data.active !== undefined ? data.active : true,
+      ]);
+
+      // Invalidate cache
       await cache.del(`plan:${planId}`);
       await cache.del('plans:all');
-      logger.info('Plan created/updated', { planId, tier: data.tier });
-      return data;
+
+      logger.info('Plan created/updated', { planId, sku: data.sku });
+      return this.mapRowToPlan(result.rows[0]);
     } catch (error) {
       logger.error('Error creating/updating plan:', error);
       throw error;
@@ -130,9 +156,12 @@ class Plan {
    */
   static async delete(planId) {
     try {
-      await query('DELETE FROM plans WHERE id = $1', [planId]);
+      await query(`DELETE FROM ${this.TABLE} WHERE id = $1`, [planId]);
+
+      // Invalidate cache
       await cache.del(`plan:${planId}`);
       await cache.del('plans:all');
+
       logger.info('Plan deleted', { planId });
       return true;
     } catch (error) {
@@ -143,21 +172,16 @@ class Plan {
 
   /**
    * Generate SKU for a plan
-   * SKU format: EASYBOTS-PNP-XXX where XXX is duration in days (3 digits)
-   * Example: EASYBOTS-PNP-007 (7 days), EASYBOTS-PNP-030 (30 days), EASYBOTS-PNP-000 (lifetime)
+   * SKU format: EASYBOT-{CLIENT}-{DURATION}D
+   * Example: EASYBOT-PNP-7D, EASYBOT-PNP-30D
    * @param {string} planId - Plan ID
    * @param {number} duration - Duration in days
    * @returns {string} Generated SKU
    */
   static generateSKU(planId, duration) {
-    // For lifetime plans (very large duration), use 000
-    if (duration >= 36500 || planId.includes('lifetime')) {
-      return 'EASYBOTS-PNP-000';
-    }
-
-    // Convert duration to 3-digit format with zero padding
-    const durationStr = String(duration).padStart(3, '0');
-    return `EASYBOTS-PNP-${durationStr}`;
+    // Extract client identifier from plan ID or use PNP as default
+    const client = 'PNP';
+    return `EASYBOT-${client}-${duration}D`;
   }
 
   /**
@@ -168,16 +192,12 @@ class Plan {
     return [
       {
         id: 'trial_week',
-        sku: 'EASYBOTS-PNP-007',
+        sku: 'EASYBOT-PNP-7D',
         name: 'Trial Week',
         nameEs: 'Semana de Prueba',
-        displayName: 'Trial Week',
-        tier: 'Basic',
         price: 14.99,
         currency: 'USD',
         duration: 7,
-        durationDays: 7,
-        description: 'Try premium features for one week',
         features: [
           'Premium channel access',
           'Access to Nearby Members feature',
@@ -185,133 +205,116 @@ class Plan {
         ],
         featuresEs: [
           'Acceso a canales premium',
-          'Acceso a la función Miembros Cercanos',
+          'Acceso a función Miembros Cercanos',
           'Acceso a reuniones Zoom: 1 por semana',
         ],
-        icon: '🎯',
         active: true,
-        recommended: false,
-        isLifetime: false,
       },
       {
         id: 'pnp_member',
-        sku: 'EASYBOTS-PNP-030',
+        sku: 'EASYBOT-PNP-30D',
         name: 'PNP Member',
         nameEs: 'Miembro PNP',
-        displayName: 'PNP Member',
-        tier: 'PNP',
         price: 24.99,
         currency: 'USD',
         duration: 30,
-        durationDays: 30,
-        description: 'Full access to all premium features',
         features: [
-          'Everything in Trial Week',
-          'Unlimited premium channel access',
-          'Zoom meeting access: 2 per week',
-          'Priority customer support',
+          'Premium channel access',
+          'Basic support',
+          'Access to Nearby Members feature',
+          'Zoom meeting access: 3 per month',
         ],
         featuresEs: [
-          'Todo lo de Semana de Prueba',
-          'Acceso ilimitado a canales premium',
-          'Acceso a reuniones Zoom: 2 por semana',
-          'Soporte al cliente prioritario',
+          'Acceso a canales premium',
+          'Soporte básico',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 3 por mes',
         ],
-        icon: '⭐',
         active: true,
-        recommended: true,
-        isLifetime: false,
       },
       {
         id: 'crystal_member',
-        sku: 'EASYBOTS-PNP-030',
+        sku: 'EASYBOT-PNP-120D',
         name: 'Crystal Member',
         nameEs: 'Miembro Crystal',
-        displayName: 'Crystal Member',
-        tier: 'Crystal',
         price: 49.99,
         currency: 'USD',
         duration: 120,
-        durationDays: 120,
-        description: 'Extended membership with exclusive benefits',
         features: [
-          'Everything in PNP Member',
-          'Zoom meeting access: 4 per week',
-          'Exclusive content access',
-          'Early access to new features',
+          'All premium features',
+          'Video calls',
+          'Priority support',
+          'Access to Nearby Members feature',
+          'Zoom meeting access: 5 per month',
         ],
         featuresEs: [
-          'Todo lo de Miembro PNP',
-          'Acceso a reuniones Zoom: 4 por semana',
-          'Acceso a contenido exclusivo',
-          'Acceso anticipado a nuevas funciones',
+          'Todas las características premium',
+          'Llamadas de video',
+          'Soporte prioritario',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 5 por mes',
         ],
-        icon: '💎',
         active: true,
-        recommended: false,
-        isLifetime: false,
       },
       {
         id: 'diamond_member',
-        sku: 'EASYBOTS-PNP-030',
+        sku: 'EASYBOT-PNP-365D',
         name: 'Diamond Member',
         nameEs: 'Miembro Diamond',
-        displayName: 'Diamond Member',
-        tier: 'Diamond',
         price: 99.99,
         currency: 'USD',
         duration: 365,
-        durationDays: 365,
-        description: 'Annual membership with VIP benefits',
         features: [
-          'Everything in Crystal Member',
-          'Unlimited Zoom meeting access',
-          'VIP customer support',
-          'Custom profile badge',
-          'Access to exclusive events',
+          'All premium features',
+          'Video calls',
+          'VIP access',
+          'Priority support',
+          'Exclusive content',
+          'Access to Nearby Members feature',
+          'Zoom meeting access: 5 per month',
         ],
         featuresEs: [
-          'Todo lo de Miembro Crystal',
-          'Acceso ilimitado a reuniones Zoom',
-          'Soporte al cliente VIP',
-          'Insignia de perfil personalizada',
-          'Acceso a eventos exclusivos',
+          'Todas las características premium',
+          'Llamadas de video',
+          'Acceso VIP',
+          'Soporte prioritario',
+          'Contenido exclusivo',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 5 por mes',
         ],
-        icon: '👑',
         active: true,
-        recommended: false,
-        isLifetime: false,
       },
       {
         id: 'lifetime_pass',
-        sku: 'EASYBOTS-PNP-000',
+        sku: 'EASYBOT-PNP-LIFE',
         name: 'Lifetime Pass',
         nameEs: 'Pase de por Vida',
-        displayName: 'Lifetime Pass',
-        tier: 'Premium',
         price: 249.99,
         currency: 'USD',
-        duration: 36500, // 100 years
-        durationDays: 36500,
-        description: 'One-time payment for lifetime access',
+        duration: 36500, // 100 years as "lifetime"
         features: [
-          'Everything in Diamond Member',
-          'Lifetime access to all features',
-          'Never pay again',
-          'Founder badge',
-          'Priority feature requests',
+          'All premium features',
+          'Video calls',
+          'VIP access',
+          'Priority support',
+          'Exclusive content',
+          'Lifetime access',
+          'Access to Nearby Members feature',
+          'Zoom meeting access: 5 per month',
+          'Exclusive: Live streaming with Santino',
         ],
         featuresEs: [
-          'Todo lo de Miembro Diamond',
-          'Acceso de por vida a todas las funciones',
-          'No pagues nunca más',
-          'Insignia de fundador',
-          'Solicitudes de funciones prioritarias',
+          'Todas las características premium',
+          'Llamadas de video',
+          'Acceso VIP',
+          'Soporte prioritario',
+          'Contenido exclusivo',
+          'Acceso de por vida',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 5 por mes',
+          'Exclusivo: Transmisión en vivo con Santino',
         ],
-        icon: '♾️',
         active: true,
-        recommended: false,
-        isLifetime: true,
       },
     ];
   }

@@ -1,18 +1,15 @@
 require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
-// Firebase eliminado: no se requiere
+const { initializePostgres, testConnection } = require('../../config/postgres');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
-const allowedChatsMiddleware = require('./middleware/allowedChats');
 const usernameEnforcement = require('./middleware/usernameEnforcement');
-const profileCompliance = require('./middleware/profileCompliance');
 const moderationFilter = require('./middleware/moderationFilter');
 const activityTrackerMiddleware = require('./middleware/activityTracker');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
-const commandAutoDeleteMiddleware = require('./middleware/commandAutoDelete');
 const errorHandler = require('./middleware/errorHandler');
 // Topic middleware
 const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./middleware/topicPermissions');
@@ -46,11 +43,10 @@ const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnaly
 const registerUserCallManagementHandlers = require('../handlers/user/callManagement');
 const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
-const { registerLeaderboardHandlers } = require('../handlers/group/leaderboard');
-// const registerZoomHandlers = require('../handlers/media/zoomV2'); // Temporarily disabled due to missing dependencies
 // Services
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
+const broadcastScheduler = require('../../services/broadcastScheduler');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
 // API Server
@@ -64,6 +60,7 @@ let isWebhookMode = false;
  * Validate critical environment variables
  */
 const validateCriticalEnvVars = () => {
+  // Only BOT_TOKEN is critical - PostgreSQL can use defaults or DATABASE_URL
   const criticalVars = ['BOT_TOKEN'];
   const missing = criticalVars.filter((varName) => !process.env[varName]);
   if (missing.length > 0) {
@@ -96,7 +93,20 @@ const startBot = async () => {
     } catch (error) {
       logger.warn('Sentry initialization failed, continuing without monitoring:', error.message);
     }
-    // Firebase eliminado: solo PostgreSQL y Redis
+    // Initialize PostgreSQL
+    try {
+      initializePostgres();
+      const connected = await testConnection();
+      if (connected) {
+        logger.info('✓ PostgreSQL initialized');
+      } else {
+        logger.warn('⚠️ PostgreSQL connection test failed, but will retry on first query');
+      }
+    } catch (error) {
+      logger.error('PostgreSQL initialization failed. Bot will run in DEGRADED mode without database.');
+      logger.error('Error:', error.message);
+      logger.warn('⚠️  Bot features requiring database will not work!');
+    }
     // Initialize Redis (optional, will use default localhost if not configured)
     try {
       initializeRedis();
@@ -114,16 +124,12 @@ const startBot = async () => {
     }
     // Create bot instance
     const bot = new Telegraf(process.env.BOT_TOKEN);
+    
     // Register middleware
     bot.use(sessionMiddleware());
-    bot.use(allowedChatsMiddleware()); // Must be early to leave unauthorized chats
-    bot.use(groupSecurityEnforcementMiddleware()); // Enforce group/channel whitelist
     bot.use(rateLimitMiddleware());
-    // bot.use(usernameChangeDetectionMiddleware()); // DISABLED - not working properly
     bot.use(chatCleanupMiddleware());
-    bot.use(commandAutoDeleteMiddleware()); // Delete commands from groups
     bot.use(usernameEnforcement());
-    bot.use(profileCompliance());
     bot.use(moderationFilter());
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());
@@ -158,28 +164,27 @@ const startBot = async () => {
     registerUserCallManagementHandlers(bot);
     registerCallFeedbackHandlers(bot);
     registerCallPackageHandlers(bot);
-    registerLeaderboardHandlers(bot);
-    registerApprovalHandlers(bot); // Approval queue for Podcasts/Thoughts topic
-    registerGroupSecurityHandlers(bot); // Group/channel security enforcement
-    // registerZoomHandlers(bot); // Temporarily disabled due to missing dependencies
     // Initialize call reminder service
     CallReminderService.initialize(bot);
     logger.info('✓ Call reminder service initialized');
     // Initialize group cleanup service
     const groupCleanup = new GroupCleanupService(bot);
     groupCleanup.initialize();
-    logger.info('✓ Registering error handler...');
+    // Initialize broadcast scheduler service
+    try {
+      broadcastScheduler.initialize(bot);
+      broadcastScheduler.start();
+      logger.info('✓ Broadcast scheduler initialized and started');
+    } catch (error) {
+      logger.warn('Broadcast scheduler initialization failed, continuing without scheduler:', error.message);
+    }
     // Error handling
     bot.catch(errorHandler);
-    logger.info('✓ Error handler registered');
-    logger.info(`Checking bot startup mode: NODE_ENV=${process.env.NODE_ENV}, BOT_WEBHOOK_DOMAIN=${process.env.BOT_WEBHOOK_DOMAIN}`);
     // Start bot
     if (process.env.NODE_ENV === 'production' && process.env.BOT_WEBHOOK_DOMAIN) {
-      logger.info('Setting up webhook mode...');
       // Webhook mode for production
       const webhookPath = process.env.BOT_WEBHOOK_PATH || '/webhook/telegram';
       const webhookUrl = `${process.env.BOT_WEBHOOK_DOMAIN}${webhookPath}`;
-      logger.info(`Calling Telegram API to set webhook: ${webhookUrl}`);
       await bot.telegram.setWebhook(webhookUrl);
       logger.info(`✓ Webhook set to: ${webhookUrl}`);
       // Register webhook callback
@@ -199,6 +204,30 @@ const startBot = async () => {
           if (!req.body || Object.keys(req.body).length === 0) {
             logger.warn('Webhook received empty body');
             return res.status(200).json({ ok: true, message: 'Empty body received' });
+          }
+
+          // Deduplicate incoming webhook updates using Redis
+          try {
+            const { cache } = require('../../config/redis');
+            const updateId = req.body.update_id;
+            if (updateId) {
+              const key = `telegram:processed_update:${updateId}`;
+              const set = await cache.setNX(key, true, 60); // keep for 60s
+              if (!set) {
+                logger.warn('Duplicate webhook update ignored', { updateId });
+                return res.status(200).json({ ok: true, message: 'Duplicate update ignored' });
+              }
+            }
+          } catch (err) {
+            // If Redis fails we don't want to block processing — log and continue
+            logger.warn('Failed to dedupe update via Redis, continuing', { error: err.message });
+          }
+          // Log the callback query data if present
+          if (req.body.callback_query) {
+            logger.info(`>>> CALLBACK_QUERY received: data=${req.body.callback_query.data}, from=${req.body.callback_query.from?.id}`);
+          }
+          if (req.body.message) {
+            logger.info(`>>> MESSAGE received: text=${req.body.message.text || 'N/A'}, from=${req.body.message.from?.id}`);
           }
           await bot.handleUpdate(req.body);
           res.status(200).json({ ok: true });
@@ -328,4 +357,10 @@ if (require.main === module) {
   });
 }
 
-module.exports = { startBot };
+/**
+ * Get the bot instance for sending messages from services
+ * @returns {Telegraf|null} The bot instance or null if not started
+ */
+const getBotInstance = () => botInstance;
+
+module.exports = { startBot, getBotInstance };

@@ -1,39 +1,71 @@
 // Mock dependencies
-jest.mock('../../../src/config/postgres');
+jest.mock('../../../src/config/firebase');
 jest.mock('../../../src/config/redis');
 
 const PlanModel = require('../../../src/models/planModel');
-const { query } = require('../../../src/config/postgres');
+const { getFirestore } = require('../../../src/config/firebase');
 const { cache } = require('../../../src/config/redis');
 
 describe('PlanModel', () => {
+  let mockDb;
+  let mockCollection;
+  let mockDoc;
+
   beforeEach(() => {
     jest.clearAllMocks();
+
+    mockDoc = {
+      get: jest.fn(),
+      set: jest.fn(),
+      delete: jest.fn(),
+      exists: false,
+      id: 'test-plan-id',
+      data: jest.fn(),
+    };
+
+    mockCollection = {
+      doc: jest.fn().mockReturnValue(mockDoc),
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      get: jest.fn(),
+    };
+
+    mockDb = {
+      collection: jest.fn().mockReturnValue(mockCollection),
+    };
+
+    getFirestore.mockReturnValue(mockDb);
 
     // Mock cache
     cache.get = jest.fn().mockResolvedValue(null);
     cache.set = jest.fn().mockResolvedValue(true);
     cache.del = jest.fn().mockResolvedValue(true);
-    cache.delPattern = jest.fn().mockResolvedValue(true);
     cache.getOrSet = jest.fn().mockImplementation(async (key, fn) => fn());
   });
 
   describe('getAll', () => {
     it('should get all plans from database', async () => {
       const plans = [
-        { id: 'basic', name: 'Basic', price: 9.99, active: true },
-        { id: 'premium', name: 'Premium', price: 19.99, active: true },
+        {
+          id: 'basic',
+          data: () => ({ name: 'Basic', price: 9.99, active: true }),
+        },
+        {
+          id: 'premium',
+          data: () => ({ name: 'Premium', price: 19.99, active: true }),
+        },
       ];
 
-      query.mockResolvedValue({ rows: plans });
+      mockCollection.get.mockResolvedValue({
+        forEach: (callback) => plans.forEach(callback),
+      });
 
       const result = await PlanModel.getAll();
 
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(2);
-      expect(query).toHaveBeenCalledWith(
-        'SELECT * FROM plans WHERE active = true ORDER BY price ASC'
-      );
+      expect(mockCollection.where).toHaveBeenCalledWith('active', '==', true);
       expect(cache.getOrSet).toHaveBeenCalled();
     });
 
@@ -49,7 +81,7 @@ describe('PlanModel', () => {
     });
 
     it('should return default plans on error', async () => {
-      query.mockRejectedValue(new Error('Database error'));
+      mockCollection.get.mockRejectedValue(new Error('Database error'));
 
       const result = await PlanModel.getAll();
 
@@ -63,13 +95,16 @@ describe('PlanModel', () => {
   describe('getById', () => {
     it('should get plan by ID from database', async () => {
       const planData = {
-        id: 'basic',
         name: 'Basic',
         price: 9.99,
         active: true,
       };
 
-      query.mockResolvedValue({ rows: [planData] });
+      mockDoc.get.mockResolvedValue({
+        exists: true,
+        id: 'basic',
+        data: () => planData,
+      });
 
       const result = await PlanModel.getById('basic');
 
@@ -89,7 +124,7 @@ describe('PlanModel', () => {
     });
 
     it('should return null for non-existent plan', async () => {
-      query.mockResolvedValue({ rows: [] });
+      mockDoc.get.mockResolvedValue({ exists: false });
 
       const result = await PlanModel.getById('non-existent');
 
@@ -97,7 +132,7 @@ describe('PlanModel', () => {
     });
 
     it('should handle errors', async () => {
-      query.mockRejectedValue(new Error('Database error'));
+      mockDoc.get.mockRejectedValue(new Error('Database error'));
 
       const result = await PlanModel.getById('basic');
 
@@ -107,7 +142,8 @@ describe('PlanModel', () => {
 
   describe('createOrUpdate', () => {
     it('should create new plan', async () => {
-      query.mockResolvedValue({ rowCount: 1 });
+      mockDoc.get.mockResolvedValue({ exists: false });
+      mockDoc.set.mockResolvedValue();
 
       const planData = {
         name: 'New Plan',
@@ -118,14 +154,16 @@ describe('PlanModel', () => {
       const result = await PlanModel.createOrUpdate('new-plan', planData);
 
       expect(result).toBeDefined();
-      expect(result.name).toBe('New Plan');
-      expect(query).toHaveBeenCalled();
+      expect(result.id).toBe('new-plan');
+      expect(result.createdAt).toBeInstanceOf(Date);
+      expect(mockDoc.set).toHaveBeenCalled();
       expect(cache.del).toHaveBeenCalledWith('plan:new-plan');
       expect(cache.del).toHaveBeenCalledWith('plans:all');
     });
 
     it('should update existing plan', async () => {
-      query.mockResolvedValue({ rowCount: 1 });
+      mockDoc.get.mockResolvedValue({ exists: true });
+      mockDoc.set.mockResolvedValue();
 
       const planData = {
         name: 'Updated Plan',
@@ -135,12 +173,12 @@ describe('PlanModel', () => {
       const result = await PlanModel.createOrUpdate('existing-plan', planData);
 
       expect(result).toBeDefined();
-      expect(result.name).toBe('Updated Plan');
-      expect(query).toHaveBeenCalled();
+      expect(result.updatedAt).toBeInstanceOf(Date);
+      expect(mockDoc.set).toHaveBeenCalled();
     });
 
     it('should handle errors', async () => {
-      query.mockRejectedValue(new Error('Database error'));
+      mockDoc.get.mockRejectedValue(new Error('Database error'));
 
       await expect(PlanModel.createOrUpdate('plan-id', {})).rejects.toThrow();
     });
@@ -148,18 +186,18 @@ describe('PlanModel', () => {
 
   describe('delete', () => {
     it('should delete plan', async () => {
-      query.mockResolvedValue({ rowCount: 1 });
+      mockDoc.delete.mockResolvedValue();
 
       const result = await PlanModel.delete('plan-to-delete');
 
       expect(result).toBe(true);
-      expect(query).toHaveBeenCalled();
+      expect(mockDoc.delete).toHaveBeenCalled();
       expect(cache.del).toHaveBeenCalledWith('plan:plan-to-delete');
       expect(cache.del).toHaveBeenCalledWith('plans:all');
     });
 
     it('should handle errors', async () => {
-      query.mockRejectedValue(new Error('Delete failed'));
+      mockDoc.delete.mockRejectedValue(new Error('Delete failed'));
 
       const result = await PlanModel.delete('plan-id');
 
@@ -199,16 +237,17 @@ describe('PlanModel', () => {
 
   describe('initializeDefaultPlans', () => {
     it('should initialize default plans', async () => {
-      query.mockResolvedValue({ rowCount: 1 });
+      mockDoc.get.mockResolvedValue({ exists: false });
+      mockDoc.set.mockResolvedValue();
 
       const result = await PlanModel.initializeDefaultPlans();
 
       expect(result).toBe(true);
-      expect(query).toHaveBeenCalled();
+      expect(mockDoc.set).toHaveBeenCalled();
     });
 
     it('should handle errors', async () => {
-      query.mockRejectedValue(new Error('Initialization failed'));
+      mockDoc.get.mockRejectedValue(new Error('Initialization failed'));
 
       const result = await PlanModel.initializeDefaultPlans();
 

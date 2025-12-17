@@ -1,6 +1,11 @@
-const { query } = require('../config/postgres');
+const { getFirestore } = require('../config/firebase');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
+
+const NOW_PLAYING_COLLECTION = 'radio_now_playing';
+const REQUESTS_COLLECTION = 'radio_requests';
+const HISTORY_COLLECTION = 'radio_history';
+const SCHEDULE_COLLECTION = 'radio_schedule';
 
 /**
  * Radio Model - Handles radio streaming, requests, and scheduling
@@ -17,24 +22,18 @@ class RadioModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query(
-            'SELECT * FROM radio_now_playing ORDER BY started_at DESC LIMIT 1',
-            []
-          );
+          const db = getFirestore();
+          const snapshot = await db.collection(NOW_PLAYING_COLLECTION)
+            .orderBy('startedAt', 'desc')
+            .limit(1)
+            .get();
 
-          if (result.rows.length === 0) {
+          if (snapshot.empty) {
             return null;
           }
 
-          const row = result.rows[0];
-          return {
-            id: row.id.toString(),
-            title: row.title,
-            artist: row.artist,
-            duration: row.duration,
-            coverUrl: row.cover_url,
-            startedAt: row.started_at,
-          };
+          const doc = snapshot.docs[0];
+          return { id: doc.id, ...doc.data() };
         },
         30, // Cache for 30 seconds
       );
@@ -51,20 +50,16 @@ class RadioModel {
    */
   static async setNowPlaying(songData) {
     try {
-      const startedAt = new Date();
-
-      const result = await query(
-        `INSERT INTO radio_now_playing (title, artist, duration, cover_url, started_at)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id`,
-        [songData.title, songData.artist || null, songData.duration || null, songData.coverUrl || null, startedAt]
-      );
+      const db = getFirestore();
+      const nowPlayingRef = db.collection(NOW_PLAYING_COLLECTION).doc();
 
       const data = {
-        id: result.rows[0].id.toString(),
         ...songData,
-        startedAt,
+        startedAt: new Date(),
+        id: nowPlayingRef.id,
       };
+
+      await nowPlayingRef.set(data);
 
       // Add to history
       await this.addToHistory(songData);
@@ -89,22 +84,18 @@ class RadioModel {
    */
   static async requestSong(userId, songName) {
     try {
-      const requestedAt = new Date();
-
-      const result = await query(
-        `INSERT INTO radio_requests (user_id, song_name, status, requested_at)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id`,
-        [userId.toString(), songName, 'pending', requestedAt]
-      );
+      const db = getFirestore();
+      const requestRef = db.collection(REQUESTS_COLLECTION).doc();
 
       const data = {
-        id: result.rows[0].id.toString(),
         userId: userId.toString(),
         songName,
         status: 'pending',
-        requestedAt,
+        requestedAt: new Date(),
+        id: requestRef.id,
       };
+
+      await requestRef.set(data);
 
       // Invalidate cache
       await cache.del('radio:requests:pending');
@@ -129,25 +120,17 @@ class RadioModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query(
-            `SELECT * FROM radio_requests
-             WHERE status = $1
-             ORDER BY requested_at ASC
-             LIMIT $2`,
-            ['pending', limit]
-          );
+          const db = getFirestore();
+          const snapshot = await db.collection(REQUESTS_COLLECTION)
+            .where('status', '==', 'pending')
+            .orderBy('requestedAt', 'asc')
+            .limit(limit)
+            .get();
 
-          const requests = result.rows.map(row => ({
-            id: row.id.toString(),
-            userId: row.user_id,
-            songName: row.song_name,
-            artist: row.artist,
-            duration: row.duration,
-            status: row.status,
-            requestedAt: row.requested_at,
-            playedAt: row.played_at,
-            updatedAt: row.updated_at,
-          }));
+          const requests = [];
+          snapshot.forEach((doc) => {
+            requests.push({ id: doc.id, ...doc.data() });
+          });
 
           logger.info(`Retrieved ${requests.length} pending requests`);
           return requests;
@@ -168,10 +151,13 @@ class RadioModel {
    */
   static async updateRequestStatus(requestId, status) {
     try {
-      await query(
-        'UPDATE radio_requests SET status = $1, updated_at = $2 WHERE id = $3',
-        [status, new Date(), requestId]
-      );
+      const db = getFirestore();
+      const requestRef = db.collection(REQUESTS_COLLECTION).doc(requestId);
+
+      await requestRef.update({
+        status,
+        updatedAt: new Date(),
+      });
 
       // Invalidate cache
       await cache.del('radio:requests:pending');
@@ -191,11 +177,16 @@ class RadioModel {
    */
   static async addToHistory(songData) {
     try {
-      await query(
-        `INSERT INTO radio_history (title, artist, duration, cover_url, played_at)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [songData.title, songData.artist || null, songData.duration || null, songData.coverUrl || null, new Date()]
-      );
+      const db = getFirestore();
+      const historyRef = db.collection(HISTORY_COLLECTION).doc();
+
+      const data = {
+        ...songData,
+        playedAt: new Date(),
+        id: historyRef.id,
+      };
+
+      await historyRef.set(data);
 
       // Invalidate cache
       await cache.del('radio:history');
@@ -220,19 +211,16 @@ class RadioModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query(
-            'SELECT * FROM radio_history ORDER BY played_at DESC LIMIT $1',
-            [limit]
-          );
+          const db = getFirestore();
+          const snapshot = await db.collection(HISTORY_COLLECTION)
+            .orderBy('playedAt', 'desc')
+            .limit(limit)
+            .get();
 
-          const history = result.rows.map(row => ({
-            id: row.id.toString(),
-            title: row.title,
-            artist: row.artist,
-            duration: row.duration,
-            coverUrl: row.cover_url,
-            playedAt: row.played_at,
-          }));
+          const history = [];
+          snapshot.forEach((doc) => {
+            history.push({ id: doc.id, ...doc.data() });
+          });
 
           logger.info(`Retrieved ${history.length} songs from history`);
           return history;
@@ -252,42 +240,37 @@ class RadioModel {
    */
   static async createOrUpdateSchedule(scheduleData) {
     try {
+      const db = getFirestore();
       const { dayOfWeek, timeSlot } = scheduleData;
 
-      // Check if schedule exists for this day/time
-      const existing = await query(
-        'SELECT id FROM radio_schedule WHERE day_of_week = $1 AND time_slot = $2',
-        [dayOfWeek, timeSlot]
-      );
+      // Find existing schedule for this day/time
+      const snapshot = await db.collection(SCHEDULE_COLLECTION)
+        .where('dayOfWeek', '==', dayOfWeek)
+        .where('timeSlot', '==', timeSlot)
+        .limit(1)
+        .get();
 
-      let result;
-      if (existing.rows.length > 0) {
-        // Update existing
-        result = await query(
-          `UPDATE radio_schedule
-           SET program_name = $1, description = $2, updated_at = $3
-           WHERE day_of_week = $4 AND time_slot = $5
-           RETURNING id`,
-          [scheduleData.programName, scheduleData.description || null, new Date(), dayOfWeek, timeSlot]
-        );
+      let scheduleRef;
+      if (!snapshot.empty) {
+        scheduleRef = snapshot.docs[0].ref;
       } else {
-        // Create new
-        result = await query(
-          `INSERT INTO radio_schedule (day_of_week, time_slot, program_name, description, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6)
-           RETURNING id`,
-          [dayOfWeek, timeSlot, scheduleData.programName, scheduleData.description || null, new Date(), new Date()]
-        );
+        scheduleRef = db.collection(SCHEDULE_COLLECTION).doc();
       }
+
+      const data = {
+        ...scheduleData,
+        updatedAt: new Date(),
+        id: scheduleRef.id,
+      };
+
+      if (snapshot.empty) {
+        data.createdAt = new Date();
+      }
+
+      await scheduleRef.set(data, { merge: true });
 
       // Invalidate cache
       await cache.del('radio:schedule');
-
-      const data = {
-        id: result.rows[0].id.toString(),
-        ...scheduleData,
-        updatedAt: new Date(),
-      };
 
       logger.info('Schedule created/updated', { dayOfWeek, timeSlot });
       return data;
@@ -308,20 +291,16 @@ class RadioModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query(
-            'SELECT * FROM radio_schedule ORDER BY day_of_week ASC, time_slot ASC',
-            []
-          );
+          const db = getFirestore();
+          const snapshot = await db.collection(SCHEDULE_COLLECTION)
+            .orderBy('dayOfWeek', 'asc')
+            .orderBy('timeSlot', 'asc')
+            .get();
 
-          const schedule = result.rows.map(row => ({
-            id: row.id.toString(),
-            dayOfWeek: row.day_of_week,
-            timeSlot: row.time_slot,
-            programName: row.program_name,
-            description: row.description,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at,
-          }));
+          const schedule = [];
+          snapshot.forEach((doc) => {
+            schedule.push({ id: doc.id, ...doc.data() });
+          });
 
           logger.info(`Retrieved ${schedule.length} schedule entries`);
           return schedule;
@@ -341,7 +320,8 @@ class RadioModel {
    */
   static async deleteSchedule(scheduleId) {
     try {
-      await query('DELETE FROM radio_schedule WHERE id = $1', [scheduleId]);
+      const db = getFirestore();
+      await db.collection(SCHEDULE_COLLECTION).doc(scheduleId).delete();
 
       // Invalidate cache
       await cache.del('radio:schedule');
@@ -360,16 +340,24 @@ class RadioModel {
    */
   static async getStatistics() {
     try {
-      const [requestsResult, historyResult, pendingResult] = await Promise.all([
-        query('SELECT COUNT(*) as total FROM radio_requests', []),
-        query('SELECT COUNT(*) as total FROM radio_history', []),
-        query('SELECT COUNT(*) as total FROM radio_requests WHERE status = $1', ['pending']),
+      const db = getFirestore();
+
+      // Get counts
+      const [requestsSnapshot, historySnapshot] = await Promise.all([
+        db.collection(REQUESTS_COLLECTION).count().get(),
+        db.collection(HISTORY_COLLECTION).count().get(),
       ]);
 
+      // Get pending requests count
+      const pendingSnapshot = await db.collection(REQUESTS_COLLECTION)
+        .where('status', '==', 'pending')
+        .count()
+        .get();
+
       const stats = {
-        totalRequests: parseInt(requestsResult.rows[0].total),
-        totalSongsPlayed: parseInt(historyResult.rows[0].total),
-        pendingRequests: parseInt(pendingResult.rows[0].total),
+        totalRequests: requestsSnapshot.data().count,
+        totalSongsPlayed: historySnapshot.data().count,
+        pendingRequests: pendingSnapshot.data().count,
       };
 
       logger.info('Radio statistics calculated', stats);
@@ -391,12 +379,13 @@ class RadioModel {
    */
   static async getUserRequestCount(userId) {
     try {
-      const result = await query(
-        'SELECT COUNT(*) as total FROM radio_requests WHERE user_id = $1',
-        [userId.toString()]
-      );
+      const db = getFirestore();
+      const snapshot = await db.collection(REQUESTS_COLLECTION)
+        .where('userId', '==', userId.toString())
+        .count()
+        .get();
 
-      return parseInt(result.rows[0].total);
+      return snapshot.data().count;
     } catch (error) {
       logger.error('Error getting user request count:', error);
       return 0;
@@ -442,30 +431,22 @@ class RadioModel {
    */
   static async getRequestsByStatus(status = 'all', limit = 50) {
     try {
-      let sql = 'SELECT * FROM radio_requests';
-      const params = [];
+      const db = getFirestore();
+      let query = db.collection(REQUESTS_COLLECTION);
 
       if (status !== 'all') {
-        sql += ' WHERE status = $1';
-        params.push(status);
+        query = query.where('status', '==', status);
       }
 
-      sql += ' ORDER BY requested_at DESC LIMIT $' + (params.length + 1);
-      params.push(limit);
+      const snapshot = await query
+        .orderBy('requestedAt', 'desc')
+        .limit(limit)
+        .get();
 
-      const result = await query(sql, params);
-
-      const requests = result.rows.map(row => ({
-        id: row.id.toString(),
-        userId: row.user_id,
-        songName: row.song_name,
-        artist: row.artist,
-        duration: row.duration,
-        status: row.status,
-        requestedAt: row.requested_at,
-        playedAt: row.played_at,
-        updatedAt: row.updated_at,
-      }));
+      const requests = [];
+      snapshot.forEach((doc) => {
+        requests.push({ id: doc.id, ...doc.data() });
+      });
 
       logger.info(`Retrieved ${requests.length} requests with status: ${status}`);
       return requests;
@@ -483,38 +464,13 @@ class RadioModel {
    */
   static async updateSchedule(scheduleId, updates) {
     try {
-      const fieldMap = {
-        dayOfWeek: 'day_of_week',
-        timeSlot: 'time_slot',
-        programName: 'program_name',
-        description: 'description',
-      };
+      const db = getFirestore();
+      const scheduleRef = db.collection(SCHEDULE_COLLECTION).doc(scheduleId);
 
-      const dbFields = [];
-      const values = [];
-      let paramIndex = 1;
-
-      Object.keys(updates).forEach((key) => {
-        const dbField = fieldMap[key] || key;
-        dbFields.push(`${dbField} = $${paramIndex}`);
-        values.push(updates[key]);
-        paramIndex++;
+      await scheduleRef.update({
+        ...updates,
+        updatedAt: new Date(),
       });
-
-      if (dbFields.length === 0) {
-        return true;
-      }
-
-      dbFields.push(`updated_at = $${paramIndex}`);
-      values.push(new Date());
-      paramIndex++;
-
-      values.push(scheduleId);
-
-      await query(
-        `UPDATE radio_schedule SET ${dbFields.join(', ')} WHERE id = $${paramIndex}`,
-        values
-      );
 
       // Invalidate cache
       await cache.del('radio:schedule');
@@ -533,26 +489,28 @@ class RadioModel {
    * @param {number} limit - Number of results
    * @returns {Promise<Array>} Matching songs
    */
-  static async searchHistory(searchQuery, limit = 10) {
+  static async searchHistory(query, limit = 10) {
     try {
-      const result = await query(
-        `SELECT * FROM radio_history
-         WHERE LOWER(title) LIKE $1 OR LOWER(artist) LIKE $1
-         ORDER BY played_at DESC
-         LIMIT $2`,
-        [`%${searchQuery.toLowerCase()}%`, limit]
-      );
+      const db = getFirestore();
+      const lowerQuery = query.toLowerCase();
 
-      const results = result.rows.map(row => ({
-        id: row.id.toString(),
-        title: row.title,
-        artist: row.artist,
-        duration: row.duration,
-        coverUrl: row.cover_url,
-        playedAt: row.played_at,
-      }));
+      const snapshot = await db.collection(HISTORY_COLLECTION)
+        .orderBy('playedAt', 'desc')
+        .limit(100) // Get more results to filter
+        .get();
 
-      return results;
+      const results = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const title = (data.title || '').toLowerCase();
+        const artist = (data.artist || '').toLowerCase();
+
+        if (title.includes(lowerQuery) || artist.includes(lowerQuery)) {
+          results.push({ id: doc.id, ...data });
+        }
+      });
+
+      return results.slice(0, limit);
     } catch (error) {
       logger.error('Error searching history:', error);
       return [];
@@ -565,10 +523,12 @@ class RadioModel {
    */
   static async getDetailedStatistics() {
     try {
+      const db = getFirestore();
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const thisWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
+      // Get counts
       const [
         totalRequests,
         totalHistory,
@@ -578,27 +538,26 @@ class RadioModel {
         todayRequests,
         weekRequests,
       ] = await Promise.all([
-        query('SELECT COUNT(*) as total FROM radio_requests', []),
-        query('SELECT COUNT(*) as total FROM radio_history', []),
-        query('SELECT COUNT(*) as total FROM radio_requests WHERE status = $1', ['pending']),
-        query('SELECT COUNT(*) as total FROM radio_requests WHERE status = $1', ['approved']),
-        query('SELECT COUNT(*) as total FROM radio_requests WHERE status = $1', ['rejected']),
-        query('SELECT COUNT(*) as total FROM radio_requests WHERE requested_at >= $1', [today]),
-        query('SELECT COUNT(*) as total FROM radio_requests WHERE requested_at >= $1', [thisWeek]),
+        db.collection(REQUESTS_COLLECTION).count().get(),
+        db.collection(HISTORY_COLLECTION).count().get(),
+        db.collection(REQUESTS_COLLECTION).where('status', '==', 'pending').count().get(),
+        db.collection(REQUESTS_COLLECTION).where('status', '==', 'approved').count().get(),
+        db.collection(REQUESTS_COLLECTION).where('status', '==', 'rejected').count().get(),
+        db.collection(REQUESTS_COLLECTION).where('requestedAt', '>=', today).count().get(),
+        db.collection(REQUESTS_COLLECTION).where('requestedAt', '>=', thisWeek).count().get(),
       ]);
 
-      const totalReq = parseInt(totalRequests.rows[0].total);
-      const approved = parseInt(approvedRequests.rows[0].total);
-
       const stats = {
-        totalRequests: totalReq,
-        totalSongsPlayed: parseInt(totalHistory.rows[0].total),
-        pendingRequests: parseInt(pendingRequests.rows[0].total),
-        approvedRequests: approved,
-        rejectedRequests: parseInt(rejectedRequests.rows[0].total),
-        todayRequests: parseInt(todayRequests.rows[0].total),
-        weekRequests: parseInt(weekRequests.rows[0].total),
-        approvalRate: totalReq > 0 ? ((approved / totalReq) * 100).toFixed(2) : 0,
+        totalRequests: totalRequests.data().count,
+        totalSongsPlayed: totalHistory.data().count,
+        pendingRequests: pendingRequests.data().count,
+        approvedRequests: approvedRequests.data().count,
+        rejectedRequests: rejectedRequests.data().count,
+        todayRequests: todayRequests.data().count,
+        weekRequests: weekRequests.data().count,
+        approvalRate: totalRequests.data().count > 0
+          ? ((approvedRequests.data().count / totalRequests.data().count) * 100).toFixed(2)
+          : 0,
       };
 
       logger.info('Detailed radio statistics calculated', stats);
@@ -625,30 +584,30 @@ class RadioModel {
    */
   static async playRequest(requestId) {
     try {
-      const requestResult = await query(
-        'SELECT * FROM radio_requests WHERE id = $1',
-        [requestId]
-      );
+      const db = getFirestore();
+      const requestRef = db.collection(REQUESTS_COLLECTION).doc(requestId);
+      const requestDoc = await requestRef.get();
 
-      if (requestResult.rows.length === 0) {
+      if (!requestDoc.exists) {
         logger.warn('Request not found for playing', { requestId });
         return false;
       }
 
-      const requestData = requestResult.rows[0];
+      const requestData = requestDoc.data();
 
       // Set as now playing
       await this.setNowPlaying({
-        title: requestData.song_name,
+        title: requestData.songName,
         artist: requestData.artist || 'Unknown Artist',
         duration: requestData.duration || '3:00',
       });
 
       // Update request status
-      await query(
-        'UPDATE radio_requests SET status = $1, played_at = $2, updated_at = $3 WHERE id = $4',
-        ['played', new Date(), new Date(), requestId]
-      );
+      await requestRef.update({
+        status: 'played',
+        playedAt: new Date(),
+        updatedAt: new Date(),
+      });
 
       // Invalidate caches
       await cache.del('radio:requests:pending');
@@ -668,20 +627,32 @@ class RadioModel {
    */
   static async getTopRequests(limit = 10) {
     try {
-      const result = await query(
-        `SELECT song_name, COUNT(*) as count
-         FROM radio_requests
-         WHERE status = $1
-         GROUP BY song_name
-         ORDER BY count DESC
-         LIMIT $2`,
-        ['played', limit]
-      );
+      const db = getFirestore();
+      const snapshot = await db.collection(REQUESTS_COLLECTION)
+        .where('status', '==', 'played')
+        .orderBy('playedAt', 'desc')
+        .limit(100)
+        .get();
 
-      const topSongs = result.rows.map(row => ({
-        songName: row.song_name,
-        count: parseInt(row.count),
-      }));
+      // Count song frequencies
+      const songCounts = {};
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const songName = data.songName.toLowerCase();
+
+        if (!songCounts[songName]) {
+          songCounts[songName] = {
+            songName: data.songName,
+            count: 0,
+          };
+        }
+        songCounts[songName].count += 1;
+      });
+
+      // Sort by count
+      const topSongs = Object.values(songCounts)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
 
       logger.info(`Retrieved top ${topSongs.length} requested songs`);
       return topSongs;

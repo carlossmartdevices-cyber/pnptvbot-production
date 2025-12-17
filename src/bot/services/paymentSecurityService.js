@@ -95,7 +95,14 @@ class PaymentSecurityService {
         return { valid: false, reason: 'Token expired or not found' };
       }
 
-      const data = JSON.parse(tokenData);
+      let data;
+      try {
+        data = JSON.parse(tokenData);
+      } catch (parseErr) {
+        logger.error('Error parsing token data:', parseErr);
+        return { valid: false, reason: 'Invalid token format' };
+      }
+
       if (new Date(data.expiresAt) < new Date()) {
         await redis.del(`payment:token:${token}`);
         logger.warn('Payment token expired', { token: token.substring(0, 10) });
@@ -399,8 +406,15 @@ class PaymentSecurityService {
         return { allowed: true };
       }
 
-      const ips = JSON.parse(whitelistedIPs);
-      const isAllowed = ips.includes(ipAddress);
+      let ips;
+      try {
+        ips = JSON.parse(whitelistedIPs);
+      } catch (parseErr) {
+        logger.error('Error parsing admin IP whitelist:', parseErr);
+        return { allowed: true }; // Don't block on error
+      }
+
+      const isAllowed = Array.isArray(ips) && ips.includes(ipAddress);
 
       if (!isAllowed) {
         logger.warn('Admin access from non-whitelisted IP', {

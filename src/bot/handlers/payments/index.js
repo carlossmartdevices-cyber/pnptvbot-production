@@ -15,15 +15,89 @@ const registerActivationHandlers = require('./activation');
 const registerPaymentHandlers = (bot) => {
   // Register activation code handlers
   registerActivationHandlers(bot);
-  // Show subscription plans
+
+  // /subscribe command - shows subscription plans directly
+  bot.command('subscribe', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+
+      // Check if user already has an active subscription
+      const hasActiveSubscription = await UserService.hasActiveSubscription(ctx.from.id);
+
+      if (hasActiveSubscription) {
+        const warningMsg = lang === 'es'
+          ? '⚠️ **Ya tienes una suscripción activa**\n\n'
+            + 'No puedes comprar una nueva suscripción mientras tengas una activa.\n\n'
+            + 'Para evitar pagos duplicados, por favor espera a que tu suscripción actual expire o contacta soporte para cambiar tu plan.'
+          : '⚠️ **You already have an active subscription**\n\n'
+            + 'You cannot purchase a new subscription while you have an active one.\n\n'
+            + 'To avoid double payments, please wait until your current subscription expires or contact support to change your plan.';
+
+        await ctx.reply(
+          warningMsg,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(t('back', lang), 'back_to_main')]
+            ])
+          }
+        );
+        return;
+      }
+
+      const plans = await PlanModel.getAll();
+
+      // Header with internationalization
+      let message = `${t('subscriptionHeader', lang)}\n`;
+      message += `${t('subscriptionDivider', lang)}\n\n`;
+      message += `${t('subscriptionDescription', lang)}\n\n\n`;
+
+      const buttons = [];
+      plans.forEach((plan) => {
+        const planName = plan.display_name || plan.name;
+        const durationText = plan.duration_days || plan.duration;
+        const price = parseFloat(plan.price);
+
+        // Format buttons with i18n
+        let buttonText;
+        if (plan.is_lifetime) {
+          // Lifetime Pass without duration
+          buttonText = `${planName} | $${price.toFixed(2)}`;
+        } else {
+          // Regular plans with duration
+          buttonText = `${planName} | ${durationText} ${t('days', lang)} | $${price.toFixed(2)}`;
+        }
+
+        buttons.push([
+          Markup.button.callback(buttonText, `select_plan_${plan.id}`),
+        ]);
+      });
+
+      buttons.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
+
+      await ctx.reply(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons)
+      });
+
+      logger.info('User viewed subscription plans via /subscribe', { userId: ctx.from.id });
+    } catch (error) {
+      logger.error('Error in /subscribe command:', error);
+      await ctx.reply('Error loading plans. Please try again.');
+    }
+  });
+
+  // Show subscription plans (callback action)
   bot.action('show_subscription_plans', async (ctx) => {
     try {
       await ctx.answerCbQuery();
       const lang = getLanguage(ctx);
-      
+
       // Check if user already has an active subscription
-      const hasActiveSubscription = await UserService.hasActiveSubscription(ctx.from.id);
-      
+      // Skip this check if admin is in "View as Free" mode
+      const isAdminViewingAsFree = ctx.session?.adminViewMode === 'free';
+      const hasActiveSubscription = !isAdminViewingAsFree && await UserService.hasActiveSubscription(ctx.from.id);
+
       if (hasActiveSubscription) {
         const warningMsg = lang === 'es'
           ? '⚠️ **Ya tienes una suscripción activa**\n\n'
@@ -116,6 +190,9 @@ const registerPaymentHandlers = (bot) => {
       // Obtener descripción del plan desde i18n
       let planDesc = '';
       switch (plan.sku) {
+        case 'TRIAL':
+          planDesc = t('planTrialDesc', lang);
+          break;
         case 'CRYSTAL':
           planDesc = t('planCrystalDesc', lang);
           break;
@@ -138,6 +215,7 @@ const registerPaymentHandlers = (bot) => {
       planHeader += `*${planName}* | $${price.toFixed(2)}\n\n`;
       planHeader += `${planDesc}\n\n`;
       planHeader += `${t('paymentMethod', lang)}`;
+      planHeader += `${t('paymentFooter', lang)}`;
 
       await ctx.editMessageText(
         planHeader,
@@ -180,8 +258,10 @@ const registerPaymentHandlers = (bot) => {
       const userId = ctx.from.id;
 
       // Double-check if user has active subscription before creating payment
-      const hasActiveSubscription = await UserService.hasActiveSubscription(userId);
-      
+      // Skip this check if admin is in "View as Free" mode
+      const isAdminViewingAsFree = ctx.session?.adminViewMode === 'free';
+      const hasActiveSubscription = !isAdminViewingAsFree && await UserService.hasActiveSubscription(userId);
+
       if (hasActiveSubscription) {
         const warningMsg = lang === 'es'
           ? '⚠️ **Ya tienes una suscripción activa**\n\n'
@@ -259,8 +339,10 @@ const registerPaymentHandlers = (bot) => {
       const chatId = ctx.chat?.id;
 
       // Double-check if user has active subscription before creating payment
-      const hasActiveSubscription = await UserService.hasActiveSubscription(userId);
-      
+      // Skip this check if admin is in "View as Free" mode
+      const isAdminViewingAsFree = ctx.session?.adminViewMode === 'free';
+      const hasActiveSubscription = !isAdminViewingAsFree && await UserService.hasActiveSubscription(userId);
+
       if (hasActiveSubscription) {
         const warningMsg = lang === 'es'
           ? '⚠️ **Ya tienes una suscripción activa**\n\n'
@@ -310,36 +392,34 @@ const registerPaymentHandlers = (bot) => {
         const paymentApps = DaimoConfig.SUPPORTED_PAYMENT_APPS.join(', ');
 
         const message = lang === 'es'
-          ? '💳 *Pago con Daimo Pay*\n\n'
+          ? '🪙 *Paga en Crypto con Daimo Pay*\n\n'
             + `Plan: ${plan.display_name || plan.name}\n`
             + `Precio: $${plan.price} USDC\n\n`
-            + '📱 *Puedes pagar usando:*\n'
-            + '• Zelle\n'
-            + '• CashApp\n'
-            + '• Venmo\n'
-            + '• Revolut\n'
-            + '• Wise\n\n'
-            + '💡 *Cómo funciona:*\n'
-            + '1. Haz clic en "Pagar Ahora"\n'
-            + '2. Elige tu app de pago preferida\n'
-            + '3. El pago se convierte automáticamente a USDC\n'
-            + '4. Tu suscripción se activa inmediatamente\n\n'
-            + '🔒 Seguro y rápido en la red Optimism'
-          : '💳 *Pay with Daimo Pay*\n\n'
+            + 'Completa tu suscripción usando crypto a través de nuestro checkout de Daimo Pay — rápido, seguro, discreto y perfecto para miembros que prefieren pagos privados y sin fronteras.\n\n'
+            + '💳 *Daimo Pay acepta USDC, y puedes pagar usando wallets populares como:*\n'
+            + 'Binance • Coinbase Wallet • MetaMask • Trust Wallet • Kraken Wallet • OKX Wallet • Bybit Wallet, y más.\n\n'
+            + '📱 *O paga usando las apps de pago más populares:*\n'
+            + 'Cash App, Venmo, Revolut, MercadoPago y Zelle.\n\n'
+            + 'Solo elige tu wallet o app, confirma la transacción, y listo.\n\n'
+            + '✅ *Una vez confirmado tu pago, recibirás automáticamente:*\n'
+            + '• Tu mensaje de acceso PRIME\n'
+            + '• Tu factura\n'
+            + '• Tus instrucciones de onboarding\n\n'
+            + '💬 Si necesitas ayuda durante el checkout, escríbele a Cristina, nuestra asistente AI — ella te guiará paso a paso o te conectará con Santino si es necesario.'
+          : '🪙 *Pay in Crypto with Daimo Pay*\n\n'
             + `Plan: ${plan.display_name || plan.name}\n`
             + `Price: $${plan.price} USDC\n\n`
-            + '📱 *You can pay using:*\n'
-            + '• Zelle\n'
-            + '• CashApp\n'
-            + '• Venmo\n'
-            + '• Revolut\n'
-            + '• Wise\n\n'
-            + '💡 *How it works:*\n'
-            + '1. Click "Pay Now"\n'
-            + '2. Choose your preferred payment app\n'
-            + '3. Payment is automatically converted to USDC\n'
-            + '4. Your subscription activates immediately\n\n'
-            + '🔒 Secure and fast on Optimism network';
+            + 'You can complete your subscription using crypto through our Daimo Pay checkout — fast, secure, discreet, and perfect for members who prefer private, borderless payments.\n\n'
+            + '💳 *Daimo Pay accepts USDC, and you can pay using popular wallets such as:*\n'
+            + 'Binance • Coinbase Wallet • MetaMask • Trust Wallet • Kraken Wallet • OKX Wallet • Bybit Wallet, and more.\n\n'
+            + '📱 *Or pay using the most popular payment apps, including:*\n'
+            + 'Cash App, Venmo, Revolut, MercadoPago, and Zelle.\n\n'
+            + 'Just choose your wallet or app, confirm the transaction, and you\'re done.\n\n'
+            + '✅ *Once your payment is confirmed, you\'ll automatically receive:*\n'
+            + '• Your PRIME access message\n'
+            + '• Your invoice\n'
+            + '• Your onboarding instructions\n\n'
+            + '💬 If you need help during checkout, just message Cristina, our AI assistant — she\'ll guide you step by step or pass you to Santino if needed.';
 
         await ctx.editMessageText(
           message,

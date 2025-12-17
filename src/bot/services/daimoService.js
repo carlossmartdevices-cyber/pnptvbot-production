@@ -2,7 +2,6 @@ const { optimismUSDC } = require('@daimo/pay-common');
 const { getAddress } = require('viem');
 const crypto = require('crypto');
 const logger = require('../../utils/logger');
-const FarcasterAuthService = require('./farcasterAuthService');
 
 /**
  * Daimo Pay Service
@@ -39,56 +38,94 @@ class DaimoService {
   }
 
   /**
-   * Generate payment link for Daimo Pay
+   * Generate payment link for Daimo Pay using the API
    * @param {Object} options - Payment options
    * @param {string} options.userId - Telegram user ID
    * @param {string} options.chatId - Telegram chat ID
    * @param {string} options.planId - Plan ID
    * @param {number} options.amount - Amount in USD (will be converted to USDC)
    * @param {string} options.paymentId - Payment record ID
-   * @returns {string} Payment link
+   * @returns {Promise<string>} Payment link
    */
-  generatePaymentLink({ userId, chatId, planId, amount, paymentId }) {
+  async generatePaymentLink({ userId, chatId, planId, amount, paymentId }) {
     try {
       if (!this.treasuryAddress || !this.refundAddress) {
         logger.error('Daimo addresses not configured');
         throw new Error('Daimo payment system not configured');
       }
 
-      // Convert amount to USDC units (6 decimals for USDC)
-      const amountInUSDC = (parseFloat(amount) * 1000000).toString(); // e.g., 10.00 USD = 10000000 USDC units
+      if (!this.apiKey) {
+        logger.error('Daimo API key not configured');
+        throw new Error('Daimo API key not configured');
+      }
 
-      // Create payment intent
-      const paymentIntent = {
-        toAddress: this.treasuryAddress,
-        toChain: this.chain.id,
-        toToken: this.chain.token,
-        toUnits: amountInUSDC,
-        intent: 'Pay PNPtv Subscription',
+      // Convert amount to USDC units string with decimals (e.g., "24.99" for $24.99)
+      const amountUnits = parseFloat(amount).toFixed(2);
+
+      // Create payment via Daimo Pay API
+      // Note: paymentOptions goes in display object per API docs
+      const requestBody = {
+        display: {
+          intent: 'Pay PNPtv Subscription',
+          paymentOptions: this.supportedPaymentApps, // ['Venmo', 'CashApp', 'Zelle', 'Revolut', 'Wise']
+        },
+        destination: {
+          destinationAddress: this.treasuryAddress,
+          chainId: this.chain.id,
+          tokenAddress: this.chain.token,
+          amountUnits: amountUnits,
+        },
         refundAddress: this.refundAddress,
         metadata: {
-          userId,
-          chatId,
-          planId,
-          paymentId,
-          timestamp: Date.now(),
+          userId: String(userId),
+          chatId: String(chatId),
+          planId: String(planId),
+          paymentId: String(paymentId),
+          timestamp: String(Date.now()),
         },
-        paymentOptions: this.supportedPaymentApps,
       };
 
-      // Generate payment URL
-      const encodedIntent = encodeURIComponent(JSON.stringify(paymentIntent));
-      const paymentUrl = `https://pay.daimo.com/pay?intent=${encodedIntent}`;
-
-      logger.info('Daimo payment link generated', {
+      logger.info('Creating Daimo payment via API', {
         paymentId,
         userId,
         amount,
-        amountInUSDC,
+        amountUnits,
         chain: this.chain.name,
       });
 
-      return paymentUrl;
+      const response = await fetch('https://pay.daimo.com/api/payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Api-Key': this.apiKey,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.error('Daimo API error', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+        });
+        throw new Error(`Daimo API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.url) {
+        logger.error('Daimo API response missing URL', { data });
+        throw new Error('Daimo API response missing payment URL');
+      }
+
+      logger.info('Daimo payment created successfully', {
+        paymentId,
+        daimoPaymentId: data.id,
+        url: data.url,
+      });
+
+      return data.url;
     } catch (error) {
       logger.error('Error generating Daimo payment link:', {
         error: error.message,
@@ -260,173 +297,6 @@ class DaimoService {
     }
 
     return isConfigured;
-  }
-
-  /**
-   * Generate payment link with Farcaster authentication
-   * @param {Object} options - Payment options
-   * @param {string} options.userId - Telegram user ID
-   * @param {string} options.chatId - Telegram chat ID
-   * @param {string} options.planId - Plan ID
-   * @param {number} options.amount - Amount in USD
-   * @param {string} options.paymentId - Payment record ID
-   * @param {string} options.farcasterFid - Farcaster FID (optional)
-   * @returns {string} Payment link
-   */
-  generatePaymentLinkWithFarcaster({ userId, chatId, planId, amount, paymentId, farcasterFid }) {
-    try {
-      if (!this.treasuryAddress || !this.refundAddress) {
-        logger.error('Daimo addresses not configured');
-        throw new Error('Daimo payment system not configured');
-      }
-
-      // Convert amount to USDC units (6 decimals for USDC)
-      const amountInUSDC = (parseFloat(amount) * 1000000).toString();
-
-      // Create payment intent with Farcaster FID
-      const paymentIntent = {
-        toAddress: this.treasuryAddress,
-        toChain: this.chain.id,
-        toToken: this.chain.token,
-        toUnits: amountInUSDC,
-        intent: 'Pay PNPtv Subscription',
-        refundAddress: this.refundAddress,
-        metadata: {
-          userId,
-          chatId,
-          planId,
-          paymentId,
-          farcasterFid: farcasterFid || null,
-          timestamp: Date.now(),
-        },
-        paymentOptions: this.supportedPaymentApps,
-      };
-
-      // Generate payment URL
-      const encodedIntent = encodeURIComponent(JSON.stringify(paymentIntent));
-      const paymentUrl = `https://pay.daimo.com/pay?intent=${encodedIntent}`;
-
-      logger.info('Daimo payment link generated with Farcaster', {
-        paymentId,
-        userId,
-        farcasterFid,
-        amount,
-        amountInUSDC,
-        chain: this.chain.name,
-      });
-
-      return paymentUrl;
-    } catch (error) {
-      logger.error('Error generating Daimo payment link with Farcaster:', {
-        error: error.message,
-        userId,
-        farcasterFid,
-        amount,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Verify Farcaster authentication token
-   * @param {string} token - Quick Auth JWT token
-   * @returns {Promise<Object>} Verification result with FID
-   */
-  async verifyFarcasterAuth(token) {
-    try {
-      const result = await FarcasterAuthService.verifyToken(token);
-
-      if (!result.valid) {
-        logger.warn('Farcaster auth verification failed', {
-          error: result.error,
-        });
-        return result;
-      }
-
-      logger.info('Farcaster auth verified for Daimo payment', {
-        fid: result.fid,
-      });
-
-      return result;
-    } catch (error) {
-      logger.error('Error verifying Farcaster auth:', {
-        error: error.message,
-      });
-      return {
-        valid: false,
-        error: error.message,
-      };
-    }
-  }
-
-  /**
-   * Process payment with Farcaster verification
-   * @param {Object} options - Payment options
-   * @param {string} options.token - Farcaster Quick Auth token
-   * @param {string} options.userId - Telegram user ID
-   * @param {string} options.planId - Plan ID
-   * @param {number} options.amount - Amount in USD
-   * @returns {Promise<Object>} Payment result with URL
-   */
-  async createPaymentWithFarcaster({ token, userId, planId, amount, chatId, paymentId }) {
-    try {
-      // Verify Farcaster authentication
-      const authResult = await this.verifyFarcasterAuth(token);
-
-      if (!authResult.valid) {
-        return {
-          success: false,
-          error: 'Farcaster authentication failed',
-          details: authResult.error,
-        };
-      }
-
-      const fid = authResult.fid;
-
-      // Link Farcaster FID to Telegram user
-      await FarcasterAuthService.linkFarcasterToTelegram(userId, fid);
-
-      // Generate payment link with FID
-      const paymentUrl = this.generatePaymentLinkWithFarcaster({
-        userId,
-        chatId,
-        planId,
-        amount,
-        paymentId,
-        farcasterFid: fid,
-      });
-
-      logger.info('Payment created with Farcaster verification', {
-        userId,
-        fid,
-        planId,
-        amount,
-      });
-
-      return {
-        success: true,
-        paymentUrl,
-        farcasterFid: fid,
-      };
-    } catch (error) {
-      logger.error('Error creating payment with Farcaster:', {
-        error: error.message,
-        userId,
-        planId,
-      });
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-
-  /**
-   * Check if Farcaster authentication is configured
-   * @returns {boolean} True if configured
-   */
-  isFarcasterConfigured() {
-    return FarcasterAuthService.isConfigured();
   }
 }
 

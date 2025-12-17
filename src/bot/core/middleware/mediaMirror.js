@@ -1,3 +1,4 @@
+const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
 const TopicConfigModel = require('../../../models/topicConfigModel');
 const UserModel = require('../../../models/userModel');
@@ -61,24 +62,81 @@ function mediaMirrorMiddleware() {
 
     const caption = message.caption || '';
 
+    // Get user profile data from database for richer display
+    let userProfile = null;
+    try {
+      userProfile = await UserModel.getById(userId);
+    } catch (e) {
+      logger.debug('Could not fetch user profile for mirror:', e.message);
+    }
+
     // Mirror to each configured topic
     for (const mirrorTopic of mirrorTopics) {
       try {
-        // Build rich mirror caption with profile info
-        let mirrorCaption = '📸 **Shared Media**\n\n';
+        // Build cute monospace caption with profile info
+        let mirrorCaption = '';
 
-        // Add profile information
-        mirrorCaption += profileInfo;
+        // Header box
+        mirrorCaption += '```\n';
+        mirrorCaption += '──────────────────────────────┐\n';
+        mirrorCaption += '    🔥 HOT PROFILE 🔥     \n';
+        mirrorCaption += '──────────────────────────────┘\n';
+        mirrorCaption += '```\n\n';
 
-        // Add original caption if exists
-        if (caption && caption.trim()) {
-          mirrorCaption += `\n\n💬 ${caption.trim()}`;
+        // Username with looking for text (no bold, just plain text)
+        const displayName = ctx.from.username ? `@${ctx.from.username}` : firstName;
+        mirrorCaption += `👤 ${displayName} is looking for...\n\n`;
+
+        // Add badges if user has any
+        if (userProfile?.badges && userProfile.badges.length > 0) {
+          const badgeEmojis = userProfile.badges.slice(0, 5).join(' ');
+          mirrorCaption += `🏆 ${badgeEmojis}\n\n`;
         }
 
-        // Add separator for cleaner look
-        mirrorCaption += '\n\n───────────────';
+        // Add bio if exists (no italics to avoid parse issues)
+        if (userProfile?.bio && userProfile.bio.trim()) {
+          const shortBio = userProfile.bio.length > 80 
+            ? userProfile.bio.substring(0, 80) + '...' 
+            : userProfile.bio;
+          mirrorCaption += `💭 "${shortBio}"\n\n`;
+        }
 
-        // Send media to mirror topic
+        // Add social media links if user has any
+        const socials = [];
+        if (userProfile?.twitter) socials.push(`𝕏 ${userProfile.twitter}`);
+        if (userProfile?.instagram) socials.push(`IG ${userProfile.instagram}`);
+        if (userProfile?.tiktok) socials.push(`TT ${userProfile.tiktok}`);
+        if (userProfile?.onlyfans) socials.push(`OF ${userProfile.onlyfans}`);
+        
+        if (socials.length > 0) {
+          mirrorCaption += `🔗 ${socials.join(' • ')}\n\n`;
+        }
+
+        // Add original caption if exists  
+        if (caption && caption.trim()) {
+          mirrorCaption += `💬 ${caption.trim()}\n\n`;
+        }
+
+        // Fun footer
+        mirrorCaption += '```\n';
+        mirrorCaption += '┌─────────────────────────┐\n';
+        mirrorCaption += '│  potential fuckbuddy 😏 │\n';
+        mirrorCaption += '└─────────────────────────┘\n';
+        mirrorCaption += '```';
+
+        // Build inline keyboard with DM button
+        let inlineKeyboard;
+        if (ctx.from.username) {
+          inlineKeyboard = Markup.inlineKeyboard([
+            [Markup.button.url(`💬 Message ${firstName}`, `https://t.me/${ctx.from.username}`)]
+          ]);
+        } else {
+          inlineKeyboard = Markup.inlineKeyboard([
+            [Markup.button.url(`💬 Message ${firstName}`, `tg://user?id=${userId}`)]
+          ]);
+        }
+
+        // Send media to mirror topic with inline button
         if (hasPhoto) {
           const photo = message.photo[message.photo.length - 1]; // Highest resolution
           await ctx.telegram.sendPhoto(
@@ -87,7 +145,8 @@ function mediaMirrorMiddleware() {
             {
               caption: mirrorCaption,
               message_thread_id: mirrorTopic.topic_id,
-              parse_mode: 'Markdown'
+              parse_mode: 'Markdown',
+              ...inlineKeyboard
             }
           );
         } else if (hasVideo) {
@@ -98,7 +157,8 @@ function mediaMirrorMiddleware() {
               caption: mirrorCaption,
               message_thread_id: mirrorTopic.topic_id,
               parse_mode: 'Markdown',
-              supports_streaming: true
+              supports_streaming: true,
+              ...inlineKeyboard
             }
           );
         } else if (hasAnimation) {
@@ -108,7 +168,8 @@ function mediaMirrorMiddleware() {
             {
               caption: mirrorCaption,
               message_thread_id: mirrorTopic.topic_id,
-              parse_mode: 'Markdown'
+              parse_mode: 'Markdown',
+              ...inlineKeyboard
             }
           );
         }

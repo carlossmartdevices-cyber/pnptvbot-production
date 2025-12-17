@@ -1,182 +1,116 @@
 const logger = require('../../../utils/logger');
-const TopicConfigModel = require('../../../models/topicConfigModel');
+const ChatCleanupService = require('../../services/chatCleanupService');
 
-// Group and topic IDs (should be configurable)
-const GROUP_CHAT_ID = process.env.GROUP_ID;
-const NOTIFICATIONS_TOPIC_ID = 3135;
+const GROUP_ID = process.env.GROUP_ID;
+const NOTIFICATIONS_TOPIC_ID = process.env.NOTIFICATIONS_TOPIC_ID || '3135';
+const AUTO_DELETE_DELAY = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Command Redirection Middleware
- * Redirects bot command responses to a dedicated notifications topic
+ * Redirects bot commands to the Notifications topic (3135) in groups
  */
 function commandRedirectionMiddleware() {
   return async (ctx, next) => {
-  const chatId = ctx.chat?.id?.toString();
-  const message = ctx.message;
+    const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+    const chatIdStr = ctx.chat?.id?.toString();
 
-  // Only apply in the configured group
-  if (!GROUP_CHAT_ID || chatId !== GROUP_CHAT_ID.toString()) {
-    return next();
-  }
+    // Only apply to configured group
+    if (!isGroup || (GROUP_ID && chatIdStr !== GROUP_ID)) {
+      return next();
+    }
 
-  // Check if this is a command
-  const isCommand = message?.text?.startsWith('/');
+    const messageText = ctx.message?.text || '';
+    const isCommand = messageText.startsWith('/');
+    const currentTopicId = ctx.message?.message_thread_id;
 
-  if (!isCommand) {
-    return next();
-  }
+    // If it's a command and NOT already in the notifications topic
+    if (isCommand && currentTopicId && currentTopicId.toString() !== NOTIFICATIONS_TOPIC_ID) {
+      const userLang = ctx.from?.language_code || 'en';
+      const isSpanish = userLang.startsWith('es');
 
-  const command = message.text.split(' ')[0].toLowerCase();
-  const currentTopicId = message?.message_thread_id;
+      const redirectMessage = isSpanish
+        ? '💬 Los comandos del bot se procesan en el tema **Notifications** →'
+        : '💬 Bot commands are processed in the **Notifications** topic →';
 
-  // Exceptions - commands that should NOT be redirected
-  const excludedCommands = [
-    '/start',
-    '/cristina',
-    '/support'
-  ];
-
-  if (excludedCommands.includes(command)) {
-    return next();
-  }
-
-  // Check if already in notifications topic
-  if (currentTopicId === NOTIFICATIONS_TOPIC_ID) {
-    // Already in notifications topic, process normally but schedule deletion
-    await scheduleCommandDeletion(ctx, chatId, message.message_id, currentTopicId);
-    return next();
-  }
-
-  try {
-    // Store original context for later
-    const originalMessageId = message.message_id;
-    const originalTopicId = currentTopicId;
-    const userId = ctx.from.id;
-    const username = ctx.from.username || ctx.from.first_name;
-
-    // Send redirect notice to user in current topic
-    const lang = ctx.from.language_code === 'es' ? 'es' : 'en';
-    const redirectNotice = lang === 'es'
-      ? '💬 Los comandos del bot se procesan en el tema **Notifications** →'
-      : '💬 Bot commands are processed in the **Notifications** topic →';
-
-    const redirectMessage = await ctx.reply(
-      redirectNotice,
-      {
-        message_thread_id: currentTopicId,
-        reply_to_message_id: originalMessageId,
-        parse_mode: 'Markdown'
-      }
-    );
-
-    // Delete user's original command after 3 minutes (GROUP BEHAVIOR OVERRIDE)
-    setTimeout(async () => {
+      // Send redirect notice
       try {
-        await ctx.telegram.deleteMessage(chatId, originalMessageId);
-      } catch (error) {
-        logger.debug('Could not delete original command:', error.message);
-      }
-    }, 180000); // 3 minutes
+        const sentMessage = await ctx.reply(redirectMessage, {
+          parse_mode: 'Markdown',
+          reply_to_message_id: ctx.message.message_id,
+        });
 
-    // Delete redirect notice after 3 minutes (GROUP BEHAVIOR OVERRIDE)
-    setTimeout(async () => {
-      try {
-        await ctx.telegram.deleteMessage(chatId, redirectMessage.message_id);
-      } catch (error) {
-        logger.debug('Could not delete redirect notice:', error.message);
-      }
-    }, 180000); // 3 minutes
-
-    // Process the command in the notifications topic
-    // We need to intercept the bot's response and redirect it
-
-    // Store redirect context
-    ctx.session = ctx.session || {};
-    ctx.session.redirectToTopic = NOTIFICATIONS_TOPIC_ID;
-    ctx.session.originalSendMessage = ctx.reply.bind(ctx);
-    ctx.session.commandUser = username;
-
-    // Override ctx.reply to redirect to notifications topic
-    const originalReply = ctx.reply.bind(ctx);
-    ctx.reply = async function(text, extra = {}) {
-      try {
-        // Send to notifications topic instead
-        const botReply = await ctx.telegram.sendMessage(
-          chatId,
-          `🤖 **Command:** ${command}\n👤 **User:** @${username}\n\n${text}`,
-          {
-            message_thread_id: NOTIFICATIONS_TOPIC_ID,
-            parse_mode: extra.parse_mode || 'Markdown',
-            reply_markup: extra.reply_markup
+        // Auto-delete redirect notice after 30 seconds
+        setTimeout(async () => {
+          try {
+            await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
+          } catch (error) {
+            logger.debug('Could not delete redirect notice:', error.message);
           }
-        );
+        }, 30000);
 
-        // Schedule deletion after 3 minutes (GROUP BEHAVIOR OVERRIDE)
-        scheduleMessageDeletion(ctx, chatId, botReply.message_id, NOTIFICATIONS_TOPIC_ID, 180);
+        logger.info('Command redirected to notifications topic', {
+          userId: ctx.from?.id,
+          chatId: ctx.chat.id,
+          fromTopic: currentTopicId,
+          toTopic: NOTIFICATIONS_TOPIC_ID,
+          command: messageText.split(' ')[0],
+        });
 
-        return botReply;
+        // Don't process the command in the wrong topic
+        return;
       } catch (error) {
-        logger.error('Error redirecting bot reply:', error);
-        // Fallback to normal reply
-        return originalReply(text, extra);
+        logger.error('Error sending command redirect notice:', error);
       }
-    };
+    }
 
-    // Continue processing the command
     return next();
-
-  } catch (error) {
-    logger.error('Error in command redirection:', error);
-    return next();
-  }
   };
 }
 
 /**
- * Schedule a message for deletion
- */
-function scheduleMessageDeletion(ctx, chatId, messageId, topicId, delaySeconds = 180) {
-  setTimeout(async () => {
-    try {
-      await ctx.telegram.deleteMessage(chatId, messageId);
-      logger.debug(`Auto-deleted message ${messageId} from topic ${topicId}`);
-    } catch (error) {
-      logger.debug(`Could not delete message ${messageId}:`, error.message);
-    }
-  }, delaySeconds * 1000);
-}
-
-/**
- * Schedule command message deletion (3 minutes - GROUP BEHAVIOR OVERRIDE)
- */
-async function scheduleCommandDeletion(ctx, chatId, messageId, topicId) {
-  setTimeout(async () => {
-    try {
-      await ctx.telegram.deleteMessage(chatId, messageId);
-      logger.debug(`Deleted command message ${messageId} from topic ${topicId}`);
-    } catch (error) {
-      logger.debug(`Could not delete command message:`, error.message);
-    }
-  }, 180000); // 3 minutes
-}
-
-/**
  * Auto-delete middleware for notifications topic
- * Enforces 5-minute auto-deletion for all messages in notifications topic
+ * Deletes messages in the notifications topic after 5 minutes
  */
 function notificationsAutoDelete() {
   return async (ctx, next) => {
-    const messageThreadId = ctx.message?.message_thread_id;
-    const chatId = ctx.chat?.id?.toString();
+    const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+    const chatIdStr = ctx.chat?.id?.toString();
+    const currentTopicId = ctx.message?.message_thread_id?.toString();
+
+    // Only apply to configured group and notifications topic
+    if (!isGroup || (GROUP_ID && chatIdStr !== GROUP_ID)) {
+      return next();
+    }
 
     // Check if in notifications topic
-    if (messageThreadId === NOTIFICATIONS_TOPIC_ID && chatId === GROUP_CHAT_ID?.toString()) {
-      const messageId = ctx.message?.message_id;
+    if (currentTopicId === NOTIFICATIONS_TOPIC_ID) {
+      // Store original reply for this context
+      const originalReply = ctx.reply.bind(ctx);
 
-      if (messageId) {
-        // Schedule deletion after 3 minutes (GROUP BEHAVIOR OVERRIDE)
-        scheduleMessageDeletion(ctx, chatId, messageId, NOTIFICATIONS_TOPIC_ID, 180);
-      }
+      // Override ctx.reply to auto-delete messages in notifications topic
+      ctx.reply = async (text, extra = {}) => {
+        const message = await originalReply(text, extra);
+
+        // Schedule deletion after 5 minutes
+        if (message) {
+          ChatCleanupService.scheduleDelete(
+            ctx.telegram,
+            ctx.chat.id,
+            message.message_id,
+            'notifications-topic-auto-delete',
+            AUTO_DELETE_DELAY
+          );
+
+          logger.debug('Message in notifications topic scheduled for auto-delete', {
+            chatId: ctx.chat.id,
+            messageId: message.message_id,
+            topicId: NOTIFICATIONS_TOPIC_ID,
+            deleteIn: '5 minutes',
+          });
+        }
+
+        return message;
+      };
     }
 
     return next();

@@ -5,6 +5,7 @@
  * Usage: node scripts/set-admin-role.js <telegram_user_id>
  */
 
+const admin = require('firebase-admin');
 const path = require('path');
 
 // Load environment variables

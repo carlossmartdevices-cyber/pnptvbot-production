@@ -126,8 +126,11 @@ const showRadioMenu = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
 
-    let text = `${t('radioTitle', lang)}\n\n`;
-    text += `${t('radio.description', lang)}\n\n`;
+    let text = lang === 'es'
+      ? '`📻 Radio PNPtv 24/7`\n\n' +
+        '¡Música, vibes relajantes y tonos cloudys todo el día! 🎵☁️\n\n'
+      : '`📻 PNPtv Radio 24/7`\n\n' +
+        'Stream beats, chill vibes, and cloudy tunes all day long! 🎵☁️\n\n';
 
     // Show current program if available
     const currentProgram = await RadioModel.getCurrentProgram();
@@ -135,6 +138,10 @@ const showRadioMenu = async (ctx) => {
       text += `🎙️ ${t('radio.onAir', lang)}: ${currentProgram.programName}\n`;
       text += `⏰ ${currentProgram.timeSlot}\n\n`;
     }
+
+    text += lang === 'es'
+      ? '`Elige una opción abajo 💜`'
+      : '`Choose an option below 💜`';
 
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.callback(t('listenNow', lang), 'radio_listen')],
@@ -149,7 +156,7 @@ const showRadioMenu = async (ctx) => {
       [Markup.button.callback(t('back', lang), 'back_to_main')],
     ]);
 
-    await ctx.editMessageText(text, keyboard);
+    await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
   } catch (error) {
     logger.error('Error in showRadioMenu:', error);
   }

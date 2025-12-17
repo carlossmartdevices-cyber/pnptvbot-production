@@ -24,10 +24,6 @@ const registerGroupWelcomeHandlers = (bot) => {
   // Handle badge selection
   bot.action(/^badge_select_(.+)$/, handleBadgeSelection);
 
-  // Handle action buttons
-  bot.action('group_subscribe_prime', handleSubscribeAction);
-  bot.action('group_book_call', handleBookCallAction);
-
   // Handle view rules button
   bot.action('group_view_rules', handleViewRules);
 };
@@ -109,7 +105,8 @@ ${subscriptionStatus}
 • Música + Podcasts premium
 • Contenido que no sale en ningún otro lado
 
-Envía /menu o /start para ver lo que el bot puede hacer.`
+Si te quieres meter más duro en la comunidad:
+👉 /subscribe`
       : `👋 Hey ${username}, welcome to PNPtv!
 
 This place is simple: real people, real vibes, no filters. Before you jump in, here's how you're entering today:
@@ -133,19 +130,14 @@ ${subscriptionStatus}
 • Premium Music & Podcasts
 • Exclusive content you won't see anywhere else
 
-Send /menu or /start to see what the bot can do.`;
+If you want the full experience:
+👉 /subscribe`;
 
-    // Send to notifications topic (3135)
-    const groupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : ctx.chat.id;
-    await ctx.telegram.sendMessage(groupId, message, {
-      parse_mode: 'Markdown',
-      message_thread_id: 3135,
-    });
+    await ctx.reply(message, { parse_mode: 'Markdown' });
 
     logger.info('Welcome message sent', {
       userId: user.userId,
       chatId: ctx.chat.id,
-      topicId: 3135,
       language: lang,
     });
   } catch (error) {
@@ -159,14 +151,12 @@ Send /menu or /start to see what the bot can do.`;
 async function sendBadgeSelectionMessage(ctx, username, lang) {
   try {
     const message = lang === 'es'
-      ? `👑 Perteneces a… (elige tu tribu)
+      ? `👑 Ahora dinos… qué vibra eres tú?
 
-Dime qué clase de desmadre eres, y te doy tu primera insignia.
-Se guarda al toque.`
-      : `👑 You belong to… (pick your tribe)
+Escoge tu energía y te damos tu primera insignia. Se guarda al instante.`
+      : `👑 Tell us… what's your vibe?
 
-Tell us what kind of chaos you are, and we'll give you your first badge.
-It saves instantly.`;
+Pick your energy and get your first badge. It saves instantly.`;
 
     const keyboard = Markup.inlineKeyboard([
       [
@@ -191,16 +181,10 @@ It saves instantly.`;
       ],
     ]);
 
-    // Send to notifications topic (3135)
-    const groupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : ctx.chat.id;
-    await ctx.telegram.sendMessage(groupId, message, {
-      ...keyboard,
-      message_thread_id: 3135,
-    });
+    await ctx.reply(message, keyboard);
 
     logger.info('Badge selection message sent', {
       chatId: ctx.chat.id,
-      topicId: 3135,
       language: lang,
     });
   } catch (error) {
@@ -250,9 +234,6 @@ async function handleBadgeSelection(ctx) {
     // Send congratulations message
     await sendCongratsMessage(ctx, username, badge, lang);
 
-    // Send action buttons (Subscribe + Book Call)
-    await sendActionButtons(ctx, lang);
-
     // Send rules menu
     await sendRulesMenu(ctx, lang);
 
@@ -276,70 +257,22 @@ async function handleBadgeSelection(ctx) {
 async function sendCongratsMessage(ctx, username, badge, lang) {
   try {
     const message = lang === 'es'
-      ? `🎉 Que chimba papi! Primera insignia desbloqueada.
+      ? `${badge.emoji} Listo ${username}, ya tienes tu primera insignia.
 
-${username} es ${badge.name}
-y oficialmente parte de la familia PNPtv!`
-      : `🎉 Que chimba papi! First badge unlocked.
+Eres ${badge.name} y oficialmente parte de la familia PNPtv!. Aquí ya entraste de verdad.`
+      : `${badge.emoji} Nice ${username} — you just earned your first badge.
 
-${username} is a ${badge.name}
-and officially part of the PNPtv! family.`;
+You're officially a ${badge.name} and now part of the PNPtv! family for real.`;
 
-    // Send to notifications topic (3135)
-    const groupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : ctx.chat.id;
-    await ctx.telegram.sendMessage(groupId, message, {
-      message_thread_id: 3135,
-    });
+    await ctx.reply(message);
 
     logger.info('Congrats message sent', {
       userId: ctx.from.id,
       chatId: ctx.chat.id,
-      topicId: 3135,
       badge: badge.name,
     });
   } catch (error) {
     logger.error('Error sending congrats message:', error);
-  }
-}
-
-/**
- * Send action buttons (Subscribe + Book Call)
- */
-async function sendActionButtons(ctx, lang) {
-  try {
-    const message = lang === 'es'
-      ? `🚀 ¿Quieres más?
-
-Explora todo lo que PNPtv! tiene para ti:`
-      : `🚀 Want more?
-
-Explore everything PNPtv! has for you:`;
-
-    const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(
-        lang === 'es' ? '⭐ Suscríbete a PNPtv! PRIME' : '⭐ Subscribe to PNPtv! PRIME',
-        'group_subscribe_prime'
-      )],
-      [Markup.button.callback(
-        lang === 'es' ? '📲 Reserva una Llamada con Performers' : '📲 Book a Call with Performers',
-        'group_book_call'
-      )],
-    ]);
-
-    // Send to notifications topic (3135)
-    const groupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : ctx.chat.id;
-    await ctx.telegram.sendMessage(groupId, message, {
-      ...keyboard,
-      message_thread_id: 3135,
-    });
-
-    logger.info('Action buttons sent', {
-      chatId: ctx.chat.id,
-      topicId: 3135,
-      language: lang,
-    });
-  } catch (error) {
-    logger.error('Error sending action buttons:', error);
   }
 }
 
@@ -354,22 +287,15 @@ async function sendRulesMenu(ctx, lang) {
       [Markup.button.callback(buttonText, 'group_view_rules')],
     ]);
 
-    // Send to notifications topic (3135)
-    const groupId = process.env.GROUP_ID ? parseInt(process.env.GROUP_ID) : ctx.chat.id;
-    await ctx.telegram.sendMessage(
-      groupId,
+    await ctx.reply(
       lang === 'es'
         ? '📋 Lee las reglas del grupo:'
         : '📋 Check out the group rules:',
-      {
-        ...keyboard,
-        message_thread_id: 3135,
-      }
+      keyboard
     );
 
     logger.info('Rules menu sent', {
       chatId: ctx.chat.id,
-      topicId: 3135,
       language: lang,
     });
   } catch (error) {
@@ -393,20 +319,14 @@ async function handleViewRules(ctx) {
 • Nada de spam
 • Consentimiento siempre
 • No ventas externas
-• No compartas links
-• Cuídate y cuida a los demás
-
-Lista completa de reglas y términos en nuestro sitio.`
+• Cuídate y cuida a los demás`
       : `📘 Quick Rules:
 
 • Respect people
 • No spam
 • Consent always
 • No external selling
-• Do not share links
-• Take care of yourself and others
-
-Full list of rules and terms and conditions on our site.`;
+• Take care of yourself and others`;
 
     // Send rules as a reply or edit the message
     try {
@@ -429,71 +349,6 @@ Full list of rules and terms and conditions on our site.`;
   } catch (error) {
     logger.error('Error handling view rules:', error);
     await ctx.answerCbQuery('Error loading rules. Please try again.');
-  }
-}
-
-/**
- * Handle subscribe button action
- */
-async function handleSubscribeAction(ctx) {
-  try {
-    await ctx.answerCbQuery();
-
-    const userId = ctx.from.id;
-    const user = await UserModel.getById(userId);
-    const lang = user?.language || 'en';
-
-    // Send subscribe command message
-    const message = lang === 'es'
-      ? '⭐ Para suscribirte a PRIME, usa el comando /subscribe'
-      : '⭐ To subscribe to PRIME, use the /subscribe command';
-
-    await ctx.reply(message);
-
-    logger.info('Subscribe action triggered', {
-      userId,
-      chatId: ctx.chat.id,
-    });
-  } catch (error) {
-    logger.error('Error handling subscribe action:', error);
-    await ctx.answerCbQuery('An error occurred. Please try again.');
-  }
-}
-
-/**
- * Handle book call button action
- */
-async function handleBookCallAction(ctx) {
-  try {
-    await ctx.answerCbQuery();
-
-    const userId = ctx.from.id;
-    const user = await UserModel.getById(userId);
-    const lang = user?.language || 'en';
-
-    // Redirect to private chat with the bot
-    const botUsername = ctx.botInfo?.username || 'PNPtvBot';
-    const message = lang === 'es'
-      ? `📲 Para reservar una llamada con performers, abre el chat privado del bot:
-
-👉 @${botUsername}
-
-Luego usa el menú para acceder a las videollamadas.`
-      : `📲 To book a call with performers, open the bot's private chat:
-
-👉 @${botUsername}
-
-Then use the menu to access video calls.`;
-
-    await ctx.reply(message);
-
-    logger.info('Book call action triggered', {
-      userId,
-      chatId: ctx.chat.id,
-    });
-  } catch (error) {
-    logger.error('Error handling book call action:', error);
-    await ctx.answerCbQuery('An error occurred. Please try again.');
   }
 }
 

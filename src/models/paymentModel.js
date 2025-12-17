@@ -2,10 +2,8 @@ const { v4: uuidv4 } = require('uuid');
 const { query } = require('../config/postgres');
 const logger = require('../utils/logger');
 
-const COLLECTION = 'payments';
-
 /**
- * Payment Model - Handles payment transactions
+ * Payment Model - Handles payment transactions (PostgreSQL)
  */
 class PaymentModel {
   /**
@@ -16,41 +14,74 @@ class PaymentModel {
   static async create(paymentData) {
     try {
       const paymentId = paymentData.paymentId || uuidv4();
-      const data = {
-        ...paymentData,
-        status: 'pending',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      const now = new Date();
 
-      // Insert with plan_id and provider
-      await query(
-        `INSERT INTO payments (id, user_id, plan_id, provider, amount, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [
-          paymentId,
-          data.userId,
-          data.planId || null,
-          data.provider || 'epayco',
-          data.amount,
-          data.status,
-          data.createdAt,
-          data.updatedAt
-        ]
-      );
-
-      logger.info('Payment created', {
+      const result = await query(`
+        INSERT INTO payments (
+          id, user_id, plan_id, plan_name, amount, currency, provider,
+          payment_method, status, payment_id, reference, destination_address,
+          payment_url, chain, chain_id, expires_at, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        RETURNING *
+      `, [
         paymentId,
-        userId: paymentData.userId,
-        planId: data.planId,
-        provider: data.provider
-      });
+        paymentData.userId?.toString(),
+        paymentData.planId,
+        paymentData.planName,
+        paymentData.amount || 0,
+        paymentData.currency || 'USD',
+        paymentData.provider,
+        paymentData.paymentMethod,
+        'pending',
+        paymentData.paymentId || paymentId,
+        paymentData.reference,
+        paymentData.destinationAddress,
+        paymentData.paymentUrl,
+        paymentData.chain ? JSON.stringify(paymentData.chain) : null,
+        paymentData.chainId,
+        paymentData.expiresAt,
+        now,
+        now
+      ]);
 
-      return { id: paymentId, ...data };
+      const row = result.rows[0];
+      logger.info('Payment created', { paymentId, userId: paymentData.userId });
+      return this._formatPayment(row);
     } catch (error) {
       logger.error('Error creating payment:', error);
       throw error;
     }
+  }
+
+  /**
+   * Format payment row from DB to expected format
+   */
+  static _formatPayment(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      paymentId: row.payment_id,
+      userId: row.user_id,
+      planId: row.plan_id,
+      planName: row.plan_name,
+      amount: parseFloat(row.amount) || 0,
+      currency: row.currency,
+      provider: row.provider,
+      paymentMethod: row.payment_method,
+      status: row.status,
+      reference: row.reference,
+      destinationAddress: row.destination_address,
+      paymentUrl: row.payment_url,
+      daimoLink: row.daimo_link,
+      chain: row.chain,
+      chainId: row.chain_id,
+      completedAt: row.completed_at,
+      completedBy: row.completed_by,
+      manualCompletion: row.manual_completion,
+      expiresAt: row.expires_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
 
   /**
@@ -60,11 +91,31 @@ class PaymentModel {
    */
   static async getById(paymentId) {
     try {
-      const result = await query('SELECT * FROM payments WHERE id = $1', [paymentId]);
-      if (result.rows.length === 0) {
-        return null;
+      // Check if paymentId is a valid UUID format
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paymentId);
+
+      let result;
+      if (isUuid) {
+        // Query by UUID id (cast to uuid)
+        result = await query(
+          'SELECT * FROM payments WHERE id = $1::uuid',
+          [paymentId]
+        );
+        // If not found by id, try payment_id
+        if (!result.rows[0]) {
+          result = await query(
+            'SELECT * FROM payments WHERE payment_id = $1',
+            [paymentId]
+          );
+        }
+      } else {
+        // Query only by payment_id (non-UUID string)
+        result = await query(
+          'SELECT * FROM payments WHERE payment_id = $1',
+          [paymentId]
+        );
       }
-      return result.rows[0];
+      return this._formatPayment(result.rows[0]);
     } catch (error) {
       logger.error('Error getting payment:', error);
       return null;
@@ -80,24 +131,55 @@ class PaymentModel {
    */
   static async updateStatus(paymentId, status, metadata = {}) {
     try {
-      // Map camelCase to snake_case for database columns
-      const fieldMap = {
-        transactionId: 'payment_id',
-        completedAt: 'completed_at',
-        completedBy: 'completed_by',
-        manualCompletion: 'manual_completion',
-        expiresAt: 'expires_at',
-        epaycoRef: 'reference',
-        paymentReference: 'reference',
-        daimoEventId: 'reference'
-      };
+      const updates = ['status = $1', 'updated_at = $2'];
+      const values = [status, new Date()];
+      let paramIndex = 3;
 
-      const fields = Object.keys(metadata).map(key => fieldMap[key] || key);
-      const values = Object.values(metadata);
-      let setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
-      setClause = `status = $1${setClause ? ', ' + setClause : ''}, updated_at = $${fields.length + 2}`;
-      await query(`UPDATE payments SET ${setClause} WHERE id = $${fields.length + 3}`, [status, ...values, new Date(), paymentId]);
-      logger.info('Payment status updated', { paymentId, status, metadata });
+      if (metadata.completedAt) {
+        updates.push(`completed_at = $${paramIndex++}`);
+        values.push(metadata.completedAt);
+      }
+      if (metadata.completedBy) {
+        updates.push(`completed_by = $${paramIndex++}`);
+        values.push(metadata.completedBy);
+      }
+      if (metadata.manualCompletion !== undefined) {
+        updates.push(`manual_completion = $${paramIndex++}`);
+        values.push(metadata.manualCompletion);
+      }
+      if (metadata.reference) {
+        updates.push(`reference = $${paramIndex++}`);
+        values.push(metadata.reference);
+      }
+      if (metadata.paymentUrl) {
+        updates.push(`payment_url = $${paramIndex++}`);
+        values.push(metadata.paymentUrl);
+      }
+      if (metadata.daimoLink) {
+        updates.push(`daimo_link = $${paramIndex++}`);
+        values.push(metadata.daimoLink);
+      }
+      if (metadata.provider) {
+        updates.push(`provider = $${paramIndex++}`);
+        values.push(metadata.provider);
+      }
+
+      values.push(paymentId);
+
+      // Check if paymentId is a valid UUID format
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paymentId);
+
+      let queryStr;
+      if (isUuid) {
+        // Only query by UUID id (cast to uuid)
+        queryStr = `UPDATE payments SET ${updates.join(', ')} WHERE id = $${paramIndex}::uuid`;
+      } else {
+        queryStr = `UPDATE payments SET ${updates.join(', ')} WHERE payment_id = $${paramIndex}`;
+      }
+
+      await query(queryStr, values);
+
+      logger.info('Payment status updated', { paymentId, status });
       return true;
     } catch (error) {
       logger.error('Error updating payment status:', error);
@@ -117,7 +199,7 @@ class PaymentModel {
         'SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2',
         [userId.toString(), limit]
       );
-      return result.rows;
+      return result.rows.map(row => this._formatPayment(row));
     } catch (error) {
       logger.error('Error getting user payments:', error);
       return [];
@@ -136,7 +218,7 @@ class PaymentModel {
         'SELECT * FROM payments WHERE status = $1 ORDER BY created_at DESC LIMIT $2',
         [status, limit]
       );
-      return result.rows;
+      return result.rows.map(row => this._formatPayment(row));
     } catch (error) {
       logger.error('Error getting payments by status:', error);
       return [];
@@ -152,13 +234,10 @@ class PaymentModel {
   static async getByTransactionId(transactionId, provider) {
     try {
       const result = await query(
-        'SELECT * FROM payments WHERE payment_id = $1 AND provider = $2 LIMIT 1',
+        'SELECT * FROM payments WHERE reference = $1 AND provider = $2 LIMIT 1',
         [transactionId, provider]
       );
-      if (result.rows.length === 0) {
-        return null;
-      }
-      return result.rows[0];
+      return this._formatPayment(result.rows[0]);
     } catch (error) {
       logger.error('Error getting payment by transaction ID:', error);
       return null;
@@ -173,35 +252,58 @@ class PaymentModel {
    */
   static async getRevenue(startDate, endDate) {
     try {
-      const result = await query(
-        'SELECT * FROM payments WHERE status = $1 AND created_at >= $2 AND created_at <= $3',
-        ['success', startDate, endDate]
-      );
+      // Get total and count
+      const statsResult = await query(`
+        SELECT
+          COALESCE(SUM(amount), 0) as total,
+          COUNT(*) as count
+        FROM payments
+        WHERE status = 'success'
+          AND created_at >= $1
+          AND created_at <= $2
+      `, [startDate, endDate]);
 
-      let total = 0;
-      let count = 0;
+      const { total, count } = statsResult.rows[0];
+
+      // Get by plan
+      const byPlanResult = await query(`
+        SELECT plan_id, COUNT(*) as count
+        FROM payments
+        WHERE status = 'success'
+          AND created_at >= $1
+          AND created_at <= $2
+          AND plan_id IS NOT NULL
+        GROUP BY plan_id
+      `, [startDate, endDate]);
+
       const byPlan = {};
-      const byProvider = {};
-
-      result.rows.forEach((payment) => {
-        total += parseFloat(payment.amount) || 0;
-        count += 1;
-
-        // Count by plan
-        if (payment.plan_id) {
-          byPlan[payment.plan_id] = (byPlan[payment.plan_id] || 0) + 1;
-        }
-
-        // Count by provider
-        if (payment.provider) {
-          byProvider[payment.provider] = (byProvider[payment.provider] || 0) + 1;
-        }
+      byPlanResult.rows.forEach(row => {
+        byPlan[row.plan_id] = parseInt(row.count);
       });
 
+      // Get by provider
+      const byProviderResult = await query(`
+        SELECT provider, COUNT(*) as count
+        FROM payments
+        WHERE status = 'success'
+          AND created_at >= $1
+          AND created_at <= $2
+          AND provider IS NOT NULL
+        GROUP BY provider
+      `, [startDate, endDate]);
+
+      const byProvider = {};
+      byProviderResult.rows.forEach(row => {
+        byProvider[row.provider] = parseInt(row.count);
+      });
+
+      const totalNum = parseFloat(total) || 0;
+      const countNum = parseInt(count) || 0;
+
       return {
-        total,
-        count,
-        average: count > 0 ? total / count : 0,
+        total: totalNum,
+        count: countNum,
+        average: countNum > 0 ? totalNum / countNum : 0,
         byPlan,
         byProvider,
       };
@@ -221,37 +323,39 @@ class PaymentModel {
   static async getAll(filters = {}) {
     try {
       const conditions = [];
-      const params = [];
+      const values = [];
       let paramIndex = 1;
 
-      // Apply filters
       if (filters.status) {
         conditions.push(`status = $${paramIndex++}`);
-        params.push(filters.status);
+        values.push(filters.status);
       }
 
       if (filters.provider) {
         conditions.push(`provider = $${paramIndex++}`);
-        params.push(filters.provider);
+        values.push(filters.provider);
       }
 
       if (filters.startDate) {
         conditions.push(`created_at >= $${paramIndex++}`);
-        params.push(filters.startDate);
+        values.push(filters.startDate);
       }
 
       if (filters.endDate) {
         conditions.push(`created_at <= $${paramIndex++}`);
-        params.push(filters.endDate);
+        values.push(filters.endDate);
       }
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
       const limit = filters.limit || 1000;
+      values.push(limit);
 
-      const sql = `SELECT * FROM payments ${whereClause} ORDER BY created_at DESC LIMIT ${limit}`;
-      const result = await query(sql, params);
+      const result = await query(
+        `SELECT * FROM payments ${whereClause} ORDER BY created_at DESC LIMIT $${paramIndex}`,
+        values
+      );
 
-      return result.rows;
+      return result.rows.map(row => this._formatPayment(row));
     } catch (error) {
       logger.error('Error getting all payments:', error);
       return [];

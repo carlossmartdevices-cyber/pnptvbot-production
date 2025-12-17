@@ -21,9 +21,9 @@ class ChatCleanupService {
   static botMessagesByChat = new Map();
 
   /**
-   * Cleanup delay in milliseconds (3 minutes - GROUP BEHAVIOR OVERRIDE)
+   * Cleanup delay in milliseconds (5 minutes)
    */
-  static CLEANUP_DELAY = 3 * 60 * 1000; // 3 minutes
+  static CLEANUP_DELAY = 5 * 60 * 1000; // 5 minutes
 
   /**
    * Maximum number of messages to track per chat (prevent memory leaks)

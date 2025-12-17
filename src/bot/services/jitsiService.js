@@ -1,6 +1,7 @@
 const JitsiRoomModel = require('../../models/jitsiRoomModel');
 const User = require('../../models/userModel');
 const logger = require('../../utils/logger');
+const PermissionService = require('./permissionService');
 
 /**
  * Jitsi Service
@@ -41,10 +42,15 @@ class JitsiService {
     // Plan tier mapping
     static PLAN_TIER_MAP = {
         'trial_week': 'Basic',
+        'trial-week': 'Basic',
         'pnp_member': 'PNP',
+        'pnp-member': 'PNP',
         'crystal_member': 'Crystal',
+        'crystal-member': 'Crystal',
         'diamond_member': 'Diamond',
-        'lifetime_pass': 'Premium'
+        'diamond-member': 'Diamond',
+        'lifetime_pass': 'Premium',
+        'lifetime-pass': 'Premium'
     };
 
     /**
@@ -120,13 +126,19 @@ class JitsiService {
 
     /**
      * Get user's plan tier
+     * Admins get Premium tier regardless of subscription
      */
     static getPlanTier(user) {
-        if (user.subscription_status !== 'active' && user.subscription_status !== 'trial') {
+        // Admins always get Premium tier
+        if (user.telegramId && (PermissionService.isEnvSuperAdmin(user.telegramId) || PermissionService.isEnvAdmin(user.telegramId))) {
+            return 'Premium';
+        }
+        
+        if (user.subscriptionStatus !== 'active' && user.subscriptionStatus !== 'trial') {
             return null;
         }
 
-        const planId = user.plan_id || 'trial_week';
+        const planId = user.planId || 'trial_week';
         return this.PLAN_TIER_MAP[planId] || 'Basic';
     }
 
@@ -141,9 +153,15 @@ class JitsiService {
         const params = new URLSearchParams();
 
         if (room.settings) {
-            const settings = typeof room.settings === 'string'
-                ? JSON.parse(room.settings)
-                : room.settings;
+            let settings;
+            try {
+                settings = typeof room.settings === 'string'
+                    ? JSON.parse(room.settings)
+                    : room.settings;
+            } catch (err) {
+                logger.warn('Error parsing Jitsi room settings:', err);
+                settings = {};
+            }
 
             if (settings.start_with_audio_muted) {
                 params.append('config.startWithAudioMuted', 'true');
@@ -212,8 +230,24 @@ class JitsiService {
 
     /**
      * Get available tiers for a user based on their plan
+     * Admins get all tiers with unlimited usage
      */
     static async getAvailableTiers(userId) {
+        // Admins get all tiers with unlimited usage
+        if (PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId)) {
+            return Object.keys(this.TIER_INFO).map(tier => ({
+                tier,
+                info: this.TIER_INFO[tier],
+                maxRoomsPerDay: 999,
+                roomsUsed: 0,
+                roomsRemaining: 999,
+                maxDuration: 999,
+                canRecord: true,
+                canSetPassword: true,
+                canCreatePrivate: true
+            }));
+        }
+        
         const user = await User.getById(userId);
         if (!user) {
             return [];
@@ -248,12 +282,18 @@ class JitsiService {
 
     /**
      * Check if user has premium access
+     * Admins always have premium access
      */
     static async hasPremiumAccess(userId) {
+        // Admins always have premium access
+        if (PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId)) {
+            return true;
+        }
+        
         const user = await User.getById(userId);
         if (!user) return false;
 
-        return user.subscription_status === 'active' || user.subscription_status === 'trial';
+        return user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
     }
 
     /**
