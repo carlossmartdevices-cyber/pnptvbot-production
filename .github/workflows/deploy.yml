@@ -1,4 +1,6 @@
 name: Deploy to server (PM2)
+permissions:
+  contents: read
 
 on:
   workflow_dispatch:
