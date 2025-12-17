@@ -14,39 +14,37 @@ class PaymentModel {
   static async create(paymentData) {
     try {
       const paymentId = paymentData.paymentId || uuidv4();
-      const now = new Date();
+      const data = {
+        ...paymentData,
+        status: 'pending',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
 
-      const result = await query(`
-        INSERT INTO payments (
-          id, user_id, plan_id, plan_name, amount, currency, provider,
-          payment_method, status, payment_id, reference, destination_address,
-          payment_url, chain, chain_id, expires_at, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-        RETURNING *
-      `, [
+      // Insert with plan_id and provider
+      await query(
+        `INSERT INTO payments (id, user_id, plan_id, provider, amount, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          paymentId,
+          data.userId,
+          data.planId || null,
+          data.provider || 'epayco',
+          data.amount,
+          data.status,
+          data.createdAt,
+          data.updatedAt
+        ]
+      );
+
+      logger.info('Payment created', {
         paymentId,
-        paymentData.userId?.toString(),
-        paymentData.planId,
-        paymentData.planName,
-        paymentData.amount || 0,
-        paymentData.currency || 'USD',
-        paymentData.provider,
-        paymentData.paymentMethod,
-        'pending',
-        paymentData.paymentId || paymentId,
-        paymentData.reference,
-        paymentData.destinationAddress,
-        paymentData.paymentUrl,
-        paymentData.chain ? JSON.stringify(paymentData.chain) : null,
-        paymentData.chainId,
-        paymentData.expiresAt,
-        now,
-        now
-      ]);
+        userId: paymentData.userId,
+        planId: data.planId,
+        provider: data.provider
+      });
 
-      const row = result.rows[0];
-      logger.info('Payment created', { paymentId, userId: paymentData.userId });
-      return this._formatPayment(row);
+      return { id: paymentId, ...data };
     } catch (error) {
       logger.error('Error creating payment:', error);
       throw error;

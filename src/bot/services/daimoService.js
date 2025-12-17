@@ -38,94 +38,56 @@ class DaimoService {
   }
 
   /**
-   * Generate payment link for Daimo Pay using the API
+   * Generate payment link for Daimo Pay
    * @param {Object} options - Payment options
    * @param {string} options.userId - Telegram user ID
    * @param {string} options.chatId - Telegram chat ID
    * @param {string} options.planId - Plan ID
    * @param {number} options.amount - Amount in USD (will be converted to USDC)
    * @param {string} options.paymentId - Payment record ID
-   * @returns {Promise<string>} Payment link
+   * @returns {string} Payment link
    */
-  async generatePaymentLink({ userId, chatId, planId, amount, paymentId }) {
+  generatePaymentLink({ userId, chatId, planId, amount, paymentId }) {
     try {
       if (!this.treasuryAddress || !this.refundAddress) {
         logger.error('Daimo addresses not configured');
         throw new Error('Daimo payment system not configured');
       }
 
-      if (!this.apiKey) {
-        logger.error('Daimo API key not configured');
-        throw new Error('Daimo API key not configured');
-      }
+      // Convert amount to USDC units (6 decimals for USDC)
+      const amountInUSDC = (parseFloat(amount) * 1000000).toString(); // e.g., 10.00 USD = 10000000 USDC units
 
-      // Convert amount to USDC units string with decimals (e.g., "24.99" for $24.99)
-      const amountUnits = parseFloat(amount).toFixed(2);
-
-      // Create payment via Daimo Pay API
-      // Note: paymentOptions goes in display object per API docs
-      const requestBody = {
-        display: {
-          intent: 'Pay PNPtv Subscription',
-          paymentOptions: this.supportedPaymentApps, // ['Venmo', 'CashApp', 'Zelle', 'Revolut', 'Wise']
-        },
-        destination: {
-          destinationAddress: this.treasuryAddress,
-          chainId: this.chain.id,
-          tokenAddress: this.chain.token,
-          amountUnits: amountUnits,
-        },
+      // Create payment intent
+      const paymentIntent = {
+        toAddress: this.treasuryAddress,
+        toChain: this.chain.id,
+        toToken: this.chain.token,
+        toUnits: amountInUSDC,
+        intent: 'Pay PNPtv Subscription',
         refundAddress: this.refundAddress,
         metadata: {
-          userId: String(userId),
-          chatId: String(chatId),
-          planId: String(planId),
-          paymentId: String(paymentId),
-          timestamp: String(Date.now()),
+          userId,
+          chatId,
+          planId,
+          paymentId,
+          timestamp: Date.now(),
         },
+        paymentOptions: this.supportedPaymentApps,
       };
 
-      logger.info('Creating Daimo payment via API', {
+      // Generate payment URL
+      const encodedIntent = encodeURIComponent(JSON.stringify(paymentIntent));
+      const paymentUrl = `https://pay.daimo.com/pay?intent=${encodedIntent}`;
+
+      logger.info('Daimo payment link generated', {
         paymentId,
         userId,
         amount,
-        amountUnits,
+        amountInUSDC,
         chain: this.chain.name,
       });
 
-      const response = await fetch('https://pay.daimo.com/api/payment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Api-Key': this.apiKey,
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        logger.error('Daimo API error', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorText,
-        });
-        throw new Error(`Daimo API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.url) {
-        logger.error('Daimo API response missing URL', { data });
-        throw new Error('Daimo API response missing payment URL');
-      }
-
-      logger.info('Daimo payment created successfully', {
-        paymentId,
-        daimoPaymentId: data.id,
-        url: data.url,
-      });
-
-      return data.url;
+      return paymentUrl;
     } catch (error) {
       logger.error('Error generating Daimo payment link:', {
         error: error.message,

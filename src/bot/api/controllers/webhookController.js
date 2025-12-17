@@ -120,6 +120,8 @@ const handleEpaycoWebhook = async (req, res) => {
  * @param {Response} res - Express response
  */
 const handleDaimoWebhook = async (req, res) => {
+  const DaimoService = require('../../services/daimoService');
+
   try {
     const {
       id, status, source, metadata,
@@ -134,6 +136,18 @@ const handleDaimoWebhook = async (req, res) => {
       chain: 'Optimism',
       token: source?.tokenSymbol || 'USDC',
     });
+
+    // Verify webhook signature
+    const signature = req.headers['x-daimo-signature'];
+    const isValidSignature = DaimoService.verifyWebhookSignature(req.body, signature);
+
+    if (!isValidSignature) {
+      logger.error('Invalid Daimo webhook signature', {
+        eventId: id,
+        hasSignature: !!signature,
+      });
+      return res.status(401).json({ success: false, error: 'Invalid signature' });
+    }
 
     // Validate payload structure
     const validation = validateDaimoPayload(req.body);

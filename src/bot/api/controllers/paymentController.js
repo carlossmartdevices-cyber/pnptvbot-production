@@ -1,7 +1,6 @@
 const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
 const logger = require('../../../utils/logger');
-const PayPalService = require('../../services/paypalService');
 
 /**
  * Payment Controller - Handles payment-related API endpoints
@@ -69,20 +68,6 @@ class PaymentController {
 
       // Handle both camelCase and snake_case from payment
       const userId = payment.userId || payment.user_id;
-      const provider = payment.provider || 'epayco';
-
-      // Daimo config
-      const daimoConfig = {
-        toAddress: process.env.DAIMO_TREASURY_ADDRESS,
-        toChain: 10, // Optimism
-        toToken: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85', // USDC on Optimism
-        toUnits: (parseFloat(plan.price) * 1000000).toString(), // USDC has 6 decimals
-        metadata: {
-          paymentId: payment.id,
-          userId,
-          planId,
-        },
-      };
 
       const responseData = {
         success: true,
@@ -92,7 +77,6 @@ class PaymentController {
           userId,
           planId,
           status: payment.status,
-          provider,
           amountUSD: parseFloat(plan.price),
           amountCOP: priceInCOP,
           plan: {
@@ -104,15 +88,10 @@ class PaymentController {
             duration: plan.duration || 30,
             features: plan.features || [],
           },
-          // ePayco config
           epaycoPublicKey,
           testMode: epaycoTestMode,
           confirmationUrl: `${webhookDomain}/api/webhooks/epayco`,
           responseUrl: `${webhookDomain}/api/payment-response`,
-          // Daimo config
-          daimoConfig,
-          paymentUrl: payment.paymentUrl || null,
-          daimoLink: payment.daimoLink || payment.daimo_link || null,
         },
       };
 
@@ -133,142 +112,6 @@ class PaymentController {
       res.status(500).json({
         success: false,
         error: 'Error al cargar la información del pago. Por favor, intenta nuevamente.',
-      });
-    }
-  }
-
-  /**
-   * Create PayPal order
-   * POST /api/paypal/create-order
-   */
-  static async createPayPalOrder(req, res) {
-    try {
-      const { paymentId } = req.body;
-
-      if (!paymentId) {
-        return res.status(400).json({
-          success: false,
-          error: 'Payment ID is required',
-        });
-      }
-
-      // Get payment from database
-      const payment = await PaymentModel.getById(paymentId);
-
-      if (!payment) {
-        logger.warn('Payment not found', { paymentId });
-        return res.status(404).json({
-          success: false,
-          error: 'Payment not found',
-        });
-      }
-
-      // Get plan information
-      const planId = payment.planId || payment.plan_id;
-      const plan = await PlanModel.getById(planId);
-
-      if (!plan) {
-        logger.error('Plan not found for payment', { paymentId, planId });
-        return res.status(404).json({
-          success: false,
-          error: 'Plan not found',
-        });
-      }
-
-      // Create PayPal order
-      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
-      const returnUrl = `${webhookDomain}/api/payment-response?status=success`;
-      const cancelUrl = `${webhookDomain}/api/payment-response?status=cancelled`;
-
-      const result = await PayPalService.createOrder({
-        paymentId: payment.id,
-        amount: plan.price,
-        planName: plan.display_name || plan.name,
-        returnUrl,
-        cancelUrl,
-      });
-
-      if (result.success) {
-        // Update payment with PayPal order ID
-        await PaymentModel.updateStatus(payment.id, 'pending', {
-          orderId: result.orderId,
-        });
-
-        logger.info('PayPal order created', {
-          paymentId: payment.id,
-          orderId: result.orderId,
-        });
-
-        return res.json({
-          success: true,
-          orderId: result.orderId,
-          approvalUrl: result.approvalUrl,
-        });
-      }
-
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to create PayPal order',
-      });
-    } catch (error) {
-      logger.error('Error creating PayPal order:', {
-        error: error.message,
-        stack: error.stack,
-      });
-
-      res.status(500).json({
-        success: false,
-        error: 'Error creating PayPal order',
-      });
-    }
-  }
-
-  /**
-   * Capture PayPal order
-   * POST /api/paypal/capture-order
-   */
-  static async capturePayPalOrder(req, res) {
-    try {
-      const { orderId, paymentId } = req.body;
-
-      if (!orderId || !paymentId) {
-        return res.status(400).json({
-          success: false,
-          error: 'Order ID and Payment ID are required',
-        });
-      }
-
-      // Capture the order
-      const result = await PayPalService.captureOrder(orderId);
-
-      if (result.success && result.status === 'COMPLETED') {
-        logger.info('PayPal order captured', {
-          orderId,
-          paymentId,
-          captureId: result.captureId,
-        });
-
-        return res.json({
-          success: true,
-          orderId: result.orderId,
-          captureId: result.captureId,
-          botUsername: process.env.BOT_USERNAME || 'pnptvbot',
-        });
-      }
-
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to capture PayPal payment',
-      });
-    } catch (error) {
-      logger.error('Error capturing PayPal order:', {
-        error: error.message,
-        stack: error.stack,
-      });
-
-      res.status(500).json({
-        success: false,
-        error: 'Error capturing PayPal payment',
       });
     }
   }

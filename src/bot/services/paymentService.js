@@ -5,125 +5,137 @@ const PlanModel = require('../../models/planModel');
 const UserModel = require('../../models/userModel');
 const { cache } = require('../../config/redis');
 const logger = require('../../utils/logger');
-const DaimoService = require('./daimoService');
-const PayPalService = require('./paypalService');
-
-/**
- * Send payment notification to support group
- * @param {string} userId - Telegram user ID
- * @param {string} planName - Name of the plan
- * @param {number} amount - Payment amount
- * @param {string} provider - Payment provider (epayco, daimo, etc.)
- * @param {string} source - Source description
- * @returns {Promise<boolean>} Success status
- */
-async function sendPaymentNotification(userId, planName, amount, provider = 'unknown', source = 'system') {
-  try {
-    const { getBotInstance } = require('../core/bot');
-    const bot = getBotInstance();
-
-    if (!bot) {
-      logger.warn('Bot instance not available for payment notification', { userId, source });
-      return false;
-    }
-
-    const supportGroupId = process.env.SUPPORT_GROUP_ID || '-1003365565562';
-    const user = await UserModel.getById(userId);
-    const userName = user?.firstName || user?.username || 'Unknown';
-    const userHandle = user?.username ? `@${user.username}` : `ID: ${userId}`;
-
-    const message = [
-      '💰 *PAGO COMPLETADO*',
-      '',
-      `👤 *Usuario:* ${userName}`,
-      `🆔 *Telegram:* ${userHandle}`,
-      `📦 *Plan:* ${planName}`,
-      `💵 *Monto:* $${parseFloat(amount).toFixed(2)}`,
-      `🏦 *Proveedor:* ${provider}`,
-      `📅 *Fecha:* ${new Date().toLocaleString('es-ES')}`,
-      '',
-      '✅ Usuario activado y enlace PRIME enviado.'
-    ].join('\n');
-
-    await bot.telegram.sendMessage(supportGroupId, message, { parse_mode: 'Markdown' });
-    logger.info('Payment notification sent to support group', { userId, planName, amount, provider });
-    return true;
-  } catch (error) {
-    logger.error('Error sending payment notification', { userId, planName, error: error.message });
-    return false;
-  }
-}
-
-/**
- * Send PRIME confirmation message with unique invite link
- * @param {string} userId - Telegram user ID
- * @param {string} planName - Name of the plan
- * @param {Date|null} expiry - Expiry date (null for lifetime)
- * @param {string} source - Source of the subscription change (e.g., 'epayco', 'admin', 'daimo')
- * @returns {Promise<boolean>} Success status
- */
-async function sendPrimeConfirmation(userId, planName, expiry, source = 'system') {
-  try {
-    const { getBotInstance } = require('../core/bot');
-    const bot = getBotInstance();
-
-    if (!bot) {
-      logger.warn('Bot instance not available for PRIME confirmation', { userId, source });
-      return false;
-    }
-
-    const primeChannelId = process.env.PRIME_CHANNEL_ID || '-1002997324714';
-    const user = await UserModel.getById(userId);
-    const userName = user?.firstName || user?.username || 'Usuario';
-
-    // Format expiry date
-    let expiryText;
-    if (expiry === null) {
-      expiryText = 'Lifetime (sin vencimiento)';
-    } else {
-      const expiryDate = new Date(expiry);
-      expiryText = expiryDate.toLocaleDateString('es-ES', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      });
-    }
-
-    // Create one-time use invite link
-    const inviteLink = await bot.telegram.createChatInviteLink(primeChannelId, {
-      member_limit: 1,
-      name: `${planName} - User ${userId}`,
-      expire_date: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) // 7 days
-    });
-
-    // Send confirmation message
-    const message = [
-      `🎉 *¡Bienvenido a PNPtv PRIME, ${userName}!*`,
-      '',
-      `✅ Tu suscripción al plan *${planName}* ha sido activada exitosamente.`,
-      '',
-      `📋 *Detalles de tu suscripción:*`,
-      `• Plan: ${planName}`,
-      `• Vence: ${expiryText}`,
-      '',
-      `🔐 *Accede al canal exclusivo PRIME:*`,
-      `👉 [Ingresar a PRIME](${inviteLink.invite_link})`,
-      '',
-      `⚠️ *Importante:* Este enlace es de un solo uso y expira en 7 días.`,
-      '',
-      `💎 ¡Gracias por confiar en PNPtv! Disfruta todos los beneficios exclusivos.`
-    ].join('\n');
-
-    await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown' });
-    logger.info('PRIME confirmation message sent', { userId, planName, source, inviteLink: inviteLink.invite_link });
-    return true;
-  } catch (error) {
-    logger.error('Error sending PRIME confirmation message', { userId, planName, source, error: error.message });
-    return false;
-  }
-}
+const crypto = require('crypto');
+const { Telegraf } = require('telegraf');
 
 class PaymentService {
+    /**
+     * Send payment confirmation notification to user via Telegram bot
+     * Includes purchase details and unique invite link to PRIME channel
+     * @param {Object} params - Notification parameters
+     * @param {string} params.userId - Telegram user ID
+     * @param {Object} params.plan - Plan object
+     * @param {string} params.transactionId - Transaction/reference ID
+     * @param {number} params.amount - Payment amount
+     * @param {Date} params.expiryDate - Subscription expiry date
+     * @param {string} params.language - User language ('es' or 'en')
+     * @returns {Promise<boolean>} Success status
+     */
+    static async sendPaymentConfirmationNotification({
+      userId, plan, transactionId, amount, expiryDate, language = 'es',
+    }) {
+      try {
+        const bot = new Telegraf(process.env.BOT_TOKEN);
+        const groupId = process.env.GROUP_ID || '-1003159260496'; // PRIME channel ID
+
+        // Create unique invite link for PRIME channel
+        let inviteLink = '';
+        try {
+          const response = await bot.telegram.createChatInviteLink(groupId, {
+            member_limit: 1, // Single use
+            name: `Subscription ${transactionId}`,
+          });
+          inviteLink = response.invite_link;
+          logger.info('Unique PRIME channel invite link created', {
+            userId,
+            transactionId,
+            inviteLink,
+          });
+        } catch (linkError) {
+          logger.error('Error creating invite link, using fallback', {
+            error: linkError.message,
+            userId,
+          });
+          // Fallback: try to create a regular link
+          try {
+            const fallbackResponse = await bot.telegram.createChatInviteLink(groupId);
+            inviteLink = fallbackResponse.invite_link;
+          } catch (fallbackError) {
+            logger.error('Fallback invite link also failed', {
+              error: fallbackError.message,
+            });
+            inviteLink = 'https://t.me/PNPTV_PRIME'; // Ultimate fallback
+          }
+        }
+
+        // Format expiry date
+        const expiryDateStr = expiryDate
+          ? expiryDate.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })
+          : (language === 'es' ? 'Sin vencimiento (Lifetime)' : 'No expiration (Lifetime)');
+
+        // Build message in user's language
+        const messageEs = [
+          '🎉 *¡Pago Confirmado!*',
+          '',
+          '✅ Tu suscripción ha sido activada exitosamente.',
+          '',
+          '📋 *Detalles de la Compra:*',
+          `💎 Plan: ${plan.display_name || plan.name}`,
+          `💵 Monto: $${amount.toFixed(2)} USD`,
+          `📅 Válido hasta: ${expiryDateStr}`,
+          `🔖 ID de Transacción: ${transactionId}`,
+          '',
+          '🌟 *¡Bienvenido a PRIME!*',
+          '',
+          '👉 Accede al canal exclusivo aquí:',
+          `[🔗 Ingresar a PRIME](${inviteLink})`,
+          '',
+          '💎 Disfruta de todo el contenido premium y beneficios exclusivos.',
+          '',
+          '¡Gracias por tu suscripción! 🙏',
+        ].join('\n');
+
+        const messageEn = [
+          '🎉 *Payment Confirmed!*',
+          '',
+          '✅ Your subscription has been activated successfully.',
+          '',
+          '📋 *Purchase Details:*',
+          `💎 Plan: ${plan.display_name || plan.name}`,
+          `💵 Amount: $${amount.toFixed(2)} USD`,
+          `📅 Valid until: ${expiryDateStr}`,
+          `🔖 Transaction ID: ${transactionId}`,
+          '',
+          '🌟 *Welcome to PRIME!*',
+          '',
+          '👉 Access the exclusive channel here:',
+          `[🔗 Join PRIME](${inviteLink})`,
+          '',
+          '💎 Enjoy all premium content and exclusive benefits.',
+          '',
+          'Thank you for your subscription! 🙏',
+        ].join('\n');
+
+        const message = language === 'es' ? messageEs : messageEn;
+
+        // Send notification
+        await bot.telegram.sendMessage(userId, message, {
+          parse_mode: 'Markdown',
+          disable_web_page_preview: false,
+        });
+
+        logger.info('Payment confirmation notification sent', {
+          userId,
+          planId: plan.id,
+          transactionId,
+          language,
+        });
+
+        return true;
+      } catch (error) {
+        logger.error('Error sending payment confirmation notification:', {
+          userId,
+          error: error.message,
+          stack: error.stack,
+        });
+        return false;
+      }
+    }
+
     /**
      * Reintentar pago fallido (simulado)
      * @param {string} paymentId
@@ -286,10 +298,8 @@ class PaymentService {
     return expected === signature;
   }
 
-  // Verify signature for Daimo
-  static verifyDaimoSignature(webhookData, signatureFromHeader = null) {
-    // Try signature from header first, then from body
-    const signature = signatureFromHeader || webhookData.signature;
+      // Check if payment exists
+      const payment = paymentId ? await PaymentModel.getById(paymentId) : null;
 
     const secret = process.env.DAIMO_WEBHOOK_SECRET;
     if (!secret) {
@@ -342,48 +352,134 @@ class PaymentService {
     throw lastErr;
   }
 
-  // Process ePayco webhook payload (lightweight for tests)
-  static async processEpaycoWebhook(body) {
-    try {
-      // ePayco sends data in x_ prefixed fields
-      const txId = body.x_ref_payco || body.data?.id || body?.transactionId || null;
-      const paymentId = body.x_extra3; // We store our payment ID in x_extra3
-      const userId = body.x_extra1;
-      const planId = body.x_extra2;
-      const transactionState = body.x_transaction_state || body.x_respuesta;
-      const provider = 'epayco';
+      // Process based on transaction state
+      if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
+        // Payment successful
+        if (payment) {
+          await PaymentModel.updateStatus(paymentId, 'completed', {
+            transaction_id: x_transaction_id,
+            approval_code: x_approval_code,
+            epayco_ref: x_ref_payco,
+          });
+        }
 
-      logger.info('Processing ePayco webhook', { txId, paymentId, userId, planId, transactionState });
+        // Activate user subscription
+        if (userId && planId) {
+          const plan = await PlanModel.getById(planId);
+          if (plan) {
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
 
-      // Only process approved/accepted transactions
-      const approvedStates = ['Aceptada', 'Aprobada', 'Approved', 'Accepted'];
-      if (!approvedStates.includes(transactionState)) {
-        logger.info('ePayco transaction not approved', { transactionState });
-        return { success: true }; // Return success to stop retries for non-approved
-      }
+            await UserModel.updateSubscription(userId, {
+              status: 'active',
+              planId,
+              expiry: expiryDate,
+            });
 
-      // Try to find payment by our payment ID first, then by transaction ID
-      let payment = paymentId ? await PaymentModel.getById(paymentId) : null;
-      if (!payment && txId) {
-        payment = await PaymentModel.getByTransactionId(txId, provider);
-      }
+            logger.info('User subscription activated via webhook', {
+              userId,
+              planId,
+              expiryDate,
+              refPayco: x_ref_payco,
+            });
+
+            // Send payment confirmation notification via bot (with PRIME channel link)
+            const user = await UserModel.getById(userId);
+            const userLanguage = user?.language || 'es';
+            try {
+              await this.sendPaymentConfirmationNotification({
+                userId,
+                plan,
+                transactionId: x_ref_payco,
+                amount: parseFloat(x_amount),
+                expiryDate,
+                language: userLanguage,
+              });
+            } catch (notifError) {
+              logger.error('Error sending payment confirmation notification (non-critical):', {
+                error: notifError.message,
+                userId,
+              });
+            }
+          }
+        }
 
       if (!payment) {
         logger.warn('Payment not found for ePayco webhook', { txId, paymentId });
         return { success: false, error: 'Payment not found' };
       }
 
-      // Check if already completed (idempotency)
-      if (payment.status === 'completed' || payment.status === 'success') {
-        logger.info('Payment already completed, skipping', { paymentId, txId });
-        return { success: true };
-      }
+        // Send both emails after successful payment
+        if (x_customer_email && userId && planId) {
+          const plan = await PlanModel.getById(planId);
+          const user = await UserModel.getById(userId);
 
-      // Update payment status
-      await PaymentModel.updateStatus(payment.id || payment.paymentId, 'completed', {
-        reference: txId,
-        completedAt: new Date(),
-      });
+          if (plan) {
+            // Get user language (from user record or default to Spanish)
+            const userLanguage = user?.language || 'es';
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
+
+            // 1. Send invoice email from easybots.store
+            try {
+              const invoiceEmailResult = await EmailService.sendInvoiceEmail({
+                to: x_customer_email,
+                customerName: x_customer_name || user?.first_name || 'Valued Customer',
+                invoiceNumber: x_ref_payco,
+                amount: parseFloat(x_amount),
+                planName: plan.display_name || plan.name,
+                invoicePdf: null, // PDF generation can be added later if needed
+              });
+
+              if (invoiceEmailResult.success) {
+                logger.info('Invoice email sent successfully', {
+                  to: x_customer_email,
+                  refPayco: x_ref_payco,
+                });
+              }
+            } catch (emailError) {
+              logger.error('Error sending invoice email (non-critical):', {
+                error: emailError.message,
+                refPayco: x_ref_payco,
+              });
+            }
+
+            // 2. Send welcome email from pnptv.app
+            try {
+              const welcomeEmailResult = await EmailService.sendWelcomeEmail({
+                to: x_customer_email,
+                customerName: x_customer_name || user?.first_name || 'Valued Customer',
+                planName: plan.display_name || plan.name,
+                duration: plan.duration,
+                expiryDate,
+                language: userLanguage,
+              });
+
+              if (welcomeEmailResult.success) {
+                logger.info('Welcome email sent successfully', {
+                  to: x_customer_email,
+                  planId,
+                  language: userLanguage,
+                });
+              }
+            } catch (emailError) {
+              logger.error('Error sending welcome email (non-critical):', {
+                error: emailError.message,
+                refPayco: x_ref_payco,
+              });
+            }
+          }
+        }
+
+        return { success: true };
+      } else if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Fallida') {
+        // Payment failed
+        if (payment) {
+          await PaymentModel.updateStatus(paymentId, 'failed', {
+            transaction_id: x_transaction_id,
+            epayco_ref: x_ref_payco,
+          });
+        }
 
       // Activate user subscription and send confirmation
       if (userId && planId) {
@@ -398,7 +494,15 @@ class PaymentService {
           expiry: expiry
         });
 
-        logger.info('User subscription activated via ePayco', { userId, planId, expiry });
+        return { success: true }; // Return success to acknowledge webhook
+      } else if (x_transaction_state === 'Pendiente') {
+        // Payment pending
+        if (payment) {
+          await PaymentModel.updateStatus(paymentId, 'pending', {
+            transaction_id: x_transaction_id,
+            epayco_ref: x_ref_payco,
+          });
+        }
 
         // Send confirmation message with PRIME invite link
         await sendPrimeConfirmation(userId, planName, expiry, 'epayco');
@@ -415,36 +519,48 @@ class PaymentService {
     }
   }
 
-  // Process Daimo webhook payload (lightweight for tests)
-  static async processDaimoWebhook(body, signatureFromHeader = null) {
+  /**
+   * Process Daimo webhook confirmation
+   * @param {Object} webhookData - Daimo webhook data
+   * @returns {Object} { success: boolean, error?: string, alreadyProcessed?: boolean }
+   */
+  static async processDaimoWebhook(webhookData) {
+    const DaimoService = require('./daimoService');
+
     try {
       // Verify signature (pass header signature if available)
       if (!this.verifyDaimoSignature(body, signatureFromHeader)) {
         return { success: false, error: 'Invalid signature' };
       }
 
-      // Metadata should contain paymentId, userId and planId
-      const metadata = body.metadata || {};
-      const paymentId = metadata.paymentId;
-      const userId = metadata.userId;
-      const planId = metadata.planId;
+      const userId = metadata?.userId;
+      const planId = metadata?.planId;
+      const paymentId = metadata?.paymentId;
+      const chatId = metadata?.chatId;
 
       if (!paymentId || !userId || !planId) {
         return { success: false, error: 'Missing required fields' };
       }
 
-      // Idempotency lock
-      const lockKey = `processing:payment:${paymentId}`;
-      const acquired = await cache.acquireLock(lockKey);
-      if (!acquired) {
-        return { success: false, error: `Already processing ${paymentId}` };
+      // Check if already processed (idempotency)
+      if (paymentId) {
+        const payment = await PaymentModel.getById(paymentId);
+        if (payment && payment.status === 'completed') {
+          logger.info('Daimo payment already processed', { paymentId, eventId: id });
+          return { success: true, alreadyProcessed: true };
+        }
       }
 
-      try {
-        const payment = await PaymentModel.getById(paymentId);
-        if (!payment) {
-          await cache.releaseLock(lockKey);
-          return { success: false, error: 'Payment not found' };
+      // Process based on status
+      if (status === 'payment_completed') {
+        // Payment successful
+        if (paymentId) {
+          await PaymentModel.updateStatus(paymentId, 'completed', {
+            transaction_id: source?.txHash || id,
+            daimo_event_id: id,
+            payer_address: source?.payerAddress,
+            chain_id: source?.chainId,
+          });
         }
 
         // Check if already completed (idempotency)
@@ -456,18 +572,148 @@ class PaymentService {
 
         // Update user subscription
         const plan = await PlanModel.getById(planId);
-        const expiry = new Date(Date.now() + ((plan && plan.duration) || 30) * 24 * 60 * 60 * 1000);
-        const planName = plan?.name || planId;
+        const user = await UserModel.getById(userId);
 
-        await UserModel.updateSubscription(userId, { status: 'active', planId, expiry });
+        if (plan) {
+          const expiryDate = new Date();
+          expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
 
-        // Mark payment as success
-        await PaymentModel.updateStatus(paymentId, 'success', { transactionId: body.transaction_id, completedAt: new Date() });
+          await UserModel.updateSubscription(userId, {
+            status: 'active',
+            planId,
+            expiry: expiryDate,
+          });
+
+          logger.info('User subscription activated via Daimo webhook', {
+            userId,
+            planId,
+            expiryDate,
+            txHash: source?.txHash,
+          });
+
+          // Send payment confirmation notification via bot (with PRIME channel link)
+          const userLanguage = user?.language || 'es';
+          const DaimoService = require('./daimoService');
+          const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
+          try {
+            await this.sendPaymentConfirmationNotification({
+              userId,
+              plan,
+              transactionId: source?.txHash || id,
+              amount: amountUSD,
+              expiryDate,
+              language: userLanguage,
+            });
+          } catch (notifError) {
+            logger.error('Error sending payment confirmation notification (non-critical):', {
+              error: notifError.message,
+              userId,
+            });
+          }
+
+          // Get customer email from user record or subscriber record
+          let customerEmail = user?.email;
+          if (!customerEmail) {
+            // Try to get from subscriber by telegram ID
+            try {
+              const subscriber = await SubscriberModel.getByTelegramId(userId);
+              customerEmail = subscriber?.email;
+            } catch (e) {
+              logger.warn('Could not find subscriber email', { userId });
+            }
+          }
+
+          // Send both emails if we have an email
+          if (customerEmail) {
+            const userLanguage = user?.language || 'es';
+            const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
+
+            // 1. Send invoice email from easybots.store
+            try {
+              const invoiceEmailResult = await EmailService.sendInvoiceEmail({
+                to: customerEmail,
+                customerName: user?.first_name || user?.username || 'Valued Customer',
+                invoiceNumber: source?.txHash || id,
+                amount: amountUSD,
+                planName: plan.display_name || plan.name,
+                invoicePdf: null,
+              });
+
+              if (invoiceEmailResult.success) {
+                logger.info('Invoice email sent successfully (Daimo)', {
+                  to: customerEmail,
+                  txHash: source?.txHash,
+                });
+              }
+            } catch (emailError) {
+              logger.error('Error sending invoice email (non-critical):', {
+                error: emailError.message,
+                eventId: id,
+              });
+            }
+
+            // 2. Send welcome email from pnptv.app
+            try {
+              const welcomeEmailResult = await EmailService.sendWelcomeEmail({
+                to: customerEmail,
+                customerName: user?.first_name || user?.username || 'Valued Customer',
+                planName: plan.display_name || plan.name,
+                duration: plan.duration,
+                expiryDate,
+                language: userLanguage,
+              });
+
+              if (welcomeEmailResult.success) {
+                logger.info('Welcome email sent successfully (Daimo)', {
+                  to: customerEmail,
+                  planId,
+                  language: userLanguage,
+                });
+              }
+            } catch (emailError) {
+              logger.error('Error sending welcome email (non-critical):', {
+                error: emailError.message,
+                eventId: id,
+              });
+            }
+          } else {
+            logger.warn('No email address found for user, skipping email notifications', {
+              userId,
+              eventId: id,
+            });
+          }
+        }
+
+        return { success: true };
+      } else if (status === 'payment_bounced' || status === 'payment_failed') {
+        // Payment failed
+        if (paymentId) {
+          await PaymentModel.updateStatus(paymentId, 'failed', {
+            transaction_id: source?.txHash || id,
+            daimo_event_id: id,
+          });
+        }
 
         logger.info('User subscription activated via Daimo', { userId, planId, expiry });
 
-        // Send confirmation message with PRIME invite link
-        await sendPrimeConfirmation(userId, planName, expiry, 'daimo');
+        return { success: true }; // Return success to acknowledge webhook
+      } else if (status === 'payment_started' || status === 'payment_unpaid') {
+        // Payment pending/started
+        if (paymentId) {
+          await PaymentModel.updateStatus(paymentId, 'pending', {
+            transaction_id: source?.txHash || id,
+            daimo_event_id: id,
+          });
+        }
+
+        logger.info('Daimo payment pending', {
+          paymentId,
+          eventId: id,
+          status,
+        });
+
+        return { success: true };
+      }
 
         // Send payment notification to support group
         const amount = payment.amount || plan?.price || 0;
@@ -484,9 +730,7 @@ class PaymentService {
       return { success: false, error: 'Internal server error' };
     }
   }
-
-  // Process PayPal webhook payload
-  static async processPayPalWebhook(body, headers) {
+  static async createPayment({ userId, planId, provider, sku, chatId, language }) {
     try {
       const eventType = body.event_type;
 
@@ -553,8 +797,124 @@ class PaymentService {
         }
       }
 
-      // For other event types, just acknowledge
-      return { success: true, eventType };
+       const payment = await PaymentModel.create({
+         userId,
+         planId,
+         provider,
+         sku,
+         amount: plan.price,
+         status: 'pending',
+       });
+
+       logger.info('Payment created', {
+         paymentId: payment.id,
+         userId,
+         planId,
+         provider,
+         amount: plan.price
+       });
+
+       // Generate ePayco payment link
+       if (provider === 'epayco') {
+         const epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;
+         const epaycoTestMode = process.env.EPAYCO_TEST_MODE === 'true';
+         const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN;
+
+         if (!epaycoPublicKey) {
+           logger.error('ePayco public key not configured');
+           throw new Error('Configuración de pago incompleta. Contacta soporte.');
+         }
+
+         if (!webhookDomain) {
+           logger.error('BOT_WEBHOOK_DOMAIN not configured');
+           throw new Error('Configuración de pago incompleta. Contacta soporte.');
+         }
+
+         // Use price in Colombian pesos for ePayco
+         const priceInCOP = plan.price_in_cop || (parseFloat(plan.price) * 4000); // Fallback conversion
+
+         // Validate price in COP
+         if (!priceInCOP || priceInCOP <= 0) {
+           logger.error('Invalid price in COP', { planId: plan.id, price_in_cop: plan.price_in_cop });
+           throw new Error('Precio inválido para este plan. Contacta soporte.');
+         }
+
+         // Create payment reference
+         const paymentRef = `PAY-${payment.id.substring(0, 8).toUpperCase()}`;
+
+         // Determine language code (default to Spanish)
+         const lang = language && language.toLowerCase().startsWith('en') ? 'en' : 'es';
+
+         // Generate URL to landing page with language parameter
+         // The landing page will handle the ePayco checkout with SDK
+         const paymentUrl = `${webhookDomain}/payment/${payment.id}?lang=${lang}`;
+
+         logger.info('ePayco payment URL generated (landing page)', {
+           paymentId: payment.id,
+           paymentRef,
+           planId: plan.id,
+           userId,
+           amountUSD: plan.price,
+           amountCOP: priceInCOP,
+           testMode: epaycoTestMode,
+           language: lang,
+           paymentUrl,
+         });
+
+         return {
+           success: true,
+           paymentUrl,
+           paymentId: payment.id,
+           paymentRef
+         };
+       }
+
+       // Generate Daimo payment link
+       if (provider === 'daimo') {
+         const DaimoService = require('./daimoService');
+
+         if (!DaimoService.isConfigured()) {
+           logger.error('Daimo not configured');
+           throw new Error('Configuración de pago incompleta. Contacta soporte.');
+         }
+
+         try {
+           const paymentUrl = DaimoService.generatePaymentLink({
+             userId,
+             chatId,
+             planId,
+             amount: plan.price,
+             paymentId: payment.id,
+           });
+
+           logger.info('Daimo payment URL generated', {
+             paymentId: payment.id,
+             planId: plan.id,
+             userId,
+             amountUSD: plan.price,
+             chain: 'Optimism',
+             token: 'USDC',
+           });
+
+           return {
+             success: true,
+             paymentUrl,
+             paymentId: payment.id,
+             paymentRef: `DAIMO-${payment.id.substring(0, 8).toUpperCase()}`,
+           };
+         } catch (error) {
+           logger.error('Error generating Daimo payment link:', {
+             error: error.message,
+             userId,
+             planId,
+           });
+           throw new Error('No se pudo generar el link de pago. Contacta soporte.');
+         }
+       }
+
+       // For other providers
+       logger.error('Unknown payment provider', { provider });
+       throw new Error('Proveedor de pago no soportado.');
     } catch (error) {
       logger.error('Error processing PayPal webhook', error);
       return { success: false, error: 'Internal server error' };
@@ -563,8 +923,36 @@ class PaymentService {
 
   static async getPaymentHistory(userId, limit = 20) {
     try {
-      // Tests expect getByUser to be called with userId only
-      return await PaymentModel.getByUser(userId);
+      const payment = await PaymentModel.getById(paymentId);
+      if (!payment) {
+        logger.error('Pago no encontrado', { paymentId });
+        throw new Error('No se encontró el pago. Verifica el ID o contacta soporte.');
+      }
+
+      // Get plan to obtain SKU (payment table doesn't store SKU, plan does)
+      const planId = payment.plan_id || payment.planId;
+      const plan = planId ? await PlanModel.getById(planId) : null;
+      const planSku = plan?.sku || 'EASYBOTS-PNP-030';
+
+      await PaymentModel.updateStatus(paymentId, 'completed');
+
+      // Generar factura
+      const invoice = await InvoiceService.generateInvoice({
+        userId: payment.userId || payment.user_id,
+        planSku,
+        amount: payment.amount,
+      });
+
+      // Enviar factura por email
+      const user = await UserModel.getById(payment.userId || payment.user_id);
+      await EmailService.sendInvoiceEmail({
+        to: user.email,
+        subject: `Factura por suscripción (SKU: ${planSku})`,
+        invoicePdf: invoice.pdf,
+        invoiceNumber: invoice.id,
+      });
+
+      return { success: true };
     } catch (error) {
       logger.error('Error getting payment history', error);
       return [];

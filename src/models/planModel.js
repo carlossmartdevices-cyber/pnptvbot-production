@@ -172,16 +172,21 @@ class Plan {
 
   /**
    * Generate SKU for a plan
-   * SKU format: EASYBOT-{CLIENT}-{DURATION}D
-   * Example: EASYBOT-PNP-7D, EASYBOT-PNP-30D
+   * SKU format: EASYBOTS-PNP-XXX where XXX is duration in days (3 digits)
+   * Example: EASYBOTS-PNP-007 (7 days), EASYBOTS-PNP-030 (30 days), EASYBOTS-PNP-000 (lifetime)
    * @param {string} planId - Plan ID
    * @param {number} duration - Duration in days
    * @returns {string} Generated SKU
    */
   static generateSKU(planId, duration) {
-    // Extract client identifier from plan ID or use PNP as default
-    const client = 'PNP';
-    return `EASYBOT-${client}-${duration}D`;
+    // For lifetime plans (very large duration), use 000
+    if (duration >= 36500 || planId.includes('lifetime')) {
+      return 'EASYBOTS-PNP-000';
+    }
+
+    // Convert duration to 3-digit format with zero padding
+    const durationStr = String(duration).padStart(3, '0');
+    return `EASYBOTS-PNP-${durationStr}`;
   }
 
   /**
@@ -192,7 +197,7 @@ class Plan {
     return [
       {
         id: 'trial_week',
-        sku: 'EASYBOT-PNP-7D',
+        sku: 'EASYBOTS-PNP-007',
         name: 'Trial Week',
         nameEs: 'Semana de Prueba',
         price: 14.99,
@@ -212,7 +217,7 @@ class Plan {
       },
       {
         id: 'pnp_member',
-        sku: 'EASYBOT-PNP-30D',
+        sku: 'EASYBOTS-PNP-030',
         name: 'PNP Member',
         nameEs: 'Miembro PNP',
         price: 24.99,
@@ -234,7 +239,7 @@ class Plan {
       },
       {
         id: 'crystal_member',
-        sku: 'EASYBOT-PNP-120D',
+        sku: 'EASYBOTS-PNP-030',
         name: 'Crystal Member',
         nameEs: 'Miembro Crystal',
         price: 49.99,
@@ -258,7 +263,7 @@ class Plan {
       },
       {
         id: 'diamond_member',
-        sku: 'EASYBOT-PNP-365D',
+        sku: 'EASYBOTS-PNP-030',
         name: 'Diamond Member',
         nameEs: 'Miembro Diamond',
         price: 99.99,
@@ -286,7 +291,7 @@ class Plan {
       },
       {
         id: 'lifetime_pass',
-        sku: 'EASYBOT-PNP-LIFE',
+        sku: 'EASYBOTS-PNP-000',
         name: 'Lifetime Pass',
         nameEs: 'Pase de por Vida',
         price: 249.99,
