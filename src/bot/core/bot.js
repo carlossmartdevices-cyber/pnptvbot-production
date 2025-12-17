@@ -47,6 +47,8 @@ const registerCallPackageHandlers = require('../handlers/user/callPackages');
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
 const broadcastScheduler = require('../../services/broadcastScheduler');
+const SubscriptionReminderService = require('../services/subscriptionReminderService');
+const { startCronJobs } = require('../../../scripts/cron');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
 // API Server
