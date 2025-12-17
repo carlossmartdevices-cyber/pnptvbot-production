@@ -316,8 +316,51 @@ const handlePaymentResponse = async (req, res) => {
   }
 };
 
+/**
+ * Handle PayPal webhook
+ * Receives payment events from PayPal
+ * Webhook URL: easybots.store/api/paypal -> /api/webhooks/paypal
+ * @param {Request} req - Express request
+ * @param {Response} res - Express response
+ */
+const handlePayPalWebhook = async (req, res) => {
+  try {
+    const eventType = req.body.event_type;
+
+    logger.info('PayPal webhook received', {
+      eventType,
+      resourceType: req.body.resource_type,
+      resourceId: req.body.resource?.id,
+    });
+
+    // Process webhook
+    const result = await PaymentService.processPayPalWebhook(req.body, req.headers);
+
+    if (result.success) {
+      logger.info('PayPal webhook processed successfully', {
+        eventType,
+        alreadyProcessed: result.alreadyProcessed || false,
+      });
+      return res.status(200).json({ success: true });
+    }
+
+    logger.warn('PayPal webhook processing failed', {
+      eventType,
+      error: result.error,
+    });
+    return res.status(400).json({ success: false, error: result.error });
+  } catch (error) {
+    logger.error('Error handling PayPal webhook:', {
+      error: error.message,
+      stack: error.stack,
+    });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   handleEpaycoWebhook,
   handleDaimoWebhook,
+  handlePayPalWebhook,
   handlePaymentResponse,
 };

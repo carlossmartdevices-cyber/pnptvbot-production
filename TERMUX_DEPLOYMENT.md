@@ -189,7 +189,7 @@ npm install
 # This may take 5-15 minutes depending on your internet speed
 ```
 
-**If you encounter errors with native modules** (like `sharp`):
+**If you encounter errors with native modules** (like `sharp`, `bcrypt`):
 
 ```bash
 # Install build tools
