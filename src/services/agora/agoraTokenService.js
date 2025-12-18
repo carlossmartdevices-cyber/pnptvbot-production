@@ -3,7 +3,7 @@
  * Generates RTC and RTM tokens for all PNPtv features
  */
 
-const { RtcTokenBuilder, RtmTokenBuilder, RtcRole } = require('agora-access-token');
+const { RtcTokenBuilder, RtmTokenBuilder, RtcRole } = require('agora-token');
 const logger = require('../../utils/logger');
 
 class AgoraTokenService {
