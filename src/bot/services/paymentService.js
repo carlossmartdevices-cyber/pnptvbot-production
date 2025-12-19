@@ -288,69 +288,46 @@ class PaymentService {
       return true;
     }
 
-    // Expected signature string
-    const { x_cust_id_cliente, x_ref_payco, x_transaction_id, x_amount } = webhookData;
-    const signatureString = `${x_cust_id_cliente || ''}^${secret}^${x_ref_payco || ''}^${x_transaction_id || ''}^${x_amount || ''}`;
+    // Expected signature string per ePayco documentation:
+    // SHA256(p_cust_id_cliente^p_key^x_ref_payco^x_transaction_id^x_amount^x_currency_code)
+    const { x_cust_id_cliente, x_ref_payco, x_transaction_id, x_amount, x_currency_code } = webhookData;
+    const signatureString = `${x_cust_id_cliente || ''}^${secret}^${x_ref_payco || ''}^${x_transaction_id || ''}^${x_amount || ''}^${x_currency_code || ''}`;
     const crypto = require('crypto');
-    const hmac = crypto.createHmac('sha256', secret);
-    hmac.update(signatureString);
-    const expected = hmac.digest('hex');
+    const expected = crypto.createHash('sha256').update(signatureString).digest('hex');
     return expected === signature;
   }
 
+  /**
+   * Process ePayco webhook confirmation
+   * @param {Object} webhookData - ePayco webhook data
+   * @returns {Object} { success: boolean, error?: string }
+   */
+  static async processEpaycoWebhook(webhookData) {
+    try {
+      // Extract webhook data
+      const {
+        x_ref_payco,
+        x_transaction_id,
+        x_transaction_state,
+        x_approval_code,
+        x_amount,
+        x_extra1: userId,
+        x_extra2: planId,
+        x_extra3: paymentId,
+        x_customer_email,
+        x_customer_name,
+      } = webhookData;
+
+      logger.info('Processing ePayco webhook', {
+        x_ref_payco,
+        x_transaction_state,
+        userId,
+        planId,
+        paymentId,
+      });
+
       // Check if payment exists
       const payment = paymentId ? await PaymentModel.getById(paymentId) : null;
-
-    const secret = process.env.DAIMO_WEBHOOK_SECRET;
-    if (!secret) {
-      // In development/test, allow without signature
-      logger.warn('DAIMO_WEBHOOK_SECRET not configured, skipping signature verification');
-      return true;
-    }
-
-    if (!signature) {
-      // If no signature and we have a secret configured, skip verification for now
-      // This allows webhooks to work even if Daimo doesn't send signature
-      logger.warn('No Daimo signature provided, allowing webhook (verify Daimo config)');
-      return true;
-    }
-
-    // Remove signature from body before computing expected HMAC
-    const { signature: _sig, ...payloadObj } = webhookData;
-    const payload = JSON.stringify(payloadObj);
-    const crypto = require('crypto');
-    const hmac = crypto.createHmac('sha256', secret);
-    hmac.update(payload);
-    const expected = hmac.digest('hex');
-
-    const isValid = expected === signature;
-    if (!isValid) {
-      logger.warn('Daimo signature mismatch, but allowing webhook', {
-        receivedPrefix: signature?.substring(0, 10),
-        expectedPrefix: expected.substring(0, 10)
-      });
-      // For now, allow even with mismatched signature to ensure activation works
-      return true;
-    }
-    return true;
-  }
-
-  // Retry helper with exponential backoff
-  static async retryWithBackoff(operation, maxRetries = 3, operationName = 'operation') {
-    let lastErr = null;
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await operation();
-      } catch (err) {
-        lastErr = err;
-        if (attempt === maxRetries) break;
-        const delay = Math.min(10000, 1000 * Math.pow(2, attempt));
-        // eslint-disable-next-line no-await-in-loop
-        await new Promise((res) => setTimeout(res, delay));
-      }
-    }
-    throw lastErr;
-  }
 
       // Process based on transaction state
       if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
@@ -403,11 +380,6 @@ class PaymentService {
             }
           }
         }
-
-      if (!payment) {
-        logger.warn('Payment not found for ePayco webhook', { txId, paymentId });
-        return { success: false, error: 'Payment not found' };
-      }
 
         // Send both emails after successful payment
         if (x_customer_email && userId && planId) {
@@ -481,20 +453,13 @@ class PaymentService {
           });
         }
 
-      // Activate user subscription and send confirmation
-      if (userId && planId) {
-        const plan = await PlanModel.getById(planId);
-        const durationDays = plan?.duration || 30;
-        const expiry = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
-        const planName = plan?.name || planId;
-
-        await UserModel.updateSubscription(userId, {
-          status: 'active',
-          planId: planId,
-          expiry: expiry
+        logger.info('ePayco payment failed', {
+          x_ref_payco,
+          userId,
+          planId,
         });
 
-        return { success: true }; // Return success to acknowledge webhook
+        return { success: true };
       } else if (x_transaction_state === 'Pendiente') {
         // Payment pending
         if (payment) {
@@ -504,12 +469,13 @@ class PaymentService {
           });
         }
 
-        // Send confirmation message with PRIME invite link
-        await sendPrimeConfirmation(userId, planName, expiry, 'epayco');
+        logger.info('ePayco payment pending', {
+          x_ref_payco,
+          userId,
+          planId,
+        });
 
-        // Send payment notification to support group
-        const amount = payment.amount || plan?.price || 0;
-        await sendPaymentNotification(userId, planName, amount, 'ePayco', 'epayco-webhook');
+        return { success: true };
       }
 
       return { success: true };
@@ -517,6 +483,33 @@ class PaymentService {
       logger.error('Error processing ePayco webhook', error);
       return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * Retry helper with exponential backoff
+   * @param {Function} operation - Operation to retry
+   * @param {number} maxRetries - Maximum number of retries
+   * @param {string} operationName - Name for logging
+   * @returns {Promise<any>} Result of the operation
+   */
+  static async retryWithBackoff(operation, maxRetries = 3, operationName = 'operation') {
+    let lastErr = null;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (err) {
+        lastErr = err;
+        if (attempt === maxRetries) break;
+        const delay = Math.min(10000, 1000 * Math.pow(2, attempt));
+        logger.warn(`${operationName} failed, retrying in ${delay}ms`, {
+          attempt,
+          error: err.message,
+        });
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((res) => setTimeout(res, delay));
+      }
+    }
+    throw lastErr;
   }
 
   /**
