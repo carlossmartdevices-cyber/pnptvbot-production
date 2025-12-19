@@ -288,69 +288,46 @@ class PaymentService {
       return true;
     }
 
-    // Expected signature string
-    const { x_cust_id_cliente, x_ref_payco, x_transaction_id, x_amount } = webhookData;
-    const signatureString = `${x_cust_id_cliente || ''}^${secret}^${x_ref_payco || ''}^${x_transaction_id || ''}^${x_amount || ''}`;
+    // Expected signature string per ePayco documentation:
+    // SHA256(p_cust_id_cliente^p_key^x_ref_payco^x_transaction_id^x_amount^x_currency_code)
+    const { x_cust_id_cliente, x_ref_payco, x_transaction_id, x_amount, x_currency_code } = webhookData;
+    const signatureString = `${x_cust_id_cliente || ''}^${secret}^${x_ref_payco || ''}^${x_transaction_id || ''}^${x_amount || ''}^${x_currency_code || ''}`;
     const crypto = require('crypto');
-    const hmac = crypto.createHmac('sha256', secret);
-    hmac.update(signatureString);
-    const expected = hmac.digest('hex');
+    const expected = crypto.createHash('sha256').update(signatureString).digest('hex');
     return expected === signature;
   }
 
+  /**
+   * Process ePayco webhook confirmation
+   * @param {Object} webhookData - ePayco webhook data
+   * @returns {Object} { success: boolean, error?: string }
+   */
+  static async processEpaycoWebhook(webhookData) {
+    try {
+      // Extract webhook data
+      const {
+        x_ref_payco,
+        x_transaction_id,
+        x_transaction_state,
+        x_approval_code,
+        x_amount,
+        x_extra1: userId,
+        x_extra2: planId,
+        x_extra3: paymentId,
+        x_customer_email,
+        x_customer_name,
+      } = webhookData;
+
+      logger.info('Processing ePayco webhook', {
+        x_ref_payco,
+        x_transaction_state,
+        userId,
+        planId,
+        paymentId,
+      });
+
       // Check if payment exists
       const payment = paymentId ? await PaymentModel.getById(paymentId) : null;
-
-    const secret = process.env.DAIMO_WEBHOOK_SECRET;
-    if (!secret) {
-      // In development/test, allow without signature
-      logger.warn('DAIMO_WEBHOOK_SECRET not configured, skipping signature verification');
-      return true;
-    }
-
-    if (!signature) {
-      // If no signature and we have a secret configured, skip verification for now
-      // This allows webhooks to work even if Daimo doesn't send signature
-      logger.warn('No Daimo signature provided, allowing webhook (verify Daimo config)');
-      return true;
-    }
-
-    // Remove signature from body before computing expected HMAC
-    const { signature: _sig, ...payloadObj } = webhookData;
-    const payload = JSON.stringify(payloadObj);
-    const crypto = require('crypto');
-    const hmac = crypto.createHmac('sha256', secret);
-    hmac.update(payload);
-    const expected = hmac.digest('hex');
-
-    const isValid = expected === signature;
-    if (!isValid) {
-      logger.warn('Daimo signature mismatch, but allowing webhook', {
-        receivedPrefix: signature?.substring(0, 10),
-        expectedPrefix: expected.substring(0, 10)
-      });
-      // For now, allow even with mismatched signature to ensure activation works
-      return true;
-    }
-    return true;
-  }
-
-  // Retry helper with exponential backoff
-  static async retryWithBackoff(operation, maxRetries = 3, operationName = 'operation') {
-    let lastErr = null;
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await operation();
-      } catch (err) {
-        lastErr = err;
-        if (attempt === maxRetries) break;
-        const delay = Math.min(10000, 1000 * Math.pow(2, attempt));
-        // eslint-disable-next-line no-await-in-loop
-        await new Promise((res) => setTimeout(res, delay));
-      }
-    }
-    throw lastErr;
-  }
 
       // Process based on transaction state
       if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
@@ -403,11 +380,6 @@ class PaymentService {
             }
           }
         }
-
-      if (!payment) {
-        logger.warn('Payment not found for ePayco webhook', { txId, paymentId });
-        return { success: false, error: 'Payment not found' };
-      }
 
         // Send both emails after successful payment
         if (x_customer_email && userId && planId) {
@@ -481,20 +453,13 @@ class PaymentService {
           });
         }
 
-      // Activate user subscription and send confirmation
-      if (userId && planId) {
-        const plan = await PlanModel.getById(planId);
-        const durationDays = plan?.duration || 30;
-        const expiry = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
-        const planName = plan?.name || planId;
-
-        await UserModel.updateSubscription(userId, {
-          status: 'active',
-          planId: planId,
-          expiry: expiry
+        logger.info('ePayco payment failed', {
+          x_ref_payco,
+          userId,
+          planId,
         });
 
-        return { success: true }; // Return success to acknowledge webhook
+        return { success: true };
       } else if (x_transaction_state === 'Pendiente') {
         // Payment pending
         if (payment) {
@@ -504,12 +469,13 @@ class PaymentService {
           });
         }
 
-        // Send confirmation message with PRIME invite link
-        await sendPrimeConfirmation(userId, planName, expiry, 'epayco');
+        logger.info('ePayco payment pending', {
+          x_ref_payco,
+          userId,
+          planId,
+        });
 
-        // Send payment notification to support group
-        const amount = payment.amount || plan?.price || 0;
-        await sendPaymentNotification(userId, planName, amount, 'ePayco', 'epayco-webhook');
+        return { success: true };
       }
 
       return { success: true };
@@ -517,6 +483,33 @@ class PaymentService {
       logger.error('Error processing ePayco webhook', error);
       return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * Retry helper with exponential backoff
+   * @param {Function} operation - Operation to retry
+   * @param {number} maxRetries - Maximum number of retries
+   * @param {string} operationName - Name for logging
+   * @returns {Promise<any>} Result of the operation
+   */
+  static async retryWithBackoff(operation, maxRetries = 3, operationName = 'operation') {
+    let lastErr = null;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (err) {
+        lastErr = err;
+        if (attempt === maxRetries) break;
+        const delay = Math.min(10000, 1000 * Math.pow(2, attempt));
+        logger.warn(`${operationName} failed, retrying in ${delay}ms`, {
+          attempt,
+          error: err.message,
+        });
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((res) => setTimeout(res, delay));
+      }
+    }
+    throw lastErr;
   }
 
   /**
@@ -715,24 +708,35 @@ class PaymentService {
         return { success: true };
       }
 
-        // Send payment notification to support group
-        const amount = payment.amount || plan?.price || 0;
-        await sendPaymentNotification(userId, planName, amount, 'Daimo', 'daimo-webhook');
-
-        await cache.releaseLock(lockKey);
-        return { success: true };
-      } catch (err) {
-        await cache.releaseLock(lockKey);
-        throw err;
-      }
+      // Unknown status
+      logger.warn('Unknown Daimo payment status', {
+        status,
+        eventId: id,
+      });
+      return { success: true };
     } catch (error) {
-      logger.error('Error processing Daimo webhook', error);
+      logger.error('Error processing Daimo webhook', {
+        error: error.message,
+        eventId: webhookData.id,
+      });
       return { success: false, error: 'Internal server error' };
     }
   }
-  static async createPayment({ userId, planId, provider, sku, chatId, language }) {
+
+  /**
+   * Process PayPal webhook confirmation
+   * @param {Object} body - PayPal webhook body
+   * @param {Object} headers - Request headers
+   * @returns {Object} { success: boolean, error?: string, alreadyProcessed?: boolean }
+   */
+  static async processPayPalWebhook(body, headers) {
     try {
       const eventType = body.event_type;
+
+      logger.info('Processing PayPal webhook', {
+        eventType,
+        resourceType: body.resource_type,
+      });
 
       // Handle different PayPal webhook events
       if (eventType === 'PAYMENT.CAPTURE.COMPLETED') {
@@ -749,13 +753,15 @@ class PaymentService {
         const lockKey = `processing:payment:${paymentId}`;
         const acquired = await cache.acquireLock(lockKey);
         if (!acquired) {
-          return { success: false, error: `Already processing ${paymentId}` };
+          logger.info('PayPal payment already being processed', { paymentId });
+          return { success: true, alreadyProcessed: true };
         }
 
         try {
           const payment = await PaymentModel.getById(paymentId);
           if (!payment) {
             await cache.releaseLock(lockKey);
+            logger.warn('Payment not found for PayPal webhook', { paymentId });
             return { success: false, error: 'Payment not found' };
           }
 
@@ -766,195 +772,97 @@ class PaymentService {
             return { success: true, alreadyProcessed: true };
           }
 
-          // Update user subscription
+          // Get plan and user info
           const plan = await PlanModel.getById(payment.planId);
+          const user = await UserModel.getById(payment.userId);
           const expiry = new Date(Date.now() + ((plan && plan.duration) || 30) * 24 * 60 * 60 * 1000);
-          const planName = plan?.name || payment.planId;
 
-          await UserModel.updateSubscription(payment.userId, { status: 'active', planId: payment.planId, expiry });
-
-          // Mark payment as success
-          await PaymentModel.updateStatus(paymentId, 'success', {
-            transactionId: capture.id,
-            orderId: orderId,
-            completedAt: new Date()
+          // Update user subscription
+          await UserModel.updateSubscription(payment.userId, {
+            status: 'active',
+            planId: payment.planId,
+            expiry
           });
 
-          logger.info('User subscription activated via PayPal', { userId: payment.userId, planId: payment.planId, expiry });
+          // Mark payment as success
+          await PaymentModel.updateStatus(paymentId, 'completed', {
+            transaction_id: capture.id,
+            order_id: orderId,
+            paypal_capture_id: capture.id,
+          });
 
-          // Send confirmation message with PRIME invite link
-          await sendPrimeConfirmation(payment.userId, planName, expiry, 'paypal');
+          logger.info('User subscription activated via PayPal', {
+            userId: payment.userId,
+            planId: payment.planId,
+            expiry,
+            captureId: capture.id,
+          });
 
-          // Send payment notification to support group
+          // Send payment confirmation notification via bot (with PRIME channel link)
+          const userLanguage = user?.language || 'es';
           const amount = payment.amount || plan?.price || 0;
-          await sendPaymentNotification(payment.userId, planName, amount, 'PayPal', 'paypal-webhook');
+          try {
+            await this.sendPaymentConfirmationNotification({
+              userId: payment.userId,
+              plan,
+              transactionId: capture.id,
+              amount,
+              expiryDate: expiry,
+              language: userLanguage,
+            });
+          } catch (notifError) {
+            logger.error('Error sending payment confirmation notification (non-critical):', {
+              error: notifError.message,
+              userId: payment.userId,
+            });
+          }
 
           await cache.releaseLock(lockKey);
           return { success: true };
         } catch (err) {
           await cache.releaseLock(lockKey);
+          logger.error('Error processing PayPal payment', {
+            error: err.message,
+            paymentId,
+          });
           throw err;
         }
       }
 
-       const payment = await PaymentModel.create({
-         userId,
-         planId,
-         provider,
-         sku,
-         amount: plan.price,
-         status: 'pending',
-       });
-
-       logger.info('Payment created', {
-         paymentId: payment.id,
-         userId,
-         planId,
-         provider,
-         amount: plan.price
-       });
-
-       // Generate ePayco payment link
-       if (provider === 'epayco') {
-         const epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;
-         const epaycoTestMode = process.env.EPAYCO_TEST_MODE === 'true';
-         const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN;
-
-         if (!epaycoPublicKey) {
-           logger.error('ePayco public key not configured');
-           throw new Error('Configuración de pago incompleta. Contacta soporte.');
-         }
-
-         if (!webhookDomain) {
-           logger.error('BOT_WEBHOOK_DOMAIN not configured');
-           throw new Error('Configuración de pago incompleta. Contacta soporte.');
-         }
-
-         // Use price in Colombian pesos for ePayco
-         const priceInCOP = plan.price_in_cop || (parseFloat(plan.price) * 4000); // Fallback conversion
-
-         // Validate price in COP
-         if (!priceInCOP || priceInCOP <= 0) {
-           logger.error('Invalid price in COP', { planId: plan.id, price_in_cop: plan.price_in_cop });
-           throw new Error('Precio inválido para este plan. Contacta soporte.');
-         }
-
-         // Create payment reference
-         const paymentRef = `PAY-${payment.id.substring(0, 8).toUpperCase()}`;
-
-         // Determine language code (default to Spanish)
-         const lang = language && language.toLowerCase().startsWith('en') ? 'en' : 'es';
-
-         // Generate URL to landing page with language parameter
-         // The landing page will handle the ePayco checkout with SDK
-         const paymentUrl = `${webhookDomain}/payment/${payment.id}?lang=${lang}`;
-
-         logger.info('ePayco payment URL generated (landing page)', {
-           paymentId: payment.id,
-           paymentRef,
-           planId: plan.id,
-           userId,
-           amountUSD: plan.price,
-           amountCOP: priceInCOP,
-           testMode: epaycoTestMode,
-           language: lang,
-           paymentUrl,
-         });
-
-         return {
-           success: true,
-           paymentUrl,
-           paymentId: payment.id,
-           paymentRef
-         };
-       }
-
-       // Generate Daimo payment link
-       if (provider === 'daimo') {
-         const DaimoService = require('./daimoService');
-
-         if (!DaimoService.isConfigured()) {
-           logger.error('Daimo not configured');
-           throw new Error('Configuración de pago incompleta. Contacta soporte.');
-         }
-
-         try {
-           const paymentUrl = DaimoService.generatePaymentLink({
-             userId,
-             chatId,
-             planId,
-             amount: plan.price,
-             paymentId: payment.id,
-           });
-
-           logger.info('Daimo payment URL generated', {
-             paymentId: payment.id,
-             planId: plan.id,
-             userId,
-             amountUSD: plan.price,
-             chain: 'Optimism',
-             token: 'USDC',
-           });
-
-           return {
-             success: true,
-             paymentUrl,
-             paymentId: payment.id,
-             paymentRef: `DAIMO-${payment.id.substring(0, 8).toUpperCase()}`,
-           };
-         } catch (error) {
-           logger.error('Error generating Daimo payment link:', {
-             error: error.message,
-             userId,
-             planId,
-           });
-           throw new Error('No se pudo generar el link de pago. Contacta soporte.');
-         }
-       }
-
-       // For other providers
-       logger.error('Unknown payment provider', { provider });
-       throw new Error('Proveedor de pago no soportado.');
+      // Handle other PayPal events
+      logger.info('PayPal webhook event not handled', { eventType });
+      return { success: true };
     } catch (error) {
-      logger.error('Error processing PayPal webhook', error);
+      logger.error('Error processing PayPal webhook', {
+        error: error.message,
+        eventType: body.event_type,
+      });
       return { success: false, error: 'Internal server error' };
     }
   }
 
+  /**
+   * Get payment history for a user
+   * @param {string} userId - User ID
+   * @param {number} limit - Maximum number of records to return
+   * @returns {Promise<Array>} Array of payment records
+   */
   static async getPaymentHistory(userId, limit = 20) {
     try {
-      const payment = await PaymentModel.getById(paymentId);
-      if (!payment) {
-        logger.error('Pago no encontrado', { paymentId });
-        throw new Error('No se encontró el pago. Verifica el ID o contacta soporte.');
-      }
+      const payments = await PaymentModel.getByUserId(userId, limit);
 
-      // Get plan to obtain SKU (payment table doesn't store SKU, plan does)
-      const planId = payment.plan_id || payment.planId;
-      const plan = planId ? await PlanModel.getById(planId) : null;
-      const planSku = plan?.sku || 'EASYBOTS-PNP-030';
-
-      await PaymentModel.updateStatus(paymentId, 'completed');
-
-      // Generar factura
-      const invoice = await InvoiceService.generateInvoice({
-        userId: payment.userId || payment.user_id,
-        planSku,
-        amount: payment.amount,
+      logger.info('Retrieved payment history', {
+        userId,
+        count: payments.length,
+        limit,
       });
 
-      // Enviar factura por email
-      const user = await UserModel.getById(payment.userId || payment.user_id);
-      await EmailService.sendInvoiceEmail({
-        to: user.email,
-        subject: `Factura por suscripción (SKU: ${planSku})`,
-        invoicePdf: invoice.pdf,
-        invoiceNumber: invoice.id,
-      });
-
-      return { success: true };
+      return payments;
     } catch (error) {
-      logger.error('Error getting payment history', error);
+      logger.error('Error getting payment history', {
+        error: error.message,
+        userId,
+      });
       return [];
     }
   }
