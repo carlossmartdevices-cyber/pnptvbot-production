@@ -33,7 +33,12 @@ async function handleUserSearch(ctx) {
       return false;
     }
 
-    const query = ctx.message.text.trim();
+    const query = ctx.message?.text?.trim();
+    if (!query) {
+      await ctx.reply('❌ Please provide a valid username or user ID.');
+      return true;
+    }
+
     let user = null;
 
     // Try to find by username
