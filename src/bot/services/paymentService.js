@@ -226,15 +226,21 @@ class PaymentService {
             throw new Error('ePayco checkout creation failed');
           }
         } catch (epaycoError) {
-          logger.error('ePayco API error:', {
+          logger.error('ePayco API error, using fallback checkout page:', {
             error: epaycoError.message,
             paymentId: payment.id,
           });
-          // Fallback to checkout page
+          // Fallback to checkout page when SDK fails
+          // This ensures users can still complete payment even if the direct SDK integration fails
           paymentUrl = `${webhookDomain}/checkout/${payment.id}`;
           await PaymentModel.updateStatus(payment.id, 'pending', {
             paymentUrl,
             provider,
+            fallback: true, // Mark as fallback for tracking
+          });
+          logger.info('ePayco fallback checkout page created', {
+            paymentId: payment.id,
+            paymentUrl,
           });
         }
       } else if (provider === 'daimo') {
@@ -264,7 +270,7 @@ class PaymentService {
             error: daimoError.message,
             paymentId: payment.id,
           });
-          throw new Error('Internal server error');
+          throw new Error('Unable to create Daimo payment. Please try again or use another payment method.');
         }
       } else if (provider === 'paypal') {
         // Create PayPal order using SDK
@@ -295,7 +301,7 @@ class PaymentService {
             error: paypalError.message,
             paymentId: payment.id,
           });
-          throw new Error('Internal server error');
+          throw new Error('Unable to create PayPal payment. Please try again or use another payment method.');
         }
       } else {
         paymentUrl = `https://${provider}.com/pay?paymentId=${payment.id}`;
@@ -307,16 +313,25 @@ class PaymentService {
       logger.error('Error creating payment:', { error: error.message, planId, provider });
       // Normalize error messages for tests (case-insensitive check)
       const msg = error && error.message ? error.message.toLowerCase() : '';
+
+      // Plan-related errors
       if (msg.includes('plan') || msg.includes('el plan seleccionado') || msg.includes('plan no')) {
         // Preserve both Spanish and English variants for compatibility with tests
         throw new Error('El plan seleccionado no existe o está inactivo. | Plan not found');
       }
-      // Daimo API failures should throw 'Internal server error'
-      if (provider === 'daimo' && msg.includes('internal server error')) {
+
+      // Payment method specific errors - preserve the original error message
+      if (msg.includes('unable to create') || msg.includes('payment creation failed')) {
+        throw error;
+      }
+
+      // For backwards compatibility with tests expecting "Internal server error"
+      if (msg.includes('internal server error')) {
         throw new Error('Internal server error');
       }
-      // For all other errors, return a generic internal error message
-      throw new Error('Internal server error');
+
+      // For all other errors, provide a helpful message
+      throw new Error(`Payment creation failed: ${error.message || 'Unknown error'}`);
     }
   }
 

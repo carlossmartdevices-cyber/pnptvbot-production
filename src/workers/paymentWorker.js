@@ -42,8 +42,8 @@ class PaymentWorker {
         // update status
         await this.redisClient.set(`task:${taskId}:status`, 'processing');
 
-        // process payment (example with Daimon)
-        const response = await this.processPaymentWithDaimon(userId, amount, currency, paymentMethod);
+        // process payment (example with Daimo)
+        const response = await this.processPaymentWithDaimo(userId, amount, currency, paymentMethod);
 
         await this.redisClient.set(
           `task:${taskId}:status`,
@@ -59,15 +59,15 @@ class PaymentWorker {
     }
   }
 
-  async processPaymentWithDaimon(userId, amount, currency, paymentMethod) {
+  async processPaymentWithDaimo(userId, amount, currency, paymentMethod) {
     try {
       const resp = await axios.post(
-        `${paymentConfig.daimonPayments.endpoint}/payments`,
+        `${paymentConfig.daimoPayments.endpoint}/payments`,
         { userId, amount, currency, paymentMethod },
         {
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${paymentConfig.daimonPayments.apiKey}`,
+            Authorization: `Bearer ${paymentConfig.daimoPayments.apiKey}`,
           },
           timeout: 15000,
         }
@@ -76,7 +76,7 @@ class PaymentWorker {
       return { success: true, data: resp.data };
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error('Daimon payment error:', err.response?.data || err.message);
+      console.error('Daimo payment error:', err.response?.data || err.message);
       return { success: false, error: err.message };
     }
   }
