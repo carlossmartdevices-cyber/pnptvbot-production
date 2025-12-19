@@ -3,10 +3,15 @@ const InvoiceService = require('../../bot/services/invoiceservice');
 const EmailService = require('../../bot/services/emailservice');
 const PlanModel = require('../../models/planModel');
 const UserModel = require('../../models/userModel');
+const SubscriberModel = require('../../models/subscriberModel');
 const { cache } = require('../../config/redis');
 const logger = require('../../utils/logger');
 const crypto = require('crypto');
 const { Telegraf } = require('telegraf');
+const DaimoService = require('./daimoService');
+const DaimoConfig = require('../../config/daimo');
+const PayPalService = require('./paypalService');
+const { getEpaycoClient } = require('../../config/epayco');
 
 class PaymentService {
     /**
@@ -182,42 +187,116 @@ class PaymentService {
       });
 
       let paymentUrl;
+      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
+
       if (provider === 'epayco') {
-        // Generate checkout URL at easybots.store for ePayco
-        const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
-        paymentUrl = `${webhookDomain}/checkout/${payment.id}`;
-        await PaymentModel.updateStatus(payment.id, 'pending', {
-          paymentUrl,
-          provider,
-        });
+        // Create ePayco checkout session using SDK
+        try {
+          const epaycoClient = getEpaycoClient();
+          const checkoutData = {
+            name: `${plan.display_name || plan.name} - PNPtv Subscription`,
+            description: `Suscripción ${plan.display_name || plan.name} - ${plan.duration || 30} días`,
+            invoice: payment.id,
+            currency: 'usd',
+            amount: parseFloat(plan.price).toFixed(2),
+            tax_base: '0',
+            tax: '0',
+            country: 'co',
+            lang: 'es',
+            external: 'false',
+            // Extra fields for webhook
+            extra1: userId.toString(),
+            extra2: planId,
+            extra3: payment.id,
+            // URLs
+            confirmation: `${webhookDomain}/api/webhooks/epayco`,
+            response: `${webhookDomain}/api/payment-response`,
+          };
+
+          const response = await epaycoClient.checkout.create(checkoutData);
+
+          if (response.success && response.data) {
+            paymentUrl = response.data;
+            await PaymentModel.updateStatus(payment.id, 'pending', {
+              paymentUrl,
+              provider,
+              epayco_ref: response.data.ref_payco || response.data.invoice,
+            });
+          } else {
+            throw new Error('ePayco checkout creation failed');
+          }
+        } catch (epaycoError) {
+          logger.error('ePayco API error:', {
+            error: epaycoError.message,
+            paymentId: payment.id,
+          });
+          // Fallback to checkout page
+          paymentUrl = `${webhookDomain}/checkout/${payment.id}`;
+          await PaymentModel.updateStatus(payment.id, 'pending', {
+            paymentUrl,
+            provider,
+          });
+        }
       } else if (provider === 'daimo') {
-        // Generate checkout URL at easybots.store for Daimo (similar to ePayco)
-        const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
-        paymentUrl = `${webhookDomain}/daimo/${payment.id}`;
+        // Create Daimo payment using official API
+        try {
+          const daimoResult = await DaimoConfig.createDaimoPayment({
+            amount: plan.price,
+            userId,
+            planId,
+            chatId,
+            paymentId: payment.id,
+            description: `${plan.display_name || plan.name} Subscription`,
+          });
 
-        // Generate the direct Daimo Pay link via API for the checkout page
-        const daimoDirectLink = await DaimoService.generatePaymentLink({
-          userId,
-          chatId,
-          planId,
-          amount: plan.price,
-          paymentId: payment.id,
-        });
-
-        await PaymentModel.updateStatus(payment.id, 'pending', {
-          paymentUrl,
-          daimoLink: daimoDirectLink,
-          provider,
-        });
+          if (daimoResult.success && daimoResult.paymentUrl) {
+            paymentUrl = daimoResult.paymentUrl;
+            await PaymentModel.updateStatus(payment.id, 'pending', {
+              paymentUrl,
+              provider,
+              daimo_payment_id: daimoResult.daimoPaymentId,
+            });
+          } else {
+            throw new Error(daimoResult.error || 'Daimo payment creation failed');
+          }
+        } catch (daimoError) {
+          logger.error('Daimo API error:', {
+            error: daimoError.message,
+            paymentId: payment.id,
+          });
+          throw new Error('Internal server error');
+        }
       } else if (provider === 'paypal') {
-        // Generate checkout URL at easybots.store for PayPal
-        const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
-        paymentUrl = `${webhookDomain}/paypal/${payment.id}`;
+        // Create PayPal order using SDK
+        try {
+          const returnUrl = `${webhookDomain}/api/payment-response?status=success&payment_id=${payment.id}`;
+          const cancelUrl = `${webhookDomain}/api/payment-response?status=cancelled&payment_id=${payment.id}`;
 
-        await PaymentModel.updateStatus(payment.id, 'pending', {
-          paymentUrl,
-          provider,
-        });
+          const orderResult = await PayPalService.createOrder({
+            paymentId: payment.id,
+            amount: plan.price,
+            planName: plan.display_name || plan.name,
+            returnUrl,
+            cancelUrl,
+          });
+
+          if (orderResult.success && orderResult.approvalUrl) {
+            paymentUrl = orderResult.approvalUrl;
+            await PaymentModel.updateStatus(payment.id, 'pending', {
+              paymentUrl,
+              provider,
+              paypal_order_id: orderResult.orderId,
+            });
+          } else {
+            throw new Error('PayPal order creation failed');
+          }
+        } catch (paypalError) {
+          logger.error('PayPal API error:', {
+            error: paypalError.message,
+            paymentId: payment.id,
+          });
+          throw new Error('Internal server error');
+        }
       } else {
         paymentUrl = `https://${provider}.com/pay?paymentId=${payment.id}`;
         await PaymentModel.updateStatus(payment.id, 'pending', { paymentUrl, provider });
@@ -515,16 +594,19 @@ class PaymentService {
   /**
    * Process Daimo webhook confirmation
    * @param {Object} webhookData - Daimo webhook data
+   * @param {string} signature - Webhook signature from headers
    * @returns {Object} { success: boolean, error?: string, alreadyProcessed?: boolean }
    */
-  static async processDaimoWebhook(webhookData) {
-    const DaimoService = require('./daimoService');
-
+  static async processDaimoWebhook(webhookData, signature) {
     try {
-      // Verify signature (pass header signature if available)
-      if (!this.verifyDaimoSignature(body, signatureFromHeader)) {
-        return { success: false, error: 'Invalid signature' };
-      }
+      // Extract webhook data
+      const {
+        id,
+        status,
+        source,
+        destination,
+        metadata,
+      } = webhookData;
 
       const userId = metadata?.userId;
       const planId = metadata?.planId;
@@ -535,185 +617,197 @@ class PaymentService {
         return { success: false, error: 'Missing required fields' };
       }
 
-      // Check if already processed (idempotency)
-      if (paymentId) {
+      // Idempotency lock
+      const lockKey = `processing:payment:${paymentId}`;
+      const acquired = await cache.acquireLock(lockKey);
+      if (!acquired) {
+        logger.info('Daimo payment already being processed', { paymentId });
+        return { success: true, alreadyProcessed: true };
+      }
+
+      try {
+        // Check if already processed (idempotency)
         const payment = await PaymentModel.getById(paymentId);
-        if (payment && payment.status === 'completed') {
+        if (payment && (payment.status === 'completed' || payment.status === 'success')) {
+          await cache.releaseLock(lockKey);
           logger.info('Daimo payment already processed', { paymentId, eventId: id });
           return { success: true, alreadyProcessed: true };
         }
-      }
 
-      // Process based on status
-      if (status === 'payment_completed') {
-        // Payment successful
-        if (paymentId) {
-          await PaymentModel.updateStatus(paymentId, 'completed', {
-            transaction_id: source?.txHash || id,
-            daimo_event_id: id,
-            payer_address: source?.payerAddress,
-            chain_id: source?.chainId,
-          });
-        }
+        // Process based on status
+        if (status === 'payment_completed') {
+          // Payment successful
+          if (paymentId) {
+            await PaymentModel.updateStatus(paymentId, 'completed', {
+              transaction_id: source?.txHash || id,
+              daimo_event_id: id,
+              payer_address: source?.payerAddress,
+              chain_id: source?.chainId,
+            });
+          }
 
-        // Check if already completed (idempotency)
-        if (payment.status === 'completed' || payment.status === 'success') {
-          await cache.releaseLock(lockKey);
-          logger.info('Payment already completed, skipping', { paymentId });
-          return { success: true, alreadyProcessed: true };
-        }
+          // Update user subscription
+          const plan = await PlanModel.getById(planId);
+          const user = await UserModel.getById(userId);
 
-        // Update user subscription
-        const plan = await PlanModel.getById(planId);
-        const user = await UserModel.getById(userId);
+          if (plan) {
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
 
-        if (plan) {
-          const expiryDate = new Date();
-          expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
+            await UserModel.updateSubscription(userId, {
+              status: 'active',
+              planId,
+              expiry: expiryDate,
+            });
 
-          await UserModel.updateSubscription(userId, {
-            status: 'active',
-            planId,
-            expiry: expiryDate,
-          });
-
-          logger.info('User subscription activated via Daimo webhook', {
-            userId,
-            planId,
-            expiryDate,
-            txHash: source?.txHash,
-          });
-
-          // Send payment confirmation notification via bot (with PRIME channel link)
-          const userLanguage = user?.language || 'es';
-          const DaimoService = require('./daimoService');
-          const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
-          try {
-            await this.sendPaymentConfirmationNotification({
+            logger.info('User subscription activated via Daimo webhook', {
               userId,
-              plan,
-              transactionId: source?.txHash || id,
-              amount: amountUSD,
+              planId,
               expiryDate,
-              language: userLanguage,
+              txHash: source?.txHash,
             });
-          } catch (notifError) {
-            logger.error('Error sending payment confirmation notification (non-critical):', {
-              error: notifError.message,
-              userId,
-            });
-          }
 
-          // Get customer email from user record or subscriber record
-          let customerEmail = user?.email;
-          if (!customerEmail) {
-            // Try to get from subscriber by telegram ID
-            try {
-              const subscriber = await SubscriberModel.getByTelegramId(userId);
-              customerEmail = subscriber?.email;
-            } catch (e) {
-              logger.warn('Could not find subscriber email', { userId });
-            }
-          }
-
-          // Send both emails if we have an email
-          if (customerEmail) {
+            // Send payment confirmation notification via bot (with PRIME channel link)
             const userLanguage = user?.language || 'es';
             const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
-
-            // 1. Send invoice email from easybots.store
             try {
-              const invoiceEmailResult = await EmailService.sendInvoiceEmail({
-                to: customerEmail,
-                customerName: user?.first_name || user?.username || 'Valued Customer',
-                invoiceNumber: source?.txHash || id,
+              await this.sendPaymentConfirmationNotification({
+                userId,
+                plan,
+                transactionId: source?.txHash || id,
                 amount: amountUSD,
-                planName: plan.display_name || plan.name,
-                invoicePdf: null,
-              });
-
-              if (invoiceEmailResult.success) {
-                logger.info('Invoice email sent successfully (Daimo)', {
-                  to: customerEmail,
-                  txHash: source?.txHash,
-                });
-              }
-            } catch (emailError) {
-              logger.error('Error sending invoice email (non-critical):', {
-                error: emailError.message,
-                eventId: id,
-              });
-            }
-
-            // 2. Send welcome email from pnptv.app
-            try {
-              const welcomeEmailResult = await EmailService.sendWelcomeEmail({
-                to: customerEmail,
-                customerName: user?.first_name || user?.username || 'Valued Customer',
-                planName: plan.display_name || plan.name,
-                duration: plan.duration,
                 expiryDate,
                 language: userLanguage,
               });
+            } catch (notifError) {
+              logger.error('Error sending payment confirmation notification (non-critical):', {
+                error: notifError.message,
+                userId,
+              });
+            }
 
-              if (welcomeEmailResult.success) {
-                logger.info('Welcome email sent successfully (Daimo)', {
+            // Get customer email from user record or subscriber record
+            let customerEmail = user?.email;
+            if (!customerEmail) {
+              // Try to get from subscriber by telegram ID
+              try {
+                const subscriber = await SubscriberModel.getByTelegramId(userId);
+                customerEmail = subscriber?.email;
+              } catch (e) {
+                logger.warn('Could not find subscriber email', { userId });
+              }
+            }
+
+            // Send both emails if we have an email
+            if (customerEmail) {
+              const userLanguage = user?.language || 'es';
+              const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
+
+              // 1. Send invoice email from easybots.store
+              try {
+                const invoiceEmailResult = await EmailService.sendInvoiceEmail({
                   to: customerEmail,
-                  planId,
-                  language: userLanguage,
+                  customerName: user?.first_name || user?.username || 'Valued Customer',
+                  invoiceNumber: source?.txHash || id,
+                  amount: amountUSD,
+                  planName: plan.display_name || plan.name,
+                  invoicePdf: null,
+                });
+
+                if (invoiceEmailResult.success) {
+                  logger.info('Invoice email sent successfully (Daimo)', {
+                    to: customerEmail,
+                    txHash: source?.txHash,
+                  });
+                }
+              } catch (emailError) {
+                logger.error('Error sending invoice email (non-critical):', {
+                  error: emailError.message,
+                  eventId: id,
                 });
               }
-            } catch (emailError) {
-              logger.error('Error sending welcome email (non-critical):', {
-                error: emailError.message,
+
+              // 2. Send welcome email from pnptv.app
+              try {
+                const welcomeEmailResult = await EmailService.sendWelcomeEmail({
+                  to: customerEmail,
+                  customerName: user?.first_name || user?.username || 'Valued Customer',
+                  planName: plan.display_name || plan.name,
+                  duration: plan.duration,
+                  expiryDate,
+                  language: userLanguage,
+                });
+
+                if (welcomeEmailResult.success) {
+                  logger.info('Welcome email sent successfully (Daimo)', {
+                    to: customerEmail,
+                    planId,
+                    language: userLanguage,
+                  });
+                }
+              } catch (emailError) {
+                logger.error('Error sending welcome email (non-critical):', {
+                  error: emailError.message,
+                  eventId: id,
+                });
+              }
+            } else {
+              logger.warn('No email address found for user, skipping email notifications', {
+                userId,
                 eventId: id,
               });
             }
-          } else {
-            logger.warn('No email address found for user, skipping email notifications', {
-              userId,
-              eventId: id,
+          }
+
+          await cache.releaseLock(lockKey);
+          return { success: true };
+        } else if (status === 'payment_bounced' || status === 'payment_failed') {
+          // Payment failed
+          if (paymentId) {
+            await PaymentModel.updateStatus(paymentId, 'failed', {
+              transaction_id: source?.txHash || id,
+              daimo_event_id: id,
             });
           }
-        }
 
-        return { success: true };
-      } else if (status === 'payment_bounced' || status === 'payment_failed') {
-        // Payment failed
-        if (paymentId) {
-          await PaymentModel.updateStatus(paymentId, 'failed', {
-            transaction_id: source?.txHash || id,
-            daimo_event_id: id,
+          logger.info('Daimo payment failed', { userId, planId, eventId: id });
+
+          await cache.releaseLock(lockKey);
+          return { success: true }; // Return success to acknowledge webhook
+        } else if (status === 'payment_started' || status === 'payment_unpaid') {
+          // Payment pending/started
+          if (paymentId) {
+            await PaymentModel.updateStatus(paymentId, 'pending', {
+              transaction_id: source?.txHash || id,
+              daimo_event_id: id,
+            });
+          }
+
+          logger.info('Daimo payment pending', {
+            paymentId,
+            eventId: id,
+            status,
           });
-        }
 
-        logger.info('User subscription activated via Daimo', { userId, planId, expiry });
-
-        return { success: true }; // Return success to acknowledge webhook
-      } else if (status === 'payment_started' || status === 'payment_unpaid') {
-        // Payment pending/started
-        if (paymentId) {
-          await PaymentModel.updateStatus(paymentId, 'pending', {
-            transaction_id: source?.txHash || id,
-            daimo_event_id: id,
+          await cache.releaseLock(lockKey);
+          return { success: true };
+        } else {
+          // Unknown status
+          logger.warn('Unknown Daimo payment status', {
+            status,
+            eventId: id,
           });
+          await cache.releaseLock(lockKey);
+          return { success: true };
         }
-
-        logger.info('Daimo payment pending', {
-          paymentId,
+      } catch (error) {
+        await cache.releaseLock(lockKey);
+        logger.error('Error processing Daimo webhook (in try block)', {
+          error: error.message,
           eventId: id,
-          status,
         });
-
-        return { success: true };
+        throw error;
       }
-
-      // Unknown status
-      logger.warn('Unknown Daimo payment status', {
-        status,
-        eventId: id,
-      });
-      return { success: true };
     } catch (error) {
       logger.error('Error processing Daimo webhook', {
         error: error.message,
