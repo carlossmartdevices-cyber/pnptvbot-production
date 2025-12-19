@@ -64,6 +64,9 @@ const getDaimoConfig = () => {
     webhookUrl,
     webhookSecret: process.env.DAIMO_WEBHOOK_SECRET,
 
+    // API configuration
+    apiKey: process.env.DAIMO_API_KEY,
+
     // App metadata
     appName: 'PNPtv Bot',
     appDescription: 'Premium subscriptions and content access',
