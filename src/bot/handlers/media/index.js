@@ -4,6 +4,7 @@ const liveHandlers = require('./live');
 const supportHandlers = require('./support');
 const playerHandlers = require('./player');
 const membersAreaHandlers = require('./membersArea');
+const hangoutsHandlers = require('./hangouts');
 
 /**
  * Register all media handlers
@@ -16,6 +17,7 @@ const registerMediaHandlers = (bot) => {
   supportHandlers(bot);
   playerHandlers(bot);
   membersAreaHandlers(bot);
+  hangoutsHandlers(bot);
 };
 
 module.exports = registerMediaHandlers;

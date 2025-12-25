@@ -21,8 +21,8 @@ const registerMembersAreaHandlers = (bot) => {
             if (!hasSubscription) {
                 await ctx.editMessageText(
                     lang === 'es'
-                        ? '🔒 *Área de Miembros PRIME*\n\nEsta área está disponible solo para miembros PRIME.\n\n✨ Con PRIME obtienes acceso a:\n• Salas Sociales PNPtv!\n• Shows en Vivo\n• Radio PNPtv!\n• Y mucho más...'
-                        : '🔒 *PRIME Members Area*\n\nThis area is only available for PRIME members.\n\n✨ With PRIME you get access to:\n• PNPtv! Social Rooms\n• Live Stream Shows\n• Radio PNPtv!\n• And much more...',
+                        ? '🔒 *Área de Miembros PRIME*\n\nEsta área está disponible solo para miembros PRIME.\n\n✨ Con PRIME obtienes acceso a:\n• Salas de Video Llamadas\n• Shows en Vivo\n• Radio PNPtv!\n• Y mucho más...'
+                        : '🔒 *PRIME Members Area*\n\nThis area is only available for PRIME members.\n\n✨ With PRIME you get access to:\n• Video Call Rooms\n• Live Stream Shows\n• Radio PNPtv!\n• And much more...',
                     {
                         parse_mode: 'Markdown',
                         ...Markup.inlineKeyboard([
@@ -42,7 +42,7 @@ const registerMembersAreaHandlers = (bot) => {
             await ctx.editMessageText(message, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
-                    [Markup.button.callback(lang === 'es' ? '🎥 Salas Sociales PNPtv!' : '🎥 PNPtv! Social Rooms', 'show_zoom')],
+                    [Markup.button.callback(lang === 'es' ? '📹 Salas de Video Llamadas' : '📹 Video Call Rooms', 'hangouts_join_main')],
                     [Markup.button.callback(lang === 'es' ? '🎬 Shows en Vivo' : '🎬 Live Stream Shows', 'show_live')],
                     [Markup.button.callback(lang === 'es' ? '📻 Radio PNPtv!' : '📻 Radio PNPtv!', 'show_radio')],
                     [Markup.button.callback(lang === 'es' ? '🔙 Atrás' : '🔙 Back', 'back_to_main')]
