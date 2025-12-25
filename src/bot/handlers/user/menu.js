@@ -215,14 +215,6 @@ const registerMenuHandlers = (bot) => {
         logger.error('Error in admin panel:', error);
       }
     });
-  // Menu command
-  bot.command('menu', async (ctx) => {
-    try {
-      await showMainMenu(ctx);
-    } catch (error) {
-      logger.error('Error showing menu:', error);
-    }
-  });
 
   // Back to main menu action
   bot.action('back_to_main', async (ctx) => {
