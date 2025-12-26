@@ -126,7 +126,8 @@
       "Bash(node scripts/send-video-room-broadcast.js:*)",
       "Bash(pg_isready:*)",
       "Bash(PGPASSWORD=\"Apelo801050#\" psql:*)",
-      "Bash(node scripts/send-broadcast-auto.js:*)"
+      "Bash(node scripts/send-broadcast-auto.js:*)",
+      "Bash(zcat:*)"
     ],
     "deny": [],
     "ask": []
