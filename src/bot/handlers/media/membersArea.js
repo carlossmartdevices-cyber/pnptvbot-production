@@ -41,7 +41,7 @@ const registerMembersAreaHandlers = (bot) => {
 
             // Build video rooms URL with user display name
             const displayName = ctx.from.first_name || ctx.from.username || 'Guest';
-            const videoRoomsUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+            const videoRoomsUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=true&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
 
             await ctx.editMessageText(message, {
                 parse_mode: 'Markdown',
