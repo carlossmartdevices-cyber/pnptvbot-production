@@ -143,8 +143,9 @@ class PaymentService {
 
     /**
      * Reintentar pago fallido (simulado)
-     * @param {string} paymentId
-     * @param {number} maxRetries
+     * @param {string|number} paymentId - Payment ID to retry
+     * @param {number} [maxRetries=2] - Maximum number of retry attempts
+     * @returns {Promise<boolean>} Success status
      */
     static async retryPayment(paymentId, maxRetries = 2) {
       let attempt = 0;

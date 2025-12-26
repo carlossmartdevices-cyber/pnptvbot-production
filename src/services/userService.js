@@ -34,8 +34,8 @@ class UserService {
   /**
    * Update user profile
    * @param {string|number} userId - Telegram user ID
-   * @param {Object} updates - Fields to update
-   * @returns {Promise<Object|null>}
+   * @param {Object.<string, *>} updates - Fields to update
+   * @returns {Promise<Object|null>} Updated user object or null
    */
   static async updateUserProfile(userId, updates) {
     try {

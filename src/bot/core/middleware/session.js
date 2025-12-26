@@ -11,7 +11,7 @@ const memoryStore = new Map();
 
 /**
  * Get session key for user
- * @param {Object} ctx - Telegraf context
+ * @param {import('telegraf').Context} ctx - Telegraf context
  * @returns {string} Session key
  */
 const getSessionKey = (ctx) => {
@@ -21,7 +21,7 @@ const getSessionKey = (ctx) => {
 
 /**
  * Session middleware
- * @returns {Function} Middleware function
+ * @returns {(ctx: import('telegraf').Context, next: Function) => Promise<void>} Middleware function
  */
 const sessionMiddleware = () => async (ctx, next) => {
   const sessionKey = getSessionKey(ctx);

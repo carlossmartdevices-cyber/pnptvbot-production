@@ -12,7 +12,7 @@ const sanitize = {
    * - Escapes HTML entities to prevent XSS
    * - Removes null bytes
    * @param {string} input - Raw text input
-   * @param {object} options - Sanitization options
+   * @param {{maxLength?: number, allowNewlines?: boolean, escapeHtml?: boolean}} [options={}] - Sanitization options
    * @returns {string} Sanitized text
    */
   text: (input, options = {}) => {
@@ -130,8 +130,8 @@ const sanitize = {
 
   /**
    * Sanitize number input
-   * @param {any} input - Raw number input
-   * @param {object} options - Sanitization options
+   * @param {*} input - Raw number input
+   * @param {{min?: number, max?: number, defaultValue?: number, allowFloat?: boolean}} [options={}] - Sanitization options
    * @returns {number} Sanitized number or default value
    */
   number: (input, options = {}) => {
@@ -162,7 +162,7 @@ const sanitize = {
   /**
    * Sanitize URL
    * @param {string} input - Raw URL
-   * @param {object} options - Sanitization options
+   * @param {{allowedProtocols?: string[], requireTld?: boolean}} [options={}] - Sanitization options
    * @returns {string} Sanitized URL or empty string if invalid
    */
   url: (input, options = {}) => {
@@ -191,8 +191,8 @@ const sanitize = {
 
   /**
    * Sanitize boolean input
-   * @param {any} input - Raw boolean input
-   * @param {boolean} defaultValue - Default value if invalid
+   * @param {*} input - Raw boolean input
+   * @param {boolean} [defaultValue=false] - Default value if invalid
    * @returns {boolean} Sanitized boolean
    */
   boolean: (input, defaultValue = false) => {
@@ -214,8 +214,8 @@ const sanitize = {
   /**
    * Sanitize JSON input
    * @param {string} input - Raw JSON string
-   * @param {any} defaultValue - Default value if invalid
-   * @returns {any} Parsed JSON or default value
+   * @param {*} [defaultValue=null] - Default value if invalid
+   * @returns {*} Parsed JSON or default value
    */
   json: (input, defaultValue = null) => {
     if (!input) return defaultValue;
@@ -276,9 +276,9 @@ const sanitize = {
 
   /**
    * Sanitize object by applying sanitizers to each field
-   * @param {object} data - Raw object data
-   * @param {object} schema - Schema defining sanitizer for each field
-   * @returns {object} Sanitized object
+   * @param {Object.<string, *>} data - Raw object data
+   * @param {Object.<string, string|{type: string, [key: string]: *}>} schema - Schema defining sanitizer for each field
+   * @returns {Object.<string, *>} Sanitized object
    * @example
    * const sanitized = sanitize.object(rawData, {
    *   username: 'username',

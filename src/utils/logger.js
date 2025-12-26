@@ -66,7 +66,12 @@ const logger = winston.createLogger({
   exitOnError: false,
 });
 
-// Add user context to logs
+/**
+ * Add user context to logs
+ * @param {string|number} userId - User ID
+ * @param {string} action - Action being performed
+ * @returns {{userId: string|number, action: string, timestamp: string}} User context object
+ */
 logger.addUserContext = (userId, action) => ({
   userId,
   action,

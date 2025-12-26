@@ -53,6 +53,8 @@ async function processRefund(call, refundAmount, refundPercentage) {
 
 /**
  * Call Management Handlers - Reschedule, cancel, view history
+ * @param {import('telegraf').Telegraf} bot - Telegraf bot instance
+ * @returns {void}
  */
 function registerCallManagementHandlers(bot) {
   /**

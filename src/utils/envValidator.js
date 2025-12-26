@@ -44,8 +44,8 @@ const ENV_VAR_GROUPS = {
 
 /**
  * Validate environment variables
- * @param {boolean} strict - If true, throw error on missing required vars
- * @returns {Object} Validation result
+ * @param {boolean} [strict=true] - If true, throw error on missing required vars
+ * @returns {{valid: boolean, missing: string[], warnings: string[], configured: string[]}} Validation result
  */
 function validateEnv(strict = true) {
   const missing = [];
@@ -102,9 +102,9 @@ function validateEnv(strict = true) {
 /**
  * Get environment variable with validation
  * @param {string} key - Environment variable name
- * @param {string} defaultValue - Default value if not set
- * @param {boolean} required - If true, throw error if not set
- * @returns {string} Environment variable value
+ * @param {string|null} [defaultValue=null] - Default value if not set
+ * @param {boolean} [required=false] - If true, throw error if not set
+ * @returns {string|null} Environment variable value or default
  */
 function getEnv(key, defaultValue = null, required = false) {
   const value = process.env[key];
@@ -143,6 +143,7 @@ function isFeatureEnabled(feature) {
 
 /**
  * Print environment configuration summary
+ * @returns {void}
  */
 function printEnvSummary() {
   console.log('\n=== Environment Configuration ===');

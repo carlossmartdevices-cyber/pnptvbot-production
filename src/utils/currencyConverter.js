@@ -97,8 +97,8 @@ class CurrencyConverter {
   /**
    * Get both USD and COP amounts for display
    * @param {number} baseAmount - Base amount
-   * @param {string} baseCurrency - Base currency ('USD' or 'COP')
-   * @returns {Promise<Object>} { usd, cop, rate }
+   * @param {string} [baseCurrency='USD'] - Base currency ('USD' or 'COP')
+   * @returns {Promise<{usd: number, cop: number, rate: number}>} Display amounts and exchange rate
    */
   static async getDisplayAmounts(baseAmount, baseCurrency = 'USD') {
     try {
@@ -138,8 +138,8 @@ class CurrencyConverter {
   /**
    * Format currency for display
    * @param {number} amount - Amount
-   * @param {string} currency - Currency code
-   * @returns {string} Formatted string
+   * @param {string} currency - Currency code ('USD', 'COP', etc.)
+   * @returns {string} Formatted currency string
    */
   static formatCurrency(amount, currency) {
     if (currency === 'USD') {
