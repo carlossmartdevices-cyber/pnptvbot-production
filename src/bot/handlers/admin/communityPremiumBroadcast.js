@@ -78,14 +78,15 @@ const registerCommunityPremiumBroadcast = (bot) => {
         try {
           const userLang = user.language || 'en';
 
-          // Check if user already has active premium
-          const hasActivePremium = user.subscriptionStatus === 'active' &&
-                                    user.planExpiry &&
-                                    new Date(user.planExpiry) > new Date();
+          // Check if user already has active premium (including lifetime)
+          const hasActivePremium = user.subscriptionStatus === 'active' && (
+            user.lifetimeAccess === true || // Lifetime members
+            (user.planExpiry && new Date(user.planExpiry) > new Date()) // Time-limited premium
+          );
 
           if (hasActivePremium) {
             alreadyPremium++;
-            // Skip users who already have premium
+            // Skip users who already have premium (including lifetime)
             continue;
           }
 
@@ -199,10 +200,11 @@ const registerCommunityPremiumBroadcast = (bot) => {
         return;
       }
 
-      // Check if user already activated this promotion
-      const hasActivePremium = user.subscriptionStatus === 'active' &&
-                                user.planExpiry &&
-                                new Date(user.planExpiry) > new Date();
+      // Check if user already has active premium (including lifetime)
+      const hasActivePremium = user.subscriptionStatus === 'active' && (
+        user.lifetimeAccess === true || // Lifetime members
+        (user.planExpiry && new Date(user.planExpiry) > new Date()) // Time-limited premium
+      );
 
       if (hasActivePremium) {
         await ctx.answerCbQuery(
