@@ -7,10 +7,7 @@ const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
-// Web app URL for Hangouts (Main Rooms use Agora)
-const HANGOUTS_WEB_URL = process.env.HANGOUTS_WEB_URL || 'https://pnptv.app/hangouts';
-
-// Jitsi Meet URL for private calls
+// Jitsi Meet URL for all rooms (no authentication required)
 const JITSI_MEET_URL = process.env.JITSI_MEET_URL || 'https://meet.jit.si';
 
 /**
@@ -243,14 +240,28 @@ const joinMainRoom = async (ctx, roomId = 1) => {
     const userId = ctx.from.id;
     const username = ctx.from.username || ctx.from.first_name;
 
-    // Join the specified main room - joinRoom handles everything
+    // Get room info first
+    const room = await MainRoomModel.getById(roomId);
+
+    if (!room) {
+      throw new Error('Room not found');
+    }
+
+    if (!room.isActive) {
+      throw new Error('Room is not active');
+    }
+
+    // Join the specified main room to track participants
     const result = await MainRoomModel.joinRoom(roomId, userId, username, true); // true = as publisher (can broadcast)
 
     // Get current participants count
     const participants = await MainRoomModel.getParticipants(roomId);
 
-    // Create web app URL with token from joinRoom result
-    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${result.room.channelName}&token=${result.token}&uid=${userId}&username=${encodeURIComponent(username)}&type=main`;
+    // Use Jitsi Meet directly - no authentication, no moderator required
+    // Format: https://meet.jit.si/{roomName}#config.prejoinPageEnabled=false&userInfo.displayName={name}
+    const jitsiUrl = `${JITSI_MEET_URL}/${encodeURIComponent(room.channelName)}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(username)}`;
+
+    const webAppUrl = jitsiUrl;
 
     let text = `✅ Joined Main Room!\n\n`;
     text += `🎥 Room: ${result.room.name}\n`;
