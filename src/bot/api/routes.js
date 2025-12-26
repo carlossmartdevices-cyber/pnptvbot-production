@@ -11,6 +11,7 @@ const logger = require('../../utils/logger');
 const webhookController = require('./controllers/webhookController');
 const subscriptionController = require('./controllers/subscriptionController');
 const paymentController = require('./controllers/paymentController');
+const invitationController = require('./controllers/invitationController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
