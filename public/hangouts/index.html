@@ -444,6 +444,7 @@
         // Initialize page
         document.addEventListener('DOMContentLoaded', () => {
             setupEventListeners();
+            clearForm();
             loadMyRooms();
             loadPublicRooms();
 
@@ -454,6 +455,23 @@
 
         function setupEventListeners() {
             document.getElementById('createBtn').addEventListener('click', createRoom);
+        }
+
+        function clearForm() {
+            // Clear form values
+            document.getElementById('creatorName').value = '';
+            document.getElementById('roomTitle').value = '';
+            document.getElementById('roomDescription').value = '';
+            document.getElementById('maxParticipants').value = '10';
+            document.getElementById('roomType').value = 'private';
+            document.getElementById('allowGuests').checked = true;
+
+            // Clear alerts
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                alert.classList.remove('show');
+                alert.textContent = '';
+            });
         }
 
         function showAlert(elementId, message, type) {
@@ -525,7 +543,11 @@
 
             } catch (error) {
                 console.error('Error creating room:', error);
-                showAlert('createAlert', `❌ ${error.message}`, 'error');
+                let errorMessage = error.message;
+                if (errorMessage === 'Failed to fetch' || errorMessage.includes('NOT_FOUND')) {
+                    errorMessage = 'Unable to reach the server. Please try again.';
+                }
+                showAlert('createAlert', `❌ ${errorMessage}`, 'error');
             } finally {
                 btn.textContent = originalText;
                 btn.disabled = false;
