@@ -40,9 +40,9 @@ const registerMembersAreaHandlers = (bot) => {
                 : '💎 *PRIME Members Area*\n\nWelcome to the exclusive area for PRIME members!\n\nSelect an option:';
 
             // Build video rooms URL
-            // Using pnptv.app community room with proper parameters
-            const displayName = encodeURIComponent(ctx.from.first_name || 'Guest');
-            const videoRoomsUrl = `https://pnptv.app/community-room?userId=${userId}&displayName=${displayName}`;
+            // Using Jitsi community room with proper parameters
+            const displayName = ctx.from.first_name || 'Guest';
+            const videoRoomsUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
 
             await ctx.editMessageText(message, {
                 parse_mode: 'Markdown',

@@ -243,7 +243,7 @@ Our main room is open around the clock for you to meet new members, make friends
 
       // Get user's display name for Jitsi
       const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
-      const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=true&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+      const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
 
       await ctx.editMessageText(hangoutsText, {
         parse_mode: 'Markdown',
