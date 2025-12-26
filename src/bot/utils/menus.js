@@ -4,6 +4,8 @@
 
 /**
  * Main menu for users
+ * @param {string} [language='en'] - Language code ('en' or 'es')
+ * @returns {{inline_keyboard: Array<Array<{text: string, callback_data: string}>>}} Inline keyboard markup
  */
 const getMainMenu = (language = 'en') => {
   const labels = {
@@ -47,6 +49,7 @@ const getMainMenu = (language = 'en') => {
 
 /**
  * Language selection menu
+ * @returns {{inline_keyboard: Array<Array<{text: string, callback_data: string}>>}} Inline keyboard markup
  */
 const getLanguageMenu = () => {
   return {
@@ -59,6 +62,8 @@ const getLanguageMenu = () => {
 
 /**
  * Subscription plans menu
+ * @param {string} [language='en'] - Language code ('en' or 'es')
+ * @returns {{inline_keyboard: Array<Array<{text: string, callback_data: string}>>}} Inline keyboard markup
  */
 const getPlansMenu = (language = 'en') => {
   const labels = {
@@ -93,6 +98,9 @@ const getPlansMenu = (language = 'en') => {
 
 /**
  * Payment method menu
+ * @param {string|number} planId - Plan ID
+ * @param {string} [language='en'] - Language code ('en' or 'es')
+ * @returns {{inline_keyboard: Array<Array<{text: string, callback_data: string}>>}} Inline keyboard markup
  */
 const getPaymentMethodMenu = (planId, language = 'en') => {
   const labels = {

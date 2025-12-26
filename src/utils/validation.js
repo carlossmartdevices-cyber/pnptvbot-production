@@ -5,7 +5,7 @@ const logger = require('./logger');
 /**
  * Sanitize user input to prevent XSS and injection attacks
  * @param {string} input - User input
- * @returns {string} Sanitized input
+ * @returns {string|*} Sanitized input (returns original if not a string)
  */
 const sanitizeInput = (input) => {
   if (typeof input !== 'string') return input;
@@ -183,9 +183,9 @@ const schemas = {
 
 /**
  * Validate data against schema
- * @param {Object} data - Data to validate
- * @param {Object} schema - Joi schema
- * @returns {Object} { error, value }
+ * @param {*} data - Data to validate
+ * @param {import('joi').Schema} schema - Joi schema
+ * @returns {{error: string|null, value: *}} Validation result with error message and value
  */
 const validateSchema = (data, schema) => {
   try {
@@ -211,9 +211,9 @@ const validateSchema = (data, schema) => {
 
 /**
  * Sanitize object properties
- * @param {Object} obj - Object to sanitize
- * @param {Array<string>} fields - Fields to sanitize
- * @returns {Object} Sanitized object
+ * @param {Object.<string, *>} obj - Object to sanitize
+ * @param {string[]} fields - Fields to sanitize
+ * @returns {Object.<string, *>} Sanitized object
  */
 const sanitizeObject = (obj, fields) => {
   const sanitized = { ...obj };

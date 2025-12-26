@@ -61,6 +61,8 @@ const config = {
 
 /**
  * Validate required configuration
+ * @throws {Error} If required configuration is missing
+ * @returns {void}
  */
 function validateConfig() {
   const required = ['botToken', 'botUsername'];
