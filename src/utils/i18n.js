@@ -390,6 +390,18 @@ explore Nearby without limits, and join private events.`,
 
     // Call Rooms
     callTitle: '🎥 Call Rooms',
+    // Hangouts (Community Rooms)
+    hangouts: {
+      title: 'Video Call Rooms',
+      description: 'Join community rooms or create private video calls',
+      mainRoomActive: 'Main Room Active',
+      participants: 'participants',
+      mainRoomsTitle: 'Join PNPtv! Main Rooms',
+      selectRoom: 'Select a room to join:',
+      roomFull: 'This room is full. Please try another room.',
+      roomNotActive: 'This room is not currently active.',
+      roomNotFound: 'Room not found.',
+    },
     // Zoom Rooms
     zoomTitle: '`🎥 Zoom Rooms`',
     createRoom: '➕ Create Room',
@@ -890,6 +902,18 @@ explorar Cercanos sin limites y unirte a eventos privados.`,
 
     // Call Rooms
     callTitle: '🎥 Salas de Video',
+    // Hangouts (Community Rooms)
+    hangouts: {
+      title: 'Salas de Video Llamadas',
+      description: 'Únete a salas comunitarias o crea videollamadas privadas',
+      mainRoomActive: 'Sala Principal Activa',
+      participants: 'participantes',
+      mainRoomsTitle: 'Unirse a Salas Principales PNPtv!',
+      selectRoom: 'Selecciona una sala para unirte:',
+      roomFull: 'Esta sala está llena. Por favor intenta otra sala.',
+      roomNotActive: 'Esta sala no está activa actualmente.',
+      roomNotFound: 'Sala no encontrada.',
+    },
     // Zoom Rooms
     zoomTitle: '`🎥 Salas Zoom`',
     createRoom: '➕ Crear Sala',
