@@ -7,10 +7,7 @@ const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
-// Web app URL for Hangouts (Main Rooms use Jitsi without authentication)
-const HANGOUTS_WEB_URL = process.env.HANGOUTS_WEB_URL || 'https://pnptv.app/community-room';
-
-// Jitsi Meet URL for private calls
+// Jitsi Meet URL for all rooms (no authentication required)
 const JITSI_MEET_URL = process.env.JITSI_MEET_URL || 'https://meet.jit.si';
 
 /**
@@ -260,27 +257,11 @@ const joinMainRoom = async (ctx, roomId = 1) => {
     // Get current participants count
     const participants = await MainRoomModel.getParticipants(roomId);
 
-    // Create web app URL without authentication - use Jitsi config parameters
-    // This allows guest access without login and starts room immediately
-    const jitsiConfig = {
-      'config.prejoinPageEnabled': 'false',
-      'config.startWithAudioMuted': 'false',
-      'config.startWithVideoMuted': 'false',
-      'config.requireDisplayName': 'false',
-      'config.enableWelcomePage': 'false',
-      'config.enableClosePage': 'false',
-      'config.disableModeratorIndicator': 'true',
-      'config.startAudioOnly': 'false',
-      'config.channelLastN': '-1',
-      'config.disableDeepLinking': 'true',
-      'userInfo.displayName': encodeURIComponent(username)
-    };
+    // Use Jitsi Meet directly - no authentication, no moderator required
+    // Format: https://meet.jit.si/{roomName}#config.prejoinPageEnabled=false&userInfo.displayName={name}
+    const jitsiUrl = `${JITSI_MEET_URL}/${encodeURIComponent(room.channelName)}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(username)}`;
 
-    const configString = Object.entries(jitsiConfig)
-      .map(([key, value]) => `${key}=${value}`)
-      .join('&');
-
-    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${encodeURIComponent(room.channelName)}&${configString}`;
+    const webAppUrl = jitsiUrl;
 
     let text = `✅ Joined Main Room!\n\n`;
     text += `🎥 Room: ${result.room.name}\n`;
