@@ -99,7 +99,7 @@ const registerMenuHandlers = (bot) => {
     'show_profile',
     'show_nearby',
     'show_radio',
-    'show_jitsi',
+    'hangouts_join_main',
     'show_support',
     'show_settings',
     'admin_panel'
