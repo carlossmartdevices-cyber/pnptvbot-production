@@ -121,7 +121,11 @@
       "Bash(git log:*)",
       "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch:*)",
       "Bash(python3 -m pip install:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(__NEW_LINE__ grep -n \"REDIS_PASSWORD\\\\|SENDGRID_API_KEY\\\\|SMTP_PASSWORD\" /root/pnptvbot-production/.env)",
+      "Bash(node scripts/send-video-room-broadcast.js:*)",
+      "Bash(pg_isready:*)",
+      "Bash(PGPASSWORD=\"Apelo801050#\" psql:*)"
     ],
     "deny": [],
     "ask": []
