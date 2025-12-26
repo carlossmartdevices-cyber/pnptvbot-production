@@ -39,10 +39,9 @@ const registerMembersAreaHandlers = (bot) => {
                 ? '💎 *Área de Miembros PRIME*\n\n¡Bienvenido al área exclusiva para miembros PRIME!\n\nSelecciona una opción:'
                 : '💎 *PRIME Members Area*\n\nWelcome to the exclusive area for PRIME members!\n\nSelect an option:';
 
-            // Build video rooms URL with user context and audio config
-            const displayName = ctx.from.first_name || 'Guest';
-            const audioStreamUrl = process.env.AUDIO_STREAM_URL || '/audio/background-music.mp3';
-            const videoRoomsUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=true&config.startWithVideoMuted=false&config.disableLocalRecording=true&config.disableScreenSharing=true&config.requireDisplayName=true&config.backgroundAudio=${encodeURIComponent(audioStreamUrl)}&userInfo.displayName=${encodeURIComponent(displayName)}`;
+            // Build video rooms URL with user display name
+            const displayName = ctx.from.first_name || ctx.from.username || 'Guest';
+            const videoRoomsUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
 
             await ctx.editMessageText(message, {
                 parse_mode: 'Markdown',
