@@ -3,12 +3,11 @@ const moment = require('moment');
 const VideoCallModel = require('../../../models/videoCallModel');
 const MainRoomModel = require('../../../models/mainRoomModel');
 const AgoraTokenService = require('../../../services/agora/agoraTokenService');
-const jaasService = require('../../services/jaasService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
-// Web app URL for Hangouts (Main Rooms use 8x8/JaaS)
+// Web app URL for Hangouts (Main Rooms use Jitsi without authentication)
 const HANGOUTS_WEB_URL = process.env.HANGOUTS_WEB_URL || 'https://pnptv.app/community-room';
 
 // Jitsi Meet URL for private calls
@@ -261,25 +260,27 @@ const joinMainRoom = async (ctx, roomId = 1) => {
     // Get current participants count
     const participants = await MainRoomModel.getParticipants(roomId);
 
-    // Generate JaaS/8x8 JWT token for authentication
-    let jwtToken;
-    try {
-      jwtToken = jaasService.generateModeratorToken(
-        room.channelName,
-        String(userId),
-        username,
-        '', // email
-        '' // avatar
-      );
-      logger.info('Generated JaaS token for main room', { roomId, userId, username });
-    } catch (jwtError) {
-      logger.error('Failed to generate JaaS token, using fallback:', jwtError);
-      // Fallback: allow access without JWT (if JaaS is not configured)
-      jwtToken = 'not-configured';
-    }
+    // Create web app URL without authentication - use Jitsi config parameters
+    // This allows guest access without login and starts room immediately
+    const jitsiConfig = {
+      'config.prejoinPageEnabled': 'false',
+      'config.startWithAudioMuted': 'false',
+      'config.startWithVideoMuted': 'false',
+      'config.requireDisplayName': 'false',
+      'config.enableWelcomePage': 'false',
+      'config.enableClosePage': 'false',
+      'config.disableModeratorIndicator': 'true',
+      'config.startAudioOnly': 'false',
+      'config.channelLastN': '-1',
+      'config.disableDeepLinking': 'true',
+      'userInfo.displayName': encodeURIComponent(username)
+    };
 
-    // Create web app URL with JWT token
-    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${encodeURIComponent(room.channelName)}&jwt=${encodeURIComponent(jwtToken)}&name=${encodeURIComponent(username)}`;
+    const configString = Object.entries(jitsiConfig)
+      .map(([key, value]) => `${key}=${value}`)
+      .join('&');
+
+    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${encodeURIComponent(room.channelName)}&${configString}`;
 
     let text = `✅ Joined Main Room!\n\n`;
     text += `🎥 Room: ${result.room.name}\n`;
