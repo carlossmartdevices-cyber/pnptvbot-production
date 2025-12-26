@@ -44,15 +44,17 @@ const MODERATION_CONFIG = {
   // Auto-Moderation Filters
   FILTERS: {
     // Spam Detection
+    // DISABLED - Using command auto-delete and message cleanup for spam prevention instead
     SPAM: {
-      enabled: true,
+      enabled: false,
       maxDuplicateMessages: 3, // Max duplicate messages before flagging
       duplicateTimeWindow: 60 * 1000, // Time window in ms (1 minute)
     },
 
     // Flood Detection
+    // DISABLED - Using command auto-delete and message cleanup for spam prevention instead
     FLOOD: {
-      enabled: true,
+      enabled: false,
       maxMessages: 10, // Max messages
       timeWindow: 30 * 1000, // In time window (30 seconds)
     },
@@ -60,7 +62,7 @@ const MODERATION_CONFIG = {
     // Link Filtering
     // Only admins are exempt (checked in middleware, not here)
     LINKS: {
-      enabled: true,
+      enabled: false,
       allowedDomains: [],
     },
 

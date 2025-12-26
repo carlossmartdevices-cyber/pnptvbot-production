@@ -134,7 +134,7 @@ const startBot = async () => {
     bot.use(sessionMiddleware());
     bot.use(rateLimitMiddleware());
     bot.use(chatCleanupMiddleware());
-    bot.use(usernameEnforcement());
+    // DISABLED: bot.use(usernameEnforcement()); // Username enforcement rules disabled
     bot.use(moderationFilter());
     bot.use(activityTrackerMiddleware());
     bot.use(groupCommandReminder());

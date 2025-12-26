@@ -1,4 +1,7 @@
 const PaymentService = require('../../services/paymentService');
+const PaymentModel = require('../../../models/paymentModel');
+const PlanModel = require('../../../models/planModel');
+const UserModel = require('../../../models/userModel');
 const logger = require('../../../utils/logger');
 const DaimoConfig = require('../../../config/daimo');
 
@@ -243,6 +246,171 @@ const handleDaimoWebhook = async (req, res) => {
 };
 
 /**
+ * Handle PayPal webhook
+ * Receives payment events from PayPal (PAYMENT.CAPTURE.COMPLETED, etc.)
+ * @param {Request} req - Express request
+ * @param {Response} res - Express response
+ */
+const handlePayPalWebhook = async (req, res) => {
+  const PayPalService = require('../../services/paypalService');
+
+  try {
+    const webhookEvent = req.body;
+    const eventType = webhookEvent.event_type;
+    const eventId = webhookEvent.id;
+
+    // Use event ID as idempotency key
+    const idempotencyKey = `paypal_${eventId}`;
+
+    // Check if this webhook was already processed
+    if (isWebhookProcessed(idempotencyKey)) {
+      logger.info('Duplicate PayPal webhook detected (already processed)', {
+        eventId,
+        eventType,
+      });
+      return res.status(200).json({ success: true, duplicate: true });
+    }
+
+    logger.info('PayPal webhook received', {
+      eventId,
+      eventType,
+    });
+
+    // Verify webhook signature
+    const verified = await PayPalService.verifyWebhook(webhookEvent, req.headers);
+
+    if (!verified) {
+      logger.error('Invalid PayPal webhook signature', {
+        eventId,
+        eventType,
+      });
+      return res.status(401).json({ success: false, error: 'Invalid signature' });
+    }
+
+    // Process different event types
+    if (eventType === 'PAYMENT.CAPTURE.COMPLETED') {
+      const resource = webhookEvent.resource;
+      const paymentId = resource?.custom_id || resource?.supplementary_data?.related_ids?.order_reference_id;
+      const captureId = resource?.id;
+      const status = resource?.status;
+
+      if (!paymentId) {
+        logger.warn('PayPal webhook missing payment ID', { eventId, eventType });
+        return res.status(400).json({ success: false, error: 'Missing payment ID' });
+      }
+
+      // Get payment from database
+      const PaymentModel = require('../../../models/paymentModel');
+      const payment = await PaymentModel.getById(paymentId);
+
+      if (!payment) {
+        logger.warn('Payment not found for PayPal webhook', { paymentId, eventId });
+        return res.status(404).json({ success: false, error: 'Payment not found' });
+      }
+
+      if (status === 'COMPLETED') {
+        // Mark payment as completed
+        const userId = payment.userId || payment.user_id;
+        const planId = payment.planId || payment.plan_id;
+
+        await PaymentModel.updateStatus(paymentId, 'completed', {
+          paypal_capture_id: captureId,
+          transaction_id: captureId,
+        });
+
+        // Activate user subscription
+        try {
+          if (userId && planId) {
+            const plan = await PlanModel.getById(planId);
+            if (plan) {
+              const expiryDate = new Date();
+              expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
+
+              await UserModel.updateSubscription(userId, {
+                status: 'active',
+                planId,
+                expiry: expiryDate,
+              });
+
+              logger.info('Subscription activated after PayPal webhook', {
+                userId,
+                planId,
+                paymentId,
+                eventId,
+                expiryDate,
+              });
+
+              // Send payment confirmation notification
+              const user = await UserModel.getById(userId);
+              const userLanguage = user?.language || 'es';
+              const amount = resource?.amount?.value || 0;
+
+              try {
+                await PaymentService.sendPaymentConfirmationNotification({
+                  userId,
+                  plan,
+                  transactionId: captureId,
+                  amount: parseFloat(amount),
+                  expiryDate,
+                  language: userLanguage,
+                });
+              } catch (notifError) {
+                logger.error('Error sending payment confirmation notification:', {
+                  error: notifError.message,
+                  userId,
+                });
+              }
+            }
+          }
+        } catch (subError) {
+          logger.error('Error activating subscription after PayPal webhook', {
+            error: subError.message,
+            userId,
+            planId,
+          });
+        }
+      } else {
+        logger.warn('PayPal payment not completed', {
+          paymentId,
+          status,
+          eventId,
+        });
+      }
+    } else if (eventType === 'PAYMENT.CAPTURE.DENIED' || eventType === 'PAYMENT.CAPTURE.REFUNDED') {
+      // Handle denied or refunded payments
+      const resource = webhookEvent.resource;
+      const paymentId = resource?.custom_id;
+
+      if (paymentId) {
+        await PaymentModel.updateStatus(paymentId, 'failed', {
+          paypal_status: eventType,
+        });
+
+        logger.info('Payment marked as failed', {
+          paymentId,
+          eventType,
+          eventId,
+        });
+      }
+    } else {
+      logger.info('Unhandled PayPal event type', {
+        eventType,
+        eventId,
+      });
+    }
+
+    markWebhookProcessed(idempotencyKey);
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    logger.error('Error handling PayPal webhook:', {
+      error: error.message,
+      stack: error.stack,
+    });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+
+/**
  * Handle payment response page
  * @param {Request} req - Express request
  * @param {Response} res - Express response
@@ -386,5 +554,6 @@ const handlePaymentResponse = async (req, res) => {
 module.exports = {
   handleEpaycoWebhook,
   handleDaimoWebhook,
+  handlePayPalWebhook,
   handlePaymentResponse,
 };

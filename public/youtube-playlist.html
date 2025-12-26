@@ -647,6 +647,41 @@
             </div>
         </div>
 
+        <!-- Video Player Modal -->
+        <div id="videoPlayerModal" class="modal" style="max-width: 90%; width: 1200px; height: 90%;">
+            <div class="modal-content" style="padding: 0; height: 100%;">
+                <div style="position: relative; height: 100%; display: flex; flex-direction: column;">
+                    <div style="padding: 20px; border-bottom: 1px solid #e0e0e0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                        <h5 id="videoPlayerTitle" style="margin: 0; font-weight: 600;">Now Playing</h5>
+                        <p id="videoPlayerSubtitle" style="margin: 5px 0 0 0; opacity: 0.9;">Loading...</p>
+                    </div>
+                    <div id="videoPlayerContainer" style="flex: 1; background: #000; position: relative;">
+                        <iframe id="videoPlayerFrame"
+                                style="width: 100%; height: 100%; border: none;"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowfullscreen>
+                        </iframe>
+                    </div>
+                    <div style="padding: 15px; background: #f5f5f5; border-top: 1px solid #e0e0e0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <button class="btn" onclick="playPreviousVideo()" id="prevBtn">
+                                <i class="material-icons left">skip_previous</i>Previous
+                            </button>
+                            <div style="text-align: center; flex: 1; min-width: 200px;">
+                                <span id="videoPosition">1 / 9</span>
+                            </div>
+                            <button class="btn" onclick="playNextVideo()" id="nextBtn">
+                                <i class="material-icons right">skip_next</i>Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 10px 24px;">
+                <button class="btn-flat" onclick="closeVideoPlayer()">Close Player</button>
+            </div>
+        </div>
+
         <div class="row" style="margin: 0;">
 
             <!-- Playlists Tab -->
@@ -1070,10 +1105,16 @@
 
             // Parse video links and create videos array
             const links = videoLinks.split(',').map(link => link.trim()).filter(link => link);
-            const videos = links.map((link, index) => ({
-                title: `Video ${index + 1}`,
-                duration: '--:--'
-            }));
+
+            // Extract YouTube video IDs from URLs
+            const videos = links.map((link, index) => {
+                const videoId = extractYouTubeVideoId(link);
+                return {
+                    title: `Video ${index + 1}`,
+                    duration: '--:--',
+                    videoId: videoId || null
+                };
+            });
 
             // Create new playlist
             const newPlaylist = {
@@ -1116,6 +1157,177 @@
             // Refresh the playlists view
             renderPlaylists(currentFilter);
             renderFavorites();
+        }
+
+        // Helper function to extract YouTube video ID from URL
+        function extractYouTubeVideoId(url) {
+            // Support various YouTube URL formats:
+            // - https://www.youtube.com/watch?v=VIDEO_ID
+            // - https://youtu.be/VIDEO_ID
+            // - https://www.youtube.com/embed/VIDEO_ID
+            // - Just VIDEO_ID
+
+            if (!url) return null;
+
+            // If it's already just an ID (11 characters, alphanumeric)
+            if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
+                return url;
+            }
+
+            // Try to extract from various URL formats
+            const patterns = [
+                /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+                /^([a-zA-Z0-9_-]{11})$/
+            ];
+
+            for (const pattern of patterns) {
+                const match = url.match(pattern);
+                if (match && match[1]) {
+                    return match[1];
+                }
+            }
+
+            return null;
+        }
+
+        // Video Player functionality
+        let currentPlaylist = null;
+        let currentVideoIndex = 0;
+        let videoPlayerModalInstance = null;
+        let currentInvidiousInstance = null;
+
+        // List of fallback Invidious instances
+        const INVIDIOUS_INSTANCES = [
+            'https://invidious.io',
+            'https://inv.nadeko.net',
+            'https://invidious.snopyta.org',
+            'https://iv.ggtyler.dev',
+            'https://invidious.nerdvpn.org',
+        ];
+
+        // Initialize video player modal
+        document.addEventListener('DOMContentLoaded', () => {
+            const videoPlayerModal = document.getElementById('videoPlayerModal');
+            videoPlayerModalInstance = M.Modal.init(videoPlayerModal, {
+                dismissible: true,
+                onCloseStart: function() {
+                    // Stop video when closing
+                    const iframe = document.getElementById('videoPlayerFrame');
+                    iframe.src = '';
+                }
+            });
+        });
+
+        // Test if an Invidious instance is working
+        async function testInvidiousInstance(instance) {
+            try {
+                const response = await fetch(`${instance}/api/v1/stats`, { timeout: 3000 });
+                return response.ok;
+            } catch (error) {
+                console.warn(`Invidious instance ${instance} failed:`, error.message);
+                return false;
+            }
+        }
+
+        // Get a working Invidious instance
+        async function getWorkingInstance() {
+            if (currentInvidiousInstance) {
+                return currentInvidiousInstance;
+            }
+
+            for (const instance of INVIDIOUS_INSTANCES) {
+                if (await testInvidiousInstance(instance)) {
+                    currentInvidiousInstance = instance;
+                    console.log(`Using Invidious instance: ${instance}`);
+                    return instance;
+                }
+            }
+
+            // If no instance works, default to first one and hope for the best
+            console.warn('No working Invidious instances found, using fallback');
+            currentInvidiousInstance = INVIDIOUS_INSTANCES[0];
+            return currentInvidiousInstance;
+        }
+
+        // Open video player
+        async function openVideoPlayer(videoId, playlist, videoIndex) {
+            currentPlaylist = playlist;
+            currentVideoIndex = videoIndex;
+
+            const video = playlist.videos[videoIndex];
+
+            // Update player UI
+            document.getElementById('videoPlayerTitle').textContent = video.title;
+            document.getElementById('videoPlayerSubtitle').textContent = `${playlist.title} - ${playlist.creator}`;
+            document.getElementById('videoPosition').textContent = `${videoIndex + 1} / ${playlist.videos.length}`;
+
+            // Get a working Invidious instance
+            const invidiousInstance = await getWorkingInstance();
+            const embedUrl = `${invidiousInstance}/embed/${videoId}?autoplay=1`;
+
+            // Load video in iframe
+            const iframe = document.getElementById('videoPlayerFrame');
+            iframe.src = embedUrl;
+
+            // Update button states
+            document.getElementById('prevBtn').disabled = videoIndex === 0;
+            document.getElementById('nextBtn').disabled = videoIndex === playlist.videos.length - 1;
+
+            // Open modal
+            videoPlayerModalInstance.open();
+        }
+
+        // Play next video
+        function playNextVideo() {
+            if (!currentPlaylist || currentVideoIndex >= currentPlaylist.videos.length - 1) {
+                M.toast({
+                    html: '<i class="material-icons left">info</i>No more videos in playlist',
+                    displayLength: 2000
+                });
+                return;
+            }
+
+            currentVideoIndex++;
+            const nextVideo = currentPlaylist.videos[currentVideoIndex];
+            openVideoPlayer(nextVideo.videoId, currentPlaylist, currentVideoIndex);
+        }
+
+        // Play previous video
+        function playPreviousVideo() {
+            if (!currentPlaylist || currentVideoIndex <= 0) {
+                M.toast({
+                    html: '<i class="material-icons left">info</i>Already at first video',
+                    displayLength: 2000
+                });
+                return;
+            }
+
+            currentVideoIndex--;
+            const prevVideo = currentPlaylist.videos[currentVideoIndex];
+            openVideoPlayer(prevVideo.videoId, currentPlaylist, currentVideoIndex);
+        }
+
+        // Close video player
+        function closeVideoPlayer() {
+            videoPlayerModalInstance.close();
+            currentPlaylist = null;
+            currentVideoIndex = 0;
+        }
+
+        // Play individual video from playlist modal
+        function playIndividualVideo(videoId, playlistId, videoIndex) {
+            const allPlaylists = getAllPlaylists();
+            const playlist = allPlaylists.find(p => p.id === playlistId);
+
+            if (playlist) {
+                // Close the playlist details modal first
+                closePlaylistModal();
+
+                // Open video player
+                setTimeout(() => {
+                    openVideoPlayer(videoId, playlist, videoIndex);
+                }, 300);
+            }
         }
     </script>
 </body>

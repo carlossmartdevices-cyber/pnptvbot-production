@@ -1,9 +1,10 @@
 const logger = require('../../../utils/logger');
+const ChatCleanupService = require('../../services/chatCleanupService');
 
 /**
  * Auto-delete commands in groups
- * Deletes command messages immediately after they're sent
- * Allows all commands to work but keeps group chat clean
+ * Deletes command messages immediately and ensures they're deleted
+ * Allows all commands to work but keeps group chat clean (SPAM PREVENTION)
  */
 const commandAutoDeleteMiddleware = () => {
   return async (ctx, next) => {
@@ -13,18 +14,35 @@ const commandAutoDeleteMiddleware = () => {
         // Check if this is a command message
         if (ctx.message?.entities) {
           const hasCommand = ctx.message.entities.some(entity => entity.type === 'bot_command');
-          
-          if (hasCommand) {
-            // Delete the command message
+
+          if (hasCommand && ctx.message?.message_id) {
+            const command = ctx.message.text?.split(' ')[0] || '/command';
+
+            // Try immediate deletion
             try {
               await ctx.deleteMessage();
-              logger.debug('Command auto-deleted from group', {
-                command: ctx.message.text,
+              logger.info('Command message auto-deleted (spam prevention)', {
+                command,
                 chatId: ctx.chat.id,
                 userId: ctx.from.id,
+                messageId: ctx.message.message_id,
               });
             } catch (deleteError) {
-              logger.debug('Could not auto-delete command message:', deleteError.message);
+              // If immediate deletion fails, schedule it with retry
+              logger.debug('Immediate deletion failed, scheduling for retry', {
+                command,
+                chatId: ctx.chat.id,
+                error: deleteError.message,
+              });
+
+              // Schedule deletion as fallback (delete after 100ms to allow message to fully propagate)
+              ChatCleanupService.scheduleDelete(
+                ctx.telegram,
+                ctx.chat.id,
+                ctx.message.message_id,
+                'group-command',
+                100
+              );
             }
           }
         }

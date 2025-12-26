@@ -24,6 +24,11 @@ const { showProfile } = require('../user/profile');
 const lastMenuMessages = {};
 
 /**
+ * Require ChatCleanupService for message deletion
+ */
+const ChatCleanupService = require('../../services/chatCleanupService');
+
+/**
  * Check if message is in a group/supergroup
  */
 function isGroupChat(ctx) {
@@ -116,6 +121,7 @@ function buildCategoryMenuKeyboard(categoryId, lang = 'en') {
 
 /**
  * Helper function to delete previous menu message and track the new one
+ * Ensures only ONE menu message per user remains (anti-spam)
  */
 async function deletePreviousMenuMessage(ctx) {
   try {
@@ -131,7 +137,7 @@ async function deletePreviousMenuMessage(ctx) {
     if (lastMenuMessages[chatId][userId]) {
       try {
         await ctx.telegram.deleteMessage(chatId, lastMenuMessages[chatId][userId]);
-        logger.debug(`Deleted previous menu message ${lastMenuMessages[chatId][userId]} for user ${userId} in chat ${chatId}`);
+        logger.info(`Deleted previous menu message (anti-spam) - ${lastMenuMessages[chatId][userId]} for user ${userId} in chat ${chatId}`);
       } catch (error) {
         // Message may have already been deleted, ignore
         logger.debug(`Could not delete previous menu message: ${error.message}`);
@@ -260,10 +266,16 @@ async function handleMenuCommand(ctx) {
     const message = getMessage('MAIN_MENU', lang);
     const keyboard = buildMainMenuKeyboard(lang);
 
-    await ctx.reply(message, {
+    // Delete previous menu message first (single message rule)
+    await deletePreviousMenuMessage(ctx);
+
+    const sentMessage = await ctx.reply(message, {
       parse_mode: 'Markdown',
       ...keyboard
     });
+
+    // Store the new menu message ID
+    storeMenuMessage(ctx, sentMessage.message_id);
 
     logger.info(`Main menu displayed for user ${ctx.from.id} in private chat`);
 
@@ -543,11 +555,15 @@ async function handleLiveStreams(ctx, lang) {
 }
 
 async function handleVideoCalls(ctx, lang) {
+  const displayName = ctx.from.first_name || 'Guest';
+  const videoRoomsUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+
   const message = lang === 'es'
-    ? '📹 *Videollamadas*\n\nAquí puedes programar videollamadas exclusivas.\n\n_Esta función estará disponible pronto._'
-    : '📹 *Video Calls*\n\nHere you can schedule exclusive video calls.\n\n_This feature is coming soon._';
+    ? '📹 *Salas de Videollamadas*\n\nAccede a nuestras salas de videollamadas en vivo.\n\nHaz clic en el botón de abajo para acceder a la sala:'
+    : '📹 *Video Call Rooms*\n\nAccess our live video calling rooms.\n\nClick the button below to join the room:';
 
   const keyboard = Markup.inlineKeyboard([
+    [Markup.button.url(lang === 'es' ? '🎥 Entrar a Sala' : '🎥 Join Room', videoRoomsUrl)],
     [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
   ]);
 
