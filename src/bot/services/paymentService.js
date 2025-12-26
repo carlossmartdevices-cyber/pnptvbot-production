@@ -977,6 +977,156 @@ class PaymentService {
   }
 }
 
+/**
+ * Send PRIME confirmation notification for manual activations
+ * Includes unique invite link to PRIME channel
+ * @param {string} userId - Telegram user ID
+ * @param {string} planName - Plan name
+ * @param {Date} expiryDate - Subscription expiry date (null for lifetime)
+ * @param {string} source - Activation source (e.g., 'admin-extend', 'admin-plan-change')
+ * @returns {Promise<boolean>} Success status
+ */
+async function sendPrimeConfirmation(userId, planName, expiryDate, source = 'manual') {
+  try {
+    const bot = new Telegraf(process.env.BOT_TOKEN);
+    const groupId = process.env.TELEGRAM_PREMIUM_CHANNEL_ID || process.env.TELEGRAM_CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
+
+    // Get user to determine language
+    const user = await UserModel.getById(userId);
+    const language = user?.language || 'es';
+
+    // Create unique one-time invite link for PRIME channel
+    let inviteLink = '';
+    try {
+      const response = await bot.telegram.createChatInviteLink(groupId, {
+        member_limit: 1, // One-time use
+        name: `Premium ${source} - User ${userId}`,
+      });
+      inviteLink = response.invite_link;
+      logger.info('One-time PRIME channel invite link created', {
+        userId,
+        source,
+        inviteLink,
+      });
+    } catch (linkError) {
+      logger.error('Error creating invite link, using fallback', {
+        error: linkError.message,
+        userId,
+      });
+      // Fallback: try to create a regular link
+      try {
+        const fallbackResponse = await bot.telegram.createChatInviteLink(groupId);
+        inviteLink = fallbackResponse.invite_link;
+      } catch (fallbackError) {
+        logger.error('Fallback invite link also failed', {
+          error: fallbackError.message,
+        });
+        inviteLink = 'https://t.me/PNPTV_PRIME'; // Ultimate fallback
+      }
+    }
+
+    // Format expiry date
+    const expiryDateStr = expiryDate
+      ? expiryDate.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+      : (language === 'es' ? 'Sin vencimiento (Lifetime)' : 'No expiration (Lifetime)');
+
+    // Build message in user's language
+    const messageEs = [
+      '🎉 *¡Membresía Premium Activada!*',
+      '',
+      '✅ Tu suscripción ha sido activada exitosamente.',
+      '',
+      '📋 *Detalles:*',
+      `💎 Plan: ${planName}`,
+      `📅 Válido hasta: ${expiryDateStr}`,
+      '',
+      '🌟 *¡Bienvenido a PRIME!*',
+      '',
+      '👉 Accede al canal exclusivo aquí:',
+      `[🔗 Ingresar a PRIME](${inviteLink})`,
+      '',
+      '💎 Disfruta de todo el contenido premium y beneficios exclusivos.',
+      '',
+      '⚠️ _Este enlace es de un solo uso y personal._',
+      '',
+      '¡Gracias! 🙏',
+    ].join('\n');
+
+    const messageEn = [
+      '🎉 *Premium Membership Activated!*',
+      '',
+      '✅ Your subscription has been activated successfully.',
+      '',
+      '📋 *Details:*',
+      `💎 Plan: ${planName}`,
+      `📅 Valid until: ${expiryDateStr}`,
+      '',
+      '🌟 *Welcome to PRIME!*',
+      '',
+      '👉 Access the exclusive channel here:',
+      `[🔗 Join PRIME](${inviteLink})`,
+      '',
+      '💎 Enjoy all premium content and exclusive benefits.',
+      '',
+      '⚠️ _This link is for one-time use only._',
+      '',
+      'Thank you! 🙏',
+    ].join('\n');
+
+    const message = language === 'es' ? messageEs : messageEn;
+
+    // Send notification
+    await bot.telegram.sendMessage(userId, message, {
+      parse_mode: 'Markdown',
+      disable_web_page_preview: false,
+    });
+
+    logger.info('PRIME confirmation sent', {
+      userId,
+      planName,
+      expiryDate,
+      source,
+      language,
+    });
+
+    return true;
+  } catch (error) {
+    logger.error('Error sending PRIME confirmation:', {
+      userId,
+      error: error.message,
+      stack: error.stack,
+    });
+    return false;
+  }
+}
+
+/**
+ * Send payment notification (legacy function for backward compatibility)
+ * @param {string} userId - User ID
+ * @param {Object} paymentData - Payment data
+ * @returns {Promise<boolean>} Success status
+ */
+async function sendPaymentNotification(userId, paymentData) {
+  try {
+    const { plan, transactionId, amount, expiryDate, language } = paymentData;
+    return await PaymentService.sendPaymentConfirmationNotification({
+      userId,
+      plan,
+      transactionId,
+      amount,
+      expiryDate,
+      language: language || 'es',
+    });
+  } catch (error) {
+    logger.error('Error in sendPaymentNotification:', error);
+    return false;
+  }
+}
+
 module.exports = PaymentService;
 module.exports.sendPrimeConfirmation = sendPrimeConfirmation;
 module.exports.sendPaymentNotification = sendPaymentNotification;
