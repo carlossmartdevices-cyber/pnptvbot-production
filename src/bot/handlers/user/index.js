@@ -4,6 +4,7 @@ const profileHandlers = require('./profile');
 const nearbyHandlers = require('./nearby');
 const settingsHandlers = require('./settings');
 const groupWelcomeHandlers = require('./groupWelcome');
+const { registerAgeVerificationHandlers } = require('./ageVerificationHandler');
 
 /**
  * Register all user handlers
@@ -11,6 +12,7 @@ const groupWelcomeHandlers = require('./groupWelcome');
  */
 const registerUserHandlers = (bot) => {
   onboardingHandlers(bot);
+  registerAgeVerificationHandlers(bot);
   menuHandlers(bot);
   profileHandlers(bot);
   nearbyHandlers(bot);

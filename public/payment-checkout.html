@@ -359,13 +359,34 @@
                 autoclick: false
             };
 
-            try {
-                ePaycoHandler.open(epaycoData);
-                // Re-enable button after popup opens
-                setTimeout(() => {
+            // Add event handlers for better UX
+            const checkoutOptions = {
+                ...epaycoData,
+                // Event handlers (optional but recommended for better UX)
+                onCreated: function() {
+                    console.log('ePayco checkout created successfully');
+                    // Re-enable button after popup opens
+                    setTimeout(() => {
+                        payButton.disabled = false;
+                        payButton.textContent = '💳 Pagar con ePayco';
+                    }, 1000);
+                },
+                onErrors: function(errors) {
+                    console.error('ePayco checkout errors:', errors);
+                    showError('Error al procesar el pago. Por favor, intenta nuevamente.');
                     payButton.disabled = false;
                     payButton.textContent = '💳 Pagar con ePayco';
-                }, 1000);
+                },
+                onClosed: function() {
+                    console.log('ePayco checkout closed');
+                    // User closed the checkout without completing payment
+                    payButton.disabled = false;
+                    payButton.textContent = '💳 Pagar con ePayco';
+                }
+            };
+
+            try {
+                ePayCoHandler.open(checkoutOptions);
             } catch (error) {
                 console.error('Error opening ePayco checkout:', error);
                 showError('Error al abrir el checkout. Por favor, intenta nuevamente.');

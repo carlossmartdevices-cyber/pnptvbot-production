@@ -1,12 +1,12 @@
-const { getFirestore } = require('../config/firebase');
+const { query } = require('../config/postgres');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
 /**
- * Plan Model - Handles subscription plan data with Firestore
+ * Plan Model - Handles subscription plan data with PostgreSQL
  */
 class Plan {
-  static COLLECTION = 'plans';
+  static TABLE = 'plans';
 
   /**
    * Get all active plans (with caching)
@@ -19,19 +19,13 @@ class Plan {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const db = getFirestore();
-          const snapshot = await db
-            .collection(this.COLLECTION)
-            .where('active', '==', true)
-            .orderBy('price', 'asc')
-            .get();
+          const result = await query(
+            `SELECT * FROM ${this.TABLE} WHERE active = true ORDER BY price ASC`
+          );
 
-          const plans = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
+          const plans = result.rows.map((row) => this.mapRowToPlan(row));
 
-          logger.info(`Fetched ${plans.length} plans from Firestore`);
+          logger.info(`Fetched ${plans.length} plans from PostgreSQL`);
           return plans.length > 0 ? plans : this.getDefaultPlans();
         },
         3600, // Cache for 1 hour
@@ -54,19 +48,18 @@ class Plan {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const db = getFirestore();
-          const doc = await db.collection(this.COLLECTION).doc(planId).get();
+          const result = await query(
+            `SELECT * FROM ${this.TABLE} WHERE id = $1`,
+            [planId]
+          );
 
-          if (!doc.exists) {
+          if (result.rows.length === 0) {
             logger.warn(`Plan not found: ${planId}`);
             return null;
           }
 
-          logger.info(`Fetched plan from Firestore: ${planId}`);
-          return {
-            id: doc.id,
-            ...doc.data(),
-          };
+          logger.info(`Fetched plan from PostgreSQL: ${planId}`);
+          return this.mapRowToPlan(result.rows[0]);
         },
         3600, // Cache for 1 hour
       );
@@ -74,6 +67,29 @@ class Plan {
       logger.error('Error getting plan:', error);
       return null;
     }
+  }
+
+  /**
+   * Map database row to plan object
+   * @param {Object} row - Database row
+   * @returns {Object} Plan object
+   */
+  static mapRowToPlan(row) {
+    return {
+      id: row.id,
+      sku: row.sku,
+      name: row.name || row.display_name,
+      nameEs: row.name_es,
+      price: parseFloat(row.price),
+      currency: row.currency || 'USD',
+      duration: row.duration_days || row.duration || 30,
+      features: row.features || [],
+      featuresEs: row.features_es || [],
+      active: row.active,
+      isLifetime: row.is_lifetime || false,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
 
   /**
@@ -91,29 +107,42 @@ class Plan {
         logger.info(`Auto-generated SKU: ${data.sku} for plan: ${planId}`);
       }
 
-      const db = getFirestore();
-      const planDoc = {
-        id: planId,
-        sku: data.sku,
-        name: data.name,
-        nameEs: data.nameEs,
-        price: data.price,
-        currency: data.currency || 'USD',
-        duration: data.duration || 30,
-        features: data.features || [],
-        featuresEs: data.featuresEs || [],
-        active: data.active !== undefined ? data.active : true,
-        updatedAt: new Date(),
-      };
+      const sql = `
+        INSERT INTO ${this.TABLE} (id, sku, name, name_es, price, currency, duration_days, features, features_es, active, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          sku = EXCLUDED.sku,
+          name = EXCLUDED.name,
+          name_es = EXCLUDED.name_es,
+          price = EXCLUDED.price,
+          currency = EXCLUDED.currency,
+          duration_days = EXCLUDED.duration_days,
+          features = EXCLUDED.features,
+          features_es = EXCLUDED.features_es,
+          active = EXCLUDED.active,
+          updated_at = NOW()
+        RETURNING *
+      `;
 
-      await db.collection(this.COLLECTION).doc(planId).set(planDoc, { merge: true });
+      const result = await query(sql, [
+        planId,
+        data.sku,
+        data.name,
+        data.nameEs,
+        data.price,
+        data.currency || 'USD',
+        data.duration || 30,
+        JSON.stringify(data.features || []),
+        JSON.stringify(data.featuresEs || []),
+        data.active !== undefined ? data.active : true,
+      ]);
 
       // Invalidate cache
       await cache.del(`plan:${planId}`);
       await cache.del('plans:all');
 
       logger.info('Plan created/updated', { planId, sku: data.sku });
-      return planDoc;
+      return this.mapRowToPlan(result.rows[0]);
     } catch (error) {
       logger.error('Error creating/updating plan:', error);
       throw error;
@@ -127,8 +156,7 @@ class Plan {
    */
   static async delete(planId) {
     try {
-      const db = getFirestore();
-      await db.collection(this.COLLECTION).doc(planId).delete();
+      await query(`DELETE FROM ${this.TABLE} WHERE id = $1`, [planId]);
 
       // Invalidate cache
       await cache.del(`plan:${planId}`);
@@ -144,16 +172,21 @@ class Plan {
 
   /**
    * Generate SKU for a plan
-   * SKU format: EASYBOT-{CLIENT}-{DURATION}D
-   * Example: EASYBOT-PNP-7D, EASYBOT-PNP-30D
+   * SKU format: EASYBOTS-PNP-XXX where XXX is duration in days (3 digits)
+   * Example: EASYBOTS-PNP-007 (7 days), EASYBOTS-PNP-030 (30 days), EASYBOTS-PNP-000 (lifetime)
    * @param {string} planId - Plan ID
    * @param {number} duration - Duration in days
    * @returns {string} Generated SKU
    */
   static generateSKU(planId, duration) {
-    // Extract client identifier from plan ID or use PNP as default
-    const client = 'PNP';
-    return `EASYBOT-${client}-${duration}D`;
+    // For lifetime plans (very large duration), use 000
+    if (duration >= 36500 || planId.includes('lifetime')) {
+      return 'EASYBOTS-PNP-000';
+    }
+
+    // Convert duration to 3-digit format with zero padding
+    const durationStr = String(duration).padStart(3, '0');
+    return `EASYBOTS-PNP-${durationStr}`;
   }
 
   /**
@@ -164,7 +197,7 @@ class Plan {
     return [
       {
         id: 'trial_week',
-        sku: 'EASYBOT-PNP-7D',
+        sku: 'EASYBOTS-PNP-007',
         name: 'Trial Week',
         nameEs: 'Semana de Prueba',
         price: 14.99,
@@ -184,93 +217,107 @@ class Plan {
       },
       {
         id: 'pnp_member',
-        sku: 'EASYBOT-PNP-30D',
+        sku: 'EASYBOTS-PNP-030',
         name: 'PNP Member',
         nameEs: 'Miembro PNP',
-        price: 29.99,
+        price: 24.99,
         currency: 'USD',
         duration: 30,
         features: [
-          'Everything in Trial Week',
-          'Unlimited premium channel access',
-          'Zoom meeting access: 2 per week',
-          'Priority customer support',
+          'Premium channel access',
+          'Basic support',
+          'Access to Nearby Members feature',
+          'Zoom meeting access: 3 per month',
         ],
         featuresEs: [
-          'Todo en Semana de Prueba',
-          'Acceso ilimitado a canales premium',
-          'Acceso a reuniones Zoom: 2 por semana',
-          'Soporte prioritario al cliente',
+          'Acceso a canales premium',
+          'Soporte básico',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 3 por mes',
         ],
         active: true,
       },
       {
         id: 'crystal_member',
-        sku: 'EASYBOT-PNP-30D-CRYSTAL',
+        sku: 'EASYBOTS-PNP-030',
         name: 'Crystal Member',
         nameEs: 'Miembro Crystal',
-        price: 59.99,
+        price: 49.99,
         currency: 'USD',
-        duration: 30,
+        duration: 120,
         features: [
-          'Everything in PNP Member',
-          'Zoom meeting access: 4 per week',
-          'Exclusive content access',
-          'Early access to new features',
+          'All premium features',
+          'Video calls',
+          'Priority support',
+          'Access to Nearby Members feature',
+          'Zoom meeting access: 5 per month',
         ],
         featuresEs: [
-          'Todo en Miembro PNP',
-          'Acceso a reuniones Zoom: 4 por semana',
-          'Acceso a contenido exclusivo',
-          'Acceso anticipado a nuevas funciones',
+          'Todas las características premium',
+          'Llamadas de video',
+          'Soporte prioritario',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 5 por mes',
         ],
         active: true,
       },
       {
         id: 'diamond_member',
-        sku: 'EASYBOT-PNP-30D-DIAMOND',
+        sku: 'EASYBOTS-PNP-030',
         name: 'Diamond Member',
         nameEs: 'Miembro Diamond',
-        price: 89.99,
+        price: 99.99,
         currency: 'USD',
-        duration: 30,
+        duration: 365,
         features: [
-          'Everything in Crystal Member',
-          'Unlimited Zoom meeting access',
-          'VIP customer support',
-          'Custom profile badge',
-          'Access to exclusive events',
+          'All premium features',
+          'Video calls',
+          'VIP access',
+          'Priority support',
+          'Exclusive content',
+          'Access to Nearby Members feature',
+          'Zoom meeting access: 5 per month',
         ],
         featuresEs: [
-          'Todo en Miembro Crystal',
-          'Acceso ilimitado a reuniones Zoom',
-          'Soporte VIP al cliente',
-          'Insignia de perfil personalizada',
-          'Acceso a eventos exclusivos',
+          'Todas las características premium',
+          'Llamadas de video',
+          'Acceso VIP',
+          'Soporte prioritario',
+          'Contenido exclusivo',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 5 por mes',
         ],
         active: true,
       },
       {
         id: 'lifetime_pass',
-        sku: 'EASYBOT-PNP-LIFETIME',
+        sku: 'EASYBOTS-PNP-000',
         name: 'Lifetime Pass',
         nameEs: 'Pase de por Vida',
-        price: 499.99,
+        price: 249.99,
         currency: 'USD',
-        duration: 36500, // 100 years
+        duration: 36500, // 100 years as "lifetime"
         features: [
-          'Everything in Diamond Member',
-          'Lifetime access to all features',
-          'Never pay again',
-          'Founder badge',
-          'Priority feature requests',
+          'All premium features',
+          'Video calls',
+          'VIP access',
+          'Priority support',
+          'Exclusive content',
+          'Lifetime access',
+          'Access to Nearby Members feature',
+          'Zoom meeting access: 5 per month',
+          'Exclusive: Live streaming with Santino',
         ],
         featuresEs: [
-          'Todo en Miembro Diamond',
-          'Acceso de por vida a todas las funciones',
-          'Nunca vuelvas a pagar',
-          'Insignia de fundador',
-          'Solicitudes de funciones prioritarias',
+          'Todas las características premium',
+          'Llamadas de video',
+          'Acceso VIP',
+          'Soporte prioritario',
+          'Contenido exclusivo',
+          'Acceso de por vida',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 5 por mes',
+          'Exclusivo: Transmisión en vivo con Santino',
         ],
         active: true,
       },

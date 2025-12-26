@@ -59,7 +59,15 @@ class PaymentController {
       const priceInCOP = plan.price_in_cop || (parseFloat(plan.price) * 4000);
 
       // Create payment reference
-      const paymentRef = `PAY-${payment.id.substring(0, 8).toUpperCase()}`;
+      const actualPaymentId = payment.id || payment.paymentId;
+      if (!actualPaymentId) {
+        logger.error('Payment ID is missing from payment object', { payment });
+        return res.status(500).json({
+          success: false,
+          error: 'Error de configuración del pago. Por favor, genera un nuevo enlace desde el bot.',
+        });
+      }
+      const paymentRef = `PAY-${actualPaymentId.substring(0, 8).toUpperCase()}`;
 
       // Prepare response data
       const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN;

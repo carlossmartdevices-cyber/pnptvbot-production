@@ -155,6 +155,9 @@ module.exports = {
   AWS_S3_BUCKET: process.env.AWS_S3_BUCKET,
   AWS_S3_RECORDINGS_FOLDER: process.env.AWS_S3_RECORDINGS_FOLDER || 'recordings',
   AWS_S3_RADIO_FOLDER: process.env.AWS_S3_RADIO_FOLDER || 'radio',
+  AWS_S3_BROADCASTS_FOLDER: process.env.AWS_S3_BROADCASTS_FOLDER || 'broadcasts',
+  AWS_S3_ACCESS_POINT_ARN: process.env.AWS_S3_ACCESS_POINT_ARN,
+  AWS_S3_ACCESS_POINT_ALIAS: process.env.AWS_S3_ACCESS_POINT_ALIAS,
 
   // ==================== FEATURE FLAGS ====================
   ENABLE_MODERATION: process.env.ENABLE_MODERATION !== 'false',

@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo:*)",
+      "Bash(cat:*)",
+      "Bash(npm run)",
+      "Bash(git -C /root/pnptvbot-production submodule status)",
+      "Bash(rm:*)",
+      "Bash(pm2 list:*)",
+      "Bash(npm install)",
+      "Bash(npm install:*)",
+      "Bash(pm2 logs:*)",
+      "Bash(node:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

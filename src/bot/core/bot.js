@@ -1,6 +1,6 @@
 require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
-const { initializeFirebase } = require('../../config/firebase');
+const { initializePostgres, testConnection } = require('../../config/postgres');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
@@ -46,6 +46,9 @@ const registerCallPackageHandlers = require('../handlers/user/callPackages');
 // Services
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
+const broadcastScheduler = require('../../services/broadcastScheduler');
+const SubscriptionReminderService = require('../services/subscriptionReminderService');
+const { startCronJobs } = require('../../../scripts/cron');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
 // API Server
@@ -59,7 +62,8 @@ let isWebhookMode = false;
  * Validate critical environment variables
  */
 const validateCriticalEnvVars = () => {
-  const criticalVars = ['BOT_TOKEN', 'FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL'];
+  // Only BOT_TOKEN is critical - PostgreSQL can use defaults or DATABASE_URL
+  const criticalVars = ['BOT_TOKEN'];
   const missing = criticalVars.filter((varName) => !process.env[varName]);
   if (missing.length > 0) {
     logger.error(`Missing critical environment variables: ${missing.join(', ')}`);
@@ -91,12 +95,17 @@ const startBot = async () => {
     } catch (error) {
       logger.warn('Sentry initialization failed, continuing without monitoring:', error.message);
     }
-    // Initialize Firebase (with fallback)
+    // Initialize PostgreSQL
     try {
-      initializeFirebase();
-      logger.info('✓ Firebase initialized');
+      initializePostgres();
+      const connected = await testConnection();
+      if (connected) {
+        logger.info('✓ PostgreSQL initialized');
+      } else {
+        logger.warn('⚠️ PostgreSQL connection test failed, but will retry on first query');
+      }
     } catch (error) {
-      logger.error('Firebase initialization failed. Bot will run in DEGRADED mode without database.');
+      logger.error('PostgreSQL initialization failed. Bot will run in DEGRADED mode without database.');
       logger.error('Error:', error.message);
       logger.warn('⚠️  Bot features requiring database will not work!');
     }
@@ -163,6 +172,14 @@ const startBot = async () => {
     // Initialize group cleanup service
     const groupCleanup = new GroupCleanupService(bot);
     groupCleanup.initialize();
+    // Initialize broadcast scheduler service
+    try {
+      broadcastScheduler.initialize(bot);
+      broadcastScheduler.start();
+      logger.info('✓ Broadcast scheduler initialized and started');
+    } catch (error) {
+      logger.warn('Broadcast scheduler initialization failed, continuing without scheduler:', error.message);
+    }
     // Error handling
     bot.catch(errorHandler);
     // Start bot
@@ -189,6 +206,23 @@ const startBot = async () => {
           if (!req.body || Object.keys(req.body).length === 0) {
             logger.warn('Webhook received empty body');
             return res.status(200).json({ ok: true, message: 'Empty body received' });
+          }
+
+          // Deduplicate incoming webhook updates using Redis
+          try {
+            const { cache } = require('../../config/redis');
+            const updateId = req.body.update_id;
+            if (updateId) {
+              const key = `telegram:processed_update:${updateId}`;
+              const set = await cache.setNX(key, true, 60); // keep for 60s
+              if (!set) {
+                logger.warn('Duplicate webhook update ignored', { updateId });
+                return res.status(200).json({ ok: true, message: 'Duplicate update ignored' });
+              }
+            }
+          } catch (err) {
+            // If Redis fails we don't want to block processing — log and continue
+            logger.warn('Failed to dedupe update via Redis, continuing', { error: err.message });
           }
           // Log the callback query data if present
           if (req.body.callback_query) {
@@ -325,4 +359,10 @@ if (require.main === module) {
   });
 }
 
-module.exports = { startBot };
+/**
+ * Get the bot instance for sending messages from services
+ * @returns {Telegraf|null} The bot instance or null if not started
+ */
+const getBotInstance = () => botInstance;
+
+module.exports = { startBot, getBotInstance };

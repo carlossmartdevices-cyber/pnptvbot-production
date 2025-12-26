@@ -31,15 +31,28 @@ class AdminService {
    */
   async sendBroadcast(bot, adminId, message, options = {}) {
     try {
-      const users = await userService.getAllUsers();
+      const allUsers = await userService.getAllUsers();
+
+      // Filter out bot users (user IDs ending with specific patterns or flagged as bots)
+      // Telegram bot IDs are typically identified by is_bot flag, but we check the stored data
+      const users = allUsers.filter(user => {
+        // Skip if user is explicitly marked as bot
+        if (user.is_bot === true) return false;
+        // Skip known bot user IDs (bots can't receive messages from other bots)
+        // User ID 1087968824 is a known bot (GroupAnonymousBot)
+        if (user.id === '1087968824' || user.id === 1087968824) return false;
+        return true;
+      });
+
       const results = {
         total: users.length,
         sent: 0,
         failed: 0,
+        skippedBots: allUsers.length - users.length,
         errors: [],
       };
 
-      logger.info(`Starting broadcast to ${users.length} users`);
+      logger.info(`Starting broadcast to ${users.length} users (skipped ${results.skippedBots} bots)`);
 
       for (const user of users) {
         try {

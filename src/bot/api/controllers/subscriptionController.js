@@ -4,6 +4,7 @@ const PlanModel = require('../../../models/planModel');
 const UserModel = require('../../../models/userModel');
 const CurrencyConverter = require('../../../utils/currencyConverter');
 const logger = require('../../../utils/logger');
+const { sendPrimeConfirmation } = require('../../services/paymentService');
 
 /**
  * Subscription Controller - Handles ePayco subscription operations
@@ -268,6 +269,10 @@ class SubscriptionController {
               planId,
               expiryDate,
             });
+
+            // Send PRIME confirmation with invite link
+            const planName = plan.name || planId;
+            await sendPrimeConfirmation(telegramId, planName, expiryDate, 'subscription-controller');
           }
         }
 

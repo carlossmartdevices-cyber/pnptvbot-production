@@ -5,6 +5,7 @@ const { PERMISSIONS } = require('../../../models/permissionModel');
 const UserModel = require('../../../models/userModel');
 const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
+const { sendPrimeConfirmation } = require('../../services/paymentService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
@@ -21,35 +22,67 @@ async function showAdminPanel(ctx, edit = false) {
     const userRole = await PermissionService.getUserRole(userId);
     const roleDisplay = await PermissionService.getUserRoleDisplay(userId, lang);
 
-    // Build menu based on role
+    // Build menu based on role with organized sections
     const buttons = [];
 
     // Common for all admin roles
     buttons.push([Markup.button.callback('👥 Usuarios', 'admin_users')]);
+    buttons.push([Markup.button.callback('🎁 Activar Membresía', 'admin_activate_membership')]);
 
     // Admin and SuperAdmin features
     if (userRole === 'superadmin' || userRole === 'admin') {
-      buttons.push([Markup.button.callback('📢 Difusión', 'admin_broadcast')]);
-      buttons.push([Markup.button.callback('📊 Analíticas', 'admin_analytics')]);
-      buttons.push([Markup.button.callback('🎮 Gamificación', 'admin_gamification')]);
-      buttons.push([Markup.button.callback('📻 Radio', 'admin_radio')]);
-      buttons.push([Markup.button.callback('📺 Transmisiones', 'admin_live_streams')]);
+      // ═══ CONTENT & MEDIA ═══
+      buttons.push([
+        Markup.button.callback('📻 Radio', 'admin_radio'),
+        Markup.button.callback('📺 ' + (lang === 'es' ? 'En Vivo' : 'Live'), 'admin_live_streams'),
+      ]);
+
+      // ═══ ENGAGEMENT ═══
+      buttons.push([
+        Markup.button.callback('📢 ' + (lang === 'es' ? 'Difusión' : 'Broadcast'), 'admin_broadcast'),
+        Markup.button.callback('🎮 ' + (lang === 'es' ? 'Gamificación' : 'Gamification'), 'admin_gamification'),
+      ]);
+
+      // ═══ COMMUNITY REWARDS ═══
+      buttons.push([
+        Markup.button.callback('🎁 ' + (lang === 'es' ? 'Premium Comunitario' : 'Community Premium'), 'admin_community_premium_broadcast'),
+      ]);
+
+      // ═══ PREVIEW MODE ═══
+      buttons.push([
+        Markup.button.callback('👁️ ' + (lang === 'es' ? 'Vista Previa' : 'Preview Mode'), 'admin_view_mode'),
+      ]);
     }
 
     // SuperAdmin only features
     if (userRole === 'superadmin') {
-      buttons.push([Markup.button.callback('📋 Menús', 'admin_menus')]);
-      buttons.push([Markup.button.callback('👑 Roles', 'admin_roles')]);
-      buttons.push([Markup.button.callback('💎 Planes', 'admin_plans')]);
-      buttons.push([Markup.button.callback('📜 Logs', 'admin_logs')]);
+      // ═══ SYSTEM CONFIG ═══
+      buttons.push([
+        Markup.button.callback('💎 ' + (lang === 'es' ? 'Planes' : 'Plans'), 'admin_plans'),
+        Markup.button.callback('👑 Roles', 'admin_roles'),
+      ]);
+      buttons.push([
+        Markup.button.callback('📋 ' + (lang === 'es' ? 'Menús' : 'Menus'), 'admin_menus'),
+        Markup.button.callback('📜 Logs', 'admin_logs'),
+      ]);
     }
 
-    const message = `${roleDisplay}\n\n${t('adminPanel', lang)}`;
+    // Build styled message
+    const header = lang === 'es' ? '`⚙️ Panel de Administración`' : '`⚙️ Admin Panel`';
+    const divider = '━━━━━━━━━━━━━━━━━━━━';
+    const footer = lang === 'es' ? '`Selecciona una opción 💜`' : '`Choose an option 💜`';
+
+    const message = `${header}\n${divider}\n\n${roleDisplay}\n\n${footer}`;
+
+    const options = {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard(buttons),
+    };
 
     if (edit) {
-      await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
+      await ctx.editMessageText(message, options);
     } else {
-      await ctx.reply(message, Markup.inlineKeyboard(buttons));
+      await ctx.reply(message, options);
     }
   } catch (error) {
     logger.error('Error showing admin panel:', error);
@@ -64,12 +97,14 @@ async function showAdminPanel(ctx, edit = false) {
 const registerGamificationHandlers = require('./gamification');
 const registerRadioManagementHandlers = require('./radioManagement');
 const registerLiveStreamManagementHandlers = require('./liveStreamManagement');
+const registerCommunityPremiumBroadcast = require('./communityPremiumBroadcast');
 
 const registerAdminHandlers = (bot) => {
   // Register gamification handlers
   registerGamificationHandlers(bot);
   registerRadioManagementHandlers(bot);
   registerLiveStreamManagementHandlers(bot);
+  registerCommunityPremiumBroadcast(bot);
 
   // Admin command
   bot.command('admin', async (ctx) => {
@@ -85,6 +120,65 @@ const registerAdminHandlers = (bot) => {
       await showAdminPanel(ctx, false);
     } catch (error) {
       logger.error('Error in /admin command:', error);
+    }
+  });
+
+  // Quick view mode command: /viewas free | /viewas prime | /viewas normal
+  bot.command('viewas', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.reply(t('unauthorized', getLanguage(ctx)));
+        return;
+      }
+
+      const lang = getLanguage(ctx);
+      const args = ctx.message.text.split(' ');
+      const mode = args[1]?.toLowerCase();
+
+      if (!mode || !['free', 'prime', 'normal'].includes(mode)) {
+        const helpMsg = lang === 'es'
+          ? '👁️ **Comando de Vista Previa**\n\n' +
+            'Uso: `/viewas <modo>`\n\n' +
+            'Modos disponibles:\n' +
+            '• `free` - Ver como usuario FREE\n' +
+            '• `prime` - Ver como usuario PRIME\n' +
+            '• `normal` - Vista normal (admin)\n\n' +
+            'Ejemplo: `/viewas free`'
+          : '👁️ **Preview Mode Command**\n\n' +
+            'Usage: `/viewas <mode>`\n\n' +
+            'Available modes:\n' +
+            '• `free` - View as FREE user\n' +
+            '• `prime` - View as PRIME user\n' +
+            '• `normal` - Normal view (admin)\n\n' +
+            'Example: `/viewas free`';
+        await ctx.reply(helpMsg, { parse_mode: 'Markdown' });
+        return;
+      }
+
+      if (mode === 'normal') {
+        delete ctx.session.adminViewMode;
+      } else {
+        ctx.session.adminViewMode = mode;
+      }
+      await ctx.saveSession();
+
+      const modeText = mode === 'free'
+        ? (lang === 'es' ? '🆓 FREE' : '🆓 FREE')
+        : mode === 'prime'
+        ? (lang === 'es' ? '💎 PRIME' : '💎 PRIME')
+        : (lang === 'es' ? '🔙 Normal' : '🔙 Normal');
+
+      await ctx.reply(
+        lang === 'es'
+          ? `👁️ Vista activada: ${modeText}\n\nUsa /menu para ver el menú.`
+          : `👁️ View activated: ${modeText}\n\nUse /menu to see the menu.`,
+        { parse_mode: 'Markdown' }
+      );
+
+      logger.info('Admin view mode changed via command', { userId: ctx.from.id, mode });
+    } catch (error) {
+      logger.error('Error in /viewas command:', error);
     }
   });
 
@@ -179,6 +273,146 @@ const registerAdminHandlers = (bot) => {
     }
   });
 
+  // View Mode - Show options to preview as Free or Prime
+  bot.action('admin_view_mode', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const lang = getLanguage(ctx);
+      const currentMode = ctx.session?.adminViewMode;
+
+      let statusText = '';
+      if (currentMode === 'free') {
+        statusText = lang === 'es' ? '\n\n_Actualmente: Vista FREE_' : '\n\n_Currently: FREE View_';
+      } else if (currentMode === 'prime') {
+        statusText = lang === 'es' ? '\n\n_Actualmente: Vista PRIME_' : '\n\n_Currently: PRIME View_';
+      } else {
+        statusText = lang === 'es' ? '\n\n_Actualmente: Vista Normal (Admin)_' : '\n\n_Currently: Normal View (Admin)_';
+      }
+
+      const message = lang === 'es'
+        ? '👁️ **Vista Previa de Menú**\n\nSelecciona cómo quieres ver el menú para probar la experiencia del usuario:' + statusText
+        : '👁️ **Menu Preview Mode**\n\nSelect how you want to view the menu to test the user experience:' + statusText;
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback(lang === 'es' ? '🆓 Ver como FREE' : '🆓 View as FREE', 'admin_view_as_free'),
+            Markup.button.callback(lang === 'es' ? '💎 Ver como PRIME' : '💎 View as PRIME', 'admin_view_as_prime'),
+          ],
+          [
+            Markup.button.callback(lang === 'es' ? '🔙 Vista Normal' : '🔙 Normal View', 'admin_view_as_normal'),
+          ],
+          [
+            Markup.button.callback(lang === 'es' ? '↩️ Volver' : '↩️ Back', 'admin_cancel'),
+          ],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in admin view mode:', error);
+    }
+  });
+
+  // Set view mode to FREE
+  bot.action('admin_view_as_free', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      ctx.session.adminViewMode = 'free';
+      await ctx.saveSession();
+
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(lang === 'es' ? '👁️ Vista FREE activada' : '👁️ FREE View activated');
+
+      // Show menu with new view mode
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error setting free view mode:', error);
+    }
+  });
+
+  // Set view mode to PRIME
+  bot.action('admin_view_as_prime', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      ctx.session.adminViewMode = 'prime';
+      await ctx.saveSession();
+
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(lang === 'es' ? '👁️ Vista PRIME activada' : '👁️ PRIME View activated');
+
+      // Show menu with new view mode
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error setting prime view mode:', error);
+    }
+  });
+
+  // Set view mode back to Normal (admin)
+  bot.action('admin_view_as_normal', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      delete ctx.session.adminViewMode;
+      await ctx.saveSession();
+
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(lang === 'es' ? '🔙 Vista Normal activada' : '🔙 Normal View activated');
+
+      // Show menu with normal view
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error setting normal view mode:', error);
+    }
+  });
+
+  // Exit preview mode (from menu button)
+  bot.action('admin_exit_preview', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      delete ctx.session.adminViewMode;
+      await ctx.saveSession();
+
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(lang === 'es' ? '🔙 Vista Normal' : '🔙 Normal View');
+
+      // Show menu with normal view
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error exiting preview mode:', error);
+    }
+  });
+
   // Broadcast
   bot.action('admin_broadcast', async (ctx) => {
     try {
@@ -208,14 +442,11 @@ const registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error in admin broadcast:', error);
-<<<<<<< HEAD
-=======
       try {
         await ctx.answerCbQuery('Error al iniciar broadcast');
       } catch (e) {
         // Already answered
       }
->>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1
     }
   });
 
@@ -1001,15 +1232,13 @@ const registerAdminHandlers = (bot) => {
       try {
         const message = ctx.message.text;
 
-<<<<<<< HEAD
-=======
         // Validate message length
         // Telegram caption limit is 1024 chars for media, 4096 for text-only
         // Use 1020 to leave room for the "📢 " prefix and safety margin
         const hasMedia = ctx.session.temp.broadcastData?.mediaFileId;
         const maxLength = hasMedia ? 1020 : 4000;
         const charCount = message.length;
-        
+
         if (charCount > maxLength) {
           const excessChars = charCount - maxLength;
           await ctx.reply(
@@ -1028,8 +1257,6 @@ const registerAdminHandlers = (bot) => {
         if (!ctx.session.temp.broadcastData) {
           ctx.session.temp.broadcastData = {};
         }
-
->>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1
         // Save English text
         ctx.session.temp.broadcastData.textEn = message;
         ctx.session.temp.broadcastStep = 'text_es';
@@ -1058,15 +1285,13 @@ const registerAdminHandlers = (bot) => {
         const target = ctx.session.temp.broadcastTarget;
         const broadcastData = ctx.session.temp.broadcastData;
 
-<<<<<<< HEAD
-=======
         // Validate message length
         // Telegram caption limit is 1024 chars for media, 4096 for text-only
         // Use 1020 to leave room for the "📢 " prefix and safety margin
         const hasMedia = broadcastData.mediaFileId;
         const maxLength = hasMedia ? 1020 : 4000;
         const charCount = message.length;
-        
+
         if (charCount > maxLength) {
           const excessChars = charCount - maxLength;
           await ctx.reply(
@@ -1088,8 +1313,6 @@ const registerAdminHandlers = (bot) => {
           await ctx.saveSession();
           return;
         }
-
->>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1
         // Save Spanish text
         broadcastData.textEs = message;
 
@@ -1121,6 +1344,12 @@ const registerAdminHandlers = (bot) => {
             const userLang = user.language || 'en';
             const textToSend = userLang === 'es' ? broadcastData.textEs : broadcastData.textEn;
 
+            const replyMarkup = Markup.inlineKeyboard([
+              Markup.button.callback(t('subscribe', userLang), 'show_subscription_plans'),
+              Markup.button.callback(t('support', userLang), 'show_support'),
+              Markup.button.callback(userLang === 'es' ? 'Menú Principal' : 'Main Menu', 'back_to_main')
+            ]);
+
             // Send with media if available
             if (broadcastData.mediaType && broadcastData.mediaFileId) {
               const sendMethod = {
@@ -1135,13 +1364,18 @@ const registerAdminHandlers = (bot) => {
                 await ctx.telegram[sendMethod](user.id, broadcastData.mediaFileId, {
                   caption: `📢 ${textToSend}`,
                   parse_mode: 'Markdown',
+                  reply_markup: replyMarkup
                 });
               } else {
-                await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`, { parse_mode: 'Markdown' });
+                logger.warn(`Invalid media type for broadcast: ${broadcastData.mediaType}`);
+                continue;
               }
             } else {
               // Text only
-              await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`, { parse_mode: 'Markdown' });
+              await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`, { 
+                parse_mode: 'Markdown',
+                reply_markup: replyMarkup 
+              });
             }
 
             sent += 1;
@@ -1339,6 +1573,62 @@ const registerAdminHandlers = (bot) => {
       return;
     }
 
+    // Membership activation - User search
+    if (ctx.session.temp?.activatingMembership && ctx.session.temp?.activationStep === 'search_user') {
+      try {
+        const userId = ctx.message.text.trim();
+
+        // Validate it's a number
+        if (!/^\d+$/.test(userId)) {
+          await ctx.reply('❌ ID inválido. Por favor envía un ID de Telegram válido (solo números).');
+          return;
+        }
+
+        const user = await UserModel.getById(userId);
+
+        if (!user) {
+          await ctx.reply(
+            '❌ **Usuario no encontrado**\n\n' +
+            `No se encontró ningún usuario con el ID: ${userId}\n\n` +
+            '💡 Asegúrate de que el usuario haya iniciado el bot al menos una vez con /start',
+            { parse_mode: 'Markdown' },
+          );
+          return;
+        }
+
+        // Clear activation step
+        ctx.session.temp.activationStep = null;
+        await ctx.saveSession();
+
+        // Show user info and type selection
+        let text = '✅ **Usuario Encontrado**\n\n';
+        text += `👤 ${user.firstName} ${user.lastName || ''}\n`;
+        text += `🆔 ${userId}\n`;
+        text += `📧 ${user.email || 'Sin email'}\n`;
+        text += `💎 Estado actual: ${user.subscriptionStatus || 'free'}\n`;
+        if (user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date()) {
+          text += `⏰ Expira: ${new Date(user.subscriptionExpiry).toLocaleDateString('es-ES')}\n`;
+        }
+        text += '\n¿Qué tipo de membresía deseas activar?\n';
+
+        await ctx.reply(
+          text,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('💎 Plan Existente', `admin_activate_type_${userId}_plan`)],
+              [Markup.button.callback('🎁 Pase de Cortesía', `admin_activate_type_${userId}_courtesy`)],
+              [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            ]),
+          },
+        );
+      } catch (error) {
+        logger.error('Error searching user for activation:', error);
+        await ctx.reply('❌ Error al buscar usuario. Por favor intenta de nuevo.');
+      }
+      return;
+    }
+
     return next();
   });
 
@@ -1425,11 +1715,16 @@ const registerAdminHandlers = (bot) => {
         }
       }
 
+      const planName = user.planId || 'premium';
+
       await UserModel.updateSubscription(userId, {
         status: 'active',
-        planId: user.planId || 'premium',
+        planId: planName,
         expiry: newExpiry,
       });
+
+      // Send PRIME confirmation with invite link to user
+      await sendPrimeConfirmation(userId, planName, newExpiry, 'admin-extend');
 
       let successText = `✅ **Membresía Extendida**\n\n`;
       successText += `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`;
@@ -1439,6 +1734,7 @@ const registerAdminHandlers = (bot) => {
       } else {
         successText += `♾️ Membresía Lifetime activada\n`;
       }
+      successText += `\n📨 Se envió confirmación con enlace PRIME al usuario`;
 
       await ctx.editMessageText(
         successText,
@@ -1551,12 +1847,16 @@ const registerAdminHandlers = (bot) => {
       }
 
       // Set new plan
+      let newExpiry = null;
+      let planName = 'Gratis';
+
       if (planId === 'free') {
         await UserModel.updateSubscription(userId, {
           status: 'free',
           planId: null,
           expiry: null,
         });
+        // No PRIME confirmation for free plan
       } else {
         const plan = await PlanModel.getById(planId);
         if (!plan) {
@@ -1564,8 +1864,10 @@ const registerAdminHandlers = (bot) => {
           return;
         }
 
+        planName = plan.name || planId;
+
         // Set new expiry date based on plan duration
-        const newExpiry = new Date();
+        newExpiry = new Date();
         newExpiry.setDate(newExpiry.getDate() + (plan.duration || 30));
 
         await UserModel.updateSubscription(userId, {
@@ -1573,13 +1875,22 @@ const registerAdminHandlers = (bot) => {
           planId,
           expiry: newExpiry,
         });
+
+        // Send PRIME confirmation with invite link to user
+        await sendPrimeConfirmation(userId, planName, newExpiry, 'admin-plan-change');
+      }
+
+      let successMsg = `✅ Plan actualizado exitosamente\n\n`
+        + `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`
+        + `💎 Nuevo Plan: ${planId === 'free' ? 'Gratis' : planName}\n`
+        + `📅 Estado: ${planId === 'free' ? 'free' : 'active'}`;
+
+      if (planId !== 'free') {
+        successMsg += `\n\n📨 Se envió confirmación con enlace PRIME al usuario`;
       }
 
       await ctx.editMessageText(
-        `✅ Plan actualizado exitosamente\n\n`
-        + `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`
-        + `💎 Nuevo Plan: ${planId === 'free' ? 'Gratis' : planId}\n`
-        + `📅 Estado: ${planId === 'free' ? 'free' : 'active'}`,
+        successMsg,
         Markup.inlineKeyboard([
           [Markup.button.callback('◀️ Volver', 'admin_cancel')],
         ]),
@@ -1591,10 +1902,39 @@ const registerAdminHandlers = (bot) => {
       await ctx.answerCbQuery('Error al cambiar el plan');
     }
   });
-<<<<<<< HEAD
-=======
 
   // ====== MANUAL MEMBERSHIP ACTIVATION ======
+
+  // Start membership activation flow
+  bot.action('admin_activate_membership', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const lang = getLanguage(ctx);
+
+      // Clear any ongoing admin tasks
+      ctx.session.temp = {
+        activatingMembership: true,
+        activationStep: 'search_user',
+      };
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        '🎁 **Activar Membresía Manualmente**\n\n'
+        + '👤 Por favor envía el **ID de Telegram** del usuario al que deseas activar la membresía.\n\n'
+        + '💡 Puedes encontrar el ID pidiendo al usuario que use /start en el bot.',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error starting membership activation:', error);
+    }
+  });
 
   // Handle membership type selection
   bot.action(/^admin_activate_type_(.+)_(plan|courtesy)$/, async (ctx) => {
@@ -1745,6 +2085,113 @@ const registerAdminHandlers = (bot) => {
     }
   });
 
+  // Activate specific plan
+  bot.action(/^admin_activate_plan_(.+)_(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.match[1];
+      const planId = ctx.match[2];
+
+      const user = await UserModel.getById(userId);
+      if (!user) {
+        await ctx.answerCbQuery('Usuario no encontrado');
+        return;
+      }
+
+      const plan = await PlanModel.getById(planId);
+      if (!plan) {
+        await ctx.answerCbQuery('Plan no encontrado');
+        return;
+      }
+
+      // Calculate expiry date based on plan duration
+      let expiryDate;
+      if (plan.isLifetime || plan.duration >= 36500) {
+        expiryDate = null; // Lifetime = no expiry
+      } else {
+        expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + plan.duration);
+      }
+
+      // Activate subscription
+      await UserModel.updateSubscription(userId, {
+        status: 'active',
+        planId: plan.id,
+        expiry: expiryDate,
+      });
+
+      const lang = user.language || 'es';
+      const planName = lang === 'es' ? (plan.nameEs || plan.name) : plan.name;
+
+      let successText = '✅ **Membresía Activada**\n\n';
+      successText += `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`;
+      successText += `🆔 ID: ${userId}\n`;
+      successText += `💎 Plan: ${planName}\n`;
+      successText += `⏱️ Duración: ${plan.isLifetime || plan.duration >= 36500 ? 'Lifetime' : `${plan.duration} días`}\n`;
+      if (expiryDate) {
+        successText += `📅 Expira: ${expiryDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}\n`;
+      } else {
+        successText += `♾️ Sin vencimiento (Lifetime)\n`;
+      }
+      successText += `💰 Valor: $${plan.price} ${plan.currency}\n`;
+      successText += `📊 Estado: Activo\n\n`;
+      successText += '📨 El usuario ha sido notificado por el bot.';
+
+      await ctx.editMessageText(
+        successText,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Volver al Panel Admin', 'admin_cancel')],
+          ]),
+        },
+      );
+
+      // Send notification to user via bot
+      try {
+        const durationText = plan.isLifetime || plan.duration >= 36500
+          ? (lang === 'es' ? 'acceso de por vida' : 'lifetime access')
+          : (lang === 'es' ? `${plan.duration} días` : `${plan.duration} days`);
+
+        const expiryText = expiryDate
+          ? (lang === 'es'
+            ? `hasta el **${expiryDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}**`
+            : `until **${expiryDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}**`)
+          : (lang === 'es' ? '**sin vencimiento**' : '**no expiration**');
+
+        const welcomeMessage = lang === 'es'
+          ? `🎉 **¡Membresía Activada!**\n\n` +
+            `Has recibido el plan **${planName}** con ${durationText}.\n\n` +
+            `✅ Tu membresía está activa ${expiryText}\n\n` +
+            `💎 Disfruta de todo el contenido premium de PNPtv!`
+          : `🎉 **Membership Activated!**\n\n` +
+            `You have received the **${planName}** plan with ${durationText}.\n\n` +
+            `✅ Your membership is active ${expiryText}\n\n` +
+            `💎 Enjoy all premium PNPtv content!`;
+
+        await ctx.telegram.sendMessage(userId, welcomeMessage, { parse_mode: 'Markdown' });
+      } catch (notifyError) {
+        logger.warn('Could not notify user about plan activation', { userId, error: notifyError.message });
+      }
+
+      logger.info('Plan activated manually by admin', {
+        adminId: ctx.from.id,
+        userId,
+        planId: plan.id,
+        planName,
+        duration: plan.duration,
+        expiryDate,
+      });
+
+      await ctx.answerCbQuery('✅ Membresía activada');
+    } catch (error) {
+      logger.error('Error activating plan:', error);
+      await ctx.answerCbQuery('Error al activar membresía');
+    }
+  });
+
   // Show type selection (plan or courtesy)
   bot.action(/^admin_activate_select_type_(.+)$/, async (ctx) => {
     try {
@@ -1785,121 +2232,6 @@ const registerAdminHandlers = (bot) => {
       await ctx.answerCbQuery('Error al mostrar opciones');
     }
   });
-
-  // =====================================================
-  // PINNED MENU COMMAND FOR GROUP TOPICS
-  // Usage: /sendmenu <topic_type>
-  // topic_type: general, wall, news
-  // =====================================================
-  bot.command('sendmenu', async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) {
-        await ctx.reply('❌ Solo administradores pueden usar este comando.');
-        return;
-      }
-
-      const args = ctx.message.text.split(' ').slice(1);
-      const topicType = args[0]?.toLowerCase();
-
-      if (!topicType) {
-        await ctx.reply(
-          '📌 **Enviar Menú Fijable a Topic**\n\n' +
-          'Uso: `/sendmenu <tipo>`\n\n' +
-          '**Tipos disponibles:**\n' +
-          '• `general` - Menú General → /menu\n' +
-          '• `wall` - Wall of Fame → /nearby + /cristina\n' +
-          '• `news` - News & Updates → /help\n\n' +
-          'Ejemplo: `/sendmenu general`',
-          { parse_mode: 'Markdown' }
-        );
-        return;
-      }
-
-      const botUsername = ctx.botInfo?.username || 'PNPtvbot';
-      let menuMessage;
-      let keyboard;
-
-      switch (topicType) {
-        case 'general':
-          // General topic - /menu button
-          menuMessage = 
-            '`📌 PNPtv Bot Menu`\n\n' +
-            '👋 Hey! Tap the button below to open your personal menu.\n\n' +
-            '• View your profile\n' +
-            '• Check subscription status\n' +
-            '• Access all bot features\n' +
-            '• Talk to Cristina AI\n\n' +
-            '`Tap below to start! 👇`';
-
-          keyboard = Markup.inlineKeyboard([
-            [Markup.button.url('📱 Open Menu', `https://t.me/${botUsername}?start=menu`)],
-          ]);
-          break;
-
-        case 'wall':
-          // Wall of Fame - /nearby + /cristina
-          menuMessage = 
-            '`🏆 Wall of Fame`\n\n' +
-            '🌟 Welcome to the Wall of Fame!\n\n' +
-            '**Find & Connect:**\n' +
-            '• 📍 Tap **Nearby** to find members close to you\n' +
-            '• 🤖 Tap **Cristina** to chat with our AI assistant\n\n' +
-            '`Share your profile and connect! 💜`';
-
-          keyboard = Markup.inlineKeyboard([
-            [
-              Markup.button.url('📍 Nearby', `https://t.me/${botUsername}?start=show_nearby`),
-              Markup.button.url('🤖 Cristina', `https://t.me/${botUsername}?start=cristina`),
-            ],
-          ]);
-          break;
-
-        case 'news':
-          // News - /help
-          menuMessage = 
-            '`📰 News & Updates`\n\n' +
-            '📢 Stay updated with the latest from PNPtv!\n\n' +
-            '**Need Help?**\n' +
-            '• Tap **Help** for support and FAQs\n' +
-            '• Learn about features and how to use them\n\n' +
-            '`Questions? We\'re here for you! 🆘`';
-
-          keyboard = Markup.inlineKeyboard([
-            [Markup.button.url('🆘 Help & Support', `https://t.me/${botUsername}?start=show_support`)],
-          ]);
-          break;
-
-        default:
-          await ctx.reply(
-            '❌ Tipo no reconocido.\n\n' +
-            'Tipos válidos: `general`, `wall`, `news`',
-            { parse_mode: 'Markdown' }
-          );
-          return;
-      }
-
-      // Send the menu message
-      await ctx.reply(menuMessage, {
-        parse_mode: 'Markdown',
-        ...keyboard,
-      });
-
-      // Delete the command message
-      try {
-        await ctx.deleteMessage();
-      } catch (e) {
-        // Ignore if can't delete
-      }
-
-      logger.info('Pinned menu sent', { topicType, adminId: ctx.from.id, chatId: ctx.chat.id });
-
-    } catch (error) {
-      logger.error('Error sending pinned menu:', error);
-      await ctx.reply('❌ Error al enviar el menú.');
-    }
-  });
->>>>>>> 1a985afecd6b66d7133bc5308e9724567cc778f1
 };
 
 module.exports = registerAdminHandlers;

@@ -32,6 +32,10 @@ function getUserFromContext(ctx) {
   }
 
   // Check if user ID or username in command
+  if (!ctx.message?.text) {
+    return null;
+  }
+
   const args = ctx.message.text.split(' ').slice(1);
   if (args.length > 0) {
     const userRef = args[0];

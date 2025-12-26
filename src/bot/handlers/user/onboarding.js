@@ -32,6 +32,69 @@ const registerOnboardingHandlers = (bot) => {
 
       // Check for deep link parameters
       const startParam = ctx.message?.text?.split(' ')[1];
+
+      // Handle lifetime pass activation request
+      if (startParam === 'activate_lifetime') {
+        const lang = getLanguage(ctx);
+        const userId = ctx.from.id;
+        const username = ctx.from.username ? `@${ctx.from.username}` : 'No username';
+        const firstName = ctx.from.first_name || 'Unknown';
+
+        // Send confirmation to user
+        const userMessage = lang === 'es'
+          ? `✅ *Solicitud de Activación Recibida*
+
+Hemos recibido tu solicitud para activar el *Lifetime Pass*.
+
+📋 *Detalles:*
+• Plan: Lifetime Pass ($100 USD)
+• Usuario: ${username}
+
+⏱️ Tu suscripción será activada en menos de 24 horas.
+
+Te enviaremos un mensaje de confirmación cuando esté lista.
+
+Si tienes alguna pregunta, usa /support para contactarnos.`
+          : `✅ *Activation Request Received*
+
+We have received your request to activate the *Lifetime Pass*.
+
+📋 *Details:*
+• Plan: Lifetime Pass ($100 USD)
+• User: ${username}
+
+⏱️ Your subscription will be activated within 24 hours.
+
+We will send you a confirmation message when it's ready.
+
+If you have any questions, use /support to contact us.`;
+
+        await ctx.reply(userMessage, { parse_mode: 'Markdown' });
+
+        // Send notification to support group
+        const supportGroupId = process.env.SUPPORT_GROUP_ID;
+        if (supportGroupId) {
+          const supportMessage = `🔔 *SOLICITUD DE ACTIVACIÓN LIFETIME*
+
+👤 *Usuario:* ${firstName}
+🆔 *Telegram:* ${username}
+🔢 *User ID:* \`${userId}\`
+💎 *Plan:* Lifetime Pass ($100 USD)
+📅 *Fecha:* ${new Date().toLocaleString('es-ES')}
+
+⚠️ Verificar pago en Meru y activar manualmente.`;
+
+          try {
+            await ctx.telegram.sendMessage(supportGroupId, supportMessage, { parse_mode: 'Markdown' });
+            logger.info(`Lifetime activation request sent to support group`, { userId, username });
+          } catch (err) {
+            logger.error('Failed to send activation request to support group:', err);
+          }
+        }
+
+        return;
+      }
+
       if (startParam && startParam.startsWith('viewprofile_')) {
         const targetUserId = startParam.replace('viewprofile_', '');
         // Import profile handler and show the profile
@@ -207,13 +270,11 @@ const showLanguageSelection = async (ctx) => {
 const showAgeConfirmation = async (ctx) => {
   const lang = getLanguage(ctx);
 
-  await ctx.reply(
-    t('ageConfirmation', lang),
-    Markup.inlineKeyboard([
-      [Markup.button.callback(t('ageConfirmYes', lang), 'age_confirm_yes')],
-      [Markup.button.callback(t('ageConfirmNo', lang), 'age_confirm_no')],
-    ]),
-  );
+  // Import age verification handler
+  const { showAgeVerificationOptions } = require('./ageVerificationHandler');
+
+  // Show new AI-based age verification options
+  await showAgeVerificationOptions(ctx);
 };
 
 /**
@@ -299,3 +360,4 @@ const completeOnboarding = async (ctx) => {
 };
 
 module.exports = registerOnboardingHandlers;
+module.exports.showTermsAndPrivacy = showTermsAndPrivacy;

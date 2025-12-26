@@ -11,7 +11,7 @@ This document provides structured information for the Mistral AI agent to answer
 ### What is PNPtv Bot?
 - Telegram bot for premium adult content community
 - Subscription-based with multiple tiers
-- Features: Premium channels, Zoom meetings, nearby members, live streams
+- Features: Premium channels, Call rooms, nearby members, live streams
 - Payment via crypto or credit card
 - Lifetime access option available
 
@@ -24,10 +24,10 @@ This document provides structured information for the Mistral AI agent to answer
 
 | Plan | Price | Duration | Key Features |
 |------|-------|----------|--------------|
-| Trial Week | $14.99 | 7 days | Basic premium access, 1 Zoom/week |
-| PNP Member | $24.99 | 30 days | Full premium, 2 Zoom/week, priority support |
-| Crystal Member | $49.99 | 120 days | Extended benefits, 4 Zoom/week, exclusive content |
-| Diamond Member | $99.99 | 365 days | VIP annual, unlimited Zoom, custom badge |
+| Trial Week | $14.99 | 7 days | Basic premium access, 1 Call/week |
+| PNP Member | $24.99 | 30 days | Full premium, 2 Call/week, priority support |
+| Crystal Member | $49.99 | 120 days | Extended benefits, 4 Call/week, exclusive content |
+| Diamond Member | $99.99 | 365 days | VIP annual, unlimited Call rooms, custom badge |
 | **Lifetime Pass** | **$249.99** | **Forever** | **One-time payment, all features forever** |
 
 ### Best Value
