@@ -70,11 +70,11 @@ async function getActiveUsers() {
     pool = createPool();
 
     const query = `
-      SELECT user_id, language_preference
+      SELECT id as user_id, language
       FROM users
       WHERE is_active = true
-      AND user_id IS NOT NULL
-      ORDER BY user_id
+      AND id IS NOT NULL
+      ORDER BY id
     `;
 
     const result = await pool.query(query);
