@@ -3,13 +3,27 @@
  */
 
 const API_BASE = '/api/materialious';
+const PLAYLIST_API_BASE = '/api/playlists';
 
 class MaterialiousApp {
   constructor() {
     this.currentPlayer = null;
     this.searchQuery = '';
     this.isDarkTheme = localStorage.getItem('theme') === 'dark';
+    this.userId = this.getUserId();
+    this.currentVideoForPlaylist = null;
+    this.userPlaylists = [];
     this.init();
+  }
+
+  getUserId() {
+    // Get or create a user ID (stored in localStorage)
+    let userId = localStorage.getItem('userId');
+    if (!userId) {
+      userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('userId', userId);
+    }
+    return userId;
   }
 
   init() {
@@ -45,6 +59,36 @@ class MaterialiousApp {
     tabs.forEach((tab) => {
       tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
     });
+
+    // Playlist event listeners
+    document.getElementById('createPlaylistBtn').addEventListener('click', () => {
+      this.showCreatePlaylistModal();
+    });
+
+    document.getElementById('cancelPlaylistBtn').addEventListener('click', () => {
+      this.hideCreatePlaylistModal();
+    });
+
+    document.getElementById('savePlaylistBtn').addEventListener('click', () => {
+      this.createPlaylist();
+    });
+
+    document.getElementById('closeAddToPlaylistBtn').addEventListener('click', () => {
+      this.hideAddToPlaylistModal();
+    });
+
+    // Close modals when clicking outside
+    document.getElementById('createPlaylistModal').addEventListener('click', (e) => {
+      if (e.target.id === 'createPlaylistModal') {
+        this.hideCreatePlaylistModal();
+      }
+    });
+
+    document.getElementById('addToPlaylistModal').addEventListener('click', (e) => {
+      if (e.target.id === 'addToPlaylistModal') {
+        this.hideAddToPlaylistModal();
+      }
+    });
   }
 
   toggleTheme() {
@@ -74,6 +118,11 @@ class MaterialiousApp {
       content.classList.remove('active');
     });
     document.getElementById(tabName).classList.add('active');
+
+    // Load playlists when switching to playlists tab
+    if (tabName === 'playlists') {
+      this.loadPlaylists();
+    }
   }
 
   search() {
@@ -162,6 +211,16 @@ class MaterialiousApp {
       duration.textContent = this.formatDuration(video.lengthSeconds);
       thumbnail.appendChild(duration);
     }
+
+    // Add to playlist button
+    const menuBtn = document.createElement('div');
+    menuBtn.className = 'video-card-menu';
+    menuBtn.innerHTML = '<span class="material-icons">playlist_add</span>';
+    menuBtn.onclick = (e) => {
+      e.stopPropagation();
+      this.showAddToPlaylistModal(video);
+    };
+    thumbnail.appendChild(menuBtn);
 
     const info = document.createElement('div');
     info.className = 'video-info';
@@ -297,6 +356,248 @@ class MaterialiousApp {
       "'": '&#039;',
     };
     return text.replace(/[&<>"']/g, (m) => map[m]);
+  }
+
+  // Playlist Methods
+
+  async loadPlaylists() {
+    const grid = document.getElementById('playlistGrid');
+    grid.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+    try {
+      const response = await fetch(`${PLAYLIST_API_BASE}/public`);
+      if (!response.ok) throw new Error('Failed to fetch playlists');
+
+      const playlists = await response.json();
+
+      // Also try to load user's personal playlists
+      try {
+        const userResponse = await fetch(`${PLAYLIST_API_BASE}/user?userId=${this.userId}`);
+        if (userResponse.ok) {
+          const userPlaylists = await userResponse.json();
+          this.userPlaylists = userPlaylists;
+          playlists.unshift(...userPlaylists);
+        }
+      } catch (error) {
+        console.warn('Could not load user playlists:', error);
+      }
+
+      grid.innerHTML = '';
+
+      if (playlists.length === 0) {
+        grid.innerHTML = '<p>No playlists found. Create your first playlist!</p>';
+        return;
+      }
+
+      playlists.forEach((playlist) => {
+        const card = this.createPlaylistCard(playlist);
+        grid.appendChild(card);
+      });
+    } catch (error) {
+      console.error('Error loading playlists:', error);
+      grid.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+    }
+  }
+
+  createPlaylistCard(playlist) {
+    const card = document.createElement('div');
+    card.className = 'playlist-card';
+
+    const name = document.createElement('div');
+    name.className = 'playlist-name';
+    name.textContent = playlist.name;
+    card.appendChild(name);
+
+    if (playlist.description) {
+      const desc = document.createElement('div');
+      desc.style.fontSize = '14px';
+      desc.style.color = 'var(--text-secondary)';
+      desc.style.marginBottom = '8px';
+      desc.textContent = playlist.description;
+      card.appendChild(desc);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'playlist-info';
+    info.innerHTML = `
+      <span>${playlist.mediaItems?.length || 0} videos</span>
+      <span>${playlist.isPublic ? 'Public' : 'Private'}</span>
+    `;
+    card.appendChild(info);
+
+    // Actions
+    const actions = document.createElement('div');
+    actions.className = 'playlist-actions';
+
+    const playBtn = document.createElement('button');
+    playBtn.innerHTML = '<span class="material-icons" style="font-size: 14px;">play_arrow</span> Play';
+    playBtn.onclick = (e) => {
+      e.stopPropagation();
+      alert('Playlist playback coming soon!');
+    };
+    actions.appendChild(playBtn);
+
+    // Only show delete for user's own playlists
+    if (playlist.userId === this.userId) {
+      const deleteBtn = document.createElement('button');
+      deleteBtn.innerHTML = '<span class="material-icons" style="font-size: 14px;">delete</span> Delete';
+      deleteBtn.style.backgroundColor = '#d32f2f';
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        this.deletePlaylist(playlist.id);
+      };
+      actions.appendChild(deleteBtn);
+    }
+
+    card.appendChild(actions);
+
+    return card;
+  }
+
+  showCreatePlaylistModal() {
+    document.getElementById('playlistName').value = '';
+    document.getElementById('playlistDescription').value = '';
+    document.getElementById('playlistPublic').checked = false;
+    document.getElementById('createPlaylistModal').classList.add('active');
+  }
+
+  hideCreatePlaylistModal() {
+    document.getElementById('createPlaylistModal').classList.remove('active');
+  }
+
+  async createPlaylist() {
+    const name = document.getElementById('playlistName').value.trim();
+    const description = document.getElementById('playlistDescription').value.trim();
+    const isPublic = document.getElementById('playlistPublic').checked;
+
+    if (!name) {
+      alert('Please enter a playlist name');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${PLAYLIST_API_BASE}/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': this.userId,
+        },
+        body: JSON.stringify({
+          userId: this.userId,
+          name,
+          description,
+          isPublic,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create playlist');
+      }
+
+      const playlist = await response.json();
+      console.log('Playlist created:', playlist);
+
+      this.hideCreatePlaylistModal();
+      this.loadPlaylists();
+    } catch (error) {
+      console.error('Error creating playlist:', error);
+      alert('Failed to create playlist. Please try again.');
+    }
+  }
+
+  async showAddToPlaylistModal(video) {
+    this.currentVideoForPlaylist = video;
+
+    // Load user playlists first
+    try {
+      const response = await fetch(`${PLAYLIST_API_BASE}/user?userId=${this.userId}`);
+      if (response.ok) {
+        this.userPlaylists = await response.json();
+      }
+    } catch (error) {
+      console.error('Error loading playlists:', error);
+    }
+
+    const listContainer = document.getElementById('playlistSelectionList');
+    listContainer.innerHTML = '';
+
+    if (this.userPlaylists.length === 0) {
+      listContainer.innerHTML = '<p>No playlists yet. Create one first!</p>';
+    } else {
+      this.userPlaylists.forEach((playlist) => {
+        const item = document.createElement('div');
+        item.style.padding = '12px';
+        item.style.borderBottom = '1px solid var(--border-color)';
+        item.style.cursor = 'pointer';
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.alignItems = 'center';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = `${playlist.name} (${playlist.mediaItems?.length || 0} videos)`;
+        item.appendChild(nameSpan);
+
+        const addBtn = document.createElement('button');
+        addBtn.textContent = 'Add';
+        addBtn.style.padding = '4px 12px';
+        addBtn.onclick = () => this.addVideoToPlaylist(playlist.id, video.videoId);
+        item.appendChild(addBtn);
+
+        listContainer.appendChild(item);
+      });
+    }
+
+    document.getElementById('addToPlaylistModal').classList.add('active');
+  }
+
+  hideAddToPlaylistModal() {
+    document.getElementById('addToPlaylistModal').classList.remove('active');
+    this.currentVideoForPlaylist = null;
+  }
+
+  async addVideoToPlaylist(playlistId, videoId) {
+    try {
+      const response = await fetch(`${PLAYLIST_API_BASE}/${playlistId}/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ videoId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add video to playlist');
+      }
+
+      alert('Video added to playlist!');
+      this.hideAddToPlaylistModal();
+      this.loadPlaylists();
+    } catch (error) {
+      console.error('Error adding to playlist:', error);
+      alert('Failed to add video to playlist. Please try again.');
+    }
+  }
+
+  async deletePlaylist(playlistId) {
+    if (!confirm('Are you sure you want to delete this playlist?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${PLAYLIST_API_BASE}/${playlistId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete playlist');
+      }
+
+      alert('Playlist deleted successfully!');
+      this.loadPlaylists();
+    } catch (error) {
+      console.error('Error deleting playlist:', error);
+      alert('Failed to delete playlist. Please try again.');
+    }
   }
 }
 
