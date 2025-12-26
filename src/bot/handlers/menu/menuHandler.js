@@ -24,6 +24,11 @@ const { showProfile } = require('../user/profile');
 const lastMenuMessages = {};
 
 /**
+ * Require ChatCleanupService for message deletion
+ */
+const ChatCleanupService = require('../../services/chatCleanupService');
+
+/**
  * Check if message is in a group/supergroup
  */
 function isGroupChat(ctx) {
@@ -116,6 +121,7 @@ function buildCategoryMenuKeyboard(categoryId, lang = 'en') {
 
 /**
  * Helper function to delete previous menu message and track the new one
+ * Ensures only ONE menu message per user remains (anti-spam)
  */
 async function deletePreviousMenuMessage(ctx) {
   try {
@@ -131,7 +137,7 @@ async function deletePreviousMenuMessage(ctx) {
     if (lastMenuMessages[chatId][userId]) {
       try {
         await ctx.telegram.deleteMessage(chatId, lastMenuMessages[chatId][userId]);
-        logger.debug(`Deleted previous menu message ${lastMenuMessages[chatId][userId]} for user ${userId} in chat ${chatId}`);
+        logger.info(`Deleted previous menu message (anti-spam) - ${lastMenuMessages[chatId][userId]} for user ${userId} in chat ${chatId}`);
       } catch (error) {
         // Message may have already been deleted, ignore
         logger.debug(`Could not delete previous menu message: ${error.message}`);
@@ -260,10 +266,16 @@ async function handleMenuCommand(ctx) {
     const message = getMessage('MAIN_MENU', lang);
     const keyboard = buildMainMenuKeyboard(lang);
 
-    await ctx.reply(message, {
+    // Delete previous menu message first (single message rule)
+    await deletePreviousMenuMessage(ctx);
+
+    const sentMessage = await ctx.reply(message, {
       parse_mode: 'Markdown',
       ...keyboard
     });
+
+    // Store the new menu message ID
+    storeMenuMessage(ctx, sentMessage.message_id);
 
     logger.info(`Main menu displayed for user ${ctx.from.id} in private chat`);
 

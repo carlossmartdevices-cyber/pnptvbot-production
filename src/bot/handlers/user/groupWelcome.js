@@ -213,7 +213,10 @@ ${subscriptionStatus}
 If you want the full experience:
 👉 /subscribe`;
 
-    await ctx.reply(message, { parse_mode: 'Markdown' });
+    const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
+
+    // Auto-delete welcome message after 3 minutes
+    ChatCleanupService.scheduleDelete(ctx.telegram, ctx.chat.id, sentMessage.message_id, 'welcome', 3 * 60 * 1000);
 
     logger.info('Welcome message sent', {
       userId: user.userId,
@@ -261,7 +264,10 @@ Pick your energy and get your first badge. It saves instantly.`;
       ],
     ]);
 
-    await ctx.reply(message, keyboard);
+    const sentMessage = await ctx.reply(message, keyboard);
+
+    // Auto-delete badge selection message after 3 minutes
+    ChatCleanupService.scheduleDelete(ctx.telegram, ctx.chat.id, sentMessage.message_id, 'badge-selection', 3 * 60 * 1000);
 
     logger.info('Badge selection message sent', {
       chatId: ctx.chat.id,
