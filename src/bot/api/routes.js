@@ -12,6 +12,7 @@ const webhookController = require('./controllers/webhookController');
 const subscriptionController = require('./controllers/subscriptionController');
 const paymentController = require('./controllers/paymentController');
 const materializousController = require('./controllers/materializousController');
+const playlistController = require('./controllers/playlistController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -233,6 +234,14 @@ app.get('/api/materialious/playlist/:playlistId', asyncHandler(materializousCont
 app.get('/api/materialious/captions/:videoId', asyncHandler(materializousController.getSubtitles));
 app.get('/api/materialious/instance-status', asyncHandler(materializousController.getInstanceStatus));
 app.post('/api/materialious/set-instance', asyncHandler(materializousController.setCustomInstance));
+
+// Playlist API routes
+app.get('/api/playlists/user', asyncHandler(playlistController.getUserPlaylists));
+app.get('/api/playlists/public', asyncHandler(playlistController.getPublicPlaylists));
+app.post('/api/playlists/create', asyncHandler(playlistController.createPlaylist));
+app.post('/api/playlists/:playlistId/add', asyncHandler(playlistController.addToPlaylist));
+app.delete('/api/playlists/:playlistId/remove/:videoId', asyncHandler(playlistController.removeFromPlaylist));
+app.delete('/api/playlists/:playlistId', asyncHandler(playlistController.deletePlaylist));
 
 // Export app WITHOUT 404/error handlers
 // These will be added in bot.js AFTER the webhook callback
