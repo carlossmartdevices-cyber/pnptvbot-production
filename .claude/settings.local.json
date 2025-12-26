@@ -125,7 +125,8 @@
       "Bash(__NEW_LINE__ grep -n \"REDIS_PASSWORD\\\\|SENDGRID_API_KEY\\\\|SMTP_PASSWORD\" /root/pnptvbot-production/.env)",
       "Bash(node scripts/send-video-room-broadcast.js:*)",
       "Bash(pg_isready:*)",
-      "Bash(PGPASSWORD=\"Apelo801050#\" psql:*)"
+      "Bash(PGPASSWORD=\"Apelo801050#\" psql:*)",
+      "Bash(node scripts/send-broadcast-auto.js:*)"
     ],
     "deny": [],
     "ask": []

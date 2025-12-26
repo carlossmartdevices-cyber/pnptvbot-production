@@ -1,15 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Send Video Room Broadcast Announcement
- * Script to announce new video rooms with Jitsi Meet link
+ * Send Video Room Broadcast - Non-interactive version
  */
 
 // Load environment variables explicitly
 const fs = require('fs');
 const path = require('path');
 
-// Parse .env file manually
 const envPath = path.join(__dirname, '..', '.env');
 if (fs.existsSync(envPath)) {
   const envContent = fs.readFileSync(envPath, 'utf8');
@@ -37,9 +35,6 @@ const broadcastMessages = {
   es: `🎥 *¡Nuevas Salas de Video Disponibles!*\n\n¡Nos complace anunciar que las salas de video ya están disponibles en PNPTV!\n\n✨ *Características:*\n• Videoconferencias directas\n• Sin descargas requeridas\n• Funciona en todos los dispositivos\n• Seguro y privado\n\n📺 ¡Únete a nuestra sala principal ahora y conéctate con la comunidad!`,
 };
 
-/**
- * Create database pool
- */
 function createPool() {
   const config = {
     host: process.env.POSTGRES_HOST || 'localhost',
@@ -50,20 +45,9 @@ function createPool() {
     ssl: false,
   };
 
-  console.log('Database config:', {
-    host: config.host,
-    port: config.port,
-    database: config.database,
-    user: config.user,
-    password: config.password ? '***' : 'empty',
-  });
-
   return new Pool(config);
 }
 
-/**
- * Get all active users from database
- */
 async function getActiveUsers() {
   let pool = null;
   try {
@@ -91,24 +75,23 @@ async function getActiveUsers() {
   }
 }
 
-/**
- * Send broadcast to users
- */
 async function sendBroadcast() {
   try {
     const users = await getActiveUsers();
 
     if (users.length === 0) {
-      logger.info('No active users found');
+      console.log('ℹ️  No active users found');
       return { sent: 0, failed: 0, total: 0 };
     }
 
     let sent = 0;
     let failed = 0;
-    const delayBetweenMessages = 50; // 50ms delay to avoid rate limiting
+    const delayBetweenMessages = 50;
 
     console.log(`\n📤 Starting broadcast to ${users.length} users...`);
     console.log(`⏱️  Using ${delayBetweenMessages}ms delay between messages\n`);
+
+    const startTime = Date.now();
 
     for (let i = 0; i < users.length; i++) {
       const user = users[i];
@@ -129,27 +112,34 @@ async function sendBroadcast() {
 
         sent++;
 
-        // Progress indicator
-        if ((i + 1) % 10 === 0) {
-          console.log(`✓ Progress: ${i + 1}/${users.length} (${Math.round((i + 1) / users.length * 100)}%)`);
+        if ((i + 1) % 50 === 0) {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          const rate = ((i + 1) / ((Date.now() - startTime) / 1000)).toFixed(1);
+          console.log(`✓ ${i + 1}/${users.length} (${Math.round((i + 1) / users.length * 100)}%) - ${elapsed}s elapsed - ${rate} msg/sec`);
         }
 
-        // Delay to respect Telegram rate limits
         await new Promise(resolve => setTimeout(resolve, delayBetweenMessages));
       } catch (error) {
         failed++;
-        logger.error(`Failed to send to user ${user.user_id}:`, error.message);
+        // Log detailed error only for first few failures to not spam logs
+        if (failed <= 10) {
+          logger.error(`Failed to send to user ${user.user_id}:`, error.message);
+        }
 
-        // Still delay on errors to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, delayBetweenMessages));
       }
     }
+
+    const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+    const avgRate = (users.length / ((Date.now() - startTime) / 1000)).toFixed(1);
 
     const result = {
       sent,
       failed,
       total: users.length,
       timestamp: new Date().toISOString(),
+      duration: totalTime,
+      avgRate,
     };
 
     console.log(`\n✅ Broadcast Complete!`);
@@ -157,6 +147,8 @@ async function sendBroadcast() {
     console.log(`   ✓ Sent: ${result.sent}`);
     console.log(`   ✗ Failed: ${result.failed}`);
     console.log(`   📈 Total: ${result.total}`);
+    console.log(`   ⏱️  Duration: ${result.duration}s`);
+    console.log(`   📤 Rate: ${result.avgRate} msg/sec`);
     console.log(`   📅 Timestamp: ${result.timestamp}\n`);
 
     return result;
@@ -166,61 +158,27 @@ async function sendBroadcast() {
   }
 }
 
-/**
- * Main function
- */
 async function main() {
   try {
-    console.log('\n🎥 Video Room Broadcast Script\n');
-
-    // Test database connection first
-    console.log('🔍 Testing database connection...');
-    try {
-      let testPool = createPool();
-      const result = await testPool.query('SELECT NOW()');
-      await testPool.end();
-      console.log('✅ Database connection successful\n');
-    } catch (err) {
-      console.error('❌ Failed to connect to database:', err.message);
-      process.exit(1);
-    }
-
-    console.log('📢 Announcement:');
+    console.log('\n🎥 Video Room Broadcast - Non-interactive Mode\n');
+    console.log('📢 Announcement (EN):');
     console.log('-'.repeat(60));
     console.log(broadcastMessages.en);
     console.log('-'.repeat(60));
+    console.log('\n📢 Announcement (ES):');
+    console.log('-'.repeat(60));
+    console.log(broadcastMessages.es);
+    console.log('-'.repeat(60));
     console.log(`\n🔗 Video Room Link: ${VIDEO_ROOM_LINK}\n`);
 
-    // Confirmation
-    const readline = require('readline');
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-
-    rl.question('⚠️  Ready to send broadcast to all active users? (yes/no): ', async (answer) => {
-      rl.close();
-
-      if (answer.toLowerCase() !== 'yes') {
-        console.log('❌ Broadcast cancelled');
-        process.exit(0);
-      }
-
-      try {
-        await sendBroadcast();
-        process.exit(0);
-      } catch (error) {
-        console.error('❌ Error:', error.message);
-        process.exit(1);
-      }
-    });
+    await sendBroadcast();
+    process.exit(0);
   } catch (error) {
-    logger.error('Fatal error:', error);
+    console.error('❌ Error:', error.message);
     process.exit(1);
   }
 }
 
-// Run if called directly
 if (require.main === module) {
   main();
 }
