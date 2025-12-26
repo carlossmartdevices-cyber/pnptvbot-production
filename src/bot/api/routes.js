@@ -11,6 +11,7 @@ const logger = require('../../utils/logger');
 const webhookController = require('./controllers/webhookController');
 const subscriptionController = require('./controllers/subscriptionController');
 const paymentController = require('./controllers/paymentController');
+const materializousController = require('./controllers/materializousController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -220,6 +221,18 @@ app.post(
 app.get('/api/subscription/payment-response', asyncHandler(subscriptionController.handlePaymentResponse));
 app.get('/api/subscription/subscriber/:identifier', asyncHandler(subscriptionController.getSubscriber));
 app.get('/api/subscription/stats', asyncHandler(subscriptionController.getStatistics));
+
+// Materialious API routes (Invidious frontend)
+app.get('/api/materialious/search', asyncHandler(materializousController.searchVideos));
+app.get('/api/materialious/trending', asyncHandler(materializousController.getTrendingVideos));
+app.get('/api/materialious/popular', asyncHandler(materializousController.getPopularVideos));
+app.get('/api/materialious/video/:videoId', asyncHandler(materializousController.getVideoDetails));
+app.get('/api/materialious/channel/:channelId', asyncHandler(materializousController.getChannelInfo));
+app.get('/api/materialious/channel/:channelId/videos', asyncHandler(materializousController.getChannelVideos));
+app.get('/api/materialious/playlist/:playlistId', asyncHandler(materializousController.getPlaylistInfo));
+app.get('/api/materialious/captions/:videoId', asyncHandler(materializousController.getSubtitles));
+app.get('/api/materialious/instance-status', asyncHandler(materializousController.getInstanceStatus));
+app.post('/api/materialious/set-instance', asyncHandler(materializousController.setCustomInstance));
 
 // Export app WITHOUT 404/error handlers
 // These will be added in bot.js AFTER the webhook callback

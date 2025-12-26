@@ -208,12 +208,26 @@ class MaterialiousApp {
     const playerContainer = document.createElement('div');
     playerContainer.className = 'player-container';
 
+    // Get working Invidious instance from backend
+    let invidiousInstance = 'https://invidious.io'; // Default fallback
+    try {
+      const statusResponse = await fetch(`${API_BASE}/instance-status`);
+      if (statusResponse.ok) {
+        const status = await statusResponse.json();
+        if (status.instance) {
+          invidiousInstance = status.instance;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to get working instance, using default:', error);
+    }
+
     const playerHTML = `
       <div class="video-player" id="videoPlayer">
         <iframe
           width="100%"
           height="100%"
-          src="https://invidious.io/embed/${video.videoId}"
+          src="${invidiousInstance}/embed/${video.videoId}?autoplay=1"
           frameborder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowfullscreen
