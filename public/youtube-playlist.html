@@ -1206,6 +1206,16 @@
         let currentPlaylist = null;
         let currentVideoIndex = 0;
         let videoPlayerModalInstance = null;
+        let currentInvidiousInstance = null;
+
+        // List of fallback Invidious instances
+        const INVIDIOUS_INSTANCES = [
+            'https://invidious.io',
+            'https://inv.nadeko.net',
+            'https://invidious.snopyta.org',
+            'https://iv.ggtyler.dev',
+            'https://invidious.nerdvpn.org',
+        ];
 
         // Initialize video player modal
         document.addEventListener('DOMContentLoaded', () => {
@@ -1220,8 +1230,39 @@
             });
         });
 
+        // Test if an Invidious instance is working
+        async function testInvidiousInstance(instance) {
+            try {
+                const response = await fetch(`${instance}/api/v1/stats`, { timeout: 3000 });
+                return response.ok;
+            } catch (error) {
+                console.warn(`Invidious instance ${instance} failed:`, error.message);
+                return false;
+            }
+        }
+
+        // Get a working Invidious instance
+        async function getWorkingInstance() {
+            if (currentInvidiousInstance) {
+                return currentInvidiousInstance;
+            }
+
+            for (const instance of INVIDIOUS_INSTANCES) {
+                if (await testInvidiousInstance(instance)) {
+                    currentInvidiousInstance = instance;
+                    console.log(`Using Invidious instance: ${instance}`);
+                    return instance;
+                }
+            }
+
+            // If no instance works, default to first one and hope for the best
+            console.warn('No working Invidious instances found, using fallback');
+            currentInvidiousInstance = INVIDIOUS_INSTANCES[0];
+            return currentInvidiousInstance;
+        }
+
         // Open video player
-        function openVideoPlayer(videoId, playlist, videoIndex) {
+        async function openVideoPlayer(videoId, playlist, videoIndex) {
             currentPlaylist = playlist;
             currentVideoIndex = videoIndex;
 
@@ -1232,8 +1273,8 @@
             document.getElementById('videoPlayerSubtitle').textContent = `${playlist.title} - ${playlist.creator}`;
             document.getElementById('videoPosition').textContent = `${videoIndex + 1} / ${playlist.videos.length}`;
 
-            // Use Invidious instance or YouTube embed
-            const invidiousInstance = 'https://invidious.io';
+            // Get a working Invidious instance
+            const invidiousInstance = await getWorkingInstance();
             const embedUrl = `${invidiousInstance}/embed/${videoId}?autoplay=1`;
 
             // Load video in iframe
