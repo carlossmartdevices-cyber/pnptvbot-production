@@ -246,6 +246,79 @@ app.get('/api/subscription/payment-response', asyncHandler(subscriptionControlle
 app.get('/api/subscription/subscriber/:identifier', asyncHandler(subscriptionController.getSubscriber));
 app.get('/api/subscription/stats', asyncHandler(subscriptionController.getStatistics));
 
+// Audio Management API
+const audioStreamer = require('../../services/audioStreamer');
+
+// List all available audio files
+app.get('/api/audio/list', asyncHandler(async (req, res) => {
+  const files = audioStreamer.listAudioFiles();
+  res.json({
+    success: true,
+    files,
+    current: audioStreamer.getCurrentTrack()
+  });
+}));
+
+// Setup background audio from SoundCloud
+app.post('/api/audio/setup-soundcloud', asyncHandler(async (req, res) => {
+  const { soundcloudUrl, trackName = 'background-music' } = req.body;
+
+  if (!soundcloudUrl) {
+    return res.status(400).json({
+      success: false,
+      message: 'SoundCloud URL is required'
+    });
+  }
+
+  try {
+    const result = await audioStreamer.setupBackgroundAudio(soundcloudUrl, trackName);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to setup audio',
+      error: error.message
+    });
+  }
+}));
+
+// Get current audio track
+app.get('/api/audio/current', asyncHandler(async (req, res) => {
+  const current = audioStreamer.getCurrentTrack();
+  res.json({
+    success: true,
+    current
+  });
+}));
+
+// Stop background audio
+app.post('/api/audio/stop', asyncHandler(async (req, res) => {
+  audioStreamer.stopBackgroundAudio();
+  res.json({
+    success: true,
+    message: 'Background audio stopped'
+  });
+}));
+
+// Delete audio file
+app.delete('/api/audio/:filename', asyncHandler(async (req, res) => {
+  const { filename } = req.params;
+
+  try {
+    const deleted = audioStreamer.deleteAudioFile(filename);
+    res.json({
+      success: deleted,
+      message: deleted ? 'Audio file deleted' : 'Audio file not found'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete audio',
+      error: error.message
+    });
+  }
+}));
+
 // Export app WITHOUT 404/error handlers
 // These will be added in bot.js AFTER the webhook callback
 module.exports = app;

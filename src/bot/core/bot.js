@@ -200,7 +200,18 @@ const startBot = async () => {
       // Webhook mode for production
       const webhookPath = process.env.BOT_WEBHOOK_PATH || '/webhook/telegram';
       const webhookUrl = `${process.env.BOT_WEBHOOK_DOMAIN}${webhookPath}`;
-      await bot.telegram.setWebhook(webhookUrl);
+
+      // Configure allowed updates to include member join/leave events
+      const allowedUpdates = [
+        'message',
+        'callback_query',
+        'my_chat_member',  // Bot added/removed from group
+        'chat_member',     // User joined/left group (for welcome messages)
+        'channel_post',
+        'edited_message',
+      ];
+
+      await bot.telegram.setWebhook(webhookUrl, { allowed_updates: allowedUpdates });
       logger.info(`✓ Webhook set to: ${webhookUrl}`);
       // Register webhook callback
       apiApp.post(webhookPath, async (req, res) => {

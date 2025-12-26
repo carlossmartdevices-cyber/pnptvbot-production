@@ -3,17 +3,21 @@ const ChatCleanupService = require('../../services/chatCleanupService');
 const PermissionService = require('../../services/permissionService');
 
 const GROUP_ID = process.env.GROUP_ID;
-const NOTIFICATIONS_TOPIC_ID = process.env.NOTIFICATIONS_TOPIC_ID || '3135';
+const NOTIFICATIONS_TOPIC_ID = process.env.NOTIFICATIONS_TOPIC_ID ? parseInt(process.env.NOTIFICATIONS_TOPIC_ID) : null;
 const AUTO_DELETE_DELAY = 3 * 60 * 1000; // 3 minutes
+
+// Cache valid topic IDs per chat to avoid repeated failed attempts
+const validTopicsPerChat = {};
 
 /**
  * Group Behavior Middleware
- * Routes all bot messages to topic 3135 (Notifications) and auto-deletes after 3 minutes
+ * Routes messages to valid topics only. Falls back to main chat if topic doesn't exist.
  */
 function groupBehaviorMiddleware() {
   return async (ctx, next) => {
     const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
-    const chatIdStr = ctx.chat?.id?.toString();
+    const chatId = ctx.chat?.id;
+    const chatIdStr = chatId?.toString();
 
     // Only apply to configured group
     if (!isGroup || (GROUP_ID && chatIdStr !== GROUP_ID)) {
@@ -31,67 +35,139 @@ function groupBehaviorMiddleware() {
       PermissionService.isEnvAdmin(userId)
     );
 
+    // Determine if we should use a topic ID
+    const shouldUseTopic = !isAdmin && NOTIFICATIONS_TOPIC_ID &&
+      (validTopicsPerChat[chatId] === undefined || validTopicsPerChat[chatId] === true);
+
     // Override ctx.reply to route to notifications topic
     ctx.reply = async (text, extra = {}) => {
-      // Route to notifications topic if not already in a specific topic and not admin
-      if (!isAdmin && !extra.message_thread_id) {
-        extra.message_thread_id = parseInt(NOTIFICATIONS_TOPIC_ID);
+      // Only add topic ID if we haven't determined it doesn't exist
+      if (shouldUseTopic && !extra.message_thread_id) {
+        extra.message_thread_id = NOTIFICATIONS_TOPIC_ID;
       }
 
-      const message = await originalReply(text, extra);
+      try {
+        const message = await originalReply(text, extra);
 
-      // Schedule deletion after 3 minutes
-      if (message) {
-        ChatCleanupService.scheduleDelete(
-          ctx.telegram,
-          ctx.chat.id,
-          message.message_id,
-          'group-bot-behavior',
-          AUTO_DELETE_DELAY
-        );
+        // Mark topic as valid for this chat
+        if (shouldUseTopic && validTopicsPerChat[chatId] === undefined) {
+          validTopicsPerChat[chatId] = true;
+        }
 
-        logger.debug('Bot message routed to notifications topic and scheduled for deletion', {
-          chatId: ctx.chat.id,
-          messageId: message.message_id,
-          topicId: NOTIFICATIONS_TOPIC_ID,
-          deleteIn: '3 minutes',
-        });
+        // Schedule deletion after 3 minutes
+        if (message) {
+          ChatCleanupService.scheduleDelete(
+            ctx.telegram,
+            chatId,
+            message.message_id,
+            'group-bot-behavior',
+            AUTO_DELETE_DELAY
+          );
+
+          logger.debug('Bot message sent and scheduled for deletion', {
+            chatId,
+            messageId: message.message_id,
+            topicId: extra.message_thread_id || 'main',
+            deleteIn: '3 minutes',
+          });
+        }
+
+        return message;
+      } catch (error) {
+        // If topic not found, mark it as invalid and retry without topic
+        if (error.description && error.description.includes('message thread not found')) {
+          logger.info('Topic does not exist, marking as invalid and using main chat', {
+            chatId,
+            topicId: NOTIFICATIONS_TOPIC_ID,
+          });
+
+          validTopicsPerChat[chatId] = false;
+          extra.message_thread_id = undefined;
+
+          const message = await originalReply(text, extra);
+
+          if (message) {
+            ChatCleanupService.scheduleDelete(
+              ctx.telegram,
+              chatId,
+              message.message_id,
+              'group-bot-behavior',
+              AUTO_DELETE_DELAY
+            );
+          }
+
+          return message;
+        }
+        throw error;
       }
-
-      return message;
     };
 
     // Override ctx.telegram.sendMessage for groups
     ctx.telegram.sendMessage = async (chatId, text, extra = {}) => {
       const chatIdStr = chatId.toString();
       const isTargetGroup = GROUP_ID ? chatIdStr === GROUP_ID : chatIdStr.startsWith('-');
+      const shouldUseTopic = isTargetGroup && !isAdmin && NOTIFICATIONS_TOPIC_ID &&
+        (validTopicsPerChat[chatId] === undefined || validTopicsPerChat[chatId] === true);
 
-      // Route to notifications topic if sending to group and not admin
-      if (isTargetGroup && !isAdmin && !extra.message_thread_id) {
-        extra.message_thread_id = parseInt(NOTIFICATIONS_TOPIC_ID);
+      // Only add topic ID if we haven't determined it doesn't exist
+      if (shouldUseTopic && !extra.message_thread_id) {
+        extra.message_thread_id = NOTIFICATIONS_TOPIC_ID;
       }
 
-      const message = await originalSendMessage(chatId, text, extra);
+      try {
+        const message = await originalSendMessage(chatId, text, extra);
 
-      // Schedule deletion after 3 minutes
-      if (isTargetGroup && message) {
-        ChatCleanupService.scheduleDelete(
-          ctx.telegram,
-          chatId,
-          message.message_id,
-          'group-bot-behavior',
-          AUTO_DELETE_DELAY
-        );
+        // Mark topic as valid for this chat
+        if (shouldUseTopic && validTopicsPerChat[chatId] === undefined) {
+          validTopicsPerChat[chatId] = true;
+        }
 
-        logger.debug('Bot message routed to notifications topic and scheduled for deletion', {
-          chatId,
-          messageId: message.message_id,
-          topicId: NOTIFICATIONS_TOPIC_ID,
-          deleteIn: '3 minutes',
-        });
+        // Schedule deletion after 3 minutes
+        if (isTargetGroup && message) {
+          ChatCleanupService.scheduleDelete(
+            ctx.telegram,
+            chatId,
+            message.message_id,
+            'group-bot-behavior',
+            AUTO_DELETE_DELAY
+          );
+
+          logger.debug('Bot message sent and scheduled for deletion', {
+            chatId,
+            messageId: message.message_id,
+            topicId: extra.message_thread_id || 'main',
+            deleteIn: '3 minutes',
+          });
+        }
+
+        return message;
+      } catch (error) {
+        // If topic not found, mark it as invalid and retry without topic
+        if (error.description && error.description.includes('message thread not found')) {
+          logger.info('Topic does not exist, marking as invalid and using main chat', {
+            chatId,
+            topicId: NOTIFICATIONS_TOPIC_ID,
+          });
+
+          validTopicsPerChat[chatId] = false;
+          extra.message_thread_id = undefined;
+
+          const message = await originalSendMessage(chatId, text, extra);
+
+          if (isTargetGroup && message) {
+            ChatCleanupService.scheduleDelete(
+              ctx.telegram,
+              chatId,
+              message.message_id,
+              'group-bot-behavior',
+              AUTO_DELETE_DELAY
+            );
+          }
+
+          return message;
+        }
+        throw error;
       }
-
-      return message;
     };
 
     return next();

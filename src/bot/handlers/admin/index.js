@@ -2528,4 +2528,13 @@ const registerAdminHandlers = (bot) => {
   });
 };
 
-module.exports = registerAdminHandlers;
+// Import and register audio management handlers
+const registerAudioManagementHandlers = require('./audioManagement');
+
+// Wrapper to register all admin handlers including audio management
+const registerAllAdminHandlers = (bot) => {
+  registerAdminHandlers(bot);
+  registerAudioManagementHandlers(bot);
+};
+
+module.exports = registerAllAdminHandlers;

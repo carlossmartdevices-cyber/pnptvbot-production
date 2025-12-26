@@ -18,8 +18,11 @@ const BADGE_OPTIONS = {
  * @param {Telegraf} bot - Bot instance
  */
 const registerGroupWelcomeHandlers = (bot) => {
-  // Handle new members joining the group
+  // Handle new members joining the group via message (traditional way)
   bot.on('new_chat_members', handleNewMembers);
+
+  // Also handle chat_member updates (webhook-compatible way)
+  bot.on('chat_member', handleChatMemberUpdate);
 
   // Handle badge selection
   bot.action(/^badge_select_(.+)$/, handleBadgeSelection);
@@ -27,6 +30,50 @@ const registerGroupWelcomeHandlers = (bot) => {
   // Handle view rules button
   bot.action('group_view_rules', handleViewRules);
 };
+
+/**
+ * Handle chat member updates (webhook-compatible way to detect new members)
+ * This catches join/leave events from chat_member updates
+ */
+async function handleChatMemberUpdate(ctx) {
+  try {
+    const chatMember = ctx.chatMember;
+    if (!chatMember) return;
+
+    const chatType = ctx.chat?.type;
+    // Only works in groups
+    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+      return;
+    }
+
+    const newMember = chatMember.new_chat_member;
+    const oldMember = chatMember.old_chat_member;
+
+    // Check if this is a join event (user was not in chat before, now is)
+    const wasInChat = oldMember?.status && ['member', 'administrator', 'creator'].includes(oldMember.status);
+    const isNowInChat = newMember?.status && ['member', 'administrator', 'creator'].includes(newMember.status);
+
+    if (!wasInChat && isNowInChat) {
+      // User joined the group
+      const member = newMember.user;
+      if (!member || member.is_bot) {
+        // Let bot removal be handled by the other handler if needed
+        return;
+      }
+
+      logger.debug('New member detected via chat_member update', {
+        userId: member.id,
+        username: member.username,
+        chatId: ctx.chat.id,
+      });
+
+      // Process the new member using same logic as message-based handler
+      await processNewMember(ctx, member);
+    }
+  } catch (error) {
+    logger.error('Error handling chat member update:', error);
+  }
+}
 
 /**
  * Handle new members joining the group
@@ -44,55 +91,66 @@ async function handleNewMembers(ctx) {
 
     // Process each new member
     for (const member of newMembers) {
-      // Remove all bots from the group (except this bot)
-      if (member.is_bot) {
-        try {
-          await ctx.kickChatMember(member.id);
-
-          // Send notification about bot removal
-          const botName = member.first_name || 'Bot';
-          const message = `🚫 **Bot Removed**\n\nNo other bots are allowed in this group. Only the official PNPtv bot is permitted.`;
-
-          const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
-
-          // Auto-delete notification after 2 minutes
-          ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000);
-
-          logger.info('Bot removed from group', {
-            botName,
-            botId: member.id,
-            chatId: ctx.chat.id,
-          });
-        } catch (error) {
-          logger.error('Error removing bot from group:', error);
-        }
-        continue;
-      }
-
-      // Get or create user
-      const user = await UserModel.createOrUpdate({
-        userId: member.id,
-        username: member.username,
-        firstName: member.first_name,
-        lastName: member.last_name,
-      });
-
-      if (!user) {
-        logger.error('Failed to get/create user for new member', { userId: member.id });
-        continue;
-      }
-
-      const lang = user.language || 'en';
-      const username = member.username ? `@${member.username}` : member.first_name;
-
-      // Send welcome message
-      await sendWelcomeMessage(ctx, username, user, lang);
-
-      // Send badge selection message
-      await sendBadgeSelectionMessage(ctx, username, lang);
+      await processNewMember(ctx, member);
     }
   } catch (error) {
     logger.error('Error handling new members:', error);
+  }
+}
+
+/**
+ * Process a new member joining (shared logic for both message and chat_member update handlers)
+ */
+async function processNewMember(ctx, member) {
+  try {
+    // Remove all bots from the group (except this bot)
+    if (member.is_bot) {
+      try {
+        await ctx.kickChatMember(member.id);
+
+        // Send notification about bot removal
+        const botName = member.first_name || 'Bot';
+        const message = `🚫 **Bot Removed**\n\nNo other bots are allowed in this group. Only the official PNPtv bot is permitted.`;
+
+        const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
+
+        // Auto-delete notification after 2 minutes
+        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000);
+
+        logger.info('Bot removed from group', {
+          botName,
+          botId: member.id,
+          chatId: ctx.chat.id,
+        });
+      } catch (error) {
+        logger.error('Error removing bot from group:', error);
+      }
+      return;
+    }
+
+    // Get or create user
+    const user = await UserModel.createOrUpdate({
+      userId: member.id,
+      username: member.username,
+      firstName: member.first_name,
+      lastName: member.last_name,
+    });
+
+    if (!user) {
+      logger.error('Failed to get/create user for new member', { userId: member.id });
+      return;
+    }
+
+    const lang = user.language || 'en';
+    const username = member.username ? `@${member.username}` : member.first_name;
+
+    // Send welcome message
+    await sendWelcomeMessage(ctx, username, user, lang);
+
+    // Send badge selection message
+    await sendBadgeSelectionMessage(ctx, username, lang);
+  } catch (error) {
+    logger.error('Error processing new member:', error);
   }
 }
 
