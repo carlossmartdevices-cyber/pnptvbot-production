@@ -543,11 +543,16 @@ async function handleLiveStreams(ctx, lang) {
 }
 
 async function handleVideoCalls(ctx, lang) {
+  const displayName = ctx.from.first_name || 'Guest';
+  const audioStreamUrl = process.env.AUDIO_STREAM_URL || '/audio/background-music.mp3';
+  const videoRoomsUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=true&config.startWithVideoMuted=false&config.disableLocalRecording=true&config.disableScreenSharing=true&config.requireDisplayName=true&config.backgroundAudio=${encodeURIComponent(audioStreamUrl)}&userInfo.displayName=${encodeURIComponent(displayName)}`;
+
   const message = lang === 'es'
-    ? '📹 *Videollamadas*\n\nAquí puedes programar videollamadas exclusivas.\n\n_Esta función estará disponible pronto._'
-    : '📹 *Video Calls*\n\nHere you can schedule exclusive video calls.\n\n_This feature is coming soon._';
+    ? '📹 *Salas de Videollamadas*\n\nAccede a nuestras salas de videollamadas en vivo.\n\nHaz clic en el botón de abajo para acceder a la sala:'
+    : '📹 *Video Call Rooms*\n\nAccess our live video calling rooms.\n\nClick the button below to join the room:';
 
   const keyboard = Markup.inlineKeyboard([
+    [Markup.button.url(lang === 'es' ? '🎥 Entrar a Sala' : '🎥 Join Room', videoRoomsUrl)],
     [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
   ]);
 
