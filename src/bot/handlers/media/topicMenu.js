@@ -52,24 +52,24 @@ const registerTopicMenuHandlers = (bot) => {
         const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'user';
         
         // Notify in topic
-        const topicMsg = `${username} I sent you a private message to create your video room! 📹`;
+        const topicMsg = `${username} I sent you a private message to join community rooms! 📹`;
         await ctx.reply(topicMsg, { message_thread_id: VIDEOCALL_TOPIC_ID });
         
         // Send private message with link
         try {
-          const pmLink = `https://t.me/${botUsername}?start=show_jitsi`;
+          const pmLink = `https://t.me/${botUsername}?start=hangouts_join_main`;
           const pmMsg = [
-            '📹 *Video Call Rooms*',
+            '📹 *Salas Comunitarias 24/7*',
             '',
-            'Click the button below to access video call rooms:',
+            'Click the button below to join community rooms:',
             '',
-            `[Open Video Rooms](${pmLink})`
+            `[Open Community Rooms](${pmLink})`
           ].join('\n');
-          
-          await ctx.telegram.sendMessage(ctx.from.id, pmMsg, { 
+
+          await ctx.telegram.sendMessage(ctx.from.id, pmMsg, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-              [Markup.button.callback('📹 Open Video Rooms', 'show_jitsi')]
+              [Markup.button.callback('📹 Join Community Rooms', 'hangouts_join_main')]
             ])
           });
         } catch (pmError) {
@@ -105,17 +105,18 @@ const registerTopicMenuHandlers = (bot) => {
  */
 async function showVideoCallMenu(ctx, topicId) {
   const message = [
-    '📹 *Video Call Rooms Menu*',
+    '📹 *Salas Comunitarias 24/7*',
     '',
-    'Create and manage video call rooms for your meetings.',
+    'Join PNPtv community rooms - always active!',
     '',
-    '🎥 Jitsi Meet - Professional video calls',
-    '👥 Support for multiple participants',
-    '🔒 Secure and encrypted'
+    '🎥 3 Rooms - 50 participants each',
+    '👥 No moderator required',
+    '🔓 Open guest access',
+    '⚡ Instant join'
   ].join('\n');
 
   const keyboard = Markup.inlineKeyboard([
-    [Markup.button.callback('🎥 Open Video Rooms', 'topic_create_room')],
+    [Markup.button.callback('🎥 Join Community Rooms', 'topic_create_room')],
     [Markup.button.callback('❌ Close Menu', 'topic_close_menu')]
   ]);
 

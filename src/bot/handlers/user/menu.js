@@ -566,14 +566,14 @@ const showLiveRadioTopicMenu = async (ctx) => {
       'This is where all the action happens! Shows, calls, radio updates — right here.\n\n' +
       '**Quick Access:**\n' +
       '• 📻 Radio — 24/7 cloudy beats\n' +
-      '• 🎥 Hangouts — Video calls with members\n' +
+      '• 🎥 Salas 24/7 — Community video rooms\n' +
       '• 🎬 Live Shows — Performers streaming\n\n' +
       '`Stay tuned papi! 🎧`';
 
     keyboard = Markup.inlineKeyboard([
       [
         Markup.button.url('📻 Radio', `https://t.me/${botUsername}?start=show_radio`),
-        Markup.button.url('🎥 Hangouts', `https://t.me/${botUsername}?start=show_jitsi`),
+        Markup.button.url('🎥 Salas 24/7', `https://t.me/${botUsername}?start=hangouts_join_main`),
       ],
       [
         Markup.button.url('🎬 Live Shows', `https://t.me/${botUsername}?start=show_live`),
