@@ -31,7 +31,7 @@ class PaymentService {
     }) {
       try {
         const bot = new Telegraf(process.env.BOT_TOKEN);
-        const groupId = process.env.GROUP_ID || '-1003159260496'; // PRIME channel ID
+        const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496'; // PRIME channel ID
 
         // Create unique invite link for PRIME channel
         let inviteLink = '';
@@ -989,7 +989,7 @@ class PaymentService {
 async function sendPrimeConfirmation(userId, planName, expiryDate, source = 'manual') {
   try {
     const bot = new Telegraf(process.env.BOT_TOKEN);
-    const groupId = process.env.TELEGRAM_PREMIUM_CHANNEL_ID || process.env.TELEGRAM_CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
+    const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
 
     // Get user to determine language
     const user = await UserModel.getById(userId);

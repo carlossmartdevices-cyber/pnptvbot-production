@@ -249,7 +249,7 @@ const registerCommunityPremiumBroadcast = (bot) => {
       try {
         // Create one-time invite link for premium channel
         const inviteLink = await ctx.telegram.createChatInviteLink(
-          process.env.TELEGRAM_PREMIUM_CHANNEL_ID || process.env.TELEGRAM_CHANNEL_ID,
+          process.env.CHANNEL_ID,
           {
             member_limit: 1, // One-time use
             name: `Premium Access - User ${userId}`,
