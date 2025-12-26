@@ -492,10 +492,276 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+
+        /* Adult Content Warning Modal Styles */
+        .adult-warning-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(10px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .adult-warning-modal.active {
+            display: flex;
+        }
+
+        .adult-warning-content {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
+            border: 2px solid rgba(102, 126, 234, 0.5);
+            border-radius: 20px;
+            padding: 25px;
+            max-width: 450px;
+            color: #fff;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(20px);
+        }
+
+        .warning-header {
+            text-align: center;
+            margin-bottom: 25px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 20px;
+        }
+
+        .warning-header h2 {
+            margin-bottom: 15px;
+            font-size: 1.8em;
+        }
+
+        .age-badge {
+            display: inline-block;
+            background: #ff0000;
+            color: #fff;
+            font-size: 1.5em;
+            font-weight: bold;
+            padding: 8px 20px;
+            border-radius: 25px;
+            margin-top: 10px;
+            box-shadow: 0 4px 15px rgba(255, 0, 0, 0.4);
+        }
+
+        .warning-body {
+            margin-bottom: 20px;
+        }
+
+        .warning-section {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .warning-section h3 {
+            margin-bottom: 12px;
+            color: #ffd700;
+            font-size: 1.15em;
+        }
+
+        .warning-section p {
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .warning-section ul {
+            list-style: none;
+            padding-left: 0;
+            margin: 10px 0;
+        }
+
+        .warning-section ul li {
+            padding: 6px 0;
+            padding-left: 25px;
+            position: relative;
+            line-height: 1.5;
+        }
+
+        .warning-section ul li:before {
+            content: "•";
+            position: absolute;
+            left: 8px;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .legal-notice {
+            background: rgba(255, 215, 0, 0.1);
+            border: 2px solid rgba(255, 215, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .legal-notice strong {
+            color: #ffd700;
+        }
+
+        .legal-notice ul {
+            list-style: none;
+            padding-left: 0;
+            margin-top: 12px;
+        }
+
+        .legal-notice ul li {
+            padding: 8px 0;
+            padding-left: 30px;
+            position: relative;
+            line-height: 1.6;
+        }
+
+        .legal-notice ul li:before {
+            content: "✓";
+            position: absolute;
+            left: 8px;
+            color: #00ff00;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .legal-notice a {
+            color: #667eea;
+            text-decoration: underline;
+            transition: color 0.3s;
+        }
+
+        .legal-notice a:hover {
+            color: #ffd700;
+        }
+
+        .warning-footer {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-decline,
+        .btn-accept {
+            flex: 1;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 1.05em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-decline {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-decline:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .btn-accept {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-accept:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn-accept:active {
+            transform: translateY(0);
+        }
+
+        @media (max-width: 768px) {
+            .adult-warning-content {
+                padding: 20px;
+                max-width: 95%;
+                max-height: 95vh;
+            }
+
+            .warning-header h2 {
+                font-size: 1.5em;
+            }
+
+            .warning-section {
+                padding: 15px;
+                margin-bottom: 15px;
+            }
+
+            .warning-section h3 {
+                font-size: 1em;
+            }
+
+            .warning-footer {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .btn-decline,
+            .btn-accept {
+                width: 100%;
+                padding: 12px 20px;
+                font-size: 1em;
+            }
+
+            .legal-notice {
+                padding: 15px;
+            }
+
+            .age-badge {
+                font-size: 1.3em;
+                padding: 6px 16px;
+            }
+        }
     </style>
 </head>
 <body>
-    <!-- Login Modal -->
+    <!-- Adult Content Warning Modal (Popup) -->
+    <div class="adult-warning-modal active" id="adultWarningModal">
+        <div class="adult-warning-content">
+            <div class="warning-header">
+                <h2>⚠️ 18+ Content Warning</h2>
+            </div>
+
+            <div class="warning-body">
+                <p style="margin-bottom: 15px; font-size: 1.05em; line-height: 1.6;">
+                    This is an adult content room. By continuing, you confirm:
+                </p>
+                <ul style="list-style: none; padding: 0; margin: 15px 0;">
+                    <li style="padding: 6px 0; padding-left: 25px; position: relative;">
+                        <span style="position: absolute; left: 0; color: #00ff00;">✓</span>
+                        You are 18 years or older
+                    </li>
+                    <li style="padding: 6px 0; padding-left: 25px; position: relative;">
+                        <span style="position: absolute; left: 0; color: #00ff00;">✓</span>
+                        You understand this room contains adult content
+                    </li>
+                    <li style="padding: 6px 0; padding-left: 25px; position: relative;">
+                        <span style="position: absolute; left: 0; color: #00ff00;">✓</span>
+                        Video/audio may be recorded by others
+                    </li>
+                </ul>
+            </div>
+
+            <div class="warning-footer">
+                <button class="btn-accept" id="acceptWarningBtn" style="width: 100%; margin-bottom: 10px;">I Agree - Enter</button>
+                <button class="btn-decline" id="declineWarningBtn" style="width: 100%; font-size: 0.9em;">Decline</button>
+            </div>
+        </div>
+    </div>
     <div class="login-modal" id="loginModal">
         <div class="login-form">
             <h2>👋 Welcome</h2>
@@ -597,6 +863,79 @@
         </div>
     </div>
 
+
+        // Adult Content Warning Modal Handler
+        (function() {
+            const warningModal = document.getElementById('adultWarningModal');
+            const acceptBtn = document.getElementById('acceptWarningBtn');
+            const declineBtn = document.getElementById('declineWarningBtn');
+            const CONSENT_KEY = 'pnptv_community_adult_consent';
+            const CONSENT_TIMESTAMP_KEY = 'pnptv_community_consent_time';
+
+            // Check if user has already consented in this session
+            function checkExistingConsent() {
+                const consent = sessionStorage.getItem(CONSENT_KEY);
+                const timestamp = sessionStorage.getItem(CONSENT_TIMESTAMP_KEY);
+
+                // Consent valid for current session only
+                if (consent === 'true' && timestamp) {
+                    const consentTime = new Date(timestamp);
+                    const now = new Date();
+                    // Consent valid for 4 hours per session
+                    const hoursSinceConsent = (now - consentTime) / (1000 * 60 * 60);
+
+                    if (hoursSinceConsent < 4) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            // Handle accept button
+            acceptBtn.addEventListener('click', function() {
+                // Store consent
+                sessionStorage.setItem(CONSENT_KEY, 'true');
+                sessionStorage.setItem(CONSENT_TIMESTAMP_KEY, new Date().toISOString());
+
+                // Optional: Track consent in analytics (if implemented)
+                if (typeof gtag !== 'undefined') {
+                    gtag('event', 'adult_content_consent', {
+                        'event_category': 'compliance',
+                        'event_label': 'community_room'
+                    });
+                }
+
+                // Redirect directly to Jitsi room
+                window.location.href = 'https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=true&config.startWithVideoMuted=false&userInfo.displayName=User' + Date.now();
+            });
+
+            // Handle decline button
+            declineBtn.addEventListener('click', function() {
+                // Track decline in analytics (if implemented)
+                if (typeof gtag !== 'undefined') {
+                    gtag('event', 'adult_content_decline', {
+                        'event_category': 'compliance',
+                        'event_label': 'community_room'
+                    });
+                }
+
+                // Redirect to main site
+                window.location.href = 'https://pnptv.app';
+            });
+
+            // Initialize on page load
+            if (checkExistingConsent()) {
+                // User already consented, hide warning modal
+                warningModal.classList.remove('active');
+            } else {
+                // Show warning modal
+                warningModal.classList.add('active');
+                // Hide login modal until consent given
+                document.getElementById('loginModal').classList.remove('show');
+            }
+        })();
+
     <script>
         // Configuration
         const jitsiDomain = '8x8.vc';
@@ -613,6 +952,21 @@
         // Initialize Telegram Web App if available
         if (tg) {
             tg.ready();
+
+            // Auto-populate Telegram user info in form
+            const user = tg.initDataUnsafe?.user;
+            if (user) {
+                const displayNameField = document.getElementById('displayNameInput');
+                if (displayNameField && !displayNameField.value) {
+                    const fullName = user.first_name + (user.last_name ? ' ' + user.last_name : '');
+                    displayNameField.value = fullName;
+                }
+
+                const emailField = document.getElementById('emailInput');
+                if (emailField && !emailField.value && user.username) {
+                    emailField.value = `@${user.username}`;
+                }
+            }
         }
 
         // Get user info from URL or session
@@ -704,6 +1058,12 @@
 
         // Check for existing session
         function checkExistingSession() {
+            // First check if adult content consent was given
+            const adultConsent = sessionStorage.getItem('pnptv_community_adult_consent');
+            if (adultConsent !== 'true') {
+                return false; // Don't auto-start if no consent
+            }
+
             const savedDisplayName = getDisplayName();
             const savedUserId = getUserId();
 
@@ -714,7 +1074,7 @@
                 return true;
             }
 
-            // Auto-start as guest if no session exists
+            // Auto-start as guest if consent given but no session
             displayName = 'Guest ' + Math.floor(Math.random() * 10000);
             userId = 'guest_' + Date.now();
             userEmail = '';
@@ -916,7 +1276,7 @@
                     DISABLE_FOCUS_INDICATOR: false
                 },
                 configOverwrite: {
-                    startWithAudioMuted: false,
+                    startWithAudioMuted: true,
                     startWithVideoMuted: false,
                     prejoinPageEnabled: false,
                     enableWelcomePage: false,
@@ -1024,6 +1384,85 @@
                 `;
             }
         }
+
+        // Adult Content Warning Modal Handler
+        (function() {
+            const warningModal = document.getElementById('adultWarningModal');
+            const acceptBtn = document.getElementById('acceptWarningBtn');
+            const declineBtn = document.getElementById('declineWarningBtn');
+            const CONSENT_KEY = 'pnptv_community_adult_consent';
+            const CONSENT_TIMESTAMP_KEY = 'pnptv_community_consent_time';
+
+            // Check if user has already consented in this session
+            function checkExistingConsent() {
+                const consent = sessionStorage.getItem(CONSENT_KEY);
+                const timestamp = sessionStorage.getItem(CONSENT_TIMESTAMP_KEY);
+
+                // Consent valid for current session only
+                if (consent === 'true' && timestamp) {
+                    const consentTime = new Date(timestamp);
+                    const now = new Date();
+                    // Consent valid for 4 hours per session
+                    const hoursSinceConsent = (now - consentTime) / (1000 * 60 * 60);
+
+                    if (hoursSinceConsent < 4) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            // Handle accept button
+            acceptBtn.addEventListener('click', function() {
+                // Store consent
+                sessionStorage.setItem(CONSENT_KEY, 'true');
+                sessionStorage.setItem(CONSENT_TIMESTAMP_KEY, new Date().toISOString());
+
+                // Optional: Track consent in analytics (if implemented)
+                if (typeof gtag !== 'undefined') {
+                    gtag('event', 'adult_content_consent', {
+                        'event_category': 'compliance',
+                        'event_label': 'community_room'
+                    });
+                }
+
+                // Hide warning modal
+                warningModal.classList.remove('active');
+                // Show login modal (if user not already logged in)
+                const existingSession = checkExistingSession();
+                if (!existingSession) {
+                    document.getElementById('loginModal').classList.remove('hidden');
+                } else {
+                    document.getElementById('loginModal').classList.add('hidden');
+                }
+            });
+
+            // Handle decline button
+            declineBtn.addEventListener('click', function() {
+                // Track decline in analytics (if implemented)
+                if (typeof gtag !== 'undefined') {
+                    gtag('event', 'adult_content_decline', {
+                        'event_category': 'compliance',
+                        'event_label': 'community_room'
+                    });
+                }
+
+                // Redirect to main site
+                window.location.href = 'https://pnptv.app';
+            });
+
+            // Initialize on page load
+            if (checkExistingConsent()) {
+                // User already consented, hide warning modal
+                warningModal.classList.remove('active');
+            } else {
+                // Show warning modal
+                warningModal.classList.add('active');
+                // Hide login modal until consent given
+                document.getElementById('loginModal').classList.add('hidden');
+            }
+        })();
 
         // Main initialization - auto-start as guest
         async function initialize() {

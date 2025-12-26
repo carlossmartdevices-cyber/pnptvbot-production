@@ -128,7 +128,9 @@
       "Bash(PGPASSWORD=\"Apelo801050#\" psql:*)",
       "Bash(node scripts/send-broadcast-auto.js:*)",
       "Bash(zcat:*)",
-      "Bash(node -c:*)"
+      "Bash(node -c:*)",
+      "Bash(curl -s https://pnptv.app/community-room)",
+      "Bash(sudo systemctl restart:*)"
     ],
     "deny": [],
     "ask": []

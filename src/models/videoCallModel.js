@@ -302,6 +302,32 @@ class VideoCallModel {
   }
 
   /**
+   * Get all public active calls
+   * @returns {Promise<Array>} Public active calls
+   */
+  static async getAllPublic() {
+    try {
+      logger.info('Fetching public hangouts from database');
+      const result = await query(
+        `SELECT * FROM video_calls
+         WHERE is_public = true AND is_active = true
+         ORDER BY created_at DESC
+         LIMIT 50`
+      );
+
+      logger.info('Successfully fetched public hangouts', { count: result.rows.length });
+      return result.rows.map(row => this._mapCallFromDb(row));
+    } catch (error) {
+      logger.error('Error getting public calls:', error, {
+        message: error.message,
+        code: error.code,
+        detail: error.detail
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Get active calls by creator
    * @param {string} creatorId - Creator user ID
    * @returns {Promise<Array>} Active calls

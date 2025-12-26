@@ -12,6 +12,7 @@ const webhookController = require('./controllers/webhookController');
 const subscriptionController = require('./controllers/subscriptionController');
 const paymentController = require('./controllers/paymentController');
 const invitationController = require('./controllers/invitationController');
+const hangoutsController = require('./controllers/hangoutsController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -237,6 +238,14 @@ app.get('/api/stats', asyncHandler(async (req, res) => {
   const stats = await UserService.getStatistics();
   res.json(stats);
 }));
+
+// Hangouts API routes
+app.post('/api/hangouts/create', asyncHandler(hangoutsController.createHangout));
+app.get('/api/hangouts/public', asyncHandler(hangoutsController.getPublicHangouts));
+app.get('/api/hangouts/my-rooms', asyncHandler(hangoutsController.getMyHangouts));
+app.post('/api/hangouts/join/:roomId', asyncHandler(hangoutsController.joinHangout));
+app.post('/api/hangouts/end/:roomId', asyncHandler(hangoutsController.endHangout));
+app.get('/api/hangouts/:roomId', asyncHandler(hangoutsController.getHangoutDetails));
 
 // Subscription API routes
 app.get('/api/subscription/plans', asyncHandler(subscriptionController.getPlans));
