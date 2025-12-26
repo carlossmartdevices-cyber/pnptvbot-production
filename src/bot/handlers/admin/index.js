@@ -43,6 +43,11 @@ async function showAdminPanel(ctx, edit = false) {
         Markup.button.callback('🎮 ' + (lang === 'es' ? 'Gamificación' : 'Gamification'), 'admin_gamification'),
       ]);
 
+      // ═══ COMMUNITY REWARDS ═══
+      buttons.push([
+        Markup.button.callback('🎁 ' + (lang === 'es' ? 'Premium Comunitario' : 'Community Premium'), 'admin_community_premium_broadcast'),
+      ]);
+
       // ═══ PREVIEW MODE ═══
       buttons.push([
         Markup.button.callback('👁️ ' + (lang === 'es' ? 'Vista Previa' : 'Preview Mode'), 'admin_view_mode'),
@@ -92,12 +97,14 @@ async function showAdminPanel(ctx, edit = false) {
 const registerGamificationHandlers = require('./gamification');
 const registerRadioManagementHandlers = require('./radioManagement');
 const registerLiveStreamManagementHandlers = require('./liveStreamManagement');
+const registerCommunityPremiumBroadcast = require('./communityPremiumBroadcast');
 
 const registerAdminHandlers = (bot) => {
   // Register gamification handlers
   registerGamificationHandlers(bot);
   registerRadioManagementHandlers(bot);
   registerLiveStreamManagementHandlers(bot);
+  registerCommunityPremiumBroadcast(bot);
 
   // Admin command
   bot.command('admin', async (ctx) => {
