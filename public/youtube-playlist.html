@@ -647,6 +647,41 @@
             </div>
         </div>
 
+        <!-- Video Player Modal -->
+        <div id="videoPlayerModal" class="modal" style="max-width: 90%; width: 1200px; height: 90%;">
+            <div class="modal-content" style="padding: 0; height: 100%;">
+                <div style="position: relative; height: 100%; display: flex; flex-direction: column;">
+                    <div style="padding: 20px; border-bottom: 1px solid #e0e0e0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                        <h5 id="videoPlayerTitle" style="margin: 0; font-weight: 600;">Now Playing</h5>
+                        <p id="videoPlayerSubtitle" style="margin: 5px 0 0 0; opacity: 0.9;">Loading...</p>
+                    </div>
+                    <div id="videoPlayerContainer" style="flex: 1; background: #000; position: relative;">
+                        <iframe id="videoPlayerFrame"
+                                style="width: 100%; height: 100%; border: none;"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowfullscreen>
+                        </iframe>
+                    </div>
+                    <div style="padding: 15px; background: #f5f5f5; border-top: 1px solid #e0e0e0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <button class="btn" onclick="playPreviousVideo()" id="prevBtn">
+                                <i class="material-icons left">skip_previous</i>Previous
+                            </button>
+                            <div style="text-align: center; flex: 1; min-width: 200px;">
+                                <span id="videoPosition">1 / 9</span>
+                            </div>
+                            <button class="btn" onclick="playNextVideo()" id="nextBtn">
+                                <i class="material-icons right">skip_next</i>Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 10px 24px;">
+                <button class="btn-flat" onclick="closeVideoPlayer()">Close Player</button>
+            </div>
+        </div>
+
         <div class="row" style="margin: 0;">
 
             <!-- Playlists Tab -->
@@ -705,15 +740,15 @@
                 creatorBadge: '👑',
                 thumbnail: 'https://via.placeholder.com/280x160?text=Emotional+Rollercoaster',
                 videos: [
-                    { title: 'Hash Pipe - Arranque acelerado, impulsivo', duration: '3:18' },
-                    { title: 'Come Undone - La euforia empieza a resquebrajarse', duration: '3:47' },
-                    { title: 'Don\'t Let Me Get Me - Auto-odio, frustración', duration: '3:36' },
-                    { title: 'Numb / Encore - Saturación total', duration: '7:20' },
-                    { title: 'Habits (Stay High) - Intento de anestesiar', duration: '3:54' },
-                    { title: 'Novacane - Desconexión emocional', duration: '3:52' },
-                    { title: 'When It Hurts So Bad - Vulnerabilidad cruda', duration: '4:08' },
-                    { title: 'Don\'t Leave Home - Aislamiento y miedo', duration: '4:33' },
-                    { title: 'La Plata - Aterrizaje latino y terrenal', duration: '3:55' }
+                    { title: 'Hash Pipe - Weezer', duration: '3:06', videoId: 'qJB9CVmylCg' },
+                    { title: 'Come Undone - Duran Duran', duration: '4:23', videoId: 'Epgo8ixX6Wo' },
+                    { title: 'Don\'t Let Me Get Me - P!nk', duration: '3:31', videoId: 'GDam0x5w7QI' },
+                    { title: 'Numb - Linkin Park', duration: '3:07', videoId: 'kXYiU_JCYtU' },
+                    { title: 'Habits (Stay High) - Tove Lo', duration: '3:29', videoId: 'oh2LWWORoiM' },
+                    { title: 'Novacane - Frank Ocean', duration: '4:10', videoId: 'TMfPiFeFGdw' },
+                    { title: 'When It Hurts So Bad - Lauryn Hill', duration: '4:03', videoId: 'omJY6F-fP_w' },
+                    { title: 'Don\'t Leave Home - Dido', duration: '4:28', videoId: 'Wto3SaRG1OI' },
+                    { title: 'La Plata - Juanes ft. Lalo Ebratt', duration: '3:39', videoId: 'qnfScIiFFYk' }
                 ]
             }
         ];
@@ -891,20 +926,40 @@
         // Play Playlist
         function playPlaylist(event, playlistId) {
             event.stopPropagation();
-            const playlist = playlists.find(p => p.id === playlistId);
+            const allPlaylists = getAllPlaylists();
+            const playlist = allPlaylists.find(p => p.id === playlistId);
+
+            if (!playlist || !playlist.videos || playlist.videos.length === 0) {
+                M.toast({
+                    html: '<i class="material-icons left">error</i>No videos in this playlist',
+                    displayLength: 3000
+                });
+                return;
+            }
+
+            // Check if videos have videoIds
+            const firstVideo = playlist.videos[0];
+            if (!firstVideo.videoId) {
+                M.toast({
+                    html: '<i class="material-icons left">error</i>Videos not yet available',
+                    displayLength: 3000
+                });
+                return;
+            }
 
             M.toast({
                 html: `<i class="material-icons left">play_arrow</i>Playing: ${playlist.title}`,
                 displayLength: 3000
             });
 
-            // In a real application, this would redirect to the video player
-            // window.location.href = `/player.html?playlist=${playlistId}`;
+            // Open video player with first video
+            openVideoPlayer(firstVideo.videoId, playlist, 0);
         }
 
         // View Playlist Details
         function viewPlaylist(playlistId) {
-            const playlist = playlists.find(p => p.id === playlistId);
+            const allPlaylists = getAllPlaylists();
+            const playlist = allPlaylists.find(p => p.id === playlistId);
 
             // Show modal with playlist details
             const modal = document.createElement('div');
@@ -915,14 +970,14 @@
                     <h4>${playlist.title}</h4>
                     <p>${playlist.description}</p>
                     <div class="video-list">
-                        ${playlist.videos.map(video => `
-                            <div class="video-item">
+                        ${playlist.videos.map((video, index) => `
+                            <div class="video-item" onclick="${video.videoId ? `playIndividualVideo('${video.videoId}', ${playlist.id}, ${index})` : ''}" style="${video.videoId ? 'cursor: pointer;' : 'cursor: default; opacity: 0.6;'}">
                                 <div class="video-thumbnail">
-                                    <i class="material-icons">play_circle</i>
+                                    <i class="material-icons">${video.videoId ? 'play_circle' : 'lock'}</i>
                                 </div>
                                 <div class="video-info">
                                     <h4>${video.title}</h4>
-                                    <p>${video.duration}</p>
+                                    <p>${video.duration}${!video.videoId ? ' - Not available' : ''}</p>
                                 </div>
                             </div>
                         `).join('')}
@@ -1062,10 +1117,16 @@
 
             // Parse video links and create videos array
             const links = videoLinks.split(',').map(link => link.trim()).filter(link => link);
-            const videos = links.map((link, index) => ({
-                title: `Video ${index + 1}`,
-                duration: '--:--'
-            }));
+
+            // Extract YouTube video IDs from URLs
+            const videos = links.map((link, index) => {
+                const videoId = extractYouTubeVideoId(link);
+                return {
+                    title: `Video ${index + 1}`,
+                    duration: '--:--',
+                    videoId: videoId || null
+                };
+            });
 
             // Create new playlist
             const newPlaylist = {
@@ -1108,6 +1169,136 @@
             // Refresh the playlists view
             renderPlaylists(currentFilter);
             renderFavorites();
+        }
+
+        // Helper function to extract YouTube video ID from URL
+        function extractYouTubeVideoId(url) {
+            // Support various YouTube URL formats:
+            // - https://www.youtube.com/watch?v=VIDEO_ID
+            // - https://youtu.be/VIDEO_ID
+            // - https://www.youtube.com/embed/VIDEO_ID
+            // - Just VIDEO_ID
+
+            if (!url) return null;
+
+            // If it's already just an ID (11 characters, alphanumeric)
+            if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
+                return url;
+            }
+
+            // Try to extract from various URL formats
+            const patterns = [
+                /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+                /^([a-zA-Z0-9_-]{11})$/
+            ];
+
+            for (const pattern of patterns) {
+                const match = url.match(pattern);
+                if (match && match[1]) {
+                    return match[1];
+                }
+            }
+
+            return null;
+        }
+
+        // Video Player functionality
+        let currentPlaylist = null;
+        let currentVideoIndex = 0;
+        let videoPlayerModalInstance = null;
+
+        // Initialize video player modal
+        document.addEventListener('DOMContentLoaded', () => {
+            const videoPlayerModal = document.getElementById('videoPlayerModal');
+            videoPlayerModalInstance = M.Modal.init(videoPlayerModal, {
+                dismissible: true,
+                onCloseStart: function() {
+                    // Stop video when closing
+                    const iframe = document.getElementById('videoPlayerFrame');
+                    iframe.src = '';
+                }
+            });
+        });
+
+        // Open video player
+        function openVideoPlayer(videoId, playlist, videoIndex) {
+            currentPlaylist = playlist;
+            currentVideoIndex = videoIndex;
+
+            const video = playlist.videos[videoIndex];
+
+            // Update player UI
+            document.getElementById('videoPlayerTitle').textContent = video.title;
+            document.getElementById('videoPlayerSubtitle').textContent = `${playlist.title} - ${playlist.creator}`;
+            document.getElementById('videoPosition').textContent = `${videoIndex + 1} / ${playlist.videos.length}`;
+
+            // Use Invidious instance or YouTube embed
+            const invidiousInstance = 'https://invidious.io';
+            const embedUrl = `${invidiousInstance}/embed/${videoId}?autoplay=1`;
+
+            // Load video in iframe
+            const iframe = document.getElementById('videoPlayerFrame');
+            iframe.src = embedUrl;
+
+            // Update button states
+            document.getElementById('prevBtn').disabled = videoIndex === 0;
+            document.getElementById('nextBtn').disabled = videoIndex === playlist.videos.length - 1;
+
+            // Open modal
+            videoPlayerModalInstance.open();
+        }
+
+        // Play next video
+        function playNextVideo() {
+            if (!currentPlaylist || currentVideoIndex >= currentPlaylist.videos.length - 1) {
+                M.toast({
+                    html: '<i class="material-icons left">info</i>No more videos in playlist',
+                    displayLength: 2000
+                });
+                return;
+            }
+
+            currentVideoIndex++;
+            const nextVideo = currentPlaylist.videos[currentVideoIndex];
+            openVideoPlayer(nextVideo.videoId, currentPlaylist, currentVideoIndex);
+        }
+
+        // Play previous video
+        function playPreviousVideo() {
+            if (!currentPlaylist || currentVideoIndex <= 0) {
+                M.toast({
+                    html: '<i class="material-icons left">info</i>Already at first video',
+                    displayLength: 2000
+                });
+                return;
+            }
+
+            currentVideoIndex--;
+            const prevVideo = currentPlaylist.videos[currentVideoIndex];
+            openVideoPlayer(prevVideo.videoId, currentPlaylist, currentVideoIndex);
+        }
+
+        // Close video player
+        function closeVideoPlayer() {
+            videoPlayerModalInstance.close();
+            currentPlaylist = null;
+            currentVideoIndex = 0;
+        }
+
+        // Play individual video from playlist modal
+        function playIndividualVideo(videoId, playlistId, videoIndex) {
+            const allPlaylists = getAllPlaylists();
+            const playlist = allPlaylists.find(p => p.id === playlistId);
+
+            if (playlist) {
+                // Close the playlist details modal first
+                closePlaylistModal();
+
+                // Open video player
+                setTimeout(() => {
+                    openVideoPlayer(videoId, playlist, videoIndex);
+                }, 300);
+            }
         }
     </script>
 </body>
