@@ -241,12 +241,16 @@ Our main room is open around the clock for you to meet new members, make friends
 3. Invite friends to your personal room
 4. Enjoy quality video connections!`;
 
+      // Get user's display name for Jitsi
+      const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
+      const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=true&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+
       await ctx.editMessageText(hangoutsText, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.url(
             lang === 'es' ? '👥 Sala Comunitaria 24/7' : '👥 24/7 Community Room',
-            process.env.COMMUNITY_ROOM_URL || 'https://pnptv.app/community-room'
+            jitsiUrl
           )],
           [Markup.button.url(
             lang === 'es' ? '📱 Abre Hangouts' : '📱 Open Hangouts',
