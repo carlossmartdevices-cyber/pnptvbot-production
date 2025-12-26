@@ -3,12 +3,13 @@ const moment = require('moment');
 const VideoCallModel = require('../../../models/videoCallModel');
 const MainRoomModel = require('../../../models/mainRoomModel');
 const AgoraTokenService = require('../../../services/agora/agoraTokenService');
+const jaasService = require('../../services/jaasService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
-// Web app URL for Hangouts (Main Rooms use Agora)
-const HANGOUTS_WEB_URL = process.env.HANGOUTS_WEB_URL || 'https://pnptv.app/hangouts';
+// Web app URL for Hangouts (Main Rooms use 8x8/JaaS)
+const HANGOUTS_WEB_URL = process.env.HANGOUTS_WEB_URL || 'https://pnptv.app/community-room';
 
 // Jitsi Meet URL for private calls
 const JITSI_MEET_URL = process.env.JITSI_MEET_URL || 'https://meet.jit.si';
@@ -243,14 +244,42 @@ const joinMainRoom = async (ctx, roomId = 1) => {
     const userId = ctx.from.id;
     const username = ctx.from.username || ctx.from.first_name;
 
-    // Join the specified main room - joinRoom handles everything
+    // Get room info first
+    const room = await MainRoomModel.getById(roomId);
+
+    if (!room) {
+      throw new Error('Room not found');
+    }
+
+    if (!room.isActive) {
+      throw new Error('Room is not active');
+    }
+
+    // Join the specified main room to track participants
     const result = await MainRoomModel.joinRoom(roomId, userId, username, true); // true = as publisher (can broadcast)
 
     // Get current participants count
     const participants = await MainRoomModel.getParticipants(roomId);
 
-    // Create web app URL with token from joinRoom result
-    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${result.room.channelName}&token=${result.token}&uid=${userId}&username=${encodeURIComponent(username)}&type=main`;
+    // Generate JaaS/8x8 JWT token for authentication
+    let jwtToken;
+    try {
+      jwtToken = jaasService.generateModeratorToken(
+        room.channelName,
+        String(userId),
+        username,
+        '', // email
+        '' // avatar
+      );
+      logger.info('Generated JaaS token for main room', { roomId, userId, username });
+    } catch (jwtError) {
+      logger.error('Failed to generate JaaS token, using fallback:', jwtError);
+      // Fallback: allow access without JWT (if JaaS is not configured)
+      jwtToken = 'not-configured';
+    }
+
+    // Create web app URL with JWT token
+    const webAppUrl = `${HANGOUTS_WEB_URL}?room=${encodeURIComponent(room.channelName)}&jwt=${encodeURIComponent(jwtToken)}&name=${encodeURIComponent(username)}`;
 
     let text = `✅ Joined Main Room!\n\n`;
     text += `🎥 Room: ${result.room.name}\n`;
