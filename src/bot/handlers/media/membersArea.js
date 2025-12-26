@@ -39,10 +39,16 @@ const registerMembersAreaHandlers = (bot) => {
                 ? '💎 *Área de Miembros PRIME*\n\n¡Bienvenido al área exclusiva para miembros PRIME!\n\nSelecciona una opción:'
                 : '💎 *PRIME Members Area*\n\nWelcome to the exclusive area for PRIME members!\n\nSelect an option:';
 
+<<<<<<< HEAD
             // Build video rooms URL
             // Using pnptv.app community room with proper parameters
             const displayName = encodeURIComponent(ctx.from.first_name || 'Guest');
             const videoRoomsUrl = `https://pnptv.app/community-room?userId=${userId}&displayName=${displayName}`;
+=======
+            // Build video rooms URL with user display name
+            const displayName = ctx.from.first_name || ctx.from.username || 'Guest';
+            const videoRoomsUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+>>>>>>> b35487efb85ab7b5356ef1d5a1484a868a71de06
 
             await ctx.editMessageText(message, {
                 parse_mode: 'Markdown',
