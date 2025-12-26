@@ -5,7 +5,7 @@
 
 const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
-const audioStreamer = require('../../services/audioStreamer');
+const audioStreamer = require('../../../services/audioStreamer');
 const PermissionService = require('../../services/permissionService');
 
 const registerAudioManagementHandlers = (bot) => {
