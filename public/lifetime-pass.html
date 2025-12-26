@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PNPtv – Lifetime Pass - Solo $100 USD</title>
+    <meta name="description" content="Acceso de por vida a PNPtv. Paga una vez, disfruta para siempre. Videos HD/4K, contenido exclusivo y más.">
+    <link rel="stylesheet" href="/unified-design.css">
+    <style>
+        body {
+            background: var(--gradient-primary);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: var(--spacing-md);
+        }
+
+        .container {
+            max-width: 550px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            margin-bottom: 15px;
+        }
+
+        .header h1 {
+            font-family: var(--font-title);
+            font-size: 1.8em;
+            margin-bottom: var(--spacing-sm);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            font-weight: 400;
+        }
+
+        .header .tagline {
+            font-size: 1.1em;
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .language-selector {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .language-selector button {
+            padding: 8px 20px;
+            margin: 0 5px;
+            border: none;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        .language-selector button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .language-selector button.active {
+            background: #ffd700;
+            color: #333;
+        }
+
+        .language {
+            display: none;
+        }
+
+        .language.active {
+            display: block;
+        }
+
+        .price-box {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            margin: 15px 0;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .price-box h3 {
+            font-size: 1.3em;
+            margin-bottom: 5px;
+        }
+
+        .price-box .price {
+            font-size: 2.8em;
+            font-weight: bold;
+            margin: 10px 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .price-box .subtitle {
+            font-size: 0.95em;
+            margin-top: 5px;
+        }
+
+        .pay-now-button {
+            background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+            color: #333;
+            padding: 18px 40px;
+            font-size: 1.3em;
+            font-weight: bold;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            width: 100%;
+            margin: 15px 0;
+        }
+
+        .pay-now-button:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 15px 40px rgba(255, 215, 0, 0.6);
+            background: linear-gradient(135deg, #ffed4e 0%, #ffaa00 100%);
+        }
+
+        .pay-now-button:active {
+            transform: translateY(-1px) scale(1.01);
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .feature {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .feature .icon {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+
+        .feature h3 {
+            font-size: 1em;
+            margin-bottom: 5px;
+        }
+
+        .feature p {
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+
+        .benefits {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 15px;
+            margin: 15px 0;
+        }
+
+        .benefits h3 {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .benefits ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .benefits ul li {
+            padding: 6px 0;
+            font-size: 0.95em;
+        }
+
+        .benefits ul li:before {
+            content: "✓ ";
+            color: #ffd700;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .activation-section {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 15px 0;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .activation-section h3 {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .activation-section p {
+            font-size: 0.95em;
+            text-align: center;
+            margin: 8px 0;
+        }
+
+        .activation-section .telegram-link {
+            display: inline-block;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px 25px;
+            border-radius: 25px;
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1em;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .activation-section .telegram-link:hover {
+            background: rgba(0, 0, 0, 0.5);
+            transform: scale(1.05);
+        }
+
+        .info-note {
+            text-align: center;
+            font-size: 0.85em;
+            opacity: 0.8;
+            margin-top: 8px;
+        }
+
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 1.5em;
+            }
+
+            .price-box .price {
+                font-size: 2.3em;
+            }
+
+            .pay-now-button {
+                font-size: 1.1em;
+                padding: 15px 30px;
+            }
+
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔥 PNPtv Lifetime Pass 🔥</h1>
+            <p class="tagline">Paga una vez. Acceso para siempre.</p>
+        </div>
+
+        <div class="language-selector">
+            <button onclick="showLanguage('es')" class="active" id="btn-es">🇪🇸 Español</button>
+            <button onclick="showLanguage('en')" id="btn-en">🇺🇸 English</button>
+        </div>
+
+        <!-- Spanish Version -->
+        <div id="es" class="language active">
+            <div class="price-box">
+                <h3>💎 Acceso de Por Vida</h3>
+                <div class="price">$100 USD</div>
+                <p class="subtitle">Pago único - Sin renovaciones</p>
+            </div>
+
+            <div style="text-align: center;">
+                <button class="pay-now-button" onclick="payNow()">
+                    💰 PAGAR AHORA
+                </button>
+                <p class="info-note">ℹ️ Pago seguro con Meru</p>
+            </div>
+
+            <div class="features">
+                <div class="feature">
+                    <div class="icon">📹</div>
+                    <h3>Videos HD/4K</h3>
+                    <p>Santino, Lex y sus boys</p>
+                </div>
+                <div class="feature">
+                    <div class="icon">🔥</div>
+                    <h3>PNP Real</h3>
+                    <p>Sin censura, sin límites</p>
+                </div>
+                <div class="feature">
+                    <div class="icon">📍</div>
+                    <h3>Quién Está Cerca</h3>
+                    <p>Conecta en tu zona</p>
+                </div>
+                <div class="feature">
+                    <div class="icon">🤖</div>
+                    <h3>Bot 24/7</h3>
+                    <p>Soporte instantáneo</p>
+                </div>
+            </div>
+
+            <div class="benefits">
+                <h3>✨ Incluye:</h3>
+                <ul>
+                    <li>Acceso ilimitado de por vida</li>
+                    <li>Nuevos videos sin costo extra</li>
+                    <li>Comunidad privada verificada</li>
+                    <li>Geolocalización para encuentros</li>
+                    <li>Contenido exclusivo único</li>
+                </ul>
+            </div>
+
+            <div class="activation-section">
+                <h3>🔑 Cómo Activar</h3>
+                <p>Después de pagar, haz clic en el botón de abajo para solicitar la activación manual de tu suscripción.</p>
+                <div style="text-align: center;">
+                    <a href="https://t.me/pnptv_bot?start=activate_lifetime" class="telegram-link" target="_blank">
+                        📱 Solicitar Activación
+                    </a>
+                </div>
+                <p style="margin-top: 15px; font-size: 0.9em; opacity: 0.9;">
+                    ⏱️ Activación en menos de 24 horas
+                </p>
+            </div>
+        </div>
+
+        <!-- English Version -->
+        <div id="en" class="language">
+            <div class="price-box">
+                <h3>💎 Lifetime Access</h3>
+                <div class="price">$100 USD</div>
+                <p class="subtitle">One-time payment - No renewals</p>
+            </div>
+
+            <div style="text-align: center;">
+                <button class="pay-now-button" onclick="payNow()">
+                    💰 PAY NOW
+                </button>
+                <p class="info-note">ℹ️ Secure payment with Meru</p>
+            </div>
+
+            <div class="features">
+                <div class="feature">
+                    <div class="icon">📹</div>
+                    <h3>HD/4K Videos</h3>
+                    <p>Santino, Lex & their boys</p>
+                </div>
+                <div class="feature">
+                    <div class="icon">🔥</div>
+                    <h3>Real PNP</h3>
+                    <p>Raw, uncensored</p>
+                </div>
+                <div class="feature">
+                    <div class="icon">📍</div>
+                    <h3>Who's Nearby</h3>
+                    <p>Connect in your area</p>
+                </div>
+                <div class="feature">
+                    <div class="icon">🤖</div>
+                    <h3>24/7 Bot</h3>
+                    <p>Instant support</p>
+                </div>
+            </div>
+
+            <div class="benefits">
+                <h3>✨ Includes:</h3>
+                <ul>
+                    <li>Unlimited lifetime access</li>
+                    <li>New videos at no extra cost</li>
+                    <li>Private verified community</li>
+                    <li>Geolocation for meetups</li>
+                    <li>Exclusive unique content</li>
+                </ul>
+            </div>
+
+            <div class="activation-section">
+                <h3>🔑 How to Activate</h3>
+                <p>After payment, click the button below to request manual activation of your subscription.</p>
+                <div style="text-align: center;">
+                    <a href="https://t.me/pnptv_bot?start=activate_lifetime" class="telegram-link" target="_blank">
+                        📱 Request Activation
+                    </a>
+                </div>
+                <p style="margin-top: 15px; font-size: 0.9em; opacity: 0.9;">
+                    ⏱️ Activation within 24 hours
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Meru payment links - randomizer will select one
+        const meruPaymentLinks = [
+            'https://pay.getmeru.com/S-L9WY',
+            'https://pay.getmeru.com/imphCW',
+            'https://pay.getmeru.com/trzaR8',
+            'https://pay.getmeru.com/uqLZH9',
+            'https://pay.getmeru.com/XAyjYj',
+            'https://pay.getmeru.com/vbSkOP',
+            'https://pay.getmeru.com/NC8GEd',
+            'https://pay.getmeru.com/YBI5uj',
+            'https://pay.getmeru.com/aagWgz'
+        ];
+
+        // Pay Now function - redirects to random Meru link
+        function payNow() {
+            const randomIndex = Math.floor(Math.random() * meruPaymentLinks.length);
+            const selectedLink = meruPaymentLinks[randomIndex];
+            window.open(selectedLink, '_blank');
+        }
+
+        // Show language
+        function showLanguage(lang) {
+            // Update language sections
+            document.querySelectorAll('.language').forEach(el => el.classList.remove('active'));
+            document.getElementById(lang).classList.add('active');
+
+            // Update buttons
+            document.querySelectorAll('.language-selector button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('btn-' + lang).classList.add('active');
+        }
+    </script>
+</body>
+</html>

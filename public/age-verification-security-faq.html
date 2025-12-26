@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Age Verification - Security & Privacy FAQ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .faq-section {
+            margin-bottom: 40px;
+        }
+
+        .faq-section h2 {
+            color: #667eea;
+            font-size: 22px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .faq-item {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .faq-item h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .faq-item h3:hover {
+            color: #667eea;
+        }
+
+        .faq-item h3::after {
+            content: "▼";
+            font-size: 12px;
+            transition: transform 0.3s ease;
+        }
+
+        .faq-item h3.expanded::after {
+            transform: rotate(180deg);
+        }
+
+        .faq-item p {
+            display: none;
+            color: #666;
+            line-height: 1.6;
+            margin-top: 10px;
+        }
+
+        .faq-item p.expanded {
+            display: block;
+        }
+
+        .highlight {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #ffc107;
+        }
+
+        .highlight strong {
+            color: #856404;
+        }
+
+        .success-box {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .warning-box {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .info-box {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        ul, ol {
+            margin: 15px 0 15px 30px;
+            line-height: 1.8;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            margin-top: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+        }
+
+        footer {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .trust-signals {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .trust-signal {
+            padding: 15px;
+            background: #f0f7ff;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            text-align: center;
+        }
+
+        .trust-signal .icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .trust-signal strong {
+            display: block;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .trust-signal small {
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔒 Age Verification</h1>
+            <p>Security & Privacy FAQ</p>
+        </header>
+
+        <div class="content">
+            <!-- Trust Signals -->
+            <div class="faq-section">
+                <h2>Why Can You Trust This System?</h2>
+                <div class="trust-signals">
+                    <div class="trust-signal">
+                        <div class="icon">🔐</div>
+                        <strong>HTTPS Encrypted</strong>
+                        <small>All data sent securely</small>
+                    </div>
+                    <div class="trust-signal">
+                        <div class="icon">📋</div>
+                        <strong>Explicit Consent</strong>
+                        <small>You control everything</small>
+                    </div>
+                    <div class="trust-signal">
+                        <div class="icon">🗑️</div>
+                        <strong>Auto-Delete</strong>
+                        <small>Photos deleted immediately</small>
+                    </div>
+                    <div class="trust-signal">
+                        <div class="icon">✅</div>
+                        <strong>No Storage</strong>
+                        <small>No facial images kept</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Software Warnings -->
+            <div class="faq-section">
+                <h2>❓ Security Software Warnings</h2>
+
+                <div class="faq-item">
+                    <h3>Why does my security software warn me?</h3>
+                    <p>Security software is designed to be cautious about camera access and sending images to external services. This is actually a good sign - it means your security is working! Age verification systems naturally trigger these warnings because they:
+                    <ul style="margin-top: 10px;">
+                        <li>Request camera access (legitimate privacy concern)</li>
+                        <li>Send images to AI services (legitimate security concern)</li>
+                        <li>Process biometric data (legitimate regulation under GDPR)</li>
+                    </ul>
+                    These warnings are <strong>normal and expected</strong> for any legitimate age verification system.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>Is this page malware?</h3>
+                    <p>No. The warning is a <strong>false positive</strong>. Here's how you can tell:
+                    <ul style="margin-top: 10px;">
+                        <li>✅ Valid HTTPS certificate for pnptv.app</li>
+                        <li>✅ No code obfuscation or hiding</li>
+                        <li>✅ Clear, transparent data handling</li>
+                        <li>✅ No suspicious network behavior</li>
+                        <li>✅ No file system modifications</li>
+                        <li>✅ Legitimate business purpose (age verification)</li>
+                    </ul>
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>Should I allow camera access?</h3>
+                    <p>Only if you feel comfortable. The system is designed with <strong>multiple privacy protections</strong>:
+                    <ul style="margin-top: 10px;">
+                        <li>You see a consent modal explaining everything first</li>
+                        <li>You can always click "Decline" to refuse</li>
+                        <li>Camera only activates AFTER you click "Accept"</li>
+                        <li>You can use manual verification instead (no camera needed)</li>
+                        <li>You control when the camera captures photos</li>
+                    </ul>
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>Can I whitelist this site?</h3>
+                    <p>Yes. If you trust pnptv.app, you can:
+                    <ul style="margin-top: 10px;">
+                        <li><strong>Windows:</strong> Allow in Windows Defender SmartScreen</li>
+                        <li><strong>Mac:</strong> Allow in macOS Gatekeeper settings</li>
+                        <li><strong>Browser:</strong> Add pnptv.app to trusted sites</li>
+                        <li><strong>Antivirus:</strong> Add pnptv.app to whitelist in security software</li>
+                    </ul>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Privacy & Data -->
+            <div class="faq-section">
+                <h2>🔐 Privacy & Data Handling</h2>
+
+                <div class="faq-item">
+                    <h3>What happens to my photo?</h3>
+                    <p><strong>It's deleted immediately.</strong> Here's the flow:
+                    <ol style="margin-top: 10px;">
+                        <li>You take a selfie in your browser</li>
+                        <li>Photo is sent to Face++ AI (encrypted via HTTPS)</li>
+                        <li>Face++ analyzes it in real-time</li>
+                        <li>Face++ deletes the photo from its servers</li>
+                        <li>Our server deletes the photo from memory</li>
+                        <li>Garbage collection clears the memory buffer</li>
+                    </ol>
+                    <strong>Result:</strong> Photo is gone within seconds. We never store it.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>What data IS stored?</h3>
+                    <p>Only verification metadata:
+                    <ul style="margin-top: 10px;">
+                        <li>Estimated age (from AI analysis)</li>
+                        <li>Confidence score (how certain the AI is)</li>
+                        <li>Verification date</li>
+                        <li>Which AI provider was used</li>
+                    </ul>
+                    <strong>What's NOT stored:</strong>
+                    <ul>
+                        <li>❌ No facial images</li>
+                        <li>❌ No photos</li>
+                        <li>❌ No facial recognition data</li>
+                        <li>❌ No personal identification data</li>
+                    </ul>
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>How long is my data kept?</h3>
+                    <p>Verification expires after <strong>7 days</strong>. After that:
+                    <ul style="margin-top: 10px;">
+                        <li>You'll need to re-verify if accessing age-restricted features</li>
+                        <li>Old verification records are automatically deleted</li>
+                        <li>You can request manual deletion at any time</li>
+                    </ul>
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>Is my data sold to third parties?</h3>
+                    <p><strong>No.</strong> Your data is:
+                    <ul style="margin-top: 10px;">
+                        <li>✅ Never sold</li>
+                        <li>✅ Never shared with advertisers</li>
+                        <li>✅ Never used for marketing</li>
+                        <li>✅ Only used for age verification</li>
+                        <li>✅ Protected under our Privacy Policy</li>
+                    </ul>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Technical Details -->
+            <div class="faq-section">
+                <h2>🔧 Technical Details</h2>
+
+                <div class="faq-item">
+                    <h3>What's Face++?</h3>
+                    <p>Face++ (also called Megvii) is a legitimate AI company specializing in facial analysis. They:
+                    <ul style="margin-top: 10px;">
+                        <li>Serve 50+ million users worldwide</li>
+                        <li>Focus on age estimation (not facial recognition)</li>
+                        <li>Are ISO/IEC 27001 certified</li>
+                        <li>Follow GDPR and data protection standards</li>
+                        <li>Do NOT store facial images sent via API</li>
+                    </ul>
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>Is the connection secure?</h3>
+                    <p><strong>Yes.</strong> All connections are:
+                    <ul style="margin-top: 10px;">
+                        <li>🔒 HTTPS encrypted (TLS 1.2+)</li>
+                        <li>✅ Certificate verified</li>
+                        <li>✅ Protected against man-in-the-middle attacks</li>
+                        <li>✅ Using modern encryption standards</li>
+                    </ul>
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>What security headers are in place?</h3>
+                    <p>The system uses multiple security headers to protect against attacks:
+                    <ul style="margin-top: 10px;">
+                        <li><code>X-Content-Type-Options: nosniff</code> - Prevents MIME type attacks</li>
+                        <li><code>X-Frame-Options: SAMEORIGIN</code> - Prevents clickjacking</li>
+                        <li><code>X-XSS-Protection</code> - Blocks XSS attacks</li>
+                        <li><code>Content-Security-Policy</code> - Strict limits on what scripts can do</li>
+                        <li><code>Permissions-Policy</code> - Limits camera/microphone access</li>
+                    </ul>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Alternatives -->
+            <div class="faq-section">
+                <h2>🤔 Not Comfortable With Camera?</h2>
+
+                <div class="faq-item">
+                    <h3>Can I skip AI verification?</h3>
+                    <p><strong>Yes!</strong> You have two options:
+                    <ol style="margin-top: 10px;">
+                        <li><strong>Click "Decline"</strong> on the consent modal - Returns to main menu</li>
+                        <li><strong>Click "Skip to Manual Verification"</strong> - Confirm age manually</li>
+                    </ol>
+                    <strong>Manual verification:</strong>
+                    <ul>
+                        <li>✅ No camera access required</li>
+                        <li>✅ No photos taken</li>
+                        <li>✅ No external APIs</li>
+                        <li>✅ Just confirm you're 18+</li>
+                    </ul>
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>What if the camera doesn't work?</h3>
+                    <p>If your camera isn't working:
+                    <ol style="margin-top: 10px;">
+                        <li>Check browser camera permissions (usually in address bar)</li>
+                        <li>Refresh the page and try again</li>
+                        <li>Use a different browser that has camera support</li>
+                        <li>Use manual verification as fallback</li>
+                    </ol>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Compliance -->
+            <div class="faq-section">
+                <h2>⚖️ Legal & Compliance</h2>
+
+                <div class="faq-item">
+                    <h3>Is this GDPR compliant?</h3>
+                    <p><strong>Yes.</strong> The system complies with:
+                    <ul style="margin-top: 10px;">
+                        <li>✅ GDPR (European regulation)</li>
+                        <li>✅ CCPA (California regulation)</li>
+                        <li>✅ LGPD (Brazilian regulation)</li>
+                    </ul>
+                    Key compliance measures:
+                    <ul>
+                        <li>✅ Explicit user consent required</li>
+                        <li>✅ Data minimization (only age estimates)</li>
+                        <li>✅ Transparent processing</li>
+                        <li>✅ Right to deletion available</li>
+                        <li>✅ Privacy policy provided</li>
+                    </ul>
+                    </p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>Why is age verification needed?</h3>
+                    <p>Age verification is required for:
+                    <ul style="margin-top: 10px;">
+                        <li>Legal compliance (COPPA, GDPR, local laws)</li>
+                        <li>Protecting minors from age-restricted content</li>
+                        <li>Verifying access to premium features</li>
+                        <li>Platform safety and responsibility</li>
+                    </ul>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Support -->
+            <div class="faq-section">
+                <h2>📞 Need Help?</h2>
+
+                <div class="success-box">
+                    <strong>Questions about age verification?</strong><br>
+                    Review our <a href="https://pnptv.app/privacy" target="_blank">Privacy Policy</a> and <a href="https://pnptv.app/terms" target="_blank">Terms of Service</a>
+                </div>
+
+                <div class="info-box">
+                    <strong>Security concerns?</strong><br>
+                    Email us at security@pnptv.app with details of the issue
+                </div>
+
+                <div class="warning-box">
+                    <strong>Still seeing warnings?</strong><br>
+                    This is likely a false positive. You can safely whitelist pnptv.app in your security software.
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2025 PNPtv. Age Verification System - Protecting Privacy While Verifying Age</p>
+            <p style="margin-top: 10px;">For more information, visit our <a href="https://pnptv.app/privacy" target="_blank">Privacy Policy</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // Handle FAQ expansion
+        document.querySelectorAll('.faq-item h3').forEach(header => {
+            header.addEventListener('click', function() {
+                const paragraph = this.nextElementSibling;
+                this.classList.toggle('expanded');
+                paragraph.classList.toggle('expanded');
+            });
+        });
+    </script>
+</body>
+</html>

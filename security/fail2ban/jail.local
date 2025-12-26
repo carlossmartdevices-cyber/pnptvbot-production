@@ -1,0 +1,119 @@
+# Fail2ban Configuration for pnptv.app
+# This file configures jails to protect against brute force attacks
+
+[DEFAULT]
+# Ban settings
+bantime = 1h
+findtime = 10m
+maxretry = 5
+
+# Action to take when banning
+banaction = ufw
+action = %(action_mwl)s
+
+# Email settings (configure if you want email notifications)
+# destemail = admin@pnptv.app
+# sender = fail2ban@pnptv.app
+# mta = sendmail
+
+# Logging
+logtarget = /var/log/fail2ban.log
+
+# =========================================
+# SSH Protection
+# =========================================
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+bantime = 24h
+findtime = 10m
+
+# =========================================
+# Nginx Protection
+# =========================================
+
+# Nginx HTTP Auth
+[nginx-http-auth]
+enabled = true
+port = http,https
+filter = nginx-http-auth
+logpath = /var/log/nginx/*access.log
+maxretry = 3
+bantime = 1h
+
+# Nginx Bad Request (4xx errors)
+[nginx-badbots]
+enabled = true
+port = http,https
+filter = nginx-badbots
+logpath = /var/log/nginx/*access.log
+maxretry = 10
+bantime = 2h
+findtime = 10m
+
+# Nginx Limit Request (rate limiting violations)
+[nginx-limit-req]
+enabled = true
+port = http,https
+filter = nginx-limit-req
+logpath = /var/log/nginx/*error.log
+maxretry = 10
+bantime = 1h
+findtime = 10m
+
+# Nginx No Script (attempts to access .php, .asp, etc.)
+[nginx-noscript]
+enabled = true
+port = http,https
+filter = nginx-noscript
+logpath = /var/log/nginx/*access.log
+maxretry = 5
+bantime = 3h
+
+# Nginx Proxy (proxy abuse)
+[nginx-noproxy]
+enabled = true
+port = http,https
+filter = nginx-noproxy
+logpath = /var/log/nginx/*access.log
+maxretry = 2
+bantime = 6h
+
+# =========================================
+# Application-Specific Protection
+# =========================================
+
+# Telegram Bot Webhook Abuse
+[pnptv-webhook]
+enabled = true
+port = http,https
+filter = pnptv-webhook
+logpath = /var/log/nginx/pnptv-telegram-webhook.log
+maxretry = 20
+bantime = 30m
+findtime = 5m
+
+# API Abuse
+[pnptv-api]
+enabled = true
+port = http,https
+filter = pnptv-api
+logpath = /var/log/nginx/pnptv-access.log
+maxretry = 100
+bantime = 1h
+findtime = 10m
+
+# =========================================
+# DoS Protection
+# =========================================
+[nginx-dos]
+enabled = true
+port = http,https
+filter = nginx-dos
+logpath = /var/log/nginx/*access.log
+maxretry = 300
+findtime = 1m
+bantime = 10m

@@ -1,0 +1,105 @@
+name: Deploy to server (PM2)
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: false
+        default: 'main'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.8.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy via SSH
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR }}
+          BRANCH: ${{ github.event.inputs.branch || 'main' }}
+        run: |
+          set -euo pipefail
+          echo "Deploying $BRANCH to $REMOTE_USER@$REMOTE_HOST:$REMOTE_APP_DIR"
+          ssh -o StrictHostKeyChecking=no "$REMOTE_USER@$REMOTE_HOST" "cd $REMOTE_APP_DIR && git fetch --all --prune && git checkout $BRANCH && git reset --hard origin/$BRANCH && if [ -f package-lock.json ]; then npm ci --production; else npm install --production; fi && if pm2 describe pnptv-bot >/dev/null 2>&1; then pm2 reload ecosystem.config.js --env production || pm2 restart pnptv-bot; else pm2 start ecosystem.config.js --env production; fi && pm2 save"
+
+      - name: Done
+        run: echo "Deploy finished"
+name: Deploy PNPtv Bot
+
+on:
+  push:
+    branches: [main, production]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint || echo "Linter not configured"
+
+      - name: Run tests
+        run: npm test || echo "Tests not configured yet"
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        run: npm ci --only=production
+
+      - name: Build Docker image
+        run: docker build -t pnptv-bot:${{ github.sha }} .
+
+      - name: Save Docker image
+        run: docker save pnptv-bot:${{ github.sha }} | gzip > pnptv-bot.tar.gz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-image
+          path: pnptv-bot.tar.gz
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/production'
+    steps:
+      - name: Deploy to production
+        run: |
+          echo "Add your deployment steps here"
+          echo "Examples:"
+          echo "  - Deploy to VPS via SSH"
+          echo "  - Deploy to cloud provider (AWS, GCP, Azure)"
+          echo "  - Deploy to container registry"

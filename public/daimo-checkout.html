@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Checkout con Daimo - PNPtv</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #10b981;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .plan-info {
+            background: #f0fdf4;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 2px solid #10b981;
+        }
+
+        .plan-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .plan-price {
+            font-size: 32px;
+            font-weight: bold;
+            color: #10b981;
+            margin: 15px 0;
+        }
+
+        .plan-price .currency {
+            font-size: 18px;
+            color: #666;
+        }
+
+        .plan-features {
+            list-style: none;
+            margin-top: 15px;
+        }
+
+        .plan-features li {
+            padding: 8px 0;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .plan-features li:before {
+            content: "✓";
+            color: #10b981;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .pay-button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        .pay-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
+        }
+
+        .pay-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .security-note {
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0fdf4;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #555;
+            border: 1px solid #10b981;
+        }
+
+        .payment-methods {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .payment-methods strong {
+            color: #10b981;
+        }
+
+        .instructions {
+            background: #f0fdf4;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #555;
+            border-left: 4px solid #10b981;
+        }
+
+        .instructions ol {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .back-link a {
+            color: #10b981;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .back-link a:hover {
+            text-decoration: underline;
+        }
+
+        .plan-duration {
+            color: #10b981;
+            font-weight: 600;
+            font-size: 15px;
+            margin: 8px 0;
+        }
+
+        .sku-text {
+            color: #888;
+            font-size: 13px;
+            margin: 8px 0;
+        }
+
+        .price-cop {
+            color: #888;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .plan-price {
+                font-size: 28px;
+            }
+
+            .pay-button {
+                padding: 14px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 PNPtv</h1>
+            <p>Paga con Daimo (Stablecoin USDC)</p>
+        </div>
+
+        <div class="content">
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Cargando información del pago...</p>
+            </div>
+
+            <div id="error" class="error" style="display: none;"></div>
+
+            <div id="checkout-form" style="display: none;">
+                <div class="plan-info">
+                    <div class="plan-name">
+                        <span id="plan-icon">💎</span>
+                        <span id="plan-name">Premium</span>
+                    </div>
+                    <div class="sku-text">
+                        SKU: <span id="plan-sku">EASYBOTS-PNP-030</span>
+                    </div>
+                    <div class="plan-duration">
+                        <span id="plan-duration">30</span> días - ¡Acceso a PNPtv!
+                    </div>
+                    <div class="plan-price">
+                        <span class="currency">USD</span> $<span id="plan-price-usd">0</span>
+                    </div>
+                    <div class="price-cop">
+                        COP $<span id="plan-price-cop">0</span>
+                    </div>
+                </div>
+
+                <div class="payment-methods">
+                    <strong>📱 Formas de pago aceptadas:</strong>
+                    <p style="margin-top: 8px;">
+                        Daimo funciona con monederos que usen stablecoin USDC (Optimism):
+                    </p>
+                    <ul style="margin-left: 20px; margin-top: 8px;">
+                        <li>💰 Wallets: MetaMask, Wallet Connect, Coinbase Wallet</li>
+                        <li>🏦 Apps de pago: Venmo, Cash App, Revolut, Wise, Zelle</li>
+                        <li>🔄 Exchange: Kraken, Coinbase y otros</li>
+                    </ul>
+                </div>
+
+                <div class="instructions">
+                    <strong>📋 Pasos para pagar:</strong>
+                    <ol>
+                        <li>Haz clic en el botón "Pagar con Daimo" abajo</li>
+                        <li>Se abrirá una nueva ventana con el checkout de Daimo</li>
+                        <li>Selecciona tu método de pago (Venmo, Cash App, etc.)</li>
+                        <li>Completa la transacción</li>
+                        <li>¡Una vez confirmado, recibirás automáticamente tu acceso a PRIME!</li>
+                    </ol>
+                </div>
+
+                <button type="button" class="pay-button" id="pay-button">
+                    💎 Pagar con Daimo
+                </button>
+
+                <div class="security-note">
+                    ✅ Pago seguro con Daimo. Tu información será protegida durante la transacción.
+                    Una vez confirmado el pago, tendrás acceso inmediato a tu suscripción.
+                </div>
+
+                <div class="back-link">
+                    <a href="#" onclick="window.close(); return false;">← Volver al bot</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get payment ID from URL
+        const pathParts = window.location.pathname.split('/');
+        const paymentId = pathParts[pathParts.length - 1];
+
+        let paymentData = null;
+
+        // Load payment information
+        async function loadPaymentInfo() {
+            try {
+                const response = await fetch(`/api/payment/${paymentId}`);
+
+                if (!response.ok) {
+                    throw new Error('No se pudo cargar la información del pago');
+                }
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Error al cargar el pago');
+                }
+
+                paymentData = data.payment;
+                displayPaymentInfo();
+
+            } catch (error) {
+                console.error('Error loading payment:', error);
+                showError(error.message || 'Error al cargar la información del pago. Por favor intenta de nuevo.');
+            }
+        }
+
+        // Display payment information
+        function displayPaymentInfo() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('checkout-form').style.display = 'block';
+
+            // Plan info
+            document.getElementById('plan-icon').textContent = paymentData.plan.icon || '💎';
+            document.getElementById('plan-name').textContent = paymentData.plan.name;
+            document.getElementById('plan-sku').textContent = paymentData.plan.sku;
+            document.getElementById('plan-duration').textContent = paymentData.plan.duration || 30;
+
+            // Prices
+            document.getElementById('plan-price-usd').textContent = paymentData.amountUSD.toFixed(2);
+            document.getElementById('plan-price-cop').textContent = formatNumber(paymentData.amountCOP);
+
+            // Add pay button handler
+            document.getElementById('pay-button').addEventListener('click', handlePayClick);
+        }
+
+        // Handle pay button click
+        function handlePayClick() {
+            const payButton = document.getElementById('pay-button');
+            payButton.disabled = true;
+            payButton.textContent = 'Abriendo Daimo...';
+
+            try {
+                // Get the Daimo payment link from payment data
+                const daimoLink = paymentData.daimoPaymentLink;
+
+                if (!daimoLink) {
+                    showError('No se pudo generar el enlace de pago. Por favor intenta desde el bot.');
+                    payButton.disabled = false;
+                    payButton.textContent = '💎 Pagar con Daimo';
+                    return;
+                }
+
+                // Open Daimo payment link in new tab
+                const daimoWindow = window.open(daimoLink, 'DaimoPayment', 'width=500,height=700');
+
+                if (!daimoWindow) {
+                    showError('No se pudo abrir la ventana de pago. Por favor comprueba tu bloqueador de ventanas emergentes.');
+                    payButton.disabled = false;
+                    payButton.textContent = '💎 Pagar con Daimo';
+                    return;
+                }
+
+                // Re-enable button after a delay
+                setTimeout(() => {
+                    payButton.disabled = false;
+                    payButton.textContent = '💎 Pagar con Daimo';
+                }, 2000);
+
+            } catch (error) {
+                console.error('Error opening Daimo payment:', error);
+                showError('Error al abrir el pago. Por favor intenta de nuevo.');
+                payButton.disabled = false;
+                payButton.textContent = '💎 Pagar con Daimo';
+            }
+        }
+
+        // Show error
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('checkout-form').style.display = 'none';
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Format number with thousands separator
+        function formatNumber(num) {
+            return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        }
+
+        // Load payment info on page load
+        loadPaymentInfo();
+    </script>
+</body>
+</html>

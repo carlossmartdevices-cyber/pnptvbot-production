@@ -1,0 +1,54 @@
+# Build stage - install all dependencies including dev dependencies
+FROM node:18 AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies for build)
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Production stage - using full Node.js image (all build tools pre-installed)
+FROM node:18 AS production
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy source code from builder
+COPY --from=builder --chown=node:node /app/src ./src
+
+# Copy public directory for landing pages
+COPY --from=builder /app/public ./public
+
+# Copy .env.example for dotenv-safe validation
+COPY --from=builder --chown=node:node /app/.env.example ./.env.example
+
+# Create logs and uploads directories with proper permissions
+RUN mkdir -p logs uploads \
+    && chown -R node:node /app \
+    && chmod -R 755 /app/public \
+    && find /app/public -type f -exec chmod 644 {} \;
+
+# Switch to non-root user for security
+USER node
+
+# Expose port
+EXPOSE 3000
+
+# Health check with improved timeout and retries
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => {process.exit(1)})"
+
+# Start the bot directly (no init process needed - Node.js handles signals)
+CMD ["node", "src/bot/core/bot.js"]

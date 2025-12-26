@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PNPtv - Subscription Checkout</title>
+  <script src="https://checkout.epayco.co/checkout.js"></script>
+  <link rel="stylesheet" href="/unified-design.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* Apply BBH Bartle font to all headings */
+    h1, h2, h3, h4, h5, h6 {
+      font-family: var(--font-title);
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 800px;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      font-size: 16px;
+      opacity: 0.9;
+    }
+
+    .content {
+      padding: 40px;
+    }
+
+    .plans-container {
+      display: grid;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .plan-card {
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 25px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .plan-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .plan-card.selected {
+      border-color: #667eea;
+      background: #f8f9ff;
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .plan-card .badge {
+      position: absolute;
+      top: -10px;
+      right: 20px;
+      background: #667eea;
+      color: white;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .plan-card h3 {
+      color: #333;
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    .plan-price {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .plan-price .usd {
+      font-size: 32px;
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .plan-price .cop {
+      font-size: 18px;
+      color: #666;
+    }
+
+    .plan-features {
+      list-style: none;
+      margin-top: 15px;
+    }
+
+    .plan-features li {
+      padding: 8px 0;
+      color: #555;
+      display: flex;
+      align-items: center;
+    }
+
+    .plan-features li:before {
+      content: "✓";
+      color: #4CAF50;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 500;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .checkout-btn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .checkout-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .checkout-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .loading.active {
+      display: block;
+    }
+
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .error.active {
+      display: block;
+    }
+
+    .info-text {
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+      margin-top: 20px;
+    }
+
+    @media (max-width: 600px) {
+      .header h1 {
+        font-size: 24px;
+      }
+
+      .plan-price .usd {
+        font-size: 24px;
+      }
+
+      .plan-price .cop {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>PNPtv Premium Subscription</h1>
+      <p>Choose your plan and enjoy exclusive content</p>
+    </div>
+
+    <div class="content">
+      <div id="error" class="error"></div>
+
+      <div id="plans-container" class="plans-container">
+        <!-- Plans will be loaded dynamically -->
+      </div>
+
+      <div id="checkout-form">
+        <div class="form-group">
+          <label for="name">Full Name *</label>
+          <input type="text" id="name" placeholder="John Doe" required>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email *</label>
+          <input type="email" id="email" placeholder="john@example.com" required>
+        </div>
+
+        <div class="form-group">
+          <label for="telegramId">Telegram ID (Optional)</label>
+          <input type="text" id="telegramId" placeholder="Your Telegram User ID">
+        </div>
+
+        <button id="checkout-btn" class="checkout-btn" onclick="openCheckout()">
+          Proceed to Payment
+        </button>
+
+        <div id="loading" class="loading">
+          <p>Loading checkout...</p>
+        </div>
+
+        <p class="info-text">
+          Secure payment powered by ePayco. Your information is protected.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let selectedPlan = null;
+    let plans = [];
+
+    // Get API base URL
+    const API_BASE = window.location.origin;
+
+    // Load plans on page load
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadPlans();
+
+      // Auto-fill Telegram ID from URL parameter if present
+      const urlParams = new URLSearchParams(window.location.search);
+      const telegramId = urlParams.get('telegramId');
+      if (telegramId) {
+        document.getElementById('telegramId').value = telegramId;
+      }
+    });
+
+    // Load available plans
+    async function loadPlans() {
+      try {
+        const response = await fetch(`${API_BASE}/api/subscription/plans`);
+        const data = await response.json();
+
+        if (data.success && data.plans && data.plans.length > 0) {
+          plans = data.plans;
+          renderPlans(data.plans);
+
+          // Select first plan by default
+          selectPlan(data.plans[0]);
+        } else {
+          showError('No plans available at this time.');
+        }
+      } catch (error) {
+        console.error('Error loading plans:', error);
+        showError('Failed to load subscription plans. Please refresh the page.');
+      }
+    }
+
+    // Render plans
+    function renderPlans(plansData) {
+      const container = document.getElementById('plans-container');
+      container.innerHTML = '';
+
+      plansData.forEach((plan, index) => {
+        const planCard = document.createElement('div');
+        planCard.className = 'plan-card';
+        planCard.onclick = () => selectPlan(plan);
+
+        const isPopular = plan.name.toLowerCase().includes('premium');
+
+        planCard.innerHTML = `
+          ${isPopular ? '<div class="badge">POPULAR</div>' : ''}
+          <h3>${plan.name}</h3>
+          <div class="plan-price">
+            <span class="usd">$${plan.priceUSD || plan.price} USD</span>
+            <span class="cop">≈ $${(plan.priceCOP || plan.price).toLocaleString('es-CO')} COP</span>
+          </div>
+          <p>${plan.description || ''}</p>
+          <ul class="plan-features">
+            ${plan.features ? plan.features.map(f => `<li>${f}</li>`).join('') : ''}
+          </ul>
+        `;
+
+        container.appendChild(planCard);
+      });
+    }
+
+    // Select a plan
+    function selectPlan(plan) {
+      selectedPlan = plan;
+
+      // Update UI
+      document.querySelectorAll('.plan-card').forEach((card, index) => {
+        if (plans[index].id === plan.id) {
+          card.classList.add('selected');
+        } else {
+          card.classList.remove('selected');
+        }
+      });
+    }
+
+    // Open ePayco checkout
+    async function openCheckout() {
+      if (!selectedPlan) {
+        showError('Please select a plan first.');
+        return;
+      }
+
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const telegramId = document.getElementById('telegramId').value.trim();
+
+      if (!name || !email) {
+        showError('Please fill in all required fields.');
+        return;
+      }
+
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        showError('Please enter a valid email address.');
+        return;
+      }
+
+      try {
+        showLoading(true);
+        hideError();
+
+        // Create checkout session
+        const response = await fetch(`${API_BASE}/api/subscription/create-checkout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email,
+            name,
+            telegramId,
+            planId: selectedPlan.id,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to create checkout session');
+        }
+
+        const checkout = data.checkout;
+
+        // Configure ePayco handler
+        const handler = ePayco.checkout.configure({
+          key: checkout.publicKey,
+          test: checkout.test,
+        });
+
+        // Generate unique invoice number
+        const invoice = `INV-${Date.now()}`;
+
+        // Open ePayco popup
+        handler.open({
+          name: checkout.planName,
+          description: checkout.description,
+          invoice: invoice,
+          currency: 'cop',
+          amount: checkout.amountCOP.toString(),
+          tax_base: '0',
+          tax: '0',
+          country: 'co',
+          lang: 'es',
+          external: 'false', // This ensures popup mode
+          response: checkout.responseUrl,
+          confirmation: checkout.confirmationUrl,
+          name_billing: name,
+          email_billing: email,
+          // Extra fields for backend processing
+          extra1: email,
+          extra2: telegramId || '',
+          extra3: selectedPlan.id,
+        });
+
+        showLoading(false);
+      } catch (error) {
+        console.error('Checkout error:', error);
+        showError(error.message || 'Failed to open checkout. Please try again.');
+        showLoading(false);
+      }
+    }
+
+    // Show error message
+    function showError(message) {
+      const errorDiv = document.getElementById('error');
+      errorDiv.textContent = message;
+      errorDiv.classList.add('active');
+    }
+
+    // Hide error message
+    function hideError() {
+      const errorDiv = document.getElementById('error');
+      errorDiv.classList.remove('active');
+    }
+
+    // Show/hide loading
+    function showLoading(show) {
+      const loadingDiv = document.getElementById('loading');
+      const checkoutBtn = document.getElementById('checkout-btn');
+
+      if (show) {
+        loadingDiv.classList.add('active');
+        checkoutBtn.disabled = true;
+      } else {
+        loadingDiv.classList.remove('active');
+        checkoutBtn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Age Verification - Camera</title>
+    <link rel="stylesheet" href="/unified-design.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* Apply BBH Bartle font to all headings */
+        h1, h2, h3, h4, h5, h6 {
+            font-family: var(--font-title);
+        }
+
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #aaa;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .privacy-notice {
+            background: rgba(100, 200, 100, 0.2);
+            border-left: 4px solid #64c864;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .privacy-notice strong {
+            color: #64c864;
+        }
+
+        .camera-section {
+            margin-bottom: 20px;
+        }
+
+        video, canvas {
+            width: 100%;
+            border-radius: 12px;
+            background: #000;
+            display: none;
+            margin-bottom: 15px;
+        }
+
+        #cameraFeed {
+            display: block;
+        }
+
+        .loader {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+
+        .loader.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #38a169;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #e53e3e;
+        }
+
+        .info-box {
+            background: rgba(102, 126, 234, 0.2);
+            border: 1px solid rgba(102, 126, 234, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .error {
+            background: rgba(245, 101, 101, 0.2);
+            border: 1px solid rgba(245, 101, 101, 0.5);
+            color: #ff6b6b;
+        }
+
+        .success {
+            background: rgba(72, 187, 120, 0.2);
+            border: 1px solid rgba(72, 187, 120, 0.5);
+            color: #68d391;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .instructions {
+            font-size: 13px;
+            color: #ccc;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .instruction-item {
+            margin-bottom: 8px;
+        }
+
+        .instruction-item::before {
+            content: "✓ ";
+            color: #68d391;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+
+        .result-box {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .result-box h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .result-box p {
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.active {
+            background: #48bb78;
+        }
+
+        .status-indicator.waiting {
+            background: #ed8936;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .footer-text {
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+            margin-top: 20px;
+        }
+
+        .footer-text a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .footer-text a:hover {
+            text-decoration: underline;
+        }
+
+        .consent-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .consent-modal.active {
+            display: flex;
+        }
+
+        .consent-content {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid rgba(102, 126, 234, 0.5);
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 500px;
+            color: #fff;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .consent-content h2 {
+            margin-bottom: 20px;
+            color: #667eea;
+            font-size: 22px;
+        }
+
+        .consent-content p {
+            margin-bottom: 15px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #ccc;
+        }
+
+        .consent-content ul {
+            margin-left: 20px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #999;
+        }
+
+        .consent-content ul li {
+            margin-bottom: 8px;
+        }
+
+        .consent-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .consent-buttons button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .consent-buttons .btn-accept {
+            background: #667eea;
+            color: white;
+        }
+
+        .consent-buttons .btn-accept:hover {
+            background: #5568d3;
+        }
+
+        .consent-buttons .btn-decline {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .consent-buttons .btn-decline:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .data-handling {
+            background: rgba(72, 187, 120, 0.1);
+            border: 1px solid rgba(72, 187, 120, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-size: 13px;
+        }
+
+        .data-handling strong {
+            color: #68d391;
+        }
+    </style>
+</head>
+<body>
+    <!-- Explicit Consent Modal -->
+    <div class="consent-modal active" id="consentModal">
+        <div class="consent-content">
+            <h2>🔒 Privacy & Consent Notice</h2>
+
+            <p><strong>Before we proceed, please review what happens with your data:</strong></p>
+
+            <div class="data-handling">
+                <strong>✓ What We Do:</strong>
+                <ul style="margin: 8px 0 0 0;">
+                    <li>Analyze your selfie in real-time using AI</li>
+                    <li>Estimate age from facial features</li>
+                    <li>Store only: age estimate, confidence score, verification date</li>
+                </ul>
+            </div>
+
+            <div class="data-handling">
+                <strong>✓ What We DON'T Do:</strong>
+                <ul style="margin: 8px 0 0 0;">
+                    <li>Never store facial images or photos</li>
+                    <li>Never share data with third parties</li>
+                    <li>Photo deleted immediately after analysis</li>
+                    <li>No facial recognition for identification</li>
+                </ul>
+            </div>
+
+            <p><strong>Technology Used:</strong></p>
+            <ul>
+                <li>Face++ AI (HTTPS encrypted transmission)</li>
+                <li>Local browser processing (device handles camera)</li>
+                <li>Secure connection verified by certificate</li>
+            </ul>
+
+            <p style="font-size: 12px; color: #999; margin-top: 15px;">
+                By clicking "I Understand & Consent", you agree that:
+                <br>• Your camera data is processed for age verification only
+                <br>• You understand data handling practices
+                <br>• You agree to our <a href="https://pnptv.app/privacy" target="_blank" style="color: #667eea;">Privacy Policy</a>
+            </p>
+
+            <div class="consent-buttons">
+                <button class="btn-decline" id="declineBtn">Decline</button>
+                <button class="btn-accept" id="acceptConsentBtn">✓ I Understand & Consent</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="mainContainer" style="display: none;">
+        <h1>🔒 Age Verification</h1>
+        <p class="subtitle">Device Camera Verification</p>
+
+        <!-- Privacy Notice -->
+        <div class="privacy-notice">
+            <strong>🔐 Your Privacy is Protected:</strong><br>
+            Your photo is analyzed in real-time and deleted immediately. We never store facial images.
+        </div>
+
+        <!-- Instructions -->
+        <div class="instructions" id="instructions">
+            <div class="instruction-item">Take a clear selfie</div>
+            <div class="instruction-item">Ensure good lighting</div>
+            <div class="instruction-item">Look directly at camera</div>
+            <div class="instruction-item">No filters or effects</div>
+        </div>
+
+        <!-- Camera Section -->
+        <div class="camera-section">
+            <video id="cameraFeed" autoplay playsinline></video>
+            <canvas id="captureCanvas"></canvas>
+
+            <!-- Loader -->
+            <div class="loader" id="loader">
+                <div class="spinner"></div>
+                <p>Analyzing your photo with AI...</p>
+            </div>
+
+            <!-- Result Display -->
+            <div class="result-box hidden" id="resultBox">
+                <h3 id="resultStatus">Verifying...</h3>
+                <p id="resultMessage"></p>
+            </div>
+
+            <!-- Info Box -->
+            <div class="info-box" id="infoBox"></div>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="button-group" id="controlButtons">
+            <button class="btn-primary" id="captureBtn">📸 Capture Photo</button>
+            <button class="btn-secondary" id="switchBtn">🔄 Switch Camera</button>
+        </div>
+
+        <div class="button-group hidden" id="resultButtons">
+            <button class="btn-success" id="acceptBtn">✅ Verify & Continue</button>
+            <button class="btn-danger" id="retryBtn">🔄 Try Again</button>
+        </div>
+
+        <button class="btn-secondary" id="manualBtn" style="width: 100%; margin-top: 10px;">
+            Skip to Manual Verification
+        </button>
+
+        <!-- Footer -->
+        <div class="footer-text">
+            By continuing, you agree to our <a href="https://pnptv.app/privacy" target="_blank">Privacy Policy</a>
+            and <a href="https://pnptv.app/terms" target="_blank">Terms of Service</a>
+        </div>
+    </div>
+
+    <script>
+        const TELEGRAM_BOT_TOKEN = new URLSearchParams(window.location.search).get('token');
+        const USER_ID = new URLSearchParams(window.location.search).get('user_id');
+        const LANGUAGE = new URLSearchParams(window.location.search).get('lang') || 'en';
+
+        const consentModal = document.getElementById('consentModal');
+        const mainContainer = document.getElementById('mainContainer');
+        const acceptConsentBtn = document.getElementById('acceptConsentBtn');
+        const declineBtn = document.getElementById('declineBtn');
+
+        const video = document.getElementById('cameraFeed');
+        const canvas = document.getElementById('captureCanvas');
+        const loader = document.getElementById('loader');
+        const resultBox = document.getElementById('resultBox');
+        const captureBtn = document.getElementById('captureBtn');
+        const switchBtn = document.getElementById('switchBtn');
+        const manualBtn = document.getElementById('manualBtn');
+        const acceptBtn = document.getElementById('acceptBtn');
+        const retryBtn = document.getElementById('retryBtn');
+        const infoBox = document.getElementById('infoBox');
+
+        let stream = null;
+        let currentFacingMode = 'user';
+        let verificationResult = null;
+        let consentGiven = false;
+
+        // Handle consent acceptance
+        acceptConsentBtn.addEventListener('click', () => {
+            consentGiven = true;
+            localStorage.setItem('ageVerificationConsent', 'true');
+            consentModal.classList.remove('active');
+            mainContainer.style.display = 'block';
+            initCamera();
+        });
+
+        // Handle consent decline
+        declineBtn.addEventListener('click', () => {
+            alert('You must consent to age verification to continue.');
+            if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+                Telegram.WebApp.close();
+            } else {
+                window.location.href = 'tg://resolve?domain=PNPtv_bot';
+            }
+        });
+
+        // Check if consent was previously given (within session)
+        function checkConsent() {
+            if (localStorage.getItem('ageVerificationConsent') === 'true') {
+                consentGiven = true;
+                consentModal.classList.remove('active');
+                mainContainer.style.display = 'block';
+            }
+        }
+
+        // Initialize camera only after consent
+        async function initCamera() {
+            if (!consentGiven) {
+                return;
+            }
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: currentFacingMode },
+                    audio: false
+                });
+                video.srcObject = stream;
+                video.play();
+                updateInfoBox('success', '✓ Camera ready. Tap capture when you\'re ready.');
+            } catch (error) {
+                updateInfoBox('error', '✗ Camera access denied. Please enable camera permissions and refresh.');
+                captureBtn.disabled = true;
+                console.error('Camera error:', error);
+            }
+        }
+
+        // Capture photo
+        captureBtn.addEventListener('click', async () => {
+            if (!stream) {
+                updateInfoBox('error', '✗ Camera not ready');
+                return;
+            }
+
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+
+            // Convert canvas to blob
+            canvas.toBlob(async (blob) => {
+                await verifyAge(blob);
+            }, 'image/jpeg', 0.9);
+        });
+
+        // Switch camera
+        switchBtn.addEventListener('click', async () => {
+            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            await initCamera();
+        });
+
+        // Manual verification fallback
+        manualBtn.addEventListener('click', () => {
+            if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+                Telegram.WebApp.sendData('manual_verification');
+            } else {
+                window.location.href = `tg://resolve?domain=PNPtv_bot&start=age_manual`;
+            }
+        });
+
+        // Verify age with AI
+        async function verifyAge(photoBlob) {
+            loader.classList.add('active');
+            captureBtn.disabled = true;
+            switchBtn.disabled = true;
+
+            try {
+                // Send to backend for AI verification
+                const formData = new FormData();
+                formData.append('photo', photoBlob);
+                formData.append('user_id', USER_ID);
+
+                const response = await fetch('/api/verify-age', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                verificationResult = result;
+
+                if (result.success && result.ageVerified) {
+                    loader.classList.remove('active');
+                    showResult(true, '✅ Age Verified!', 'You have been verified as 18 or older.');
+                    document.getElementById('controlButtons').classList.add('hidden');
+                    document.getElementById('resultButtons').classList.remove('hidden');
+                } else {
+                    loader.classList.remove('active');
+                    showResult(false, '❌ Verification Failed', 'We could not verify your age. Please try again or use manual verification.');
+                    document.getElementById('controlButtons').classList.remove('hidden');
+                    document.getElementById('resultButtons').classList.add('hidden');
+                    captureBtn.disabled = false;
+                    switchBtn.disabled = false;
+                }
+            } catch (error) {
+                loader.classList.remove('active');
+                updateInfoBox('error', '✗ Verification error: ' + error.message);
+                captureBtn.disabled = false;
+                switchBtn.disabled = false;
+                console.error('Verification error:', error);
+            }
+        }
+
+        // Show result
+        function showResult(success, status, message) {
+            resultBox.classList.remove('hidden');
+            document.getElementById('resultStatus').textContent = status;
+            document.getElementById('resultMessage').textContent = message;
+            resultBox.className = resultBox.className.replace('error success', '') + (success ? ' success' : ' error');
+        }
+
+        // Update info box
+        function updateInfoBox(type, message) {
+            infoBox.textContent = message;
+            infoBox.className = 'info-box ' + type;
+        }
+
+        // Accept verification
+        acceptBtn.addEventListener('click', () => {
+            if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+                Telegram.WebApp.sendData('age_verified:' + verificationResult.estimatedAge);
+            } else {
+                alert('Age verified! Redirecting...');
+                window.location.href = `tg://resolve?domain=PNPtv_bot&start=age_verified`;
+            }
+        });
+
+        // Retry
+        retryBtn.addEventListener('click', () => {
+            resultBox.classList.add('hidden');
+            document.getElementById('controlButtons').classList.remove('hidden');
+            document.getElementById('resultButtons').classList.add('hidden');
+            captureBtn.disabled = false;
+            switchBtn.disabled = false;
+            updateInfoBox('success', 'Ready to try again. Tap capture when ready.');
+        });
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            checkConsent();
+            // Only init camera if consent already given, otherwise user must click accept
+            if (consentGiven) {
+                initCamera();
+            }
+        });
+
+        // Cleanup on unload
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
+
+        // Handle Telegram WebApp
+        if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+        }
+
+        // Add page visibility to pause/resume stream
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+        });
+    </script>
+</body>
+</html>
