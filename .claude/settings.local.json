@@ -127,7 +127,8 @@
       "Bash(pg_isready:*)",
       "Bash(PGPASSWORD=\"Apelo801050#\" psql:*)",
       "Bash(node scripts/send-broadcast-auto.js:*)",
-      "Bash(zcat:*)"
+      "Bash(zcat:*)",
+      "Bash(node -c:*)"
     ],
     "deny": [],
     "ask": []
