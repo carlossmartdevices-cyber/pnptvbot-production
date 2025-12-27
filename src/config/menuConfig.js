@@ -166,6 +166,13 @@ const MENU_CONFIG = {
           title: { en: '📜 Community Rules', es: '📜 Reglas de la Comunidad' },
           callback: 'menu:rules',
           deepLink: 'rules'
+        },
+        {
+          id: 'how_to_use',
+          title: { en: '📖 How to use PNPtv!', es: '📖 ¡Cómo usar PNPtv!' },
+          callback: 'menu:how_to_use',
+          deepLink: 'how_to_use',
+          url: 'https://pnptv.app/community-features'
         }
       ]
     },

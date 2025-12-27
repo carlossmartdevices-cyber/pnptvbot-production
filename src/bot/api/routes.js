@@ -57,6 +57,11 @@ app.get('/pnptv-haus', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/community-room.html'));
 });
 
+// Community Features page
+app.get('/community-features', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/community-features.html'));
+});
+
 // Video Rooms page
 app.get('/video-rooms', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/video-rooms.html'));

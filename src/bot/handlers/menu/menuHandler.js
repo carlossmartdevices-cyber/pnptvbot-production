@@ -438,6 +438,10 @@ async function handleMenuCallback(ctx) {
         await handleRules(ctx, lang);
         break;
 
+      case 'how_to_use':
+        await handleHowToUse(ctx, lang);
+        break;
+
       case 'profile':
         logger.info(`>>> Calling handleProfile for user ${ctx.from.id}`);
         await handleProfile(ctx, lang);
@@ -741,6 +745,22 @@ async function handleRules(ctx, lang) {
   ]);
 
   await ctx.editMessageText(rulesText, {
+    parse_mode: 'Markdown',
+    ...keyboard
+  });
+}
+
+async function handleHowToUse(ctx, lang) {
+  const message = lang === 'es'
+    ? '📖 *¡Cómo usar PNPtv!*\n\nVisita nuestro centro de ayuda para aprender más sobre cómo utilizar todas las características de PNPtv.'
+    : '📖 *How to use PNPtv!*\n\nVisit our community features guide to learn more about using PNPtv.';
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.url(lang === 'es' ? '📖 Centro de Ayuda' : '📖 Community Features', 'https://pnptv.app/community-features')],
+    [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
+  ]);
+
+  await ctx.editMessageText(message, {
     parse_mode: 'Markdown',
     ...keyboard
   });
