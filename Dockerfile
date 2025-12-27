@@ -28,6 +28,9 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy source code from builder
 COPY --from=builder --chown=node:node /app/src ./src
 
+# Copy scripts directory for cron jobs
+COPY --from=builder --chown=node:node /app/scripts ./scripts
+
 # Copy public directory for landing pages
 COPY --from=builder /app/public ./public
 
