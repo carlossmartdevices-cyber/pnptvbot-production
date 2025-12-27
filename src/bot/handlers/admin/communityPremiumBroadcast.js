@@ -6,7 +6,7 @@ const { getLanguage } = require('../../utils/helpers');
 
 /**
  * Community Premium Broadcast Handler
- * Sends a thank you broadcast to community with self-activation button for 3-day premium access
+ * Sends a thank you broadcast to community with self-activation button for 1-day premium access
  */
 const registerCommunityPremiumBroadcast = (bot) => {
   /**
@@ -27,11 +27,11 @@ const registerCommunityPremiumBroadcast = (bot) => {
       // Show confirmation
       await ctx.editMessageText(
         '🎁 **Difusión de Premium Comunitario**\n\n' +
-        '¿Deseas enviar un mensaje de agradecimiento a todos los usuarios con acceso premium de 3 días?\n\n' +
+        '¿Deseas enviar un mensaje de agradecimiento a todos los usuarios con acceso premium de 1 día?\n\n' +
         '📊 **Detalles:**\n' +
         '• Todos los usuarios recibirán el mensaje\n' +
         '• Incluye botón de auto-activación\n' +
-        '• 3 días de acceso premium\n' +
+        '• 1 día de acceso premium\n' +
         '• Mensaje bilingüe (EN/ES)\n\n' +
         '¿Continuar?',
         {
@@ -92,7 +92,7 @@ const registerCommunityPremiumBroadcast = (bot) => {
 
           const messageText = userLang === 'es'
             ? '🎉 **¡Gracias por ser parte de nuestra comunidad!**\n\n' +
-              'Como agradecimiento, te ofrecemos **3 días de acceso premium GRATIS**.\n\n' +
+              'Como agradecimiento, te ofrecemos **1 día de acceso premium GRATIS**.\n\n' +
               '✨ **Beneficios Premium:**\n' +
               '• Videos HD/4K completos\n' +
               '• Contenido exclusivo PNP\n' +
@@ -101,7 +101,7 @@ const registerCommunityPremiumBroadcast = (bot) => {
               '• Sin anuncios\n\n' +
               '👇 **Haz clic abajo para activar tu premium ahora:**'
             : '🎉 **Thank you for being part of our community!**\n\n' +
-              'As a token of appreciation, we\'re offering you **3 days of FREE premium access**.\n\n' +
+              'As a token of appreciation, we\'re offering you **1 day of FREE premium access**.\n\n' +
               '✨ **Premium Benefits:**\n' +
               '• Full HD/4K videos\n' +
               '• Exclusive PNP content\n' +
@@ -148,7 +148,7 @@ const registerCommunityPremiumBroadcast = (bot) => {
         `💎 Ya Premium: ${alreadyPremium}\n` +
         `📈 Total usuarios: ${users.length}\n\n` +
         `🎯 Tipo: Acceso Premium Comunitario\n` +
-        `⏱️ Duración: 3 días\n` +
+        `⏱️ Duración: 1 día\n` +
         `🌐 Mensajes bilingües: EN / ES`,
         {
           parse_mode: 'Markdown',
@@ -228,11 +228,11 @@ const registerCommunityPremiumBroadcast = (bot) => {
         return;
       }
 
-      // Calculate 3-day expiry
+      // Calculate 1-day expiry
       const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + 3);
+      expiryDate.setDate(expiryDate.getDate() + 1);
 
-      // Activate 3-day premium with special plan ID
+      // Activate 1-day premium with special plan ID
       const currentDate = new Date().toISOString().split('T')[0];
       await UserModel.updateSubscription(userId, {
         status: 'active',
@@ -266,7 +266,7 @@ const registerCommunityPremiumBroadcast = (bot) => {
       // Send success message with channel link
       let successMessage = lang === 'es'
         ? '🎉 **¡Premium Activado!**\n\n' +
-          '✅ Tu acceso premium de **3 días** ha sido activado exitosamente.\n\n' +
+          '✅ Tu acceso premium de **1 día** ha sido activado exitosamente.\n\n' +
           `📅 Válido hasta: **${expiryDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}**\n\n` +
           '💎 **Disfruta de:**\n' +
           '• Videos HD/4K completos\n' +
@@ -275,7 +275,7 @@ const registerCommunityPremiumBroadcast = (bot) => {
           '• Soporte prioritario\n' +
           '• Sin anuncios'
         : '🎉 **Premium Activated!**\n\n' +
-          '✅ Your **3-day premium access** has been successfully activated.\n\n' +
+          '✅ Your **1-day premium access** has been successfully activated.\n\n' +
           `📅 Valid until: **${expiryDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}**\n\n` +
           '💎 **Enjoy:**\n' +
           '• Full HD/4K videos\n' +
@@ -333,8 +333,8 @@ const registerCommunityPremiumBroadcast = (bot) => {
     const lang = getLanguage(ctx);
     await ctx.answerCbQuery(
       lang === 'es'
-        ? 'Ya activaste tu premium de 3 días'
-        : 'You already activated your 3-day premium',
+        ? 'Ya activaste tu premium de 1 día'
+        : 'You already activated your 1-day premium',
       { show_alert: false }
     );
   });
