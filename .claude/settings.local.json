@@ -130,7 +130,10 @@
       "Bash(zcat:*)",
       "Bash(node -c:*)",
       "Bash(curl -s https://pnptv.app/community-room)",
-      "Bash(sudo systemctl restart:*)"
+      "Bash(sudo systemctl restart:*)",
+      "Bash(npm run apply-hangouts-schema:*)",
+      "Bash(node scripts/apply-hangouts-schema.js:*)",
+      "Bash(kill:*)"
     ],
     "deny": [],
     "ask": []

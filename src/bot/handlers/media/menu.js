@@ -1,6 +1,8 @@
 const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
+const UserService = require('../../services/userService');
+const PermissionService = require('../../services/permissionService');
 
 /**
  * Store the last menu message ID per user per chat
@@ -57,65 +59,122 @@ function storeMenuMessage(ctx, messageId) {
 const registerMenuHandlers = (bot) => {
   /**
    * Show main menu with all options
+   * Displays different views based on subscription status
    */
   const showMainMenu = async (ctx) => {
     try {
       const lang = getLanguage(ctx);
+      const userId = ctx.from?.id;
 
       // Delete previous menu message if in group
       if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
         await deletePreviousMenuMessage(ctx);
       }
 
-      const menuText = lang === 'es'
-        ? `🎉 Bienvenido a PNPtv
+      // Check subscription status
+      const hasSubscription = userId ? await UserService.hasActiveSubscription(userId) : false;
+      const username = ctx.from?.username || ctx.from?.first_name || 'Member';
 
-Explora todas las características increíbles de nuestra plataforma:
+      let menuText;
+      let buttons;
 
-🌍 Encuentra Gente Nearby - Conecta con miembros cerca de ti
-🎥 PNPtv Hangouts! - Salas de video en vivo, crea tu propia sala
-📺 PNPtv Live! - Próximamente (streaming en vivo)
-▶️ PNPtv Videorama! - Playlists curadas y contenido de video
-🏪 Lifetime100 - Tu tienda personal, planes y suscripciones
-🆘 ¡Ayuda! - Cómo usar PNPtv, tutoriales y Cristina (asistente IA)`
-        : `🎉 Welcome to PNPtv
+      if (hasSubscription) {
+        // PRIME MEMBER VIEW
+        menuText = lang === 'es'
+          ? `🎬 *¡Eres PRIME!*
 
-Explore all the amazing features of our platform:
+¡Gracias por ser PRIME, papi! 🔥
 
-🌍 Who is Nearby? - Connect with members near you
-🎥 PNPtv Hangouts! - Live video rooms, create your own room
-📺 PNPtv Live! - Coming soon (live streaming)
-▶️ PNPtv Videorama! - Curated playlists and video content
-🏪 Lifetime100 - Your personal store, plans and subscriptions
-🆘 Help! - How to use PNPtv, tutorials and Cristina (AI assistant)`;
+Pulsa los botones de abajo y disfruta todo lo que hemos preparado para ti — videos, Nearby, hangouts, lives, shows, y más.
 
-      // In groups, show inline buttons; in private, also show command options
-      const buttons = [
-        [Markup.button.callback(
-          lang === 'es' ? '🌍 ¿Quién está cerca?' : '🌍 Who is Nearby?',
-          'menu_nearby'
-        )],
-        [Markup.button.callback(
-          lang === 'es' ? '🎥 PNPtv Hangouts!' : '🎥 PNPtv Hangouts!',
-          'menu_hangouts'
-        )],
-        [Markup.button.callback(
-          lang === 'es' ? '📺 PNPtv Live!' : '📺 PNPtv Live!',
-          'menu_live'
-        )],
-        [Markup.button.url(
-          lang === 'es' ? '▶️ PNPtv Videorama!' : '▶️ PNPtv Videorama!',
-          `${process.env.BOT_DOMAIN || 'https://pnptv.app'}/youtube-playlist.html`
-        )],
-        [Markup.button.url(
-          lang === 'es' ? '🏪 Lifetime100' : '🏪 Lifetime100',
-          `${process.env.BOT_DOMAIN || 'https://pnptv.app'}/lifetime100`
-        )],
-        [Markup.button.callback(
-          lang === 'es' ? '🆘 ¡Ayuda!' : '🆘 Help!',
-          'menu_help'
-        )],
-      ];
+*Cristina*, nuestra asistente IA, está aquí para guiarte y responder tus preguntas.
+
+\`¡Eso está muy hot! 🔥\``
+          : `🎬 *You are PRIME!*
+
+Thank you for being PRIME, papi! 🔥
+
+Tap the buttons below and enjoy everything we've prepared for you — videos, Nearby, hangouts, lives, shows, and more.
+
+*Cristina*, our AI assistant, is here to guide you and answer questions.
+
+\`That's so hot! 🔥\``;
+
+        buttons = [
+          [Markup.button.callback(
+            lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile',
+            'show_profile'
+          )],
+          [Markup.button.callback(
+            lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who is Nearby?',
+            'menu_nearby'
+          )],
+          [Markup.button.callback(
+            lang === 'es' ? '🧑‍💼 Área de Miembros' : '🧑‍💼 Members Area',
+            'show_members_area'
+          )],
+          [Markup.button.callback(
+            lang === 'es' ? '🎥 PNPtv Hangouts!' : '🎥 PNPtv Hangouts!',
+            'menu_hangouts'
+          )],
+          [Markup.button.callback(
+            lang === 'es' ? '🆘 Ayuda' : '🆘 Help',
+            'menu_help'
+          )],
+          [Markup.button.callback(
+            lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings',
+            'show_settings'
+          )],
+        ];
+      } else {
+        // FREE MEMBER VIEW
+        menuText = lang === 'es'
+          ? `🎬 *¡Bienvenido a PNPtv!*
+
+@${username} ¡nos encanta tenerte en la Comunidad PNPtv! 💜
+
+Pulsa *Desbloquear PRIME* para más diversión — videos completos, lives, hangouts, Nearby, y todas las funciones de miembro.
+
+*Cristina*, nuestra asistente IA, está aquí para guiarte y responder tus preguntas.
+
+\`¡Desbloquea la diversión! 🔓\``
+          : `🎬 *Welcome to PNPtv!*
+
+@${username} we love having you in the PNPtv Community! 💜
+
+Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, hangouts, Nearby, and all member features.
+
+*Cristina*, our AI assistant, is here to guide you and answer questions.
+
+\`Unlock the fun! 🔓\``;
+
+        buttons = [
+          [Markup.button.callback(
+            lang === 'es' ? '🔓 Desbloquear PRIME' : '🔓 Unlock PRIME',
+            'show_subscription_plans'
+          )],
+          [Markup.button.callback(
+            lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile',
+            'show_profile'
+          )],
+          [Markup.button.callback(
+            lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who is Nearby?',
+            'menu_nearby'
+          )],
+          [Markup.button.callback(
+            lang === 'es' ? '🧑‍💼 Área de Miembros 🔒' : '🧑‍💼 Members Area 🔒',
+            'locked_feature'
+          )],
+          [Markup.button.callback(
+            lang === 'es' ? '🆘 Ayuda' : '🆘 Help',
+            'menu_help'
+          )],
+          [Markup.button.callback(
+            lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings',
+            'show_settings'
+          )],
+        ];
+      }
 
       const sentMessage = await ctx.reply(menuText, {
         parse_mode: 'Markdown',
@@ -406,6 +465,19 @@ Click the button below to connect!`;
     } catch (error) {
       logger.error('Error going back to main menu:', error);
     }
+  });
+
+  /**
+   * Locked feature handler for free users
+   */
+  bot.action('locked_feature', async (ctx) => {
+    const lang = getLanguage(ctx);
+    await ctx.answerCbQuery(
+      lang === 'es'
+        ? '🔒 Esta función solo está disponible para miembros PRIME. ¡Suscríbete ahora!'
+        : '🔒 This feature is only available for PRIME members. Subscribe now!',
+      { show_alert: true }
+    );
   });
 
   /**
