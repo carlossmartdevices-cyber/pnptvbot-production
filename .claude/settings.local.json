@@ -135,7 +135,13 @@
       "Bash(node scripts/apply-hangouts-schema.js:*)",
       "Bash(kill:*)",
       "Bash(tail:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker build:*)",
+      "Bash(docker stop:*)",
+      "Bash(docker run:*)",
+      "Bash(docker rm:*)",
+      "Bash(curl -s https://pnptv.app/community-features.html)"
     ],
     "deny": [],
     "ask": []
