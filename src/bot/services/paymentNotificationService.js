@@ -266,8 +266,10 @@ class PaymentNotificationService {
   }) {
     try {
       const adminId = process.env.ADMIN_ID;
-      if (!adminId) {
-        logger.warn('ADMIN_ID not configured, skipping admin notification');
+      const supportGroupId = process.env.SUPPORT_GROUP_ID;
+
+      if (!adminId && !supportGroupId) {
+        logger.warn('Neither ADMIN_ID nor SUPPORT_GROUP_ID configured, skipping admin notification');
         return false;
       }
 
@@ -296,28 +298,60 @@ class PaymentNotificationService {
         `/plan_${planName} - Ver detalles del plan`,
       ].join('\n');
 
-      try {
-        await bot.telegram.sendMessage(adminId, message, {
-          parse_mode: 'Markdown',
-        });
+      let sentToAdmin = false;
+      let sentToGroup = false;
 
-        logger.info('Admin payment notification sent', {
-          adminId,
-          userId,
-          planName,
-          amount,
-          provider,
-        });
+      // Send to admin user if configured
+      if (adminId) {
+        try {
+          await bot.telegram.sendMessage(adminId, message, {
+            parse_mode: 'Markdown',
+          });
 
-        return true;
-      } catch (sendError) {
-        logger.error('Error sending admin notification:', {
-          adminId,
-          userId,
-          error: sendError.message,
-        });
-        return false;
+          logger.info('Admin payment notification sent', {
+            adminId,
+            userId,
+            planName,
+            amount,
+            provider,
+          });
+
+          sentToAdmin = true;
+        } catch (sendError) {
+          logger.error('Error sending admin notification:', {
+            adminId,
+            userId,
+            error: sendError.message,
+          });
+        }
       }
+
+      // Send to support group if configured
+      if (supportGroupId) {
+        try {
+          await bot.telegram.sendMessage(supportGroupId, message, {
+            parse_mode: 'Markdown',
+          });
+
+          logger.info('Support group payment notification sent', {
+            supportGroupId,
+            userId,
+            planName,
+            amount,
+            provider,
+          });
+
+          sentToGroup = true;
+        } catch (sendError) {
+          logger.error('Error sending support group notification:', {
+            supportGroupId,
+            userId,
+            error: sendError.message,
+          });
+        }
+      }
+
+      return sentToAdmin || sentToGroup;
     } catch (error) {
       logger.error('Error in admin payment notification:', {
         userId,

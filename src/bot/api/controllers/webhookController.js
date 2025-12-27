@@ -360,6 +360,28 @@ const handlePayPalWebhook = async (req, res) => {
                   userId,
                 });
               }
+
+              // Send admin/support group notification for purchase
+              try {
+                const { Telegraf } = require('telegraf');
+                const bot = new Telegraf(process.env.BOT_TOKEN);
+                const PaymentNotificationService = require('../../services/paymentNotificationService');
+                await PaymentNotificationService.sendAdminPaymentNotification({
+                  bot,
+                  userId,
+                  planName: plan.display_name || plan.name,
+                  amount: parseFloat(amount),
+                  provider: 'PayPal',
+                  transactionId: captureId,
+                  customerName: user?.first_name || user?.username || 'Unknown',
+                  customerEmail: payment.email,
+                });
+              } catch (adminError) {
+                logger.error('Error sending admin notification for PayPal payment (non-critical):', {
+                  error: adminError.message,
+                  paymentId,
+                });
+              }
             }
           }
         } catch (subError) {
