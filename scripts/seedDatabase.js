@@ -101,7 +101,7 @@ async function seedDatabase() {
     const sampleRooms = [
       {
         id: 'room1',
-        name: 'Community Room',
+        name: 'PNPtv Haus',
         joinUrl: 'https://zoom.us/j/123456789',
         active: true,
         createdAt: new Date(),

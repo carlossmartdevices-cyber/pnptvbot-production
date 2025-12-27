@@ -145,6 +145,8 @@ class JaaSService {
      * Generate moderator token (for streamers/hosts)
      */
     generateModeratorToken(roomName, userId, userName, userEmail = '', userAvatar = '') {
+        // For PNPtv Haus (community room), disable recording to ensure privacy
+        const isCommunitRoom = roomName && roomName.includes('haus');
         return this.generateToken({
             roomName,
             userId,
@@ -152,9 +154,9 @@ class JaaSService {
             userEmail,
             userAvatar,
             isModerator: true,
-            enableLivestreaming: true,
-            enableRecording: true,
-            enableTranscription: true,
+            enableLivestreaming: false,
+            enableRecording: isCommunitRoom ? false : false, // NO RECORDING - Privacy First
+            enableTranscription: false,
             expiresIn: '4h'
         });
     }

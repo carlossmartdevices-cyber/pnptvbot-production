@@ -2,13 +2,13 @@ const logger = require('../../utils/logger');
 const JaasService = require('./jaasService');
 
 /**
- * Community Room Service
+ * PNPtv Haus Service
  * Manages the 24/7 persistent community video room
  */
 class CommunityRoomService {
   constructor() {
-    this.COMMUNITY_ROOM_ID = 'pnptv-community-24-7';
-    this.COMMUNITY_ROOM_NAME = 'pnptv-community';
+    this.COMMUNITY_ROOM_ID = 'pnptv-haus-24-7';
+    this.COMMUNITY_ROOM_NAME = 'pnptv-haus';
     this.activeUsers = new Map(); // userId -> { userName, joinedAt, role }
     this.messageHistory = []; // Store last 100 messages
     this.MAX_MESSAGES = 100;
@@ -34,14 +34,16 @@ class CommunityRoomService {
         isPersistent: true,
         isOpen24_7: true,
         moderatorRequired: false,
-        description: 'PNPtv 24/7 Community Room - Open to all, anyone can join and start calls',
+        description: 'PNPtv 24/7 Haus - Open to all, anyone can join and start calls',
         settings: {
           chatEnabled: true,
-          recordingEnabled: true,
+          recordingEnabled: false, // RECORDING DISABLED - Privacy & Security First
           moderationEnabled: false, // Room moderation disabled - open access
           allowScreenShare: true,
           requireModerator: false, // No moderator required to start
-          allowGuestAccess: true // Guests can join without authentication
+          allowGuestAccess: true, // Guests can join without authentication
+          isPrivate: true, // Private, encrypted conversations
+          endToEndEncryption: true // E2E encryption enabled
         }
       };
 

@@ -59,17 +59,17 @@ const registerTopicMenuHandlers = (bot) => {
         try {
           const pmLink = `https://t.me/${botUsername}?start=hangouts_join_main`;
           const pmMsg = [
-            '📹 *Salas Comunitarias 24/7*',
+            '📹 *PNPtv Haus 24/7*',
             '',
-            'Click the button below to join community rooms:',
+            'Click the button below to join PNPtv Haus:',
             '',
-            `[Open Community Rooms](${pmLink})`
+            `[Open PNPtv Haus](${pmLink})`
           ].join('\n');
 
           await ctx.telegram.sendMessage(ctx.from.id, pmMsg, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-              [Markup.button.callback('📹 Join Community Rooms', 'hangouts_join_main')]
+              [Markup.button.callback('📹 Join PNPtv Haus', 'hangouts_join_main')]
             ])
           });
         } catch (pmError) {
@@ -116,7 +116,7 @@ async function showVideoCallMenu(ctx, topicId) {
   ].join('\n');
 
   const keyboard = Markup.inlineKeyboard([
-    [Markup.button.callback('🎥 Join Community Rooms', 'topic_create_room')],
+    [Markup.button.callback('🎥 Join PNPtv Haus', 'topic_create_room')],
     [Markup.button.callback('❌ Close Menu', 'topic_close_menu')]
   ]);
 

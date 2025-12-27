@@ -95,9 +95,9 @@ module.exports = {
 
   // Feature Flags
   features: {
-    // Recording
+    // Recording - DISABLED for Privacy & Security
     recording: {
-      enabled: true,
+      enabled: false, // NO RECORDING - This is a safe, private space
       type: 'jibri' // Jitsi Broadcast Infrastructure
     },
 

@@ -210,11 +210,15 @@ async function handleGroupRedirect(ctx) {
 
   const message = lang === 'es'
     ? '👋 ¡Hola! Has sido redirigido desde el grupo.\n\n' +
-      'Ahora puedes usar el bot en este chat privado. ¡Explora todas las funciones!\n\n' +
-      'Usa /menu para ver el menú principal o /help para obtener ayuda.'
+      'Ahora puedes usar el bot en este chat privado.\n\n' +
+      '📋 Usa /menu para navegar todas las funciones disponibles.\n\n' +
+      '⚠️ **Recuerda:** El grupo NO es para servicio al cliente. ' +
+      'Las violaciones repetidas resultarán en sanciones.'
     : '👋 Hello! You\'ve been redirected from the group.\n\n' +
-      'You can now use the bot in this private chat. Explore all features!\n\n' +
-      'Use /menu for main menu or /help for assistance.';
+      'You can now use the bot in this private chat.\n\n' +
+      '📋 Use /menu to navigate all available features.\n\n' +
+      '⚠️ **Remember:** The group is NOT for customer service. ' +
+      'Repeated violations will result in penalties.';
 
   await ctx.reply(
     message,

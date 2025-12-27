@@ -72,7 +72,7 @@ const joinCommunityRoom = async (req, res) => {
         maxParticipants: room.maxParticipants,
         isPersistent: true,
         isOpen24_7: true,
-        description: 'PNPtv 24/7 Community Room - Open to all members'
+        description: 'PNPtv 24/7 Haus - Open to all members'
       }
     });
   } catch (error) {

@@ -285,17 +285,17 @@ Nuestra sala principal está abierta 24 horas para que conozcas miembros nuevos,
 Live video rooms to connect with other members.
 
 **Features:**
-• 👥 24/7 Community Room - Always open to meet new people
+• 👥 24/7 PNPtv Haus - Always open to meet new people
 • 🔒 Private rooms - Create exclusive rooms with friends
 • 👫 Up to 4 participants per room
 • 🎬 High-quality video and audio
 • 💬 Real-time chat
 
-**24/7 Community Room:**
+**24/7 PNPtv Haus:**
 Our main room is open around the clock for you to meet new members, make friends, and enjoy pressure-free connections.
 
 **How to use:**
-1. Join the 24/7 Community Room to get started
+1. Join the 24/7 PNPtv Haus to get started
 2. Or create your own private room
 3. Invite friends to your personal room
 4. Enjoy quality video connections!`;
@@ -308,7 +308,7 @@ Our main room is open around the clock for you to meet new members, make friends
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.url(
-            lang === 'es' ? '👥 Sala Comunitaria 24/7' : '👥 24/7 Community Room',
+            lang === 'es' ? '👥 PNPtv Haus 24/7' : '👥 PNPtv Haus 24/7',
             jitsiUrl
           )],
           [Markup.button.url(

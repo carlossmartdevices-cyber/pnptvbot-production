@@ -731,7 +731,7 @@
             {
                 id: 1,
                 title: 'Emotional Rollercoaster',
-                description: 'A narrative journey through impulse, mental noise, intrusive thoughts, emotional numbness, breaking points, acceptance, and landing back in reality. Listen in order. Let each song do its work. It\\'s not a party. It\\'s a journey.',
+                description: 'A narrative journey through impulse, euphoria, anxiety, numbness, vulnerability, and acceptance',
                 category: 'music',
                 icon: '🎢',
                 videoCount: 12,
@@ -740,18 +740,17 @@
                 creatorBadge: '👑',
                 thumbnail: 'https://i.ytimg.com/vi/_9BGLtqqkVI/hqdefault.jpg',
                 videos: [
-                    { title: '1. Hash Pipe - Weezer', url: 'https://www.youtube.com/watch?v=_9BGLtqqkVI', description: 'Impulso inicial: energía caótica, decisiones rápidas, cero filtro. El momento donde todo arranca sin pensar demasiado.' },
-                    { title: '2. Come Undone - Robbie Williams', url: 'https://www.youtube.com/watch?v=4D35vfQ7eZg', description: 'La euforia empieza a agrietarse. Sigue siendo intensa, pero ya convive con ansiedad y pérdida de control.' },
-                    { title: '3. Don\'t Let Me Get Me - P!nk', url: 'https://www.youtube.com/watch?v=asaCQOZpqUQ', description: 'Auto-conflicto. Frustración. La mente girando contra sí misma.' },
-                    { title: '4. Berghain - Rosalía feat. Björk & Yves Tumor', url: 'https://www.youtube.com/watch?v=6TKYd-pHo1A', description: 'Pensamientos intrusivos: introspección intensa, diálogo interno invasivo, ideas que no se pueden apagar. Aquí el viaje se vuelve mental.' },
-                    { title: '5. Numb / Encore - Linkin Park & Jay-Z', url: 'https://www.youtube.com/watch?v=yS8lkzNF-eU', description: 'Saturación total. El ruido interno ya es constante y abrumador.' },
-                    { title: '6. Habits (Stay High) - Tove Lo', url: 'https://www.youtube.com/watch?v=SYM-RJwSGQ8', description: 'El intento de escapar. Repetición emocional. Loop.' },
-                    { title: '7. Novacane - Frank Ocean', url: 'https://www.youtube.com/watch?v=8PtP3AO4Rgo', description: 'Anestesia emocional. Nada duele… pero nada se siente.' },
-                    { title: '8. When It Hurts So Bad - Lauryn Hill', url: 'https://www.youtube.com/watch?v=tG21lp8fNpM', description: 'El quiebre. La emoción que ya no se puede evitar.' },
-                    { title: '9. Don\'t Leave Home - Dido', url: 'https://www.youtube.com/watch?v=vuGL6RZg_Gs', description: 'Aislamiento. Miedo. Necesidad de refugio.' },
-                    { title: '10. Tears Dry on Their Own - Amy Winehouse', url: 'https://www.youtube.com/watch?v=j-GqgTX43wo', description: 'Aceptación silenciosa. No todo se arregla, pero se sigue.' },
-                    { title: '11. La Plata - Diomedes Díaz', url: 'https://www.youtube.com/watch?v=0MWlFi9d4c0', description: 'Aterrizaje terrenal. Memoria, culpa, realidad cotidiana.' },
-                    { title: '12. Thank U - Alanis Morissette', url: 'https://www.youtube.com/watch?v=JXRmZRmpsbE', description: 'No es felicidad forzada. Es conciencia. Gratitud por lo aprendido, incluso por lo incómodo.' }
+                    { title: 'Hash Pipe - Weezer (Impulso, caos inicial)', url: 'https://www.youtube.com/watch?v=_9BGLtqqkVI' },
+                    { title: 'Come Undone - Robbie Williams (Euforia que se fractura)', url: 'https://www.youtube.com/watch?v=4D35vfQ7eZg' },
+                    { title: 'Don\'t Let Me Get Me - P!nk (Auto-conflicto, frustración)', url: 'https://www.youtube.com/watch?v=asaCQOZpqUQ' },
+                    { title: 'Numb / Encore - Linkin Park & Jay-Z (Saturación mental)', url: 'https://www.youtube.com/watch?v=yS8lkzNF-eU' },
+                    { title: 'Habits (Stay High) - Tove Lo (Escape emocional)', url: 'https://www.youtube.com/watch?v=SYM-RJwSGQ8' },
+                    { title: 'Novacane - Frank Ocean (Anestesia, desconexión)', url: 'https://www.youtube.com/watch?v=8PtP3AO4Rgo' },
+                    { title: 'When It Hurts So Bad - Lauryn Hill (Quiebre, vulnerabilidad)', url: 'https://www.youtube.com/watch?v=tG21lp8fNpM' },
+                    { title: 'Don\'t Leave Home - Dido (Aislamiento, refugio)', url: 'https://www.youtube.com/watch?v=vuGL6RZg_Gs' },
+                    { title: 'Tears Dry on Their Own - Amy Winehouse (Aceptación, claridad)', url: 'https://www.youtube.com/watch?v=j-GqgTX43wo' },
+                    { title: 'La Plata - Diomedes Díaz (Aterrizaje terrenal, realidad)', url: 'https://www.youtube.com/watch?v=0MWlFi9d4c0' },
+                    { title: 'Thank U - Alanis Morissette (Gratitud, cierre consciente)', url: 'https://www.youtube.com/watch?v=JXRmZRmpsbE' }
                 ]
             }
         ];
@@ -961,13 +960,12 @@
                     <p>${playlist.description}</p>
                     <div class="video-list" style="max-height: 60vh; overflow-y: auto;">
                         ${playlist.videos.map((video, index) => `
-                            <div class="video-item" style="cursor: pointer; padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: flex-start; gap: 15px;" onclick="window.open('${video.url}', '_blank')">
+                            <div class="video-item" style="cursor: pointer; padding: 10px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 15px;" onclick="window.open('${video.url}', '_blank')">
                                 <div class="video-thumbnail" style="flex-shrink: 0;">
                                     <i class="material-icons" style="font-size: 2rem; color: #667eea;">play_circle</i>
                                 </div>
                                 <div class="video-info" style="flex: 1;">
-                                    <h6 style="margin: 0 0 8px 0; font-weight: 600; color: #333;">${video.title}</h6>
-                                    ${video.description ? `<p style="margin: 0; font-size: 0.85rem; color: #666; line-height: 1.4;">${video.description}</p>` : ''}
+                                    <h6 style="margin: 0; font-weight: 500;">${index + 1}. ${video.title}</h6>
                                 </div>
                             </div>
                         `).join('')}
