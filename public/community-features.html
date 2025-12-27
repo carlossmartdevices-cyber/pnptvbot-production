@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PNPtv Community - Features & How to Use | Complete Guide</title>
+    <meta name="description" content="Learn how to use all PNPtv community features including video rooms, live streaming, radio, geolocation, and more. Complete guide with step-by-step instructions.">
+    <link rel="stylesheet" href="/unified-design.css">
+    <style>
+        body {
+            background: var(--gradient-primary);
+            padding-top: 80px;
+        }
+
+        /* Navigation */
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            background: linear-gradient(90deg, #ffd700, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-light);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent-gold);
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 4rem 2rem;
+            background: rgba(0, 0, 0, 0.3);
+            margin-bottom: 3rem;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(90deg, #ffd700, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.3rem;
+            max-width: 800px;
+            margin: 0 auto 2rem;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem 4rem;
+        }
+
+        /* Section Styles */
+        .section {
+            margin-bottom: 5rem;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .section-title {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: var(--accent-gold);
+        }
+
+        .section-subtitle {
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.8);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Feature Cards */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: var(--radius-xl);
+            padding: 2rem;
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: var(--shadow-xl);
+            border-color: var(--accent-gold);
+        }
+
+        .feature-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .feature-card h3 {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            color: var(--accent-gold);
+        }
+
+        .feature-card p {
+            line-height: 1.8;
+            margin-bottom: 1rem;
+        }
+
+        /* How-to Steps */
+        .how-to-section {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: var(--radius-xl);
+            padding: 3rem;
+            margin-bottom: 3rem;
+        }
+
+        .steps {
+            display: grid;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .step {
+            display: flex;
+            gap: 1.5rem;
+            align-items: flex-start;
+        }
+
+        .step-number {
+            background: var(--gradient-primary);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .step-content h4 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+            color: var(--accent-gold);
+        }
+
+        .step-content p {
+            line-height: 1.7;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Diagram */
+        .diagram {
+            background: rgba(0, 0, 0, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: var(--radius-xl);
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .diagram-title {
+            text-align: center;
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            color: var(--accent-gold);
+        }
+
+        .flow-diagram {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .flow-box {
+            background: var(--gradient-secondary);
+            padding: 1.5rem;
+            border-radius: var(--radius-lg);
+            text-align: center;
+            min-width: 180px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .flow-arrow {
+            font-size: 2rem;
+            color: var(--accent-gold);
+        }
+
+        /* Payment Methods */
+        .payment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .payment-card {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: var(--radius-xl);
+            padding: 2rem;
+            transition: all 0.3s;
+        }
+
+        .payment-card:hover {
+            transform: scale(1.05);
+            border-color: var(--accent-gold);
+            box-shadow: 0 15px 40px rgba(255, 215, 0, 0.3);
+        }
+
+        .payment-logo {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .payment-card h3 {
+            font-size: 1.6rem;
+            margin-bottom: 1rem;
+            color: var(--accent-gold);
+        }
+
+        .payment-list {
+            list-style: none;
+            margin: 1rem 0;
+        }
+
+        .payment-list li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .payment-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--accent-green);
+            font-weight: bold;
+        }
+
+        /* Pricing Table */
+        .pricing-table {
+            overflow-x: auto;
+            margin: 2rem 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 1.2rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        th {
+            background: rgba(255, 215, 0, 0.2);
+            color: var(--accent-gold);
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        td {
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .highlight {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 170, 0, 0.2));
+            font-weight: bold;
+        }
+
+        /* CTA Button */
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            color: #333;
+            padding: 1rem 2.5rem;
+            border-radius: var(--radius-full);
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+            transition: all 0.3s;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.4);
+            margin-top: 1rem;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(255, 215, 0, 0.6);
+        }
+
+        /* Info Box */
+        .info-box {
+            background: rgba(102, 126, 234, 0.2);
+            border-left: 4px solid var(--primary-color);
+            padding: 1.5rem;
+            border-radius: var(--radius-md);
+            margin: 2rem 0;
+        }
+
+        .warning-box {
+            background: rgba(255, 170, 0, 0.2);
+            border-left: 4px solid var(--accent-orange);
+            padding: 1.5rem;
+            border-radius: var(--radius-md);
+            margin: 2rem 0;
+        }
+
+        .success-box {
+            background: rgba(56, 239, 125, 0.2);
+            border-left: 4px solid var(--accent-green);
+            padding: 1.5rem;
+            border-radius: var(--radius-md);
+            margin: 2rem 0;
+        }
+
+        /* Feature List */
+        .feature-list {
+            list-style: none;
+            margin: 1.5rem 0;
+        }
+
+        .feature-list li {
+            padding: 0.7rem 0;
+            padding-left: 2rem;
+            position: relative;
+            line-height: 1.6;
+        }
+
+        .feature-list li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--accent-gold);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .payment-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .flow-diagram {
+                flex-direction: column;
+            }
+
+            .flow-arrow {
+                transform: rotate(90deg);
+            }
+
+            .nav-links {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="/" class="logo">🔥 PNPtv</a>
+        <ul class="nav-links">
+            <li><a href="/">Home</a></li>
+            <li><a href="/video-rooms">Video Rooms</a></li>
+            <li><a href="/lifetime-pass">Get Access</a></li>
+            <li><a href="https://t.me/PNPtvbot" target="_blank">Bot</a></li>
+        </ul>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <h1>🌟 PNPtv Community Features</h1>
+        <p>Your complete guide to using all PNPtv community features, connecting with members, and getting the most out of your subscription. Learn everything from video rooms to payment methods.</p>
+    </section>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Introduction -->
+        <div class="info-box">
+            <h3 style="margin-bottom: 1rem;">📖 What is PNPtv Community?</h3>
+            <p>PNPtv is more than just content – it's a complete ecosystem for authentic connections, premium entertainment, and real community engagement. Built on Telegram for maximum privacy and security, our platform offers video rooms, live streaming, geolocation features, and exclusive content.</p>
+        </div>
+
+        <!-- Quick Start Guide -->
+        <section class="section">
+            <div class="section-header">
+                <h2 class="section-title">🚀 Quick Start Guide</h2>
+                <p class="section-subtitle">Get started with PNPtv in just a few simple steps</p>
+            </div>
+
+            <div class="diagram">
+                <h3 class="diagram-title">Your Journey from Signup to Full Access</h3>
+                <div class="flow-diagram">
+                    <div class="flow-box">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">1️⃣</div>
+                        <strong>Open Telegram</strong>
+                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">Download if needed</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-box">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">2️⃣</div>
+                        <strong>Start @PNPtvbot</strong>
+                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">Your private assistant</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-box">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">3️⃣</div>
+                        <strong>Choose Plan</strong>
+                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">Pick your subscription</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-box">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">4️⃣</div>
+                        <strong>Make Payment</strong>
+                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">Secure checkout</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-box">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">5️⃣</div>
+                        <strong>Enjoy Access!</strong>
+                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">All features unlocked</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="how-to-section">
+                <h3 style="font-size: 2rem; margin-bottom: 1.5rem; text-align: center;">Detailed Step-by-Step</h3>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h4>Install Telegram (if you haven't already)</h4>
+                            <p>Download Telegram from your app store (iOS/Android) or visit <a href="https://telegram.org" target="_blank" style="color: var(--accent-gold);">telegram.org</a> for desktop. Create an account using your phone number. Telegram is free, secure, and works on all devices.</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h4>Open the PNPtv Bot</h4>
+                            <p>Search for <strong>@PNPtvbot</strong> in Telegram or click this link: <a href="https://t.me/PNPtvbot" target="_blank" style="color: var(--accent-gold);">t.me/PNPtvbot</a>. Tap "Start" to begin your conversation with the bot. This is your personal gateway to all PNPtv features.</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h4>Complete Age Verification</h4>
+                            <p>For legal compliance, you must verify you're 18+. The bot will guide you through a secure verification process. This is a one-time requirement and your privacy is protected throughout.</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h4>Set Your Language</h4>
+                            <p>Choose between English and Spanish. You can change this anytime from the bot settings menu.</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <h4>Browse Subscription Plans</h4>
+                            <p>The bot will show you available plans. Review the features and pricing. We offer flexible options from weekly trials to lifetime passes.</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">6</div>
+                        <div class="step-content">
+                            <h4>Choose Your Payment Method</h4>
+                            <p>Select from credit card (ePayco), crypto (Daimo/USDC), or PayPal. Each method is secure and processed instantly.</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">7</div>
+                        <div class="step-content">
+                            <h4>Complete Payment</h4>
+                            <p>Follow the checkout process. After successful payment, your account is activated immediately and you'll receive a confirmation message.</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">8</div>
+                        <div class="step-content">
+                            <h4>Join PRIME Channel & Community</h4>
+                            <p>The bot will send you links to join the PNPtv PRIME channel (for content) and Community Group (for socializing). Click the links and you're in!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- All Features Overview -->
+        <section class="section">
+            <div class="section-header">
+                <h2 class="section-title">🎯 All Features Explained</h2>
+                <p class="section-subtitle">Everything you get with your PNPtv subscription</p>
+            </div>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <span class="feature-icon">🤖</span>
+                    <h3>PNPtv Bot (Private)</h3>
+                    <p><strong>Your personal content delivery system</strong></p>
+                    <ul class="feature-list">
+                        <li>Browse HD/4K video library</li>
+                        <li>Manage your subscription</li>
+                        <li>Check account status</li>
+                        <li>Update payment methods</li>
+                        <li>Get 24/7 support</li>
+                        <li>100% private messaging</li>
+                    </ul>
+                    <div class="success-box" style="margin-top: 1rem;">
+                        <strong>How to use:</strong> Just message @PNPtvbot anytime. Use the menu buttons to navigate or type your questions.
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">💎</span>
+                    <h3>PRIME Channel</h3>
+                    <p><strong>Exclusive premium content broadcast</strong></p>
+                    <ul class="feature-list">
+                        <li>Daily HD/4K video releases</li>
+                        <li>Exclusive content from Santino & crew</li>
+                        <li>New uploads notification</li>
+                        <li>Organized by category</li>
+                        <li>Ad-free viewing</li>
+                        <li>Download or stream</li>
+                    </ul>
+                    <div class="success-box" style="margin-top: 1rem;">
+                        <strong>How to use:</strong> Join via the bot's invite link. New content appears in your feed automatically. Tap to watch.
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">👥</span>
+                    <h3>Community Group</h3>
+                    <p><strong>Connect with verified members</strong></p>
+                    <ul class="feature-list">
+                        <li>Chat with other members</li>
+                        <li>Share photos & updates</li>
+                        <li>Organize meetups</li>
+                        <li>Find local connections</li>
+                        <li>Get community support</li>
+                        <li>Safe, moderated environment</li>
+                    </ul>
+                    <div class="success-box" style="margin-top: 1rem;">
+                        <strong>How to use:</strong> Join the group via bot invite. Introduce yourself and start chatting!
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🎥</span>
+                    <h3>24/7 Video Rooms</h3>
+                    <p><strong>Live video chat anytime</strong></p>
+                    <ul class="feature-list">
+                        <li>3 permanent community rooms</li>
+                        <li>Up to 50 people per room</li>
+                        <li>HD video & audio</li>
+                        <li>Screen sharing</li>
+                        <li>Camera & mic controls</li>
+                        <li>Works on all devices</li>
+                    </ul>
+                    <div class="success-box" style="margin-top: 1rem;">
+                        <strong>How to use:</strong> Click the video room link from the bot or website. Choose your name and join. That's it!
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">📻</span>
+                    <h3>24/7 Radio Streaming</h3>
+                    <p><strong>Non-stop music & entertainment</strong></p>
+                    <ul class="feature-list">
+                        <li>Live DJ sets</li>
+                        <li>Curated playlists</li>
+                        <li>Song requests</li>
+                        <li>Request your favorite tracks</li>
+                        <li>Chat with other listeners</li>
+                        <li>Mobile & desktop compatible</li>
+                    </ul>
+                    <div class="success-box" style="margin-top: 1rem;">
+                        <strong>How to use:</strong> Access via bot menu or website radio page. Press play and enjoy!
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">📍</span>
+                    <h3>Nearby Members</h3>
+                    <p><strong>Find connections near you</strong></p>
+                    <ul class="feature-list">
+                        <li>See members in your area</li>
+                        <li>Distance-based matching</li>
+                        <li>Privacy controls</li>
+                        <li>Share location optionally</li>
+                        <li>Arrange local meetups</li>
+                        <li>Verified members only</li>
+                    </ul>
+                    <div class="success-box" style="margin-top: 1rem;">
+                        <strong>How to use:</strong> Enable location in bot settings. Browse nearby members and send messages to connect.
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">📺</span>
+                    <h3>Live Streaming</h3>
+                    <p><strong>Exclusive live shows</strong></p>
+                    <ul class="feature-list">
+                        <li>Live streams with Santino</li>
+                        <li>Interactive chat during streams</li>
+                        <li>Special events & Q&A</li>
+                        <li>Notifications for new streams</li>
+                        <li>Watch live or replay</li>
+                        <li>Premium members only</li>
+                    </ul>
+                    <div class="success-box" style="margin-top: 1rem;">
+                        <strong>How to use:</strong> Get notified when streams start. Click the link and watch in real-time.
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🔐</span>
+                    <h3>Privacy & Security</h3>
+                    <p><strong>Your safety is our priority</strong></p>
+                    <ul class="feature-list">
+                        <li>Encrypted messaging</li>
+                        <li>Age verification required</li>
+                        <li>Verified member badges</li>
+                        <li>Active moderation team</li>
+                        <li>Report & block features</li>
+                        <li>Secure payment processing</li>
+                    </ul>
+                    <div class="success-box" style="margin-top: 1rem;">
+                        <strong>Your data:</strong> We never share your personal information. All payments are PCI-compliant.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How to Use Video Rooms (Detailed) -->
+        <section class="section">
+            <div class="section-header">
+                <h2 class="section-title">🎥 How to Use Video Rooms</h2>
+                <p class="section-subtitle">Complete guide to joining and using live video chat</p>
+            </div>
+
+            <div class="how-to-section">
+                <h3 style="font-size: 1.8rem; margin-bottom: 1.5rem;">Joining a Video Room</h3>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h4>Get the Room Link</h4>
+                            <p>Access video rooms from: The PNPtv bot menu → Video Rooms section, or directly from <a href="/video-rooms" style="color: var(--accent-gold);">pnptv.app/video-rooms</a>, or community group pinned messages.</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h4>Accept Adult Content Warning</h4>
+                            <p>First time joining requires 18+ confirmation. Click "I Agree - Enter" to proceed. This is saved for your session.</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h4>Enter Your Display Name</h4>
+                            <p>Choose how you want to appear to others. You can use your real name, username, or stay anonymous. Can be changed anytime.</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h4>Allow Camera & Microphone</h4>
+                            <p>Your browser will ask for permissions. Click "Allow" to enable video and audio. You can disable them later with the room controls.</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <h4>You're In!</h4>
+                            <p>You'll see other participants' video feeds. Your video appears in the corner. Use the bottom toolbar to control camera, mic, screen share, and more.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-box" style="margin-top: 2rem;">
+                    <h4 style="margin-bottom: 1rem;">💡 Video Room Tips</h4>
+                    <ul class="feature-list">
+                        <li><strong>Good lighting:</strong> Face a window or light source for better video quality</li>
+                        <li><strong>Stable internet:</strong> WiFi recommended for smooth streaming</li>
+                        <li><strong>Headphones:</strong> Prevent echo and feedback</li>
+                        <li><strong>Test first:</strong> Check your camera/mic before joining a busy room</li>
+                        <li><strong>Be respectful:</strong> Follow community guidelines at all times</li>
+                    </ul>
+                </div>
+
+                <div class="warning-box" style="margin-top: 2rem;">
+                    <h4 style="margin-bottom: 0.5rem;">⚠️ Important Room Rules</h4>
+                    <p>• Must be 18+ to participate<br>
+                    • No illegal content or activities<br>
+                    • Respect other members' privacy<br>
+                    • Videos may be recorded by participants<br>
+                    • Moderators can remove disruptive users<br>
+                    • Report violations to @PNPtvbot immediately</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Payment Methods -->
+        <section class="section">
+            <div class="section-header">
+                <h2 class="section-title">💳 Payment Methods</h2>
+                <p class="section-subtitle">Multiple secure ways to pay for your subscription</p>
+            </div>
+
+            <div class="payment-grid">
+                <div class="payment-card">
+                    <div class="payment-logo">💳</div>
+                    <h3>ePayco (Credit/Debit)</h3>
+                    <p><strong>Traditional payment processing</strong></p>
+                    <ul class="payment-list">
+                        <li>All major credit cards</li>
+                        <li>Debit cards accepted</li>
+                        <li>Bank transfers (select countries)</li>
+                        <li>USD currency</li>
+                        <li>Instant activation</li>
+                        <li>Secure PCI-compliant</li>
+                        <li>Popular in Latin America</li>
+                    </ul>
+                    <div class="info-box" style="margin-top: 1rem; font-size: 0.95rem;">
+                        <strong>How to pay:</strong><br>
+                        1. Select ePayco option<br>
+                        2. Enter card details<br>
+                        3. Confirm payment<br>
+                        4. Instant access!
+                    </div>
+                </div>
+
+                <div class="payment-card">
+                    <div class="payment-logo">₿</div>
+                    <h3>Daimo (Crypto/USDC)</h3>
+                    <p><strong>Modern crypto payment system</strong></p>
+                    <ul class="payment-list">
+                        <li>Pay with USDC stablecoin</li>
+                        <li>Optimism L2 network</li>
+                        <li>Connect via Venmo, CashApp</li>
+                        <li>Also: Zelle, Revolut, Wise</li>
+                        <li>Low fees, fast transfers</li>
+                        <li>Extra privacy</li>
+                        <li>Perfect for crypto users</li>
+                    </ul>
+                    <div class="info-box" style="margin-top: 1rem; font-size: 0.95rem;">
+                        <strong>How to pay:</strong><br>
+                        1. Select Daimo option<br>
+                        2. Scan QR code<br>
+                        3. Pay via your preferred app<br>
+                        4. Confirmation in minutes
+                    </div>
+                </div>
+
+                <div class="payment-card">
+                    <div class="payment-logo">🅿️</div>
+                    <h3>PayPal</h3>
+                    <p><strong>Global trusted payment</strong></p>
+                    <ul class="payment-list">
+                        <li>PayPal account required</li>
+                        <li>Linked cards or balance</li>
+                        <li>Buyer protection included</li>
+                        <li>USD currency</li>
+                        <li>Instant processing</li>
+                        <li>Worldwide accepted</li>
+                        <li>Familiar & easy</li>
+                    </ul>
+                    <div class="info-box" style="margin-top: 1rem; font-size: 0.95rem;">
+                        <strong>How to pay:</strong><br>
+                        1. Select PayPal option<br>
+                        2. Log into PayPal<br>
+                        3. Confirm payment<br>
+                        4. Return to PNPtv - you're active!
+                    </div>
+                </div>
+            </div>
+
+            <div class="warning-box" style="margin-top: 3rem;">
+                <h3 style="margin-bottom: 1rem;">🔒 Payment Security</h3>
+                <p><strong>All payment methods are fully secure:</strong></p>
+                <ul class="feature-list" style="margin-top: 1rem;">
+                    <li>PCI-DSS compliant processing</li>
+                    <li>SSL encryption on all transactions</li>
+                    <li>No card details stored on our servers</li>
+                    <li>Instant payment confirmation</li>
+                    <li>Automatic account activation</li>
+                    <li>Email receipt for all payments</li>
+                </ul>
+                <p style="margin-top: 1rem;"><strong>Need help?</strong> Message @PNPtvbot support 24/7</p>
+            </div>
+        </section>
+
+        <!-- Subscription Plans -->
+        <section class="section">
+            <div class="section-header">
+                <h2 class="section-title">💎 Subscription Plans</h2>
+                <p class="section-subtitle">Choose the plan that works best for you</p>
+            </div>
+
+            <div class="pricing-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Plan</th>
+                            <th>Duration</th>
+                            <th>Price</th>
+                            <th>Key Features</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Trial Week</strong></td>
+                            <td>7 days</td>
+                            <td><strong>$14.99</strong></td>
+                            <td>
+                                • Premium channel access<br>
+                                • Nearby members feature<br>
+                                • 1 Zoom meeting/week
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>PNP Member</strong></td>
+                            <td>30 days</td>
+                            <td><strong>$24.99</strong></td>
+                            <td>
+                                • Premium channel access<br>
+                                • Basic support<br>
+                                • Nearby members<br>
+                                • 3 Zoom meetings/month
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Crystal Member</strong></td>
+                            <td>120 days (4 months)</td>
+                            <td><strong>$49.99</strong></td>
+                            <td>
+                                • All premium features<br>
+                                • Video calls<br>
+                                • Priority support<br>
+                                • 5 Zoom meetings/month
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Diamond Member</strong></td>
+                            <td>365 days (1 year)</td>
+                            <td><strong>$99.99</strong></td>
+                            <td>
+                                • All premium features<br>
+                                • Video calls<br>
+                                • VIP access<br>
+                                • Priority support<br>
+                                • Exclusive content
+                            </td>
+                        </tr>
+                        <tr class="highlight">
+                            <td><strong>🌟 Lifetime Pass</strong></td>
+                            <td><strong>LIFETIME</strong></td>
+                            <td><strong>$249.99</strong></td>
+                            <td>
+                                • <strong>EVERYTHING FOREVER</strong><br>
+                                • All premium features<br>
+                                • Live streaming with Santino<br>
+                                • VIP access for life<br>
+                                • Priority support<br>
+                                • Never pay again!
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="success-box" style="margin-top: 2rem; text-align: center;">
+                <h3 style="margin-bottom: 1rem;">🎁 Best Value: Lifetime Pass</h3>
+                <p style="font-size: 1.1rem;">One payment of $249.99 = Access forever. No renewals, no recurring charges, no limits. Save thousands over time!</p>
+                <a href="/lifetime-pass" class="cta-button">Get Lifetime Access Now</a>
+            </div>
+
+            <div class="info-box" style="margin-top: 2rem;">
+                <h4 style="margin-bottom: 1rem;">📋 What's Included in All Plans:</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                    <div>
+                        <strong>✓ Content Access</strong>
+                        <ul style="list-style: none; margin-top: 0.5rem;">
+                            <li>→ HD/4K video library</li>
+                            <li>→ Daily new uploads</li>
+                            <li>→ Download or stream</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong>✓ Community Features</strong>
+                        <ul style="list-style: none; margin-top: 0.5rem;">
+                            <li>→ PRIME channel access</li>
+                            <li>→ Community group chat</li>
+                            <li>→ Member profiles</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong>✓ Interactive Tools</strong>
+                        <ul style="list-style: none; margin-top: 0.5rem;">
+                            <li>→ 24/7 video rooms</li>
+                            <li>→ Radio streaming</li>
+                            <li>→ Nearby members</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong>✓ Support & Safety</strong>
+                        <ul style="list-style: none; margin-top: 0.5rem;">
+                            <li>→ 24/7 bot support</li>
+                            <li>→ Verified community</li>
+                            <li>→ Secure & private</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section class="section">
+            <div class="section-header">
+                <h2 class="section-title">❓ Frequently Asked Questions</h2>
+                <p class="section-subtitle">Quick answers to common questions</p>
+            </div>
+
+            <div class="how-to-section">
+                <div class="step">
+                    <div class="step-number">Q</div>
+                    <div class="step-content">
+                        <h4>Do I need Telegram to use PNPtv?</h4>
+                        <p>Yes, Telegram is required for the bot and community features. However, video rooms and the website work independently. Telegram is free and available on all devices.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">Q</div>
+                    <div class="step-content">
+                        <h4>Can I cancel my subscription?</h4>
+                        <p>Yes, you can cancel anytime through the bot. Your access continues until the end of your paid period. No refunds for partial months, but you keep access for the time you paid for.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">Q</div>
+                    <div class="step-content">
+                        <h4>Is my payment information safe?</h4>
+                        <p>Absolutely. We use industry-standard PCI-DSS compliant payment processors (ePayco, PayPal, Daimo). We never store your card details on our servers. All transactions are encrypted.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">Q</div>
+                    <div class="step-content">
+                        <h4>What devices can I use?</h4>
+                        <p>Everything works on desktop, laptop, tablet, and mobile. Video rooms work best on desktop/laptop but are mobile-compatible. Telegram works everywhere.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">Q</div>
+                    <div class="step-content">
+                        <h4>How do I upgrade my plan?</h4>
+                        <p>Message @PNPtvbot and select "Upgrade Plan" from the menu. Choose your new plan and pay the difference. Your new features activate immediately.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">Q</div>
+                    <div class="step-content">
+                        <h4>Can I use multiple devices?</h4>
+                        <p>Yes! Your subscription works on unlimited devices. Just log into Telegram on each device. However, you can't be in multiple video rooms simultaneously.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">Q</div>
+                    <div class="step-content">
+                        <h4>What if I have technical issues?</h4>
+                        <p>Message @PNPtvbot for 24/7 support. We have automated help for common issues and human support for complex problems. Average response time: under 30 minutes.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">Q</div>
+                    <div class="step-content">
+                        <h4>Is there a refund policy?</h4>
+                        <p>Due to the nature of digital content, we generally don't offer refunds. However, if you experience technical issues preventing access, contact support within 48 hours and we'll help or refund.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Call to Action -->
+        <section class="section" style="text-align: center;">
+            <div style="background: var(--gradient-primary); padding: 4rem 2rem; border-radius: var(--radius-xl); box-shadow: var(--shadow-xl);">
+                <h2 style="font-size: 3rem; margin-bottom: 1rem;">Ready to Join PNPtv?</h2>
+                <p style="font-size: 1.3rem; margin-bottom: 2rem; max-width: 700px; margin-left: auto; margin-right: auto;">
+                    Join thousands of verified members enjoying premium content, live video rooms, and real community connections. Start today!
+                </p>
+                <div style="display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;">
+                    <a href="https://t.me/PNPtvbot" class="cta-button" target="_blank">🤖 Start with Bot</a>
+                    <a href="/lifetime-pass" class="cta-button">💎 Get Lifetime Pass</a>
+                    <a href="/video-rooms" class="cta-button">🎥 Try Video Rooms</a>
+                </div>
+                <p style="margin-top: 2rem; font-size: 0.95rem; opacity: 0.9;">
+                    18+ Only • Secure Payment • Instant Access • 24/7 Support
+                </p>
+            </div>
+        </section>
+
+        <!-- Contact & Support -->
+        <section class="section">
+            <div class="info-box" style="text-align: center;">
+                <h3 style="margin-bottom: 1rem;">💬 Need Help?</h3>
+                <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">Our support team is available 24/7 to assist you</p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+                    <div>
+                        <strong style="font-size: 1.1rem;">📱 Telegram Bot</strong>
+                        <p style="margin-top: 0.5rem;"><a href="https://t.me/PNPtvbot" target="_blank" style="color: var(--accent-gold);">@PNPtvbot</a></p>
+                        <p style="font-size: 0.9rem; opacity: 0.8;">Instant automated help</p>
+                    </div>
+                    <div>
+                        <strong style="font-size: 1.1rem;">👥 Community</strong>
+                        <p style="margin-top: 0.5rem;"><a href="https://t.me/PNPtvCommunity" target="_blank" style="color: var(--accent-gold);">Community Group</a></p>
+                        <p style="font-size: 0.9rem; opacity: 0.8;">Ask other members</p>
+                    </div>
+                    <div>
+                        <strong style="font-size: 1.1rem;">📧 Email</strong>
+                        <p style="margin-top: 0.5rem;">support@pnptv.app</p>
+                        <p style="font-size: 0.9rem; opacity: 0.8;">Response in 24 hours</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer style="background: rgba(0, 0, 0, 0.9); padding: 3rem 2rem; text-align: center; margin-top: 4rem;">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <div style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 2rem; flex-wrap: wrap;">
+                <a href="/" style="color: rgba(255, 255, 255, 0.8); text-decoration: none;">Home</a>
+                <a href="/video-rooms" style="color: rgba(255, 255, 255, 0.8); text-decoration: none;">Video Rooms</a>
+                <a href="/lifetime-pass" style="color: rgba(255, 255, 255, 0.8); text-decoration: none;">Lifetime Pass</a>
+                <a href="/terms?lang=en" style="color: rgba(255, 255, 255, 0.8); text-decoration: none;">Terms</a>
+                <a href="/privacy?lang=en" style="color: rgba(255, 255, 255, 0.8); text-decoration: none;">Privacy</a>
+            </div>
+            <p style="color: rgba(255, 255, 255, 0.6); margin-bottom: 0.5rem;">&copy; 2025 PNPtv. All rights reserved.</p>
+            <p style="color: rgba(255, 255, 255, 0.5); font-size: 0.9rem;">18+ Only | Adult Content | By accessing this site you confirm you are 18 years or older</p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Scroll animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -100px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        // Observe all sections for fade-in effect
+        document.querySelectorAll('.section, .feature-card, .payment-card').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(30px)';
+            el.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>
