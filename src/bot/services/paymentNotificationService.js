@@ -80,7 +80,9 @@ class PaymentNotificationService {
 
         message += `\n🔐 Verifica tu compra usando el enlace seguro de abajo.\n`;
         message += `Este enlace es única y solo puede ser usado una vez.\n\n`;
-        message += `¡Gracias por tu confianza en PNPtv! 🙏`;
+        message += `¡Gracias por tu confianza en PNPtv! 🙏\n\n`;
+        message += `✨ Aprende sobre todas las características de la comunidad:\n`;
+        message += `https://pnptv.app/community-features`;
         confirmButtonText = '✅ Confirmar Compra';
       } else {
         message = `🎉 Payment Confirmed!\n\n`;
@@ -99,7 +101,9 @@ class PaymentNotificationService {
 
         message += `\n🔐 Verify your purchase using the secure link below.\n`;
         message += `This link is unique and can only be used once.\n\n`;
-        message += `Thank you for your trust in PNPtv! 🙏`;
+        message += `Thank you for your trust in PNPtv! 🙏\n\n`;
+        message += `✨ Learn about all community features:\n`;
+        message += `https://pnptv.app/community-features`;
         confirmButtonText = '✅ Confirm Purchase';
       }
 

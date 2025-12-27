@@ -105,6 +105,13 @@ const MENU_CONFIG = {
       emoji: '👥',
       options: [
         {
+          id: 'community_features',
+          title: { en: '✨ Community Features', es: '✨ Características de la Comunidad' },
+          callback: 'menu:community_features',
+          deepLink: 'community_features',
+          url: 'https://pnptv.app/community-features'
+        },
+        {
           id: 'join_group',
           title: { en: '🌟 Join Group', es: '🌟 Unirse al Grupo' },
           callback: 'menu:join_group',
