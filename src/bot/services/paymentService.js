@@ -366,11 +366,32 @@ class PaymentService {
     }
 
     // Expected signature string per ePayco documentation:
-    // SHA256(p_cust_id_cliente^p_key^x_ref_payco^x_transaction_id^x_amount^x_currency_code)
-    const { x_cust_id_cliente, x_ref_payco, x_transaction_id, x_amount, x_currency_code } = webhookData;
-    const signatureString = `${x_cust_id_cliente || ''}^${secret}^${x_ref_payco || ''}^${x_transaction_id || ''}^${x_amount || ''}^${x_currency_code || ''}`;
-    const crypto = require('crypto');
-    const expected = crypto.createHash('sha256').update(signatureString).digest('hex');
+    // SHA256(x_cust_id_cliente^secret^x_ref_payco^x_transaction_id^x_amount)
+    const { x_cust_id_cliente, x_ref_payco, x_transaction_id, x_amount } = webhookData;
+    const signatureString = `${x_cust_id_cliente || ''}^${secret}^${x_ref_payco || ''}^${x_transaction_id || ''}^${x_amount || ''}`;
+    const expected = crypto.createHmac('sha256', secret).update(signatureString).digest('hex');
+    return expected === signature;
+  }
+
+  // Verify signature for Daimo
+  static verifyDaimoSignature(webhookData) {
+    const signature = webhookData.signature;
+    if (!signature) return false;
+
+    const secret = process.env.DAIMO_WEBHOOK_SECRET;
+    if (!secret) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('DAIMO_WEBHOOK_SECRET must be configured in production');
+      }
+      // In non-production allow bypass for testing/dev
+      return true;
+    }
+
+    // Create payload from webhook data (excluding signature itself)
+    const { signature: _, ...dataWithoutSignature } = webhookData;
+    const payload = JSON.stringify(dataWithoutSignature);
+
+    const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
     return expected === signature;
   }
 

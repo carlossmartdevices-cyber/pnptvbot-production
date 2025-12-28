@@ -143,7 +143,14 @@
       "Bash(docker rm:*)",
       "Bash(curl -s https://pnptv.app/community-features.html)",
       "Bash(npm run lint:*)",
-      "Bash(npm run test:unit:*)"
+      "Bash(npm run test:unit:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(git hash-object:*)",
+      "Bash(git update-index:*)",
+      "Bash(touch:*)"
     ],
     "deny": [],
     "ask": []
