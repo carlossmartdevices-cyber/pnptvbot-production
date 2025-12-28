@@ -760,6 +760,14 @@
         let favorites = JSON.parse(localStorage.getItem('playlistFavorites')) || [];
         let userPlaylists = JSON.parse(localStorage.getItem('userPlaylists')) || [];
 
+        // Utility function to escape HTML and prevent XSS
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            const div = document.createElement('div');
+            div.textContent = unsafe;
+            return div.innerHTML;
+        }
+
         // Merge all playlists (PNPtv + user)
         function getAllPlaylists() {
             let allPlaylists = [...playlists];
@@ -806,7 +814,7 @@
             container.innerHTML = filtered.map(playlist => `
                 <div class="playlist-card" onclick="viewPlaylist(${playlist.id})">
                     <div class="playlist-thumbnail">
-                        <img src="${playlist.thumbnail}" alt="${playlist.title}">
+                        <img src="${escapeHtml(playlist.thumbnail)}" alt="${escapeHtml(playlist.title)}">
                         <div class="overlay">
                             <div class="overlay-icon">
                                 <i class="material-icons">play_arrow</i>
@@ -814,12 +822,12 @@
                         </div>
                     </div>
                     <div class="playlist-content">
-                        <h3>${playlist.title}</h3>
-                        <p>${playlist.description}</p>
+                        <h3>${escapeHtml(playlist.title)}</h3>
+                        <p>${escapeHtml(playlist.description)}</p>
                         <div style="margin-top: auto; display: flex; gap: 8px; align-items: center;">
                             ${playlist.featured ? '<span class="badge featured">Featured</span>' : ''}
-                            <span class="creator-badge" title="Created by ${playlist.creator}">
-                                ${playlist.creatorBadge || '👤'} ${playlist.creator}
+                            <span class="creator-badge" title="Created by ${escapeHtml(playlist.creator)}">
+                                ${escapeHtml(playlist.creatorBadge || '👤')} ${escapeHtml(playlist.creator)}
                             </span>
                         </div>
                     </div>
@@ -861,7 +869,7 @@
             container.innerHTML = favoritePlaylists.map(playlist => `
                 <div class="playlist-card" onclick="viewPlaylist(${playlist.id})">
                     <div class="playlist-thumbnail">
-                        <img src="${playlist.thumbnail}" alt="${playlist.title}">
+                        <img src="${escapeHtml(playlist.thumbnail)}" alt="${escapeHtml(playlist.title)}">
                         <div class="overlay">
                             <div class="overlay-icon">
                                 <i class="material-icons">play_arrow</i>
@@ -869,12 +877,12 @@
                         </div>
                     </div>
                     <div class="playlist-content">
-                        <h3>${playlist.title}</h3>
-                        <p>${playlist.description}</p>
+                        <h3>${escapeHtml(playlist.title)}</h3>
+                        <p>${escapeHtml(playlist.description)}</p>
                         <div style="margin-top: auto; display: flex; gap: 8px; align-items: center;">
                             ${playlist.featured ? '<span class="badge featured">Featured</span>' : ''}
-                            <span class="creator-badge" title="Created by ${playlist.creator}">
-                                ${playlist.creatorBadge || '👤'} ${playlist.creator}
+                            <span class="creator-badge" title="Created by ${escapeHtml(playlist.creator)}">
+                                ${escapeHtml(playlist.creatorBadge || '👤')} ${escapeHtml(playlist.creator)}
                             </span>
                         </div>
                     </div>

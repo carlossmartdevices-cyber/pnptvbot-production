@@ -28,9 +28,11 @@ const startCronJobs = async () => {
     });
 
     logger.info('✓ Cron jobs started successfully');
+    return true;
   } catch (error) {
     logger.error('Failed to start cron jobs:', error);
-    process.exit(1);
+    logger.error('Application will continue running without cron jobs');
+    return false;
   }
 };
 

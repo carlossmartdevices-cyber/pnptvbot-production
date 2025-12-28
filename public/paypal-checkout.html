@@ -376,6 +376,14 @@
     document.getElementById('pageTitle').textContent = t.pageTitle;
     document.querySelector('#loading p').textContent = t.loading;
 
+    // Utility function to escape HTML and prevent XSS
+    function escapeHtml(unsafe) {
+      if (!unsafe) return '';
+      const div = document.createElement('div');
+      div.textContent = unsafe;
+      return div.innerHTML;
+    }
+
     function loadPayPalSDK(clientId) {
       return new Promise((resolve, reject) => {
         const script = document.createElement('script');
@@ -411,7 +419,7 @@
 
         // Add features
         if (payment.plan.features && payment.plan.features.length > 0) {
-          const featuresHtml = payment.plan.features.map(feature => `<li>${feature}</li>`).join('');
+          const featuresHtml = payment.plan.features.map(feature => `<li>${escapeHtml(feature)}</li>`).join('');
           document.getElementById('planFeatures').innerHTML = featuresHtml;
         }
 

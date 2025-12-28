@@ -1,5 +1,7 @@
 require('dotenv').config();
 
+const logger = require('../../utils/logger');
+
 /**
  * Bot configuration
  */
@@ -73,11 +75,11 @@ function validateConfig() {
   }
 
   if (config.adminIds.length === 0) {
-    console.warn('⚠️  WARNING: No admin IDs configured. Admin features will be unavailable.');
+    logger.warn('⚠️  WARNING: No admin IDs configured. Admin features will be unavailable.');
   }
 
   if (!config.firebase.privateKey) {
-    console.warn('⚠️  WARNING: Firebase private key not configured. Database features will fail.');
+    logger.warn('⚠️  WARNING: Firebase private key not configured. Database features will fail.');
   }
 }
 

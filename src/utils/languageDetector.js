@@ -4,6 +4,7 @@
  */
 
 const logger = require('./logger');
+const UserModel = require('../models/userModel');
 
 /**
  * Detect language from user context
@@ -27,7 +28,20 @@ async function detectLanguage(ctx) {
       }
     }
 
-    // Priority 2: Check message text for language indicators
+    // Priority 2: Check user's saved language preference from database
+    if (ctx.from?.id) {
+      try {
+        const user = await UserModel.getById(ctx.from.id);
+        if (user && user.language) {
+          return user.language;
+        }
+      } catch (error) {
+        logger.debug('Error fetching user language preference:', error);
+        // Continue to next priority level
+      }
+    }
+
+    // Priority 3: Check message text for language indicators
     const messageText = ctx.message?.text || ctx.callbackQuery?.message?.text || '';
     if (messageText) {
       const spanishIndicators = ['hola', 'ayuda', 'gracias', 'sí', 'no', 'por favor', 'cómo', 'qué'];
@@ -39,11 +53,6 @@ async function detectLanguage(ctx) {
         }
       }
     }
-
-    // Priority 3: TODO - Check user's saved language preference from database
-    // This would require querying the database for the user's language setting
-    // const userLang = await getUserLanguagePreference(ctx.from.id);
-    // if (userLang) return userLang;
 
     // Default to English
     return 'en';
