@@ -116,6 +116,11 @@ app.get('/daimo-checkout/:paymentId', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', 'daimo-checkout.html'));
 });
 
+// PayPal Checkout page - serves paypal-checkout.html for /paypal-checkout
+app.get('/paypal-checkout', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'paypal-checkout.html'));
+});
+
 // Payment checkout page with language support
 app.get('/payment/:paymentId', (req, res) => {
   // Get language from query parameter (e.g., ?lang=en)
