@@ -35,12 +35,12 @@ async function handleStart(ctx) {
     const userId = ctx.from.id.toString();
     const lang = ctx.session?.language || ctx.from.language_code || 'en';
 
-    console.log(`[Start] User ${userId} triggered /start command`);
+    logger.info(`[Start] User ${userId} triggered /start command`);
 
     // Check for group redirect payload
     const startPayload = ctx.message?.text?.split(' ')[1];
     if (startPayload === 'group_redirect') {
-      console.log(`[Start] User ${userId} redirected from group`);
+      logger.info(`[Start] User ${userId} redirected from group`);
       return await handleGroupRedirect(ctx);
     }
 
@@ -50,7 +50,7 @@ async function handleStart(ctx) {
 
     if (!userDoc.exists) {
       // New user - start fresh onboarding
-      console.log(`[Start] New user ${userId} - starting onboarding`);
+      logger.info(`[Start] New user ${userId} - starting onboarding`);
       return await startFreshOnboarding(ctx);
     }
 
@@ -58,20 +58,20 @@ async function handleStart(ctx) {
 
     // Optional: Force fresh onboarding for admins during testing
     if (isAdmin(ctx.from.id) && process.env.ADMIN_FRESH_ONBOARDING === 'true') {
-      console.log(`[Start] Admin ${userId} - forcing fresh onboarding`);
+      logger.info(`[Start] Admin ${userId} - forcing fresh onboarding`);
       return await startFreshOnboarding(ctx);
     }
 
     // Check if age verification has expired
     if (hasAgeVerificationExpired(userData.ageVerificationExpiresAt)) {
-      console.log(`[Start] User ${userId} - age verification expired, re-verification required`);
+      logger.info(`[Start] User ${userId} - age verification expired, re-verification required`);
       return await handleAgeReverification(ctx, userData);
     }
 
     // Check if onboarding is complete
     if (userData.onboardingComplete) {
       // Returning user with valid age verification
-      console.log(`[Start] Returning user ${userId} - showing main menu`);
+      logger.info(`[Start] Returning user ${userId} - showing main menu`);
 
       // Update last active
       try {
@@ -94,7 +94,7 @@ async function handleStart(ctx) {
     }
 
     // User exists but onboarding incomplete - resume onboarding
-    console.log(`[Start] User ${userId} - resuming incomplete onboarding`);
+    logger.info(`[Start] User ${userId} - resuming incomplete onboarding`);
     return await resumeOnboarding(ctx, userData);
   } catch (error) {
     logger.error('Error in handleStart:', error);
@@ -183,7 +183,7 @@ async function resumeOnboarding(ctx, userData) {
     temp: {}, // Initialize temp object for handlers
   };
 
-  console.log(`[Start] Resuming onboarding at step: ${ctx.session.onboardingStep}`);
+  logger.info(`[Start] Resuming onboarding at step: ${ctx.session.onboardingStep}`);
 
   // Resume from the last incomplete step
   const { showTerms, showPrivacyPolicy, showEmailPrompt } = require('../helpers/onboardingHelpers');

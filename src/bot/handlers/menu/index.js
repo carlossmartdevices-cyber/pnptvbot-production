@@ -4,6 +4,7 @@
  */
 
 const logger = require('../../../utils/logger');
+const UserModel = require('../../../models/userModel');
 const {
   handleMenuCommand,
   handleDeepLinkStart,
@@ -39,8 +40,12 @@ function registerMenuHandlers(bot) {
       try {
         const lang = ctx.callbackQuery.data.split(':')[1];
 
-        // TODO: Save language preference to database
-        // For now, just acknowledge
+        // Save language preference to database
+        const updated = await UserModel.updateProfile(ctx.from.id, { language: lang });
+
+        if (!updated) {
+          logger.warn(`Failed to save language preference for user ${ctx.from.id}`);
+        }
 
         await ctx.answerCbQuery(
           lang === 'es'

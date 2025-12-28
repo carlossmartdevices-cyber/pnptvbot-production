@@ -653,6 +653,14 @@
     const songArtist = document.getElementById('songArtist');
     const volumeSlider = document.getElementById('volumeSlider');
 
+    // Utility function to escape HTML and prevent XSS
+    function escapeHtml(unsafe) {
+      if (!unsafe) return '';
+      const div = document.createElement('div');
+      div.textContent = unsafe;
+      return div.innerHTML;
+    }
+
     // Initialize
     document.addEventListener('DOMContentLoaded', async () => {
       await loadStreamUrl();
@@ -745,8 +753,8 @@
             <li class="history-item">
               <span class="history-number">${index + 1}</span>
               <div class="history-info">
-                <div class="history-title">${song.title || song.song}</div>
-                <div class="history-artist">${song.artist || '-'}</div>
+                <div class="history-title">${escapeHtml(song.title || song.song)}</div>
+                <div class="history-artist">${escapeHtml(song.artist || '-')}</div>
               </div>
               <span class="history-time">${formatTime(song.playedAt)}</span>
             </li>
@@ -799,10 +807,10 @@
                   <div class="schedule-day-name">${day}</div>
                   ${scheduleByDay[day].map(program => `
                     <div class="schedule-program">
-                      <span class="schedule-time">${program.timeSlot}</span>
+                      <span class="schedule-time">${escapeHtml(program.timeSlot)}</span>
                       <div class="schedule-info">
-                        <div class="schedule-program-name">${program.programName}</div>
-                        ${program.description ? `<div class="schedule-description">${program.description}</div>` : ''}
+                        <div class="schedule-program-name">${escapeHtml(program.programName)}</div>
+                        ${program.description ? `<div class="schedule-description">${escapeHtml(program.description)}</div>` : ''}
                       </div>
                     </div>
                   `).join('')}

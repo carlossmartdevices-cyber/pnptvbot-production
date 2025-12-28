@@ -21,13 +21,22 @@ const initializePostgres = () => {
     const user = process.env.POSTGRES_USER || 'pnptvbot';
     const password = process.env.POSTGRES_PASSWORD || '';
 
+    // Configure SSL based on environment variable
+    // In production, set POSTGRES_SSL=true for secure connections
+    let sslConfig = false;
+    if (process.env.POSTGRES_SSL === 'true') {
+      sslConfig = {
+        rejectUnauthorized: process.env.POSTGRES_SSL_REJECT_UNAUTHORIZED !== 'false',
+      };
+    }
+
     pool = new Pool({
       host,
       port,
       database,
       user,
       password,
-      ssl: false, // Local PostgreSQL doesn't use SSL
+      ssl: sslConfig,
       max: process.env.POSTGRES_POOL_MAX ? parseInt(process.env.POSTGRES_POOL_MAX) : 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
