@@ -141,7 +141,9 @@
       "Bash(docker stop:*)",
       "Bash(docker run:*)",
       "Bash(docker rm:*)",
-      "Bash(curl -s https://pnptv.app/community-features.html)"
+      "Bash(curl -s https://pnptv.app/community-features.html)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run test:unit:*)"
     ],
     "deny": [],
     "ask": []
