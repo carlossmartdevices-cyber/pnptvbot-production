@@ -352,6 +352,10 @@ app.delete('/api/audio/:filename', asyncHandler(async (req, res) => {
   }
 }));
 
+// Broadcast Queue API Routes
+const broadcastQueueRoutes = require('./broadcastQueueRoutes');
+app.use('/api/admin/queue', broadcastQueueRoutes);
+
 // Export app WITHOUT 404/error handlers
 // These will be added in bot.js AFTER the webhook callback
 module.exports = app;

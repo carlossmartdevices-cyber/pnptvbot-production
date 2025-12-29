@@ -55,6 +55,8 @@ const radioStreamManager = require('../../services/radio/radioStreamManager');
 const { startCronJobs } = require('../../../scripts/cron');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
+// Async Broadcast Queue
+const { initializeAsyncBroadcastQueue } = require('../services/initializeQueue');
 // API Server
 const apiApp = require('../api/routes');
 // Variable de estado para saber si el bot está iniciado
@@ -187,6 +189,18 @@ const startBot = async () => {
       logger.info('✓ Broadcast scheduler initialized and started');
     } catch (error) {
       logger.warn('Broadcast scheduler initialization failed, continuing without scheduler:', error.message);
+    }
+    // Initialize async broadcast queue
+    try {
+      const queueIntegration = await initializeAsyncBroadcastQueue(bot, {
+        concurrency: 2,
+        maxAttempts: 3,
+        autoStart: true,
+      });
+      global.broadcastQueueIntegration = queueIntegration;
+      logger.info('✓ Async broadcast queue initialized and started');
+    } catch (error) {
+      logger.warn('Async broadcast queue initialization failed, continuing without async processing:', error.message);
     }
     // Initialize radio stream manager
     try {

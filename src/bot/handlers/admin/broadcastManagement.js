@@ -252,8 +252,25 @@ async function sendBroadcastNow(ctx, bot) {
       target: broadcastTarget,
     });
 
-    // Send broadcast
-    const results = await broadcastService.sendBroadcast(bot, broadcast.broadcast_id);
+    // Queue broadcast using async queue if available
+    let results;
+    const queueIntegration = global.broadcastQueueIntegration;
+    if (queueIntegration) {
+      try {
+        const job = await queueIntegration.queueBroadcast(broadcast.broadcast_id);
+        logger.info('Broadcast queued', {
+          broadcastId: broadcast.broadcast_id,
+          jobId: job.job_id,
+        });
+        results = { success: true, jobId: job.job_id, queued: true };
+      } catch (error) {
+        logger.warn('Failed to queue broadcast, falling back to sync:', error.message);
+        results = await broadcastService.sendBroadcast(bot, broadcast.broadcast_id);
+      }
+    } else {
+      // Fallback if queue not initialized
+      results = await broadcastService.sendBroadcast(bot, broadcast.broadcast_id);
+    }
 
     // Clear session data
     ctx.session.temp.broadcastTarget = null;
