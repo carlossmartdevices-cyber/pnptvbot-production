@@ -1,165 +1,172 @@
-# 🚀 Deployment Guide - Redis & Permissions Fix
+# Deployment Guide - Async Broadcast Queue System
 
-## Changes Deployed
+## Overview
+This guide walks through deploying the async broadcast queue system to production.
 
-This deployment includes critical fixes for:
-- ✅ Enhanced Redis connection resilience with exponential backoff
-- ✅ Fixed Docker file permissions for public directory
-- ✅ Improved health checks and network configuration
-- ✅ Better DNS resolution handling during startup
+## Prerequisites
+- PostgreSQL database running
+- Node.js 18+
+- Bot instance initialized
+- All async queue files in place
 
-## Deployment Options
+## Deployment Steps
 
-### Option 1: Automatic CI/CD (Recommended)
+### Step 1: Database Setup
 
-Since your changes are pushed to `main` branch, GitHub Actions will automatically:
-1. Run tests
-2. Build Docker image
-3. Deploy to production server
-
-**Check deployment status:**
-```bash
-# Visit: https://github.com/carlossmartdevices-cyber/pnptvbot-production/actions
-```
-
-### Option 2: Manual Docker Deployment
-
-On your production server, run:
+Initialize the database tables for the queue:
 
 ```bash
-# Navigate to project directory
-cd /path/to/pnptvbot-production
-
-# Pull latest changes
-git pull origin main
-
-# Run deployment script
-./scripts/deploy.sh production
+node scripts/setupAsyncQueue.js
 ```
 
-The script will:
-- Stop existing containers
-- Pull latest changes
-- Rebuild Docker images
-- Start services with health checks
-- Verify deployment success
+### Step 2: Update Bot Initialization
 
-### Option 3: Quick Manual Deployment
+Add to your bot startup:
+
+```javascript
+const { initializeAsyncBroadcastQueue } = require('./services/initializeQueue');
+
+const queueIntegration = await initializeAsyncBroadcastQueue(bot, {
+  concurrency: 2,
+  maxAttempts: 3,
+  autoStart: true,
+});
+```
+
+### Step 3: Add API Routes
+
+```javascript
+const broadcastQueueRoutes = require('./api/broadcastQueueRoutes');
+app.use('/api/admin/queue', broadcastQueueRoutes);
+```
+
+### Step 4: Update Broadcast Calls
+
+Instead of:
+```javascript
+const result = await broadcastService.sendBroadcast(bot, broadcastId);
+```
+
+Use:
+```javascript
+const job = await queueIntegration.queueBroadcast(broadcastId);
+res.json({ success: true, jobId: job.job_id });
+```
+
+### Step 5: Verify Deployment
 
 ```bash
-# Stop existing containers
-docker-compose down
+# Test health endpoint
+curl http://localhost:3000/api/admin/queue/health
 
-# Pull and rebuild
-git pull origin main
-docker-compose build --no-cache
-
-# Start services
-docker-compose up -d
-
-# Monitor logs
-docker-compose logs -f bot
+# Check queue status
+curl http://localhost:3000/api/admin/queue/status
 ```
 
-## Verification Steps
+## Testing
 
-After deployment, verify the fixes are working:
+### Test 1: Queue Single Broadcast
+```javascript
+const job = await queueIntegration.queueBroadcast('test-id');
+// Wait 3 seconds
+const jobDetails = await queueIntegration.getJobDetails(job.job_id);
+console.log(jobDetails.status); // Should be 'completed'
+```
 
-### 1. Check Redis Connection
+### Test 2: Queue Batch
+```javascript
+const broadcasts = [
+  { broadcast_id: 'id1' },
+  { broadcast_id: 'id2' },
+];
+const jobs = await queueIntegration.queueBroadcastBatch(broadcasts);
+```
+
+## Deployment Checklist
+
+- [ ] Run setup script
+- [ ] Verify database tables
+- [ ] Add initialization to bot
+- [ ] Add API routes
+- [ ] Update broadcast code
+- [ ] Test with sample broadcast
+- [ ] Verify API endpoints
+- [ ] Set up monitoring
+- [ ] Deploy to production
+- [ ] Monitor for 24 hours
+
+## Production Configuration
+
+### High Volume
+```javascript
+await queueIntegration.start(10);
+```
+
+### Normal
+```javascript
+await queueIntegration.start(2);
+```
+
+### High Reliability
+```javascript
+await queueIntegration.queueBroadcast(id, {
+  maxAttempts: 5,
+});
+```
+
+## Monitoring
+
+### Queue Status
 ```bash
-docker-compose logs bot | grep -i redis
+curl http://localhost:3000/api/admin/queue/status
 ```
 
-**Expected:** No more "getaddrinfo EAI_AGAIN redis" errors
-**Expected:** See "Redis connected successfully" message
-
-### 2. Check File Permissions
+### Failed Jobs
 ```bash
-curl http://localhost:3000/
+curl http://localhost:3000/api/admin/queue/broadcasts/failed
 ```
 
-**Expected:** No "EACCES: permission denied" errors
-**Expected:** HTML page loads successfully
-
-### 3. Check Service Health
+### Health Check
 ```bash
-curl http://localhost:3000/health | jq .
+curl http://localhost:3000/api/admin/queue/health
 ```
 
-**Expected output:**
-```json
-{
-  "status": "ok",
-  "timestamp": "2025-11-17T...",
-  "dependencies": {
-    "redis": "connected",
-    "firebase": "connected",
-    "postgres": "connected"
-  }
-}
+## Troubleshooting
+
+### Queue not processing
+1. Check health: `curl http://localhost:3000/api/admin/queue/health`
+2. Verify database exists
+3. Check logs
+
+### High failure rate
+1. Check failed jobs: `/api/admin/queue/broadcasts/failed`
+2. Review error messages
+3. Check broadcast service
+
+### Memory growing
+1. Check active jobs count
+2. Reduce concurrency
+3. Run cleanup
+
+## Rollback
+
+If issues occur:
+
+```javascript
+// Stop queue
+const queueIntegration = getBroadcastQueueIntegration();
+await queueIntegration.stop();
+
+// Return to synchronous
+const result = await broadcastService.sendBroadcast(bot, broadcastId);
 ```
 
-### 4. Monitor Startup Logs
-```bash
-docker-compose logs -f bot
-```
+## Support
 
-**Look for:**
-- ✅ "✓ Redis initialized"
-- ✅ "✓ Cache prewarmed successfully"
-- ✅ "🚀 PNPtv Telegram Bot is running!"
-- ✅ No permission errors
-
-## Rollback (if needed)
-
-If issues occur, rollback to previous version:
-
-```bash
-# Stop services
-docker-compose down
-
-# Checkout previous commit
-git log --oneline -5  # Find previous commit
-git checkout <previous-commit-hash>
-
-# Rebuild and restart
-docker-compose build
-docker-compose up -d
-```
-
-## Support Commands
-
-```bash
-# View all logs
-docker-compose logs -f
-
-# View bot logs only
-docker-compose logs -f bot
-
-# Check container status
-docker-compose ps
-
-# Restart bot only
-docker-compose restart bot
-
-# Access bot container shell
-docker-compose exec bot sh
-
-# Check Redis connection inside container
-docker-compose exec bot node -e "require('./src/config/redis').initializeRedis()"
-```
-
-## Expected Improvements
-
-After this deployment:
-- 🎯 Redis connections establish reliably
-- 🎯 No more DNS resolution errors during startup
-- 🎯 Public HTML files serve without permission errors
-- 🎯 Faster startup with better health check timing
-- 🎯 More informative retry logs
+- See: ASYNC_QUEUE_IMPLEMENTATION.md
+- See: BROADCAST_ENHANCEMENTS.md
+- See: DEPLOYMENT_GUIDE.md (this file)
 
 ---
-
-**Deployment completed by:** Claude AI
-**Date:** 2025-11-17
-**Commit:** 0af0063 - fix: Improve Redis connection resilience and Docker permissions
+**Version**: 1.0
+**Status**: Ready for Production
