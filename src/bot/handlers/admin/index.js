@@ -540,6 +540,192 @@ const registerAdminHandlers = (bot) => {
     }
   });
 
+  // Broadcast - Button preset selection (regex for all presets)
+  bot.action(/^broadcast_preset_(\d+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      const presetId = parseInt(ctx.match[1]);
+      const BroadcastButtonModel = require('../../../models/broadcastButtonModel');
+      const preset = await BroadcastButtonModel.getPresetById(presetId);
+
+      if (!preset) {
+        await ctx.answerCbQuery('❌ Preset not found');
+        return;
+      }
+
+      // Save selected preset buttons
+      if (!ctx.session.temp.broadcastData) {
+        ctx.session.temp.broadcastData = {};
+      }
+      ctx.session.temp.broadcastData.buttons = preset.buttons;
+      ctx.session.temp.broadcastData.presetId = presetId;
+      ctx.session.temp.broadcastStep = 'schedule_options';
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery(`✓ ${preset.name}`);
+      await ctx.editMessageText(
+        `✅ Botones configurados: ${preset.name}\n\n`
+        + '⏰ *Paso 5/5: Envío*\n\n'
+        + '¿Cuándo quieres enviar este broadcast?',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('📤 Enviar Ahora', 'broadcast_send_now_with_buttons')],
+            [Markup.button.callback('📅 Programar Envío', 'broadcast_schedule_with_buttons')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error selecting button preset:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Broadcast - No buttons option
+  bot.action('broadcast_no_buttons', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      // Save no buttons selection
+      if (!ctx.session.temp.broadcastData) {
+        ctx.session.temp.broadcastData = {};
+      }
+      ctx.session.temp.broadcastData.buttons = [];
+      ctx.session.temp.broadcastStep = 'schedule_options';
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('⏭️ Sin botones');
+      await ctx.editMessageText(
+        '⏰ *Paso 5/5: Envío*\n\n'
+        + '¿Cuándo quieres enviar este broadcast?',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('📤 Enviar Ahora', 'broadcast_send_now_with_buttons')],
+            [Markup.button.callback('📅 Programar Envío', 'broadcast_schedule_with_buttons')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error selecting no buttons:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Broadcast - Custom buttons option
+  bot.action('broadcast_custom_buttons', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      ctx.session.temp.broadcastStep = 'custom_buttons';
+      ctx.session.temp.customButtons = [];
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('➕ Botones Personalizados');
+      await ctx.editMessageText(
+        '➕ *Agregar Botones Personalizados*\n\n'
+        + 'Envía cada botón en este formato:\n\n'
+        + '`Texto del Botón|tipo|destino`\n\n'
+        + '**Tipos disponibles:**\n'
+        + '• `url` - Enlace externo (ej: https://...)\n'
+        + '• `plan` - Plan específico (ej: premium, gold)\n'
+        + '• `command` - Comando bot (ej: /plans, /support)\n'
+        + '• `feature` - Característica (ej: features, nearby)\n\n'
+        + '**Ejemplos:**\n'
+        + '`💎 Ver Planes|command|/plans`\n'
+        + '`⭐ Premium Now|plan|premium`\n'
+        + '`🔗 Website|url|https://pnptv.app`\n\n'
+        + 'Escribe cada botón en un mensaje. Cuando termines, di \"listo\".',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error starting custom buttons:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Broadcast - Send now with buttons
+  bot.action('broadcast_send_now_with_buttons', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      await ctx.answerCbQuery();
+      ctx.session.temp.broadcastStep = 'sending';
+      await ctx.saveSession();
+
+      // Process broadcast sending with buttons
+      await sendBroadcastWithButtons(ctx, bot);
+    } catch (error) {
+      logger.error('Error in broadcast send now with buttons:', error);
+      await ctx.reply('❌ Error al enviar broadcast').catch(() => {});
+    }
+  });
+
+  // Broadcast - Schedule with buttons
+  bot.action('broadcast_schedule_with_buttons', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      if (!ctx.session.temp || !ctx.session.temp.broadcastTarget) {
+        await ctx.answerCbQuery('❌ Sesión expirada');
+        return;
+      }
+
+      ctx.session.temp.broadcastStep = 'schedule_count';
+      ctx.session.temp.scheduledTimes = [];
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery();
+
+      await ctx.editMessageText(
+        '📅 *Programar Broadcasts*\n\n'
+        + '¿Cuántas veces deseas programar este broadcast?\n\n'
+        + '🔄 *Opciones:* 1 a 12 programaciones diferentes',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('1️⃣ Una vez', 'schedule_count_1'), Markup.button.callback('2️⃣ Dos veces', 'schedule_count_2'), Markup.button.callback('3️⃣ Tres veces', 'schedule_count_3')],
+            [Markup.button.callback('4️⃣ Cuatro', 'schedule_count_4'), Markup.button.callback('5️⃣ Cinco', 'schedule_count_5'), Markup.button.callback('6️⃣ Seis', 'schedule_count_6')],
+            [Markup.button.callback('7️⃣ Siete', 'schedule_count_7'), Markup.button.callback('8️⃣ Ocho', 'schedule_count_8'), Markup.button.callback('9️⃣ Nueve', 'schedule_count_9')],
+            [Markup.button.callback('🔟 Diez', 'schedule_count_10'), Markup.button.callback('1️⃣1️⃣ Once', 'schedule_count_11'), Markup.button.callback('1️⃣2️⃣ Doce', 'schedule_count_12')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error in broadcast schedule with buttons:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
   // Plan management - List all plans
   bot.action('admin_plans', async (ctx) => {
     try {
@@ -1292,6 +1478,9 @@ const registerAdminHandlers = (bot) => {
       return;
     }
 
+    // Handle button preset selection
+    const presetMatch = ctx.session?.broadcastStep === 'buttons' ? true : false;
+
     // Broadcast flow - If user types while in media step, guide them
     if (ctx.session.temp?.broadcastStep === 'media') {
       try {
@@ -1312,6 +1501,159 @@ const registerAdminHandlers = (bot) => {
         );
       } catch (error) {
         logger.error('Error guiding user during media step:', error);
+      }
+      return;
+    }
+
+    // Broadcast flow - Handle custom button entries
+    if (ctx.session.temp?.broadcastStep === 'custom_buttons') {
+      try {
+        const message = ctx.message.text;
+
+        // Check for "listo" (done) command
+        if (message.toLowerCase() === 'listo') {
+          // Verify at least one button was added
+          if (!ctx.session.temp.customButtons || ctx.session.temp.customButtons.length === 0) {
+            await ctx.reply(
+              '❌ *Sin Botones*\n\n'
+              + 'No has agregado ningún botón. Por favor agrega al menos uno o selecciona "Sin Botones".',
+              {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                  [Markup.button.callback('◀️ Volver a Presets', 'broadcast_custom_buttons')],
+                ]),
+              }
+            );
+            return;
+          }
+
+          // Convert custom buttons to same format as presets
+          ctx.session.temp.broadcastData.buttons = ctx.session.temp.customButtons;
+
+          // Move to schedule/send options
+          ctx.session.temp.broadcastStep = 'schedule_options';
+          await ctx.saveSession();
+
+          await ctx.reply(
+            '✅ *Botones Configurados*\n\n'
+            + `📝 Botones agregados: ${ctx.session.temp.customButtons.length}\n\n`
+            + '¿Qué deseas hacer?',
+            {
+              parse_mode: 'Markdown',
+              ...Markup.inlineKeyboard([
+                [Markup.button.callback('📤 Enviar Ahora', 'broadcast_send_now_with_buttons')],
+                [Markup.button.callback('📅 Programar', 'broadcast_schedule_with_buttons')],
+                [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+              ]),
+            }
+          );
+          return;
+        }
+
+        // Parse button entry: "Button Text|type|target"
+        const parts = message.split('|');
+        if (parts.length !== 3) {
+          await ctx.reply(
+            '❌ *Formato Inválido*\n\n'
+            + 'Por favor usa el formato: `Texto|tipo|destino`\n\n'
+            + '**Ejemplo:**\n'
+            + '`💎 Ver Planes|command|/plans`\n\n'
+            + 'O di "listo" cuando termines.',
+            { parse_mode: 'Markdown' }
+          );
+          return;
+        }
+
+        const [buttonText, buttonType, buttonTarget] = parts.map(p => p.trim());
+
+        // Validate button type
+        const validTypes = ['url', 'plan', 'command', 'feature'];
+        if (!validTypes.includes(buttonType.toLowerCase())) {
+          await ctx.reply(
+            '❌ *Tipo de Botón Inválido*\n\n'
+            + `Tipo recibido: \`${buttonType}\`\n\n`
+            + '**Tipos válidos:**\n'
+            + '• `url` - Enlace web (ej: https://...)\n'
+            + '• `plan` - Plan (ej: premium)\n'
+            + '• `command` - Comando (ej: /plans)\n'
+            + '• `feature` - Característica (ej: features)\n\n'
+            + 'Por favor intenta de nuevo.',
+            { parse_mode: 'Markdown' }
+          );
+          return;
+        }
+
+        // Validate URL format if type is url
+        if (buttonType.toLowerCase() === 'url') {
+          if (!buttonTarget.startsWith('http://') && !buttonTarget.startsWith('https://')) {
+            await ctx.reply(
+              '❌ *URL Inválida*\n\n'
+              + `URL recibida: \`${buttonTarget}\`\n\n`
+              + 'Las URLs deben comenzar con `http://` o `https://`\n\n'
+              + 'Por favor intenta de nuevo.',
+              { parse_mode: 'Markdown' }
+            );
+            return;
+          }
+        }
+
+        // Validate command format if type is command
+        if (buttonType.toLowerCase() === 'command') {
+          if (!buttonTarget.startsWith('/')) {
+            await ctx.reply(
+              '❌ *Comando Inválido*\n\n'
+              + `Comando recibido: \`${buttonTarget}\`\n\n`
+              + 'Los comandos deben comenzar con `/` (ej: /plans, /support)\n\n'
+              + 'Por favor intenta de nuevo.',
+              { parse_mode: 'Markdown' }
+            );
+            return;
+          }
+        }
+
+        // Validate button text length
+        if (buttonText.length > 64) {
+          await ctx.reply(
+            '❌ *Texto del Botón Muy Largo*\n\n'
+            + `Longitud actual: ${buttonText.length} caracteres\n`
+            + 'Máximo: 64 caracteres\n\n'
+            + 'Por favor acorta el texto.',
+            { parse_mode: 'Markdown' }
+          );
+          return;
+        }
+
+        // Initialize customButtons array if needed
+        if (!ctx.session.temp.customButtons) {
+          ctx.session.temp.customButtons = [];
+        }
+
+        // Add button
+        ctx.session.temp.customButtons.push({
+          text: buttonText,
+          type: buttonType.toLowerCase(),
+          target: buttonTarget,
+        });
+
+        await ctx.saveSession();
+
+        await ctx.reply(
+          `✅ *Botón Agregado*\n\n`
+          + `📝 ${buttonText}\n`
+          + `🔗 Tipo: ${buttonType}\n`
+          + `🎯 Destino: ${buttonTarget}\n\n`
+          + `Total: ${ctx.session.temp.customButtons.length} botón(es)\n\n`
+          + 'Envía otro botón o escribe "listo" cuando termines.',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            ]),
+          }
+        );
+      } catch (error) {
+        logger.error('Error handling custom button input:', error);
+        await ctx.reply('❌ Error al procesar el botón. Por favor intenta de nuevo.').catch(() => {});
       }
       return;
     }
@@ -1405,11 +1747,31 @@ const registerAdminHandlers = (bot) => {
         // Save Spanish text
         broadcastData.textEs = message;
 
-        await ctx.reply(
-          '📤 *Paso 4/4: Enviando Broadcast...*\n\n'
-          + 'Procesando envío a usuarios seleccionados...',
-          { parse_mode: 'Markdown' },
+        // Move to buttons step
+        ctx.session.temp.broadcastStep = 'buttons';
+        await ctx.saveSession();
+
+        // Show buttons configuration screen
+        const BroadcastButtonModel = require('../../../models/broadcastButtonModel');
+        const presets = await BroadcastButtonModel.getAllPresets();
+
+        const buttonMenu = presets.map(preset =>
+          [Markup.button.callback(`${preset.icon} ${preset.name}`, `broadcast_preset_${preset.preset_id}`)]
         );
+        buttonMenu.push([Markup.button.callback('➕ Botones Personalizados', 'broadcast_custom_buttons')]);
+        buttonMenu.push([Markup.button.callback('⏭️ Sin Botones', 'broadcast_no_buttons')]);
+        buttonMenu.push([Markup.button.callback('❌ Cancelar', 'admin_cancel')]);
+
+        await ctx.reply(
+          '🎯 *Paso 4/5: Configurar Botones*\n\n'
+          + '¿Qué botones quieres agregar al broadcast?\n\n'
+          + '💡 Selecciona un preset o agrega botones personalizados:',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard(buttonMenu),
+          }
+        );
+        return;
 
         // Get target users
         let users = [];
@@ -2551,6 +2913,168 @@ const registerAdminHandlers = (bot) => {
     }
   });
 };
+
+/**
+ * Send broadcast with buttons
+ */
+async function sendBroadcastWithButtons(ctx, bot) {
+  try {
+    const { broadcastTarget, broadcastData } = ctx.session.temp;
+    const { getLanguage } = require('../../utils/helpers');
+
+    if (!broadcastData || !broadcastData.textEn || !broadcastData.textEs) {
+      await ctx.reply('❌ Error: Faltan datos del broadcast');
+      return;
+    }
+
+    await ctx.editMessageText(
+      '📤 *Enviando Broadcast...*\n\n'
+      + 'Tu broadcast se está enviando a los usuarios seleccionados...'
+    );
+
+    // Get target users
+    let users = [];
+    if (broadcastTarget === 'all') {
+      const result = await UserModel.getAll(1000);
+      users = result.users;
+    } else if (broadcastTarget === 'premium') {
+      users = await UserModel.getBySubscriptionStatus('active');
+    } else if (broadcastTarget === 'free') {
+      users = await UserModel.getBySubscriptionStatus('free');
+    } else if (broadcastTarget === 'churned') {
+      users = await UserModel.getChurnedUsers();
+    }
+
+    let sent = 0;
+    let failed = 0;
+
+    // Build button markup
+    const buildButtonMarkup = (buttons, userLang) => {
+      if (!buttons || buttons.length === 0) {
+        return undefined; // No buttons
+      }
+
+      try {
+        // If buttons is a JSON string, parse it
+        let buttonArray = buttons;
+        if (typeof buttons === 'string') {
+          buttonArray = JSON.parse(buttons);
+        }
+
+        if (!Array.isArray(buttonArray) || buttonArray.length === 0) {
+          return undefined;
+        }
+
+        const buttonRows = [];
+        for (const btn of buttonArray) {
+          const buttonObj = typeof btn === 'string' ? JSON.parse(btn) : btn;
+
+          if (buttonObj.type === 'url') {
+            buttonRows.push([Markup.button.url(buttonObj.text, buttonObj.target)]);
+          } else if (buttonObj.type === 'command') {
+            buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_action_${buttonObj.target}`)]);
+          } else if (buttonObj.type === 'plan') {
+            buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_plan_${buttonObj.target}`)]);
+          } else if (buttonObj.type === 'feature') {
+            buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_feature_${buttonObj.target}`)]);
+          }
+        }
+
+        return Markup.inlineKeyboard(buttonRows);
+      } catch (error) {
+        logger.warn('Error building button markup:', error);
+        return undefined;
+      }
+    };
+
+    // Send to each user
+    for (const user of users) {
+      try {
+        const userLang = user.language || 'en';
+        const textToSend = userLang === 'es' ? broadcastData.textEs : broadcastData.textEn;
+        const buttonMarkup = buildButtonMarkup(broadcastData.buttons, userLang);
+
+        // Send with media if available
+        if (broadcastData.mediaType && broadcastData.mediaFileId) {
+          const sendMethod = {
+            photo: 'sendPhoto',
+            video: 'sendVideo',
+            document: 'sendDocument',
+          }[broadcastData.mediaType];
+
+          if (sendMethod) {
+            const options = {
+              caption: `📢 ${textToSend}`,
+              parse_mode: 'Markdown',
+            };
+            if (buttonMarkup) {
+              options.reply_markup = buttonMarkup;
+            }
+
+            await ctx.telegram[sendMethod](user.id, broadcastData.mediaFileId, options);
+          }
+        } else {
+          // Text only
+          const options = {
+            parse_mode: 'Markdown',
+          };
+          if (buttonMarkup) {
+            options.reply_markup = buttonMarkup;
+          }
+
+          await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`, options);
+        }
+
+        sent++;
+      } catch (error) {
+        failed++;
+        const errorMsg = error.message || '';
+
+        if (errorMsg.includes('bot was blocked') || errorMsg.includes('user is deactivated') || errorMsg.includes('chat not found')) {
+          logger.debug('User unavailable for broadcast:', { userId: user.id });
+        } else {
+          logger.warn('Failed to send broadcast to user:', { userId: user.id, error: errorMsg });
+        }
+      }
+    }
+
+    // Clear broadcast session data
+    ctx.session.temp.broadcastTarget = null;
+    ctx.session.temp.broadcastStep = null;
+    ctx.session.temp.broadcastData = null;
+    await ctx.saveSession();
+
+    // Show results
+    const buttonInfo = broadcastData.buttons && broadcastData.buttons.length > 0
+      ? `\n🔘 Botones: ${Array.isArray(broadcastData.buttons) ? broadcastData.buttons.length : JSON.parse(broadcastData.buttons).length}`
+      : '';
+
+    await ctx.reply(
+      `✅ *Broadcast Completado*\n\n`
+      + `📊 Estadísticas:\n`
+      + `✓ Enviados: ${sent}\n`
+      + `✗ Fallidos: ${failed}\n`
+      + `📈 Total intentos: ${sent + failed}`
+      + buttonInfo,
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('◀️ Volver al Panel Admin', 'admin_cancel')],
+        ]),
+      }
+    );
+
+    logger.info('Broadcast with buttons sent', {
+      adminId: ctx.from.id,
+      sent,
+      failed,
+      buttons: broadcastData.buttons ? (Array.isArray(broadcastData.buttons) ? broadcastData.buttons.length : JSON.parse(broadcastData.buttons).length) : 0,
+    });
+  } catch (error) {
+    logger.error('Error sending broadcast with buttons:', error);
+    await ctx.reply('❌ Error al enviar broadcast').catch(() => {});
+  }
+}
 
 // Import and register audio management handlers
 const registerAudioManagementHandlers = require('./audioManagement');
