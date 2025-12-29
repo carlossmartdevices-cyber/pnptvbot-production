@@ -410,6 +410,81 @@ class VideoCallModel {
   }
 
   /**
+   * Delete a call (only when empty)
+   * @param {string} callId - Call ID
+   * @param {string} creatorId - Creator user ID
+   * @returns {Promise<Object>} Deleted call data
+   */
+  static async deleteCall(callId, creatorId) {
+    const client = await getClient();
+
+    try {
+      await client.query('BEGIN');
+
+      // Get call with lock
+      const callResult = await client.query(
+        'SELECT * FROM video_calls WHERE id = $1 FOR UPDATE',
+        [callId]
+      );
+
+      if (callResult.rows.length === 0) {
+        throw new Error('Call not found');
+      }
+
+      const call = callResult.rows[0];
+
+      if (call.creator_id !== String(creatorId)) {
+        throw new Error('Only the creator can delete the call');
+      }
+
+      // Check if room is empty (no active participants)
+      const participantsResult = await client.query(
+        `SELECT COUNT(*) as count FROM call_participants
+         WHERE call_id = $1 AND left_at IS NULL`,
+        [callId]
+      );
+
+      const activeParticipants = parseInt(participantsResult.rows[0].count);
+
+      if (activeParticipants > 0) {
+        throw new Error('Cannot delete call with active participants. Please wait for all participants to leave.');
+      }
+
+      // Delete call participants (cascade)
+      await client.query(
+        'DELETE FROM call_participants WHERE call_id = $1',
+        [callId]
+      );
+
+      // Delete the call
+      const deleteResult = await client.query(
+        'DELETE FROM video_calls WHERE id = $1 RETURNING *',
+        [callId]
+      );
+
+      // Deactivate Agora channel
+      await client.query(
+        `UPDATE agora_channels
+         SET is_active = false
+         WHERE channel_name = $1`,
+        [call.channel_name]
+      );
+
+      await client.query('COMMIT');
+
+      logger.info('Call deleted', { callId, creatorId });
+
+      return this._mapCallFromDb(deleteResult.rows[0]);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error deleting call:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Register Agora channel
    * @private
    */

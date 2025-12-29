@@ -357,6 +357,55 @@ class JitsiRoomModel {
     }
 
     /**
+     * Hard delete room (only when empty)
+     * @param {number} roomId - Room ID
+     * @param {string} hostUserId - Host user ID for authorization
+     * @returns {Promise<Object>} Deleted room data
+     */
+    static async hardDelete(roomId, hostUserId) {
+        try {
+            // Get room and verify host
+            const room = await this.getById(roomId);
+            if (!room) {
+                throw new Error('Room not found');
+            }
+
+            if (room.host_user_id !== String(hostUserId)) {
+                throw new Error('Only the host can delete this room');
+            }
+
+            // Check if room has active participants
+            const participantsQuery = `
+                SELECT COUNT(*) as count FROM jitsi_participants
+                WHERE room_id = $1 AND leave_time IS NULL
+            `;
+            const participantsResult = await pool.query(participantsQuery, [roomId]);
+            const activeParticipants = parseInt(participantsResult.rows[0].count);
+
+            if (activeParticipants > 0) {
+                throw new Error('Cannot delete room with active participants. Please wait for all participants to leave.');
+            }
+
+            // Delete all participant records
+            await pool.query('DELETE FROM jitsi_participants WHERE room_id = $1', [roomId]);
+
+            // Hard delete the room
+            const deleteQuery = `
+                DELETE FROM jitsi_rooms
+                WHERE id = $1
+                RETURNING *
+            `;
+            const result = await pool.query(deleteQuery, [roomId]);
+
+            logger.info(`Jitsi room hard deleted: ${roomId} by host ${hostUserId}`);
+            return result.rows[0];
+        } catch (error) {
+            logger.error('Error hard deleting Jitsi room:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Update participant count
      */
     static async updateParticipantCount(roomId, count) {

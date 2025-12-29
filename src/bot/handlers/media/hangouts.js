@@ -1,6 +1,7 @@
 const { Markup } = require('telegraf');
 const moment = require('moment');
 const VideoCallModel = require('../../../models/videoCallModel');
+const JitsiRoomModel = require('../../../models/jitsiRoomModel');
 const MainRoomModel = require('../../../models/mainRoomModel');
 const AgoraTokenService = require('../../../services/agora/agoraTokenService');
 const { t } = require('../../../utils/i18n');
@@ -87,6 +88,36 @@ const registerHangoutsHandlers = (bot) => {
       await endRoom(ctx, roomId);
     } catch (error) {
       logger.error('Error ending room:', error);
+    }
+  });
+
+  // Delete video call room action
+  bot.action(/hangouts_delete_call_(.+)/, async (ctx) => {
+    try {
+      const roomId = ctx.match[1];
+      await deleteVideoCallRoom(ctx, roomId);
+    } catch (error) {
+      logger.error('Error deleting video call room:', error);
+    }
+  });
+
+  // Delete Jitsi room action
+  bot.action(/hangouts_delete_jitsi_(\d+)/, async (ctx) => {
+    try {
+      const roomId = parseInt(ctx.match[1]);
+      await deleteJitsiRoom(ctx, roomId);
+    } catch (error) {
+      logger.error('Error deleting Jitsi room:', error);
+    }
+  });
+
+  // Delete main room action
+  bot.action(/hangouts_delete_main_(\d+)/, async (ctx) => {
+    try {
+      const roomId = parseInt(ctx.match[1]);
+      await deleteMainRoom(ctx, roomId);
+    } catch (error) {
+      logger.error('Error deleting main room:', error);
     }
   });
 };
@@ -449,6 +480,112 @@ const endRoom = async (ctx, roomId) => {
     logger.error('Error in endRoom:', error);
     const lang = getLanguage(ctx);
     await ctx.answerCbQuery(t('error', lang));
+  }
+};
+
+/**
+ * Delete a video call room (only when empty)
+ */
+const deleteVideoCallRoom = async (ctx, roomId) => {
+  try {
+    const lang = getLanguage(ctx);
+    const userId = ctx.from.id;
+
+    // Verify user is the creator
+    const room = await VideoCallModel.getById(roomId);
+
+    if (!room) {
+      await ctx.answerCbQuery('Room not found');
+      return;
+    }
+
+    if (room.creatorId !== String(userId)) {
+      await ctx.answerCbQuery('Only the creator can delete this room');
+      return;
+    }
+
+    // Delete the room
+    await VideoCallModel.deleteCall(roomId, userId);
+
+    await ctx.answerCbQuery('Room deleted successfully');
+    await ctx.reply('✅ Your video call room has been deleted.');
+    await showHangoutsMenu(ctx);
+  } catch (error) {
+    logger.error('Error in deleteVideoCallRoom:', error);
+
+    // Handle specific errors
+    if (error.message.includes('active participants')) {
+      await ctx.answerCbQuery('Cannot delete: room still has active participants');
+      await ctx.reply('⚠️ Cannot delete room with active participants. Please wait for all participants to leave.');
+    } else {
+      await ctx.answerCbQuery(t('error', lang));
+    }
+  }
+};
+
+/**
+ * Delete a Jitsi room (only when empty)
+ */
+const deleteJitsiRoom = async (ctx, roomId) => {
+  try {
+    const lang = getLanguage(ctx);
+    const userId = ctx.from.id;
+
+    // Verify user is the host
+    const room = await JitsiRoomModel.getById(roomId);
+
+    if (!room) {
+      await ctx.answerCbQuery('Room not found');
+      return;
+    }
+
+    if (room.host_user_id !== String(userId)) {
+      await ctx.answerCbQuery('Only the host can delete this room');
+      return;
+    }
+
+    // Delete the room
+    await JitsiRoomModel.hardDelete(roomId, userId);
+
+    await ctx.answerCbQuery('Room deleted successfully');
+    await ctx.reply('✅ Your Jitsi room has been deleted.');
+    await showHangoutsMenu(ctx);
+  } catch (error) {
+    logger.error('Error in deleteJitsiRoom:', error);
+
+    // Handle specific errors
+    if (error.message.includes('active participants')) {
+      await ctx.answerCbQuery('Cannot delete: room still has active participants');
+      await ctx.reply('⚠️ Cannot delete room with active participants. Please wait for all participants to leave.');
+    } else {
+      await ctx.answerCbQuery(t('error', lang));
+    }
+  }
+};
+
+/**
+ * Delete a main room (only when empty)
+ */
+const deleteMainRoom = async (ctx, roomId) => {
+  try {
+    const lang = getLanguage(ctx);
+
+    // Delete the room
+    await MainRoomModel.deleteRoom(roomId);
+
+    await ctx.answerCbQuery('Room deleted successfully');
+    await ctx.reply('✅ Main room has been deleted.');
+    await showHangoutsMenu(ctx);
+  } catch (error) {
+    logger.error('Error in deleteMainRoom:', error);
+
+    // Handle specific errors
+    if (error.message.includes('active participants')) {
+      await ctx.answerCbQuery('Cannot delete: room still has active participants');
+      await ctx.reply('⚠️ Cannot delete room with active participants. Please wait for all participants to leave.');
+    } else {
+      await ctx.answerCbQuery(t('error', lang));
+    }
   }
 };
 

@@ -261,6 +261,10 @@ app.get('/api/hangouts/my-rooms', asyncHandler(hangoutsController.getMyHangouts)
 app.post('/api/hangouts/join/:roomId', asyncHandler(hangoutsController.joinHangout));
 app.post('/api/hangouts/end/:roomId', asyncHandler(hangoutsController.endHangout));
 app.get('/api/hangouts/:roomId', asyncHandler(hangoutsController.getHangoutDetails));
+// Delete room endpoints
+app.delete('/api/hangouts/video-call/:roomId', asyncHandler(hangoutsController.deleteVideoCallRoom));
+app.delete('/api/hangouts/jitsi/:roomId', asyncHandler(hangoutsController.deleteJitsiRoom));
+app.delete('/api/hangouts/main/:roomId', asyncHandler(hangoutsController.deleteMainRoom));
 
 // Subscription API routes
 app.get('/api/subscription/plans', asyncHandler(subscriptionController.getPlans));

@@ -1,4 +1,6 @@
 const VideoCallModel = require('../../../models/videoCallModel');
+const JitsiRoomModel = require('../../../models/jitsiRoomModel');
+const MainRoomModel = require('../../../models/mainRoomModel');
 const logger = require('../../../utils/logger');
 
 /**
@@ -281,6 +283,134 @@ const getHangoutDetails = async (req, res) => {
   }
 };
 
+/**
+ * Delete a video call room (only when empty)
+ * DELETE /api/hangouts/video-call/:roomId
+ */
+const deleteVideoCallRoom = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { userId } = req.body;
+
+    if (!roomId || !userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields'
+      });
+    }
+
+    // Delete the room
+    const deletedRoom = await VideoCallModel.deleteCall(roomId, userId);
+
+    logger.info('Video call room deleted', {
+      roomId,
+      userId,
+    });
+
+    res.json({
+      success: true,
+      message: 'Video call room deleted successfully',
+      room: {
+        id: deletedRoom.id,
+        title: deletedRoom.title,
+        creatorName: deletedRoom.creatorName,
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error deleting video call room:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to delete video call room'
+    });
+  }
+};
+
+/**
+ * Delete a Jitsi room (only when empty)
+ * DELETE /api/hangouts/jitsi/:roomId
+ */
+const deleteJitsiRoom = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { userId } = req.body;
+
+    if (!roomId || !userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields'
+      });
+    }
+
+    // Delete the room
+    const deletedRoom = await JitsiRoomModel.hardDelete(roomId, userId);
+
+    logger.info('Jitsi room deleted', {
+      roomId,
+      userId,
+    });
+
+    res.json({
+      success: true,
+      message: 'Jitsi room deleted successfully',
+      room: {
+        id: deletedRoom.id,
+        roomCode: deletedRoom.room_code,
+        title: deletedRoom.title,
+        hostName: deletedRoom.host_name,
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error deleting Jitsi room:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to delete Jitsi room'
+    });
+  }
+};
+
+/**
+ * Delete a main room (only when empty)
+ * DELETE /api/hangouts/main/:roomId
+ */
+const deleteMainRoom = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+
+    if (!roomId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing roomId parameter'
+      });
+    }
+
+    // Delete the room
+    const deletedRoom = await MainRoomModel.deleteRoom(roomId);
+
+    logger.info('Main room deleted', {
+      roomId,
+    });
+
+    res.json({
+      success: true,
+      message: 'Main room deleted successfully',
+      room: {
+        id: deletedRoom.id,
+        name: deletedRoom.name,
+        description: deletedRoom.description,
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error deleting main room:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to delete main room'
+    });
+  }
+};
+
 module.exports = {
   createHangout,
   getPublicHangouts,
@@ -288,4 +418,7 @@ module.exports = {
   joinHangout,
   endHangout,
   getHangoutDetails,
+  deleteVideoCallRoom,
+  deleteJitsiRoom,
+  deleteMainRoom,
 };

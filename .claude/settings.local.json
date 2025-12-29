@@ -150,7 +150,8 @@
       "Bash(docker-compose logs:*)",
       "Bash(git hash-object:*)",
       "Bash(git update-index:*)",
-      "Bash(touch:*)"
+      "Bash(touch:*)",
+      "Bash(npm ci)"
     ],
     "deny": [],
     "ask": []

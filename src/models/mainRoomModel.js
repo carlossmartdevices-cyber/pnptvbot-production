@@ -443,6 +443,74 @@ class MainRoomModel {
   }
 
   /**
+   * Delete a main room (only when empty)
+   * @param {number} roomId - Room ID
+   * @returns {Promise<Object>} Deleted room data
+   */
+  static async deleteRoom(roomId) {
+    const client = await getClient();
+
+    try {
+      await client.query('BEGIN');
+
+      // Get room with lock
+      const roomResult = await client.query(
+        'SELECT * FROM main_rooms WHERE id = $1 FOR UPDATE',
+        [roomId]
+      );
+
+      if (roomResult.rows.length === 0) {
+        throw new Error('Room not found');
+      }
+
+      const room = roomResult.rows[0];
+
+      // Check if room has active participants
+      const participantsResult = await client.query(
+        `SELECT COUNT(*) as count FROM room_participants
+         WHERE room_id = $1 AND left_at IS NULL`,
+        [roomId]
+      );
+
+      const activeParticipants = parseInt(participantsResult.rows[0].count);
+
+      if (activeParticipants > 0) {
+        throw new Error('Cannot delete room with active participants. Please wait for all participants to leave.');
+      }
+
+      // Delete all room participants
+      await client.query(
+        'DELETE FROM room_participants WHERE room_id = $1',
+        [roomId]
+      );
+
+      // Delete all room events
+      await client.query(
+        'DELETE FROM room_events WHERE room_id = $1',
+        [roomId]
+      );
+
+      // Delete the room
+      const deleteResult = await client.query(
+        'DELETE FROM main_rooms WHERE id = $1 RETURNING *',
+        [roomId]
+      );
+
+      await client.query('COMMIT');
+
+      logger.info('Main room deleted', { roomId });
+
+      return this._mapRoomFromDb(deleteResult.rows[0]);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error deleting room:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Map database row to room object
    * @private
    */
