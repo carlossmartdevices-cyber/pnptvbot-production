@@ -41,6 +41,28 @@ services:
     networks:
       - pnptv-network
 
+  postgres:
+    image: postgres:15-alpine
+    container_name: pnptv-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-pnptvbot}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DATABASE:-pnptvbot}
+      - POSTGRES_INITDB_ARGS=-c max_connections=100 -c shared_buffers=256MB
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      pnptv-network:
+        aliases:
+          - postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pnptvbot} -d ${POSTGRES_DATABASE:-pnptvbot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   bot:
     build:
       context: .
@@ -49,17 +71,21 @@ services:
     restart: unless-stopped
     # Expose port only to internal Docker network (not to host)
     expose:
-      - "3000"
+      - "3005"
     env_file:
       - .env
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - REDIS_HOST=redis
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
     dns:
       - 8.8.8.8
       - 8.8.4.4
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
@@ -67,7 +93,7 @@ services:
     networks:
       - pnptv-network
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => {process.exit(1)})"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3005/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => {process.exit(1)})"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -101,6 +127,8 @@ networks:
     driver: bridge
 
 volumes:
+  postgres-data:
+    driver: local
   redis-data:
     driver: local
   certbot-etc:
