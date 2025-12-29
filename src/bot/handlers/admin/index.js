@@ -1292,6 +1292,30 @@ const registerAdminHandlers = (bot) => {
       return;
     }
 
+    // Broadcast flow - If user types while in media step, guide them
+    if (ctx.session.temp?.broadcastStep === 'media') {
+      try {
+        await ctx.reply(
+          '⏳ *Esperando Media*\n\n'
+          + 'Parece que estás escribiendo texto, pero aún estamos en el paso de media.\n\n'
+          + 'Tienes dos opciones:\n'
+          + '1️⃣ **Salta el media** - Presiona el botón "Saltar (Solo Texto)" arriba\n'
+          + '2️⃣ **Sube media** - Envía una imagen, video o archivo\n\n'
+          + 'Luego podrás escribir tu mensaje.',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('⏭️ Saltar (Solo Texto)', 'broadcast_skip_media')],
+              [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            ]),
+          }
+        );
+      } catch (error) {
+        logger.error('Error guiding user during media step:', error);
+      }
+      return;
+    }
+
     // Broadcast flow - Handle text inputs
     if (ctx.session.temp?.broadcastStep === 'text_en') {
       try {
