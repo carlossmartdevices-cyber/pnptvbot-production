@@ -11,7 +11,7 @@ const { Telegraf } = require('telegraf');
 const DaimoService = require('./daimoService');
 const DaimoConfig = require('../../config/daimo');
 const PaymentNotificationService = require('./paymentNotificationService');
-const { getEpaycoClient } = require('../../config/epayco');
+const PayPalService = require('./paypalService');
 
 class PaymentService {
     /**
@@ -368,14 +368,21 @@ class PaymentService {
     // Expected signature string per ePayco documentation:
     // SHA256(x_cust_id_cliente^secret^x_ref_payco^x_transaction_id^x_amount)
     const { x_cust_id_cliente, x_ref_payco, x_transaction_id, x_amount } = webhookData;
-    const signatureString = `${x_cust_id_cliente || ''}^${secret}^${x_ref_payco || ''}^${x_transaction_id || ''}^${x_amount || ''}`;
+    const signatureParts = [
+      x_cust_id_cliente || '',
+      secret,
+      x_ref_payco || '',
+      x_transaction_id || '',
+      x_amount || '',
+    ];
+    const signatureString = signatureParts.join('^');
     const expected = crypto.createHmac('sha256', secret).update(signatureString).digest('hex');
     return expected === signature;
   }
 
   // Verify signature for Daimo
   static verifyDaimoSignature(webhookData) {
-    const signature = webhookData.signature;
+    const { signature, ...dataWithoutSignature } = webhookData;
     if (!signature) return false;
 
     const secret = process.env.DAIMO_WEBHOOK_SECRET;
@@ -388,11 +395,18 @@ class PaymentService {
     }
 
     // Create payload from webhook data (excluding signature itself)
-    const { signature: _, ...dataWithoutSignature } = webhookData;
     const payload = JSON.stringify(dataWithoutSignature);
 
     const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-    return expected === signature;
+    const expectedBuffer = Buffer.from(expected);
+    const receivedBuffer = Buffer.from(signature);
+
+    // Prevent subtle timing differences
+    if (expectedBuffer.length !== receivedBuffer.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
   }
 
   /**
@@ -434,6 +448,7 @@ class PaymentService {
           await PaymentModel.updateStatus(paymentId, 'completed', {
             transaction_id: x_transaction_id,
             approval_code: x_approval_code,
+            reference: x_ref_payco,
             epayco_ref: x_ref_payco,
           });
         }
@@ -567,6 +582,7 @@ class PaymentService {
         if (payment) {
           await PaymentModel.updateStatus(paymentId, 'failed', {
             transaction_id: x_transaction_id,
+            reference: x_ref_payco,
             epayco_ref: x_ref_payco,
           });
         }
@@ -583,6 +599,7 @@ class PaymentService {
         if (payment) {
           await PaymentModel.updateStatus(paymentId, 'pending', {
             transaction_id: x_transaction_id,
+            reference: x_ref_payco,
             epayco_ref: x_ref_payco,
           });
         }
@@ -633,24 +650,21 @@ class PaymentService {
   /**
    * Process Daimo webhook confirmation
    * @param {Object} webhookData - Daimo webhook data
-   * @param {string} signature - Webhook signature from headers
    * @returns {Object} { success: boolean, error?: string, alreadyProcessed?: boolean }
    */
-  static async processDaimoWebhook(webhookData, signature) {
+  static async processDaimoWebhook(webhookData) {
     try {
       // Extract webhook data
       const {
         id,
         status,
         source,
-        destination,
         metadata,
       } = webhookData;
 
       const userId = metadata?.userId;
       const planId = metadata?.planId;
       const paymentId = metadata?.paymentId;
-      const chatId = metadata?.chatId;
 
       if (!paymentId || !userId || !planId) {
         return { success: false, error: 'Missing required fields' };
@@ -1053,5 +1067,8 @@ async function sendPaymentNotification(userId, paymentData) {
     return false;
   }
 }
+
+PaymentService.sendPrimeConfirmation = sendPrimeConfirmation;
+PaymentService.sendPaymentNotification = sendPaymentNotification;
 
 module.exports = PaymentService;
