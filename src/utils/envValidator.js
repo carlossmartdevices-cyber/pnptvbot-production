@@ -1,3 +1,6 @@
+// Load environment variables first
+require('dotenv-safe').config({ allowEmptyValues: true });
+
 const logger = require('./logger');
 
 /**

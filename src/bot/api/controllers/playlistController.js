@@ -1,4 +1,5 @@
 const MediaPlayerModel = require('../../../models/mediaPlayerModel');
+const db = require('../../../config/postgres');
 const logger = require('../../../utils/logger');
 
 /**
@@ -18,7 +19,27 @@ const getUserPlaylists = async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    const playlists = await MediaPlayerModel.getUserPlaylists(userId);
+    const result = await db.query(
+      'SELECT * FROM user_playlists WHERE user_id = $1 ORDER BY created_at DESC',
+      [userId]
+    );
+
+    const playlists = result.rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      category: row.category,
+      icon: row.icon,
+      thumbnail: row.thumbnail,
+      videos: row.videos,
+      videoCount: row.video_count,
+      isPublic: row.is_public,
+      creator: row.creator_name,
+      creatorBadge: row.creator_badge,
+      featured: row.featured,
+      createdAt: row.created_at,
+    }));
+
     res.json(playlists);
   } catch (error) {
     logger.error('Error getting user playlists:', error);
@@ -31,8 +52,29 @@ const getUserPlaylists = async (req, res) => {
  */
 const getPublicPlaylists = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit, 10) || 20;
-    const playlists = await MediaPlayerModel.getPublicPlaylists(limit);
+    const limit = parseInt(req.query.limit, 10) || 50;
+
+    const result = await db.query(
+      'SELECT * FROM user_playlists WHERE is_public = true ORDER BY created_at DESC LIMIT $1',
+      [limit]
+    );
+
+    const playlists = result.rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      category: row.category,
+      icon: row.icon,
+      thumbnail: row.thumbnail,
+      videos: row.videos,
+      videoCount: row.video_count,
+      isPublic: row.is_public,
+      creator: row.creator_name,
+      creatorBadge: row.creator_badge,
+      featured: row.featured,
+      createdAt: row.created_at,
+    }));
+
     res.json(playlists);
   } catch (error) {
     logger.error('Error getting public playlists:', error);
@@ -46,25 +88,62 @@ const getPublicPlaylists = async (req, res) => {
 const createPlaylist = async (req, res) => {
   try {
     const userId = req.body.userId || req.headers['x-user-id'];
-    const { name, description, isPublic } = req.body;
+    const {
+      title,
+      description,
+      category,
+      icon,
+      thumbnail,
+      videos,
+      isPublic,
+      creatorName,
+      creatorBadge
+    } = req.body;
 
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    if (!name || name.trim().length === 0) {
-      return res.status(400).json({ error: 'Playlist name is required' });
+    if (!title || title.trim().length === 0) {
+      return res.status(400).json({ error: 'Playlist title is required' });
     }
 
-    const playlist = await MediaPlayerModel.createPlaylist(userId, {
-      name: name.trim(),
-      description: description || '',
-      isPublic: isPublic === true,
-    });
+    const videoCount = Array.isArray(videos) ? videos.length : 0;
 
-    if (!playlist) {
-      return res.status(500).json({ error: 'Failed to create playlist' });
-    }
+    const result = await db.query(
+      `INSERT INTO user_playlists
+        (user_id, title, description, category, icon, thumbnail, videos, is_public, video_count, creator_name, creator_badge)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING *`,
+      [
+        userId,
+        title.trim(),
+        description || '',
+        category || 'music',
+        icon || '🎵',
+        thumbnail || '',
+        JSON.stringify(videos || []),
+        isPublic === true,
+        videoCount,
+        creatorName || 'User',
+        creatorBadge || '👤'
+      ]
+    );
+
+    const playlist = {
+      id: result.rows[0].id,
+      title: result.rows[0].title,
+      description: result.rows[0].description,
+      category: result.rows[0].category,
+      icon: result.rows[0].icon,
+      thumbnail: result.rows[0].thumbnail,
+      videos: result.rows[0].videos,
+      videoCount: result.rows[0].video_count,
+      isPublic: result.rows[0].is_public,
+      creator: result.rows[0].creator_name,
+      creatorBadge: result.rows[0].creator_badge,
+      createdAt: result.rows[0].created_at,
+    };
 
     res.status(201).json(playlist);
   } catch (error) {

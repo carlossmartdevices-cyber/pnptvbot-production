@@ -213,8 +213,31 @@ const startBot = async () => {
         'edited_message',
       ];
 
-      await bot.telegram.setWebhook(webhookUrl, { allowed_updates: allowedUpdates });
-      logger.info(`✓ Webhook set to: ${webhookUrl}`);
+      // Try to set webhook with retry logic and fallback
+      let webhookSet = false;
+      const maxRetries = 3;
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          await bot.telegram.setWebhook(webhookUrl, {
+            allowed_updates: allowedUpdates,
+            drop_pending_updates: false
+          });
+          logger.info(`✓ Webhook set to: ${webhookUrl}`);
+          webhookSet = true;
+          break;
+        } catch (webhookError) {
+          logger.warn(`Webhook setup attempt ${i + 1}/${maxRetries} failed:`, webhookError.message);
+          if (i < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
+          }
+        }
+      }
+
+      if (!webhookSet) {
+        logger.error('Failed to set webhook after multiple attempts');
+        logger.warn('Bot will continue in degraded mode. Webhook must be set manually.');
+        logger.warn('You can set webhook later using: curl -X POST https://api.telegram.org/bot<TOKEN>/setWebhook?url=' + webhookUrl);
+      }
       // Register webhook callback
       apiApp.post(webhookPath, async (req, res) => {
         req.setTimeout(0);

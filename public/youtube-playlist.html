@@ -528,7 +528,7 @@
             <ul class="right hide-on-med-and-down">
                 <li><a href="/" title="Home"><i class="material-icons">home</i></a></li>
                 <li><a href="/radio.html" title="Radio"><i class="material-icons">radio</i></a></li>
-                <li><a href="/video-rooms.html" title="Video Rooms"><i class="material-icons">videocam</i></a></li>
+                <li><a href="/videorama" title="Videorama"><i class="material-icons">videocam</i></a></li>
                 <li><a href="#language" title="Language"><i class="material-icons">language</i></a></li>
             </ul>
         </div>
@@ -768,17 +768,42 @@
             return div.innerHTML;
         }
 
-        // Merge all playlists (PNPtv + user)
-        function getAllPlaylists() {
+        // Merge all playlists (PNPtv + user + API)
+        async function getAllPlaylists() {
             let allPlaylists = [...playlists];
 
-            // Add user playlists with random featured status
+            // Add localStorage user playlists
             userPlaylists.forEach(userPlaylist => {
                 allPlaylists.push({
                     ...userPlaylist,
-                    featured: Math.random() < 0.3 // 30% chance of being featured
+                    featured: Math.random() < 0.3
                 });
             });
+
+            // Fetch public playlists from API
+            try {
+                const response = await fetch('/api/playlists/public');
+                if (response.ok) {
+                    const apiPlaylists = await response.json();
+                    apiPlaylists.forEach(p => {
+                        allPlaylists.push({
+                            id: p.id,
+                            title: p.title,
+                            description: p.description,
+                            category: p.category,
+                            icon: p.icon || '🎵',
+                            videoCount: p.videoCount,
+                            thumbnail: p.thumbnail,
+                            videos: p.videos,
+                            featured: p.featured,
+                            creator: p.creator || 'User',
+                            creatorBadge: p.creatorBadge || '👤'
+                        });
+                    });
+                }
+            } catch (error) {
+                console.log('Could not load API playlists:', error);
+            }
 
             return allPlaylists;
         }
@@ -791,11 +816,11 @@
         });
 
         // Render Playlists
-        function renderPlaylists(filter = 'all') {
+        async function renderPlaylists(filter = 'all') {
             const container = document.getElementById('playlistsContainer');
             const emptyState = document.getElementById('emptyState');
 
-            let allPlaylists = getAllPlaylists();
+            let allPlaylists = await getAllPlaylists();
             let filtered = allPlaylists;
 
             if (filter !== 'all') {
@@ -850,11 +875,11 @@
         }
 
         // Render Favorites
-        function renderFavorites() {
+        async function renderFavorites() {
             const container = document.getElementById('favoritesContainer');
             const emptyFavorites = document.getElementById('emptyFavorites');
 
-            let allPlaylists = getAllPlaylists();
+            let allPlaylists = await getAllPlaylists();
             const favoritePlaylists = allPlaylists.filter(p => favorites.includes(p.id));
 
             if (favoritePlaylists.length === 0) {

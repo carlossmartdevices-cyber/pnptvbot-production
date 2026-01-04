@@ -63,9 +63,14 @@ app.get('/community-features', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/community-features.html'));
 });
 
-// Video Rooms page
-app.get('/video-rooms', (req, res) => {
+// Videorama page
+app.get('/videorama', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/video-rooms.html'));
+});
+
+// Legacy path redirect
+app.get('/video-rooms', (req, res) => {
+  res.redirect(301, '/videorama');
 });
 
 // Lifetime Pass landing page
@@ -97,9 +102,19 @@ app.get('/policies', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
 
-// Video Rooms landing page
-app.get('/video-rooms', pageLimiter, (req, res) => {
+// Videorama landing page
+app.get('/videorama', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', 'video-rooms.html'));
+});
+
+// Music Collections (formerly playlists)
+app.get('/music-collections', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'youtube-playlist.html'));
+});
+
+// Playlists (legacy route - redirects to music-collections)
+app.get('/playlists', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'youtube-playlist.html'));
 });
 
 // Hangouts page

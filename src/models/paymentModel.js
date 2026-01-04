@@ -14,8 +14,12 @@ class PaymentModel {
   static async create(paymentData) {
     try {
       const paymentId = paymentData.paymentId || uuidv4();
+      const reference = paymentData.reference || paymentId;
+      const currency = paymentData.currency || 'USD';
       const data = {
         ...paymentData,
+        reference,
+        currency,
         status: 'pending',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -23,14 +27,16 @@ class PaymentModel {
 
       // Insert with plan_id and provider
       await query(
-        `INSERT INTO payments (id, user_id, plan_id, provider, amount, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        `INSERT INTO payments (id, reference, user_id, plan_id, provider, amount, currency, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
           paymentId,
+          data.reference,
           data.userId,
           data.planId || null,
           data.provider || 'epayco',
           data.amount,
+          data.currency,
           data.status,
           data.createdAt,
           data.updatedAt

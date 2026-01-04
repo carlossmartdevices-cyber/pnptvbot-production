@@ -6,9 +6,11 @@ module.exports = {
     autorestart: true,
     watch: false,
     max_memory_restart: '1G',
+    node_args: '--dns-result-order=ipv4first',
     env: {
       NODE_ENV: 'production',
-      PORT: '3005',
+      PORT: '3000',
+      NODE_OPTIONS: '--dns-result-order=ipv4first',
     },
     env_development: {
       NODE_ENV: 'development',
