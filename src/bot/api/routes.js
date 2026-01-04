@@ -282,10 +282,13 @@ app.delete('/api/hangouts/video-call/:roomId', asyncHandler(hangoutsController.d
 app.delete('/api/hangouts/jitsi/:roomId', asyncHandler(hangoutsController.deleteJitsiRoom));
 app.delete('/api/hangouts/main/:roomId', asyncHandler(hangoutsController.deleteMainRoom));
 
-// ==================== PLAYLISTS API ====================
-app.get('/api/playlists/public', asyncHandler(playlistController.getPublicPlaylists));
+// Playlist API routes
 app.get('/api/playlists/user', asyncHandler(playlistController.getUserPlaylists));
-app.post('/api/playlists/create', asyncHandler(playlistController.createPlaylist));
+app.get('/api/playlists/public', asyncHandler(playlistController.getPublicPlaylists));
+app.post('/api/playlists', asyncHandler(playlistController.createPlaylist));
+app.post('/api/playlists/:playlistId/videos', asyncHandler(playlistController.addToPlaylist));
+app.delete('/api/playlists/:playlistId/videos/:videoId', asyncHandler(playlistController.removeFromPlaylist));
+app.delete('/api/playlists/:playlistId', asyncHandler(playlistController.deletePlaylist));
 
 // Subscription API routes
 app.get('/api/subscription/plans', asyncHandler(subscriptionController.getPlans));
