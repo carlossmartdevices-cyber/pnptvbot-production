@@ -13,6 +13,7 @@ const subscriptionController = require('./controllers/subscriptionController');
 const paymentController = require('./controllers/paymentController');
 const invitationController = require('./controllers/invitationController');
 const hangoutsController = require('./controllers/hangoutsController');
+const playlistController = require('./controllers/playlistController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -99,6 +100,16 @@ app.get('/policies', pageLimiter, (req, res) => {
 // Video Rooms landing page
 app.get('/video-rooms', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', 'video-rooms.html'));
+});
+
+// Music Collections (formerly playlists)
+app.get('/music-collections', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'youtube-playlist.html'));
+});
+
+// Playlists (legacy route - redirects to music-collections)
+app.get('/playlists', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'youtube-playlist.html'));
 });
 
 // Hangouts page
@@ -265,6 +276,11 @@ app.get('/api/hangouts/:roomId', asyncHandler(hangoutsController.getHangoutDetai
 app.delete('/api/hangouts/video-call/:roomId', asyncHandler(hangoutsController.deleteVideoCallRoom));
 app.delete('/api/hangouts/jitsi/:roomId', asyncHandler(hangoutsController.deleteJitsiRoom));
 app.delete('/api/hangouts/main/:roomId', asyncHandler(hangoutsController.deleteMainRoom));
+
+// ==================== PLAYLISTS API ====================
+app.get('/api/playlists/public', asyncHandler(playlistController.getPublicPlaylists));
+app.get('/api/playlists/user', asyncHandler(playlistController.getUserPlaylists));
+app.post('/api/playlists/create', asyncHandler(playlistController.createPlaylist));
 
 // Subscription API routes
 app.get('/api/subscription/plans', asyncHandler(subscriptionController.getPlans));

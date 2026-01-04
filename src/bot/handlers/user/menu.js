@@ -295,33 +295,46 @@ const showMainMenu = async (ctx) => {
       ? '`💎 TU ÁREA PRIME`\n\n' +
         `¡Hola ${username}! Bienvenido a tu área exclusiva. 🔥\n\n` +
         '**Accede a todo tu contenido:**\n\n' +
-        '🧑‍💼 **Área de Miembros** — Videos completos, shows y contenido exclusivo\n' +
+        '🎬 **Ver Contenido** — Videos completos, shows y contenido exclusivo\n' +
         '📍 **Nearby** — Encuentra papis cerca de ti\n' +
-        '🎥 **Hangouts** — Salas de video en vivo 24/7\n' +
-        '📻 **Radio** — Música y shows sin parar\n\n' +
+        '🎥 **PNPtv main Room!** — Sala de video en vivo principal\n' +
+        '🎬 **PNPtv Hangouts!** — Página de hangouts\n' +
+        '🎵 **Videorama** — Colecciones de música y videos\n\n' +
         '**Cristina**, tu asistente IA, está lista para ayudarte.\n\n' +
         '`¡Disfruta todo tu contenido PRIME! 🎬`'
       : '`💎 YOUR PRIME AREA`\n\n' +
         `Hey ${username}! Welcome to your exclusive area. 🔥\n\n` +
         '**Access all your content:**\n\n' +
-        '🧑‍💼 **Members Area** — Full videos, shows & exclusive content\n' +
+        '🎬 **Watch Content** — Full videos, shows & exclusive content\n' +
         '📍 **Nearby** — Find papis near you\n' +
-        '🎥 **Hangouts** — Live video rooms 24/7\n' +
-        '📻 **Radio** — Non-stop music and shows\n\n' +
+        '🎥 **PNPtv main Room!** — Main live video room\n' +
+        '🎬 **PNPtv Hangouts!** — Hangouts page\n' +
+        '🎵 **Videorama** — Music and video collections\n\n' +
         '**Cristina**, your AI assistant, is ready to help.\n\n' +
         '`Enjoy all your PRIME content! 🎬`');
 
+    // Get user's display name for Jitsi
+    const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
+    const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+
     buttons = [
       [
-        Markup.button.callback(lang === 'es' ? '🧑‍💼 Área de Miembros' : '🧑‍💼 Members Area', 'show_members_area'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
         Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '🎥 Hangouts' : '🎥 Hangouts', 'hangouts_join_main'),
-        Markup.button.callback(lang === 'es' ? '📻 Radio' : '📻 Radio', 'show_radio'),
+        Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
+      ],
+      [
+        Markup.button.url(lang === 'es' ? '🎬 Ver Contenido' : '🎬 Watch Content', 'https://t.me/+mUGxQj6w9AI2NGUx'),
+      ],
+      [
+        Markup.button.url(lang === 'es' ? '🎥 PNPtv main Room!' : '🎥 PNPtv main Room!', jitsiUrl),
+      ],
+      [
+        Markup.button.url(lang === 'es' ? '🎬 PNPtv Hangouts!' : '🎬 PNPtv Hangouts!', 'https://pnptv.app/hangouts'),
+      ],
+      [
+        Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'https://pnptv.app/music-collections'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
@@ -340,7 +353,7 @@ const showMainMenu = async (ctx) => {
         '📻 Radio y contenido sin restricciones\n' +
         '💬 Chat y soporte prioritario\n\n' +
         '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
-        '`Desde solo $10/mes 💎`'
+        '`Desde solo $7 USD/semana 💎`'
       : '`🔒 UNLOCK ALL CONTENT`\n\n' +
         `Hey ${username}, you\'re on the FREE version.\n\n` +
         '**With PRIME you get unlimited access to:**\n\n' +
@@ -350,7 +363,7 @@ const showMainMenu = async (ctx) => {
         '📻 Radio & unrestricted content\n' +
         '💬 Priority chat & support\n\n' +
         '**Go PRIME now and enjoy everything!**\n\n' +
-        '`Starting at just $10/month 💎`');
+        '`Starting at just $7 USD/week 💎`');
 
     buttons = [
       [
@@ -451,33 +464,46 @@ const showMainMenuEdit = async (ctx) => {
       ? '`💎 TU ÁREA PRIME`\n\n' +
         `¡Hola ${username}! Bienvenido a tu área exclusiva. 🔥\n\n` +
         '**Accede a todo tu contenido:**\n\n' +
-        '🧑‍💼 **Área de Miembros** — Videos completos, shows y contenido exclusivo\n' +
+        '🎬 **Ver Contenido** — Videos completos, shows y contenido exclusivo\n' +
         '📍 **Nearby** — Encuentra papis cerca de ti\n' +
-        '🎥 **Hangouts** — Salas de video en vivo 24/7\n' +
-        '📻 **Radio** — Música y shows sin parar\n\n' +
+        '🎥 **PNPtv main Room!** — Sala de video en vivo principal\n' +
+        '🎬 **PNPtv Hangouts!** — Página de hangouts\n' +
+        '🎵 **Videorama** — Colecciones de música y videos\n\n' +
         '**Cristina**, tu asistente IA, está lista para ayudarte.\n\n' +
         '`¡Disfruta todo tu contenido PRIME! 🎬`'
       : '`💎 YOUR PRIME AREA`\n\n' +
         `Hey ${username}! Welcome to your exclusive area. 🔥\n\n` +
         '**Access all your content:**\n\n' +
-        '🧑‍💼 **Members Area** — Full videos, shows & exclusive content\n' +
+        '🎬 **Watch Content** — Full videos, shows & exclusive content\n' +
         '📍 **Nearby** — Find papis near you\n' +
-        '🎥 **Hangouts** — Live video rooms 24/7\n' +
-        '📻 **Radio** — Non-stop music and shows\n\n' +
+        '🎥 **PNPtv main Room!** — Main live video room\n' +
+        '🎬 **PNPtv Hangouts!** — Hangouts page\n' +
+        '🎵 **Videorama** — Music and video collections\n\n' +
         '**Cristina**, your AI assistant, is ready to help.\n\n' +
         '`Enjoy all your PRIME content! 🎬`');
 
+    // Get user's display name for Jitsi
+    const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
+    const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+
     buttons = [
       [
-        Markup.button.callback(lang === 'es' ? '🧑‍💼 Área de Miembros' : '🧑‍💼 Members Area', 'show_members_area'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
         Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '🎥 Hangouts' : '🎥 Hangouts', 'hangouts_join_main'),
-        Markup.button.callback(lang === 'es' ? '📻 Radio' : '📻 Radio', 'show_radio'),
+        Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
+      ],
+      [
+        Markup.button.url(lang === 'es' ? '🎬 Ver Contenido' : '🎬 Watch Content', 'https://t.me/+mUGxQj6w9AI2NGUx'),
+      ],
+      [
+        Markup.button.url(lang === 'es' ? '🎥 PNPtv main Room!' : '🎥 PNPtv main Room!', jitsiUrl),
+      ],
+      [
+        Markup.button.url(lang === 'es' ? '🎬 PNPtv Hangouts!' : '🎬 PNPtv Hangouts!', 'https://pnptv.app/hangouts'),
+      ],
+      [
+        Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'https://pnptv.app/music-collections'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
@@ -496,7 +522,7 @@ const showMainMenuEdit = async (ctx) => {
         '📻 Radio y contenido sin restricciones\n' +
         '💬 Chat y soporte prioritario\n\n' +
         '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
-        '`Desde solo $10/mes 💎`'
+        '`Desde solo $7 USD/semana 💎`'
       : '`🔒 UNLOCK ALL CONTENT`\n\n' +
         `Hey ${username}, you\'re on the FREE version.\n\n` +
         '**With PRIME you get unlimited access to:**\n\n' +
@@ -506,7 +532,7 @@ const showMainMenuEdit = async (ctx) => {
         '📻 Radio & unrestricted content\n' +
         '💬 Priority chat & support\n\n' +
         '**Go PRIME now and enjoy everything!**\n\n' +
-        '`Starting at just $10/month 💎`');
+        '`Starting at just $7 USD/week 💎`');
 
     buttons = [
       [
