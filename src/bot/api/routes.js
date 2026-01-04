@@ -13,6 +13,7 @@ const subscriptionController = require('./controllers/subscriptionController');
 const paymentController = require('./controllers/paymentController');
 const invitationController = require('./controllers/invitationController');
 const hangoutsController = require('./controllers/hangoutsController');
+const playlistController = require('./controllers/playlistController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -265,6 +266,14 @@ app.get('/api/hangouts/:roomId', asyncHandler(hangoutsController.getHangoutDetai
 app.delete('/api/hangouts/video-call/:roomId', asyncHandler(hangoutsController.deleteVideoCallRoom));
 app.delete('/api/hangouts/jitsi/:roomId', asyncHandler(hangoutsController.deleteJitsiRoom));
 app.delete('/api/hangouts/main/:roomId', asyncHandler(hangoutsController.deleteMainRoom));
+
+// Playlist API routes
+app.get('/api/playlists/user', asyncHandler(playlistController.getUserPlaylists));
+app.get('/api/playlists/public', asyncHandler(playlistController.getPublicPlaylists));
+app.post('/api/playlists', asyncHandler(playlistController.createPlaylist));
+app.post('/api/playlists/:playlistId/videos', asyncHandler(playlistController.addToPlaylist));
+app.delete('/api/playlists/:playlistId/videos/:videoId', asyncHandler(playlistController.removeFromPlaylist));
+app.delete('/api/playlists/:playlistId', asyncHandler(playlistController.deletePlaylist));
 
 // Subscription API routes
 app.get('/api/subscription/plans', asyncHandler(subscriptionController.getPlans));
