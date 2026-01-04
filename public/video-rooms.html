@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PNPtv Video Rooms - Live Video Chat</title>
-    <meta name="description" content="Join PNPtv Video Rooms for live video chat and interaction with the community.">
+    <title>PNPtv Videorama - Live Video Chat</title>
+    <meta name="description" content="Join PNPtv Videorama for live video chat and interaction with the community.">
     <style>
         * {
             margin: 0;
@@ -49,6 +49,97 @@
             width: 100%;
             height: calc(100vh - 80px);
             background: #000;
+            display: grid;
+            grid-template-columns: 1fr 320px;
+        }
+
+        .playlist-panel {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .playlist-panel h3 {
+            margin-bottom: 8px;
+            font-size: 1em;
+            letter-spacing: 0.5px;
+        }
+
+        .playlist-section {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .playlist-list {
+            list-style: none;
+        }
+
+        .playlist-list li {
+            margin-bottom: 10px;
+        }
+
+        .playlist-list a {
+            color: #ffd700;
+            text-decoration: none;
+            word-break: break-word;
+        }
+
+        .playlist-list a:hover {
+            text-decoration: underline;
+        }
+
+        .playlist-form input,
+        .playlist-form button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 8px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95em;
+        }
+
+        .playlist-form input {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .playlist-form button {
+            background: linear-gradient(135deg, #ffd700, #ff8c00);
+            color: #000;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
+        }
+
+        .playlist-form button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+        }
+
+        .toggle-playlist {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.6);
+            color: #ffd700;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 999px;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .playlist-hidden .playlist-panel {
+            display: none;
+        }
+
+        .playlist-hidden .video-container {
+            grid-template-columns: 1fr;
         }
 
         #jitsi-meet {
@@ -118,16 +209,32 @@
 </head>
 <body>
     <div class="header">
-        <h1>🎥 PNPtv Video Rooms</h1>
+        <h1>🎥 PNPtv Videorama</h1>
         <p class="tagline">Live Video Chat & Community</p>
     </div>
 
     <div class="video-container">
+        <button id="togglePlaylist" class="toggle-playlist">🎵 Playlist</button>
         <div id="jitsi-meet"></div>
         <div id="loadingMessage" class="loading-message">
             <h2>Loading Video Room...</h2>
             <div class="loading-spinner"></div>
         </div>
+        <aside class="playlist-panel" id="playlistPanel">
+            <div class="playlist-section">
+                <h3>🔥 Curated PNPtv Playlist</h3>
+                <ul class="playlist-list" id="curatedList"></ul>
+            </div>
+            <div class="playlist-section">
+                <h3>🧑‍🚀 Your Playlist</h3>
+                <form id="playlistForm" class="playlist-form">
+                    <input type="text" id="trackTitle" placeholder="Title (e.g. My Mix)" required>
+                    <input type="url" id="trackUrl" placeholder="Link to your video/playlist" required>
+                    <button type="submit">Add to My Playlist</button>
+                </form>
+                <ul class="playlist-list" id="userList"></ul>
+            </div>
+        </aside>
     </div>
 
     <script>
@@ -316,6 +423,78 @@
             }
         }
 
+        // Playlist helpers
+        const curatedPlaylist = [
+            { title: 'PNPtv Prime Room', url: 'https://pnptv.app/video-rooms' },
+            { title: 'Santino Drops', url: 'https://www.youtube.com/playlist?list=PLVJU' },
+            { title: 'Community Mix', url: 'https://www.youtube.com/playlist?list=COMMUNITY' },
+        ];
+
+        const userPlaylistKey = 'pnptv:userPlaylist';
+
+        function loadUserPlaylist() {
+            try {
+                const saved = localStorage.getItem(userPlaylistKey);
+                return saved ? JSON.parse(saved) : [];
+            } catch (e) {
+                console.warn('Failed to load user playlist', e);
+                return [];
+            }
+        }
+
+        function saveUserPlaylist(list) {
+            try {
+                localStorage.setItem(userPlaylistKey, JSON.stringify(list));
+            } catch (e) {
+                console.warn('Failed to save user playlist', e);
+            }
+        }
+
+        function renderPlaylist(list, container) {
+            container.innerHTML = '';
+            list.forEach(item => {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.href = item.url;
+                a.target = '_blank';
+                a.rel = 'noopener';
+                a.textContent = item.title;
+                li.appendChild(a);
+                container.appendChild(li);
+            });
+        }
+
+        function initPlaylists() {
+            const curatedListEl = document.getElementById('curatedList');
+            const userListEl = document.getElementById('userList');
+            const form = document.getElementById('playlistForm');
+            const titleInput = document.getElementById('trackTitle');
+            const urlInput = document.getElementById('trackUrl');
+            const toggleBtn = document.getElementById('togglePlaylist');
+            const videoContainer = document.querySelector('.video-container');
+
+            renderPlaylist(curatedPlaylist, curatedListEl);
+            let userList = loadUserPlaylist();
+            renderPlaylist(userList, userListEl);
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const title = titleInput.value.trim();
+                const url = urlInput.value.trim();
+                if (!title || !url) return;
+                const next = [...userList, { title, url }];
+                userList = next;
+                saveUserPlaylist(next);
+                renderPlaylist(next, userListEl);
+                titleInput.value = '';
+                urlInput.value = '';
+            });
+
+            toggleBtn.addEventListener('click', () => {
+                videoContainer.classList.toggle('playlist-hidden');
+            });
+        }
+
         // Main initialization function for JaaS
         async function initialize() {
             try {
@@ -329,6 +508,9 @@
                     displayName: displayName,
                     userId: userId
                 });
+
+                // Step 0: Prepare playlists UI
+                initPlaylists();
 
                 // Step 1: Fetch JWT token from backend
                 console.log('Step 1: Fetching JWT token from backend...');

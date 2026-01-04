@@ -182,8 +182,9 @@ class PaymentService {
         userId,
         planId,
         provider,
-        sku,
+        sku: sku || plan.sku,
         amount: plan.price,
+        currency: plan.currency || 'USD',
         status: 'pending',
       });
 

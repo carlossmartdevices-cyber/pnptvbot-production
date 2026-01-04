@@ -237,6 +237,7 @@ const registerPaymentHandlers = (bot) => {
 
   // Pay with ePayco
   bot.action(/^pay_epayco_(.+)$/, async (ctx) => {
+    const lang = getLanguage(ctx);
     try {
       await ctx.answerCbQuery();
 
@@ -247,7 +248,6 @@ const registerPaymentHandlers = (bot) => {
       }
 
       const planId = ctx.match[1];
-      const lang = getLanguage(ctx);
 
       // Validate user context exists
       if (!ctx.from?.id) {
