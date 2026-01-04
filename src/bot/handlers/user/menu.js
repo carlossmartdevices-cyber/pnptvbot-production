@@ -290,65 +290,78 @@ const showMainMenu = async (ctx) => {
   let buttons = [];
 
   if (isPremium || isAdmin) {
-    // PRIME MEMBER VERSION
+    // PRIME MEMBER VERSION - BENEFITS FOCUSED
     menuText = previewBanner + (lang === 'es'
-      ? '`🎬 ¡Eres PRIME!`\n\n' +
-        '¡Gracias por ser PRIME, papi! 🔥\n\n' +
-        'Pulsa **Área de Miembros** y disfruta todo lo que hemos preparado para ti — videos, Nearby, hangouts, lives, shows, y más.\n\n' +
-        '**Cristina**, nuestra asistente IA, está aquí para guiarte y responder tus preguntas.\n\n' +
-        '`¡Eso está muy hot! 🔥`'
-      : '`🎬 You are PRIME!`\n\n' +
-        'Thank you for being PRIME, papi! 🔥\n\n' +
-        'Hit **Members Area** and enjoy everything we\'ve prepared for you — videos, Nearby, hangouts, lives, shows, and more.\n\n' +
-        '**Cristina**, our AI assistant, is here to guide you and answer questions.\n\n' +
-        '`That\'s so hot! 🔥`');
+      ? '`💎 TU ÁREA PRIME`\n\n' +
+        `¡Hola ${username}! Bienvenido a tu área exclusiva. 🔥\n\n` +
+        '**Accede a todo tu contenido:**\n\n' +
+        '🧑‍💼 **Área de Miembros** — Videos completos, shows y contenido exclusivo\n' +
+        '📍 **Nearby** — Encuentra papis cerca de ti\n' +
+        '🎥 **Hangouts** — Salas de video en vivo 24/7\n' +
+        '📻 **Radio** — Música y shows sin parar\n\n' +
+        '**Cristina**, tu asistente IA, está lista para ayudarte.\n\n' +
+        '`¡Disfruta todo tu contenido PRIME! 🎬`'
+      : '`💎 YOUR PRIME AREA`\n\n' +
+        `Hey ${username}! Welcome to your exclusive area. 🔥\n\n` +
+        '**Access all your content:**\n\n' +
+        '🧑‍💼 **Members Area** — Full videos, shows & exclusive content\n' +
+        '📍 **Nearby** — Find papis near you\n' +
+        '🎥 **Hangouts** — Live video rooms 24/7\n' +
+        '📻 **Radio** — Non-stop music and shows\n\n' +
+        '**Cristina**, your AI assistant, is ready to help.\n\n' +
+        '`Enjoy all your PRIME content! 🎬`');
 
     buttons = [
       [
-        Markup.button.callback('💎 PRIME ✓', 'already_prime'),
-        Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
+        Markup.button.callback(lang === 'es' ? '🧑‍💼 Área de Miembros' : '🧑‍💼 Members Area', 'show_members_area'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
-        Markup.button.callback(lang === 'es' ? '🧑‍💼 Área Miembros' : '🧑‍💼 Members Area', 'show_members_area'),
+        Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '🎥 Hangouts' : '🎥 Hangouts', 'hangouts_join_main'),
+        Markup.button.callback(lang === 'es' ? '📻 Radio' : '📻 Radio', 'show_radio'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
         Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings', 'show_settings'),
-      ],
-      [
-        Markup.button.callback(creatorBtnText, 'creator_coming_soon'),
       ],
     ];
   } else {
-    // FREE MEMBER VERSION
+    // FREE MEMBER VERSION - SALES FOCUSED
     menuText = previewBanner + (lang === 'es'
-      ? '`🎬 ¡Bienvenido a PNPtv!`\n\n' +
-        `@${username} ¡nos encanta tenerte en la Comunidad PNPtv! 💜\n\n` +
-        'Pulsa **Desbloquear PRIME** para más diversión — videos completos, lives, hangouts, Nearby, y todas las funciones de miembro.\n\n' +
-        '**Cristina**, nuestra asistente IA, está aquí para guiarte y responder tus preguntas.\n\n' +
-        '`¡Desbloquea la diversión! 🔓`'
-      : '`🎬 Welcome to PNPtv!`\n\n' +
-        `@${username} we love having you in the PNPtv Community! 💜\n\n` +
-        'Hit **Unlock PRIME** to get even more cloudy fun — full-length videos, lives, hangouts, Nearby, and all member features.\n\n' +
-        '**Cristina**, our AI assistant, is here to guide you and answer questions.\n\n' +
-        '`Unlock the fun! 🔓`');
+      ? '`🔒 DESBLOQUEA TODO EL CONTENIDO`\n\n' +
+        `Hola ${username}, estás usando la versión FREE.\n\n` +
+        '**Con PRIME obtienes acceso ilimitado a:**\n\n' +
+        '🎬 Videos completos y shows exclusivos\n' +
+        '📍 Encuentra papis cerca de ti (Nearby)\n' +
+        '🎥 Salas de video en vivo 24/7\n' +
+        '📻 Radio y contenido sin restricciones\n' +
+        '💬 Chat y soporte prioritario\n\n' +
+        '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
+        '`Desde solo $10/mes 💎`'
+      : '`🔒 UNLOCK ALL CONTENT`\n\n' +
+        `Hey ${username}, you\'re on the FREE version.\n\n` +
+        '**With PRIME you get unlimited access to:**\n\n' +
+        '🎬 Full videos & exclusive shows\n' +
+        '📍 Find papis near you (Nearby)\n' +
+        '🎥 Live video rooms 24/7\n' +
+        '📻 Radio & unrestricted content\n' +
+        '💬 Priority chat & support\n\n' +
+        '**Go PRIME now and enjoy everything!**\n\n' +
+        '`Starting at just $10/month 💎`');
 
     buttons = [
       [
-        Markup.button.callback(lang === 'es' ? '🔓 Desbloquear PRIME' : '🔓 Unlock PRIME', 'show_subscription_plans'),
+        Markup.button.callback(lang === 'es' ? '💎 VER PLANES PRIME' : '💎 VIEW PRIME PLANS', 'show_subscription_plans'),
+      ],
+      [
         Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
-        Markup.button.callback(lang === 'es' ? '🧑‍💼 Área Miembros 🔒' : '🧑‍💼 Members Area 🔒', 'locked_feature'),
-      ],
-      [
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
-        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings', 'show_settings'),
       ],
       [
-        Markup.button.callback(creatorBtnText, 'creator_coming_soon'),
+        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings', 'show_settings'),
       ],
     ];
   }
@@ -423,8 +436,6 @@ const showMainMenuEdit = async (ctx) => {
   let menuText;
   let buttons = [];
 
-  const creatorBtnText = lang === 'es' ? '🎬 ¡Sé Creador! - Próximamente' : '🎬 Be a Creator! - Coming Soon';
-
   // Add preview mode indicator for admins
   let previewBanner = '';
   if (isPreviewMode) {
@@ -435,65 +446,78 @@ const showMainMenuEdit = async (ctx) => {
   }
 
   if (isPremium || isAdmin) {
-    // PRIME MEMBER VERSION
+    // PRIME MEMBER VERSION - BENEFITS FOCUSED
     menuText = previewBanner + (lang === 'es'
-      ? '`🎬 ¡Eres PRIME!`\n\n' +
-        '¡Gracias por ser PRIME, papi! 🔥\n\n' +
-        'Pulsa **Área de Miembros** y disfruta todo lo que hemos preparado para ti — videos, Nearby, hangouts, lives, shows, y más.\n\n' +
-        '**Cristina**, nuestra asistente IA, está aquí para guiarte y responder tus preguntas.\n\n' +
-        '`¡Eso está muy hot! 🔥`'
-      : '`🎬 You are PRIME!`\n\n' +
-        'Thank you for being PRIME, papi! 🔥\n\n' +
-        'Hit **Members Area** and enjoy everything we\'ve prepared for you — videos, Nearby, hangouts, lives, shows, and more.\n\n' +
-        '**Cristina**, our AI assistant, is here to guide you and answer questions.\n\n' +
-        '`That\'s so hot! 🔥`');
+      ? '`💎 TU ÁREA PRIME`\n\n' +
+        `¡Hola ${username}! Bienvenido a tu área exclusiva. 🔥\n\n` +
+        '**Accede a todo tu contenido:**\n\n' +
+        '🧑‍💼 **Área de Miembros** — Videos completos, shows y contenido exclusivo\n' +
+        '📍 **Nearby** — Encuentra papis cerca de ti\n' +
+        '🎥 **Hangouts** — Salas de video en vivo 24/7\n' +
+        '📻 **Radio** — Música y shows sin parar\n\n' +
+        '**Cristina**, tu asistente IA, está lista para ayudarte.\n\n' +
+        '`¡Disfruta todo tu contenido PRIME! 🎬`'
+      : '`💎 YOUR PRIME AREA`\n\n' +
+        `Hey ${username}! Welcome to your exclusive area. 🔥\n\n` +
+        '**Access all your content:**\n\n' +
+        '🧑‍💼 **Members Area** — Full videos, shows & exclusive content\n' +
+        '📍 **Nearby** — Find papis near you\n' +
+        '🎥 **Hangouts** — Live video rooms 24/7\n' +
+        '📻 **Radio** — Non-stop music and shows\n\n' +
+        '**Cristina**, your AI assistant, is ready to help.\n\n' +
+        '`Enjoy all your PRIME content! 🎬`');
 
     buttons = [
       [
-        Markup.button.callback('💎 PRIME ✓', 'already_prime'),
-        Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
+        Markup.button.callback(lang === 'es' ? '🧑‍💼 Área de Miembros' : '🧑‍💼 Members Area', 'show_members_area'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
-        Markup.button.callback(lang === 'es' ? '🧑‍💼 Área Miembros' : '🧑‍💼 Members Area', 'show_members_area'),
+        Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '🎥 Hangouts' : '🎥 Hangouts', 'hangouts_join_main'),
+        Markup.button.callback(lang === 'es' ? '📻 Radio' : '📻 Radio', 'show_radio'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
         Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings', 'show_settings'),
-      ],
-      [
-        Markup.button.callback(creatorBtnText, 'creator_coming_soon'),
       ],
     ];
   } else {
-    // FREE MEMBER VERSION
+    // FREE MEMBER VERSION - SALES FOCUSED
     menuText = previewBanner + (lang === 'es'
-      ? '`🎬 ¡Bienvenido a PNPtv!`\n\n' +
-        `@${username} ¡nos encanta tenerte en la Comunidad PNPtv! 💜\n\n` +
-        'Pulsa **Desbloquear PRIME** para más diversión — videos completos, lives, hangouts, Nearby, y todas las funciones de miembro.\n\n' +
-        '**Cristina**, nuestra asistente IA, está aquí para guiarte y responder tus preguntas.\n\n' +
-        '`¡Desbloquea la diversión! 🔓`'
-      : '`🎬 Welcome to PNPtv!`\n\n' +
-        `@${username} we love having you in the PNPtv Community! 💜\n\n` +
-        'Hit **Unlock PRIME** to get even more cloudy fun — full-length videos, lives, hangouts, Nearby, and all member features.\n\n' +
-        '**Cristina**, our AI assistant, is here to guide you and answer questions.\n\n' +
-        '`Unlock the fun! 🔓`');
+      ? '`🔒 DESBLOQUEA TODO EL CONTENIDO`\n\n' +
+        `Hola ${username}, estás usando la versión FREE.\n\n` +
+        '**Con PRIME obtienes acceso ilimitado a:**\n\n' +
+        '🎬 Videos completos y shows exclusivos\n' +
+        '📍 Encuentra papis cerca de ti (Nearby)\n' +
+        '🎥 Salas de video en vivo 24/7\n' +
+        '📻 Radio y contenido sin restricciones\n' +
+        '💬 Chat y soporte prioritario\n\n' +
+        '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
+        '`Desde solo $10/mes 💎`'
+      : '`🔒 UNLOCK ALL CONTENT`\n\n' +
+        `Hey ${username}, you\'re on the FREE version.\n\n` +
+        '**With PRIME you get unlimited access to:**\n\n' +
+        '🎬 Full videos & exclusive shows\n' +
+        '📍 Find papis near you (Nearby)\n' +
+        '🎥 Live video rooms 24/7\n' +
+        '📻 Radio & unrestricted content\n' +
+        '💬 Priority chat & support\n\n' +
+        '**Go PRIME now and enjoy everything!**\n\n' +
+        '`Starting at just $10/month 💎`');
 
     buttons = [
       [
-        Markup.button.callback(lang === 'es' ? '🔓 Desbloquear PRIME' : '🔓 Unlock PRIME', 'show_subscription_plans'),
+        Markup.button.callback(lang === 'es' ? '💎 VER PLANES PRIME' : '💎 VIEW PRIME PLANS', 'show_subscription_plans'),
+      ],
+      [
         Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
-        Markup.button.callback(lang === 'es' ? '🧑‍💼 Área Miembros 🔒' : '🧑‍💼 Members Area 🔒', 'locked_feature'),
-      ],
-      [
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
-        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings', 'show_settings'),
       ],
       [
-        Markup.button.callback(creatorBtnText, 'creator_coming_soon'),
+        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings', 'show_settings'),
       ],
     ];
   }
