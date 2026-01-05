@@ -151,7 +151,14 @@
       "Bash(git hash-object:*)",
       "Bash(git update-index:*)",
       "Bash(touch:*)",
-      "Bash(npm ci)"
+      "Bash(npm ci)",
+      "Bash(test -f:*)",
+      "Bash(test:*)",
+      "Bash(\\\\\\) -exec ls -lh {} ;)",
+      "Bash(node --version:*)",
+      "Bash(node scripts/setupAsyncQueue.js:*)",
+      "Bash(node scripts/verifyDeployment.js:*)",
+      "Bash(target\"\n- Supports 4 button types: URL links, plan references, bot commands, and feature shortcuts\n- Buttons integrated throughout broadcast flow \\(Step 4/5 configuration\\)\n\n**Database Schema:**\n- broadcast_button_presets: Stores pre-configured button sets with JSONB storage\n- broadcast_buttons: Per-broadcast button mappings with full indexing\n- 3 optimized indexes for performance\n\n**Admin Handler Updates:**\n- New action handlers for preset selection \\(regex pattern\\)\n- No-buttons option handler\n- Custom buttons builder entry point\n- Custom button text input parser \\(validates format, type, target\\)\n- Send/schedule with buttons handlers\n- sendBroadcastWithButtons\\(\\) function for dynamic Telegram inline keyboard rendering\n\n**Button Type Support:**\n- URL: External web links with HTTP/HTTPS validation\n- Command: Bot commands starting with / \\(e.g., /plans, /support\\)\n- Plan: Direct plan references \\(e.g., premium, gold\\)\n- Feature: App feature shortcuts \\(e.g., features, nearby\\)\n\n**Validation & Safety:**\n- Format validation for all button entries\n- URL scheme validation \\(http/https required\\)\n- Command prefix validation \\(/ required\\)\n- Button text length limits \\(64 chars max\\)\n- Type validation against allowed values\n- Graceful error messaging for admin guidance\n\n**User Experience Flow:**\n1. After Spanish text input \\(Step 3/4\\)\n2. Shows button configuration menu \\(Step 4/5\\)\n3. Admin can select preset or build custom buttons\n4. Custom buttons parsed as admin enters each one\n5. Real-time confirmation with button count\n6. Buttons sent with broadcast to all users\n7. Completion report includes button statistics\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ],
     "deny": [],
     "ask": []
