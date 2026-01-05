@@ -42,8 +42,18 @@ function mediaOnlyValidator() {
     const hasVoice = !!message.voice;
     const hasAudio = !!message.audio;
 
-    // Parse allowed media from config
-    const allowedMedia = JSON.parse(topicConfig.allowed_media || '[]');
+    // Parse allowed media from config (handle both string and object)
+    let allowedMedia = [];
+    try {
+      if (typeof topicConfig.allowed_media === 'string') {
+        allowedMedia = JSON.parse(topicConfig.allowed_media || '[]');
+      } else if (Array.isArray(topicConfig.allowed_media)) {
+        allowedMedia = topicConfig.allowed_media;
+      }
+    } catch (e) {
+      logger.warn('Failed to parse allowed_media config:', e);
+      allowedMedia = [];
+    }
 
     const hasAllowedMedia = (
       (hasPhoto && allowedMedia.includes('photo')) ||
