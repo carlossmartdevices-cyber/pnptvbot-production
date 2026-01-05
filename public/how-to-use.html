@@ -171,6 +171,7 @@
             z-index: 1;
             max-width: 900px;
             margin: 0 auto;
+            animation: fadeIn 0.6s ease-out;
         }
 
         .hero h1 {
@@ -197,16 +198,6 @@
             padding: 0 2rem 4rem;
         }
 
-        /* Language Sections */
-        .lang-section {
-            display: none;
-        }
-
-        .lang-section.active {
-            display: block;
-            animation: fadeIn 0.4s ease-out;
-        }
-
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -221,6 +212,7 @@
         /* Sections */
         .section {
             margin-bottom: 5rem;
+            animation: fadeIn 0.5s ease-out;
         }
 
         .section h2 {
@@ -297,7 +289,7 @@
         /* Info/Success Boxes */
         .info-box, .success-box {
             background: rgba(102, 126, 234, 0.15);
-            border-left: 4px solid var(--primary-color);
+            border-left: 4px solid #667eea;
             padding: 1.8rem;
             border-radius: 12px;
             margin: 2rem 0;
@@ -385,7 +377,6 @@
             border: none;
             cursor: pointer;
             margin: 1.5rem 0;
-            display: inline-block;
         }
 
         .cta-button:hover {
@@ -487,431 +478,927 @@
 
     <!-- Language Toggle -->
     <div class="lang-toggle">
-        <button class="lang-btn active" id="langEnBtn" onclick="switchLanguage('en')">English</button>
-        <button class="lang-btn" id="langEsBtn" onclick="switchLanguage('es')">Español</button>
+        <button class="lang-btn active" id="langEnBtn" onclick="window.pageManager?.switchLanguage('en')">English</button>
+        <button class="lang-btn" id="langEsBtn" onclick="window.pageManager?.switchLanguage('es')">Español</button>
     </div>
 
     <!-- Main Content -->
     <div class="main-content">
-        <!-- ENGLISH VERSION -->
-        <div class="lang-section active" id="content-en">
-            <!-- Hero -->
-            <section class="hero">
-                <div class="hero-content">
-                    <h1>🌟 How to Use PNPtv!</h1>
-                    <p>Everything you need to know about connecting, sharing, and creating in the PNPtv! community</p>
-                </div>
-            </section>
-
-            <!-- Content -->
-            <div class="container">
-                <!-- Section 1 -->
-                <section class="section">
-                    <h2>1. What is PNPtv!?</h2>
-
-                    <p><strong>PNPtv!</strong> is a community of <strong>PNP stans and like-minded adults</strong> who connect, share, and create inside Telegram.</p>
-
-                    <p>At its core, PNPtv! is:</p>
-                    <ul>
-                        <li>A <strong>free Telegram community</strong> where members can interact</li>
-                        <li>A <strong>PRIME membership experience</strong> for those who want full access</li>
-                    </ul>
-
-                    <h3>💎 What You Get with PNPtv! PRIME</h3>
-                    <ul>
-                        <li>Exclusive <strong>PNP content by Santino and Lex</strong></li>
-                        <li>Access to <strong>video call rooms</strong></li>
-                        <li>Curated <strong>music playlists</strong></li>
-                        <li><strong>Geolocation features</strong> to discover nearby members</li>
-                        <li>Early access to new tools and community features</li>
-                    </ul>
-
-                    <p style="margin-top: 2rem; font-style: italic;">PNPtv! is not just content — it's a <strong>self-managed digital community</strong> built around connection, creativity, and shared experiences.</p>
-                </section>
-
-                <!-- Section 2 -->
-                <section class="section">
-                    <h2>2. How Does It Work?</h2>
-
-                    <p>PNPtv! lives entirely inside <strong>Telegram</strong>, using four simple components that work together.</p>
-
-                    <h3>🔹 Telegram</h3>
-                    <p>Telegram is a free messaging app (similar to WhatsApp, but more powerful) that allows communities to combine channels, groups, and bots in one place.</p>
-
-                    <h3>🔹 Channel</h3>
-                    <p>The <strong>PNPtv! Channel</strong> is where official content and announcements are posted.</p>
-                    <ul>
-                        <li>Members <strong>read</strong> content here</li>
-                        <li>Posting is limited to admins</li>
-                        <li>Think of it as the community's bulletin board</li>
-                    </ul>
-
-                    <h3>🔹 Group</h3>
-                    <p>The <strong>PNPtv! Community Group</strong> is where members interact.</p>
-                    <ul>
-                        <li>Chat with other members</li>
-                        <li>Join discussions</li>
-                        <li>Participate in community activities</li>
-                    </ul>
-
-                    <h3>🔹 Bot</h3>
-                    <p>The <strong>PNPtv! Bot</strong> is the core system that runs everything. It:</p>
-                    <ul>
-                        <li>Guides you through onboarding</li>
-                        <li>Verifies access</li>
-                        <li>Activates PRIME memberships</li>
-                        <li>Unlocks features automatically (menus, video rooms, links)</li>
-                    </ul>
-
-                    <p style="margin-top: 1.5rem;">The bot makes the experience <strong>automatic and instant</strong>, with no manual approval needed.</p>
-                </section>
-
-                <!-- Section 3 -->
-                <section class="section">
-                    <h2>3. How Do I Join?</h2>
-
-                    <p>Joining PNPtv! is simple and only takes a minute:</p>
-
-                    <ol>
-                        <li><strong>Open Telegram</strong></li>
-                        <li><strong>Go to</strong> t.me/pnptv_bot</li>
-                        <li><strong>Tap Start</strong></li>
-                        <li><strong>Complete</strong> the quick onboarding process</li>
-                    </ol>
-
-                    <p style="margin-top: 1.5rem;"><strong>Once onboarding is finished:</strong></p>
-                    <ul>
-                        <li>You receive the <strong>link to the PNPtv! Community Group</strong></li>
-                        <li>You gain access to the free community features</li>
-                    </ul>
-
-                    <div class="success-box">
-                        <strong>💡 Tip:</strong> To unlock <strong>all features</strong>, you can subscribe to a <strong>PNPtv! PRIME membership</strong> directly through the bot.
-                    </div>
-
-                    <a href="https://t.me/pnptv_bot" target="_blank" class="cta-button">Open PNPtv! Bot Now</a>
-                </section>
-
-                <!-- Section 4 -->
-                <section class="section">
-                    <h2>4. How Do I Pay for PRIME?</h2>
-
-                    <p>PNPtv! PRIME memberships are handled <strong>directly through the bot</strong> and activate <strong>immediately after payment</strong>.</p>
-
-                    <div class="grid">
-                        <div class="card">
-                            <h4>💳 Credit & Debit Cards</h4>
-                            <p>Pay securely using credit or debit cards. Payments processed through <strong>ePayco</strong>.</p>
-                        </div>
-                        <div class="card">
-                            <h4>💎 Crypto Payments</h4>
-                            <p>Pay with crypto via <strong>Daimo</strong> — fast, secure, and discreet for global use. Supports all major wallets.</p>
-                        </div>
-                        <div class="card">
-                            <h4>🅿️ PayPal</h4>
-                            <p>Pay using PayPal balance or linked cards and bank accounts. Worldwide accepted.</p>
-                        </div>
-                        <div class="card">
-                            <h4>🏦 Bank Apps & USDC</h4>
-                            <p>Fund USDC payments via Cash App, Zelle, or Venmo. No crypto experience needed!</p>
-                        </div>
-                    </div>
-
-                    <h3 style="margin-top: 2rem;">✅ Instant Activation</h3>
-                    <p>As soon as your payment is completed:</p>
-                    <ul>
-                        <li>The <strong>PNPtv! bot automatically detects it</strong></li>
-                        <li>Your <strong>PRIME membership activates instantly</strong></li>
-                        <li>All premium features unlock right away</li>
-                    </ul>
-
-                    <p style="margin-top: 1rem;"><strong>No waiting, no emails, no screenshots, no manual approval.</strong></p>
-
-                    <div class="info-box">
-                        <strong>🔒 Security:</strong> All payments are processed through industry-standard, secure payment gateways. Your card details are never stored on our servers.
-                    </div>
-                </section>
-
-                <!-- Section 5 -->
-                <section class="section">
-                    <h2>5. Premium Features</h2>
-
-                    <p>With PNPtv! PRIME, you unlock:</p>
-
-                    <h3>📺 Exclusive Content</h3>
-                    <ul>
-                        <li>PNP content curated by Santino and Lex</li>
-                        <li>Early access to new releases</li>
-                        <li>Behind-the-scenes material</li>
-                    </ul>
-
-                    <h3>🎥 Video Rooms</h3>
-                    <ul>
-                        <li>24/7 access to live video chat rooms</li>
-                        <li>Connect with verified community members</li>
-                        <li>Screen sharing and HD video</li>
-                    </ul>
-
-                    <h3>🎵 Music Playlists</h3>
-                    <ul>
-                        <li>Curated playlists for every mood</li>
-                        <li>Access to exclusive music collections</li>
-                        <li>Create and share your own playlists</li>
-                    </ul>
-
-                    <h3>📍 Geolocation Features</h3>
-                    <ul>
-                        <li>Discover PNPtv! members near you</li>
-                        <li>Optional location sharing with privacy controls</li>
-                        <li>Arrange local meetups and connections</li>
-                    </ul>
-
-                    <h3>🔔 Early Access</h3>
-                    <ul>
-                        <li>First access to new features and tools</li>
-                        <li>Beta testing opportunities</li>
-                        <li>Exclusive community announcements</li>
-                    </ul>
-                </section>
-
-                <!-- CTA -->
-                <section class="section" style="text-align: center;">
-                    <h2>Ready to Join PNPtv!?</h2>
-                    <p style="font-size: 1.2rem; margin-bottom: 2rem;">Join thousands of PNP stans in our community. It takes less than a minute.</p>
-                    <a href="https://t.me/pnptv_bot" target="_blank" class="cta-button">Start with the Bot Now</a>
-                </section>
-            </div>
-
-            <!-- Footer -->
-            <footer class="footer">
-                <p>&copy; 2025 PNPtv!. All rights reserved.</p>
-                <p>18+ Only | By accessing this site you confirm you are 18 years or older</p>
-            </footer>
-        </div>
-
-        <!-- SPANISH VERSION -->
-        <div class="lang-section" id="content-es">
-            <!-- Hero -->
-            <section class="hero">
-                <div class="hero-content">
-                    <h1>🌟 ¿Cómo Usar PNPtv!?</h1>
-                    <p>Todo lo que necesitas saber sobre conectar, compartir y crear en la comunidad PNPtv!</p>
-                </div>
-            </section>
-
-            <!-- Content -->
-            <div class="container">
-                <!-- Section 1 ES -->
-                <section class="section">
-                    <h2>1. ¿Qué es PNPtv!?</h2>
-
-                    <p><strong>PNPtv!</strong> es una comunidad de <strong>fans de PNP y adultos afines</strong> que se conectan, comparten y crean dentro de Telegram.</p>
-
-                    <p>En esencia, PNPtv! es:</p>
-                    <ul>
-                        <li>Una <strong>comunidad gratuita en Telegram</strong> donde los miembros pueden interactuar</li>
-                        <li>Una <strong>experiencia de membresía PRIME</strong> para quienes desean acceso completo</li>
-                    </ul>
-
-                    <h3>💎 ¿Qué Obtienes con PNPtv! PRIME?</h3>
-                    <ul>
-                        <li>Contenido exclusivo de <strong>PNP por Santino y Lex</strong></li>
-                        <li>Acceso a <strong>salas de videollamadas</strong></li>
-                        <li><strong>Playlists musicales</strong> curadas</li>
-                        <li><strong>Funciones de geolocalización</strong> para descubrir miembros cercanos</li>
-                        <li>Acceso anticipado a nuevas herramientas y características de la comunidad</li>
-                    </ul>
-
-                    <p style="margin-top: 2rem; font-style: italic;">PNPtv! no es solo contenido — es una <strong>comunidad digital autogestionada</strong> centrada en la conexión, la creatividad y las experiencias compartidas.</p>
-                </section>
-
-                <!-- Section 2 ES -->
-                <section class="section">
-                    <h2>2. ¿Cómo Funciona?</h2>
-
-                    <p>PNPtv! vive completamente dentro de <strong>Telegram</strong>, utilizando cuatro componentes simples que trabajan juntos.</p>
-
-                    <h3>🔹 Telegram</h3>
-                    <p>Telegram es una aplicación de mensajería gratuita (similar a WhatsApp, pero más poderosa) que permite que las comunidades combinen canales, grupos y bots en un solo lugar.</p>
-
-                    <h3>🔹 Canal</h3>
-                    <p>El <strong>Canal de PNPtv!</strong> es donde se publican anuncios y contenido oficial.</p>
-                    <ul>
-                        <li>Los miembros <strong>leen</strong> contenido aquí</li>
-                        <li>Solo los administradores pueden publicar</li>
-                        <li>Piénsalo como el tablón de anuncios de la comunidad</li>
-                    </ul>
-
-                    <h3>🔹 Grupo</h3>
-                    <p>El <strong>Grupo de la Comunidad PNPtv!</strong> es donde los miembros interactúan.</p>
-                    <ul>
-                        <li>Chatea con otros miembros</li>
-                        <li>Únete a discusiones</li>
-                        <li>Participa en actividades de la comunidad</li>
-                    </ul>
-
-                    <h3>🔹 Bot</h3>
-                    <p>El <strong>Bot de PNPtv!</strong> es el sistema central que lo gestiona todo. Esto:</p>
-                    <ul>
-                        <li>Te guía durante la incorporación</li>
-                        <li>Verifica el acceso</li>
-                        <li>Activa las membresías PRIME</li>
-                        <li>Desbloquea características automáticamente (menús, salas de video, enlaces)</li>
-                    </ul>
-
-                    <p style="margin-top: 1.5rem;">El bot hace que la experiencia sea <strong>automática e instantánea</strong>, sin necesidad de aprobación manual.</p>
-                </section>
-
-                <!-- Section 3 ES -->
-                <section class="section">
-                    <h2>3. ¿Cómo Me Uno?</h2>
-
-                    <p>Unirse a PNPtv! es simple y solo toma un minuto:</p>
-
-                    <ol>
-                        <li><strong>Abre Telegram</strong></li>
-                        <li><strong>Ve a</strong> t.me/pnptv_bot</li>
-                        <li><strong>Presiona Start / Iniciar</strong></li>
-                        <li><strong>Completa</strong> el proceso rápido de incorporación</li>
-                    </ol>
-
-                    <p style="margin-top: 1.5rem;"><strong>Una vez que termine la incorporación:</strong></p>
-                    <ul>
-                        <li>Recibirás el <strong>enlace al Grupo de la Comunidad PNPtv!</strong></li>
-                        <li>Tendrás acceso a las características de la comunidad gratuita</li>
-                    </ul>
-
-                    <div class="success-box">
-                        <strong>💡 Consejo:</strong> Para desbloquear <strong>todas las características</strong>, puedes suscribirte a una <strong>membresía PNPtv! PRIME</strong> directamente a través del bot.
-                    </div>
-
-                    <a href="https://t.me/pnptv_bot" target="_blank" class="cta-button">Abre el Bot de PNPtv! Ahora</a>
-                </section>
-
-                <!-- Section 4 ES -->
-                <section class="section">
-                    <h2>4. ¿Cómo Pago una Membresía PRIME?</h2>
-
-                    <p>Las membresías PNPtv! PRIME se gestionan <strong>directamente a través del bot</strong> y se activan <strong>inmediatamente después del pago</strong>.</p>
-
-                    <div class="grid">
-                        <div class="card">
-                            <h4>💳 Tarjetas de Crédito y Débito</h4>
-                            <p>Paga de forma segura usando tarjetas de crédito o débito. Los pagos se procesan a través de <strong>ePayco</strong>.</p>
-                        </div>
-                        <div class="card">
-                            <h4>💎 Pagos con Cripto</h4>
-                            <p>Paga con cripto a través de <strong>Daimo</strong> — rápido, seguro y discreto para uso global. Compatible con todos los monederos principales.</p>
-                        </div>
-                        <div class="card">
-                            <h4>🅿️ PayPal</h4>
-                            <p>Paga usando tu saldo de PayPal o tarjetas vinculadas y cuentas bancarias. Aceptado en todo el mundo.</p>
-                        </div>
-                        <div class="card">
-                            <h4>🏦 Apps Bancarias y USDC</h4>
-                            <p>Financia pagos USDC a través de Cash App, Zelle o Venmo. ¡Sin experiencia en cripto necesaria!</p>
-                        </div>
-                    </div>
-
-                    <h3 style="margin-top: 2rem;">✅ Activación Instantánea</h3>
-                    <p>Tan pronto como se complete el pago:</p>
-                    <ul>
-                        <li>El <strong>bot de PNPtv! lo detecta automáticamente</strong></li>
-                        <li>Tu <strong>membresía PRIME se activa instantáneamente</strong></li>
-                        <li>Todas las características premium se desbloquean de inmediato</li>
-                    </ul>
-
-                    <p style="margin-top: 1rem;"><strong>Sin esperas, sin correos, sin capturas de pantalla, sin aprobación manual.</strong></p>
-
-                    <div class="info-box">
-                        <strong>🔒 Seguridad:</strong> Todos los pagos se procesan a través de puertas de pago seguras estándar de la industria. Los detalles de tu tarjeta nunca se almacenan en nuestros servidores.
-                    </div>
-                </section>
-
-                <!-- Section 5 ES -->
-                <section class="section">
-                    <h2>5. Características Premium</h2>
-
-                    <p>Con PNPtv! PRIME, desbloqueas:</p>
-
-                    <h3>📺 Contenido Exclusivo</h3>
-                    <ul>
-                        <li>Contenido de PNP curado por Santino y Lex</li>
-                        <li>Acceso anticipado a nuevos lanzamientos</li>
-                        <li>Material detrás de cámaras</li>
-                    </ul>
-
-                    <h3>🎥 Salas de Video</h3>
-                    <ul>
-                        <li>Acceso 24/7 a salas de chat de video en vivo</li>
-                        <li>Conecta con miembros verificados de la comunidad</li>
-                        <li>Compartición de pantalla y video HD</li>
-                    </ul>
-
-                    <h3>🎵 Playlists Musicales</h3>
-                    <ul>
-                        <li>Playlists curadas para cada estado de ánimo</li>
-                        <li>Acceso a colecciones de música exclusiva</li>
-                        <li>Crea y comparte tus propias playlists</li>
-                    </ul>
-
-                    <h3>📍 Funciones de Geolocalización</h3>
-                    <ul>
-                        <li>Descubre miembros de PNPtv! cerca de ti</li>
-                        <li>Compartición de ubicación opcional con controles de privacidad</li>
-                        <li>Organiza encuentros locales y conexiones</li>
-                    </ul>
-
-                    <h3>🔔 Acceso Anticipado</h3>
-                    <ul>
-                        <li>Primer acceso a nuevas herramientas y características</li>
-                        <li>Oportunidades de prueba beta</li>
-                        <li>Anuncios exclusivos de la comunidad</li>
-                    </ul>
-                </section>
-
-                <!-- CTA ES -->
-                <section class="section" style="text-align: center;">
-                    <h2>¿Listo para Unirte a PNPtv!?</h2>
-                    <p style="font-size: 1.2rem; margin-bottom: 2rem;">Únete a miles de fans de PNP en nuestra comunidad. Solo toma un minuto.</p>
-                    <a href="https://t.me/pnptv_bot" target="_blank" class="cta-button">Comienza con el Bot Ahora</a>
-                </section>
-            </div>
-
-            <!-- Footer ES -->
-            <footer class="footer">
-                <p>&copy; 2025 PNPtv!. Todos los derechos reservados.</p>
-                <p>Solo para mayores de 18 años | Al acceder a este sitio confirmas que tienes 18 años o más</p>
-            </footer>
-        </div>
+        <div id="main-container"></div>
     </div>
 
     <script>
-        let currentLanguage = 'en';
+        /**
+         * JSON Content Data Structure
+         * Single source of truth for all page content (English & Spanish)
+         * Easy to extend with new sections - just add to the sections array
+         */
+        const contentData = {
+            meta: {
+                title: "How to Use PNPtv! | Cómo Usar PNPtv!",
+                description: "Complete guide to using PNPtv! community on Telegram. Learn about PRIME membership, payment methods, and all available features."
+            },
 
-        function switchLanguage(lang) {
-            currentLanguage = lang;
+            hero: {
+                type: "hero",
+                icon: "🌟",
+                title: {
+                    en: "How to Use PNPtv!",
+                    es: "¿Cómo Usar PNPtv!?"
+                },
+                subtitle: {
+                    en: "Everything you need to know about connecting, sharing, and creating in the PNPtv! community",
+                    es: "Todo lo que necesitas saber sobre conectar, compartir y crear en la comunidad PNPtv!"
+                }
+            },
 
-            document.getElementById('langEnBtn').classList.toggle('active', lang === 'en');
-            document.getElementById('langEsBtn').classList.toggle('active', lang === 'es');
+            sections: [
+                {
+                    id: "what-is-pnptv",
+                    type: "content",
+                    order: 1,
+                    title: {
+                        en: "1. What is PNPtv!?",
+                        es: "1. ¿Qué es PNPtv!?"
+                    },
+                    content: [
+                        {
+                            type: "paragraph",
+                            html: {
+                                en: "<strong>PNPtv!</strong> is a community of <strong>PNP stans and like-minded adults</strong> who connect, share, and create inside Telegram.",
+                                es: "<strong>PNPtv!</strong> es una comunidad de <strong>fans de PNP y adultos afines</strong> que se conectan, comparten y crean dentro de Telegram."
+                            }
+                        },
+                        {
+                            type: "paragraph",
+                            text: {
+                                en: "At its core, PNPtv! is:",
+                                es: "En esencia, PNPtv! es:"
+                            }
+                        },
+                        {
+                            type: "list",
+                            items: {
+                                en: [
+                                    "A <strong>free Telegram community</strong> where members can interact",
+                                    "A <strong>PRIME membership experience</strong> for those who want full access"
+                                ],
+                                es: [
+                                    "Una <strong>comunidad gratuita en Telegram</strong> donde los miembros pueden interactuar",
+                                    "Una <strong>experiencia de membresía PRIME</strong> para quienes desean acceso completo"
+                                ]
+                            }
+                        },
+                        {
+                            type: "subsection",
+                            icon: "💎",
+                            title: {
+                                en: "What You Get with PNPtv! PRIME",
+                                es: "¿Qué Obtienes con PNPtv! PRIME?"
+                            },
+                            content: [
+                                {
+                                    type: "list",
+                                    items: {
+                                        en: [
+                                            "Exclusive <strong>PNP content by Santino and Lex</strong>",
+                                            "Access to <strong>video call rooms</strong>",
+                                            "Curated <strong>music playlists</strong>",
+                                            "<strong>Geolocation features</strong> to discover nearby members",
+                                            "Early access to new tools and community features"
+                                        ],
+                                        es: [
+                                            "Contenido exclusivo de <strong>PNP por Santino y Lex</strong>",
+                                            "Acceso a <strong>salas de videollamadas</strong>",
+                                            "<strong>Playlists musicales</strong> curadas",
+                                            "<strong>Funciones de geolocalización</strong> para descubrir miembros cercanos",
+                                            "Acceso anticipado a nuevas herramientas y características de la comunidad"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            type: "paragraph",
+                            html: {
+                                en: "<p style='margin-top: 2rem; font-style: italic;'>PNPtv! is not just content — it's a <strong>self-managed digital community</strong> built around connection, creativity, and shared experiences.</p>",
+                                es: "<p style='margin-top: 2rem; font-style: italic;'>PNPtv! no es solo contenido — es una <strong>comunidad digital autogestionada</strong> centrada en la conexión, la creatividad y las experiencias compartidas.</p>"
+                            }
+                        }
+                    ]
+                },
 
-            document.getElementById('content-en').classList.toggle('active', lang === 'en');
-            document.getElementById('content-es').classList.toggle('active', lang === 'es');
+                {
+                    id: "how-it-works",
+                    type: "content",
+                    order: 2,
+                    title: {
+                        en: "2. How Does It Work?",
+                        es: "2. ¿Cómo Funciona?"
+                    },
+                    content: [
+                        {
+                            type: "paragraph",
+                            html: {
+                                en: "PNPtv! lives entirely inside <strong>Telegram</strong>, using four simple components that work together.",
+                                es: "PNPtv! vive completamente dentro de <strong>Telegram</strong>, utilizando cuatro componentes simples que trabajan juntos."
+                            }
+                        },
+                        {
+                            type: "subsection",
+                            icon: "🔹",
+                            title: { en: "Telegram", es: "Telegram" },
+                            content: [
+                                {
+                                    type: "paragraph",
+                                    text: {
+                                        en: "Telegram is a free messaging app (similar to WhatsApp, but more powerful) that allows communities to combine channels, groups, and bots in one place.",
+                                        es: "Telegram es una aplicación de mensajería gratuita (similar a WhatsApp, pero más poderosa) que permite que las comunidades combinen canales, grupos y bots en un solo lugar."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            type: "subsection",
+                            icon: "🔹",
+                            title: { en: "Channel", es: "Canal" },
+                            content: [
+                                {
+                                    type: "paragraph",
+                                    html: {
+                                        en: "The <strong>PNPtv! Channel</strong> is where official content and announcements are posted.",
+                                        es: "El <strong>Canal de PNPtv!</strong> es donde se publican anuncios y contenido oficial."
+                                    }
+                                },
+                                {
+                                    type: "list",
+                                    items: {
+                                        en: [
+                                            "Members <strong>read</strong> content here",
+                                            "Posting is limited to admins",
+                                            "Think of it as the community's bulletin board"
+                                        ],
+                                        es: [
+                                            "Los miembros <strong>leen</strong> contenido aquí",
+                                            "Solo los administradores pueden publicar",
+                                            "Piénsalo como el tablón de anuncios de la comunidad"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            type: "subsection",
+                            icon: "🔹",
+                            title: { en: "Group", es: "Grupo" },
+                            content: [
+                                {
+                                    type: "paragraph",
+                                    html: {
+                                        en: "The <strong>PNPtv! Community Group</strong> is where members interact.",
+                                        es: "El <strong>Grupo de la Comunidad PNPtv!</strong> es donde los miembros interactúan."
+                                    }
+                                },
+                                {
+                                    type: "list",
+                                    items: {
+                                        en: [
+                                            "Chat with other members",
+                                            "Join discussions",
+                                            "Participate in community activities"
+                                        ],
+                                        es: [
+                                            "Chatea con otros miembros",
+                                            "Únete a discusiones",
+                                            "Participa en actividades de la comunidad"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            type: "subsection",
+                            icon: "🔹",
+                            title: { en: "Bot", es: "Bot" },
+                            content: [
+                                {
+                                    type: "paragraph",
+                                    html: {
+                                        en: "The <strong>PNPtv! Bot</strong> is the core system that runs everything. It:",
+                                        es: "El <strong>Bot de PNPtv!</strong> es el sistema central que lo gestiona todo. Esto:"
+                                    }
+                                },
+                                {
+                                    type: "list",
+                                    items: {
+                                        en: [
+                                            "Guides you through onboarding",
+                                            "Verifies access",
+                                            "Activates PRIME memberships",
+                                            "Unlocks features automatically (menus, video rooms, links)"
+                                        ],
+                                        es: [
+                                            "Te guía durante la incorporación",
+                                            "Verifica el acceso",
+                                            "Activa las membresías PRIME",
+                                            "Desbloquea características automáticamente (menús, salas de video, enlaces)"
+                                        ]
+                                    }
+                                },
+                                {
+                                    type: "paragraph",
+                                    text: {
+                                        en: "The bot makes the experience automatic and instant, with no manual approval needed.",
+                                        es: "El bot hace que la experiencia sea automática e instantánea, sin necesidad de aprobación manual."
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
 
-            localStorage.setItem('pnptv_language', lang);
+                {
+                    id: "how-to-join",
+                    type: "content",
+                    order: 3,
+                    title: {
+                        en: "3. How Do I Join?",
+                        es: "3. ¿Cómo Me Uno?"
+                    },
+                    content: [
+                        {
+                            type: "paragraph",
+                            text: {
+                                en: "Joining PNPtv! is simple and only takes a minute:",
+                                es: "Unirse a PNPtv! es simple y solo toma un minuto:"
+                            }
+                        },
+                        {
+                            type: "ordered-list",
+                            items: {
+                                en: [
+                                    "<strong>Open Telegram</strong>",
+                                    "<strong>Go to</strong> t.me/pnptv_bot",
+                                    "<strong>Tap Start</strong>",
+                                    "<strong>Complete</strong> the quick onboarding process"
+                                ],
+                                es: [
+                                    "<strong>Abre Telegram</strong>",
+                                    "<strong>Ve a</strong> t.me/pnptv_bot",
+                                    "<strong>Presiona Start / Iniciar</strong>",
+                                    "<strong>Completa</strong> el proceso rápido de incorporación"
+                                ]
+                            }
+                        },
+                        {
+                            type: "paragraph",
+                            html: {
+                                en: "<p style='margin-top: 1.5rem;'><strong>Once onboarding is finished:</strong></p>",
+                                es: "<p style='margin-top: 1.5rem;'><strong>Una vez que termine la incorporación:</strong></p>"
+                            }
+                        },
+                        {
+                            type: "list",
+                            items: {
+                                en: [
+                                    "You receive the <strong>link to the PNPtv! Community Group</strong>",
+                                    "You gain access to the free community features"
+                                ],
+                                es: [
+                                    "Recibirás el <strong>enlace al Grupo de la Comunidad PNPtv!</strong>",
+                                    "Tendrás acceso a las características de la comunidad gratuita"
+                                ]
+                            }
+                        },
+                        {
+                            type: "infobox",
+                            variant: "success",
+                            icon: "💡",
+                            title: {
+                                en: "Tip:",
+                                es: "Consejo:"
+                            },
+                            text: {
+                                en: "To unlock <strong>all features</strong>, you can subscribe to a <strong>PNPtv! PRIME membership</strong> directly through the bot.",
+                                es: "Para desbloquear <strong>todas las características</strong>, puedes suscribirte a una <strong>membresía PNPtv! PRIME</strong> directamente a través del bot."
+                            }
+                        },
+                        {
+                            type: "cta",
+                            text: {
+                                en: "Open PNPtv! Bot Now",
+                                es: "Abre el Bot de PNPtv! Ahora"
+                            },
+                            url: "https://t.me/pnptv_bot"
+                        }
+                    ]
+                },
+
+                {
+                    id: "payment-methods",
+                    type: "card-grid",
+                    order: 4,
+                    title: {
+                        en: "4. How Do I Pay for PRIME?",
+                        es: "4. ¿Cómo Pago una Membresía PRIME?"
+                    },
+                    intro: {
+                        type: "paragraph",
+                        html: {
+                            en: "PNPtv! PRIME memberships are handled <strong>directly through the bot</strong> and activate <strong>immediately after payment</strong>.",
+                            es: "Las membresías PNPtv! PRIME se gestionan <strong>directamente a través del bot</strong> y se activan <strong>inmediatamente después del pago</strong>."
+                        }
+                    },
+                    cards: [
+                        {
+                            icon: "💳",
+                            title: {
+                                en: "Credit & Debit Cards",
+                                es: "Tarjetas de Crédito y Débito"
+                            },
+                            description: {
+                                en: "Pay securely using credit or debit cards. Payments processed through <strong>ePayco</strong>.",
+                                es: "Paga de forma segura usando tarjetas de crédito o débito. Los pagos se procesan a través de <strong>ePayco</strong>."
+                            }
+                        },
+                        {
+                            icon: "💎",
+                            title: {
+                                en: "Crypto Payments",
+                                es: "Pagos con Cripto"
+                            },
+                            description: {
+                                en: "Pay with crypto via <strong>Daimo</strong> — fast, secure, and discreet for global use. Supports all major wallets.",
+                                es: "Paga con cripto a través de <strong>Daimo</strong> — rápido, seguro y discreto para uso global. Compatible con todos los monederos principales."
+                            }
+                        },
+                        {
+                            icon: "🅿️",
+                            title: {
+                                en: "PayPal",
+                                es: "PayPal"
+                            },
+                            description: {
+                                en: "Pay using PayPal balance or linked cards and bank accounts. Worldwide accepted.",
+                                es: "Paga usando tu saldo de PayPal o tarjetas vinculadas y cuentas bancarias. Aceptado en todo el mundo."
+                            }
+                        },
+                        {
+                            icon: "🏦",
+                            title: {
+                                en: "Bank Apps & USDC",
+                                es: "Apps Bancarias y USDC"
+                            },
+                            description: {
+                                en: "Fund USDC payments via Cash App, Zelle, or Venmo. No crypto experience needed!",
+                                es: "Financia pagos USDC a través de Cash App, Zelle o Venmo. ¡Sin experiencia en cripto necesaria!"
+                            }
+                        }
+                    ],
+                    footer: [
+                        {
+                            type: "subsection",
+                            icon: "✅",
+                            title: {
+                                en: "Instant Activation",
+                                es: "Activación Instantánea"
+                            },
+                            content: [
+                                {
+                                    type: "paragraph",
+                                    text: {
+                                        en: "As soon as your payment is completed:",
+                                        es: "Tan pronto como se complete el pago:"
+                                    }
+                                },
+                                {
+                                    type: "list",
+                                    items: {
+                                        en: [
+                                            "The <strong>PNPtv! bot automatically detects it</strong>",
+                                            "Your <strong>PRIME membership activates instantly</strong>",
+                                            "All premium features unlock right away"
+                                        ],
+                                        es: [
+                                            "El <strong>bot de PNPtv! lo detecta automáticamente</strong>",
+                                            "Tu <strong>membresía PRIME se activa instantáneamente</strong>",
+                                            "Todas las características premium se desbloquean de inmediato"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            type: "infobox",
+                            variant: "info",
+                            icon: "🔒",
+                            title: {
+                                en: "Security:",
+                                es: "Seguridad:"
+                            },
+                            text: {
+                                en: "All payments are processed through industry-standard, secure payment gateways. Your card details are never stored on our servers.",
+                                es: "Todos los pagos se procesan a través de puertas de pago seguras estándar de la industria. Los detalles de tu tarjeta nunca se almacenan en nuestros servidores."
+                            }
+                        }
+                    ]
+                },
+
+                {
+                    id: "premium-features",
+                    type: "content",
+                    order: 5,
+                    title: {
+                        en: "5. Premium Features",
+                        es: "5. Características Premium"
+                    },
+                    content: [
+                        {
+                            type: "paragraph",
+                            text: {
+                                en: "With PNPtv! PRIME, you unlock:",
+                                es: "Con PNPtv! PRIME, desbloqueas:"
+                            }
+                        },
+                        {
+                            type: "subsection",
+                            icon: "📺",
+                            title: {
+                                en: "Exclusive Content",
+                                es: "Contenido Exclusivo"
+                            },
+                            content: [
+                                {
+                                    type: "list",
+                                    items: {
+                                        en: [
+                                            "PNP content curated by Santino and Lex",
+                                            "Early access to new releases",
+                                            "Behind-the-scenes material"
+                                        ],
+                                        es: [
+                                            "Contenido de PNP curado por Santino y Lex",
+                                            "Acceso anticipado a nuevos lanzamientos",
+                                            "Material detrás de cámaras"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            type: "subsection",
+                            icon: "🎥",
+                            title: {
+                                en: "Video Rooms",
+                                es: "Salas de Video"
+                            },
+                            content: [
+                                {
+                                    type: "list",
+                                    items: {
+                                        en: [
+                                            "24/7 access to live video chat rooms",
+                                            "Connect with verified community members",
+                                            "Screen sharing and HD video"
+                                        ],
+                                        es: [
+                                            "Acceso 24/7 a salas de chat de video en vivo",
+                                            "Conecta con miembros verificados de la comunidad",
+                                            "Compartición de pantalla y video HD"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            type: "subsection",
+                            icon: "🎵",
+                            title: {
+                                en: "Music Playlists",
+                                es: "Playlists Musicales"
+                            },
+                            content: [
+                                {
+                                    type: "list",
+                                    items: {
+                                        en: [
+                                            "Curated playlists for every mood",
+                                            "Access to exclusive music collections",
+                                            "Create and share your own playlists"
+                                        ],
+                                        es: [
+                                            "Playlists curadas para cada estado de ánimo",
+                                            "Acceso a colecciones de música exclusiva",
+                                            "Crea y comparte tus propias playlists"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            type: "subsection",
+                            icon: "📍",
+                            title: {
+                                en: "Geolocation Features",
+                                es: "Funciones de Geolocalización"
+                            },
+                            content: [
+                                {
+                                    type: "list",
+                                    items: {
+                                        en: [
+                                            "Discover PNPtv! members near you",
+                                            "Optional location sharing with privacy controls",
+                                            "Arrange local meetups and connections"
+                                        ],
+                                        es: [
+                                            "Descubre miembros de PNPtv! cerca de ti",
+                                            "Compartición de ubicación opcional con controles de privacidad",
+                                            "Organiza encuentros locales y conexiones"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            type: "subsection",
+                            icon: "🔔",
+                            title: {
+                                en: "Early Access",
+                                es: "Acceso Anticipado"
+                            },
+                            content: [
+                                {
+                                    type: "list",
+                                    items: {
+                                        en: [
+                                            "First access to new features and tools",
+                                            "Beta testing opportunities",
+                                            "Exclusive community announcements"
+                                        ],
+                                        es: [
+                                            "Primer acceso a nuevas herramientas y características",
+                                            "Oportunidades de prueba beta",
+                                            "Anuncios exclusivos de la comunidad"
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+
+                {
+                    id: "cta-final",
+                    type: "cta",
+                    order: 6,
+                    title: {
+                        en: "Ready to Join PNPtv!?",
+                        es: "¿Listo para Unirte a PNPtv!?"
+                    },
+                    subtitle: {
+                        en: "Join thousands of PNP stans in our community. It takes less than a minute.",
+                        es: "Únete a miles de fans de PNP en nuestra comunidad. Solo toma un minuto."
+                    },
+                    button: {
+                        text: {
+                            en: "Start with the Bot Now",
+                            es: "Comienza con el Bot Ahora"
+                        },
+                        url: "https://t.me/pnptv_bot"
+                    }
+                }
+            ],
+
+            footer: {
+                copyright: {
+                    en: "&copy; 2025 PNPtv!. All rights reserved.",
+                    es: "&copy; 2025 PNPtv!. Todos los derechos reservados."
+                },
+                disclaimer: {
+                    en: "18+ Only | By accessing this site you confirm you are 18 years or older",
+                    es: "Solo para mayores de 18 años | Al acceder a este sitio confirmas que tienes 18 años o más"
+                }
+            }
+        };
+
+        /**
+         * ContentRenderer - Base class for rendering content elements
+         * Handles: paragraphs, lists, subsections, infoboxes, cards, CTAs
+         */
+        class ContentRenderer {
+            constructor(language = 'en') {
+                this.language = language;
+            }
+
+            getText(obj) {
+                if (typeof obj === 'string') return obj;
+                return obj[this.language] || obj.en || '';
+            }
+
+            render(item) {
+                if (!item || !item.type) return null;
+
+                const method = `render${item.type.charAt(0).toUpperCase()}${item.type.slice(1).replace(/-./g, x => x[1].toUpperCase())}`;
+
+                if (typeof this[method] === 'function') {
+                    return this[method].call(this, item);
+                }
+
+                console.warn(`No renderer for type: ${item.type}`);
+                return null;
+            }
+
+            renderParagraph(item) {
+                const p = document.createElement('p');
+                if (item.html) {
+                    p.innerHTML = this.getText(item.html);
+                } else {
+                    p.textContent = this.getText(item.text);
+                }
+                if (item.style) p.setAttribute('style', item.style);
+                return p;
+            }
+
+            renderList(item) {
+                const ul = document.createElement('ul');
+                const items = this.getText(item.items);
+                items.forEach(itemText => {
+                    const li = document.createElement('li');
+                    li.innerHTML = itemText;
+                    ul.appendChild(li);
+                });
+                return ul;
+            }
+
+            renderOrderedList(item) {
+                const ol = document.createElement('ol');
+                const items = this.getText(item.items);
+                items.forEach(itemText => {
+                    const li = document.createElement('li');
+                    li.innerHTML = itemText;
+                    ol.appendChild(li);
+                });
+                return ol;
+            }
+
+            renderSubsection(item) {
+                const div = document.createElement('div');
+                const h3 = document.createElement('h3');
+                h3.innerHTML = `${item.icon || ''} ${this.getText(item.title)}`.trim();
+                div.appendChild(h3);
+
+                if (item.content) {
+                    item.content.forEach(content => {
+                        const elem = this.render(content);
+                        if (elem) div.appendChild(elem);
+                    });
+                }
+                return div;
+            }
+
+            renderInfobox(item) {
+                const div = document.createElement('div');
+                div.className = `${item.variant || 'info'}-box`;
+                const p = document.createElement('p');
+                const title = this.getText(item.title);
+                const text = this.getText(item.text);
+                p.innerHTML = `<strong>${item.icon ? item.icon + ' ' : ''}${title}</strong> ${text}`;
+                div.appendChild(p);
+                return div;
+            }
+
+            renderCard(item) {
+                const card = document.createElement('div');
+                card.className = 'card';
+
+                if (item.icon) {
+                    const h4 = document.createElement('h4');
+                    h4.innerHTML = `${item.icon} ${this.getText(item.title)}`;
+                    card.appendChild(h4);
+                } else {
+                    const h4 = document.createElement('h4');
+                    h4.innerHTML = this.getText(item.title);
+                    card.appendChild(h4);
+                }
+
+                const p = document.createElement('p');
+                p.innerHTML = this.getText(item.description);
+                card.appendChild(p);
+                return card;
+            }
+
+            renderCta(item) {
+                const a = document.createElement('a');
+                a.href = item.url;
+                a.className = 'cta-button';
+                a.textContent = this.getText(item.text);
+                a.target = '_blank';
+                return a;
+            }
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
-            const savedLang = localStorage.getItem('pnptv_language') || 'en';
-            switchLanguage(savedLang);
+        /**
+         * SectionRenderer - Section-level rendering for different section types
+         */
+        class SectionRenderer extends ContentRenderer {
+            renderSection(section) {
+                const handler = this[`render${section.type.charAt(0).toUpperCase()}${section.type.slice(1).replace(/-./g, x => x[1].toUpperCase())}Section`];
+
+                if (typeof handler === 'function') {
+                    return handler.call(this, section);
+                }
+
+                console.warn(`No section renderer for type: ${section.type}`);
+                return null;
+            }
+
+            renderContentSection(section) {
+                const sectionEl = document.createElement('section');
+                sectionEl.className = 'section';
+                sectionEl.id = section.id;
+
+                const h2 = document.createElement('h2');
+                h2.textContent = this.getText(section.title);
+                sectionEl.appendChild(h2);
+
+                if (section.content) {
+                    section.content.forEach(item => {
+                        const elem = this.render(item);
+                        if (elem) sectionEl.appendChild(elem);
+                    });
+                }
+                return sectionEl;
+            }
+
+            renderCardgridSection(section) {
+                const sectionEl = document.createElement('section');
+                sectionEl.className = 'section';
+                sectionEl.id = section.id;
+
+                const h2 = document.createElement('h2');
+                h2.textContent = this.getText(section.title);
+                sectionEl.appendChild(h2);
+
+                if (section.intro) {
+                    const intro = this.render(section.intro);
+                    if (intro) sectionEl.appendChild(intro);
+                }
+
+                const grid = document.createElement('div');
+                grid.className = 'grid';
+                section.cards.forEach(card => {
+                    grid.appendChild(this.renderCard(card));
+                });
+                sectionEl.appendChild(grid);
+
+                if (section.footer) {
+                    section.footer.forEach(item => {
+                        const elem = this.render(item);
+                        if (elem) sectionEl.appendChild(elem);
+                    });
+                }
+                return sectionEl;
+            }
+
+            renderCtaSection(section) {
+                const sectionEl = document.createElement('section');
+                sectionEl.className = 'section';
+                sectionEl.id = section.id;
+                sectionEl.style.textAlign = 'center';
+
+                const h2 = document.createElement('h2');
+                h2.textContent = this.getText(section.title);
+                sectionEl.appendChild(h2);
+
+                const p = document.createElement('p');
+                p.style.fontSize = '1.2rem';
+                p.style.marginBottom = '2rem';
+                p.textContent = this.getText(section.subtitle);
+                sectionEl.appendChild(p);
+
+                const button = this.renderCta(section.button);
+                sectionEl.appendChild(button);
+                return sectionEl;
+            }
+
+            renderHeroSection(section) {
+                const hero = document.createElement('section');
+                hero.className = 'hero';
+
+                const heroContent = document.createElement('div');
+                heroContent.className = 'hero-content';
+
+                const h1 = document.createElement('h1');
+                h1.textContent = `${section.icon} ${this.getText(section.title)}`;
+                heroContent.appendChild(h1);
+
+                const p = document.createElement('p');
+                p.textContent = this.getText(section.subtitle);
+                heroContent.appendChild(p);
+
+                hero.appendChild(heroContent);
+                return hero;
+            }
+        }
+
+        /**
+         * BilingualPageManager - Manages page lifecycle and language switching
+         */
+        class BilingualPageManager {
+            constructor(contentData) {
+                this.contentData = contentData;
+                this.currentLanguage = this.loadLanguagePreference();
+                this.renderer = new SectionRenderer(this.currentLanguage);
+            }
+
+            loadLanguagePreference() {
+                return localStorage.getItem('pnptv_language') || 'en';
+            }
+
+            saveLanguagePreference(lang) {
+                localStorage.setItem('pnptv_language', lang);
+            }
+
+            switchLanguage(lang) {
+                if (lang === this.currentLanguage) return;
+
+                this.currentLanguage = lang;
+                this.saveLanguagePreference(lang);
+                this.renderer.language = lang;
+
+                this.renderPage();
+                this.updateLanguageButtons();
+            }
+
+            updateLanguageButtons() {
+                document.getElementById('langEnBtn')?.classList.toggle('active', this.currentLanguage === 'en');
+                document.getElementById('langEsBtn')?.classList.toggle('active', this.currentLanguage === 'es');
+            }
+
+            renderPage() {
+                const container = document.getElementById('main-container');
+                container.innerHTML = '';
+
+                if (this.contentData.hero) {
+                    const hero = this.renderer.renderHeroSection(this.contentData.hero);
+                    container.appendChild(hero);
+                }
+
+                const contentContainer = document.createElement('div');
+                contentContainer.className = 'container';
+
+                const sortedSections = [...this.contentData.sections].sort((a, b) => a.order - b.order);
+
+                sortedSections.forEach(section => {
+                    const sectionEl = this.renderer.renderSection(section);
+                    if (sectionEl) contentContainer.appendChild(sectionEl);
+                });
+
+                container.appendChild(contentContainer);
+
+                if (this.contentData.footer) {
+                    const footer = this.renderFooter(this.contentData.footer);
+                    container.appendChild(footer);
+                }
+            }
+
+            renderFooter(footerData) {
+                const footer = document.createElement('footer');
+                footer.className = 'footer';
+
+                const copyright = document.createElement('p');
+                copyright.innerHTML = this.renderer.getText(footerData.copyright);
+                footer.appendChild(copyright);
+
+                const disclaimer = document.createElement('p');
+                disclaimer.innerHTML = this.renderer.getText(footerData.disclaimer);
+                footer.appendChild(disclaimer);
+
+                return footer;
+            }
+
+            init() {
+                this.renderPage();
+                this.updateLanguageButtons();
+
+                document.getElementById('langEnBtn')?.addEventListener('click', () => this.switchLanguage('en'));
+                document.getElementById('langEsBtn')?.addEventListener('click', () => this.switchLanguage('es'));
+
+                const menuToggle = document.getElementById('menuToggle');
+                if (menuToggle) {
+                    menuToggle.addEventListener('click', () => {
+                        console.log('Mobile menu toggled');
+                    });
+                }
+            }
+        }
+
+        // Initialize page on load
+        document.addEventListener('DOMContentLoaded', () => {
+            window.pageManager = new BilingualPageManager(contentData);
+            window.pageManager.init();
         });
-
-        const menuToggle = document.getElementById('menuToggle');
-        if (menuToggle) {
-            menuToggle.addEventListener('click', () => {
-                alert('Mobile menu - Full implementation in mobile version');
-            });
-        }
     </script>
 </body>
 </html>

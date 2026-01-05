@@ -24,6 +24,7 @@ const {
   groupMenuRedirectMiddleware,
   groupCommandDeleteMiddleware
 } = require('./middleware/groupBehavior');
+const groupCommandRestrictionMiddleware = require('./middleware/groupCommandRestriction');
 const logger = require('../../utils/logger');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
@@ -146,6 +147,7 @@ const startBot = async () => {
     bot.use(cristinaGroupFilterMiddleware()); // Filter personal info from Cristina in groups
     bot.use(groupMenuRedirectMiddleware()); // Redirect menu button clicks to private
     bot.use(groupCommandDeleteMiddleware()); // Delete commands after 3 minutes
+    bot.use(groupCommandRestrictionMiddleware()); // Block all commands except /menu in groups
 
     // Topic-specific middlewares
     bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
