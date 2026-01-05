@@ -262,6 +262,22 @@
             background: linear-gradient(135deg, #5568d3 0%, #663a91 100%);
         }
 
+        /* Icon Button */
+        .btn-icon-small {
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .btn-icon-small:hover {
+            transform: scale(1.1);
+        }
+
         /* Tabs */
         .tabs {
             background: #f5f5f5;
@@ -528,7 +544,7 @@
             <ul class="right hide-on-med-and-down">
                 <li><a href="/" title="Home"><i class="material-icons">home</i></a></li>
                 <li><a href="/radio.html" title="Radio"><i class="material-icons">radio</i></a></li>
-                <li><a href="/video-rooms.html" title="Video Rooms"><i class="material-icons">videocam</i></a></li>
+                <li><a href="/videorama" title="Videorama"><i class="material-icons">videocam</i></a></li>
                 <li><a href="#language" title="Language"><i class="material-icons">language</i></a></li>
             </ul>
         </div>
@@ -768,34 +784,78 @@
             return div.innerHTML;
         }
 
-        // Merge all playlists (PNPtv + user)
-        function getAllPlaylists() {
+        // Merge all playlists (PNPtv + user + API)
+        async function getAllPlaylists() {
             let allPlaylists = [...playlists];
 
-            // Add user playlists with random featured status
+            // Add localStorage user playlists
             userPlaylists.forEach(userPlaylist => {
                 allPlaylists.push({
                     ...userPlaylist,
-                    featured: Math.random() < 0.3 // 30% chance of being featured
+                    featured: Math.random() < 0.3
                 });
             });
+
+            // Fetch public playlists from API
+            try {
+                const response = await fetch('/api/playlists/public');
+                if (response.ok) {
+                    const apiPlaylists = await response.json();
+                    apiPlaylists.forEach(p => {
+                        allPlaylists.push({
+                            id: p.id,
+                            title: p.title,
+                            description: p.description,
+                            category: p.category,
+                            icon: p.icon || '🎵',
+                            videoCount: p.videoCount,
+                            thumbnail: p.thumbnail,
+                            videos: p.videos,
+                            featured: p.featured,
+                            creator: p.creator || 'User',
+                            creatorBadge: p.creatorBadge || '👤'
+                        });
+                    });
+                }
+            } catch (error) {
+                console.log('Could not load API playlists:', error);
+            }
 
             return allPlaylists;
         }
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function () {
+        // Initialize - Consolidated single initialization
+        document.addEventListener('DOMContentLoaded', async function () {
+            // Initialize Materialize components
             M.Tabs.init(document.querySelectorAll('.tabs'));
-            renderPlaylists();
-            renderFavorites();
+            M.Modal.init(document.getElementById('createPlaylistModal'));
+            M.updateTextFields();
+            M.FormSelect.init(document.querySelectorAll('select'));
+
+            // Set first chip as active
+            document.querySelector('.filter-chips .chip').classList.add('active');
+
+            // Initialize search input
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleSearch();
+                }
+            });
+
+            // Initialize video player
+            initializeVideoPlayer();
+
+            // Render content
+            await renderPlaylists();
+            await renderFavorites();
         });
 
         // Render Playlists
-        function renderPlaylists(filter = 'all') {
+        async function renderPlaylists(filter = 'all') {
             const container = document.getElementById('playlistsContainer');
             const emptyState = document.getElementById('emptyState');
 
-            let allPlaylists = getAllPlaylists();
+            let allPlaylists = await getAllPlaylists();
             let filtered = allPlaylists;
 
             if (filter !== 'all') {
@@ -850,11 +910,11 @@
         }
 
         // Render Favorites
-        function renderFavorites() {
+        async function renderFavorites() {
             const container = document.getElementById('favoritesContainer');
             const emptyFavorites = document.getElementById('emptyFavorites');
 
-            let allPlaylists = getAllPlaylists();
+            let allPlaylists = await getAllPlaylists();
             const favoritePlaylists = allPlaylists.filter(p => favorites.includes(p.id));
 
             if (favoritePlaylists.length === 0) {
@@ -935,9 +995,9 @@
         }
 
         // Play Playlist
-        function playPlaylist(event, playlistId) {
+        async function playPlaylist(event, playlistId) {
             event.stopPropagation();
-            const allPlaylists = getAllPlaylists();
+            const allPlaylists = await getAllPlaylists();
             const playlist = allPlaylists.find(p => p.id === playlistId);
 
             if (playlist && playlist.videos && playlist.videos.length > 0) {
@@ -954,8 +1014,8 @@
         }
 
         // View Playlist Details
-        function viewPlaylist(playlistId) {
-            const allPlaylists = getAllPlaylists();
+        async function viewPlaylist(playlistId) {
+            const allPlaylists = await getAllPlaylists();
             const playlist = allPlaylists.find(p => p.id === playlistId);
 
             // Show modal with playlist details
@@ -1059,23 +1119,6 @@
         function scrollToTop() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-
-        // Search on Enter
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('searchInput').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    handleSearch();
-                }
-            });
-        });
-
-        // Set first chip as active
-        document.addEventListener('DOMContentLoaded', () => {
-            document.querySelector('.filter-chips .chip').classList.add('active');
-            M.Modal.init(document.getElementById('createPlaylistModal'));
-            M.updateTextFields();
-            M.FormSelect.init(document.querySelectorAll('select'));
-        });
 
         // Create Playlist Modal Functions
         function openCreatePlaylistModal() {
@@ -1215,8 +1258,8 @@
             'https://invidious.nerdvpn.org',
         ];
 
-        // Initialize video player modal
-        document.addEventListener('DOMContentLoaded', () => {
+        // Initialize video player modal (moved to main DOMContentLoaded)
+        function initializeVideoPlayer() {
             const videoPlayerModal = document.getElementById('videoPlayerModal');
             videoPlayerModalInstance = M.Modal.init(videoPlayerModal, {
                 dismissible: true,
@@ -1226,7 +1269,7 @@
                     iframe.src = '';
                 }
             });
-        });
+        }
 
         // Test if an Invidious instance is working
         async function testInvidiousInstance(instance) {
@@ -1325,8 +1368,8 @@
         }
 
         // Play individual video from playlist modal
-        function playIndividualVideo(videoId, playlistId, videoIndex) {
-            const allPlaylists = getAllPlaylists();
+        async function playIndividualVideo(videoId, playlistId, videoIndex) {
+            const allPlaylists = await getAllPlaylists();
             const playlist = allPlaylists.find(p => p.id === playlistId);
 
             if (playlist) {

@@ -224,6 +224,40 @@ const MENU_CONFIG = {
     }
   },
 
+  // Group-specific menu (restricted options for group chat)
+  GROUP_MENU: {
+    title: {
+      en: '🎯 PNPtv Menu',
+      es: '🎯 Menú PNPtv'
+    },
+    options: [
+      {
+        id: 'subscribe',
+        title: { en: '💎 Subscribe to PRIME', es: '💎 Suscribirse a PRIME' },
+        callback: 'menu:subscribe',
+        deepLink: 'subscribe'
+      },
+      {
+        id: 'nearby',
+        title: { en: '📍 Nearby', es: '📍 Cercanos' },
+        callback: 'menu:nearby',
+        deepLink: 'nearby'
+      },
+      {
+        id: 'main_room',
+        title: { en: '🎥 PNPtv Main Room', es: '🎥 Sala Principal PNPtv' },
+        callback: 'menu:main_room',
+        deepLink: 'main_room'
+      },
+      {
+        id: 'support',
+        title: { en: '💬 Support', es: '💬 Soporte' },
+        callback: 'menu:support',
+        deepLink: 'support'
+      }
+    ]
+  },
+
   // Topic 3809 specific menu (only live streams & video calls)
   TOPIC_3809_MENU: {
     title: {

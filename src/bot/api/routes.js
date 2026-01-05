@@ -13,6 +13,7 @@ const subscriptionController = require('./controllers/subscriptionController');
 const paymentController = require('./controllers/paymentController');
 const invitationController = require('./controllers/invitationController');
 const hangoutsController = require('./controllers/hangoutsController');
+const playlistController = require('./controllers/playlistController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -62,9 +63,19 @@ app.get('/community-features', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/community-features.html'));
 });
 
-// Video Rooms page
-app.get('/video-rooms', (req, res) => {
+// How to Use page (Bilingual)
+app.get('/how-to-use', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/how-to-use.html'));
+});
+
+// Videorama page
+app.get('/videorama', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/video-rooms.html'));
+});
+
+// Legacy path redirect
+app.get('/video-rooms', (req, res) => {
+  res.redirect(301, '/videorama');
 });
 
 // Lifetime Pass landing page
@@ -96,9 +107,19 @@ app.get('/policies', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
 
-// Video Rooms landing page
-app.get('/video-rooms', pageLimiter, (req, res) => {
+// Videorama landing page
+app.get('/videorama', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', 'video-rooms.html'));
+});
+
+// Music Collections (formerly playlists)
+app.get('/music-collections', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'youtube-playlist.html'));
+});
+
+// Playlists (legacy route - redirects to music-collections)
+app.get('/playlists', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'youtube-playlist.html'));
 });
 
 // Hangouts page
@@ -265,6 +286,14 @@ app.get('/api/hangouts/:roomId', asyncHandler(hangoutsController.getHangoutDetai
 app.delete('/api/hangouts/video-call/:roomId', asyncHandler(hangoutsController.deleteVideoCallRoom));
 app.delete('/api/hangouts/jitsi/:roomId', asyncHandler(hangoutsController.deleteJitsiRoom));
 app.delete('/api/hangouts/main/:roomId', asyncHandler(hangoutsController.deleteMainRoom));
+
+// Playlist API routes
+app.get('/api/playlists/user', asyncHandler(playlistController.getUserPlaylists));
+app.get('/api/playlists/public', asyncHandler(playlistController.getPublicPlaylists));
+app.post('/api/playlists', asyncHandler(playlistController.createPlaylist));
+app.post('/api/playlists/:playlistId/videos', asyncHandler(playlistController.addToPlaylist));
+app.delete('/api/playlists/:playlistId/videos/:videoId', asyncHandler(playlistController.removeFromPlaylist));
+app.delete('/api/playlists/:playlistId', asyncHandler(playlistController.deletePlaylist));
 
 // Subscription API routes
 app.get('/api/subscription/plans', asyncHandler(subscriptionController.getPlans));

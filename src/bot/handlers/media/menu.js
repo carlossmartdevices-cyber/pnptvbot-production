@@ -100,6 +100,10 @@ Tap the buttons below and enjoy everything we've prepared for you — videos, Ne
 
 \`That's so hot! 🔥\``;
 
+        // Get user's display name for Jitsi
+        const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
+        const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+
         buttons = [
           [Markup.button.callback(
             lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile',
@@ -109,13 +113,17 @@ Tap the buttons below and enjoy everything we've prepared for you — videos, Ne
             lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who is Nearby?',
             'menu_nearby'
           )],
-          [Markup.button.callback(
-            lang === 'es' ? '🧑‍💼 Área de Miembros' : '🧑‍💼 Members Area',
-            'show_members_area'
+          [Markup.button.url(
+            lang === 'es' ? '🎬 Ver Contenido' : '🎬 Watch Content',
+            'https://t.me/+mUGxQj6w9AI2NGUx'
           )],
-          [Markup.button.callback(
-            lang === 'es' ? '🎥 PNPtv Hangouts!' : '🎥 PNPtv Hangouts!',
-            'menu_hangouts'
+          [Markup.button.url(
+            lang === 'es' ? '🎥 PNPtv main Room!' : '🎥 PNPtv main Room!',
+            jitsiUrl
+          )],
+          [Markup.button.url(
+            lang === 'es' ? '🎬 PNPtv Hangouts!' : '🎬 PNPtv Hangouts!',
+            'https://pnptv.app/hangouts'
           )],
           [Markup.button.callback(
             lang === 'es' ? '🆘 Ayuda' : '🆘 Help',
@@ -162,7 +170,7 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
             'menu_nearby'
           )],
           [Markup.button.callback(
-            lang === 'es' ? '🧑‍💼 Área de Miembros 🔒' : '🧑‍💼 Members Area 🔒',
+            lang === 'es' ? '🎬 Ver Contenido 🔒' : '🎬 Watch Content 🔒',
             'locked_feature'
           )],
           [Markup.button.callback(
@@ -261,7 +269,7 @@ Privacy: Your exact location is never publicly shared`;
       await ctx.answerCbQuery();
 
       const hangoutsText = lang === 'es'
-        ? `🎥 PNPtv Hangouts!
+        ? `🎥 PNPtv Video Room!
 
 Salas de video en vivo para conectar con otros miembros.
 
@@ -280,7 +288,7 @@ Nuestra sala principal está abierta 24 horas para que conozcas miembros nuevos,
 2. O crea tu propia sala privada
 3. Invita amigos a tu sala personal
 4. ¡Disfruta conexiones en video de calidad!`
-        : `🎥 PNPtv Hangouts!
+        : `🎥 PNPtv Video Room!
 
 Live video rooms to connect with other members.
 

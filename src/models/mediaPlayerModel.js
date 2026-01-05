@@ -187,10 +187,11 @@ class MediaPlayerModel {
   static async addToPlaylist(playlistId, mediaId) {
     try {
       const db = getFirestore();
+      const { FieldValue } = require('firebase-admin').firestore;
       const playlistRef = db.collection(PLAYLISTS_COLLECTION).doc(playlistId);
 
       await playlistRef.update({
-        mediaItems: db.FieldValue.arrayUnion(mediaId),
+        mediaItems: FieldValue.arrayUnion(mediaId),
         updatedAt: new Date(),
       });
 
@@ -211,10 +212,11 @@ class MediaPlayerModel {
   static async removeFromPlaylist(playlistId, mediaId) {
     try {
       const db = getFirestore();
+      const { FieldValue } = require('firebase-admin').firestore;
       const playlistRef = db.collection(PLAYLISTS_COLLECTION).doc(playlistId);
 
       await playlistRef.update({
-        mediaItems: db.FieldValue.arrayRemove(mediaId),
+        mediaItems: FieldValue.arrayRemove(mediaId),
         updatedAt: new Date(),
       });
 
@@ -370,10 +372,11 @@ class MediaPlayerModel {
   static async incrementPlayCount(mediaId) {
     try {
       const db = getFirestore();
+      const { FieldValue } = require('firebase-admin').firestore;
       const mediaRef = db.collection(MEDIA_COLLECTION).doc(mediaId);
 
       await mediaRef.update({
-        plays: db.FieldValue.increment(1),
+        plays: FieldValue.increment(1),
         updatedAt: new Date(),
       });
 
@@ -397,10 +400,11 @@ class MediaPlayerModel {
   static async toggleLike(mediaId, isLike) {
     try {
       const db = getFirestore();
+      const { FieldValue } = require('firebase-admin').firestore;
       const mediaRef = db.collection(MEDIA_COLLECTION).doc(mediaId);
 
       await mediaRef.update({
-        likes: db.FieldValue.increment(isLike ? 1 : -1),
+        likes: FieldValue.increment(isLike ? 1 : -1),
         updatedAt: new Date(),
       });
 

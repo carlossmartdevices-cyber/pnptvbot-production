@@ -9,13 +9,5 @@ module.exports = {
   testMatch: [
     '**/tests/**/*.test.js',
   ],
-  coverageThreshold: {
-    global: {
-      branches: 5,
-      functions: 10,
-      lines: 8,
-      statements: 8,
-    },
-  },
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
 };

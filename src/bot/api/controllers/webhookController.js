@@ -47,6 +47,19 @@ const markWebhookProcessed = (idempotencyKey) => {
 };
 
 /**
+ * Send a normalized error response
+ * @param {Response} res
+ * @param {number} status
+ * @param {string} code
+ * @param {string} message
+ */
+const sendError = (res, status, code, message) => res.status(status).json({
+  success: false,
+  code,
+  message,
+});
+
+/**
  * Sanitize bot username for safe HTML insertion
  * @param {string} username - Raw username
  * @returns {string} Sanitized username
@@ -106,7 +119,10 @@ const validateDaimoPayload = (payload) => {
       if (result.error && result.error.toLowerCase().includes('missing required fields')) {
         return { valid: false, error: 'Missing required fields' };
       }
-      if (result.error && (result.error.toLowerCase().includes('metadata') || result.error.toLowerCase().includes('source') || result.error.toLowerCase().includes('destination'))) {
+      const errorMsg = result.error ? result.error.toLowerCase() : '';
+      const metadataErrors = ['metadata', 'source', 'destination'];
+      const isMetadataError = metadataErrors.some((term) => errorMsg.includes(term));
+      if (result.error && isMetadataError) {
         return { valid: false, error: 'Invalid metadata structure' };
       }
       return result;
@@ -116,13 +132,17 @@ const validateDaimoPayload = (payload) => {
     if (err && err.message && err.message.toLowerCase().includes('missing required fields')) {
       return { valid: false, error: 'Missing required fields' };
     }
-    if (err && err.message && (err.message.toLowerCase().includes('metadata') || err.message.toLowerCase().includes('source') || err.message.toLowerCase().includes('destination'))) {
+    if (err && err.message) {
+      const errMsg = err.message.toLowerCase();
+      const metadataErrors = ['metadata', 'source', 'destination'];
+      const isMetadataError = metadataErrors.some((term) => errMsg.includes(term));
+      if (isMetadataError) {
       return { valid: false, error: 'Invalid metadata structure' };
+    }
     }
     return { valid: false, error: 'Invalid metadata structure' };
   }
 };
-;
 
 /**
  * Handle ePayco webhook
@@ -131,14 +151,34 @@ const validateDaimoPayload = (payload) => {
  */
 const handleEpaycoWebhook = async (req, res) => {
   try {
+    // Ensure transaction ID is present to build a stable idempotency key
+    if (!req.body.x_transaction_id) {
+      logger.warn('ePayco webhook missing transaction ID', {
+        transactionId: req.body.x_ref_payco,
+        signaturePresent: Boolean(req.body.x_signature),
+        provider: 'epayco',
+      });
+      return sendError(res, 400, 'MISSING_TRANSACTION_ID', 'x_transaction_id is required');
+    }
+
     // Use transaction ID as idempotency key
     const idempotencyKey = `epayco_${req.body.x_transaction_id}`;
+
+    // Verify webhook signature before any processing
+    const signatureCheck = verifyEpaycoSignature(req);
+    if (!signatureCheck.valid) {
+      const status = signatureCheck.reason === 'missing_signature' ? 400 : 401;
+      return sendError(res, status, 'INVALID_SIGNATURE', signatureCheck.error);
+    }
 
     // Check if this webhook was already processed
     if (isWebhookProcessed(idempotencyKey)) {
       logger.info('Duplicate ePayco webhook detected (already processed)', {
         transactionId: req.body.x_ref_payco,
         txId: req.body.x_transaction_id,
+        idempotencyKey,
+        provider: 'epayco',
+        signaturePresent: Boolean(req.body.x_signature),
       });
       return res.status(200).json({ success: true, duplicate: true });
     }
@@ -146,6 +186,9 @@ const handleEpaycoWebhook = async (req, res) => {
     logger.info('ePayco webhook received', {
       transactionId: req.body.x_ref_payco,
       state: req.body.x_transaction_state,
+      idempotencyKey,
+      provider: 'epayco',
+      signaturePresent: Boolean(req.body.x_signature),
     });
 
     // Validate payload structure
@@ -153,7 +196,7 @@ const handleEpaycoWebhook = async (req, res) => {
     if (!validation || !validation.valid) {
       const errorMsg = validation?.error || 'Invalid webhook payload';
       logger.warn('Invalid ePayco webhook payload', { error: errorMsg });
-      return res.status(400).json({ success: false, error: errorMsg });
+      return sendError(res, 400, 'INVALID_PAYLOAD', errorMsg);
     }
 
     const result = await PaymentService.processEpaycoWebhook(req.body);
@@ -162,12 +205,51 @@ const handleEpaycoWebhook = async (req, res) => {
       markWebhookProcessed(idempotencyKey);
       return res.status(200).json({ success: true });
     }
-    return res.status(400).json({ success: false, error: result.error });
+
+    logger.warn('ePayco webhook rejected during processing', {
+      transactionId: req.body.x_ref_payco,
+      error: result.error,
+      idempotencyKey,
+      provider: 'epayco',
+      signaturePresent: Boolean(req.body.x_signature),
+    });
+    return sendError(res, 400, 'EPAYCO_REJECTED', result.error || 'Webhook processing failed');
   } catch (error) {
     logger.error('Error handling ePayco webhook:', error);
-    return res.status(500).json({ success: false, error: 'Internal server error' });
+    return sendError(res, 500, 'INTERNAL_ERROR', 'Internal server error');
   }
 };
+
+/**
+ * Validate and verify ePayco webhook signature before processing
+ * @param {Request} req
+ * @returns {boolean} True when signature is valid
+ */
+function verifyEpaycoSignature(req) {
+  const hasSignature = Boolean(req.body?.x_signature);
+  const signatureResult = PaymentService.verifyEpaycoSignature(req.body);
+  const isValid = typeof signatureResult === 'object' && signatureResult !== null
+    ? signatureResult.valid !== false
+    : Boolean(signatureResult);
+
+  if (!isValid) {
+    logger.error('Invalid ePayco webhook signature', {
+      hasSignature,
+      transactionId: req.body?.x_ref_payco,
+    });
+    const reason = hasSignature ? 'invalid_signature' : 'missing_signature';
+    const error = hasSignature ? 'Invalid signature' : 'Missing signature';
+    return { valid: false, reason, error };
+  }
+
+  if (!hasSignature) {
+    logger.warn('ePayco webhook missing signature', {
+      transactionId: req.body?.x_ref_payco,
+    });
+  }
+
+  return { valid: true };
+}
 
 /**
  * Handle Daimo webhook

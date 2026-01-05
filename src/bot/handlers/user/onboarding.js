@@ -1,6 +1,5 @@
 const { Markup } = require('telegraf');
 const UserService = require('../../services/userService');
-const GroupInvitationService = require('../../services/groupInvitationService');
 const { t } = require('../../../utils/i18n');
 const { isValidEmail } = require('../../../utils/validation');
 const logger = require('../../../utils/logger');
@@ -369,23 +368,6 @@ const completeOnboarding = async (ctx) => {
     ctx.session.temp = {};
     await ctx.saveSession();
 
-    // Generate unique one-time invitation link for free group
-    let invitationLink = null;
-    try {
-      const invitation = await GroupInvitationService.generateInvitation({
-        userId: userId.toString(),
-        groupType: 'free',
-      });
-      invitationLink = invitation.link;
-      logger.info('Group invitation generated for new user', {
-        userId,
-        invitationLink: invitation.link,
-      });
-    } catch (invitationError) {
-      logger.error('Failed to generate group invitation:', invitationError);
-      // Continue without invitation link if generation fails
-    }
-
     await ctx.reply(t('onboardingComplete', lang));
 
     // Send Telegram group invite via API
@@ -419,20 +401,12 @@ const completeOnboarding = async (ctx) => {
     } catch (telegramInviteError) {
       logger.error('Failed to create Telegram group invite link:', telegramInviteError);
 
-      // Fallback to custom invitation link if Telegram API fails
-      if (invitationLink) {
-        const fallbackMessage = lang === 'es'
-          ? `🎉 ¡Estás listo!\n\nTe damos la bienvenida a la comunidad PNPtv. Aquí está tu enlace para acceder al grupo gratuito:\n\n${invitationLink}\n\n⏰ Este enlace expira en 24 horas.`
-          : `🎉 You're all set!\n\nWelcome to the PNPtv community. Here's your link to access the free group:\n\n${invitationLink}\n\n⏰ This link expires in 24 hours.`;
+      // Fallback to customer support if invite link generation fails
+      const fallbackMessage = lang === 'es'
+        ? `⚠️ Hubo un problema al generar tu enlace de acceso.\n\nNo te preocupes, nuestro equipo de soporte te ayudará. Por favor contacta a:\n\n🔗 https://t.me/pnptv_support\n\n📞 Nuestro equipo te dará acceso manual al grupo en menos de 5 minutos.`
+        : `⚠️ There was an issue generating your access link.\n\nDon't worry, our support team will help you. Please contact:\n\n🔗 https://t.me/pnptv_support\n\n📞 Our team will give you manual access to the group within 5 minutes.`;
 
-        await ctx.reply(fallbackMessage);
-      } else {
-        await ctx.reply(
-          lang === 'es'
-            ? '✅ Registro completado. ¡Bienvenido! Únete a la comunidad aquí: https://t.me/pnptv_community'
-            : '✅ Registration complete. Welcome! Join the community here: https://t.me/pnptv_community'
-        );
-      }
+      await ctx.reply(fallbackMessage);
     }
 
     // Show main menu

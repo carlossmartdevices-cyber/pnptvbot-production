@@ -7,7 +7,9 @@ const logger = require('../../utils/logger');
 class PayPalService {
   constructor() {
     this.environment = this.getEnvironment();
-    this.client = new paypal.core.PayPalHttpClient(this.environment);
+    this.client = this.environment
+      ? new paypal.core.PayPalHttpClient(this.environment)
+      : null;
   }
 
   /**
@@ -19,7 +21,8 @@ class PayPalService {
     const mode = process.env.PAYPAL_MODE || 'sandbox'; // 'sandbox' or 'live'
 
     if (!clientId || !clientSecret) {
-      throw new Error('PayPal credentials not configured');
+      logger.warn('PayPal credentials not configured, PayPal features are disabled');
+      return null;
     }
 
     if (mode === 'live') {
@@ -40,6 +43,10 @@ class PayPalService {
    */
   async createOrder({ paymentId, amount, planName, returnUrl, cancelUrl }) {
     try {
+      if (!this.client) {
+        throw new Error('PayPal not configured');
+      }
+
       const request = new paypal.orders.OrdersCreateRequest();
       request.prefer('return=representation');
       request.requestBody({
@@ -99,6 +106,10 @@ class PayPalService {
    */
   async captureOrder(orderId) {
     try {
+      if (!this.client) {
+        throw new Error('PayPal not configured');
+      }
+
       const request = new paypal.orders.OrdersCaptureRequest(orderId);
       request.requestBody({});
 
@@ -134,6 +145,10 @@ class PayPalService {
    */
   async getOrder(orderId) {
     try {
+      if (!this.client) {
+        throw new Error('PayPal not configured');
+      }
+
       const request = new paypal.orders.OrdersGetRequest(orderId);
       const order = await this.client.execute(request);
 
@@ -161,6 +176,11 @@ class PayPalService {
    */
   async verifyWebhook(webhookEvent, headers) {
     try {
+      if (!this.client) {
+        logger.warn('PayPal not configured, skipping webhook verification');
+        return false;
+      }
+
       const webhookId = process.env.PAYPAL_WEBHOOK_ID;
 
       if (!webhookId) {

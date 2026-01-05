@@ -39,7 +39,7 @@ class UserModel {
       role: row.role,
       assignedBy: row.assigned_by,
       roleAssignedAt: row.role_assigned_at,
-      privacy: row.privacy || { showLocation: true, showInterests: true, showBio: true, allowMessages: true, showOnline: true },
+      privacy: typeof row.privacy === 'string' ? JSON.parse(row.privacy) : (row.privacy || { showLocation: true, showInterests: true, showBio: true, allowMessages: true, showOnline: true }),
       profileViews: row.profile_views || 0,
       xp: row.xp || 0,
       favorites: row.favorites || [],

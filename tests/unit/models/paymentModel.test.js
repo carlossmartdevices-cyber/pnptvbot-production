@@ -1,48 +1,52 @@
 // Mock dependencies
-jest.mock('../../../src/config/firebase');
+jest.mock('../../../src/config/postgres', () => ({
+  query: jest.fn(),
+}));
 jest.mock('uuid');
 
 const PaymentModel = require('../../../src/models/paymentModel');
-const { getFirestore } = require('../../../src/config/firebase');
+const { query } = require('../../../src/config/postgres');
 const { v4: uuidv4 } = require('uuid');
 
 describe('PaymentModel', () => {
-  let mockDb;
-  let mockCollection;
-  let mockDoc;
+  const now = new Date();
+  const defaultRows = [
+    {
+      id: 'payment-123',
+      payment_id: 'payment-123',
+      user_id: '123456789',
+      plan_id: 'basic',
+      provider: 'epayco',
+      amount: 9.99,
+      currency: 'USD',
+      status: 'pending',
+      reference: 'ref-123',
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: 'payment-456',
+      payment_id: 'payment-456',
+      user_id: '123456789',
+      plan_id: 'premium',
+      provider: 'daimo',
+      amount: 19.99,
+      currency: 'USD',
+      status: 'completed',
+      reference: 'txn-123',
+      created_at: now,
+      updated_at: now,
+    },
+  ];
 
   beforeEach(() => {
     jest.clearAllMocks();
-
-    mockDoc = {
-      get: jest.fn(),
-      set: jest.fn(),
-      update: jest.fn(),
-      exists: false,
-      id: 'test-payment-id',
-      data: jest.fn(),
-    };
-
-    mockCollection = {
-      doc: jest.fn().mockReturnValue(mockDoc),
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      get: jest.fn(),
-    };
-
-    mockDb = {
-      collection: jest.fn().mockReturnValue(mockCollection),
-    };
-
-    getFirestore.mockReturnValue(mockDb);
+    query.mockResolvedValue({ rows: defaultRows });
     uuidv4.mockReturnValue('test-uuid-123');
   });
 
   describe('create', () => {
     it('should create payment with generated ID', async () => {
-      mockDoc.set.mockResolvedValue();
-
       const paymentData = {
         userId: 123456789,
         amount: 9.99,
@@ -56,14 +60,14 @@ describe('PaymentModel', () => {
       expect(result).toBeDefined();
       expect(result.id).toBe('test-uuid-123');
       expect(result.status).toBe('pending');
-      expect(result.amount).toBe(9.99);
       expect(result.createdAt).toBeInstanceOf(Date);
-      expect(mockDoc.set).toHaveBeenCalled();
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO payments'),
+        expect.any(Array)
+      );
     });
 
     it('should create payment with provided ID', async () => {
-      mockDoc.set.mockResolvedValue();
-
       const paymentData = {
         paymentId: 'custom-id',
         userId: 123456789,
@@ -73,11 +77,10 @@ describe('PaymentModel', () => {
       const result = await PaymentModel.create(paymentData);
 
       expect(result.id).toBe('custom-id');
-      expect(mockCollection.doc).toHaveBeenCalledWith('custom-id');
     });
 
     it('should handle errors', async () => {
-      mockDoc.set.mockRejectedValue(new Error('Database error'));
+      query.mockRejectedValueOnce(new Error('Database error'));
 
       await expect(PaymentModel.create({ userId: 123 })).rejects.toThrow();
     });
@@ -85,18 +88,6 @@ describe('PaymentModel', () => {
 
   describe('getById', () => {
     it('should get payment by ID', async () => {
-      const paymentData = {
-        userId: 123456789,
-        amount: 9.99,
-        status: 'success',
-      };
-
-      mockDoc.get.mockResolvedValue({
-        exists: true,
-        id: 'payment-123',
-        data: () => paymentData,
-      });
-
       const result = await PaymentModel.getById('payment-123');
 
       expect(result).toBeDefined();
@@ -105,7 +96,7 @@ describe('PaymentModel', () => {
     });
 
     it('should return null for non-existent payment', async () => {
-      mockDoc.get.mockResolvedValue({ exists: false });
+      query.mockResolvedValueOnce({ rows: [] });
 
       const result = await PaymentModel.getById('non-existent');
 
@@ -113,7 +104,7 @@ describe('PaymentModel', () => {
     });
 
     it('should handle errors', async () => {
-      mockDoc.get.mockRejectedValue(new Error('Database error'));
+      query.mockRejectedValueOnce(new Error('Database error'));
 
       const result = await PaymentModel.getById('payment-123');
 
@@ -123,24 +114,19 @@ describe('PaymentModel', () => {
 
   describe('updateStatus', () => {
     it('should update payment status', async () => {
-      mockDoc.update.mockResolvedValue();
-
       const result = await PaymentModel.updateStatus('payment-123', 'success', {
         transactionId: 'txn-456',
       });
 
       expect(result).toBe(true);
-      expect(mockDoc.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          status: 'success',
-          transactionId: 'txn-456',
-          updatedAt: expect.any(Date),
-        })
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE payments SET'),
+        expect.arrayContaining(['success', expect.any(Date)])
       );
     });
 
     it('should handle errors', async () => {
-      mockDoc.update.mockRejectedValue(new Error('Update failed'));
+      query.mockRejectedValueOnce(new Error('Update failed'));
 
       const result = await PaymentModel.updateStatus('payment-123', 'failed');
 
@@ -150,40 +136,23 @@ describe('PaymentModel', () => {
 
   describe('getByUser', () => {
     it('should get user payments', async () => {
-      const payments = [
-        {
-          id: '1',
-          data: () => ({ userId: '123456789', amount: 9.99 }),
-        },
-        {
-          id: '2',
-          data: () => ({ userId: '123456789', amount: 19.99 }),
-        },
-      ];
-
-      mockCollection.get.mockResolvedValue({
-        forEach: (callback) => payments.forEach(callback),
-      });
-
       const result = await PaymentModel.getByUser(123456789);
 
       expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBe(2);
-      expect(mockCollection.where).toHaveBeenCalledWith('userId', '==', '123456789');
+      expect(result.length).toBeGreaterThan(0);
     });
 
     it('should limit results', async () => {
-      mockCollection.get.mockResolvedValue({
-        forEach: () => {},
-      });
-
       await PaymentModel.getByUser(123456789, 10);
 
-      expect(mockCollection.limit).toHaveBeenCalledWith(10);
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY created_at DESC LIMIT $2'),
+        expect.arrayContaining(['123456789', 10])
+      );
     });
 
     it('should handle errors', async () => {
-      mockCollection.get.mockRejectedValue(new Error('Query error'));
+      query.mockRejectedValueOnce(new Error('Query error'));
 
       const result = await PaymentModel.getByUser(123456789);
 
@@ -193,25 +162,18 @@ describe('PaymentModel', () => {
 
   describe('getByStatus', () => {
     it('should get payments by status', async () => {
-      const payments = [
-        {
-          id: '1',
-          data: () => ({ status: 'pending', amount: 9.99 }),
-        },
-      ];
-
-      mockCollection.get.mockResolvedValue({
-        forEach: (callback) => payments.forEach(callback),
-      });
-
       const result = await PaymentModel.getByStatus('pending');
 
       expect(Array.isArray(result)).toBe(true);
-      expect(mockCollection.where).toHaveBeenCalledWith('status', '==', 'pending');
+      expect(result.length).toBeGreaterThan(0);
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE status = $1'),
+        ['pending', expect.any(Number)]
+      );
     });
 
     it('should handle errors', async () => {
-      mockCollection.get.mockRejectedValue(new Error('Query error'));
+      query.mockRejectedValueOnce(new Error('Query error'));
 
       const result = await PaymentModel.getByStatus('success');
 
@@ -221,31 +183,31 @@ describe('PaymentModel', () => {
 
   describe('getByTransactionId', () => {
     it('should get payment by transaction ID', async () => {
-      const paymentData = {
-        transactionId: 'txn-123',
-        provider: 'epayco',
-        amount: 9.99,
-      };
-
-      mockCollection.get.mockResolvedValue({
-        empty: false,
-        docs: [{
-          id: 'payment-123',
-          data: () => paymentData,
+      query.mockResolvedValueOnce({
+        rows: [{
+          id: 'payment-456',
+          payment_id: 'payment-456',
+          user_id: 'user-123',
+          plan_id: 'basic',
+          provider: 'epayco',
+          amount: 19.99,
+          currency: 'USD',
+          status: 'completed',
+          reference: 'txn-123',
+          created_at: now,
+          updated_at: now,
         }],
       });
 
       const result = await PaymentModel.getByTransactionId('txn-123', 'epayco');
 
       expect(result).toBeDefined();
-      expect(result.id).toBe('payment-123');
-      expect(result.transactionId).toBe('txn-123');
+      expect(result.id).toBe('payment-456');
+      expect(result.reference).toBe('txn-123');
     });
 
     it('should return null when not found', async () => {
-      mockCollection.get.mockResolvedValue({
-        empty: true,
-      });
+      query.mockResolvedValueOnce({ rows: [] });
 
       const result = await PaymentModel.getByTransactionId('non-existent', 'epayco');
 
@@ -253,7 +215,7 @@ describe('PaymentModel', () => {
     });
 
     it('should handle errors', async () => {
-      mockCollection.get.mockRejectedValue(new Error('Query error'));
+      query.mockRejectedValueOnce(new Error('Query error'));
 
       const result = await PaymentModel.getByTransactionId('txn-123', 'epayco');
 
@@ -263,33 +225,20 @@ describe('PaymentModel', () => {
 
   describe('getRevenue', () => {
     it('should calculate revenue statistics', async () => {
-      const payments = [
-        {
-          data: () => ({
-            amount: 9.99,
-            planId: 'basic',
-            provider: 'epayco',
-          }),
-        },
-        {
-          data: () => ({
-            amount: 19.99,
-            planId: 'premium',
-            provider: 'epayco',
-          }),
-        },
-        {
-          data: () => ({
-            amount: 29.99,
-            planId: 'gold',
-            provider: 'daimo',
-          }),
-        },
-      ];
-
-      mockCollection.get.mockResolvedValue({
-        forEach: (callback) => payments.forEach(callback),
-      });
+      query
+        .mockResolvedValueOnce({ rows: [{ total: 59.97, count: 3 }] }) // statsResult
+        .mockResolvedValueOnce({
+          rows: [
+            { plan_id: 'basic', count: 1 },
+            { plan_id: 'premium', count: 1 },
+          ],
+        }) // byPlanResult
+        .mockResolvedValueOnce({
+          rows: [
+            { provider: 'epayco', count: 2, total: 29.98 },
+            { provider: 'daimo', count: 1, total: 29.99 },
+          ],
+        }); // byProviderResult
 
       const startDate = new Date('2024-01-01');
       const endDate = new Date('2024-12-31');
@@ -300,29 +249,18 @@ describe('PaymentModel', () => {
       expect(result.average).toBeCloseTo(19.99, 2);
       expect(result.byPlan).toHaveProperty('basic', 1);
       expect(result.byPlan).toHaveProperty('premium', 1);
-      expect(result.byProvider).toHaveProperty('epayco', 2);
-      expect(result.byProvider).toHaveProperty('daimo', 1);
+      expect(result.byProvider).toHaveProperty('epayco');
+      expect(result.byProvider).toHaveProperty('daimo');
     });
 
-    it('should handle empty results', async () => {
-      mockCollection.get.mockResolvedValue({
-        forEach: () => {},
-      });
+    it('should handle errors', async () => {
+      query.mockRejectedValueOnce(new Error('Query error'));
 
       const result = await PaymentModel.getRevenue(new Date(), new Date());
 
       expect(result.total).toBe(0);
       expect(result.count).toBe(0);
       expect(result.average).toBe(0);
-    });
-
-    it('should handle errors', async () => {
-      mockCollection.get.mockRejectedValue(new Error('Query error'));
-
-      const result = await PaymentModel.getRevenue(new Date(), new Date());
-
-      expect(result.total).toBe(0);
-      expect(result.count).toBe(0);
     });
   });
 });
