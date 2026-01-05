@@ -11,8 +11,8 @@ const BroadcastEnhancements = require('./broadcastEnhancements');
 
 class EnhancedBroadcastService {
   constructor() {
-    this.broadcastService = new BroadcastService();
-    this.enhancements = new BroadcastEnhancements();
+    this.broadcastService = BroadcastService;
+    this.enhancements = BroadcastEnhancements;
   }
 
   /**
