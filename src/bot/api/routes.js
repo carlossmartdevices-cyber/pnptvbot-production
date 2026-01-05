@@ -63,6 +63,11 @@ app.get('/community-features', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/community-features.html'));
 });
 
+// How to Use page (Bilingual)
+app.get('/how-to-use', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/how-to-use.html'));
+});
+
 // Videorama page
 app.get('/videorama', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/video-rooms.html'));
