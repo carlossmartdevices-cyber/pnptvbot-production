@@ -119,11 +119,31 @@ class BroadcastScheduler {
     try {
       logger.info(`Executing scheduled broadcast: ${broadcastId}`);
 
-      const results = await broadcastService.sendBroadcast(this.bot, broadcastId);
+      // Queue broadcast using async queue if available
+      let results;
+      const queueIntegration = global.broadcastQueueIntegration;
+      if (queueIntegration) {
+        try {
+          const job = await queueIntegration.queueBroadcast(broadcastId);
+          logger.info('Scheduled broadcast queued', {
+            broadcastId,
+            jobId: job.job_id,
+          });
+          results = { success: true, jobId: job.job_id, queued: true };
+        } catch (error) {
+          logger.warn('Failed to queue scheduled broadcast, falling back to sync:', error.message);
+          results = await broadcastService.sendBroadcast(this.bot, broadcastId);
+        }
+      } else {
+        // Fallback if queue not initialized
+        results = await broadcastService.sendBroadcast(this.bot, broadcastId);
+      }
 
-      logger.info(
-        `Scheduled broadcast ${broadcastId} completed: ${results.sent} sent, ${results.failed} failed`
-      );
+      if (!results.queued) {
+        logger.info(
+          `Scheduled broadcast ${broadcastId} completed: ${results.sent} sent, ${results.failed} failed`
+        );
+      }
 
       return results;
     } catch (error) {
