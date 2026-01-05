@@ -231,30 +231,56 @@ const MENU_CONFIG = {
       es: '🎯 Menú PNPtv'
     },
     options: [
-      {
-        id: 'subscribe',
-        title: { en: '💎 Subscribe to PRIME', es: '💎 Suscribirse a PRIME' },
-        callback: 'menu:subscribe',
-        deepLink: 'subscribe'
-      },
-      {
-        id: 'nearby',
-        title: { en: '📍 Nearby', es: '📍 Cercanos' },
-        callback: 'menu:nearby',
-        deepLink: 'nearby'
-      },
-      {
-        id: 'main_room',
-        title: { en: '🎥 PNPtv Main Room', es: '🎥 Sala Principal PNPtv' },
-        callback: 'menu:main_room',
-        deepLink: 'main_room'
-      },
-      {
-        id: 'support',
-        title: { en: '💬 Support', es: '💬 Soporte' },
-        callback: 'menu:support',
-        deepLink: 'support'
-      }
+      [
+        {
+          id: 'profile',
+          title: { en: '👤 My Profile', es: '👤 Mi Perfil' },
+          callback: 'menu:profile',
+          deepLink: 'profile'
+        },
+        {
+          id: 'nearby',
+          title: { en: '📍 Who is Nearby?', es: '📍 ¿Quién está Cercano?' },
+          callback: 'menu:nearby',
+          deepLink: 'nearby'
+        }
+      ],
+      [
+        {
+          id: 'subscribe',
+          title: { en: '💎 Watch PRIME Content', es: '💎 Ver Contenido PRIME' },
+          callback: 'menu:subscribe',
+          deepLink: 'subscribe'
+        },
+        {
+          id: 'vc_rooms',
+          title: { en: '🎥 PNPtv VC Rooms', es: '🎥 Salas VC PNPtv' },
+          callback: 'menu:vc_rooms',
+          deepLink: 'vc_rooms'
+        }
+      ],
+      [
+        {
+          id: 'videorama',
+          title: { en: '🎬 PNPtv Videorama', es: '🎬 Videorama PNPtv' },
+          callback: 'menu:videorama',
+          deepLink: 'videorama'
+        },
+        {
+          id: 'settings',
+          title: { en: '⚙️ Settings', es: '⚙️ Configuración' },
+          callback: 'menu:settings',
+          deepLink: 'settings'
+        }
+      ],
+      [
+        {
+          id: 'support',
+          title: { en: '💬 Support', es: '💬 Soporte' },
+          callback: 'menu:support',
+          deepLink: 'support'
+        }
+      ]
     ]
   },
 

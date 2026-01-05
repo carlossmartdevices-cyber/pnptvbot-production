@@ -169,7 +169,9 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Implement group-only /menu command with restricted options and command blocking\n\n- Add GROUP_MENU configuration with Subscribe to PRIME, Nearby, PNPtv Main Room, Support\n- Display subscription plans in group /menu with pricing and features\n- Add ''Go to Bot for all options'' button at end of group menu\n- Create groupCommandRestriction middleware to block all commands except /menu in groups\n- Delete all non-/menu command messages automatically in groups\n- Add handlers for view_plans, main_room, and nearby menu options\n- Support bilingual UI \\(English/Spanish\\) for all group menu features\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git diff-index:*)",
       "Bash(sudo pg_isready:*)",
-      "Bash(xargs kill -9)"
+      "Bash(xargs kill -9)",
+      "Bash(redis-cli:*)",
+      "Bash(systemctl restart:*)"
     ],
     "deny": [],
     "ask": []

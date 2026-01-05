@@ -81,44 +81,33 @@ function buildMainMenuKeyboard(lang = 'en') {
 }
 
 /**
- * Build group menu keyboard with subscription plans
+ * Build group menu keyboard with 2-column layout
  */
 async function buildGroupMenuKeyboard(lang = 'en') {
-  const Plan = require('../../../models/planModel');
   const buttons = [];
 
-  // Add main group menu options
-  for (const option of MENU_CONFIG.GROUP_MENU.options) {
-    buttons.push([
-      Markup.button.callback(
-        option.title[lang] || option.title.en,
-        option.callback
-      )
-    ]);
-  }
-
-  // Add subscription plans section
-  try {
-    const plans = await Plan.getAll();
-    if (plans && plans.length > 0) {
+  // Add main group menu options (already organized in 2-column rows)
+  for (const row of MENU_CONFIG.GROUP_MENU.options) {
+    if (Array.isArray(row)) {
+      // Row is already a group of options
+      buttons.push(
+        row.map(option =>
+          Markup.button.callback(
+            option.title[lang] || option.title.en,
+            option.callback
+          )
+        )
+      );
+    } else {
+      // Single option
       buttons.push([
         Markup.button.callback(
-          lang === 'es' ? '💎 Ver Planes de Suscripción' : '💎 View Subscription Plans',
-          'menu:view_plans'
+          row.title[lang] || row.title.en,
+          row.callback
         )
       ]);
     }
-  } catch (error) {
-    logger.debug('Could not load plans for group menu:', error.message);
   }
-
-  // Add "Go to Bot" button at the end
-  buttons.push([
-    Markup.button.url(
-      lang === 'es' ? '🤖 Ir al Bot para más opciones' : '🤖 Go to Bot for all options',
-      `https://t.me/${MENU_CONFIG.BOT_USERNAME}`
-    )
-  ]);
 
   return Markup.inlineKeyboard(buttons);
 }
@@ -461,12 +450,16 @@ async function handleMenuCallback(ctx) {
         await handleViewPlans(ctx, lang);
         break;
 
-      case 'main_room':
-        await handleMainRoom(ctx, lang);
+      case 'vc_rooms':
+        await handleVCRooms(ctx, lang);
         break;
 
-      case 'nearby':
-        await handleNearby(ctx, lang);
+      case 'videorama':
+        await handleVideorama(ctx, lang);
+        break;
+
+      case 'settings':
+        await handleSettingsMenu(ctx, lang);
         break;
 
       default:
@@ -830,89 +823,44 @@ async function handlePrivacySettings(ctx, lang) {
   });
 }
 
-async function handleViewPlans(ctx, lang) {
-  try {
-    const Plan = require('../../../models/planModel');
-    const plans = await Plan.getAll();
+async function handleVCRooms(ctx, lang) {
+  const message = lang === 'es'
+    ? '🎥 *Salas VC PNPtv*\n\n' +
+      '*PNPtv Main Room*\n' +
+      '✨ Sala segura y privada\n' +
+      '🔐 Auto-alojada (self-hosted)\n' +
+      '📹 Grabación de pantalla deshabilitada\n' +
+      '✅ Usuarios verificados por edad\n' +
+      '👥 Videollamadas de grupo en vivo\n\n' +
+      '*PNPtv Hangouts*\n' +
+      '🎭 Salas temáticas de networking\n' +
+      '💬 Interacciones sociales enfocadas\n' +
+      '🎯 Conexiones auténticas\n' +
+      '🔒 Privacidad garantizada\n\n' +
+      '_Selecciona una sala para acceder:_'
+    : '🎥 *PNPtv VC Rooms*\n\n' +
+      '*PNPtv Main Room*\n' +
+      '✨ Safe and private room\n' +
+      '🔐 Self-hosted infrastructure\n' +
+      '📹 Screen recording disabled\n' +
+      '✅ Age-verified users\n' +
+      '👥 Live group video calls\n\n' +
+      '*PNPtv Hangouts*\n' +
+      '🎭 Themed networking rooms\n' +
+      '💬 Social interactions\n' +
+      '🎯 Authentic connections\n' +
+      '🔒 Privacy guaranteed\n\n' +
+      '_Select a room to join:_';
 
-    if (!plans || plans.length === 0) {
-      const message = lang === 'es'
-        ? '❌ No hay planes disponibles en este momento.'
-        : '❌ No plans available at this moment.';
-
-      const keyboard = Markup.inlineKeyboard([
-        [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
-      ]);
-
-      await ctx.editMessageText(message, {
-        parse_mode: 'Markdown',
-        ...keyboard
-      });
-      return;
-    }
-
-    // Build plans display
-    let plansText = lang === 'es'
-      ? '💎 *Planes de Suscripción*\n\n'
-      : '💎 *Subscription Plans*\n\n';
-
-    for (const plan of plans) {
-      const name = lang === 'es' && plan.nameEs ? plan.nameEs : plan.name;
-      const price = plan.price || 0;
-      const currency = plan.currency || 'USD';
-      const duration = plan.duration || 30;
-
-      plansText += `*${name}*\n`;
-      plansText += `💰 ${price} ${currency}/${duration} days\n`;
-      if (plan.features && plan.features.length > 0) {
-        plansText += `✅ ${plan.features.join(', ')}\n`;
-      }
-      plansText += '\n';
-    }
-
-    plansText += lang === 'es'
-      ? '\n_Haz clic en el botón de abajo para ir al bot y suscribirte._'
-      : '\n_Click the button below to go to the bot and subscribe._';
-
-    const keyboard = Markup.inlineKeyboard([
-      [Markup.button.url(
-        lang === 'es' ? '💳 Suscribirse Ahora' : '💳 Subscribe Now',
-        `https://t.me/${MENU_CONFIG.BOT_USERNAME}`
-      )],
-      [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
-    ]);
-
-    await ctx.editMessageText(plansText, {
-      parse_mode: 'Markdown',
-      ...keyboard
-    });
-  } catch (error) {
-    logger.error('Error displaying plans:', error);
-    const message = lang === 'es'
-      ? '❌ Error al cargar los planes. Por favor, intenta de nuevo.'
-      : '❌ Error loading plans. Please try again.';
-
-    const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
-    ]);
-
-    await ctx.editMessageText(message, {
-      parse_mode: 'Markdown',
-      ...keyboard
-    });
-  }
-}
-
-async function handleMainRoom(ctx, lang) {
   const displayName = ctx.from.first_name || 'Guest';
   const mainRoomUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
-
-  const message = lang === 'es'
-    ? '🎥 *Sala Principal PNPtv*\n\nAccede a la sala principal para videollamadas en vivo.\n\nHaz clic en el botón de abajo para entrar:'
-    : '🎥 *PNPtv Main Room*\n\nAccess the main room for live video calls.\n\nClick the button below to join:';
+  const hangoutsUrl = `https://meet.jit.si/pnptv-hangouts#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
 
   const keyboard = Markup.inlineKeyboard([
-    [Markup.button.url(lang === 'es' ? '🎥 Entrar Ahora' : '🎥 Join Now', mainRoomUrl)],
+    [
+      Markup.button.url(lang === 'es' ? '🎥 Main Room' : '🎥 Main Room', mainRoomUrl),
+      Markup.button.url(lang === 'es' ? '🎭 Hangouts' : '🎭 Hangouts', hangoutsUrl)
+    ],
     [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
   ]);
 
@@ -922,14 +870,39 @@ async function handleMainRoom(ctx, lang) {
   });
 }
 
-async function handleNearby(ctx, lang) {
+async function handleVideorama(ctx, lang) {
   const message = lang === 'es'
-    ? '📍 *Usuarios Cercanos*\n\nDescubre usuarios cerca de ti en tu área.\n\n_Para ver usuarios cercanos, dirígete al bot con el comando /start._'
-    : '📍 *Nearby Users*\n\nDiscover users near you in your area.\n\n_To view nearby users, go to the bot with the /start command._';
+    ? '🎬 *PNPtv Videorama*\n\n' +
+      'Accede a nuestro portal de videos exclusivos con contenido curado de los creadores de PNPtv.\n\n' +
+      '_Para ver Videorama, dirígete al bot._'
+    : '🎬 *PNPtv Videorama*\n\n' +
+      'Access our exclusive video portal with curated content from PNPtv creators.\n\n' +
+      '_To view Videorama, go to the bot._';
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.url(
-      lang === 'es' ? '🔍 Ver Cercanos' : '🔍 View Nearby',
+      lang === 'es' ? '🎬 Abrir Videorama' : '🎬 Open Videorama',
+      `https://t.me/${MENU_CONFIG.BOT_USERNAME}`
+    )],
+    [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
+  ]);
+
+  await ctx.editMessageText(message, {
+    parse_mode: 'Markdown',
+    ...keyboard
+  });
+}
+
+async function handleSettingsMenu(ctx, lang) {
+  const message = lang === 'es'
+    ? '⚙️ *Configuración*\n\n' +
+      'Accede a tus configuraciones personales en el bot.'
+    : '⚙️ *Settings*\n\n' +
+      'Access your personal settings in the bot.';
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.url(
+      lang === 'es' ? '⚙️ Abrir Configuración' : '⚙️ Open Settings',
       `https://t.me/${MENU_CONFIG.BOT_USERNAME}`
     )],
     [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
