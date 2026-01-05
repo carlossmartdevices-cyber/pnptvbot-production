@@ -654,6 +654,228 @@ class CommunityPostService {
       throw error;
     }
   }
+
+  /**
+   * Get all available posting destinations (groups + channels)
+   * @param {boolean} activeOnly - Only active destinations
+   * @returns {Promise<Array>} Destinations array
+   */
+  async getPostingDestinations(activeOnly = true) {
+    try {
+      const query = activeOnly
+        ? `SELECT * FROM community_post_destinations WHERE is_active = true ORDER BY display_order ASC`
+        : `SELECT * FROM community_post_destinations ORDER BY display_order ASC`;
+
+      const result = await db.query(query);
+      return result.rows;
+    } catch (error) {
+      logger.error('Error fetching posting destinations:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send post to Prime channel
+   * @param {Object} post - Post object with details
+   * @param {Object} bot - Telegraf bot instance
+   * @param {string} primeChannelId - Prime channel Telegram ID
+   * @param {string} messageLanguage - 'en' or 'es'
+   * @returns {Promise<Object>} Send result
+   */
+  async sendPostToPrimeChannel(post, bot, primeChannelId, messageLanguage = 'en') {
+    try {
+      logger.info('Sending post to Prime Channel', { postId: post.post_id });
+
+      let message = this.formatMessage(
+        post.formatted_template_type,
+        messageLanguage === 'es' ? post.message_es : post.message_en,
+        post.title,
+        post.media_type
+      );
+
+      const buttons = await this.getButtonsForPost(post.post_id);
+      const markup = this.buildButtonKeyboard(buttons);
+
+      let messageId = null;
+      const options = {
+        parse_mode: 'Markdown',
+        ...markup,
+      };
+
+      try {
+        if (post.media_type === 'photo' && (post.telegram_file_id || post.media_url)) {
+          const response = await bot.telegram.sendPhoto(
+            primeChannelId,
+            post.telegram_file_id || post.media_url,
+            { ...options, caption: message }
+          );
+          messageId = response.message_id;
+        } else if (post.media_type === 'video' && (post.telegram_file_id || post.media_url)) {
+          const response = await bot.telegram.sendVideo(
+            primeChannelId,
+            post.telegram_file_id || post.media_url,
+            {
+              ...options,
+              caption: message,
+              supports_streaming: true, // Critical for large videos
+            }
+          );
+          messageId = response.message_id;
+        } else {
+          const response = await bot.telegram.sendMessage(
+            primeChannelId,
+            message,
+            options
+          );
+          messageId = response.message_id;
+        }
+
+        // Log successful delivery to channel
+        await this.logChannelDelivery(post.post_id, 'prime_channel', primeChannelId, 'sent', messageId);
+
+        return {
+          success: true,
+          messageId,
+          channelId: primeChannelId,
+          channelName: 'Prime Channel',
+        };
+      } catch (telegramError) {
+        logger.error('Telegram send to channel error', {
+          channelId: primeChannelId,
+          error: telegramError.message,
+        });
+        await this.logChannelDelivery(post.post_id, 'prime_channel', primeChannelId, 'failed', null, telegramError.message);
+
+        return {
+          success: false,
+          channelId: primeChannelId,
+          error: telegramError.message,
+        };
+      }
+    } catch (error) {
+      logger.error('Error sending post to Prime Channel:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Log channel delivery
+   * @param {string} postId - Post UUID
+   * @param {string} channelName - Channel name
+   * @param {string} channelId - Telegram channel ID
+   * @param {string} status - Delivery status
+   * @param {string} messageId - Telegram message ID
+   * @param {string} errorMessage - Optional error message
+   */
+  async logChannelDelivery(postId, channelName, channelId, status, messageId = null, errorMessage = null) {
+    try {
+      const query = `
+        INSERT INTO community_post_channel_deliveries (
+          post_id, channel_name, channel_id, status, message_id, error_message, sent_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT DO NOTHING;
+      `;
+
+      await db.query(query, [
+        postId,
+        channelName,
+        channelId,
+        status,
+        messageId,
+        errorMessage,
+        status === 'sent' ? new Date() : null,
+      ]);
+    } catch (error) {
+      logger.error('Error logging channel delivery:', error);
+    }
+  }
+
+  /**
+   * Send post to multiple destinations (groups + channels)
+   * @param {Object} post - Post object
+   * @param {Array} destinationIds - Array of destination IDs
+   * @param {Object} bot - Telegraf bot instance
+   * @returns {Promise<Object>} Results summary
+   */
+  async sendPostToMultipleDestinations(post, destinationIds, bot) {
+    try {
+      const results = {
+        successful: 0,
+        failed: 0,
+        total: destinationIds.length,
+        details: [],
+      };
+
+      for (const destId of destinationIds) {
+        try {
+          // Get destination details
+          const destQuery = `SELECT * FROM community_post_destinations WHERE telegram_id = $1`;
+          const destResult = await db.query(destQuery, [destId]);
+
+          if (!destResult.rows[0]) {
+            continue;
+          }
+
+          const destination = destResult.rows[0];
+
+          if (destination.destination_type === 'channel') {
+            // Send to channel (Prime Channel)
+            const result = await this.sendPostToPrimeChannel(post, bot, destId, 'en');
+            results.details.push(result);
+            if (result.success) results.successful++;
+            else results.failed++;
+          } else {
+            // Send to group using existing method
+            const group = await this.getCommunityGroupById(destination.destination_name.split(' ')[1]); // Parse group name
+            if (group) {
+              const result = await this.sendPostToGroup(post, group, bot, 'en');
+              results.details.push(result);
+              if (result.success) results.successful++;
+              else results.failed++;
+            }
+          }
+        } catch (error) {
+          logger.error('Error sending to destination:', error, { destId });
+          results.failed++;
+          results.details.push({ success: false, destId, error: error.message });
+        }
+      }
+
+      logger.info('Multi-destination send complete', results);
+      return results;
+    } catch (error) {
+      logger.error('Error sending to multiple destinations:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get channel analytics
+   * @param {string} postId - Post UUID
+   * @param {string} channelName - Channel name (optional)
+   * @returns {Promise<Object>} Analytics object
+   */
+  async getChannelAnalytics(postId, channelName = null) {
+    try {
+      const query = channelName
+        ? `SELECT * FROM community_post_channel_analytics WHERE post_id = $1 AND destination_name = $2`
+        : `SELECT * FROM community_post_channel_analytics WHERE post_id = $1`;
+
+      const params = channelName ? [postId, channelName] : [postId];
+      const result = await db.query(query, params);
+
+      return result.rows[0] || {
+        views: 0,
+        forwards: 0,
+        reactions: 0,
+        shares: 0,
+      };
+    } catch (error) {
+      logger.error('Error fetching channel analytics:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new CommunityPostService();

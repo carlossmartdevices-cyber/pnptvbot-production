@@ -29,13 +29,16 @@ const registerCommunityPostHandlers = (bot) => {
       if (!ctx.session.temp) ctx.session.temp = {};
 
       // Initialize session data
-      ctx.session.temp.communityPostStep = 'select_groups';
+      ctx.session.temp.communityPostStep = 'select_destinations';
       ctx.session.temp.communityPostData = {
         targetGroups: [],
+        targetPrimeChannel: false, // NEW: Prime channel support
+        postDestinations: [], // NEW: Multiple destinations
         mediaType: null,
         mediaFileId: null,
         s3Key: null,
         s3Url: null,
+        fileSizeMB: 0, // NEW: Track file size for large videos
         textEn: '',
         textEs: '',
         buttons: [],
@@ -52,32 +55,43 @@ const registerCommunityPostHandlers = (bot) => {
 
       await ctx.answerCbQuery();
 
-      // Show group selection
-      const groups = await communityPostService.getCommunityGroups();
+      // Show destination selection (groups + Prime channel)
+      const destinations = await communityPostService.getPostingDestinations();
       const buttons = [];
 
+      // Add Prime Channel button first
+      buttons.push([
+        Markup.button.callback(
+          '💎 Prime Channel',
+          'share_post_dest_prime_channel'
+        ),
+      ]);
+
       // Add group selection buttons
-      for (const group of groups) {
+      buttons.push([Markup.button.callback('━━ Community Groups ━━', 'share_post_groups_header')]);
+      for (const group of destinations.filter(d => d.destination_type === 'group')) {
         buttons.push([
           Markup.button.callback(
-            `${group.icon} ${group.name}`,
-            `share_post_group_${group.group_id}`
+            `${group.icon} ${group.destination_name}`,
+            `share_post_dest_${group.telegram_id}`
           ),
         ]);
       }
 
       // Add select all button
-      buttons.push([Markup.button.callback('✅ Select All', 'share_post_select_all')]);
-      buttons.push([Markup.button.callback('⬜ Clear Selection', 'share_post_clear_selection')]);
+      buttons.push([Markup.button.callback('✅ Select All', 'share_post_select_all_dest')]);
+      buttons.push([Markup.button.callback('⬜ Clear Selection', 'share_post_clear_selection_dest')]);
       buttons.push([Markup.button.callback('➡️ Continue', 'share_post_continue_to_media')]);
       buttons.push([Markup.button.callback('❌ Cancel', 'admin_cancel')]);
 
       await ctx.editMessageText(
-        '📤 *Compartir Publicación en Comunidad*\n\n'
-        + '*Paso 1/9: Selecciona Grupos*\n\n'
-        + 'Selecciona uno o más grupos para recibir esta publicación:\n\n'
+        '📤 *Compartir Publicación*\n\n'
+        + '*Paso 1/9: Selecciona Destinos*\n\n'
+        + 'Selecciona uno o más destinos (grupos o canal):\n\n'
         + '━━━━━━━━━━━━━━━━━\n\n'
-        + '💡 *Tip:* Puedes seleccionar múltiples grupos o todos de una vez.',
+        + '💎 *Prime Channel:* Para miembros premium\n'
+        + '👥 *Grupos Comunitarios:* Todos los usuarios\n\n'
+        + '💡 *Tip:* Puedes compartir en múltiples destinos a la vez.',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard(buttons),
@@ -90,7 +104,175 @@ const registerCommunityPostHandlers = (bot) => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Group selection actions
+  // DESTINATION SELECTION (Groups + Prime Channel)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Prime Channel selection
+  bot.action('share_post_dest_prime_channel', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      const postDestinations = ctx.session.temp?.communityPostData?.postDestinations || [];
+      const primeChannelId = '-1002997324714'; // From env
+
+      // Toggle Prime Channel selection
+      const index = postDestinations.indexOf(primeChannelId);
+      if (index > -1) {
+        postDestinations.splice(index, 1);
+      } else {
+        postDestinations.push(primeChannelId);
+      }
+
+      ctx.session.temp.communityPostData.postDestinations = postDestinations;
+      ctx.session.temp.communityPostData.targetPrimeChannel = postDestinations.includes(primeChannelId);
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery(postDestinations.includes(primeChannelId) ? '💎 Prime Channel añadido' : '💎 Prime Channel removido');
+
+      // Refresh UI
+      await showDestinationSelection(ctx);
+    } catch (error) {
+      logger.error('Error selecting Prime Channel:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Destination selection by ID (for groups)
+  bot.action(/^share_post_dest_(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      const destId = ctx.match[1];
+      if (destId === 'prime_channel') return; // Handled by other handler
+
+      const postDestinations = ctx.session.temp?.communityPostData?.postDestinations || [];
+
+      // Toggle destination selection
+      const index = postDestinations.indexOf(destId);
+      if (index > -1) {
+        postDestinations.splice(index, 1);
+      } else {
+        postDestinations.push(destId);
+      }
+
+      ctx.session.temp.communityPostData.postDestinations = postDestinations;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery(`✅ Destino ${postDestinations.length > 0 ? 'añadido' : 'removido'}`);
+
+      // Refresh UI
+      await showDestinationSelection(ctx);
+    } catch (error) {
+      logger.error('Error selecting destination:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Select all destinations
+  bot.action('share_post_select_all_dest', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      const destinations = await communityPostService.getPostingDestinations();
+      const destIds = destinations.map(d => d.telegram_id);
+
+      ctx.session.temp.communityPostData.postDestinations = destIds;
+      ctx.session.temp.communityPostData.targetPrimeChannel = destIds.some(id => id === '-1002997324714');
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery(`✅ Todos los ${destinations.length} destinos seleccionados`);
+      await showDestinationSelection(ctx);
+    } catch (error) {
+      logger.error('Error selecting all destinations:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Clear all destinations
+  bot.action('share_post_clear_selection_dest', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      ctx.session.temp.communityPostData.postDestinations = [];
+      ctx.session.temp.communityPostData.targetPrimeChannel = false;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('⬜ Selección borrada');
+      await showDestinationSelection(ctx);
+    } catch (error) {
+      logger.error('Error clearing destinations:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Helper function to show destination selection UI
+  async function showDestinationSelection(ctx) {
+    const destinations = await communityPostService.getPostingDestinations();
+    const postDestinations = ctx.session.temp?.communityPostData?.postDestinations || [];
+    const buttons = [];
+
+    // Prime Channel button
+    const primeChannelId = '-1002997324714';
+    const isPrimeSelected = postDestinations.includes(primeChannelId);
+    const primePrefix = isPrimeSelected ? '💎✅' : '💎⬜';
+    buttons.push([
+      Markup.button.callback(
+        `${primePrefix} Prime Channel`,
+        'share_post_dest_prime_channel'
+      ),
+    ]);
+
+    // Group buttons
+    buttons.push([Markup.button.callback('━━ Community Groups ━━', 'share_post_groups_header')]);
+    for (const dest of destinations.filter(d => d.destination_type === 'group')) {
+      const isSelected = postDestinations.includes(dest.telegram_id);
+      const prefix = isSelected ? '✅' : '⬜';
+      buttons.push([
+        Markup.button.callback(
+          `${prefix} ${dest.icon} ${dest.destination_name}`,
+          `share_post_dest_${dest.telegram_id}`
+        ),
+      ]);
+    }
+
+    buttons.push([Markup.button.callback('✅ Select All', 'share_post_select_all_dest')]);
+    buttons.push([Markup.button.callback('⬜ Clear Selection', 'share_post_clear_selection_dest')]);
+    buttons.push([Markup.button.callback('➡️ Continue', 'share_post_continue_to_media')]);
+    buttons.push([Markup.button.callback('❌ Cancel', 'admin_cancel')]);
+
+    const selectedCount = postDestinations.length;
+    const message = `📤 *Compartir Publicación*\n\n`
+      + `*Paso 1/9: Selecciona Destinos*\n\n`
+      + `Destinos seleccionados: *${selectedCount}*\n\n`
+      + `━━━━━━━━━━━━━━━━━\n\n`
+      + `💎 *Prime Channel:* Contenido exclusivo para miembros\n`
+      + `👥 *Grupos:* Contenido para todos\n\n`
+      + `💡 *Tip:* Selecciona múltiples destinos para mayor alcance.`;
+
+    await ctx.editMessageText(message, {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard(buttons),
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Group selection actions (legacy - keep for compatibility)
   // ═══════════════════════════════════════════════════════════════════════════
   bot.action(/^share_post_group_(.+)$/, async (ctx) => {
     try {
