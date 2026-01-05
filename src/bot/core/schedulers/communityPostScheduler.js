@@ -57,21 +57,55 @@ class CommunityPostScheduler {
       // Get all pending posts scheduled for now or earlier
       const query = `
         SELECT
-          p.*,
+          p.post_id,
+          p.admin_id,
+          p.admin_username,
+          p.title,
+          p.message_en,
+          p.message_es,
+          p.media_type,
+          p.media_url,
+          p.s3_key,
+          p.telegram_file_id,
+          p.target_group_ids,
+          p.target_all_groups,
+          p.formatted_template_type,
+          p.button_layout,
+          p.scheduled_at,
+          p.timezone,
+          p.is_recurring,
+          p.recurrence_pattern,
+          p.cron_expression,
+          p.recurrence_end_date,
+          p.max_occurrences,
+          p.status,
+          p.scheduled_count,
+          p.sent_count,
+          p.failed_count,
+          p.created_at,
+          p.updated_at,
+          p.destination_type,
+          p.post_to_prime_channel,
+          p.post_to_groups,
+          p.post_to_destinations,
+          p.video_file_size_mb,
+          p.video_duration_seconds,
+          p.uses_streaming,
+          p.prime_channel_message_id,
           s.schedule_id,
           s.execution_order,
           s.next_execution_at,
-          array_agg(g.group_id) as target_group_ids,
-          array_agg(g.telegram_group_id) as telegram_group_ids,
-          array_agg(g.name) as group_names
+          array_agg(DISTINCT g.group_id) as target_group_ids_agg,
+          array_agg(DISTINCT g.telegram_group_id) as telegram_group_ids,
+          array_agg(DISTINCT g.name) as group_names
         FROM community_posts p
         JOIN community_post_schedules s ON p.post_id = s.post_id
-        JOIN community_groups g ON g.group_id = ANY(p.target_group_ids)
+        LEFT JOIN community_groups g ON g.group_id = ANY(p.target_group_ids)
         WHERE s.status = 'scheduled'
         AND s.scheduled_for <= NOW()
         AND p.status IN ('scheduled', 'sending')
-        AND g.is_active = true
-        GROUP BY p.post_id, s.schedule_id, s.execution_order, s.next_execution_at
+        AND (g.is_active = true OR g.id IS NULL)
+        GROUP BY p.post_id, p.admin_id, p.admin_username, p.title, p.message_en, p.message_es, p.media_type, p.media_url, p.s3_key, p.telegram_file_id, p.target_group_ids, p.target_all_groups, p.formatted_template_type, p.button_layout, p.scheduled_at, p.timezone, p.is_recurring, p.recurrence_pattern, p.cron_expression, p.recurrence_end_date, p.max_occurrences, p.status, p.scheduled_count, p.sent_count, p.failed_count, p.created_at, p.updated_at, p.destination_type, p.post_to_prime_channel, p.post_to_groups, p.post_to_destinations, p.video_file_size_mb, p.video_duration_seconds, p.uses_streaming, p.prime_channel_message_id, s.schedule_id, s.execution_order, s.next_execution_at
         ORDER BY s.execution_order ASC
         LIMIT 5;
       `;
