@@ -54,6 +54,76 @@
             color: var(--accent-gold);
         }
 
+        /* Mobile Menu Toggle */
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--accent-gold);
+            font-size: 1.8rem;
+            cursor: pointer;
+            z-index: 1001;
+        }
+
+        /* Sidebar Table of Contents */
+        .sidebar-toc {
+            position: fixed;
+            left: 0;
+            top: 80px;
+            width: 280px;
+            max-height: calc(100vh - 80px);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255, 215, 0, 0.2);
+            padding: 2rem 1.5rem;
+            overflow-y: auto;
+            z-index: 999;
+            transform: translateX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-toc.mobile-hidden {
+            transform: translateX(-100%);
+        }
+
+        .toc-title {
+            font-size: 1.2rem;
+            color: var(--accent-gold);
+            margin-bottom: 1.5rem;
+            font-weight: bold;
+        }
+
+        .toc-list {
+            list-style: none;
+        }
+
+        .toc-list li {
+            margin-bottom: 0.8rem;
+        }
+
+        .toc-list a {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            font-size: 0.95rem;
+            display: block;
+            padding: 0.5rem 0.8rem;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .toc-list a:hover,
+        .toc-list a.active {
+            color: var(--accent-gold);
+            border-left-color: var(--accent-gold);
+            padding-left: 1.2rem;
+        }
+
+        /* Adjust main content for sidebar */
+        .main-content {
+            margin-left: 280px;
+            transition: margin-left 0.3s ease;
+        }
+
         /* Hero Section */
         .hero {
             text-align: center;
@@ -390,6 +460,184 @@
             font-size: 1.2rem;
         }
 
+        /* Collapsible FAQ Styles */
+        .faq-item {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--radius-lg);
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .faq-question {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .faq-question:hover {
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .faq-question h4 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--accent-gold);
+        }
+
+        .faq-toggle {
+            font-size: 1.5rem;
+            transition: transform 0.3s;
+        }
+
+        .faq-item.active .faq-toggle {
+            transform: rotate(180deg);
+        }
+
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            padding: 0 1.5rem;
+        }
+
+        .faq-item.active .faq-answer {
+            max-height: 500px;
+            padding: 0 1.5rem 1.5rem;
+        }
+
+        .faq-answer p {
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.7;
+        }
+
+        /* Feature Comparison Table */
+        .comparison-table {
+            overflow-x: auto;
+            margin: 2rem 0;
+        }
+
+        .comparison-table table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 1rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .comparison-table th {
+            background: rgba(255, 215, 0, 0.15);
+            color: var(--accent-gold);
+            font-weight: bold;
+        }
+
+        .comparison-table th:first-child,
+        .comparison-table td:first-child {
+            text-align: left;
+        }
+
+        .comparison-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .check-mark {
+            color: var(--accent-green);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .x-mark {
+            color: rgba(255, 255, 255, 0.4);
+            font-weight: bold;
+        }
+
+        /* Testimonials Section */
+        .testimonials-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .testimonial-card {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            transition: all 0.3s;
+        }
+
+        .testimonial-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.2);
+            border-color: var(--accent-gold);
+        }
+
+        .testimonial-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .testimonial-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ffd700, #ff6b6b);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .testimonial-info h4 {
+            margin: 0;
+            color: var(--accent-gold);
+            font-size: 1rem;
+        }
+
+        .testimonial-info p {
+            margin: 0.2rem 0 0;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .stars {
+            color: var(--accent-gold);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .testimonial-text {
+            color: rgba(255, 255, 255, 0.85);
+            line-height: 1.6;
+            font-style: italic;
+        }
+
+        /* Scroll animations */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .hero h1 {
@@ -408,6 +656,10 @@
                 grid-template-columns: 1fr;
             }
 
+            .testimonials-grid {
+                grid-template-columns: 1fr;
+            }
+
             .flow-diagram {
                 flex-direction: column;
             }
@@ -419,6 +671,32 @@
             .nav-links {
                 display: none;
             }
+
+            .menu-toggle {
+                display: block;
+            }
+
+            .sidebar-toc {
+                width: 100%;
+                max-height: 100vh;
+            }
+
+            .sidebar-toc.mobile-hidden {
+                transform: translateX(-100%);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .comparison-table {
+                font-size: 0.9rem;
+            }
+
+            .comparison-table th,
+            .comparison-table td {
+                padding: 0.7rem;
+            }
         }
     </style>
 </head>
@@ -426,6 +704,7 @@
     <!-- Navigation -->
     <nav class="navbar">
         <a href="/" class="logo">🔥 PNPtv</a>
+        <button class="menu-toggle" id="menuToggle">☰</button>
         <ul class="nav-links">
             <li><a href="/">Home</a></li>
             <li><a href="/videorama">Videorama</a></li>
@@ -434,6 +713,22 @@
         </ul>
     </nav>
 
+    <!-- Sidebar Table of Contents -->
+    <aside class="sidebar-toc" id="sidebarToc">
+        <div class="toc-title">📑 Quick Navigate</div>
+        <ul class="toc-list">
+            <li><a href="#quick-start">Quick Start</a></li>
+            <li><a href="#features">All Features</a></li>
+            <li><a href="#video-rooms">Video Rooms</a></li>
+            <li><a href="#testimonials">Member Reviews</a></li>
+            <li><a href="#payment">Payment Methods</a></li>
+            <li><a href="#plans">Subscription Plans</a></li>
+            <li><a href="#comparison">Plan Comparison</a></li>
+            <li><a href="#faq">FAQ</a></li>
+            <li><a href="#support">Support</a></li>
+        </ul>
+    </aside>
+
     <!-- Hero Section -->
     <section class="hero">
         <h1>🌟 PNPtv Community Features</h1>
@@ -441,6 +736,7 @@
     </section>
 
     <!-- Main Container -->
+    <div class="main-content">
     <div class="container">
         <!-- Introduction -->
         <div class="info-box">
@@ -449,7 +745,7 @@
         </div>
 
         <!-- Quick Start Guide -->
-        <section class="section">
+        <section class="section fade-in" id="quick-start">
             <div class="section-header">
                 <h2 class="section-title">🚀 Quick Start Guide</h2>
                 <p class="section-subtitle">Get started with PNPtv in just a few simple steps</p>
@@ -561,7 +857,7 @@
         </section>
 
         <!-- All Features Overview -->
-        <section class="section">
+        <section class="section fade-in" id="features">
             <div class="section-header">
                 <h2 class="section-title">🎯 All Features Explained</h2>
                 <p class="section-subtitle">Everything you get with your PNPtv subscription</p>
@@ -706,8 +1002,90 @@
             </div>
         </section>
 
+        <!-- Testimonials Section -->
+        <section class="section fade-in" id="testimonials">
+            <div class="section-header">
+                <h2 class="section-title">⭐ Member Reviews</h2>
+                <p class="section-subtitle">What real PNPtv members are saying</p>
+            </div>
+
+            <div class="testimonials-grid">
+                <div class="testimonial-card">
+                    <div class="stars">★★★★★</div>
+                    <div class="testimonial-header">
+                        <div class="testimonial-avatar">👨</div>
+                        <div class="testimonial-info">
+                            <h4>Marcus T.</h4>
+                            <p>Diamond Member</p>
+                        </div>
+                    </div>
+                    <p class="testimonial-text">"PNPtv completely changed how I connect with people. The video rooms are amazing and the community is super welcoming. Best decision I made!"</p>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="stars">★★★★★</div>
+                    <div class="testimonial-header">
+                        <div class="testimonial-avatar">👩</div>
+                        <div class="testimonial-info">
+                            <h4>Jessica L.</h4>
+                            <p>Crystal Member</p>
+                        </div>
+                    </div>
+                    <p class="testimonial-text">"The content quality is incredible, and I love that I can connect with verified members. The support team is also super responsive!"</p>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="stars">★★★★★</div>
+                    <div class="testimonial-header">
+                        <div class="testimonial-avatar">👨</div>
+                        <div class="testimonial-info">
+                            <h4>David R.</h4>
+                            <p>Lifetime Member</p>
+                        </div>
+                    </div>
+                    <p class="testimonial-text">"Lifetime pass was the best investment. No more monthly payments, unlimited access to everything. This is the future of online communities!"</p>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="stars">★★★★★</div>
+                    <div class="testimonial-header">
+                        <div class="testimonial-avatar">👩</div>
+                        <div class="testimonial-info">
+                            <h4>Sarah M.</h4>
+                            <p>PNP Member</p>
+                        </div>
+                    </div>
+                    <p class="testimonial-text">"I started with the trial week and loved it so much I upgraded. The nearby members feature helped me make real friends nearby!"</p>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="stars">★★★★★</div>
+                    <div class="testimonial-header">
+                        <div class="testimonial-avatar">👨</div>
+                        <div class="testimonial-info">
+                            <h4>James K.</h4>
+                            <p>Diamond Member</p>
+                        </div>
+                    </div>
+                    <p class="testimonial-text">"The security and privacy measures are top-notch. I feel safe and comfortable meeting people here. Great platform!"</p>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="stars">★★★★★</div>
+                    <div class="testimonial-header">
+                        <div class="testimonial-avatar">👩</div>
+                        <div class="testimonial-info">
+                            <h4>Amanda P.</h4>
+                            <p>Lifetime Member</p>
+                        </div>
+                    </div>
+                    <p class="testimonial-text">"The live streams with Santino are incredible. Been a member for months and I'm amazed at how much value this offers. Highly recommend!"</p>
+                </div>
+            </div>
+        </section>
+
         <!-- How to Use Video Rooms (Detailed) -->
-        <section class="section">
+        <section class="section fade-in" id="video-rooms">
             <div class="section-header">
                 <h2 class="section-title">🎥 How to Use Video Rooms</h2>
                 <p class="section-subtitle">Complete guide to joining and using live video chat</p>
@@ -781,7 +1159,7 @@
         </section>
 
         <!-- Payment Methods -->
-        <section class="section">
+        <section class="section fade-in" id="payment">
             <div class="section-header">
                 <h2 class="section-title">💳 Payment Methods</h2>
                 <p class="section-subtitle">Multiple secure ways to pay for your subscription</p>
@@ -871,7 +1249,7 @@
         </section>
 
         <!-- Subscription Plans -->
-        <section class="section">
+        <section class="section fade-in" id="plans">
             <div class="section-header">
                 <h2 class="section-title">💎 Subscription Plans</h2>
                 <p class="section-subtitle">Choose the plan that works best for you</p>
@@ -994,74 +1372,232 @@
             </div>
         </section>
 
+        <!-- Plan Comparison Table -->
+        <section class="section fade-in" id="comparison">
+            <div class="section-header">
+                <h2 class="section-title">📊 Plan Comparison</h2>
+                <p class="section-subtitle">See exactly what's included in each plan</p>
+            </div>
+
+            <div class="comparison-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Trial Week</th>
+                            <th>PNP Member</th>
+                            <th>Crystal</th>
+                            <th>Diamond</th>
+                            <th>Lifetime</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Premium Content Access</strong></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>HD/4K Video Library</strong></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Community Group Access</strong></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>24/7 Video Rooms</strong></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Radio Streaming</strong></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Nearby Members Feature</strong></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Basic Support</strong></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Priority Support</strong></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Exclusive Content</strong></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>VIP Access</strong></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Live Streams with Santino</strong></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Lifetime Access</strong></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="x-mark">✗</span></td>
+                            <td><span class="check-mark">✓</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Duration</strong></td>
+                            <td>7 days</td>
+                            <td>30 days</td>
+                            <td>120 days</td>
+                            <td>365 days</td>
+                            <td>Forever</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Price</strong></td>
+                            <td>$14.99</td>
+                            <td>$24.99</td>
+                            <td>$49.99</td>
+                            <td>$99.99</td>
+                            <td>$249.99</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="success-box" style="margin-top: 2rem;">
+                <h3 style="margin-bottom: 1rem;">💡 Best Value</h3>
+                <p>The Lifetime Pass offers the best value per dollar. One payment of $249.99 gives you everything forever, saving thousands compared to monthly subscriptions!</p>
+            </div>
+        </section>
+
         <!-- FAQ Section -->
-        <section class="section">
+        <section class="section fade-in" id="faq">
             <div class="section-header">
                 <h2 class="section-title">❓ Frequently Asked Questions</h2>
                 <p class="section-subtitle">Quick answers to common questions</p>
             </div>
 
-            <div class="how-to-section">
-                <div class="step">
-                    <div class="step-number">Q</div>
-                    <div class="step-content">
+            <div style="max-width: 900px; margin: 0 auto;">
+                <div class="faq-item">
+                    <div class="faq-question">
                         <h4>Do I need Telegram to use PNPtv?</h4>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
                         <p>Yes, Telegram is required for the bot and community features. However, video rooms and the website work independently. Telegram is free and available on all devices.</p>
                     </div>
                 </div>
 
-                <div class="step">
-                    <div class="step-number">Q</div>
-                    <div class="step-content">
+                <div class="faq-item">
+                    <div class="faq-question">
                         <h4>Can I cancel my subscription?</h4>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
                         <p>Yes, you can cancel anytime through the bot. Your access continues until the end of your paid period. No refunds for partial months, but you keep access for the time you paid for.</p>
                     </div>
                 </div>
 
-                <div class="step">
-                    <div class="step-number">Q</div>
-                    <div class="step-content">
+                <div class="faq-item">
+                    <div class="faq-question">
                         <h4>Is my payment information safe?</h4>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
                         <p>Absolutely. We use industry-standard PCI-DSS compliant payment processors (ePayco, PayPal, Daimo). We never store your card details on our servers. All transactions are encrypted.</p>
                     </div>
                 </div>
 
-                <div class="step">
-                    <div class="step-number">Q</div>
-                    <div class="step-content">
+                <div class="faq-item">
+                    <div class="faq-question">
                         <h4>What devices can I use?</h4>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
                         <p>Everything works on desktop, laptop, tablet, and mobile. Video rooms work best on desktop/laptop but are mobile-compatible. Telegram works everywhere.</p>
                     </div>
                 </div>
 
-                <div class="step">
-                    <div class="step-number">Q</div>
-                    <div class="step-content">
+                <div class="faq-item">
+                    <div class="faq-question">
                         <h4>How do I upgrade my plan?</h4>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
                         <p>Message @PNPtvbot and select "Upgrade Plan" from the menu. Choose your new plan and pay the difference. Your new features activate immediately.</p>
                     </div>
                 </div>
 
-                <div class="step">
-                    <div class="step-number">Q</div>
-                    <div class="step-content">
+                <div class="faq-item">
+                    <div class="faq-question">
                         <h4>Can I use multiple devices?</h4>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
                         <p>Yes! Your subscription works on unlimited devices. Just log into Telegram on each device. However, you can't be in multiple video rooms simultaneously.</p>
                     </div>
                 </div>
 
-                <div class="step">
-                    <div class="step-number">Q</div>
-                    <div class="step-content">
+                <div class="faq-item">
+                    <div class="faq-question">
                         <h4>What if I have technical issues?</h4>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
                         <p>Message @PNPtvbot for 24/7 support. We have automated help for common issues and human support for complex problems. Average response time: under 30 minutes.</p>
                     </div>
                 </div>
 
-                <div class="step">
-                    <div class="step-number">Q</div>
-                    <div class="step-content">
+                <div class="faq-item">
+                    <div class="faq-question">
                         <h4>Is there a refund policy?</h4>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
                         <p>Due to the nature of digital content, we generally don't offer refunds. However, if you experience technical issues preventing access, contact support within 48 hours and we'll help or refund.</p>
                     </div>
                 </div>
@@ -1087,7 +1623,7 @@
         </section>
 
         <!-- Contact & Support -->
-        <section class="section">
+        <section class="section fade-in" id="support">
             <div class="info-box" style="text-align: center;">
                 <h3 style="margin-bottom: 1rem;">💬 Need Help?</h3>
                 <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">Our support team is available 24/7 to assist you</p>
@@ -1111,6 +1647,7 @@
             </div>
         </section>
     </div>
+    </div>
 
     <!-- Footer -->
     <footer style="background: rgba(0, 0, 0, 0.9); padding: 3rem 2rem; text-align: center; margin-top: 4rem;">
@@ -1128,6 +1665,25 @@
     </footer>
 
     <script>
+        // Mobile menu toggle
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebarToc = document.getElementById('sidebarToc');
+
+        if (menuToggle) {
+            menuToggle.addEventListener('click', () => {
+                sidebarToc.classList.toggle('mobile-hidden');
+            });
+
+            // Close menu when clicking on a link
+            document.querySelectorAll('.toc-list a').forEach(link => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth <= 768) {
+                        sidebarToc.classList.add('mobile-hidden');
+                    }
+                });
+            });
+        }
+
         // Smooth scroll for anchor links
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
@@ -1139,7 +1695,39 @@
             });
         });
 
-        // Scroll animations
+        // Active nav indicator
+        const updateActiveNav = () => {
+            const sections = document.querySelectorAll('section[id]');
+            const navLinks = document.querySelectorAll('.toc-list a');
+
+            window.addEventListener('scroll', () => {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (pageYOffset >= sectionTop - 200) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').slice(1) === current) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+        };
+        updateActiveNav();
+
+        // FAQ Collapsible functionality
+        document.querySelectorAll('.faq-item').forEach(item => {
+            const question = item.querySelector('.faq-question');
+            question.addEventListener('click', () => {
+                item.classList.toggle('active');
+            });
+        });
+
+        // Scroll animations for fade-in elements
         const observerOptions = {
             threshold: 0.1,
             rootMargin: '0px 0px -100px 0px'
@@ -1148,18 +1736,29 @@
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    entry.target.style.opacity = '1';
-                    entry.target.style.transform = 'translateY(0)';
+                    entry.target.classList.add('visible');
                 }
             });
         }, observerOptions);
 
-        // Observe all sections for fade-in effect
-        document.querySelectorAll('.section, .feature-card, .payment-card').forEach(el => {
-            el.style.opacity = '0';
-            el.style.transform = 'translateY(30px)';
-            el.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+        // Observe all fade-in elements
+        document.querySelectorAll('.fade-in, .feature-card, .payment-card, .testimonial-card').forEach(el => {
             observer.observe(el);
+        });
+
+        // Initial fade-in setup
+        document.querySelectorAll('.fade-in').forEach(el => {
+            if (!el.classList.contains('visible')) {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(30px)';
+            }
+        });
+
+        // Responsive sidebar on window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768) {
+                sidebarToc?.classList.remove('mobile-hidden');
+            }
         });
     </script>
 </body>
