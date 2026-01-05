@@ -265,8 +265,19 @@ const startBot = async () => {
 
       if (!webhookSet) {
         logger.error('Failed to set webhook after multiple attempts');
-        logger.warn('Bot will continue in degraded mode. Webhook must be set manually.');
-        logger.warn('You can set webhook later using: curl -X POST https://api.telegram.org/bot<TOKEN>/setWebhook?url=' + webhookUrl);
+        logger.warn('Webhook setup failed. Falling back to polling mode for bot functionality.');
+        try {
+          await bot.telegram.deleteWebhook();
+          await bot.launch();
+          botInstance = bot;
+          botStarted = true;
+          logger.info('✓ Bot started in polling mode (webhook fallback)');
+          return; // Exit webhook setup, polling is now active
+        } catch (pollingError) {
+          logger.error('Failed to enable polling fallback:', pollingError.message);
+          logger.warn('Bot will continue in degraded mode. Manual webhook setup required.');
+          logger.warn('You can set webhook later using: curl -X POST https://api.telegram.org/bot<TOKEN>/setWebhook?url=' + webhookUrl);
+        }
       }
       // Register webhook callback
       apiApp.post(webhookPath, async (req, res) => {
