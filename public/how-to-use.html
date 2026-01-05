@@ -4,9 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>How to Use PNPtv! | Cómo Usar PNPtv!</title>
-    <meta name="description" content="Complete guide to using PNPtv! community on Telegram. Learn about PRIME membership, payment methods, and all available features. | Guía completa para usar PNPtv! en Telegram.">
+    <meta name="description" content="Complete guide to using PNPtv! community on Telegram. Learn about PRIME membership, payment methods, and all available features.">
     <link rel="stylesheet" href="/unified-design.css">
     <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --dark-bg: rgba(0, 0, 0, 0.85);
+            --card-bg: rgba(255, 255, 255, 0.1);
+            --accent-gold: #ffd700;
+            --accent-green: #38ef7d;
+            --text-light: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.8);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -14,59 +25,31 @@
         }
 
         body {
-            background: var(--gradient-primary);
-            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-gradient);
+            color: var(--text-light);
+            line-height: 1.6;
+            overflow-x: hidden;
         }
 
-        /* Language Toggle */
-        .language-toggle {
-            position: fixed;
-            top: 100px;
-            right: 2rem;
-            z-index: 998;
-            display: flex;
-            gap: 0.5rem;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 0.5rem;
-            border-radius: 50px;
-            backdrop-filter: blur(10px);
+        h1, h2, h3, h4, h5, h6 {
+            font-family: "BBH Bartle", sans-serif;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         }
 
-        .lang-btn {
-            background: rgba(255, 255, 255, 0.2);
-            color: rgba(255, 255, 255, 0.7);
-            border: 1px solid rgba(255, 215, 0, 0.2);
-            padding: 0.5rem 1rem;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: 500;
-        }
-
-        .lang-btn.active {
-            background: linear-gradient(135deg, #ffd700, #ffaa00);
-            color: #333;
-            border-color: var(--accent-gold);
-        }
-
-        .lang-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        /* Navigation */
+        /* Navigation Bar */
         .navbar {
             position: fixed;
             top: 0;
             width: 100%;
-            background: rgba(0, 0, 0, 0.95);
+            background: var(--dark-bg);
             backdrop-filter: blur(10px);
-            padding: 1rem 2rem;
+            padding: 1.2rem 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             z-index: 1000;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
         }
 
         .logo {
@@ -76,24 +59,39 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            text-decoration: none;
         }
 
         .nav-links {
             display: flex;
-            gap: 2rem;
+            gap: 2.5rem;
             list-style: none;
         }
 
         .nav-links a {
-            color: rgba(255, 255, 255, 0.8);
+            color: var(--text-light);
             text-decoration: none;
             font-weight: 500;
             transition: color 0.3s;
+            position: relative;
         }
 
         .nav-links a:hover {
             color: var(--accent-gold);
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--accent-gold);
+            transition: width 0.3s;
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
         }
 
         .menu-toggle {
@@ -105,96 +103,98 @@
             cursor: pointer;
         }
 
-        /* Sidebar */
-        .sidebar {
+        /* Language Toggle */
+        .lang-toggle {
             position: fixed;
-            left: 0;
-            top: 80px;
-            width: 260px;
-            max-height: calc(100vh - 80px);
-            background: rgba(0, 0, 0, 0.85);
+            top: 90px;
+            right: 2rem;
+            z-index: 998;
+            display: flex;
+            gap: 0.8rem;
+            background: var(--dark-bg);
+            padding: 0.8rem;
+            border-radius: 50px;
             backdrop-filter: blur(10px);
-            border-right: 1px solid rgba(255, 215, 0, 0.2);
-            padding: 2rem 1.5rem;
-            overflow-y: auto;
-            z-index: 999;
-            transform: translateX(0);
-            transition: transform 0.3s ease;
+            border: 1px solid rgba(255, 215, 0, 0.3);
         }
 
-        .sidebar.hidden {
-            transform: translateX(-100%);
-        }
-
-        .sidebar-title {
-            font-size: 1.1rem;
-            color: var(--accent-gold);
-            margin-bottom: 1.5rem;
-            font-weight: bold;
-        }
-
-        .sidebar-list {
-            list-style: none;
-        }
-
-        .sidebar-list li {
-            margin-bottom: 0.8rem;
-        }
-
-        .sidebar-list a {
-            color: rgba(255, 255, 255, 0.7);
-            text-decoration: none;
-            font-size: 0.95rem;
-            display: block;
-            padding: 0.5rem 0.8rem;
-            border-left: 3px solid transparent;
-            transition: all 0.3s;
+        .lang-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-dim);
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 50px;
             cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            font-size: 0.9rem;
         }
 
-        .sidebar-list a:hover,
-        .sidebar-list a.active {
-            color: var(--accent-gold);
-            border-left-color: var(--accent-gold);
-            padding-left: 1.2rem;
+        .lang-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: var(--text-light);
+        }
+
+        .lang-btn.active {
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            color: #1a1a1a;
+            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4);
         }
 
         /* Main Content */
         .main-content {
-            margin-left: 260px;
             padding-top: 80px;
             min-height: 100vh;
         }
 
-        /* Hero */
+        /* Hero Section */
         .hero {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(118, 75, 162, 0.3));
             padding: 4rem 2rem;
             text-align: center;
-            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 50% 50%, rgba(118, 75, 162, 0.3) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+            margin: 0 auto;
         }
 
         .hero h1 {
-            font-size: 2.8rem;
-            margin-bottom: 1rem;
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
             background: linear-gradient(90deg, #ffd700, #ff6b6b);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            line-height: 1.2;
         }
 
         .hero p {
-            font-size: 1.1rem;
-            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.2rem;
+            color: var(--text-dim);
             max-width: 700px;
             margin: 0 auto;
         }
 
         /* Container */
         .container {
-            max-width: 900px;
+            max-width: 950px;
             margin: 0 auto;
-            padding: 4rem 2rem;
+            padding: 0 2rem 4rem;
         }
 
         /* Language Sections */
@@ -204,19 +204,13 @@
 
         .lang-section.active {
             display: block;
-        }
-
-        /* Sections */
-        .section {
-            margin-bottom: 4rem;
-            opacity: 0;
-            animation: fadeIn 0.6s ease-out forwards;
+            animation: fadeIn 0.4s ease-out;
         }
 
         @keyframes fadeIn {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform: translateY(10px);
             }
             to {
                 opacity: 1;
@@ -224,184 +218,262 @@
             }
         }
 
-        .section:nth-child(1) { animation-delay: 0.1s; }
-        .section:nth-child(2) { animation-delay: 0.2s; }
-        .section:nth-child(3) { animation-delay: 0.3s; }
-        .section:nth-child(4) { animation-delay: 0.4s; }
-        .section:nth-child(5) { animation-delay: 0.5s; }
+        /* Sections */
+        .section {
+            margin-bottom: 5rem;
+        }
 
         .section h2 {
-            font-size: 2rem;
+            font-size: 2.5rem;
             color: var(--accent-gold);
-            margin-bottom: 1.5rem;
+            margin-bottom: 2rem;
+            position: relative;
+            padding-bottom: 1rem;
+        }
+
+        .section h2::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-gold), transparent);
+            border-radius: 2px;
         }
 
         .section h3 {
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             color: var(--accent-gold);
-            margin: 1.5rem 0 1rem;
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
         }
 
         .section p {
-            font-size: 1rem;
+            font-size: 1.05rem;
             line-height: 1.8;
-            color: rgba(255, 255, 255, 0.9);
-            margin-bottom: 1rem;
+            color: var(--text-dim);
+            margin-bottom: 1.2rem;
         }
 
+        .section strong {
+            color: var(--accent-gold);
+        }
+
+        /* Lists */
         .section ul {
             list-style: none;
-            margin: 1rem 0;
-            padding-left: 1.5rem;
+            margin: 1.5rem 0;
         }
 
         .section li {
-            margin-bottom: 0.8rem;
-            color: rgba(255, 255, 255, 0.85);
-            line-height: 1.6;
+            padding: 0.6rem 0 0.6rem 2.5rem;
             position: relative;
-            padding-left: 1.5rem;
+            color: var(--text-dim);
+            line-height: 1.7;
+            font-size: 1.05rem;
         }
 
         .section li:before {
-            content: "→";
+            content: "▸";
             position: absolute;
-            left: 0;
+            left: 0.5rem;
             color: var(--accent-gold);
-            font-weight: bold;
+            font-size: 1.2rem;
         }
 
-        /* Info Boxes */
-        .info-box {
+        .section ol {
+            list-style-position: inside;
+            margin: 1.5rem 0 1.5rem 2rem;
+        }
+
+        .section ol li {
+            margin-bottom: 1rem;
+            padding-left: 0.5rem;
+        }
+
+        /* Info/Success Boxes */
+        .info-box, .success-box {
             background: rgba(102, 126, 234, 0.15);
             border-left: 4px solid var(--primary-color);
-            padding: 1.5rem;
-            border-radius: 8px;
-            margin: 1.5rem 0;
+            padding: 1.8rem;
+            border-radius: 12px;
+            margin: 2rem 0;
+            backdrop-filter: blur(10px);
         }
 
         .success-box {
-            background: rgba(56, 239, 125, 0.15);
-            border-left: 4px solid var(--accent-green);
-            padding: 1.5rem;
-            border-radius: 8px;
-            margin: 1.5rem 0;
+            background: rgba(56, 239, 125, 0.1);
+            border-left-color: var(--accent-green);
+        }
+
+        .info-box strong, .success-box strong {
+            color: var(--accent-gold);
+        }
+
+        /* Grid of Cards */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin: 2.5rem 0;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            border-radius: 16px;
+            padding: 2.2rem;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, transparent 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(255, 215, 0, 0.5);
+            box-shadow: 0 15px 40px rgba(255, 215, 0, 0.2);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card h4 {
+            font-size: 1.35rem;
+            color: var(--accent-gold);
+            margin-bottom: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card p {
+            color: var(--text-dim);
+            font-size: 1rem;
+            line-height: 1.7;
+            position: relative;
+            z-index: 1;
         }
 
         /* CTA Button */
         .cta-button {
             display: inline-block;
-            background: linear-gradient(135deg, #ffd700, #ffaa00);
-            color: #333;
-            padding: 1rem 2.5rem;
+            background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+            color: #1a1a1a;
+            padding: 1.1rem 2.8rem;
             border-radius: 50px;
             text-decoration: none;
             font-weight: bold;
-            font-size: 1rem;
-            transition: all 0.3s;
+            font-size: 1.05rem;
+            transition: all 0.3s ease;
             box-shadow: 0 10px 30px rgba(255, 215, 0, 0.4);
             border: none;
             cursor: pointer;
-            margin: 1rem 0;
+            margin: 1.5rem 0;
+            display: inline-block;
         }
 
         .cta-button:hover {
-            transform: translateY(-3px);
+            transform: translateY(-3px) scale(1.05);
             box-shadow: 0 15px 40px rgba(255, 215, 0, 0.6);
-        }
-
-        /* Grid */
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 2rem;
-            margin: 2rem 0;
-        }
-
-        .card {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 215, 0, 0.3);
-            border-radius: 12px;
-            padding: 2rem;
-            transition: all 0.3s;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            border-color: var(--accent-gold);
-            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.2);
-        }
-
-        .card h4 {
-            color: var(--accent-gold);
-            margin-bottom: 1rem;
-            font-size: 1.2rem;
         }
 
         /* Footer */
         .footer {
-            background: rgba(0, 0, 0, 0.9);
-            padding: 3rem 2rem;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 3.5rem 2rem;
             text-align: center;
             color: rgba(255, 255, 255, 0.6);
-            margin-top: 4rem;
+            border-top: 1px solid rgba(255, 215, 0, 0.2);
+            margin-top: 5rem;
+        }
+
+        .footer p {
+            margin: 0.5rem 0;
+            font-size: 0.95rem;
         }
 
         /* Responsive */
         @media (max-width: 768px) {
-            .language-toggle {
-                top: 80px;
-                right: 1rem;
-                gap: 0.25rem;
+            .navbar {
+                padding: 1rem 1.5rem;
             }
 
-            .lang-btn {
-                padding: 0.4rem 0.8rem;
-                font-size: 0.9rem;
-            }
-
-            .sidebar {
-                width: 100%;
-                max-height: 100vh;
-            }
-
-            .sidebar.hidden {
-                transform: translateX(-100%);
-            }
-
-            .main-content {
-                margin-left: 0;
-            }
-
-            .menu-toggle {
-                display: block;
+            .logo {
+                font-size: 1.5rem;
             }
 
             .nav-links {
                 display: none;
             }
 
+            .menu-toggle {
+                display: block;
+            }
+
+            .lang-toggle {
+                top: 70px;
+                right: 1rem;
+                gap: 0.5rem;
+            }
+
+            .lang-btn {
+                padding: 0.5rem 1rem;
+                font-size: 0.85rem;
+            }
+
             .hero h1 {
-                font-size: 2rem;
+                font-size: 2.2rem;
+            }
+
+            .hero p {
+                font-size: 1rem;
             }
 
             .section h2 {
-                font-size: 1.5rem;
+                font-size: 1.8rem;
+            }
+
+            .section h3 {
+                font-size: 1.3rem;
+            }
+
+            .section p, .section li {
+                font-size: 0.95rem;
             }
 
             .container {
-                padding: 2rem 1rem;
+                padding: 0 1.5rem 2rem;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .cta-button {
+                padding: 0.95rem 2.2rem;
+                font-size: 0.95rem;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Language Toggle -->
-    <div class="language-toggle">
-        <button class="lang-btn active" id="langEnBtn" onclick="switchLanguage('en')">English</button>
-        <button class="lang-btn" id="langEsBtn" onclick="switchLanguage('es')">Español</button>
-    </div>
-
     <!-- Navigation -->
     <nav class="navbar">
         <a href="/" class="logo">🔥 PNPtv!</a>
@@ -413,26 +485,11 @@
         </ul>
     </nav>
 
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-title" id="sidebarTitle">📑 Navigation</div>
-        <ul class="sidebar-list">
-            <li><a href="#what-is" class="nav-link-en" onclick="scrollToSection(event, 'what-is')">What is PNPtv!</a></li>
-            <li><a href="#what-is" class="nav-link-es" style="display:none;" onclick="scrollToSection(event, 'what-is')">¿Qué es PNPtv!?</a></li>
-
-            <li><a href="#how-works" class="nav-link-en" onclick="scrollToSection(event, 'how-works')">How It Works</a></li>
-            <li><a href="#how-works" class="nav-link-es" style="display:none;" onclick="scrollToSection(event, 'how-works')">¿Cómo Funciona?</a></li>
-
-            <li><a href="#join" class="nav-link-en" onclick="scrollToSection(event, 'join')">How to Join</a></li>
-            <li><a href="#join" class="nav-link-es" style="display:none;" onclick="scrollToSection(event, 'join')">¿Cómo Unirse?</a></li>
-
-            <li><a href="#payments" class="nav-link-en" onclick="scrollToSection(event, 'payments')">Payment Methods</a></li>
-            <li><a href="#payments" class="nav-link-es" style="display:none;" onclick="scrollToSection(event, 'payments')">Métodos de Pago</a></li>
-
-            <li><a href="#features" class="nav-link-en" onclick="scrollToSection(event, 'features')">Premium Features</a></li>
-            <li><a href="#features" class="nav-link-es" style="display:none;" onclick="scrollToSection(event, 'features')">Características Premium</a></li>
-        </ul>
-    </aside>
+    <!-- Language Toggle -->
+    <div class="lang-toggle">
+        <button class="lang-btn active" id="langEnBtn" onclick="switchLanguage('en')">English</button>
+        <button class="lang-btn" id="langEsBtn" onclick="switchLanguage('es')">Español</button>
+    </div>
 
     <!-- Main Content -->
     <div class="main-content">
@@ -440,22 +497,27 @@
         <div class="lang-section active" id="content-en">
             <!-- Hero -->
             <section class="hero">
-                <h1>🌟 How to Use PNPtv!</h1>
-                <p>Everything you need to know about connecting, sharing, and creating in the PNPtv! community on Telegram</p>
+                <div class="hero-content">
+                    <h1>🌟 How to Use PNPtv!</h1>
+                    <p>Everything you need to know about connecting, sharing, and creating in the PNPtv! community</p>
+                </div>
             </section>
 
             <!-- Content -->
             <div class="container">
-                <!-- Section 1: What is PNPtv! -->
-                <section class="section" id="what-is">
+                <!-- Section 1 -->
+                <section class="section">
                     <h2>1. What is PNPtv!?</h2>
+
                     <p><strong>PNPtv!</strong> is a community of <strong>PNP stans and like-minded adults</strong> who connect, share, and create inside Telegram.</p>
+
                     <p>At its core, PNPtv! is:</p>
                     <ul>
                         <li>A <strong>free Telegram community</strong> where members can interact</li>
                         <li>A <strong>PRIME membership experience</strong> for those who want full access</li>
                     </ul>
-                    <h3>What You Get with PNPtv! PRIME</h3>
+
+                    <h3>💎 What You Get with PNPtv! PRIME</h3>
                     <ul>
                         <li>Exclusive <strong>PNP content by Santino and Lex</strong></li>
                         <li>Access to <strong>video call rooms</strong></li>
@@ -463,15 +525,19 @@
                         <li><strong>Geolocation features</strong> to discover nearby members</li>
                         <li>Early access to new tools and community features</li>
                     </ul>
+
                     <p style="margin-top: 2rem; font-style: italic;">PNPtv! is not just content — it's a <strong>self-managed digital community</strong> built around connection, creativity, and shared experiences.</p>
                 </section>
 
-                <!-- Section 2: How It Works -->
-                <section class="section" id="how-works">
+                <!-- Section 2 -->
+                <section class="section">
                     <h2>2. How Does It Work?</h2>
+
                     <p>PNPtv! lives entirely inside <strong>Telegram</strong>, using four simple components that work together.</p>
+
                     <h3>🔹 Telegram</h3>
                     <p>Telegram is a free messaging app (similar to WhatsApp, but more powerful) that allows communities to combine channels, groups, and bots in one place.</p>
+
                     <h3>🔹 Channel</h3>
                     <p>The <strong>PNPtv! Channel</strong> is where official content and announcements are posted.</p>
                     <ul>
@@ -479,6 +545,7 @@
                         <li>Posting is limited to admins</li>
                         <li>Think of it as the community's bulletin board</li>
                     </ul>
+
                     <h3>🔹 Group</h3>
                     <p>The <strong>PNPtv! Community Group</strong> is where members interact.</p>
                     <ul>
@@ -486,6 +553,7 @@
                         <li>Join discussions</li>
                         <li>Participate in community activities</li>
                     </ul>
+
                     <h3>🔹 Bot</h3>
                     <p>The <strong>PNPtv! Bot</strong> is the core system that runs everything. It:</p>
                     <ul>
@@ -494,34 +562,42 @@
                         <li>Activates PRIME memberships</li>
                         <li>Unlocks features automatically (menus, video rooms, links)</li>
                     </ul>
+
                     <p style="margin-top: 1.5rem;">The bot makes the experience <strong>automatic and instant</strong>, with no manual approval needed.</p>
                 </section>
 
-                <!-- Section 3: How to Join -->
-                <section class="section" id="join">
+                <!-- Section 3 -->
+                <section class="section">
                     <h2>3. How Do I Join?</h2>
+
                     <p>Joining PNPtv! is simple and only takes a minute:</p>
-                    <ol style="list-style: decimal; padding-left: 2rem; margin: 1.5rem 0;">
-                        <li>Open Telegram</li>
-                        <li>Go to <strong>t.me/pnptv_bot</strong></li>
-                        <li>Tap <strong>Start</strong></li>
-                        <li>Complete the quick onboarding process</li>
+
+                    <ol>
+                        <li><strong>Open Telegram</strong></li>
+                        <li><strong>Go to</strong> t.me/pnptv_bot</li>
+                        <li><strong>Tap Start</strong></li>
+                        <li><strong>Complete</strong> the quick onboarding process</li>
                     </ol>
-                    <p><strong>Once onboarding is finished:</strong></p>
+
+                    <p style="margin-top: 1.5rem;"><strong>Once onboarding is finished:</strong></p>
                     <ul>
                         <li>You receive the <strong>link to the PNPtv! Community Group</strong></li>
                         <li>You gain access to the free community features</li>
                     </ul>
+
                     <div class="success-box">
                         <strong>💡 Tip:</strong> To unlock <strong>all features</strong>, you can subscribe to a <strong>PNPtv! PRIME membership</strong> directly through the bot.
                     </div>
+
                     <a href="https://t.me/pnptv_bot" target="_blank" class="cta-button">Open PNPtv! Bot Now</a>
                 </section>
 
-                <!-- Section 4: Payment Methods -->
-                <section class="section" id="payments">
+                <!-- Section 4 -->
+                <section class="section">
                     <h2>4. How Do I Pay for PRIME?</h2>
+
                     <p>PNPtv! PRIME memberships are handled <strong>directly through the bot</strong> and activate <strong>immediately after payment</strong>.</p>
+
                     <div class="grid">
                         <div class="card">
                             <h4>💳 Credit & Debit Cards</h4>
@@ -529,19 +605,18 @@
                         </div>
                         <div class="card">
                             <h4>💎 Crypto Payments</h4>
-                            <p>Pay with crypto via <strong>Daimo</strong> — fast, secure, and discreet for global use.</p>
-                            <p style="font-size: 0.9rem; margin-top: 1rem; color: rgba(255, 255, 255, 0.7);">Supports: Coinbase, MetaMask, Trust Wallet, Binance, and more.</p>
+                            <p>Pay with crypto via <strong>Daimo</strong> — fast, secure, and discreet for global use. Supports all major wallets.</p>
                         </div>
                         <div class="card">
                             <h4>🅿️ PayPal</h4>
-                            <p>Pay using PayPal balance or linked cards and bank accounts.</p>
+                            <p>Pay using PayPal balance or linked cards and bank accounts. Worldwide accepted.</p>
                         </div>
                         <div class="card">
                             <h4>🏦 Bank Apps & USDC</h4>
-                            <p>Fund USDC payments through Cash App, Zelle, Venmo, or your wallet provider.</p>
-                            <p style="font-size: 0.9rem; margin-top: 1rem; color: rgba(255, 255, 255, 0.7);">No crypto experience needed!</p>
+                            <p>Fund USDC payments via Cash App, Zelle, or Venmo. No crypto experience needed!</p>
                         </div>
                     </div>
+
                     <h3 style="margin-top: 2rem;">✅ Instant Activation</h3>
                     <p>As soon as your payment is completed:</p>
                     <ul>
@@ -549,40 +624,48 @@
                         <li>Your <strong>PRIME membership activates instantly</strong></li>
                         <li>All premium features unlock right away</li>
                     </ul>
-                    <p style="margin-top: 1rem; font-style: italic;">No waiting, no emails, no screenshots, no manual approval.</p>
+
+                    <p style="margin-top: 1rem;"><strong>No waiting, no emails, no screenshots, no manual approval.</strong></p>
+
                     <div class="info-box">
                         <strong>🔒 Security:</strong> All payments are processed through industry-standard, secure payment gateways. Your card details are never stored on our servers.
                     </div>
                 </section>
 
-                <!-- Section 5: Premium Features -->
-                <section class="section" id="features">
+                <!-- Section 5 -->
+                <section class="section">
                     <h2>5. Premium Features</h2>
+
                     <p>With PNPtv! PRIME, you unlock:</p>
+
                     <h3>📺 Exclusive Content</h3>
                     <ul>
                         <li>PNP content curated by Santino and Lex</li>
                         <li>Early access to new releases</li>
                         <li>Behind-the-scenes material</li>
                     </ul>
+
                     <h3>🎥 Video Rooms</h3>
                     <ul>
                         <li>24/7 access to live video chat rooms</li>
                         <li>Connect with verified community members</li>
                         <li>Screen sharing and HD video</li>
                     </ul>
+
                     <h3>🎵 Music Playlists</h3>
                     <ul>
                         <li>Curated playlists for every mood</li>
                         <li>Access to exclusive music collections</li>
                         <li>Create and share your own playlists</li>
                     </ul>
+
                     <h3>📍 Geolocation Features</h3>
                     <ul>
                         <li>Discover PNPtv! members near you</li>
                         <li>Optional location sharing with privacy controls</li>
                         <li>Arrange local meetups and connections</li>
                     </ul>
+
                     <h3>🔔 Early Access</h3>
                     <ul>
                         <li>First access to new features and tools</li>
@@ -591,10 +674,10 @@
                     </ul>
                 </section>
 
-                <!-- CTA Section -->
-                <section class="section" style="text-align: center; margin-top: 4rem; margin-bottom: 2rem;">
-                    <h2 style="margin-bottom: 1.5rem;">Ready to Join PNPtv!?</h2>
-                    <p style="margin-bottom: 2rem; font-size: 1.1rem;">Join thousands of PNP stans in our community. It takes less than a minute.</p>
+                <!-- CTA -->
+                <section class="section" style="text-align: center;">
+                    <h2>Ready to Join PNPtv!?</h2>
+                    <p style="font-size: 1.2rem; margin-bottom: 2rem;">Join thousands of PNP stans in our community. It takes less than a minute.</p>
                     <a href="https://t.me/pnptv_bot" target="_blank" class="cta-button">Start with the Bot Now</a>
                 </section>
             </div>
@@ -602,7 +685,7 @@
             <!-- Footer -->
             <footer class="footer">
                 <p>&copy; 2025 PNPtv!. All rights reserved.</p>
-                <p style="font-size: 0.9rem; margin-top: 1rem;">18+ Only | By accessing this site you confirm you are 18 years or older</p>
+                <p>18+ Only | By accessing this site you confirm you are 18 years or older</p>
             </footer>
         </div>
 
@@ -610,22 +693,27 @@
         <div class="lang-section" id="content-es">
             <!-- Hero -->
             <section class="hero">
-                <h1>🌟 ¿Cómo Usar PNPtv!?</h1>
-                <p>Todo lo que necesitas saber sobre conectar, compartir y crear en la comunidad PNPtv! en Telegram</p>
+                <div class="hero-content">
+                    <h1>🌟 ¿Cómo Usar PNPtv!?</h1>
+                    <p>Todo lo que necesitas saber sobre conectar, compartir y crear en la comunidad PNPtv!</p>
+                </div>
             </section>
 
             <!-- Content -->
             <div class="container">
                 <!-- Section 1 ES -->
-                <section class="section" id="what-is-es">
+                <section class="section">
                     <h2>1. ¿Qué es PNPtv!?</h2>
+
                     <p><strong>PNPtv!</strong> es una comunidad de <strong>fans de PNP y adultos afines</strong> que se conectan, comparten y crean dentro de Telegram.</p>
+
                     <p>En esencia, PNPtv! es:</p>
                     <ul>
                         <li>Una <strong>comunidad gratuita en Telegram</strong> donde los miembros pueden interactuar</li>
                         <li>Una <strong>experiencia de membresía PRIME</strong> para quienes desean acceso completo</li>
                     </ul>
-                    <h3>¿Qué Obtienes con PNPtv! PRIME?</h3>
+
+                    <h3>💎 ¿Qué Obtienes con PNPtv! PRIME?</h3>
                     <ul>
                         <li>Contenido exclusivo de <strong>PNP por Santino y Lex</strong></li>
                         <li>Acceso a <strong>salas de videollamadas</strong></li>
@@ -633,15 +721,19 @@
                         <li><strong>Funciones de geolocalización</strong> para descubrir miembros cercanos</li>
                         <li>Acceso anticipado a nuevas herramientas y características de la comunidad</li>
                     </ul>
+
                     <p style="margin-top: 2rem; font-style: italic;">PNPtv! no es solo contenido — es una <strong>comunidad digital autogestionada</strong> centrada en la conexión, la creatividad y las experiencias compartidas.</p>
                 </section>
 
                 <!-- Section 2 ES -->
-                <section class="section" id="how-works-es">
+                <section class="section">
                     <h2>2. ¿Cómo Funciona?</h2>
+
                     <p>PNPtv! vive completamente dentro de <strong>Telegram</strong>, utilizando cuatro componentes simples que trabajan juntos.</p>
+
                     <h3>🔹 Telegram</h3>
                     <p>Telegram es una aplicación de mensajería gratuita (similar a WhatsApp, pero más poderosa) que permite que las comunidades combinen canales, grupos y bots en un solo lugar.</p>
+
                     <h3>🔹 Canal</h3>
                     <p>El <strong>Canal de PNPtv!</strong> es donde se publican anuncios y contenido oficial.</p>
                     <ul>
@@ -649,6 +741,7 @@
                         <li>Solo los administradores pueden publicar</li>
                         <li>Piénsalo como el tablón de anuncios de la comunidad</li>
                     </ul>
+
                     <h3>🔹 Grupo</h3>
                     <p>El <strong>Grupo de la Comunidad PNPtv!</strong> es donde los miembros interactúan.</p>
                     <ul>
@@ -656,6 +749,7 @@
                         <li>Únete a discusiones</li>
                         <li>Participa en actividades de la comunidad</li>
                     </ul>
+
                     <h3>🔹 Bot</h3>
                     <p>El <strong>Bot de PNPtv!</strong> es el sistema central que lo gestiona todo. Esto:</p>
                     <ul>
@@ -664,34 +758,42 @@
                         <li>Activa las membresías PRIME</li>
                         <li>Desbloquea características automáticamente (menús, salas de video, enlaces)</li>
                     </ul>
+
                     <p style="margin-top: 1.5rem;">El bot hace que la experiencia sea <strong>automática e instantánea</strong>, sin necesidad de aprobación manual.</p>
                 </section>
 
                 <!-- Section 3 ES -->
-                <section class="section" id="join-es">
+                <section class="section">
                     <h2>3. ¿Cómo Me Uno?</h2>
+
                     <p>Unirse a PNPtv! es simple y solo toma un minuto:</p>
-                    <ol style="list-style: decimal; padding-left: 2rem; margin: 1.5rem 0;">
-                        <li>Abre Telegram</li>
-                        <li>Ve a <strong>t.me/pnptv_bot</strong></li>
-                        <li>Presiona <strong>Start / Iniciar</strong></li>
-                        <li>Completa el proceso rápido de incorporación</li>
+
+                    <ol>
+                        <li><strong>Abre Telegram</strong></li>
+                        <li><strong>Ve a</strong> t.me/pnptv_bot</li>
+                        <li><strong>Presiona Start / Iniciar</strong></li>
+                        <li><strong>Completa</strong> el proceso rápido de incorporación</li>
                     </ol>
-                    <p><strong>Una vez que termine la incorporación:</strong></p>
+
+                    <p style="margin-top: 1.5rem;"><strong>Una vez que termine la incorporación:</strong></p>
                     <ul>
                         <li>Recibirás el <strong>enlace al Grupo de la Comunidad PNPtv!</strong></li>
                         <li>Tendrás acceso a las características de la comunidad gratuita</li>
                     </ul>
+
                     <div class="success-box">
                         <strong>💡 Consejo:</strong> Para desbloquear <strong>todas las características</strong>, puedes suscribirte a una <strong>membresía PNPtv! PRIME</strong> directamente a través del bot.
                     </div>
+
                     <a href="https://t.me/pnptv_bot" target="_blank" class="cta-button">Abre el Bot de PNPtv! Ahora</a>
                 </section>
 
                 <!-- Section 4 ES -->
-                <section class="section" id="payments-es">
+                <section class="section">
                     <h2>4. ¿Cómo Pago una Membresía PRIME?</h2>
+
                     <p>Las membresías PNPtv! PRIME se gestionan <strong>directamente a través del bot</strong> y se activan <strong>inmediatamente después del pago</strong>.</p>
+
                     <div class="grid">
                         <div class="card">
                             <h4>💳 Tarjetas de Crédito y Débito</h4>
@@ -699,19 +801,18 @@
                         </div>
                         <div class="card">
                             <h4>💎 Pagos con Cripto</h4>
-                            <p>Paga con cripto a través de <strong>Daimo</strong> — rápido, seguro y discreto para uso global.</p>
-                            <p style="font-size: 0.9rem; margin-top: 1rem; color: rgba(255, 255, 255, 0.7);">Compatible con: Coinbase, MetaMask, Trust Wallet, Binance, y más.</p>
+                            <p>Paga con cripto a través de <strong>Daimo</strong> — rápido, seguro y discreto para uso global. Compatible con todos los monederos principales.</p>
                         </div>
                         <div class="card">
                             <h4>🅿️ PayPal</h4>
-                            <p>Paga usando tu saldo de PayPal o tarjetas vinculadas y cuentas bancarias.</p>
+                            <p>Paga usando tu saldo de PayPal o tarjetas vinculadas y cuentas bancarias. Aceptado en todo el mundo.</p>
                         </div>
                         <div class="card">
                             <h4>🏦 Apps Bancarias y USDC</h4>
-                            <p>Financia pagos USDC a través de Cash App, Zelle, Venmo o tu proveedor de billetera.</p>
-                            <p style="font-size: 0.9rem; margin-top: 1rem; color: rgba(255, 255, 255, 0.7);">¡Sin experiencia en cripto necesaria!</p>
+                            <p>Financia pagos USDC a través de Cash App, Zelle o Venmo. ¡Sin experiencia en cripto necesaria!</p>
                         </div>
                     </div>
+
                     <h3 style="margin-top: 2rem;">✅ Activación Instantánea</h3>
                     <p>Tan pronto como se complete el pago:</p>
                     <ul>
@@ -719,40 +820,48 @@
                         <li>Tu <strong>membresía PRIME se activa instantáneamente</strong></li>
                         <li>Todas las características premium se desbloquean de inmediato</li>
                     </ul>
-                    <p style="margin-top: 1rem; font-style: italic;">Sin esperas, sin correos, sin capturas de pantalla, sin aprobación manual.</p>
+
+                    <p style="margin-top: 1rem;"><strong>Sin esperas, sin correos, sin capturas de pantalla, sin aprobación manual.</strong></p>
+
                     <div class="info-box">
                         <strong>🔒 Seguridad:</strong> Todos los pagos se procesan a través de puertas de pago seguras estándar de la industria. Los detalles de tu tarjeta nunca se almacenan en nuestros servidores.
                     </div>
                 </section>
 
                 <!-- Section 5 ES -->
-                <section class="section" id="features-es">
+                <section class="section">
                     <h2>5. Características Premium</h2>
+
                     <p>Con PNPtv! PRIME, desbloqueas:</p>
+
                     <h3>📺 Contenido Exclusivo</h3>
                     <ul>
                         <li>Contenido de PNP curado por Santino y Lex</li>
                         <li>Acceso anticipado a nuevos lanzamientos</li>
                         <li>Material detrás de cámaras</li>
                     </ul>
+
                     <h3>🎥 Salas de Video</h3>
                     <ul>
                         <li>Acceso 24/7 a salas de chat de video en vivo</li>
                         <li>Conecta con miembros verificados de la comunidad</li>
                         <li>Compartición de pantalla y video HD</li>
                     </ul>
+
                     <h3>🎵 Playlists Musicales</h3>
                     <ul>
                         <li>Playlists curadas para cada estado de ánimo</li>
                         <li>Acceso a colecciones de música exclusiva</li>
                         <li>Crea y comparte tus propias playlists</li>
                     </ul>
+
                     <h3>📍 Funciones de Geolocalización</h3>
                     <ul>
                         <li>Descubre miembros de PNPtv! cerca de ti</li>
                         <li>Compartición de ubicación opcional con controles de privacidad</li>
                         <li>Organiza encuentros locales y conexiones</li>
                     </ul>
+
                     <h3>🔔 Acceso Anticipado</h3>
                     <ul>
                         <li>Primer acceso a nuevas herramientas y características</li>
@@ -761,10 +870,10 @@
                     </ul>
                 </section>
 
-                <!-- CTA Section ES -->
-                <section class="section" style="text-align: center; margin-top: 4rem; margin-bottom: 2rem;">
-                    <h2 style="margin-bottom: 1.5rem;">¿Listo para Unirte a PNPtv!?</h2>
-                    <p style="margin-bottom: 2rem; font-size: 1.1rem;">Únete a miles de fans de PNP en nuestra comunidad. Solo toma un minuto.</p>
+                <!-- CTA ES -->
+                <section class="section" style="text-align: center;">
+                    <h2>¿Listo para Unirte a PNPtv!?</h2>
+                    <p style="font-size: 1.2rem; margin-bottom: 2rem;">Únete a miles de fans de PNP en nuestra comunidad. Solo toma un minuto.</p>
                     <a href="https://t.me/pnptv_bot" target="_blank" class="cta-button">Comienza con el Bot Ahora</a>
                 </section>
             </div>
@@ -772,7 +881,7 @@
             <!-- Footer ES -->
             <footer class="footer">
                 <p>&copy; 2025 PNPtv!. Todos los derechos reservados.</p>
-                <p style="font-size: 0.9rem; margin-top: 1rem;">Solo para mayores de 18 años | Al acceder a este sitio confirmas que tienes 18 años o más</p>
+                <p>Solo para mayores de 18 años | Al acceder a este sitio confirmas que tienes 18 años o más</p>
             </footer>
         </div>
     </div>
@@ -780,69 +889,29 @@
     <script>
         let currentLanguage = 'en';
 
-        // Switch Language Function
         function switchLanguage(lang) {
             currentLanguage = lang;
 
-            // Update active button
             document.getElementById('langEnBtn').classList.toggle('active', lang === 'en');
             document.getElementById('langEsBtn').classList.toggle('active', lang === 'es');
 
-            // Update content visibility
             document.getElementById('content-en').classList.toggle('active', lang === 'en');
             document.getElementById('content-es').classList.toggle('active', lang === 'es');
 
-            // Update sidebar title
-            document.getElementById('sidebarTitle').textContent = lang === 'en' ? '📑 Navigation' : '📑 Navegación';
-
-            // Update nav links visibility
-            document.querySelectorAll('.nav-link-en').forEach(el => el.style.display = lang === 'en' ? 'block' : 'none');
-            document.querySelectorAll('.nav-link-es').forEach(el => el.style.display = lang === 'es' ? 'block' : 'none');
-
-            // Save preference
             localStorage.setItem('pnptv_language', lang);
         }
 
-        // Load saved language preference
         window.addEventListener('DOMContentLoaded', () => {
             const savedLang = localStorage.getItem('pnptv_language') || 'en';
             switchLanguage(savedLang);
         });
 
-        // Mobile menu toggle
         const menuToggle = document.getElementById('menuToggle');
-        const sidebar = document.getElementById('sidebar');
-
         if (menuToggle) {
             menuToggle.addEventListener('click', () => {
-                sidebar.classList.toggle('hidden');
-            });
-
-            document.querySelectorAll('.sidebar-list a').forEach(link => {
-                link.addEventListener('click', () => {
-                    if (window.innerWidth <= 768) {
-                        sidebar.classList.add('hidden');
-                    }
-                });
+                alert('Mobile menu - Full implementation in mobile version');
             });
         }
-
-        // Scroll to section function
-        function scrollToSection(event, sectionId) {
-            event.preventDefault();
-            const suffix = currentLanguage === 'es' ? '-es' : '';
-            const section = document.getElementById(sectionId + suffix);
-            if (section) {
-                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        }
-
-        // Responsive sidebar on resize
-        window.addEventListener('resize', () => {
-            if (window.innerWidth > 768) {
-                sidebar.classList.remove('hidden');
-            }
-        });
     </script>
 </body>
 </html>
