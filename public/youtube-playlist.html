@@ -824,11 +824,30 @@
             return allPlaylists;
         }
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function () {
+        // Initialize - Consolidated single initialization
+        document.addEventListener('DOMContentLoaded', async function () {
+            // Initialize Materialize components
             M.Tabs.init(document.querySelectorAll('.tabs'));
-            renderPlaylists();
-            renderFavorites();
+            M.Modal.init(document.getElementById('createPlaylistModal'));
+            M.updateTextFields();
+            M.FormSelect.init(document.querySelectorAll('select'));
+
+            // Set first chip as active
+            document.querySelector('.filter-chips .chip').classList.add('active');
+
+            // Initialize search input
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleSearch();
+                }
+            });
+
+            // Initialize video player
+            initializeVideoPlayer();
+
+            // Render content
+            await renderPlaylists();
+            await renderFavorites();
         });
 
         // Render Playlists
@@ -1101,23 +1120,6 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Search on Enter
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('searchInput').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    handleSearch();
-                }
-            });
-        });
-
-        // Set first chip as active
-        document.addEventListener('DOMContentLoaded', () => {
-            document.querySelector('.filter-chips .chip').classList.add('active');
-            M.Modal.init(document.getElementById('createPlaylistModal'));
-            M.updateTextFields();
-            M.FormSelect.init(document.querySelectorAll('select'));
-        });
-
         // Create Playlist Modal Functions
         function openCreatePlaylistModal() {
             const modal = M.Modal.getInstance(document.getElementById('createPlaylistModal'));
@@ -1256,8 +1258,8 @@
             'https://invidious.nerdvpn.org',
         ];
 
-        // Initialize video player modal
-        document.addEventListener('DOMContentLoaded', () => {
+        // Initialize video player modal (moved to main DOMContentLoaded)
+        function initializeVideoPlayer() {
             const videoPlayerModal = document.getElementById('videoPlayerModal');
             videoPlayerModalInstance = M.Modal.init(videoPlayerModal, {
                 dismissible: true,
@@ -1267,7 +1269,7 @@
                     iframe.src = '';
                 }
             });
-        });
+        }
 
         // Test if an Invidious instance is working
         async function testInvidiousInstance(instance) {
