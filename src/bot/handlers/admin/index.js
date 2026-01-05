@@ -43,6 +43,11 @@ async function showAdminPanel(ctx, edit = false) {
         Markup.button.callback('🎮 ' + (lang === 'es' ? 'Gamificación' : 'Gamification'), 'admin_gamification'),
       ]);
 
+      // ═══ COMMUNITY POSTS ═══
+      buttons.push([
+        Markup.button.callback('📤 ' + (lang === 'es' ? 'Compartir Publicación' : 'Share Post'), 'admin_share_post_to_groups'),
+      ]);
+
       // ═══ COMMUNITY REWARDS ═══
       buttons.push([
         Markup.button.callback('🎁 ' + (lang === 'es' ? 'Premium Comunitario' : 'Community Premium'), 'admin_community_premium_broadcast'),
@@ -98,6 +103,7 @@ const registerGamificationHandlers = require('./gamification');
 const registerRadioManagementHandlers = require('./radioManagement');
 const registerLiveStreamManagementHandlers = require('./liveStreamManagement');
 const registerCommunityPremiumBroadcast = require('./communityPremiumBroadcast');
+const registerCommunityPostHandlers = require('./sharePostToCommunityGroup');
 
 const registerAdminHandlers = (bot) => {
   // Register gamification handlers
@@ -105,6 +111,7 @@ const registerAdminHandlers = (bot) => {
   registerRadioManagementHandlers(bot);
   registerLiveStreamManagementHandlers(bot);
   registerCommunityPremiumBroadcast(bot);
+  registerCommunityPostHandlers(bot);
 
   // Admin command
   bot.command('admin', async (ctx) => {
@@ -3096,8 +3103,8 @@ const registerGroupCleanupCommand = (bot) => {
       // Send status message
       const statusMsg = await ctx.reply(
         lang === 'es'
-          ? '🧹 Limpiando mensajes del bot en la comunidad...'
-          : '🧹 Cleaning bot messages in community...'
+          ? '🧹 Limpiando mensajes del bot en la comunidad...\n\n⚠️ Nota: Solo se eliminan mensajes del bot\n✨ Las fotos y videos del Muro de la Fama NO se eliminan NUNCA'
+          : '🧹 Cleaning bot messages in community...\n\n⚠️ Note: Only bot messages are deleted\n✨ Wall of Fame photos and videos are NEVER deleted'
       );
 
       try {
@@ -3108,27 +3115,35 @@ const registerGroupCleanupCommand = (bot) => {
         const deletedCount = await ChatCleanupService.deleteAllPreviousBotMessages(
           telegram,
           groupId,
-          statusMsg.message_id // Keep the status message
+          statusMsg.message_id // Keep only the most recent message (this one)
         );
+
+        // Build detailed results message
+        const detailedResults = lang === 'es'
+          ? `✅ Limpieza completada\n\n📊 Estadísticas:\n• Mensajes del bot eliminados: ${deletedCount}\n• Mensaje actual: ✨ Conservado (más reciente)\n\n🛡️ Excepciones:\n• Muro de la Fama: NUNCA se eliminan ♾️\n• Fotos/Videos: Permanentes en el Muro ♾️\n• Solo mensajes del bot anterior: Eliminados`
+          : `✅ Cleanup completed\n\n📊 Statistics:\n• Bot messages deleted: ${deletedCount}\n• Current message: ✨ Kept (most recent)\n\n🛡️ Exceptions:\n• Wall of Fame: NEVER deleted ♾️\n• Photos/Videos: Permanent on Wall ♾️\n• Only previous bot messages: Deleted`;
 
         // Update status message with results
         await ctx.telegram.editMessageText(
           groupId,
           statusMsg.message_id,
           undefined,
-          lang === 'es'
-            ? `✅ Limpieza completada\n\n📊 Estadísticas:\n• Mensajes eliminados: ${deletedCount}\n• Mensaje actual: Conservado`
-            : `✅ Cleanup completed\n\n📊 Statistics:\n• Messages deleted: ${deletedCount}\n• Current message: Kept`
+          detailedResults
         );
 
         // Also send confirmation to admin
         await ctx.reply(
           lang === 'es'
-            ? `✅ Limpieza completada exitosamente\n\n📊 Mensajes eliminados: ${deletedCount}`
-            : `✅ Cleanup completed successfully\n\n📊 Messages deleted: ${deletedCount}`
+            ? `✅ Limpieza completada exitosamente\n\n📊 Mensajes eliminados: ${deletedCount}\n\n🔐 Regla de Eliminación:\n✅ Se eliminan: Todos los mensajes previos del bot\n✨ Se conservan: Solo el mensaje más reciente\n♾️ NUNCA se eliminan: Fotos/Videos del Muro de la Fama`
+            : `✅ Cleanup completed successfully\n\n📊 Messages deleted: ${deletedCount}\n\n🔐 Deletion Rule:\n✅ Deleted: All previous bot messages\n✨ Kept: Only the most recent message\n♾️ NEVER deleted: Wall of Fame photos/videos`
         );
 
-        logger.info('Group cleanup completed', { groupId, deletedCount });
+        logger.info('Group cleanup completed', {
+          groupId,
+          deletedCount,
+          keptMessage: statusMsg.message_id,
+          rule: 'Only previous bot messages deleted, keep most recent, Wall of Fame forever',
+        });
       } catch (cleanupError) {
         logger.error('Error during cleanup:', cleanupError);
         await ctx.telegram.editMessageText(

@@ -40,6 +40,7 @@ const registerRoleManagementHandlers = require('../handlers/admin/roleManagement
 const registerGamificationHandlers = require('../handlers/admin/gamification');
 const registerLiveStreamManagementHandlers = require('../handlers/admin/liveStreamManagement');
 const registerRadioManagementHandlers = require('../handlers/admin/radioManagement');
+const { registerWallOfFameHandlers } = require('../handlers/group/wallOfFame');
 const registerPrivateCallHandlers = require('../handlers/user/privateCalls');
 const registerPaymentHistoryHandlers = require('../handlers/user/paymentHistory');
 const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnalytics');
@@ -54,6 +55,7 @@ const GroupCleanupService = require('../services/groupCleanupService');
 const broadcastScheduler = require('../../services/broadcastScheduler');
 const SubscriptionReminderService = require('../services/subscriptionReminderService');
 const radioStreamManager = require('../../services/radio/radioStreamManager');
+const CommunityPostScheduler = require('./schedulers/communityPostScheduler');
 const { startCronJobs } = require('../../../scripts/cron');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
@@ -171,6 +173,7 @@ const startBot = async () => {
     registerGamificationHandlers(bot);
     registerLiveStreamManagementHandlers(bot);
     registerRadioManagementHandlers(bot);
+    registerWallOfFameHandlers(bot);
     registerPrivateCallHandlers(bot);
     registerPaymentHistoryHandlers(bot);
     registerPaymentAnalyticsHandlers(bot);
@@ -212,6 +215,15 @@ const startBot = async () => {
       logger.info('✓ Radio stream manager initialized and started');
     } catch (error) {
       logger.warn('Radio stream manager initialization failed, continuing without radio:', error.message);
+    }
+    // Initialize community post scheduler
+    try {
+      const communityPostScheduler = new CommunityPostScheduler(bot);
+      communityPostScheduler.start();
+      global.communityPostScheduler = communityPostScheduler;
+      logger.info('✓ Community post scheduler initialized and started');
+    } catch (error) {
+      logger.warn('Community post scheduler initialization failed, continuing without community posts:', error.message);
     }
     // Error handling
     bot.catch(errorHandler);

@@ -64,6 +64,12 @@ class UserModel {
       deactivationReason: row.deactivation_reason,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      // Social media fields
+      instagram: row.instagram || null,
+      twitter: row.twitter || null,
+      tiktok: row.tiktok || null,
+      youtube: row.youtube || null,
+      telegram: row.telegram || null,
     };
   }
 
