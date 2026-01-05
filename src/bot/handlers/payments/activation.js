@@ -3,6 +3,8 @@ const UserModel = require('../../../models/userModel');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
+const MessageTemplates = require('../../services/messageTemplates');
+const { Telegraf } = require('telegraf');
 
 /**
  * Activation code handlers for lifetime pass
@@ -120,49 +122,38 @@ const registerActivationHandlers = (bot) => {
           success: true,
         });
 
-        // Send success message with enhanced formatting
-        const successMessage = lang === 'es'
-          ? '🎉 ¡Felicidades! Tu Lifetime Pass ha sido activado con éxito.\n\n'
-            + '✅ Tu membresía es ahora PERMANENTE\n'
-            + '✅ Acceso ilimitado a todo el contenido\n'
-            + '✅ Sin fechas de expiración\n'
-            + '✅ Todas las funciones premium desbloqueadas\n\n'
-            + '🔥 Disfruta de:\n'
-            + '• Videos HD/4K completos\n'
-            + '• Contenido exclusivo PNP\n'
-            + '• Función "Quién está cerca"\n'
-            + '• Soporte prioritario 24/7\n'
-            + '• Actualizaciones futuras gratis\n\n'
-            + '¡Bienvenido a la comunidad PNPtv! 🎊'
-          : '🎉 Congratulations! Your Lifetime Pass has been successfully activated.\n\n'
-            + '✅ Your membership is now PERMANENT\n'
-            + '✅ Unlimited access to all content\n'
-            + '✅ No expiration dates\n'
-            + '✅ All premium features unlocked\n\n'
-            + '🔥 Enjoy:\n'
-            + '• Full HD/4K videos\n'
-            + '• Exclusive PNP content\n'
-            + '• "Who\'s Nearby" feature\n'
-            + '• Priority 24/7 support\n'
-            + '• Free future updates\n\n'
-            + 'Welcome to the PNPtv community! 🎊';
+        // Generate PRIME channel invite link for lifetime pass
+        let inviteLink = 'https://t.me/PNPTV_PRIME'; // Fallback
+        try {
+          const bot = new Telegraf(process.env.BOT_TOKEN);
+          const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
+          const response = await bot.telegram.createChatInviteLink(groupId, {
+            member_limit: 1,
+            name: `LifetimePass ${code}`,
+          });
+          inviteLink = response.invite_link;
+          logger.info('Lifetime pass channel invite link created', {
+            userId,
+            code,
+            inviteLink,
+          });
+        } catch (linkError) {
+          logger.warn('Failed to create lifetime pass invite link, using fallback', {
+            userId,
+            code,
+            error: linkError.message,
+          });
+        }
 
-        await ctx.reply(successMessage);
+        // Use unified lifetime pass message template with channel invite
+        const successMessage = MessageTemplates.buildLifetimePassMessage(lang);
 
-        // Send follow-up message after initial response
-        // Using Promise.resolve().then() instead of setTimeout to maintain context
-        Promise.resolve().then(async () => {
-          try {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            await ctx.reply(
-              lang === 'es'
-                ? '📱 Usa /menu para ver todas las funciones disponibles.'
-                : '📱 Use /menu to see all available features.',
-            );
-          } catch (err) {
-            logger.error('Error sending follow-up message:', err);
-          }
-        });
+        // Add channel invite to the message
+        const messageWithInvite = lang === 'es'
+          ? successMessage + `\n\n🌟 *¡Accede al canal PRIME!*\n👉 [🔗 Ingresar a PRIME](${inviteLink})`
+          : successMessage + `\n\n🌟 *Access PRIME Channel!*\n👉 [🔗 Join PRIME](${inviteLink})`;
+
+        await ctx.reply(messageWithInvite, { parse_mode: 'Markdown', disable_web_page_preview: false });
       } catch (updateError) {
         // Rollback code usage if user update fails
         logger.error('Error updating user after activation:', updateError);

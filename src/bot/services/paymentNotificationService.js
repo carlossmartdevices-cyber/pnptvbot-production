@@ -2,6 +2,7 @@ const logger = require('../../utils/logger');
 const UserModel = require('../../models/userModel');
 const PlanModel = require('../../models/planModel');
 const ConfirmationTokenService = require('./confirmationTokenService');
+const MessageTemplates = require('./messageTemplates');
 
 /**
  * Payment Notification Service
@@ -169,9 +170,10 @@ class PaymentNotificationService {
    * @param {string} params.userId - Telegram user ID
    * @param {string} params.planName - Plan name
    * @param {Date} params.expiryDate - Subscription expiry date
+   * @param {string} params.transactionId - Transaction ID (for invite link generation)
    * @returns {Promise<boolean>} Success status
    */
-  static async sendSubscriptionActivated({ bot, userId, planName, expiryDate }) {
+  static async sendSubscriptionActivated({ bot, userId, planName, expiryDate, transactionId = 'subscription' }) {
     try {
       const user = await UserModel.getById(userId);
       if (!user) {
@@ -180,51 +182,34 @@ class PaymentNotificationService {
       }
 
       const lang = user.language || 'es';
-      let message = '';
+      const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
 
-      if (lang === 'es') {
-        message = `🎊 ¡Membresía Activada!\n\n`;
-        message += `🌟 ${planName} ya está activa en tu cuenta\n\n`;
-        message += `✨ Ahora tienes acceso a:\n`;
-        message += `• Videos HD/4K completos\n`;
-        message += `• Contenido exclusivo PNP\n`;
-        message += `• Función "Quién está cerca"\n`;
-        message += `• Salas de llamadas de video en vivo\n`;
-        message += `• Soporte prioritario 24/7\n\n`;
-        message += `📋 Detalles de tu membresía:\n`;
-        message += `• Plan: ${planName}\n`;
-        if (expiryDate) {
-          message += `• Vence: ${expiryDate.toLocaleDateString('es-ES')}\n`;
-        } else {
-          message += `• Duración: Permanente ♾️\n`;
-        }
-        message += `\n📱 Usa /menu para ver todas las funciones disponibles\n`;
-        message += `🎥 Accede a la sala de videos en vivo: /live\n`;
-        message += `🔗 Comparte tu cuenta de forma segura: /share-account`;
-      } else {
-        message = `🎊 Membership Activated!\n\n`;
-        message += `🌟 ${planName} is now active on your account\n\n`;
-        message += `✨ You now have access to:\n`;
-        message += `• Full HD/4K videos\n`;
-        message += `• Exclusive PNP content\n`;
-        message += `• "Who's Nearby" feature\n`;
-        message += `• Live video chat rooms\n`;
-        message += `• Priority 24/7 support\n\n`;
-        message += `📋 Your membership details:\n`;
-        message += `• Plan: ${planName}\n`;
-        if (expiryDate) {
-          message += `• Expires: ${expiryDate.toLocaleDateString('en-US')}\n`;
-        } else {
-          message += `• Duration: Permanent ♾️\n`;
-        }
-        message += `\n📱 Use /menu to see all available features\n`;
-        message += `🎥 Access live video room: /live\n`;
-        message += `🔗 Share your account securely: /share-account`;
+      // Generate unique invite link for PRIME channel
+      let inviteLink = 'https://t.me/PNPTV_PRIME'; // Fallback
+      try {
+        const response = await bot.telegram.createChatInviteLink(groupId, {
+          member_limit: 1,
+          name: `Subscription ${transactionId}`,
+        });
+        inviteLink = response.invite_link;
+      } catch (linkError) {
+        logger.warn('Failed to create invite link, using fallback', { userId, error: linkError.message });
       }
+
+      // Use unified message template
+      const message = MessageTemplates.buildPrimeActivationMessage({
+        planName,
+        amount: null, // No amount for activated messages
+        expiryDate,
+        transactionId,
+        inviteLink,
+        language: lang,
+      });
 
       try {
         await bot.telegram.sendMessage(userId, message, {
-          parse_mode: 'HTML',
+          parse_mode: 'Markdown',
+          disable_web_page_preview: false,
         });
 
         logger.info('Subscription activated notification sent', { userId, planName });

@@ -12,6 +12,7 @@ const DaimoService = require('./daimoService');
 const DaimoConfig = require('../../config/daimo');
 const PaymentNotificationService = require('./paymentNotificationService');
 const PayPalService = require('./paypalService');
+const MessageTemplates = require('./messageTemplates');
 
 class PaymentService {
     /**
@@ -63,59 +64,15 @@ class PaymentService {
           }
         }
 
-        // Format expiry date
-        const expiryDateStr = expiryDate
-          ? expiryDate.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })
-          : (language === 'es' ? 'Sin vencimiento (Lifetime)' : 'No expiration (Lifetime)');
-
-        // Build message in user's language
-        const messageEs = [
-          '🎉 *¡Pago Confirmado!*',
-          '',
-          '✅ Tu suscripción ha sido activada exitosamente.',
-          '',
-          '📋 *Detalles de la Compra:*',
-          `💎 Plan: ${plan.display_name || plan.name}`,
-          `💵 Monto: $${amount.toFixed(2)} USD`,
-          `📅 Válido hasta: ${expiryDateStr}`,
-          `🔖 ID de Transacción: ${transactionId}`,
-          '',
-          '🌟 *¡Bienvenido a PRIME!*',
-          '',
-          '👉 Accede al canal exclusivo aquí:',
-          `[🔗 Ingresar a PRIME](${inviteLink})`,
-          '',
-          '💎 Disfruta de todo el contenido premium y beneficios exclusivos.',
-          '',
-          '¡Gracias por tu suscripción! 🙏',
-        ].join('\n');
-
-        const messageEn = [
-          '🎉 *Payment Confirmed!*',
-          '',
-          '✅ Your subscription has been activated successfully.',
-          '',
-          '📋 *Purchase Details:*',
-          `💎 Plan: ${plan.display_name || plan.name}`,
-          `💵 Amount: $${amount.toFixed(2)} USD`,
-          `📅 Valid until: ${expiryDateStr}`,
-          `🔖 Transaction ID: ${transactionId}`,
-          '',
-          '🌟 *Welcome to PRIME!*',
-          '',
-          '👉 Access the exclusive channel here:',
-          `[🔗 Join PRIME](${inviteLink})`,
-          '',
-          '💎 Enjoy all premium content and exclusive benefits.',
-          '',
-          'Thank you for your subscription! 🙏',
-        ].join('\n');
-
-        const message = language === 'es' ? messageEs : messageEn;
+        // Use unified message template
+        const message = MessageTemplates.buildPrimeActivationMessage({
+          planName: plan.display_name || plan.name,
+          amount,
+          expiryDate,
+          transactionId,
+          inviteLink,
+          language,
+        });
 
         // Send notification
         await bot.telegram.sendMessage(userId, message, {
