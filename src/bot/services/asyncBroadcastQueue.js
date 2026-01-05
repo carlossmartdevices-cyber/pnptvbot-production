@@ -16,6 +16,8 @@ class AsyncBroadcastQueue {
     this.maxConcurrentJobs = 2;
     this.activeJobs = new Set();
     this.tablesInitialized = false;
+    this.pollIntervalMs = parseInt(process.env.BROADCAST_QUEUE_POLL_INTERVAL_MS, 10) || 1000;
+    this.retryBaseDelayMs = parseInt(process.env.BROADCAST_QUEUE_RETRY_DELAY_MS, 10) || 60000;
   }
 
   /**
@@ -170,7 +172,7 @@ class AsyncBroadcastQueue {
       this.processNextJobs().catch((error) => {
         logger.error('Error in queue processing loop:', error);
       });
-    }, 1000); // Check every 1 second
+    }, this.pollIntervalMs); // Check on configured interval
 
     logger.info(`Queue processor started (concurrency: ${concurrency})`);
   }
@@ -298,8 +300,8 @@ class AsyncBroadcastQueue {
       // Check if we should retry
       const nextAttempt = job.attempts + 1;
       if (nextAttempt < job.max_attempts) {
-        // Calculate exponential backoff (60s * 2^attempt)
-        const delayMs = 60000 * Math.pow(2, nextAttempt - 1);
+        // Calculate exponential backoff (base * 2^attempt)
+        const delayMs = this.retryBaseDelayMs * Math.pow(2, nextAttempt - 1);
         const nextRetryAt = new Date(Date.now() + delayMs);
 
         await this.updateJobStatus(
