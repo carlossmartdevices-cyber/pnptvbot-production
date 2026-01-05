@@ -231,6 +231,40 @@ const MENU_CONFIG = {
       es: '🎯 Menú PNPtv'
     },
     options: [
+      {
+        id: 'subscribe',
+        title: { en: '💎 Subscribe to PRIME', es: '💎 Suscribirse a PRIME' },
+        callback: 'menu:subscribe',
+        deepLink: 'subscribe'
+      },
+      {
+        id: 'nearby',
+        title: { en: '📍 Nearby', es: '📍 Cercanos' },
+        callback: 'menu:nearby',
+        deepLink: 'nearby'
+      },
+      {
+        id: 'main_room',
+        title: { en: '🎥 PNPtv Main Room', es: '🎥 Sala Principal PNPtv' },
+        callback: 'menu:main_room',
+        deepLink: 'main_room'
+      },
+      {
+        id: 'support',
+        title: { en: '💬 Support', es: '💬 Soporte' },
+        callback: 'menu:support',
+        deepLink: 'support'
+      }
+    ]
+  },
+
+  // PRIME members menu (2-column layout for /start)
+  PRIME_MENU: {
+    title: {
+      en: '👑 PRIME Members Menu',
+      es: '👑 Menú Miembros PRIME'
+    },
+    options: [
       [
         {
           id: 'profile',
@@ -247,10 +281,10 @@ const MENU_CONFIG = {
       ],
       [
         {
-          id: 'subscribe',
+          id: 'prime_content',
           title: { en: '💎 Watch PRIME Content', es: '💎 Ver Contenido PRIME' },
-          callback: 'menu:subscribe',
-          deepLink: 'subscribe'
+          callback: 'menu:prime_content',
+          deepLink: 'prime_content'
         },
         {
           id: 'vc_rooms',

@@ -81,13 +81,27 @@ function buildMainMenuKeyboard(lang = 'en') {
 }
 
 /**
- * Build group menu keyboard with 2-column layout
+ * Build group menu keyboard (simple vertical layout)
  */
-async function buildGroupMenuKeyboard(lang = 'en') {
+function buildGroupMenuKeyboard(lang = 'en') {
+  const buttons = MENU_CONFIG.GROUP_MENU.options.map(option =>
+    [Markup.button.callback(
+      option.title[lang] || option.title.en,
+      option.callback
+    )]
+  );
+
+  return Markup.inlineKeyboard(buttons);
+}
+
+/**
+ * Build PRIME members menu keyboard (2-column layout for /start)
+ */
+function buildPrimeMenuKeyboard(lang = 'en') {
   const buttons = [];
 
-  // Add main group menu options (already organized in 2-column rows)
-  for (const row of MENU_CONFIG.GROUP_MENU.options) {
+  // Add PRIME menu options (already organized in 2-column rows)
+  for (const row of MENU_CONFIG.PRIME_MENU.options) {
     if (Array.isArray(row)) {
       // Row is already a group of options
       buttons.push(
@@ -227,7 +241,7 @@ async function handleMenuCommand(ctx) {
         ? '🎯 *PNPtv Menu*\n\nSelecciona una opción:'
         : '🎯 *PNPtv Menu*\n\nSelect an option:';
 
-      const groupMenuKeyboard = await buildGroupMenuKeyboard(lang);
+      const groupMenuKeyboard = buildGroupMenuKeyboard(lang);
 
       const sentMessage = await ctx.reply(groupMenuMessage, {
         parse_mode: 'Markdown',
@@ -361,6 +375,10 @@ async function handleMenuCallback(ctx) {
         await handleSubscribeMenu(ctx, lang);
         break;
 
+      case 'prime_content':
+        await handlePrimeContent(ctx, lang);
+        break;
+
       case 'subscription_status':
         await handleSubscriptionStatus(ctx, lang);
         break;
@@ -490,6 +508,21 @@ async function handleSubscribeMenu(ctx, lang) {
   const message = lang === 'es'
     ? '✨ *Suscripción*\n\nAquí puedes suscribirte para acceder a contenido exclusivo.\n\n_Esta función estará disponible pronto._'
     : '✨ *Subscription*\n\nHere you can subscribe to access exclusive content.\n\n_This feature is coming soon._';
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
+  ]);
+
+  await ctx.editMessageText(message, {
+    parse_mode: 'Markdown',
+    ...keyboard
+  });
+}
+
+async function handlePrimeContent(ctx, lang) {
+  const message = lang === 'es'
+    ? '💎 *Contenido PRIME*\n\nAccede a todo nuestro contenido exclusivo de PRIME.\n\n_Esta función estará disponible pronto._'
+    : '💎 *PRIME Content*\n\nAccess all our exclusive PRIME content.\n\n_This feature is coming soon._';
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
