@@ -196,10 +196,10 @@ class Plan {
   static getDefaultPlans() {
     return [
       {
-        id: 'trial_week',
+        id: 'week_pass',
         sku: 'EASYBOTS-PNP-007',
-        name: 'Trial Week',
-        nameEs: 'Semana de Prueba',
+        name: 'Week Pass',
+        nameEs: 'Pase Semanal',
         price: 14.99,
         currency: 'USD',
         duration: 7,
@@ -216,10 +216,10 @@ class Plan {
         active: true,
       },
       {
-        id: 'pnp_member',
+        id: 'monthly_pass',
         sku: 'EASYBOTS-PNP-030',
-        name: 'PNP Member',
-        nameEs: 'Miembro PNP',
+        name: 'Monthly Pass',
+        nameEs: 'Pase Mensual',
         price: 24.99,
         currency: 'USD',
         duration: 30,
@@ -238,10 +238,10 @@ class Plan {
         active: true,
       },
       {
-        id: 'crystal_member',
-        sku: 'EASYBOTS-PNP-030',
-        name: 'Crystal Member',
-        nameEs: 'Miembro Crystal',
+        id: 'crystal_pass',
+        sku: 'EASYBOTS-PNP-120',
+        name: 'Crystal Pass',
+        nameEs: 'Pase Crystal',
         price: 49.99,
         currency: 'USD',
         duration: 120,
@@ -262,10 +262,10 @@ class Plan {
         active: true,
       },
       {
-        id: 'diamond_member',
-        sku: 'EASYBOTS-PNP-030',
-        name: 'Diamond Member',
-        nameEs: 'Miembro Diamond',
+        id: 'yearly_pass',
+        sku: 'EASYBOTS-PNP-365',
+        name: 'Yearly Pass',
+        nameEs: 'Pase Anual',
         price: 99.99,
         currency: 'USD',
         duration: 365,
@@ -296,7 +296,7 @@ class Plan {
         nameEs: 'Pase de por Vida',
         price: 249.99,
         currency: 'USD',
-        duration: 36500, // 100 years as "lifetime"
+        duration: 36500, // 100 years as "lifetime" - equivalent to lifetime
         features: [
           'All premium features',
           'Video calls',
