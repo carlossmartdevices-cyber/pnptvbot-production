@@ -7,6 +7,16 @@ const app = require('../../../src/bot/api/routes');
 const PaymentService = require('../../../src/bot/services/paymentService');
 
 describe('Webhook Controller Integration Tests', () => {
+  let server;
+
+  beforeAll(() => {
+    server = app.listen(0, '127.0.0.1');
+  });
+
+  afterAll(() => {
+    if (server) server.close();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -24,7 +34,7 @@ describe('Webhook Controller Integration Tests', () => {
         x_signature: 'mock_signature',
       };
 
-      const response = await request(app)
+      const response = await request(server)
         .post('/api/webhooks/epayco')
         .send(webhookData);
 
@@ -48,7 +58,7 @@ describe('Webhook Controller Integration Tests', () => {
         x_signature: 'invalid_signature',
       };
 
-      const response = await request(app)
+      const response = await request(server)
         .post('/api/webhooks/epayco')
         .send(webhookData);
 
@@ -68,7 +78,7 @@ describe('Webhook Controller Integration Tests', () => {
         x_signature: 'mock_signature',
       };
 
-      const response = await request(app)
+      const response = await request(server)
         .post('/api/webhooks/epayco')
         .send(webhookData);
 
@@ -91,7 +101,7 @@ describe('Webhook Controller Integration Tests', () => {
         x_signature: 'mock_signature',
       };
 
-      const response = await request(app)
+      const response = await request(server)
         .post('/api/webhooks/epayco')
         .send(webhookData);
 
@@ -115,7 +125,7 @@ describe('Webhook Controller Integration Tests', () => {
         signature: 'mock_signature',
       };
 
-      const response = await request(app)
+      const response = await request(server)
         .post('/api/webhooks/daimo')
         .send(webhookData);
 
@@ -141,7 +151,7 @@ describe('Webhook Controller Integration Tests', () => {
         signature: 'invalid_signature',
       };
 
-      const response = await request(app)
+      const response = await request(server)
         .post('/api/webhooks/daimo')
         .send(webhookData);
 
@@ -163,7 +173,7 @@ describe('Webhook Controller Integration Tests', () => {
         signature: 'mock_signature',
       };
 
-      const response = await request(app)
+      const response = await request(server)
         .post('/api/webhooks/daimo')
         .send(webhookData);
 
@@ -188,7 +198,7 @@ describe('Webhook Controller Integration Tests', () => {
         signature: 'mock_signature',
       };
 
-      const response = await request(app)
+      const response = await request(server)
         .post('/api/webhooks/daimo')
         .send(webhookData);
 
@@ -210,7 +220,7 @@ describe('Webhook Controller Integration Tests', () => {
         signature: 'mock_signature',
       };
 
-      const response = await request(app)
+      const response = await request(server)
         .post('/api/webhooks/daimo')
         .send(webhookData);
 
@@ -221,7 +231,7 @@ describe('Webhook Controller Integration Tests', () => {
 
   describe('GET /api/payment-response', () => {
     it('should return success page for successful payment', async () => {
-      const response = await request(app)
+      const response = await request(server)
         .get('/api/payment-response')
         .query({ ref: 'ref_123', status: 'success' });
 
@@ -231,7 +241,7 @@ describe('Webhook Controller Integration Tests', () => {
     });
 
     it('should return success page for approved payment', async () => {
-      const response = await request(app)
+      const response = await request(server)
         .get('/api/payment-response')
         .query({ ref: 'ref_123', status: 'approved' });
 
@@ -241,7 +251,7 @@ describe('Webhook Controller Integration Tests', () => {
     });
 
     it('should return error page for failed payment', async () => {
-      const response = await request(app)
+      const response = await request(server)
         .get('/api/payment-response')
         .query({ ref: 'ref_456', status: 'failed' });
 
@@ -251,7 +261,7 @@ describe('Webhook Controller Integration Tests', () => {
     });
 
     it('should return error page for declined payment', async () => {
-      const response = await request(app)
+      const response = await request(server)
         .get('/api/payment-response')
         .query({ ref: 'ref_456', status: 'declined' });
 
@@ -263,7 +273,7 @@ describe('Webhook Controller Integration Tests', () => {
     it('should include Telegram bot link in success page', async () => {
       process.env.BOT_USERNAME = 'test_pnptv_bot';
 
-      const response = await request(app)
+      const response = await request(server)
         .get('/api/payment-response')
         .query({ ref: 'ref_123', status: 'success' });
 
@@ -274,7 +284,7 @@ describe('Webhook Controller Integration Tests', () => {
     it('should include Telegram bot link in error page', async () => {
       process.env.BOT_USERNAME = 'test_pnptv_bot';
 
-      const response = await request(app)
+      const response = await request(server)
         .get('/api/payment-response')
         .query({ ref: 'ref_456', status: 'failed' });
 
@@ -285,7 +295,7 @@ describe('Webhook Controller Integration Tests', () => {
 
   describe('Health Check', () => {
     it('should return health status with dependencies check', async () => {
-      const response = await request(app).get('/health');
+      const response = await request(server).get('/health');
 
       // Status can be 200 (ok) or 503 (degraded) depending on dependencies availability
       expect([200, 503]).toContain(response.status);
@@ -315,7 +325,7 @@ describe('Webhook Controller Integration Tests', () => {
         signature: 'mock_signature',
       };
 
-      const response = await request(app)
+      const response = await request(server)
         .post('/api/webhooks/daimo')
         .send(webhookData);
 
