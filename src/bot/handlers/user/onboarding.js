@@ -401,10 +401,10 @@ const completeOnboarding = async (ctx) => {
     } catch (telegramInviteError) {
       logger.error('Failed to create Telegram group invite link:', telegramInviteError);
 
-      // Fallback to static Telegram group link
+      // Fallback to customer support if invite link generation fails
       const fallbackMessage = lang === 'es'
-        ? `🎉 ¡Estás listo!\n\nTe damos la bienvenida a la comunidad PNPtv. Únete al grupo gratuito:\n\n🔗 https://t.me/pnptv_community\n\n📱 Haz clic para unirte ahora.`
-        : `🎉 You're all set!\n\nWelcome to the PNPtv community. Join the free group:\n\n🔗 https://t.me/pnptv_community\n\n📱 Click to join now.`;
+        ? `⚠️ Hubo un problema al generar tu enlace de acceso.\n\nNo te preocupes, nuestro equipo de soporte te ayudará. Por favor contacta a:\n\n🔗 https://t.me/pnptv_support\n\n📞 Nuestro equipo te dará acceso manual al grupo en menos de 5 minutos.`
+        : `⚠️ There was an issue generating your access link.\n\nDon't worry, our support team will help you. Please contact:\n\n🔗 https://t.me/pnptv_support\n\n📞 Our team will give you manual access to the group within 5 minutes.`;
 
       await ctx.reply(fallbackMessage);
     }
