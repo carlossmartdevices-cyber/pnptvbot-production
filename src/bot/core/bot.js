@@ -33,6 +33,7 @@ const registerMediaHandlers = require('../handlers/media');
 const registerModerationHandlers = require('../handlers/moderation');
 const registerModerationAdminHandlers = require('../handlers/moderation/adminCommands');
 const registerAccessControlHandlers = require('../handlers/moderation/accessControlCommands');
+const registerJitsiModeratorHandlers = require('../handlers/moderation/jitsiModerator');
 const registerCallManagementHandlers = require('../handlers/admin/callManagement');
 const registerRoleManagementHandlers = require('../handlers/admin/roleManagement');
 const registerGamificationHandlers = require('../handlers/admin/gamification');
@@ -160,6 +161,7 @@ const startBot = async () => {
     registerModerationHandlers(bot);
     registerModerationAdminHandlers(bot);
     registerAccessControlHandlers(bot);
+    registerJitsiModeratorHandlers(bot);
     registerCallManagementHandlers(bot);
     registerRoleManagementHandlers(bot);
     registerGamificationHandlers(bot);

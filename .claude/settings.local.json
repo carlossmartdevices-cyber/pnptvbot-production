@@ -151,7 +151,8 @@
       "Bash(git hash-object:*)",
       "Bash(git update-index:*)",
       "Bash(touch:*)",
-      "Bash(npm ci)"
+      "Bash(npm ci)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nrefactor: Redesign community features page with PNPtv! branding and content\n\nComplete rewrite of the community features page with:\n- Streamlined, direct content focused on PNPtv! community\n- Clear explanation of what PNPtv! is \\(PNP stans community on Telegram\\)\n- Simple How It Works section \\(Telegram, Channel, Group, Bot\\)\n- Step-by-step joining instructions\n- Comprehensive payment methods \\(ePayco, Daimo/Crypto, PayPal, Bank apps\\)\n- Premium features overview\n- Instant activation after payment\n- Mobile-responsive sidebar navigation with smooth scrolling\n- Clean, modern design with fade-in animations\n- CTA buttons linking to t.me/pnptv_bot\n- Better information hierarchy and readability\n\nChanges:\n✨ Focused on actual user journey \\(join → pay → access features\\)\n📱 Responsive design with hamburger menu\n🎯 Clear navigation sidebar with active indicators\n💳 Payment methods prominently featured\n🎬 Smooth animations and transitions\n🔗 Direct links to Telegram bot\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ],
     "deny": [],
     "ask": []
