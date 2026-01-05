@@ -28,6 +28,25 @@ const groupCommandRestrictionMiddleware = () => {
           if (command && command !== 'menu') {
             logger.info(`Blocking command /${command} in group ${ctx.chat.id} from user ${ctx.from.id}`);
 
+            // Send reply message that only /menu is allowed
+            try {
+              const replyMsg = await ctx.reply('Only /menu command is allowed in this group.');
+              logger.info(`Sent restriction message for blocked command /${command} in group ${ctx.chat.id}`);
+
+              // Schedule the reply message for deletion after 30 seconds
+              if (replyMsg?.message_id) {
+                ChatCleanupService.scheduleDelete(
+                  ctx.telegram,
+                  ctx.chat.id,
+                  replyMsg.message_id,
+                  'command-restriction-reply',
+                  30000
+                );
+              }
+            } catch (replyError) {
+              logger.error(`Failed to send restriction message for /${command}:`, replyError);
+            }
+
             // Delete the command message immediately
             try {
               await ctx.deleteMessage();

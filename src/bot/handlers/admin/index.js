@@ -3078,11 +3078,85 @@ async function sendBroadcastWithButtons(ctx, bot) {
 
 // Import and register audio management handlers
 const registerAudioManagementHandlers = require('./audioManagement');
+const ChatCleanupService = require('../../services/chatCleanupService');
+
+// Group cleanup command for admins
+const registerGroupCleanupCommand = (bot) => {
+  bot.command('cleanupcommunity', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.reply(t('unauthorized', getLanguage(ctx)));
+        return;
+      }
+
+      const lang = getLanguage(ctx);
+      const groupId = process.env.GROUP_ID || '-1003291737499';
+
+      // Send status message
+      const statusMsg = await ctx.reply(
+        lang === 'es'
+          ? '🧹 Limpiando mensajes del bot en la comunidad...'
+          : '🧹 Cleaning bot messages in community...'
+      );
+
+      try {
+        // Get the Telegram instance
+        const telegram = ctx.telegram;
+
+        // Delete all previous bot messages except the status message itself
+        const deletedCount = await ChatCleanupService.deleteAllPreviousBotMessages(
+          telegram,
+          groupId,
+          statusMsg.message_id // Keep the status message
+        );
+
+        // Update status message with results
+        await ctx.telegram.editMessageText(
+          groupId,
+          statusMsg.message_id,
+          undefined,
+          lang === 'es'
+            ? `✅ Limpieza completada\n\n📊 Estadísticas:\n• Mensajes eliminados: ${deletedCount}\n• Mensaje actual: Conservado`
+            : `✅ Cleanup completed\n\n📊 Statistics:\n• Messages deleted: ${deletedCount}\n• Current message: Kept`
+        );
+
+        // Also send confirmation to admin
+        await ctx.reply(
+          lang === 'es'
+            ? `✅ Limpieza completada exitosamente\n\n📊 Mensajes eliminados: ${deletedCount}`
+            : `✅ Cleanup completed successfully\n\n📊 Messages deleted: ${deletedCount}`
+        );
+
+        logger.info('Group cleanup completed', { groupId, deletedCount });
+      } catch (cleanupError) {
+        logger.error('Error during cleanup:', cleanupError);
+        await ctx.telegram.editMessageText(
+          groupId,
+          statusMsg.message_id,
+          undefined,
+          lang === 'es'
+            ? '❌ Error durante la limpieza'
+            : '❌ Error during cleanup'
+        );
+        await ctx.reply(
+          lang === 'es'
+            ? '❌ Error al limpiar los mensajes'
+            : '❌ Error cleaning messages'
+        );
+      }
+    } catch (error) {
+      logger.error('Error in cleanupcommunity command:', error);
+      await ctx.reply('❌ ' + (getLanguage(ctx) === 'es' ? 'Error en el comando' : 'Command error')).catch(() => {});
+    }
+  });
+};
 
 // Wrapper to register all admin handlers including audio management
 const registerAllAdminHandlers = (bot) => {
   registerAdminHandlers(bot);
   registerAudioManagementHandlers(bot);
+  registerGroupCleanupCommand(bot);
 };
 
 module.exports = registerAllAdminHandlers;

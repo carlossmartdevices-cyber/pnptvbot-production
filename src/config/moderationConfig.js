@@ -44,17 +44,17 @@ const MODERATION_CONFIG = {
   // Auto-Moderation Filters
   FILTERS: {
     // Spam Detection
-    // DISABLED - Using command auto-delete and message cleanup for spam prevention instead
+    // ENABLED - Detects excessive caps, emojis, repeated characters, and punctuation
     SPAM: {
-      enabled: false,
+      enabled: true,
       maxDuplicateMessages: 3, // Max duplicate messages before flagging
       duplicateTimeWindow: 60 * 1000, // Time window in ms (1 minute)
     },
 
     // Flood Detection
-    // DISABLED - Using command auto-delete and message cleanup for spam prevention instead
+    // ENABLED - Detects too many messages in short time window
     FLOOD: {
-      enabled: false,
+      enabled: true,
       maxMessages: 10, // Max messages
       timeWindow: 30 * 1000, // In time window (30 seconds)
     },
@@ -62,15 +62,19 @@ const MODERATION_CONFIG = {
     // Link Filtering
     // Only admins are exempt (checked in middleware, not here)
     LINKS: {
-      enabled: false,
+      enabled: true,
       allowedDomains: [],
     },
 
     // Profanity Filter (basic - can be expanded)
     PROFANITY: {
-      enabled: false, // Disabled by default - this is an adult community
+      enabled: true, // Enabled - bans only severe content
       blacklist: [
-        // Add prohibited words here if needed
+        // Only ban words referring to rape, pedophilia, and zoophilia
+        'rape', 'raped', 'rapist', 'violación', 'violador',
+        'pedophile', 'pedophilia', 'pedofilia', 'pedófilo', 'pedo',
+        'zoophilia', 'zoophile', 'zoofilia', 'zoófilo',
+        'child sex', 'child abuse', 'animal abuse',
       ],
     },
 
