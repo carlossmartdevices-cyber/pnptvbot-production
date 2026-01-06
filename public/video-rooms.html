@@ -106,6 +106,19 @@
             color: #fff;
         }
 
+        .playlist-form textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 8px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95em;
+            min-height: 90px;
+            resize: vertical;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
         .playlist-form button {
             background: linear-gradient(135deg, #ffd700, #ff8c00);
             color: #000;
@@ -140,6 +153,105 @@
 
         .playlist-hidden .video-container {
             grid-template-columns: 1fr;
+        }
+
+        .videorama-player {
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 14px;
+        }
+
+        .videorama-player .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: rgba(0, 0, 0, 0.45);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .videorama-player .player-header .now-playing {
+            font-weight: 800;
+            font-size: 0.95em;
+            line-height: 1.2;
+        }
+
+        .videorama-player .player-header .player-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(0, 0, 0, 0.35);
+            color: #ffd700;
+            cursor: pointer;
+            font-weight: 800;
+            font-size: 0.85em;
+        }
+
+        .btn-small:hover {
+            background: rgba(0, 0, 0, 0.55);
+        }
+
+        .videorama-player iframe,
+        .videorama-player video {
+            width: 100%;
+            height: 180px;
+            border: 0;
+            background: #000;
+            display: block;
+        }
+
+        .lyrics-panel {
+            display: none;
+            padding: 12px;
+        }
+
+        .lyrics-panel.active {
+            display: block;
+        }
+
+        .lyrics-panel pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.55;
+            font-size: 0.95em;
+        }
+
+        .playlist-item {
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .playlist-item .meta {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .playlist-item .meta a {
+            display: inline-block;
+            max-width: 100%;
+        }
+
+        .playlist-item .actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .muted {
+            opacity: 0.9;
+            font-size: 0.85em;
+            margin-top: 4px;
         }
 
         #jitsi-meet {
@@ -221,6 +333,19 @@
             <div class="loading-spinner"></div>
         </div>
         <aside class="playlist-panel" id="playlistPanel">
+            <div class="videorama-player" id="videoramaPlayer">
+                <div class="player-header">
+                    <div class="now-playing" id="nowPlaying">Now playing: —</div>
+                    <div class="player-actions">
+                        <button class="btn-small" id="toggleLyricsBtn" type="button">Lyrics</button>
+                        <button class="btn-small" id="stopPlaybackBtn" type="button">Stop</button>
+                    </div>
+                </div>
+                <div id="playerMount"></div>
+                <div class="lyrics-panel" id="lyricsPanel">
+                    <pre id="lyricsText"></pre>
+                </div>
+            </div>
             <div class="playlist-section">
                 <h3>🔥 Curated PNPtv Playlist</h3>
                 <ul class="playlist-list" id="curatedList"></ul>
@@ -228,9 +353,14 @@
             <div class="playlist-section">
                 <h3>🧑‍🚀 Your Playlist</h3>
                 <form id="playlistForm" class="playlist-form">
-                    <input type="text" id="trackTitle" placeholder="Title (e.g. My Mix)" required>
-                    <input type="url" id="trackUrl" placeholder="Link to your video/playlist" required>
-                    <button type="submit">Add to My Playlist</button>
+                    <input type="text" id="playlistName" placeholder="Playlist name (e.g. Emotional Rollercoaster)" required>
+                    <input type="text" id="trackTitle" placeholder="Title (e.g. Song name or topic)" required>
+                    <textarea id="trackDescription" placeholder="Song description (your curatorial copy)"></textarea>
+                    <input type="url" id="trackUrl" placeholder="YouTube link (video or playlist) or any video link">
+                    <input type="file" id="trackFile" accept="video/*">
+                    <textarea id="trackNotes" placeholder="What are you saying about it? (notes)"></textarea>
+                    <textarea id="trackLyrics" placeholder="Lyrics for this song (paste here)"></textarea>
+                    <button type="submit">Add (Link or Upload)</button>
                 </form>
                 <ul class="playlist-list" id="userList"></ul>
             </div>
@@ -430,12 +560,142 @@
             { title: 'Community Mix', url: 'https://www.youtube.com/playlist?list=COMMUNITY' },
         ];
 
-        const userPlaylistKey = 'pnptv:userPlaylist';
+        const userPlaylistKey = 'pnptv:videorama:userPlaylist:v3';
+
+        function newId() {
+            return Math.random().toString(36).slice(2) + Date.now().toString(36);
+        }
+
+        function seedEmotionalRollercoasterIfEmpty(list) {
+            if (Array.isArray(list) && list.length > 0) return list;
+
+            const playlist = 'PNPtv – Emotional Rollercoaster';
+            const items = [
+                {
+                    title: 'Hash Pipe — Weezer',
+                    descriptionEs: '🧠 ¿Por qué abre la playlist?\nRepresenta el impulso inicial: energía caótica, decisiones rápidas, cero filtro. El momento donde todo arranca sin pensar demasiado.',
+                    descriptionEn: '🧠 Why does it open the playlist?\nIt captures the initial impulse: chaotic energy, fast decisions, no filter. The moment everything starts without overthinking.',
+                },
+                {
+                    title: 'Come Undone — Robbie Williams',
+                    descriptionEs: '🧠 ¿Por qué va aquí?\nLa euforia empieza a agrietarse. Sigue siendo intensa, pero ya convive con ansiedad y pérdida de control.',
+                    descriptionEn: '🧠 Why here?\nEuphoria starts to crack. It’s still intense, but anxiety and loss of control begin to show.',
+                },
+                {
+                    title: 'Don’t Let Me Get Me — P!nk',
+                    descriptionEs: '🧠 ¿Qué representa?\nAuto-conflicto. Frustración. La mente girando contra sí misma.',
+                    descriptionEn: '🧠 What does it represent?\nSelf-conflict. Frustration. The mind turning against itself.',
+                },
+                {
+                    title: 'Berghain — Rosalía',
+                    descriptionEs: '🧠 ¿Por qué Berghain va en este punto?\nRepresenta los pensamientos intrusivos: introspección intensa, diálogo interno invasivo, ideas que no se pueden apagar. Aquí el viaje deja de ser externo y se vuelve mental.',
+                    descriptionEn: '🧠 Why is Berghain placed here?\nIt represents intrusive thoughts: intense introspection, invasive inner dialogue, ideas you can’t shut off. This is where the journey turns inward.',
+                },
+                {
+                    title: 'Numb / Encore — Linkin Park & Jay‑Z',
+                    descriptionEs: '🧠 ¿Por qué después?\nSaturación total. El ruido interno ya es constante y abrumador.',
+                    descriptionEn: '🧠 Why next?\nTotal saturation. The internal noise becomes constant and overwhelming.',
+                },
+                {
+                    title: 'Habits (Stay High) — Tove Lo',
+                    descriptionEs: '🧠 ¿Qué etapa marca?\nEl intento de escapar. Repetición emocional. Loop.',
+                    descriptionEn: '🧠 What stage is this?\nThe attempt to escape. Emotional repetition. A loop.',
+                },
+                {
+                    title: 'Novacane — Frank Ocean',
+                    descriptionEs: '🧠 ¿Por qué aquí?\nAnestesia emocional. Nada duele… pero nada se siente.',
+                    descriptionEn: '🧠 Why here?\nEmotional numbness. Nothing hurts… but nothing is felt either.',
+                },
+                {
+                    title: 'When It Hurts So Bad — Lauryn Hill',
+                    descriptionEs: '🧠 ¿Qué pasa en este punto?\nEl quiebre. La emoción que ya no se puede evitar.',
+                    descriptionEn: '🧠 What happens here?\nThe break. Emotion you can no longer avoid.',
+                },
+                {
+                    title: 'Don’t Leave Home — Dido',
+                    descriptionEs: '🧠 ¿Qué representa?\nAislamiento. Miedo. Necesidad de refugio.',
+                    descriptionEn: '🧠 What does it represent?\nIsolation. Fear. The need for shelter.',
+                },
+                {
+                    title: 'Tears Dry on Their Own — Amy Winehouse',
+                    descriptionEs: '🧠 ¿Por qué va antes del aterrizaje?\nAceptación silenciosa. No todo se arregla, pero se sigue.',
+                    descriptionEn: '🧠 Why before landing?\nQuiet acceptance. Not everything gets fixed, but you keep going.',
+                },
+                {
+                    title: 'La Plata — Diomedes Díaz',
+                    descriptionEs: '🧠 ¿Qué aporta?\nAterrizaje terrenal. Memoria, culpa, realidad cotidiana.',
+                    descriptionEn: '🧠 What does it bring?\nA grounded landing. Memory, consequence, everyday reality.',
+                },
+                {
+                    title: 'Thank U — Alanis Morissette',
+                    descriptionEs: '🧠 ¿Por qué cierra la playlist?\nNo es felicidad forzada. Es conciencia. Gratitud por lo aprendido, incluso por lo incómodo.',
+                    descriptionEn: '🧠 Why does it close the playlist?\nNot forced happiness. Awareness. Gratitude for the lessons — even the uncomfortable ones.',
+                },
+            ];
+
+            return items.map((it, idx) => ({
+                id: newId(),
+                playlist,
+                title: `${idx + 1}. ${it.title}`,
+                url: '',
+                type: 'link',
+                description: `${it.descriptionEs}\n\n—\n\n${it.descriptionEn}`,
+                notes: '',
+                lyrics: '',
+                createdAt: Date.now() + idx,
+            }));
+        }
+
+        function parseYouTube(url) {
+            try {
+                const u = new URL(url);
+                if (!/(^|\\.)youtube\\.com$/.test(u.hostname) && u.hostname !== 'youtu.be') return null;
+                if (u.hostname === 'youtu.be') {
+                    const id = u.pathname.replace(/^\\//, '').split('/')[0];
+                    return id ? { kind: 'video', id } : null;
+                }
+                const list = u.searchParams.get('list');
+                const v = u.searchParams.get('v');
+                if (list) return { kind: 'playlist', list };
+                if (v) return { kind: 'video', id: v };
+                if (u.pathname.startsWith('/shorts/')) {
+                    const id = u.pathname.split('/')[2];
+                    return id ? { kind: 'video', id } : null;
+                }
+                return null;
+            } catch {
+                return null;
+            }
+        }
+
+        async function tryYouTubeTitle(url) {
+            try {
+                const resp = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+                if (!resp.ok) return null;
+                const data = await resp.json();
+                return typeof data?.title === 'string' ? data.title : null;
+            } catch {
+                return null;
+            }
+        }
 
         function loadUserPlaylist() {
             try {
                 const saved = localStorage.getItem(userPlaylistKey);
-                return saved ? JSON.parse(saved) : [];
+                const parsed = saved ? JSON.parse(saved) : [];
+                if (!Array.isArray(parsed)) return [];
+                const normalized = parsed.map((item) => ({
+                    id: item.id || newId(),
+                    playlist: item.playlist || item.playlistName || 'My Playlist',
+                    title: item.title || 'Untitled',
+                    url: item.url || '',
+                    type: item.type || (item.url ? 'link' : 'link'),
+                    description: item.description || item.songDescription || '',
+                    notes: item.notes || '',
+                    lyrics: item.lyrics || '',
+                    createdAt: item.createdAt || Date.now(),
+                }));
+                return seedEmotionalRollercoasterIfEmpty(normalized);
             } catch (e) {
                 console.warn('Failed to load user playlist', e);
                 return [];
@@ -450,17 +710,98 @@
             }
         }
 
-        function renderPlaylist(list, container) {
+        function renderPlaylist(list, container, opts = {}) {
             container.innerHTML = '';
-            list.forEach(item => {
+            const grouped = new Map();
+            list.forEach((item) => {
+                const key = item.playlist || 'My Playlist';
+                if (!grouped.has(key)) grouped.set(key, []);
+                grouped.get(key).push(item);
+            });
+
+            Array.from(grouped.entries()).forEach(([playlistName, items]) => {
+                const headerLi = document.createElement('li');
+                headerLi.innerHTML = `<strong>${playlistName}</strong>`;
+                container.appendChild(headerLi);
+
+                items.forEach(item => {
                 const li = document.createElement('li');
-                const a = document.createElement('a');
-                a.href = item.url;
-                a.target = '_blank';
-                a.rel = 'noopener';
-                a.textContent = item.title;
-                li.appendChild(a);
+                if (opts.readonly) {
+                    const a = document.createElement('a');
+                    a.href = item.url;
+                    a.target = '_blank';
+                    a.rel = 'noopener';
+                    a.textContent = item.title;
+                    li.appendChild(a);
+                    container.appendChild(li);
+                    return;
+                }
+
+                const row = document.createElement('div');
+                row.className = 'playlist-item';
+
+                const meta = document.createElement('div');
+                meta.className = 'meta';
+
+                if (item.url) {
+                    const a = document.createElement('a');
+                    a.href = item.url;
+                    a.target = '_blank';
+                    a.rel = 'noopener';
+                    a.textContent = item.title;
+                    meta.appendChild(a);
+                } else {
+                    const span = document.createElement('span');
+                    span.textContent = item.title;
+                    meta.appendChild(span);
+                }
+
+                const details = document.createElement('div');
+                details.className = 'muted';
+                details.textContent = [
+                    item.type === 'upload' ? 'Uploaded video' : (parseYouTube(item.url) ? 'YouTube' : 'Link'),
+                    item.description ? 'Has description' : null,
+                    item.notes ? 'Has notes' : null,
+                    item.lyrics ? 'Has lyrics' : null,
+                ].filter(Boolean).join(' • ');
+                meta.appendChild(details);
+
+                const actions = document.createElement('div');
+                actions.className = 'actions';
+
+                const playBtn = document.createElement('button');
+                playBtn.type = 'button';
+                playBtn.className = 'btn-small';
+                playBtn.textContent = 'Play';
+                playBtn.addEventListener('click', () => {
+                    opts.onPlay?.(item);
+                });
+
+                const lyricsBtn = document.createElement('button');
+                lyricsBtn.type = 'button';
+                lyricsBtn.className = 'btn-small';
+                lyricsBtn.textContent = 'Lyrics';
+                lyricsBtn.addEventListener('click', () => {
+                    opts.onLyrics?.(item);
+                });
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'btn-small';
+                removeBtn.textContent = 'Remove';
+                removeBtn.addEventListener('click', () => {
+                    opts.onRemove?.(item);
+                });
+
+                actions.appendChild(playBtn);
+                actions.appendChild(lyricsBtn);
+                actions.appendChild(removeBtn);
+
+                row.appendChild(meta);
+                row.appendChild(actions);
+                li.appendChild(row);
                 container.appendChild(li);
+                });
             });
         }
 
@@ -468,26 +809,186 @@
             const curatedListEl = document.getElementById('curatedList');
             const userListEl = document.getElementById('userList');
             const form = document.getElementById('playlistForm');
+            const playlistNameInput = document.getElementById('playlistName');
             const titleInput = document.getElementById('trackTitle');
+            const descriptionInput = document.getElementById('trackDescription');
             const urlInput = document.getElementById('trackUrl');
+            const fileInput = document.getElementById('trackFile');
+            const notesInput = document.getElementById('trackNotes');
+            const lyricsInput = document.getElementById('trackLyrics');
             const toggleBtn = document.getElementById('togglePlaylist');
             const videoContainer = document.querySelector('.video-container');
 
-            renderPlaylist(curatedPlaylist, curatedListEl);
-            let userList = loadUserPlaylist();
-            renderPlaylist(userList, userListEl);
+            const playerMount = document.getElementById('playerMount');
+            const nowPlayingEl = document.getElementById('nowPlaying');
+            const lyricsPanel = document.getElementById('lyricsPanel');
+            const lyricsText = document.getElementById('lyricsText');
+            const toggleLyricsBtn = document.getElementById('toggleLyricsBtn');
+            const stopPlaybackBtn = document.getElementById('stopPlaybackBtn');
 
-            form.addEventListener('submit', (e) => {
+            let currentItem = null;
+
+            function setLyricsView(item) {
+                currentItem = item;
+                const text = item?.lyrics?.trim() || 'No lyrics yet — add them in the form when you add this song, or edit and re-add.';
+                lyricsText.textContent = text;
+                lyricsPanel.classList.add('active');
+            }
+
+            function setDescriptionView(item) {
+                currentItem = item;
+                const text = item?.description?.trim() || 'No description yet — add it in the form.';
+                lyricsText.textContent = text;
+                lyricsPanel.classList.add('active');
+            }
+
+            function clearPlayer() {
+                playerMount.innerHTML = '';
+                nowPlayingEl.textContent = 'Now playing: —';
+                currentItem = null;
+            }
+
+            function mountPlayerForItem(item) {
+                clearPlayer();
+                currentItem = item;
+                nowPlayingEl.textContent = `Now playing: ${item.title}`;
+
+                const yt = parseYouTube(item.url);
+                if (yt?.kind === 'playlist') {
+                    const iframe = document.createElement('iframe');
+                    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+                    iframe.allowFullscreen = true;
+                    iframe.src = `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(yt.list)}`;
+                    playerMount.appendChild(iframe);
+                    return;
+                }
+                if (yt?.kind === 'video') {
+                    const iframe = document.createElement('iframe');
+                    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+                    iframe.allowFullscreen = true;
+                    iframe.src = `https://www.youtube.com/embed/${encodeURIComponent(yt.id)}`;
+                    playerMount.appendChild(iframe);
+                    return;
+                }
+
+                if (item.type === 'upload' || (item.url && item.url.startsWith('/uploads/'))) {
+                    const v = document.createElement('video');
+                    v.controls = true;
+                    v.src = item.url;
+                    playerMount.appendChild(v);
+                    return;
+                }
+
+                const a = document.createElement('a');
+                a.href = item.url;
+                a.target = '_blank';
+                a.rel = 'noopener';
+                a.textContent = 'Open link in new tab';
+                a.style.display = 'block';
+                a.style.padding = '12px';
+                playerMount.appendChild(a);
+            }
+
+            toggleLyricsBtn.addEventListener('click', () => {
+                lyricsPanel.classList.toggle('active');
+                if (lyricsPanel.classList.contains('active') && currentItem) {
+                    lyricsText.textContent = currentItem.lyrics?.trim() || 'No lyrics yet — add them for this song.';
+                }
+            });
+
+            stopPlaybackBtn.addEventListener('click', () => {
+                clearPlayer();
+            });
+
+            renderPlaylist(curatedPlaylist, curatedListEl, { readonly: true });
+            let userList = loadUserPlaylist();
+            const renderUserList = () => renderPlaylist(userList, userListEl, {
+                onPlay: (item) => mountPlayerForItem(item),
+                onLyrics: (item) => (item.lyrics ? setLyricsView(item) : setDescriptionView(item)),
+                onRemove: (item) => {
+                    userList = userList.filter((x) => x.id !== item.id);
+                    saveUserPlaylist(userList);
+                    renderUserList();
+                },
+            });
+            renderUserList();
+
+            if (!playlistNameInput.value) {
+                playlistNameInput.value = 'PNPtv – Emotional Rollercoaster';
+            }
+
+            async function uploadSelectedFile(file) {
+                const fd = new FormData();
+                fd.append('video', file, file.name);
+                const resp = await fetch('/api/videorama/upload', { method: 'POST', body: fd });
+                const data = await resp.json().catch(() => null);
+                if (!resp.ok || !data?.success) {
+                    const msg = data?.message || 'Upload failed';
+                    throw new Error(msg);
+                }
+                return data.file.url;
+            }
+
+            form.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const title = titleInput.value.trim();
-                const url = urlInput.value.trim();
-                if (!title || !url) return;
-                const next = [...userList, { title, url }];
-                userList = next;
-                saveUserPlaylist(next);
-                renderPlaylist(next, userListEl);
-                titleInput.value = '';
-                urlInput.value = '';
+                const playlistName = playlistNameInput.value.trim();
+                let title = titleInput.value.trim();
+                let url = urlInput.value.trim();
+                const description = descriptionInput.value.trim();
+                const notes = notesInput.value.trim();
+                const lyrics = lyricsInput.value.trim();
+                const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+                if (!playlistName) return;
+                if (!title) return;
+                if (!url && !file) return;
+
+                try {
+                    form.querySelector('button[type="submit"]').disabled = true;
+                    form.querySelector('button[type="submit"]').textContent = 'Adding...';
+
+                    if (file) {
+                        url = await uploadSelectedFile(file);
+                    } else {
+                        const yt = parseYouTube(url);
+                        if (yt?.kind === 'video' && (!title || title.toLowerCase() === 'untitled')) {
+                            const maybeTitle = await tryYouTubeTitle(url);
+                            if (maybeTitle) title = maybeTitle;
+                        }
+                    }
+
+                    const item = {
+                        id: newId(),
+                        playlist: playlistName,
+                        title,
+                        url,
+                        type: file ? 'upload' : 'link',
+                        description,
+                        notes,
+                        lyrics,
+                        createdAt: Date.now(),
+                    };
+                    userList = [...userList, item];
+                    saveUserPlaylist(userList);
+                    renderUserList();
+
+                    mountPlayerForItem(item);
+                    if (item.lyrics) setLyricsView(item);
+                    else if (item.description) setDescriptionView(item);
+
+                    // keep playlist name for fast adding
+                    titleInput.value = '';
+                    descriptionInput.value = '';
+                    urlInput.value = '';
+                    fileInput.value = '';
+                    notesInput.value = '';
+                    lyricsInput.value = '';
+                } catch (err) {
+                    alert(err?.message || 'Failed to add item');
+                } finally {
+                    form.querySelector('button[type="submit"]').disabled = false;
+                    form.querySelector('button[type="submit"]').textContent = 'Add (Link or Upload)';
+                }
             });
 
             toggleBtn.addEventListener('click', () => {

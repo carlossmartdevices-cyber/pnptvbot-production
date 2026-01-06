@@ -14,6 +14,7 @@ const paymentController = require('./controllers/paymentController');
 const invitationController = require('./controllers/invitationController');
 const hangoutsController = require('./controllers/hangoutsController');
 const playlistController = require('./controllers/playlistController');
+const videoramaController = require('./controllers/videoramaController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -294,6 +295,13 @@ app.post('/api/playlists', asyncHandler(playlistController.createPlaylist));
 app.post('/api/playlists/:playlistId/videos', asyncHandler(playlistController.addToPlaylist));
 app.delete('/api/playlists/:playlistId/videos/:videoId', asyncHandler(playlistController.removeFromPlaylist));
 app.delete('/api/playlists/:playlistId', asyncHandler(playlistController.deletePlaylist));
+
+// Videorama uploads (local storage under /public/uploads/videorama)
+app.post(
+  '/api/videorama/upload',
+  videoramaController.upload.single('video'),
+  asyncHandler(videoramaController.uploadVideo)
+);
 
 // Subscription API routes
 app.get('/api/subscription/plans', asyncHandler(subscriptionController.getPlans));
