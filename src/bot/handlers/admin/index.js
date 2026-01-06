@@ -3430,8 +3430,6 @@ async function handleSendPrimeLinks(ctx, lang, telegram) {
   }
 }
 
-};
-
 // After registerAdminHandlers is defined, wrap it to add additional handlers
 const wrappedRegisterAdminHandlers = registerAdminHandlers;
 
