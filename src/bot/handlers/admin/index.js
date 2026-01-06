@@ -3344,7 +3344,7 @@ async function handleSendPrimeLinks(ctx, lang, telegram) {
         // Build message
         const message = userLang === 'es'
           ? `🌟 *¡Acceso a PRIME Disponible!*\n\n` +
-            `Hola ${user.first_name || 'Usuario'}! 👋\n\n` +
+            `Hola ${user.firstName || 'Usuario'}! 👋\n\n` +
             `Te enviamos el enlace directo para acceder al canal exclusivo PRIME:\n\n` +
             `👉 [🔗 Ingresar a PRIME](${inviteLink})\n\n` +
             `✨ Disfruta de todo el contenido premium y beneficios exclusivos.\n\n` +
@@ -3355,7 +3355,7 @@ async function handleSendPrimeLinks(ctx, lang, telegram) {
             `• Comunidad privada\n\n` +
             `📱 Usa /menu para ver todas las funciones.`
           : `🌟 *PRIME Access Available!*\n\n` +
-            `Hi ${user.first_name || 'User'}! 👋\n\n` +
+            `Hi ${user.firstName || 'User'}! 👋\n\n` +
             `We sent you the direct link to access the exclusive PRIME channel:\n\n` +
             `👉 [🔗 Join PRIME](${inviteLink})\n\n` +
             `✨ Enjoy all premium content and exclusive benefits.\n\n` +
