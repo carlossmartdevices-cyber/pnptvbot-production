@@ -53,6 +53,16 @@ module.exports.sendPrimeWelcome = sendPrimeWelcome;
  * @param {Telegraf} bot - Bot instance
  */
 const registerMenuHandlers = (bot) => {
+    // /menu command: show main menu
+    bot.command('menu', async (ctx) => {
+      try {
+        await showMainMenu(ctx);
+      } catch (error) {
+        logger.error('Error showing main menu:', error);
+        await ctx.reply('Error loading menu. Please try again.');
+      }
+    });
+
     // /cristina command: starts AI support chat, message stays in chat (no autodelete)
     bot.command('cristina', async (ctx) => {
       try {
