@@ -5,6 +5,7 @@ import { getUrlParams } from './utils/url'
 function App() {
   const [params, setParams] = useState(null)
   const [error, setError] = useState(null)
+  const [hasConsent, setHasConsent] = useState(false)
 
   useEffect(() => {
     try {
@@ -16,6 +17,14 @@ function App() {
       }
 
       setParams(urlParams)
+
+      // Remove sensitive query params (token) from the address bar to reduce accidental leakage.
+      if (window?.history?.replaceState) {
+        const cleanUrl = `${window.location.origin}${window.location.pathname}`
+        window.history.replaceState({}, document.title, cleanUrl)
+      }
+
+      setHasConsent(sessionStorage.getItem('pnp_hangouts_consent_v1') === 'true')
     } catch (err) {
       setError(err.message)
     }
@@ -50,7 +59,14 @@ function App() {
 
   return (
     <div className="app">
-      <VideoCall {...params} />
+      <VideoCall
+        {...params}
+        hasConsent={hasConsent}
+        onConsentGranted={() => {
+          sessionStorage.setItem('pnp_hangouts_consent_v1', 'true')
+          setHasConsent(true)
+        }}
+      />
     </div>
   )
 }
