@@ -106,6 +106,7 @@ const registerCommunityPremiumBroadcast = require('./communityPremiumBroadcast')
 const registerCommunityPostHandlers = require('./sharePostToCommunityGroup');
 
 const registerAdminHandlers = (bot) => {
+  logger.info('[DEBUG-INIT] registerAdminHandlers called - registering admin command handlers');
   // Register gamification handlers
   registerGamificationHandlers(bot);
   registerRadioManagementHandlers(bot);
@@ -115,17 +116,22 @@ const registerAdminHandlers = (bot) => {
 
   // Admin command
   bot.command('admin', async (ctx) => {
+    console.log(`[DEBUG] /admin command triggered for user ${ctx.from.id}`);
     try {
       // Check if user is admin using new permission system
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      console.log(`[DEBUG] isAdmin check result: ${isAdmin} for user ${ctx.from.id}`);
 
       if (!isAdmin) {
+        console.log(`[DEBUG] User ${ctx.from.id} is NOT admin`);
         await ctx.reply(t('unauthorized', getLanguage(ctx)));
         return;
       }
 
+      console.log(`[DEBUG] User ${ctx.from.id} IS admin, calling showAdminPanel`);
       await showAdminPanel(ctx, false);
     } catch (error) {
+      console.log(`[DEBUG] Error in /admin command: ${error.message}`);
       logger.error('Error in /admin command:', error);
     }
   });
@@ -3167,11 +3173,14 @@ const registerGroupCleanupCommand = (bot) => {
   });
 };
 
-// Wrapper to register all admin handlers including audio management
-const registerAllAdminHandlers = (bot) => {
-  registerAdminHandlers(bot);
+// After registerAdminHandlers is defined, add the additional handlers
+const originalRegisterAdminHandlers = registerAdminHandlers;
+
+// Override to also register audio management and group cleanup
+registerAdminHandlers = (bot) => {
+  originalRegisterAdminHandlers(bot);
   registerAudioManagementHandlers(bot);
   registerGroupCleanupCommand(bot);
 };
 
-module.exports = registerAllAdminHandlers;
+module.exports = registerAdminHandlers;
