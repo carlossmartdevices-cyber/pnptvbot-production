@@ -105,7 +105,7 @@ const registerLiveStreamManagementHandlers = require('./liveStreamManagement');
 const registerCommunityPremiumBroadcast = require('./communityPremiumBroadcast');
 const registerCommunityPostHandlers = require('./sharePostToCommunityGroup');
 
-const registerAdminHandlers = (bot) => {
+let registerAdminHandlers = (bot) => {
   logger.info('[DEBUG-INIT] registerAdminHandlers called - registering admin command handlers');
   // Register gamification handlers
   registerGamificationHandlers(bot);
