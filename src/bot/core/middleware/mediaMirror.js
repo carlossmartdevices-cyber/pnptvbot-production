@@ -83,8 +83,8 @@ function mediaMirrorMiddleware() {
         mirrorCaption += '──────────────────────────────┘\n';
         mirrorCaption += '```\n\n';
 
-        // Username with looking for text (no bold, just plain text)
-        const displayName = ctx.from.username ? `@${ctx.from.username}` : firstName;
+        // Username with looking for text (no bold, just plain text, escape special chars)
+        const displayName = ctx.from.username ? `@${ctx.from.username.replace(/[_*[\]()~`>#+\-.!]/g, '\\$&')}` : firstName;
         mirrorCaption += `👤 ${displayName} is looking for...\n\n`;
 
         // Add badges if user has any
@@ -93,12 +93,13 @@ function mediaMirrorMiddleware() {
           mirrorCaption += `🏆 ${badgeEmojis}\n\n`;
         }
 
-        // Add bio if exists (no italics to avoid parse issues)
+        // Add bio if exists (escape Markdown special characters)
         if (userProfile?.bio && userProfile.bio.trim()) {
-          const shortBio = userProfile.bio.length > 80 
-            ? userProfile.bio.substring(0, 80) + '...' 
+          const shortBio = userProfile.bio.length > 80
+            ? userProfile.bio.substring(0, 80) + '...'
             : userProfile.bio;
-          mirrorCaption += `💭 "${shortBio}"\n\n`;
+          const escapedBio = shortBio.replace(/[_*[\]()~`>#+\-.!]/g, '\\$&');
+          mirrorCaption += `💭 "${escapedBio}"\n\n`;
         }
 
         // Add social media links if user has any

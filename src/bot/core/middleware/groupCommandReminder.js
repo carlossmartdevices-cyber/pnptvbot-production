@@ -29,16 +29,16 @@ const groupCommandReminder = () => {
       // Show reminder message
       const lang = ctx.session?.language || 'en';
       const botUsername = ctx.botInfo?.username || 'pnptv_bot';
-      const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'User';
+      const firstName = ctx.from?.first_name || 'User';
 
-      const messageEs = `👋 Hola ${username}!\n\n` +
-        `🔒 Para usar el comando \`${commandText}\` y todas las funciones de PNPtv!, ` +
+      const messageEs = `👋 Hola ${firstName}!\n\n` +
+        `🔒 Para usar el comando ${commandText} y todas las funciones de PNPtv!, ` +
         `debes abrir el chat privado con el bot.\n\n` +
         `Esto es para proteger tu privacidad y cumplir con las políticas anti-spam de la comunidad.\n\n` +
         `👇 Haz clic en el botón de abajo para ir al bot:`;
 
-      const messageEn = `👋 Hi ${username}!\n\n` +
-        `🔒 To use the command \`${commandText}\` and all PNPtv! features, ` +
+      const messageEn = `👋 Hi ${firstName}!\n\n` +
+        `🔒 To use the command ${commandText} and all PNPtv! features, ` +
         `you need to open a private chat with the bot.\n\n` +
         `This is to protect your privacy and comply with our community anti-spam policies.\n\n` +
         `👇 Click the button below to go to the bot:`;

@@ -142,7 +142,7 @@ async function processNewMember(ctx, member) {
     }
 
     const lang = user.language || 'en';
-    const username = member.username ? `@${member.username}` : member.first_name;
+    const username = member.first_name || 'Friend';
 
     // Send welcome message
     await sendWelcomeMessage(ctx, username, user, lang);
