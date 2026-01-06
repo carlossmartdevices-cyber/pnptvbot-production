@@ -161,7 +161,7 @@ const startBot = async () => {
     bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery
     // Register handlers
     registerUserHandlers(bot);
-    registerAdminHandlers(bot);
+    registerAdminHandlers(bot); // This registers gamification, radio, live streams, community premium, and community posts handlers
     registerPaymentHandlers(bot);
     registerMediaHandlers(bot);
     registerModerationHandlers(bot);
@@ -170,9 +170,6 @@ const startBot = async () => {
     registerJitsiModeratorHandlers(bot);
     registerCallManagementHandlers(bot);
     registerRoleManagementHandlers(bot);
-    registerGamificationHandlers(bot);
-    registerLiveStreamManagementHandlers(bot);
-    registerRadioManagementHandlers(bot);
     registerWallOfFameHandlers(bot);
     registerPrivateCallHandlers(bot);
     registerPaymentHistoryHandlers(bot);
@@ -319,7 +316,10 @@ const startBot = async () => {
             logger.info(`>>> CALLBACK_QUERY received: data=${req.body.callback_query.data}, from=${req.body.callback_query.from?.id}`);
           }
           if (req.body.message) {
-            logger.info(`>>> MESSAGE received: text=${req.body.message.text || 'N/A'}, from=${req.body.message.from?.id}`);
+            logger.info(`>>> MESSAGE received: text=${req.body.message.text || 'N/A'}, from=${req.body.message.from?.id}, entities=${JSON.stringify(req.body.message.entities || [])}`);
+            if (req.body.message.text && req.body.message.text.startsWith('/')) {
+              logger.info(`>>> COMMAND MESSAGE detected: ${req.body.message.text}`);
+            }
           }
           await bot.handleUpdate(req.body);
           res.status(200).json({ ok: true });
