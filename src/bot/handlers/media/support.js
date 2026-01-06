@@ -265,16 +265,16 @@ const registerSupportHandlers = (bot) => {
     const isGroup = chatType === 'group' || chatType === 'supergroup';
     const rawUserMessage = ctx.message?.text || '';
 
-    // IN GROUPS: Only respond if message mentions "Cristina" (case insensitive)
+    // IN GROUPS: Only respond when invoked with "Ey Cristina" (case insensitive)
     if (isGroup) {
-      const mentionsCristina = /\bcristina\b/i.test(rawUserMessage);
-      if (!mentionsCristina) {
-        return next(); // Don't respond in groups unless Cristina is mentioned
+      const invokesCristina = /\b(e(y|y)?|hey)\s+cristina\b/i.test(rawUserMessage);
+      if (!invokesCristina) {
+        return next(); // Don't respond in groups unless explicitly invoked
       }
-      // Remove "Cristina" from the message before processing
-      const cleanedMessage = rawUserMessage.replace(/\bcristina\b/i, '').trim();
+      // Remove the invocation phrase before processing
+      const cleanedMessage = rawUserMessage.replace(/\b(e(y|y)?|hey)\s+cristina\b/i, '').replace(/^[:,.-]\s*/, '').trim();
       if (!cleanedMessage) {
-        // Just said "Cristina" with no question
+        // Just invoked Cristina with no question
         const lang = getLanguage(ctx);
         await ctx.reply(lang === 'es' ? '¿Sí papi? ¿Qué necesitas? 💜' : 'Yes papi? What do you need? 💜', { reply_to_message_id: ctx.message.message_id });
         return;

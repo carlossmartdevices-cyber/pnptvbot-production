@@ -56,7 +56,44 @@ function storeMenuMessage(ctx, messageId) {
  * Can be used in groups and private chats
  * @param {Telegraf} bot - Bot instance
  */
+function buildGroupMenuPayload(ctx) {
+  const lang = getLanguage(ctx);
+  const botUsername = ctx.botInfo?.username || process.env.BOT_USERNAME || 'pnptv_bot';
+  const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
+  const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+
+  const text = lang === 'es'
+    ? `📱 *Menú PNPtv*\n\nSelecciona una opción:`
+    : `📱 *PNPtv Menu*\n\nChoose an option:`;
+
+  const buttons = [
+    [Markup.button.callback(
+      lang === 'es' ? '💎 Planes PRIME' : '💎 PRIME Membership Plans',
+      'show_subscription_plans'
+    )],
+    [Markup.button.callback(
+      lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby',
+      'menu_nearby'
+    )],
+    [Markup.button.url(
+      lang === 'es' ? '🎥 PNPtv Main Room' : '🎥 PNPtv Main Room',
+      jitsiUrl
+    )],
+    [Markup.button.url(
+      lang === 'es' ? '🎬 PNPtv Hangouts' : '🎬 PNPtv Hangouts',
+      'https://pnptv.app/hangouts'
+    )],
+    [Markup.button.url(
+      lang === 'es' ? '✨ Todas las funciones (Abrir Bot)' : '✨ All features (Open Bot)',
+      `https://t.me/${botUsername}?start=from_menu`
+    )],
+  ];
+
+  return { text, buttons };
+}
+
 const registerMenuHandlers = (bot) => {
+
   /**
    * Show main menu with all options
    * Displays different views based on subscription status
@@ -65,9 +102,11 @@ const registerMenuHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
       const userId = ctx.from?.id;
+      const botUsername = ctx.botInfo?.username || process.env.BOT_USERNAME || 'pnptv_bot';
+      const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
 
       // Delete previous menu message if in group
-      if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+      if (isGroup) {
         await deletePreviousMenuMessage(ctx);
       }
 
@@ -78,7 +117,12 @@ const registerMenuHandlers = (bot) => {
       let menuText;
       let buttons;
 
-      if (hasSubscription) {
+      // In group chats, always show a simple, consistent menu (so /menu and /menu@Bot work as expected)
+      if (isGroup) {
+        const groupMenu = buildGroupMenuPayload(ctx);
+        menuText = groupMenu.text;
+        buttons = groupMenu.buttons;
+      } else if (hasSubscription) {
         // PRIME MEMBER VIEW
         menuText = lang === 'es'
           ? `🎬 *¡Eres PRIME!*
@@ -105,6 +149,10 @@ Tap the buttons below and enjoy everything we've prepared for you — videos, Ne
         const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
 
         buttons = [
+          [Markup.button.url(
+            lang === 'es' ? '💬 Abrir Bot' : '💬 Open Bot',
+            `https://t.me/${botUsername}?start=from_menu`
+          )],
           [Markup.button.callback(
             lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile',
             'show_profile'
@@ -157,6 +205,10 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
 \`Unlock the fun! 🔓\``;
 
         buttons = [
+          [Markup.button.url(
+            lang === 'es' ? '💬 Abrir Bot' : '💬 Open Bot',
+            `https://t.me/${botUsername}?start=from_menu`
+          )],
           [Markup.button.callback(
             lang === 'es' ? '🔓 Desbloquear PRIME' : '🔓 Unlock PRIME',
             'show_subscription_plans'
@@ -190,7 +242,7 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
       });
 
       // Store menu message ID if in group
-      if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+      if (isGroup) {
         storeMenuMessage(ctx, sentMessage.message_id);
 
         // Also delete the /menu command message from user if available
@@ -507,5 +559,7 @@ Click the button below to connect!`;
     }
   });
 };
+
+registerMenuHandlers.buildGroupMenuPayload = buildGroupMenuPayload;
 
 module.exports = registerMenuHandlers;

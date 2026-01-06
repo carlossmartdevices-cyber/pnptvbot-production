@@ -67,9 +67,12 @@ class UserModel {
       // Social media fields
       instagram: row.instagram || null,
       twitter: row.twitter || null,
+      facebook: row.facebook || null,
       tiktok: row.tiktok || null,
       youtube: row.youtube || null,
       telegram: row.telegram || null,
+      looking_for: row.looking_for || null,
+      tribe: row.tribe || null,
     };
   }
 
@@ -197,6 +200,14 @@ class UserModel {
         bio: 'bio',
         photoFileId: 'photo_file_id',
         interests: 'interests',
+        looking_for: 'looking_for',
+        tribe: 'tribe',
+        instagram: 'instagram',
+        twitter: 'twitter',
+        facebook: 'facebook',
+        tiktok: 'tiktok',
+        youtube: 'youtube',
+        telegram: 'telegram',
         onboardingComplete: 'onboarding_complete',
         ageVerified: 'age_verified',
         termsAccepted: 'terms_accepted',

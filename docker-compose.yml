@@ -71,7 +71,7 @@ services:
     restart: unless-stopped
     # Expose port only to internal Docker network (not to host)
     expose:
-      - "3005"
+      - "3000"
     env_file:
       - .env
     environment:
@@ -79,9 +79,6 @@ services:
       - REDIS_HOST=redis
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
     depends_on:
       redis:
         condition: service_healthy
@@ -93,7 +90,7 @@ services:
     networks:
       - pnptv-network
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3005/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => {process.exit(1)})"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => {process.exit(1)})"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -105,9 +102,6 @@ services:
     restart: unless-stopped
     # Ports removed - only accessible via internal Docker network
     # Uncomment if you need external access: ports: ["${REDIS_PORT:-6379}:6379"]
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
     volumes:
       - redis-data:/data
     networks:

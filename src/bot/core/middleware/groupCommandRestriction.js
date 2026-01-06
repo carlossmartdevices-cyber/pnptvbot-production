@@ -5,7 +5,12 @@
  */
 
 const logger = require('../../../utils/logger');
+const { Markup } = require('telegraf');
 const ChatCleanupService = require('../../services/chatCleanupService');
+const { buildGroupMenuPayload } = require('../../handlers/media/menu');
+const PermissionService = require('../../services/permissionService');
+
+const GROUP_ID = process.env.GROUP_ID;
 
 const groupCommandRestrictionMiddleware = () => {
   return async (ctx, next) => {
@@ -15,23 +20,44 @@ const groupCommandRestrictionMiddleware = () => {
         return next();
       }
 
+      // Only apply to configured community group (if set)
+      const chatIdStr = ctx.chat?.id?.toString();
+      if (GROUP_ID && chatIdStr !== GROUP_ID) {
+        return next();
+      }
+
       // Check if this is a command message
-      if (ctx.message?.entities) {
-        const hasCommand = ctx.message.entities.some(entity => entity.type === 'bot_command');
+      const messageText = ctx.message?.text || '';
+      const isCommandLike = messageText.startsWith('/');
 
-        if (hasCommand && ctx.message?.text) {
-          // Extract the command (first word starting with /)
-          const commandMatch = ctx.message.text.match(/^\/(\w+)/);
-          const command = commandMatch ? commandMatch[1] : null;
+      if (ctx.message?.entities || isCommandLike) {
+        const hasCommandEntity = ctx.message?.entities?.some((entity) => entity.type === 'bot_command');
+        const hasCommand = Boolean(hasCommandEntity || isCommandLike);
 
-          // Allow only /menu command in groups
+        if (hasCommand && messageText) {
+          // Normalize the command (handles /cmd@BotUsername)
+          const commandRaw = messageText.split(' ')[0]?.toLowerCase() || '';
+          const command = commandRaw.split('@')[0].replace('/', '');
+
+          // Allow /admin to work in the community group for admins
+          if (command === 'admin') {
+            const isAdmin = await PermissionService.isAdmin(ctx.from?.id);
+            if (isAdmin) return next();
+          }
+
+          // Any slash command in the community group shows the menu (except /menu itself)
           if (command && command !== 'menu') {
-            logger.info(`Blocking command /${command} in group ${ctx.chat.id} from user ${ctx.from.id}`);
+            logger.info(`Redirecting command /${command} to group menu in group ${ctx.chat.id} from user ${ctx.from.id}`);
 
-            // Send reply message that only /menu is allowed
+            // Send menu
             try {
-              const replyMsg = await ctx.reply('Only /menu command is allowed in this group.');
-              logger.info(`Sent restriction message for blocked command /${command} in group ${ctx.chat.id}`);
+              const menu = buildGroupMenuPayload(ctx);
+              const replyMsg = await ctx.reply(menu.text, {
+                reply_to_message_id: ctx.message.message_id,
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard(menu.buttons),
+              });
+              logger.info(`Sent group menu for /${command} in group ${ctx.chat.id}`);
 
               // Schedule the reply message for deletion after 30 seconds
               if (replyMsg?.message_id) {
@@ -39,18 +65,18 @@ const groupCommandRestrictionMiddleware = () => {
                   ctx.telegram,
                   ctx.chat.id,
                   replyMsg.message_id,
-                  'command-restriction-reply',
+                  'group-command-menu-reply',
                   30000
                 );
               }
             } catch (replyError) {
-              logger.error(`Failed to send restriction message for /${command}:`, replyError);
+              logger.error(`Failed to send group menu for /${command}:`, replyError);
             }
 
             // Delete the command message immediately
             try {
               await ctx.deleteMessage();
-              logger.info(`Deleted blocked command message: /${command} in group ${ctx.chat.id}`);
+              logger.info(`Deleted command message: /${command} in group ${ctx.chat.id}`);
             } catch (deleteError) {
               // If immediate deletion fails, schedule it with retry
               logger.debug(`Immediate deletion failed for /${command}, scheduling for retry`, {
@@ -65,7 +91,7 @@ const groupCommandRestrictionMiddleware = () => {
                   ctx.telegram,
                   ctx.chat.id,
                   ctx.message.message_id,
-                  'blocked-group-command',
+                  'group-command-delete',
                   100
                 );
               }

@@ -152,18 +152,15 @@ const startBot = async () => {
     // DISABLED: bot.use(usernameEnforcement()); // Username enforcement rules disabled
     bot.use(moderationFilter());
     bot.use(activityTrackerMiddleware());
-    bot.use(groupCommandReminder());
 
     // Group behavior rules (OVERRIDE all previous rules)
     bot.use(groupBehaviorMiddleware()); // Route all bot messages to topic 3135, 3-min delete
     bot.use(cristinaGroupFilterMiddleware()); // Filter personal info from Cristina in groups
     bot.use(groupMenuRedirectMiddleware()); // Redirect menu button clicks to private
-    bot.use(groupCommandDeleteMiddleware()); // Delete commands after 3 minutes
     bot.use(groupCommandRestrictionMiddleware()); // Block all commands except /menu in groups
 
     // Topic-specific middlewares
     bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
-    bot.use(commandRedirectionMiddleware()); // Redirect commands to notifications
     bot.use(mediaMirrorMiddleware()); // Mirror media to PNPtv Gallery
     bot.use(topicPermissionsMiddleware()); // Admin-only and approval queue
     bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery

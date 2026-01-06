@@ -1,5 +1,7 @@
 const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
+const PermissionService = require('../../services/permissionService');
+const GROUP_ID = process.env.GROUP_ID;
 
 /**
  * Middleware to remind users to use bot in private chat when using commands in groups
@@ -16,9 +18,22 @@ const groupCommandReminder = () => {
         return next();
       }
 
+      // In the configured community group, all /commands are unified to show the /menu in-group
+      // (handled by groupCommandRestrictionMiddleware), so skip the private-chat reminder here.
+      const chatIdStr = ctx.chat?.id?.toString();
+      if (GROUP_ID && chatIdStr === GROUP_ID) {
+        return next();
+      }
+
       // Extract command name (without parameters)
       const commandText = ctx.message.text.split(' ')[0].toLowerCase();
-      const command = commandText.replace('@', '').split('/')[1]; // Remove bot username if present
+      const command = commandText.split('@')[0].replace('/', '');
+
+      // Allow /admin in groups for admins
+      if (command === 'admin') {
+        const isAdmin = await PermissionService.isAdmin(ctx.from?.id);
+        if (isAdmin) return next();
+      }
 
       // Exceptions - these commands can work in groups
       const allowedCommands = ['menu', 'start', 'help'];

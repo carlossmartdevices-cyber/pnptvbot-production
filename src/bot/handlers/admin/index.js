@@ -2724,17 +2724,45 @@ let registerAdminHandlers = (bot) => {
 
       // Send notification to user via bot
       try {
+        // Generate unique invite link for PRIME channel
+        let inviteLink = 'https://t.me/PNPTV_PRIME'; // Fallback
+        try {
+          const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
+          const response = await ctx.telegram.createChatInviteLink(groupId, {
+            member_limit: 1,
+            name: `CourtesyPass ${userId}_${Date.now()}`,
+          });
+          inviteLink = response.invite_link;
+          logger.info('PRIME channel invite link created for courtesy pass', {
+            userId,
+            inviteLink,
+          });
+        } catch (linkError) {
+          logger.warn('Failed to create PRIME channel invite link, using fallback', {
+            userId,
+            error: linkError.message,
+          });
+        }
+
         const welcomeMessage = lang === 'es'
           ? `🎉 **¡Membresía Activada!**\n\n` +
             `Has recibido un **pase de cortesía** de **${durationText}**.\n\n` +
             `✅ Tu membresía está activa hasta el **${expiryDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}**\n\n` +
-            `💎 Disfruta de todo el contenido premium de PNPtv!`
+            `🌟 **¡Bienvenido a PRIME!**\n\n` +
+            `👉 Accede al canal exclusivo aquí:\n` +
+            `[🔗 Ingresar a PRIME](${inviteLink})\n\n` +
+            `💎 Disfruta de todo el contenido premium y beneficios exclusivos.\n\n` +
+            `📱 Usa /menu para ver todas las funciones disponibles.`
           : `🎉 **Membership Activated!**\n\n` +
             `You have received a **courtesy pass** for **${days} days**.\n\n` +
             `✅ Your membership is active until **${expiryDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}**\n\n` +
-            `💎 Enjoy all premium PNPtv content!`;
+            `🌟 **Welcome to PRIME!**\n\n` +
+            `👉 Access the exclusive channel here:\n` +
+            `[🔗 Join PRIME](${inviteLink})\n\n` +
+            `💎 Enjoy all premium content and exclusive benefits.\n\n` +
+            `📱 Use /menu to see all available features.`;
 
-        await ctx.telegram.sendMessage(userId, welcomeMessage, { parse_mode: 'Markdown' });
+        await ctx.telegram.sendMessage(userId, welcomeMessage, { parse_mode: 'Markdown', disable_web_page_preview: false });
       } catch (notifyError) {
         logger.warn('Could not notify user about courtesy pass', { userId, error: notifyError.message });
       }
@@ -2832,6 +2860,26 @@ let registerAdminHandlers = (bot) => {
 
       // Send notification to user via bot
       try {
+        // Generate unique invite link for PRIME channel
+        let inviteLink = 'https://t.me/PNPTV_PRIME'; // Fallback
+        try {
+          const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
+          const response = await ctx.telegram.createChatInviteLink(groupId, {
+            member_limit: 1,
+            name: `Plan ${userId}_${Date.now()}`,
+          });
+          inviteLink = response.invite_link;
+          logger.info('PRIME channel invite link created for plan activation', {
+            userId,
+            inviteLink,
+          });
+        } catch (linkError) {
+          logger.warn('Failed to create PRIME channel invite link, using fallback', {
+            userId,
+            error: linkError.message,
+          });
+        }
+
         const durationText = plan.isLifetime || plan.duration >= 36500
           ? (lang === 'es' ? 'acceso de por vida' : 'lifetime access')
           : (lang === 'es' ? `${plan.duration} días` : `${plan.duration} days`);
@@ -2846,13 +2894,21 @@ let registerAdminHandlers = (bot) => {
           ? `🎉 **¡Membresía Activada!**\n\n` +
             `Has recibido el plan **${planName}** con ${durationText}.\n\n` +
             `✅ Tu membresía está activa ${expiryText}\n\n` +
-            `💎 Disfruta de todo el contenido premium de PNPtv!`
+            `🌟 **¡Bienvenido a PRIME!**\n\n` +
+            `👉 Accede al canal exclusivo aquí:\n` +
+            `[🔗 Ingresar a PRIME](${inviteLink})\n\n` +
+            `💎 Disfruta de todo el contenido premium y beneficios exclusivos.\n\n` +
+            `📱 Usa /menu para ver todas las funciones disponibles.`
           : `🎉 **Membership Activated!**\n\n` +
             `You have received the **${planName}** plan with ${durationText}.\n\n` +
             `✅ Your membership is active ${expiryText}\n\n` +
-            `💎 Enjoy all premium PNPtv content!`;
+            `🌟 **Welcome to PRIME!**\n\n` +
+            `👉 Access the exclusive channel here:\n` +
+            `[🔗 Join PRIME](${inviteLink})\n\n` +
+            `💎 Enjoy all premium content and exclusive benefits.\n\n` +
+            `📱 Use /menu to see all available features.`;
 
-        await ctx.telegram.sendMessage(userId, welcomeMessage, { parse_mode: 'Markdown' });
+        await ctx.telegram.sendMessage(userId, welcomeMessage, { parse_mode: 'Markdown', disable_web_page_preview: false });
       } catch (notifyError) {
         logger.warn('Could not notify user about plan activation', { userId, error: notifyError.message });
       }

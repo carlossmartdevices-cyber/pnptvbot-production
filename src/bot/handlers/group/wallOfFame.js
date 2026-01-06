@@ -59,6 +59,7 @@ const registerWallOfFameHandlers = (bot) => {
 
       // Build member info caption
       const caption = buildMemberInfoCaption(user, lang);
+      const inlineKeyboard = buildMemberInlineKeyboard(user, userId, lang);
 
       // Prepare to forward to Wall of Fame
       const isPhoto = ctx.message.photo;
@@ -79,6 +80,7 @@ const registerWallOfFameHandlers = (bot) => {
               parse_mode: 'HTML',
               disable_notification: false,
               message_thread_id: WALL_OF_FAME_TOPIC_ID, // Post to the specific topic
+              ...(inlineKeyboard ? inlineKeyboard : {}),
             }
           );
 
@@ -106,6 +108,7 @@ const registerWallOfFameHandlers = (bot) => {
               disable_notification: false,
               duration: video.duration,
               message_thread_id: WALL_OF_FAME_TOPIC_ID, // Post to the specific topic
+              ...(inlineKeyboard ? inlineKeyboard : {}),
             }
           );
 
@@ -180,6 +183,8 @@ function buildMemberInfoCaption(user, lang) {
   const nameLabel = lang === 'es' ? 'Nombre:' : 'Name:';
   const usernameLabel = lang === 'es' ? 'Usuario:' : 'Username:';
   const bioLabel = lang === 'es' ? 'Bio:' : 'Bio:';
+  const lookingForLabel = lang === 'es' ? 'Buscando:' : 'Looking for:';
+  const interestsLabel = lang === 'es' ? 'Intereses:' : 'Interests:';
   const socialLabel = lang === 'es' ? 'Redes Sociales:' : 'Social Media:';
 
   let caption = `<b>${label}</b>\n\n`;
@@ -199,27 +204,40 @@ function buildMemberInfoCaption(user, lang) {
     caption += `<b>${bioLabel}</b> ${escapeHtml(user.bio)}\n`;
   }
 
+  if (user.looking_for) {
+    caption += `<b>${lookingForLabel}</b> ${escapeHtml(user.looking_for)}\n`;
+  }
+
+  if (Array.isArray(user.interests) && user.interests.length > 0) {
+    const interests = user.interests.filter(Boolean).slice(0, 8).map((i) => escapeHtml(String(i)));
+    if (interests.length > 0) {
+      caption += `<b>${interestsLabel}</b> ${interests.join(', ')}\n`;
+    }
+  }
+
   // Add social media links if available
   const socialLinks = [];
 
   if (user.instagram) {
-    socialLinks.push(`<a href="https://instagram.com/${user.instagram}">📸 Instagram</a>`);
+    socialLinks.push(`<a href="https://instagram.com/${escapeHtml(String(user.instagram).replace(/^@/, ''))}">📸 Instagram</a>`);
   }
 
   if (user.twitter) {
-    socialLinks.push(`<a href="https://twitter.com/${user.twitter}">𝕏 Twitter</a>`);
+    socialLinks.push(`<a href="https://x.com/${escapeHtml(String(user.twitter).replace(/^@/, ''))}">𝕏 X</a>`);
   }
 
   if (user.tiktok) {
-    socialLinks.push(`<a href="https://tiktok.com/@${user.tiktok}">🎵 TikTok</a>`);
+    socialLinks.push(`<a href="https://www.tiktok.com/@${escapeHtml(String(user.tiktok).replace(/^@/, ''))}">🎵 TikTok</a>`);
   }
 
   if (user.youtube) {
-    socialLinks.push(`<a href="${user.youtube}">▶️ YouTube</a>`);
+    const youtubeValue = String(user.youtube).trim();
+    const youtubeUrl = youtubeValue.startsWith('http') ? youtubeValue : `https://www.youtube.com/@${youtubeValue.replace(/^@/, '')}`;
+    socialLinks.push(`<a href="${escapeHtml(youtubeUrl)}">▶️ YouTube</a>`);
   }
 
   if (user.telegram) {
-    socialLinks.push(`<a href="https://t.me/${user.telegram}">✈️ Telegram</a>`);
+    socialLinks.push(`<a href="https://t.me/${escapeHtml(String(user.telegram).replace(/^@/, ''))}">✈️ Telegram</a>`);
   }
 
   if (socialLinks.length > 0) {
@@ -229,6 +247,56 @@ function buildMemberInfoCaption(user, lang) {
   caption += `\n✨ <i>${lang === 'es' ? 'Destacado en el Muro de la Fama' : 'Featured on Wall of Fame'}</i>`;
 
   return caption;
+}
+
+function buildMemberInlineKeyboard(user, userId, lang) {
+  try {
+    const keyboard = [];
+
+    // Interests as callback buttons (shows alert)
+    if (Array.isArray(user.interests) && user.interests.length > 0) {
+      const interestButtons = user.interests
+        .map((interest, index) => ({ interest, index }))
+        .filter(({ interest }) => Boolean(interest))
+        .slice(0, 6)
+        .map(({ interest, index }) => Markup.button.callback(String(interest).slice(0, 24), `profile_interest_${userId}_${index}`));
+
+      for (let i = 0; i < interestButtons.length; i += 2) {
+        keyboard.push(interestButtons.slice(i, i + 2));
+      }
+    }
+
+    const normalizeHandle = (value) => String(value || '').trim().replace(/^@/, '');
+    const socialButtons = [];
+
+    if (user.instagram) {
+      socialButtons.push(Markup.button.url('Instagram', `https://instagram.com/${encodeURIComponent(normalizeHandle(user.instagram))}`));
+    }
+    if (user.twitter) {
+      socialButtons.push(Markup.button.url('X', `https://x.com/${encodeURIComponent(normalizeHandle(user.twitter))}`));
+    }
+    if (user.tiktok) {
+      socialButtons.push(Markup.button.url('TikTok', `https://www.tiktok.com/@${encodeURIComponent(normalizeHandle(user.tiktok))}`));
+    }
+    if (user.youtube) {
+      const youtubeValue = String(user.youtube).trim();
+      const youtubeUrl = youtubeValue.startsWith('http') ? youtubeValue : `https://www.youtube.com/@${encodeURIComponent(normalizeHandle(youtubeValue))}`;
+      socialButtons.push(Markup.button.url('YouTube', youtubeUrl));
+    }
+    if (user.telegram) {
+      socialButtons.push(Markup.button.url('Telegram', `https://t.me/${encodeURIComponent(normalizeHandle(user.telegram))}`));
+    }
+
+    for (let i = 0; i < socialButtons.length; i += 2) {
+      keyboard.push(socialButtons.slice(i, i + 2));
+    }
+
+    if (keyboard.length === 0) return null;
+    return Markup.inlineKeyboard(keyboard);
+  } catch (error) {
+    logger.error('Error building Wall of Fame inline keyboard:', error);
+    return null;
+  }
 }
 
 /**

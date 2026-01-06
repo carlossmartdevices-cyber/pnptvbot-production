@@ -20,8 +20,7 @@ const {
  */
 function registerMenuHandlers(bot) {
   try {
-    // Register /menu command
-    bot.command('menu', handleMenuCommand);
+    // NOTE: /menu is handled by `src/bot/handlers/media/menu.js` to ensure the group menu is consistent.
 
     // Register /cristina command
     bot.command('cristina', handleCristinaCommand);

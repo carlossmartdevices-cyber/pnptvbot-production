@@ -1,5 +1,6 @@
 const logger = require('../../../utils/logger');
 const ChatCleanupService = require('../../services/chatCleanupService');
+const PermissionService = require('../../services/permissionService');
 
 const GROUP_ID = process.env.GROUP_ID;
 const NOTIFICATIONS_TOPIC_ID = process.env.NOTIFICATIONS_TOPIC_ID || '3135';
@@ -22,11 +23,17 @@ function commandRedirectionMiddleware() {
     const messageText = ctx.message?.text || '';
     const isCommand = messageText.startsWith('/');
     const currentTopicId = ctx.message?.message_thread_id;
-    const command = messageText.split(' ')[0]?.toLowerCase();
+    const commandRaw = messageText.split(' ')[0]?.toLowerCase();
+    const command = commandRaw ? commandRaw.split('@')[0] : '';
 
     // Skip menu command - allow it to work anywhere
     if (command === '/menu') {
       return next();
+    }
+    // Allow /admin anywhere for admins
+    if (command === '/admin') {
+      const isAdmin = await PermissionService.isAdmin(ctx.from?.id);
+      if (isAdmin) return next();
     }
 
     // If it's a command and NOT already in the notifications topic

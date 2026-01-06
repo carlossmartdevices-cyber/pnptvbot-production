@@ -592,12 +592,12 @@ const registerCommunityPostHandlers = (bot) => {
     await ctx.saveSession();
   }
 
-  bot.on('text', async (ctx) => {
+  bot.on('text', async (ctx, next) => {
     try {
-      if (!ctx.session.temp?.communityPostStep) return;
+      if (!ctx.session.temp?.communityPostStep) return next();
 
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
+      if (!isAdmin) return next();
 
       const step = ctx.session.temp.communityPostStep;
       const text = ctx.message.text;
@@ -632,9 +632,11 @@ const registerCommunityPostHandlers = (bot) => {
           await showButtonSelectionStep(ctx);
         }
       }
+      return;
     } catch (error) {
       logger.error('Error handling text input:', error);
       await ctx.reply('❌ Error al procesar el texto').catch(() => {});
+      return;
     }
   });
 
@@ -958,12 +960,12 @@ const registerCommunityPostHandlers = (bot) => {
   }
 
   // Handle datetime input
-  bot.on('text', async (ctx) => {
+  bot.on('text', async (ctx, next) => {
     try {
-      if (!ctx.session.temp?.waitingForDateTime) return;
+      if (!ctx.session.temp?.waitingForDateTime) return next();
 
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
+      if (!isAdmin) return next();
 
       const dateTimeStr = ctx.message.text.trim();
       const dateTimeRegex = /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2})$/;
@@ -1002,9 +1004,11 @@ const registerCommunityPostHandlers = (bot) => {
         await ctx.reply('✅ Todas las fechas guardadas');
         await showPreviewStep(ctx);
       }
+      return;
     } catch (error) {
       logger.error('Error handling datetime input:', error);
       await ctx.reply('❌ Error al procesar la fecha').catch(() => {});
+      return;
     }
   });
 

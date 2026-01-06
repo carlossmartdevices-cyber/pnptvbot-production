@@ -10,6 +10,35 @@ const userService = require('./userService');
 const { v4: uuidv4 } = require('uuid');
 
 class BroadcastService {
+  async sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  getTelegramRetryAfterSeconds(error) {
+    return error?.parameters?.retry_after
+      || error?.response?.parameters?.retry_after
+      || error?.response?.parameters?.retryAfter
+      || null;
+  }
+
+  classifyTelegramSendError(error) {
+    const description = error?.response?.description || error?.description || error?.message || '';
+    const lower = description.toLowerCase();
+
+    if (error?.code === 429 || lower.includes('too many requests')) {
+      return { status: 'retry', reason: 'rate_limited', description };
+    }
+    if (lower.includes('bot was blocked') || lower.includes('blocked by the user')) {
+      return { status: 'blocked', reason: 'blocked', description };
+    }
+    if (lower.includes('user is deactivated') || lower.includes('deactivated user')) {
+      return { status: 'deactivated', reason: 'deactivated', description };
+    }
+    if (lower.includes('chat not found')) {
+      return { status: 'failed', reason: 'chat_not_found', description };
+    }
+    return { status: 'failed', reason: 'unknown', description };
+  }
   /**
    * Create a new broadcast
    * @param {Object} broadcastData - Broadcast configuration
@@ -236,27 +265,55 @@ class BroadcastService {
 
       logger.info(`Starting broadcast ${broadcastId} to ${stats.total} users`);
 
+      const perRecipientDelayMs = parseInt(process.env.BROADCAST_SEND_DELAY_MS || '80', 10);
+      const progressUpdateEvery = parseInt(process.env.BROADCAST_PROGRESS_EVERY || '10', 10);
+      const cancellationCheckEvery = parseInt(process.env.BROADCAST_CANCELLATION_CHECK_EVERY || '25', 10);
+
       // Send to each user
-      for (const user of targetUsers) {
+      for (let index = 0; index < targetUsers.length; index++) {
+        const user = targetUsers[index];
         try {
+          // Allow cancelling mid-flight
+          if (index % cancellationCheckEvery === 0) {
+            const current = await this.getBroadcastById(broadcastId);
+            if (current?.status === 'cancelled') {
+              logger.warn(`Broadcast ${broadcastId} cancelled during send loop, stopping early`);
+              break;
+            }
+          }
+
           const message = user.language === 'es' ? broadcast.message_es : broadcast.message_en;
 
           // Send based on media type
           let messageId = null;
-          if (broadcast.media_type && broadcast.media_url) {
-            messageId = await this.sendMediaMessage(
-              bot,
-              user.id,
-              broadcast.media_type,
-              broadcast.media_url,
-              message,
-              broadcast.s3_key // Pass S3 key for presigned URL generation
-            );
-          } else {
-            const result = await bot.telegram.sendMessage(user.id, message, {
-              parse_mode: 'Markdown',
-            });
-            messageId = result.message_id;
+          const attemptSend = async () => {
+            if (broadcast.media_type && broadcast.media_url) {
+              return this.sendMediaMessage(
+                bot,
+                user.id,
+                broadcast.media_type,
+                broadcast.media_url,
+                message,
+                broadcast.s3_key
+              );
+            }
+            const result = await bot.telegram.sendMessage(user.id, message, { parse_mode: 'Markdown' });
+            return result.message_id;
+          };
+
+          try {
+            messageId = await attemptSend();
+          } catch (error) {
+            const classification = this.classifyTelegramSendError(error);
+            if (classification.status === 'retry') {
+              const retryAfterSeconds = this.getTelegramRetryAfterSeconds(error);
+              const waitMs = Math.min(Math.max(retryAfterSeconds ? retryAfterSeconds * 1000 : 1500, 1000), 120000);
+              logger.warn(`Rate limited, waiting ${Math.round(waitMs / 1000)}s then retrying user ${user.id}`);
+              await this.sleep(waitMs);
+              messageId = await attemptSend();
+            } else {
+              throw error;
+            }
           }
 
           // Record successful delivery
@@ -269,46 +326,44 @@ class BroadcastService {
           stats.sent++;
 
           // Small delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 50));
+          await this.sleep(perRecipientDelayMs);
         } catch (error) {
-          // Handle specific errors
-          let status = 'failed';
-          if (error.message.includes('bot was blocked')) {
-            status = 'blocked';
-            stats.blocked++;
-          } else if (error.message.includes('user is deactivated')) {
-            status = 'deactivated';
-            stats.deactivated++;
-          } else {
-            stats.errors++;
-          }
-
+          const classification = this.classifyTelegramSendError(error);
+          const status = classification.status === 'retry' ? 'failed' : classification.status;
+          if (status === 'blocked') stats.blocked++;
+          else if (status === 'deactivated') stats.deactivated++;
+          else stats.errors++;
           stats.failed++;
 
           // Record failed delivery
           await this.recordRecipient(broadcastId, user.id, status, {
             errorCode: error.code,
-            errorMessage: error.message,
+            errorMessage: classification.description || error.message,
             language: user.language,
             subscriptionTier: user.subscription_tier,
           });
 
-          logger.warn(`Failed to send to user ${user.id}: ${error.message}`);
+          logger.warn(`Failed to send to user ${user.id}: ${classification.description || error.message}`);
         }
 
         // Update progress
-        const progress = ((stats.sent + stats.failed) / stats.total) * 100;
-        await getPool().query(
-          'UPDATE broadcasts SET sent_count = $1, failed_count = $2, blocked_count = $3, deactivated_count = $4, error_count = $5, progress_percentage = $6 WHERE broadcast_id = $7',
-          [stats.sent, stats.failed, stats.blocked, stats.deactivated, stats.errors, progress.toFixed(2), broadcastId]
-        );
+        if (index % progressUpdateEvery === 0 || index === targetUsers.length - 1) {
+          const progress = ((stats.sent + stats.failed) / stats.total) * 100;
+          await getPool().query(
+            'UPDATE broadcasts SET sent_count = $1, failed_count = $2, blocked_count = $3, deactivated_count = $4, error_count = $5, progress_percentage = $6 WHERE broadcast_id = $7',
+            [stats.sent, stats.failed, stats.blocked, stats.deactivated, stats.errors, progress.toFixed(2), broadcastId]
+          );
+        }
       }
 
-      // Mark broadcast as completed
-      await getPool().query(
-        'UPDATE broadcasts SET status = $1, completed_at = CURRENT_TIMESTAMP WHERE broadcast_id = $2',
-        ['completed', broadcastId]
-      );
+      // Mark broadcast as completed (or keep cancelled)
+      const finalBroadcast = await this.getBroadcastById(broadcastId);
+      if (finalBroadcast?.status !== 'cancelled') {
+        await getPool().query(
+          'UPDATE broadcasts SET status = $1, completed_at = CURRENT_TIMESTAMP WHERE broadcast_id = $2',
+          ['completed', broadcastId]
+        );
+      }
 
       logger.info(`Broadcast ${broadcastId} completed: ${stats.sent} sent, ${stats.failed} failed`);
 

@@ -96,6 +96,9 @@ class PermissionService {
    */
   static async isAdmin(userId) {
     try {
+      if (this.isEnvSuperAdmin(userId) || this.isEnvAdmin(userId)) {
+        return true;
+      }
       const role = await this.getUserRole(userId);
       return PermissionModel.isAdminRole(role);
     } catch (error) {

@@ -39,10 +39,19 @@ function groupBehaviorMiddleware() {
     const shouldUseTopic = !isAdmin && NOTIFICATIONS_TOPIC_ID &&
       (validTopicsPerChat[chatId] === undefined || validTopicsPerChat[chatId] === true);
 
+    const incomingText = (ctx.message?.text || '').toLowerCase();
+    const isMenuCommand = incomingText.startsWith('/menu');
+
     // Override ctx.reply to route to notifications topic
     ctx.reply = async (text, extra = {}) => {
+      // /menu should be visible in the same place it was invoked (main chat or current topic)
+      if (isMenuCommand) {
+        if (ctx.message?.message_thread_id && !extra.message_thread_id) {
+          extra.message_thread_id = ctx.message.message_thread_id;
+        }
+      }
       // Only add topic ID if we haven't determined it doesn't exist
-      if (shouldUseTopic && !extra.message_thread_id) {
+      if (!isMenuCommand && shouldUseTopic && !extra.message_thread_id) {
         extra.message_thread_id = NOTIFICATIONS_TOPIC_ID;
       }
 
@@ -54,21 +63,21 @@ function groupBehaviorMiddleware() {
           validTopicsPerChat[chatId] = true;
         }
 
-        // Schedule deletion after 3 minutes
+        // Schedule deletion after 3 minutes (keep /menu longer)
         if (message) {
           ChatCleanupService.scheduleDelete(
             ctx.telegram,
             chatId,
             message.message_id,
             'group-bot-behavior',
-            AUTO_DELETE_DELAY
+            isMenuCommand ? 15 * 60 * 1000 : AUTO_DELETE_DELAY
           );
 
           logger.debug('Bot message sent and scheduled for deletion', {
             chatId,
             messageId: message.message_id,
             topicId: extra.message_thread_id || 'main',
-            deleteIn: '3 minutes',
+            deleteIn: isMenuCommand ? '15 minutes' : '3 minutes',
           });
         }
 

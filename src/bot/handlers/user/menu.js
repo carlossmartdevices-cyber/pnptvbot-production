@@ -53,18 +53,7 @@ module.exports.sendPrimeWelcome = sendPrimeWelcome;
  * @param {Telegraf} bot - Bot instance
  */
 const registerMenuHandlers = (bot) => {
-    // /menu command: show main menu
-    bot.command('menu', async (ctx) => {
-      logger.info('[MENU-HANDLER] /menu command handler triggered');
-      try {
-        logger.info('[MENU-HANDLER] Calling showMainMenu');
-        await showMainMenu(ctx);
-        logger.info('[MENU-HANDLER] showMainMenu completed');
-      } catch (error) {
-        logger.error('[MENU-HANDLER] Error showing main menu:', error);
-        await ctx.reply('Error loading menu. Please try again.');
-      }
-    });
+    // /menu command is handled by `src/bot/handlers/media/menu.js` to avoid conflicts (especially in groups)
 
     // /cristina command: starts AI support chat, message stays in chat (no autodelete)
     bot.command('cristina', async (ctx) => {

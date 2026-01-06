@@ -11,6 +11,39 @@ const { getLanguage, validateUserInput } = require('../../utils/helpers');
  * @param {Telegraf} bot - Bot instance
  */
 const registerProfileHandlers = (bot) => {
+  // Show all interests as a popup (used by profile inline button)
+  bot.action(/^profile_interests_(\d+)$/, async (ctx) => {
+    try {
+      const targetUserId = ctx.match[1];
+      const targetUser = await UserModel.getById(targetUserId);
+      const interests = Array.isArray(targetUser?.interests) ? targetUser.interests.filter(Boolean) : [];
+      const text = interests.length ? interests.join(', ').slice(0, 200) : '—';
+      await ctx.answerCbQuery(text, { show_alert: true });
+    } catch (error) {
+      logger.error('Error showing profile interests:', error);
+      await ctx.answerCbQuery('Error', { show_alert: false }).catch(() => {});
+    }
+  });
+
+  // Show a single interest as a popup (used by profile inline buttons)
+  bot.action(/^profile_interest_(\d+)_(\d+)$/, async (ctx) => {
+    try {
+      const targetUserId = ctx.match[1];
+      const interestIndex = parseInt(ctx.match[2], 10);
+      const targetUser = await UserModel.getById(targetUserId);
+      const interests = Array.isArray(targetUser?.interests) ? targetUser.interests : [];
+      const interest = interests[interestIndex];
+      if (!interest) {
+        await ctx.answerCbQuery('Not available', { show_alert: false });
+        return;
+      }
+      await ctx.answerCbQuery(String(interest).slice(0, 200), { show_alert: true });
+    } catch (error) {
+      logger.error('Error showing profile interest:', error);
+      await ctx.answerCbQuery('Error', { show_alert: false }).catch(() => {});
+    }
+  });
+
   // Show own profile
   bot.action('show_profile', async (ctx) => {
     try {
@@ -905,6 +938,7 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
   try {
     const lang = getLanguage(ctx);
     const viewerId = ctx.from.id;
+    const botUsername = ctx.botInfo?.username || process.env.BOT_USERNAME || 'pnptv_bot';
 
     // Get target user
     const targetUser = await UserModel.getById(targetUserId);
@@ -1009,13 +1043,14 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
     profileText += '______________________________\n';
 
     // Social media section
-    const hasSocialMedia = targetUser.tiktok || targetUser.twitter || targetUser.facebook || targetUser.instagram;
+    const hasSocialMedia = targetUser.tiktok || targetUser.twitter || targetUser.youtube || targetUser.instagram || targetUser.telegram;
     if (hasSocialMedia) {
       profileText += `\n📱 ${lang === 'es' ? 'Redes Sociales' : 'Social Media'}:\n`;
       if (targetUser.tiktok) profileText += `  TikTok: @${targetUser.tiktok}\n`;
       if (targetUser.twitter) profileText += `  X: @${targetUser.twitter}\n`;
-      if (targetUser.facebook) profileText += `  Facebook: ${targetUser.facebook}\n`;
+      if (targetUser.youtube) profileText += `  YouTube: ${targetUser.youtube}\n`;
       if (targetUser.instagram) profileText += `  Instagram: @${targetUser.instagram}\n`;
+      if (targetUser.telegram) profileText += `  Telegram: @${targetUser.telegram}\n`;
     }
 
     // Subscription status
@@ -1056,8 +1091,69 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
       profileText += `👁️ ${lang === 'es' ? 'Vistas' : 'Views'}: ${targetUser.profileViews || 0}\n`;
     }
 
+    const normalizeHandle = (value) => String(value || '').trim().replace(/^@/, '');
+
+    const buildProfileCardText = () => {
+      const lines = [];
+      const displayNameLine = targetUser.username ? `@${targetUser.username}` : (targetUser.firstName || 'User');
+      lines.push(`👤 ${displayNameLine}`);
+      if (targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
+        lines.push(`📝 ${String(targetUser.bio).trim().slice(0, 240)}`);
+      }
+      if (targetUser.looking_for && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
+        lines.push(`🔎 ${lang === 'es' ? 'Buscando' : 'Looking for'}: ${String(targetUser.looking_for).trim().slice(0, 120)}`);
+      }
+      if (targetUser.tribe && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
+        lines.push(`🏳️‍🌈 ${lang === 'es' ? 'Tribu' : 'Tribe'}: ${String(targetUser.tribe).trim().slice(0, 60)}`);
+      }
+      lines.push(lang === 'es' ? '💜 PNPtv' : '💜 PNPtv');
+      return ['```', ...lines, '```'].join('\n');
+    };
+
     // Build keyboard
     const keyboard = [];
+
+    // Interests popup button
+    if (targetUser.interests && targetUser.interests.length > 0 && (isOwnProfile || targetUser.privacy?.showInterests !== false)) {
+      keyboard.push([Markup.button.callback(lang === 'es' ? '🎯 Intereses' : '🎯 Interests', `profile_interests_${targetUserId}`)]);
+    }
+
+    // Social inline buttons (only active fields): X, Facebook, TikTok, YouTube
+    const socialButtons = [];
+    if (targetUser.twitter) {
+      socialButtons.push(Markup.button.url('X', `https://x.com/${encodeURIComponent(normalizeHandle(targetUser.twitter))}`));
+    }
+    if (targetUser.facebook) {
+      socialButtons.push(Markup.button.url('Facebook', `https://facebook.com/${encodeURIComponent(normalizeHandle(targetUser.facebook))}`));
+    }
+    if (targetUser.tiktok) {
+      socialButtons.push(Markup.button.url('TikTok', `https://www.tiktok.com/@${encodeURIComponent(normalizeHandle(targetUser.tiktok))}`));
+    }
+    if (targetUser.youtube) {
+      const youtubeValue = String(targetUser.youtube).trim();
+      const youtubeUrl = youtubeValue.startsWith('http') ? youtubeValue : `https://www.youtube.com/@${encodeURIComponent(normalizeHandle(youtubeValue))}`;
+      socialButtons.push(Markup.button.url('YouTube', youtubeUrl));
+    }
+    for (let i = 0; i < socialButtons.length; i += 2) {
+      keyboard.push(socialButtons.slice(i, i + 2));
+    }
+
+    // Always show "All features" link for convenience
+    keyboard.push([Markup.button.url(lang === 'es' ? '✨ Todas las funciones' : '✨ All features', `https://t.me/${botUsername}?start=from_profile`)]);
+
+    // If user has a profile photo, show the profile as a photo + card caption
+    if (targetUser.photoFileId) {
+      if (edit && ctx.callbackQuery?.message?.message_id) {
+        try { await ctx.deleteMessage(); } catch (e) { /* ignore */ }
+      }
+      const caption = buildProfileCardText();
+      await ctx.replyWithPhoto(targetUser.photoFileId, {
+        caption,
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(keyboard),
+      });
+      return;
+    }
 
     if (isOwnProfile) {
       // Options footer
