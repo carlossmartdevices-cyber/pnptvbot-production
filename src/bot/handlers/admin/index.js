@@ -136,6 +136,35 @@ let registerAdminHandlers = (bot) => {
     }
   });
 
+  // FALLBACK: Handle /admin as text for webhook compatibility
+  bot.on('text', async (ctx, next) => {
+    // Check if message is just "/admin"
+    if (ctx.message.text === '/admin') {
+      logger.info(`[HANDLER-FALLBACK] /admin text fallback triggered for user ${ctx.from.id}`);
+      try {
+        const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+        logger.info(`[HANDLER-FALLBACK] isAdmin check result: ${isAdmin} for user ${ctx.from.id}`);
+
+        if (!isAdmin) {
+          logger.info(`[HANDLER-FALLBACK] User ${ctx.from.id} is NOT admin`);
+          await ctx.reply(t('unauthorized', getLanguage(ctx)));
+          return;
+        }
+
+        logger.info(`[HANDLER-FALLBACK] User ${ctx.from.id} IS admin, calling showAdminPanel`);
+        await showAdminPanel(ctx, false);
+        return; // Don't call next() - we handled it
+      } catch (error) {
+        logger.error(`[HANDLER-FALLBACK] Error: ${error.message}`);
+        logger.error('Error in /admin fallback:', error);
+        return;
+      }
+    }
+
+    // Not /admin, continue to next handler
+    return next();
+  });
+
   // Quick view mode command: /viewas free | /viewas prime | /viewas normal
   bot.command('viewas', async (ctx) => {
     try {
