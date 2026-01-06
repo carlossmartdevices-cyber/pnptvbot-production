@@ -116,22 +116,22 @@ let registerAdminHandlers = (bot) => {
 
   // Admin command
   bot.command('admin', async (ctx) => {
-    console.log(`[DEBUG] /admin command triggered for user ${ctx.from.id}`);
+    logger.info(`[HANDLER] /admin command triggered for user ${ctx.from.id}`);
     try {
       // Check if user is admin using new permission system
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      console.log(`[DEBUG] isAdmin check result: ${isAdmin} for user ${ctx.from.id}`);
+      logger.info(`[HANDLER] isAdmin check result: ${isAdmin} for user ${ctx.from.id}`);
 
       if (!isAdmin) {
-        console.log(`[DEBUG] User ${ctx.from.id} is NOT admin`);
+        logger.info(`[HANDLER] User ${ctx.from.id} is NOT admin`);
         await ctx.reply(t('unauthorized', getLanguage(ctx)));
         return;
       }
 
-      console.log(`[DEBUG] User ${ctx.from.id} IS admin, calling showAdminPanel`);
+      logger.info(`[HANDLER] User ${ctx.from.id} IS admin, calling showAdminPanel`);
       await showAdminPanel(ctx, false);
     } catch (error) {
-      console.log(`[DEBUG] Error in /admin command: ${error.message}`);
+      logger.error(`[HANDLER] Error in /admin command: ${error.message}`);
       logger.error('Error in /admin command:', error);
     }
   });
