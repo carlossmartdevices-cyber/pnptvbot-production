@@ -136,7 +136,15 @@ const startBot = async () => {
     }
     // Create bot instance
     const bot = new Telegraf(process.env.BOT_TOKEN);
-    
+
+    // DEBUG: Log all updates
+    bot.use(async (ctx, next) => {
+      if (ctx.message?.text?.startsWith('/')) {
+        logger.info(`[TELEGRAF] Command received: text="${ctx.message.text}", from=${ctx.from?.id}, chat=${ctx.chat?.id}`);
+      }
+      return next();
+    });
+
     // Register middleware
     bot.use(sessionMiddleware());
     bot.use(rateLimitMiddleware());
