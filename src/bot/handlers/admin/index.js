@@ -3173,14 +3173,14 @@ const registerGroupCleanupCommand = (bot) => {
   });
 };
 
-// After registerAdminHandlers is defined, add the additional handlers
-const originalRegisterAdminHandlers = registerAdminHandlers;
+// After registerAdminHandlers is defined, wrap it to add additional handlers
+const wrappedRegisterAdminHandlers = registerAdminHandlers;
 
-// Override to also register audio management and group cleanup
-registerAdminHandlers = (bot) => {
-  originalRegisterAdminHandlers(bot);
+// Create wrapper function that also registers audio management and group cleanup
+const finalRegisterAdminHandlers = (bot) => {
+  wrappedRegisterAdminHandlers(bot);
   registerAudioManagementHandlers(bot);
   registerGroupCleanupCommand(bot);
 };
 
-module.exports = registerAdminHandlers;
+module.exports = finalRegisterAdminHandlers;
