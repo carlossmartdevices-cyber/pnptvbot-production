@@ -116,23 +116,24 @@ let registerAdminHandlers = (bot) => {
 
   // Admin command
   bot.command('admin', async (ctx) => {
-    logger.info(`[HANDLER] /admin command triggered for user ${ctx.from.id}`);
+    logger.info(`[HANDLER-COMMAND] ✅ /admin command matched by Telegraf! User: ${ctx.from.id}`);
     try {
       // Check if user is admin using new permission system
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      logger.info(`[HANDLER] isAdmin check result: ${isAdmin} for user ${ctx.from.id}`);
+      logger.info(`[HANDLER-COMMAND] isAdmin check result: ${isAdmin} for user ${ctx.from.id}`);
 
       if (!isAdmin) {
-        logger.info(`[HANDLER] User ${ctx.from.id} is NOT admin`);
+        logger.info(`[HANDLER-COMMAND] User ${ctx.from.id} is NOT admin`);
         await ctx.reply(t('unauthorized', getLanguage(ctx)));
         return;
       }
 
-      logger.info(`[HANDLER] User ${ctx.from.id} IS admin, calling showAdminPanel`);
+      logger.info(`[HANDLER-COMMAND] User ${ctx.from.id} IS admin, calling showAdminPanel`);
       await showAdminPanel(ctx, false);
+      logger.info(`[HANDLER-COMMAND] showAdminPanel completed for user ${ctx.from.id}`);
     } catch (error) {
-      logger.error(`[HANDLER] Error in /admin command: ${error.message}`);
-      logger.error('Error in /admin command:', error);
+      logger.error(`[HANDLER-COMMAND] ERROR in /admin command: ${error.message}`);
+      logger.error('[HANDLER-COMMAND] Error stack:', error);
     }
   });
 
