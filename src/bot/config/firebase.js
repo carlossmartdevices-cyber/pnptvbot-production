@@ -33,7 +33,8 @@ function initializeFirebase() {
     return admin.app();
   } catch (error) {
     logger.error('Failed to initialize Firebase:', error);
-    throw error;
+    logger.warn('Firebase will not be available - bot will run in degraded mode');
+    return null;
   }
 }
 
@@ -41,10 +42,16 @@ function initializeFirebase() {
  * Get Firestore instance
  */
 function getFirestore() {
-  if (admin.apps.length === 0) {
-    initializeFirebase();
+  try {
+    if (admin.apps.length === 0) {
+      const app = initializeFirebase();
+      if (!app) return null;
+    }
+    return admin.firestore();
+  } catch (error) {
+    logger.warn('Firestore not available:', error.message);
+    return null;
   }
-  return admin.firestore();
 }
 
 /**
