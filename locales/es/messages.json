@@ -41,5 +41,22 @@
   "broadcast_sent": "✅ Transmisión enviada a {count} usuarios",
   "broadcast_failed": "⚠️ Transmisión completada con {failed} fallos",
   "error_occurred": "❌ Ocurrió un error. Por favor intenta de nuevo más tarde.",
-  "rate_limit_exceeded": "⚠️ Estás enviando comandos demasiado rápido. Por favor espera un momento e intenta de nuevo."
+  "rate_limit_exceeded": "⚠️ Estás enviando comandos demasiado rápido. Por favor espera un momento e intenta de nuevo.",
+  "emailPrompt": "¿Te gustaría proporcionar tu dirección de correo electrónico? Esto ayuda con la recuperación de cuenta y notificaciones.",
+  "skipEmail": "➡️ Saltar por ahora",
+  "emailReceived": "✅ ¡Correo recibido! Gracias.",
+  "locationSharingPrompt": "📍 Compartir Ubicación (Opcional)\
+\n¿Quieres que otros miembros te encuentren en el mapa de *¿Quién está Cercano?*?\n\n💡 Esto es completamente opcional y puedes cambiarlo más tarde en tu perfil.",
+  "locationSharingEnabled": "✅ ¡Compartir ubicación activado! Aparecerás en el mapa de Cercanos.",
+  "locationSharingDisabled": "🔒 Compartir ubicación desactivado. Puedes activarlo cuando quieras en tu perfil.",
+  "locationSharingToggleEnabled": "✅ ¡Compartir ubicación ACTIVADO! Ahora aparecerás en el mapa de Cercanos.",
+  "locationSharingToggleDisabled": "🔒 Compartir ubicación DESACTIVADO. No aparecerás en el mapa de Cercanos.",
+  "lookingForUpdated": "✅ ¡Buscando actualizado!",
+  "interestsUpdated": "✅ ¡Intereses actualizados!",
+  "bioUpdated": "✅ ¡Bio actualizado!",
+  "tribeUpdated": "✅ ¡Tribu actualizada!",
+  "sendInterests": "🎯 Envía tus intereses (separados por comas)",
+  "sendBio": "📝 Envía tu bio (máximo 500 caracteres)",
+  "sendTribe": "🏳️‍🌈 Envía tu tribu (ej: Bear, Otter, Jock)",
+  "invalidInput": "❌ Entrada inválida. Por favor intenta de nuevo."
 }

@@ -212,10 +212,48 @@ If you have any questions, use /support to contact us.`;
     }
   });
 
+  // Location sharing actions
+  bot.action('share_location_yes', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      
+      // Set location sharing preference
+      if (ctx.from?.id) {
+        await UserService.updateProfile(ctx.from.id, {
+          locationSharingEnabled: true
+        });
+      }
+      
+      await ctx.editMessageText(t('locationSharingEnabled', lang));
+      await completeOnboarding(ctx);
+    } catch (error) {
+      logger.error('Error enabling location sharing:', error);
+    }
+  });
+
+  bot.action('share_location_no', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      
+      // Set location sharing preference
+      if (ctx.from?.id) {
+        await UserService.updateProfile(ctx.from.id, {
+          locationSharingEnabled: false
+        });
+      }
+      
+      await ctx.editMessageText(t('locationSharingDisabled', lang));
+      await completeOnboarding(ctx);
+    } catch (error) {
+      logger.error('Error disabling location sharing:', error);
+    }
+  });
+
   // Email prompt actions
   bot.action('skip_email', async (ctx) => {
     try {
-      await completeOnboarding(ctx);
+      // Move to location sharing prompt after skipping email
+      await showLocationSharingPrompt(ctx);
     } catch (error) {
       logger.error('Error skipping email:', error);
     }
@@ -262,7 +300,7 @@ If you have any questions, use /support to contact us.`;
         await ctx.saveSession();
 
         await ctx.reply(t('emailReceived', lang));
-        await completeOnboarding(ctx);
+        await showLocationSharingPrompt(ctx);
       } else {
         await ctx.reply(`${t('invalidInput', lang)}\nPlease send a valid email address (e.g., user@example.com).`);
       }
@@ -331,6 +369,61 @@ const showEmailPrompt = async (ctx) => {
       [Markup.button.callback('📧 Provide Email', 'provide_email')],
       [Markup.button.callback(t('skipEmail', lang), 'skip_email')],
     ]),
+  );
+};
+
+/**
+ * Show location sharing prompt
+ * @param {Context} ctx - Telegraf context
+ */
+const showLocationSharingPrompt = async (ctx) => {
+  const lang = getLanguage(ctx);
+
+  const locationText = lang === 'es'
+    ? `📍 *Compartir Ubicación (Opcional)*
+
+¿Quieres que otros miembros te encuentren en el mapa de *¿Quién está Cercano?*?
+
+💡 *Esto es completamente opcional* y puedes cambiarlo más tarde en tu perfil.
+
+🔒 *Tu privacidad está protegida*: Solo mostrará tu ubicación aproximada a otros miembros que también hayan activado esta función.
+
+👥 *Beneficios*:
+• Conecta con otros papis cloudy cerca de ti
+• Encuentra slam buddies en tu área
+• Descubre la escena local de PNP
+
+🌍 *¿Cómo funciona?*:
+• Solo compartes tu ubicación cuando usas la función *¿Quién está Cercano?*
+• Puedes desactivarlo en cualquier momento
+• Solo es visible para otros miembros verificados`
+    : `📍 *Share Location (Optional)*
+
+Want other members to find you on the *Who is Nearby?* map?
+
+💡 *This is completely optional* and you can change it later in your profile.
+
+🔒 *Your privacy is protected*: It will only show your approximate location to other members who have also enabled this feature.
+
+👥 *Benefits*:
+• Connect with other cloudy papis near you
+• Find slam buddies in your area
+• Discover the local PNP scene
+
+🌍 *How it works*:
+• You only share your location when using the *Who is Nearby?* feature
+• You can turn it off anytime
+• Only visible to other verified members`;
+
+  await ctx.reply(
+    locationText,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('📍 Yes, Share My Location', 'share_location_yes')],
+        [Markup.button.callback('🚫 No Thanks', 'share_location_no')],
+      ]),
+    }
   );
 };
 

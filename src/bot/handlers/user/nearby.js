@@ -24,6 +24,11 @@ const registerNearbyHandlers = (bot) => {
         'fun started fast._\n\n' +
         '`📍 Select distance:`';
 
+      // Get user's current location sharing preference
+      const user = await UserService.getOrCreateFromContext(ctx);
+      const locationStatus = user.locationSharingEnabled ? '🟢 ON' : '🔴 OFF';
+      const toggleText = user.locationSharingEnabled ? '🔴 Turn OFF' : '🟢 Turn ON';
+
       await ctx.editMessageText(
         headerText,
         {
@@ -37,12 +42,57 @@ const registerNearbyHandlers = (bot) => {
               Markup.button.callback('📍 25 km', 'nearby_radius_25'),
               Markup.button.callback('📍 50 km', 'nearby_radius_50'),
             ],
+            [Markup.button.callback(`📍 Location: ${locationStatus}`, 'toggle_location_sharing')],
             [Markup.button.callback('🔙 Back', 'back_to_main')],
           ]),
         }
       );
     } catch (error) {
       logger.error('Error showing nearby menu:', error);
+    }
+  });
+
+  // Toggle location sharing
+  bot.action('toggle_location_sharing', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      
+      if (!ctx.from?.id) {
+        logger.error('Missing user context in location sharing toggle');
+        await ctx.answerCbQuery(t('error', lang));
+        return;
+      }
+
+      const userId = ctx.from.id;
+      const user = await UserService.getOrCreateFromContext(ctx);
+      
+      // Toggle the current setting
+      const newSetting = !user.locationSharingEnabled;
+      
+      await UserService.updateProfile(userId, {
+        locationSharingEnabled: newSetting
+      });
+
+      const message = newSetting 
+        ? t('locationSharingToggleEnabled', lang)
+        : t('locationSharingToggleDisabled', lang);
+
+      await ctx.answerCbQuery(message);
+      
+      // Update the button text
+      await ctx.editMessageReplyMarkup({
+        inline_keyboard: ctx.callbackQuery.message.reply_markup.inline_keyboard.map(row => {
+          if (row[0]?.callback_data === 'toggle_location_sharing') {
+            const newStatus = newSetting ? '🟢 ON' : '🔴 OFF';
+            return [Markup.button.callback(`📍 Location: ${newStatus}`, 'toggle_location_sharing')];
+          }
+          return row;
+        })
+      });
+    } catch (error) {
+      logger.error('Error toggling location sharing:', error);
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(t('error', lang));
     }
   });
 

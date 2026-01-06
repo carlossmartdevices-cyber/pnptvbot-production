@@ -228,6 +228,31 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
+  // Edit Looking For
+  bot.action('edit_looking_for', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      ctx.session.temp.waitingForLookingFor = true;
+      await ctx.saveSession();
+      
+      const text = lang === 'es'
+        ? '🔎 ¿Qué estás buscando?
+
+Ejemplos: "Un slam buddy", "Amigos cloudy", "Relación seria", "Diversión casual", etc.
+
+Envía lo que buscas o "borrar" para eliminar:'
+        : '🔎 What are you looking for?
+
+Examples: "A slam buddy", "Cloudy friends", "Serious relationship", "Casual fun", etc.
+
+Send what you're looking for or "delete" to remove:';
+      
+      await ctx.editMessageText(text);
+    } catch (error) {
+      logger.error('Error in edit looking for:', error);
+    }
+  });
+
   // Edit Profile Info (Bio, Interests, Tribe, Looking For)
   bot.action('edit_profile_info', async (ctx) => {
     try {
@@ -527,6 +552,35 @@ const registerProfileHandlers = (bot) => {
         await showProfile(ctx, ctx.from.id, false, true);
       } catch (error) {
         logger.error('Error updating interests:', error);
+      }
+      return;
+    }
+
+    // Looking For Handler
+    if (temp?.waitingForLookingFor) {
+      try {
+        const lang = getLanguage(ctx);
+        const input = validateUserInput(ctx.message.text, 200);
+
+        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
+          await UserService.updateProfile(ctx.from.id, { looking_for: null });
+          ctx.session.temp.waitingForLookingFor = false;
+          await ctx.saveSession();
+          await ctx.reply(lang === 'es' ? '✅ Buscando eliminado' : '✅ Looking for removed');
+        } else if (input) {
+          await UserService.updateProfile(ctx.from.id, { looking_for: input });
+          ctx.session.temp.waitingForLookingFor = false;
+          await ctx.saveSession();
+          await ctx.reply(lang === 'es' ? '✅ Buscando actualizado' : '✅ Looking for updated');
+        } else {
+          await ctx.reply(t('invalidInput', lang));
+          return;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await showProfile(ctx, ctx.from.id, false, true);
+      } catch (error) {
+        logger.error('Error updating looking for:', error);
       }
       return;
     }
@@ -1023,6 +1077,14 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
     // Location
     if (targetUser.location && (isOwnProfile || targetUser.privacy?.showLocation !== false)) {
       profileText += `📍 ${lang === 'es' ? 'Ubicación compartida' : 'Location shared'}\n`;
+    }
+
+    // Location sharing status (only for own profile)
+    if (isOwnProfile && targetUser.locationSharingEnabled !== undefined) {
+      const locationStatus = targetUser.locationSharingEnabled 
+        ? lang === 'es' ? '🟢 Visible en Cercanos' : '🟢 Visible on Nearby'
+        : lang === 'es' ? '🔴 Oculto en Cercanos' : '🔴 Hidden on Nearby';
+      profileText += `🌍 ${lang === 'es' ? 'Compartir ubicación' : 'Location sharing'}: ${locationStatus}\n`;
     }
 
     // Looking for
