@@ -126,7 +126,7 @@ const registerActivationHandlers = (bot) => {
         let inviteLink = 'https://t.me/PNPTV_PRIME'; // Fallback
         try {
           const bot = new Telegraf(process.env.BOT_TOKEN);
-          const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
+          const groupId = process.env.PRIME_CHANNEL_ID || '-1002997324714';
           const response = await bot.telegram.createChatInviteLink(groupId, {
             member_limit: 1,
             name: `LifetimePass ${code}`,
@@ -136,6 +136,7 @@ const registerActivationHandlers = (bot) => {
             userId,
             code,
             inviteLink,
+            channelId: groupId,
           });
         } catch (linkError) {
           logger.warn('Failed to create lifetime pass invite link, using fallback', {

@@ -5,8 +5,8 @@ const userService = require('./userService');
 class AdminService {
   constructor() {
     this.db = getFirestore();
-    this.adminLogsCollection = this.db.collection(Collections.ADMIN_LOGS);
-    this.broadcastsCollection = this.db.collection(Collections.BROADCASTS);
+    this.adminLogsCollection = this.db ? this.db.collection(Collections.ADMIN_LOGS) : null;
+    this.broadcastsCollection = this.db ? this.db.collection(Collections.BROADCASTS) : null;
   }
 
   /**
@@ -14,6 +14,7 @@ class AdminService {
    */
   async logAction(adminId, action, metadata = {}) {
     try {
+      if (!this.adminLogsCollection) return;
       await this.adminLogsCollection.add({
         adminId,
         action,
@@ -126,6 +127,7 @@ class AdminService {
    */
   async getBroadcastHistory(limit = 50) {
     try {
+      if (!this.broadcastsCollection) return [];
       const snapshot = await this.broadcastsCollection
         .orderBy('sentAt', 'desc')
         .limit(limit)
@@ -143,6 +145,7 @@ class AdminService {
    */
   async getAdminLogs(limit = 100) {
     try {
+      if (!this.adminLogsCollection) return [];
       const snapshot = await this.adminLogsCollection
         .orderBy('timestamp', 'desc')
         .limit(limit)

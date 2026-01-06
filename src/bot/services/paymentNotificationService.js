@@ -182,7 +182,7 @@ class PaymentNotificationService {
       }
 
       const lang = user.language || 'es';
-      const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
+      const groupId = process.env.PRIME_CHANNEL_ID || '-1002997324714';
 
       // Generate unique invite link for PRIME channel
       let inviteLink = 'https://t.me/PNPTV_PRIME'; // Fallback
@@ -192,6 +192,7 @@ class PaymentNotificationService {
           name: `Subscription ${transactionId}`,
         });
         inviteLink = response.invite_link;
+        logger.info('PRIME channel invite link created', { userId, transactionId, channelId: groupId });
       } catch (linkError) {
         logger.warn('Failed to create invite link, using fallback', { userId, error: linkError.message });
       }

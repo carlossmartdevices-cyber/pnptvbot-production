@@ -32,7 +32,7 @@ class PaymentService {
     }) {
       try {
         const bot = new Telegraf(process.env.BOT_TOKEN);
-        const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496'; // PRIME channel ID
+        const groupId = process.env.PRIME_CHANNEL_ID || '-1002997324714'; // PRIME channel ID
 
         // Create unique invite link for PRIME channel
         let inviteLink = '';
@@ -46,6 +46,7 @@ class PaymentService {
             userId,
             transactionId,
             inviteLink,
+            channelId: groupId,
           });
         } catch (linkError) {
           logger.error('Error creating invite link, using fallback', {
@@ -888,7 +889,7 @@ class PaymentService {
 async function sendPrimeConfirmation(userId, planName, expiryDate, source = 'manual') {
   try {
     const bot = new Telegraf(process.env.BOT_TOKEN);
-    const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
+    const groupId = process.env.PRIME_CHANNEL_ID || '-1002997324714';
 
     // Get user to determine language
     const user = await UserModel.getById(userId);

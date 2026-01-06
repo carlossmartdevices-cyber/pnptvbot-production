@@ -6,9 +6,40 @@ const UserModel = require('../../../models/userModel');
 const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
 const PaymentService = require('../../services/paymentService');
+const adminService = require('../../services/adminService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
+
+function safeMarkdown(text) {
+  if (!text) return '';
+  return String(text).replace(/[`]/g, '\\`');
+}
+
+function formatDashboardStats(stats, lang) {
+  if (!stats?.users) return '';
+
+  const users = stats.users;
+  const totalUsers = users.totalUsers ?? '-';
+  const activeSubscriptions = users.activeSubscriptions ?? '-';
+  const newUsersLast30Days = users.newUsersLast30Days ?? '-';
+
+  const lines = [];
+  lines.push(lang === 'es' ? '`📊 Resumen`' : '`📊 Summary`');
+  lines.push(`${lang === 'es' ? '• Usuarios' : '• Users'}: ${totalUsers}`);
+  lines.push(`${lang === 'es' ? '• Suscripciones activas' : '• Active subscriptions'}: ${activeSubscriptions}`);
+  lines.push(`${lang === 'es' ? '• Nuevos (30d)' : '• New (30d)'}: ${newUsersLast30Days}`);
+
+  if (stats.recentBroadcasts?.length) {
+    const recent = stats.recentBroadcasts
+      .slice(0, 3)
+      .map(b => safeMarkdown(b?.status || 'sent'))
+      .join(', ');
+    lines.push(`${lang === 'es' ? '• Broadcasts' : '• Broadcasts'}: ${recent}`);
+  }
+
+  return `${lines.join('\n')}\n\n`;
+}
 
 /**
  * Show admin panel based on user role
@@ -22,8 +53,24 @@ async function showAdminPanel(ctx, edit = false) {
     const userRole = await PermissionService.getUserRole(userId);
     const roleDisplay = await PermissionService.getUserRoleDisplay(userId, lang);
 
+    // Optional stats (Firestore may be disabled in some deployments)
+    let statsText = '';
+    try {
+      if (userRole === 'superadmin' || userRole === 'admin') {
+        const stats = await adminService.getDashboardStats();
+        statsText = formatDashboardStats(stats, lang);
+      }
+    } catch (error) {
+      logger.warn(`Admin stats unavailable (continuing without stats): ${error.message}`);
+    }
+
     // Build menu based on role with organized sections
     const buttons = [];
+
+    // Top controls
+    buttons.push([
+      Markup.button.callback(lang === 'es' ? '🔄 Actualizar' : '🔄 Refresh', 'admin_refresh'),
+    ]);
 
     // Common for all admin roles
     buttons.push([Markup.button.callback('👥 Usuarios', 'admin_users')]);
@@ -77,7 +124,7 @@ async function showAdminPanel(ctx, edit = false) {
     const divider = '━━━━━━━━━━━━━━━━━━━━';
     const footer = lang === 'es' ? '`Selecciona una opción 💜`' : '`Choose an option 💜`';
 
-    const message = `${header}\n${divider}\n\n${roleDisplay}\n\n${footer}`;
+    const message = `${header}\n${divider}\n\n${roleDisplay}\n\n${statsText}${footer}`;
 
     const options = {
       parse_mode: 'Markdown',
@@ -113,6 +160,28 @@ let registerAdminHandlers = (bot) => {
   registerLiveStreamManagementHandlers(bot);
   registerCommunityPremiumBroadcast(bot);
   registerCommunityPostHandlers(bot);
+
+  bot.action('admin_home', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await showAdminPanel(ctx, true);
+    } catch (error) {
+      logger.error('Error in admin_home:', error);
+    }
+  });
+
+  bot.action('admin_refresh', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await showAdminPanel(ctx, true);
+    } catch (error) {
+      logger.error('Error in admin_refresh:', error);
+    }
+  });
 
   // Admin command
   bot.command('admin', async (ctx) => {
@@ -2689,6 +2758,33 @@ let registerAdminHandlers = (bot) => {
         expiry: expiryDate,
       });
 
+      // Record as PRIME sale (manual activation)
+      try {
+        await PaymentModel.create({
+          userId,
+          planId: `courtesy_${days}d`,
+          provider: 'manual_activation',
+          amount: 0, // Courtesy pass is free
+          currency: 'USD',
+          status: 'completed',
+          metadata: {
+            activatedBy: ctx.from.id,
+            activationType: 'courtesy_pass',
+            durationDays: days,
+          },
+        });
+        logger.info('Payment record created for courtesy pass activation', {
+          userId,
+          days,
+          activatedBy: ctx.from.id,
+        });
+      } catch (paymentError) {
+        logger.warn('Failed to create payment record for courtesy pass, continuing', {
+          userId,
+          error: paymentError.message,
+        });
+      }
+
       const lang = user.language || 'es';
       const durationText = days === 2 ? '2 días' : days === 7 ? '1 semana (7 días)' : '2 semanas (14 días)';
 
@@ -2727,7 +2823,7 @@ let registerAdminHandlers = (bot) => {
         // Generate unique invite link for PRIME channel
         let inviteLink = 'https://t.me/PNPTV_PRIME'; // Fallback
         try {
-          const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
+          const groupId = process.env.PRIME_CHANNEL_ID || '-1002997324714';
           const response = await ctx.telegram.createChatInviteLink(groupId, {
             member_limit: 1,
             name: `CourtesyPass ${userId}_${Date.now()}`,
@@ -2736,6 +2832,7 @@ let registerAdminHandlers = (bot) => {
           logger.info('PRIME channel invite link created for courtesy pass', {
             userId,
             inviteLink,
+            channelId: groupId,
           });
         } catch (linkError) {
           logger.warn('Failed to create PRIME channel invite link, using fallback', {
@@ -2820,6 +2917,37 @@ let registerAdminHandlers = (bot) => {
         expiry: expiryDate,
       });
 
+      // Record as PRIME sale (manual activation)
+      try {
+        await PaymentModel.create({
+          userId,
+          planId: plan.id,
+          provider: 'manual_activation',
+          amount: plan.price || 0,
+          currency: plan.currency || 'USD',
+          status: 'completed',
+          metadata: {
+            activatedBy: ctx.from.id,
+            activationType: 'plan_activation',
+            planName: plan.name,
+            duration: plan.duration,
+            isLifetime: plan.isLifetime || false,
+          },
+        });
+        logger.info('Payment record created for plan activation', {
+          userId,
+          planId: plan.id,
+          amount: plan.price,
+          activatedBy: ctx.from.id,
+        });
+      } catch (paymentError) {
+        logger.warn('Failed to create payment record for plan activation, continuing', {
+          userId,
+          planId: plan.id,
+          error: paymentError.message,
+        });
+      }
+
       const lang = user.language || 'es';
       const planName = lang === 'es' ? (plan.nameEs || plan.name) : plan.name;
 
@@ -2863,7 +2991,7 @@ let registerAdminHandlers = (bot) => {
         // Generate unique invite link for PRIME channel
         let inviteLink = 'https://t.me/PNPTV_PRIME'; // Fallback
         try {
-          const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
+          const groupId = process.env.PRIME_CHANNEL_ID || '-1002997324714';
           const response = await ctx.telegram.createChatInviteLink(groupId, {
             member_limit: 1,
             name: `Plan ${userId}_${Date.now()}`,
@@ -2872,6 +3000,7 @@ let registerAdminHandlers = (bot) => {
           logger.info('PRIME channel invite link created for plan activation', {
             userId,
             inviteLink,
+            channelId: groupId,
           });
         } catch (linkError) {
           logger.warn('Failed to create PRIME channel invite link, using fallback', {
@@ -3313,10 +3442,12 @@ async function handleSendPrimeLinks(ctx, lang, telegram) {
       return;
     }
 
-    const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
+    const groupId = process.env.PRIME_CHANNEL_ID || '-1002997324714';
     let sentCount = 0;
     let failedCount = 0;
     let blockedCount = 0;
+
+    logger.info('Using PRIME channel ID for invite links', { channelId: groupId });
 
     // Send to each user
     for (let i = 0; i < activeUsers.length; i++) {
