@@ -11,6 +11,7 @@ const { buildGroupMenuPayload } = require('../../handlers/media/menu');
 const PermissionService = require('../../services/permissionService');
 
 const GROUP_ID = process.env.GROUP_ID;
+const WALL_OF_FAME_TOPIC_ID = parseInt(process.env.WALL_OF_FAME_TOPIC_ID || '3132', 10);
 
 const groupCommandRestrictionMiddleware = () => {
   return async (ctx, next) => {
@@ -23,6 +24,11 @@ const groupCommandRestrictionMiddleware = () => {
       // Only apply to configured community group (if set)
       const chatIdStr = ctx.chat?.id?.toString();
       if (GROUP_ID && chatIdStr !== GROUP_ID) {
+        return next();
+      }
+
+      // Never show menus in Wall of Fame topic (bot-only posting enforced elsewhere)
+      if (ctx.message?.message_thread_id && Number(ctx.message.message_thread_id) === WALL_OF_FAME_TOPIC_ID) {
         return next();
       }
 

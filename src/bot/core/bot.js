@@ -25,6 +25,7 @@ const {
   groupCommandDeleteMiddleware
 } = require('./middleware/groupBehavior');
 const groupCommandRestrictionMiddleware = require('./middleware/groupCommandRestriction');
+const wallOfFameGuard = require('./middleware/wallOfFameGuard');
 const logger = require('../../utils/logger');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
@@ -157,6 +158,7 @@ const startBot = async () => {
     bot.use(groupBehaviorMiddleware()); // Route all bot messages to topic 3135, 3-min delete
     bot.use(cristinaGroupFilterMiddleware()); // Filter personal info from Cristina in groups
     bot.use(groupMenuRedirectMiddleware()); // Redirect menu button clicks to private
+    bot.use(wallOfFameGuard()); // Wall of Fame topic is bot-only
     bot.use(groupCommandRestrictionMiddleware()); // Block all commands except /menu in groups
 
     // Topic-specific middlewares
