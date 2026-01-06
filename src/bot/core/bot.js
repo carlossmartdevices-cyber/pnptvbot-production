@@ -230,6 +230,22 @@ const startBot = async () => {
     } catch (error) {
       logger.warn('Community post scheduler initialization failed, continuing without community posts:', error.message);
     }
+    // Register commands with Telegram
+    try {
+      const commands = [
+        { command: 'start', description: 'Start the bot and select your language' },
+        { command: 'menu', description: 'Show main menu with all features' },
+        { command: 'admin', description: 'Open admin panel (admin only)' },
+        { command: 'stats', description: 'View real-time statistics (admin only)' },
+        { command: 'viewas', description: 'Preview as different user type (admin only)' },
+        { command: 'support', description: 'Get help and support' },
+        { command: 'about', description: 'Learn about PNPtv' },
+      ];
+      await bot.telegram.setMyCommands(commands);
+      logger.info('✓ Bot commands registered with Telegram:', commands.map(c => `/${c.command}`).join(', '));
+    } catch (error) {
+      logger.warn('Failed to register bot commands with Telegram:', error.message);
+    }
     // Error handling
     bot.catch(errorHandler);
     // Start bot
