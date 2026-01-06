@@ -27,6 +27,7 @@ const {
 const groupCommandRestrictionMiddleware = require('./middleware/groupCommandRestriction');
 const wallOfFameGuard = require('./middleware/wallOfFameGuard');
 const logger = require('../../utils/logger');
+const performanceMonitor = require('../../utils/performanceMonitor');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
 const registerAdminHandlers = require('../handlers/admin');
@@ -64,6 +65,8 @@ const PlanModel = require('../../models/planModel');
 const { initializeAsyncBroadcastQueue } = require('../services/initializeQueue');
 // API Server
 const apiApp = require('../api/routes');
+// Broadcast buttons presets
+const BroadcastButtonModel = require('../../models/broadcastButtonModel');
 // Variable de estado para saber si el bot está iniciado
 let botStarted = false;
 let botInstance = null;
@@ -88,6 +91,7 @@ const validateCriticalEnvVars = () => {
  */
 const startBot = async () => {
   try {
+    performanceMonitor.start('bot_startup');
     logger.info('Starting PNPtv Telegram Bot...');
     // Validate critical environment variables
     try {
@@ -200,6 +204,12 @@ const startBot = async () => {
       logger.info('✓ Broadcast scheduler initialized and started');
     } catch (error) {
       logger.warn('Broadcast scheduler initialization failed, continuing without scheduler:', error.message);
+    }
+    // Initialize broadcast buttons tables (presets/custom CTAs)
+    try {
+      await BroadcastButtonModel.initializeTables();
+    } catch (error) {
+      logger.warn('Broadcast button tables initialization failed (broadcasts will run without presets until fixed):', error.message);
     }
     // Initialize async broadcast queue
     try {
@@ -398,6 +408,8 @@ const startBot = async () => {
     server.headersTimeout = 66000;
     server.timeout = 120000;
     logger.info('🚀 PNPtv Telegram Bot is running!');
+    performanceMonitor.end('bot_startup', { mode: isWebhookMode ? 'webhook' : 'polling' });
+    performanceMonitor.logSummary();
   } catch (error) {
     logger.error('❌ CRITICAL ERROR during bot startup:', error);
     logger.error('Stack trace:', error.stack);

@@ -31,7 +31,7 @@ class BroadcastButtonModel {
       await client.query(`
         CREATE TABLE IF NOT EXISTS broadcast_buttons (
           button_id SERIAL PRIMARY KEY,
-          broadcast_id UUID NOT NULL REFERENCES broadcasts(broadcast_id) ON DELETE CASCADE,
+          broadcast_id UUID NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
           preset_id INT REFERENCES broadcast_button_presets(preset_id),
           button_text VARCHAR(255) NOT NULL,
           button_type VARCHAR(50) NOT NULL,
@@ -100,6 +100,23 @@ class BroadcastButtonModel {
       `);
       return result.rows;
     } catch (error) {
+      // If table doesn't exist in production yet, create it and retry once.
+      if (error && error.code === '42P01') {
+        logger.warn('broadcast_button_presets missing; initializing tables');
+        try {
+          await this.initializeTables();
+          const result = await getPool().query(`
+            SELECT preset_id, name, description, icon, buttons
+            FROM broadcast_button_presets
+            WHERE enabled = true
+            ORDER BY name
+          `);
+          return result.rows;
+        } catch (initError) {
+          logger.error('Failed to initialize broadcast buttons tables, continuing without presets:', initError);
+          return [];
+        }
+      }
       logger.error('Error getting button presets:', error);
       throw error;
     }
@@ -117,6 +134,21 @@ class BroadcastButtonModel {
       `, [presetId]);
       return result.rows[0] || null;
     } catch (error) {
+      if (error && error.code === '42P01') {
+        logger.warn('broadcast_button_presets missing; initializing tables');
+        try {
+          await this.initializeTables();
+          const result = await getPool().query(`
+            SELECT preset_id, name, description, icon, buttons
+            FROM broadcast_button_presets
+            WHERE preset_id = $1 AND enabled = true
+          `, [presetId]);
+          return result.rows[0] || null;
+        } catch (initError) {
+          logger.error('Failed to initialize broadcast buttons tables, continuing without preset:', initError);
+          return null;
+        }
+      }
       logger.error('Error getting preset:', error);
       throw error;
     }

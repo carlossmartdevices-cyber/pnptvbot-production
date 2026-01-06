@@ -16,6 +16,7 @@ const hangoutsController = require('./controllers/hangoutsController');
 const playlistController = require('./controllers/playlistController');
 const videoramaController = require('./controllers/videoramaController');
 const podcastController = require('./controllers/podcastController');
+const healthController = require('./controllers/healthController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -45,43 +46,78 @@ app.use(morgan('combined', { stream: logger.stream }));
 app.use(express.static(path.join(__dirname, '../../../public')));
 
 // Landing page routes
-// Home page
+// Home page - domain aware routing
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/index.html'));
+  const host = req.get('host') || '';
+  // If the request is coming from easybots.store, serve a blank/generic page
+  // The actual easybots.store homepage should be served from port 3010
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    res.send('<h1>EasyBots</h1><p>Service under maintenance. Please visit the main website.</p>');
+  } else {
+    res.sendFile(path.join(__dirname, '../../../public/index.html'));
+  }
 });
 
 // PNPtv Haus page
 app.get('/community-room', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   res.sendFile(path.join(__dirname, '../../../public/community-room.html'));
 });
 
 // PNPtv Haus alias
 app.get('/pnptv-haus', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   res.sendFile(path.join(__dirname, '../../../public/community-room.html'));
 });
 
 // Community Features page
 app.get('/community-features', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   res.sendFile(path.join(__dirname, '../../../public/community-features.html'));
 });
 
 // How to Use page (Bilingual)
 app.get('/how-to-use', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   res.sendFile(path.join(__dirname, '../../../public/how-to-use.html'));
 });
 
 // Videorama page
 app.get('/videorama', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   res.sendFile(path.join(__dirname, '../../../public/video-rooms.html'));
 });
 
 // Legacy path redirect
 app.get('/video-rooms', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   res.redirect(301, '/videorama');
 });
 
 // Lifetime Pass landing page
 app.get('/lifetime-pass', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
 });
 
@@ -404,6 +440,21 @@ app.delete('/api/audio/:filename', asyncHandler(async (req, res) => {
 // Broadcast Queue API Routes
 const broadcastQueueRoutes = require('./broadcastQueueRoutes');
 app.use('/api/admin/queue', broadcastQueueRoutes);
+
+// Health Check and Monitoring Endpoints
+// Health check endpoints should be accessible but with reasonable rate limits
+const healthLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30, // Limit each IP to 30 health checks per minute
+  message: 'Too many health check requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.get('/health', healthLimiter, asyncHandler(healthController.healthCheck));
+app.get('/api/health', healthLimiter, asyncHandler(healthController.healthCheck));
+app.get('/api/metrics', healthLimiter, asyncHandler(healthController.performanceMetrics));
+app.post('/api/metrics/reset', healthLimiter, asyncHandler(healthController.resetMetrics));
 
 // Export app WITHOUT 404/error handlers
 // These will be added in bot.js AFTER the webhook callback

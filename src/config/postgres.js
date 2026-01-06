@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
 const logger = require('../utils/logger');
+const performanceMonitor = require('../utils/performanceMonitor');
 
 let pool = null;
 
@@ -38,8 +39,18 @@ const initializePostgres = () => {
       password,
       ssl: sslConfig,
       max: process.env.POSTGRES_POOL_MAX ? parseInt(process.env.POSTGRES_POOL_MAX) : 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
+      min: process.env.POSTGRES_POOL_MIN ? parseInt(process.env.POSTGRES_POOL_MIN) : 4,
+      idleTimeoutMillis: process.env.POSTGRES_IDLE_TIMEOUT ? parseInt(process.env.POSTGRES_IDLE_TIMEOUT) : 30000,
+      connectionTimeoutMillis: process.env.POSTGRES_CONNECTION_TIMEOUT ? parseInt(process.env.POSTGRES_CONNECTION_TIMEOUT) : 10000,
+      maxUses: process.env.POSTGRES_MAX_USES ? parseInt(process.env.POSTGRES_MAX_USES) : 10000,
+      // Enable connection validation to prevent using stale connections
+      validate: process.env.POSTGRES_VALIDATE_CONNECTIONS !== 'false',
+      // Log connection events for monitoring
+      log: (message) => {
+        if (message.includes('connect') || message.includes('disconnect') || message.includes('error')) {
+          logger.debug(`PostgreSQL pool event: ${message}`);
+        }
+      }
     });
 
     pool.on('error', (err) => {
@@ -118,12 +129,89 @@ const getClient = async () => {
  * @param {Array} params - Query parameters
  * @returns {Promise<Object>} Query result
  */
-const query = async (text, params) => {
-  const start = Date.now();
-  const result = await getPool().query(text, params);
-  const duration = Date.now() - start;
-  logger.debug('Executed query', { duration, rows: result.rowCount });
-  return result;
+/**
+ * Query cache configuration
+ */
+const queryCache = {
+  enabled: process.env.POSTGRES_QUERY_CACHE_ENABLED !== 'false',
+  ttl: process.env.POSTGRES_QUERY_CACHE_TTL ? parseInt(process.env.POSTGRES_QUERY_CACHE_TTL) : 60, // 60 seconds default
+  maxSize: process.env.POSTGRES_QUERY_CACHE_MAX_SIZE ? parseInt(process.env.POSTGRES_QUERY_CACHE_MAX_SIZE) : 1000,
+  cache: new Map()
+};
+
+/**
+ * Generate cache key for query
+ */
+const generateCacheKey = (text, params) => {
+  return `${text}:${JSON.stringify(params || [])}`;
+};
+
+/**
+ * Clear query cache
+ */
+const clearQueryCache = () => {
+  queryCache.cache.clear();
+  logger.info('PostgreSQL query cache cleared');
+};
+
+const query = async (text, params, { cache = queryCache.enabled, ttl = queryCache.ttl } = {}) => {
+  performanceMonitor.start('postgres_query');
+  
+  // Check cache first if enabled
+  if (cache && queryCache.enabled) {
+    const cacheKey = generateCacheKey(text, params);
+    const cachedResult = queryCache.cache.get(cacheKey);
+    
+    if (cachedResult && cachedResult.expires > Date.now()) {
+      performanceMonitor.end('postgres_query', {
+        duration: 0,
+        rows: cachedResult.result.rowCount,
+        query: text.length > 100 ? `${text.substring(0, 100)}...` : text,
+        source: 'cache'
+      });
+      return cachedResult.result;
+    }
+  }
+  
+  try {
+    const start = Date.now();
+    const result = await getPool().query(text, params);
+    const duration = Date.now() - start;
+    
+    // Cache the result if enabled
+    if (cache && queryCache.enabled && queryCache.cache.size < queryCache.maxSize) {
+      const cacheKey = generateCacheKey(text, params);
+      queryCache.cache.set(cacheKey, {
+        result,
+        expires: Date.now() + (ttl * 1000)
+      });
+    }
+    
+    performanceMonitor.end('postgres_query', {
+      duration,
+      rows: result.rowCount,
+      query: text.length > 100 ? `${text.substring(0, 100)}...` : text,
+      source: 'database'
+    });
+    
+    if (duration > 100) { // Log slow queries
+      logger.warn('Slow query detected', {
+        duration,
+        rows: result.rowCount,
+        query: text.length > 200 ? `${text.substring(0, 200)}...` : text,
+        params: params ? params.length : 0
+      });
+    }
+    
+    return result;
+  } catch (error) {
+    performanceMonitor.end('postgres_query', { error: error.message });
+    logger.error('Query failed', {
+      error: error.message,
+      query: text.length > 200 ? `${text.substring(0, 200)}...` : text
+    });
+    throw error;
+  }
 };
 
 module.exports = {
@@ -133,4 +221,11 @@ module.exports = {
   testConnection,
   closePool,
   query,
+  clearQueryCache,
+  getQueryCacheStats: () => ({
+    size: queryCache.cache.size,
+    enabled: queryCache.enabled,
+    ttl: queryCache.ttl,
+    maxSize: queryCache.maxSize
+  })
 };

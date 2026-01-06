@@ -18,6 +18,8 @@ const OPTIMISM_CHAIN_ID = 10;
 const SUPPORTED_PAYMENT_APPS = [
   'AllWallets',
   'AllExchanges',
+  // Enables payment apps like Cash App, Venmo, Zelle, Wise, Revolut (as supported by Daimo)
+  'AllPaymentApps',
   'AllAddresses',
 ];
 

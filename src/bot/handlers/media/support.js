@@ -129,6 +129,22 @@ async function initializeAgent() {
  * @param {Telegraf} bot - Bot instance
  */
 const registerSupportHandlers = (bot) => {
+  // Broadcast CTA: Cristina AI button (opens instructions)
+  bot.action('broadcast_cristina_ai', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const lang = getLanguage(ctx);
+      await ctx.reply(
+        lang === 'es'
+          ? '🤖 *Cristina AI*\n\nPara hablar conmigo en el grupo, escribe: `Ey Cristina ...`'
+          : '🤖 *Cristina AI*\n\nTo talk to me in the group, type: `Ey Cristina ...`',
+        { parse_mode: 'Markdown' },
+      );
+    } catch (error) {
+      logger.error('Error in broadcast_cristina_ai:', error);
+    }
+  });
+
   // Show support menu
   bot.action('show_support', async (ctx) => {
     try {

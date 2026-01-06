@@ -164,7 +164,7 @@ class AdminService {
   async getDashboardStats() {
     try {
       const [userStats, broadcasts] = await Promise.all([
-        userService.getUserStats(),
+        userService.getStatistics(),
         this.getBroadcastHistory(10),
       ]);
 

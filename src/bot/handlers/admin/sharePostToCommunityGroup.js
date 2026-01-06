@@ -7,14 +7,79 @@ const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
 const communityPostService = require('../../services/communityPostService');
 const PermissionService = require('../../services/permissionService');
-const s3Service = require('../../../utils/s3Service');
 const { getLanguage } = require('../../utils/helpers');
+const GrokService = require('../../services/grokService');
+
+function getSharePostButtonOptions() {
+  const botUsername = process.env.BOT_USERNAME || 'PNPtv_bot';
+  const mainRoomUrl = 'https://meet.jit.si/pnptv-main-room#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false';
+  const hangoutsUrl = process.env.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts';
+  const videoramaUrl = process.env.VIDEORAMA_URL || 'https://pnptv.app/videorama';
+
+  return [
+    { key: 'home', text: '🏠 Back to home menu', type: 'url', target: `https://t.me/${botUsername}?start=1` },
+    { key: 'plans', text: '💎 Membership Plans', type: 'callback', data: 'show_subscription_plans' },
+    { key: 'main_room', text: '🎥 PNPtv Main Room', type: 'url', target: mainRoomUrl },
+    { key: 'hangouts', text: '🎭 PNPtv Hangouts', type: 'url', target: hangoutsUrl },
+    { key: 'videorama', text: '🎬 PNPtv Videorama', type: 'url', target: videoramaUrl },
+    { key: 'nearby', text: '📍 Who is Nearby?', type: 'callback', data: 'menu_nearby' },
+    { key: 'profile', text: '👤 My Profile', type: 'callback', data: 'show_profile' },
+    { key: 'cristina', text: '🤖 Cristina AI', type: 'callback', data: 'broadcast_cristina_ai' },
+  ];
+}
+
+function normalizeButtons(buttons) {
+  if (!buttons) return [];
+  if (Array.isArray(buttons)) return buttons;
+  if (typeof buttons === 'string' && buttons.trim()) {
+    try {
+      const parsed = JSON.parse(buttons);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+  return [];
+}
+
+function buildInlineKeyboard(buttons) {
+  const normalized = normalizeButtons(buttons);
+  if (!normalized.length) return undefined;
+  const rows = normalized.map((raw) => {
+    const b = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (b.type === 'url') return [Markup.button.url(b.text, b.target)];
+    if (b.type === 'callback') return [Markup.button.callback(b.text, b.data)];
+    return null;
+  }).filter(Boolean);
+  return rows.length ? Markup.inlineKeyboard(rows) : undefined;
+}
+
+function buildPostCaption(postData) {
+  const text = postData.text || '';
+  return text ? `📢 ${text}` : '';
+}
 
 /**
  * Register community post handlers
  * @param {Telegraf} bot - Bot instance
  */
 const registerCommunityPostHandlers = (bot) => {
+  bot.action('share_post_ai_text', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp.communityPostStep = 'ai_prompt';
+      await ctx.saveSession();
+      await ctx.reply(
+        '🤖 *AI Write (Grok)*\n\nDescribe el post que quieres publicar.\nEjemplo:\n`Anuncia un evento hoy, tono sexy, incluye CTA a membership`',
+        { parse_mode: 'Markdown' },
+      );
+    } catch (error) {
+      logger.error('Error in share_post_ai_text:', error);
+    }
+  });
+
   // ═══════════════════════════════════════════════════════════════════════════
   // STEP 1: Main entry point - Show community groups
   // ═══════════════════════════════════════════════════════════════════════════
@@ -34,14 +99,13 @@ const registerCommunityPostHandlers = (bot) => {
         targetGroups: [],
         targetPrimeChannel: false, // NEW: Prime channel support
         postDestinations: [], // NEW: Multiple destinations
+        sourceChatId: null,
+        sourceMessageId: null,
         mediaType: null,
         mediaFileId: null,
-        s3Key: null,
-        s3Url: null,
-        fileSizeMB: 0, // NEW: Track file size for large videos
-        textEn: '',
-        textEs: '',
-        buttons: [],
+        fileSizeMB: 0, // Track size (info only)
+        text: '',
+        buttons: [getSharePostButtonOptions()[0]], // default: home button only
         templateType: 'standard',
         buttonLayout: 'single_row',
         isRecurring: false,
@@ -438,9 +502,9 @@ const registerCommunityPostHandlers = (bot) => {
         return;
       }
 
-      const targetGroups = ctx.session.temp?.communityPostData?.targetGroups || [];
-      if (targetGroups.length === 0) {
-        await ctx.answerCbQuery('❌ Debes seleccionar al menos un grupo');
+      const postDestinations = ctx.session.temp?.communityPostData?.postDestinations || [];
+      if (postDestinations.length === 0) {
+        await ctx.answerCbQuery('❌ Debes seleccionar al menos un destino');
         return;
       }
 
@@ -457,7 +521,7 @@ const registerCommunityPostHandlers = (bot) => {
         + '• 📷 Envía una foto (JPEG, PNG)\n'
         + '• 🎥 Envía un video (MP4, MOV)\n'
         + '• ➡️ Click "Sin Media" para continuar sin imagen/video\n\n'
-        + '⚠️ *Tamaño máximo:* 50 MB',
+        + '✅ *Videos grandes:* Se publican usando Telegram (sin re-subir) para soportar archivos muy grandes.',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -499,31 +563,24 @@ const registerCommunityPostHandlers = (bot) => {
   // ═══════════════════════════════════════════════════════════════════════════
   // Media upload middleware (handle photo/video from user)
   // ═══════════════════════════════════════════════════════════════════════════
-  bot.on('photo', async (ctx) => {
+  bot.on('photo', async (ctx, next) => {
     try {
-      if (!ctx.session.temp?.waitingForMedia) return;
+      if (!ctx.session.temp?.waitingForMedia) return next();
 
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      await ctx.reply('📤 Uploading photo to S3...');
+      if (!isAdmin) return next();
 
       const photo = ctx.message.photo[ctx.message.photo.length - 1];
-      const fileLink = await ctx.telegram.getFileLink(photo.file_id);
 
-      // Upload to S3
-      const s3Result = await s3Service.uploadFromUrl(fileLink.href, 'community-posts');
-
+      ctx.session.temp.communityPostData.sourceChatId = ctx.chat.id;
+      ctx.session.temp.communityPostData.sourceMessageId = ctx.message.message_id;
       ctx.session.temp.communityPostData.mediaType = 'photo';
       ctx.session.temp.communityPostData.mediaFileId = photo.file_id;
-      ctx.session.temp.communityPostData.s3Key = s3Result.key;
-      ctx.session.temp.communityPostData.s3Url = s3Result.url;
-      ctx.session.temp.communityPostData.s3Bucket = s3Result.bucket;
       ctx.session.temp.communityPostStep = 'write_text';
       ctx.session.temp.waitingForMedia = false;
       await ctx.saveSession();
 
-      await ctx.reply('✅ Foto cargada exitosamente');
+      await ctx.reply('✅ Foto guardada');
       await showTextInputStep(ctx);
     } catch (error) {
       logger.error('Error handling photo upload:', error);
@@ -531,31 +588,26 @@ const registerCommunityPostHandlers = (bot) => {
     }
   });
 
-  bot.on('video', async (ctx) => {
+  bot.on('video', async (ctx, next) => {
     try {
-      if (!ctx.session.temp?.waitingForMedia) return;
+      if (!ctx.session.temp?.waitingForMedia) return next();
 
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      await ctx.reply('📤 Uploading video to S3...');
+      if (!isAdmin) return next();
 
       const video = ctx.message.video;
-      const fileLink = await ctx.telegram.getFileLink(video.file_id);
 
-      // Upload to S3
-      const s3Result = await s3Service.uploadFromUrl(fileLink.href, 'community-posts');
-
+      const fileSizeMB = video.file_size ? Math.round((video.file_size / (1024 * 1024)) * 10) / 10 : 0;
+      ctx.session.temp.communityPostData.sourceChatId = ctx.chat.id;
+      ctx.session.temp.communityPostData.sourceMessageId = ctx.message.message_id;
       ctx.session.temp.communityPostData.mediaType = 'video';
       ctx.session.temp.communityPostData.mediaFileId = video.file_id;
-      ctx.session.temp.communityPostData.s3Key = s3Result.key;
-      ctx.session.temp.communityPostData.s3Url = s3Result.url;
-      ctx.session.temp.communityPostData.s3Bucket = s3Result.bucket;
+      ctx.session.temp.communityPostData.fileSizeMB = fileSizeMB;
       ctx.session.temp.communityPostStep = 'write_text';
       ctx.session.temp.waitingForMedia = false;
       await ctx.saveSession();
 
-      await ctx.reply('✅ Video cargado exitosamente');
+      await ctx.reply(`✅ Video guardado${fileSizeMB ? ` (${fileSizeMB} MB)` : ''}`);
       await showTextInputStep(ctx);
     } catch (error) {
       logger.error('Error handling video upload:', error);
@@ -574,21 +626,18 @@ const registerCommunityPostHandlers = (bot) => {
       '📤 *Compartir Publicación en Comunidad*\n\n'
       + '*Paso 3/9: Escribir Texto*\n\n'
       + '✍️ Envía el texto de tu publicación.\n\n'
-      + '💡 *Instrucciones:*\n'
-      + '• Escribe tu mensaje en Inglés\n'
-      + '• Luego enviarás la versión en Español\n'
-      + '• Usa *negrita* para destacar\n'
-      + '• Usa _cursiva_ para énfasis\n\n'
-      + '📝 *Máximo:* 1024 caracteres',
+      + '💡 *Tip:* Puedes usar *negrita* y _cursiva_.\n\n'
+      + '📝 *Límites:* 1024 si hay media / 4096 si es solo texto',
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
+          [Markup.button.callback('🤖 AI Write (Grok)', 'share_post_ai_text')],
           [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
         ]),
       }
     );
 
-    ctx.session.temp.waitingForText = 'en';
+    ctx.session.temp.waitingForText = true;
     await ctx.saveSession();
   }
 
@@ -602,35 +651,65 @@ const registerCommunityPostHandlers = (bot) => {
       const step = ctx.session.temp.communityPostStep;
       const text = ctx.message.text;
 
+      if (step === 'ai_prompt') {
+        const prompt = (text || '').trim();
+        if (!prompt) return;
+        try {
+          const hasMedia = !!ctx.session.temp.communityPostData.mediaFileId;
+          const maxTokens = hasMedia ? 260 : 380;
+          const result = await GrokService.chat({
+            mode: 'post',
+            language: 'Spanish',
+            prompt,
+            maxTokens,
+          });
+          ctx.session.temp.communityPostData.text = result;
+          ctx.session.temp.communityPostStep = 'select_buttons';
+          await ctx.saveSession();
+          await ctx.reply(`✅ *AI draft saved*\n\n${result}`, { parse_mode: 'Markdown' });
+          await showButtonSelectionStep(ctx);
+        } catch (e) {
+          await ctx.reply(`❌ AI error: ${e.message}`);
+        }
+        return;
+      }
+
+      if (step === 'custom_link') {
+        const parts = (text || '').split('|').map(s => s.trim()).filter(Boolean);
+        if (parts.length !== 2) {
+          await ctx.reply('❌ Formato inválido. Usa: `Texto|https://link.com`', { parse_mode: 'Markdown' });
+          return;
+        }
+        const [label, url] = parts;
+        if (!/^https?:\/\//i.test(url)) {
+          await ctx.reply('❌ El link debe comenzar con http:// o https://', { parse_mode: 'Markdown' });
+          return;
+        }
+        const buttons = normalizeButtons(ctx.session.temp.communityPostData.buttons);
+        buttons.push({ key: 'custom', text: label, type: 'url', target: url });
+        ctx.session.temp.communityPostData.buttons = buttons;
+        ctx.session.temp.communityPostStep = 'select_buttons';
+        await ctx.saveSession();
+        await ctx.reply('✅ Custom link agregado');
+        await showButtonSelectionStep(ctx);
+        return;
+      }
+
       // Text input during write_text step
       if (step === 'write_text') {
-        if (ctx.session.temp.waitingForText === 'en') {
-          if (text.length > 1024) {
-            await ctx.reply('❌ El texto es demasiado largo (máximo 1024 caracteres)');
-            return;
-          }
-
-          ctx.session.temp.communityPostData.textEn = text;
-          ctx.session.temp.waitingForText = 'es';
-          await ctx.saveSession();
-
-          await ctx.reply(
-            '✅ Texto en Inglés guardado.\n\n'
-            + 'Ahora envía la versión en Español:'
-          );
-        } else if (ctx.session.temp.waitingForText === 'es') {
-          if (text.length > 1024) {
-            await ctx.reply('❌ El texto es demasiado largo (máximo 1024 caracteres)');
-            return;
-          }
-
-          ctx.session.temp.communityPostData.textEs = text;
-          ctx.session.temp.communityPostStep = 'select_buttons';
-          ctx.session.temp.waitingForText = null;
-          await ctx.saveSession();
-
-          await showButtonSelectionStep(ctx);
+        const hasMedia = !!ctx.session.temp.communityPostData.mediaFileId;
+        const maxLen = hasMedia ? 1024 : 4096;
+        if (text.length > maxLen) {
+          await ctx.reply(`❌ El texto es demasiado largo (máximo ${maxLen} caracteres)`);
+          return;
         }
+
+        ctx.session.temp.communityPostData.text = text;
+        ctx.session.temp.communityPostStep = 'select_buttons';
+        ctx.session.temp.waitingForText = false;
+        await ctx.saveSession();
+
+        await showButtonSelectionStep(ctx);
       }
       return;
     } catch (error) {
@@ -645,33 +724,22 @@ const registerCommunityPostHandlers = (bot) => {
   // ═══════════════════════════════════════════════════════════════════════════
   async function showButtonSelectionStep(ctx) {
     try {
-      const presets = await communityPostService.getButtonPresets();
-      const buttons = [];
+      const options = getSharePostButtonOptions();
+      const selected = new Set((normalizeButtons(ctx.session.temp.communityPostData.buttons) || []).map((b) => (typeof b === 'string' ? JSON.parse(b).key : b.key)));
 
-      for (const preset of presets) {
-        buttons.push([
-          Markup.button.callback(
-            `${preset.icon_emoji} ${preset.button_label}`,
-            `share_post_add_button_${preset.button_type}`
-          ),
-        ]);
-      }
+      const buttons = options.map((opt) => {
+        const on = selected.has(opt.key);
+        return [Markup.button.callback(`${on ? '✅' : '➕'} ${opt.text}`, `share_post_toggle_${opt.key}`)];
+      });
 
-      buttons.push([Markup.button.callback('➡️ Continuar', 'share_post_continue_to_template')]);
+      buttons.push([Markup.button.callback('➕ Custom Link', 'share_post_add_custom_link')]);
+      buttons.push([Markup.button.callback('👀 Preview', 'share_post_preview')]);
       buttons.push([Markup.button.callback('❌ Cancelar', 'admin_cancel')]);
 
       await ctx.editMessageText(
         '📤 *Compartir Publicación en Comunidad*\n\n'
         + '*Paso 4/9: Seleccionar Botones*\n\n'
-        + '🔗 Añade botones interactivos a tu publicación:\n\n'
-        + '📍 Nearby\n'
-        + '👤 Profile\n'
-        + '🎯 Main Room\n'
-        + '🎉 Hangouts\n'
-        + '🤖 Cristina AI\n'
-        + '🎬 Videorama\n'
-        + '🔗 Custom Link\n\n'
-        + '💡 Tip: Puedes seleccionar múltiples botones',
+        + '🔗 Selecciona 1 o varios botones (o deja solo el default):',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard(buttons),
@@ -686,53 +754,111 @@ const registerCommunityPostHandlers = (bot) => {
     }
   }
 
-  bot.action(/^share_post_add_button_(.+)$/, async (ctx) => {
+  bot.action(/^share_post_toggle_(.+)$/, async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) {
-        await ctx.answerCbQuery('❌ No autorizado');
-        return;
-      }
+      if (!isAdmin) return;
+      const key = ctx.match?.[1];
+      if (!key) return;
 
-      const buttonType = ctx.match[1];
-      const preset = (await communityPostService.getButtonPresets()).find(
-        (p) => p.button_type === buttonType
-      );
-
-      if (!preset) {
+      const options = getSharePostButtonOptions();
+      const opt = options.find((o) => o.key === key);
+      if (!opt) {
         await ctx.answerCbQuery('❌ Botón no encontrado');
         return;
       }
 
-      const buttons = ctx.session.temp.communityPostData.buttons || [];
-      const exists = buttons.some((b) => b.buttonType === buttonType);
-
-      if (exists) {
-        // Remove button
-        ctx.session.temp.communityPostData.buttons = buttons.filter(
-          (b) => b.buttonType !== buttonType
-        );
-        await ctx.answerCbQuery('❌ Botón removido');
+      const current = normalizeButtons(ctx.session.temp.communityPostData.buttons);
+      const idx = current.findIndex((b) => (typeof b === 'string' ? JSON.parse(b).key : b.key) === key);
+      if (idx >= 0) {
+        current.splice(idx, 1);
+        await ctx.answerCbQuery('Removed');
       } else {
-        // Add button
-        buttons.push({
-          buttonType: preset.button_type,
-          label: preset.button_label,
-          defaultLabel: preset.default_label,
-          icon: preset.icon_emoji,
-          targetUrl: preset.target_url,
-          allowCustomUrl: preset.allow_custom_url,
-        });
-        ctx.session.temp.communityPostData.buttons = buttons;
-        await ctx.answerCbQuery('✅ Botón añadido');
+        current.push(opt);
+        await ctx.answerCbQuery('Added');
       }
-
+      ctx.session.temp.communityPostData.buttons = current;
       await ctx.saveSession();
-
-      // Refresh UI
       await showButtonSelectionStep(ctx);
     } catch (error) {
-      logger.error('Error adding button:', error);
+      logger.error('Error toggling share post button:', error);
+    }
+  });
+
+  bot.action('share_post_add_custom_link', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp.communityPostStep = 'custom_link';
+      await ctx.saveSession();
+      await ctx.answerCbQuery();
+      await ctx.editMessageText(
+        '🔗 *Custom Link*\n\nEnvía: `Texto|https://link.com`',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('⬅️ Back', 'share_post_back_to_buttons')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error starting custom link for share post:', error);
+    }
+  });
+
+  bot.action('share_post_back_to_buttons', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp.communityPostStep = 'select_buttons';
+      await ctx.saveSession();
+      await showButtonSelectionStep(ctx);
+    } catch (error) {
+      logger.error('Error in share_post_back_to_buttons:', error);
+    }
+  });
+
+  // Preview + send now (broadcast-like flow)
+  bot.action('share_post_preview', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery();
+
+      const postData = ctx.session.temp.communityPostData;
+      const caption = buildPostCaption(postData);
+      const kb = buildInlineKeyboard(postData.buttons);
+
+      // Render a preview message (copy media to admin chat if present to support very large videos)
+      if (postData.sourceChatId && postData.sourceMessageId) {
+        try {
+          await ctx.telegram.copyMessage(ctx.chat.id, postData.sourceChatId, postData.sourceMessageId, {
+            caption,
+            parse_mode: 'Markdown',
+            ...(kb ? { reply_markup: kb.reply_markup } : {}),
+          });
+        } catch (e) {
+          logger.warn('Preview copyMessage failed (continuing):', e.message);
+        }
+      } else if (caption) {
+        await ctx.reply(caption, { parse_mode: 'Markdown', ...(kb ? { reply_markup: kb.reply_markup } : {}) });
+      }
+
+      await ctx.reply(
+        '👀 *Preview*\n\n¿Enviar ahora a los destinos seleccionados?',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('✅ Send Now', 'share_post_confirm_and_send')],
+            [Markup.button.callback('🔘 Edit Buttons', 'share_post_back_to_buttons')],
+            [Markup.button.callback('❌ Cancel', 'admin_cancel')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error in share_post_preview:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
@@ -1023,40 +1149,19 @@ const registerCommunityPostHandlers = (bot) => {
       let previewText = '📤 *Compartir Publicación en Comunidad*\n\n'
         + '*Paso 9/9: Vista Previa*\n\n'
         + '━━━━━━━━━━━━━━━━━\n'
-        + '*VISTA PREVIA (EN):*\n'
+        + '*VISTA PREVIA:*\n'
         + '━━━━━━━━━━━━━━━━━\n\n';
 
       if (postData.mediaType) {
-        previewText += `[${postData.mediaType.toUpperCase()}]\n\n`;
+        previewText += `[${String(postData.mediaType).toUpperCase()}]\n\n`;
       }
 
-      previewText += communityPostService.formatMessage(
-        postData.templateType,
-        postData.textEn,
-        postData.title
-      );
-
-      previewText += '\n━━━━━━━━━━━━━━━━━\n'
-        + '*VISTA PREVIA (ES):*\n'
-        + '━━━━━━━━━━━━━━━━━\n\n';
-
-      if (postData.mediaType) {
-        previewText += `[${postData.mediaType.toUpperCase()}]\n\n`;
-      }
-
-      previewText += communityPostService.formatMessage(
-        postData.templateType,
-        postData.textEs,
-        postData.title
-      );
+      previewText += postData.text ? `📢 ${postData.text}\n\n` : '';
 
       previewText += '\n━━━━━━━━━━━━━━━━━\n'
         + '*CONFIGURACIÓN:*\n'
         + '━━━━━━━━━━━━━━━━━\n'
-        + `Grupos: ${postData.targetGroups.length}\n`
-        + `Plantilla: ${postData.templateType}\n`
-        + `Recurrente: ${postData.isRecurring ? 'Sí (' + postData.recurrencePattern + ')' : 'No'}\n`
-        + `Programaciones: ${postData.scheduledCount}\n`
+        + `Destinos: ${(postData.postDestinations || []).length}\n`
         + `Botones: ${postData.buttons.length}\n`;
 
       await ctx.editMessageText(previewText, {
@@ -1089,64 +1194,53 @@ const registerCommunityPostHandlers = (bot) => {
       const postData = ctx.session.temp.communityPostData;
 
       // Validate all required fields
-      if (!postData.targetGroups.length) {
-        await ctx.answerCbQuery('❌ Debes seleccionar al menos un grupo');
+      if (!postData.postDestinations?.length) {
+        await ctx.answerCbQuery('❌ Debes seleccionar al menos un destino');
         return;
       }
 
-      if (!postData.textEn || !postData.textEs) {
-        await ctx.answerCbQuery('❌ Debes proporcionar texto en ambos idiomas');
+      if (!postData.text) {
+        await ctx.answerCbQuery('❌ Debes escribir el texto');
         return;
       }
 
-      await ctx.answerCbQuery('⏳ Guardando publicación...');
+      await ctx.answerCbQuery('⏳ Enviando...');
 
-      // Create community post
-      const createdPost = await communityPostService.createCommunityPost({
-        adminId: ctx.from.id,
-        adminUsername: ctx.from.username,
-        title: postData.title,
-        messageEn: postData.textEn,
-        messageEs: postData.textEs,
-        mediaType: postData.mediaType,
-        mediaUrl: postData.s3Url,
-        s3Key: postData.s3Key,
-        s3Bucket: postData.s3Bucket,
-        telegramFileId: postData.mediaFileId,
-        targetGroupIds: postData.targetGroups,
-        templateType: postData.templateType,
-        buttonLayout: postData.buttonLayout,
-        isRecurring: postData.isRecurring,
-        recurrencePattern: postData.recurrencePattern,
-        status: 'scheduled',
-        scheduledCount: postData.scheduledCount,
-      });
+      const caption = buildPostCaption(postData);
+      const kb = buildInlineKeyboard(postData.buttons);
 
-      // Add buttons if any
-      if (postData.buttons.length > 0) {
-        await communityPostService.addButtonsToPost(createdPost.post_id, postData.buttons);
-      }
+      let sent = 0;
+      let failed = 0;
 
-      // Schedule post(s)
-      const schedules = await communityPostService.schedulePost(
-        createdPost.post_id,
-        postData.scheduledTimes,
-        {
-          timezone: 'UTC',
-          isRecurring: postData.isRecurring,
-          recurrencePattern: postData.recurrencePattern,
+      for (const destId of postData.postDestinations) {
+        try {
+          if (postData.sourceChatId && postData.sourceMessageId) {
+            await ctx.telegram.copyMessage(destId, postData.sourceChatId, postData.sourceMessageId, {
+              caption,
+              parse_mode: 'Markdown',
+              ...(kb ? { reply_markup: kb.reply_markup } : {}),
+            });
+          } else {
+            await ctx.telegram.sendMessage(destId, caption, {
+              parse_mode: 'Markdown',
+              ...(kb ? { reply_markup: kb.reply_markup } : {}),
+            });
+          }
+          sent += 1;
+        } catch (e) {
+          failed += 1;
+          logger.error('Failed to send shared post', { destId, error: e.message });
         }
-      );
+      }
 
       // Clear session
       ctx.session.temp = {};
       await ctx.saveSession();
 
-      const message = `✅ *Publicación Guardada*\n\n`
-        + `📦 Post ID: \`${createdPost.post_id}\`\n`
-        + `📊 Grupos: ${postData.targetGroups.length}\n`
-        + `🗓️ Programaciones: ${schedules.length}\n\n`
-        + `La publicación será enviada según la programación configurada.`;
+      const message = `✅ *Publicación Enviada*\n\n`
+        + `📊 Destinos: ${postData.postDestinations.length}\n`
+        + `✓ Enviados: ${sent}\n`
+        + `✗ Fallidos: ${failed}`;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -1156,15 +1250,15 @@ const registerCommunityPostHandlers = (bot) => {
         ]),
       });
 
-      logger.info('Community post created and scheduled', {
-        postId: createdPost.post_id,
+      logger.info('Community post sent now', {
         adminId: ctx.from.id,
-        groups: postData.targetGroups.length,
-        schedules: schedules.length,
+        destinations: postData.postDestinations.length,
+        sent,
+        failed,
       });
     } catch (error) {
       logger.error('Error confirming and sending post:', error);
-      await ctx.answerCbQuery('❌ Error al guardar publicación').catch(() => {});
+      await ctx.answerCbQuery('❌ Error al enviar publicación').catch(() => {});
       await ctx.reply(`❌ Error: ${error.message}`).catch(() => {});
     }
   });

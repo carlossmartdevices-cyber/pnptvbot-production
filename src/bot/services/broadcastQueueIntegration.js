@@ -13,6 +13,10 @@ class BroadcastQueueIntegration {
     this.queue = getAsyncBroadcastQueue();
     this.broadcastService = getEnhancedBroadcastService();
     this.initialized = false;
+    this.retryIntervalId = null;
+    this.cleanupIntervalId = null;
+    this.cleanupTimeoutId = null;
+    this.schedulersStarted = false;
   }
 
   /**
@@ -69,13 +73,11 @@ class BroadcastQueueIntegration {
         throw new Error('Broadcast Queue Integration not initialized');
       }
 
-      await this.queue.start(concurrency);
+      if (!this.queue.isProcessorRunning()) {
+        await this.queue.start(concurrency);
+      }
 
-      // Start periodic retry processing
-      this.setupRetryScheduler();
-
-      // Start periodic cleanup
-      this.setupCleanupScheduler();
+      this.startSchedulers();
 
       logger.info(`Broadcast Queue Integration started (concurrency: ${concurrency})`);
     } catch (error) {
@@ -91,6 +93,7 @@ class BroadcastQueueIntegration {
   async stop() {
     try {
       await this.queue.stop();
+      this.stopSchedulers();
       logger.info('Broadcast Queue Integration stopped');
     } catch (error) {
       logger.error('Error stopping Broadcast Queue Integration:', error);
@@ -306,9 +309,33 @@ class BroadcastQueueIntegration {
    * Setup periodic retry processing
    * @private
    */
+  startSchedulers() {
+    if (this.schedulersStarted) return;
+    this.setupRetryScheduler();
+    this.setupCleanupScheduler();
+    this.schedulersStarted = true;
+  }
+
+  stopSchedulers() {
+    if (this.retryIntervalId) {
+      clearInterval(this.retryIntervalId);
+      this.retryIntervalId = null;
+    }
+    if (this.cleanupIntervalId) {
+      clearInterval(this.cleanupIntervalId);
+      this.cleanupIntervalId = null;
+    }
+    if (this.cleanupTimeoutId) {
+      clearTimeout(this.cleanupTimeoutId);
+      this.cleanupTimeoutId = null;
+    }
+    this.schedulersStarted = false;
+  }
+
   setupRetryScheduler() {
     // Process retries every 5 minutes
-    setInterval(async () => {
+    if (this.retryIntervalId) return;
+    this.retryIntervalId = setInterval(async () => {
       try {
         await this.queue.addJob(
           'retries',
@@ -329,6 +356,7 @@ class BroadcastQueueIntegration {
    * @private
    */
   setupCleanupScheduler() {
+    if (this.cleanupTimeoutId || this.cleanupIntervalId) return;
     // Cleanup old jobs daily at 2 AM
     const now = new Date();
     const target = new Date();
@@ -340,7 +368,7 @@ class BroadcastQueueIntegration {
 
     const delay = target - now;
 
-    setTimeout(() => {
+    this.cleanupTimeoutId = setTimeout(() => {
       this.queue.addJob(
         'cleanup',
         'cleanup_queue',
@@ -349,7 +377,7 @@ class BroadcastQueueIntegration {
       );
 
       // Then repeat daily
-      setInterval(async () => {
+      this.cleanupIntervalId = setInterval(async () => {
         try {
           await this.queue.addJob(
             'cleanup',

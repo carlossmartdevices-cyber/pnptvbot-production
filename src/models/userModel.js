@@ -1,6 +1,7 @@
 const { query } = require('../config/postgres');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
+const performanceMonitor = require('../utils/performanceMonitor');
 
 const TABLE = 'users';
 
@@ -151,6 +152,7 @@ class UserModel {
    */
   static async getById(userId) {
     try {
+      performanceMonitor.start('user_getById');
       const cacheKey = `user:${userId}`;
 
       if (cache.getOrSet && typeof cache.getOrSet === 'function') {
@@ -165,17 +167,24 @@ class UserModel {
           },
           600,
         );
-        if (maybeCached !== undefined) return maybeCached;
+        if (maybeCached !== undefined) {
+          performanceMonitor.end('user_getById', { source: 'cache_getOrSet', userId });
+          return maybeCached;
+        }
       }
 
       const cached = await cache.get(cacheKey);
-      if (cached) return cached;
+      if (cached) {
+        performanceMonitor.end('user_getById', { source: 'cache', userId });
+        return cached;
+      }
 
       const result = await query(`SELECT * FROM ${TABLE} WHERE id = $1`, [userId.toString()]);
       if (result.rows.length === 0) return null;
 
       const userData = this.mapRowToUser(result.rows[0]);
       if (cache.set) await cache.set(cacheKey, userData, 600);
+      performanceMonitor.end('user_getById', { source: 'database', userId });
       return userData;
     } catch (error) {
       logger.error('Error getting user:', error);

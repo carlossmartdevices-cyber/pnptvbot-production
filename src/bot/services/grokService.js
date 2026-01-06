@@ -1,0 +1,74 @@
+const logger = require('../../utils/logger');
+
+function getGrokConfig() {
+  return {
+    apiKey: process.env.GROK_API_KEY,
+    model: process.env.GROK_MODEL || 'grok-2-latest',
+    baseUrl: process.env.GROK_BASE_URL || 'https://api.x.ai/v1',
+    timeoutMs: Number(process.env.GROK_TIMEOUT_MS || 45000),
+  };
+}
+
+function buildSystemPrompt({ mode, language }) {
+  const langHint = language ? `Language: ${language}` : '';
+  const pnptvContext = `PNPtv context:
+- Telegram-based 18+ community (consent-first, privacy-first, respectful, sex-positive).
+- Culture: warm, playful, flirty, bilingual EN/ES vibe; no hate, no harassment, no coercion, no doxxing, no underage content.
+- Avoid explicit pornography descriptions; keep it tasteful and within Telegram-friendly marketing language.
+- Common CTAs/features: PRIME Membership Plans, Who is Nearby, My Profile, PNPtv Main Room (Jitsi), PNPtv Hangouts, PNPtv Videorama, Cristina AI support.
+- If you mention actions, phrase them as simple bot CTAs (e.g., “Tap Membership Plans”, “Open Videorama”, “Use /start”).`;
+
+  if (mode === 'broadcast') {
+    return `You write concise, high-converting Telegram broadcast copy for the PNPtv community.\n${langHint}\n${pnptvContext}\nOutput rules:\n- Return ONLY the final message text.\n- No quotes, no markdown headings.\n- Keep within Telegram limits (prefer <= 900 chars if media caption).\n- End with a clear CTA.`;
+  }
+  return `You write concise Telegram post copy for the PNPtv community.\n${langHint}\n${pnptvContext}\nOutput rules:\n- Return ONLY the final message text.\n- No quotes, no markdown headings.\n- Keep within Telegram limits (prefer <= 900 chars if media caption).\n- End with a clear CTA.`;
+}
+
+async function chat({ mode, language, prompt, maxTokens = 300 }) {
+  const cfg = getGrokConfig();
+  if (!cfg.apiKey) {
+    throw new Error('GROK_API_KEY not configured');
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), cfg.timeoutMs);
+
+  try {
+    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cfg.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: cfg.model,
+        temperature: 0.7,
+        max_tokens: maxTokens,
+        messages: [
+          { role: 'system', content: buildSystemPrompt({ mode, language }) },
+          { role: 'user', content: prompt },
+        ],
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new Error(`Grok API error ${res.status}: ${txt || res.statusText}`);
+    }
+
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content;
+    if (!content) throw new Error('Grok returned empty response');
+    return String(content).trim();
+  } catch (error) {
+    logger.error('Grok chat failed', { error: error.message });
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+module.exports = {
+  chat,
+};

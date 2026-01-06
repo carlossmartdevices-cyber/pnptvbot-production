@@ -209,11 +209,35 @@ const registerPaymentHandlers = (bot) => {
           planDesc = plan.description || '';
       }
 
+      // Normalize plan feature list for display (DB may store JSON or array)
+      let features = [];
+      try {
+        if (Array.isArray(plan.features)) {
+          features = plan.features;
+        } else if (typeof plan.features === 'string' && plan.features.trim()) {
+          const parsed = JSON.parse(plan.features);
+          features = Array.isArray(parsed) ? parsed : [];
+        }
+      } catch (_) {
+        features = [];
+      }
+
       const planName = plan.display_name || plan.name;
       const price = parseFloat(plan.price);
+      const durationDays = plan.duration_days || plan.duration;
       let planHeader = `${t('planDetails', lang)}\n`;
-      planHeader += `*${planName}* | $${price.toFixed(2)}\n\n`;
+      planHeader += `*${planName}* | $${price.toFixed(2)}\n`;
+      if (!plan.is_lifetime && durationDays) {
+        planHeader += `${t('duration', lang)}: *${durationDays} ${t('days', lang)}*\n`;
+      }
+      planHeader += '\n';
       planHeader += `${planDesc}\n\n`;
+      if (features.length) {
+        const shown = features.slice(0, 8);
+        planHeader += `${t('features', lang)}\n`;
+        planHeader += shown.map((f) => `• ${String(f)}`).join('\n');
+        planHeader += '\n\n';
+      }
       planHeader += `${t('paymentMethod', lang)}`;
       planHeader += `${t('paymentFooter', lang)}`;
 
