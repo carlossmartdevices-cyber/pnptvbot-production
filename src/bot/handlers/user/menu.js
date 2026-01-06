@@ -55,10 +55,13 @@ module.exports.sendPrimeWelcome = sendPrimeWelcome;
 const registerMenuHandlers = (bot) => {
     // /menu command: show main menu
     bot.command('menu', async (ctx) => {
+      logger.info('[MENU-HANDLER] /menu command handler triggered');
       try {
+        logger.info('[MENU-HANDLER] Calling showMainMenu');
         await showMainMenu(ctx);
+        logger.info('[MENU-HANDLER] showMainMenu completed');
       } catch (error) {
-        logger.error('Error showing main menu:', error);
+        logger.error('[MENU-HANDLER] Error showing main menu:', error);
         await ctx.reply('Error loading menu. Please try again.');
       }
     });
