@@ -1,7 +1,6 @@
 require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
 const { initializePostgres, testConnection } = require('../../config/postgres');
-const { initializeCoreTables } = require('../../config/ensureCoreTables');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
@@ -114,12 +113,6 @@ const startBot = async () => {
         logger.info('✓ PostgreSQL initialized');
       } else {
         logger.warn('⚠️ PostgreSQL connection test failed, but will retry on first query');
-      }
-      try {
-        await initializeCoreTables();
-        logger.info('✓ Core database tables verified');
-      } catch (schemaError) {
-        logger.warn('⚠️ Failed to initialize core database tables:', schemaError.message);
       }
     } catch (error) {
       logger.error('PostgreSQL initialization failed. Bot will run in DEGRADED mode without database.');
