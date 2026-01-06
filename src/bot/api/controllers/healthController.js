@@ -1,7 +1,7 @@
-const logger = require('../../utils/logger');
-const performanceMonitor = require('../../utils/performanceMonitor');
-const { getPool, getQueryCacheStats } = require('../../config/postgres');
-const { cache } = require('../../config/redis');
+const logger = require('../../../utils/logger');
+const performanceMonitor = require('../../../utils/performanceMonitor');
+const { getPool, getQueryCacheStats } = require('../../../config/postgres');
+const { cache } = require('../../../config/redis');
 
 /**
  * Health check controller

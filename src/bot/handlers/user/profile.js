@@ -236,16 +236,8 @@ const registerProfileHandlers = (bot) => {
       await ctx.saveSession();
       
       const text = lang === 'es'
-        ? '🔎 ¿Qué estás buscando?
-
-Ejemplos: "Un slam buddy", "Amigos cloudy", "Relación seria", "Diversión casual", etc.
-
-Envía lo que buscas o "borrar" para eliminar:'
-        : '🔎 What are you looking for?
-
-Examples: "A slam buddy", "Cloudy friends", "Serious relationship", "Casual fun", etc.
-
-Send what you're looking for or "delete" to remove:';
+        ? '🔎 ¿Qué estás buscando?\n\nEjemplos: "Un slam buddy", "Amigos cloudy", "Relación seria", "Diversión casual", etc.\n\nEnvía lo que buscas o "borrar" para eliminar:'
+        : '🔎 What are you looking for?\n\nExamples: "A slam buddy", "Cloudy friends", "Serious relationship", "Casual fun", etc.\n\nSend what you\'re looking for or "delete" to remove:';
       
       await ctx.editMessageText(text);
     } catch (error) {

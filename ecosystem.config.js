@@ -7,6 +7,8 @@ module.exports = {
     watch: false,
     max_memory_restart: '1G',
     node_args: '--dns-result-order=ipv4first',
+    exec_mode: 'fork',
+    cwd: '/root/pnptvbot-production',
     env: {
       NODE_ENV: 'production',
       PORT: '3000',
