@@ -3257,6 +3257,179 @@ const registerGroupCleanupCommand = (bot) => {
       await ctx.reply('❌ ' + (getLanguage(ctx) === 'es' ? 'Error en el comando' : 'Command error')).catch(() => {});
     }
   });
+
+  /**
+   * Send PRIME channel invite links to all active users
+   * Usage: /send_prime_links
+   */
+  bot.command('send_prime_links', async (ctx) => {
+    try {
+      const userId = ctx.from.id;
+      const isAdmin = await PermissionService.isAdmin(userId);
+
+      if (!isAdmin) {
+        logger.warn(`Unauthorized send_prime_links attempt from user ${userId}`);
+        await ctx.reply(getLanguage(ctx) === 'es' ? '❌ No autorizado' : '❌ Unauthorized');
+        return;
+      }
+
+      const lang = getLanguage(ctx);
+      await handleSendPrimeLinks(ctx, lang, ctx.telegram);
+    } catch (error) {
+      logger.error('Error in send_prime_links command:', error);
+      await ctx.reply(
+        getLanguage(ctx) === 'es'
+          ? '❌ Error procesando comando'
+          : '❌ Error processing command'
+      ).catch(() => {});
+    }
+  });
+};
+
+/**
+ * Handle sending PRIME channel invite links to all active users
+ */
+async function handleSendPrimeLinks(ctx, lang, telegram) {
+  try {
+    const statusMsg = await ctx.reply(
+      lang === 'es'
+        ? '⏳ Obteniendo usuarios activos...'
+        : '⏳ Fetching active users...'
+    );
+
+    // Get all active users
+    const activeUsers = await UserModel.getBySubscriptionStatus('active');
+    logger.info(`Found ${activeUsers.length} active users to send PRIME links to`);
+
+    if (activeUsers.length === 0) {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        statusMsg.message_id,
+        undefined,
+        lang === 'es'
+          ? '❌ No hay usuarios activos'
+          : '❌ No active users found'
+      );
+      return;
+    }
+
+    const groupId = process.env.CHANNEL_ID || process.env.GROUP_ID || '-1003159260496';
+    let sentCount = 0;
+    let failedCount = 0;
+    let blockedCount = 0;
+
+    // Send to each user
+    for (let i = 0; i < activeUsers.length; i++) {
+      const user = activeUsers[i];
+
+      try {
+        // Generate unique invite link for PRIME channel
+        let inviteLink = 'https://t.me/PNPTV_PRIME'; // Fallback
+        try {
+          const response = await telegram.createChatInviteLink(groupId, {
+            member_limit: 1,
+            name: `PrimeLink ${user.id}_${Date.now()}`,
+          });
+          inviteLink = response.invite_link;
+        } catch (linkError) {
+          logger.warn('Failed to create invite link for user, using fallback', {
+            userId: user.id,
+            error: linkError.message,
+          });
+        }
+
+        // Determine user language
+        const userLang = user.language || 'es';
+
+        // Build message
+        const message = userLang === 'es'
+          ? `🌟 *¡Acceso a PRIME Disponible!*\n\n` +
+            `Hola ${user.first_name || 'Usuario'}! 👋\n\n` +
+            `Te enviamos el enlace directo para acceder al canal exclusivo PRIME:\n\n` +
+            `👉 [🔗 Ingresar a PRIME](${inviteLink})\n\n` +
+            `✨ Disfruta de todo el contenido premium y beneficios exclusivos.\n\n` +
+            `💎 *Beneficios PRIME:*\n` +
+            `• Acceso a contenido exclusivo\n` +
+            `• Videollamadas premium\n` +
+            `• Transmisiones en vivo\n` +
+            `• Comunidad privada\n\n` +
+            `📱 Usa /menu para ver todas las funciones.`
+          : `🌟 *PRIME Access Available!*\n\n` +
+            `Hi ${user.first_name || 'User'}! 👋\n\n` +
+            `We sent you the direct link to access the exclusive PRIME channel:\n\n` +
+            `👉 [🔗 Join PRIME](${inviteLink})\n\n` +
+            `✨ Enjoy all premium content and exclusive benefits.\n\n` +
+            `💎 *PRIME Benefits:*\n` +
+            `• Access to exclusive content\n` +
+            `• Premium video calls\n` +
+            `• Live streams\n` +
+            `• Private community\n\n` +
+            `📱 Use /menu to see all features.`;
+
+        // Send message to user
+        await telegram.sendMessage(user.id, message, {
+          parse_mode: 'Markdown',
+          disable_web_page_preview: false,
+        });
+
+        sentCount++;
+        logger.info(`PRIME link sent to user ${user.id}`, { username: user.username });
+      } catch (userError) {
+        const errorMsg = userError?.response?.description || userError?.message || '';
+
+        if (errorMsg.includes('blocked by the user') || errorMsg.includes('bot was blocked')) {
+          blockedCount++;
+          logger.warn(`User ${user.id} has blocked the bot`);
+        } else {
+          failedCount++;
+          logger.warn(`Failed to send PRIME link to user ${user.id}`, {
+            error: errorMsg,
+          });
+        }
+      }
+
+      // Update progress every 10 users
+      if ((i + 1) % 10 === 0) {
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          statusMsg.message_id,
+          undefined,
+          lang === 'es'
+            ? `📤 Enviando enlaces PRIME...\n\n📊 Progreso: ${i + 1}/${activeUsers.length}\n✅ Enviados: ${sentCount}\n❌ Fallidos: ${failedCount}\n🚫 Bloqueados: ${blockedCount}`
+            : `�� Sending PRIME links...\n\n📊 Progress: ${i + 1}/${activeUsers.length}\n✅ Sent: ${sentCount}\n❌ Failed: ${failedCount}\n🚫 Blocked: ${blockedCount}`
+        );
+      }
+
+      // Add small delay between sends to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 80));
+    }
+
+    // Final update
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      statusMsg.message_id,
+      undefined,
+      lang === 'es'
+        ? `✅ *Envío Completado*\n\n📊 *Estadísticas:*\n✅ Enviados: ${sentCount}/${activeUsers.length}\n❌ Fallidos: ${failedCount}\n🚫 Bloqueados: ${blockedCount}\n\n🎉 ¡Enlaces PRIME enviados a todos los usuarios activos!`
+        : `✅ *Sending Complete*\n\n📊 *Statistics:*\n✅ Sent: ${sentCount}/${activeUsers.length}\n❌ Failed: ${failedCount}\n🚫 Blocked: ${blockedCount}\n\n🎉 PRIME links sent to all active users!`
+    );
+
+    logger.info('PRIME links broadcast completed', {
+      totalUsers: activeUsers.length,
+      sentCount,
+      failedCount,
+      blockedCount,
+    });
+  } catch (error) {
+    logger.error('Error in handleSendPrimeLinks:', error);
+    await ctx.reply(
+      lang === 'es'
+        ? '❌ Error al enviar los enlaces PRIME'
+        : '❌ Error sending PRIME links'
+    ).catch(() => {});
+  }
+}
+
 };
 
 // After registerAdminHandlers is defined, wrap it to add additional handlers
