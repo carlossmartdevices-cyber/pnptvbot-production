@@ -73,6 +73,58 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
 
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(0, 0, 0, 0.35);
+            color: #ffd700;
+            cursor: pointer;
+            font-weight: 900;
+            font-size: 0.9em;
+            letter-spacing: 0.4px;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #ffd700, #ff8c00);
+            color: #000;
+            border-color: rgba(0, 0, 0, 0.2);
+        }
+
+        .panel-hidden {
+            display: none !important;
+        }
+
+        .playlist-manager {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .playlist-manager select {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95em;
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+        }
+
+        .playlist-actions {
+            display: flex;
+            gap: 6px;
+        }
+
         .playlist-list {
             list-style: none;
         }
@@ -333,6 +385,10 @@
             <div class="loading-spinner"></div>
         </div>
         <aside class="playlist-panel" id="playlistPanel">
+            <div class="tabs">
+                <button class="tab-btn active" id="tabVideos" type="button">🎬 Videos</button>
+                <button class="tab-btn" id="tabPodcasts" type="button">🎙️ Podcasts</button>
+            </div>
             <div class="videorama-player" id="videoramaPlayer">
                 <div class="player-header">
                     <div class="now-playing" id="nowPlaying">Now playing: —</div>
@@ -346,14 +402,22 @@
                     <pre id="lyricsText"></pre>
                 </div>
             </div>
-            <div class="playlist-section">
+            <div class="playlist-section" id="videosPanel">
                 <h3>🔥 Curated PNPtv Playlist</h3>
                 <ul class="playlist-list" id="curatedList"></ul>
             </div>
-            <div class="playlist-section">
-                <h3>🧑‍🚀 Your Playlist</h3>
+            <div class="playlist-section" id="videosPanel2">
+                <h3>🧑‍🚀 Your Playlists</h3>
+                <div class="playlist-manager">
+                    <select id="activePlaylistSelect" aria-label="Active playlist"></select>
+                    <div class="playlist-actions">
+                        <button class="btn-small" id="newPlaylistBtn" type="button">New</button>
+                        <button class="btn-small" id="renamePlaylistBtn" type="button">Rename</button>
+                        <button class="btn-small" id="deletePlaylistBtn" type="button">Delete</button>
+                    </div>
+                </div>
                 <form id="playlistForm" class="playlist-form">
-                    <input type="text" id="playlistName" placeholder="Playlist name (e.g. Emotional Rollercoaster)" required>
+                    <input type="text" id="playlistName" placeholder="Playlist name" required>
                     <input type="text" id="trackTitle" placeholder="Title (e.g. Song name or topic)" required>
                     <textarea id="trackDescription" placeholder="Song description (your curatorial copy)"></textarea>
                     <input type="url" id="trackUrl" placeholder="YouTube link (video or playlist) or any video link">
@@ -363,6 +427,27 @@
                     <button type="submit">Add (Link or Upload)</button>
                 </form>
                 <ul class="playlist-list" id="userList"></ul>
+            </div>
+
+            <div class="playlist-section panel-hidden" id="podcastsPanel">
+                <h3>🎙️ Your Podcasts</h3>
+                <div class="playlist-manager">
+                    <select id="activePodcastSelect" aria-label="Active podcast"></select>
+                    <div class="playlist-actions">
+                        <button class="btn-small" id="newPodcastBtn" type="button">New</button>
+                        <button class="btn-small" id="renamePodcastBtn" type="button">Rename</button>
+                        <button class="btn-small" id="deletePodcastBtn" type="button">Delete</button>
+                    </div>
+                </div>
+                <form id="podcastForm" class="playlist-form">
+                    <input type="text" id="podcastName" placeholder="Podcast name" required>
+                    <input type="text" id="episodeTitle" placeholder="Episode title" required>
+                    <textarea id="episodeDescription" placeholder="Episode description / show notes"></textarea>
+                    <input type="url" id="episodeUrl" placeholder="Audio link (mp3) or YouTube link">
+                    <input type="file" id="episodeFile" accept="audio/*">
+                    <button type="submit">Add Episode (Link or Upload)</button>
+                </form>
+                <ul class="playlist-list" id="podcastList"></ul>
             </div>
         </aside>
     </div>
@@ -561,9 +646,24 @@
         ];
 
         const userPlaylistKey = 'pnptv:videorama:userPlaylist:v3';
+        const userPodcastKey = 'pnptv:videorama:podcasts:v1';
 
         function newId() {
             return Math.random().toString(36).slice(2) + Date.now().toString(36);
+        }
+
+        function normalizeName(name, fallback) {
+            const n = (name || '').trim();
+            return n || fallback;
+        }
+
+        function uniqueName(existing, desiredBase) {
+            const set = new Set(existing);
+            const base = desiredBase.trim();
+            if (!set.has(base)) return base;
+            let i = 2;
+            while (set.has(`${base} (${i})`)) i += 1;
+            return `${base} (${i})`;
         }
 
         function seedEmotionalRollercoasterIfEmpty(list) {
@@ -710,6 +810,34 @@
             }
         }
 
+        function loadPodcasts() {
+            try {
+                const saved = localStorage.getItem(userPodcastKey);
+                const parsed = saved ? JSON.parse(saved) : [];
+                if (!Array.isArray(parsed)) return [];
+                return parsed.map((item) => ({
+                    id: item.id || newId(),
+                    podcast: item.podcast || item.podcastName || 'My Podcast',
+                    title: item.title || item.episodeTitle || 'Untitled episode',
+                    url: item.url || item.episodeUrl || '',
+                    type: item.type || (item.url ? 'link' : 'link'),
+                    description: item.description || item.episodeDescription || '',
+                    createdAt: item.createdAt || Date.now(),
+                }));
+            } catch (e) {
+                console.warn('Failed to load podcasts', e);
+                return [];
+            }
+        }
+
+        function savePodcasts(list) {
+            try {
+                localStorage.setItem(userPodcastKey, JSON.stringify(list));
+            } catch (e) {
+                console.warn('Failed to save podcasts', e);
+            }
+        }
+
         function renderPlaylist(list, container, opts = {}) {
             container.innerHTML = '';
             const grouped = new Map();
@@ -819,6 +947,29 @@
             const toggleBtn = document.getElementById('togglePlaylist');
             const videoContainer = document.querySelector('.video-container');
 
+            const activePlaylistSelect = document.getElementById('activePlaylistSelect');
+            const newPlaylistBtn = document.getElementById('newPlaylistBtn');
+            const renamePlaylistBtn = document.getElementById('renamePlaylistBtn');
+            const deletePlaylistBtn = document.getElementById('deletePlaylistBtn');
+
+            const tabVideos = document.getElementById('tabVideos');
+            const tabPodcasts = document.getElementById('tabPodcasts');
+            const videosPanel = document.getElementById('videosPanel');
+            const videosPanel2 = document.getElementById('videosPanel2');
+            const podcastsPanel = document.getElementById('podcastsPanel');
+
+            const podcastForm = document.getElementById('podcastForm');
+            const activePodcastSelect = document.getElementById('activePodcastSelect');
+            const newPodcastBtn = document.getElementById('newPodcastBtn');
+            const renamePodcastBtn = document.getElementById('renamePodcastBtn');
+            const deletePodcastBtn = document.getElementById('deletePodcastBtn');
+            const podcastNameInput = document.getElementById('podcastName');
+            const episodeTitleInput = document.getElementById('episodeTitle');
+            const episodeDescriptionInput = document.getElementById('episodeDescription');
+            const episodeUrlInput = document.getElementById('episodeUrl');
+            const episodeFileInput = document.getElementById('episodeFile');
+            const podcastListEl = document.getElementById('podcastList');
+
             const playerMount = document.getElementById('playerMount');
             const nowPlayingEl = document.getElementById('nowPlaying');
             const lyricsPanel = document.getElementById('lyricsPanel');
@@ -892,7 +1043,9 @@
             toggleLyricsBtn.addEventListener('click', () => {
                 lyricsPanel.classList.toggle('active');
                 if (lyricsPanel.classList.contains('active') && currentItem) {
-                    lyricsText.textContent = currentItem.lyrics?.trim() || 'No lyrics yet — add them for this song.';
+                    lyricsText.textContent = currentItem.lyrics?.trim()
+                        || currentItem.description?.trim()
+                        || 'Nothing to show yet.';
                 }
             });
 
@@ -900,9 +1053,47 @@
                 clearPlayer();
             });
 
+            function setActiveTab(which) {
+                const isVideos = which === 'videos';
+                tabVideos.classList.toggle('active', isVideos);
+                tabPodcasts.classList.toggle('active', !isVideos);
+                videosPanel.classList.toggle('panel-hidden', !isVideos);
+                videosPanel2.classList.toggle('panel-hidden', !isVideos);
+                podcastsPanel.classList.toggle('panel-hidden', isVideos);
+                clearPlayer();
+            }
+
+            tabVideos.addEventListener('click', () => setActiveTab('videos'));
+            tabPodcasts.addEventListener('click', () => setActiveTab('podcasts'));
+
             renderPlaylist(curatedPlaylist, curatedListEl, { readonly: true });
             let userList = loadUserPlaylist();
-            const renderUserList = () => renderPlaylist(userList, userListEl, {
+            let activePlaylist = 'PNPtv – Emotional Rollercoaster';
+
+            function getPlaylistNames() {
+                return Array.from(new Set(userList.map((x) => x.playlist || 'My Playlist'))).sort();
+            }
+
+            function syncPlaylistSelect() {
+                const names = getPlaylistNames();
+                if (!names.includes(activePlaylist)) activePlaylist = names[0] || 'My Playlist';
+                activePlaylistSelect.innerHTML = '';
+                names.forEach((name) => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    if (name === activePlaylist) opt.selected = true;
+                    activePlaylistSelect.appendChild(opt);
+                });
+                playlistNameInput.value = activePlaylist;
+            }
+
+            const renderUserList = () => {
+                syncPlaylistSelect();
+                const visible = userList
+                    .filter((x) => (x.playlist || 'My Playlist') === activePlaylist)
+                    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                renderPlaylist(visible, userListEl, {
                 onPlay: (item) => mountPlayerForItem(item),
                 onLyrics: (item) => (item.lyrics ? setLyricsView(item) : setDescriptionView(item)),
                 onRemove: (item) => {
@@ -910,12 +1101,52 @@
                     saveUserPlaylist(userList);
                     renderUserList();
                 },
-            });
+                });
+            };
             renderUserList();
 
             if (!playlistNameInput.value) {
                 playlistNameInput.value = 'PNPtv – Emotional Rollercoaster';
             }
+            activePlaylist = playlistNameInput.value.trim();
+            syncPlaylistSelect();
+
+            activePlaylistSelect.addEventListener('change', () => {
+                activePlaylist = activePlaylistSelect.value;
+                playlistNameInput.value = activePlaylist;
+                renderUserList();
+            });
+
+            newPlaylistBtn.addEventListener('click', () => {
+                const name = prompt('New playlist name:');
+                if (!name) return;
+                const next = uniqueName(getPlaylistNames(), normalizeName(name, 'My Playlist'));
+                activePlaylist = next;
+                playlistNameInput.value = activePlaylist;
+                renderUserList();
+            });
+
+            renamePlaylistBtn.addEventListener('click', () => {
+                const name = prompt('Rename playlist to:', activePlaylist);
+                if (!name) return;
+                const desired = normalizeName(name, activePlaylist);
+                const others = getPlaylistNames().filter((n) => n !== activePlaylist);
+                const nextName = uniqueName(others, desired);
+                userList = userList.map((x) => ((x.playlist || 'My Playlist') === activePlaylist ? { ...x, playlist: nextName } : x));
+                saveUserPlaylist(userList);
+                activePlaylist = nextName;
+                playlistNameInput.value = activePlaylist;
+                renderUserList();
+            });
+
+            deletePlaylistBtn.addEventListener('click', () => {
+                if (!confirm(`Delete playlist "${activePlaylist}" and all its items?`)) return;
+                userList = userList.filter((x) => (x.playlist || 'My Playlist') !== activePlaylist);
+                saveUserPlaylist(userList);
+                activePlaylist = getPlaylistNames()[0] || 'My Playlist';
+                playlistNameInput.value = activePlaylist;
+                renderUserList();
+            });
 
             async function uploadSelectedFile(file) {
                 const fd = new FormData();
@@ -931,7 +1162,7 @@
 
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const playlistName = playlistNameInput.value.trim();
+                const playlistName = normalizeName(playlistNameInput.value, activePlaylist);
                 let title = titleInput.value.trim();
                 let url = urlInput.value.trim();
                 const description = descriptionInput.value.trim();
@@ -970,6 +1201,7 @@
                     };
                     userList = [...userList, item];
                     saveUserPlaylist(userList);
+                    activePlaylist = playlistName;
                     renderUserList();
 
                     mountPlayerForItem(item);
@@ -993,6 +1225,228 @@
 
             toggleBtn.addEventListener('click', () => {
                 videoContainer.classList.toggle('playlist-hidden');
+            });
+
+            // Podcasts
+            let podcasts = loadPodcasts();
+            let activePodcast = 'My Podcast';
+
+            function getPodcastNames() {
+                return Array.from(new Set(podcasts.map((x) => x.podcast || 'My Podcast'))).sort();
+            }
+
+            function syncPodcastSelect() {
+                const names = getPodcastNames();
+                if (!names.includes(activePodcast)) activePodcast = names[0] || 'My Podcast';
+                activePodcastSelect.innerHTML = '';
+                names.forEach((name) => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    if (name === activePodcast) opt.selected = true;
+                    activePodcastSelect.appendChild(opt);
+                });
+                podcastNameInput.value = activePodcast;
+            }
+
+            function mountPodcastItem(item) {
+                clearPlayer();
+                currentItem = item;
+                nowPlayingEl.textContent = `Now playing: ${item.title}`;
+                const yt = parseYouTube(item.url);
+                if (yt?.kind === 'playlist') {
+                    const iframe = document.createElement('iframe');
+                    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+                    iframe.allowFullscreen = true;
+                    iframe.src = `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(yt.list)}`;
+                    playerMount.appendChild(iframe);
+                    return;
+                }
+                if (yt?.kind === 'video') {
+                    const iframe = document.createElement('iframe');
+                    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+                    iframe.allowFullscreen = true;
+                    iframe.src = `https://www.youtube.com/embed/${encodeURIComponent(yt.id)}`;
+                    playerMount.appendChild(iframe);
+                    return;
+                }
+
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.src = item.url;
+                playerMount.appendChild(audio);
+            }
+
+            function renderPodcasts() {
+                syncPodcastSelect();
+                const visible = podcasts
+                    .filter((x) => (x.podcast || 'My Podcast') === activePodcast)
+                    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                podcastListEl.innerHTML = '';
+                visible.forEach((item) => {
+                    const li = document.createElement('li');
+                    const row = document.createElement('div');
+                    row.className = 'playlist-item';
+
+                    const meta = document.createElement('div');
+                    meta.className = 'meta';
+                    if (item.url) {
+                        const a = document.createElement('a');
+                        a.href = item.url;
+                        a.target = '_blank';
+                        a.rel = 'noopener';
+                        a.textContent = item.title;
+                        meta.appendChild(a);
+                    } else {
+                        const span = document.createElement('span');
+                        span.textContent = item.title;
+                        meta.appendChild(span);
+                    }
+
+                    const details = document.createElement('div');
+                    details.className = 'muted';
+                    details.textContent = [
+                        parseYouTube(item.url) ? 'YouTube' : (item.type === 'upload' ? 'Uploaded audio' : 'Link'),
+                        item.description ? 'Has description' : null,
+                    ].filter(Boolean).join(' • ');
+                    meta.appendChild(details);
+
+                    const actions = document.createElement('div');
+                    actions.className = 'actions';
+
+                    const playBtn = document.createElement('button');
+                    playBtn.type = 'button';
+                    playBtn.className = 'btn-small';
+                    playBtn.textContent = 'Play';
+                    playBtn.addEventListener('click', () => {
+                        mountPodcastItem(item);
+                        if (item.description) setDescriptionView(item);
+                    });
+
+                    const descBtn = document.createElement('button');
+                    descBtn.type = 'button';
+                    descBtn.className = 'btn-small';
+                    descBtn.textContent = 'Notes';
+                    descBtn.addEventListener('click', () => setDescriptionView(item));
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'btn-small';
+                    removeBtn.textContent = 'Remove';
+                    removeBtn.addEventListener('click', () => {
+                        podcasts = podcasts.filter((x) => x.id !== item.id);
+                        savePodcasts(podcasts);
+                        renderPodcasts();
+                    });
+
+                    actions.appendChild(playBtn);
+                    actions.appendChild(descBtn);
+                    actions.appendChild(removeBtn);
+
+                    row.appendChild(meta);
+                    row.appendChild(actions);
+                    li.appendChild(row);
+                    podcastListEl.appendChild(li);
+                });
+            }
+
+            function setActivePodcast(name) {
+                activePodcast = name;
+                podcastNameInput.value = activePodcast;
+                renderPodcasts();
+            }
+
+            // Initialize podcast UI
+            if (getPodcastNames().length === 0) {
+                const defaultName = 'My Podcast';
+                podcasts = [{ id: newId(), podcast: defaultName, title: 'Episode 1 (draft)', url: '', type: 'link', description: '', createdAt: Date.now() }];
+                savePodcasts(podcasts);
+                podcasts = podcasts.filter((x) => x.url); // don't show draft
+            }
+            activePodcast = getPodcastNames()[0] || 'My Podcast';
+            syncPodcastSelect();
+            renderPodcasts();
+
+            activePodcastSelect.addEventListener('change', () => setActivePodcast(activePodcastSelect.value));
+
+            newPodcastBtn.addEventListener('click', () => {
+                const name = prompt('New podcast name:');
+                if (!name) return;
+                const next = uniqueName(getPodcastNames(), normalizeName(name, 'My Podcast'));
+                setActivePodcast(next);
+            });
+
+            renamePodcastBtn.addEventListener('click', () => {
+                const name = prompt('Rename podcast to:', activePodcast);
+                if (!name) return;
+                const desired = normalizeName(name, activePodcast);
+                const others = getPodcastNames().filter((n) => n !== activePodcast);
+                const nextName = uniqueName(others, desired);
+                podcasts = podcasts.map((x) => ((x.podcast || 'My Podcast') === activePodcast ? { ...x, podcast: nextName } : x));
+                savePodcasts(podcasts);
+                setActivePodcast(nextName);
+            });
+
+            deletePodcastBtn.addEventListener('click', () => {
+                if (!confirm(`Delete podcast "${activePodcast}" and all its episodes?`)) return;
+                podcasts = podcasts.filter((x) => (x.podcast || 'My Podcast') !== activePodcast);
+                savePodcasts(podcasts);
+                setActivePodcast(getPodcastNames()[0] || 'My Podcast');
+            });
+
+            async function uploadSelectedAudio(file) {
+                const fd = new FormData();
+                fd.append('audio', file, file.name);
+                const resp = await fetch('/api/podcasts/upload', { method: 'POST', body: fd });
+                const data = await resp.json().catch(() => null);
+                if (!resp.ok || !data?.success) {
+                    const msg = data?.message || 'Upload failed';
+                    throw new Error(msg);
+                }
+                return data.file.url;
+            }
+
+            podcastForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const podcastName = normalizeName(podcastNameInput.value, activePodcast);
+                const episodeTitle = episodeTitleInput.value.trim();
+                let url = episodeUrlInput.value.trim();
+                const description = episodeDescriptionInput.value.trim();
+                const file = episodeFileInput.files && episodeFileInput.files[0] ? episodeFileInput.files[0] : null;
+                if (!podcastName || !episodeTitle) return;
+                if (!url && !file) return;
+
+                try {
+                    podcastForm.querySelector('button[type=\"submit\"]').disabled = true;
+                    podcastForm.querySelector('button[type=\"submit\"]').textContent = 'Adding...';
+                    if (file) url = await uploadSelectedAudio(file);
+
+                    const item = {
+                        id: newId(),
+                        podcast: podcastName,
+                        title: episodeTitle,
+                        url,
+                        type: file ? 'upload' : 'link',
+                        description,
+                        createdAt: Date.now(),
+                    };
+                    podcasts = [...podcasts, item];
+                    savePodcasts(podcasts);
+                    activePodcast = podcastName;
+                    renderPodcasts();
+                    mountPodcastItem(item);
+                    if (item.description) setDescriptionView(item);
+
+                    episodeTitleInput.value = '';
+                    episodeDescriptionInput.value = '';
+                    episodeUrlInput.value = '';
+                    episodeFileInput.value = '';
+                } catch (err) {
+                    alert(err?.message || 'Failed to add episode');
+                } finally {
+                    podcastForm.querySelector('button[type=\"submit\"]').disabled = false;
+                    podcastForm.querySelector('button[type=\"submit\"]').textContent = 'Add Episode (Link or Upload)';
+                }
             });
         }
 

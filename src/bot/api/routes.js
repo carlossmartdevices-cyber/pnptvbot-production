@@ -15,6 +15,7 @@ const invitationController = require('./controllers/invitationController');
 const hangoutsController = require('./controllers/hangoutsController');
 const playlistController = require('./controllers/playlistController');
 const videoramaController = require('./controllers/videoramaController');
+const podcastController = require('./controllers/podcastController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -301,6 +302,13 @@ app.post(
   '/api/videorama/upload',
   videoramaController.upload.single('video'),
   asyncHandler(videoramaController.uploadVideo)
+);
+
+// Podcasts uploads (local storage under /public/uploads/podcasts)
+app.post(
+  '/api/podcasts/upload',
+  podcastController.upload.single('audio'),
+  asyncHandler(podcastController.uploadAudio)
 );
 
 // Subscription API routes
