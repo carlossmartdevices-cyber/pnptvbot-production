@@ -324,9 +324,11 @@ const startBot = async () => {
             logger.info(`>>> CALLBACK_QUERY received: data=${req.body.callback_query.data}, from=${req.body.callback_query.from?.id}`);
           }
           if (req.body.message) {
-            logger.info(`>>> MESSAGE received: text=${req.body.message.text || 'N/A'}, from=${req.body.message.from?.id}, entities=${JSON.stringify(req.body.message.entities || [])}`);
+            const entities = req.body.message.entities || [];
+            const hasBotCommand = entities.some(e => e.type === 'bot_command');
+            logger.info(`>>> MESSAGE received: text="${req.body.message.text || 'N/A'}", from=${req.body.message.from?.id}, hasBotCommand=${hasBotCommand}, entities=${JSON.stringify(entities)}`);
             if (req.body.message.text && req.body.message.text.startsWith('/')) {
-              logger.info(`>>> COMMAND MESSAGE detected: ${req.body.message.text}`);
+              logger.info(`>>> COMMAND MESSAGE detected: text="${req.body.message.text}", hasBotCommand=${hasBotCommand}`);
             }
           }
           await bot.handleUpdate(req.body);
