@@ -29,6 +29,9 @@ const wallOfFameGuard = require('./middleware/wallOfFameGuard');
 const notificationsTopicGuard = require('./middleware/notificationsTopicGuard');
 const logger = require('../../utils/logger');
 const performanceMonitor = require('../../utils/performanceMonitor');
+// Media popularity tracking
+const MediaPopularityService = require('../services/mediaPopularityService');
+const MediaPopularityScheduler = require('../services/mediaPopularityScheduler');
 // Handlers
 const registerUserHandlers = require('../handlers/user');
 const registerAdminHandlers = require('../handlers/admin');
@@ -212,6 +215,15 @@ const startBot = async () => {
       await BroadcastButtonModel.initializeTables();
     } catch (error) {
       logger.warn('Broadcast button tables initialization failed (broadcasts will run without presets until fixed):', error.message);
+    }
+    // Initialize media popularity scheduler
+    try {
+      const mediaPopularityScheduler = new MediaPopularityScheduler(bot);
+      await mediaPopularityScheduler.initialize();
+      logger.info('✓ Media popularity scheduler initialized');
+    } catch (error) {
+      logger.error('Media popularity scheduler initialization failed:', error.message);
+      logger.warn('⚠️  Automated media announcements will not work');
     }
     // Initialize async broadcast queue
     try {

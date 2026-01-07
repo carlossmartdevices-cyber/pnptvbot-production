@@ -169,7 +169,7 @@ export default function Lobby({ defaultAppId }) {
   return (
     <div className="app">
       <div className="bg" />
-      <header className="topHeader">
+      <header className="header">
         <div className="brand">
           <div className="brandMark">
             <Sparkles size={18} />

@@ -14,7 +14,31 @@ import {
   Signal,
   Eye,
   EyeOff,
+  X,
 } from 'lucide-react'
+
+function cx(...parts) {
+  return parts.filter(Boolean).join(' ')
+}
+
+function Sheet({ open, title, children, onClose }) {
+  if (!open) return null
+  return (
+    <div className="sheetBackdrop" role="dialog" aria-modal="true" onMouseDown={onClose}>
+      <div className="sheet" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="sheetHeader">
+          <div className="sheetTitle">
+            <div className="titleText">{title}</div>
+          </div>
+          <button className="iconBtn" onClick={onClose} aria-label="Close">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="sheetBody">{children}</div>
+      </div>
+    </div>
+  )
+}
 
 const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onConsentGranted }) => {
   const [localTracks, setLocalTracks] = useState({ video: null, audio: null })
@@ -485,221 +509,273 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
     return 'many'
   }
 
+  const callTitle = type === 'main' ? 'PNP Room' : 'Private Call'
+  const participantCount = remoteUsers.length + 1
+
   if (error) {
     return (
-      <div className="loading">
-        <div className="error">
-          <h2>Error</h2>
-          <p>{error}</p>
-        </div>
-      </div>
+      <>
+        <header className="header">
+          <div className="brand">
+            <div className="brandMark">
+              <Video size={18} />
+            </div>
+            <div className="brandText">
+              <div className="brandName">PNPtv Hangouts</div>
+              <div className="brandTag">{callTitle} • {participantCount} participants</div>
+            </div>
+          </div>
+          <div className="headerActions">
+            <button className="iconBtn danger" onClick={() => window.close()} title="Exit" aria-label="Exit">
+              <X size={20} />
+            </button>
+          </div>
+        </header>
+        <main className="main callBody">
+          <div className="notice error">{error}</div>
+        </main>
+      </>
     )
   }
 
   if (!hasConsent) {
     return (
-      <div className="gate">
-        <div className="gate-card">
-          <h2>{type === 'main' ? 'PNP Room' : 'Private Call'}</h2>
-          <p className="gate-subtitle">
-            Private-by-default. Nothing starts until you confirm.
-          </p>
-
-          <div className="gate-checks">
-            <label className="gate-check">
-              <input
-                type="checkbox"
-                checked={ageConfirmed}
-                onChange={(e) => setAgeConfirmed(e.target.checked)}
-              />
-              I confirm I am 18+ (or legal age in my country)
-            </label>
-            <label className="gate-check">
-              <input
-                type="checkbox"
-                checked={privacyConfirmed}
-                onChange={(e) => setPrivacyConfirmed(e.target.checked)}
-              />
-              I understand this is private content; don’t record or share links
-            </label>
+      <>
+        <header className="header">
+          <div className="brand">
+            <div className="brandMark">
+              <Video size={18} />
+            </div>
+            <div className="brandText">
+              <div className="brandName">PNPtv Hangouts</div>
+              <div className="brandTag">{callTitle} • Private-by-default • 18+</div>
+            </div>
           </div>
-
-          <div className="gate-actions">
-            <button
-              className="gate-btn"
-              disabled={!ageConfirmed || !privacyConfirmed}
-              onClick={onConsentGranted}
-            >
-              Continue
-            </button>
-            <button className="gate-btn secondary" onClick={() => window.close()}>
-              Exit
+          <div className="headerActions">
+            <button className="iconBtn danger" onClick={() => window.close()} title="Exit" aria-label="Exit">
+              <X size={20} />
             </button>
           </div>
+        </header>
 
-          <div className="gate-footnote">
-            Tip: open in a private window, disable screen recording, and keep your link secret.
+        <main className="main callBody">
+          <div className="hero">
+            <div className="heroTitle">Confirm before entering</div>
+            <div className="heroText">Nothing starts until you confirm.</div>
+            <div className="card">
+              <div className="checkList">
+                <label className="checkRow">
+                  <input
+                    type="checkbox"
+                    checked={ageConfirmed}
+                    onChange={(e) => setAgeConfirmed(e.target.checked)}
+                  />
+                  <span>I confirm I am 18+ (or legal age in my country)</span>
+                </label>
+                <label className="checkRow">
+                  <input
+                    type="checkbox"
+                    checked={privacyConfirmed}
+                    onChange={(e) => setPrivacyConfirmed(e.target.checked)}
+                  />
+                  <span>I understand this is private content; don’t record or share links</span>
+                </label>
+              </div>
+
+              <div className="heroActions">
+                <button
+                  className="btn"
+                  disabled={!ageConfirmed || !privacyConfirmed}
+                  onClick={onConsentGranted}
+                >
+                  Continue
+                </button>
+                <button className="btn btnGhost" onClick={() => window.close()}>
+                  Exit
+                </button>
+              </div>
+            </div>
+
+            <div className="hint">
+              Tip: open in a private window, disable screen recording, and keep your link secret.
+            </div>
           </div>
-        </div>
-      </div>
+        </main>
+      </>
     )
   }
 
   if (!isJoined) {
     return (
-      <div className="prejoin">
-        <div className="prejoin-card">
-          <h2>{type === 'main' ? 'PNP Room' : 'Private Call'}</h2>
-          <p className="prejoin-subtitle">
-            You are not connected yet. Choose what to share.
-          </p>
-
-          <div className="prejoin-preview">
-            <div className={`prejoin-preview-box ${isVideoEnabled ? 'on' : 'off'}`}>
-              <div id="prejoin-player" className="prejoin-player" />
-              {!isVideoEnabled ? (
-                <div className="prejoin-preview-overlay">
-                  Camera preview is off
-                </div>
-              ) : null}
+      <>
+        <header className="header">
+          <div className="brand">
+            <div className="brandMark">
+              <Video size={18} />
             </div>
-            <div className="prejoin-stats">
-              <div className="stat">
-                <div className="stat-label">Mic</div>
-                <div className="stat-value">{isAudioEnabled ? 'On' : 'Off'}</div>
-                <div className="meter">
-                  <div className="meter-fill" style={{ width: `${Math.round(micLevel * 100)}%` }} />
+            <div className="brandText">
+              <div className="brandName">PNPtv Hangouts</div>
+              <div className="brandTag">{callTitle} • Pre-join • 18+</div>
+            </div>
+          </div>
+          <div className="headerActions">
+            <button
+              className={cx('iconBtn', privacyMode && 'active')}
+              onClick={() => setPrivacyMode((prev) => !prev)}
+              title={privacyMode ? 'Privacy Mode: On' : 'Privacy Mode: Off'}
+              aria-label="Toggle privacy mode"
+            >
+              {privacyMode ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+            <button className="iconBtn danger" onClick={() => window.close()} title="Exit" aria-label="Exit">
+              <X size={20} />
+            </button>
+          </div>
+        </header>
+
+        <main className="main callBody">
+          <div className="hero">
+            <div className="heroTitle">Ready when you are</div>
+            <div className="heroText">Choose what to share before joining.</div>
+
+            <div className="card">
+              <div className="prejoin-preview">
+                <div className={cx('prejoin-preview-box', isVideoEnabled && 'on')}>
+                  <div id="prejoin-player" className="prejoin-player" />
+                  {!isVideoEnabled ? <div className="prejoin-preview-overlay">Camera preview is off</div> : null}
+                </div>
+                <div className="prejoin-stats">
+                  <div className="stat">
+                    <div className="stat-label">Mic</div>
+                    <div className="stat-value">{isAudioEnabled ? 'On' : 'Off'}</div>
+                    <div className="meter">
+                      <div className="meter-fill" style={{ width: `${Math.round(micLevel * 100)}%` }} />
+                    </div>
+                  </div>
+                  <div className="stat">
+                    <div className="stat-label">Privacy</div>
+                    <div className="stat-value">{privacyMode ? 'On' : 'Off'}</div>
+                    <div className="hint">Hides room/user details.</div>
+                  </div>
                 </div>
               </div>
-              <div className="stat">
-                <div className="stat-label">Privacy</div>
-                <div className="stat-value">{privacyMode ? 'On' : 'Off'}</div>
+
+              <div className="segmented prejoin-toggles">
+                <button
+                  className={cx('seg', isAudioEnabled && 'active')}
+                  onClick={toggleAudio}
+                  aria-pressed={isAudioEnabled}
+                  type="button"
+                >
+                  {isAudioEnabled ? <Mic size={16} /> : <MicOff size={16} />} Mic
+                </button>
+                <button
+                  className={cx('seg', isVideoEnabled && 'active')}
+                  onClick={toggleVideo}
+                  aria-pressed={isVideoEnabled}
+                  type="button"
+                >
+                  {isVideoEnabled ? <Video size={16} /> : <VideoOff size={16} />} Camera
+                </button>
+              </div>
+
+              <div className="prejoin-devices">
+                <label className="field">
+                  <div className="label">Microphone</div>
+                  <select
+                    value={selectedMicId}
+                    onChange={async (e) => {
+                      const next = e.target.value
+                      setSelectedMicId(next)
+                      try {
+                        if (localTracks.audio && typeof localTracks.audio.setDevice === 'function') {
+                          await localTracks.audio.setDevice(next)
+                        }
+                      } catch (_) {
+                        // ignore
+                      }
+                    }}
+                  >
+                    {mics.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Microphone ${d.deviceId.slice(-4)}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field">
+                  <div className="label">Camera</div>
+                  <select
+                    value={selectedCameraId}
+                    onChange={async (e) => {
+                      const next = e.target.value
+                      setSelectedCameraId(next)
+                      try {
+                        if (localTracks.video && typeof localTracks.video.setDevice === 'function') {
+                          await localTracks.video.setDevice(next)
+                          playLocalPreview(localTracks.video)
+                        }
+                      } catch (_) {
+                        // ignore
+                      }
+                    }}
+                  >
+                    {cameras.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Camera ${d.deviceId.slice(-4)}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <button className="btn btnGhost" onClick={refreshDevices} type="button">
+                  Refresh devices
+                </button>
+              </div>
+
+              <div className="heroActions">
+                <button className="btn" onClick={joinChannel} disabled={isReadyToJoin}>
+                  {isReadyToJoin ? 'Joining…' : 'Join now'}
+                </button>
+                <button className="btn btnGhost" onClick={() => window.close()}>
+                  Exit
+                </button>
               </div>
             </div>
           </div>
 
-          <div className="prejoin-toggles">
-            <button
-              className={`toggle-btn ${isAudioEnabled ? 'on' : 'off'}`}
-              onClick={toggleAudio}
-              aria-pressed={isAudioEnabled}
-            >
-              {isAudioEnabled ? <Mic size={20} /> : <MicOff size={20} />}
-              Mic {isAudioEnabled ? 'On' : 'Off'}
-            </button>
-            <button
-              className={`toggle-btn ${isVideoEnabled ? 'on' : 'off'}`}
-              onClick={toggleVideo}
-              aria-pressed={isVideoEnabled}
-            >
-              {isVideoEnabled ? <Video size={20} /> : <VideoOff size={20} />}
-              Camera {isVideoEnabled ? 'On' : 'Off'}
-            </button>
-          </div>
-
-          <div className="prejoin-devices">
-            <div className="device-row">
-              <label>Microphone</label>
-              <select
-                value={selectedMicId}
-                onChange={async (e) => {
-                  const next = e.target.value
-                  setSelectedMicId(next)
-                  try {
-                    if (localTracks.audio && typeof localTracks.audio.setDevice === 'function') {
-                      await localTracks.audio.setDevice(next)
-                    }
-                  } catch (_) {
-                    // ignore
-                  }
-                }}
-              >
-                {mics.map((d) => (
-                  <option key={d.deviceId} value={d.deviceId}>
-                    {d.label || `Microphone ${d.deviceId.slice(-4)}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="device-row">
-              <label>Camera</label>
-              <select
-                value={selectedCameraId}
-                onChange={async (e) => {
-                  const next = e.target.value
-                  setSelectedCameraId(next)
-                  try {
-                    if (localTracks.video && typeof localTracks.video.setDevice === 'function') {
-                      await localTracks.video.setDevice(next)
-                      playLocalPreview(localTracks.video)
-                    }
-                  } catch (_) {
-                    // ignore
-                  }
-                }}
-              >
-                {cameras.map((d) => (
-                  <option key={d.deviceId} value={d.deviceId}>
-                    {d.label || `Camera ${d.deviceId.slice(-4)}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button className="link-btn" onClick={refreshDevices}>
-              Refresh devices
-            </button>
-          </div>
-
-        <div className="prejoin-actions">
-          <button
-            className="gate-btn"
-            onClick={async () => {
-              await joinChannel()
-            }}
-            disabled={isReadyToJoin}
-          >
-            {isReadyToJoin ? 'Joining…' : 'Join Now'}
-            </button>
-            <button className="gate-btn secondary" onClick={() => window.close()}>
-              Exit
-            </button>
-          </div>
-
-          <div className="prejoin-footnote">
-            Privacy mode is enabled by default (hides identifying details).
-          </div>
-        </div>
-      </div>
+          <div className="hint">Privacy mode is enabled by default.</div>
+        </main>
+      </>
     )
   }
 
   return (
     <>
-      <div className="header">
-        <div className="room-info">
-          <h2>{type === 'main' ? 'PNP Room' : 'Private Call'}</h2>
-          <p>
-            {remoteUsers.length + 1} participant{remoteUsers.length !== 0 ? 's' : ''}
-          </p>
-          <div className="call-status">
-            <span className="status-pill">
-              <Signal size={14} /> {connectionState}
-            </span>
-            <span className="status-pill">
-              <span className="dot" /> {qualityLabel}
-            </span>
+      <header className="header">
+        <div className="brand">
+          <div className="brandMark">
+            <Video size={18} />
+          </div>
+          <div className="brandText">
+            <div className="brandName">PNPtv Hangouts</div>
+            <div className="brandTag">
+              {callTitle} • {participantCount} participants • <span className="monoInline">{privacyMode ? 'Privacy on' : 'Privacy off'}</span>
+            </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div className="headerActions">
           <button
-            className={`control-btn ${privacyMode ? 'active' : ''}`}
+            className={cx('iconBtn', privacyMode && 'active')}
             onClick={() => setPrivacyMode((prev) => !prev)}
             title={privacyMode ? 'Privacy Mode: On' : 'Privacy Mode: Off'}
+            aria-label="Toggle privacy mode"
           >
-            {privacyMode ? <EyeOff size={24} /> : <Eye size={24} />}
+            {privacyMode ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
           <button
-            className="control-btn"
+            className="iconBtn"
             onClick={async () => {
               try {
                 await navigator.clipboard.writeText(room)
@@ -710,27 +786,30 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
               }
             }}
             title="Copy room code"
+            aria-label="Copy room code"
           >
-            <Copy size={24} />
+            <Copy size={20} />
           </button>
-          <button
-            className="control-btn"
-            onClick={() => setShowParticipants(!showParticipants)}
-            title="Participants"
-          >
-            <Users size={24} />
+          <button className="iconBtn" onClick={() => setShowParticipants(true)} title="Participants" aria-label="Participants">
+            <Users size={20} />
           </button>
-          <button
-            className="control-btn"
-            onClick={() => setShowSettings(!showSettings)}
-            title="Settings"
-          >
-            <Settings size={24} />
+          <button className="iconBtn" onClick={() => setShowSettings(true)} title="Settings" aria-label="Settings">
+            <Settings size={20} />
           </button>
         </div>
-      </div>
+      </header>
 
-      <div className={`video-container ${getGridClass()} ${privacyMode ? 'privacy' : ''}`}>
+      <main className="main callBody">
+        <div className="call-status">
+          <span className="status-pill">
+            <Signal size={14} /> {connectionState}
+          </span>
+          <span className="status-pill">
+            <span className="dot" /> {qualityLabel}
+          </span>
+        </div>
+
+        <div className={`video-container ${getGridClass()} ${privacyMode ? 'privacy' : ''}`}>
         {/* Local video */}
         <div className="video-player local">
           <div id="local-player" style={{ width: '100%', height: '100%' }}></div>
@@ -749,140 +828,131 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      </main>
 
-      <div className="controls">
+      <div className="callControls">
         <button
-          className={`control-btn ${isAudioEnabled ? 'active' : 'danger'}`}
+          className={cx('iconBtn', 'callBtn', isAudioEnabled ? 'active' : '')}
           onClick={toggleAudio}
           disabled={!isJoined}
           title={isAudioEnabled ? 'Mute' : 'Unmute'}
+          aria-label={isAudioEnabled ? 'Mute' : 'Unmute'}
         >
-          {isAudioEnabled ? <Mic size={24} /> : <MicOff size={24} />}
+          {isAudioEnabled ? <Mic size={22} /> : <MicOff size={22} />}
         </button>
 
         <button
-          className={`control-btn ${isVideoEnabled ? 'active' : 'danger'}`}
+          className={cx('iconBtn', 'callBtn', isVideoEnabled ? 'active' : '')}
           onClick={toggleVideo}
           disabled={!isJoined}
           title={isVideoEnabled ? 'Stop Video' : 'Start Video'}
+          aria-label={isVideoEnabled ? 'Stop video' : 'Start video'}
         >
-          {isVideoEnabled ? <Video size={24} /> : <VideoOff size={24} />}
+          {isVideoEnabled ? <Video size={22} /> : <VideoOff size={22} />}
         </button>
 
         <button
-          className={`control-btn ${isScreenSharing ? 'active' : ''}`}
+          className={cx('iconBtn', 'callBtn', isScreenSharing ? 'active' : '')}
           onClick={toggleScreenShare}
           disabled={!isJoined}
           title={isScreenSharing ? 'Stop Sharing' : 'Share Screen'}
+          aria-label={isScreenSharing ? 'Stop sharing' : 'Share screen'}
         >
-          {isScreenSharing ? <MonitorOff size={24} /> : <Monitor size={24} />}
+          {isScreenSharing ? <MonitorOff size={22} /> : <Monitor size={22} />}
         </button>
 
-        <button
-          className="control-btn danger"
-          onClick={leaveChannel}
-          title="Leave Call"
-        >
-          <PhoneOff size={24} />
+        <button className="iconBtn callBtn danger" onClick={leaveChannel} title="Leave Call" aria-label="Leave call">
+          <PhoneOff size={22} />
         </button>
       </div>
 
-      {showParticipants && (
-        <div className="participants-list">
-          <h3>Participants ({remoteUsers.length + 1})</h3>
-          <div className="participant-item">
-            {privacyMode ? 'You' : `${username || 'You'} (You)`}
-          </div>
+      <Sheet open={showParticipants} title={`Participants (${participantCount})`} onClose={() => setShowParticipants(false)}>
+        <div className="list">
+          <div className="listItem">{privacyMode ? 'You' : `${username || 'You'} (You)`}</div>
           {remoteUsers.map((user) => (
-            <div key={user.uid} className="participant-item">
+            <div key={user.uid} className="listItem">
               {privacyMode ? safeLabelForUser(user.uid) : `User ${user.uid}`}
             </div>
           ))}
         </div>
-      )}
+      </Sheet>
 
-      {showSettings && (
-        <div className="settings-panel">
-          <h3>Settings</h3>
-          <div className="setting-item">
-            <label>Devices</label>
-            <div className="setting-note">Change mic/camera without leaving.</div>
-            <div className="device-row">
-              <label>Microphone</label>
-              <select
-                value={selectedMicId}
-                onChange={async (e) => {
-                  const next = e.target.value
-                  setSelectedMicId(next)
-                  try {
-                    if (localTracks.audio && typeof localTracks.audio.setDevice === 'function') {
-                      await localTracks.audio.setDevice(next)
-                    }
-                  } catch (_) {
-                    // ignore
+      <Sheet open={showSettings} title="Settings" onClose={() => setShowSettings(false)}>
+        <div className="card">
+          <div className="hint">Change mic/camera without leaving.</div>
+
+          <label className="field" style={{ marginTop: 10 }}>
+            <div className="label">Microphone</div>
+            <select
+              value={selectedMicId}
+              onChange={async (e) => {
+                const next = e.target.value
+                setSelectedMicId(next)
+                try {
+                  if (localTracks.audio && typeof localTracks.audio.setDevice === 'function') {
+                    await localTracks.audio.setDevice(next)
                   }
-                }}
-              >
-                {mics.map((d) => (
-                  <option key={d.deviceId} value={d.deviceId}>
-                    {d.label || `Microphone ${d.deviceId.slice(-4)}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="device-row">
-              <label>Camera</label>
-              <select
-                value={selectedCameraId}
-                onChange={async (e) => {
-                  const next = e.target.value
-                  setSelectedCameraId(next)
-                  try {
-                    if (localTracks.video && typeof localTracks.video.setDevice === 'function') {
-                      await localTracks.video.setDevice(next)
-                      localTracks.video.play('local-player')
-                    }
-                  } catch (_) {
-                    // ignore
+                } catch (_) {
+                  // ignore
+                }
+              }}
+            >
+              {mics.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  {d.label || `Microphone ${d.deviceId.slice(-4)}`}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field">
+            <div className="label">Camera</div>
+            <select
+              value={selectedCameraId}
+              onChange={async (e) => {
+                const next = e.target.value
+                setSelectedCameraId(next)
+                try {
+                  if (localTracks.video && typeof localTracks.video.setDevice === 'function') {
+                    await localTracks.video.setDevice(next)
+                    localTracks.video.play('local-player')
                   }
-                }}
-              >
-                {cameras.map((d) => (
-                  <option key={d.deviceId} value={d.deviceId}>
-                    {d.label || `Camera ${d.deviceId.slice(-4)}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button className="link-btn" onClick={refreshDevices}>
+                } catch (_) {
+                  // ignore
+                }
+              }}
+            >
+              {cameras.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  {d.label || `Camera ${d.deviceId.slice(-4)}`}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="heroActions">
+            <button className="btn btnGhost" onClick={refreshDevices} type="button">
               Refresh devices
             </button>
-          </div>
-          <div className="setting-item">
-            <label>Privacy Mode</label>
-            <div className="setting-note">
-              When enabled, the UI hides room/user details and obfuscates participant IDs.
-            </div>
-          </div>
-          <div className="setting-item">
-            <button
-              className="link-btn"
-              onClick={() => setShowRoomDetails((prev) => !prev)}
-            >
+            <button className="btn btnGhost" onClick={() => setShowRoomDetails((prev) => !prev)} type="button">
               {showRoomDetails ? 'Hide' : 'Show'} room details
             </button>
-            {showRoomDetails && (
-              <div className="setting-note">
-                <div>Room: {room}</div>
-                <div>User ID: {uid}</div>
-                <div>Type: {type}</div>
-              </div>
-            )}
           </div>
-          {copied ? <div className="setting-note" style={{ color: '#4CAF50' }}>Copied room code</div> : null}
+
+          {showRoomDetails ? (
+            <div className="monoTextarea">
+              Room: {room}{'\n'}
+              User ID: {uid}{'\n'}
+              Type: {type}{'\n'}
+              Connection: {connectionState}{'\n'}
+              Quality: {qualityLabel}
+            </div>
+          ) : null}
         </div>
-      )}
+      </Sheet>
+
+      {copied ? <div className="toast">Copied room code</div> : null}
     </>
   )
 }
