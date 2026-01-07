@@ -3,7 +3,7 @@ const ChatCleanupService = require('../../services/chatCleanupService');
 const PermissionService = require('../../services/permissionService');
 
 const GROUP_ID = process.env.GROUP_ID;
-const NOTIFICATIONS_TOPIC_ID = process.env.NOTIFICATIONS_TOPIC_ID ? parseInt(process.env.NOTIFICATIONS_TOPIC_ID) : null;
+const NOTIFICATIONS_TOPIC_ID = parseInt(process.env.NOTIFICATIONS_TOPIC_ID || '10682', 10);
 const AUTO_DELETE_DELAY = 3 * 60 * 1000; // 3 minutes
 
 // Cache valid topic IDs per chat to avoid repeated failed attempts

@@ -9,54 +9,20 @@ const communityPostService = require('../../services/communityPostService');
 const PermissionService = require('../../services/permissionService');
 const { getLanguage } = require('../../utils/helpers');
 const GrokService = require('../../services/grokService');
+const broadcastUtils = require('../../utils/broadcastUtils');
+const performanceUtils = require('../../utils/performanceUtils');
+const uxUtils = require('../../utils/uxUtils');
+
+// Use shared utilities
+const { 
+  getStandardButtonOptions, 
+  normalizeButtons, 
+  buildInlineKeyboard, 
+  buildPostCaption 
+} = broadcastUtils;
 
 function getSharePostButtonOptions() {
-  const botUsername = process.env.BOT_USERNAME || 'PNPtv_bot';
-  const mainRoomUrl = 'https://meet.jit.si/pnptv-main-room#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false';
-  const hangoutsUrl = process.env.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts';
-  const videoramaUrl = process.env.VIDEORAMA_URL || 'https://pnptv.app/videorama-app/';
-
-  return [
-    { key: 'home', text: '🏠 Back to home menu', type: 'url', target: `https://t.me/${botUsername}?start=1` },
-    { key: 'plans', text: '💎 Membership Plans', type: 'callback', data: 'show_subscription_plans' },
-    { key: 'main_room', text: '🎥 PNPtv Main Room', type: 'url', target: mainRoomUrl },
-    { key: 'hangouts', text: '🎭 PNPtv Hangouts', type: 'url', target: hangoutsUrl },
-    { key: 'videorama', text: '🎬 PNPtv Videorama', type: 'url', target: videoramaUrl },
-    { key: 'nearby', text: '📍 Who is Nearby?', type: 'callback', data: 'menu_nearby' },
-    { key: 'profile', text: '👤 My Profile', type: 'callback', data: 'show_profile' },
-    { key: 'cristina', text: '🤖 Cristina AI', type: 'callback', data: 'broadcast_cristina_ai' },
-  ];
-}
-
-function normalizeButtons(buttons) {
-  if (!buttons) return [];
-  if (Array.isArray(buttons)) return buttons;
-  if (typeof buttons === 'string' && buttons.trim()) {
-    try {
-      const parsed = JSON.parse(buttons);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (_) {
-      return [];
-    }
-  }
-  return [];
-}
-
-function buildInlineKeyboard(buttons) {
-  const normalized = normalizeButtons(buttons);
-  if (!normalized.length) return undefined;
-  const rows = normalized.map((raw) => {
-    const b = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    if (b.type === 'url') return [Markup.button.url(b.text, b.target)];
-    if (b.type === 'callback') return [Markup.button.callback(b.text, b.data)];
-    return null;
-  }).filter(Boolean);
-  return rows.length ? Markup.inlineKeyboard(rows) : undefined;
-}
-
-function buildPostCaption(postData) {
-  const text = postData.text || '';
-  return text ? `📢 ${text}` : '';
+  return getStandardButtonOptions();
 }
 
 /**
@@ -572,13 +538,15 @@ const registerCommunityPostHandlers = (bot) => {
 
       const photo = ctx.message.photo[ctx.message.photo.length - 1];
 
-      ctx.session.temp.communityPostData.sourceChatId = ctx.chat.id;
-      ctx.session.temp.communityPostData.sourceMessageId = ctx.message.message_id;
-      ctx.session.temp.communityPostData.mediaType = 'photo';
-      ctx.session.temp.communityPostData.mediaFileId = photo.file_id;
-      ctx.session.temp.communityPostStep = 'write_text';
-      ctx.session.temp.waitingForMedia = false;
-      await ctx.saveSession();
+      // Use batch session updates for better performance
+      await performanceUtils.batchSessionUpdates(ctx, [
+        { key: 'communityPostData.sourceChatId', value: ctx.chat.id },
+        { key: 'communityPostData.sourceMessageId', value: ctx.message.message_id },
+        { key: 'communityPostData.mediaType', value: 'photo' },
+        { key: 'communityPostData.mediaFileId', value: photo.file_id },
+        { key: 'communityPostStep', value: 'write_text' },
+        { key: 'waitingForMedia', value: false }
+      ]);
 
       await ctx.reply('✅ Foto guardada');
       await showTextInputStep(ctx);
@@ -598,14 +566,16 @@ const registerCommunityPostHandlers = (bot) => {
       const video = ctx.message.video;
 
       const fileSizeMB = video.file_size ? Math.round((video.file_size / (1024 * 1024)) * 10) / 10 : 0;
-      ctx.session.temp.communityPostData.sourceChatId = ctx.chat.id;
-      ctx.session.temp.communityPostData.sourceMessageId = ctx.message.message_id;
-      ctx.session.temp.communityPostData.mediaType = 'video';
-      ctx.session.temp.communityPostData.mediaFileId = video.file_id;
-      ctx.session.temp.communityPostData.fileSizeMB = fileSizeMB;
-      ctx.session.temp.communityPostStep = 'write_text';
-      ctx.session.temp.waitingForMedia = false;
-      await ctx.saveSession();
+      // Use batch session updates for better performance
+      await performanceUtils.batchSessionUpdates(ctx, [
+        { key: 'communityPostData.sourceChatId', value: ctx.chat.id },
+        { key: 'communityPostData.sourceMessageId', value: ctx.message.message_id },
+        { key: 'communityPostData.mediaType', value: 'video' },
+        { key: 'communityPostData.mediaFileId', value: video.file_id },
+        { key: 'communityPostData.fileSizeMB', value: fileSizeMB },
+        { key: 'communityPostStep', value: 'write_text' },
+        { key: 'waitingForMedia', value: false }
+      ]);
 
       await ctx.reply(`✅ Video guardado${fileSizeMB ? ` (${fileSizeMB} MB)` : ''}`);
       await showTextInputStep(ctx);

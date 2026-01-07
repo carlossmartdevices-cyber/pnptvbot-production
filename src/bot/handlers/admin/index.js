@@ -12,36 +12,12 @@ const GrokService = require('../../services/grokService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
+const broadcastUtils = require('../../utils/broadcastUtils');
+const performanceUtils = require('../../utils/performanceUtils');
+const uxUtils = require('../../utils/uxUtils');
 
-function safeMarkdown(text) {
-  if (!text) return '';
-  return String(text).replace(/[`]/g, '\\`');
-}
-
-function formatDashboardStats(stats, lang) {
-  if (!stats?.users) return '';
-
-  const users = stats.users;
-  const totalUsers = users.totalUsers ?? '-';
-  const activeSubscriptions = users.activeSubscriptions ?? '-';
-  const newUsersLast30Days = users.newUsersLast30Days ?? '-';
-
-  const lines = [];
-  lines.push(lang === 'es' ? '`📊 Resumen`' : '`📊 Summary`');
-  lines.push(`${lang === 'es' ? '• Usuarios' : '• Users'}: ${totalUsers}`);
-  lines.push(`${lang === 'es' ? '• Suscripciones activas' : '• Active subscriptions'}: ${activeSubscriptions}`);
-  lines.push(`${lang === 'es' ? '• Nuevos (30d)' : '• New (30d)'}: ${newUsersLast30Days}`);
-
-  if (stats.recentBroadcasts?.length) {
-    const recent = stats.recentBroadcasts
-      .slice(0, 3)
-      .map(b => safeMarkdown(b?.status || 'sent'))
-      .join(', ');
-    lines.push(`${lang === 'es' ? '• Broadcasts' : '• Broadcasts'}: ${recent}`);
-  }
-
-  return `${lines.join('\n')}\n\n`;
-}
+// Use shared utilities
+const { sanitizeInput } = broadcastUtils;
 
 function getBroadcastStepLabel(step, lang) {
   const labels = {
@@ -58,53 +34,23 @@ function getBroadcastStepLabel(step, lang) {
   return labels[step] || step || (lang === 'es' ? 'Desconocido' : 'Unknown');
 }
 
-function buildDefaultBroadcastButtons(lang) {
-  const botUsername = process.env.BOT_USERNAME || 'PNPtv_bot';
-  return [
-    // Default: 1 button that deep-links to /start (home menu)
-    { key: 'home', text: lang === 'es' ? '🏠 Back to home menu' : '🏠 Back to home menu', type: 'url', target: `https://t.me/${botUsername}?start=1` },
-  ];
-}
+// Use shared utilities for button management
+const { 
+  getStandardButtonOptions, 
+  normalizeButtons, 
+  buildInlineKeyboard 
+} = broadcastUtils;
 
 function getBroadcastButtonOptions(lang) {
-  const botUsername = process.env.BOT_USERNAME || 'PNPtv_bot';
-  const mainRoomUrl = 'https://meet.jit.si/pnptv-main-room#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false';
-  const hangoutsUrl = process.env.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts';
-  const videoramaUrl = process.env.VIDEORAMA_URL || 'https://pnptv.app/videorama-app/';
-
-  return [
-    { key: 'plans', text: '💎 Membership Plans', type: 'callback', data: 'show_subscription_plans' },
-    { key: 'main_room', text: '🎥 PNPtv Main Room', type: 'url', target: mainRoomUrl },
-    { key: 'hangouts', text: '🎭 PNPtv Hangouts', type: 'url', target: hangoutsUrl },
-    { key: 'videorama', text: '🎬 PNPtv Videorama', type: 'url', target: videoramaUrl },
-    { key: 'nearby', text: '📍 Who is Nearby?', type: 'callback', data: 'menu_nearby' },
-    { key: 'profile', text: '👤 My Profile', type: 'callback', data: 'show_profile' },
-    { key: 'cristina', text: '🤖 Cristina AI', type: 'callback', data: 'broadcast_cristina_ai' },
-    { key: 'all_features', text: '✨ All Features', type: 'url', target: `https://t.me/${botUsername}` },
-  ].map((b) => ({ ...b, text: b.text }));
-}
-
-function normalizeBroadcastButtons(buttons) {
-  if (!buttons) return [];
-  if (Array.isArray(buttons)) return buttons;
-  if (typeof buttons === 'string' && buttons.trim()) {
-    try {
-      const parsed = JSON.parse(buttons);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (_) {
-      return [];
-    }
-  }
-  return [];
+  return getStandardButtonOptions();
 }
 
 function summarizeBroadcastButtons(buttons) {
-  const normalized = normalizeBroadcastButtons(buttons);
-  const labels = normalized.map((b) => {
+  const normalized = normalizeButtons(buttons);
+  return normalized.map((b) => {
     const obj = typeof b === 'string' ? JSON.parse(b) : b;
     return obj.text;
   });
-  return labels;
 }
 
 async function sendBroadcastPreview(ctx) {
@@ -313,7 +259,7 @@ async function showAdminPanel(ctx, edit = false) {
     try {
       if (userRole === 'superadmin' || userRole === 'admin') {
         const stats = await adminService.getDashboardStats();
-        statsText = formatDashboardStats(stats, lang);
+        statsText = broadcastUtils.formatDashboardStats(stats, lang);
       }
     } catch (error) {
       logger.warn(`Admin stats unavailable (continuing without stats): ${error.message}`);
@@ -457,7 +403,7 @@ let registerAdminHandlers = (bot) => {
       if (status?.error) {
         await ctx.editMessageText(
           (lang === 'es' ? '❌ Error al cargar el estado de la cola:\n\n' : '❌ Failed to load queue status:\n\n') +
-            safeMarkdown(status.error),
+            sanitizeInput(status.error),
           Markup.inlineKeyboard([
             [Markup.button.callback(lang === 'es' ? '🔄 Actualizar' : '🔄 Refresh', 'admin_queue_status')],
             [Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', 'admin_cancel')],
@@ -598,8 +544,8 @@ let registerAdminHandlers = (bot) => {
       const lines = failed.map((job, idx) => {
         const id = job.job_id || job.id || '-';
         const attempts = job.attempts ?? '-';
-        const lastError = safeMarkdown(job.last_error || job.error || '').slice(0, 80);
-        return `${idx + 1}) \`${safeMarkdown(id)}\` (attempts: ${attempts})${lastError ? `\n   ${lastError}` : ''}`;
+        const lastError = sanitizeInput(job.last_error || job.error || '').slice(0, 80);
+        return `${idx + 1}) \`${sanitizeInput(id)}\` (attempts: ${attempts})${lastError ? `\n   ${lastError}` : ''}`;
       });
 
       const keyboard = failed
@@ -1830,10 +1776,12 @@ let registerAdminHandlers = (bot) => {
         return;
       }
 
-      ctx.session.temp.broadcastData.mediaType = 'photo';
-      ctx.session.temp.broadcastData.mediaFileId = photo.file_id;
-      ctx.session.temp.broadcastStep = 'text_en';
-      await ctx.saveSession();
+      // Use batch session updates for better performance
+      await performanceUtils.batchSessionUpdates(ctx, [
+        { key: 'broadcastData.mediaType', value: 'photo' },
+        { key: 'broadcastData.mediaFileId', value: photo.file_id },
+        { key: 'broadcastStep', value: 'text_en' }
+      ]);
 
       logger.info('Broadcast photo uploaded', {
         userId: ctx.from.id,
@@ -1883,10 +1831,12 @@ let registerAdminHandlers = (bot) => {
         return;
       }
 
-      ctx.session.temp.broadcastData.mediaType = 'video';
-      ctx.session.temp.broadcastData.mediaFileId = video.file_id;
-      ctx.session.temp.broadcastStep = 'text_en';
-      await ctx.saveSession();
+      // Use batch session updates for better performance
+      await performanceUtils.batchSessionUpdates(ctx, [
+        { key: 'broadcastData.mediaType', value: 'video' },
+        { key: 'broadcastData.mediaFileId', value: video.file_id },
+        { key: 'broadcastStep', value: 'text_en' }
+      ]);
 
       logger.info('Broadcast video uploaded', {
         userId: ctx.from.id,

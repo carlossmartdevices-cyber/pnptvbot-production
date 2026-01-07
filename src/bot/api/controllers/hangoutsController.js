@@ -2,6 +2,8 @@ const VideoCallModel = require('../../../models/videoCallModel');
 const JitsiRoomModel = require('../../../models/jitsiRoomModel');
 const MainRoomModel = require('../../../models/mainRoomModel');
 const logger = require('../../../utils/logger');
+const { notifyPublicHangoutCreated } = require('../../services/hangoutsCommunityNotifier');
+const { validateTelegramWebAppInitData } = require('../../services/telegramWebAppAuth');
 
 /**
  * Create a new hangout room
@@ -20,19 +22,36 @@ const createHangout = async (req, res) => {
       enforceCamera = false,
     } = req.body;
 
+    const initData = req.headers['x-telegram-init-data'] || req.body?.initData;
+    const tg = initData
+      ? validateTelegramWebAppInitData(initData, { botToken: process.env.BOT_TOKEN })
+      : { ok: false };
+
+    if (isPublic && !tg.ok) {
+      return res.status(403).json({
+        success: false,
+        error: 'Public rooms must be created from Telegram',
+      });
+    }
+
     // Validate required fields
-    if (!creatorId || !creatorName) {
+    if ((!creatorId || !creatorName) && !tg.ok) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields: creatorId, creatorName'
       });
     }
 
+    const finalCreatorId = tg.ok ? tg.user.id : creatorId;
+    const finalCreatorName = tg.ok ? (tg.user.displayName || creatorName) : creatorName;
+    const creatorIdNumber = Number(finalCreatorId);
+    const safeCreatorId = Number.isFinite(creatorIdNumber) ? creatorIdNumber : finalCreatorId;
+
     // Create the video call/hangout
     const hangout = await VideoCallModel.create({
-      creatorId,
-      creatorName,
-      title: title || `${creatorName}'s Hangout`,
+      creatorId: safeCreatorId,
+      creatorName: finalCreatorName,
+      title: title || `${finalCreatorName}'s Hangout`,
       maxParticipants,
       enforceCamera,
       allowGuests,
@@ -47,6 +66,15 @@ const createHangout = async (req, res) => {
       isPublic,
     });
 
+    if (hangout.isPublic) {
+      notifyPublicHangoutCreated({
+        id: hangout.id,
+        title: hangout.title,
+        creatorName: hangout.creatorName,
+        maxParticipants: hangout.maxParticipants,
+      });
+    }
+
     res.json({
       success: true,
       id: hangout.id,
@@ -55,9 +83,11 @@ const createHangout = async (req, res) => {
       maxParticipants: hangout.maxParticipants,
       isPublic: hangout.isPublic,
       createdAt: hangout.createdAt,
-      token: hangout.token,
-      room: hangout.room,
-      uid: hangout.uid,
+      callId: hangout.id,
+      token: hangout.rtcToken,
+      room: hangout.channelName,
+      uid: hangout.userId,
+      appId: hangout.appId,
     });
 
   } catch (error) {
@@ -153,7 +183,15 @@ const joinHangout = async (req, res) => {
     const { roomId } = req.params;
     const { userId, userName } = req.body;
 
-    if (!roomId || !userId || !userName) {
+    const initData = req.headers['x-telegram-init-data'] || req.body?.initData;
+    const tg = initData
+      ? validateTelegramWebAppInitData(initData, { botToken: process.env.BOT_TOKEN })
+      : { ok: false };
+
+    const finalUserId = tg.ok ? tg.user.id : userId;
+    const finalUserName = tg.ok ? (tg.user.displayName || userName) : userName;
+
+    if (!roomId || !finalUserId || !finalUserName) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields'
@@ -161,7 +199,9 @@ const joinHangout = async (req, res) => {
     }
 
     // Join the room
-    const result = await VideoCallModel.joinCall(roomId, userId, userName, false);
+    const numericUserId = Number(finalUserId);
+    const safeUserId = Number.isFinite(numericUserId) ? numericUserId : finalUserId;
+    const result = await VideoCallModel.joinCall(roomId, safeUserId, finalUserName, false);
 
     logger.info('User joined hangout', {
       roomId,
@@ -172,10 +212,12 @@ const joinHangout = async (req, res) => {
     res.json({
       success: true,
       roomId: result.call.id,
+      callId: result.call.id,
       channelName: result.call.channelName,
-      token: result.token,
-      uid: result.uid,
-      room: result.room,
+      token: result.rtcToken,
+      uid: result.userId,
+      room: result.call.channelName,
+      appId: result.appId,
     });
 
   } catch (error) {

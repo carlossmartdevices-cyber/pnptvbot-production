@@ -14,6 +14,11 @@ module.exports = {
       PORT: '3000',
       NODE_OPTIONS: '--dns-result-order=ipv4first',
     },
+    env_production: {
+      NODE_ENV: 'production',
+      PORT: '3000',
+      NODE_OPTIONS: '--dns-result-order=ipv4first',
+    },
     env_development: {
       NODE_ENV: 'development',
     },

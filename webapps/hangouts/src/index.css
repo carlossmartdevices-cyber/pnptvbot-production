@@ -10,7 +10,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #0f0f0f;
+  background: #07020f;
   color: #fff;
 }
 
@@ -25,15 +25,332 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, rgba(236, 72, 153, 0.45), transparent 50%),
+    radial-gradient(900px 500px at 110% 20%, rgba(192, 38, 211, 0.45), transparent 45%),
+    radial-gradient(700px 500px at 50% 120%, rgba(168, 85, 247, 0.25), transparent 55%),
+    linear-gradient(180deg, rgba(19, 5, 31, 0.95), rgba(7, 2, 15, 0.98));
+  filter: saturate(1.05);
+  z-index: 0;
+}
+
+.topHeader {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  padding: 16px 14px 14px;
+  background: rgba(8, 2, 16, 0.62);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.brandMark {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.9), rgba(168, 85, 247, 0.9));
+  box-shadow: 0 12px 40px rgba(236, 72, 153, 0.18);
+  flex: 0 0 auto;
+}
+
+.brandText {
+  min-width: 0;
+}
+
+.brandName {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brandTag {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.main {
+  z-index: 1;
+  padding: 14px;
+  flex: 1;
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.hero {
+  padding: 16px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px);
+  margin-bottom: 14px;
+}
+
+.heroTitle {
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.heroText {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.heroActions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(236, 72, 153, 0.45);
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.25), rgba(168, 85, 247, 0.18));
+  color: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btnGhost {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.btnSmall {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.monoInline {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.95em;
+}
+
+.muted {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.card {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 14px;
+}
+
+.card.glass {
+  backdrop-filter: blur(18px);
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.cardTitle {
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.cardDesc {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cardMeta {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.28);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pill.subtle {
+  opacity: 0.85;
+}
+
+.sectionTitle {
+  margin: 14px 0 10px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.notice {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
+  margin-bottom: 12px;
+  z-index: 1;
+  position: relative;
+}
+
+.notice.error {
+  border-color: rgba(244, 67, 54, 0.45);
+  background: rgba(244, 67, 54, 0.12);
+}
+
+.empty {
+  padding: 18px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.emptyTitle {
+  font-weight: 900;
+}
+
+.emptyText {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 999;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 10px 12px;
+  border-radius: 999px;
+  backdrop-filter: blur(18px);
+  font-weight: 800;
+}
+
+.formGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 720px) {
+  .formGrid {
+    grid-template-columns: 1.2fr 1fr 0.6fr;
+    align-items: end;
+  }
+}
+
+.field .label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  margin-bottom: 6px;
+  font-weight: 800;
+}
+
+.field input {
+  width: 100%;
+  padding: 12px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  outline: none;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.seg {
+  width: 100%;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.seg.active {
+  border-color: rgba(236, 72, 153, 0.55);
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.22), rgba(168, 85, 247, 0.16));
+}
+
+.hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.4;
 }
 
 .video-container {
   flex: 1;
   position: relative;
-  background: #1a1a1a;
+  background: rgba(0, 0, 0, 0.18);
   display: grid;
   gap: 8px;
   padding: 8px;
+  z-index: 1;
 }
 
 .video-container.single {
@@ -69,7 +386,8 @@ body {
 }
 
 .video-player.local {
-  border: 2px solid #4CAF50;
+  border: 1px solid rgba(0, 255, 168, 0.35);
+  box-shadow: 0 0 0 1px rgba(0, 208, 255, 0.12);
 }
 
 .video-container.privacy .video-player video {
@@ -104,8 +422,10 @@ body {
   align-items: center;
   gap: 16px;
   padding: 20px;
-  background: #1a1a1a;
-  border-top: 1px solid #333;
+  background: rgba(8, 2, 16, 0.62);
+  backdrop-filter: blur(18px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 12;
 }
 
 .control-btn {
@@ -113,7 +433,7 @@ body {
   height: 56px;
   border-radius: 50%;
   border: none;
-  background: #333;
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
   cursor: pointer;
   display: flex;
@@ -123,12 +443,13 @@ body {
 }
 
 .control-btn:hover {
-  background: #444;
+  background: rgba(255, 255, 255, 0.12);
   transform: scale(1.05);
 }
 
 .control-btn.active {
-  background: #4CAF50;
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.30), rgba(168, 85, 247, 0.22));
+  border: 1px solid rgba(236, 72, 153, 0.45);
 }
 
 .control-btn.danger {
@@ -142,11 +463,13 @@ body {
 
 .header {
   padding: 16px;
-  background: #1a1a1a;
-  border-bottom: 1px solid #333;
+  background: rgba(8, 2, 16, 0.62);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  z-index: 12;
 }
 
 .room-info h2 {
@@ -195,12 +518,14 @@ body {
   position: absolute;
   top: 80px;
   right: 20px;
-  background: rgba(0, 0, 0, 0.9);
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(18px);
   padding: 16px;
   border-radius: 12px;
   min-width: 200px;
   max-height: 400px;
   overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .participants-list h3 {
@@ -221,10 +546,12 @@ body {
   position: absolute;
   top: 80px;
   right: 20px;
-  background: rgba(0, 0, 0, 0.95);
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(18px);
   padding: 20px;
   border-radius: 12px;
   min-width: 300px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .settings-panel h3 {

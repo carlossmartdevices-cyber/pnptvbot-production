@@ -46,7 +46,8 @@ class AgoraTokenService {
       throw new Error('Channel name is required for RTC token generation');
     }
 
-    const uid = typeof userId === 'string' ? 0 : userId; // 0 = any user can join
+    const numericUid = Number(userId);
+    const uid = Number.isFinite(numericUid) ? numericUid : 0; // 0 = any user can join (fallback)
     const currentTimestamp = Math.floor(Date.now() / 1000);
     const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
 

@@ -3,12 +3,12 @@ const ChatCleanupService = require('../../services/chatCleanupService');
 const PermissionService = require('../../services/permissionService');
 
 const GROUP_ID = process.env.GROUP_ID;
-const NOTIFICATIONS_TOPIC_ID = process.env.NOTIFICATIONS_TOPIC_ID || '3135';
+const NOTIFICATIONS_TOPIC_ID = process.env.NOTIFICATIONS_TOPIC_ID || '10682';
 const AUTO_DELETE_DELAY = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Command Redirection Middleware
- * Redirects bot commands to the Notifications topic (3135) in groups
+ * Redirects bot commands to the Notifications topic in groups
  */
 function commandRedirectionMiddleware() {
   return async (ctx, next) => {

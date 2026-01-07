@@ -12,5 +12,6 @@ export function getUrlParams() {
     username: params.get('username') || 'Anonymous',
     type: params.get('type') || 'private', // main or private
     appId: params.get('appId') || 'b68ab7b61ea44eabab7f242171311c5e', // Default Agora App ID
+    callId: params.get('callId'),
   }
 }
