@@ -1,6 +1,7 @@
 # PNPtv Web Applications
 
 Complete React-based web applications for PNPtv's Hangouts, Radio, and Live features.
+Includes a mobile-first Videorama app for YouTube links + uploads.
 
 ## 🎯 Features
 
@@ -25,6 +26,11 @@ Complete React-based web applications for PNPtv's Hangouts, Radio, and Live feat
 - **Real-time Chat**: Live chat during streams
 - **Viewer Count**: Track audience size
 - **Broadcast Controls**: Mute, camera, end stream
+
+### 🎵 Videorama (`/videorama-app/`)
+- **YouTube Links**: Add YouTube videos/playlists and play inline
+- **Video Uploads**: Upload videos via backend `POST /api/videorama/upload`
+- **Mobile-first UI**: PNPtv-styled design for phones
 
 ## 🛠️ Technology Stack
 
@@ -76,6 +82,11 @@ webapps/
 │   ├── package.json
 │   └── ...
 │
+├── videorama/             # YouTube links + uploads app
+│   ├── src/
+│   ├── package.json
+│   └── vite.config.js
+│
 ├── DEPLOYMENT.md          # Deployment guide
 ├── AI_AGENT_INTEGRATION.md # AI features guide
 └── README.md              # This file
@@ -88,7 +99,7 @@ webapps/
 ```bash
 # Install dependencies for all apps
 cd webapps
-for app in hangouts radio live; do
+for app in hangouts radio live videorama; do
   cd $app
   npm install
   cd ..
@@ -105,13 +116,17 @@ npm run dev -- --port 3001
 # Run Live app (port 3002)
 cd live
 npm run dev -- --port 3002
+
+# Run Videorama app (port 3012)
+cd ../videorama
+npm run dev
 ```
 
 ### Production Build
 
 ```bash
 # Build all apps
-for app in hangouts radio live; do
+for app in hangouts radio live videorama; do
   cd webapps/$app
   npm install
   npm run build

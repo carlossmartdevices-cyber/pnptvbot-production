@@ -75,17 +75,13 @@ function buildGroupMenuPayload(ctx) {
       lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby',
       'menu_nearby'
     )],
-    [Markup.button.url(
-      lang === 'es' ? '🎥 PNPtv Main Room' : '🎥 PNPtv Main Room',
-      jitsiUrl
+    [Markup.button.callback(
+      lang === 'es' ? '🎥 PNPtv Video Rooms' : '🎥 PNPtv Video Rooms',
+      'menu_hangouts'
     )],
-    [Markup.button.url(
-      lang === 'es' ? '🎬 PNPtv Hangouts' : '🎬 PNPtv Hangouts',
-      'https://pnptv.app/hangouts'
-    )],
-    [Markup.button.url(
-      lang === 'es' ? '✨ Todas las funciones (Abrir Bot)' : '✨ All features (Open Bot)',
-      `https://t.me/${botUsername}?start=from_menu`
+    [Markup.button.callback(
+      lang === 'es' ? '🎬 Contenido Exclusivo' : '🎬 Exclusive Content',
+      'menu_content'
     )],
   ];
 
@@ -149,10 +145,6 @@ Tap the buttons below and enjoy everything we've prepared for you — videos, Ne
         const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
 
         buttons = [
-          [Markup.button.url(
-            lang === 'es' ? '💬 Abrir Bot' : '💬 Open Bot',
-            `https://t.me/${botUsername}?start=from_menu`
-          )],
           [Markup.button.callback(
             lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile',
             'show_profile'
@@ -161,17 +153,21 @@ Tap the buttons below and enjoy everything we've prepared for you — videos, Ne
             lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who is Nearby?',
             'menu_nearby'
           )],
-          [Markup.button.url(
-            lang === 'es' ? '🎬 Ver Contenido' : '🎬 Watch Content',
-            'https://t.me/+mUGxQj6w9AI2NGUx'
+          [Markup.button.callback(
+            lang === 'es' ? '🎥 PNPtv Video Rooms' : '🎥 PNPtv Video Rooms',
+            'menu_hangouts'
+          )],
+          [Markup.button.callback(
+            lang === 'es' ? '🎬 Contenido Exclusivo' : '🎬 Exclusive Content',
+            'menu_content'
           )],
           [Markup.button.url(
-            lang === 'es' ? '🎥 PNPtv main Room!' : '🎥 PNPtv main Room!',
-            jitsiUrl
+            lang === 'es' ? '🎵 Videorama' : '🎵 Videorama',
+            'https://pnptv.app/videorama-app'
           )],
-          [Markup.button.url(
-            lang === 'es' ? '🎬 PNPtv Hangouts!' : '🎬 PNPtv Hangouts!',
-            'https://pnptv.app/hangouts'
+          [Markup.button.callback(
+            lang === 'es' ? '💎 Mi Membresía' : '💎 My Membership',
+            'menu_membership'
           )],
           [Markup.button.callback(
             lang === 'es' ? '🆘 Ayuda' : '🆘 Help',
@@ -205,13 +201,9 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
 \`Unlock the fun! 🔓\``;
 
         buttons = [
-          [Markup.button.url(
-            lang === 'es' ? '💬 Abrir Bot' : '💬 Open Bot',
-            `https://t.me/${botUsername}?start=from_menu`
-          )],
           [Markup.button.callback(
             lang === 'es' ? '🔓 Desbloquear PRIME' : '🔓 Unlock PRIME',
-            'show_subscription_plans'
+            'menu_membership'
           )],
           [Markup.button.callback(
             lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile',
@@ -222,8 +214,16 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
             'menu_nearby'
           )],
           [Markup.button.callback(
-            lang === 'es' ? '🎬 Ver Contenido 🔒' : '🎬 Watch Content 🔒',
-            'locked_feature'
+            lang === 'es' ? '🎥 PNPtv Video Rooms' : '🎥 PNPtv Video Rooms',
+            'menu_hangouts'
+          )],
+          [Markup.button.callback(
+            lang === 'es' ? '🎬 Contenido Exclusivo 🔒' : '🎬 Exclusive Content 🔒',
+            'menu_content'
+          )],
+          [Markup.button.url(
+            lang === 'es' ? '🎵 Videorama' : '🎵 Videorama',
+            'https://pnptv.app/videorama-app'
           )],
           [Markup.button.callback(
             lang === 'es' ? '🆘 Ayuda' : '🆘 Help',
@@ -261,6 +261,7 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
 
   /**
    * Who is Nearby? - Geolocation based member discovery
+   * Now shows directly in group chat with auto-delete
    */
   bot.action('menu_nearby', async (ctx) => {
     try {
@@ -268,47 +269,214 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
       await ctx.answerCbQuery();
 
       const nearbyText = lang === 'es'
-        ? `🌍 ¿Quién está cerca?
+        ? `🌍 *¿Quién está cerca?* 🌍
 
-Descubre miembros de PNPtv cerca de ti basado en ubicación.
+📍 *Descubre miembros de PNPtv cerca de ti*
 
-Características:
-• Encuentra miembros en tu área
-• Filtra por edad, género e intereses
-• Chat privado con conexiones
-• Privacidad garantizada - compartir ubicación es opcional
+🎯 *Características:*
+✅ Encuentra miembros en tu área
+✅ Filtra por edad, género e intereses
+✅ Chat privado con conexiones
+✅ Privacidad garantizada
 
-Para usar esta función:
-1. Ve a tu perfil
-2. Habilita la ubicación (opcional)
-3. Explora miembros cercanos
+📱 *Cómo usar:*
+1. Ve a tu perfil → ⚙️ Ajustes
+2. Habilita "Compartir ubicación" (opcional)
+3. Usa el botón "📍 ¿Quién está cerca?" en el menú principal
+4. Explora y conecta con miembros cercanos
 
-Privacidad: Tu ubicación exacta nunca se comparte públicamente`
-        : `🌍 Who is Nearby?
+🔒 *Privacidad:* Tu ubicación exacta NUNCA se comparte públicamente
 
-Discover PNPtv members near you based on location.
+💡 *Consejo:* Más miembros activan la ubicación = más conexiones posibles`
+        : `🌍 *Who is Nearby?* 🌍
 
-Features:
-• Find members in your area
-• Filter by age, gender and interests
-• Private chat with matches
-• Privacy guaranteed - sharing location is optional
+📍 *Discover PNPtv members near you*
 
-To use this feature:
-1. Go to your profile
-2. Enable location (optional)
-3. Explore nearby members
+🎯 *Features:*
+✅ Find members in your area
+✅ Filter by age, gender and interests
+✅ Private chat with matches
+✅ Privacy guaranteed
 
-Privacy: Your exact location is never publicly shared`;
+📱 *How to use:*
+1. Go to your profile → ⚙️ Settings
+2. Enable "Share location" (optional)
+3. Use the "📍 Who is Nearby?" button in main menu
+4. Explore and connect with nearby members
 
-      await ctx.editMessageText(nearbyText, {
+🔒 *Privacy:* Your exact location is NEVER publicly shared
+
+💡 *Tip:* More members enable location = more possible connections`;
+
+      const sentMessage = await ctx.editMessageText(nearbyText, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(lang === 'es' ? '🔙 Volver al Menú' : '🔙 Back to Menu', 'menu_main')],
+        ]),
+      });
+
+      // Auto-delete after 30 seconds of inactivity
+      setTimeout(async () => {
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
+        } catch (error) {
+          // Message may have already been deleted or chat may not allow deletion
+        }
+      }, 30000);
+    } catch (error) {
+      logger.error('Error in nearby menu:', error);
+    }
+  });
+
+  /**
+   * Exclusive Content Menu
+   */
+  bot.action('menu_content', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery();
+
+      const contentText = lang === 'es'
+        ? `🎬 Contenido Exclusivo PNPtv
+
+💎 *Para miembros PRIME:*
+• Videos completos de la comunidad
+• Acceso a contenido premium
+• Colecciones exclusivas
+• Actualizaciones diarias
+
+📱 *Para miembros gratuitos:*
+• Previsualizaciones de contenido
+• Muestras y avances
+• Acceso limitado a videos
+
+💡 *¿Quieres más?* Desbloquea PRIME para acceso completo a toda nuestra biblioteca de contenido.`
+        : `🎬 PNPtv Exclusive Content
+
+💎 *For PRIME members:*
+• Full-length community videos
+• Premium content access
+• Exclusive collections
+• Daily updates
+
+📱 *For free members:*
+• Content previews
+• Samples and trailers
+• Limited video access
+
+💡 *Want more?* Unlock PRIME for full access to our entire content library.`;
+
+      await ctx.editMessageText(contentText, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.callback(lang === 'es' ? '🔙 Atrás' : '🔙 Back', 'menu_main')],
         ]),
       });
     } catch (error) {
-      logger.error('Error in nearby menu:', error);
+      logger.error('Error in content menu:', error);
+    }
+  });
+
+  /**
+   * Membership Menu
+   */
+  bot.action('menu_membership', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      const userId = ctx.from?.id;
+      const hasSubscription = userId ? await UserService.hasActiveSubscription(userId) : false;
+      
+      await ctx.answerCbQuery();
+
+      let membershipText;
+      if (hasSubscription) {
+        // PRIME member view
+        membershipText = lang === 'es'
+          ? `💎 Tu Membresía PRIME
+
+✅ *Estado:* ACTIVA 🎉
+
+🎁 *Beneficios PRIME:*
+• 🎬 Videos completos y contenido exclusivo
+• 📍 Acceso completo a PNP Nearby
+• 🎥 Salas de video premium
+• 💬 Chat privado con miembros
+• 🌟 Perfil destacado
+• 🎟️ Acceso a eventos especiales
+
+💜 *Gracias por apoyar a PNPtv!*`
+          : `💎 Your PRIME Membership
+
+✅ *Status:* ACTIVE 🎉
+
+🎁 *PRIME Benefits:*
+• 🎬 Full-length and exclusive videos
+• 📍 Full access to PNP Nearby
+• 🎥 Premium video rooms
+• 💬 Private chat with members
+• 🌟 Featured profile
+• 🎟️ Access to special events
+
+💜 *Thank you for supporting PNPtv!*`;
+      } else {
+        // Free member view
+        membershipText = lang === 'es'
+          ? `📱 Tu Membresía Actual
+
+🔓 *Estado:* GRATIS
+
+🎁 *Beneficios gratuitos:*
+• 📍 PNP Nearby básico
+• 🎥 Sala comunitaria 24/7
+• 📸 Perfil y fotos
+• 💬 Chat grupal
+
+💎 *Desbloquea PRIME para:*
+• 🎬 Videos completos y exclusivos
+• 📍 Filtros avanzados en Nearby
+• 🎥 Salas de video privadas
+• 💬 Chat privado con miembros
+• 🌟 Perfil destacado
+• 🎟️ Eventos especiales
+
+💡 *¡Hazte PRIME hoy y disfruta de todo!*`
+          : `📱 Your Current Membership
+
+🔓 *Status:* FREE
+
+🎁 *Free Benefits:*
+• 📍 Basic PNP Nearby
+• 🎥 24/7 Community Room
+• 📸 Profile and photos
+• 💬 Group chat
+
+💎 *Unlock PRIME for:*
+• 🎬 Full-length and exclusive videos
+• 📍 Advanced Nearby filters
+• 🎥 Private video rooms
+• 💬 Private chat with members
+• 🌟 Featured profile
+• 🎟️ Special events
+
+💡 *Go PRIME today and enjoy everything!*`;
+      }
+
+      const buttons = [];
+      if (!hasSubscription) {
+        buttons.push([
+          Markup.button.callback(lang === 'es' ? '💎 Ver Planes PRIME' : '💎 View PRIME Plans', 'show_subscription_plans')
+        ]);
+      }
+      buttons.push([
+        Markup.button.callback(lang === 'es' ? '🔙 Atrás' : '🔙 Back', 'menu_main')
+      ]);
+
+      await ctx.editMessageText(membershipText, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons),
+      });
+    } catch (error) {
+      logger.error('Error in membership menu:', error);
     }
   });
 

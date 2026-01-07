@@ -336,7 +336,7 @@ const showMainMenu = async (ctx) => {
         Markup.button.url(lang === 'es' ? '🎬 PNPtv Hangouts!' : '🎬 PNPtv Hangouts!', 'https://pnptv.app/hangouts'),
       ],
       [
-        Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'https://pnptv.app/music-collections'),
+        Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'https://pnptv.app/videorama-app'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
@@ -505,7 +505,7 @@ const showMainMenuEdit = async (ctx) => {
         Markup.button.url(lang === 'es' ? '🎬 PNPtv Hangouts!' : '🎬 PNPtv Hangouts!', 'https://pnptv.app/hangouts'),
       ],
       [
-        Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'https://pnptv.app/music-collections'),
+        Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'https://pnptv.app/videorama-app'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),

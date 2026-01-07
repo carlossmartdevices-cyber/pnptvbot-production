@@ -149,7 +149,18 @@ const registerPaymentHandlers = (bot) => {
 
       buttons.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
 
-      await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
+      const sentMessage = await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
+
+      // Auto-delete after 30 seconds of inactivity (for group chats)
+      if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+        setTimeout(async () => {
+          try {
+            await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
+          } catch (error) {
+            // Message may have already been deleted or chat may not allow deletion
+          }
+        }, 30000);
+      }
     } catch (error) {
       logger.error('Error showing subscription plans:', error);
       await ctx.answerCbQuery('Error loading plans. Please try again.').catch(() => {});

@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
@@ -148,6 +149,15 @@ app.get('/policies', pageLimiter, (req, res) => {
 // Videorama landing page
 app.get('/videorama', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', 'video-rooms.html'));
+});
+
+// Videorama (new) - React app build output under /public/videorama-app
+app.get(['/videorama-app', '/videorama-app/'], pageLimiter, (req, res) => {
+  const indexPath = path.join(__dirname, '../../../public/videorama-app/index.html');
+  if (!fs.existsSync(indexPath)) {
+    return res.redirect('/videorama');
+  }
+  return res.sendFile(indexPath);
 });
 
 // Music Collections (formerly playlists)

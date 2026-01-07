@@ -1225,11 +1225,23 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
         ),
       ]);
 
-      // Row 2: Social Media | Profile Settings
+      // Row 2: Quick Access - Looking For | Tribe
       keyboard.push([
         Markup.button.callback(
-          lang === 'es' ? '🔗 Redes Sociales' : '🔗 Social Media',
-          'edit_social'
+          lang === 'es' ? '🔎 Buscando' : '🔎 Looking For',
+          'edit_looking_for'
+        ),
+        Markup.button.callback(
+          lang === 'es' ? '🏳️‍🌈 Tribu' : '🏳️‍🌈 Tribe',
+          'edit_tribe'
+        ),
+      ]);
+
+      // Row 3: Location | Profile Settings
+      keyboard.push([
+        Markup.button.callback(
+          lang === 'es' ? '📍 Ubicación' : '📍 Location',
+          'edit_location'
         ),
         Markup.button.callback(
           lang === 'es' ? '⚙️ Ajustes de Perfil' : '⚙️ Profile Settings',
@@ -1237,12 +1249,20 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
         ),
       ]);
 
-      // Row 3: Print My Profile | Apply to PNP Contacto!
+      // Row 4: Social Media | Print My Profile
       keyboard.push([
+        Markup.button.callback(
+          lang === 'es' ? '🔗 Redes Sociales' : '🔗 Social Media',
+          'edit_social'
+        ),
         Markup.button.callback(
           lang === 'es' ? '🖨️ Imprimir Mi Perfil' : '🖨️ Print My Profile',
           'share_profile'
         ),
+      ]);
+
+      // Row 5: Apply to PNP Contacto!
+      keyboard.push([
         Markup.button.callback(
           lang === 'es' ? '⭐ Aplicar a PNP Contacto!' : '⭐ Apply to PNP Contacto!',
           'apply_pnp_contacto'
