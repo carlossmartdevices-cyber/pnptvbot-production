@@ -15,6 +15,8 @@ const errorHandler = require('./middleware/errorHandler');
 const { topicPermissionsMiddleware, registerApprovalHandlers } = require('./middleware/topicPermissions');
 const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
 const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
+const topicModerationMiddleware = require('./middleware/topicModeration');
+const botAdditionPreventionMiddleware = require('./middleware/botAdditionPrevention');
 const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
 const { groupSecurityEnforcementMiddleware, registerGroupSecurityHandlers } = require('./middleware/groupSecurityEnforcement');
 // Group behavior rules (overrides previous rules)
@@ -159,6 +161,7 @@ const startBot = async () => {
     bot.use(rateLimitMiddleware());
     bot.use(chatCleanupMiddleware());
     // DISABLED: bot.use(usernameEnforcement()); // Username enforcement rules disabled
+    bot.use(botAdditionPreventionMiddleware()); // Prevent unauthorized bot additions
     bot.use(moderationFilter());
     bot.use(activityTrackerMiddleware());
 
@@ -174,6 +177,7 @@ const startBot = async () => {
     bot.use(notificationsAutoDelete()); // Auto-delete in notifications topic
     bot.use(mediaMirrorMiddleware()); // Mirror media to PNPtv Gallery
     bot.use(topicPermissionsMiddleware()); // Admin-only and approval queue
+    bot.use(topicModerationMiddleware()); // Anti-spam, anti-flood for topics
     bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery
     // Register handlers
     registerUserHandlers(bot);

@@ -279,6 +279,26 @@ class TopicConfigModel {
   }
 
   /**
+   * Get user violation count in last 24 hours
+   */
+  static async getViolationCount(userId, topicId) {
+    const sql = `
+      SELECT COUNT(*) as count
+      FROM topic_violations
+      WHERE user_id = $1 AND topic_id = $2
+      AND timestamp > NOW() - INTERVAL '24 hours'
+    `;
+
+    try {
+      const result = await query(sql, [userId, topicId]);
+      return parseInt(result.rows[0].count);
+    } catch (error) {
+      logger.error('Error getting violation count:', error);
+      return 0;
+    }
+  }
+
+  /**
    * Update topic analytics
    */
   static async updateAnalytics(topicId, userId, username, data) {

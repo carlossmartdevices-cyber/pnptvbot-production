@@ -1,4 +1,5 @@
 const ModerationService = require('../../services/moderationService');
+const TopicModerationService = require('../../services/topicModerationService');
 const ModerationModel = require('../../../models/moderationModel');
 const logger = require('../../../utils/logger');
 const { t } = require('../../../utils/i18n');
@@ -34,6 +35,10 @@ const registerModerationAdminHandlers = (bot) => {
 
   // /usernamechanges - View recent username changes in group
   bot.command('usernamechanges', handleUsernameChanges);
+
+  // Topic moderation commands
+  bot.command('topicmod', handleTopicModeration);
+  bot.command('settopicmod', handleSetTopicModeration);
 };
 
 /**
@@ -582,6 +587,164 @@ async function handleUsernameChanges(ctx) {
   } catch (error) {
     logger.error('Error viewing username changes:', error);
     await ctx.reply('Error loading username changes.');
+  }
+}
+
+/**
+ * Handle /topicmod command
+ * View topic moderation status
+ */
+async function handleTopicModeration(ctx) {
+  try {
+    const chatType = ctx.chat?.type;
+
+    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+      return ctx.reply('This command only works in groups.');
+    }
+
+    if (!(await isAdmin(ctx))) {
+      return ctx.reply('⛔ Only administrators can use this command.');
+    }
+
+    // Get topic ID from current message
+    const topicId = ctx.message.message_thread_id;
+    
+    if (!topicId) {
+      return ctx.reply('This command must be used within a topic.');
+    }
+
+    const status = await TopicModerationService.getTopicModerationStatus(topicId);
+
+    let message = `📊 **Topic ${topicId} Moderation Status**\n\n`;
+    message += `🔗 Anti-Links: ${status.anti_links_enabled ? '✅ Enabled' : '❌ Disabled'}\n`;
+    message += `📢 Anti-Spam: ${status.anti_spam_enabled ? '✅ Enabled' : '❌ Disabled'}\n`;
+    message += `💬 Anti-Flood: ${status.anti_flood_enabled ? '✅ Enabled' : '❌ Disabled'}\n`;
+    
+    if (status.max_posts_per_hour) {
+      message += `⏳ Max Posts/Hour: ${status.max_posts_per_hour}\n`;
+    }
+    
+    if (status.allowed_domains && status.allowed_domains.length > 0) {
+      message += `\n✅ Allowed Domains: ${status.allowed_domains.join(', ')}`;
+    }
+
+    await ctx.reply(message, { parse_mode: 'Markdown' });
+
+    logger.info('Topic moderation status viewed', {
+      topicId,
+      adminId: ctx.from.id,
+    });
+  } catch (error) {
+    logger.error('Error viewing topic moderation status:', error);
+    await ctx.reply('Error loading topic moderation status.');
+  }
+}
+
+/**
+ * Handle /settopicmod command
+ * Configure topic moderation settings
+ */
+async function handleSetTopicModeration(ctx) {
+  try {
+    const chatType = ctx.chat?.type;
+
+    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+      return ctx.reply('This command only works in groups.');
+    }
+
+    if (!(await isAdmin(ctx))) {
+      return ctx.reply('⛔ Only administrators can use this command.');
+    }
+
+    // Get topic ID from current message
+    const topicId = ctx.message.message_thread_id;
+    
+    if (!topicId) {
+      return ctx.reply('This command must be used within a topic.');
+    }
+
+    const args = ctx.message.text.split(' ').slice(1);
+    const action = args[0]?.toLowerCase();
+
+    if (!action || !['on', 'off', 'spam', 'flood', 'links', 'limit'].includes(action)) {
+      let helpMessage = '**Topic Moderation Settings**\n\n';
+      helpMessage += '**Usage:**\n';
+      helpMessage += '`/settopicmod on` - Enable all topic moderation\n';
+      helpMessage += '`/settopicmod off` - Disable all topic moderation\n';
+      helpMessage += '`/settopicmod spam on|off` - Toggle anti-spam\n';
+      helpMessage += '`/settopicmod flood on|off` - Toggle anti-flood\n';
+      helpMessage += '`/settopicmod links on|off` - Toggle anti-links\n';
+      helpMessage += '`/settopicmod limit <number>` - Set max posts/hour\n';
+
+      return ctx.reply(helpMessage, { parse_mode: 'Markdown' });
+    }
+
+    const settings = {};
+
+    if (action === 'on') {
+      settings.anti_spam_enabled = true;
+      settings.anti_flood_enabled = true;
+      settings.anti_links_enabled = true;
+    } else if (action === 'off') {
+      settings.anti_spam_enabled = false;
+      settings.anti_flood_enabled = false;
+      settings.anti_links_enabled = false;
+    } else if (action === 'spam') {
+      const value = args[1]?.toLowerCase();
+      if (value === 'on' || value === 'off') {
+        settings.anti_spam_enabled = value === 'on';
+      } else {
+        return ctx.reply('Usage: /settopicmod spam on|off');
+      }
+    } else if (action === 'flood') {
+      const value = args[1]?.toLowerCase();
+      if (value === 'on' || value === 'off') {
+        settings.anti_flood_enabled = value === 'on';
+      } else {
+        return ctx.reply('Usage: /settopicmod flood on|off');
+      }
+    } else if (action === 'links') {
+      const value = args[1]?.toLowerCase();
+      if (value === 'on' || value === 'off') {
+        settings.anti_links_enabled = value === 'on';
+      } else {
+        return ctx.reply('Usage: /settopicmod links on|off');
+      }
+    } else if (action === 'limit') {
+      const limit = parseInt(args[1]);
+      if (isNaN(limit) || limit < 1 || limit > 1000) {
+        return ctx.reply('Usage: /settopicmod limit <number> (1-1000)');
+      }
+      settings.max_posts_per_hour = limit;
+    }
+
+    const success = await TopicModerationService.updateTopicModerationSettings(topicId, settings);
+
+    if (success) {
+      const status = await TopicModerationService.getTopicModerationStatus(topicId);
+      
+      let message = '✅ Topic moderation settings updated:\n\n';
+      message += `📢 Anti-Spam: ${status.anti_spam_enabled ? 'Enabled' : 'Disabled'}\n`;
+      message += `💬 Anti-Flood: ${status.anti_flood_enabled ? 'Enabled' : 'Disabled'}\n`;
+      message += `🔗 Anti-Links: ${status.anti_links_enabled ? 'Enabled' : 'Disabled'}\n`;
+      
+      if (status.max_posts_per_hour) {
+        message += `⏳ Max Posts/Hour: ${status.max_posts_per_hour}`;
+      }
+
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+
+      logger.info('Topic moderation settings updated', {
+        topicId,
+        adminId: ctx.from.id,
+        settings,
+      });
+    } else {
+      await ctx.reply('❌ Failed to update topic moderation settings.');
+    }
+  } catch (error) {
+    logger.error('Error updating topic moderation settings:', error);
+    await ctx.reply('Error updating topic moderation settings.');
   }
 }
 

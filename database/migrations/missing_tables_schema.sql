@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS group_settings (
   anti_links_enabled BOOLEAN DEFAULT TRUE,
   anti_spam_enabled BOOLEAN DEFAULT TRUE,
   anti_flood_enabled BOOLEAN DEFAULT TRUE,
+  anti_forwarded_enabled BOOLEAN DEFAULT TRUE,
   profanity_filter_enabled BOOLEAN DEFAULT FALSE,
   max_warnings INTEGER DEFAULT 3,
   flood_limit INTEGER DEFAULT 5,
@@ -67,6 +68,10 @@ CREATE TABLE IF NOT EXISTS group_settings (
   -- Custom filters
   allowed_domains TEXT[] DEFAULT '{}',
   banned_words TEXT[] DEFAULT '{}',
+
+  -- Bot addition settings
+  restrict_bot_addition BOOLEAN DEFAULT TRUE,
+  allowed_bots TEXT[] DEFAULT '{pnptv_bot,PNPtvBot,PNPtvOfficialBot}',
 
   -- Metadata
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -80,6 +85,30 @@ CREATE TABLE IF NOT EXISTS user_warnings (
   group_id VARCHAR(255) NOT NULL,
   reason TEXT NOT NULL,
   details TEXT DEFAULT '',
+  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Forwarded message violations
+CREATE TABLE IF NOT EXISTS forwarded_violations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  group_id VARCHAR(255) NOT NULL,
+  message_id INTEGER,
+  source_type VARCHAR(50) NOT NULL, -- 'group', 'bot', 'external'
+  source_info JSONB,
+  violation_type VARCHAR(50) DEFAULT 'forwarded_message',
+  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Bot addition attempts
+CREATE TABLE IF NOT EXISTS bot_addition_attempts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  group_id VARCHAR(255) NOT NULL,
+  bot_username VARCHAR(255) NOT NULL,
+  bot_id VARCHAR(255),
+  status VARCHAR(50) DEFAULT 'blocked', -- 'blocked', 'allowed'
+  reason TEXT,
   timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -136,6 +165,13 @@ CREATE INDEX IF NOT EXISTS idx_username_history_group_id ON username_history(gro
 CREATE INDEX IF NOT EXISTS idx_username_history_changed_at ON username_history(changed_at);
 CREATE INDEX IF NOT EXISTS idx_username_history_flagged ON username_history(flagged);
 CREATE INDEX IF NOT EXISTS idx_username_history_flagged_at ON username_history(flagged_at);
+CREATE INDEX IF NOT EXISTS idx_forwarded_violations_user_id ON forwarded_violations(user_id);
+CREATE INDEX IF NOT EXISTS idx_forwarded_violations_group_id ON forwarded_violations(group_id);
+CREATE INDEX IF NOT EXISTS idx_forwarded_violations_timestamp ON forwarded_violations(timestamp);
+CREATE INDEX IF NOT EXISTS idx_bot_addition_attempts_user_id ON bot_addition_attempts(user_id);
+CREATE INDEX IF NOT EXISTS idx_bot_addition_attempts_group_id ON bot_addition_attempts(group_id);
+CREATE INDEX IF NOT EXISTS idx_bot_addition_attempts_timestamp ON bot_addition_attempts(timestamp);
+CREATE INDEX IF NOT EXISTS idx_bot_addition_attempts_bot_username ON bot_addition_attempts(bot_username);
 
 -- Promo codes table
 CREATE TABLE IF NOT EXISTS promo_codes (

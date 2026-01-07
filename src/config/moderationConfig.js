@@ -15,6 +15,8 @@ const MODERATION_CONFIG = {
       '⚠️ **Follow Warnings:** Respect moderator warnings - 3 strikes and you\'re out',
       '💬 **Stay On Topic:** Keep conversations relevant to the community',
       '🤖 **No Bots:** Only the official PNPtv bot is allowed in this group',
+      '📤 **No Forwarded Messages:** Messages forwarded from other groups or bots will be deleted',
+      '🔒 **Bot Addition:** Only admins can add bots to this group',
     ],
     es: [
       '🔞 **Requisito de Edad:** Debes tener más de 18 años para participar',
@@ -26,6 +28,8 @@ const MODERATION_CONFIG = {
       '⚠️ **Sigue las Advertencias:** Respeta las advertencias de los moderadores - 3 strikes y estás fuera',
       '💬 **Mantente en el Tema:** Mantén las conversaciones relevantes para la comunidad',
       '🤖 **Sin Bots:** Solo se permite el bot oficial de PNPtv en este grupo',
+      '📤 **Sin Mensajes Reenviados:** Los mensajes reenviados de otros grupos o bots serán eliminados',
+      '🔒 **Adición de Bots:** Solo los admins pueden agregar bots a este grupo',
     ],
   },
 
@@ -59,11 +63,29 @@ const MODERATION_CONFIG = {
       timeWindow: 30 * 1000, // In time window (30 seconds)
     },
 
-    // Link Filtering
+    // Link Filtering - ENHANCED: NO LINKS ALLOWED
     // Only admins are exempt (checked in middleware, not here)
     LINKS: {
       enabled: true,
-      allowedDomains: [],
+      allowNoLinks: true, // NEW: Block ALL links by default
+      allowedDomains: [], // Whitelist is empty - no links allowed
+    },
+
+    // Forwarded Messages Filtering - NEW
+    // Blocks messages forwarded from other groups or bots
+    FORWARDED_MESSAGES: {
+      enabled: true,
+      blockFromGroups: true,
+      blockFromBots: true,
+      blockFromExternal: true,
+    },
+
+    // Bot Addition Prevention - NEW
+    // Prevents non-admin users from adding bots
+    BOT_ADDITION: {
+      enabled: true,
+      allowOnlyAdmins: true,
+      officialBots: ['pnptv_bot', 'PNPtvBot', 'PNPtvOfficialBot'],
     },
 
     // Profanity Filter (basic - can be expanded)

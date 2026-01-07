@@ -21,21 +21,6 @@ CREATE INDEX IF NOT EXISTS idx_media_shares_created_at ON media_shares(created_a
 CREATE INDEX IF NOT EXISTS idx_media_shares_like_count ON media_shares(like_count);
 CREATE INDEX IF NOT EXISTS idx_media_shares_share_count ON media_shares(share_count);
 
--- Create a function to update the updated_at timestamp
-CREATE OR REPLACE FUNCTION update_media_shares_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Create triggers to automatically update timestamps
-CREATE TRIGGER trigger_update_media_shares_updated_at
-BEFORE UPDATE ON media_shares
-FOR EACH ROW
-EXECUTE FUNCTION update_media_shares_updated_at();
-
 -- Add comments for documentation
 COMMENT ON TABLE media_shares IS 'Tracks media shares and likes for gamification and rewards';
 COMMENT ON COLUMN media_shares.user_id IS 'Telegram user ID who shared the media';

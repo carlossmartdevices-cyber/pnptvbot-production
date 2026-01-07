@@ -48,6 +48,16 @@ class ModerationService {
    */
   static messageTracker = new Map();
 
+  /**
+   * Track forwarded messages for anti-spam
+   */
+  static forwardedMessageTracker = new Map();
+
+  /**
+   * Track bot additions to prevent unauthorized bots
+   */
+  static botAdditionTracker = new Map();
+
   // ==================== CONTENT DETECTION ====================
 
   /**
@@ -190,6 +200,7 @@ class ModerationService {
     };
   }
 
+=======
   /**
    * Cleanup message tracker
    */
@@ -210,7 +221,107 @@ class ModerationService {
     logger.debug(`Message tracker cleaned up. Size: ${this.messageTracker.size}`);
   }
 
-  // ==================== MODERATION ACTIONS ====================
+  /**
+   * Check if message is forwarded from another group or bot
+   * @param {Object} message - Telegram message object
+   * @returns {Object} { isForwarded, sourceType, sourceInfo }
+   */
+  static checkForwardedMessage(message) {
+    if (!message.forward_from || !message.forward_from_chat) {
+      return { isForwarded: false, sourceType: null, sourceInfo: null };
+    }
+
+    // Check if forwarded from a group
+    if (message.forward_from_chat && message.forward_from_chat.type === 'group') {
+      return {
+        isForwarded: true,
+        sourceType: 'group',
+        sourceInfo: {
+          chatId: message.forward_from_chat.id,
+          title: message.forward_from_chat.title || 'Unknown Group'
+        }
+      };
+    }
+
+    // Check if forwarded from a bot
+    if (message.forward_from && message.forward_from.is_bot) {
+      return {
+        isForwarded: true,
+        sourceType: 'bot',
+        sourceInfo: {
+          userId: message.forward_from.id,
+          username: message.forward_from.username || 'Unknown Bot',
+          firstName: message.forward_from.first_name || ''
+        }
+      };
+    }
+
+    // Check if forwarded from any external source
+    if (message.forward_from_chat) {
+      return {
+        isForwarded: true,
+        sourceType: message.forward_from_chat.type || 'external',
+        sourceInfo: {
+          chatId: message.forward_from_chat.id,
+          title: message.forward_from_chat.title || message.forward_from_chat.username || 'External Source'
+        }
+      };
+    }
+
+    return { isForwarded: false, sourceType: null, sourceInfo: null };
+  }
+
+  /**
+   * Check if a user is trying to add a bot to the group
+   * @param {number|string} userId - User ID attempting to add bot
+   * @param {number|string} groupId - Group ID
+   * @param {string} botUsername - Bot username being added
+   * @returns {Object} { isUnauthorized, reason }
+   */
+  static checkBotAddition(userId, groupId, botUsername) {
+    // Check if user is admin - admins can add any bot
+    const isAdmin = this.isUserAdmin(userId, groupId);
+    if (isAdmin) {
+      return { isUnauthorized: false, reason: 'User is admin' };
+    }
+
+    // Check if this is the official PNPtv bot
+    const officialBots = ['pnptv_bot', 'PNPtvBot', 'PNPtvOfficialBot'];
+    if (officialBots.includes(botUsername.toLowerCase())) {
+      return { isUnauthorized: false, reason: 'Official bot' };
+    }
+
+    // Track bot addition attempts
+    const key = `${groupId}_${userId}`;
+    const now = Date.now();
+    const windowMs = 3600000; // 1 hour
+
+    if (!this.botAdditionTracker.has(key)) {
+      this.botAdditionTracker.set(key, []);
+    }
+
+    const attempts = this.botAdditionTracker.get(key);
+    const recentAttempts = attempts.filter((timestamp) => now - timestamp < windowMs);
+    recentAttempts.push(now);
+    this.botAdditionTracker.set(key, recentAttempts);
+
+    return {
+      isUnauthorized: true,
+      reason: 'Non-admin user attempting to add unauthorized bot'
+    };
+  }
+
+  /**
+   * Check if user is admin (simplified - should be enhanced with actual admin check)
+   */
+  static isUserAdmin(userId, groupId) {
+    // In production, this should check the actual admin list from Telegram API
+    // For now, we'll use a simple approach
+    const adminUsers = process.env.ADMIN_USERS ? process.env.ADMIN_USERS.split(',') : [];
+    return adminUsers.includes(userId.toString());
+  }
+
+  // ==================== MODERATION ACTIONS ========================================
 
   /**
    * Process message and check if it should be moderated
@@ -297,6 +408,34 @@ class ModerationService {
             action: 'warn_and_delete',
             reason: 'profanity',
             details: `Banned words: ${words.join(', ')}`,
+          };
+        }
+      }
+
+      // Anti-Forwarded Messages check
+      if (settings.antiSpamEnabled) {
+        const { isForwarded, sourceType, sourceInfo } = this.checkForwardedMessage(message);
+
+        if (isForwarded) {
+          return {
+            shouldModerate: true,
+            action: 'delete',
+            reason: 'forwarded_message',
+            details: `Forwarded from ${sourceType}: ${JSON.stringify(sourceInfo)}`,
+          };
+        }
+      }
+
+      // Enhanced Link Filtering - No links allowed
+      if (settings.antiLinksEnabled) {
+        const { hasLinks, links } = this.detectLinks(text);
+
+        if (hasLinks) {
+          return {
+            shouldModerate: true,
+            action: 'warn_and_delete',
+            reason: 'unauthorized_link',
+            details: `Links detected: ${links.join(', ')} - No links allowed in this group`,
           };
         }
       }
