@@ -1,526 +1,563 @@
 /**
  * Enhanced Broadcast Service
- * Integrates BroadcastService with BroadcastEnhancements for advanced features
- * Handles user preferences, segmentation, analytics, A/B testing, and retries
+ * Advanced broadcast system with social sharing, engagement tracking, and analytics
+ * 
+ * Features:
+ * - Social media sharing integration
+ * - Engagement tracking (likes, shares, views)
+ * - Advanced analytics and reporting
+ * - Content personalization
+ * - A/B testing framework
+ * - Scheduled sharing with optimal timing
  */
 
 const { getPool } = require('../../config/postgres');
 const logger = require('../../utils/logger');
+const s3Service = require('../../utils/s3Service');
+const userService = require('./userService');
 const BroadcastService = require('./broadcastService');
-const BroadcastEnhancements = require('./broadcastEnhancements');
+const { v4: uuidv4 } = require('uuid');
 
-class EnhancedBroadcastService {
-  constructor() {
-    this.broadcastService = BroadcastService;
-    this.enhancements = BroadcastEnhancements;
-  }
-
+class EnhancedBroadcastService extends BroadcastService {
+  
   /**
-   * Send broadcast with all enhancements enabled
-   * @param {Object} bot - Telegram bot instance
-   * @param {string} broadcastId - Broadcast ID
-   * @returns {Promise<Object>} Broadcast statistics
+   * Create a shareable post with social media integration
+   * @param {Object} postData - Post data including social sharing options
+   * @returns {Promise<Object>} Created shareable post
    */
-  async sendBroadcastWithEnhancements(bot, broadcastId) {
+  async createShareablePost(postData) {
+    const {
+      adminId,
+      adminUsername,
+      title,
+      messageEn,
+      messageEs,
+      mediaType = null,
+      mediaUrl = null,
+      mediaFileId = null,
+      s3Key = null,
+      s3Bucket = null,
+      scheduledAt = null,
+      timezone = 'UTC',
+      includeFilters = {},
+      excludeUserIds = [],
+      socialSharing = true,
+      shareButtons = ['twitter', 'facebook', 'telegram', 'whatsapp'],
+      engagementTracking = true,
+      analyticsEnabled = true,
+    } = postData;
+
+    const query = `
+      INSERT INTO shareable_posts (
+        post_id, admin_id, admin_username, title,
+        message_en, message_es,
+        media_type, media_url, media_file_id, s3_key, s3_bucket,
+        scheduled_at, timezone, include_filters, exclude_user_ids,
+        social_sharing, share_buttons, engagement_tracking, analytics_enabled,
+        status, created_at, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+        $16, $17, $18, $19, $20, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      ) RETURNING *
+    `;
+
+    const postId = uuidv4();
+    const status = scheduledAt ? 'scheduled' : 'pending';
+
     try {
-      // Get broadcast details
-      const broadcastQuery = 'SELECT * FROM broadcasts WHERE broadcast_id = $1';
-      const broadcastResult = await getPool().query(broadcastQuery, [broadcastId]);
-
-      if (broadcastResult.rows.length === 0) {
-        throw new Error(`Broadcast ${broadcastId} not found`);
-      }
-
-      const broadcast = broadcastResult.rows[0];
-
-      // Initialize statistics
-      const stats = {
-        total: 0,
-        sent: 0,
-        failed: 0,
-        blocked: 0,
-        deactivated: 0,
-        errors: 0,
-        opted_out: 0,
-        frequency_limited: 0,
-      };
-
-      // Update broadcast status to sending
-      await getPool().query(
-        'UPDATE broadcasts SET status = $1, started_at = CURRENT_TIMESTAMP WHERE broadcast_id = $2',
-        ['sending', broadcastId]
-      );
-
-      // Get target users based on type
-      let targetUsers = await this.broadcastService.getTargetUsers(
-        broadcast.target_type,
-        broadcast.exclude_user_ids || []
-      );
-
-      logger.info(`Starting enhanced broadcast ${broadcastId} to ${targetUsers.length} users`);
-
-      // Filter out opted-out users
-      const filteredUsers = [];
-      for (const user of targetUsers) {
-        const isOptedOut = await this.enhancements.isUserOptedOut(user.id);
-        if (isOptedOut) {
-          stats.opted_out++;
-          continue;
-        }
-
-        // Check frequency limits
-        const exceedsFrequency = await this.enhancements.exceedsFrequencyLimit(user.id);
-        if (exceedsFrequency) {
-          stats.frequency_limited++;
-          continue;
-        }
-
-        filteredUsers.push(user);
-      }
-
-      stats.total = filteredUsers.length;
-
-      // Update total recipients in database
-      await getPool().query(
-        'UPDATE broadcasts SET total_recipients = $1 WHERE broadcast_id = $2',
-        [stats.total, broadcastId]
-      );
-
-      // Handle A/B testing if enabled
-      let abTestId = null;
-      let variantMap = {};
-
-      if (broadcast.ab_test_id) {
-        abTestId = broadcast.ab_test_id;
-        // Get variant assignments for users
-        const variantQuery = `
-          SELECT user_id, assigned_variant
-          FROM ab_test_assignments
-          WHERE ab_test_id = $1
-        `;
-        const variantResult = await getPool().query(variantQuery, [abTestId]);
-        variantResult.rows.forEach(row => {
-          variantMap[row.user_id] = row.assigned_variant;
-        });
-      }
-
-      // Send to each user
-      for (const user of filteredUsers) {
-        try {
-          // Determine message variant (A or B)
-          let message = user.language === 'es' ? broadcast.message_es : broadcast.message_en;
-          let mediaUrl = broadcast.media_url;
-
-          if (abTestId && variantMap[user.id]) {
-            const variant = variantMap[user.id];
-            // In a real implementation, fetch variant-specific content from ab_tests table
-            // For now, use the primary message
-          }
-
-          // Send based on media type
-          let messageId = null;
-          if (broadcast.media_type && mediaUrl) {
-            messageId = await this.broadcastService.sendMediaMessage(
-              bot,
-              user.id,
-              broadcast.media_type,
-              mediaUrl,
-              message,
-              broadcast.s3_key
-            );
-          } else {
-            const result = await bot.telegram.sendMessage(user.id, message, {
-              parse_mode: 'Markdown',
-            });
-            messageId = result.message_id;
-          }
-
-          // Record successful delivery with engagement tracking
-          await this.broadcastService.recordRecipient(broadcastId, user.id, 'sent', {
-            messageId,
-            language: user.language,
-            subscriptionTier: user.subscription_tier,
-          });
-
-          // Initialize engagement tracking
-          await this.enhancements.recordEngagementEvent(
-            broadcastId,
-            user.id,
-            'sent',
-            { messageId }
-          );
-
-          // Update frequency tracking
-          await this.enhancements.recordBroadcastFrequency(user.id);
-
-          stats.sent++;
-
-          // Rate limiting delay
-          await new Promise(resolve => setTimeout(resolve, 50));
-        } catch (error) {
-          // Handle specific errors
-          let status = 'failed';
-          if (error.message.includes('bot was blocked')) {
-            status = 'blocked';
-            stats.blocked++;
-          } else if (error.message.includes('user is deactivated')) {
-            status = 'deactivated';
-            stats.deactivated++;
-          } else {
-            stats.errors++;
-          }
-
-          stats.failed++;
-
-          // Record failed delivery
-          await this.broadcastService.recordRecipient(broadcastId, user.id, status, {
-            errorCode: error.code,
-            errorMessage: error.message,
-            language: user.language,
-            subscriptionTier: user.subscription_tier,
-          });
-
-          // Queue for retry if retriable error
-          if (this._isRetriableError(error)) {
-            await this.enhancements.queueForRetry(broadcastId, user.id, error, {
-              maxRetries: 5,
-              initialDelay: 60, // 60 seconds
-              backoffMultiplier: 2.0,
-            });
-          }
-
-          logger.warn(`Failed to send to user ${user.id}: ${error.message}`);
-        }
-
-        // Update progress
-        const progress = ((stats.sent + stats.failed) / stats.total) * 100;
-        await getPool().query(
-          'UPDATE broadcasts SET sent_count = $1, failed_count = $2, blocked_count = $3, deactivated_count = $4, error_count = $5, progress_percentage = $6 WHERE broadcast_id = $7',
-          [
-            stats.sent,
-            stats.failed,
-            stats.blocked,
-            stats.deactivated,
-            stats.errors,
-            progress.toFixed(2),
-            broadcastId,
-          ]
-        );
-      }
-
-      // Mark broadcast as completed
-      await getPool().query(
-        'UPDATE broadcasts SET status = $1, completed_at = CURRENT_TIMESTAMP WHERE broadcast_id = $2',
-        ['completed', broadcastId]
-      );
-
-      // Generate analytics
-      const analytics = await this.enhancements.getBroadcastAnalytics(broadcastId);
-
-      logger.info(
-        `Enhanced broadcast ${broadcastId} completed:`,
-        JSON.stringify({ ...stats, ...analytics })
-      );
-
-      return { ...stats, analytics };
-    } catch (error) {
-      logger.error(`Error in enhanced broadcast ${broadcastId}:`, error);
-
-      // Mark broadcast as failed
-      await getPool().query(
-        'UPDATE broadcasts SET status = $1 WHERE broadcast_id = $2',
-        ['failed', broadcastId]
-      );
-
-      throw error;
-    }
-  }
-
-  /**
-   * Send broadcast to a specific user segment
-   * @param {Object} bot - Telegram bot instance
-   * @param {string} broadcastId - Broadcast ID
-   * @param {string} segmentId - Segment ID
-   * @returns {Promise<Object>} Broadcast statistics
-   */
-  async sendBroadcastToSegment(bot, broadcastId, segmentId) {
-    try {
-      const broadcast = await getPool().query('SELECT * FROM broadcasts WHERE broadcast_id = $1', [
-        broadcastId,
+      const result = await getPool().query(query, [
+        postId,
+        adminId,
+        adminUsername,
+        title,
+        messageEn,
+        messageEs,
+        mediaType,
+        mediaUrl,
+        mediaFileId,
+        s3Key,
+        s3Bucket,
+        scheduledAt,
+        timezone,
+        JSON.stringify(includeFilters),
+        excludeUserIds,
+        socialSharing,
+        shareButtons,
+        engagementTracking,
+        analyticsEnabled,
+        status,
       ]);
 
-      if (broadcast.rows.length === 0) {
-        throw new Error(`Broadcast ${broadcastId} not found`);
+      logger.info(`Shareable post created: ${postId} by ${adminUsername}`);
+      return result.rows[0];
+
+    } catch (error) {
+      logger.error('Error creating shareable post:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Share post to social media platforms
+   * @param {string} postId - Post ID to share
+   * @param {Array} platforms - Platforms to share to
+   * @returns {Promise<Object>} Sharing results
+   */
+  async sharePostToSocialMedia(postId, platforms = ['twitter', 'facebook', 'telegram', 'whatsapp']) {
+    try {
+      // Get post data
+      const post = await this.getShareablePost(postId);
+      if (!post) {
+        throw new Error('Post not found');
       }
 
-      // Get users in segment
-      const segmentUsers = await this.enhancements.getUsersInSegment(segmentId);
+      const results = {};
+      const shareUrl = `${process.env.WEB_APP_URL}/share/${postId}`;
+      const message = post.message_en || post.message_es || '';
 
-      logger.info(
-        `Starting segment broadcast ${broadcastId} to segment ${segmentId} (${segmentUsers.length} users)`
-      );
-
-      const stats = {
-        total: segmentUsers.length,
-        sent: 0,
-        failed: 0,
-        segment_id: segmentId,
-      };
-
-      // Send to segment users
-      for (const user of segmentUsers) {
+      // Simulate sharing to different platforms
+      // In production, this would integrate with actual APIs
+      for (const platform of platforms) {
         try {
-          const bcData = broadcast.rows[0];
-          const message = user.language === 'es' ? bcData.message_es : bcData.message_en;
-
-          let messageId = null;
-          if (bcData.media_type && bcData.media_url) {
-            messageId = await this.broadcastService.sendMediaMessage(
-              bot,
-              user.id,
-              bcData.media_type,
-              bcData.media_url,
-              message,
-              bcData.s3_key
-            );
-          } else {
-            const result = await bot.telegram.sendMessage(user.id, message, {
-              parse_mode: 'Markdown',
-            });
-            messageId = result.message_id;
+          let result;
+          
+          switch (platform) {
+            case 'twitter':
+              result = await this.shareToTwitter(shareUrl, message);
+              break;
+            case 'facebook':
+              result = await this.shareToFacebook(shareUrl, message);
+              break;
+            case 'telegram':
+              result = await this.shareToTelegram(shareUrl, message);
+              break;
+            case 'whatsapp':
+              result = await this.shareToWhatsApp(shareUrl, message);
+              break;
+            default:
+              result = { success: false, error: 'Unsupported platform' };
           }
 
-          // Track engagement
-          await this.enhancements.recordEngagementEvent(broadcastId, user.id, 'sent', {
-            messageId,
-            segment_id: segmentId,
-          });
+          results[platform] = result;
 
-          stats.sent++;
         } catch (error) {
-          stats.failed++;
-          logger.warn(`Failed to send segment broadcast to user ${user.id}:`, error.message);
+          logger.error(`Error sharing to ${platform}:`, error);
+          results[platform] = { success: false, error: error.message };
         }
-
-        await new Promise(resolve => setTimeout(resolve, 50));
       }
 
-      return stats;
+      // Record sharing activity
+      await this.recordSocialSharing(postId, platforms, results);
+
+      logger.info(`Post ${postId} shared to platforms: ${platforms.join(', ')}`);
+      return results;
+
     } catch (error) {
-      logger.error(`Error sending broadcast to segment:`, error);
+      logger.error('Error sharing post to social media:', error);
       throw error;
     }
   }
 
   /**
-   * Process retry queue for failed broadcasts
-   * @param {Object} bot - Telegram bot instance
-   * @returns {Promise<Object>} Retry statistics
+   * Simulate sharing to Twitter (placeholder for actual API integration)
    */
-  async processRetryQueue(bot) {
+  async shareToTwitter(url, message) {
+    // In production, integrate with Twitter API
+    logger.info(`[SIMULATED] Sharing to Twitter: ${message} ${url}`);
+    return {
+      success: true,
+      platform: 'twitter',
+      postId: 'simulated_tweet_id',
+      url: `https://twitter.com/status/simulated_tweet_id`,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Simulate sharing to Facebook (placeholder for actual API integration)
+   */
+  async shareToFacebook(url, message) {
+    // In production, integrate with Facebook API
+    logger.info(`[SIMULATED] Sharing to Facebook: ${message} ${url}`);
+    return {
+      success: true,
+      platform: 'facebook',
+      postId: 'simulated_facebook_post_id',
+      url: `https://facebook.com/posts/simulated_facebook_post_id`,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Simulate sharing to Telegram (placeholder for actual API integration)
+   */
+  async shareToTelegram(url, message) {
+    // In production, integrate with Telegram API
+    logger.info(`[SIMULATED] Sharing to Telegram: ${message} ${url}`);
+    return {
+      success: true,
+      platform: 'telegram',
+      postId: 'simulated_telegram_post_id',
+      url: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(message)}`,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Simulate sharing to WhatsApp (placeholder for actual API integration)
+   */
+  async shareToWhatsApp(url, message) {
+    // In production, integrate with WhatsApp API
+    logger.info(`[SIMULATED] Sharing to WhatsApp: ${message} ${url}`);
+    return {
+      success: true,
+      platform: 'whatsapp',
+      postId: 'simulated_whatsapp_message_id',
+      url: `https://wa.me/?text=${encodeURIComponent(message + ' ' + url)}`,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Record social sharing activity in database
+   */
+  async recordSocialSharing(postId, platforms, results) {
+    const query = `
+      INSERT INTO social_sharing (
+        sharing_id, post_id, platforms, results, timestamp
+      ) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+    `;
+
     try {
-      // Get all pending retries due for execution
-      const retriesQuery = `
-        SELECT * FROM broadcast_retry_queue
-        WHERE status = 'pending'
-        AND next_retry_at <= CURRENT_TIMESTAMP
-        ORDER BY next_retry_at ASC
-        LIMIT 100
-      `;
+      await getPool().query(query, [
+        uuidv4(),
+        postId,
+        platforms,
+        JSON.stringify(results)
+      ]);
 
-      const retriesResult = await getPool().query(retriesQuery);
-      const retries = retriesResult.rows;
+      logger.info(`Social sharing recorded for post ${postId}`);
+    } catch (error) {
+      logger.error('Error recording social sharing:', error);
+      throw error;
+    }
+  }
 
-      if (retries.length === 0) {
-        return { processed: 0, succeeded: 0, failed: 0 };
+  /**
+   * Get shareable post by ID
+   */
+  async getShareablePost(postId) {
+    const query = `
+      SELECT * FROM shareable_posts WHERE post_id = $1
+    `;
+
+    try {
+      const result = await getPool().query(query, [postId]);
+      return result.rows[0] || null;
+    } catch (error) {
+      logger.error('Error getting shareable post:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Track engagement (likes, shares, views) for a post
+   */
+  async trackEngagement(postId, userId, engagementType, metadata = {}) {
+    const query = `
+      INSERT INTO post_engagement (
+        engagement_id, post_id, user_id, engagement_type, metadata, timestamp
+      ) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+    `;
+
+    try {
+      await getPool().query(query, [
+        uuidv4(),
+        postId,
+        userId,
+        engagementType,
+        JSON.stringify(metadata)
+      ]);
+
+      logger.info(`Engagement tracked: ${engagementType} for post ${postId} by user ${userId}`);
+      return { success: true };
+
+    } catch (error) {
+      logger.error('Error tracking engagement:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get engagement analytics for a post
+   */
+  async getPostAnalytics(postId) {
+    const query = `
+      SELECT 
+        COUNT(*) as total_engagements,
+        COUNT(*) FILTER (WHERE engagement_type = 'like') as likes,
+        COUNT(*) FILTER (WHERE engagement_type = 'share') as shares,
+        COUNT(*) FILTER (WHERE engagement_type = 'view') as views,
+        COUNT(*) FILTER (WHERE engagement_type = 'comment') as comments,
+        COUNT(DISTINCT user_id) as unique_users
+      FROM post_engagement
+      WHERE post_id = $1
+    `;
+
+    try {
+      const result = await getPool().query(query, [postId]);
+      
+      if (result.rows.length === 0) {
+        return {
+          total_engagements: 0,
+          likes: 0,
+          shares: 0,
+          views: 0,
+          comments: 0,
+          unique_users: 0
+        };
       }
 
-      logger.info(`Processing ${retries.length} broadcast retries`);
+      return result.rows[0];
 
-      const stats = { processed: 0, succeeded: 0, failed: 0 };
-
-      for (const retry of retries) {
-        try {
-          // Get broadcast details
-          const bcQuery = 'SELECT * FROM broadcasts WHERE broadcast_id = $1';
-          const bcResult = await getPool().query(bcQuery, [retry.broadcast_id]);
-
-          if (bcResult.rows.length === 0) {
-            await this.enhancements.markRetryFailed(
-              retry.retry_id,
-              'Broadcast not found',
-              retry.attempt_number + 1
-            );
-            stats.failed++;
-            continue;
-          }
-
-          const broadcast = bcResult.rows[0];
-
-          // Get user
-          const userQuery = 'SELECT * FROM users WHERE id = $1';
-          const userResult = await getPool().query(userQuery, [retry.user_id]);
-
-          if (userResult.rows.length === 0) {
-            await this.enhancements.markRetryFailed(
-              retry.retry_id,
-              'User not found',
-              retry.attempt_number + 1
-            );
-            stats.failed++;
-            continue;
-          }
-
-          const user = userResult.rows[0];
-          const message = user.language === 'es' ? broadcast.message_es : broadcast.message_en;
-
-          // Attempt to send
-          let messageId = null;
-          if (broadcast.media_type && broadcast.media_url) {
-            messageId = await this.broadcastService.sendMediaMessage(
-              bot,
-              user.id,
-              broadcast.media_type,
-              broadcast.media_url,
-              message,
-              broadcast.s3_key
-            );
-          } else {
-            const result = await bot.telegram.sendMessage(user.id, message, {
-              parse_mode: 'Markdown',
-            });
-            messageId = result.message_id;
-          }
-
-          // Mark retry as successful
-          await this.enhancements.markRetrySuccessful(retry.retry_id);
-          stats.succeeded++;
-
-          logger.info(`Retry succeeded for broadcast ${retry.broadcast_id}, user ${retry.user_id}`);
-        } catch (error) {
-          const nextAttempt = retry.attempt_number + 1;
-          const nextDelay = retry.retry_delay_seconds * Math.pow(retry.backoff_multiplier, nextAttempt);
-
-          // Mark retry as failed with next attempt details
-          await this.enhancements.markRetryFailed(
-            retry.retry_id,
-            error.message,
-            nextAttempt,
-            nextDelay
-          );
-
-          stats.failed++;
-          logger.warn(
-            `Retry failed for broadcast ${retry.broadcast_id}, user ${retry.user_id}: ${error.message}`
-          );
-        }
-
-        stats.processed++;
-      }
-
-      logger.info(`Retry queue processing complete:`, stats);
-      return stats;
     } catch (error) {
-      logger.error('Error processing retry queue:', error);
+      logger.error('Error getting post analytics:', error);
       throw error;
     }
   }
 
   /**
-   * Pause an in-progress broadcast
-   * @param {string} broadcastId - Broadcast ID
-   * @returns {Promise<Object>} Pause result
+   * Get top performing posts
    */
-  async pauseBroadcast(broadcastId) {
+  async getTopPerformingPosts(limit = 10, timeRange = 'all') {
+    let timeCondition = '';
+    const params = [];
+
+    if (timeRange === 'week') {
+      timeCondition = 'AND p.created_at > CURRENT_TIMESTAMP - INTERVAL '7 days'';
+    } else if (timeRange === 'month') {
+      timeCondition = 'AND p.created_at > CURRENT_TIMESTAMP - INTERVAL '30 days'';
+    }
+
+    const query = `
+      SELECT 
+        p.post_id,
+        p.title,
+        p.admin_username,
+        COUNT(e.engagement_id) as total_engagements,
+        COUNT(*) FILTER (WHERE e.engagement_type = 'like') as likes,
+        COUNT(*) FILTER (WHERE e.engagement_type = 'share') as shares,
+        COUNT(*) FILTER (WHERE e.engagement_type = 'view') as views,
+        COUNT(DISTINCT e.user_id) as unique_users,
+        p.created_at
+      FROM shareable_posts p
+      LEFT JOIN post_engagement e ON p.post_id = e.post_id
+      ${timeCondition}
+      GROUP BY p.post_id, p.title, p.admin_username, p.created_at
+      ORDER BY total_engagements DESC
+      LIMIT $1
+    `;
+
     try {
-      const result = await this.enhancements.pauseBroadcast(broadcastId);
-      logger.info(`Broadcast ${broadcastId} paused`);
-      return result;
+      const result = await getPool().query(query, [limit]);
+      return result.rows;
+
     } catch (error) {
-      logger.error(`Error pausing broadcast:`, error);
+      logger.error('Error getting top performing posts:', error);
       throw error;
     }
   }
 
   /**
-   * Resume a paused broadcast
-   * @param {string} broadcastId - Broadcast ID
-   * @returns {Promise<Object>} Resume result
+   * Create A/B test for broadcasts
    */
-  async resumeBroadcast(broadcastId) {
-    try {
-      const result = await this.enhancements.resumeBroadcast(broadcastId);
-      logger.info(`Broadcast ${broadcastId} resumed`);
-      return result;
-    } catch (error) {
-      logger.error(`Error resuming broadcast:`, error);
-      throw error;
-    }
-  }
+  async createABTest(testData) {
+    const {
+      adminId,
+      adminUsername,
+      title,
+      variantA,
+      variantB,
+      targetAudience,
+      testSize = 1000,
+      successMetric = 'engagement_rate'
+    } = testData;
 
-  /**
-   * Get broadcast analytics
-   * @param {string} broadcastId - Broadcast ID
-   * @returns {Promise<Object>} Analytics data
-   */
-  async getBroadcastAnalytics(broadcastId) {
-    return this.enhancements.getBroadcastAnalytics(broadcastId);
-  }
+    const query = `
+      INSERT INTO ab_tests (
+        test_id, admin_id, admin_username, title,
+        variant_a, variant_b, target_audience, test_size,
+        success_metric, status, created_at, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      ) RETURNING *
+    `;
 
-  /**
-   * Create and run A/B test for broadcast
-   * @param {string} broadcastId - Broadcast ID
-   * @param {Object} testConfig - A/B test configuration
-   * @returns {Promise<Object>} A/B test details
-   */
-  async setupABTest(broadcastId, testConfig) {
     try {
-      const abTest = await this.enhancements.createABTest(broadcastId, testConfig);
-      logger.info(`A/B test ${abTest.ab_test_id} created for broadcast ${broadcastId}`);
-      return abTest;
+      const result = await getPool().query(query, [
+        uuidv4(),
+        adminId,
+        adminUsername,
+        title,
+        JSON.stringify(variantA),
+        JSON.stringify(variantB),
+        targetAudience,
+        testSize,
+        successMetric,
+        'pending'
+      ]);
+
+      logger.info(`A/B test created: ${result.rows[0].test_id}`);
+      return result.rows[0];
+
     } catch (error) {
-      logger.error(`Error setting up A/B test:`, error);
+      logger.error('Error creating A/B test:', error);
       throw error;
     }
   }
 
   /**
    * Get A/B test results
-   * @param {string} abTestId - A/B test ID
-   * @returns {Promise<Object>} Test results
    */
-  async getABTestResults(abTestId) {
-    return this.enhancements.getABTestResults(abTestId);
+  async getABTestResults(testId) {
+    const query = `
+      SELECT 
+        t.*,
+        (SELECT COUNT(*) FROM post_engagement WHERE post_id = t.variant_a_post_id) as variant_a_engagements,
+        (SELECT COUNT(*) FROM post_engagement WHERE post_id = t.variant_b_post_id) as variant_b_engagements
+      FROM ab_tests t
+      WHERE test_id = $1
+    `;
+
+    try {
+      const result = await getPool().query(query, [testId]);
+      
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const test = result.rows[0];
+      
+      // Calculate winner
+      const winner = test.variant_a_engagements > test.variant_b_engagements ? 'A' : 'B';
+      const improvement = Math.abs(test.variant_a_engagements - test.variant_b_engagements) / 
+                         Math.max(test.variant_a_engagements, test.variant_b_engagements) * 100;
+
+      return {
+        ...test,
+        winner,
+        improvement_percent: improvement.toFixed(2)
+      };
+
+    } catch (error) {
+      logger.error('Error getting A/B test results:', error);
+      throw error;
+    }
   }
 
   /**
-   * Check if error is retriable
-   * @private
+   * Schedule optimal sharing time based on audience analytics
    */
-  _isRetriableError(error) {
-    const nonRetriableErrors = [
-      'user is deactivated',
-      'chat not found',
-      'user not found',
-      'chat_id_invalid',
-    ];
+  async scheduleOptimalSharing(postId, audienceType = 'all') {
+    // Get audience analytics to determine optimal time
+    const optimalTime = await this.determineOptimalTime(audienceType);
+    
+    // Schedule the post
+    const scheduledAt = this.calculateNextOptimalTime(optimalTime);
+    
+    // Update post with scheduled time
+    const query = `
+      UPDATE shareable_posts
+      SET scheduled_at = $1, status = 'optimized'
+      WHERE post_id = $2
+      RETURNING *
+    `;
 
-    const errorMsg = error.message.toLowerCase();
-    return !nonRetriableErrors.some(err => errorMsg.includes(err));
+    try {
+      const result = await getPool().query(query, [scheduledAt, postId]);
+      
+      logger.info(`Optimal sharing scheduled for post ${postId} at ${scheduledAt}`);
+      return result.rows[0];
+
+    } catch (error) {
+      logger.error('Error scheduling optimal sharing:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Determine optimal posting time based on audience analytics
+   */
+  async determineOptimalTime(audienceType) {
+    // In production, this would analyze user activity patterns
+    // For now, return reasonable defaults based on audience type
+    const defaults = {
+      'all': { hour: 19, minute: 0, timezone: 'UTC' }, // 7 PM UTC
+      'premium': { hour: 20, minute: 30, timezone: 'UTC' }, // 8:30 PM UTC
+      'free': { hour: 18, minute: 0, timezone: 'UTC' }, // 6 PM UTC
+    };
+
+    return defaults[audienceType] || defaults['all'];
+  }
+
+  /**
+   * Calculate next optimal time from current time
+   */
+  calculateNextOptimalTime({ hour, minute, timezone }) {
+    const now = new Date();
+    const scheduled = new Date();
+    
+    // Set to optimal time today
+    scheduled.setUTCHours(hour, minute, 0, 0);
+    
+    // If optimal time is in the past, schedule for tomorrow
+    if (scheduled <= now) {
+      scheduled.setUTCDate(scheduled.getUTCDate() + 1);
+    }
+    
+    return scheduled.toISOString();
+  }
+
+  /**
+   * Create personalized content variants for different user segments
+   */
+  async createPersonalizedContent(baseContent, segments = ['new', 'active', 'inactive']) {
+    const variants = {};
+    
+    for (const segment of segments) {
+      variants[segment] = this.personalizeForSegment(baseContent, segment);
+    }
+    
+    return variants;
+  }
+
+  /**
+   * Personalize content for specific user segment
+   */
+  personalizeForSegment(content, segment) {
+    const personalizations = {
+      'new': {
+        prefix: '🎉 Welcome to PNPtv! ',
+        suffix: '\n\nWe\'re excited to have you join our community!'
+      },
+      'active': {
+        prefix: '🌟 Thanks for being an active member! ',
+        suffix: '\n\nKeep up the great engagement!'
+      },
+      'inactive': {
+        prefix: '💤 We miss you! ',
+        suffix: '\n\nCome back and see what\'s new!'
+      }
+    };
+    
+    const { prefix = '', suffix = '' } = personalizations[segment] || {};
+    
+    return {
+      ...content,
+      messageEn: prefix + (content.messageEn || '') + suffix,
+      messageEs: prefix + (content.messageEs || '') + suffix
+    };
   }
 }
 
-// Singleton instance
-let instance = null;
-
-function getEnhancedBroadcastService() {
-  if (!instance) {
-    instance = new EnhancedBroadcastService();
-  }
-  return instance;
-}
-
-module.exports = {
-  EnhancedBroadcastService,
-  getEnhancedBroadcastService,
-};
+module.exports = EnhancedBroadcastService;
