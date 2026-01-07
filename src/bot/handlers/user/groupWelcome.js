@@ -399,20 +399,50 @@ async function handleViewRules(ctx) {
     const lang = user?.language || 'en';
 
     const rulesMessage = lang === 'es'
-      ? `📘 Reglas rápidas del grupo:
+      ? `📘 *Normas de la Comunidad PNPtv* 📘
 
-• Respeto
-• Nada de spam
-• Consentimiento siempre
-• No ventas externas
-• Cuídate y cuida a los demás`
-      : `📘 Quick Rules:
+💙 *Respeto y Seguridad:*
+• Trata a todos con respeto y amabilidad
+• Prohibido: discriminación, acoso, lenguaje de odio
+• Consentimiento obligatorio para contenido sensible
+• Reporta comportamiento inapropiado
 
-• Respect people
-• No spam
-• Consent always
-• No external selling
-• Take care of yourself and others`;
+💬 *Contenido de Calidad:*
+• Prohibido spam o autopromoción excesiva
+• Mantén conversaciones relevantes y valiosas
+• Comparte contenido significativo y positivo
+
+🛡️ *Normas de la Comunidad:*
+• No ventas o promociones externas
+• Sigue las reglas de Telegram y PNPtv
+• Ayuda a mantener un ambiente positivo
+
+❤️ *Cuidado Personal y Apoyo:*
+• Cuídate y cuida a los demás
+• Apoya a los miembros de la comunidad
+• Recursos de salud mental disponibles`
+      : `📘 *PNPtv Community Guidelines* 📘
+
+💙 *Respect & Safety:*
+• Be kind and respectful to all members
+• No discrimination, harassment, or hate speech
+• Consent required for sensitive content
+• Report inappropriate behavior
+
+💬 *Quality Content:*
+• No spam or excessive self-promotion
+• Keep conversations relevant and valuable
+• Share meaningful, positive content
+
+🛡️ *Community Standards:*
+• No external selling or promotions
+• Follow Telegram and PNPtv guidelines
+• Help maintain a positive environment
+
+❤️ *Self-Care & Support:*
+• Take care of yourself and others
+• Support fellow community members
+• Mental health resources available`;
 
     // Send rules as a reply or edit the message
     try {
