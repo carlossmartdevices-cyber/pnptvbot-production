@@ -14,7 +14,9 @@ fi
 echo "Building Videorama webapp…"
 cd "$WEBAPP_DIR"
 
-npm install
+if [[ ! -d node_modules ]]; then
+  npm install
+fi
 npm run build
 
 echo "Copying build output to public/…"
@@ -23,4 +25,3 @@ mkdir -p "$OUT_DIR"
 cp -R dist/* "$OUT_DIR/"
 
 echo "Done. Open: /videorama-app/"
-

@@ -83,6 +83,10 @@ function buildGroupMenuPayload(ctx) {
       lang === 'es' ? '🎬 Contenido Exclusivo' : '🎬 Exclusive Content',
       'menu_content'
     )],
+    [Markup.button.callback(
+      lang === 'es' ? '🎵 Videorama' : '🎵 Videorama',
+      'menu_videorama'
+    )],
   ];
 
   return { text, buttons };
@@ -161,9 +165,9 @@ Tap the buttons below and enjoy everything we've prepared for you — videos, Ne
             lang === 'es' ? '🎬 Contenido Exclusivo' : '🎬 Exclusive Content',
             'menu_content'
           )],
-          [Markup.button.url(
+          [Markup.button.callback(
             lang === 'es' ? '🎵 Videorama' : '🎵 Videorama',
-            'https://pnptv.app/videorama-app'
+            'menu_videorama'
           )],
           [Markup.button.callback(
             lang === 'es' ? '💎 Mi Membresía' : '💎 My Membership',
@@ -374,6 +378,69 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
       });
     } catch (error) {
       logger.error('Error in content menu:', error);
+    }
+  });
+
+  /**
+   * Videorama Menu
+   */
+  bot.action('menu_videorama', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery();
+
+      const videoramaText = lang === 'es'
+        ? `🎵 *Videorama - Tu Biblioteca de Videos*
+
+🎬 *Descubre y disfruta contenido de video de la comunidad*
+
+🎯 *Características:*
+✅ Explora videos de miembros de PNPtv
+✅ Filtra por categorías y popularidad
+✅ Guarda tus videos favoritos
+✅ Acceso rápido a contenido nuevo
+✅ Interfaz intuitiva y rápida
+
+📱 *Cómo usar:*
+1. Abre Videorama desde el menú principal
+2. Explora las categorías disponibles
+3. Selecciona un video para verlo
+4. Usa los filtros para encontrar lo que buscas
+5. Guarda tus favoritos para acceso rápido
+
+💡 *Consejo:* Videorama muestra contenido de toda la comunidad. Más interacciones = más contenido recomendado para ti!`
+        : `🎵 *Videorama - Your Video Library*
+
+🎬 *Discover and enjoy video content from the community*
+
+🎯 *Features:*
+✅ Browse videos from PNPtv members
+✅ Filter by categories and popularity
+✅ Save your favorite videos
+✅ Quick access to new content
+✅ Intuitive and fast interface
+
+📱 *How to use:*
+1. Open Videorama from the main menu
+2. Explore available categories
+3. Select a video to watch
+4. Use filters to find what you're looking for
+5. Save favorites for quick access
+
+💡 *Tip:* Videorama shows content from the entire community. More interactions = more recommended content for you!`;
+
+      await ctx.editMessageText(videoramaText, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.url(
+            lang === 'es' ? '🌐 Abrir Videorama' : '🌐 Open Videorama',
+            'https://pnptv.app/videorama-app'
+          )],
+          [Markup.button.callback(lang === 'es' ? '🔙 Atrás' : '🔙 Back', 'menu_main')],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in videorama menu:', error);
     }
   });
 

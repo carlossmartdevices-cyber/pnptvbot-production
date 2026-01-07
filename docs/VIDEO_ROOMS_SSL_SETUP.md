@@ -125,7 +125,7 @@ sudo systemctl reload nginx
 
 #### Step 4: Update Landing Page
 
-Update the iframe URL in `/home/user/pnptvbot-production/public/video-rooms.html`:
+The legacy iframe landing page (`public/video-rooms.html`) has been removed. If you still embed the video rooms in a page, update that page’s iframe URL:
 
 ```html
 <!-- Change from: -->
@@ -142,7 +142,7 @@ Update the iframe URL in `/home/user/pnptvbot-production/public/video-rooms.html
 curl -I https://videorooms.pnptv.app/pnptvvideorooms
 
 # Test in browser
-# Visit: https://pnptv.app/video-rooms
+# Visit: https://pnptv.app/video-rooms (legacy redirect) or your current video rooms page
 # The iframe should load without security warnings
 ```
 
@@ -184,7 +184,7 @@ location /videorooms-proxy {
 }
 ```
 
-**Update iframe** in `public/video-rooms.html`:
+**Update iframe** in your video rooms landing page (legacy `public/video-rooms.html` no longer exists):
 
 ```html
 <iframe src="https://pnptv.app/videorooms-proxy" ...></iframe>

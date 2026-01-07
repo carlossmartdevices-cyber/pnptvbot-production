@@ -14,7 +14,7 @@ function getSharePostButtonOptions() {
   const botUsername = process.env.BOT_USERNAME || 'PNPtv_bot';
   const mainRoomUrl = 'https://meet.jit.si/pnptv-main-room#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false';
   const hangoutsUrl = process.env.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts';
-  const videoramaUrl = process.env.VIDEORAMA_URL || 'https://pnptv.app/videorama';
+  const videoramaUrl = process.env.VIDEORAMA_URL || 'https://pnptv.app/videorama-app/';
 
   return [
     { key: 'home', text: '🏠 Back to home menu', type: 'url', target: `https://t.me/${botUsername}?start=1` },

@@ -236,7 +236,7 @@ The following HTML files have been integrated with the unified design system:
 
 ### Additional Pages (Ready to integrate)
 - payment-checkout.html
-- video-rooms.html
+- videorama-app/ (React build; replaces legacy video-rooms.html)
 - youtube-playlist.html
 - policies_en.html
 - policies_es.html
@@ -446,4 +446,3 @@ For design system updates or new component requests, maintain consistency with:
 
 - **Unified CSS:** `/public/unified-design.css` (370 lines)
 - **Integration:** Latest in `/public/lifetime-pass.html`, `/public/index.html`, `/public/community-room.html`, `/public/radio.html`, `/public/checkout.html`, `/public/age-verification-camera.html`
-

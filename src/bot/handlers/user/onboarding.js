@@ -135,8 +135,130 @@ If you have any questions, use /support to contact us.`;
       }
 
       if (user.onboardingComplete) {
-        // User already onboarded, show main menu
-        return ctx.scene?.enter ? ctx.scene.enter('main_menu') : showMainMenu(ctx);
+        // User already onboarded, show welcome message based on subscription status
+        const hasSubscription = await UserService.hasActiveSubscription(ctx.from.id);
+        const lang = getLanguage(ctx);
+        
+        let welcomeText, keyboard;
+        
+        if (hasSubscription) {
+          // PRIME user welcome message
+          welcomeText = lang === 'es'
+            ? `🎬 *¡Bienvenido de vuelta, PRIME!* 🎬
+
+💎 *Tu membresía está ACTIVA* 🎉
+
+🎁 *Disfruta de todos tus beneficios:*
+✅ Videos completos y contenido exclusivo
+✅ Acceso completo a PNP Nearby
+✅ Salas de video premium
+✅ Chat privado con miembros
+✅ Perfil destacado en la comunidad
+
+📱 *Menú rápido:*
+📸 /profile — Tu perfil
+📍 /nearby — ¿Quién está cerca?
+🎬 /content — Contenido exclusivo
+🎵 /videorama — Biblioteca de videos
+💎 /subscribe — Gestionar membresía
+
+💜 *Gracias por ser parte de PNPtv!*`
+            : `🎬 *Welcome back, PRIME!* 🎬
+
+💎 *Your membership is ACTIVE* 🎉
+
+🎁 *Enjoy all your benefits:*
+✅ Full-length and exclusive videos
+✅ Full access to PNP Nearby
+✅ Premium video rooms
+✅ Private chat with members
+✅ Featured profile in community
+
+📱 *Quick menu:*
+📸 /profile — Your profile
+📍 /nearby — Who is Nearby?
+🎬 /content — Exclusive content
+🎵 /videorama — Video library
+💎 /subscribe — Manage membership
+
+💜 *Thank you for being part of PNPtv!*`;
+          
+          keyboard = Markup.inlineKeyboard([
+            [Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile')],
+            [Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who is Nearby?', 'menu_nearby')],
+            [Markup.button.callback(lang === 'es' ? '🎬 Contenido Exclusivo' : '🎬 Exclusive Content', 'menu_content')],
+            [Markup.button.callback(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'menu_videorama')],
+            [Markup.button.callback(lang === 'es' ? '💎 Mi Membresía' : '💎 My Membership', 'menu_membership')],
+          ]);
+        } else {
+          // FREE user welcome message
+          welcomeText = lang === 'es'
+            ? `🎬 *¡Bienvenido a PNPtv!* 🎬
+
+📱 *Tu membresía actual: GRATIS*
+
+🎁 *Beneficios gratuitos:*
+✅ Sala comunitaria 24/7
+✅ Perfil y fotos
+✅ Chat grupal
+✅ Contenido limitado
+
+💎 *Desbloquea PRIME para:*
+✅ Videos completos y exclusivos
+✅ Filtros avanzados en Nearby
+✅ Salas de video privadas
+✅ Chat privado con miembros
+✅ Perfil destacado
+
+📱 *Menú rápido:*
+📸 /profile — Tu perfil
+📍 /nearby — ¿Quién está cerca?
+🎥 /hangouts — Salas de video
+🎵 /videorama — Biblioteca de videos
+💎 /subscribe — Ver planes PRIME
+
+💡 *¡Hazte PRIME hoy y disfruta de todo!*`
+            : `🎬 *Welcome to PNPtv!* 🎬
+
+📱 *Your current membership: FREE*
+
+🎁 *Free benefits:*
+✅ 24/7 Community Room
+✅ Profile and photos
+✅ Group chat
+✅ Limited content
+
+💎 *Unlock PRIME for:*
+✅ Full-length and exclusive videos
+✅ Advanced Nearby filters
+✅ Private video rooms
+✅ Private chat with members
+✅ Featured profile
+
+📱 *Quick menu:*
+📸 /profile — Your profile
+📍 /nearby — Who is Nearby?
+🎥 /hangouts — Video rooms
+🎵 /videorama — Video library
+💎 /subscribe — View PRIME plans
+
+💡 *Go PRIME today and enjoy everything!*`;
+          
+          keyboard = Markup.inlineKeyboard([
+            [Markup.button.callback(lang === 'es' ? '🔓 Ver Planes PRIME' : '🔓 View PRIME Plans', 'menu_membership')],
+            [Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile')],
+            [Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who is Nearby?', 'menu_nearby')],
+            [Markup.button.callback(lang === 'es' ? '🎥 Salas de Video' : '🎥 Video Rooms', 'menu_hangouts')],
+            [Markup.button.callback(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'menu_videorama')],
+          ]);
+        }
+        
+        await ctx.reply(welcomeText, {
+          parse_mode: 'Markdown',
+          ...keyboard,
+        });
+        
+        return;
       }
 
       // Start onboarding - language selection

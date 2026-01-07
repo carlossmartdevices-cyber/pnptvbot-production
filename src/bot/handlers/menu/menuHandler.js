@@ -906,16 +906,16 @@ async function handleVCRooms(ctx, lang) {
 async function handleVideorama(ctx, lang) {
   const message = lang === 'es'
     ? '🎬 *PNPtv Videorama*\n\n' +
-      'Accede a nuestro portal de videos exclusivos con contenido curado de los creadores de PNPtv.\n\n' +
-      '_Para ver Videorama, dirígete al bot._'
+      'Accede a Videorama y reproduce la playlist completa (auto-secuencial) con descripciones.\n\n' +
+      'Pulsa el botón de abajo:'
     : '🎬 *PNPtv Videorama*\n\n' +
-      'Access our exclusive video portal with curated content from PNPtv creators.\n\n' +
-      '_To view Videorama, go to the bot._';
+      'Open Videorama and play the full sequence (auto-advance) with descriptions.\n\n' +
+      'Tap the button below:';
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.url(
       lang === 'es' ? '🎬 Abrir Videorama' : '🎬 Open Videorama',
-      `https://t.me/${MENU_CONFIG.BOT_USERNAME}`
+      'https://pnptv.app/videorama-app/'
     )],
     [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
   ]);

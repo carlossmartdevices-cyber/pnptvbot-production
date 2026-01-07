@@ -99,7 +99,7 @@ curl -I https://pnptv.app/videorooms-api/external_api.js
 
 Open browser and test:
 ```
-https://pnptv.app/video-rooms
+https://pnptv.app/videorama-app/
 
 Check for:
 ✓ No security warnings
@@ -116,7 +116,7 @@ Check for:
 | File | Change | Status |
 |------|--------|--------|
 | `nginx/pnptv-app.conf` | Added reverse proxy + updated CSP | ✅ Complete |
-| `public/video-rooms.html` | Already using reverse proxy | ✅ Ready |
+| `public/videorama-app/` | Videorama React app (legacy `public/video-rooms.html` removed) | ✅ Ready |
 
 ### Video Rooms Server (148.230.80.210) - After Deployment
 | File | Purpose |
@@ -243,10 +243,10 @@ For more detailed information, refer to:
 ```
 User Browser
     ↓
-https://pnptv.app/video-rooms
+https://pnptv.app/video-rooms (redirects) or https://pnptv.app/videorama-app/
     ↓
 Main Server (72.60.29.80)
-    ├─ Serves HTML: public/video-rooms.html
+    ├─ Serves HTML: public/videorama-app/ (legacy public/video-rooms.html removed)
     ├─ Reverse Proxy: /videorooms-api → videorooms.pnptv.app
     └─ CSP Header: frame-src 'self' https://videorooms.pnptv.app
     ↓

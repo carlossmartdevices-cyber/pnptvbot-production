@@ -95,13 +95,13 @@ app.get('/how-to-use', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/how-to-use.html'));
 });
 
-// Videorama page
+// Videorama (legacy) now redirects to the new React app
 app.get('/videorama', (req, res) => {
   const host = req.get('host') || '';
   if (host.includes('easybots.store') || host.includes('easybots')) {
     return res.status(404).send('Page not found.');
   }
-  res.sendFile(path.join(__dirname, '../../../public/video-rooms.html'));
+  return res.redirect(301, '/videorama-app/');
 });
 
 // Legacy path redirect
@@ -110,7 +110,7 @@ app.get('/video-rooms', (req, res) => {
   if (host.includes('easybots.store') || host.includes('easybots')) {
     return res.status(404).send('Page not found.');
   }
-  res.redirect(301, '/videorama');
+  return res.redirect(301, '/videorama-app/');
 });
 
 // Lifetime Pass landing page
@@ -146,16 +146,11 @@ app.get('/policies', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
 
-// Videorama landing page
-app.get('/videorama', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public', 'video-rooms.html'));
-});
-
 // Videorama (new) - React app build output under /public/videorama-app
 app.get(['/videorama-app', '/videorama-app/'], pageLimiter, (req, res) => {
   const indexPath = path.join(__dirname, '../../../public/videorama-app/index.html');
   if (!fs.existsSync(indexPath)) {
-    return res.redirect('/videorama');
+    return res.status(404).send('Videorama app not built. Deploy `public/videorama-app/`.');
   }
   return res.sendFile(indexPath);
 });

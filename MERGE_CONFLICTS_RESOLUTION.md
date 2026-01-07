@@ -29,7 +29,7 @@ Branches without conflicts: **13**
 ### 2. ✅ claude/create-pnptv-landing-page-013FFARMn68woKkCvGCwZTQc
 
 **Conflicted Files:**
-- `public/video-rooms.html`
+- `public/video-rooms.html` (removed; replaced by `public/videorama-app/`)
 
 **Resolution Strategy:**
 - Kept HEAD version (landing page implementation)

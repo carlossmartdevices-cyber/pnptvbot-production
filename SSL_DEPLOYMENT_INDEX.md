@@ -32,7 +32,7 @@
 
 ### Configuration Changes
 - ✅ nginx/pnptv-app.conf - Reverse proxy + CSP headers
-- ✅ public/video-rooms.html - Already configured
+- ✅ public/videorama-app/ - React Videorama app (replaces legacy video-rooms.html)
 
 ---
 
@@ -88,7 +88,7 @@ Scripts:
 
 Configuration:
 ├── nginx/pnptv-app.conf .................. Updated
-└── public/video-rooms.html ............... Ready
+└── public/videorama-app/ ................. Ready
 ```
 
 ---
@@ -100,7 +100,7 @@ After deployment, you should have:
 ✓ HTTPS working: curl -I https://videorooms.pnptv.app/
 ✓ Valid certificate: Let's Encrypt
 ✓ No warnings: Browser shows no security issues
-✓ Video loads: https://pnptv.app/video-rooms works
+✓ Video loads: https://pnptv.app/videorama-app/ works
 ✓ Auto-renewal: Certificate auto-updates every 60 days
 
 ---

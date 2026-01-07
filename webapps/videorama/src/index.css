@@ -107,10 +107,16 @@ body {
 }
 
 .tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 10px;
   margin-bottom: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
@@ -125,6 +131,8 @@ body {
   color: rgba(255, 255, 255, 0.9);
   cursor: pointer;
   font-weight: 700;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .tab.active {
@@ -219,12 +227,67 @@ body {
   gap: 12px;
 }
 
+.hero {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(14px);
+  border-radius: 18px;
+  padding: 16px;
+  margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: -60px -40px auto -40px;
+  height: 140px;
+  background: radial-gradient(closest-side, rgba(236, 72, 153, 0.25), transparent 70%);
+  filter: blur(2px);
+}
+
+.heroTitle {
+  position: relative;
+  z-index: 1;
+  font-weight: 950;
+  letter-spacing: -0.02em;
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.heroText {
+  position: relative;
+  z-index: 1;
+  color: rgba(255, 255, 255, 0.74);
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+.heroActions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .card {
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(0, 0, 0, 0.26);
   backdrop-filter: blur(12px);
   border-radius: 18px;
   padding: 14px;
+}
+
+.cardBtn {
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.cardBtn:hover {
+  border-color: rgba(236, 72, 153, 0.35);
 }
 
 .cardTop {
@@ -388,6 +451,20 @@ body {
   font-size: 14px;
 }
 
+.monoTextarea {
+  width: 100%;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.92);
+  outline: none;
+  font-size: 12px;
+  line-height: 1.45;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  white-space: pre-wrap;
+}
+
 .hint {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.62);
@@ -475,6 +552,7 @@ body {
   width: 100%;
   aspect-ratio: 16 / 9;
   background: #000;
+  position: relative;
 }
 
 .playerFrame,
@@ -484,19 +562,127 @@ body {
   border: 0;
 }
 
-.sheetDesc {
-  padding: 12px 14px 0;
+.tapOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-weight: 900;
+  font-size: 16px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.queueControls {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.queueControls .btn {
+  flex: 1;
+}
+
+.queueMeta {
+  padding: 12px 14px 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.queueNow {
+  display: grid;
+  gap: 4px;
+}
+
+.queueLabel {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.62);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.queueTitle {
+  font-weight: 950;
+  letter-spacing: -0.02em;
+}
+
+.queueDesc {
   color: rgba(255, 255, 255, 0.82);
   white-space: pre-wrap;
   line-height: 1.4;
   font-size: 13px;
 }
 
-.sheetActions {
-  padding: 14px;
-  display: flex;
-  justify-content: flex-end;
+.queueList {
+  max-height: min(46vh, 420px);
+  overflow: auto;
+  padding: 10px 14px 14px;
+  display: grid;
   gap: 10px;
+}
+
+.queueItem {
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 12px;
+  cursor: pointer;
+  color: #fff;
+}
+
+.queueItem.active {
+  border-color: rgba(236, 72, 153, 0.55);
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.18), rgba(168, 85, 247, 0.12));
+}
+
+.queueItemTop {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+
+.queueIndex {
+  font-weight: 950;
+  opacity: 0.85;
+}
+
+.queueItemTitle {
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.queueItemDesc {
+  white-space: pre-wrap;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 80;
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 2, 16, 0.85);
+  backdrop-filter: blur(18px);
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 900;
+  letter-spacing: -0.01em;
 }
 
 .notice {
@@ -531,8 +717,6 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .tabs {
-    grid-template-columns: 240px 240px;
     justify-content: flex-start;
   }
 }
-

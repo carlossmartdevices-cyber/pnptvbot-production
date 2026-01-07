@@ -12,6 +12,7 @@ This guide provides step-by-step instructions to deploy the Video Rooms SSL upgr
 
 **Main Server**: 72.60.29.80 (pnptv.app)
 **Video Rooms Server**: 148.230.80.210 (will use videorooms.pnptv.app)
+**Note**: The legacy `public/video-rooms.html` page has been removed; `/video-rooms` and `/videorama` now redirect to `/videorama-app/`.
 
 ---
 
@@ -20,9 +21,9 @@ This guide provides step-by-step instructions to deploy the Video Rooms SSL upgr
 The following steps have already been automated and completed on the main server:
 
 ### 1. ✅ Updated iframe URL Configuration
-- **File**: `public/video-rooms.html`
-- **Current Status**: Already configured to use `https://pnptv.app/videorooms-api`
-- **Action**: No changes needed - uses reverse proxy
+- **Legacy File**: `public/video-rooms.html` (removed)
+- **Current Page**: `public/videorama-app/` (served at `/videorama-app/`)
+- **Action**: If you still use an iframe-based video rooms page elsewhere, update its URL to use the reverse proxy / domain.
 
 ### 2. ✅ Updated CSP Security Headers
 - **File**: `nginx/pnptv-app.conf` (Line 63)
@@ -247,7 +248,7 @@ TTL: 3600
 ### Main Server Changes
 | File | Change | Status |
 |------|--------|--------|
-| `public/video-rooms.html` | Uses `https://pnptv.app/videorooms-api` | ✓ Ready |
+| `public/videorama-app/` | Videorama React app (legacy `public/video-rooms.html` removed) | ✓ Ready |
 | `nginx/pnptv-app.conf` line 63 | CSP: `frame-src 'self' https://videorooms.pnptv.app;` | ✓ Applied |
 | `nginx/pnptv-app.conf` lines 114-151 | Added `/videorooms-api` reverse proxy | ✓ Applied |
 
@@ -413,7 +414,7 @@ The system will automatically fall back to using the old IP address if the proxy
 
 ### Configuration Files
 - `nginx/pnptv-app.conf` - Main server reverse proxy and CSP configuration
-- `public/video-rooms.html` - Video rooms HTML (already configured)
+- `public/videorama-app/` - Videorama React app (replaces legacy video-rooms.html)
 
 ### Documentation
 - `docs/VIDEO_ROOMS_SSL_SETUP.md` - Original setup guide

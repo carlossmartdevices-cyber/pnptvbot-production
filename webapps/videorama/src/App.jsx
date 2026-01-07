@@ -9,10 +9,19 @@ import {
   PlayCircle,
   X,
   Sparkles,
+  Play,
+  Copy,
+  Music2,
+  Mic2,
+  Star,
 } from 'lucide-react'
 import { loadItems, saveItems } from './lib/storage'
-import { getPublicPlaylists, uploadVideoramaVideo } from './lib/api'
-import { parseYouTubeUrl, toYouTubeEmbedUrl, tryYouTubeTitle } from './lib/youtube'
+import { getPublicPlaylists, uploadPodcastAudio, uploadVideoramaVideo } from './lib/api'
+import { parseYouTubeUrl, tryYouTubeTitle } from './lib/youtube'
+import PlayerSheet from './components/PlayerSheet'
+import { OFFICIAL_VIDEORAMA } from './lib/videoramaCatalog'
+import { TELEGRAM_POST_BILINGUAL } from './lib/telegramPost'
+import { loadPodcasts, savePodcasts } from './lib/podcastStorage'
 
 function cx(...parts) {
   return parts.filter(Boolean).join(' ')
@@ -25,69 +34,6 @@ function formatBytes(bytes) {
   const idx = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)))
   const v = n / (1024 ** idx)
   return `${v >= 10 ? Math.round(v) : Math.round(v * 10) / 10} ${units[idx]}`
-}
-
-function normalizePlaylistVideos(videos) {
-  try {
-    if (!videos) return []
-    if (Array.isArray(videos)) return videos
-    if (typeof videos === 'string') {
-      const parsed = JSON.parse(videos)
-      return Array.isArray(parsed) ? parsed : []
-    }
-    return []
-  } catch {
-    return []
-  }
-}
-
-function PlayerSheet({ item, onClose }) {
-  const yt = item?.kind === 'link' ? parseYouTubeUrl(item?.url) : null
-  const embed = yt ? toYouTubeEmbedUrl(yt) : null
-  const videoUrl = item?.kind === 'upload' ? new URL(item.url, window.location.origin).toString() : null
-
-  if (!item) return null
-
-  return (
-    <div className="sheetBackdrop" role="dialog" aria-modal="true">
-      <div className="sheet">
-        <div className="sheetHeader">
-          <div className="sheetTitle">
-            <div className="pill">{item.kind === 'upload' ? 'Upload' : 'Link'}</div>
-            <div className="titleText">{item.title}</div>
-          </div>
-          <button className="iconBtn" onClick={onClose} aria-label="Close">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="player">
-          {embed ? (
-            <iframe
-              title="YouTube player"
-              className="playerFrame"
-              src={embed}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          ) : (
-            <video className="playerVideo" controls playsInline src={videoUrl || item.url} />
-          )}
-        </div>
-
-        {item.description ? <div className="sheetDesc">{item.description}</div> : null}
-
-        <div className="sheetActions">
-          <a className="btn btnGhost" href={item.url} target="_blank" rel="noreferrer">
-            Open source
-          </a>
-          <button className="btn" onClick={onClose}>
-            Done
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 function Modal({ open, title, children, onClose }) {
@@ -108,13 +54,19 @@ function Modal({ open, title, children, onClose }) {
 }
 
 export default function App() {
-  const [tab, setTab] = useState('my')
+  const [tab, setTab] = useState('categories')
   const [items, setItems] = useState(() => loadItems())
+  const [podcasts, setPodcasts] = useState(() => loadPodcasts())
   const [query, setQuery] = useState('')
-  const [playerItem, setPlayerItem] = useState(null)
+  const [playerOpen, setPlayerOpen] = useState(false)
+  const [playerTitle, setPlayerTitle] = useState('')
+  const [playerQueue, setPlayerQueue] = useState([])
+  const [playerStartIndex, setPlayerStartIndex] = useState(0)
 
   const [openAddLink, setOpenAddLink] = useState(false)
   const [openAddUpload, setOpenAddUpload] = useState(false)
+  const [openTelegramPost, setOpenTelegramPost] = useState(false)
+  const [toast, setToast] = useState('')
 
   const [linkUrl, setLinkUrl] = useState('')
   const [linkTitle, setLinkTitle] = useState('')
@@ -128,16 +80,34 @@ export default function App() {
   const [uploadProgress, setUploadProgress] = useState(null)
   const uploadAbortRef = useRef(null)
 
+  const [openAddPodcast, setOpenAddPodcast] = useState(false)
+  const [podcastFile, setPodcastFile] = useState(null)
+  const [podcastTitle, setPodcastTitle] = useState('')
+  const [podcastDesc, setPodcastDesc] = useState('')
+  const [podcastBusy, setPodcastBusy] = useState(false)
+  const [podcastProgress, setPodcastProgress] = useState(null)
+  const podcastAbortRef = useRef(null)
+
   const [publicPlaylists, setPublicPlaylists] = useState([])
-  const [publicError, setPublicError] = useState('')
   const [publicLoading, setPublicLoading] = useState(false)
+  const [publicError, setPublicError] = useState('')
+
+  useEffect(() => {
+    if (!toast) return undefined
+    const t = setTimeout(() => setToast(''), 1800)
+    return () => clearTimeout(t)
+  }, [toast])
 
   useEffect(() => {
     saveItems(items)
   }, [items])
 
   useEffect(() => {
-    if (tab !== 'explore') return
+    savePodcasts(podcasts)
+  }, [podcasts])
+
+  useEffect(() => {
+    if (tab !== 'music') return
     let mounted = true
     setPublicLoading(true)
     setPublicError('')
@@ -160,6 +130,13 @@ export default function App() {
     }
   }, [tab])
 
+  function openQueue({ title, queue, startIndex = 0 }) {
+    setPlayerTitle(title || 'Videorama')
+    setPlayerQueue(queue || [])
+    setPlayerStartIndex(startIndex)
+    setPlayerOpen(true)
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return items.slice().sort((a, b) => b.createdAt - a.createdAt)
@@ -167,6 +144,10 @@ export default function App() {
       .filter((it) => `${it.title} ${it.url} ${it.description}`.toLowerCase().includes(q))
       .sort((a, b) => b.createdAt - a.createdAt)
   }, [items, query])
+
+  const podcastFiltered = useMemo(() => {
+    return podcasts.slice().sort((a, b) => b.createdAt - a.createdAt)
+  }, [podcasts])
 
   async function submitLink() {
     const url = String(linkUrl || '').trim()
@@ -252,6 +233,67 @@ export default function App() {
     }
   }
 
+  async function submitPodcast() {
+    const file = podcastFile
+    if (!file) return
+
+    const title = String(podcastTitle || '').trim()
+    const safeTitle = title || (file?.name ? file.name.replace(/\.[^/.]+$/, '') : 'Podcast')
+
+    setPodcastBusy(true)
+    setPodcastProgress({ pct: 0, loaded: 0, total: file.size })
+
+    const controller = new AbortController()
+    podcastAbortRef.current = controller
+
+    try {
+      const info = await uploadPodcastAudio(file, {
+        signal: controller.signal,
+        onProgress: (p) => setPodcastProgress(p),
+      })
+
+      const url = String(info?.url || '').trim()
+      if (!url) throw new Error('Upload succeeded but no URL returned')
+
+      const next = {
+        id: crypto.randomUUID(),
+        title: safeTitle,
+        url,
+        kind: 'audio',
+        createdAt: Date.now(),
+        description: String(podcastDesc || '').trim(),
+      }
+
+      setPodcasts((prev) => [next, ...prev])
+      setOpenAddPodcast(false)
+      setPodcastFile(null)
+      setPodcastTitle('')
+      setPodcastDesc('')
+      setPodcastProgress(null)
+      setTab('podcasts')
+    } finally {
+      setPodcastBusy(false)
+      podcastAbortRef.current = null
+    }
+  }
+
+  function cancelPodcastUpload() {
+    try {
+      podcastAbortRef.current?.abort()
+    } catch {
+      // ignore
+    }
+  }
+
+  async function copyTelegramPost() {
+    try {
+      await navigator.clipboard.writeText(TELEGRAM_POST_BILINGUAL)
+      setToast('Copied')
+    } catch {
+      setToast('Copy failed')
+    }
+  }
+
   return (
     <div className="app">
       <div className="bg" />
@@ -263,29 +305,243 @@ export default function App() {
           </div>
           <div className="brandText">
             <div className="brandName">PNPtv Videorama</div>
-            <div className="brandTag">Uploads + YouTube links, mobile-first</div>
+            <div className="brandTag">Categories • Featured • Podcasts</div>
           </div>
         </div>
 
         <div className="headerActions">
-          <button className="btn btnGhost" onClick={() => setOpenAddLink(true)}>
-            <Link2 size={18} /> Link
-          </button>
-          <button className="btn" onClick={() => setOpenAddUpload(true)}>
-            <UploadCloud size={18} /> Upload
-          </button>
+          {tab === 'videorama' ? (
+            <>
+              <button
+                className="btn"
+                onClick={() => openQueue({ title: 'Play Videorama', queue: OFFICIAL_VIDEORAMA, startIndex: 0 })}
+              >
+                <Play size={18} /> Play Videorama
+              </button>
+              <button className="btn btnGhost" onClick={() => setOpenTelegramPost(true)}>
+                <Copy size={18} /> Post
+              </button>
+            </>
+          ) : tab === 'podcasts' ? (
+            <>
+              <button
+                className="btn"
+                onClick={() => openQueue({ title: 'Podcasts', queue: podcastFiltered, startIndex: 0 })}
+                disabled={podcastFiltered.length === 0}
+              >
+                <Play size={18} /> Play All
+              </button>
+              <button className="btn btnGhost" onClick={() => setOpenAddPodcast(true)}>
+                <Mic2 size={18} /> Upload
+              </button>
+            </>
+          ) : tab === 'my' ? (
+            <>
+              <button className="btn btnGhost" onClick={() => setOpenAddLink(true)}>
+                <Link2 size={18} /> Link
+              </button>
+              <button className="btn" onClick={() => setOpenAddUpload(true)}>
+                <UploadCloud size={18} /> Upload
+              </button>
+            </>
+          ) : (
+            null
+          )}
         </div>
       </header>
 
       <main className="main">
         <div className="tabs">
+          <button className={cx('tab', tab === 'categories' && 'active')} onClick={() => setTab('categories')}>
+            <Sparkles size={18} /> Categories
+          </button>
+          <button className={cx('tab', tab === 'music' && 'active')} onClick={() => setTab('music')}>
+            <Music2 size={18} /> PNP Music
+          </button>
+          <button className={cx('tab', tab === 'videorama' && 'active')} onClick={() => setTab('videorama')}>
+            <Star size={18} /> Featured
+          </button>
+          <button className={cx('tab', tab === 'podcasts' && 'active')} onClick={() => setTab('podcasts')}>
+            <Mic2 size={18} /> Podcasts
+          </button>
           <button className={cx('tab', tab === 'my' && 'active')} onClick={() => setTab('my')}>
             <Film size={18} /> My Mix
           </button>
-          <button className={cx('tab', tab === 'explore' && 'active')} onClick={() => setTab('explore')}>
-            <Sparkles size={18} /> Explore
-          </button>
         </div>
+
+        {tab === 'categories' ? (
+          <>
+            <div className="hero">
+              <div className="heroTitle">PNPtv Categories</div>
+              <div className="heroText">Choose a lane: music, featured videoramas, or podcasts.</div>
+            </div>
+
+            <div className="grid">
+              <button className="card cardBtn" onClick={() => setTab('music')}>
+                <div className="cardTop">
+                  <div className="pill">Category</div>
+                  <div className="pill subtle">PNP Music</div>
+                </div>
+                <div className="cardTitle">PNP Music / Música para Viciosos</div>
+                <div className="cardDesc">Colecciones, links y playlists curadas para viciosos.</div>
+              </button>
+
+              <button className="card cardBtn" onClick={() => setTab('videorama')}>
+                <div className="cardTop">
+                  <div className="pill">Category</div>
+                  <div className="pill subtle">Featured</div>
+                </div>
+                <div className="cardTitle">Featured Videoramas</div>
+                <div className="cardDesc">Play full sequences back‑to‑back with the curator’s text.</div>
+              </button>
+
+              <button className="card cardBtn" onClick={() => setTab('podcasts')}>
+                <div className="cardTop">
+                  <div className="pill">Category</div>
+                  <div className="pill subtle">Podcasts</div>
+                </div>
+                <div className="cardTitle">Podcasts by PNP putxs</div>
+                <div className="cardDesc">Uploads + playback. Keep it raw, personal, and PNPtv.</div>
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {tab === 'music' ? (
+          <>
+            <div className="hero">
+              <div className="heroTitle">PNP Music / Música para Viciosos</div>
+              <div className="heroText">Browse curated playlists. (No preview — open the full collections.)</div>
+              <div className="heroActions">
+                <a className="btn" href="/music-collections" target="_blank" rel="noreferrer">
+                  <Music2 size={18} /> Open Music Collections
+                </a>
+              </div>
+            </div>
+
+            {publicLoading ? <div className="notice">Loading playlists…</div> : null}
+            {publicError ? <div className="notice error">{publicError}</div> : null}
+
+            <div className="grid">
+              {publicPlaylists.map((p) => (
+                <div key={p.id} className="card">
+                  <div className="cardTop">
+                    <div className="pill">Playlist</div>
+                    <div className="pill subtle">{p.videoCount || 0} items</div>
+                  </div>
+                  <div className="cardTitle">{p.title || 'Untitled playlist'}</div>
+                  {p.description ? <div className="cardDesc">{p.description}</div> : null}
+                  <div className="cardActions">
+                    <a className="btn btnSmall btnGhost" href="/music-collections" target="_blank" rel="noreferrer">
+                      Open
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+
+        {tab === 'videorama' ? (
+          <>
+            <div className="hero">
+              <div className="heroTitle">PNPtv – Emotional Rollercoaster</div>
+              <div className="heroText">
+                Hit play and let it run. Every track plays back‑to‑back, with your descriptions showing as it goes.
+              </div>
+              <div className="heroActions">
+                <button
+                  className="btn"
+                  onClick={() => openQueue({ title: 'Play Videorama', queue: OFFICIAL_VIDEORAMA, startIndex: 0 })}
+                >
+                  <Play size={18} /> Play Videorama
+                </button>
+                <button className="btn btnGhost" onClick={() => setOpenTelegramPost(true)}>
+                  <Copy size={18} /> Post para Telegram
+                </button>
+              </div>
+            </div>
+
+            <div className="grid">
+              {OFFICIAL_VIDEORAMA.map((it, idx) => (
+                <div key={it.id} className="card">
+                  <div className="cardTop">
+                    <div className="pill">Track</div>
+                    <button
+                      className="btn btnSmall"
+                      onClick={() => openQueue({ title: 'Play Videorama', queue: OFFICIAL_VIDEORAMA, startIndex: idx })}
+                    >
+                      <PlayCircle size={18} /> Play from here
+                    </button>
+                  </div>
+                  <div className="cardTitle">{it.title}</div>
+                  <div className="cardSub">{it.url}</div>
+                  {it.description ? <div className="cardDesc">{it.description}</div> : null}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+
+        {tab === 'podcasts' ? (
+          <>
+            <div className="hero">
+              <div className="heroTitle">Podcasts by PNP putxs</div>
+              <div className="heroText">Upload and play episodes. Tap “Play All” for back‑to‑back.</div>
+              <div className="heroActions">
+                <button
+                  className="btn"
+                  onClick={() => openQueue({ title: 'Podcasts', queue: podcastFiltered, startIndex: 0 })}
+                  disabled={podcastFiltered.length === 0}
+                >
+                  <Play size={18} /> Play All
+                </button>
+                <button className="btn btnGhost" onClick={() => setOpenAddPodcast(true)}>
+                  <Mic2 size={18} /> Upload Podcast
+                </button>
+              </div>
+            </div>
+
+            {podcastFiltered.length === 0 ? (
+              <div className="empty">
+                <div className="emptyTitle">No podcasts yet</div>
+                <div className="emptyText">Upload your first episode and it’ll show up here.</div>
+                <div className="emptyActions">
+                  <button className="btn" onClick={() => setOpenAddPodcast(true)}>
+                    <Mic2 size={18} /> Upload Podcast
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid">
+                {podcastFiltered.map((it) => (
+                  <div key={it.id} className="card">
+                    <div className="cardTop">
+                      <div className="pill">Podcast</div>
+                      <button
+                        className="iconBtn danger"
+                        onClick={() => setPodcasts((prev) => prev.filter((x) => x.id !== it.id))}
+                        aria-label="Delete"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                    <div className="cardTitle">{it.title}</div>
+                    {it.description ? <div className="cardDesc">{it.description}</div> : null}
+                    <div className="cardActions">
+                      <button className="btn btnSmall" onClick={() => openQueue({ title: it.title, queue: [it], startIndex: 0 })}>
+                        <PlayCircle size={18} /> Play
+                      </button>
+                      <a className="btn btnSmall btnGhost" href={it.url} target="_blank" rel="noreferrer">
+                        Open
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : null}
 
         {tab === 'my' ? (
           <>
@@ -335,7 +591,10 @@ export default function App() {
                     <div className="cardSub">{it.url}</div>
                     {it.description ? <div className="cardDesc">{it.description}</div> : null}
                     <div className="cardActions">
-                      <button className="btn btnSmall" onClick={() => setPlayerItem(it)}>
+                      <button
+                        className="btn btnSmall"
+                        onClick={() => openQueue({ title: 'My Mix', queue: [it], startIndex: 0 })}
+                      >
                         <PlayCircle size={18} /> Play
                       </button>
                       <a className="btn btnSmall btnGhost" href={it.url} target="_blank" rel="noreferrer">
@@ -348,74 +607,93 @@ export default function App() {
             )}
           </>
         ) : null}
-
-        {tab === 'explore' ? (
-          <div className="explore">
-            <div className="exploreTop">
-              <div className="exploreTitle">Community Collections</div>
-              <a className="btn btnGhost" href="/music-collections" target="_blank" rel="noreferrer">
-                Open classic page
-              </a>
-            </div>
-
-            {publicLoading ? <div className="notice">Loading playlists…</div> : null}
-            {publicError ? <div className="notice error">{publicError}</div> : null}
-
-            <div className="grid">
-              {publicPlaylists.map((p) => {
-                const vids = normalizePlaylistVideos(p.videos)
-                const sample = vids[0]?.url || vids[0]
-                const sampleText = sample ? String(sample) : ''
-                return (
-                  <div key={p.id} className="card">
-                    <div className="cardTop">
-                      <div className="pill">Playlist</div>
-                      <div className="pill subtle">{p.videoCount || vids.length || 0} items</div>
-                    </div>
-                    <div className="cardTitle">{p.title || 'Untitled playlist'}</div>
-                    {p.description ? <div className="cardDesc">{p.description}</div> : null}
-                    {sampleText ? <div className="cardSub">{sampleText}</div> : null}
-                    <div className="cardActions">
-                      {sampleText ? (
-                        <button
-                          className="btn btnSmall"
-                          onClick={() =>
-                            setPlayerItem({
-                              id: `${p.id}:sample`,
-                              title: p.title || 'Playlist sample',
-                              url: sampleText,
-                              kind: 'link',
-                              createdAt: Date.now(),
-                              description: p.description || '',
-                            })
-                          }
-                        >
-                          <PlayCircle size={18} /> Preview
-                        </button>
-                      ) : null}
-                      <a className="btn btnSmall btnGhost" href="/music-collections" target="_blank" rel="noreferrer">
-                        Browse
-                      </a>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        ) : null}
       </main>
 
       <footer className="footer">
-        <a className="footerLink" href="/videorama" target="_blank" rel="noreferrer">
-          Old Videorama
-        </a>
-        <span className="footerDot">•</span>
         <a className="footerLink" href="/terms?lang=en" target="_blank" rel="noreferrer">
           Policies
         </a>
       </footer>
 
-      <PlayerSheet item={playerItem} onClose={() => setPlayerItem(null)} />
+      <PlayerSheet
+        open={playerOpen}
+        title={playerTitle}
+        queue={playerQueue}
+        startIndex={playerStartIndex}
+        onClose={() => setPlayerOpen(false)}
+      />
+
+      <Modal
+        open={openTelegramPost}
+        title="Post para Telegram"
+        onClose={() => setOpenTelegramPost(false)}
+      >
+        <div className="hint">Listo para copiar / pegar.</div>
+        <textarea className="monoTextarea" rows={18} value={TELEGRAM_POST_BILINGUAL} readOnly />
+        <div className="modalActions">
+          <button className="btn btnGhost" onClick={() => setOpenTelegramPost(false)}>
+            Close
+          </button>
+          <button className="btn" onClick={copyTelegramPost}>
+            <Copy size={18} /> Copy
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={openAddPodcast}
+        title="Upload Podcast"
+        onClose={() => {
+          if (podcastBusy) return
+          setOpenAddPodcast(false)
+        }}
+      >
+        <label className="field">
+          <div className="label">Audio file (max 100MB)</div>
+          <input
+            type="file"
+            accept="audio/*"
+            onChange={(e) => setPodcastFile(e.target.files?.[0] || null)}
+            disabled={podcastBusy}
+          />
+          {podcastFile ? <div className="hint">{podcastFile.name} • {formatBytes(podcastFile.size)}</div> : null}
+        </label>
+        <label className="field">
+          <div className="label">Title (optional)</div>
+          <input value={podcastTitle} onChange={(e) => setPodcastTitle(e.target.value)} disabled={podcastBusy} />
+        </label>
+        <label className="field">
+          <div className="label">Notes (optional)</div>
+          <textarea value={podcastDesc} onChange={(e) => setPodcastDesc(e.target.value)} rows={3} disabled={podcastBusy} />
+        </label>
+
+        {podcastProgress ? (
+          <div className="progress">
+            <div className="progressTop">
+              <div>Uploading…</div>
+              <div>{podcastProgress.pct || 0}%</div>
+            </div>
+            <div className="progressBar">
+              <div className="progressFill" style={{ width: `${Math.max(0, Math.min(100, podcastProgress.pct || 0))}%` }} />
+            </div>
+            <div className="progressMeta">
+              <span>{formatBytes(podcastProgress.loaded || 0)} / {formatBytes(podcastProgress.total || 0)}</span>
+              <button className="btn btnSmall btnGhost" onClick={cancelPodcastUpload}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="modalActions">
+          <button className="btn btnGhost" onClick={() => setOpenAddPodcast(false)} disabled={podcastBusy}>
+            Close
+          </button>
+          <button className="btn" onClick={submitPodcast} disabled={podcastBusy || !podcastFile}>
+            {podcastBusy ? 'Uploading…' : 'Upload'}
+          </button>
+        </div>
+      </Modal>
 
       <Modal
         open={openAddLink}
@@ -505,7 +783,8 @@ export default function App() {
           </button>
         </div>
       </Modal>
+
+      {toast ? <div className="toast">{toast}</div> : null}
     </div>
   )
 }
-
