@@ -434,7 +434,10 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
         ...Markup.inlineKeyboard([
           [Markup.button.url(
             lang === 'es' ? '🌐 Abrir Videorama' : '🌐 Open Videorama',
-            'https://pnptv.app/videorama-app'
+            (() => {
+              const tg = ctx.from?.username ? `@${ctx.from.username}` : '';
+              return tg ? `https://pnptv.app/videorama-app/?tg=${encodeURIComponent(tg)}` : 'https://pnptv.app/videorama-app/';
+            })()
           )],
           [Markup.button.callback(lang === 'es' ? '🔙 Atrás' : '🔙 Back', 'menu_main')],
         ]),

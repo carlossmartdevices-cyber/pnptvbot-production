@@ -22,9 +22,27 @@ import PlayerSheet from './components/PlayerSheet'
 import { OFFICIAL_VIDEORAMA } from './lib/videoramaCatalog'
 import { TELEGRAM_POST_BILINGUAL } from './lib/telegramPost'
 import { loadPodcasts, savePodcasts } from './lib/podcastStorage'
+import { getTelegramCreator } from './lib/userContext'
+import { DEFAULT_FEATURED, loadFeaturedVideoramas, saveFeaturedVideoramas } from './lib/featuredVideoramas'
 
 function cx(...parts) {
   return parts.filter(Boolean).join(' ')
+}
+
+function normalizeKeyPart(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function dedupePlaylists(playlists) {
+  const seen = new Set()
+  const out = []
+  for (const p of playlists || []) {
+    const key = [normalizeKeyPart(p.category), normalizeKeyPart(p.title), normalizeKeyPart(p.creator)].join('|')
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(p)
+  }
+  return out
 }
 
 function formatBytes(bytes) {
@@ -62,11 +80,13 @@ export default function App() {
   const [playerTitle, setPlayerTitle] = useState('')
   const [playerQueue, setPlayerQueue] = useState([])
   const [playerStartIndex, setPlayerStartIndex] = useState(0)
+  const [playerMode, setPlayerMode] = useState('full')
 
   const [openAddLink, setOpenAddLink] = useState(false)
   const [openAddUpload, setOpenAddUpload] = useState(false)
   const [openTelegramPost, setOpenTelegramPost] = useState(false)
   const [toast, setToast] = useState('')
+  const [openCreateVideorama, setOpenCreateVideorama] = useState(false)
 
   const [linkUrl, setLinkUrl] = useState('')
   const [linkTitle, setLinkTitle] = useState('')
@@ -92,6 +112,16 @@ export default function App() {
   const [publicLoading, setPublicLoading] = useState(false)
   const [publicError, setPublicError] = useState('')
 
+  const [createVideoramaTitle, setCreateVideoramaTitle] = useState('')
+  const [createVideoramaDesc, setCreateVideoramaDesc] = useState('')
+
+  const [featured, setFeatured] = useState(() => {
+    const stored = loadFeaturedVideoramas()
+    return [...DEFAULT_FEATURED, ...stored].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+  })
+
+  const tgCreator = useMemo(() => getTelegramCreator(), [])
+
   useEffect(() => {
     if (!toast) return undefined
     const t = setTimeout(() => setToast(''), 1800)
@@ -107,6 +137,13 @@ export default function App() {
   }, [podcasts])
 
   useEffect(() => {
+    // Persist only user-created featured videoramas (exclude defaults)
+    const defaultIds = new Set(DEFAULT_FEATURED.map((v) => v.id))
+    const userCreated = (featured || []).filter((v) => !defaultIds.has(v.id))
+    saveFeaturedVideoramas(userCreated)
+  }, [featured])
+
+  useEffect(() => {
     if (tab !== 'music') return
     let mounted = true
     setPublicLoading(true)
@@ -114,7 +151,7 @@ export default function App() {
     getPublicPlaylists(30)
       .then((data) => {
         if (!mounted) return
-        setPublicPlaylists(Array.isArray(data) ? data : [])
+        setPublicPlaylists(dedupePlaylists(Array.isArray(data) ? data : []))
       })
       .catch((e) => {
         if (!mounted) return
@@ -130,10 +167,11 @@ export default function App() {
     }
   }, [tab])
 
-  function openQueue({ title, queue, startIndex = 0 }) {
+  function openQueue({ title, queue, startIndex = 0, mode = 'full' }) {
     setPlayerTitle(title || 'Videorama')
     setPlayerQueue(queue || [])
     setPlayerStartIndex(startIndex)
+    setPlayerMode(mode)
     setPlayerOpen(true)
   }
 
@@ -285,6 +323,45 @@ export default function App() {
     }
   }
 
+  function openFeaturedVideorama(videorama) {
+    openQueue({
+      title: videorama?.creator ? `${videorama.title} — by ${videorama.creator}` : videorama?.title,
+      queue: videorama?.tracks || [],
+      startIndex: 0,
+      mode: 'focus',
+    })
+  }
+
+  function startCreateVideorama() {
+    setCreateVideoramaTitle('')
+    setCreateVideoramaDesc('')
+    setOpenCreateVideorama(true)
+  }
+
+  function createVideoramaFromMyMix({ title, description }) {
+    const normalizedTitle = String(title || '').trim() || 'Untitled Videorama'
+    const creator = tgCreator || 'Anonymous'
+    const tracks = items
+      .slice()
+      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+      .map((t) => ({ ...t }))
+
+    const next = {
+      id: crypto.randomUUID(),
+      title: normalizedTitle,
+      category: 'Featured Videoramas',
+      creator,
+      description: String(description || '').trim(),
+      tracks,
+      createdAt: Date.now(),
+    }
+
+    setFeatured((prev) => [next, ...(prev || [])])
+    setOpenCreateVideorama(false)
+    setToast('Videorama created')
+    setTab('videorama')
+  }
+
   async function copyTelegramPost() {
     try {
       await navigator.clipboard.writeText(TELEGRAM_POST_BILINGUAL)
@@ -314,7 +391,7 @@ export default function App() {
             <>
               <button
                 className="btn"
-                onClick={() => openQueue({ title: 'Play Videorama', queue: OFFICIAL_VIDEORAMA, startIndex: 0 })}
+                onClick={() => openQueue({ title: 'Videorama', queue: OFFICIAL_VIDEORAMA, startIndex: 0, mode: 'focus' })}
               >
                 <Play size={18} /> Play Videorama
               </button>
@@ -445,38 +522,36 @@ export default function App() {
         {tab === 'videorama' ? (
           <>
             <div className="hero">
-              <div className="heroTitle">PNPtv – Emotional Rollercoaster</div>
-              <div className="heroText">
-                Hit play and let it run. Every track plays back‑to‑back, with your descriptions showing as it goes.
-              </div>
+              <div className="heroTitle">Featured Videoramas</div>
+              <div className="heroText">Play featured sequences back‑to‑back. New creations are credited to your Telegram username.</div>
               <div className="heroActions">
                 <button
                   className="btn"
-                  onClick={() => openQueue({ title: 'Play Videorama', queue: OFFICIAL_VIDEORAMA, startIndex: 0 })}
+                  onClick={() => openFeaturedVideorama(DEFAULT_FEATURED[0])}
                 >
                   <Play size={18} /> Play Videorama
                 </button>
                 <button className="btn btnGhost" onClick={() => setOpenTelegramPost(true)}>
                   <Copy size={18} /> Post para Telegram
                 </button>
+                <button className="btn btnGhost" onClick={startCreateVideorama}>
+                  <Plus size={18} /> Create
+                </button>
               </div>
             </div>
 
             <div className="grid">
-              {OFFICIAL_VIDEORAMA.map((it, idx) => (
-                <div key={it.id} className="card">
+              {featured.map((v) => (
+                <div key={v.id} className="card">
                   <div className="cardTop">
-                    <div className="pill">Track</div>
-                    <button
-                      className="btn btnSmall"
-                      onClick={() => openQueue({ title: 'Play Videorama', queue: OFFICIAL_VIDEORAMA, startIndex: idx })}
-                    >
-                      <PlayCircle size={18} /> Play from here
+                    <div className="pill">Videorama</div>
+                    <button className="btn btnSmall" onClick={() => openFeaturedVideorama(v)}>
+                      <PlayCircle size={18} /> Play
                     </button>
                   </div>
-                  <div className="cardTitle">{it.title}</div>
-                  <div className="cardSub">{it.url}</div>
-                  {it.description ? <div className="cardDesc">{it.description}</div> : null}
+                  <div className="cardTitle">{v.title}</div>
+                  {v.creator ? <div className="cardSub">by {v.creator}</div> : null}
+                  {v.description ? <div className="cardDesc">{v.description}</div> : null}
                 </div>
               ))}
             </div>
@@ -620,6 +695,7 @@ export default function App() {
         title={playerTitle}
         queue={playerQueue}
         startIndex={playerStartIndex}
+        mode={playerMode}
         onClose={() => setPlayerOpen(false)}
       />
 
@@ -636,6 +712,45 @@ export default function App() {
           </button>
           <button className="btn" onClick={copyTelegramPost}>
             <Copy size={18} /> Copy
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={openCreateVideorama}
+        title="Create Featured Videorama"
+        onClose={() => setOpenCreateVideorama(false)}
+      >
+        <div className="hint">
+          Creator: <span className="monoInline">{tgCreator || 'Anonymous'}</span> • Tracks: {items.length} (from My Mix)
+        </div>
+        <label className="field">
+          <div className="label">Title</div>
+          <input
+            value={createVideoramaTitle}
+            onChange={(e) => setCreateVideoramaTitle(e.target.value)}
+            placeholder="Videorama title"
+          />
+        </label>
+        <label className="field">
+          <div className="label">Description (optional)</div>
+          <textarea
+            value={createVideoramaDesc}
+            onChange={(e) => setCreateVideoramaDesc(e.target.value)}
+            rows={4}
+            placeholder="Short curator note"
+          />
+        </label>
+        <div className="modalActions">
+          <button className="btn btnGhost" onClick={() => setOpenCreateVideorama(false)}>
+            Cancel
+          </button>
+          <button
+            className="btn"
+            onClick={() => createVideoramaFromMyMix({ title: createVideoramaTitle, description: createVideoramaDesc })}
+            disabled={items.length === 0}
+          >
+            <Plus size={18} /> Create
           </button>
         </div>
       </Modal>

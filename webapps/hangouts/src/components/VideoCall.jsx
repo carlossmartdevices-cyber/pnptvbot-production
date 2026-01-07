@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import AgoraRTC from 'agora-rtc-sdk-ng'
 import {
   Mic,
@@ -10,6 +10,10 @@ import {
   Settings,
   Monitor,
   MonitorOff,
+  Copy,
+  Signal,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 
 const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onConsentGranted }) => {
@@ -27,10 +31,18 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
   const [privacyConfirmed, setPrivacyConfirmed] = useState(false)
   const [showRoomDetails, setShowRoomDetails] = useState(false)
   const [privacyMode, setPrivacyMode] = useState(true)
+  const [mics, setMics] = useState([])
+  const [cameras, setCameras] = useState([])
+  const [selectedMicId, setSelectedMicId] = useState('')
+  const [selectedCameraId, setSelectedCameraId] = useState('')
+  const [micLevel, setMicLevel] = useState(0)
+  const [connectionState, setConnectionState] = useState('DISCONNECTED')
+  const [networkQuality, setNetworkQuality] = useState({ uplink: null, downlink: null })
+  const [copied, setCopied] = useState(false)
 
   const clientRef = useRef(null)
-  const screenClientRef = useRef(null)
   const screenTrackRef = useRef(null)
+  const wakeLockRef = useRef(null)
 
   useEffect(() => {
     // Initialize Agora client
@@ -41,6 +53,16 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
     client.on('user-published', handleUserPublished)
     client.on('user-unpublished', handleUserUnpublished)
     client.on('user-left', handleUserLeft)
+    client.on('connection-state-change', (curState) => {
+      setConnectionState(String(curState || 'UNKNOWN').toUpperCase())
+    })
+    client.on('network-quality', (quality) => {
+      if (!quality) return
+      setNetworkQuality({
+        uplink: quality.uplinkNetworkQuality,
+        downlink: quality.downlinkNetworkQuality,
+      })
+    })
 
     // Cleanup on unmount
     return () => {
@@ -48,17 +70,138 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
     }
   }, [])
 
-  const createLocalTracks = async ({ enableAudio, enableVideo }) => {
-    const [audioTrack, videoTrack] = await Promise.all([
-      enableAudio ? AgoraRTC.createMicrophoneAudioTrack() : Promise.resolve(null),
-      enableVideo ? AgoraRTC.createCameraVideoTrack() : Promise.resolve(null),
-    ])
+  const qualityLabel = useMemo(() => {
+    const q = Math.max(networkQuality.uplink ?? 0, networkQuality.downlink ?? 0)
+    if (!q) return '—'
+    if (q <= 2) return 'Excellent'
+    if (q <= 3) return 'Good'
+    if (q <= 4) return 'Fair'
+    if (q <= 5) return 'Poor'
+    return 'Bad'
+  }, [networkQuality])
 
-    setLocalTracks({ audio: audioTrack, video: videoTrack })
-    setIsAudioEnabled(Boolean(audioTrack))
-    setIsVideoEnabled(Boolean(videoTrack))
+  const refreshDevices = async () => {
+    try {
+      const [micDevices, cameraDevices] = await Promise.all([
+        AgoraRTC.getMicrophones(),
+        AgoraRTC.getCameras(),
+      ])
+      setMics(micDevices || [])
+      setCameras(cameraDevices || [])
+      setSelectedMicId((prev) => prev || micDevices?.[0]?.deviceId || '')
+      setSelectedCameraId((prev) => prev || cameraDevices?.[0]?.deviceId || '')
+    } catch (e) {
+      // If permissions are blocked, device enumeration can fail.
+    }
+  }
 
-    return { audioTrack, videoTrack }
+  useEffect(() => {
+    refreshDevices()
+  }, [])
+
+  useEffect(() => {
+    if (!localTracks.audio || !isAudioEnabled) {
+      setMicLevel(0)
+      return undefined
+    }
+
+    const t = setInterval(() => {
+      try {
+        const v = localTracks.audio?.getVolumeLevel?.() ?? 0
+        setMicLevel(Math.max(0, Math.min(1, v)))
+      } catch (_) {
+        // ignore
+      }
+    }, 120)
+    return () => clearInterval(t)
+  }, [localTracks.audio, isAudioEnabled])
+
+  const ensureWakeLock = async () => {
+    try {
+      if (!('wakeLock' in navigator)) return
+      if (wakeLockRef.current) return
+      wakeLockRef.current = await navigator.wakeLock.request('screen')
+      wakeLockRef.current.addEventListener('release', () => {
+        wakeLockRef.current = null
+      })
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  const releaseWakeLock = async () => {
+    try {
+      await wakeLockRef.current?.release?.()
+    } catch (_) {
+      // ignore
+    }
+    wakeLockRef.current = null
+  }
+
+  const stopAndCloseTrack = (track) => {
+    try { track?.stop?.() } catch (_) { /* ignore */ }
+    try { track?.close?.() } catch (_) { /* ignore */ }
+  }
+
+  const playLocalPreview = (track) => {
+    try {
+      if (!track) return
+      track.play('prejoin-player')
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  const playInElement = (track, elementId) => {
+    try {
+      if (!track) return
+      track.stop?.()
+    } catch (_) {
+      // ignore
+    }
+    try {
+      track?.play?.(elementId)
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  const createOrUpdateAudioTrack = async () => {
+    if (localTracks.audio) {
+      if (selectedMicId && typeof localTracks.audio.setDevice === 'function') {
+        await localTracks.audio.setDevice(selectedMicId)
+      }
+      await localTracks.audio.setEnabled(true)
+      setIsAudioEnabled(true)
+      return localTracks.audio
+    }
+
+    const audioTrack = await AgoraRTC.createMicrophoneAudioTrack(
+      selectedMicId ? { microphoneId: selectedMicId } : undefined
+    )
+    setLocalTracks((prev) => ({ ...prev, audio: audioTrack }))
+    setIsAudioEnabled(true)
+    return audioTrack
+  }
+
+  const createOrUpdateVideoTrack = async () => {
+    if (localTracks.video) {
+      if (selectedCameraId && typeof localTracks.video.setDevice === 'function') {
+        await localTracks.video.setDevice(selectedCameraId)
+      }
+      await localTracks.video.setEnabled(true)
+      setIsVideoEnabled(true)
+      playLocalPreview(localTracks.video)
+      return localTracks.video
+    }
+
+    const videoTrack = await AgoraRTC.createCameraVideoTrack(
+      selectedCameraId ? { cameraId: selectedCameraId } : undefined
+    )
+    setLocalTracks((prev) => ({ ...prev, video: videoTrack }))
+    setIsVideoEnabled(true)
+    playLocalPreview(videoTrack)
+    return videoTrack
   }
 
   const joinChannel = async () => {
@@ -67,25 +210,32 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
 
     try {
       setError(null)
-      setIsReadyToJoin(false)
+      setIsReadyToJoin(true)
 
       await client.join(appId, room, token, uid)
 
-      const { audioTrack, videoTrack } = await createLocalTracks({
-        enableAudio: isAudioEnabled,
-        enableVideo: isVideoEnabled,
-      })
+      const tracksToPublish = []
+      let joinedVideoTrack = null
 
-      const tracksToPublish = [audioTrack, videoTrack].filter(Boolean)
-      if (tracksToPublish.length) {
-        await client.publish(tracksToPublish)
+      if (isAudioEnabled) {
+        const audioTrack = await createOrUpdateAudioTrack()
+        if (audioTrack) tracksToPublish.push(audioTrack)
       }
+
+      if (isVideoEnabled) {
+        const videoTrack = await createOrUpdateVideoTrack()
+        if (videoTrack) {
+          joinedVideoTrack = videoTrack
+          tracksToPublish.push(videoTrack)
+        }
+      }
+
+      if (tracksToPublish.length) await client.publish(tracksToPublish)
 
       setIsJoined(true)
+      await ensureWakeLock()
 
-      if (videoTrack) {
-        videoTrack.play('local-player')
-      }
+      if (joinedVideoTrack) playInElement(joinedVideoTrack, 'local-player')
     } catch (err) {
       console.error('Failed to join channel:', err)
       setError(err?.message || 'Failed to join room')
@@ -94,6 +244,8 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
       } catch (_) {
         // ignore
       }
+    } finally {
+      setIsReadyToJoin(false)
     }
   }
 
@@ -113,12 +265,15 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
       })
 
       // Play remote video
-      setTimeout(() => {
+      const attemptPlay = (attempt = 0) => {
         const playerElement = document.getElementById(`player-${user.uid}`)
         if (playerElement && user.videoTrack) {
-          user.videoTrack.play(`player-${user.uid}`)
+          try { user.videoTrack.play(`player-${user.uid}`) } catch (_) { /* ignore */ }
+          return
         }
-      }, 100)
+        if (attempt < 15) setTimeout(() => attemptPlay(attempt + 1), 120)
+      }
+      setTimeout(() => attemptPlay(0), 80)
     }
 
     if (mediaType === 'audio') {
@@ -159,7 +314,17 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
 
   const toggleAudio = async () => {
     if (!isJoined) {
-      setIsAudioEnabled((prev) => !prev)
+      if (isAudioEnabled) {
+        stopAndCloseTrack(localTracks.audio)
+        setLocalTracks((prev) => ({ ...prev, audio: null }))
+        setIsAudioEnabled(false)
+        return
+      }
+      try {
+        await createOrUpdateAudioTrack()
+      } catch (e) {
+        setError(e?.message || 'Microphone permission denied')
+      }
       return
     }
 
@@ -177,15 +342,27 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
 
     const client = clientRef.current
     if (!client) return
-    const audioTrack = await AgoraRTC.createMicrophoneAudioTrack()
-    setLocalTracks((prev) => ({ ...prev, audio: audioTrack }))
-    await client.publish(audioTrack)
-    setIsAudioEnabled(true)
+    try {
+      const audioTrack = await createOrUpdateAudioTrack()
+      await client.publish(audioTrack)
+    } catch (e) {
+      setError(e?.message || 'Microphone permission denied')
+    }
   }
 
   const toggleVideo = async () => {
     if (!isJoined) {
-      setIsVideoEnabled((prev) => !prev)
+      if (isVideoEnabled) {
+        stopAndCloseTrack(localTracks.video)
+        setLocalTracks((prev) => ({ ...prev, video: null }))
+        setIsVideoEnabled(false)
+        return
+      }
+      try {
+        await createOrUpdateVideoTrack()
+      } catch (e) {
+        setError(e?.message || 'Camera permission denied')
+      }
       return
     }
 
@@ -198,16 +375,19 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
 
       await localTracks.video.setEnabled(true)
       setIsVideoEnabled(true)
+      playInElement(localTracks.video, 'local-player')
       return
     }
 
     const client = clientRef.current
     if (!client) return
-    const videoTrack = await AgoraRTC.createCameraVideoTrack()
-    setLocalTracks((prev) => ({ ...prev, video: videoTrack }))
-    await client.publish(videoTrack)
-    videoTrack.play('local-player')
-    setIsVideoEnabled(true)
+    try {
+      const videoTrack = await createOrUpdateVideoTrack()
+      await client.publish(videoTrack)
+      videoTrack.play('local-player')
+    } catch (e) {
+      setError(e?.message || 'Camera permission denied')
+    }
   }
 
   const toggleScreenShare = async () => {
@@ -216,7 +396,8 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
     if (!isScreenSharing) {
       try {
         // Create screen track
-        const screenTrack = await AgoraRTC.createScreenVideoTrack()
+        const created = await AgoraRTC.createScreenVideoTrack()
+        const screenTrack = Array.isArray(created) ? created[0] : created
         screenTrackRef.current = screenTrack
 
         // Unpublish camera and publish screen
@@ -227,7 +408,7 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
         await client.publish(screenTrack)
 
         // Play screen share locally
-        screenTrack.play('local-player')
+        playInElement(screenTrack, 'local-player')
 
         setIsScreenSharing(true)
 
@@ -248,16 +429,19 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
     const screenTrack = screenTrackRef.current
 
     if (screenTrack) {
-      screenTrack.stop()
-      screenTrack.close()
-      await client.unpublish(screenTrack)
+      try {
+        await client.unpublish(screenTrack)
+      } catch (_) {
+        // ignore
+      }
+      stopAndCloseTrack(screenTrack)
       screenTrackRef.current = null
     }
 
     // Republish camera
     if (localTracks.video && isVideoEnabled) {
       await client.publish(localTracks.video)
-      localTracks.video.play('local-player')
+      playInElement(localTracks.video, 'local-player')
     }
 
     setIsScreenSharing(false)
@@ -266,21 +450,14 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
   const leaveChannel = async () => {
     const client = clientRef.current
 
-    // Stop and close local tracks
-    if (localTracks.audio) {
-      localTracks.audio.stop()
-      localTracks.audio.close()
-    }
-
-    if (localTracks.video) {
-      localTracks.video.stop()
-      localTracks.video.close()
-    }
-
     // Stop screen sharing if active
     if (isScreenSharing) {
       await stopScreenShare()
     }
+
+    // Stop and close local tracks
+    stopAndCloseTrack(localTracks.audio)
+    stopAndCloseTrack(localTracks.video)
 
     // Leave the channel
     if (client) {
@@ -288,6 +465,7 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
     }
 
     setIsJoined(false)
+    await releaseWakeLock()
 
     // Redirect back to Telegram or close window
     window.close()
@@ -376,6 +554,30 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
             You are not connected yet. Choose what to share.
           </p>
 
+          <div className="prejoin-preview">
+            <div className={`prejoin-preview-box ${isVideoEnabled ? 'on' : 'off'}`}>
+              <div id="prejoin-player" className="prejoin-player" />
+              {!isVideoEnabled ? (
+                <div className="prejoin-preview-overlay">
+                  Camera preview is off
+                </div>
+              ) : null}
+            </div>
+            <div className="prejoin-stats">
+              <div className="stat">
+                <div className="stat-label">Mic</div>
+                <div className="stat-value">{isAudioEnabled ? 'On' : 'Off'}</div>
+                <div className="meter">
+                  <div className="meter-fill" style={{ width: `${Math.round(micLevel * 100)}%` }} />
+                </div>
+              </div>
+              <div className="stat">
+                <div className="stat-label">Privacy</div>
+                <div className="stat-value">{privacyMode ? 'On' : 'Off'}</div>
+              </div>
+            </div>
+          </div>
+
           <div className="prejoin-toggles">
             <button
               className={`toggle-btn ${isAudioEnabled ? 'on' : 'off'}`}
@@ -395,16 +597,68 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
             </button>
           </div>
 
-          <div className="prejoin-actions">
-            <button
-              className="gate-btn"
-              onClick={async () => {
-                setIsReadyToJoin(true)
-                await joinChannel()
-              }}
-              disabled={isReadyToJoin}
-            >
-              {isReadyToJoin ? 'Joining…' : 'Join Now'}
+          <div className="prejoin-devices">
+            <div className="device-row">
+              <label>Microphone</label>
+              <select
+                value={selectedMicId}
+                onChange={async (e) => {
+                  const next = e.target.value
+                  setSelectedMicId(next)
+                  try {
+                    if (localTracks.audio && typeof localTracks.audio.setDevice === 'function') {
+                      await localTracks.audio.setDevice(next)
+                    }
+                  } catch (_) {
+                    // ignore
+                  }
+                }}
+              >
+                {mics.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label || `Microphone ${d.deviceId.slice(-4)}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="device-row">
+              <label>Camera</label>
+              <select
+                value={selectedCameraId}
+                onChange={async (e) => {
+                  const next = e.target.value
+                  setSelectedCameraId(next)
+                  try {
+                    if (localTracks.video && typeof localTracks.video.setDevice === 'function') {
+                      await localTracks.video.setDevice(next)
+                      playLocalPreview(localTracks.video)
+                    }
+                  } catch (_) {
+                    // ignore
+                  }
+                }}
+              >
+                {cameras.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label || `Camera ${d.deviceId.slice(-4)}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button className="link-btn" onClick={refreshDevices}>
+              Refresh devices
+            </button>
+          </div>
+
+        <div className="prejoin-actions">
+          <button
+            className="gate-btn"
+            onClick={async () => {
+              await joinChannel()
+            }}
+            disabled={isReadyToJoin}
+          >
+            {isReadyToJoin ? 'Joining…' : 'Join Now'}
             </button>
             <button className="gate-btn secondary" onClick={() => window.close()}>
               Exit
@@ -427,6 +681,14 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
           <p>
             {remoteUsers.length + 1} participant{remoteUsers.length !== 0 ? 's' : ''}
           </p>
+          <div className="call-status">
+            <span className="status-pill">
+              <Signal size={14} /> {connectionState}
+            </span>
+            <span className="status-pill">
+              <span className="dot" /> {qualityLabel}
+            </span>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
@@ -434,7 +696,22 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
             onClick={() => setPrivacyMode((prev) => !prev)}
             title={privacyMode ? 'Privacy Mode: On' : 'Privacy Mode: Off'}
           >
-            Privacy
+            {privacyMode ? <EyeOff size={24} /> : <Eye size={24} />}
+          </button>
+          <button
+            className="control-btn"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(room)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 1200)
+              } catch (_) {
+                // ignore
+              }
+            }}
+            title="Copy room code"
+          >
+            <Copy size={24} />
           </button>
           <button
             className="control-btn"
@@ -529,6 +806,60 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
         <div className="settings-panel">
           <h3>Settings</h3>
           <div className="setting-item">
+            <label>Devices</label>
+            <div className="setting-note">Change mic/camera without leaving.</div>
+            <div className="device-row">
+              <label>Microphone</label>
+              <select
+                value={selectedMicId}
+                onChange={async (e) => {
+                  const next = e.target.value
+                  setSelectedMicId(next)
+                  try {
+                    if (localTracks.audio && typeof localTracks.audio.setDevice === 'function') {
+                      await localTracks.audio.setDevice(next)
+                    }
+                  } catch (_) {
+                    // ignore
+                  }
+                }}
+              >
+                {mics.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label || `Microphone ${d.deviceId.slice(-4)}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="device-row">
+              <label>Camera</label>
+              <select
+                value={selectedCameraId}
+                onChange={async (e) => {
+                  const next = e.target.value
+                  setSelectedCameraId(next)
+                  try {
+                    if (localTracks.video && typeof localTracks.video.setDevice === 'function') {
+                      await localTracks.video.setDevice(next)
+                      localTracks.video.play('local-player')
+                    }
+                  } catch (_) {
+                    // ignore
+                  }
+                }}
+              >
+                {cameras.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label || `Camera ${d.deviceId.slice(-4)}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button className="link-btn" onClick={refreshDevices}>
+              Refresh devices
+            </button>
+          </div>
+          <div className="setting-item">
             <label>Privacy Mode</label>
             <div className="setting-note">
               When enabled, the UI hides room/user details and obfuscates participant IDs.
@@ -549,6 +880,7 @@ const VideoCall = ({ room, token, uid, username, type, appId, hasConsent, onCons
               </div>
             )}
           </div>
+          {copied ? <div className="setting-note" style={{ color: '#4CAF50' }}>Copied room code</div> : null}
         </div>
       )}
     </>

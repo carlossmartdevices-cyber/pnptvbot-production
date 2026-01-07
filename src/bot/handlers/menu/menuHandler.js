@@ -915,7 +915,10 @@ async function handleVideorama(ctx, lang) {
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.url(
       lang === 'es' ? '🎬 Abrir Videorama' : '🎬 Open Videorama',
-      'https://pnptv.app/videorama-app/'
+      (() => {
+        const tg = ctx.from?.username ? `@${ctx.from.username}` : '';
+        return tg ? `https://pnptv.app/videorama-app/?tg=${encodeURIComponent(tg)}` : 'https://pnptv.app/videorama-app/';
+      })()
     )],
     [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
   ]);

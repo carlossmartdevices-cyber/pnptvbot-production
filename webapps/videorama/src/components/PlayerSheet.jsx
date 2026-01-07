@@ -8,7 +8,7 @@ function isYouTubeVideoUrl(url) {
   return info?.kind === 'video' ? info : null
 }
 
-export default function PlayerSheet({ open, title, queue, startIndex = 0, onClose }) {
+export default function PlayerSheet({ open, title, queue, startIndex = 0, mode = 'full', onClose }) {
   const [index, setIndex] = useState(startIndex)
   const [isPlaying, setIsPlaying] = useState(true)
   const [error, setError] = useState('')
@@ -293,7 +293,7 @@ export default function PlayerSheet({ open, title, queue, startIndex = 0, onClos
         <div className="sheetHeader">
           <div className="sheetTitle">
             <div className="pill">Videorama</div>
-            <div className="titleText">{title || current?.title || 'Now playing'}</div>
+            <div className="titleText">{title || 'Now playing'}</div>
           </div>
           <button className="iconBtn" onClick={onClose} aria-label="Close">
             <X size={20} />
@@ -329,42 +329,56 @@ export default function PlayerSheet({ open, title, queue, startIndex = 0, onClos
 
         {error ? <div className="notice error">{error}</div> : null}
 
-        <div className="queueControls">
-          <button className="iconBtn" onClick={goPrev} disabled={!hasPrev} aria-label="Previous">
-            <ChevronLeft size={20} />
-          </button>
-          <button className="btn btnGhost" onClick={togglePlay}>
-            {isPlaying ? <Pause size={18} /> : <Play size={18} />}
-            {isPlaying ? 'Pause' : 'Play'}
-          </button>
-          <button className="iconBtn" onClick={goNext} disabled={!hasNext} aria-label="Next">
-            <ChevronRight size={20} />
-          </button>
-        </div>
+        {mode === 'full' ? (
+          <>
+            <div className="queueControls">
+              <button className="iconBtn" onClick={goPrev} disabled={!hasPrev} aria-label="Previous">
+                <ChevronLeft size={20} />
+              </button>
+              <button className="btn btnGhost" onClick={togglePlay}>
+                {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                {isPlaying ? 'Pause' : 'Play'}
+              </button>
+              <button className="iconBtn" onClick={goNext} disabled={!hasNext} aria-label="Next">
+                <ChevronRight size={20} />
+              </button>
+            </div>
 
-        <div className="queueMeta">
-          <div className="queueNow">
-            <div className="queueLabel">Now</div>
-            <div className="queueTitle">{current?.title}</div>
-          </div>
-          {current?.description ? <div className="queueDesc">{current.description}</div> : null}
-        </div>
-
-        <div className="queueList">
-          {(queue || []).map((it, idx) => (
-            <button
-              key={it.id || `${idx}-${it.url}`}
-              className={idx === index ? 'queueItem active' : 'queueItem'}
-              onClick={() => setIndex(idx)}
-            >
-              <div className="queueItemTop">
-                <div className="queueIndex">{idx + 1}</div>
-                <div className="queueItemTitle">{it.title}</div>
+            <div className="queueMeta">
+              <div className="queueNow">
+                <div className="queueLabel">Now</div>
+                <div className="queueTitle">{current?.title}</div>
               </div>
-              {it.description ? <div className="queueItemDesc">{it.description}</div> : null}
-            </button>
-          ))}
-        </div>
+              {current?.description ? <div className="queueDesc">{current.description}</div> : null}
+            </div>
+
+            <div className="queueList">
+              {(queue || []).map((it, idx) => (
+                <button
+                  key={it.id || `${idx}-${it.url}`}
+                  className={idx === index ? 'queueItem active' : 'queueItem'}
+                  onClick={() => setIndex(idx)}
+                >
+                  <div className="queueItemTop">
+                    <div className="queueIndex">{idx + 1}</div>
+                    <div className="queueItemTitle">{it.title}</div>
+                  </div>
+                  {it.description ? <div className="queueItemDesc">{it.description}</div> : null}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="queueMeta focusOnly">
+            {current?.description ? <div className="queueDesc">{current.description}</div> : null}
+            <div className="queueControls focusControls">
+              <button className="btn btnGhost" onClick={togglePlay}>
+                {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                {isPlaying ? 'Pause' : 'Play'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

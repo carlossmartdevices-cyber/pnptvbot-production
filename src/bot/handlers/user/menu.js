@@ -318,6 +318,8 @@ const showMainMenu = async (ctx) => {
     // Get user's display name for Jitsi
     const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
     const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+    const tg = ctx.from?.username ? `@${ctx.from.username}` : '';
+    const videoramaUrl = tg ? `https://pnptv.app/videorama-app/?tg=${encodeURIComponent(tg)}` : 'https://pnptv.app/videorama-app/';
 
     buttons = [
       [
@@ -336,7 +338,7 @@ const showMainMenu = async (ctx) => {
         Markup.button.url(lang === 'es' ? '🎬 PNPtv Hangouts!' : '🎬 PNPtv Hangouts!', 'https://pnptv.app/hangouts'),
       ],
       [
-        Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'https://pnptv.app/videorama-app'),
+        Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', videoramaUrl),
       ],
       [
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
@@ -505,7 +507,7 @@ const showMainMenuEdit = async (ctx) => {
         Markup.button.url(lang === 'es' ? '🎬 PNPtv Hangouts!' : '🎬 PNPtv Hangouts!', 'https://pnptv.app/hangouts'),
       ],
       [
-        Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'https://pnptv.app/videorama-app'),
+        Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', videoramaUrl),
       ],
       [
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),

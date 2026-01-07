@@ -2,6 +2,28 @@ const MediaPlayerModel = require('../../../models/mediaPlayerModel');
 const db = require('../../../config/postgres');
 const logger = require('../../../utils/logger');
 
+const normalizeKeyPart = (value) => String(value || '')
+  .trim()
+  .toLowerCase()
+  .replace(/\s+/g, ' ');
+
+const dedupePlaylists = (playlists) => {
+  const seen = new Set();
+  const out = [];
+  for (const playlist of playlists || []) {
+    const key = [
+      normalizeKeyPart(playlist.category),
+      normalizeKeyPart(playlist.title),
+      normalizeKeyPart(playlist.creator),
+    ].join('|');
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(playlist);
+  }
+  return out;
+};
+
 /**
  * Playlist API Controller
  * Handles playlist management for web interface
@@ -40,7 +62,7 @@ const getUserPlaylists = async (req, res) => {
       createdAt: row.created_at,
     }));
 
-    res.json(playlists);
+    res.json(dedupePlaylists(playlists));
   } catch (error) {
     logger.error('Error getting user playlists:', error);
     res.status(500).json({ error: 'Failed to get playlists' });
@@ -75,7 +97,7 @@ const getPublicPlaylists = async (req, res) => {
       createdAt: row.created_at,
     }));
 
-    res.json(playlists);
+    res.json(dedupePlaylists(playlists));
   } catch (error) {
     logger.error('Error getting public playlists:', error);
     res.status(500).json({ error: 'Failed to get public playlists' });
