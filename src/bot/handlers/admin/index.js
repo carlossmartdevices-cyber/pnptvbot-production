@@ -84,7 +84,7 @@ async function sendBroadcastPreview(ctx) {
   try {
     const buttonMarkup = (() => {
       const rows = [];
-      for (const btn of normalizeBroadcastButtons(data.buttons)) {
+      for (const btn of normalizeButtons(data.buttons)) {
         const b = typeof btn === 'string' ? JSON.parse(btn) : btn;
         if (b.type === 'url') rows.push([Markup.button.url(b.text, b.target)]);
         else if (b.type === 'callback') rows.push([Markup.button.callback(b.text, b.data)]);
@@ -128,7 +128,7 @@ async function showBroadcastButtonsPicker(ctx) {
   const options = getBroadcastButtonOptions(lang);
 
   if (!ctx.session.temp?.broadcastData) ctx.session.temp.broadcastData = {};
-  ctx.session.temp.broadcastData.buttons = normalizeBroadcastButtons(ctx.session.temp.broadcastData.buttons);
+  ctx.session.temp.broadcastData.buttons = normalizeButtons(ctx.session.temp.broadcastData.buttons);
 
   const selectedKeys = new Set(
     (ctx.session.temp.broadcastData.buttons || [])
@@ -1159,7 +1159,7 @@ let registerAdminHandlers = (bot) => {
         return;
       }
 
-      const buttons = normalizeBroadcastButtons(ctx.session.temp.broadcastData.buttons);
+      const buttons = normalizeButtons(ctx.session.temp.broadcastData.buttons);
       const idx = buttons.findIndex((b) => (typeof b === 'string' ? JSON.parse(b).key : b.key) === key);
       if (idx >= 0) {
         buttons.splice(idx, 1);
