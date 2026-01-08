@@ -569,6 +569,11 @@ function getEnhancedBroadcastService() {
   return instance;
 }
 
+// Delegate processRetryQueue to parent BroadcastService
+EnhancedBroadcastService.prototype.processRetryQueue = function(bot) {
+  return BroadcastService.prototype.processRetryQueue.call(this, bot);
+};
+
 module.exports = {
   EnhancedBroadcastService,
   getEnhancedBroadcastService,
