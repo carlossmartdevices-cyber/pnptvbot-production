@@ -1169,9 +1169,17 @@ let registerAdminHandlers = (bot) => {
         await ctx.answerCbQuery('Added');
       }
       ctx.session.temp.broadcastData.buttons = buttons;
+      ctx.session.temp.broadcastStep = 'buttons'; // Ensure we stay in buttons step
       await ctx.saveSession();
+      await showBroadcastButtonsPicker(ctx);
     } catch (error) {
       logger.error('Error toggling broadcast button:', error);
+      // Reset to buttons step on error to prevent getting stuck
+      if (ctx.session.temp) {
+        ctx.session.temp.broadcastStep = 'buttons';
+        await ctx.saveSession();
+      }
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
 
@@ -2447,8 +2455,8 @@ let registerAdminHandlers = (bot) => {
         } else {
           ctx.session.temp.broadcastData.textEs = result;
           ctx.session.temp.broadcastStep = 'buttons';
-          // If buttons already exist, keep them; otherwise default
-          if (!ctx.session.temp.broadcastData.buttons) {
+          // Ensure buttons array is properly initialized
+          if (!ctx.session.temp.broadcastData.buttons || !Array.isArray(ctx.session.temp.broadcastData.buttons)) {
             ctx.session.temp.broadcastData.buttons = buildDefaultBroadcastButtons(getLanguage(ctx));
           }
           await ctx.saveSession();
@@ -2461,6 +2469,9 @@ let registerAdminHandlers = (bot) => {
       } catch (error) {
         logger.error('Error generating AI broadcast text:', error);
         await ctx.reply(`❌ AI error: ${error.message}`);
+        // Reset to previous step on error
+        ctx.session.temp.broadcastStep = ctx.session.temp.broadcastStep === 'ai_prompt_en' ? 'text_en' : 'text_es';
+        await ctx.saveSession();
       }
       return;
     }
@@ -3823,20 +3834,36 @@ async function sendBroadcastWithButtons(ctx, bot) {
         for (const btn of buttonArray) {
           const buttonObj = typeof btn === 'string' ? JSON.parse(btn) : btn;
 
+          // Validate button object structure
+          if (!buttonObj || typeof buttonObj !== 'object') {
+            logger.warn('Invalid button object structure:', buttonObj);
+            continue;
+          }
+
           if (buttonObj.type === 'url') {
-            buttonRows.push([Markup.button.url(buttonObj.text, buttonObj.target)]);
+            if (buttonObj.text && buttonObj.target) {
+              buttonRows.push([Markup.button.url(buttonObj.text, buttonObj.target)]);
+            }
           } else if (buttonObj.type === 'callback') {
-            buttonRows.push([Markup.button.callback(buttonObj.text, buttonObj.data)]);
+            if (buttonObj.text && buttonObj.data) {
+              buttonRows.push([Markup.button.callback(buttonObj.text, buttonObj.data)]);
+            }
           } else if (buttonObj.type === 'command') {
-            buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_action_${buttonObj.target}`)]);
+            if (buttonObj.text && buttonObj.target) {
+              buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_action_${buttonObj.target}`)]);
+            }
           } else if (buttonObj.type === 'plan') {
-            buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_plan_${buttonObj.target}`)]);
+            if (buttonObj.text && buttonObj.target) {
+              buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_plan_${buttonObj.target}`)]);
+            }
           } else if (buttonObj.type === 'feature') {
-            buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_feature_${buttonObj.target}`)]);
+            if (buttonObj.text && buttonObj.target) {
+              buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_feature_${buttonObj.target}`)]);
+            }
           }
         }
 
-        return Markup.inlineKeyboard(buttonRows);
+        return buttonRows.length > 0 ? Markup.inlineKeyboard(buttonRows) : undefined;
       } catch (error) {
         logger.warn('Error building button markup:', error);
         return undefined;
