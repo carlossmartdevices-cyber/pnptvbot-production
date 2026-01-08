@@ -334,9 +334,9 @@ class EnhancedBroadcastService extends BroadcastService {
     const params = [];
 
     if (timeRange === 'week') {
-      timeCondition = 'AND p.created_at > CURRENT_TIMESTAMP - INTERVAL '7 days'';
+      timeCondition = 'AND p.created_at > CURRENT_TIMESTAMP - INTERVAL \'7 days\'';
     } else if (timeRange === 'month') {
-      timeCondition = 'AND p.created_at > CURRENT_TIMESTAMP - INTERVAL '30 days'';
+      timeCondition = 'AND p.created_at > CURRENT_TIMESTAMP - INTERVAL \'30 days\'';
     }
 
     const query = `

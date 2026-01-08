@@ -602,4 +602,4 @@ class BroadcastService {
   }
 }
 
-module.exports = new BroadcastService();
+module.exports = BroadcastService;

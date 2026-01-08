@@ -5,7 +5,8 @@
 
 const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
-const broadcastService = require('../../services/broadcastService');
+const BroadcastService = require('../../services/broadcastService');
+const broadcastService = new BroadcastService();
 const s3Service = require('../../../utils/s3Service');
 const PermissionService = require('../../services/permissionService');
 const { getLanguage } = require('../../utils/helpers');
