@@ -603,10 +603,10 @@ const completeOnboarding = async (ctx) => {
       );
 
       const message = lang === 'es'
-        ? `🎉 ¡Estás listo!\n\nTe damos la bienvenida a la comunidad PNPtv. Aquí está tu enlace exclusivo de acceso único para el grupo gratuito:\n\n🔗 ${inviteLink.invite_link}\n\n⏰ Este enlace expira en 24 horas.\n📱 Únete ahora para acceder a todo el contenido.`
-        : `🎉 You're all set!\n\nWelcome to the PNPtv community. Here's your exclusive one-time use link to access the free group:\n\n🔗 ${inviteLink.invite_link}\n\n⏰ This link expires in 24 hours.\n📱 Join now to access all content.`;
+        ? `🎉 ¡Estás listo!\n\nTe damos la bienvenida a la comunidad PNPtv. Aquí está tu enlace exclusivo de acceso único para el grupo gratuito:\n\n🔗 [Únete al grupo](${inviteLink.invite_link})\n\n⏰ Este enlace expira en 24 horas.\n📱 Únete ahora para acceder a todo el contenido.`
+        : `🎉 You're all set!\n\nWelcome to the PNPtv community. Here's your exclusive one-time use link to access the free group:\n\n🔗 [Join the group](${inviteLink.invite_link})\n\n⏰ This link expires in 24 hours.\n📱 Join now to access all content.`;
 
-      await ctx.reply(message, { parse_mode: 'Markdown' });
+      await ctx.reply(message, { parse_mode: 'Markdown', disable_web_page_preview: true });
 
       logger.info('Telegram group invite sent to user', {
         userId,

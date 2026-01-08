@@ -560,4 +560,16 @@ class EnhancedBroadcastService extends BroadcastService {
   }
 }
 
-module.exports = EnhancedBroadcastService;
+let instance;
+
+function getEnhancedBroadcastService() {
+  if (!instance) {
+    instance = new EnhancedBroadcastService();
+  }
+  return instance;
+}
+
+module.exports = {
+  EnhancedBroadcastService,
+  getEnhancedBroadcastService,
+};

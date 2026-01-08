@@ -592,20 +592,42 @@ const registerCommunityPostHandlers = (bot) => {
     ctx.session.temp.communityPostStep = 'write_text';
     await ctx.saveSession();
 
-    await ctx.editMessageText(
-      '📤 *Compartir Publicación en Comunidad*\n\n'
-      + '*Paso 3/9: Escribir Texto*\n\n'
-      + '✍️ Envía el texto de tu publicación.\n\n'
-      + '💡 *Tip:* Puedes usar *negrita* y _cursiva_.\n\n'
-      + '📝 *Límites:* 1024 si hay media / 4096 si es solo texto',
-      {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback('🤖 AI Write (Grok)', 'share_post_ai_text')],
-          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
-        ]),
+    try {
+      await ctx.editMessageText(
+        '📤 *Compartir Publicación en Comunidad*\n\n'
+        + '*Paso 3/9: Escribir Texto*\n\n'
+        + '✍️ Envía el texto de tu publicación.\n\n'
+        + '💡 *Tip:* Puedes usar *negrita* y _cursiva_.\n\n'
+        + '📝 *Límites:* 1024 si hay media / 4096 si es solo texto',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🤖 AI Write (Grok)', 'share_post_ai_text')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        }
+      );
+    } catch (editError) {
+      if (editError.response?.description?.includes("can't be edited")) {
+        // Message can't be edited, send as new message instead
+        await ctx.reply(
+          '📤 *Compartir Publicación en Comunidad*\n\n'
+          + '*Paso 3/9: Escribir Texto*\n\n'
+          + '✍️ Envía el texto de tu publicación.\n\n'
+          + '💡 *Tip:* Puedes usar *negrita* y _cursiva_.\n\n'
+          + '📝 *Límites:* 1024 si hay media / 4096 si es solo texto',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('🤖 AI Write (Grok)', 'share_post_ai_text')],
+              [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            ]),
+          }
+        );
+      } else {
+        throw editError; // Re-throw other errors
       }
-    );
+    }
 
     ctx.session.temp.waitingForText = true;
     await ctx.saveSession();
@@ -706,15 +728,32 @@ const registerCommunityPostHandlers = (bot) => {
       buttons.push([Markup.button.callback('👀 Preview', 'share_post_preview')]);
       buttons.push([Markup.button.callback('❌ Cancelar', 'admin_cancel')]);
 
-      await ctx.editMessageText(
-        '📤 *Compartir Publicación en Comunidad*\n\n'
-        + '*Paso 4/9: Seleccionar Botones*\n\n'
-        + '🔗 Selecciona 1 o varios botones (o deja solo el default):',
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard(buttons),
+      try {
+        await ctx.editMessageText(
+          '📤 *Compartir Publicación en Comunidad*\n\n'
+          + '*Paso 4/9: Seleccionar Botones*\n\n'
+          + '🔗 Selecciona 1 o varios botones (o deja solo el default):',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard(buttons),
+          }
+        );
+      } catch (editError) {
+        if (editError.response?.description?.includes("can't be edited")) {
+          // Message can't be edited, send as new message instead
+          await ctx.reply(
+            '📤 *Compartir Publicación en Comunidad*\n\n'
+            + '*Paso 4/9: Seleccionar Botones*\n\n'
+            + '🔗 Selecciona 1 o varios botones (o deja solo el default):',
+            {
+              parse_mode: 'Markdown',
+              ...Markup.inlineKeyboard(buttons),
+            }
+          );
+        } else {
+          throw editError; // Re-throw other errors
         }
-      );
+      }
 
       ctx.session.temp.communityPostStep = 'select_buttons';
       await ctx.saveSession();

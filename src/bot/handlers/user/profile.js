@@ -169,7 +169,16 @@ const registerProfileHandlers = (bot) => {
       const lang = getLanguage(ctx);
       ctx.session.temp.waitingForLookingFor = true;
       await ctx.saveSession();
-      await ctx.editMessageText(t('sendLookingFor', lang));
+      try {
+        await ctx.editMessageText(t('sendLookingFor', lang));
+      } catch (editError) {
+        if (editError.response?.description?.includes("can't be edited")) {
+          // Message can't be edited, send as new message instead
+          await ctx.reply(t('sendLookingFor', lang));
+        } else {
+          throw editError; // Re-throw other errors
+        }
+      }
     } catch (error) {
       logger.error('Error in edit looking_for:', error);
     }
