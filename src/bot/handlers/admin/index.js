@@ -1048,7 +1048,7 @@ let registerAdminHandlers = (bot) => {
       }
 
       ctx.session.temp.broadcastTarget = target;
-      ctx.session.temp.broadcastStep = 'media';
+      await updateBroadcastStep(ctx, 'media');
       ctx.session.temp.broadcastData = {};
       await ctx.saveSession();
 
@@ -2414,6 +2414,55 @@ let registerAdminHandlers = (bot) => {
       return;
     }
 
+  /**
+   * Update broadcast step with validation and atomic save
+   * @param {Object} ctx - Telegraf context
+   * @param {string} newStep - New step to transition to
+   */
+  async function updateBroadcastStep(ctx, newStep) {
+    const validSteps = ['media', 'text_en', 'text_es', 'ai_prompt_en', 'ai_prompt_es', 'buttons', 'preview', 'sending', 'schedule_count', 'custom_link', 'custom_buttons'];
+    
+    if (!validSteps.includes(newStep)) {
+      logger.error(`Invalid broadcast step transition attempted: ${newStep}`);
+      throw new Error(`Invalid broadcast step: ${newStep}`);
+    }
+
+    const previousStep = ctx.session.temp?.broadcastStep;
+    ctx.session.temp.broadcastStep = newStep;
+    
+    try {
+      await ctx.saveSession();
+      logger.info(`Broadcast step updated: ${previousStep} → ${newStep}`, {
+        userId: ctx.from.id,
+        previousStep,
+        newStep
+      });
+    } catch (error) {
+      logger.error('Failed to save broadcast step:', {
+        error: error.message,
+        previousStep,
+        attemptedStep: newStep
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get appropriate fallback step on error
+   * @param {string} currentStep - Current step
+   * @returns {string} Safe fallback step
+   */
+  function getFallbackStep(currentStep) {
+    const fallbackMap = {
+      'ai_prompt_en': 'text_en',
+      'ai_prompt_es': 'text_es',
+      'custom_link': 'buttons',
+      'custom_buttons': 'buttons'
+    };
+    
+    return fallbackMap[currentStep] || currentStep;
+  }
+
     // Broadcast flow - AI prompt EN/ES
     if (ctx.session.temp?.broadcastStep === 'ai_prompt_en' || ctx.session.temp?.broadcastStep === 'ai_prompt_es') {
       try {
@@ -2435,8 +2484,7 @@ let registerAdminHandlers = (bot) => {
         if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
         if (isEn) {
           ctx.session.temp.broadcastData.textEn = result;
-          ctx.session.temp.broadcastStep = 'text_es';
-          await ctx.saveSession();
+          await updateBroadcastStep(ctx, 'text_es');
           await ctx.reply(
             `✅ *AI draft saved (EN)*\n\n${result}`,
             { parse_mode: 'Markdown' },
@@ -2454,7 +2502,7 @@ let registerAdminHandlers = (bot) => {
           );
         } else {
           ctx.session.temp.broadcastData.textEs = result;
-          ctx.session.temp.broadcastStep = 'buttons';
+          await updateBroadcastStep(ctx, 'buttons');
           // Ensure buttons array is properly initialized
           if (!ctx.session.temp.broadcastData.buttons || !Array.isArray(ctx.session.temp.broadcastData.buttons)) {
             ctx.session.temp.broadcastData.buttons = buildDefaultBroadcastButtons(getLanguage(ctx));
@@ -2469,9 +2517,9 @@ let registerAdminHandlers = (bot) => {
       } catch (error) {
         logger.error('Error generating AI broadcast text:', error);
         await ctx.reply(`❌ AI error: ${error.message}`);
-        // Reset to previous step on error
-        ctx.session.temp.broadcastStep = ctx.session.temp.broadcastStep === 'ai_prompt_en' ? 'text_en' : 'text_es';
-        await ctx.saveSession();
+        // Reset to previous step on error using fallback logic
+        const fallbackStep = getFallbackStep(ctx.session.temp.broadcastStep);
+        await updateBroadcastStep(ctx, fallbackStep);
       }
       return;
     }
