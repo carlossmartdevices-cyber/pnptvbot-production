@@ -990,6 +990,66 @@ let registerAdminHandlers = (bot) => {
     }
   });
 
+  bot.action('broadcast_all', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await updateBroadcastStep(ctx, 'media');
+      ctx.session.temp.broadcastTarget = 'all';
+      ctx.session.temp.broadcastData = {};
+      await ctx.saveSession();
+      await ctx.reply('👥 Audiencia seleccionada: Todos los usuarios');
+    } catch (error) {
+      logger.error('Error selecting broadcast audience (all):', error);
+    }
+  });
+
+  bot.action('broadcast_premium', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await updateBroadcastStep(ctx, 'media');
+      ctx.session.temp.broadcastTarget = 'premium';
+      ctx.session.temp.broadcastData = {};
+      await ctx.saveSession();
+      await ctx.reply('💎 Audiencia seleccionada: Solo usuarios Premium');
+    } catch (error) {
+      logger.error('Error selecting broadcast audience (premium):', error);
+    }
+  });
+
+  bot.action('broadcast_free', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await updateBroadcastStep(ctx, 'media');
+      ctx.session.temp.broadcastTarget = 'free';
+      ctx.session.temp.broadcastData = {};
+      await ctx.saveSession();
+      await ctx.reply('🆓 Audiencia seleccionada: Solo usuarios gratuitos');
+    } catch (error) {
+      logger.error('Error selecting broadcast audience (free):', error);
+    }
+  });
+
+  bot.action('broadcast_churned', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await updateBroadcastStep(ctx, 'media');
+      ctx.session.temp.broadcastTarget = 'churned';
+      ctx.session.temp.broadcastData = {};
+      await ctx.saveSession();
+      await ctx.reply('↩️ Audiencia seleccionada: Usuarios churned (ex-premium)');
+    } catch (error) {
+      logger.error('Error selecting broadcast audience (churned):', error);
+    }
+  });
+
   bot.action('broadcast_resume', async (ctx) => {
     try {
       await ctx.answerCbQuery();
