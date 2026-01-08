@@ -600,6 +600,117 @@ class BroadcastService {
       throw error;
     }
   }
+
+  /**
+   * Process retry queue for failed broadcasts
+   * @param {Object} bot - Telegraf bot instance
+   * @returns {Promise<Object>} Processing results
+   */
+  async processRetryQueue(bot) {
+    const query = `
+      SELECT * FROM broadcast_recipients
+      WHERE status = 'failed'
+        AND retry_count < 3
+        AND created_at > CURRENT_TIMESTAMP - INTERVAL '1 hour'
+      ORDER BY created_at ASC
+      LIMIT 10
+    `;
+
+    try {
+      const result = await getPool().query(query);
+      const failedRecipients = result.rows;
+      
+      let processed = 0;
+      let succeeded = 0;
+      let failed = 0;
+
+      for (const recipient of failedRecipients) {
+        try {
+          // Get broadcast details
+          const broadcastQuery = `
+            SELECT * FROM broadcasts WHERE broadcast_id = $1
+          `;
+          const broadcastResult = await getPool().query(broadcastQuery, [recipient.broadcast_id]);
+          
+          if (broadcastResult.rows.length === 0) {
+            // Broadcast doesn't exist, mark as failed
+            await this._updateRecipientStatus(recipient.id, 'failed', {
+              error_code: 'BROADCAST_NOT_FOUND'
+            });
+            failed++;
+            continue;
+          }
+
+          const broadcast = broadcastResult.rows[0];
+          const userId = recipient.user_id;
+          
+          // Try to send the broadcast again
+          const sendOptions = {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true
+          };
+
+          let messageId;
+          if (broadcast.media_type && broadcast.media_file_id) {
+            // Media broadcast
+            messageId = await this._sendMediaBroadcast(bot, userId, broadcast, sendOptions);
+          } else {
+            // Text-only broadcast
+            const text = broadcast.text_en || broadcast.text;
+            const sentMessage = await bot.telegram.sendMessage(userId, text, sendOptions);
+            messageId = sentMessage.message_id;
+          }
+
+          // Update status to succeeded
+          await this._updateRecipientStatus(recipient.id, 'succeeded', {
+            message_id: messageId,
+            retry_count: recipient.retry_count + 1
+          });
+          succeeded++;
+          
+        } catch (error) {
+          logger.warn(`Retry failed for recipient ${recipient.id}: ${error.message}`);
+          
+          // Update status with error
+          await this._updateRecipientStatus(recipient.id, 'failed', {
+            error_code: 'RETRY_FAILED',
+            error_message: error.message,
+            retry_count: recipient.retry_count + 1
+          });
+          failed++;
+        }
+        
+        processed++;
+        await this.sleep(100); // Rate limiting
+      }
+
+      return { processed, succeeded, failed };
+      
+    } catch (error) {
+      logger.error('Error processing retry queue:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update recipient status in database
+   * @param {string} recipientId - Recipient ID
+   * @param {string} status - New status
+   * @param {Object} updates - Additional updates
+   */
+  async _updateRecipientStatus(recipientId, status, updates = {}) {
+    const updateQuery = `
+      UPDATE broadcast_recipients
+      SET 
+        status = $1,
+        updated_at = CURRENT_TIMESTAMP,
+        ${Object.keys(updates).map((key, i) => `${key} = $${i + 2}`).join(', ')}
+      WHERE id = $${Object.keys(updates).length + 2}
+    `;
+
+    const params = [status, ...Object.values(updates), recipientId];
+    await getPool().query(updateQuery, params);
+  }
 }
 
 module.exports = BroadcastService;
