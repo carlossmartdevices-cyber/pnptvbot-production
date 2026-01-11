@@ -15,6 +15,7 @@ const { getLanguage, validateUserInput } = require('../../utils/helpers');
 const broadcastUtils = require('../../utils/broadcastUtils');
 const performanceUtils = require('../../utils/performanceUtils');
 const uxUtils = require('../../utils/uxUtils');
+const BroadcastButtonModel = require('../../../models/broadcastButtonModel');
 
 // Use shared utilities
 const { sanitizeInput } = broadcastUtils;
@@ -2979,6 +2980,19 @@ let registerAdminHandlers = (bot) => {
               scheduledAt: scheduledTime,
               timezone: 'UTC',
             });
+
+            // Add buttons to the broadcast if they exist
+            if (broadcastData.buttons && broadcastData.buttons.length > 0) {
+              try {
+                await BroadcastButtonModel.addButtonsToBroadcast(broadcast.broadcast_id, broadcastData.buttons);
+                logger.info(`Buttons added to broadcast ${broadcast.broadcast_id}`, {
+                  buttonCount: broadcastData.buttons.length
+                });
+              } catch (buttonError) {
+                logger.error(`Error adding buttons to broadcast ${broadcast.broadcast_id}:`, buttonError);
+                // Continue even if buttons fail - broadcast can still be sent without buttons
+              }
+            }
 
             broadcastIds.push(broadcast.broadcast_id);
             successCount += 1;

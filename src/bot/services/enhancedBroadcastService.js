@@ -17,6 +17,8 @@ const s3Service = require('../../utils/s3Service');
 const userService = require('./userService');
 const BroadcastService = require('./broadcastService');
 const { v4: uuidv4 } = require('uuid');
+const BroadcastButtonModel = require('../../models/broadcastButtonModel');
+const { Markup } = require('telegraf');
 
 class EnhancedBroadcastService extends BroadcastService {
   
@@ -557,6 +559,243 @@ class EnhancedBroadcastService extends BroadcastService {
       messageEn: prefix + (content.messageEn || '') + suffix,
       messageEs: prefix + (content.messageEs || '') + suffix
     };
+  }
+
+  /**
+   * Build button markup for a broadcast
+   * @param {Array} buttons - Array of button configurations
+   * @returns {Object|undefined} Markup.inlineKeyboard object or undefined
+   */
+  buildButtonMarkup(buttons) {
+    if (!buttons || buttons.length === 0) {
+      return undefined; // No buttons
+    }
+
+    try {
+      const buttonRows = [];
+      for (const btn of buttons) {
+        const buttonObj = typeof btn === 'string' ? JSON.parse(btn) : btn;
+
+        // Validate button object structure
+        if (!buttonObj || typeof buttonObj !== 'object') {
+          logger.warn('Invalid button object structure:', buttonObj);
+          continue;
+        }
+
+        if (buttonObj.type === 'url') {
+          if (buttonObj.text && buttonObj.target) {
+            buttonRows.push([Markup.button.url(buttonObj.text, buttonObj.target)]);
+          }
+        } else if (buttonObj.type === 'callback') {
+          if (buttonObj.text && buttonObj.data) {
+            buttonRows.push([Markup.button.callback(buttonObj.text, buttonObj.data)]);
+          }
+        } else if (buttonObj.type === 'command') {
+          if (buttonObj.text && buttonObj.target) {
+            buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_action_${buttonObj.target}`)]);
+          }
+        } else if (buttonObj.type === 'plan') {
+          if (buttonObj.text && buttonObj.target) {
+            buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_plan_${buttonObj.target}`)]);
+          }
+        } else if (buttonObj.type === 'feature') {
+          if (buttonObj.text && buttonObj.target) {
+            buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_feature_${buttonObj.target}`)]);
+          }
+        }
+      }
+
+      return buttonRows.length > 0 ? Markup.inlineKeyboard(buttonRows) : undefined;
+    } catch (error) {
+      logger.warn('Error building button markup:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Send broadcast with enhancements (buttons, analytics, etc.)
+   * @param {Object} bot - Telegram bot instance
+   * @param {string} broadcastId - Broadcast ID
+   * @returns {Promise<Object>} Broadcast results with enhancements
+   */
+  async sendBroadcastWithEnhancements(bot, broadcastId) {
+    try {
+      // Get broadcast details
+      const broadcastQuery = 'SELECT * FROM broadcasts WHERE broadcast_id = $1';
+      const broadcastResult = await getPool().query(broadcastQuery, [broadcastId]);
+
+      if (broadcastResult.rows.length === 0) {
+        throw new Error(`Broadcast not found: ${broadcastId}`);
+      }
+
+      const broadcast = broadcastResult.rows[0];
+
+      // Check if broadcast is already being processed or completed (idempotency check)
+      if (broadcast.status === 'sending' || broadcast.status === 'completed') {
+        logger.warn(`Broadcast ${broadcastId} is already ${broadcast.status}, skipping duplicate execution`);
+        return {
+          total: broadcast.total_recipients || 0,
+          sent: broadcast.sent_count || 0,
+          failed: broadcast.failed_count || 0,
+          blocked: broadcast.blocked_count || 0,
+          deactivated: broadcast.deactivated_count || 0,
+          errors: broadcast.error_count || 0,
+          duplicate: true,
+        };
+      }
+
+      // Update status to sending
+      await getPool().query(
+        'UPDATE broadcasts SET status = $1, started_at = CURRENT_TIMESTAMP WHERE broadcast_id = $2',
+        ['sending', broadcastId]
+      );
+
+      // Get buttons for this broadcast
+      const buttons = await BroadcastButtonModel.getButtonsForBroadcast(broadcastId);
+      const buttonMarkup = this.buildButtonMarkup(buttons);
+
+      // Get target users
+      const targetUsers = await this.getTargetUsers(
+        broadcast.target_type,
+        broadcast.exclude_user_ids || []
+      );
+
+      const stats = {
+        total: targetUsers.length,
+        sent: 0,
+        failed: 0,
+        blocked: 0,
+        deactivated: 0,
+        errors: 0,
+      };
+
+      // Update total recipients
+      await getPool().query(
+        'UPDATE broadcasts SET total_recipients = $1 WHERE broadcast_id = $2',
+        [stats.total, broadcastId]
+      );
+
+      logger.info(`Starting enhanced broadcast ${broadcastId} to ${stats.total} users`);
+
+      const perRecipientDelayMs = parseInt(process.env.BROADCAST_SEND_DELAY_MS || '80', 10);
+      const progressUpdateEvery = parseInt(process.env.BROADCAST_PROGRESS_EVERY || '10', 10);
+      const cancellationCheckEvery = parseInt(process.env.BROADCAST_CANCELLATION_CHECK_EVERY || '25', 10);
+
+      // Send to each user
+      for (let index = 0; index < targetUsers.length; index++) {
+        const user = targetUsers[index];
+        try {
+          // Allow cancelling mid-flight
+          if (index % cancellationCheckEvery === 0) {
+            const current = await this.getBroadcastById(broadcastId);
+            if (current?.status === 'cancelled') {
+              logger.warn(`Broadcast ${broadcastId} cancelled during send loop, stopping early`);
+              break;
+            }
+          }
+
+          const message = user.language === 'es' ? broadcast.message_es : broadcast.message_en;
+
+          // Send based on media type
+          let messageId = null;
+          const attemptSend = async () => {
+            const sendOptions = {
+              parse_mode: 'Markdown',
+              ...(buttonMarkup ? { reply_markup: buttonMarkup } : {})
+            };
+
+            if (broadcast.media_type && broadcast.media_url) {
+              return this.sendMediaMessage(
+                bot,
+                user.id,
+                broadcast.media_type,
+                broadcast.media_url,
+                message,
+                broadcast.s3_key,
+                sendOptions
+              );
+            }
+            const result = await bot.telegram.sendMessage(user.id, message, sendOptions);
+            return result.message_id;
+          };
+
+          try {
+            messageId = await attemptSend();
+          } catch (error) {
+            const classification = this.classifyTelegramSendError(error);
+            if (classification.status === 'retry') {
+              const retryAfterSeconds = this.getTelegramRetryAfterSeconds(error);
+              const waitMs = Math.min(Math.max(retryAfterSeconds ? retryAfterSeconds * 1000 : 1500, 1000), 120000);
+              logger.warn(`Rate limited, waiting ${Math.round(waitMs / 1000)}s then retrying user ${user.id}`);
+              await this.sleep(waitMs);
+              messageId = await attemptSend();
+            } else {
+              throw error;
+            }
+          }
+
+          // Record successful delivery
+          await this.recordRecipient(broadcastId, user.id, 'sent', {
+            messageId,
+            language: user.language,
+            subscriptionTier: user.subscription_tier,
+          });
+
+          stats.sent++;
+
+          // Small delay to avoid rate limiting
+          await this.sleep(perRecipientDelayMs);
+        } catch (error) {
+          const classification = this.classifyTelegramSendError(error);
+          const status = classification.status === 'retry' ? 'failed' : classification.status;
+          if (status === 'blocked') stats.blocked++;
+          else if (status === 'deactivated') stats.deactivated++;
+          else stats.errors++;
+          stats.failed++;
+
+          // Record failed delivery
+          await this.recordRecipient(broadcastId, user.id, status, {
+            errorCode: error.code,
+            errorMessage: classification.description || error.message,
+            language: user.language,
+            subscriptionTier: user.subscription_tier,
+          });
+
+          logger.warn(`Failed to send to user ${user.id}: ${classification.description || error.message}`);
+        }
+
+        // Update progress
+        if (index % progressUpdateEvery === 0 || index === targetUsers.length - 1) {
+          const progress = ((stats.sent + stats.failed) / stats.total) * 100;
+          await getPool().query(
+            'UPDATE broadcasts SET sent_count = $1, failed_count = $2, blocked_count = $3, deactivated_count = $4, error_count = $5, progress_percentage = $6 WHERE broadcast_id = $7',
+            [stats.sent, stats.failed, stats.blocked, stats.deactivated, stats.errors, progress.toFixed(2), broadcastId]
+          );
+        }
+      }
+
+      // Mark broadcast as completed (or keep cancelled)
+      const finalBroadcast = await this.getBroadcastById(broadcastId);
+      if (finalBroadcast?.status !== 'cancelled') {
+        await getPool().query(
+          'UPDATE broadcasts SET status = $1, completed_at = CURRENT_TIMESTAMP WHERE broadcast_id = $2',
+          ['completed', broadcastId]
+        );
+      }
+
+      logger.info(`Enhanced broadcast ${broadcastId} completed: ${stats.sent} sent, ${stats.failed} failed`);
+
+      return stats;
+    } catch (error) {
+      // Mark broadcast as failed
+      await getPool().query(
+        'UPDATE broadcasts SET status = $1 WHERE broadcast_id = $2',
+        ['failed', broadcastId]
+      );
+
+      logger.error(`Error sending enhanced broadcast ${broadcastId}:`, error);
+      throw error;
+    }
   }
 }
 

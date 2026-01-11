@@ -388,12 +388,14 @@ class BroadcastService {
    * @param {string} mediaUrl - Media URL (S3 URL or Telegram file_id)
    * @param {string} caption - Message caption
    * @param {string} s3Key - S3 key (optional, for generating presigned URLs)
+   * @param {Object} sendOptions - Additional send options (optional)
    * @returns {Promise<number>} Message ID
    */
-  async sendMediaMessage(bot, userId, mediaType, mediaUrl, caption, s3Key = null) {
+  async sendMediaMessage(bot, userId, mediaType, mediaUrl, caption, s3Key = null, sendOptions = {}) {
     const options = {
       caption,
       parse_mode: 'Markdown',
+      ...sendOptions
     };
 
     // If we have an S3 key and the URL is an S3 URL, generate a presigned URL
