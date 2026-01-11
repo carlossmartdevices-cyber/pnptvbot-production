@@ -130,7 +130,28 @@ async function showBroadcastButtonsPicker(ctx) {
   const options = getBroadcastButtonOptions(lang);
 
   if (!ctx.session.temp?.broadcastData) ctx.session.temp.broadcastData = {};
+  
+  // Ensure we're in the buttons step
+  ctx.session.temp.broadcastStep = 'buttons';
+  
   ctx.session.temp.broadcastData.buttons = normalizeButtons(ctx.session.temp.broadcastData.buttons);
+  
+  // Debug: Log button picker display
+  logger.info('Displaying button picker', {
+    userId: ctx.from.id,
+    broadcastStep: ctx.session.temp.broadcastStep,
+    buttonCount: ctx.session.temp.broadcastData.buttons.length
+  });
+  
+  // Final defensive check: Ensure we stay in buttons step
+  if (ctx.session.temp.broadcastStep !== 'buttons') {
+    logger.warn('Button picker called but not in buttons step - forcing buttons step', {
+      userId: ctx.from.id,
+      currentStep: ctx.session.temp.broadcastStep
+    });
+    ctx.session.temp.broadcastStep = 'buttons';
+    await ctx.saveSession();
+  }
 
   const selectedKeys = new Set(
     (ctx.session.temp.broadcastData.buttons || [])
@@ -2423,6 +2444,16 @@ let registerAdminHandlers = (bot) => {
       }
       return;
     }
+    
+    // Defensive check: If we're past media step but user sends text, don't reset to media
+    if (ctx.session.temp?.broadcastStep && ['text_en', 'text_es', 'buttons', 'preview'].includes(ctx.session.temp.broadcastStep)) {
+      // Allow text input for these steps - don't interfere
+      logger.info('Allowing text input for current broadcast step', {
+        userId: ctx.from.id,
+        currentStep: ctx.session.temp.broadcastStep
+      });
+      // Continue with normal processing
+    }
 
     // Broadcast flow - Handle custom button entries
     if (ctx.session.temp?.broadcastStep === 'custom_buttons') {
@@ -2766,15 +2797,59 @@ let registerAdminHandlers = (bot) => {
           await ctx.saveSession();
           return;
         }
+        
+        // Debug: Log state before saving Spanish text
+        logger.info('Before saving Spanish text', {
+          userId: ctx.from.id,
+          currentStep: ctx.session.temp.broadcastStep,
+          hasMedia: !!broadcastData.mediaFileId,
+          hasEnglishText: !!broadcastData.textEn,
+          messageLength: message.length
+        });
+        
         // Save Spanish text
         broadcastData.textEs = message;
 
         // Buttons step (flexible selection)
         ctx.session.temp.broadcastStep = 'buttons';
-        broadcastData.buttons = buildDefaultBroadcastButtons(getLanguage(ctx)); // default: only home/start
+        
+        // Ensure buttons array exists and has default buttons
+        if (!broadcastData.buttons || !Array.isArray(broadcastData.buttons)) {
+          broadcastData.buttons = buildDefaultBroadcastButtons(getLanguage(ctx)); // default: only home/start
+        }
+        
+        // Debug: Log the current state after setting buttons step
+        logger.info('After setting buttons step - before saveSession', {
+          userId: ctx.from.id,
+          broadcastStep: ctx.session.temp.broadcastStep,
+          hasMedia: !!broadcastData.mediaFileId,
+          buttonCount: broadcastData.buttons.length,
+          hasSpanishText: !!broadcastData.textEs
+        });
+        
         await ctx.saveSession();
+        
+        // Debug: Log state after saveSession
+        logger.info('After saveSession - before showing button picker', {
+          userId: ctx.from.id,
+          broadcastStep: ctx.session.temp.broadcastStep,
+          sessionData: {
+            hasBroadcastData: !!ctx.session.temp.broadcastData,
+            hasTextEn: !!ctx.session.temp.broadcastData?.textEn,
+            hasTextEs: !!ctx.session.temp.broadcastData?.textEs,
+            buttonCount: ctx.session.temp.broadcastData?.buttons?.length
+          }
+        });
 
+        // Show button picker
         await showBroadcastButtonsPicker(ctx);
+        
+        // Debug: Log after showing button picker
+        logger.info('After showing button picker', {
+          userId: ctx.from.id,
+          broadcastStep: ctx.session.temp.broadcastStep
+        });
+        
         return;
 
         // Get target users
