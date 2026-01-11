@@ -143,47 +143,10 @@ async function showBroadcastButtonsPicker(ctx) {
     buttonCount: ctx.session.temp.broadcastData.buttons.length
   });
   
-  // DEFENSIVE FIX: Step progression guard in button picker
-  // Check if we have a step progression lock
-  if (ctx.session.temp?.stepProgressionLock && ctx.session.temp?.maxCompletedStep) {
-    const currentStep = ctx.session.temp.broadcastStep;
-    const maxStep = ctx.session.temp.maxCompletedStep;
-    
-    // Define step order
-    const stepOrder = ['media', 'text_en', 'text_es', 'buttons', 'preview', 'sending'];
-    const currentStepIndex = stepOrder.indexOf(currentStep);
-    const maxStepIndex = stepOrder.indexOf(maxStep);
-    
-    // If current step is before max completed step, prevent regression
-    if (currentStepIndex < maxStepIndex) {
-      logger.warn('Step regression detected in button picker - preventing', {
-        userId: ctx.from.id,
-        attemptedStep: currentStep,
-        maxCompletedStep: maxStep,
-        currentStepIndex,
-        maxStepIndex
-      });
-      
-      // Force back to the correct step
-      ctx.session.temp.broadcastStep = maxStep;
-      await ctx.saveSession();
-      
-      logger.info('Step regression prevented in button picker - restored to max completed step', {
-        userId: ctx.from.id,
-        restoredStep: ctx.session.temp.broadcastStep
-      });
-    }
-  }
-  
-  // Final defensive check: Ensure we stay in buttons step
-  if (ctx.session.temp.broadcastStep !== 'buttons') {
-    logger.warn('Button picker called but not in buttons step - forcing buttons step', {
-      userId: ctx.from.id,
-      currentStep: ctx.session.temp.broadcastStep
-    });
-    ctx.session.temp.broadcastStep = 'buttons';
-    await ctx.saveSession();
-  }
+  // AGGRESSIVE FIX: Force buttons step regardless of current state
+  // This ensures we're always in the correct step when showing button picker
+  ctx.session.temp.broadcastStep = 'buttons';
+  await ctx.saveSession();
 
   const selectedKeys = new Set(
     (ctx.session.temp.broadcastData.buttons || [])
@@ -2477,46 +2440,12 @@ let registerAdminHandlers = (bot) => {
       return;
     }
     
-    // DEFENSIVE FIX: Step progression guard to prevent regression
-    // Check if we have a step progression lock
-    if (ctx.session.temp?.stepProgressionLock && ctx.session.temp?.maxCompletedStep) {
-      const currentStep = ctx.session.temp.broadcastStep;
-      const maxStep = ctx.session.temp.maxCompletedStep;
-      
-      // Define step order
-      const stepOrder = ['media', 'text_en', 'text_es', 'buttons', 'preview', 'sending'];
-      const currentStepIndex = stepOrder.indexOf(currentStep);
-      const maxStepIndex = stepOrder.indexOf(maxStep);
-      
-      // If current step is before max completed step, prevent regression
-      if (currentStepIndex < maxStepIndex) {
-        logger.warn('Attempted step regression detected - preventing', {
-          userId: ctx.from.id,
-          attemptedStep: currentStep,
-          maxCompletedStep: maxStep,
-          currentStepIndex,
-          maxStepIndex
-        });
-        
-        // Force back to the correct step
-        ctx.session.temp.broadcastStep = maxStep;
-        await ctx.saveSession();
-        
-        logger.info('Step regression prevented - restored to max completed step', {
-          userId: ctx.from.id,
-          restoredStep: ctx.session.temp.broadcastStep
-        });
-      }
-    }
-    
-    // Defensive check: If we're past media step but user sends text, don't reset to media
-    if (ctx.session.temp?.broadcastStep && ['text_en', 'text_es', 'buttons', 'preview'].includes(ctx.session.temp.broadcastStep)) {
-      // Allow text input for these steps - don't interfere
-      logger.info('Allowing text input for current broadcast step', {
-        userId: ctx.from.id,
-        currentStep: ctx.session.temp.broadcastStep
-      });
-      // Continue with normal processing
+    // AGGRESSIVE FIX: Force correct step if we detect any issues
+    // If we're in buttons or later steps, ensure we stay there
+    if (ctx.session.temp?.broadcastStep && ['buttons', 'preview', 'sending'].includes(ctx.session.temp.broadcastStep)) {
+      // We're already in a valid advanced step - don't interfere
+      // This prevents any regression to earlier steps
+      return; // Skip further processing to avoid interference
     }
 
     // Broadcast flow - Handle custom button entries
@@ -2862,68 +2791,46 @@ let registerAdminHandlers = (bot) => {
           return;
         }
         
-        // Debug: Log state before saving Spanish text
-        logger.info('Before saving Spanish text', {
-          userId: ctx.from.id,
-          currentStep: ctx.session.temp.broadcastStep,
-          hasMedia: !!broadcastData.mediaFileId,
-          hasEnglishText: !!broadcastData.textEn,
-          messageLength: message.length
-        });
-        
+        // AGGRESSIVE FIX: Completely bypass any potential issues
         // Save Spanish text
         broadcastData.textEs = message;
 
-        // DEFENSIVE FIX: Lock step progression to prevent regression
-        // Set step progression lock to prevent going back to media
+        // Force step to buttons and immediately show button picker
+        // This bypasses any potential middleware or external interference
         ctx.session.temp.broadcastStep = 'buttons';
-        ctx.session.temp.stepProgressionLock = true; // Prevent step regression
-        ctx.session.temp.maxCompletedStep = 'buttons'; // Track furthest step
         
         // Ensure buttons array exists and has default buttons
         if (!broadcastData.buttons || !Array.isArray(broadcastData.buttons)) {
-          broadcastData.buttons = buildDefaultBroadcastButtons(getLanguage(ctx)); // default: only home/start
+          broadcastData.buttons = buildDefaultBroadcastButtons(getLanguage(ctx));
         }
         
-        // Debug: Log the current state after setting buttons step
-        logger.info('After setting buttons step - before saveSession', {
-          userId: ctx.from.id,
-          broadcastStep: ctx.session.temp.broadcastStep,
-          stepProgressionLock: ctx.session.temp.stepProgressionLock,
-          maxCompletedStep: ctx.session.temp.maxCompletedStep,
-          hasMedia: !!broadcastData.mediaFileId,
-          buttonCount: broadcastData.buttons.length,
-          hasSpanishText: !!broadcastData.textEs
-        });
-        
+        // Save session immediately
         await ctx.saveSession();
-        
-        // Debug: Log state after saveSession
-        logger.info('After saveSession - before showing button picker', {
-          userId: ctx.from.id,
-          broadcastStep: ctx.session.temp.broadcastStep,
-          stepProgressionLock: ctx.session.temp.stepProgressionLock,
-          maxCompletedStep: ctx.session.temp.maxCompletedStep,
-          sessionData: {
-            hasBroadcastData: !!ctx.session.temp.broadcastData,
-            hasTextEn: !!ctx.session.temp.broadcastData?.textEn,
-            hasTextEs: !!ctx.session.temp.broadcastData?.textEs,
-            buttonCount: ctx.session.temp.broadcastData?.buttons?.length
-          }
-        });
 
-        // Show button picker
-        await showBroadcastButtonsPicker(ctx);
-        
-        // Debug: Log after showing button picker
-        logger.info('After showing button picker', {
-          userId: ctx.from.id,
-          broadcastStep: ctx.session.temp.broadcastStep,
-          stepProgressionLock: ctx.session.temp.stepProgressionLock,
-          maxCompletedStep: ctx.session.temp.maxCompletedStep
-        });
-        
-        return;
+        // AGGRESSIVE FIX: Directly call button picker without any intermediate steps
+        // This ensures we bypass any potential issues in the flow
+        try {
+          await showBroadcastButtonsPicker(ctx);
+          return;
+        } catch (error) {
+          logger.error('AGGRESSIVE FIX: Error in direct button picker call, falling back to manual display', {
+            userId: ctx.from.id,
+            error: error.message
+          });
+          
+          // Fallback: Manually display button picker if direct call fails
+          await ctx.reply('🎯 *Paso 4/5: Botones*\n\nSelecciona botones para tu broadcast:', {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('✅ Home', 'broadcast_toggle_home')],
+              [Markup.button.callback('✅ Profile', 'broadcast_toggle_profile')],
+              [Markup.button.callback('➕ Custom Link', 'broadcast_add_custom_link')],
+              [Markup.button.callback('✅ Done', 'broadcast_continue_with_buttons')],
+              [Markup.button.callback('⏭️ No Buttons', 'broadcast_no_buttons')],
+            ]),
+          });
+          return;
+        }
 
         // Get target users
         let users = [];
