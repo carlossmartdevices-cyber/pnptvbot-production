@@ -143,6 +143,38 @@ async function showBroadcastButtonsPicker(ctx) {
     buttonCount: ctx.session.temp.broadcastData.buttons.length
   });
   
+  // DEFENSIVE FIX: Step progression guard in button picker
+  // Check if we have a step progression lock
+  if (ctx.session.temp?.stepProgressionLock && ctx.session.temp?.maxCompletedStep) {
+    const currentStep = ctx.session.temp.broadcastStep;
+    const maxStep = ctx.session.temp.maxCompletedStep;
+    
+    // Define step order
+    const stepOrder = ['media', 'text_en', 'text_es', 'buttons', 'preview', 'sending'];
+    const currentStepIndex = stepOrder.indexOf(currentStep);
+    const maxStepIndex = stepOrder.indexOf(maxStep);
+    
+    // If current step is before max completed step, prevent regression
+    if (currentStepIndex < maxStepIndex) {
+      logger.warn('Step regression detected in button picker - preventing', {
+        userId: ctx.from.id,
+        attemptedStep: currentStep,
+        maxCompletedStep: maxStep,
+        currentStepIndex,
+        maxStepIndex
+      });
+      
+      // Force back to the correct step
+      ctx.session.temp.broadcastStep = maxStep;
+      await ctx.saveSession();
+      
+      logger.info('Step regression prevented in button picker - restored to max completed step', {
+        userId: ctx.from.id,
+        restoredStep: ctx.session.temp.broadcastStep
+      });
+    }
+  }
+  
   // Final defensive check: Ensure we stay in buttons step
   if (ctx.session.temp.broadcastStep !== 'buttons') {
     logger.warn('Button picker called but not in buttons step - forcing buttons step', {
@@ -2445,6 +2477,38 @@ let registerAdminHandlers = (bot) => {
       return;
     }
     
+    // DEFENSIVE FIX: Step progression guard to prevent regression
+    // Check if we have a step progression lock
+    if (ctx.session.temp?.stepProgressionLock && ctx.session.temp?.maxCompletedStep) {
+      const currentStep = ctx.session.temp.broadcastStep;
+      const maxStep = ctx.session.temp.maxCompletedStep;
+      
+      // Define step order
+      const stepOrder = ['media', 'text_en', 'text_es', 'buttons', 'preview', 'sending'];
+      const currentStepIndex = stepOrder.indexOf(currentStep);
+      const maxStepIndex = stepOrder.indexOf(maxStep);
+      
+      // If current step is before max completed step, prevent regression
+      if (currentStepIndex < maxStepIndex) {
+        logger.warn('Attempted step regression detected - preventing', {
+          userId: ctx.from.id,
+          attemptedStep: currentStep,
+          maxCompletedStep: maxStep,
+          currentStepIndex,
+          maxStepIndex
+        });
+        
+        // Force back to the correct step
+        ctx.session.temp.broadcastStep = maxStep;
+        await ctx.saveSession();
+        
+        logger.info('Step regression prevented - restored to max completed step', {
+          userId: ctx.from.id,
+          restoredStep: ctx.session.temp.broadcastStep
+        });
+      }
+    }
+    
     // Defensive check: If we're past media step but user sends text, don't reset to media
     if (ctx.session.temp?.broadcastStep && ['text_en', 'text_es', 'buttons', 'preview'].includes(ctx.session.temp.broadcastStep)) {
       // Allow text input for these steps - don't interfere
@@ -2810,8 +2874,11 @@ let registerAdminHandlers = (bot) => {
         // Save Spanish text
         broadcastData.textEs = message;
 
-        // Buttons step (flexible selection)
+        // DEFENSIVE FIX: Lock step progression to prevent regression
+        // Set step progression lock to prevent going back to media
         ctx.session.temp.broadcastStep = 'buttons';
+        ctx.session.temp.stepProgressionLock = true; // Prevent step regression
+        ctx.session.temp.maxCompletedStep = 'buttons'; // Track furthest step
         
         // Ensure buttons array exists and has default buttons
         if (!broadcastData.buttons || !Array.isArray(broadcastData.buttons)) {
@@ -2822,6 +2889,8 @@ let registerAdminHandlers = (bot) => {
         logger.info('After setting buttons step - before saveSession', {
           userId: ctx.from.id,
           broadcastStep: ctx.session.temp.broadcastStep,
+          stepProgressionLock: ctx.session.temp.stepProgressionLock,
+          maxCompletedStep: ctx.session.temp.maxCompletedStep,
           hasMedia: !!broadcastData.mediaFileId,
           buttonCount: broadcastData.buttons.length,
           hasSpanishText: !!broadcastData.textEs
@@ -2833,6 +2902,8 @@ let registerAdminHandlers = (bot) => {
         logger.info('After saveSession - before showing button picker', {
           userId: ctx.from.id,
           broadcastStep: ctx.session.temp.broadcastStep,
+          stepProgressionLock: ctx.session.temp.stepProgressionLock,
+          maxCompletedStep: ctx.session.temp.maxCompletedStep,
           sessionData: {
             hasBroadcastData: !!ctx.session.temp.broadcastData,
             hasTextEn: !!ctx.session.temp.broadcastData?.textEn,
@@ -2847,7 +2918,9 @@ let registerAdminHandlers = (bot) => {
         // Debug: Log after showing button picker
         logger.info('After showing button picker', {
           userId: ctx.from.id,
-          broadcastStep: ctx.session.temp.broadcastStep
+          broadcastStep: ctx.session.temp.broadcastStep,
+          stepProgressionLock: ctx.session.temp.stepProgressionLock,
+          maxCompletedStep: ctx.session.temp.maxCompletedStep
         });
         
         return;
