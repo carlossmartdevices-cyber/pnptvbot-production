@@ -160,6 +160,21 @@ function sanitizeInput(text, maxLength = 4096) {
 }
 
 /**
+ * Build default broadcast buttons (home and profile)
+ * @param {String} lang - Language code (en/es)
+ * @returns {Array} Array of default button configurations
+ */
+function buildDefaultBroadcastButtons(lang = 'en') {
+  const options = getStandardButtonOptions();
+
+  // Return only home and profile buttons by default
+  const homeButton = options.find(opt => opt.key === 'home');
+  const profileButton = options.find(opt => opt.key === 'profile');
+
+  return [homeButton, profileButton].filter(Boolean);
+}
+
+/**
  * Get button toggle label based on selection state
  * @param {Boolean} isSelected - Whether button is selected
  * @param {String} text - Button text
@@ -210,6 +225,7 @@ module.exports = {
   validateBroadcastData,
   buildProgressIndicator,
   sanitizeInput,
+  buildDefaultBroadcastButtons,
   getButtonToggleLabel,
   formatDashboardStats
 };

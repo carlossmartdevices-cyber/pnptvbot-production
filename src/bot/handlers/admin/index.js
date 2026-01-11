@@ -35,10 +35,11 @@ function getBroadcastStepLabel(step, lang) {
 }
 
 // Use shared utilities for button management
-const { 
-  getStandardButtonOptions, 
-  normalizeButtons, 
-  buildInlineKeyboard 
+const {
+  getStandardButtonOptions,
+  normalizeButtons,
+  buildInlineKeyboard,
+  buildDefaultBroadcastButtons
 } = broadcastUtils;
 
 function getBroadcastButtonOptions(lang) {
