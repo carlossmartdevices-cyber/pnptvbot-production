@@ -174,11 +174,67 @@ async function showBroadcastResumePrompt(ctx) {
   );
 }
 
+/**
+ * Update broadcast step with validation and atomic save
+ * @param {Object} ctx - Telegraf context
+ * @param {string} newStep - New step to transition to
+ */
+async function updateBroadcastStep(ctx, newStep) {
+  const validSteps = ['media', 'text_en', 'text_es', 'ai_prompt_en', 'ai_prompt_es', 'buttons', 'preview', 'sending', 'schedule_count', 'custom_link', 'custom_buttons'];
+
+  if (!validSteps.includes(newStep)) {
+    logger.error(`Invalid broadcast step transition attempted: ${newStep}`);
+    throw new Error(`Invalid broadcast step: ${newStep}`);
+  }
+
+  const previousStep = ctx.session.temp?.broadcastStep;
+  ctx.session.temp.broadcastStep = newStep;
+
+  try {
+    await ctx.saveSession();
+    logger.info(`Broadcast step updated: ${previousStep} → ${newStep}`, {
+      userId: ctx.from.id,
+      previousStep,
+      newStep
+    });
+  } catch (error) {
+    logger.error('Failed to save broadcast step:', {
+      error: error.message,
+      previousStep,
+      attemptedStep: newStep
+    });
+    throw error;
+  }
+}
+
+/**
+ * Get appropriate fallback step on error
+ * @param {string} currentStep - Current step
+ * @returns {string} Safe fallback step
+ */
+function getFallbackStep(currentStep) {
+  const fallbackMap = {
+    'ai_prompt_en': 'text_en',
+    'ai_prompt_es': 'text_es',
+    'custom_link': 'buttons',
+    'custom_buttons': 'buttons'
+  };
+
+  return fallbackMap[currentStep] || currentStep;
+}
+
 async function renderBroadcastStep(ctx) {
   const lang = getLanguage(ctx);
   const step = ctx.session?.temp?.broadcastStep;
+  
+  logger.info('Rendering broadcast step', {
+    userId: ctx.from.id,
+    broadcastTarget: ctx.session?.temp?.broadcastTarget,
+    broadcastStep: step
+  });
 
   if (!ctx.session?.temp?.broadcastTarget) {
+    logger.warn('No broadcast target found in session', { userId: ctx.from.id });
     await ctx.editMessageText(
       lang === 'es' ? '❌ Sesión expirada. Inicia de nuevo desde /admin.' : '❌ Session expired. Start again from /admin.',
       Markup.inlineKeyboard([[Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', 'admin_cancel')]]),
@@ -276,6 +332,9 @@ async function showAdminPanel(ctx, edit = false) {
     // Common for all admin roles
     buttons.push([Markup.button.callback('👥 Usuarios', 'admin_users')]);
     buttons.push([Markup.button.callback('🎁 Activar Membresía', 'admin_activate_membership')]);
+    
+    // 🧪 TEST BUTTON: Add test callback button for debugging
+    buttons.push([Markup.button.callback('🧪 Test Callback', 'test_callback')]);
 
     // Admin and SuperAdmin features
     if (userRole === 'superadmin' || userRole === 'admin') {
@@ -984,39 +1043,143 @@ let registerAdminHandlers = (bot) => {
       logger.error('Error in admin broadcast:', error);
       try {
         await ctx.answerCbQuery('Error al iniciar broadcast');
+        await ctx.reply('❌ Error loading broadcast menu. Please try again.').catch(() => {});
       } catch (e) {
-        // Already answered
+        logger.error('Failed to send error message:', e);
       }
     }
   });
 
   bot.action('broadcast_all', async (ctx) => {
     try {
-      await ctx.answerCbQuery();
+      logger.info('🎯 HANDLER TRIGGERED: broadcast_all', {
+        userId: ctx.from.id,
+        chatType: ctx.chat?.type,
+        callbackData: ctx.callbackQuery?.data
+      });
+      
+      // Answer callback immediately
+      await ctx.answerCbQuery('✅ Processing...');
+      logger.info('✅ Callback query answered');
+      
+      // Check admin permissions
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-      await updateBroadcastStep(ctx, 'media');
+      logger.info('🔐 Permission check result:', { userId: ctx.from.id, isAdmin });
+      
+      if (!isAdmin) {
+        logger.warn('Non-admin tried to select broadcast audience (all):', { userId: ctx.from.id });
+        await ctx.answerCbQuery('❌ Not authorized');
+        return;
+      }
+      
+      logger.info('👥 Broadcast audience selected: all', { userId: ctx.from.id });
+      
+      // Initialize session data with debugging
+      logger.info('📊 Session before initialization:', ctx.session);
+      ctx.session.temp = ctx.session.temp || {};
       ctx.session.temp.broadcastTarget = 'all';
       ctx.session.temp.broadcastData = {};
+      logger.info('📊 Session after initialization:', ctx.session);
+      
+      // Update broadcast step
+      logger.info('🔄 Updating broadcast step to media...');
+      await updateBroadcastStep(ctx, 'media');
+      logger.info('✅ Broadcast step updated');
+      
+      // Save session
+      logger.info('💾 Saving session...');
       await ctx.saveSession();
-      await ctx.reply('👥 Audiencia seleccionada: Todos los usuarios');
+      logger.info('✅ Session saved successfully');
+      
+      // Log final session state
+      logger.info('📋 Final session state:', {
+        userId: ctx.from.id,
+        broadcastTarget: ctx.session.temp.broadcastTarget,
+        broadcastStep: ctx.session.temp.broadcastStep,
+        broadcastData: ctx.session.temp.broadcastData
+      });
+      
+      // Render next step
+      logger.info('🎨 Rendering broadcast step...');
+      await renderBroadcastStep(ctx);
+      logger.info('✅ Broadcast step rendered');
+      
+      // Send confirmation
+      await ctx.reply('👥 Audiencia seleccionada: Todos los usuarios').catch(() => {});
+      
     } catch (error) {
-      logger.error('Error selecting broadcast audience (all):', error);
+      logger.error('❌ CRITICAL ERROR in broadcast_all handler:', {
+        error: error.message,
+        stack: error.stack,
+        userId: ctx.from.id
+      });
+      try {
+        await ctx.reply('❌ Error selecting audience. Please check logs and try again.').catch(() => {});
+      } catch (replyError) {
+        logger.error('❌ Failed to send error message:', replyError.message);
+      }
     }
   });
 
   bot.action('broadcast_premium', async (ctx) => {
     try {
-      await ctx.answerCbQuery();
+      logger.info('🎯 HANDLER TRIGGERED: broadcast_premium', {
+        userId: ctx.from.id,
+        chatType: ctx.chat?.type,
+        callbackData: ctx.callbackQuery?.data
+      });
+      
+      await ctx.answerCbQuery('✅ Processing...');
+      logger.info('✅ Callback query answered');
+      
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-      await updateBroadcastStep(ctx, 'media');
+      logger.info('🔐 Permission check result:', { userId: ctx.from.id, isAdmin });
+      
+      if (!isAdmin) {
+        logger.warn('Non-admin tried to select broadcast audience (premium):', { userId: ctx.from.id });
+        await ctx.answerCbQuery('❌ Not authorized');
+        return;
+      }
+      
+      logger.info('💎 Broadcast audience selected: premium', { userId: ctx.from.id });
+      
+      logger.info('📊 Session before initialization:', ctx.session);
+      ctx.session.temp = ctx.session.temp || {};
       ctx.session.temp.broadcastTarget = 'premium';
       ctx.session.temp.broadcastData = {};
+      logger.info('📊 Session after initialization:', ctx.session);
+      
+      logger.info('🔄 Updating broadcast step to media...');
+      await updateBroadcastStep(ctx, 'media');
+      logger.info('✅ Broadcast step updated');
+      
+      logger.info('💾 Saving session...');
       await ctx.saveSession();
-      await ctx.reply('💎 Audiencia seleccionada: Solo usuarios Premium');
+      logger.info('✅ Session saved successfully');
+      
+      logger.info('📋 Final session state:', {
+        userId: ctx.from.id,
+        broadcastTarget: ctx.session.temp.broadcastTarget,
+        broadcastStep: ctx.session.temp.broadcastStep
+      });
+      
+      logger.info('🎨 Rendering broadcast step...');
+      await renderBroadcastStep(ctx);
+      logger.info('✅ Broadcast step rendered');
+      
+      await ctx.reply('💎 Audiencia seleccionada: Solo usuarios Premium').catch(() => {});
+      
     } catch (error) {
-      logger.error('Error selecting broadcast audience (premium):', error);
+      logger.error('❌ CRITICAL ERROR in broadcast_premium handler:', {
+        error: error.message,
+        stack: error.stack,
+        userId: ctx.from.id
+      });
+      try {
+        await ctx.reply('❌ Error selecting audience. Please check logs and try again.').catch(() => {});
+      } catch (replyError) {
+        logger.error('❌ Failed to send error message:', replyError.message);
+      }
     }
   });
 
@@ -1025,11 +1188,11 @@ let registerAdminHandlers = (bot) => {
       await ctx.answerCbQuery();
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
-      await updateBroadcastStep(ctx, 'media');
       ctx.session.temp.broadcastTarget = 'free';
       ctx.session.temp.broadcastData = {};
+      await updateBroadcastStep(ctx, 'media');
       await ctx.saveSession();
-      await ctx.reply('🆓 Audiencia seleccionada: Solo usuarios gratuitos');
+      await renderBroadcastStep(ctx);
     } catch (error) {
       logger.error('Error selecting broadcast audience (free):', error);
     }
@@ -1040,11 +1203,11 @@ let registerAdminHandlers = (bot) => {
       await ctx.answerCbQuery();
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
-      await updateBroadcastStep(ctx, 'media');
       ctx.session.temp.broadcastTarget = 'churned';
       ctx.session.temp.broadcastData = {};
+      await updateBroadcastStep(ctx, 'media');
       await ctx.saveSession();
-      await ctx.reply('↩️ Audiencia seleccionada: Usuarios churned (ex-premium)');
+      await renderBroadcastStep(ctx);
     } catch (error) {
       logger.error('Error selecting broadcast audience (churned):', error);
     }
@@ -1084,55 +1247,86 @@ let registerAdminHandlers = (bot) => {
   });
 
   // Broadcast target selection
-  bot.action(/^broadcast_(.+)$/, async (ctx) => {
+  // 🧪 TEST HANDLER: Simple callback test to verify callback queries work
+  bot.action('test_callback', async (ctx) => {
     try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) {
-        await ctx.answerCbQuery('❌ No autorizado');
-        return;
-      }
-
-      // Validate match result exists
-      if (!ctx.match || !ctx.match[1]) {
-        logger.error('Invalid broadcast target action format');
-        await ctx.answerCbQuery('❌ Error en formato de acción');
-        return;
-      }
-
-      const target = ctx.match[1];
-      const lang = getLanguage(ctx);
-
-      // Initialize session temp if needed
-      if (!ctx.session.temp) {
-        ctx.session.temp = {};
-      }
-
-      ctx.session.temp.broadcastTarget = target;
-      await updateBroadcastStep(ctx, 'media');
-      ctx.session.temp.broadcastData = {};
-      await ctx.saveSession();
-
-      logger.info('Broadcast target selected', { target, userId: ctx.from.id });
-
-      await ctx.answerCbQuery(`✓ Audiencia: ${target}`);
-
-      await ctx.editMessageText(
-        '📎 *Paso 1/4: Subir Media*\n\n'
-        + 'Por favor envía una imagen, video o archivo para adjuntar al broadcast.\n\n'
-        + '💡 También puedes saltar este paso si solo quieres enviar texto.',
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('⏭️ Saltar (Solo Texto)', 'broadcast_skip_media')],
-            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
-          ]),
-        },
-      );
+      logger.info('🧪 TEST CALLBACK TRIGGERED', {
+        userId: ctx.from.id,
+        callbackData: ctx.callbackQuery?.data
+      });
+      
+      await ctx.answerCbQuery('✅ Test callback received!');
+      await ctx.reply('🎉 Test callback works! Callback queries are functioning properly.').catch(() => {});
+      
+      logger.info('✅ Test callback completed successfully');
     } catch (error) {
-      logger.error('Error in broadcast target:', error);
-      await ctx.answerCbQuery('❌ Error al seleccionar audiencia').catch(() => {});
+      logger.error('❌ Test callback failed:', {
+        error: error.message,
+        userId: ctx.from.id
+      });
+      try {
+        await ctx.answerCbQuery('❌ Test failed');
+        await ctx.reply('❌ Test callback failed. Check logs for details.').catch(() => {});
+      } catch (replyError) {
+        logger.error('❌ Failed to send test error message:', replyError.message);
+      }
     }
   });
+
+  // DISABLED: Regex handler conflicts with specific audience selection handlers
+  // bot.action(/^broadcast_(.+)$/, async (ctx) => {
+  //   try {
+  //     logger.info('🎯 Regex handler: broadcast_* triggered', { 
+  //       userId: ctx.from.id, 
+  //       action: ctx.callbackQuery?.data 
+  //     });
+  //     const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+  //     if (!isAdmin) {
+  //       await ctx.answerCbQuery('❌ No autorizado');
+  //       return;
+  //     }
+
+  //     // Validate match result exists
+  //     if (!ctx.match || !ctx.match[1]) {
+  //       logger.error('Invalid broadcast target action format');
+  //       await ctx.answerCbQuery('❌ Error en formato de acción');
+  //       return;
+  //     }
+
+  //     const target = ctx.match[1];
+  //     const lang = getLanguage(ctx);
+
+  //     // Initialize session temp if needed
+  //     if (!ctx.session.temp) {
+  //       ctx.session.temp = {};
+  //     }
+
+  //     ctx.session.temp.broadcastTarget = target;
+  //     await updateBroadcastStep(ctx, 'media');
+  //     ctx.session.temp.broadcastData = {};
+  //     await ctx.saveSession();
+
+  //     logger.info('Broadcast target selected via regex handler', { target, userId: ctx.from.id });
+
+  //     await ctx.answerCbQuery(`✓ Audiencia: ${target}`);
+
+  //     await ctx.editMessageText(
+  //       '📎 *Paso 1/4: Subir Media*\n\n'
+  //       + 'Por favor envía una imagen, video o archivo para adjuntar al broadcast.\n\n'
+  //       + '💡 También puedes saltar este paso si solo quieres enviar texto.',
+  //       {
+  //         parse_mode: 'Markdown',
+  //         ...Markup.inlineKeyboard([
+  //           [Markup.button.callback('⏭️ Saltar (Solo Texto)', 'broadcast_skip_media')],
+  //           [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+  //         ]),
+  //       },
+  //     );
+  //   } catch (error) {
+  //     logger.error('Error in broadcast target:', error);
+  //     await ctx.answerCbQuery('❌ Error al seleccionar audiencia').catch(() => {});
+  //   }
+  // });
 
   // Skip media upload
   bot.action('broadcast_skip_media', async (ctx) => {
@@ -2473,55 +2667,6 @@ let registerAdminHandlers = (bot) => {
       }
       return;
     }
-
-  /**
-   * Update broadcast step with validation and atomic save
-   * @param {Object} ctx - Telegraf context
-   * @param {string} newStep - New step to transition to
-   */
-  async function updateBroadcastStep(ctx, newStep) {
-    const validSteps = ['media', 'text_en', 'text_es', 'ai_prompt_en', 'ai_prompt_es', 'buttons', 'preview', 'sending', 'schedule_count', 'custom_link', 'custom_buttons'];
-    
-    if (!validSteps.includes(newStep)) {
-      logger.error(`Invalid broadcast step transition attempted: ${newStep}`);
-      throw new Error(`Invalid broadcast step: ${newStep}`);
-    }
-
-    const previousStep = ctx.session.temp?.broadcastStep;
-    ctx.session.temp.broadcastStep = newStep;
-    
-    try {
-      await ctx.saveSession();
-      logger.info(`Broadcast step updated: ${previousStep} → ${newStep}`, {
-        userId: ctx.from.id,
-        previousStep,
-        newStep
-      });
-    } catch (error) {
-      logger.error('Failed to save broadcast step:', {
-        error: error.message,
-        previousStep,
-        attemptedStep: newStep
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Get appropriate fallback step on error
-   * @param {string} currentStep - Current step
-   * @returns {string} Safe fallback step
-   */
-  function getFallbackStep(currentStep) {
-    const fallbackMap = {
-      'ai_prompt_en': 'text_en',
-      'ai_prompt_es': 'text_es',
-      'custom_link': 'buttons',
-      'custom_buttons': 'buttons'
-    };
-    
-    return fallbackMap[currentStep] || currentStep;
-  }
 
     // Broadcast flow - AI prompt EN/ES
     if (ctx.session.temp?.broadcastStep === 'ai_prompt_en' || ctx.session.temp?.broadcastStep === 'ai_prompt_es') {
