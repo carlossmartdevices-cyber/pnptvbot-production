@@ -22,12 +22,12 @@ const { sanitizeInput } = broadcastUtils;
 
 function getBroadcastStepLabel(step, lang) {
   const labels = {
-    media: lang === 'es' ? 'Paso 1/4: Media' : 'Step 1/4: Media',
-    text_en: lang === 'es' ? 'Paso 2/4: Texto (EN)' : 'Step 2/4: Text (EN)',
-    text_es: lang === 'es' ? 'Paso 3/4: Texto (ES)' : 'Step 3/4: Text (ES)',
-    buttons: lang === 'es' ? 'Paso 4/4: Botones' : 'Step 4/4: Buttons',
-    custom_buttons: lang === 'es' ? 'Paso 4/4: Botones (Custom)' : 'Step 4/4: Buttons (Custom)',
-    schedule_options: lang === 'es' ? 'Programación' : 'Scheduling',
+    media: lang === 'es' ? 'Paso 1/5: Media' : 'Step 1/5: Media',
+    text_en: lang === 'es' ? 'Paso 2/5: Texto (EN)' : 'Step 2/5: Text (EN)',
+    text_es: lang === 'es' ? 'Paso 3/5: Texto (ES)' : 'Step 3/5: Text (ES)',
+    buttons: lang === 'es' ? 'Paso 4/5: Botones' : 'Step 4/5: Buttons',
+    custom_buttons: lang === 'es' ? 'Paso 4/5: Botones (Custom)' : 'Step 4/5: Buttons (Custom)',
+    schedule_options: lang === 'es' ? 'Paso 5/5: Programación' : 'Step 5/5: Scheduling',
     schedule_datetime: lang === 'es' ? 'Programación (Fecha/Hora)' : 'Scheduling (Date/Time)',
     schedule_count: lang === 'es' ? 'Programación (Cantidad)' : 'Scheduling (Count)',
     sending: lang === 'es' ? 'Enviando…' : 'Sending…',
@@ -44,7 +44,17 @@ const {
 } = broadcastUtils;
 
 function getBroadcastButtonOptions(lang) {
-  return getStandardButtonOptions();
+  const options = getStandardButtonOptions();
+  
+  // Return language-specific button texts
+  if (lang === 'es') {
+    return options.map(opt => ({
+      ...opt,
+      text: broadcastUtils.getSpanishButtonText(opt.key, opt.text)
+    }));
+  }
+  
+  return options;
 }
 
 function summarizeBroadcastButtons(buttons) {
@@ -130,23 +140,28 @@ async function showBroadcastButtonsPicker(ctx) {
   const options = getBroadcastButtonOptions(lang);
 
   if (!ctx.session.temp?.broadcastData) ctx.session.temp.broadcastData = {};
-  
-  // Ensure we're in the buttons step
-  ctx.session.temp.broadcastStep = 'buttons';
-  
+
+  // Normalize and ensure buttons array
   ctx.session.temp.broadcastData.buttons = normalizeButtons(ctx.session.temp.broadcastData.buttons);
-  
-  // Debug: Log button picker display
+
+  // Ensure we're in the buttons step with additional safeguards
+  const currentStep = ctx.session.temp.broadcastStep;
+  if (currentStep !== 'buttons') {
+    logger.info('Broadcast step correction in button picker', {
+      userId: ctx.from.id,
+      fromStep: currentStep,
+      toStep: 'buttons'
+    });
+    ctx.session.temp.broadcastStep = 'buttons';
+    await ctx.saveSession();
+  }
+
+  // Log button picker display
   logger.info('Displaying button picker', {
     userId: ctx.from.id,
     broadcastStep: ctx.session.temp.broadcastStep,
     buttonCount: ctx.session.temp.broadcastData.buttons.length
   });
-  
-  // AGGRESSIVE FIX: Force buttons step regardless of current state
-  // This ensures we're always in the correct step when showing button picker
-  ctx.session.temp.broadcastStep = 'buttons';
-  await ctx.saveSession();
 
   const selectedKeys = new Set(
     (ctx.session.temp.broadcastData.buttons || [])
@@ -261,8 +276,8 @@ async function renderBroadcastStep(ctx) {
   }
 
   if (step === 'media') {
-    await ctx.editMessageText(
-      '📎 *Paso 1/4: Subir Media*\n\n'
+    const message = await ctx.editMessageText(
+      '📎 *Paso 1/5: Subir Media*\n\n'
       + 'Por favor envía una imagen, video o archivo para adjuntar al broadcast.\n\n'
       + '💡 También puedes saltar este paso si solo quieres enviar texto.',
       {
@@ -273,12 +288,23 @@ async function renderBroadcastStep(ctx) {
         ]),
       },
     );
+
+    // Store message ID to delete later when media is uploaded
+    // For editMessageText, the message ID is from the callback query message
+    if (ctx.callbackQuery && ctx.callbackQuery.message) {
+      ctx.session.temp.mediaPromptMessageId = ctx.callbackQuery.message.message_id;
+      await ctx.saveSession();
+      logger.info('Stored media prompt message ID for deletion', {
+        messageId: ctx.callbackQuery.message.message_id
+      });
+    }
+
     return;
   }
 
   if (step === 'text_en') {
     await ctx.editMessageText(
-      '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
+      '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
       + 'Por favor escribe el mensaje en inglés que quieres enviar:',
       {
         parse_mode: 'Markdown',
@@ -290,7 +316,7 @@ async function renderBroadcastStep(ctx) {
 
   if (step === 'text_es') {
     await ctx.editMessageText(
-      '🇪🇸 *Paso 3/4: Texto en Español*\n\n'
+      '🇪🇸 *Paso 3/5: Texto en Español*\n\n'
       + 'Por favor escribe el mensaje en español que quieres enviar:',
       {
         parse_mode: 'Markdown',
@@ -1122,9 +1148,6 @@ let registerAdminHandlers = (bot) => {
       await renderBroadcastStep(ctx);
       logger.info('✅ Broadcast step rendered');
       
-      // Send confirmation
-      await ctx.reply('👥 Audiencia seleccionada: Todos los usuarios').catch(() => {});
-      
     } catch (error) {
       logger.error('❌ CRITICAL ERROR in broadcast_all handler:', {
         error: error.message,
@@ -1184,8 +1207,6 @@ let registerAdminHandlers = (bot) => {
       logger.info('🎨 Rendering broadcast step...');
       await renderBroadcastStep(ctx);
       logger.info('✅ Broadcast step rendered');
-      
-      await ctx.reply('💎 Audiencia seleccionada: Solo usuarios Premium').catch(() => {});
       
     } catch (error) {
       logger.error('❌ CRITICAL ERROR in broadcast_premium handler:', {
@@ -1329,7 +1350,7 @@ let registerAdminHandlers = (bot) => {
   //     await ctx.answerCbQuery(`✓ Audiencia: ${target}`);
 
   //     await ctx.editMessageText(
-  //       '📎 *Paso 1/4: Subir Media*\n\n'
+  //       '📎 *Paso 1/5: Subir Media*\n\n'
   //       + 'Por favor envía una imagen, video o archivo para adjuntar al broadcast.\n\n'
   //       + '💡 También puedes saltar este paso si solo quieres enviar texto.',
   //       {
@@ -1368,7 +1389,7 @@ let registerAdminHandlers = (bot) => {
       await ctx.answerCbQuery('⏭️ Saltando media');
 
       await ctx.editMessageText(
-        '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
+        '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
         + 'Por favor escribe el mensaje en inglés que quieres enviar:',
         {
           parse_mode: 'Markdown',
@@ -1599,12 +1620,30 @@ let registerAdminHandlers = (bot) => {
         return;
       }
 
-      await ctx.answerCbQuery();
+      // Answer callback query immediately to prevent timeout
+      await ctx.answerCbQuery('📤 Enviando broadcast...');
+
       ctx.session.temp.broadcastStep = 'sending';
       await ctx.saveSession();
 
-      // Process broadcast sending with buttons
-      await sendBroadcastWithButtons(ctx, bot);
+      // Process broadcast sending with buttons (async/non-blocking)
+      sendBroadcastWithButtons(ctx, bot).catch(error => {
+        logger.error('Error in background broadcast send:', error);
+      });
+
+      // Immediately show "processing" message to user
+      await ctx.editMessageText(
+        '📤 *Broadcast en Cola*\n\n'
+        + 'Tu broadcast se está enviando en segundo plano.\n\n'
+        + 'Recibirás una notificación cuando se complete.\n\n'
+        + '⏳ Esto puede tomar unos minutos dependiendo del número de usuarios...',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Volver al Panel Admin', 'admin_cancel')],
+          ]),
+        }
+      );
     } catch (error) {
       logger.error('Error in broadcast send now with buttons:', error);
       await ctx.reply('❌ Error al enviar broadcast').catch(() => {});
@@ -2069,9 +2108,19 @@ let registerAdminHandlers = (bot) => {
         target: ctx.session.temp.broadcastTarget
       });
 
+      // Delete the "Upload Media" prompt message to avoid confusion
+      if (ctx.session.temp.mediaPromptMessageId) {
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, ctx.session.temp.mediaPromptMessageId);
+          logger.info('Deleted media prompt message', { messageId: ctx.session.temp.mediaPromptMessageId });
+        } catch (deleteError) {
+          logger.warn('Could not delete media prompt message:', deleteError.message);
+        }
+      }
+
       await ctx.reply(
         '✅ Imagen guardada correctamente\n\n'
-        + '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
+        + '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
         + 'Por favor escribe el mensaje en inglés que quieres enviar:',
         {
           parse_mode: 'Markdown',
@@ -2124,9 +2173,19 @@ let registerAdminHandlers = (bot) => {
         target: ctx.session.temp.broadcastTarget
       });
 
+      // Delete the "Upload Media" prompt message to avoid confusion
+      if (ctx.session.temp.mediaPromptMessageId) {
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, ctx.session.temp.mediaPromptMessageId);
+          logger.info('Deleted media prompt message', { messageId: ctx.session.temp.mediaPromptMessageId });
+        } catch (deleteError) {
+          logger.warn('Could not delete media prompt message:', deleteError.message);
+        }
+      }
+
       await ctx.reply(
         '✅ Video guardado correctamente\n\n'
-        + '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
+        + '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
         + 'Por favor escribe el mensaje en inglés que quieres enviar:',
         {
           parse_mode: 'Markdown',
@@ -2177,9 +2236,18 @@ let registerAdminHandlers = (bot) => {
         target: ctx.session.temp.broadcastTarget
       });
 
+      // Delete the "Upload Media" prompt message to avoid confusion
+      if (ctx.session.temp.mediaPromptMessageId) {
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, ctx.session.temp.mediaPromptMessageId);
+        } catch (deleteError) {
+          logger.warn('Could not delete media prompt message:', deleteError.message);
+        }
+      }
+
       await ctx.reply(
         '✅ Documento guardado correctamente\n\n'
-        + '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
+        + '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
         + 'Por favor escribe el mensaje en inglés que quieres enviar:',
         {
           parse_mode: 'Markdown',
@@ -2230,9 +2298,18 @@ let registerAdminHandlers = (bot) => {
         target: ctx.session.temp.broadcastTarget
       });
 
+      // Delete the "Upload Media" prompt message to avoid confusion
+      if (ctx.session.temp.mediaPromptMessageId) {
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, ctx.session.temp.mediaPromptMessageId);
+        } catch (deleteError) {
+          logger.warn('Could not delete media prompt message:', deleteError.message);
+        }
+      }
+
       await ctx.reply(
         '✅ Audio guardado correctamente\n\n'
-        + '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
+        + '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
         + 'Por favor escribe el mensaje en inglés que quieres enviar:',
         {
           parse_mode: 'Markdown',
@@ -2283,9 +2360,18 @@ let registerAdminHandlers = (bot) => {
         target: ctx.session.temp.broadcastTarget
       });
 
+      // Delete the "Upload Media" prompt message to avoid confusion
+      if (ctx.session.temp.mediaPromptMessageId) {
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, ctx.session.temp.mediaPromptMessageId);
+        } catch (deleteError) {
+          logger.warn('Could not delete media prompt message:', deleteError.message);
+        }
+      }
+
       await ctx.reply(
         '✅ Mensaje de voz guardado correctamente\n\n'
-        + '🇺🇸 *Paso 2/4: Texto en Inglés*\n\n'
+        + '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
         + 'Por favor escribe el mensaje en inglés que quieres enviar:',
         {
           parse_mode: 'Markdown',
@@ -2440,12 +2526,15 @@ let registerAdminHandlers = (bot) => {
       return;
     }
     
-    // AGGRESSIVE FIX: Force correct step if we detect any issues
-    // If we're in buttons or later steps, ensure we stay there
+    // Guard: Prevent text input interference in advanced broadcast steps
+    // If we're in buttons/preview/sending steps, skip text processing
     if (ctx.session.temp?.broadcastStep && ['buttons', 'preview', 'sending'].includes(ctx.session.temp.broadcastStep)) {
-      // We're already in a valid advanced step - don't interfere
-      // This prevents any regression to earlier steps
-      return; // Skip further processing to avoid interference
+      // User is in a step that uses callback buttons, not text input
+      logger.info('Skipping text input processing - already in advanced broadcast step', {
+        userId: ctx.from.id,
+        currentStep: ctx.session.temp.broadcastStep
+      });
+      return;
     }
 
     // Broadcast flow - Handle custom button entries
@@ -2637,7 +2726,7 @@ let registerAdminHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(
-          '🇪🇸 *Paso 3/4: Texto en Español*\n\n'
+          '🇪🇸 *Paso 3/5: Texto en Español*\n\n'
           + 'Por favor escribe el mensaje en español que quieres enviar:',
           {
             parse_mode: 'Markdown',
@@ -2721,7 +2810,7 @@ let registerAdminHandlers = (bot) => {
             { parse_mode: 'Markdown' },
           );
           await ctx.reply(
-            '🇪🇸 *Paso 3/4: Texto en Español*\n\n'
+            '🇪🇸 *Paso 3/5: Texto en Español*\n\n'
             + 'Por favor escribe el mensaje en español que quieres enviar:',
             {
               parse_mode: 'Markdown',
@@ -2791,157 +2880,44 @@ let registerAdminHandlers = (bot) => {
           return;
         }
         
-        // AGGRESSIVE FIX: Completely bypass any potential issues
         // Save Spanish text
         broadcastData.textEs = message;
 
-        // Force step to buttons and immediately show button picker
-        // This bypasses any potential middleware or external interference
+        logger.info('Spanish text saved, transitioning to buttons step', {
+          userId: ctx.from.id,
+          hasTextEn: !!broadcastData.textEn,
+          hasTextEs: !!broadcastData.textEs,
+          currentStep: ctx.session.temp.broadcastStep
+        });
+
+        // Move to buttons step
         ctx.session.temp.broadcastStep = 'buttons';
-        
-        // Ensure buttons array exists and has default buttons
+
+        // Initialize buttons array with default buttons if not exists
         if (!broadcastData.buttons || !Array.isArray(broadcastData.buttons)) {
           broadcastData.buttons = buildDefaultBroadcastButtons(getLanguage(ctx));
         }
-        
-        // Save session immediately
+
         await ctx.saveSession();
 
-        // AGGRESSIVE FIX: Directly call button picker without any intermediate steps
-        // This ensures we bypass any potential issues in the flow
+        logger.info('Session saved, showing button picker', {
+          userId: ctx.from.id,
+          broadcastStep: ctx.session.temp.broadcastStep,
+          buttonCount: broadcastData.buttons?.length || 0
+        });
+
+        // Show button picker for next step
         try {
           await showBroadcastButtonsPicker(ctx);
-          return;
+          logger.info('Button picker displayed successfully', { userId: ctx.from.id });
         } catch (error) {
-          logger.error('AGGRESSIVE FIX: Error in direct button picker call, falling back to manual display', {
+          logger.error('Error showing button picker:', {
             userId: ctx.from.id,
-            error: error.message
+            error: error.message,
+            stack: error.stack
           });
-          
-          // Fallback: Manually display button picker if direct call fails
-          await ctx.reply('🎯 *Paso 4/5: Botones*\n\nSelecciona botones para tu broadcast:', {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback('✅ Home', 'broadcast_toggle_home')],
-              [Markup.button.callback('✅ Profile', 'broadcast_toggle_profile')],
-              [Markup.button.callback('➕ Custom Link', 'broadcast_add_custom_link')],
-              [Markup.button.callback('✅ Done', 'broadcast_continue_with_buttons')],
-              [Markup.button.callback('⏭️ No Buttons', 'broadcast_no_buttons')],
-            ]),
-          });
-          return;
+          await ctx.reply('❌ Error al mostrar el selector de botones. Por favor intenta de nuevo.');
         }
-
-        // Get target users
-        let users = [];
-        if (target === 'all') {
-          const result = await UserModel.getAll(1000);
-          users = result.users;
-        } else if (target === 'premium') {
-          users = await UserModel.getBySubscriptionStatus('active');
-        } else if (target === 'free') {
-          users = await UserModel.getBySubscriptionStatus('free');
-        } else if (target === 'churned') {
-          users = await UserModel.getChurnedUsers();
-        }
-
-        // Send broadcast
-        let sent = 0;
-        let failed = 0;
-
-        for (const user of users) {
-          try {
-            const userLang = user.language || 'en';
-            const textToSend = userLang === 'es' ? broadcastData.textEs : broadcastData.textEn;
-
-            const replyMarkup = Markup.inlineKeyboard([
-              Markup.button.callback(t('subscribe', userLang), 'show_subscription_plans'),
-              Markup.button.callback(t('support', userLang), 'show_support'),
-              Markup.button.callback(userLang === 'es' ? 'Menú Principal' : 'Main Menu', 'back_to_main')
-            ]);
-
-            // Send with media if available
-            if (broadcastData.mediaType && broadcastData.mediaFileId) {
-              const sendMethod = {
-                photo: 'sendPhoto',
-                video: 'sendVideo',
-                document: 'sendDocument',
-                audio: 'sendAudio',
-                voice: 'sendVoice',
-              }[broadcastData.mediaType];
-
-              if (sendMethod) {
-                await ctx.telegram[sendMethod](user.id, broadcastData.mediaFileId, {
-                  caption: `📢 ${textToSend}`,
-                  parse_mode: 'Markdown',
-                  reply_markup: replyMarkup
-                });
-              } else {
-                logger.warn(`Invalid media type for broadcast: ${broadcastData.mediaType}`);
-                continue;
-              }
-            } else {
-              // Text only
-              await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`, { 
-                parse_mode: 'Markdown',
-                reply_markup: replyMarkup 
-              });
-            }
-
-            sent += 1;
-          } catch (sendError) {
-            failed += 1;
-            const errorMsg = sendError.message || '';
-            
-            // Log specific error types
-            if (errorMsg.includes('caption is too long')) {
-              logger.error('Broadcast caption too long - should have been caught by validation', { 
-                userId: user.id, 
-                textLength: textToSend?.length,
-                hasMedia: !!broadcastData.mediaType 
-              });
-            } else if (errorMsg.includes('bot was blocked') || errorMsg.includes('user is deactivated')) {
-              // User blocked bot or deactivated account - this is expected
-              logger.debug('User unavailable for broadcast:', { userId: user.id });
-            } else if (errorMsg.includes('chat not found')) {
-              // Chat doesn't exist - user never started the bot
-              logger.debug('Chat not found for broadcast:', { userId: user.id });
-            } else {
-              logger.warn('Failed to send broadcast to user:', { userId: user.id, error: errorMsg });
-            }
-          }
-        }
-
-        // Clear broadcast session data
-        ctx.session.temp.broadcastTarget = null;
-        ctx.session.temp.broadcastStep = null;
-        ctx.session.temp.broadcastData = null;
-        await ctx.saveSession();
-
-        await ctx.reply(
-          `✅ *Broadcast Completado*\n\n`
-          + `📊 Estadísticas:\n`
-          + `✓ Enviados: ${sent}\n`
-          + `✗ Fallidos: ${failed}\n`
-          + `📈 Total intentos: ${sent + failed}\n\n`
-          + `🎯 Audiencia: ${target === 'all' ? 'Todos' : target === 'premium' ? 'Premium' : target === 'free' ? 'Gratis' : 'Churned'}\n`
-          + `🌐 Mensajes bilingües: EN / ES\n`
-          + `${broadcastData.mediaType ? `📎 Con media: ${broadcastData.mediaType}` : '📝 Solo texto'}`,
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback('◀️ Volver al Panel Admin', 'admin_cancel')],
-            ]),
-          },
-        );
-
-        logger.info('Broadcast sent', {
-          adminId: ctx.from.id,
-          target,
-          sent,
-          failed,
-          hasMedia: !!broadcastData.mediaType,
-        });
       } catch (error) {
         logger.error('Error sending broadcast:', error);
         await ctx.reply('❌ Error al enviar el broadcast. Por favor intenta de nuevo.');
@@ -4115,10 +4091,8 @@ async function sendBroadcastWithButtons(ctx, bot) {
       return;
     }
 
-    await ctx.editMessageText(
-      '📤 *Enviando Broadcast...*\n\n'
-      + 'Tu broadcast se está enviando a los usuarios seleccionados...'
-    );
+    // Get admin ID to send completion notification
+    const adminId = ctx.from.id;
 
     // Get target users
     let users = [];
@@ -4250,17 +4224,20 @@ async function sendBroadcastWithButtons(ctx, bot) {
     ctx.session.temp.broadcastData = null;
     await ctx.saveSession();
 
-    // Show results
+    // Show results - send notification to admin
     const buttonInfo = broadcastData.buttons && broadcastData.buttons.length > 0
       ? `\n🔘 Botones: ${Array.isArray(broadcastData.buttons) ? broadcastData.buttons.length : JSON.parse(broadcastData.buttons).length}`
       : '';
 
-    await ctx.reply(
+    await bot.telegram.sendMessage(
+      adminId,
       `✅ *Broadcast Completado*\n\n`
       + `📊 Estadísticas:\n`
       + `✓ Enviados: ${sent}\n`
       + `✗ Fallidos: ${failed}\n`
-      + `📈 Total intentos: ${sent + failed}`
+      + `📈 Total intentos: ${sent + failed}\n`
+      + `🎯 Audiencia: ${broadcastTarget}\n`
+      + `🌐 Mensajes bilingües: EN / ES`
       + buttonInfo,
       {
         parse_mode: 'Markdown',
@@ -4278,7 +4255,21 @@ async function sendBroadcastWithButtons(ctx, bot) {
     });
   } catch (error) {
     logger.error('Error sending broadcast with buttons:', error);
-    await ctx.reply('❌ Error al enviar broadcast').catch(() => {});
+    // Try to notify admin of error
+    try {
+      const adminId = ctx.from?.id;
+      if (adminId && bot) {
+        await bot.telegram.sendMessage(
+          adminId,
+          '❌ *Error al Enviar Broadcast*\n\n'
+          + 'Ocurrió un error durante el envío del broadcast.\n\n'
+          + 'Por favor revisa los logs o intenta de nuevo.',
+          { parse_mode: 'Markdown' }
+        );
+      }
+    } catch (notifyError) {
+      logger.error('Failed to notify admin of broadcast error:', notifyError);
+    }
   }
 }
 
