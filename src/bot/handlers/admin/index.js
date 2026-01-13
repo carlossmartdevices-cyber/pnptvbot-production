@@ -157,7 +157,8 @@ async function showBroadcastButtonsPicker(ctx) {
     const maxStepIndex = stepOrder.indexOf(maxCompletedStep);
     
     // If current step is before max completed step, prevent regression
-    if (currentStepIndex < maxStepIndex) {
+    // EXCEPT: Allow button picker to run when called from text_es step (normal progression)
+    if (currentStepIndex < maxStepIndex && currentStep !== 'text_es') {
       logger.warn('Step regression detected in button picker - preventing', {
         userId: ctx.from.id,
         attemptedStep: currentStep,
@@ -2585,7 +2586,12 @@ let registerAdminHandlers = (bot) => {
       const maxStepIndex = stepOrder.indexOf(maxCompletedStep);
       
       // If current step is before max completed step, prevent regression
-      if (currentStepIndex < maxStepIndex) {
+      // EXCEPT: Allow normal step progression (text_en -> text_es -> buttons)
+      const isNormalProgression = 
+        (currentStep === 'text_en' && maxCompletedStep === 'text_es') ||
+        (currentStep === 'text_es' && maxCompletedStep === 'buttons');
+      
+      if (currentStepIndex < maxStepIndex && !isNormalProgression) {
         logger.warn('Step regression detected in text processing - preventing', {
           userId: ctx.from.id,
           attemptedStep: currentStep,
