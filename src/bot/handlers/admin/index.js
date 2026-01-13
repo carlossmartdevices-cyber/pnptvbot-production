@@ -2097,9 +2097,9 @@ let registerAdminHandlers = (bot) => {
 
       // Use batch session updates for better performance
       await performanceUtils.batchSessionUpdates(ctx, [
-        { key: 'broadcastData.mediaType', value: 'photo' },
-        { key: 'broadcastData.mediaFileId', value: photo.file_id },
-        { key: 'broadcastStep', value: 'text_en' }
+        { key: 'temp.broadcastData.mediaType', value: 'photo' },
+        { key: 'temp.broadcastData.mediaFileId', value: photo.file_id },
+        { key: 'temp.broadcastStep', value: 'text_en' }
       ]);
 
       logger.info('Broadcast photo uploaded', {
@@ -2162,9 +2162,9 @@ let registerAdminHandlers = (bot) => {
 
       // Use batch session updates for better performance
       await performanceUtils.batchSessionUpdates(ctx, [
-        { key: 'broadcastData.mediaType', value: 'video' },
-        { key: 'broadcastData.mediaFileId', value: video.file_id },
-        { key: 'broadcastStep', value: 'text_en' }
+        { key: 'temp.broadcastData.mediaType', value: 'video' },
+        { key: 'temp.broadcastData.mediaFileId', value: video.file_id },
+        { key: 'temp.broadcastStep', value: 'text_en' }
       ]);
 
       logger.info('Broadcast video uploaded', {
@@ -2500,7 +2500,7 @@ let registerAdminHandlers = (bot) => {
     }
 
     // Handle button preset selection
-    const presetMatch = ctx.session?.broadcastStep === 'buttons' ? true : false;
+    const presetMatch = ctx.session.temp?.broadcastStep === 'buttons' ? true : false;
 
     // Broadcast flow - If user types while in media step, guide them
     if (ctx.session.temp?.broadcastStep === 'media') {
