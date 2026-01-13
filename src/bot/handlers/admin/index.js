@@ -144,8 +144,42 @@ async function showBroadcastButtonsPicker(ctx) {
   // Normalize and ensure buttons array
   ctx.session.temp.broadcastData.buttons = normalizeButtons(ctx.session.temp.broadcastData.buttons);
 
-  // Ensure we're in the buttons step with additional safeguards
+  // DEFENSIVE FIX: Step progression guard in button picker
+  // Check if we have a max completed step to prevent regression
   const currentStep = ctx.session.temp.broadcastStep;
+  const maxCompletedStep = ctx.session.temp.maxCompletedStep;
+  
+  // Define step order for progression validation
+  const stepOrder = ['media', 'text_en', 'text_es', 'buttons', 'preview', 'sending'];
+  
+  if (maxCompletedStep) {
+    const currentStepIndex = stepOrder.indexOf(currentStep);
+    const maxStepIndex = stepOrder.indexOf(maxCompletedStep);
+    
+    // If current step is before max completed step, prevent regression
+    if (currentStepIndex < maxStepIndex) {
+      logger.warn('Step regression detected in button picker - preventing', {
+        userId: ctx.from.id,
+        attemptedStep: currentStep,
+        maxCompletedStep: maxCompletedStep,
+        currentStepIndex,
+        maxStepIndex
+      });
+      
+      // Force back to the correct step
+      ctx.session.temp.broadcastStep = maxCompletedStep;
+      await ctx.saveSession();
+      
+      logger.info('Step regression prevented in button picker - restored to max completed step', {
+        userId: ctx.from.id,
+        restoredStep: ctx.session.temp.broadcastStep
+      });
+      
+      return; // Exit to prevent further processing with wrong step
+    }
+  }
+  
+  // Ensure we're in the buttons step with additional safeguards
   if (currentStep !== 'buttons') {
     logger.info('Broadcast step correction in button picker', {
       userId: ctx.from.id,
@@ -2099,7 +2133,8 @@ let registerAdminHandlers = (bot) => {
       await performanceUtils.batchSessionUpdates(ctx, [
         { key: 'temp.broadcastData.mediaType', value: 'photo' },
         { key: 'temp.broadcastData.mediaFileId', value: photo.file_id },
-        { key: 'temp.broadcastStep', value: 'text_en' }
+        { key: 'temp.broadcastStep', value: 'text_en' },
+        { key: 'temp.maxCompletedStep', value: 'text_en' }
       ]);
 
       logger.info('Broadcast photo uploaded', {
@@ -2164,7 +2199,8 @@ let registerAdminHandlers = (bot) => {
       await performanceUtils.batchSessionUpdates(ctx, [
         { key: 'temp.broadcastData.mediaType', value: 'video' },
         { key: 'temp.broadcastData.mediaFileId', value: video.file_id },
-        { key: 'temp.broadcastStep', value: 'text_en' }
+        { key: 'temp.broadcastStep', value: 'text_en' },
+        { key: 'temp.maxCompletedStep', value: 'text_en' }
       ]);
 
       logger.info('Broadcast video uploaded', {
@@ -2227,6 +2263,10 @@ let registerAdminHandlers = (bot) => {
 
       ctx.session.temp.broadcastData.mediaType = 'document';
       ctx.session.temp.broadcastData.mediaFileId = document.file_id;
+      
+      // DEFENSIVE FIX: Track max completed step to prevent regression
+      ctx.session.temp.maxCompletedStep = 'text_en';
+      
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
 
@@ -2289,6 +2329,10 @@ let registerAdminHandlers = (bot) => {
 
       ctx.session.temp.broadcastData.mediaType = 'audio';
       ctx.session.temp.broadcastData.mediaFileId = audio.file_id;
+      
+      // DEFENSIVE FIX: Track max completed step to prevent regression
+      ctx.session.temp.maxCompletedStep = 'text_en';
+      
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
 
@@ -2351,6 +2395,10 @@ let registerAdminHandlers = (bot) => {
 
       ctx.session.temp.broadcastData.mediaType = 'voice';
       ctx.session.temp.broadcastData.mediaFileId = voice.file_id;
+      
+      // DEFENSIVE FIX: Track max completed step to prevent regression
+      ctx.session.temp.maxCompletedStep = 'text_en';
+      
       ctx.session.temp.broadcastStep = 'text_en';
       await ctx.saveSession();
 
@@ -2524,6 +2572,39 @@ let registerAdminHandlers = (bot) => {
         logger.error('Error guiding user during media step:', error);
       }
       return;
+    }
+    
+    // DEFENSIVE FIX: Guard against step regression in text processing
+    // Check if we have a max completed step to prevent regression
+    const maxCompletedStep = ctx.session.temp?.maxCompletedStep;
+    const currentStep = ctx.session.temp?.broadcastStep;
+    
+    if (maxCompletedStep && currentStep) {
+      const stepOrder = ['media', 'text_en', 'text_es', 'buttons', 'preview', 'sending'];
+      const currentStepIndex = stepOrder.indexOf(currentStep);
+      const maxStepIndex = stepOrder.indexOf(maxCompletedStep);
+      
+      // If current step is before max completed step, prevent regression
+      if (currentStepIndex < maxStepIndex) {
+        logger.warn('Step regression detected in text processing - preventing', {
+          userId: ctx.from.id,
+          attemptedStep: currentStep,
+          maxCompletedStep: maxCompletedStep,
+          currentStepIndex,
+          maxStepIndex
+        });
+        
+        // Force back to the correct step
+        ctx.session.temp.broadcastStep = maxCompletedStep;
+        await ctx.saveSession();
+        
+        logger.info('Step regression prevented in text processing - restored to max completed step', {
+          userId: ctx.from.id,
+          restoredStep: ctx.session.temp.broadcastStep
+        });
+        
+        return; // Exit to prevent further processing with wrong step
+      }
     }
     
     // Guard: Prevent text input interference in advanced broadcast steps
@@ -2722,6 +2803,10 @@ let registerAdminHandlers = (bot) => {
         }
         // Save English text
         ctx.session.temp.broadcastData.textEn = message;
+        
+        // DEFENSIVE FIX: Track max completed step to prevent regression
+        ctx.session.temp.maxCompletedStep = 'text_es';
+        
         ctx.session.temp.broadcastStep = 'text_es';
         await ctx.saveSession();
 
@@ -2890,6 +2975,9 @@ let registerAdminHandlers = (bot) => {
           currentStep: ctx.session.temp.broadcastStep
         });
 
+        // DEFENSIVE FIX: Prevent step regression by tracking max completed step
+        ctx.session.temp.maxCompletedStep = 'buttons';
+        
         // Move to buttons step
         ctx.session.temp.broadcastStep = 'buttons';
 
