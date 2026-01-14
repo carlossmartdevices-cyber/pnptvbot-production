@@ -18,24 +18,52 @@ function translateButtonText(buttonKey, language = 'en') {
 
 /**
  * Get standard button options for broadcasts and community posts
+ * @param {string} [language='en'] - Language code ('en' or 'es')
  * @returns {Array} Array of button configuration objects
  */
-function getStandardButtonOptions() {
+function getStandardButtonOptions(language = 'en') {
   const botUsername = process.env.BOT_USERNAME || 'PNPtv_bot';
   const mainRoomUrl = 'https://meet.jit.si/pnptv-main-room#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false';
   const hangoutsUrl = process.env.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts';
   const videoramaUrl = process.env.VIDEORAMA_URL || 'https://pnptv.app/videorama-app/';
 
+  const translations = {
+    en: {
+      home: '🏠 Back to home menu',
+      plans: '💎 Membership Plans',
+      main_room: '🎥 PNPtv Main Room',
+      hangouts: '🎭 PNPtv Hangouts',
+      videorama: '🎬 PNPtv Videorama',
+      nearby: '📍 Who is Nearby?',
+      profile: '👤 My Profile',
+      cristina: '🤖 Cristina AI',
+      all_features: '✨ All Features',
+    },
+    es: {
+      home: '🏠 Volver al menú principal',
+      plans: '💎 Planes de Membresía',
+      main_room: '🎥 Sala Principal PNPtv',
+      hangouts: '🎭 PNPtv Hangouts',
+      videorama: '🎬 PNPtv Videorama',
+      nearby: '📍 ¿Quién está cerca?',
+      profile: '👤 Mi Perfil',
+      cristina: '🤖 Cristina AI',
+      all_features: '✨ Todas las Funciones',
+    }
+  };
+
+  const t = translations[language] || translations.en;
+
   return [
-    { key: 'home', text: '🏠 Back to home menu', type: 'url', target: `https://t.me/${botUsername}?start=1` },
-    { key: 'plans', text: '💎 Membership Plans', type: 'callback', data: 'show_subscription_plans' },
-    { key: 'main_room', text: '🎥 PNPtv Main Room', type: 'url', target: mainRoomUrl },
-    { key: 'hangouts', text: '🎭 PNPtv Hangouts', type: 'url', target: hangoutsUrl },
-    { key: 'videorama', text: '🎬 PNPtv Videorama', type: 'url', target: videoramaUrl },
-    { key: 'nearby', text: '📍 Who is Nearby?', type: 'callback', data: 'menu_nearby' },
-    { key: 'profile', text: '👤 My Profile', type: 'callback', data: 'show_profile' },
-    { key: 'cristina', text: '🤖 Cristina AI', type: 'callback', data: 'broadcast_cristina_ai' },
-    { key: 'all_features', text: '✨ All Features', type: 'url', target: `https://t.me/${botUsername}` },
+    { key: 'home', text: t.home, type: 'url', target: `https://t.me/${botUsername}?start=1` },
+    { key: 'plans', text: t.plans, type: 'callback', data: 'show_subscription_plans' },
+    { key: 'main_room', text: t.main_room, type: 'url', target: mainRoomUrl },
+    { key: 'hangouts', text: t.hangouts, type: 'url', target: hangoutsUrl },
+    { key: 'videorama', text: t.videorama, type: 'url', target: videoramaUrl },
+    { key: 'nearby', text: t.nearby, type: 'callback', data: 'menu_nearby' },
+    { key: 'profile', text: t.profile, type: 'callback', data: 'show_profile' },
+    { key: 'cristina', text: t.cristina, type: 'callback', data: 'broadcast_cristina_ai' },
+    { key: 'all_features', text: t.all_features, type: 'url', target: `https://t.me/${botUsername}` },
   ];
 }
 

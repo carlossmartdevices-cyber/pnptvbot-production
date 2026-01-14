@@ -1,6 +1,7 @@
 const { getFirestore, Collections } = require('../config/firebase');
 const logger = require('../../utils/logger');
 const userService = require('./userService');
+const broadcastUtils = require('../utils/broadcastUtils');
 
 class AdminService {
   constructor() {
@@ -57,19 +58,27 @@ class AdminService {
 
       for (const user of users) {
         try {
+          // Get standard buttons for broadcast messages (use user's language)
+          const userLanguage = user.language || 'en'; // Default to English if not set
+          const standardButtons = broadcastUtils.getStandardButtonOptions(userLanguage);
+          const replyMarkup = broadcastUtils.buildInlineKeyboard(standardButtons);
+
           if (options.mediaType === 'photo' && options.mediaUrl) {
             await bot.telegram.sendPhoto(user.id, options.mediaUrl, {
               caption: message,
               parse_mode: 'Markdown',
+              reply_markup: replyMarkup,
             });
           } else if (options.mediaType === 'video' && options.mediaUrl) {
             await bot.telegram.sendVideo(user.id, options.mediaUrl, {
               caption: message,
               parse_mode: 'Markdown',
+              reply_markup: replyMarkup,
             });
           } else {
             await bot.telegram.sendMessage(user.id, message, {
               parse_mode: 'Markdown',
+              reply_markup: replyMarkup,
             });
           }
 

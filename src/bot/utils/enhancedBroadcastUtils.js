@@ -332,10 +332,11 @@ function formatOptimizationSuggestions(suggestions, lang = 'en') {
 
 /**
  * Enhanced version of standard button options with social sharing
+ * @param {string} [language='en'] - Language code ('en' or 'es')
  * @returns {Array} Enhanced button options
  */
-function getEnhancedButtonOptions() {
-  const standardButtons = broadcastUtils.getStandardButtonOptions();
+function getEnhancedButtonOptions(language = 'en') {
+  const standardButtons = broadcastUtils.getStandardButtonOptions(language);
   const socialButtons = getSocialSharingButtons();
   
   return [...standardButtons, ...socialButtons];
