@@ -1,5 +1,6 @@
 const ModerationModel = require('../../models/moderationModel');
 const logger = require('../../utils/logger');
+const MODERATION_CONFIG = require('../../config/moderationConfig');
 
 /**
  * Moderation Service - Business logic for moderation operations
@@ -515,6 +516,56 @@ class ModerationService {
     } catch (error) {
       logger.error('Error getting moderation logs:', error);
       return [];
+    }
+  }
+
+  /**
+   * Check if bot addition is authorized
+   * @param {string} userId - User ID attempting to add bot
+   * @param {string} groupId - Group ID
+   * @param {string} botUsername - Bot username being added
+   * @returns {Object} { isUnauthorized, reason }
+   */
+  static checkBotAddition(userId, groupId, botUsername) {
+    try {
+      const config = MODERATION_CONFIG.FILTERS.BOT_ADDITION;
+      
+      // If bot addition prevention is disabled, allow all
+      if (!config.enabled) {
+        return { isUnauthorized: false, reason: 'Bot addition prevention disabled' };
+      }
+
+      // Check if user is admin (admins can add any bot)
+      // Note: In production, this should check actual admin status
+      // For now, we'll use the allowOnlyAdmins flag
+      if (config.allowOnlyAdmins) {
+        // In a real implementation, we would check if userId is an admin
+        // For now, we'll assume non-admins are trying to add bots
+        // This is a placeholder - actual admin check should be implemented
+        
+        // Check if the bot being added is an official bot
+        const isOfficialBot = config.officialBots.some(
+          officialBot => botUsername.toLowerCase() === officialBot.toLowerCase()
+        );
+        
+        if (isOfficialBot) {
+          return { isUnauthorized: false, reason: 'Official bot addition' };
+        }
+        
+        // If not official bot and allowOnlyAdmins is true, block it
+        return {
+          isUnauthorized: true,
+          reason: 'Only admins can add bots to this group'
+        };
+      }
+
+      // If we get here, bot addition is allowed
+      return { isUnauthorized: false, reason: 'Bot addition allowed' };
+      
+    } catch (error) {
+      logger.error('Error checking bot addition:', error);
+      // Fail safe - allow bot addition if there's an error
+      return { isUnauthorized: false, reason: 'Error checking bot addition' };
     }
   }
 }

@@ -17,6 +17,7 @@ const mediaOnlyValidator = require('./middleware/mediaOnlyValidator');
 const { mediaMirrorMiddleware } = require('./middleware/mediaMirror');
 const topicModerationMiddleware = require('./middleware/topicModeration');
 const botAdditionPreventionMiddleware = require('./middleware/botAdditionPrevention');
+const autoModerationMiddleware = require('./middleware/autoModeration');
 const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
 const { groupSecurityEnforcementMiddleware, registerGroupSecurityHandlers } = require('./middleware/groupSecurityEnforcement');
 // Group behavior rules (overrides previous rules)
@@ -162,6 +163,7 @@ const startBot = async () => {
     bot.use(chatCleanupMiddleware());
     // DISABLED: bot.use(usernameEnforcement()); // Username enforcement rules disabled
     bot.use(botAdditionPreventionMiddleware()); // Prevent unauthorized bot additions
+    bot.use(autoModerationMiddleware()); // Auto-moderation for links, spam, flooding
     bot.use(moderationFilter());
     bot.use(activityTrackerMiddleware());
 
@@ -256,6 +258,23 @@ const startBot = async () => {
       logger.info('✓ Community post scheduler initialized and started');
     } catch (error) {
       logger.warn('Community post scheduler initialization failed, continuing without community posts:', error.message);
+    }
+
+    // Initialize proactive reminder service
+    try {
+      const ProactiveReminderService = require('../services/proactiveReminderService');
+      
+      // Start reminders for main group (replace with your actual group ID)
+      const GROUP_ID = process.env.GROUP_ID || '-1001234567890'; // Default fallback
+      const GROUP_LANGUAGE = 'en'; // Default language
+      
+      ProactiveReminderService.startReminders(bot.telegram, GROUP_ID, GROUP_LANGUAGE);
+      logger.info('✓ Proactive reminder service initialized and started');
+      
+      // Store reference for potential future use
+      global.proactiveReminderService = ProactiveReminderService;
+    } catch (error) {
+      logger.warn('Proactive reminder service initialization failed, continuing without reminders:', error.message);
     }
     // Register commands with Telegram
     try {

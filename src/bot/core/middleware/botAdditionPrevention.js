@@ -22,7 +22,22 @@ function botAdditionPreventionMiddleware() {
           if (newMember.is_bot) {
             const botUsername = newMember.username || '';
             
-            // Check if this bot addition is authorized
+            // Check if user is admin (admins can add any bot)
+            let isAdmin = false;
+            try {
+              const chatMember = await ctx.telegram.getChatMember(groupId, userId);
+              isAdmin = ['creator', 'administrator'].includes(chatMember.status);
+            } catch (error) {
+              logger.error('Error checking admin status for bot addition:', error);
+            }
+
+            // If user is admin, allow any bot addition
+            if (isAdmin) {
+              logger.info(`Admin ${userId} added bot @${botUsername} to group ${groupId}`);
+              continue; // Skip to next member
+            }
+
+            // Check if this bot addition is authorized (for non-admins)
             const { isUnauthorized, reason } = ModerationService.checkBotAddition(
               userId, 
               groupId.toString(), 
