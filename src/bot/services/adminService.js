@@ -67,18 +67,18 @@ class AdminService {
             await bot.telegram.sendPhoto(user.id, options.mediaUrl, {
               caption: message,
               parse_mode: 'Markdown',
-              reply_markup: replyMarkup,
+              ...(replyMarkup ? { reply_markup: replyMarkup.reply_markup } : {}),
             });
           } else if (options.mediaType === 'video' && options.mediaUrl) {
             await bot.telegram.sendVideo(user.id, options.mediaUrl, {
               caption: message,
               parse_mode: 'Markdown',
-              reply_markup: replyMarkup,
+              ...(replyMarkup ? { reply_markup: replyMarkup.reply_markup } : {}),
             });
           } else {
             await bot.telegram.sendMessage(user.id, message, {
               parse_mode: 'Markdown',
-              reply_markup: replyMarkup,
+              ...(replyMarkup ? { reply_markup: replyMarkup.reply_markup } : {}),
             });
           }
 
