@@ -144,14 +144,32 @@ const getAdminMenu = () => {
 
 /**
  * Broadcast type menu
+ * @param {string} [language='en'] - Language code ('en' or 'es')
  */
-const getBroadcastTypeMenu = () => {
+const getBroadcastTypeMenu = (language = 'en') => {
+  const labels = {
+    en: {
+      text: '💬 Text Message',
+      photo: '📷 Photo with Caption',
+      video: '🎥 Video with Caption',
+      back: '🔙 Back to Admin',
+    },
+    es: {
+      text: '💬 Mensaje de Texto',
+      photo: '📷 Foto con Leyenda',
+      video: '🎥 Video con Leyenda',
+      back: '🔙 Volver al Admin',
+    },
+  };
+
+  const l = labels[language] || labels.en;
+
   return {
     inline_keyboard: [
-      [{ text: '💬 Text Message', callback_data: 'broadcast_text' }],
-      [{ text: '📷 Photo with Caption', callback_data: 'broadcast_photo' }],
-      [{ text: '🎥 Video with Caption', callback_data: 'broadcast_video' }],
-      [{ text: '🔙 Back to Admin', callback_data: 'back_admin' }],
+      [{ text: l.text, callback_data: 'broadcast_text' }],
+      [{ text: l.photo, callback_data: 'broadcast_photo' }],
+      [{ text: l.video, callback_data: 'broadcast_video' }],
+      [{ text: l.back, callback_data: 'back_admin' }],
     ],
   };
 };

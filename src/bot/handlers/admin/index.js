@@ -22,11 +22,24 @@ const { sanitizeInput } = broadcastUtils;
 
 function getBroadcastStepLabel(step, lang) {
   const labels = {
-    media: lang === 'es' ? 'Paso 1/5: Media' : 'Step 1/5: Media',
-    text_en: lang === 'es' ? 'Paso 2/5: Texto (EN)' : 'Step 2/5: Text (EN)',
-    text_es: lang === 'es' ? 'Paso 3/5: Texto (ES)' : 'Step 3/5: Text (ES)',
-    buttons: lang === 'es' ? 'Paso 4/5: Botones' : 'Step 4/5: Buttons',
-    custom_buttons: lang === 'es' ? 'Paso 4/5: Botones (Custom)' : 'Step 4/5: Buttons (Custom)',
+    // Step 1/5: Audience selection (shown before wizard starts)
+    audience: lang === 'es' ? 'Paso 1/5: Seleccionar Audiencia' : 'Step 1/5: Select Audience',
+
+    // Step 2/5: Media (optional)
+    media: lang === 'es' ? 'Paso 2/5: Media (Opcional)' : 'Step 2/5: Media (Optional)',
+
+    // Step 3/5: English text (optional)
+    text_en: lang === 'es' ? 'Paso 3/5: Texto en Inglés (Opcional)' : 'Step 3/5: Text in English (Optional)',
+    ai_prompt_en: lang === 'es' ? 'Paso 3/5: AI (Inglés)' : 'Step 3/5: AI (English)',
+
+    // Step 4/5: Spanish text (optional)
+    text_es: lang === 'es' ? 'Paso 4/5: Texto en Español (Opcional)' : 'Step 4/5: Text in Spanish (Optional)',
+    ai_prompt_es: lang === 'es' ? 'Paso 4/5: AI (Español)' : 'Step 4/5: AI (Spanish)',
+
+    // Step 5/5: Buttons and send (unified)
+    buttons: lang === 'es' ? 'Paso 5/5: Botones y Envío' : 'Step 5/5: Buttons & Send',
+    custom_buttons: lang === 'es' ? 'Paso 5/5: Botones Personalizados' : 'Step 5/5: Custom Buttons',
+    preview: lang === 'es' ? 'Paso 5/5: Vista Previa y Envío' : 'Step 5/5: Preview & Send',
     schedule_options: lang === 'es' ? 'Paso 5/5: Programación' : 'Step 5/5: Scheduling',
     schedule_datetime: lang === 'es' ? 'Programación (Fecha/Hora)' : 'Scheduling (Date/Time)',
     schedule_count: lang === 'es' ? 'Programación (Cantidad)' : 'Scheduling (Count)',
@@ -45,15 +58,9 @@ const {
 
 function getBroadcastButtonOptions(lang) {
   const options = getStandardButtonOptions();
-  
-  // Return language-specific button texts
-  if (lang === 'es') {
-    return options.map(opt => ({
-      ...opt,
-      text: broadcastUtils.getSpanishButtonText(opt.key, opt.text)
-    }));
-  }
-  
+
+  // Return options as-is (button text is already in English)
+  // Language preference doesn't affect button labels in this implementation
   return options;
 }
 
@@ -68,9 +75,36 @@ function summarizeBroadcastButtons(buttons) {
 async function sendBroadcastPreview(ctx) {
   const lang = getLanguage(ctx);
   const data = ctx.session?.temp?.broadcastData;
-  if (!ctx.session?.temp?.broadcastTarget || !data?.textEn || !data?.textEs) {
+
+  // Validate session exists
+  if (!ctx.session?.temp?.broadcastTarget) {
     await ctx.reply(lang === 'es' ? '❌ Sesión expirada. Inicia de nuevo.' : '❌ Session expired. Start again.');
     return;
+  }
+
+  // Validate that we have at least SOME content (text or media)
+  const hasTextEn = data?.textEn && data.textEn.trim().length > 0;
+  const hasTextEs = data?.textEs && data.textEs.trim().length > 0;
+  const hasMedia = data?.mediaFileId;
+
+  if (!hasTextEn && !hasTextEs && !hasMedia) {
+    await ctx.reply(
+      lang === 'es'
+        ? '❌ Debes proporcionar al menos uno de los siguientes:\n• Texto en inglés\n• Texto en español\n• Media (imagen/video/archivo)'
+        : '❌ You must provide at least one of:\n• English text\n• Spanish text\n• Media (image/video/file)'
+    );
+    return;
+  }
+
+  // Log warning if only one language provided
+  if (!hasTextEn || !hasTextEs) {
+    const missingLang = !hasTextEn ? 'inglés' : 'español';
+    logger.warn(`Broadcasting without ${missingLang} text`, {
+      userId: ctx.from.id,
+      hasTextEn,
+      hasTextEs,
+      hasMedia
+    });
   }
 
   const buttons = summarizeBroadcastButtons(data.buttons);
@@ -78,18 +112,25 @@ async function sendBroadcastPreview(ctx) {
   const mediaText = data.mediaType ? `📎 ${data.mediaType}` : (lang === 'es' ? '📝 Solo texto' : '📝 Text only');
 
   const previewText =
-    (lang === 'es' ? '*👀 Vista previa del Broadcast*' : '*👀 Broadcast Preview*') +
+    (lang === 'es'
+      ? '🎯 *Paso 5/5: Botones y Envío*\n\n'
+        + '📌 *Parte 2: Vista Previa y Envío*\n\n'
+        + '👀 *Vista previa del Broadcast:*'
+      : '🎯 *Step 5/5: Buttons & Send*\n\n'
+        + '📌 *Part 2: Preview & Send*\n\n'
+        + '👀 *Broadcast Preview:*'
+    ) +
     `\n\n${mediaText}\n\n` +
-    '*EN:*\n' + `${data.textEn}\n\n` +
-    '*ES:*\n' + `${data.textEs}\n\n` +
+    (hasTextEn ? `*EN:*\n${data.textEn}\n\n` : '') +
+    (hasTextEs ? `*ES:*\n${data.textEs}\n\n` : '') +
     (lang === 'es' ? '*Botones:*' : '*Buttons:*') + `\n${buttonsText}\n\n` +
     (lang === 'es' ? '¿Listo para enviar?' : 'Ready to send?');
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback(lang === 'es' ? '📤 Enviar Ahora' : '📤 Send Now', 'broadcast_send_now_with_buttons')],
-    [Markup.button.callback(lang === 'es' ? '📅 Programar' : '📅 Schedule', 'broadcast_schedule_with_buttons')],
-    [Markup.button.callback(lang === 'es' ? '🔘 Editar Botones' : '🔘 Edit Buttons', 'broadcast_resume_buttons')],
-    [Markup.button.callback(lang === 'es' ? '❌ Cancelar' : '❌ Cancel', 'admin_cancel')],
+    [Markup.button.callback(lang === 'es' ? '📅 Programar Envío' : '📅 Schedule Send', 'broadcast_schedule_with_buttons')],
+    [Markup.button.callback(lang === 'es' ? '◀️ Volver a Botones' : '◀️ Back to Buttons', 'broadcast_resume_buttons')],
+    [Markup.button.callback(lang === 'es' ? '❌ Cancelar Broadcast' : '❌ Cancel Broadcast', 'admin_cancel')],
   ]);
 
   // Also send a "rendered" preview with buttons for one language (EN) so admin sees layout.
@@ -104,26 +145,30 @@ async function sendBroadcastPreview(ctx) {
       return rows.length ? Markup.inlineKeyboard(rows) : undefined;
     })();
 
+    // Use English text if available, otherwise Spanish, otherwise empty string
+    const previewCaption = hasTextEn ? `📢 ${data.textEn}` : hasTextEs ? `📢 ${data.textEs}` : '📢';
+
     if (data.mediaType === 'photo') {
       await ctx.replyWithPhoto(data.mediaFileId, {
-        caption: `📢 ${data.textEn}`,
+        caption: previewCaption,
         parse_mode: 'Markdown',
         ...(buttonMarkup ? { reply_markup: buttonMarkup.reply_markup } : {}),
       });
     } else if (data.mediaType === 'video') {
       await ctx.replyWithVideo(data.mediaFileId, {
-        caption: `📢 ${data.textEn}`,
+        caption: previewCaption,
         parse_mode: 'Markdown',
         ...(buttonMarkup ? { reply_markup: buttonMarkup.reply_markup } : {}),
       });
     } else if (data.mediaType === 'document') {
       await ctx.replyWithDocument(data.mediaFileId, {
-        caption: `📢 ${data.textEn}`,
+        caption: previewCaption,
         parse_mode: 'Markdown',
         ...(buttonMarkup ? { reply_markup: buttonMarkup.reply_markup } : {}),
       });
-    } else {
-      await ctx.reply(`📢 ${data.textEn}`, {
+    } else if (hasTextEn || hasTextEs) {
+      // Only send text preview if we have text
+      await ctx.reply(previewCaption, {
         parse_mode: 'Markdown',
         ...(buttonMarkup ? { reply_markup: buttonMarkup.reply_markup } : {}),
       });
@@ -211,14 +256,20 @@ async function showBroadcastButtonsPicker(ctx) {
   });
 
   rows.push([Markup.button.callback('➕ Custom Link', 'broadcast_add_custom_link')]);
-  rows.push([Markup.button.callback('✅ Done', 'broadcast_continue_with_buttons')]);
-  rows.push([Markup.button.callback('⏭️ No Buttons', 'broadcast_no_buttons')]);
-  rows.push([Markup.button.callback('❌ Cancel', 'admin_cancel')]);
+  rows.push([Markup.button.callback(lang === 'es' ? '✅ Continuar a Vista Previa' : '✅ Continue to Preview', 'broadcast_continue_with_buttons')]);
+  rows.push([Markup.button.callback(lang === 'es' ? '⏭️ Sin Botones' : '⏭️ No Buttons', 'broadcast_no_buttons')]);
+  rows.push([Markup.button.callback(lang === 'es' ? '❌ Cancelar' : '❌ Cancel', 'admin_cancel')]);
 
   await ctx.reply(
     lang === 'es'
-      ? '🎯 *Paso 4/5: Botones*\n\nSelecciona 1 o varios botones para incluir en el broadcast.'
-      : '🎯 *Step 4/5: Buttons*\n\nSelect 1 or more buttons to include in the broadcast.',
+      ? '🎯 *Paso 5/5: Botones y Envío*\n\n'
+        + '📌 *Parte 1: Seleccionar Botones*\n\n'
+        + 'Selecciona 1 o varios botones para incluir en el broadcast, o elige "Sin Botones" para continuar.\n\n'
+        + 'Cuando estés listo, presiona "✅ Continuar" para ver la vista previa y enviar.'
+      : '🎯 *Step 5/5: Buttons & Send*\n\n'
+        + '📌 *Part 1: Select Buttons*\n\n'
+        + 'Select 1 or more buttons to include in the broadcast, or choose "No Buttons" to continue.\n\n'
+        + 'When ready, press "✅ Continue" to preview and send.',
     { parse_mode: 'Markdown', ...Markup.inlineKeyboard(rows) },
   );
 }
@@ -312,8 +363,8 @@ async function renderBroadcastStep(ctx) {
 
   if (step === 'media') {
     const message = await ctx.editMessageText(
-      '📎 *Paso 1/5: Subir Media*\n\n'
-      + 'Por favor envía una imagen, video o archivo para adjuntar al broadcast.\n\n'
+      '📎 *Paso 2/5: Subir Media (Opcional)*\n\n'
+      + 'Envía una imagen, video o archivo para adjuntar al broadcast.\n\n'
       + '💡 También puedes saltar este paso si solo quieres enviar texto.',
       {
         parse_mode: 'Markdown',
@@ -339,11 +390,16 @@ async function renderBroadcastStep(ctx) {
 
   if (step === 'text_en') {
     await ctx.editMessageText(
-      '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
-      + 'Por favor escribe el mensaje en inglés que quieres enviar:',
+      '🇺🇸 *Paso 3/5: Texto en Inglés (Opcional)*\n\n'
+      + 'Escribe el mensaje en inglés que quieres enviar.\n\n'
+      + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en inglés.',
       {
         parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancelar', 'admin_cancel')]]),
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_en')],
+          [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_en')],
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+        ]),
       },
     );
     return;
@@ -351,11 +407,16 @@ async function renderBroadcastStep(ctx) {
 
   if (step === 'text_es') {
     await ctx.editMessageText(
-      '🇪🇸 *Paso 3/5: Texto en Español*\n\n'
-      + 'Por favor escribe el mensaje en español que quieres enviar:',
+      '🇪🇸 *Paso 4/5: Texto en Español (Opcional)*\n\n'
+      + 'Escribe el mensaje en español que quieres enviar.\n\n'
+      + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en español.',
       {
         parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancelar', 'admin_cancel')]]),
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_es')],
+          [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_es')],
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+        ]),
       },
     );
     return;
@@ -1109,14 +1170,19 @@ let registerAdminHandlers = (bot) => {
       await ctx.saveSession();
 
       await ctx.editMessageText(
-        t('broadcastTarget', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback('👥 Todos los Usuarios', 'broadcast_all')],
-          [Markup.button.callback('💎 Solo Premium', 'broadcast_premium')],
-          [Markup.button.callback('🆓 Solo Gratis', 'broadcast_free')],
-          [Markup.button.callback('↩️ Churned (Ex-Premium)', 'broadcast_churned')],
-          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
-        ]),
+        (lang === 'es'
+          ? '📢 *Broadcast Wizard*\n\n🎯 *Paso 1/5: Seleccionar Audiencia*\n\nElige a quién enviar este broadcast:'
+          : '📢 *Broadcast Wizard*\n\n🎯 *Step 1/5: Select Target Audience*\n\nChoose who will receive this broadcast:'),
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('👥 Todos los Usuarios', 'broadcast_all')],
+            [Markup.button.callback('💎 Solo Premium', 'broadcast_premium')],
+            [Markup.button.callback('🆓 Solo Gratis', 'broadcast_free')],
+            [Markup.button.callback('↩️ Churned (Ex-Premium)', 'broadcast_churned')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
       );
     } catch (error) {
       logger.error('Error in admin broadcast:', error);
@@ -1424,12 +1490,14 @@ let registerAdminHandlers = (bot) => {
       await ctx.answerCbQuery('⏭️ Saltando media');
 
       await ctx.editMessageText(
-        '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
-        + 'Por favor escribe el mensaje en inglés que quieres enviar:',
+        '🇺🇸 *Paso 3/5: Texto en Inglés (Opcional)*\n\n'
+        + 'Escribe el mensaje en inglés que quieres enviar.\n\n'
+        + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en inglés.',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_en')],
+            [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_en')],
             [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
           ]),
         },
@@ -1439,6 +1507,98 @@ let registerAdminHandlers = (bot) => {
     } catch (error) {
       logger.error('Error skipping media:', error);
       await ctx.answerCbQuery('❌ Error al saltar media').catch(() => {});
+    }
+  });
+
+  // Skip English text
+  bot.action('broadcast_skip_text_en', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      // Validate session state
+      if (!ctx.session.temp || !ctx.session.temp.broadcastTarget) {
+        await ctx.answerCbQuery('❌ Sesión expirada. Por favor inicia de nuevo.');
+        logger.warn('Broadcast session expired or missing', { userId: ctx.from.id });
+        return;
+      }
+
+      // Set empty English text
+      if (!ctx.session.temp.broadcastData) {
+        ctx.session.temp.broadcastData = {};
+      }
+      ctx.session.temp.broadcastData.textEn = '';
+
+      ctx.session.temp.broadcastStep = 'text_es';
+      ctx.session.temp.maxCompletedStep = 'text_es';
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('⏭️ Texto en inglés omitido');
+
+      await ctx.editMessageText(
+        '🇪🇸 *Paso 4/5: Texto en Español (Opcional)*\n\n'
+        + 'Escribe el mensaje en español que quieres enviar.\n\n'
+        + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en español.',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_es')],
+            [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_es')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+
+      logger.info('Broadcast English text skipped', { userId: ctx.from.id });
+    } catch (error) {
+      logger.error('Error skipping English text:', error);
+      await ctx.answerCbQuery('❌ Error al saltar texto').catch(() => {});
+    }
+  });
+
+  // Skip Spanish text
+  bot.action('broadcast_skip_text_es', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      // Validate session state
+      if (!ctx.session.temp || !ctx.session.temp.broadcastTarget) {
+        await ctx.answerCbQuery('❌ Sesión expirada. Por favor inicia de nuevo.');
+        logger.warn('Broadcast session expired or missing', { userId: ctx.from.id });
+        return;
+      }
+
+      // Set empty Spanish text
+      if (!ctx.session.temp.broadcastData) {
+        ctx.session.temp.broadcastData = {};
+      }
+      ctx.session.temp.broadcastData.textEs = '';
+
+      ctx.session.temp.broadcastStep = 'buttons';
+      ctx.session.temp.maxCompletedStep = 'buttons';
+
+      // Initialize buttons array with default buttons
+      const lang = getLanguage(ctx);
+      if (!ctx.session.temp.broadcastData.buttons || !Array.isArray(ctx.session.temp.broadcastData.buttons)) {
+        ctx.session.temp.broadcastData.buttons = buildDefaultBroadcastButtons(lang);
+      }
+
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('⏭️ Texto en español omitido');
+      await showBroadcastButtonsPicker(ctx);
+
+      logger.info('Broadcast Spanish text skipped', { userId: ctx.from.id });
+    } catch (error) {
+      logger.error('Error skipping Spanish text:', error);
+      await ctx.answerCbQuery('❌ Error al saltar texto').catch(() => {});
     }
   });
 
@@ -2105,6 +2265,23 @@ let registerAdminHandlers = (bot) => {
     }
   });
 
+  // Back to admin panel (alternative back button)
+  bot.action('back_admin', async (ctx) => {
+    try {
+      await ctx.answerCbQuery(); // Answer immediately
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      ctx.session.temp = {};
+      await ctx.saveSession();
+
+      await showAdminPanel(ctx, true);
+    } catch (error) {
+      logger.error('Error in back_admin:', error);
+    }
+  });
+
   // Handle media uploads for broadcast
   bot.on('photo', async (ctx, next) => {
     try {
@@ -2156,12 +2333,14 @@ let registerAdminHandlers = (bot) => {
 
       await ctx.reply(
         '✅ Imagen guardada correctamente\n\n'
-        + '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
-        + 'Por favor escribe el mensaje en inglés que quieres enviar:',
+        + '🇺🇸 *Paso 3/5: Texto en Inglés (Opcional)*\n\n'
+        + 'Escribe el mensaje en inglés que quieres enviar.\n\n'
+        + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en inglés.',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_en')],
+            [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_en')],
             [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
           ]),
         },
@@ -2222,12 +2401,14 @@ let registerAdminHandlers = (bot) => {
 
       await ctx.reply(
         '✅ Video guardado correctamente\n\n'
-        + '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
-        + 'Por favor escribe el mensaje en inglés que quieres enviar:',
+        + '🇺🇸 *Paso 3/5: Texto en Inglés (Opcional)*\n\n'
+        + 'Escribe el mensaje en inglés que quieres enviar.\n\n'
+        + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en inglés.',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_en')],
+            [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_en')],
             [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
           ]),
         },
@@ -2288,12 +2469,14 @@ let registerAdminHandlers = (bot) => {
 
       await ctx.reply(
         '✅ Documento guardado correctamente\n\n'
-        + '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
-        + 'Por favor escribe el mensaje en inglés que quieres enviar:',
+        + '🇺🇸 *Paso 3/5: Texto en Inglés (Opcional)*\n\n'
+        + 'Escribe el mensaje en inglés que quieres enviar.\n\n'
+        + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en inglés.',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_en')],
+            [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_en')],
             [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
           ]),
         },
@@ -2354,12 +2537,14 @@ let registerAdminHandlers = (bot) => {
 
       await ctx.reply(
         '✅ Audio guardado correctamente\n\n'
-        + '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
-        + 'Por favor escribe el mensaje en inglés que quieres enviar:',
+        + '🇺🇸 *Paso 3/5: Texto en Inglés (Opcional)*\n\n'
+        + 'Escribe el mensaje en inglés que quieres enviar.\n\n'
+        + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en inglés.',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_en')],
+            [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_en')],
             [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
           ]),
         },
@@ -2420,12 +2605,14 @@ let registerAdminHandlers = (bot) => {
 
       await ctx.reply(
         '✅ Mensaje de voz guardado correctamente\n\n'
-        + '🇺🇸 *Paso 2/5: Texto en Inglés*\n\n'
-        + 'Por favor escribe el mensaje en inglés que quieres enviar:',
+        + '🇺🇸 *Paso 3/5: Texto en Inglés (Opcional)*\n\n'
+        + 'Escribe el mensaje en inglés que quieres enviar.\n\n'
+        + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en inglés.',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_en')],
+            [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_en')],
             [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
           ]),
         },
@@ -2817,12 +3004,14 @@ let registerAdminHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(
-          '🇪🇸 *Paso 3/5: Texto en Español*\n\n'
-          + 'Por favor escribe el mensaje en español que quieres enviar:',
+          '🇪🇸 *Paso 4/5: Texto en Español (Opcional)*\n\n'
+          + 'Escribe el mensaje en español que quieres enviar.\n\n'
+          + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en español.',
           {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_es')],
+              [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_es')],
               [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
             ]),
           },
@@ -4282,7 +4471,7 @@ async function sendBroadcastWithButtons(ctx, bot) {
               parse_mode: 'Markdown',
             };
             if (buttonMarkup) {
-              options.reply_markup = buttonMarkup;
+              options.reply_markup = buttonMarkup.reply_markup;
             }
 
             await ctx.telegram[sendMethod](user.id, broadcastData.mediaFileId, options);
@@ -4293,7 +4482,7 @@ async function sendBroadcastWithButtons(ctx, bot) {
             parse_mode: 'Markdown',
           };
           if (buttonMarkup) {
-            options.reply_markup = buttonMarkup;
+            options.reply_markup = buttonMarkup.reply_markup;
           }
 
           await ctx.telegram.sendMessage(user.id, `📢 ${textToSend}`, options);
@@ -4627,11 +4816,119 @@ async function handleSendPrimeLinks(ctx, lang, telegram) {
 // After registerAdminHandlers is defined, wrap it to add additional handlers
 const wrappedRegisterAdminHandlers = registerAdminHandlers;
 
+// Add broadcast button action handlers
+const addBroadcastButtonHandlers = (bot) => {
+  // Handle broadcast action buttons (command type)
+  bot.action(/^broadcast_action_(\S+)$/, async (ctx) => {
+    try {
+      const action = ctx.match[1]; // Extract the action from callback data
+      const lang = ctx.session?.language || 'en';
+      
+      // Map broadcast actions to actual callback handlers
+      const actionMapping = {
+        '/plans': 'show_subscription_plans',
+        '/support': 'support',
+        '/share': 'share',
+        '/features': 'features',
+        '/nearby': 'menu_nearby',
+        '/profile': 'show_profile'
+      };
+      
+      const targetAction = actionMapping[action];
+      
+      if (targetAction) {
+        // For most actions, redirect to main menu where these are available
+        // This is the safest approach that won't break existing functionality
+        await ctx.answerCbQuery();
+        
+        // Show a helpful message
+        const messages = {
+          'show_subscription_plans': lang === 'es' ? '💎 Abriendo planes de membresía...' : '💎 Opening membership plans...',
+          'menu_nearby': lang === 'es' ? '📍 Mostrando usuarios cercanos...' : '📍 Showing nearby users...',
+          'show_profile': lang === 'es' ? '👤 Abriendo tu perfil...' : '👤 Opening your profile...',
+          'support': lang === 'es' ? '💬 Abriendo soporte...' : '💬 Opening support...',
+          'share': lang === 'es' ? '📢 Abriendo opciones para compartir...' : '📢 Opening share options...',
+          'features': lang === 'es' ? '✨ Mostrando todas las funciones...' : '✨ Showing all features...'
+        };
+        
+        await ctx.reply(messages[targetAction] || (lang === 'es' ? '💡 Abriendo función solicitada...' : '💡 Opening requested feature...'));
+        
+        // Enter main menu where all these features are accessible
+        await ctx.scene.enter('main_menu');
+      } else {
+        await ctx.answerCbQuery(
+          lang === 'es' 
+            ? '❌ Acción no soportada'
+            : '❌ Action not supported'
+        );
+      }
+    } catch (error) {
+      logger.error('Error handling broadcast action:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Handle broadcast plan buttons
+  bot.action(/^broadcast_plan_(\S+)$/, async (ctx) => {
+    try {
+      const planType = ctx.match[1]; // Extract the plan type
+      const lang = ctx.session?.language || 'en';
+      
+      await ctx.answerCbQuery();
+      
+      // Show message and redirect to main menu where plans are accessible
+      await ctx.reply(lang === 'es' 
+        ? '💎 Abriendo planes de membresía...'
+        : '💎 Opening membership plans...');
+      await ctx.scene.enter('main_menu');
+    } catch (error) {
+      logger.error('Error handling broadcast plan:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Handle broadcast feature buttons
+  bot.action(/^broadcast_feature_(\S+)$/, async (ctx) => {
+    try {
+      const feature = ctx.match[1]; // Extract the feature
+      const lang = ctx.session?.language || 'en';
+      
+      await ctx.answerCbQuery();
+      
+      // Show message and redirect to main menu where features are accessible
+      await ctx.reply(lang === 'es' 
+        ? '✨ Mostrando todas las funciones...'
+        : '✨ Showing all features...');
+      await ctx.scene.enter('main_menu');
+    } catch (error) {
+      logger.error('Error handling broadcast feature:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Handle back buttons
+  bot.action(/^broadcast_back_(\S+)$/, async (ctx) => {
+    try {
+      const targetScene = ctx.match[1]; // Extract the target scene
+      const lang = ctx.session?.language || 'en';
+      
+      await ctx.answerCbQuery();
+      
+      // Go back to the specified scene
+      await ctx.scene.enter(targetScene);
+    } catch (error) {
+      logger.error('Error handling broadcast back button:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+};
+
 // Create wrapper function that also registers audio management and group cleanup
 const finalRegisterAdminHandlers = (bot) => {
   wrappedRegisterAdminHandlers(bot);
   registerAudioManagementHandlers(bot);
   registerGroupCleanupCommand(bot);
+  addBroadcastButtonHandlers(bot);
 };
 
 module.exports = finalRegisterAdminHandlers;

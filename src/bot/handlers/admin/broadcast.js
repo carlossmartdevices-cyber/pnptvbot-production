@@ -1,4 +1,5 @@
-const { getBroadcastTypeMenu, getConfirmationMenu } = require('../../utils/menus');
+const { getBroadcastTypeMenu, getConfirmationMenu, getBackButton } = require('../../utils/menus');
+const { getLanguage } = require('../../utils/helpers');
 const adminService = require('../../services/adminService');
 const logger = require('../../../utils/logger');
 
@@ -7,18 +8,24 @@ const logger = require('../../../utils/logger');
  */
 async function handleBroadcastMenu(ctx) {
   try {
+    const lang = getLanguage(ctx);
+    const title = lang === 'es' ? '📢 **Mensajes de Difusión**' : '📢 **Broadcast Messages**';
+    const subtitle = lang === 'es' ? '\n\nSelecciona el tipo de mensaje que quieres difundir:' : '\n\nSelect the type of message you want to broadcast:';
+
     await ctx.editMessageText(
-      '📢 **Broadcast Messages**\n\nSelect the type of message you want to broadcast:',
+      title + subtitle,
       {
         parse_mode: 'Markdown',
-        reply_markup: getBroadcastTypeMenu(),
+        reply_markup: getBroadcastTypeMenu(lang),
       }
     );
 
     logger.info(`Broadcast menu accessed by ${ctx.from.id}`);
   } catch (error) {
     logger.error('Error in broadcast menu:', error);
-    await ctx.answerCbQuery('❌ Error loading broadcast menu');
+    const lang = getLanguage(ctx);
+    const errorMsg = lang === 'es' ? '❌ Error cargando el menú de difusión' : '❌ Error loading broadcast menu';
+    await ctx.answerCbQuery(errorMsg);
   }
 }
 
@@ -27,12 +34,34 @@ async function handleBroadcastMenu(ctx) {
  */
 async function handleBroadcastType(ctx) {
   try {
+    const lang = getLanguage(ctx);
     const type = ctx.callbackQuery.data.split('_')[1]; // 'broadcast_text' -> 'text'
 
+    const typeLabels = {
+      en: {
+        text: 'text',
+        photo: 'photo',
+        video: 'video',
+        enter: 'Enter the',
+        forText: 'For text: Just type your message',
+        forMedia: 'For media: Send the photo/video with a caption',
+      },
+      es: {
+        text: 'texto',
+        photo: 'foto',
+        video: 'video',
+        enter: 'Ingresa el',
+        forText: 'Para texto: Solo escribe tu mensaje',
+        forMedia: 'Para media: Envía la foto/video con una leyenda',
+      },
+    };
+
+    const l = typeLabels[lang] || typeLabels.en;
+
     await ctx.editMessageText(
-      `📝 Enter the ${type} message to broadcast:\n\n` +
-      `For text: Just type your message\n` +
-      `For media: Send the photo/video with a caption`
+      `📝 ${l.enter} ${l[type]} message to broadcast:\n\n` +
+      `${l.forText}\n` +
+      `${l.forMedia}`
     );
 
     // Save session
@@ -41,7 +70,9 @@ async function handleBroadcastType(ctx) {
     logger.info(`Admin ${ctx.from.id} selected broadcast type: ${type}`);
   } catch (error) {
     logger.error('Error in broadcast type selection:', error);
-    await ctx.answerCbQuery('❌ Error');
+    const lang = getLanguage(ctx);
+    const errorMsg = lang === 'es' ? '❌ Error' : '❌ Error';
+    await ctx.answerCbQuery(errorMsg);
   }
 }
 
@@ -73,17 +104,22 @@ async function handleBroadcastInput(ctx, bot) {
       mediaType = 'video';
       message = ctx.message.caption || '';
     } else {
-      await ctx.reply('❌ Invalid message type. Please try again.');
+      const lang = getLanguage(ctx);
+      const errorMsg = lang === 'es' ? '❌ Tipo de mensaje inválido. Por favor intente nuevamente.' : '❌ Invalid message type. Please try again.';
+      await ctx.reply(errorMsg);
       return true;
     }
 
     // Show preview and confirmation
-    const previewMessage = `📢 **Broadcast Preview**\n\n${message}\n\n` +
-      `This message will be sent to all users. Continue?`;
+    const lang = getLanguage(ctx);
+    const previewTitle = lang === 'es' ? '📢 **Vista Previa de Difusión**' : '📢 **Broadcast Preview**';
+    const previewQuestion = lang === 'es' ? '\n\nEste mensaje será enviado a todos los usuarios. ¿Continuar?' : '\n\nThis message will be sent to all users. Continue?';
+
+    const previewMessage = `${previewTitle}\n\n${message}${previewQuestion}`;
 
     await ctx.reply(previewMessage, {
       parse_mode: 'Markdown',
-      reply_markup: getConfirmationMenu('broadcast'),
+      reply_markup: getConfirmationMenu('broadcast', lang),
     });
 
     // Save broadcast data
@@ -98,7 +134,9 @@ async function handleBroadcastInput(ctx, bot) {
     return true;
   } catch (error) {
     logger.error('Error in broadcast input:', error);
-    await ctx.reply('❌ Error processing broadcast');
+    const lang = getLanguage(ctx);
+    const errorMsg = lang === 'es' ? '❌ Error procesando la difusión' : '❌ Error processing broadcast';
+    await ctx.reply(errorMsg);
     return false;
   }
 }
@@ -108,16 +146,19 @@ async function handleBroadcastInput(ctx, bot) {
  */
 async function handleBroadcastConfirm(ctx, bot) {
   try {
+    const lang = getLanguage(ctx);
     const session = ctx.session || {};
     const confirmed = ctx.callbackQuery.data === 'confirm_broadcast';
 
     if (!confirmed) {
-      await ctx.editMessageText('❌ Broadcast cancelled');
+      const cancelledMsg = lang === 'es' ? '❌ Difusión cancelada' : '❌ Broadcast cancelled';
+      await ctx.editMessageText(cancelledMsg);
       await ctx.clearSession();
       return;
     }
 
-    await ctx.editMessageText('📢 Sending broadcast...');
+    const sendingMsg = lang === 'es' ? '📢 Enviando difusión...' : '📢 Sending broadcast...';
+    await ctx.editMessageText(sendingMsg);
 
     // Send broadcast
     const results = await adminService.sendBroadcast(
@@ -130,10 +171,27 @@ async function handleBroadcastConfirm(ctx, bot) {
       }
     );
 
-    const resultMessage = `✅ Broadcast completed!\n\n` +
-      `• Total users: ${results.total}\n` +
-      `• Sent successfully: ${results.sent}\n` +
-      `• Failed: ${results.failed}`;
+    const resultLabels = {
+      en: {
+        completed: '✅ Broadcast completed!',
+        total: '• Total users:',
+        sent: '• Sent successfully:',
+        failed: '• Failed:',
+      },
+      es: {
+        completed: '✅ ¡Difusión completada!',
+        total: '• Usuarios totales:',
+        sent: '• Enviados con éxito:',
+        failed: '• Fallidos:',
+      },
+    };
+
+    const l = resultLabels[lang] || resultLabels.en;
+
+    const resultMessage = `${l.completed}\n\n` +
+      `${l.total} ${results.total}\n` +
+      `${l.sent} ${results.sent}\n` +
+      `${l.failed} ${results.failed}`;
 
     await ctx.editMessageText(resultMessage);
     await ctx.clearSession();
@@ -141,7 +199,9 @@ async function handleBroadcastConfirm(ctx, bot) {
     logger.info(`Broadcast sent by admin ${ctx.from.id}: ${results.sent} sent, ${results.failed} failed`);
   } catch (error) {
     logger.error('Error in broadcast confirm:', error);
-    await ctx.editMessageText('❌ Error sending broadcast');
+    const lang = getLanguage(ctx);
+    const errorMsg = lang === 'es' ? '❌ Error enviando la difusión' : '❌ Error sending broadcast';
+    await ctx.editMessageText(errorMsg);
   }
 }
 

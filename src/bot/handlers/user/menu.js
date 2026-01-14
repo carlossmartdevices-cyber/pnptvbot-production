@@ -179,6 +179,15 @@ const registerMenuHandlers = (bot) => {
     }
   });
 
+  // Alternative back to main menu action
+  bot.action('back_main', async (ctx) => {
+    try {
+      await showMainMenuEdit(ctx);
+    } catch (error) {
+      logger.error('Error in back_main:', error);
+    }
+  });
+
   // Note: show_subscription_plans handler is in payments/index.js
 
   // Group menu: Contact Admin

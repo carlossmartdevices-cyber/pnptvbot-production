@@ -264,6 +264,181 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
   };
 
   /**
+   * My Profile - Redirect to show_profile action
+   */
+  bot.action('menu_profile', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery();
+
+      // Redirect to the existing show_profile handler
+      const profileText = lang === 'es'
+        ? '📸 *Mi Perfil* 📸\n\nRedirigiendo a tu perfil...'
+        : '📸 *My Profile* 📸\n\nRedirecting to your profile...';
+
+      await ctx.editMessageText(profileText, {
+        parse_mode: 'Markdown'
+      });
+
+      // Trigger the show_profile action
+      ctx.callbackQuery.data = 'show_profile';
+      await bot.handleUpdate(ctx.update);
+    } catch (error) {
+      logger.error('Error handling menu_profile:', error);
+    }
+  });
+
+  /**
+   * Subscribe to PRIME - Redirect to show_subscription_plans action
+   */
+  bot.action('menu_subscribe', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery();
+
+      // Redirect to the existing show_subscription_plans handler
+      const subscribeText = lang === 'es'
+        ? '💎 *Suscribirse a PRIME* 💎\n\nRedirigiendo a los planes de membresía...'
+        : '💎 *Subscribe to PRIME* 💎\n\nRedirecting to membership plans...';
+
+      await ctx.editMessageText(subscribeText, {
+        parse_mode: 'Markdown'
+      });
+
+      // Trigger the show_subscription_plans action
+      ctx.callbackQuery.data = 'show_subscription_plans';
+      await bot.handleUpdate(ctx.update);
+    } catch (error) {
+      logger.error('Error handling menu_subscribe:', error);
+    }
+  });
+
+  /**
+   * Live Streams - Redirect to show_live action
+   */
+  bot.action('menu_streams', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery();
+
+      // Redirect to the existing live streams handler
+      const streamsText = lang === 'es'
+        ? '🎥 *Transmisiones en Vivo* 🎥\n\nRedirigiendo a las transmisiones en vivo...'
+        : '🎥 *Live Streams* 🎥\n\nRedirecting to live streams...';
+
+      await ctx.editMessageText(streamsText, {
+        parse_mode: 'Markdown'
+      });
+
+      // Trigger the show_live action
+      ctx.callbackQuery.data = 'show_live';
+      await bot.handleUpdate(ctx.update);
+    } catch (error) {
+      logger.error('Error handling menu_streams:', error);
+    }
+  });
+
+  /**
+   * Radio - Redirect to show_radio action
+   */
+  bot.action('menu_radio', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery();
+
+      // Redirect to the existing radio handler
+      const radioText = lang === 'es'
+        ? '📻 *Radio PNPtv* 📻\n\nRedirigiendo a la radio...'
+        : '📻 *PNPtv Radio* 📻\n\nRedirecting to radio...';
+
+      await ctx.editMessageText(radioText, {
+        parse_mode: 'Markdown'
+      });
+
+      // Trigger the show_radio action
+      ctx.callbackQuery.data = 'show_radio';
+      await bot.handleUpdate(ctx.update);
+    } catch (error) {
+      logger.error('Error handling menu_radio:', error);
+    }
+  });
+
+  /**
+   * Zoom Rooms - Redirect to show_zoom action
+   */
+  bot.action('menu_zoom', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery();
+
+      // Redirect to the existing zoom handler
+      const zoomText = lang === 'es'
+        ? '🎥 *Salas Zoom* 🎥\n\nRedirigiendo a las salas Zoom...'
+        : '🎥 *Zoom Rooms* 🎥\n\nRedirecting to Zoom rooms...';
+
+      await ctx.editMessageText(zoomText, {
+        parse_mode: 'Markdown'
+      });
+
+      // Trigger the show_zoom action
+      ctx.callbackQuery.data = 'show_zoom';
+      await bot.handleUpdate(ctx.update);
+    } catch (error) {
+      logger.error('Error handling menu_zoom:', error);
+    }
+  });
+
+  /**
+   * Support - Redirect to show_support action
+   */
+  bot.action('menu_support', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery();
+
+      // Redirect to the existing support handler
+      const supportText = lang === 'es'
+        ? '💬 *Soporte* 💬\n\nRedirigiendo al menú de soporte...'
+        : '💬 *Support* 💬\n\nRedirecting to support menu...';
+
+      await ctx.editMessageText(supportText, {
+        parse_mode: 'Markdown'
+      });
+
+      // Trigger the show_support action
+      ctx.callbackQuery.data = 'show_support';
+      await bot.handleUpdate(ctx.update);
+    } catch (error) {
+      logger.error('Error handling menu_support:', error);
+    }
+  });
+
+  /**
+   * Settings - Redirect to show_settings action
+   */
+  bot.action('menu_settings', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery();
+
+      // Redirect to the existing settings handler
+      const settingsText = lang === 'es'
+        ? '⚙️ *Configuración* ⚙️\n\nRedirigiendo al menú de configuración...'
+        : '⚙️ *Settings* ⚙️\n\nRedirecting to settings menu...';
+
+      await ctx.editMessageText(settingsText, {
+        parse_mode: 'Markdown'
+      });
+
+      // Trigger the show_settings action
+      ctx.callbackQuery.data = 'show_settings';
+      await bot.handleUpdate(ctx.update);
+    } catch (error) {
+      logger.error('Error handling menu_settings:', error);
+    }
+  });
+
+  /**
    * Who is Nearby? - Geolocation based member discovery
    * Now shows directly in group chat with auto-delete
    */
