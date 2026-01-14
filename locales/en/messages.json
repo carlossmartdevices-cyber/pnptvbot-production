@@ -45,8 +45,8 @@
   "emailPrompt": "Would you like to provide your email address? This helps with account recovery and notifications.",
   "skipEmail": "➡️ Skip for now",
   "emailReceived": "✅ Email received! Thank you.",
-  "locationSharingPrompt": "📍 Share Location (Optional)\
-\nWant other members to find you on the *Who is Nearby?* map?\n\n💡 This is completely optional and you can change it later in your profile.",
+
+💡 This is completely optional and you can change it later in your profile.",
   "locationSharingEnabled": "✅ Location sharing enabled! You'll appear on the Nearby map.",
   "locationSharingDisabled": "🔒 Location sharing disabled. You can enable it anytime in your profile.",
   "locationSharingToggleEnabled": "✅ Location sharing turned ON. You'll now appear on the Nearby map!",

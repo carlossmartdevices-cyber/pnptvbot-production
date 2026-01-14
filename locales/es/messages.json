@@ -58,5 +58,16 @@
   "sendInterests": "🎯 Envía tus intereses (separados por comas)",
   "sendBio": "📝 Envía tu bio (máximo 500 caracteres)",
   "sendTribe": "🏳️‍🌈 Envía tu tribu (ej: Bear, Otter, Jock)",
-  "invalidInput": "❌ Entrada inválida. Por favor intenta de nuevo."
+  "invalidInput": "❌ Entrada inválida. Por favor intenta de nuevo.",
+  "broadcast_button_plans": "💎 Ver Planes",
+  "broadcast_button_premium": "⭐ Obtener Premium",
+  "broadcast_button_help": "🆘 Obtener Ayuda",
+  "broadcast_button_share": "📢 Compartir",
+  "broadcast_button_features": "✨ Explorar Funciones",
+  "broadcast_button_community": "👥 Unirse a la Comunidad",
+  "broadcast_button_channel": "📣 Canal",
+  "broadcast_button_support": "🆘 Soporte",
+  "broadcast_button_nearby": "📍 Cercanos",
+  "broadcast_button_profile": "👤 Mi Perfil",
+  "broadcast_button_back": "◀️ Atrás"
 }

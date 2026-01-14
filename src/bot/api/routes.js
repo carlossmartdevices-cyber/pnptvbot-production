@@ -46,6 +46,16 @@ app.use(morgan('combined', { stream: logger.stream }));
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../../../public')));
 
+// Add cache control headers for static assets to prevent browser caching issues
+app.use((req, res, next) => {
+  if (req.path.startsWith('/videorama-app/') && (req.path.endsWith('.js') || req.path.endsWith('.css') || req.path.endsWith('.html'))) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
+
 // Landing page routes
 // Home page - domain aware routing
 app.get('/', (req, res) => {
@@ -152,21 +162,22 @@ app.get(['/videorama-app', '/videorama-app/'], pageLimiter, (req, res) => {
   if (!fs.existsSync(indexPath)) {
     return res.status(404).send('Videorama app not built. Deploy `public/videorama-app/`.');
   }
+  // Set cache control headers to prevent browser caching issues
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   return res.sendFile(indexPath);
 });
 
-// Music Collections (formerly playlists)
-app.get('/music-collections', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public', 'youtube-playlist.html'));
-});
-
-// Playlists (legacy route - redirects to music-collections)
-app.get('/playlists', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public', 'youtube-playlist.html'));
-});
+// Music Collections and Playlists routes have been removed
+// These functionalities are now integrated into the Videorama app
 
 // Hangouts page
 app.get('/hangouts', pageLimiter, (req, res) => {
+  // Set cache control headers to prevent browser caching issues
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, '../../../public/hangouts', 'index.html'));
 });
 

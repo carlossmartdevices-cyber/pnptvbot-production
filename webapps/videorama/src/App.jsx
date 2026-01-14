@@ -80,7 +80,7 @@ export default function App() {
   const [playerTitle, setPlayerTitle] = useState('')
   const [playerQueue, setPlayerQueue] = useState([])
   const [playerStartIndex, setPlayerStartIndex] = useState(0)
-  const [playerMode, setPlayerMode] = useState('full')
+  const [playerMode, setPlayerMode] = useState('focusOnly')
 
   const [openAddLink, setOpenAddLink] = useState(false)
   const [openAddUpload, setOpenAddUpload] = useState(false)
@@ -167,12 +167,34 @@ export default function App() {
     }
   }, [tab])
 
-  function openQueue({ title, queue, startIndex = 0, mode = 'full' }) {
+  function openQueue({ title, queue, startIndex = 0, mode = 'focusOnly' }) {
     setPlayerTitle(title || 'Videorama')
     setPlayerQueue(queue || [])
     setPlayerStartIndex(startIndex)
     setPlayerMode(mode)
     setPlayerOpen(true)
+  }
+
+  function playPlaylist(playlist) {
+    if (!playlist || !playlist.videos || playlist.videos.length === 0) {
+      return
+    }
+
+    // Convert playlist videos to the format expected by PlayerSheet
+    const queue = playlist.videos.map((video, index) => ({
+      id: `playlist-${playlist.id}-video-${index}`,
+      title: video.title || `Video ${index + 1}`,
+      url: video.url,
+      kind: 'link',
+      description: video.description || ''
+    }))
+
+    openQueue({
+      title: playlist.title || 'Playlist',
+      queue: queue,
+      startIndex: 0,
+      mode: 'focusOnly'
+    })
   }
 
   const filtered = useMemo(() => {
@@ -403,7 +425,7 @@ export default function App() {
             <>
               <button
                 className="btn"
-                onClick={() => openQueue({ title: 'Podcasts', queue: podcastFiltered, startIndex: 0 })}
+                onClick={() => openQueue({ title: 'Podcasts', queue: podcastFiltered, startIndex: 0, mode: 'focusOnly' })}
                 disabled={podcastFiltered.length === 0}
               >
                 <Play size={18} /> Play All
@@ -488,12 +510,7 @@ export default function App() {
           <>
             <div className="hero">
               <div className="heroTitle">PNP Music / Música para Viciosos</div>
-              <div className="heroText">Browse curated playlists. (No preview — open the full collections.)</div>
-              <div className="heroActions">
-                <a className="btn" href="/music-collections" target="_blank" rel="noreferrer">
-                  <Music2 size={18} /> Open Music Collections
-                </a>
-              </div>
+              <div className="heroText">Browse curated playlists. Click on any playlist to play it.</div>
             </div>
 
             {publicLoading ? <div className="notice">Loading playlists…</div> : null}
@@ -509,9 +526,9 @@ export default function App() {
                   <div className="cardTitle">{p.title || 'Untitled playlist'}</div>
                   {p.description ? <div className="cardDesc">{p.description}</div> : null}
                   <div className="cardActions">
-                    <a className="btn btnSmall btnGhost" href="/music-collections" target="_blank" rel="noreferrer">
-                      Open
-                    </a>
+                    <button className="btn btnSmall btnGhost" onClick={() => playPlaylist(p)}>
+                      <Play size={14} /> Play
+                    </button>
                   </div>
                 </div>
               ))}
@@ -566,7 +583,7 @@ export default function App() {
               <div className="heroActions">
                 <button
                   className="btn"
-                  onClick={() => openQueue({ title: 'Podcasts', queue: podcastFiltered, startIndex: 0 })}
+                  onClick={() => openQueue({ title: 'Podcasts', queue: podcastFiltered, startIndex: 0, mode: 'focusOnly' })}
                   disabled={podcastFiltered.length === 0}
                 >
                   <Play size={18} /> Play All
@@ -604,7 +621,7 @@ export default function App() {
                     <div className="cardTitle">{it.title}</div>
                     {it.description ? <div className="cardDesc">{it.description}</div> : null}
                     <div className="cardActions">
-                      <button className="btn btnSmall" onClick={() => openQueue({ title: it.title, queue: [it], startIndex: 0 })}>
+                      <button className="btn btnSmall" onClick={() => openQueue({ title: it.title, queue: [it], startIndex: 0, mode: 'focusOnly' })}>
                         <PlayCircle size={18} /> Play
                       </button>
                       <a className="btn btnSmall btnGhost" href={it.url} target="_blank" rel="noreferrer">
@@ -668,7 +685,7 @@ export default function App() {
                     <div className="cardActions">
                       <button
                         className="btn btnSmall"
-                        onClick={() => openQueue({ title: 'My Mix', queue: [it], startIndex: 0 })}
+                        onClick={() => openQueue({ title: 'My Mix', queue: [it], startIndex: 0, mode: 'focusOnly' })}
                       >
                         <PlayCircle size={18} /> Play
                       </button>

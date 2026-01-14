@@ -4,6 +4,17 @@
  */
 
 const { Markup } = require('telegraf');
+const i18n = require('./i18n');
+
+/**
+ * Translate button text based on user language
+ * @param {string} buttonKey - Button translation key
+ * @param {string} language - User language ('en' or 'es')
+ * @returns {string} Translated button text
+ */
+function translateButtonText(buttonKey, language = 'en') {
+  return i18n.t(buttonKey, language);
+}
 
 /**
  * Get standard button options for broadcasts and community posts

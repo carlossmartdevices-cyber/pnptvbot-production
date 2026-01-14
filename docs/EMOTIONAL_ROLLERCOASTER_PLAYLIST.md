@@ -7,7 +7,7 @@
 - **Videos:** 12 tracks
 - **Status:** Public & Featured
 - **Creator:** PNPtv (👑)
-- **Access:** https://pnptv.app/music-collections
+- **Access:** https://pnptv.app/videorama-app/
 
 ---
 
@@ -184,7 +184,7 @@ Not forced happiness. Awareness. Gratitude for the lessons — even the uncomfor
 ## 🌐 Access & API
 
 ### View in Videorama
-- URL: https://pnptv.app/music-collections
+- URL: https://pnptv.app/videorama-app/
 - The playlist appears as a featured card with all songs and descriptions
 
 ### API Endpoint

@@ -8,7 +8,7 @@ function isYouTubeVideoUrl(url) {
   return info?.kind === 'video' ? info : null
 }
 
-export default function PlayerSheet({ open, title, queue, startIndex = 0, mode = 'full', onClose }) {
+export default function PlayerSheet({ open, title, queue, startIndex = 0, mode = 'focusOnly', onClose }) {
   const [index, setIndex] = useState(startIndex)
   const [isPlaying, setIsPlaying] = useState(true)
   const [error, setError] = useState('')

@@ -564,9 +564,10 @@ class EnhancedBroadcastService extends BroadcastService {
   /**
    * Build button markup for a broadcast
    * @param {Array} buttons - Array of button configurations
+   * @param {string} language - User language for translation
    * @returns {Object|undefined} Markup.inlineKeyboard object or undefined
    */
-  buildButtonMarkup(buttons) {
+  buildButtonMarkup(buttons, language = 'en') {
     if (!buttons || buttons.length === 0) {
       return undefined; // No buttons
     }
@@ -582,25 +583,32 @@ class EnhancedBroadcastService extends BroadcastService {
           continue;
         }
 
+        // Translate button text based on user language
+        let buttonText = buttonObj.text;
+        if (buttonObj.translationKey) {
+          // Use translation system if translation key is provided
+          buttonText = this.translateButtonText(buttonObj.translationKey, language);
+        }
+
         if (buttonObj.type === 'url') {
-          if (buttonObj.text && buttonObj.target) {
-            buttonRows.push([Markup.button.url(buttonObj.text, buttonObj.target)]);
+          if (buttonText && buttonObj.target) {
+            buttonRows.push([Markup.button.url(buttonText, buttonObj.target)]);
           }
         } else if (buttonObj.type === 'callback') {
-          if (buttonObj.text && buttonObj.data) {
-            buttonRows.push([Markup.button.callback(buttonObj.text, buttonObj.data)]);
+          if (buttonText && buttonObj.data) {
+            buttonRows.push([Markup.button.callback(buttonText, buttonObj.data)]);
           }
         } else if (buttonObj.type === 'command') {
-          if (buttonObj.text && buttonObj.target) {
-            buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_action_${buttonObj.target}`)]);
+          if (buttonText && buttonObj.target) {
+            buttonRows.push([Markup.button.callback(buttonText, `broadcast_action_${buttonObj.target}`)]);
           }
         } else if (buttonObj.type === 'plan') {
-          if (buttonObj.text && buttonObj.target) {
-            buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_plan_${buttonObj.target}`)]);
+          if (buttonText && buttonObj.target) {
+            buttonRows.push([Markup.button.callback(buttonText, `broadcast_plan_${buttonObj.target}`)]);
           }
         } else if (buttonObj.type === 'feature') {
-          if (buttonObj.text && buttonObj.target) {
-            buttonRows.push([Markup.button.callback(buttonObj.text, `broadcast_feature_${buttonObj.target}`)]);
+          if (buttonText && buttonObj.target) {
+            buttonRows.push([Markup.button.callback(buttonText, `broadcast_feature_${buttonObj.target}`)]);
           }
         }
       }
@@ -610,6 +618,17 @@ class EnhancedBroadcastService extends BroadcastService {
       logger.warn('Error building button markup:', error);
       return undefined;
     }
+  }
+
+  /**
+   * Translate button text based on user language
+   * @param {string} buttonKey - Button translation key
+   * @param {string} language - User language ('en' or 'es')
+   * @returns {string} Translated button text
+   */
+  translateButtonText(buttonKey, language = 'en') {
+    const i18n = require('../utils/i18n');
+    return i18n.t(buttonKey, language);
   }
 
   /**
@@ -650,9 +669,8 @@ class EnhancedBroadcastService extends BroadcastService {
         ['sending', broadcastId]
       );
 
-      // Get buttons for this broadcast
+      // Get buttons for this broadcast (we'll build markup per user based on language)
       const buttons = await BroadcastButtonModel.getButtonsForBroadcast(broadcastId);
-      const buttonMarkup = this.buildButtonMarkup(buttons);
 
       // Get target users
       const targetUsers = await this.getTargetUsers(
@@ -699,9 +717,11 @@ class EnhancedBroadcastService extends BroadcastService {
           // Send based on media type
           let messageId = null;
           const attemptSend = async () => {
+            // Build button markup for this specific user based on their language
+            const userButtonMarkup = this.buildButtonMarkup(buttons, user.language);
             const sendOptions = {
               parse_mode: 'Markdown',
-              ...(buttonMarkup ? { reply_markup: buttonMarkup } : {})
+              ...(userButtonMarkup ? { reply_markup: userButtonMarkup.reply_markup } : {})
             };
 
             if (broadcast.media_type && broadcast.media_url) {

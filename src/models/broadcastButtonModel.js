@@ -59,7 +59,7 @@ class BroadcastButtonModel {
         ON broadcast_button_presets(enabled)
       `);
 
-      // Insert default presets
+      // Insert default presets with translation keys
       await client.query(`
         INSERT INTO broadcast_button_presets (name, description, icon, buttons, enabled) VALUES
         ('Plans Promo', 'Link to subscription plans page', '💎', $1::jsonb, true),
@@ -70,12 +70,12 @@ class BroadcastButtonModel {
         ('Engagement Full', 'All engagement options', '🎯', $6::jsonb, true)
         ON CONFLICT (name) DO NOTHING
       `, [
-        '[{"text":"💎 View Plans","type":"command","target":"/plans"}]',
-        '[{"text":"⭐ Get Premium","type":"plan","target":"premium"}]',
-        '[{"text":"🆘 Get Help","type":"command","target":"/support"},{"text":"📢 Share","type":"command","target":"/share"}]',
-        '[{"text":"✨ Explore Features","type":"command","target":"/features"}]',
-        '[{"text":"👥 Join Community","type":"url","target":"https://t.me/pnptv_community"},{"text":"📣 Channel","type":"url","target":"https://t.me/pnptv_channel"}]',
-        '[{"text":"💎 Plans","type":"command","target":"/plans"},{"text":"🆘 Support","type":"command","target":"/support"},{"text":"📢 Share","type":"command","target":"/share"}]'
+        '[{"text":"💎 View Plans","translationKey":"broadcast_button_plans","type":"command","target":"/plans"}]',
+        '[{"text":"⭐ Get Premium","translationKey":"broadcast_button_premium","type":"plan","target":"premium"}]',
+        '[{"text":"🆘 Get Help","translationKey":"broadcast_button_help","type":"command","target":"/support"},{"text":"📢 Share","translationKey":"broadcast_button_share","type":"command","target":"/share"}]',
+        '[{"text":"✨ Explore Features","translationKey":"broadcast_button_features","type":"command","target":"/features"}]',
+        '[{"text":"👥 Join Community","translationKey":"broadcast_button_community","type":"url","target":"https://t.me/pnptv_community"},{"text":"📣 Channel","translationKey":"broadcast_button_channel","type":"url","target":"https://t.me/pnptv_channel"}]',
+        '[{"text":"💎 Plans","translationKey":"broadcast_button_plans","type":"command","target":"/plans"},{"text":"🆘 Support","translationKey":"broadcast_button_support","type":"command","target":"/support"},{"text":"📢 Share","translationKey":"broadcast_button_share","type":"command","target":"/share"}]'
       ]);
 
       logger.info('✓ Broadcast buttons tables initialized');
