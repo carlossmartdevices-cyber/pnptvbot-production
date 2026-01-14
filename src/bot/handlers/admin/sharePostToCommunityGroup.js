@@ -146,7 +146,11 @@ const registerCommunityPostHandlers = (bot) => {
         return;
       }
 
-      const postDestinations = ctx.session.temp?.communityPostData?.postDestinations || [];
+      // Ensure session structure exists
+      if (!ctx.session.temp) ctx.session.temp = {};
+      if (!ctx.session.temp.communityPostData) ctx.session.temp.communityPostData = {};
+
+      const postDestinations = ctx.session.temp.communityPostData.postDestinations || [];
       const primeChannelId = '-1002997324714'; // From env
 
       // Toggle Prime Channel selection
@@ -183,7 +187,11 @@ const registerCommunityPostHandlers = (bot) => {
       const destId = ctx.match[1];
       if (destId === 'prime_channel') return; // Handled by other handler
 
-      const postDestinations = ctx.session.temp?.communityPostData?.postDestinations || [];
+      // Ensure session structure exists
+      if (!ctx.session.temp) ctx.session.temp = {};
+      if (!ctx.session.temp.communityPostData) ctx.session.temp.communityPostData = {};
+
+      const postDestinations = ctx.session.temp.communityPostData.postDestinations || [];
 
       // Toggle destination selection
       const index = postDestinations.indexOf(destId);
@@ -215,6 +223,10 @@ const registerCommunityPostHandlers = (bot) => {
         return;
       }
 
+      // Ensure session structure exists
+      if (!ctx.session.temp) ctx.session.temp = {};
+      if (!ctx.session.temp.communityPostData) ctx.session.temp.communityPostData = {};
+
       const destinations = await communityPostService.getPostingDestinations();
       const destIds = destinations.map(d => d.telegram_id);
 
@@ -238,6 +250,10 @@ const registerCommunityPostHandlers = (bot) => {
         await ctx.answerCbQuery('❌ No autorizado');
         return;
       }
+
+      // Ensure session structure exists
+      if (!ctx.session.temp) ctx.session.temp = {};
+      if (!ctx.session.temp.communityPostData) ctx.session.temp.communityPostData = {};
 
       ctx.session.temp.communityPostData.postDestinations = [];
       ctx.session.temp.communityPostData.targetPrimeChannel = false;
@@ -312,8 +328,12 @@ const registerCommunityPostHandlers = (bot) => {
         return;
       }
 
+      // Ensure session structure exists
+      if (!ctx.session.temp) ctx.session.temp = {};
+      if (!ctx.session.temp.communityPostData) ctx.session.temp.communityPostData = {};
+
       const groupId = ctx.match[1];
-      const targetGroups = ctx.session.temp?.communityPostData?.targetGroups || [];
+      const targetGroups = ctx.session.temp.communityPostData.targetGroups || [];
 
       // Toggle group selection
       const index = targetGroups.indexOf(groupId);
@@ -373,6 +393,10 @@ const registerCommunityPostHandlers = (bot) => {
         return;
       }
 
+      // Ensure session structure exists
+      if (!ctx.session.temp) ctx.session.temp = {};
+      if (!ctx.session.temp.communityPostData) ctx.session.temp.communityPostData = {};
+
       const groups = await communityPostService.getCommunityGroups();
       const groupIds = groups.map((g) => g.group_id);
 
@@ -419,6 +443,10 @@ const registerCommunityPostHandlers = (bot) => {
         await ctx.answerCbQuery('❌ No autorizado');
         return;
       }
+
+      // Ensure session structure exists
+      if (!ctx.session.temp) ctx.session.temp = {};
+      if (!ctx.session.temp.communityPostData) ctx.session.temp.communityPostData = {};
 
       ctx.session.temp.communityPostData.targetGroups = [];
       await ctx.saveSession();
@@ -643,6 +671,11 @@ const registerCommunityPostHandlers = (bot) => {
       const step = ctx.session.temp.communityPostStep;
       const text = ctx.message.text;
 
+      // Check if this is a command (starts with /) - if so, pass to other handlers
+      if (text && text.startsWith('/')) {
+        return next();
+      }
+
       if (step === 'ai_prompt') {
         const prompt = (text || '').trim();
         if (!prompt) return;
@@ -702,12 +735,15 @@ const registerCommunityPostHandlers = (bot) => {
         await ctx.saveSession();
 
         await showButtonSelectionStep(ctx);
+        return;
       }
-      return;
+
+      // If no step matched, pass to other handlers
+      return next();
     } catch (error) {
       logger.error('Error handling text input:', error);
       await ctx.reply('❌ Error al procesar el texto').catch(() => {});
-      return;
+      return next();
     }
   });
 
@@ -1103,6 +1139,12 @@ const registerCommunityPostHandlers = (bot) => {
       if (!isAdmin) return next();
 
       const dateTimeStr = ctx.message.text.trim();
+
+      // Check if this is a command (starts with /) - if so, pass to other handlers
+      if (dateTimeStr && dateTimeStr.startsWith('/')) {
+        return next();
+      }
+
       const dateTimeRegex = /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2})$/;
 
       if (!dateTimeRegex.test(dateTimeStr)) {
@@ -1143,7 +1185,7 @@ const registerCommunityPostHandlers = (bot) => {
     } catch (error) {
       logger.error('Error handling datetime input:', error);
       await ctx.reply('❌ Error al procesar la fecha').catch(() => {});
-      return;
+      return next();
     }
   });
 

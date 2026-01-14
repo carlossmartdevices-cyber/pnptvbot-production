@@ -25,6 +25,56 @@ async function isExempt(ctx) {
 }
 
 /**
+ * Check if message is forwarded
+ * @param {Object} message - Telegram message object
+ * @returns {boolean} Is forwarded
+ */
+function isForwardedMessage(message) {
+  if (!message) return false;
+
+  return !!(message.forward_from ||
+           message.forward_from_chat ||
+           message.forward_from_message_id ||
+           message.forward_sender_name ||
+           message.forward_date);
+}
+
+/**
+ * Enhanced link detection patterns
+ */
+const ENHANCED_LINK_PATTERNS = [
+  // Standard URLs with protocol
+  /https?:\/\/[^\s]+/gi,
+  // URLs without protocol
+  /(?:www\.)[a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*/gi,
+  // Short URLs
+  /(?:bit\.ly|t\.me|tinyurl\.com|goo\.gl|ow\.ly|buff\.ly|is\.gd|v\.gd)\/[^\s]+/gi,
+  // Telegram links (non-official)
+  /(?:@[a-zA-Z0-9_]{5,}|t\.me\/[a-zA-Z0-9_]+)(?<!pnptv_bot|PNPtvBot|PNPtvOfficialBot)/gi,
+  // IP addresses
+  /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g,
+  // Email addresses
+  /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+];
+
+/**
+ * Enhanced link detection
+ * @param {string} text - Message text
+ * @returns {boolean} Contains links
+ */
+function detectAnyLink(text) {
+  if (!text) return false;
+
+  for (const pattern of ENHANCED_LINK_PATTERNS) {
+    if (pattern.test(text)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Add message to user history for tracking
  */
 function addToHistory(userId, messageText) {
@@ -177,6 +227,22 @@ const autoModerationMiddleware = () => async (ctx, next) => {
 
     const userId = ctx.from.id;
     const messageText = ctx.message.text;
+    const message = ctx.message;
+
+    // ENHANCED: Check for forwarded messages - BLOCK ALL
+    if (isForwardedMessage(message)) {
+      await deleteAndNotify(ctx, 'Forwarded messages are not allowed in this group');
+
+      // Issue auto-warning
+      await WarningService.addWarning({
+        userId,
+        adminId: 'system',
+        reason: 'Auto-moderation: Forwarded message',
+        groupId: ctx.chat.id,
+      });
+
+      return; // Don't proceed
+    }
 
     // Add message to history
     addToHistory(userId, messageText);
@@ -221,15 +287,15 @@ const autoModerationMiddleware = () => async (ctx, next) => {
       return; // Don't proceed
     }
 
-    // Check for unauthorized links
-    if (checkLinks(messageText)) {
-      await deleteAndNotify(ctx, 'Unauthorized links are not allowed');
+    // ENHANCED: Check for ANY links - COMPLETE BLOCK
+    if (detectAnyLink(messageText)) {
+      await deleteAndNotify(ctx, 'Links are not allowed in this group');
 
       // Issue auto-warning
       await WarningService.addWarning({
         userId,
         adminId: 'system',
-        reason: 'Auto-moderation: Unauthorized link',
+        reason: 'Auto-moderation: Link detected',
         groupId: ctx.chat.id,
       });
 

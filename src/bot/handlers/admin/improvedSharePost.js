@@ -48,8 +48,7 @@ const registerImprovedSharePostHandlers = (bot) => {
       // Initialize session data
       ctx.session.temp.sharePostStep = 'select_destinations';
       ctx.session.temp.sharePostData = {
-        channelIds: [],
-        groupIds: [],
+        destinations: [], // Array of {chatId, threadId, name}
         mediaType: null,
         mediaFileId: null,
         fileSizeMB: 0,
@@ -62,59 +61,8 @@ const registerImprovedSharePostHandlers = (bot) => {
 
       await ctx.answerCbQuery();
 
-      // Show destination selection (channels + groups)
-      const destinations = await communityPostService.getPostingDestinations();
-      const buttons = [];
-
-      // Separate channels and groups
-      const channels = destinations.filter(d => d.destination_type === 'channel');
-      const groups = destinations.filter(d => d.destination_type === 'group');
-
-      // Add channel selection buttons
-      if (channels.length > 0) {
-        buttons.push([Markup.button.callback('━━ Canales ━━', 'share_post_channels_header')]);
-        for (const channel of channels) {
-          buttons.push([
-            Markup.button.callback(
-              channel.icon + ' ' + channel.destination_name,
-              'share_post_channel_' + channel.telegram_id
-            ),
-          ]);
-        }
-      }
-
-      // Add group selection buttons
-      if (groups.length > 0) {
-        buttons.push([Markup.button.callback('━━ Grupos ━━', 'share_post_groups_header')]);
-        for (const group of groups) {
-          buttons.push([
-            Markup.button.callback(
-              group.icon + ' ' + group.destination_name,
-              'share_post_group_' + group.telegram_id
-            ),
-          ]);
-        }
-      }
-
-      // Add action buttons
-      buttons.push([Markup.button.callback('✅ Select All', 'share_post_select_all')]);
-      buttons.push([Markup.button.callback('⬜ Clear Selection', 'share_post_clear_selection')]);
-      buttons.push([Markup.button.callback('➡️ Continue', 'share_post_continue_to_media')]);
-      buttons.push([Markup.button.callback('❌ Cancel', 'admin_cancel')]);
-
-      await ctx.editMessageText(
-        '📤 *Compartir Publicacion*\n\n'
-        + '*Paso 1/6: Selecciona Destinos*\n\n'
-        + 'Selecciona uno o mas canales/grupos:\n\n'
-        + '━━━━━━━━━━━━━━━━━\n\n'
-        + '📢 *Canales:* Para anuncios importantes\n'
-        + '👥 *Grupos:* Para discusion comunitaria\n\n'
-        + '💡 *Tip:* Puedes compartir en multiples destinos a la vez.',
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard(buttons),
-        }
-      );
+      // Hardcoded destinations - Prime Channel and Community Group topics
+      await showDestinationSelection(ctx);
     } catch (error) {
       logger.error('Error in improved share post entry:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
@@ -122,11 +70,23 @@ const registerImprovedSharePostHandlers = (bot) => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // DESTINATION CONFIGURATION - Hardcoded targets
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Available destinations
+  const SHARE_DESTINATIONS = [
+    { id: 'prime', chatId: process.env.PRIME_CHANNEL_ID || '-1002997324714', threadId: null, name: '💎 Prime Channel', type: 'channel' },
+    { id: 'general', chatId: process.env.GROUP_ID || '-1003291737499', threadId: 1, name: '💬 General', type: 'topic' },
+    { id: 'walloffame', chatId: process.env.GROUP_ID || '-1003291737499', threadId: 3132, name: '🏆 Wall Of Fame', type: 'topic' },
+    { id: 'hangouts', chatId: process.env.GROUP_ID || '-1003291737499', threadId: 10682, name: '🎉 Hangouts Notifications', type: 'topic' },
+  ];
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // DESTINATION SELECTION HANDLERS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Channel selection
-  bot.action(/^share_post_channel_(.+)$/, async (ctx) => {
+  // Toggle destination selection
+  bot.action(/^share_post_dest_(.+)$/, async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) {
@@ -134,55 +94,28 @@ const registerImprovedSharePostHandlers = (bot) => {
         return;
       }
 
-      const channelId = ctx.match[1];
-      const channelIds = ctx.session.temp?.sharePostData?.channelIds || [];
+      const destId = ctx.match[1];
+      const destinations = ctx.session.temp?.sharePostData?.destinations || [];
 
-      // Toggle channel selection
-      const index = channelIds.indexOf(channelId);
+      // Toggle destination selection
+      const index = destinations.findIndex(d => d.id === destId);
       if (index > -1) {
-        channelIds.splice(index, 1);
+        destinations.splice(index, 1);
       } else {
-        channelIds.push(channelId);
+        const dest = SHARE_DESTINATIONS.find(d => d.id === destId);
+        if (dest) {
+          destinations.push({ ...dest });
+        }
       }
 
-      ctx.session.temp.sharePostData.channelIds = channelIds;
+      ctx.session.temp.sharePostData.destinations = destinations;
       await ctx.saveSession();
 
-      await ctx.answerCbQuery(channelIds.includes(channelId) ? '✅ Canal anadido' : '⬜ Canal removido');
+      const isSelected = destinations.some(d => d.id === destId);
+      await ctx.answerCbQuery(isSelected ? '✅ Agregado' : '⬜ Removido');
       await showDestinationSelection(ctx);
     } catch (error) {
-      logger.error('Error selecting channel:', error);
-      await ctx.answerCbQuery('❌ Error').catch(() => {});
-    }
-  });
-
-  // Group selection
-  bot.action(/^share_post_group_(.+)$/, async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) {
-        await ctx.answerCbQuery('❌ No autorizado');
-        return;
-      }
-
-      const groupId = ctx.match[1];
-      const groupIds = ctx.session.temp?.sharePostData?.groupIds || [];
-
-      // Toggle group selection
-      const index = groupIds.indexOf(groupId);
-      if (index > -1) {
-        groupIds.splice(index, 1);
-      } else {
-        groupIds.push(groupId);
-      }
-
-      ctx.session.temp.sharePostData.groupIds = groupIds;
-      await ctx.saveSession();
-
-      await ctx.answerCbQuery(groupIds.includes(groupId) ? '✅ Grupo anadido' : '⬜ Grupo removido');
-      await showDestinationSelection(ctx);
-    } catch (error) {
-      logger.error('Error selecting group:', error);
+      logger.error('Error selecting destination:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
@@ -196,15 +129,10 @@ const registerImprovedSharePostHandlers = (bot) => {
         return;
       }
 
-      const destinations = await communityPostService.getPostingDestinations();
-      const channelIds = destinations.filter(d => d.destination_type === 'channel').map(d => d.telegram_id);
-      const groupIds = destinations.filter(d => d.destination_type === 'group').map(d => d.telegram_id);
-
-      ctx.session.temp.sharePostData.channelIds = channelIds;
-      ctx.session.temp.sharePostData.groupIds = groupIds;
+      ctx.session.temp.sharePostData.destinations = SHARE_DESTINATIONS.map(d => ({ ...d }));
       await ctx.saveSession();
 
-      await ctx.answerCbQuery('✅ Todos los ' + destinations.length + ' destinos seleccionados');
+      await ctx.answerCbQuery('✅ Todos seleccionados');
       await showDestinationSelection(ctx);
     } catch (error) {
       logger.error('Error selecting all destinations:', error);
@@ -221,8 +149,7 @@ const registerImprovedSharePostHandlers = (bot) => {
         return;
       }
 
-      ctx.session.temp.sharePostData.channelIds = [];
-      ctx.session.temp.sharePostData.groupIds = [];
+      ctx.session.temp.sharePostData.destinations = [];
       await ctx.saveSession();
 
       await ctx.answerCbQuery('⬜ Seleccion borrada');
@@ -235,58 +162,47 @@ const registerImprovedSharePostHandlers = (bot) => {
 
   // Helper function to show destination selection UI
   async function showDestinationSelection(ctx) {
-    const destinations = await communityPostService.getPostingDestinations();
-    const channelIds = ctx.session.temp?.sharePostData?.channelIds || [];
-    const groupIds = ctx.session.temp?.sharePostData?.groupIds || [];
+    const selectedDestinations = ctx.session.temp?.sharePostData?.destinations || [];
     const buttons = [];
 
-    // Separate channels and groups
-    const channels = destinations.filter(d => d.destination_type === 'channel');
-    const groups = destinations.filter(d => d.destination_type === 'group');
+    // Prime Channel section
+    buttons.push([Markup.button.callback('━━ Canal ━━', 'share_post_header_channel')]);
+    const primeChannel = SHARE_DESTINATIONS.find(d => d.id === 'prime');
+    const isPrimeSelected = selectedDestinations.some(d => d.id === 'prime');
+    buttons.push([
+      Markup.button.callback(
+        (isPrimeSelected ? '✅ ' : '⬜ ') + primeChannel.name,
+        'share_post_dest_prime'
+      ),
+    ]);
 
-    // Channel buttons
-    if (channels.length > 0) {
-      buttons.push([Markup.button.callback('━━ Canales ━━', 'share_post_channels_header')]);
-      for (const channel of channels) {
-        const isSelected = channelIds.includes(channel.telegram_id);
-        const prefix = isSelected ? '✅' : '⬜';
-        buttons.push([
-          Markup.button.callback(
-            prefix + ' ' + channel.icon + ' ' + channel.destination_name,
-            'share_post_channel_' + channel.telegram_id
-          ),
-        ]);
-      }
+    // Community Group Topics section
+    buttons.push([Markup.button.callback('━━ Comunidad (Topics) ━━', 'share_post_header_topics')]);
+    const topicDestinations = SHARE_DESTINATIONS.filter(d => d.type === 'topic');
+    for (const dest of topicDestinations) {
+      const isSelected = selectedDestinations.some(d => d.id === dest.id);
+      buttons.push([
+        Markup.button.callback(
+          (isSelected ? '✅ ' : '⬜ ') + dest.name,
+          'share_post_dest_' + dest.id
+        ),
+      ]);
     }
 
-    // Group buttons
-    if (groups.length > 0) {
-      buttons.push([Markup.button.callback('━━ Grupos ━━', 'share_post_groups_header')]);
-      for (const group of groups) {
-        const isSelected = groupIds.includes(group.telegram_id);
-        const prefix = isSelected ? '✅' : '⬜';
-        buttons.push([
-          Markup.button.callback(
-            prefix + ' ' + group.icon + ' ' + group.destination_name,
-            'share_post_group_' + group.telegram_id
-          ),
-        ]);
-      }
-    }
+    // Action buttons
+    buttons.push([Markup.button.callback('✅ Seleccionar Todo', 'share_post_select_all')]);
+    buttons.push([Markup.button.callback('⬜ Limpiar', 'share_post_clear_selection')]);
+    buttons.push([Markup.button.callback('➡️ Continuar', 'share_post_continue_to_media')]);
+    buttons.push([Markup.button.callback('❌ Cancelar', 'admin_cancel')]);
 
-    buttons.push([Markup.button.callback('✅ Select All', 'share_post_select_all')]);
-    buttons.push([Markup.button.callback('⬜ Clear Selection', 'share_post_clear_selection')]);
-    buttons.push([Markup.button.callback('➡️ Continue', 'share_post_continue_to_media')]);
-    buttons.push([Markup.button.callback('❌ Cancel', 'admin_cancel')]);
-
-    const selectedCount = channelIds.length + groupIds.length;
-    const message = '📤 *Compartir Publicacion*\n\n'
+    const selectedCount = selectedDestinations.length;
+    const message = '📤 *Compartir Publicación*\n\n'
       + '*Paso 1/6: Selecciona Destinos*\n\n'
       + 'Destinos seleccionados: *' + selectedCount + '*\n\n'
       + '━━━━━━━━━━━━━━━━━\n\n'
-      + '📢 *Canales:* ' + channelIds.length + ' seleccionados\n'
-      + '👥 *Grupos:* ' + groupIds.length + ' seleccionados\n\n'
-      + '💡 *Tip:* Selecciona multiples destinos para mayor alcance.';
+      + '💎 *Prime Channel:* Canal principal\n'
+      + '👥 *Comunidad:* Grupo con topics\n\n'
+      + '💡 Selecciona donde quieres publicar.';
 
     await ctx.editMessageText(message, {
       parse_mode: 'Markdown',
@@ -305,10 +221,9 @@ const registerImprovedSharePostHandlers = (bot) => {
         return;
       }
 
-      const channelIds = ctx.session.temp?.sharePostData?.channelIds || [];
-      const groupIds = ctx.session.temp?.sharePostData?.groupIds || [];
-      
-      if (channelIds.length === 0 && groupIds.length === 0) {
+      const destinations = ctx.session.temp?.sharePostData?.destinations || [];
+
+      if (destinations.length === 0) {
         await ctx.answerCbQuery('❌ Debes seleccionar al menos un destino');
         return;
       }
@@ -879,12 +794,13 @@ const registerImprovedSharePostHandlers = (bot) => {
     try {
       const postData = ctx.session.temp.sharePostData;
       const scheduledAt = postData.scheduledAt;
+      const destinations = postData.destinations || [];
 
       await ctx.reply(
-        '📅 *Publicacion Programada*\n\n'
+        '📅 *Publicación Programada*\n\n'
         + '🗓️ Fecha: ' + scheduledAt.toISOString().replace('T', ' ').substring(0, 16) + ' UTC\n'
-        + '📢 Destinos: ' + (postData.channelIds.length + postData.groupIds.length) + '\n\n'
-        + '✅ ¿Confirmar programacion?',
+        + '📢 Destinos: ' + destinations.length + '\n\n'
+        + '✅ ¿Confirmar programación?',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -928,9 +844,10 @@ const registerImprovedSharePostHandlers = (bot) => {
       }
 
       const postData = ctx.session.temp.sharePostData;
+      const destinations = postData.destinations || [];
 
       // Validate all required fields
-      if ((postData.channelIds.length === 0 && postData.groupIds.length === 0)) {
+      if (destinations.length === 0) {
         await ctx.answerCbQuery('❌ Debes seleccionar al menos un destino');
         return;
       }
@@ -942,75 +859,66 @@ const registerImprovedSharePostHandlers = (bot) => {
 
       await ctx.answerCbQuery('⏳ Enviando...');
 
-      const caption = buildPostCaption(postData);
       const kb = buildInlineKeyboard(postData.buttons);
 
       let sent = 0;
       let failed = 0;
 
-      // Send to groups using the service method
-      if (postData.groupIds.length > 0) {
-        const groups = await communityPostService.getCommunityGroups();
-        const targetGroups = groups.filter((g) => postData.groupIds.includes(g.telegram_group_id));
-        
-        if (targetGroups.length > 0) {
-          const groupResults = await communityPostService.sendPostToGroups(
-            {
-              post_id: 'immediate-' + Date.now(),
-              formatted_template_type: 'standard',
-              media_type: postData.mediaType,
-              telegram_file_id: postData.mediaFileId,
-              message_en: postData.text,
-              message_es: postData.text,
-              title: postData.text.substring(0, 100),
-            },
-            targetGroups,
-            ctx.telegram
-          );
-          sent += groupResults.successful;
-          failed += groupResults.failed;
-        }
-      }
+      // Send to each destination directly
+      for (const dest of destinations) {
+        try {
+          const options = {
+            parse_mode: 'Markdown',
+            reply_markup: kb.reply_markup,
+          };
 
-      // Send to channels using the service method
-      if (postData.channelIds.length > 0) {
-        const channelResults = await communityPostService.sendPostToChannels(
-          {
-            post_id: 'immediate-' + Date.now(),
-            formatted_template_type: 'standard',
-            media_type: postData.mediaType,
-            telegram_file_id: postData.mediaFileId,
-            message_en: postData.text,
-            message_es: postData.text,
-            title: postData.text.substring(0, 100),
-          },
-          postData.channelIds,
-          ctx.telegram
-        );
-        sent += channelResults.successful;
-        failed += channelResults.failed;
+          // Add thread_id for topics
+          if (dest.threadId) {
+            options.message_thread_id = dest.threadId;
+          }
+
+          if (postData.mediaType === 'photo' && postData.mediaFileId) {
+            await ctx.telegram.sendPhoto(dest.chatId, postData.mediaFileId, {
+              caption: postData.text,
+              ...options,
+            });
+          } else if (postData.mediaType === 'video' && postData.mediaFileId) {
+            await ctx.telegram.sendVideo(dest.chatId, postData.mediaFileId, {
+              caption: postData.text,
+              ...options,
+            });
+          } else {
+            await ctx.telegram.sendMessage(dest.chatId, postData.text, options);
+          }
+
+          sent++;
+          logger.info(`Post sent to ${dest.name} (${dest.chatId}${dest.threadId ? ', topic ' + dest.threadId : ''})`);
+        } catch (sendError) {
+          failed++;
+          logger.error(`Failed to send to ${dest.name}:`, sendError.message);
+        }
       }
 
       // Clear session
       ctx.session.temp = {};
       await ctx.saveSession();
 
-      const message = '✅ *Publicacion Enviada*\n\n'
-        + '📊 Destinos: ' + (postData.channelIds.length + postData.groupIds.length) + '\n'
+      const message = '✅ *Publicación Enviada*\n\n'
+        + '📊 Destinos: ' + destinations.length + '\n'
         + '✓ Enviados: ' + sent + '\n'
         + '✗ Fallidos: ' + failed;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback('📤 Nueva Publicacion', 'admin_improved_share_post')],
+          [Markup.button.callback('📤 Nueva Publicación', 'admin_improved_share_post')],
           [Markup.button.callback('⬅️ Panel Admin', 'admin_dashboard')],
         ]),
       });
 
       logger.info('Shared post sent now', {
         adminId: ctx.from.id,
-        destinations: postData.channelIds.length + postData.groupIds.length,
+        destinations: destinations.length,
         sent,
         failed,
       });
@@ -1033,9 +941,10 @@ const registerImprovedSharePostHandlers = (bot) => {
       }
 
       const postData = ctx.session.temp.sharePostData;
+      const destinations = postData.destinations || [];
 
       // Validate all required fields
-      if ((postData.channelIds.length === 0 && postData.groupIds.length === 0)) {
+      if (destinations.length === 0) {
         await ctx.answerCbQuery('❌ Debes seleccionar al menos un destino');
         return;
       }
@@ -1052,20 +961,25 @@ const registerImprovedSharePostHandlers = (bot) => {
 
       await ctx.answerCbQuery('⏳ Programando...');
 
+      // Extract channel and group IDs for compatibility with database
+      const channelDests = destinations.filter(d => d.type === 'channel');
+      const topicDests = destinations.filter(d => d.type === 'topic');
+
       // Create the post in database for scheduling
       const postId = await communityPostService.createCommunityPost({
         adminId: ctx.from.id,
         adminUsername: ctx.from.username || 'unknown',
         title: postData.text.substring(0, 100),
         messageEn: postData.text,
-        messageEs: postData.text, // For now, same for both languages
+        messageEs: postData.text,
         mediaType: postData.mediaType,
         mediaUrl: postData.mediaFileId,
         telegramFileId: postData.mediaFileId,
-        targetGroupIds: postData.groupIds,
-        targetChannelIds: postData.channelIds,
+        targetGroupIds: topicDests.map(d => d.chatId),
+        targetChannelIds: channelDests.map(d => d.chatId),
+        targetTopics: topicDests.map(d => ({ chatId: d.chatId, threadId: d.threadId, name: d.name })),
         targetAllGroups: false,
-        postToPrimeChannel: false,
+        postToPrimeChannel: channelDests.length > 0,
         templateType: 'standard',
         buttonLayout: 'single_row',
         scheduledAt: postData.scheduledAt,
@@ -1078,15 +992,15 @@ const registerImprovedSharePostHandlers = (bot) => {
       ctx.session.temp = {};
       await ctx.saveSession();
 
-      const message = '✅ *Publicacion Programada*\n\n'
+      const message = '✅ *Publicación Programada*\n\n'
         + '🗓️ Fecha: ' + postData.scheduledAt.toISOString().replace('T', ' ').substring(0, 16) + ' UTC\n'
-        + '📢 Destinos: ' + (postData.channelIds.length + postData.groupIds.length) + '\n'
+        + '📢 Destinos: ' + destinations.length + '\n'
         + '📝 ID: ' + postId;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback('📤 Nueva Publicacion', 'admin_improved_share_post')],
+          [Markup.button.callback('📤 Nueva Publicación', 'admin_improved_share_post')],
           [Markup.button.callback('⬅️ Panel Admin', 'admin_dashboard')],
         ]),
       });
@@ -1095,7 +1009,7 @@ const registerImprovedSharePostHandlers = (bot) => {
         adminId: ctx.from.id,
         postId,
         scheduledAt: postData.scheduledAt,
-        destinations: postData.channelIds.length + postData.groupIds.length,
+        destinations: destinations.length,
       });
     } catch (error) {
       logger.error('Error scheduling post:', error);

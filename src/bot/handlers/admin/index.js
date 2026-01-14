@@ -12,6 +12,7 @@ const GrokService = require('../../services/grokService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
+const sanitize = require('../../../utils/sanitizer');
 const broadcastUtils = require('../../utils/broadcastUtils');
 const performanceUtils = require('../../utils/performanceUtils');
 const uxUtils = require('../../utils/uxUtils');
@@ -497,8 +498,7 @@ async function showAdminPanel(ctx, edit = false) {
 
       // ═══ COMMUNITY POSTS ═══
       buttons.push([
-        Markup.button.callback('📤 ' + (lang === 'es' ? 'Compartir Publicación' : 'Share Post'), 'admin_share_post_to_groups'),
-        Markup.button.callback('✨ ' + (lang === 'es' ? 'Nueva Publicación' : 'New Post'), 'admin_improved_share_post'),
+        Markup.button.callback('📤 ' + (lang === 'es' ? 'Compartir Publicación' : 'Share Post'), 'admin_improved_share_post'),
       ]);
 
       // ═══ COMMUNITY REWARDS ═══
@@ -2692,8 +2692,9 @@ let registerAdminHandlers = (bot) => {
           await ctx.telegram.sendMessage(recipientId, message, { parse_mode: 'Markdown' });
 
           // Confirm to admin
+          const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
           let confirmText = '✅ **Mensaje Enviado**\n\n';
-          confirmText += `👤 Destinatario: ${user.firstName} ${user.lastName || ''}\n`;
+          confirmText += `👤 Destinatario: ${safeName}\n`;
           confirmText += `🆔 ID: ${recipientId}\n\n`;
           confirmText += '📨 El mensaje ha sido entregado correctamente.';
 
@@ -3549,8 +3550,9 @@ let registerAdminHandlers = (bot) => {
         await ctx.saveSession();
 
         // Show user info and type selection
+        const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
         let text = '✅ **Usuario Encontrado**\n\n';
-        text += `👤 ${user.firstName} ${user.lastName || ''}\n`;
+        text += `👤 ${safeName}\n`;
         text += `🆔 ${userId}\n`;
         text += `📧 ${user.email || 'Sin email'}\n`;
         text += `💎 Estado actual: ${user.subscriptionStatus || 'free'}\n`;
@@ -3595,8 +3597,9 @@ let registerAdminHandlers = (bot) => {
         return;
       }
 
+      const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
       let text = `📅 **Extender Membresía**\n\n`;
-      text += `👤 ${user.firstName} ${user.lastName || ''}\n`;
+      text += `👤 ${safeName}\n`;
       text += `💎 Status: ${user.subscriptionStatus}\n`;
       if (user.subscriptionExpiry) {
         text += `⏰ Expira: ${new Date(user.subscriptionExpiry).toLocaleDateString()}\n`;
@@ -3674,8 +3677,9 @@ let registerAdminHandlers = (bot) => {
       // Send PRIME confirmation with invite link to user
       await PaymentService.sendPrimeConfirmation(userId, planName, newExpiry, 'admin-extend');
 
+      const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
       let successText = `✅ **Membresía Extendida**\n\n`;
-      successText += `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`;
+      successText += `👤 Usuario: ${safeName}\n`;
       successText += `⏱️ Duración: ${durationText}\n`;
       if (newExpiry) {
         successText += `📅 Nueva fecha de vencimiento: ${newExpiry.toLocaleDateString()}\n`;
@@ -3750,8 +3754,9 @@ let registerAdminHandlers = (bot) => {
 
       const plans = await PlanModel.getAll();
 
+      const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
       let text = `💎 **Cambiar Plan de Usuario**\n\n`;
-      text += `👤 ${user.firstName} ${user.lastName || ''}\n`;
+      text += `👤 ${safeName}\n`;
       text += `📦 Plan Actual: ${user.planId || 'Ninguno'}\n`;
       text += `💎 Status: ${user.subscriptionStatus}\n\n`;
       text += `Selecciona el nuevo plan:\n`;
@@ -3828,8 +3833,9 @@ let registerAdminHandlers = (bot) => {
         await PaymentService.sendPrimeConfirmation(userId, planName, newExpiry, 'admin-plan-change');
       }
 
+      const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
       let successMsg = `✅ Plan actualizado exitosamente\n\n`
-        + `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`
+        + `👤 Usuario: ${safeName}\n`
         + `💎 Nuevo Plan: ${planId === 'free' ? 'Gratis' : planName}\n`
         + `📅 Estado: ${planId === 'free' ? 'free' : 'active'}`;
 
@@ -3899,10 +3905,12 @@ let registerAdminHandlers = (bot) => {
         return;
       }
 
+      const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
+
       if (type === 'courtesy') {
         // Show courtesy pass options
         let text = '🎁 **Pase de Cortesía**\n\n';
-        text += `👤 ${user.firstName} ${user.lastName || ''}\n`;
+        text += `👤 ${safeName}\n`;
         text += `🆔 ${userId}\n\n`;
         text += 'Selecciona la duración del pase de cortesía:';
 
@@ -3923,7 +3931,7 @@ let registerAdminHandlers = (bot) => {
         const plans = await PlanModel.getAll();
 
         let text = '💎 **Seleccionar Plan**\n\n';
-        text += `👤 ${user.firstName} ${user.lastName || ''}\n`;
+        text += `👤 ${safeName}\n`;
         text += `🆔 ${userId}\n\n`;
         text += 'Selecciona el plan a activar:';
 
@@ -4009,9 +4017,10 @@ let registerAdminHandlers = (bot) => {
 
       const lang = user.language || 'es';
       const durationText = days === 2 ? '2 días' : days === 7 ? '1 semana (7 días)' : '2 semanas (14 días)';
+      const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
 
       let successText = '✅ **Pase de Cortesía Activado**\n\n';
-      successText += `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`;
+      successText += `👤 Usuario: ${safeName}\n`;
       successText += `🆔 ID: ${userId}\n`;
       successText += `🎁 Tipo: Pase de Cortesía\n`;
       successText += `⏱️ Duración: ${durationText}\n`;
@@ -4172,9 +4181,10 @@ let registerAdminHandlers = (bot) => {
 
       const lang = user.language || 'es';
       const planName = lang === 'es' ? (plan.nameEs || plan.name) : plan.name;
+      const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
 
       let successText = '✅ **Membresía Activada**\n\n';
-      successText += `👤 Usuario: ${user.firstName} ${user.lastName || ''}\n`;
+      successText += `👤 Usuario: ${safeName}\n`;
       successText += `🆔 ID: ${userId}\n`;
       successText += `💎 Plan: ${planName}\n`;
       successText += `⏱️ Duración: ${plan.isLifetime || plan.duration >= 36500 ? 'Lifetime' : `${plan.duration} días`}\n`;
@@ -4336,8 +4346,9 @@ let registerAdminHandlers = (bot) => {
         return;
       }
 
+      const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
       let text = '🎁 **Activar Membresía**\n\n';
-      text += `👤 ${user.firstName} ${user.lastName || ''}\n`;
+      text += `👤 ${safeName}\n`;
       text += `🆔 ${userId}\n`;
       text += `📧 ${user.email || 'Sin email'}\n`;
       text += `💎 Estado actual: ${user.subscriptionStatus || 'free'}\n`;

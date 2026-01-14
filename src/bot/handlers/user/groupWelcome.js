@@ -156,9 +156,18 @@ async function processNewMember(ctx, member) {
 
 /**
  * Send welcome message with membership info
+ * Only sends once per user (tracked via ChatCleanupService)
  */
 async function sendWelcomeMessage(ctx, username, user, lang) {
   try {
+    const userId = user.userId;
+    
+    // Check if user has already received welcome message
+    if (ChatCleanupService.hasReceivedWelcome(userId)) {
+      logger.debug('Welcome message already sent to user', { userId });
+      return; // Skip if already welcomed
+    }
+
     const subscriptionStatus = user.subscriptionStatus === 'active' ? 'PRIME Member' : 'Free Member';
 
     const message = lang === 'es'
@@ -215,13 +224,17 @@ If you want the full experience:
 
     const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
 
-    // Auto-delete welcome message after 3 minutes
-    ChatCleanupService.scheduleDelete(ctx.telegram, ctx.chat.id, sentMessage.message_id, 'welcome', 3 * 60 * 1000);
+    // Use 1-minute auto-delete for temporary messages
+    ChatCleanupService.scheduleWelcomeMessage(ctx.telegram, sentMessage);
+
+    // Mark user as welcomed
+    ChatCleanupService.markWelcomeSent(userId);
 
     logger.info('Welcome message sent', {
       userId: user.userId,
       chatId: ctx.chat.id,
       language: lang,
+      firstTime: true,
     });
   } catch (error) {
     logger.error('Error sending welcome message:', error);
@@ -266,8 +279,8 @@ Pick your energy and get your first badge. It saves instantly.`;
 
     const sentMessage = await ctx.reply(message, keyboard);
 
-    // Auto-delete badge selection message after 3 minutes
-    ChatCleanupService.scheduleDelete(ctx.telegram, ctx.chat.id, sentMessage.message_id, 'badge-selection', 3 * 60 * 1000);
+    // Use 1-minute auto-delete for temporary messages
+    ChatCleanupService.scheduleMenuMessage(ctx.telegram, sentMessage);
 
     logger.info('Badge selection message sent', {
       chatId: ctx.chat.id,

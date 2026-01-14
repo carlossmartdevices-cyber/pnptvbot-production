@@ -93,9 +93,16 @@ const validateEpaycoPayload = (payload) => {
  * Validate Daimo webhook payload
  * Uses the official Daimo Pay webhook structure
  * @param {Object} payload - Webhook payload
- * @returns {Object} { valid: boolean, error?: string }
+ * @returns {Object} { valid: boolean, error?: string, isTestEvent?: boolean }
  */
 const validateDaimoPayload = (payload) => {
+  // Handle test events from Daimo's /api/webhook/test endpoint
+  // Test events have structure: { type, isTestEvent, paymentId, chainId, txHash, payment }
+  if (payload && payload.isTestEvent === true) {
+    logger.info('Daimo test event received', { type: payload.type, paymentId: payload.paymentId });
+    return { valid: true, isTestEvent: true };
+  }
+
   // Support two payload shapes:
   // 1) Official Daimo webhook structure (id, status, source, destination, metadata)
   // 2) Simplified test-friendly shape (transaction_id, status, metadata)
@@ -288,14 +295,15 @@ const handleDaimoWebhook = async (req, res) => {
       token: source?.tokenSymbol || 'USDC',
     });
 
-    // Verify webhook signature
-    const signature = req.headers['x-daimo-signature'];
-    const isValidSignature = DaimoService.verifyWebhookSignature(req.body, signature);
+    // Verify webhook authorization
+    // Daimo uses Authorization: Basic <token> header for webhook verification
+    const authHeader = req.headers['authorization'] || req.headers['x-daimo-signature'];
+    const isValidSignature = DaimoService.verifyWebhookSignature(req.body, authHeader);
 
     if (!isValidSignature) {
-      logger.error('Invalid Daimo webhook signature', {
+      logger.error('Invalid Daimo webhook authorization', {
         eventId: id,
-        hasSignature: !!signature,
+        hasAuthHeader: !!authHeader,
       });
       return res.status(401).json({ success: false, error: 'Invalid signature' });
     }
@@ -311,8 +319,15 @@ const handleDaimoWebhook = async (req, res) => {
         return res.status(400).json({ success: false, error: 'Invalid metadata structure' });
     }
 
-    // Process webhook with signature
-    const result = await PaymentService.processDaimoWebhook(req.body, signature);
+    // Handle test events - acknowledge without processing
+    if (validation.isTestEvent) {
+      markWebhookProcessed(idempotencyKey);
+      logger.info('Daimo test event acknowledged', { eventId: id });
+      return res.status(200).json({ success: true, testEvent: true });
+    }
+
+    // Process webhook with auth header
+    const result = await PaymentService.processDaimoWebhook(req.body, authHeader);
 
     if (result.success) {
       markWebhookProcessed(idempotencyKey);

@@ -99,45 +99,58 @@ class DaimoService {
   }
 
   /**
-   * Verify webhook signature from Daimo
-   * @param {Object} payload - Webhook payload
-   * @param {string} signature - Signature from x-daimo-signature header
-   * @returns {boolean} True if signature is valid
+   * Verify webhook authorization from Daimo
+   * Daimo uses Authorization: Basic <token> header for webhook verification
+   * @param {Object} payload - Webhook payload (unused but kept for API compatibility)
+   * @param {string} authHeader - Authorization header value (can be from x-daimo-signature or Authorization)
+   * @returns {boolean} True if authorization is valid
    */
-  verifyWebhookSignature(payload, signature) {
+  verifyWebhookSignature(payload, authHeader) {
     try {
       if (!this.webhookSecret) {
-        logger.warn('Daimo webhook secret not configured, skipping signature verification');
+        logger.warn('Daimo webhook secret not configured, skipping authorization verification');
         return true; // Allow in development, but log warning
       }
 
-      if (!signature) {
-        logger.error('Missing Daimo webhook signature');
+      if (!authHeader) {
+        logger.error('Missing Daimo webhook authorization');
         return false;
       }
 
-      // Create HMAC SHA-256 signature
-      const payloadString = JSON.stringify(payload);
-      const expectedSignature = crypto
-        .createHmac('sha256', this.webhookSecret)
-        .update(payloadString)
-        .digest('hex');
-
-      const isValid = crypto.timingSafeEqual(
-        Buffer.from(signature),
-        Buffer.from(expectedSignature)
-      );
-
-      if (!isValid) {
-        logger.error('Invalid Daimo webhook signature', {
-          received: signature.substring(0, 10) + '...',
-          expected: expectedSignature.substring(0, 10) + '...',
-        });
+      // Daimo sends Authorization: Basic <token>
+      // Extract token if it has "Basic " prefix
+      let receivedToken = authHeader;
+      if (authHeader.startsWith('Basic ')) {
+        receivedToken = authHeader.substring(6);
       }
 
-      return isValid;
+      // Compare tokens using timing-safe comparison
+      const expectedToken = this.webhookSecret;
+
+      try {
+        const isValid = crypto.timingSafeEqual(
+          Buffer.from(receivedToken),
+          Buffer.from(expectedToken)
+        );
+
+        if (!isValid) {
+          logger.error('Invalid Daimo webhook authorization token', {
+            receivedLength: receivedToken.length,
+            expectedLength: expectedToken.length,
+          });
+        }
+
+        return isValid;
+      } catch (bufferError) {
+        // If buffer lengths don't match, timingSafeEqual throws
+        logger.error('Daimo webhook token length mismatch', {
+          receivedLength: receivedToken.length,
+          expectedLength: expectedToken.length,
+        });
+        return false;
+      }
     } catch (error) {
-      logger.error('Error verifying Daimo webhook signature:', error);
+      logger.error('Error verifying Daimo webhook authorization:', error);
       return false;
     }
   }

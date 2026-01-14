@@ -33,7 +33,7 @@ class JitsiRoomModel {
             title = 'PNP.tv Jitsi Room',
             description,
             scheduledStartTime,
-            scheduledDuration = 60,
+            scheduledDuration = 120, // Default: 2 hours
             settings = {},
             isPublic = true,
             requiresPassword = false,

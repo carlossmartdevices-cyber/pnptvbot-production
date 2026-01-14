@@ -251,6 +251,9 @@ async function handleMenuCommand(ctx) {
       // Store the menu message ID to delete it later
       storeMenuMessage(ctx, sentMessage.message_id);
 
+      // Schedule auto-delete for menu message (1 minute)
+      ChatCleanupService.scheduleMenuMessage(ctx.telegram, sentMessage);
+
       // Also delete the /menu command message from user
       try {
         await ctx.deleteMessage();
@@ -277,6 +280,9 @@ async function handleMenuCommand(ctx) {
 
     // Store the new menu message ID
     storeMenuMessage(ctx, sentMessage.message_id);
+
+    // Schedule auto-delete for menu message (1 minute)
+    ChatCleanupService.scheduleMenuMessage(ctx.telegram, sentMessage);
 
     logger.info(`Main menu displayed for user ${ctx.from.id} in private chat`);
 

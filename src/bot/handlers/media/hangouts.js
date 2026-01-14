@@ -130,15 +130,19 @@ const showHangoutsMenu = async (ctx) => {
     const lang = getLanguage(ctx);
     const userId = ctx.from.id;
 
-    let text = `🎥 ${t('hangouts.title', lang)}\n\n`;
-    text += `${t('hangouts.description', lang)}\n\n`;
+    let text = `🎥 *Hangouts - Video Rooms*\n\n`;
+    text += `Connect with the community via video calls!\n\n`;
+    text += `✨ *Create rooms* - Up to 2 hours, 50 participants\n`;
+    text += `🏠 *Join main rooms* - Always open community spaces\n\n`;
 
     // Get active participants count in main room (room ID 1)
     try {
       const mainRoom = await MainRoomModel.getById(1);
       if (mainRoom && mainRoom.isActive) {
         const participants = await MainRoomModel.getParticipants(1);
-        text += `👥 ${t('hangouts.mainRoomActive', lang)}: ${participants.length} ${t('hangouts.participants', lang)}\n\n`;
+        if (participants.length > 0) {
+          text += `👥 Main Room: ${participants.length} online now\n\n`;
+        }
       }
     } catch (error) {
       // If room doesn't exist yet, skip showing count
@@ -146,16 +150,14 @@ const showHangoutsMenu = async (ctx) => {
     }
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('🏠 Join PNPtv! Main Rooms', 'hangouts_join_main')],
-      [
-        Markup.button.callback('➕ Create Private Room', 'hangouts_create_private'),
-        Markup.button.callback('🚪 Join Private Room', 'hangouts_join_private'),
-      ],
-      [Markup.button.callback('📱 My Active Rooms', 'hangouts_my_rooms')],
+      [Markup.button.callback('🏠 Join Main Rooms', 'hangouts_join_main')],
+      [Markup.button.callback('➕ Create Room (2 hours)', 'hangouts_create_private')],
+      [Markup.button.callback('🚪 Join Room', 'hangouts_join_private')],
+      [Markup.button.callback('📱 My Rooms', 'hangouts_my_rooms')],
       [Markup.button.callback(t('back', lang), 'back_to_main')],
     ]);
 
-    await ctx.editMessageText(text, keyboard);
+    await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
   } catch (error) {
     logger.error('Error in showHangoutsMenu:', error);
   }
@@ -324,6 +326,7 @@ const joinMainRoom = async (ctx, roomId = 1) => {
 
 /**
  * Create private room
+ * Anyone can create rooms with 2-hour duration
  */
 const createPrivateRoom = async (ctx) => {
   try {
@@ -332,33 +335,36 @@ const createPrivateRoom = async (ctx) => {
     const username = ctx.from.username || ctx.from.first_name;
 
     // Create private room using correct API
+    // Duration: 2 hours (no enforced limit, just for display)
     const result = await VideoCallModel.create({
       creatorId: userId,
       creatorName: username,
       title: `${username}'s Room`,
-      maxParticipants: 10,
+      maxParticipants: 50, // Increased from 10 to 50
       enforceCamera: false,
       allowGuests: true,
-      isPublic: false,
+      isPublic: true, // Make public so others can see and join
     });
 
     // Generate Jitsi Meet URL for private rooms (instead of Agora)
     // Use the channel name as the Jitsi room ID
-    const jitsiUrl = `${JITSI_MEET_URL}/${result.channelName}#config.prejoinPageEnabled=false&userInfo.displayName="${encodeURIComponent(username)}"`;
+    const jitsiUrl = `${JITSI_MEET_URL}/${result.channelName}#config.prejoinPageEnabled=false&userInfo.displayName=${encodeURIComponent(username)}`;
 
-    let text = `✅ Private Room Created!\n\n`;
-    text += `🎥 Room ID: \`${result.id}\`\n`;
-    text += `🔗 Share this ID with others to invite them\n\n`;
-    text += `💡 Click "Open Room" to join via Jitsi Meet\n`;
-    text += `🎯 Room: ${result.channelName}`;
+    let text = `✅ Room Created!\n\n`;
+    text += `🎥 Room: \`${result.channelName}\`\n`;
+    text += `⏱️ Duration: 2 hours\n`;
+    text += `👥 Max participants: 50\n\n`;
+    text += `🔗 Share this link with others to invite them:\n`;
+    text += `\`${jitsiUrl}\`\n\n`;
+    text += `💡 Click "Open Room" to start`;
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.url('🎥 Open Room (Jitsi)', jitsiUrl)],
+      [Markup.button.url('🎥 Open Room', jitsiUrl)],
       [Markup.button.callback('🚪 End Room', `hangouts_end_${result.id}`)],
       [Markup.button.callback('🔙 Back to Menu', 'hangouts_menu')],
     ]);
 
-    await ctx.editMessageText(text, keyboard);
+    await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
   } catch (error) {
     logger.error('Error in createPrivateRoom:', error);
     const lang = getLanguage(ctx);

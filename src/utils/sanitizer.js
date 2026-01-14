@@ -275,6 +275,18 @@ const sanitize = {
   },
 
   /**
+   * Escape special Markdown characters for Telegram
+   * @param {string} input - Raw text that may contain Markdown special characters
+   * @returns {string} Escaped text safe for Telegram Markdown
+   */
+  telegramMarkdown: (input) => {
+    if (!input) return '';
+
+    // Escape Telegram Markdown special characters: _ * [ ] ( ) ~ ` > # + - = | { } . !
+    return String(input).replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
+  },
+
+  /**
    * Sanitize object by applying sanitizers to each field
    * @param {Object.<string, *>} data - Raw object data
    * @param {Object.<string, string|{type: string, [key: string]: *}>} schema - Schema defining sanitizer for each field

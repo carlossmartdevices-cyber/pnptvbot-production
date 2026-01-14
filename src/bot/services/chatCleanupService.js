@@ -21,9 +21,17 @@ class ChatCleanupService {
   static botMessagesByChat = new Map();
 
   /**
-   * Cleanup delay in milliseconds (5 minutes)
+   * Welcome message tracking by user
+   * Key: userId
+   * Value: true (has received welcome)
+   */
+  static welcomeMessagesSent = new Map();
+
+  /**
+   * Cleanup delay in milliseconds (5 minutes default, 1 minute for temporary messages)
    */
   static CLEANUP_DELAY = 5 * 60 * 1000; // 5 minutes
+  static TEMPORARY_DELAY = 60 * 1000; // 1 minute for welcome/menu messages
 
   /**
    * Maximum number of messages to track per chat (prevent memory leaks)
@@ -134,9 +142,10 @@ class ChatCleanupService {
    * @param {Object} message - Sent message object
    * @param {number} delay - Delay in milliseconds
    * @param {boolean} isBroadcast - If true, don't schedule deletion (for important broadcasts)
+   * @param {boolean} isTemporary - If true, use 1-minute delay for temporary messages
    * @returns {number} Timeout ID
    */
-  static scheduleBotMessage(telegram, message, delay = this.CLEANUP_DELAY, isBroadcast = false) {
+  static scheduleBotMessage(telegram, message, delay = this.CLEANUP_DELAY, isBroadcast = false, isTemporary = false) {
     if (!message || !message.chat || !message.message_id) {
       return null;
     }
@@ -150,6 +159,11 @@ class ChatCleanupService {
       return null;
     }
 
+    // Use temporary delay for welcome/menu messages
+    if (isTemporary) {
+      delay = this.TEMPORARY_DELAY;
+    }
+
     return this.scheduleDelete(
       telegram,
       message.chat.id,
@@ -157,6 +171,26 @@ class ChatCleanupService {
       'bot',
       delay,
     );
+  }
+
+  /**
+   * Schedule deletion for a welcome message (1-minute auto-delete)
+   * @param {Object} telegram - Telegram bot instance
+   * @param {Object} message - Sent message object
+   * @returns {number} Timeout ID
+   */
+  static scheduleWelcomeMessage(telegram, message) {
+    return this.scheduleBotMessage(telegram, message, this.TEMPORARY_DELAY, false, true);
+  }
+
+  /**
+   * Schedule deletion for a menu interaction message (1-minute auto-delete)
+   * @param {Object} telegram - Telegram bot instance
+   * @param {Object} message - Sent message object
+   * @returns {number} Timeout ID
+   */
+  static scheduleMenuMessage(telegram, message) {
+    return this.scheduleBotMessage(telegram, message, this.TEMPORARY_DELAY, false, true);
   }
 
   /**
@@ -376,6 +410,31 @@ class ChatCleanupService {
   }
 
   /**
+   * Check if user has already received welcome message
+   * @param {number|string} userId - User ID
+   * @returns {boolean} Has received welcome
+   */
+  static hasReceivedWelcome(userId) {
+    return this.welcomeMessagesSent.has(userId);
+  }
+
+  /**
+   * Mark user as having received welcome message
+   * @param {number|string} userId - User ID
+   */
+  static markWelcomeSent(userId) {
+    this.welcomeMessagesSent.set(userId, true);
+    
+    // Cleanup old entries periodically
+    if (this.welcomeMessagesSent.size > 1000) {
+      // Keep only the most recent 1000 entries
+      const users = Array.from(this.welcomeMessagesSent.keys());
+      const toRemove = users.slice(0, users.length - 1000);
+      toRemove.forEach((id) => this.welcomeMessagesSent.delete(id));
+    }
+  }
+
+  /**
    * Get statistics about tracked bot messages
    * @returns {Object} Statistics
    */
@@ -392,6 +451,16 @@ class ChatCleanupService {
     }
 
     return stats;
+  }
+
+  /**
+   * Get welcome message statistics
+   * @returns {Object} Statistics
+   */
+  static getWelcomeStats() {
+    return {
+      totalUsersWelcomed: this.welcomeMessagesSent.size,
+    };
   }
 }
 
