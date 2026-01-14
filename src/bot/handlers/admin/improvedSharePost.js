@@ -500,6 +500,11 @@ const registerImprovedSharePostHandlers = (bot) => {
       const step = ctx.session.temp.sharePostStep;
       const text = ctx.message.text;
 
+      // Check if this is a command (starts with /) - if so, pass to other handlers
+      if (text && text.startsWith('/')) {
+        return next();
+      }
+
       if (step === 'ai_prompt') {
         const prompt = (text || '').trim();
         if (!prompt) return;
@@ -538,12 +543,15 @@ const registerImprovedSharePostHandlers = (bot) => {
         await ctx.saveSession();
 
         await showButtonSelectionStep(ctx);
+        return;
       }
-      return;
+      
+      // If we get here and it's not a handled step, pass to other handlers
+      return next();
     } catch (error) {
       logger.error('Error handling text input:', error);
       await ctx.reply('❌ Error al procesar el texto').catch(() => {});
-      return;
+      return next(); // Pass to other handlers even on error
     }
   });
 
@@ -678,6 +686,11 @@ const registerImprovedSharePostHandlers = (bot) => {
       const step = ctx.session.temp.sharePostStep;
       const text = ctx.message.text;
 
+      // Check if this is a command (starts with /) - if so, pass to other handlers
+      if (text && text.startsWith('/')) {
+        return next();
+      }
+
       if (step === 'custom_link') {
         const parts = (text || '').split('|').map(s => s.trim()).filter(Boolean);
         if (parts.length !== 2) {
@@ -698,10 +711,12 @@ const registerImprovedSharePostHandlers = (bot) => {
         await showButtonSelectionStep(ctx);
         return;
       }
-      return;
+      
+      // If we get here and it's not a handled step, pass to other handlers
+      return next();
     } catch (error) {
       logger.error('Error handling custom link input:', error);
-      return;
+      return next();
     }
   });
 
@@ -820,6 +835,12 @@ const registerImprovedSharePostHandlers = (bot) => {
       if (!isAdmin) return next();
 
       const dateTimeStr = ctx.message.text.trim();
+      
+      // Check if this is a command (starts with /) - if so, pass to other handlers
+      if (dateTimeStr && dateTimeStr.startsWith('/')) {
+        return next();
+      }
+
       const dateTimeRegex = /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2})$/;
 
       if (!dateTimeRegex.test(dateTimeStr)) {
@@ -849,7 +870,7 @@ const registerImprovedSharePostHandlers = (bot) => {
     } catch (error) {
       logger.error('Error handling datetime input:', error);
       await ctx.reply('❌ Error al procesar la fecha').catch(() => {});
-      return;
+      return next(); // Pass to other handlers even on error
     }
   });
 
