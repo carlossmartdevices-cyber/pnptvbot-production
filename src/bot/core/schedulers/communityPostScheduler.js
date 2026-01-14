@@ -88,6 +88,7 @@ class CommunityPostScheduler {
           p.post_to_prime_channel,
           p.post_to_groups,
           p.post_to_destinations,
+          p.target_channel_ids,
           p.video_file_size_mb,
           p.video_duration_seconds,
           p.uses_streaming,
@@ -149,11 +150,30 @@ class CommunityPostScheduler {
       const targetGroups = groups.filter((g) => post.target_group_ids.includes(g.group_id));
 
       // Send to all target groups
-      const results = await communityPostService.sendPostToGroups(
-        fullPost,
-        targetGroups,
-        this.bot
-      );
+      let groupResults = { successful: 0, failed: 0 };
+      if (targetGroups.length > 0) {
+        groupResults = await communityPostService.sendPostToGroups(
+          fullPost,
+          targetGroups,
+          this.bot
+        );
+      }
+
+      // Send to all target channels
+      let channelResults = { successful: 0, failed: 0 };
+      if (post.target_channel_ids && post.target_channel_ids.length > 0) {
+        channelResults = await communityPostService.sendPostToChannels(
+          fullPost,
+          post.target_channel_ids,
+          this.bot
+        );
+      }
+
+      // Combine results
+      const results = {
+        successful: groupResults.successful + channelResults.successful,
+        failed: groupResults.failed + channelResults.failed,
+      };
 
       logger.info('Post execution complete', {
         postId: post.post_id,

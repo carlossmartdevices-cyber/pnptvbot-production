@@ -28,7 +28,9 @@ class CommunityPostService {
         s3Bucket = null,
         telegramFileId = null,
         targetGroupIds = [],
+        targetChannelIds = [],
         targetAllGroups = false,
+        postToPrimeChannel = false,
         templateType = 'standard',
         buttonLayout = 'single_row',
         scheduledAt = null,
@@ -46,13 +48,13 @@ class CommunityPostService {
         INSERT INTO community_posts (
           admin_id, admin_username, title, message_en, message_es,
           media_type, media_url, s3_key, s3_bucket, telegram_file_id,
-          target_group_ids, target_all_groups,
+          target_group_ids, target_channel_ids, target_all_groups, post_to_prime_channel,
           formatted_template_type, button_layout,
           scheduled_at, timezone,
           is_recurring, recurrence_pattern, cron_expression, recurrence_end_date, max_occurrences,
           status, scheduled_count
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
         RETURNING *;
       `;
 
@@ -68,7 +70,9 @@ class CommunityPostService {
         s3Bucket,
         telegramFileId,
         targetGroupIds,
+        targetChannelIds,
         targetAllGroups,
+        postToPrimeChannel,
         templateType,
         buttonLayout,
         scheduledAt,
@@ -456,6 +460,120 @@ class CommunityPostService {
     } catch (error) {
       logger.error('Error sending post to group:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Send post to multiple channels
+   * @param {Object} post - Post object with details
+   * @param {Array} channelIds - Array of channel Telegram IDs
+   * @param {Object} bot - Telegraf bot instance
+   * @returns {Promise<Object>} Results summary
+   */
+  async sendPostToChannels(post, channelIds, bot) {
+    try {
+      const results = {
+        successful: 0,
+        failed: 0,
+        total: channelIds.length,
+        details: [],
+      };
+
+      for (const channelId of channelIds) {
+        try {
+          const result = await this.sendPostToChannel(post, bot, channelId, 'en');
+          results.details.push(result);
+
+          if (result.success) {
+            results.successful++;
+          } else {
+            results.failed++;
+          }
+        } catch (error) {
+          logger.error('Error sending post to channel:', { channelId, error: error.message });
+          results.failed++;
+          results.details.push({ success: false, channelId, error: error.message });
+        }
+      }
+
+      logger.info('Batch send to channels complete', {
+        postId: post.post_id,
+        results,
+      });
+
+      return results;
+    } catch (error) {
+      logger.error('Error sending post to channels:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send post to a single channel
+   * @param {Object} post - Post object with details
+   * @param {Object} bot - Telegraf bot instance
+   * @param {string} channelId - Telegram channel ID
+   * @param {string} messageLanguage - 'en' or 'es'
+   * @returns {Promise<Object>} Send result
+   */
+  async sendPostToChannel(post, bot, channelId, messageLanguage = 'en') {
+    try {
+      logger.info('Sending post to channel', { postId: post.post_id, channelId });
+
+      let message = this.formatMessage(
+        post.formatted_template_type,
+        messageLanguage === 'es' ? post.message_es : post.message_en,
+        post.title,
+        post.media_type
+      );
+
+      const buttons = await this.getButtonsForPost(post.post_id);
+      const markup = this.buildButtonKeyboard(buttons);
+
+      let messageId = null;
+      const options = {
+        parse_mode: 'Markdown',
+        ...(markup ? { reply_markup: markup } : {}),
+      };
+
+      // Send appropriate media type or text
+      if (post.media_type === 'photo' && post.telegram_file_id) {
+        const response = await bot.telegram.sendPhoto(channelId, post.telegram_file_id, {
+          caption: message,
+          ...options,
+        });
+        messageId = response.message_id;
+      } else if (post.media_type === 'video' && post.telegram_file_id) {
+        const response = await bot.telegram.sendVideo(channelId, post.telegram_file_id, {
+          caption: message,
+          ...options,
+        });
+        messageId = response.message_id;
+      } else {
+        // Text-only message
+        const response = await bot.telegram.sendMessage(channelId, message, options);
+        messageId = response.message_id;
+      }
+
+      await this.logChannelDelivery(post.post_id, channelId, 'sent', messageId);
+
+      logger.info('Post sent to channel', { postId: post.post_id, channelId, messageId });
+
+      return {
+        success: true,
+        channelId,
+        messageId,
+        postId: post.post_id,
+      };
+    } catch (error) {
+      logger.error('Error sending post to channel:', { postId: post.post_id, channelId, error: error.message });
+      await this.logChannelDelivery(post.post_id, channelId, 'failed', null, error.message);
+      return {
+        success: false,
+        channelId,
+        error: error.message,
+        postId: post.post_id,
+      };
     }
   }
 

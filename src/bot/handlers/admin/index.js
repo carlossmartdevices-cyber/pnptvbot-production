@@ -498,6 +498,7 @@ async function showAdminPanel(ctx, edit = false) {
       // ═══ COMMUNITY POSTS ═══
       buttons.push([
         Markup.button.callback('📤 ' + (lang === 'es' ? 'Compartir Publicación' : 'Share Post'), 'admin_share_post_to_groups'),
+        Markup.button.callback('✨ ' + (lang === 'es' ? 'Nueva Publicación' : 'New Post'), 'admin_improved_share_post'),
       ]);
 
       // ═══ COMMUNITY REWARDS ═══
@@ -556,6 +557,7 @@ const registerRadioManagementHandlers = require('./radioManagement');
 const registerLiveStreamManagementHandlers = require('./liveStreamManagement');
 const registerCommunityPremiumBroadcast = require('./communityPremiumBroadcast');
 const registerCommunityPostHandlers = require('./sharePostToCommunityGroup');
+const registerImprovedSharePostHandlers = require('./improvedSharePost');
 
 let registerAdminHandlers = (bot) => {
   logger.info('[DEBUG-INIT] registerAdminHandlers called - registering admin command handlers');
@@ -565,6 +567,7 @@ let registerAdminHandlers = (bot) => {
   registerLiveStreamManagementHandlers(bot);
   registerCommunityPremiumBroadcast(bot);
   registerCommunityPostHandlers(bot);
+  registerImprovedSharePostHandlers(bot);
 
   bot.action('admin_home', async (ctx) => {
     try {
