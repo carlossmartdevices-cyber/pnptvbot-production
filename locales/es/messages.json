@@ -38,6 +38,7 @@
   "settings": "⚙️ Configuración",
   "admin_panel": "🔐 Panel de Administración",
   "admin_only": "❌ Acceso denegado. Este comando es solo para administradores.",
+  "unauthorized": "❌ No autorizado. Se requiere acceso de administrador.",
   "broadcast_sent": "✅ Transmisión enviada a {count} usuarios",
   "broadcast_failed": "⚠️ Transmisión completada con {failed} fallos",
   "error_occurred": "❌ Ocurrió un error. Por favor intenta de nuevo más tarde.",
