@@ -4,7 +4,7 @@ const PlanModel = require('../../../models/planModel');
 const UserService = require('../../services/userService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
-const { getLanguage } = require('../../utils/helpers');
+const { getLanguage, safeReplyOrEdit } = require('../../utils/helpers');
 const DaimoConfig = require('../../../config/daimo');
 const registerActivationHandlers = require('./activation');
 
@@ -106,16 +106,13 @@ const registerPaymentHandlers = (bot) => {
           : '⚠️ **You already have an active subscription**\n\n'
             + 'You cannot purchase a new subscription while you have an active one.\n\n'
             + 'To avoid double payments, please wait until your current subscription expires or contact support to change your plan.';
-        
-        await ctx.editMessageText(
-          warningMsg,
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(t('back', lang), 'back_to_main')]
-            ])
-          }
-        );
+
+        await safeReplyOrEdit(ctx, warningMsg, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(t('back', lang), 'back_to_main')]
+          ])
+        });
         return;
       }
       
@@ -149,10 +146,10 @@ const registerPaymentHandlers = (bot) => {
 
       buttons.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
 
-      const sentMessage = await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
+      const sentMessage = await safeReplyOrEdit(ctx, message, Markup.inlineKeyboard(buttons));
 
       // Auto-delete after 30 seconds of inactivity (for group chats)
-      if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+      if (sentMessage && (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup')) {
         setTimeout(async () => {
           try {
             await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);

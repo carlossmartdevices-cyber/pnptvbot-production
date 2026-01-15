@@ -4,7 +4,7 @@ const UserService = require('../../services/userService');
 const UserModel = require('../../../models/userModel');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
-const { getLanguage, validateUserInput } = require('../../utils/helpers');
+const { getLanguage, validateUserInput, safeReplyOrEdit } = require('../../utils/helpers');
 
 /**
  * Profile handlers
@@ -1302,7 +1302,8 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
     }
 
     if (edit) {
-      await ctx.editMessageText(profileText, Markup.inlineKeyboard(keyboard));
+      // Use safeReplyOrEdit to handle both text and media message callbacks
+      await safeReplyOrEdit(ctx, profileText, Markup.inlineKeyboard(keyboard));
     } else {
       await ctx.reply(profileText, Markup.inlineKeyboard(keyboard));
     }

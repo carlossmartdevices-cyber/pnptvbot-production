@@ -1,6 +1,6 @@
 const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
-const { getLanguage } = require('../../utils/helpers');
+const { getLanguage, safeReplyOrEdit } = require('../../utils/helpers');
 const UserService = require('../../services/userService');
 const PermissionService = require('../../services/permissionService');
 
@@ -487,7 +487,7 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
 
 💡 *Tip:* More members enable location = more possible connections`;
 
-      const sentMessage = await ctx.editMessageText(nearbyText, {
+      const sentMessage = await safeReplyOrEdit(ctx, nearbyText, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.callback(lang === 'es' ? '🔙 Volver al Menú' : '🔙 Back to Menu', 'menu_main')],
@@ -495,13 +495,15 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
       });
 
       // Auto-delete after 30 seconds of inactivity
-      setTimeout(async () => {
-        try {
-          await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-        } catch (error) {
-          // Message may have already been deleted or chat may not allow deletion
-        }
-      }, 30000);
+      if (sentMessage) {
+        setTimeout(async () => {
+          try {
+            await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
+          } catch (error) {
+            // Message may have already been deleted or chat may not allow deletion
+          }
+        }, 30000);
+      }
     } catch (error) {
       logger.error('Error in nearby menu:', error);
     }

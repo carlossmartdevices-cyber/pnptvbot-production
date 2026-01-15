@@ -122,6 +122,50 @@ const clearSessionState = (ctx, stateKey = null) => {
   }
 };
 
+/**
+ * Check if the callback query message is a media message (photo, video, etc.)
+ * Media messages cannot use editMessageText - they need editMessageCaption or reply
+ * @param {Object} ctx - Telegraf context with callback_query
+ * @returns {boolean} True if the message contains media
+ */
+const isMediaMessage = (ctx) => {
+  const msg = ctx.callbackQuery?.message;
+  if (!msg) return false;
+
+  // Check for any media types
+  return !!(msg.photo || msg.video || msg.animation || msg.document ||
+            msg.audio || msg.voice || msg.video_note || msg.sticker);
+};
+
+/**
+ * Safely reply or edit a message based on whether the original is a media message
+ * If from broadcast (media), sends new message. If text message, edits in place.
+ * @param {Object} ctx - Telegraf context
+ * @param {string} text - Message text to send/edit
+ * @param {Object} options - Additional options (parse_mode, reply_markup, etc.)
+ * @returns {Promise<Object>} Sent or edited message
+ */
+const safeReplyOrEdit = async (ctx, text, options = {}) => {
+  // If this is a media message (like from a broadcast with photo/video),
+  // we can't use editMessageText - send a new message instead
+  if (isMediaMessage(ctx)) {
+    return ctx.reply(text, options);
+  }
+
+  // For text-only messages, edit in place for better UX
+  try {
+    return await ctx.editMessageText(text, options);
+  } catch (error) {
+    // Fallback to reply if edit fails for any reason
+    if (error.message?.includes('no text in the message to edit') ||
+        error.message?.includes('message is not modified') ||
+        error.message?.includes('message to edit not found')) {
+      return ctx.reply(text, options);
+    }
+    throw error;
+  }
+};
+
 module.exports = {
   getLanguage,
   safeHandler,
@@ -130,4 +174,6 @@ module.exports = {
   setSessionState,
   getSessionState,
   clearSessionState,
+  isMediaMessage,
+  safeReplyOrEdit,
 };
