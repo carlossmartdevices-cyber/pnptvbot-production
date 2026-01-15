@@ -259,7 +259,6 @@ const registerPaymentHandlers = (bot) => {
           ...Markup.inlineKeyboard([
             [Markup.button.callback(t('payWithEpayco', lang), `pay_epayco_${planId}`)],
             [Markup.button.callback(t('payWithDaimo', lang), `pay_daimo_${planId}`)],
-            [Markup.button.callback(t('payWithPayPal', lang), `pay_paypal_${planId}`)],
             [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
           ]),
         },
@@ -492,147 +491,8 @@ const registerPaymentHandlers = (bot) => {
       logger.error('Error creating Daimo payment:', error);
       const lang = getLanguage(ctx);
       const errorMsg = lang === 'es'
-        ? '❌ **Error al procesar el pago**\n\nOcurrió un error al crear tu pago con Daimo. Por favor intenta nuevamente o contacta soporte si el problema persiste.\n\n💡 *Sugerencia:* Puedes intentar con otro método de pago como ePayco o PayPal.'
-        : '❌ **Payment Processing Error**\n\nAn error occurred while creating your Daimo payment. Please try again or contact support if the problem persists.\n\n💡 *Tip:* You can try another payment method like ePayco or PayPal.';
-
-      await ctx.editMessageText(
-        errorMsg,
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
-          ]),
-        },
-      ).catch(() => {});
-    }
-  });
-
-  // Pay with PayPal
-  bot.action(/^pay_paypal_(.+)$/, async (ctx) => {
-    try {
-      await ctx.answerCbQuery();
-
-      // Validate match result exists
-      if (!ctx.match || !ctx.match[1]) {
-        logger.error('Invalid PayPal payment action format');
-        return;
-      }
-
-      const planId = ctx.match[1];
-      const lang = getLanguage(ctx);
-
-      // Validate user context exists
-      if (!ctx.from?.id) {
-        logger.error('Missing user context in PayPal payment');
-        await ctx.reply(t('error', lang));
-        return;
-      }
-
-      const userId = ctx.from.id;
-
-      // Double-check if user has active subscription before creating payment
-      // Skip this check if admin is in "View as Free" mode
-      const isAdminViewingAsFree = ctx.session?.adminViewMode === 'free';
-      const hasActiveSubscription = !isAdminViewingAsFree && await UserService.hasActiveSubscription(userId);
-
-      if (hasActiveSubscription) {
-        const warningMsg = lang === 'es'
-          ? '⚠️ **Ya tienes una suscripción activa**\n\n'
-            + 'No puedes realizar un nuevo pago mientras tengas una suscripción activa.\n\n'
-            + 'Esto evita pagos duplicados. Si deseas cambiar tu plan, contacta soporte.'
-          : '⚠️ **You already have an active subscription**\n\n'
-            + 'You cannot make a new payment while you have an active subscription.\n\n'
-            + 'This prevents double payments. If you want to change your plan, contact support.';
-
-        await ctx.editMessageText(
-          warningMsg,
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(t('back', lang), 'back_to_main')]
-            ])
-          }
-        );
-        return;
-      }
-
-      logger.info('Creating PayPal payment', { planId, userId });
-
-      await ctx.editMessageText(t('loading', lang));
-
-      // Get plan details for display
-      const plan = await PlanModel.getById(planId);
-      if (!plan) {
-        await ctx.editMessageText(
-          t('error', lang),
-          Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
-          ]),
-        );
-        return;
-      }
-
-      const result = await PaymentService.createPayment({
-        userId,
-        planId,
-        provider: 'paypal',
-      });
-
-      if (result.success) {
-        const message = lang === 'es'
-          ? '💳 *Paga con PayPal*\n\n'
-            + `Plan: ${plan.display_name || plan.name}\n`
-            + `Precio: $${plan.price} USD\n\n`
-            + 'Completa tu suscripción usando PayPal — rápido, seguro y confiable.\n\n'
-            + '💳 *PayPal acepta:*\n'
-            + '• Saldo de PayPal\n'
-            + '• Tarjetas de crédito y débito\n'
-            + '• Cuentas bancarias\n'
-            + '• Pago en 4 cuotas (donde esté disponible)\n\n'
-            + '✅ *Una vez confirmado tu pago, recibirás automáticamente:*\n'
-            + '• Tu mensaje de acceso PRIME\n'
-            + '• Tu factura\n'
-            + '• Tus instrucciones de onboarding\n\n'
-            + '💬 Si necesitas ayuda durante el checkout, escríbele a Cristina, nuestra asistente AI.'
-          : '💳 *Pay with PayPal*\n\n'
-            + `Plan: ${plan.display_name || plan.name}\n`
-            + `Price: $${plan.price} USD\n\n`
-            + 'Complete your subscription using PayPal — fast, secure, and reliable.\n\n'
-            + '💳 *PayPal accepts:*\n'
-            + '• PayPal balance\n'
-            + '• Credit and debit cards\n'
-            + '• Bank accounts\n'
-            + '• Pay in 4 installments (where available)\n\n'
-            + '✅ *Once your payment is confirmed, you\'ll automatically receive:*\n'
-            + '• Your PRIME access message\n'
-            + '• Your invoice\n'
-            + '• Your onboarding instructions\n\n'
-            + '💬 If you need help during checkout, just message Cristina, our AI assistant.';
-
-        await ctx.editMessageText(
-          message,
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.url('💰 Pay with PayPal', result.paymentUrl)],
-              [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
-            ]),
-          },
-        );
-      } else {
-        await ctx.editMessageText(
-          `${t('error', lang)}\n\n${result.error}`,
-          Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
-          ]),
-        );
-      }
-    } catch (error) {
-      logger.error('Error creating PayPal payment:', error);
-      const lang = getLanguage(ctx);
-      const errorMsg = lang === 'es'
-        ? '❌ **Error al procesar el pago**\n\nOcurrió un error al crear tu pago con PayPal. Por favor intenta nuevamente o contacta soporte si el problema persiste.\n\n💡 *Sugerencia:* Puedes intentar con otro método de pago como ePayco o Daimo.'
-        : '❌ **Payment Processing Error**\n\nAn error occurred while creating your PayPal payment. Please try again or contact support if the problem persists.\n\n💡 *Tip:* You can try another payment method like ePayco or Daimo.';
+        ? '❌ **Error al procesar el pago**\n\nOcurrió un error al crear tu pago con Daimo. Por favor intenta nuevamente o contacta soporte si el problema persiste.\n\n💡 *Sugerencia:* Puedes intentar con otro método de pago como ePayco.'
+        : '❌ **Payment Processing Error**\n\nAn error occurred while creating your Daimo payment. Please try again or contact support if the problem persists.\n\n💡 *Tip:* You can try another payment method like ePayco.';
 
       await ctx.editMessageText(
         errorMsg,
