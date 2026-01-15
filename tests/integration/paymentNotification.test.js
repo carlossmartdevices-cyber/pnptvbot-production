@@ -19,12 +19,9 @@ const mockTelegraf = {
   },
 };
 
-jest.mock('telegraf', () => {
-  return {
-    __esModule: true,
-    default: jest.fn().mockImplementation(() => mockTelegraf),
-  };
-});
+jest.mock('telegraf', () => ({
+  Telegraf: jest.fn().mockImplementation(() => mockTelegraf),
+}));
 
 describe('Payment Notification Integration Tests', () => {
   beforeEach(() => {

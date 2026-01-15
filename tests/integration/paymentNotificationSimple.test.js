@@ -15,15 +15,15 @@ const mockCreateChatInviteLink = jest.fn().mockResolvedValue({
   invite_link: 'https://t.me/test_invite_link',
 });
 
-// Mock the Telegraf constructor
-jest.mock('telegraf', () => {
-  return jest.fn().mockImplementation(() => ({
+// Mock the Telegraf constructor (named export)
+jest.mock('telegraf', () => ({
+  Telegraf: jest.fn().mockImplementation(() => ({
     telegram: {
       createChatInviteLink: mockCreateChatInviteLink,
       sendMessage: mockSendMessage,
     },
-  }));
-});
+  })),
+}));
 
 describe('Payment Notification Simple Tests', () => {
   beforeEach(() => {
