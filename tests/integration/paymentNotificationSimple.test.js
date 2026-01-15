@@ -71,7 +71,7 @@ describe('Payment Notification Simple Tests', () => {
           display_name: 'PRIME Annual',
           name: 'Premium Annual',
         },
-        transactionId: 'paypal_789',
+        transactionId: 'txn_789',
         amount: 99.99,
         expiryDate: new Date('2026-12-31'),
         language: 'en',

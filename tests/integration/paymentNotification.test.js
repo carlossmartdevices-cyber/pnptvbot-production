@@ -86,45 +86,6 @@ describe('Payment Notification Integration Tests', () => {
       expect(callArgs[1]).toContain('https://t.me/test_invite_link'); // Invite link
     });
 
-    it('should send Telegram notification for PayPal payment', async () => {
-      // Mock UserModel.getById
-      UserModel.getById.mockResolvedValue({
-        id: 'user_456',
-        first_name: 'John',
-        language: 'en',
-      });
-
-      const result = await PaymentService.sendPaymentConfirmationNotification({
-        userId: 'user_456',
-        plan: {
-          id: 'plan_456',
-          display_name: 'PRIME Annual',
-          name: 'Premium Annual',
-        },
-        transactionId: 'paypal_789',
-        amount: 99.99,
-        expiryDate: new Date('2026-12-31'),
-        language: 'en',
-      });
-
-      expect(result).toBe(true);
-
-      // Verify that Telegram bot was used to send the message
-      const Telegraf = require('telegraf');
-      expect(Telegraf).toHaveBeenCalledWith('test_bot_token');
-
-      // Verify that sendMessage was called
-      expect(mockTelegraf.telegram.sendMessage).toHaveBeenCalled();
-
-      // Verify the message content (English version)
-      const callArgs = mockTelegraf.telegram.sendMessage.mock.calls[0];
-      expect(callArgs[0]).toBe('user_456'); // User ID
-      expect(callArgs[1]).toContain('🎉 *Payment Confirmed!*'); // English confirmation
-      expect(callArgs[1]).toContain('PRIME Annual'); // Plan name
-      expect(callArgs[1]).toContain('$99.99 USD'); // Amount
-      expect(callArgs[1]).toContain('paypal_789'); // Transaction ID
-    });
-
     it('should send Telegram notification for Daimo payment', async () => {
       // Mock UserModel.getById
       UserModel.getById.mockResolvedValue({

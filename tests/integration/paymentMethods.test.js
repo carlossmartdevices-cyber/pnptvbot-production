@@ -2,14 +2,12 @@ const PaymentService = require('../../src/bot/services/paymentService');
 const PlanModel = require('../../src/models/planModel');
 const PaymentModel = require('../../src/models/paymentModel');
 const UserModel = require('../../src/models/userModel');
-const PayPalService = require('../../src/bot/services/paypalService');
 const DaimoService = require('../../src/bot/services/daimoService');
 
 // Mock all external dependencies BEFORE importing PaymentService
 jest.mock('../../src/models/planModel');
 jest.mock('../../src/models/paymentModel');
 jest.mock('../../src/models/userModel');
-jest.mock('../../src/bot/services/paypalService');
 jest.mock('../../src/bot/services/daimoService');
 
 describe('Payment Methods Integration Tests', () => {
@@ -21,8 +19,6 @@ describe('Payment Methods Integration Tests', () => {
     process.env.BOT_WEBHOOK_DOMAIN = 'https://test.easybots.store';
     process.env.EPAYCO_PUBLIC_KEY = 'test_public_key';
     process.env.DAIMO_API_KEY = 'test_daimo_key';
-    process.env.PAYPAL_CLIENT_ID = 'test_paypal_client_id';
-    process.env.PAYPAL_CLIENT_SECRET = 'test_paypal_secret';
   });
 
   describe('ePayco Payment Method', () => {
@@ -154,139 +150,6 @@ describe('Payment Methods Integration Tests', () => {
         reference: 'ref_123',
         epayco_ref: 'ref_123',
       });
-    });
-  });
-
-  describe('PayPal Payment Method', () => {
-    it('should create PayPal payment successfully', async () => {
-      // Mock PlanModel.getById
-      PlanModel.getById.mockResolvedValue({
-        id: 'plan_456',
-        name: 'Premium',
-        price: 10,
-        currency: 'USD',
-        duration: 30,
-        active: true,
-      });
-
-      // Mock PaymentModel.create
-      PaymentModel.create.mockResolvedValue({
-        id: 'pay_456',
-        userId: 456,
-        planId: 'plan_456',
-        amount: 10,
-        currency: 'USD',
-        provider: 'paypal',
-      });
-
-      // Mock PayPalService.createOrder
-      PayPalService.createOrder.mockResolvedValue({
-        success: true,
-        orderId: 'order_123',
-        approvalUrl: 'https://paypal.com/checkout/order_123',
-      });
-
-      // Mock PaymentModel.updateStatus
-      PaymentModel.updateStatus.mockResolvedValue(true);
-
-      const result = await PaymentService.createPayment({
-        userId: 456,
-        planId: 'plan_456',
-        provider: 'paypal',
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.paymentUrl).toBe('https://paypal.com/checkout/order_123');
-      expect(result.paymentId).toBe('pay_456');
-      expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_456', 'pending', {
-        paymentUrl: 'https://paypal.com/checkout/order_123',
-        provider: 'paypal',
-        paypal_order_id: 'order_123',
-      });
-    });
-
-    it('should handle PayPal payment failure with fallback', async () => {
-      // Mock PlanModel.getById
-      PlanModel.getById.mockResolvedValue({
-        id: 'plan_456',
-        name: 'Premium',
-        price: 10,
-        currency: 'USD',
-        duration: 30,
-        active: true,
-      });
-
-      // Mock PaymentModel.create
-      PaymentModel.create.mockResolvedValue({
-        id: 'pay_456',
-        userId: 456,
-        planId: 'plan_456',
-        amount: 10,
-        currency: 'USD',
-        provider: 'paypal',
-      });
-
-      // Mock PayPalService.createOrder to fail
-      PayPalService.createOrder.mockRejectedValue(new Error('PayPal API error'));
-
-      // Mock PaymentModel.updateStatus
-      PaymentModel.updateStatus.mockResolvedValue(true);
-
-      const result = await PaymentService.createPayment({
-        userId: 456,
-        planId: 'plan_456',
-        provider: 'paypal',
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.paymentUrl).toContain('paypal-checkout/pay_456');
-      expect(result.paymentId).toBe('pay_456');
-      expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_456', 'pending', {
-        paymentUrl: expect.stringContaining('paypal-checkout/pay_456'),
-        provider: 'paypal',
-        fallback: true,
-      });
-    });
-
-    it('should handle PayPal not being configured gracefully', async () => {
-      // This test verifies that the system handles PayPal not being configured
-      // Set PayPal to not configured
-      process.env.PAYPAL_CLIENT_ID = '';
-      process.env.PAYPAL_CLIENT_SECRET = '';
-
-      // Test that it doesn't crash when creating PayPal payment
-      // Mock PlanModel.getById
-      PlanModel.getById.mockResolvedValue({
-        id: 'plan_456',
-        name: 'Premium',
-        price: 10,
-        currency: 'USD',
-        duration: 30,
-        active: true,
-      });
-
-      // Mock PaymentModel.create
-      PaymentModel.create.mockResolvedValue({
-        id: 'pay_456',
-        userId: 456,
-        planId: 'plan_456',
-        amount: 10,
-        currency: 'USD',
-        provider: 'paypal',
-      });
-
-      // Mock PaymentModel.updateStatus
-      PaymentModel.updateStatus.mockResolvedValue(true);
-
-      const result = await PaymentService.createPayment({
-        userId: 456,
-        planId: 'plan_456',
-        provider: 'paypal',
-      });
-
-      // Should fall back to checkout page when PayPal is not configured
-      expect(result.success).toBe(true);
-      expect(result.paymentUrl).toContain('paypal-checkout/pay_456');
     });
   });
 

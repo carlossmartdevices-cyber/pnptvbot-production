@@ -104,8 +104,3 @@ describe('handleEpaycoWebhook', () => {
     jest.useRealTimers();
   });
 });
-jest.mock('../src/bot/services/paypalService', () => ({
-  createOrder: jest.fn(),
-  verifyWebhook: jest.fn(),
-  getClient: jest.fn(),
-}));
