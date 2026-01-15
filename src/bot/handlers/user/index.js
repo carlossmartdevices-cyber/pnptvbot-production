@@ -5,6 +5,7 @@ const nearbyHandlers = require('./nearby');
 const settingsHandlers = require('./settings');
 const groupWelcomeHandlers = require('./groupWelcome');
 const { registerAgeVerificationHandlers } = require('./ageVerificationHandler');
+const lifetimeMigrationHandlers = require('./lifetimeMigration');
 
 /**
  * Register all user handlers
@@ -18,6 +19,7 @@ const registerUserHandlers = (bot) => {
   nearbyHandlers(bot);
   settingsHandlers(bot);
   groupWelcomeHandlers(bot);
+  lifetimeMigrationHandlers(bot);
 };
 
 module.exports = registerUserHandlers;
