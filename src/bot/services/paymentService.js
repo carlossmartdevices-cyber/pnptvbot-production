@@ -272,27 +272,30 @@ class PaymentService {
     const signature = webhookData.x_signature;
     if (!signature) return false;
 
-    const secret = process.env.EPAYCO_PRIVATE_KEY;
-    if (!secret) {
+    // ePayco uses p_key for signature verification, not the private key
+    const pKey = process.env.EPAYCO_P_KEY;
+    if (!pKey) {
       if (process.env.NODE_ENV === 'production') {
-        throw new Error('EPAYCO_PRIVATE_KEY must be configured in production');
+        throw new Error('EPAYCO_P_KEY must be configured in production');
       }
       // In non-production allow bypass for testing/dev
       return true;
     }
 
     // Expected signature string per ePayco documentation:
-    // SHA256(x_cust_id_cliente^secret^x_ref_payco^x_transaction_id^x_amount)
-    const { x_cust_id_cliente, x_ref_payco, x_transaction_id, x_amount } = webhookData;
+    // SHA256(x_cust_id_cliente^p_key^x_ref_payco^x_transaction_id^x_amount^x_currency_code)
+    const { x_cust_id_cliente, x_ref_payco, x_transaction_id, x_amount, x_currency_code } = webhookData;
     const signatureParts = [
       x_cust_id_cliente || '',
-      secret,
+      pKey,
       x_ref_payco || '',
       x_transaction_id || '',
       x_amount || '',
+      x_currency_code || '',
     ];
     const signatureString = signatureParts.join('^');
-    const expected = crypto.createHmac('sha256', secret).update(signatureString).digest('hex');
+    // ePayco uses SHA256 hash (not HMAC)
+    const expected = crypto.createHash('sha256').update(signatureString).digest('hex');
     return expected === signature;
   }
 

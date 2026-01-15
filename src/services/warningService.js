@@ -124,10 +124,13 @@ class WarningService {
    */
   static async recordAction({ userId, adminId, action, reason, duration, groupId }) {
     try {
+      // Calculate expires_at from duration (duration is in milliseconds)
+      const expiresAt = duration ? new Date(Date.now() + duration) : null;
+
       await query(
-        `INSERT INTO moderation_actions (user_id, admin_id, action, reason, duration, group_id, created_at)
+        `INSERT INTO moderation_actions (user_id, moderator_id, action_type, reason, expires_at, group_id, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-        [userId.toString(), adminId.toString(), action, reason, duration, groupId.toString()]
+        [userId.toString(), adminId.toString(), action, reason, expiresAt, groupId.toString()]
       );
 
       logger.info('Moderation action recorded', { userId, adminId, action, reason });
@@ -148,8 +151,8 @@ class WarningService {
         `SELECT * FROM moderation_actions
          WHERE user_id = $1
          AND group_id = $2
-         AND action = 'mute'
-         AND (created_at + duration * interval '1 millisecond') > NOW()
+         AND action_type = 'mute'
+         AND expires_at > NOW()
          ORDER BY created_at DESC
          LIMIT 1`,
         [userId.toString(), groupId.toString()]
@@ -160,13 +163,14 @@ class WarningService {
       }
 
       const mute = result.rows[0];
-      const expiresAt = new Date(new Date(mute.created_at).getTime() + parseInt(mute.duration));
+      const expiresAt = new Date(mute.expires_at);
+      const duration = expiresAt.getTime() - new Date(mute.created_at).getTime();
 
       return {
         isMuted: true,
         reason: mute.reason,
         expiresAt,
-        duration: mute.duration,
+        duration,
       };
     } catch (error) {
       logger.error('Error checking mute status:', error);
@@ -183,14 +187,14 @@ class WarningService {
    */
   static async unmute(userId, adminId, groupId) {
     try {
-      // Set duration to 0 to expire the mute immediately
+      // Set expires_at to NOW() to expire the mute immediately
       await query(
         `UPDATE moderation_actions
-         SET duration = 0
+         SET expires_at = NOW(), updated_at = NOW()
          WHERE user_id = $1
          AND group_id = $2
-         AND action = 'mute'
-         AND (created_at + duration * interval '1 millisecond') > NOW()`,
+         AND action_type = 'mute'
+         AND expires_at > NOW()`,
         [userId.toString(), groupId.toString()]
       );
 
@@ -235,13 +239,14 @@ class WarningService {
       await query(`
         CREATE TABLE IF NOT EXISTS moderation_actions (
           id SERIAL PRIMARY KEY,
-          user_id VARCHAR(255) NOT NULL,
-          admin_id VARCHAR(255) NOT NULL,
-          action VARCHAR(50) NOT NULL,
+          user_id BIGINT NOT NULL,
+          group_id BIGINT,
+          action_type VARCHAR(50) NOT NULL,
           reason TEXT,
-          duration BIGINT,
-          group_id VARCHAR(255) NOT NULL,
-          created_at TIMESTAMP DEFAULT NOW()
+          moderator_id BIGINT,
+          expires_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `);
 
