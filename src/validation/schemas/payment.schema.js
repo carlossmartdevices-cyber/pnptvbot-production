@@ -36,10 +36,10 @@ const schemas = {
    * Payment provider validation
    */
   provider: Joi.string()
-    .valid('daimo', 'epayco', 'paypal')
+    .valid('daimo', 'epayco')
     .required()
     .messages({
-      'any.only': 'Payment provider must be one of: daimo, epayco, paypal',
+      'any.only': 'Payment provider must be one of: daimo, epayco',
       'any.required': 'Payment provider is required',
     }),
 
@@ -91,7 +91,7 @@ const schemas = {
     userId: Joi.string().pattern(/^\d+$/).required(),
     planId: Joi.string().pattern(/^[a-z0-9_-]+$/).required(),
     amount: Joi.number().positive().precision(2).required(),
-    provider: Joi.string().valid('daimo', 'epayco', 'paypal').required(),
+    provider: Joi.string().valid('daimo', 'epayco').required(),
     currency: Joi.string().valid('USD', 'COP', 'USDC').default('USD'),
     metadata: Joi.object().optional(),
   }),
@@ -134,7 +134,7 @@ const schemas = {
   paymentQuery: Joi.object({
     userId: Joi.string().pattern(/^\d+$/).optional(),
     status: Joi.string().valid('pending', 'completed', 'failed', 'refunded', 'cancelled').optional(),
-    provider: Joi.string().valid('daimo', 'epayco', 'paypal').optional(),
+    provider: Joi.string().valid('daimo', 'epayco').optional(),
     startDate: Joi.date().iso().optional(),
     endDate: Joi.date().iso().min(Joi.ref('startDate')).optional(),
     minAmount: Joi.number().positive().optional(),

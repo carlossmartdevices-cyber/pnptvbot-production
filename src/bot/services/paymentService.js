@@ -11,7 +11,6 @@ const { Telegraf } = require('telegraf');
 const DaimoService = require('./daimoService');
 const DaimoConfig = require('../../config/daimo');
 const PaymentNotificationService = require('./paymentNotificationService');
-const PayPalService = require('./paypalService');
 const MessageTemplates = require('./messageTemplates');
 
 class PaymentService {
@@ -199,48 +198,6 @@ class PaymentService {
             fallback: true, // Mark as fallback for tracking
           });
           logger.info('Daimo fallback checkout page created', {
-            paymentId: payment.id,
-            paymentUrl,
-          });
-        }
-      } else if (provider === 'paypal') {
-        // Create PayPal order using SDK
-        try {
-          const returnUrl = `${webhookDomain}/api/payment-response?status=success&payment_id=${payment.id}`;
-          const cancelUrl = `${webhookDomain}/api/payment-response?status=cancelled&payment_id=${payment.id}`;
-
-          const orderResult = await PayPalService.createOrder({
-            paymentId: payment.id,
-            amount: plan.price,
-            planName: plan.display_name || plan.name,
-            returnUrl,
-            cancelUrl,
-          });
-
-          if (orderResult.success && orderResult.approvalUrl) {
-            paymentUrl = orderResult.approvalUrl;
-            await PaymentModel.updateStatus(payment.id, 'pending', {
-              paymentUrl,
-              provider,
-              paypal_order_id: orderResult.orderId,
-            });
-          } else {
-            throw new Error('PayPal order creation failed');
-          }
-        } catch (paypalError) {
-          logger.error('PayPal API error, using fallback checkout page:', {
-            error: paypalError.message,
-            paymentId: payment.id,
-          });
-          // Fallback to checkout page when SDK fails
-          // This ensures users can still complete payment even if the direct SDK integration fails
-          paymentUrl = `${webhookDomain}/paypal-checkout/${payment.id}`;
-          await PaymentModel.updateStatus(payment.id, 'pending', {
-            paymentUrl,
-            provider,
-            fallback: true, // Mark as fallback for tracking
-          });
-          logger.info('PayPal fallback checkout page created', {
             paymentId: payment.id,
             paymentUrl,
           });

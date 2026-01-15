@@ -191,11 +191,6 @@ app.get('/daimo-checkout/:paymentId', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', 'daimo-checkout.html'));
 });
 
-// PayPal Checkout page - serves paypal-checkout.html for /paypal-checkout
-app.get('/paypal-checkout', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public', 'paypal-checkout.html'));
-});
-
 // Payment checkout page with language support
 app.get('/payment/:paymentId', (req, res) => {
   // Get language from query parameter (e.g., ?lang=en)
@@ -311,16 +306,11 @@ app.get('/health', async (req, res) => {
 // API routes
 app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
 app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
-app.post('/api/webhooks/paypal', webhookLimiter, webhookController.handlePayPalWebhook);
 app.get('/api/payment-response', webhookController.handlePaymentResponse);
 
 // Payment API routes
 app.get('/api/payment/:paymentId', asyncHandler(paymentController.getPaymentInfo));
 app.get('/api/confirm-payment/:token', asyncHandler(paymentController.confirmPaymentToken));
-
-// PayPal API routes
-app.post('/api/paypal/create-order', asyncHandler(paymentController.createPayPalOrder));
-app.post('/api/paypal/capture-order', asyncHandler(paymentController.capturePayPalOrder));
 
 // Group Invitation routes
 app.get('/api/join-group/:token', asyncHandler(invitationController.verifyGroupInvitation));

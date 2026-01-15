@@ -13,7 +13,7 @@ class ConfirmationTokenService {
    * @param {string} params.paymentId - Payment ID
    * @param {string} params.userId - User ID
    * @param {string} params.planId - Plan ID
-   * @param {string} params.provider - Payment provider (paypal, daimo, epayco)
+   * @param {string} params.provider - Payment provider (daimo, epayco)
    * @returns {Promise<string>} Generated token
    */
   static async generateToken({ paymentId, userId, planId, provider }) {

@@ -108,15 +108,13 @@ Choose your plan and get instant access to all premium features:
     paymentMethod: 'Choose payment method:',
     payWithEpayco: '💳 Pay with Debit/Credit Card',
     payWithDaimo: '🪙 Pay with Crypto and Payment Apps',
-    payWithPayPal: '💰 Pay with PayPal',
     paymentFooter: '',
     paymentInstructions: '💳 *Payment Instructions*\n\n'
       + 'Please tap the button below to go to the checkout page.\n'
       + 'There you\'ll be able to review the price, plan details, and all benefits included before confirming your purchase.\n\n'
       + 'After confirming, you will be redirected to ePayco\'s secure payment gateway, where you can pay using:\n\n'
       + '• Debit card\n'
-      + '• Credit card\n'
-      + '• PayPal (via integrated checkout)\n\n'
+      + '• Credit card\n\n'
       + '*Please remember:*\n\n'
       + '• The charge will appear on your bank statement as Easy Bots\n'
       + '• You can review our Terms, Conditions, and Refund Policy at:\n'
@@ -626,15 +624,13 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
     paymentMethod: 'Elige método de pago:',
     payWithEpayco: '💳 Pagar con Tarjeta Débito/Crédito',
     payWithDaimo: '🪙 Pagar con Crypto y Apps de Pago',
-    payWithPayPal: '💰 Pagar con PayPal',
     paymentFooter: '',
     paymentInstructions: '💳 *Instrucciones de Pago*\n\n'
       + 'Por favor toca el botón de abajo para ir a la página de checkout.\n'
       + 'Ahí podrás revisar el precio, los detalles del plan y todos los beneficios incluidos antes de confirmar tu compra.\n\n'
       + 'Después de confirmar, serás redirigido a la pasarela de pago segura de ePayco, donde puedes pagar usando:\n\n'
       + '• Tarjeta de débito\n'
-      + '• Tarjeta de crédito\n'
-      + '• PayPal (vía checkout integrado)\n\n'
+      + '• Tarjeta de crédito\n\n'
       + '*Por favor recuerda:*\n\n'
       + '• El cargo aparecerá en tu estado de cuenta bancario como Easy Bots\n'
       + '• Puedes revisar nuestros Términos, Condiciones y Política de Reembolso en:\n'

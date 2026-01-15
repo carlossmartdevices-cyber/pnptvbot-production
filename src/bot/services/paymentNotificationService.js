@@ -155,7 +155,6 @@ class PaymentNotificationService {
    */
   static getProviderName(provider, lang = 'en') {
     const providers = {
-      paypal: { en: 'PayPal', es: 'PayPal' },
       daimo: { en: 'Daimo Pay', es: 'Daimo Pay' },
       epayco: { en: 'ePayco', es: 'ePayco' },
     };
