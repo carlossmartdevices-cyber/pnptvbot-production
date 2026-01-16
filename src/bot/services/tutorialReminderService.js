@@ -26,8 +26,8 @@ class TutorialReminderService {
   }
 
   /**
-   * Start sending tutorial reminders every 4 hours
-   * Sends 3 messages in sequence: health, PRIME features, and subscription info
+   * Start sending tutorial reminders every 3 hours
+   * Sends 1 message at a time, rotating through different types
    */
   static startScheduling() {
     if (!this.bot) {
@@ -39,51 +39,63 @@ class TutorialReminderService {
       return;
     }
 
-    // Send initial tutorials immediately
-    this.sendScheduledTutorials();
+    // Track the last message type sent (0: health, 1: tutorial, 2: subscription)
+    let lastMessageType = -1;
 
-    // Schedule to run every 4 hours (4 * 60 * 60 * 1000 milliseconds)
+    // Send initial message immediately
+    this.sendSingleScheduledTutorial(lastMessageType);
+
+    // Schedule to run every 3 hours (3 * 60 * 60 * 1000 milliseconds)
     const intervalId = setInterval(async () => {
       try {
-        await this.sendScheduledTutorials();
+        lastMessageType = await this.sendSingleScheduledTutorial(lastMessageType);
       } catch (error) {
         logger.error('Error in tutorial reminder scheduler:', error);
       }
-    }, 4 * 60 * 60 * 1000);
+    }, 3 * 60 * 60 * 1000);
 
-    logger.info('Tutorial reminder scheduler started - will send messages every 4 hours');
+    logger.info('Tutorial reminder scheduler started - will send 1 message every 3 hours');
     return intervalId;
   }
 
   /**
-   * Send scheduled tutorials in sequence
-   * 1. Health message
-   * 2. PRIME features tutorial
-   * 3. Subscription info
+   * Send a single scheduled tutorial message
+   * Rotates through: health message, PRIME features tutorial, subscription info
+   * @param {number} lastType - Last message type sent (0: health, 1: tutorial, 2: subscription)
+   * @returns {number} The message type that was just sent
    */
-  static async sendScheduledTutorials() {
+  static async sendSingleScheduledTutorial(lastType) {
     if (!this.bot || !this.GROUP_ID) {
-      logger.warn('Cannot send scheduled tutorials - service not properly initialized');
-      return;
+      logger.warn('Cannot send scheduled tutorial - service not properly initialized');
+      return lastType;
     }
 
     try {
-      logger.info('Sending scheduled tutorial reminders to group...');
+      logger.info('Sending scheduled tutorial reminder to group...');
 
-      // 1. Send health message
-      await this.sendHealthMessage();
-      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+      // Determine which message to send next (rotate through types)
+      const nextType = (lastType + 1) % 3;
 
-      // 2. Send PRIME features tutorial
-      await this.sendPrimeFeaturesTutorial();
-      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+      switch (nextType) {
+        case 0:
+          await this.sendHealthMessage();
+          logger.info('Health message sent to group');
+          break;
+        case 1:
+          await this.sendPrimeFeaturesTutorial();
+          logger.info('PRIME features tutorial sent to group');
+          break;
+        case 2:
+          await this.sendSubscriptionInfo();
+          logger.info('Subscription info sent to group');
+          break;
+      }
 
-      // 3. Send subscription info
-      await this.sendSubscriptionInfo();
-
-      logger.info('Scheduled tutorial reminders completed');
+      logger.info('Single scheduled tutorial reminder completed');
+      return nextType;
     } catch (error) {
-      logger.error('Error sending scheduled tutorials:', error);
+      logger.error('Error sending scheduled tutorial:', error);
+      return lastType;
     }
   }
 
