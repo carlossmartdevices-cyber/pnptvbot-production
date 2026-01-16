@@ -383,7 +383,7 @@ const showMainMenu = async (ctx) => {
         '📻 Radio y contenido sin restricciones\n' +
         '💬 Chat y soporte prioritario\n\n' +
         '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
-        '`Desde solo $7 USD/semana 💎`'
+        '`Desde solo $14.99 USD/semana 💎`'
       : '`🔒 UNLOCK ALL CONTENT`\n\n' +
         `Hey ${username}, you\'re on the FREE version.\n\n` +
         '**With PRIME you get unlimited access to:**\n\n' +
@@ -393,7 +393,7 @@ const showMainMenu = async (ctx) => {
         '📻 Radio & unrestricted content\n' +
         '💬 Priority chat & support\n\n' +
         '**Go PRIME now and enjoy everything!**\n\n' +
-        '`Starting at just $7 USD/week 💎`');
+        '`Starting at just $14.99 USD/week 💎`');
 
     buttons = [
       [
@@ -555,7 +555,7 @@ const showMainMenuEdit = async (ctx) => {
         '📻 Radio y contenido sin restricciones\n' +
         '💬 Chat y soporte prioritario\n\n' +
         '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
-        '`Desde solo $7 USD/semana 💎`'
+        '`Desde solo $14.99 USD/semana 💎`'
       : '`🔒 UNLOCK ALL CONTENT`\n\n' +
         `Hey ${username}, you\'re on the FREE version.\n\n` +
         '**With PRIME you get unlimited access to:**\n\n' +
@@ -565,7 +565,7 @@ const showMainMenuEdit = async (ctx) => {
         '📻 Radio & unrestricted content\n' +
         '💬 Priority chat & support\n\n' +
         '**Go PRIME now and enjoy everything!**\n\n' +
-        '`Starting at just $7 USD/week 💎`');
+        '`Starting at just $14.99 USD/week 💎`');
 
     buttons = [
       [
