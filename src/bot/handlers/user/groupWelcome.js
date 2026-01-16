@@ -173,32 +173,52 @@ async function sendWelcomeMessage(ctx, username, user, lang) {
     const message = lang === 'es'
       ? `👋 Ey ${username}, bienvenidx a PNPtv!
 
-⭐ Estado: ${subscriptionStatus}
+Aquí la vuelta es simple: gente real, buena vibra, cero filtro.
 
-💎 PRIME te da:
-• Videos completos de Santino, Lex y la comunidad
+⭐ Tu membresía actual: ${subscriptionStatus}
+
+🔥 Lo que tienes por ahora:
+• Acceso al grupo
+• Contenido corto
+• Music Library gratis
+• 3 vistas en Nearby
+
+💎 Si te haces PRIME, desbloqueas:
+• Videos completos de Santino, Lex y latinos hot 🔥
 • Nearby ilimitado
 • Hangouts privados (video rooms)
-• Videorama 24/7
+• Videorama (música y podcasts 24/7)
 • Canal PRIME exclusivo
-• Música + Podcasts premium
 
 💰 $14.99/semana
-🔥 HOT PNP LIFETIME SPECIAL: $100 → pnptv.app/lifetime100`
+🔥 HOT PNP LIFETIME: $100 → pnptv.app/lifetime100
+
+📸 ¡Comparte fotos y sé la LEYENDA PNPtv DEL DÍA! Gana 1 día PRIME gratis.
+👉 /subscribe`
       : `👋 Hey ${username}, welcome to PNPtv!
 
-⭐ Status: ${subscriptionStatus}
+This place is simple: real people, real vibes, no filters.
 
-💎 PRIME unlocks:
-• Full videos from Santino, Lex & the community
-• Unlimited Nearby
+⭐ Your current membership: ${subscriptionStatus}
+
+🔥 What you get right now:
+• Group access
+• Short content
+• Free Music Library
+• 3 views in Nearby Members
+
+💎 If you go PRIME, you unlock:
+• Full-length videos from Santino, Lex & hot latinos 🔥
+• Unlimited Nearby Members
 • Private Hangouts (video rooms)
-• Videorama 24/7
+• Videorama (music & podcasts 24/7)
 • Exclusive PRIME Channel
-• Premium Music + Podcasts
 
 💰 $14.99/week
-🔥 HOT PNP LIFETIME SPECIAL: $100 → pnptv.app/lifetime100`;
+🔥 HOT PNP LIFETIME: $100 → pnptv.app/lifetime100
+
+📸 Share pics and be the PNPtv LEGEND OF THE DAY! Win 1 day FREE PRIME.
+👉 /subscribe`;
 
     const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
 

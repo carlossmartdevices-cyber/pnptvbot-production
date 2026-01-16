@@ -113,16 +113,17 @@ class TutorialReminderService {
    * Send PRIME features tutorial to group
    */
   static async sendPrimeFeaturesTutorial() {
-    const message = `💎 PRIME unlocks:
-• Full videos from Santino, Lex & the community
-• Unlimited Nearby
-• Private Hangouts (video rooms)
-• Videorama 24/7
-• Exclusive PRIME Channel
-• Premium Music + Podcasts
+    const message = `💎 PRIME te da:
+• Videos completos de Santino, Lex y latinos hot 🔥
+• Nearby ilimitado
+• Hangouts privados (video rooms)
+• Videorama (música y podcasts 24/7)
+• Canal PRIME exclusivo
 
-💰 $14.99/week
-🔥 HOT PNP LIFETIME SPECIAL: $100 → pnptv.app/lifetime100`;
+💰 $14.99/semana
+🔥 HOT PNP LIFETIME: $100 → pnptv.app/lifetime100
+
+📸 ¡Comparte fotos y sé la LEYENDA PNPtv DEL DÍA! Gana 1 día PRIME gratis.`;
 
     try {
       await this.bot.telegram.sendMessage(this.GROUP_ID, message, {
