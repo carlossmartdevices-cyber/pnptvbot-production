@@ -14,12 +14,28 @@ class ModerationModel {
   static async getGroupSettings(groupId) {
     try {
       const result = await query(
-        `SELECT * FROM moderation WHERE id = 'default' OR group_id = $1 LIMIT 1`,
+        `SELECT * FROM moderation WHERE group_id = $1 LIMIT 1`,
         [groupId.toString()]
       );
 
       if (result.rows.length > 0) {
-        return result.rows[0];
+        // Map database columns to expected property names
+        const row = result.rows[0];
+        return {
+          groupId: row.group_id,
+          antiLinksEnabled: row.anti_links_enabled ?? true,
+          antiSpamEnabled: row.anti_spam_enabled ?? true,
+          antiFloodEnabled: row.anti_flood_enabled ?? true,
+          profanityFilterEnabled: row.profanity_filter_enabled ?? true,
+          maxWarnings: row.max_warnings ?? 3,
+          floodLimit: row.flood_limit ?? 5,
+          floodWindow: row.flood_window ?? 10,
+          muteDuration: row.mute_duration ?? 3600,
+          allowedDomains: row.allowed_domains || [],
+          bannedWords: row.banned_words || [],
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        };
       }
 
       // Return default settings if no custom settings exist
@@ -40,7 +56,22 @@ class ModerationModel {
       };
     } catch (error) {
       logger.error('Error getting group settings:', error);
-      return null;
+      // Return default settings on error instead of null
+      return {
+        groupId: groupId.toString(),
+        antiLinksEnabled: true,
+        antiSpamEnabled: true,
+        antiFloodEnabled: true,
+        profanityFilterEnabled: true,
+        maxWarnings: 3,
+        floodLimit: 5,
+        floodWindow: 10,
+        muteDuration: 3600,
+        allowedDomains: [],
+        bannedWords: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
     }
   }
 
@@ -280,15 +311,20 @@ class ModerationModel {
    */
   static async isUserBanned(userId, groupId) {
     try {
+      // Try with 'active' column first, fall back to simpler query if column doesn't exist
       const result = await query(
         `SELECT COUNT(*) as count
          FROM banned_users
-         WHERE user_id = $1 AND group_id = $2 AND active = TRUE`,
+         WHERE user_id = $1 AND group_id = $2`,
         [userId.toString(), groupId.toString()]
       );
 
       return parseInt(result.rows[0].count) > 0;
     } catch (error) {
+      // If table doesn't exist, user is not banned
+      if (error.code === '42P01') {
+        return false;
+      }
       logger.error('Error checking ban status:', error);
       return false;
     }

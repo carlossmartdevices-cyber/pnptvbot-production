@@ -140,9 +140,27 @@ class TopicConfigModel {
       const result = await query(sql, [threadId]);
       return result.rows[0] || null;
     } catch (error) {
+      // If table doesn't exist, return null instead of throwing
+      if (error.code === '42P01') {
+        return null;
+      }
       logger.error('Error getting topic config:', error);
-      throw error;
+      return null;
     }
+  }
+
+  /**
+   * Alias for getByThreadId - used by TopicModerationService
+   */
+  static async getTopicConfig(topicId) {
+    return this.getByThreadId(topicId);
+  }
+
+  /**
+   * Alias for upsert - used by TopicModerationService
+   */
+  static async saveTopicConfig(config) {
+    return this.upsert(config);
   }
 
   /**

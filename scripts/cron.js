@@ -41,6 +41,23 @@ const startCronJobs = async (bot = null) => {
       }
     });
 
+    // Comprehensive membership status sync - runs twice daily (6 AM and 6 PM UTC)
+    // Ensures all users have correct status/tier based on plan_expiry
+    cron.schedule(process.env.MEMBERSHIP_SYNC_CRON || '0 6,18 * * *', async () => {
+      try {
+        logger.info('Running membership status sync (twice daily)...');
+        const results = await MembershipCleanupService.syncAllMembershipStatuses();
+        logger.info('Membership status sync completed', {
+          toActive: results.toActive,
+          toChurned: results.toChurned,
+          toFree: results.toFree,
+          errors: results.errors
+        });
+      } catch (error) {
+        logger.error('Error in membership sync cron:', error);
+      }
+    });
+
     // Subscription expiry check (legacy - keeping for backwards compatibility)
     cron.schedule(process.env.SUBSCRIPTION_CHECK_CRON || '0 6 * * *', async () => {
       try {

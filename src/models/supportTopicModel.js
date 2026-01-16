@@ -182,7 +182,7 @@ class SupportTopicModel {
     `;
 
     try {
-      const result = await pool.query(query);
+      const result = await getPool().query(query);
       return result.rows;
     } catch (error) {
       logger.error('Error getting open topics:', error);
@@ -228,7 +228,7 @@ class SupportTopicModel {
     `;
 
     try {
-      const result = await pool.query(query);
+      const result = await getPool().query(query);
       return result.rows[0];
     } catch (error) {
       logger.error('Error getting topic statistics:', error);

@@ -2,6 +2,7 @@ const { Markup } = require('telegraf');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
+const SupportTopicModel = require('../../../models/supportTopicModel');
 
 // Mistral AI integration
 let mistral = null;
@@ -270,6 +271,40 @@ const registerSupportHandlers = (bot) => {
     }
   });
 
+  // Request Activation
+  bot.action('support_request_activation', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.requestingActivation = true;
+      await ctx.saveSession();
+
+      const activationText = lang === 'es'
+        ? '`🎁 Solicitar Activación`\n\n' +
+          '¿Ya realizaste tu pago y necesitas activar tu membresía?\n\n' +
+          '📝 Por favor envía:\n' +
+          '• Tu ID de transacción o comprobante\n' +
+          '• El plan que compraste\n' +
+          '• Cualquier detalle adicional\n\n' +
+          '_Nuestro equipo revisará y activará tu cuenta._'
+        : '`🎁 Request Activation`\n\n' +
+          'Already made your payment and need to activate your membership?\n\n' +
+          '📝 Please send:\n' +
+          '• Your transaction ID or receipt\n' +
+          '• The plan you purchased\n' +
+          '• Any additional details\n\n' +
+          '_Our team will review and activate your account._';
+
+      await ctx.answerCbQuery();
+      await ctx.editMessageText(activationText, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([[Markup.button.callback(t('cancel', lang), 'show_support')]]),
+      });
+    } catch (error) {
+      logger.error('Error in request activation:', error);
+    }
+  });
+
   // Handle text messages for AI chat
   bot.on('text', async (ctx, next) => {
     // Skip commands - let them be handled by command handlers
@@ -342,12 +377,54 @@ const registerSupportHandlers = (bot) => {
         const questionCount = ctx.session.temp.aiQuestionCount || 0;
         if (questionCount >= 5) {
           // Reset counters after reaching limit
+          const chatHistory = ctx.session.temp.aiChatHistory || [];
           ctx.session.temp.aiChatHistory = null;
           ctx.session.temp.aiQuestionCount = 0;
           ctx.session.temp.aiChatActive = false; // Deactivate AI chat
           await ctx.saveSession();
 
-          const limitMessage = lang === 'es' ? '💬 Has alcanzado el límite de preguntas con Cristina (5 preguntas).\n\nPara continuar con tu consulta, por favor contacta con nuestro equipo humano:\n\n👉 Usa el botón "Contactar Admin" abajo para hablar con una persona real.' : '💬 You\'ve reached the question limit with Cristina (5 questions).\n\nTo continue with your inquiry, please contact our human team:\n\n👉 Use the "Contact Admin" button below to talk with a real person.';
+          // Auto-create support ticket for escalation
+          let ticketId = null;
+          try {
+            const userId = ctx.from.id;
+            const firstName = ctx.from.first_name || 'Unknown';
+            let supportTopic = await SupportTopicModel.getByUserId(String(userId));
+            if (!supportTopic) {
+              supportTopic = await SupportTopicModel.create({
+                userId: String(userId),
+                threadId: Date.now(),
+                threadName: `Auto-Escalation: ${firstName} (${userId})`,
+              });
+            } else {
+              await SupportTopicModel.updateLastMessage(String(userId));
+              if (supportTopic.status !== 'open') {
+                await SupportTopicModel.updateStatus(String(userId), 'open');
+              }
+            }
+            ticketId = supportTopic.thread_id;
+
+            // Notify admin of escalation with AI conversation summary
+            const supportGroupId = process.env.SUPPORT_GROUP_ID;
+            if (supportGroupId) {
+              const lastQuestions = chatHistory
+                .filter(m => m.role === 'user')
+                .slice(-3)
+                .map(m => `• ${m.content.substring(0, 100)}${m.content.length > 100 ? '...' : ''}`)
+                .join('\n');
+
+              const escalationMessage = `🚨 *AUTO-ESCALACIÓN*\n\n👤 *Usuario:* ${firstName}\n🆔 *User ID:* \`${userId}\`\n🎫 *Ticket:* #${ticketId}\n\n📝 *Últimas preguntas:*\n${lastQuestions || 'N/A'}\n\n_El usuario ha alcanzado el límite de 5 preguntas con Cristina AI._`;
+
+              await ctx.telegram.sendMessage(supportGroupId, escalationMessage, { parse_mode: 'Markdown' });
+            }
+            logger.info(`Auto-escalation ticket created for user ${userId}`, { ticketId });
+          } catch (escalationError) {
+            logger.warn('Failed to create auto-escalation ticket:', escalationError.message);
+          }
+
+          const ticketInfo = ticketId ? (lang === 'es' ? `\n\n🎫 Se ha creado el ticket #${ticketId} para tu caso.` : `\n\n🎫 Ticket #${ticketId} has been created for your case.`) : '';
+          const limitMessage = lang === 'es'
+            ? `💬 Has alcanzado el límite de preguntas con Cristina (5 preguntas).${ticketInfo}\n\nNuestro equipo de soporte ha sido notificado y te responderá pronto.\n\n👉 Puedes enviar más detalles usando el botón "Contactar Admin".`
+            : `💬 You've reached the question limit with Cristina (5 questions).${ticketInfo}\n\nOur support team has been notified and will respond shortly.\n\n👉 You can send more details using the "Contact Admin" button.`;
 
           await ctx.reply(limitMessage, Markup.inlineKeyboard([[Markup.button.callback(t('contactAdmin', lang), 'support_contact_admin')], [Markup.button.callback(t('back', lang), 'show_support')]]));
           return;
@@ -473,12 +550,40 @@ const registerSupportHandlers = (bot) => {
         const username = ctx.from.username ? `@${ctx.from.username}` : 'No username';
         const firstName = ctx.from.first_name || 'Unknown';
 
+        // Track support ticket in database
+        let supportTopic = null;
+        try {
+          supportTopic = await SupportTopicModel.getByUserId(String(userId));
+          if (supportTopic) {
+            // Update existing topic
+            await SupportTopicModel.updateLastMessage(String(userId));
+            // Reopen if it was closed/resolved
+            if (supportTopic.status !== 'open') {
+              await SupportTopicModel.updateStatus(String(userId), 'open');
+            }
+            logger.info(`Support ticket updated for user ${userId}`, { ticketId: supportTopic.thread_id });
+          } else {
+            // Create new support topic
+            const threadName = `Support: ${firstName} (${userId})`;
+            supportTopic = await SupportTopicModel.create({
+              userId: String(userId),
+              threadId: Date.now(), // Use timestamp as unique ID since we're not using forum topics
+              threadName,
+            });
+            logger.info(`New support ticket created for user ${userId}`, { ticketId: supportTopic.thread_id });
+          }
+        } catch (dbError) {
+          logger.warn('Failed to track support ticket in database:', dbError.message);
+          // Continue without database tracking
+        }
+
+        const ticketInfo = supportTopic ? `\n🎫 *Ticket:* #${supportTopic.thread_id}` : '';
         const supportMessage = `📬 *SOLICITUD DE SOPORTE*
 
 👤 *Usuario:* ${firstName}
 🆔 *Telegram:* ${username}
 🔢 *User ID:* \`${userId}\`
-📅 *Fecha:* ${new Date().toLocaleString('es-ES')}
+📅 *Fecha:* ${new Date().toLocaleString('es-ES')}${ticketInfo}
 
 💬 *Mensaje:*
 ${message}`;
@@ -501,8 +606,101 @@ ${message}`;
         }
 
         ctx.session.temp.contactingAdmin = false; await ctx.saveSession();
-        await ctx.reply(t('messageSent', lang), Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'show_support')]]));
+
+        // Show confirmation with ticket number if available
+        const confirmationMessage = supportTopic
+          ? (lang === 'es'
+              ? `✅ *Mensaje enviado*\n\n🎫 Tu ticket de soporte: #${supportTopic.thread_id}\n\nNuestro equipo te responderá pronto.`
+              : `✅ *Message sent*\n\n🎫 Your support ticket: #${supportTopic.thread_id}\n\nOur team will respond shortly.`)
+          : t('messageSent', lang);
+
+        await ctx.reply(confirmationMessage, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'show_support')]])
+        });
       } catch (error) { logger.error('Error contacting admin:', error); }
+      return;
+    }
+
+    // Handle activation requests
+    if (ctx.session.temp?.requestingActivation) {
+      try {
+        const lang = getLanguage(ctx);
+
+        // Validate message text exists
+        if (!ctx.message?.text) { logger.warn('Activation request received message without text'); return next(); }
+
+        const message = ctx.message.text;
+
+        // Exit activation mode if user sends a command
+        if (message.startsWith('/')) { ctx.session.temp.requestingActivation = false; await ctx.saveSession(); return next(); }
+
+        // Build activation request message
+        const userId = ctx.from.id;
+        const username = ctx.from.username ? `@${ctx.from.username}` : 'No username';
+        const firstName = ctx.from.first_name || 'Unknown';
+
+        // Track support ticket in database
+        let supportTopic = null;
+        try {
+          supportTopic = await SupportTopicModel.getByUserId(String(userId));
+          if (supportTopic) {
+            await SupportTopicModel.updateLastMessage(String(userId));
+            if (supportTopic.status !== 'open') {
+              await SupportTopicModel.updateStatus(String(userId), 'open');
+            }
+          } else {
+            supportTopic = await SupportTopicModel.create({
+              userId: String(userId),
+              threadId: Date.now(),
+              threadName: `Activation Request: ${firstName} (${userId})`,
+            });
+          }
+        } catch (dbError) {
+          logger.warn('Failed to track activation ticket in database:', dbError.message);
+        }
+
+        const ticketInfo = supportTopic ? `\n🎫 *Ticket:* #${supportTopic.thread_id}` : '';
+        const activationMessage = `🎁 *SOLICITUD DE ACTIVACIÓN*
+
+👤 *Usuario:* ${firstName}
+🆔 *Telegram:* ${username}
+🔢 *User ID:* \`${userId}\`
+📅 *Fecha:* ${new Date().toLocaleString('es-ES')}${ticketInfo}
+
+📝 *Detalles de pago/activación:*
+${message}`;
+
+        // Send to support group
+        const supportGroupId = process.env.SUPPORT_GROUP_ID;
+        if (supportGroupId) {
+          try {
+            await ctx.telegram.sendMessage(supportGroupId, activationMessage, { parse_mode: 'Markdown' });
+            logger.info(`Activation request sent to support group`, { userId, username });
+          } catch (groupError) {
+            logger.error('Error sending activation request to support group:', groupError);
+          }
+        }
+
+        // Also send to admin users
+        const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
+        for (const adminId of adminIds) {
+          try { await ctx.telegram.sendMessage(adminId.trim(), `🎁 Activation Request from User ${ctx.from.id} (@${ctx.from.username || 'no username'}):\n\n${message}`); } catch (sendError) { logger.error('Error sending activation to admin:', sendError); }
+        }
+
+        ctx.session.temp.requestingActivation = false; await ctx.saveSession();
+
+        const confirmationMessage = supportTopic
+          ? (lang === 'es'
+              ? `✅ *Solicitud de activación recibida*\n\n🎫 Tu ticket: #${supportTopic.thread_id}\n\nRevisaremos tu solicitud y activaremos tu cuenta pronto.`
+              : `✅ *Activation request received*\n\n🎫 Your ticket: #${supportTopic.thread_id}\n\nWe'll review your request and activate your account shortly.`)
+          : (lang === 'es' ? '✅ Solicitud de activación recibida. Te contactaremos pronto.' : '✅ Activation request received. We\'ll contact you soon.');
+
+        await ctx.reply(confirmationMessage, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'show_support')]])
+        });
+      } catch (error) { logger.error('Error processing activation request:', error); }
       return;
     }
 

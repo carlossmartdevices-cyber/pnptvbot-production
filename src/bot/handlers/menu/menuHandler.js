@@ -904,17 +904,27 @@ async function handleFAQ(ctx, lang) {
 }
 
 async function handleSupport(ctx, lang) {
-  const message = lang === 'es'
-    ? '🆘 *Contactar Soporte*\n\nAquí puedes contactar a nuestro equipo de soporte.\n\n_Esta función estará disponible pronto._'
-    : '🆘 *Contact Support*\n\nHere you can contact our support team.\n\n_This feature is coming soon._';
+  const supportText =
+    '`🆘 Help Center`\n\n' +
+    'Need help? We got you! 💜\n\n' +
+    '**Cristina** is our AI assistant —\n' +
+    'she can answer questions about:\n' +
+    '• Platform features\n' +
+    '• Harm reduction & safer use\n' +
+    '• Sexual & mental health\n' +
+    '• Community resources\n\n' +
+    '_Or contact Santino directly for\n' +
+    'account issues & billing._';
 
-  const keyboard = Markup.inlineKeyboard([
-    [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
-  ]);
-
-  await ctx.editMessageText(message, {
+  await ctx.editMessageText(supportText, {
     parse_mode: 'Markdown',
-    ...keyboard
+    ...Markup.inlineKeyboard([
+      [Markup.button.callback('🤖 Chat with Cristina', 'support_ai_chat')],
+      [Markup.button.callback('👤 Contact Santino', 'support_contact_admin')],
+      [Markup.button.callback('🎁 Request Activation', 'support_request_activation')],
+      [Markup.button.callback('❓ FAQ', 'support_faq')],
+      [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')],
+    ]),
   });
 }
 

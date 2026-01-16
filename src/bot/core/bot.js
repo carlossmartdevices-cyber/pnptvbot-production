@@ -76,6 +76,8 @@ const CommunityPostScheduler = require('./schedulers/communityPostScheduler');
 const { startCronJobs } = require('../../../scripts/cron');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
+// Support model for ticket tracking
+const SupportTopicModel = require('../../models/supportTopicModel');
 // Async Broadcast Queue
 const { initializeAsyncBroadcastQueue } = require('../services/initializeQueue');
 // API Server
@@ -131,6 +133,13 @@ const startBot = async () => {
       const connected = await testConnection();
       if (connected) {
         logger.info('✓ PostgreSQL initialized');
+        // Initialize support topics table
+        try {
+          await SupportTopicModel.initTable();
+          logger.info('✓ Support topics table initialized');
+        } catch (tableError) {
+          logger.warn('Support topics table initialization failed:', tableError.message);
+        }
       } else {
         logger.warn('⚠️ PostgreSQL connection test failed, but will retry on first query');
       }
@@ -227,6 +236,13 @@ const startBot = async () => {
     // Initialize membership cleanup service (for daily status updates and channel management)
     MembershipCleanupService.initialize(bot);
     logger.info('✓ Membership cleanup service initialized');
+    // Start cron jobs for scheduled tasks (membership sync, cleanup, etc.)
+    try {
+      await startCronJobs(bot);
+      logger.info('✓ Cron jobs started');
+    } catch (cronError) {
+      logger.warn('Cron jobs initialization failed, continuing without scheduled tasks:', cronError.message);
+    }
     // Initialize message rate limiter (to limit group messages to 6/day)
     MessageRateLimiter.initialize();
     logger.info('✓ Message rate limiter initialized');

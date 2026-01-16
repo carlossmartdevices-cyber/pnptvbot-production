@@ -230,6 +230,139 @@ Type /subscribe to view membership plans and reactivate your access!`;
   }
 
   /**
+   * Sync ALL users' membership status and tier
+   * This is a comprehensive fix that ensures all users have correct status/tier based on plan_expiry
+   * - Users with plan_expiry > NOW() → 'active' status, 'Prime' tier
+   * - Users with lifetime plans (no expiry or plan_id contains 'lifetime') → 'active' status, 'Prime' tier
+   * - Users with plan_expiry <= NOW() → 'churned' status, 'Free' tier
+   * - Users with no subscription → 'free' status, 'Free' tier
+   * @returns {Promise<Object>} Sync results
+   */
+  static async syncAllMembershipStatuses() {
+    const results = {
+      toActive: 0,
+      toChurned: 0,
+      toFree: 0,
+      alreadyCorrect: 0,
+      errors: 0,
+      startTime: new Date()
+    };
+
+    try {
+      logger.info('Starting comprehensive membership status sync...');
+
+      // Step 1: Update users with valid active subscriptions (expiry in future) to 'active'
+      const activateResult = await query(`
+        UPDATE users
+        SET subscription_status = 'active',
+            tier = 'Prime',
+            updated_at = NOW()
+        WHERE plan_expiry IS NOT NULL
+          AND plan_expiry > NOW()
+          AND (subscription_status != 'active' OR tier != 'Prime')
+        RETURNING id, username
+      `);
+      results.toActive += activateResult.rowCount;
+      if (activateResult.rowCount > 0) {
+        logger.info(`Activated ${activateResult.rowCount} users with valid subscriptions`);
+      }
+
+      // Step 2: Update lifetime users to 'active' (plan_id contains 'lifetime' and no expiry)
+      const lifetimeResult = await query(`
+        UPDATE users
+        SET subscription_status = 'active',
+            tier = 'Prime',
+            updated_at = NOW()
+        WHERE (plan_id ILIKE '%lifetime%' OR plan_id ILIKE '%life-time%')
+          AND (subscription_status != 'active' OR tier != 'Prime')
+        RETURNING id, username
+      `);
+      results.toActive += lifetimeResult.rowCount;
+      if (lifetimeResult.rowCount > 0) {
+        logger.info(`Activated ${lifetimeResult.rowCount} lifetime users`);
+      }
+
+      // Step 3: Update users with expired subscriptions to 'churned'
+      const churnResult = await query(`
+        UPDATE users
+        SET subscription_status = 'churned',
+            tier = 'Free',
+            updated_at = NOW()
+        WHERE plan_expiry IS NOT NULL
+          AND plan_expiry <= NOW()
+          AND plan_id NOT ILIKE '%lifetime%'
+          AND plan_id NOT ILIKE '%life-time%'
+          AND subscription_status NOT IN ('churned', 'free')
+        RETURNING id, username
+      `);
+      results.toChurned += churnResult.rowCount;
+      if (churnResult.rowCount > 0) {
+        logger.info(`Churned ${churnResult.rowCount} users with expired subscriptions`);
+      }
+
+      // Step 4: Ensure 'Free' tier for all churned users
+      const fixChurnedTierResult = await query(`
+        UPDATE users
+        SET tier = 'Free',
+            updated_at = NOW()
+        WHERE subscription_status IN ('churned', 'expired', 'free')
+          AND tier != 'Free'
+        RETURNING id
+      `);
+      if (fixChurnedTierResult.rowCount > 0) {
+        logger.info(`Fixed tier for ${fixChurnedTierResult.rowCount} churned/free users`);
+      }
+
+      // Step 5: Convert old 'expired' status to 'churned' for consistency
+      const expiredToChurnedResult = await query(`
+        UPDATE users
+        SET subscription_status = 'churned',
+            updated_at = NOW()
+        WHERE subscription_status = 'expired'
+        RETURNING id
+      `);
+      if (expiredToChurnedResult.rowCount > 0) {
+        results.toChurned += expiredToChurnedResult.rowCount;
+        logger.info(`Converted ${expiredToChurnedResult.rowCount} 'expired' status to 'churned'`);
+      }
+
+      // Step 6: Ensure users without any plan are set to 'free'
+      const freeResult = await query(`
+        UPDATE users
+        SET subscription_status = 'free',
+            tier = 'Free',
+            updated_at = NOW()
+        WHERE plan_id IS NULL
+          AND plan_expiry IS NULL
+          AND subscription_status NOT IN ('free')
+        RETURNING id
+      `);
+      results.toFree += freeResult.rowCount;
+      if (freeResult.rowCount > 0) {
+        logger.info(`Set ${freeResult.rowCount} users to 'free' status`);
+      }
+
+      results.endTime = new Date();
+      const duration = (results.endTime - results.startTime) / 1000;
+
+      logger.info('Membership status sync completed', {
+        duration: `${duration}s`,
+        toActive: results.toActive,
+        toChurned: results.toChurned,
+        toFree: results.toFree,
+        errors: results.errors
+      });
+
+      return results;
+    } catch (error) {
+      logger.error('Error in membership status sync:', error);
+      results.errors++;
+      results.endTime = new Date();
+      return results;
+    }
+  }
+
+  /**
    * Get membership statistics
    * @returns {Promise<Object>} Membership stats
    */

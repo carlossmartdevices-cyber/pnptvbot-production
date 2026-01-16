@@ -1,11 +1,59 @@
 /**
  * Cristina AI Support Agent
- * Provides AI-powered support and assistance
+ * Provides AI-powered support and assistance using Mistral AI
  */
 
 const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
 const { detectLanguage } = require('../../../utils/languageDetector');
+
+// Mistral AI integration
+let mistral = null;
+let AGENT_ID = null;
+
+try {
+  const { Mistral } = require('@mistralai/mistralai');
+  if (process.env.MISTRAL_API_KEY) {
+    mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
+    AGENT_ID = process.env.MISTRAL_AGENT_ID || null;
+    logger.info('Cristina AI: Mistral AI initialized');
+  }
+} catch (error) {
+  logger.warn('Cristina AI: Mistral AI package not installed, using keyword fallback');
+}
+
+// Agent instructions for Mistral
+const AGENT_INSTRUCTIONS = `You are Cristina, the PNPtv Customer Support AI Assistant - a professional, helpful, and friendly support chatbot.
+
+🎯 YOUR ROLE
+You are the official customer support assistant for PNPtv, providing:
+- Technical assistance with subscriptions, payments, and account access
+- Information about membership plans and features
+- Privacy, security, and legal information
+- Community guidelines and wellness support
+- General questions about the PNPtv experience
+
+💬 COMMUNICATION STYLE
+- Professional, friendly, and helpful
+- Clear and concise responses
+- Empathetic and non-judgmental
+- Respond in the user's language
+- Use emojis sparingly for clarity
+- Keep responses under 300 words
+
+🔑 KEY INFORMATION
+**Membership Plans:**
+- Basic ($9.99/month): Access to radio, Basic Zoom rooms, Profile customization
+- Premium ($19.99/month): Everything in Basic + Unlimited Zoom rooms, Live streaming, Priority support
+- Gold ($29.99/month): Everything in Premium + Advanced analytics, Custom branding, API access
+
+**Commands:** /menu (main menu), /support (help), /cristina (AI assistant)
+**Support Email:** support@pnptv.app
+
+🚫 LIMITATIONS
+- Do not provide explicit content or medical advice
+- Do not share private user information
+- Direct complex issues to /support for human assistance`;
 
 // Store active conversations
 const activeConversations = new Map();
@@ -315,10 +363,46 @@ If the issue persists, use /support to contact a human.`;
 }
 
 /**
- * Process a question and generate a response
- * This is a placeholder implementation - can be enhanced with actual AI
+ * Process a question and generate a response using Mistral AI or keyword fallback
  */
 async function processQuestion(question, lang, userId) {
+  // Try Mistral AI first
+  if (mistral) {
+    try {
+      const languagePrompt = lang === 'es' ? 'Responde en español.' : 'Respond in English.';
+
+      let aiResponse;
+      if (AGENT_ID) {
+        // Use Agents API
+        const completion = await mistral.agents.complete({
+          agentId: AGENT_ID,
+          messages: [{ role: 'user', content: `${languagePrompt}\n\n${question}` }],
+        });
+        aiResponse = completion.choices?.[0]?.message?.content || completion.message?.content;
+      } else {
+        // Use Chat Completions API
+        const completion = await mistral.chat.complete({
+          model: process.env.MISTRAL_MODEL || 'mistral-small-latest',
+          messages: [
+            { role: 'system', content: `${AGENT_INSTRUCTIONS}\n\n${languagePrompt}` },
+            { role: 'user', content: question },
+          ],
+          maxTokens: parseInt(process.env.MISTRAL_MAX_TOKENS || '500', 10),
+          temperature: 0.7,
+        });
+        aiResponse = completion.choices[0].message.content;
+      }
+
+      if (aiResponse) {
+        logger.info(`Cristina AI: Mistral response generated for user ${userId}`);
+        return aiResponse;
+      }
+    } catch (aiError) {
+      logger.error('Cristina AI: Mistral error, falling back to keywords:', aiError.message);
+    }
+  }
+
+  // Fallback to keyword-based responses
   const questionLower = question.toLowerCase();
 
   // Subscription-related questions
