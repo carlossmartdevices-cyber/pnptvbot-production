@@ -212,7 +212,8 @@ const startBot = async () => {
     logger.info('✓ Membership cleanup service initialized');
     // Initialize tutorial reminder service (proactive tutorials for FREE and PRIME users)
     TutorialReminderService.initialize(bot);
-    logger.info('✓ Tutorial reminder service initialized');
+    TutorialReminderService.startScheduling();
+    logger.info('✓ Tutorial reminder service initialized and started');
     // Initialize group cleanup service
     const groupCleanup = new GroupCleanupService(bot);
     groupCleanup.initialize();

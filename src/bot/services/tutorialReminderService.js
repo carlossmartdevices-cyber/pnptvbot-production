@@ -25,6 +25,141 @@ class TutorialReminderService {
     }
   }
 
+  /**
+   * Start sending tutorial reminders every 4 hours
+   * Sends 3 messages in sequence: health, PRIME features, and subscription info
+   */
+  static startScheduling() {
+    if (!this.bot) {
+      logger.warn('Cannot start tutorial scheduling - bot not initialized');
+      return;
+    }
+    if (!this.GROUP_ID) {
+      logger.warn('Cannot start tutorial scheduling - GROUP_ID not configured');
+      return;
+    }
+
+    // Send initial tutorials immediately
+    this.sendScheduledTutorials();
+
+    // Schedule to run every 4 hours (4 * 60 * 60 * 1000 milliseconds)
+    const intervalId = setInterval(async () => {
+      try {
+        await this.sendScheduledTutorials();
+      } catch (error) {
+        logger.error('Error in tutorial reminder scheduler:', error);
+      }
+    }, 4 * 60 * 60 * 1000);
+
+    logger.info('Tutorial reminder scheduler started - will send messages every 4 hours');
+    return intervalId;
+  }
+
+  /**
+   * Send scheduled tutorials in sequence
+   * 1. Health message
+   * 2. PRIME features tutorial
+   * 3. Subscription info
+   */
+  static async sendScheduledTutorials() {
+    if (!this.bot || !this.GROUP_ID) {
+      logger.warn('Cannot send scheduled tutorials - service not properly initialized');
+      return;
+    }
+
+    try {
+      logger.info('Sending scheduled tutorial reminders to group...');
+
+      // 1. Send health message
+      await this.sendHealthMessage();
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+
+      // 2. Send PRIME features tutorial
+      await this.sendPrimeFeaturesTutorial();
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+
+      // 3. Send subscription info
+      await this.sendSubscriptionInfo();
+
+      logger.info('Scheduled tutorial reminders completed');
+    } catch (error) {
+      logger.error('Error sending scheduled tutorials:', error);
+    }
+  }
+
+  /**
+   * Send health message to group
+   */
+  static async sendHealthMessage() {
+    const message = '💪 *Stay Healthy, Stay Strong!* \n\n' +
+      'Remember to take care of your physical and mental health. ' +
+      'Stay hydrated, exercise regularly, and take breaks from screens. ' +
+      'Your well-being is important to us! 💙';
+
+    try {
+      await this.bot.telegram.sendMessage(this.GROUP_ID, message, {
+        parse_mode: 'Markdown'
+      });
+      logger.info('Health message sent to group');
+    } catch (error) {
+      logger.error('Error sending health message:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Send PRIME features tutorial to group
+   */
+  static async sendPrimeFeaturesTutorial() {
+    const message = '💎 *PRIME Features Tutorial* \n\n' +
+      'Did you know PRIME members get exclusive access to:\n\n' +
+      '✅ **Hangouts** - Create private video rooms\n' +
+      '✅ **Videorama** - Full video library access\n' +
+      '✅ **Nearby** - Find papis near you\n' +
+      '✅ **No Ads** - Clean, uninterrupted experience\n\n' +
+      'Already PRIME? Tap the menu button to explore! 🎬';
+
+    try {
+      await this.bot.telegram.sendMessage(this.GROUP_ID, message, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [[
+            { text: '📱 Open Menu', callback_data: 'menu:main' }
+          ]]
+        }
+      });
+      logger.info('PRIME features tutorial sent to group');
+    } catch (error) {
+      logger.error('Error sending PRIME features tutorial:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Send subscription info to group
+   */
+  static async sendSubscriptionInfo() {
+    const message = '🎁 *Upgrade to PRIME Today!* \n\n' +
+      'Unlock all features and support our community. ' +
+      'PRIME membership gives you full access to everything PNPtv has to offer.\n\n' +
+      '💎 *Tap below to see our plans and join the fun!*';
+
+    try {
+      await this.bot.telegram.sendMessage(this.GROUP_ID, message, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [[
+            { text: '💎 View PRIME Plans', callback_data: 'show_subscription_plans' }
+          ]]
+        }
+      });
+      logger.info('Subscription info sent to group');
+    } catch (error) {
+      logger.error('Error sending subscription info:', error.message);
+      throw error;
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // FREE/CHURNED USER TUTORIALS - How to become PRIME
   // ═══════════════════════════════════════════════════════════════════════════
