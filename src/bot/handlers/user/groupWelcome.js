@@ -193,6 +193,13 @@ ${subscriptionStatus}
 • Zoom Calls + Live Performances
 • Música + Podcasts premium
 • Contenido que no sale en ningún otro lado
+• Hangouts privados (video rooms)
+• Videorama 24/7 (streaming de música y videos)
+• Canal PRIME exclusivo
+• Soporte prioritario
+
+💰 Planes desde solo $14.99 USD/mes
+💎 Lifetime Pass: $100 USD (acceso de por vida)
 
 Si te quieres meter más duro en la comunidad:
 👉 /subscribe`
@@ -218,6 +225,13 @@ ${subscriptionStatus}
 • Zoom Calls + Live Performances
 • Premium Music & Podcasts
 • Exclusive content you won't see anywhere else
+• Private Hangouts (video rooms)
+• Videorama 24/7 (music & video streaming)
+• PRIME Channel (exclusive posts)
+• Priority Support
+
+💰 Plans start at just $14.99 USD/month
+💎 Lifetime Pass: $100 USD (lifetime access)
 
 If you want the full experience:
 👉 /subscribe`;
