@@ -175,18 +175,30 @@ async function sendWelcomeMessage(ctx, username, user, lang) {
 
 ⭐ Estado: ${subscriptionStatus}
 
-💎 PRIME te da: Videos completos, Nearby ilimitado, Hangouts, Videorama 24/7 y más.
+💎 PRIME te da:
+• Videos completos de Santino, Lex y la comunidad
+• Nearby ilimitado
+• Hangouts privados (video rooms)
+• Videorama 24/7
+• Canal PRIME exclusivo
+• Música + Podcasts premium
 
 💰 $14.99/semana
-🔥 HOT LIFETIME SPECIAL: $100 → pnptv.app/lifetime100`
+🔥 HOT PNP LIFETIME SPECIAL: $100 → pnptv.app/lifetime100`
       : `👋 Hey ${username}, welcome to PNPtv!
 
 ⭐ Status: ${subscriptionStatus}
 
-💎 PRIME unlocks: Full videos, unlimited Nearby, Hangouts, Videorama 24/7 and more.
+💎 PRIME unlocks:
+• Full videos from Santino, Lex & the community
+• Unlimited Nearby
+• Private Hangouts (video rooms)
+• Videorama 24/7
+• Exclusive PRIME Channel
+• Premium Music + Podcasts
 
 💰 $14.99/week
-🔥 HOT LIFETIME SPECIAL: $100 → pnptv.app/lifetime100`;
+🔥 HOT PNP LIFETIME SPECIAL: $100 → pnptv.app/lifetime100`;
 
     const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
 

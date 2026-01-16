@@ -17,7 +17,7 @@ const translations = {
 
 This is your control dashboard.
 From here, you can access all your premium features:
-open Zoom Rooms, start live streams, watch full videos,
+open Video Rooms, start live streams, watch full videos,
 explore Nearby without limits, and join private events.`,
       welcomeScreenFree: `-----------------------------]
             PNPtv!
@@ -30,7 +30,7 @@ Unlock all premium features:
 • Full videos  
 • Live streams  
 • Unlimited Nearby  
-• Zoom Rooms  
+• Video Rooms  
 • Private community events
 
 Tap "Subscribe to PRIME" below to get instant access.`,
@@ -79,7 +79,7 @@ Choose your plan and get instant access to all premium features:
 🔥 Long-session videos + weekly new releases
 🔥 Santino's full videography
 🔥 Nearby feature (unlimited)
-🔥 Live Streams & Zoom Rooms
+🔥 Live Streams & Video Rooms
 🔥 Profile Card with photo, badges & bio
 🔥 Instant support through the bot
 
@@ -172,7 +172,7 @@ Choose your plan and get instant access to all premium features:
 
 This is your PRIME dashboard.
 From here you can access all your premium features:
-open Zoom Rooms, start live streams, watch full videos,
+open Video Rooms, start live streams, watch full videos,
 explore Nearby without limits, and join private events.`,
     noBlockedUsers: 'You have no blocked users.',
     shareProfile: '📤 Share Profile',
@@ -410,8 +410,8 @@ explore Nearby without limits, and join private events.`,
       roomNotActive: 'This room is not currently active.',
       roomNotFound: 'Room not found.',
     },
-    // Zoom Rooms
-    zoomTitle: '`🎥 Zoom Rooms`',
+    // Video Rooms
+    zoomTitle: '`🎥 Video Rooms`',
     createRoom: '➕ Create Room',
     joinRoom: '▶️ Join Room',
     myRooms: '📋 My Rooms',
@@ -533,7 +533,7 @@ explore Nearby without limits, and join private events.`,
 
 Este es tu panel de control.
 Desde aqui puedes acceder a todas tus funciones premium:
-abrir Salas Zoom, iniciar transmisiones en vivo, ver videos completos,
+abrir Video Rooms, iniciar transmisiones en vivo, ver videos completos,
 explorar Cercanos sin limites y unirte a eventos privados.`,
     welcomeScreenFree: `-----------------------------]
               PNPtv!
@@ -546,7 +546,7 @@ Desbloquea todas las funciones premium:
 • Videos completos  
 • Transmisiones en vivo  
 • Nearby ilimitado  
-• Salas Zoom  
+• Video Rooms  
 • Eventos privados de la comunidad
 
 Toca "Suscribete a PRIME" para obtener acceso inmediato.`,
@@ -595,7 +595,7 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
 🔥 Videos de larga duración + estrenos semanales
 🔥 Videografía completa de Santino
 🔥 Nearby ilimitado
-🔥 Transmisiones en vivo y salas Zoom
+🔥 Transmisiones en vivo y Video Rooms
 🔥 Tarjeta de perfil con foto, badges y bio
 🔥 Soporte instantáneo desde el bot
 
@@ -688,7 +688,7 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
 
 Este es tu panel PRIME.
 Desde aqui puedes acceder a todas tus funciones premium:
-abrir Salas Zoom, iniciar transmisiones en vivo, ver videos completos,
+abrir Video Rooms, iniciar transmisiones en vivo, ver videos completos,
 explorar Cercanos sin limites y unirte a eventos privados.`,
     noBlockedUsers: 'No tienes usuarios bloqueados.',
     shareProfile: '📤 Compartir Perfil',
@@ -930,8 +930,8 @@ explorar Cercanos sin limites y unirte a eventos privados.`,
       roomNotActive: 'Esta sala no está activa actualmente.',
       roomNotFound: 'Sala no encontrada.',
     },
-    // Zoom Rooms
-    zoomTitle: '`🎥 Salas Zoom`',
+    // Video Rooms
+    zoomTitle: '`🎥 Video Rooms`',
     createRoom: '➕ Crear Sala',
     joinRoom: '▶️ Unirse a Sala',
     myRooms: '📋 Mis Salas',
