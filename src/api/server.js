@@ -5,6 +5,7 @@ const paymentService = require('../bot/services/paymentService');
 const logger = require('../utils/logger');
 const { telegramAuth, checkTermsAccepted, requirePrime } = require('./middleware/telegramAuth');
 const { handleTelegramAuth, handleAcceptTerms, checkAuthStatus } = require('./handlers/telegramAuthHandler');
+const { healthCheck, authStatus, runAuthTests, getAuthActivity, getSystemMetrics } = require('./handlers/monitoringHandler');
 
 const app = express();
 const port = config.port;
@@ -23,6 +24,9 @@ app.use(session({
 
 // Serve static auth pages
 app.use('/auth', express.static(__dirname + '/../../public/auth'));
+
+// Serve monitoring dashboard
+app.use('/monitoring', express.static(__dirname + '/../../public/monitoring'));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -100,6 +104,13 @@ app.use((error, req, res, next) => {
 app.post('/api/telegram-auth', handleTelegramAuth);
 app.post('/api/accept-terms', handleAcceptTerms);
 app.get('/api/auth-status', checkAuthStatus);
+
+// Monitoring and Health Check endpoints
+app.get('/api/health', healthCheck);
+app.get('/api/monitor/auth-status', authStatus);
+app.get('/api/monitor/run-tests', runAuthTests);
+app.get('/api/monitor/auth-activity', getAuthActivity);
+app.get('/api/monitor/system-metrics', getSystemMetrics);
 
 // Logout endpoint
 app.post('/api/logout', (req, res) => {
