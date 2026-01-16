@@ -382,8 +382,7 @@ const showMainMenu = async (ctx) => {
         '🎥 Salas de video en vivo 24/7\n' +
         '📻 Radio y contenido sin restricciones\n' +
         '💬 Chat y soporte prioritario\n\n' +
-        '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
-        '`Desde solo $14.99 USD/semana 💎`'
+        '**¡Hazte PRIME!** $14.99 USD/semana 💎'
       : '`🔒 UNLOCK ALL CONTENT`\n\n' +
         `Hey ${username}, you\'re on the FREE version.\n\n` +
         '**With PRIME you get unlimited access to:**\n\n' +
@@ -392,8 +391,7 @@ const showMainMenu = async (ctx) => {
         '🎥 Live video rooms 24/7\n' +
         '📻 Radio & unrestricted content\n' +
         '💬 Priority chat & support\n\n' +
-        '**Go PRIME now and enjoy everything!**\n\n' +
-        '`Starting at just $14.99 USD/week 💎`');
+        '**Go PRIME!** $14.99 USD/week 💎');
 
     buttons = [
       [
@@ -554,8 +552,7 @@ const showMainMenuEdit = async (ctx) => {
         '🎥 Salas de video en vivo 24/7\n' +
         '📻 Radio y contenido sin restricciones\n' +
         '💬 Chat y soporte prioritario\n\n' +
-        '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
-        '`Desde solo $14.99 USD/semana 💎`'
+        '**¡Hazte PRIME!** $14.99 USD/semana 💎'
       : '`🔒 UNLOCK ALL CONTENT`\n\n' +
         `Hey ${username}, you\'re on the FREE version.\n\n` +
         '**With PRIME you get unlimited access to:**\n\n' +
@@ -564,8 +561,7 @@ const showMainMenuEdit = async (ctx) => {
         '🎥 Live video rooms 24/7\n' +
         '📻 Radio & unrestricted content\n' +
         '💬 Priority chat & support\n\n' +
-        '**Go PRIME now and enjoy everything!**\n\n' +
-        '`Starting at just $14.99 USD/week 💎`');
+        '**Go PRIME!** $14.99 USD/week 💎');
 
     buttons = [
       [
