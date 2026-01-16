@@ -9,6 +9,18 @@ const { t } = require('../../utils/i18n');
 const getLanguage = (ctx) => ctx.session?.language || 'en';
 
 /**
+ * Check if user has PRIME subscription
+ * Handles both 'active' and 'prime' status values
+ * @param {Object} user - User object with subscriptionStatus
+ * @returns {boolean} True if user is PRIME
+ */
+const isPrimeUser = (user) => {
+  if (!user) return false;
+  const status = user.subscriptionStatus || user.subscription_status;
+  return status === 'active' || status === 'prime';
+};
+
+/**
  * Safe handler wrapper with error handling
  * Automatically handles errors and sends user-friendly messages
  * @param {Function} handlerFn - Handler function to wrap
@@ -168,6 +180,7 @@ const safeReplyOrEdit = async (ctx, text, options = {}) => {
 
 module.exports = {
   getLanguage,
+  isPrimeUser,
   safeHandler,
   validateUserInput,
   isSessionExpired,

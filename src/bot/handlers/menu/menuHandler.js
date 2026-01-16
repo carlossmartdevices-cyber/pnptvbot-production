@@ -16,6 +16,8 @@ const {
 } = require('../../../config/menuConfig');
 const { detectLanguage } = require('../../../utils/languageDetector');
 const { showProfile } = require('../user/profile');
+const UserModel = require('../../../models/userModel');
+const { isPrimeUser } = require('../../utils/helpers');
 
 /**
  * Store the last menu message ID per user per chat
@@ -53,31 +55,87 @@ async function getUserLanguage(ctx) {
 }
 
 /**
- * Build main menu keyboard (for private chat)
+ * Build PRIME member menu keyboard (subscription-aware)
  */
-function buildMainMenuKeyboard(lang = 'en') {
-  const keyboard = [];
+function buildPrimeMenuKeyboard(lang = 'en') {
+  const labels = lang === 'es' ? {
+    profile: '👤 Mi Perfil',
+    membership: '💎 Mi Membresía PRIME',
+    nearby: '📍 Usuarios Cercanos',
+    hangouts: '🎥 Hangouts',
+    videorama: '📹 Videorama',
+    streams: '🔴 Transmisiones en Vivo',
+    radio: '📻 Radio',
+    support: '💬 Soporte',
+    settings: '⚙️ Configuración',
+  } : {
+    profile: '👤 My Profile',
+    membership: '💎 My PRIME Membership',
+    nearby: '📍 Nearby Users',
+    hangouts: '🎥 Hangouts',
+    videorama: '📹 Videorama',
+    streams: '🔴 Live Streams',
+    radio: '📻 Radio',
+    support: '💬 Support',
+    settings: '⚙️ Settings',
+  };
 
-  for (const category of Object.values(MENU_CONFIG.MAIN_CATEGORIES)) {
-    // Add category as a row header (optional)
-    const categoryButtons = [];
+  return Markup.inlineKeyboard([
+    [Markup.button.callback(labels.profile, 'menu:profile')],
+    [Markup.button.callback(labels.membership, 'menu:subscription_status')],
+    [Markup.button.callback(labels.nearby, 'menu:nearby')],
+    [
+      Markup.button.callback(labels.hangouts, 'menu:video_calls'),
+      Markup.button.callback(labels.videorama, 'menu:videorama'),
+    ],
+    [Markup.button.callback(labels.streams, 'menu:live_streams')],
+    [Markup.button.callback(labels.radio, 'menu:radio')],
+    [Markup.button.callback(labels.support, 'menu:support')],
+    [Markup.button.callback(labels.settings, 'menu:settings')],
+  ]);
+}
 
-    for (const option of category.options) {
-      categoryButtons.push(
-        Markup.button.callback(
-          option.title[lang] || option.title.en,
-          option.callback
-        )
-      );
-    }
+/**
+ * Build FREE user menu keyboard (sales-focused)
+ */
+function buildFreeMenuKeyboard(lang = 'en') {
+  const labels = lang === 'es' ? {
+    profile: '👤 Mi Perfil',
+    subscribe: '💎 Suscribirse a PRIME',
+    nearby: '📍 Usuarios Cercanos',
+    streams: '🔴 Transmisiones en Vivo',
+    radio: '📻 Radio',
+    support: '💬 Soporte',
+    settings: '⚙️ Configuración',
+  } : {
+    profile: '👤 My Profile',
+    subscribe: '💎 Subscribe to PRIME',
+    nearby: '📍 Nearby Users',
+    streams: '🔴 Live Streams',
+    radio: '📻 Radio',
+    support: '💬 Support',
+    settings: '⚙️ Settings',
+  };
 
-    // Split into rows of 2 buttons each
-    for (let i = 0; i < categoryButtons.length; i += 2) {
-      keyboard.push(categoryButtons.slice(i, i + 2));
-    }
+  return Markup.inlineKeyboard([
+    [Markup.button.callback(labels.profile, 'menu:profile')],
+    [Markup.button.callback(labels.subscribe, 'menu:subscribe')],
+    [Markup.button.callback(labels.nearby, 'menu:nearby')],
+    [Markup.button.callback(labels.streams, 'menu:live_streams')],
+    [Markup.button.callback(labels.radio, 'menu:radio')],
+    [Markup.button.callback(labels.support, 'menu:support')],
+    [Markup.button.callback(labels.settings, 'menu:settings')],
+  ]);
+}
+
+/**
+ * Build main menu keyboard based on subscription status
+ */
+function buildMainMenuKeyboard(lang = 'en', isPrime = false) {
+  if (isPrime) {
+    return buildPrimeMenuKeyboard(lang);
   }
-
-  return Markup.inlineKeyboard(keyboard);
+  return buildFreeMenuKeyboard(lang);
 }
 
 /**
@@ -266,9 +324,19 @@ async function handleMenuCommand(ctx) {
       return;
     }
 
-    // Private chat - display full menu (same as /start)
-    const message = getMessage('MAIN_MENU', lang);
-    const keyboard = buildMainMenuKeyboard(lang);
+    // Private chat - display subscription-aware menu
+    // Fetch user data to determine subscription status
+    const user = await UserModel.getById(ctx.from.id);
+    const userIsPrime = isPrimeUser(user);
+
+    // Different message for PRIME vs FREE users
+    const message = userIsPrime
+      ? (lang === 'es'
+        ? '💎 *¡Hola, miembro PRIME!*\n\nSelecciona una opción del menú:'
+        : '💎 *Hello, PRIME member!*\n\nSelect an option from the menu:')
+      : getMessage('MAIN_MENU', lang);
+
+    const keyboard = buildMainMenuKeyboard(lang, userIsPrime);
 
     // Delete previous menu message first (single message rule)
     await deletePreviousMenuMessage(ctx);
@@ -284,7 +352,7 @@ async function handleMenuCommand(ctx) {
     // Schedule auto-delete for menu message (1 minute)
     ChatCleanupService.scheduleMenuMessage(ctx.telegram, sentMessage);
 
-    logger.info(`Main menu displayed for user ${ctx.from.id} in private chat`);
+    logger.info(`Main menu displayed for user ${ctx.from.id} in private chat (isPrime: ${userIsPrime})`);
 
   } catch (error) {
     logger.error('Error handling menu command:', error);
@@ -365,8 +433,17 @@ async function handleMenuCallback(ctx) {
 
     // Handle back button
     if (action === 'back') {
-      const message = getMessage('MAIN_MENU', lang);
-      const keyboard = buildMainMenuKeyboard(lang);
+      // Fetch user data to determine subscription status
+      const user = await UserModel.getById(ctx.from.id);
+      const userIsPrime = isPrimeUser(user);
+
+      const message = userIsPrime
+        ? (lang === 'es'
+          ? '💎 *¡Hola, miembro PRIME!*\n\nSelecciona una opción del menú:'
+          : '💎 *Hello, PRIME member!*\n\nSelect an option from the menu:')
+        : getMessage('MAIN_MENU', lang);
+
+      const keyboard = buildMainMenuKeyboard(lang, userIsPrime);
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -511,11 +588,60 @@ async function handleMenuCallback(ctx) {
 // ==========================================
 
 async function handleSubscribeMenu(ctx, lang) {
+  // Check if user is already PRIME
+  const user = await UserModel.getById(ctx.from.id);
+  const userIsPrime = isPrimeUser(user);
+
+  if (userIsPrime) {
+    // User is already PRIME - show membership status
+    const expiryText = user.planExpiry
+      ? new Date(user.planExpiry).toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+      : (lang === 'es' ? 'Sin vencimiento' : 'No expiration');
+
+    const message = lang === 'es'
+      ? `💎 *¡Ya eres miembro PRIME!*\n\n` +
+        `✅ Estado: Activo\n` +
+        `📅 Expira: ${expiryText}\n` +
+        `📦 Plan: ${user.planId || 'PRIME'}\n\n` +
+        `🎉 Disfruta de todos los beneficios exclusivos de tu membresía.`
+      : `💎 *You're already a PRIME member!*\n\n` +
+        `✅ Status: Active\n` +
+        `📅 Expires: ${expiryText}\n` +
+        `📦 Plan: ${user.planId || 'PRIME'}\n\n` +
+        `🎉 Enjoy all the exclusive benefits of your membership.`;
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
+    ]);
+
+    await ctx.editMessageText(message, {
+      parse_mode: 'Markdown',
+      ...keyboard
+    });
+    return;
+  }
+
+  // User is FREE - show subscription options
   const message = lang === 'es'
-    ? '✨ *Suscripción*\n\nAquí puedes suscribirte para acceder a contenido exclusivo.\n\n_Esta función estará disponible pronto._'
-    : '✨ *Subscription*\n\nHere you can subscribe to access exclusive content.\n\n_This feature is coming soon._';
+    ? '✨ *Suscripción PRIME*\n\n' +
+      '💎 Con PRIME obtienes acceso a:\n\n' +
+      '• 🎥 Hangouts y Videorama\n' +
+      '• 📹 Salas de video exclusivas\n' +
+      '• 🔴 Transmisiones en vivo premium\n' +
+      '• 📍 Usuarios cercanos sin límites\n' +
+      '• 💬 Canal PRIME exclusivo\n\n' +
+      '¡Únete ahora y disfruta de todos los beneficios!'
+    : '✨ *PRIME Subscription*\n\n' +
+      '💎 With PRIME you get access to:\n\n' +
+      '• 🎥 Hangouts and Videorama\n' +
+      '• 📹 Exclusive video rooms\n' +
+      '• 🔴 Premium live streams\n' +
+      '• 📍 Unlimited nearby users\n' +
+      '• 💬 Exclusive PRIME channel\n\n' +
+      'Join now and enjoy all the benefits!';
 
   const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback(lang === 'es' ? '💳 Ver Planes' : '💳 View Plans', 'menu:view_plans')],
     [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
   ]);
 
@@ -541,13 +667,48 @@ async function handlePrimeContent(ctx, lang) {
 }
 
 async function handleSubscriptionStatus(ctx, lang) {
-  const message = lang === 'es'
-    ? '📊 *Estado de Suscripción*\n\nAquí puedes ver el estado de tu suscripción.\n\n_Esta función estará disponible pronto._'
-    : '📊 *Subscription Status*\n\nHere you can view your subscription status.\n\n_This feature is coming soon._';
+  // Fetch fresh user data
+  const user = await UserModel.getById(ctx.from.id);
+  const userIsPrime = isPrimeUser(user);
+
+  let message;
+
+  if (userIsPrime) {
+    const expiryText = user.planExpiry
+      ? new Date(user.planExpiry).toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+      : (lang === 'es' ? 'Sin vencimiento (Lifetime)' : 'No expiration (Lifetime)');
+
+    message = lang === 'es'
+      ? `💎 *Mi Membresía PRIME*\n\n` +
+        `✅ *Estado:* Activo\n` +
+        `📦 *Plan:* ${user.planId || 'PRIME'}\n` +
+        `📅 *Expira:* ${expiryText}\n` +
+        `🏷️ *Tier:* ${user.tier || 'Prime'}\n\n` +
+        `🎉 ¡Disfruta de todos los beneficios exclusivos!`
+      : `💎 *My PRIME Membership*\n\n` +
+        `✅ *Status:* Active\n` +
+        `📦 *Plan:* ${user.planId || 'PRIME'}\n` +
+        `📅 *Expires:* ${expiryText}\n` +
+        `🏷️ *Tier:* ${user.tier || 'Prime'}\n\n` +
+        `🎉 Enjoy all the exclusive benefits!`;
+  } else {
+    message = lang === 'es'
+      ? `📊 *Estado de Suscripción*\n\n` +
+        `❌ *Estado:* Sin membresía PRIME\n` +
+        `🏷️ *Tier:* ${user?.tier || 'Free'}\n\n` +
+        `💎 Suscríbete a PRIME para acceder a todos los beneficios exclusivos.`
+      : `📊 *Subscription Status*\n\n` +
+        `❌ *Status:* No PRIME membership\n` +
+        `🏷️ *Tier:* ${user?.tier || 'Free'}\n\n` +
+        `💎 Subscribe to PRIME to access all exclusive benefits.`;
+  }
 
   const keyboard = Markup.inlineKeyboard([
+    userIsPrime
+      ? []
+      : [Markup.button.callback(lang === 'es' ? '💎 Suscribirse' : '💎 Subscribe', 'menu:subscribe')],
     [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
-  ]);
+  ].filter(row => row.length > 0));
 
   await ctx.editMessageText(message, {
     parse_mode: 'Markdown',

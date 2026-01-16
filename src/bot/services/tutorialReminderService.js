@@ -1,7 +1,7 @@
 const { query } = require('../../config/postgres');
 const { Markup } = require('telegraf');
 const logger = require('../../utils/logger');
-const { config } = require('../../config/config');
+const config = require('../../config/config');
 
 /**
  * Tutorial Reminder Service

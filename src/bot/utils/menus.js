@@ -5,27 +5,32 @@
 /**
  * Main menu for users
  * @param {string} [language='en'] - Language code ('en' or 'es')
+ * @param {boolean} [isPrime=false] - Whether user is PRIME member
  * @returns {{inline_keyboard: Array<Array<{text: string, callback_data: string}>>}} Inline keyboard markup
  */
-const getMainMenu = (language = 'en') => {
+const getMainMenu = (language = 'en', isPrime = false) => {
   const labels = {
     en: {
       profile: '👤 My Profile',
       subscribe: '💎 Subscribe to PRIME',
+      membership: '💎 My PRIME Membership',
       nearby: '📍 Nearby Users',
+      hangouts: '🎥 Hangouts',
+      videorama: '📹 Videorama',
       streams: '🎥 Live Streams',
       radio: '📻 Radio',
-      zoom: '🎥 Zoom Rooms',
       support: '💬 Support',
       settings: '⚙️ Settings',
     },
     es: {
       profile: '👤 Mi Perfil',
       subscribe: '💎 Suscribirse a PRIME',
+      membership: '💎 Mi Membresía PRIME',
       nearby: '📍 Usuarios Cercanos',
+      hangouts: '🎥 Hangouts',
+      videorama: '📹 Videorama',
       streams: '🎥 Transmisiones en Vivo',
       radio: '📻 Radio',
-      zoom: '🎥 Salas Zoom',
       support: '💬 Soporte',
       settings: '⚙️ Configuración',
     },
@@ -33,17 +38,34 @@ const getMainMenu = (language = 'en') => {
 
   const l = labels[language] || labels.en;
 
+  // Build menu based on subscription status
+  const buttons = [
+    [{ text: l.profile, callback_data: 'menu_profile' }],
+  ];
+
+  if (isPrime) {
+    // PRIME user menu - show features instead of subscribe button
+    buttons.push([{ text: l.membership, callback_data: 'menu_membership' }]);
+    buttons.push([{ text: l.nearby, callback_data: 'menu_nearby' }]);
+    buttons.push([
+      { text: l.hangouts, callback_data: 'menu_hangouts' },
+      { text: l.videorama, callback_data: 'menu_videorama' },
+    ]);
+    buttons.push([{ text: l.streams, callback_data: 'menu_streams' }]);
+    buttons.push([{ text: l.radio, callback_data: 'menu_radio' }]);
+  } else {
+    // FREE user menu - show subscribe button prominently
+    buttons.push([{ text: l.subscribe, callback_data: 'menu_subscribe' }]);
+    buttons.push([{ text: l.nearby, callback_data: 'menu_nearby' }]);
+    buttons.push([{ text: l.streams, callback_data: 'menu_streams' }]);
+    buttons.push([{ text: l.radio, callback_data: 'menu_radio' }]);
+  }
+
+  buttons.push([{ text: l.support, callback_data: 'menu_support' }]);
+  buttons.push([{ text: l.settings, callback_data: 'menu_settings' }]);
+
   return {
-    inline_keyboard: [
-      [{ text: l.profile, callback_data: 'menu_profile' }],
-      [{ text: l.subscribe, callback_data: 'menu_subscribe' }],
-      [{ text: l.nearby, callback_data: 'menu_nearby' }],
-      [{ text: l.streams, callback_data: 'menu_streams' }],
-      [{ text: l.radio, callback_data: 'menu_radio' }],
-      [{ text: l.zoom, callback_data: 'menu_zoom' }],
-      [{ text: l.support, callback_data: 'menu_support' }],
-      [{ text: l.settings, callback_data: 'menu_settings' }],
-    ],
+    inline_keyboard: buttons,
   };
 };
 

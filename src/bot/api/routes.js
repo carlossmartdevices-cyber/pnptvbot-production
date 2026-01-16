@@ -56,6 +56,27 @@ app.use(session({
 // Logging (before other middleware for accurate request tracking)
 app.use(morgan('combined', { stream: logger.stream }));
 
+// Serve auth wrappers before static middleware to prevent conflicts
+app.get(['/videorama-app', '/videorama-app/'], pageLimiter, (req, res) => {
+  const authWrapperPath = path.join(__dirname, '../../../public/videorama-app/auth-wrapper.html');
+  if (!fs.existsSync(authWrapperPath)) {
+    return res.status(404).send('Videorama auth wrapper not found.');
+  }
+  // Set cache control headers to prevent browser caching issues
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  return res.sendFile(authWrapperPath);
+});
+
+app.get('/hangouts', pageLimiter, (req, res) => {
+  // Set cache control headers to prevent browser caching issues
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, '../../../public/hangouts/auth-wrapper.html'));
+});
+
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../../../public')));
 
@@ -189,20 +210,6 @@ app.get('/policies', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
 
-// Videorama (new) - React app build output under /public/videorama-app
-// Serve auth wrapper first
-app.get(['/videorama-app', '/videorama-app/'], pageLimiter, (req, res) => {
-  const authWrapperPath = path.join(__dirname, '../../../public/videorama-app/auth-wrapper.html');
-  if (!fs.existsSync(authWrapperPath)) {
-    return res.status(404).send('Videorama auth wrapper not found.');
-  }
-  // Set cache control headers to prevent browser caching issues
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  return res.sendFile(authWrapperPath);
-});
-
 // Protected Videorama app - requires authentication
 app.get('/videorama/app', telegramAuth, checkTermsAccepted, (req, res) => {
   const indexPath = path.join(__dirname, '../../../public/videorama-app/index.html');
@@ -218,15 +225,6 @@ app.get('/videorama/app', telegramAuth, checkTermsAccepted, (req, res) => {
 
 // Music Collections and Playlists routes have been removed
 // These functionalities are now integrated into the Videorama app
-
-// Hangouts page - serve auth wrapper
-app.get('/hangouts', pageLimiter, (req, res) => {
-  // Set cache control headers to prevent browser caching issues
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(__dirname, '../../../public/hangouts/auth-wrapper.html'));
-});
 
 // Protected Hangouts app - requires authentication
 app.get('/hangouts/app', telegramAuth, checkTermsAccepted, (req, res) => {

@@ -22,7 +22,10 @@ module.exports = {
   GROUP_INVITE_LINK: process.env.GROUP_INVITE_LINK || 'https://t.me/pnptvgroup',
   SUPPORT_GROUP_ID: process.env.SUPPORT_GROUP_ID,
   SUPPORT_GROUP_NAME: process.env.SUPPORT_GROUP_NAME || 'PNPtv Support Team',
-  NOTIFICATIONS_TOPIC_ID: process.env.NOTIFICATIONS_TOPIC_ID,
+  NOTIFICATIONS_TOPIC_ID: process.env.NOTIFICATIONS_TOPIC_ID ? parseInt(process.env.NOTIFICATIONS_TOPIC_ID) : null,
+  WALL_OF_FAME_TOPIC_ID: process.env.WALL_OF_FAME_TOPIC_ID ? parseInt(process.env.WALL_OF_FAME_TOPIC_ID.replace(/.*\//, '')) : null,
+  GENERAL_TOPIC_ID: process.env.GENERAL_TOPIC_ID ? parseInt(process.env.GENERAL_TOPIC_ID) : 1,
+  HANGOUTS_TOPIC_ID: process.env.HANGOUTS_TOPIC_ID ? parseInt(process.env.HANGOUTS_TOPIC_ID) : null,
 
   // ==================== ENVIRONMENT ====================
   NODE_ENV: process.env.NODE_ENV || 'development',

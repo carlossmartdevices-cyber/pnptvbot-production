@@ -3,6 +3,8 @@ const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const ChatCleanupService = require('../../services/chatCleanupService');
 const PermissionService = require('../../services/permissionService');
+const { isPrimeUser } = require('../../utils/helpers');
+const UserModel = require('../../../models/userModel');
 
 /**
  * Sanitize text for Telegram Markdown to prevent parsing errors
@@ -235,11 +237,26 @@ const registerMenuHandlers = (bot) => {
  * @param {Context} ctx - Telegraf context
  * @returns {Object} { isPremium, isAdmin, viewMode }
  */
-const getEffectiveViewMode = (ctx) => {
-  const user = ctx.session?.user || {};
+const getEffectiveViewMode = async (ctx) => {
   const userId = ctx.from?.id;
-  const actualIsAdmin = user.role === 'admin' || PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId);
-  const actualIsPremium = user.subscriptionStatus === 'active';
+
+  // ALWAYS fetch fresh user data from database - don't rely on stale session data
+  let user;
+  try {
+    user = await UserModel.getById(userId);
+  } catch (error) {
+    logger.warn('Error fetching user in getEffectiveViewMode:', error.message);
+    user = ctx.session?.user || {};
+  }
+
+  // Check admin status using env vars (most reliable) or database role
+  const actualIsAdmin = PermissionService.isEnvSuperAdmin(userId) ||
+                        PermissionService.isEnvAdmin(userId) ||
+                        user?.role === 'admin' ||
+                        user?.role === 'superadmin';
+
+  // Check PRIME status from fresh database data
+  const actualIsPremium = isPrimeUser(user);
 
   // Check if admin has set a view mode
   const adminViewMode = ctx.session?.adminViewMode;
@@ -280,7 +297,7 @@ const showMainMenu = async (ctx) => {
   }
 
   // Get effective view mode (handles admin preview)
-  const viewState = getEffectiveViewMode(ctx);
+  const viewState = await getEffectiveViewMode(ctx);
   const { isPremium, isAdmin, isPreviewMode, viewMode, actualIsAdmin } = viewState;
 
   let menuText;
@@ -338,7 +355,7 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
       ],
       [
-        Markup.button.url(lang === 'es' ? '🎬 Ver Contenido' : '🎬 Watch Content', 'https://t.me/+mUGxQj6w9AI2NGUx'),
+        Markup.button.url(lang === 'es' ? '🎬 Ver Contenido' : '🎬 Watch Content', 'https://t.me/+GDD0AAVbvGM3MGEx'),
       ],
       [
         Markup.button.url(lang === 'es' ? '🎥 PNPtv main Room!' : '🎥 PNPtv main Room!', jitsiUrl),
@@ -459,7 +476,7 @@ const showMainMenuEdit = async (ctx) => {
   const username = ctx.from?.username || ctx.from?.first_name || 'Member';
 
   // Get effective view mode (handles admin preview)
-  const viewState = getEffectiveViewMode(ctx);
+  const viewState = await getEffectiveViewMode(ctx);
   const { isPremium, isAdmin, isPreviewMode, viewMode, actualIsAdmin } = viewState;
 
   let menuText;
@@ -510,7 +527,7 @@ const showMainMenuEdit = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
       ],
       [
-        Markup.button.url(lang === 'es' ? '🎬 Ver Contenido' : '🎬 Watch Content', 'https://t.me/+mUGxQj6w9AI2NGUx'),
+        Markup.button.url(lang === 'es' ? '🎬 Ver Contenido' : '🎬 Watch Content', 'https://t.me/+GDD0AAVbvGM3MGEx'),
       ],
       [
         Markup.button.url(lang === 'es' ? '🎥 PNPtv main Room!' : '🎥 PNPtv main Room!', jitsiUrl),
@@ -598,7 +615,7 @@ const showMainMenuEdit = async (ctx) => {
  */
 const showLiveRadioTopicMenu = async (ctx) => {
   const user = ctx.session?.user || {};
-  const isPremium = user.subscriptionStatus === 'active';
+  const isPremium = isPrimeUser(user);
   const userId = ctx.from?.id;
   const isAdmin = user.role === 'admin' || PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId);
   const firstName = ctx.from?.first_name || 'friend';

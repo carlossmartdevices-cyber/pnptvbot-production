@@ -81,6 +81,14 @@ class PermissionService {
    */
   static async getUserRole(userId) {
     try {
+      // Check env vars first for admin status
+      if (this.isEnvSuperAdmin(userId)) {
+        return 'superadmin';
+      }
+      if (this.isEnvAdmin(userId)) {
+        return 'admin';
+      }
+      // Fall back to database role
       const user = await UserModel.getById(userId);
       return user?.role || 'user';
     } catch (error) {

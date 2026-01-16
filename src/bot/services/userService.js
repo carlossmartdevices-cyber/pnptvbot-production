@@ -8,6 +8,71 @@ const PermissionService = require('./permissionService');
  */
 class UserService {
   /**
+   * Get user by ID
+   * @param {number|string} userId - User ID
+   * @returns {Promise<Object|null>} User data or null
+   */
+  static async getUser(userId) {
+    try {
+      return await UserModel.getById(userId);
+    } catch (error) {
+      logger.error('Error getting user:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get or create user by ID and data
+   * @param {number|string} userId - User ID
+   * @param {Object} userData - User data (username, firstName, lastName)
+   * @returns {Promise<Object>} User data
+   */
+  static async getOrCreateUser(userId, userData = {}) {
+    try {
+      let user = await UserModel.getById(userId);
+
+      if (!user) {
+        // Create new user
+        const createData = {
+          userId: userId,
+          username: userData.username || '',
+          firstName: userData.firstName || '',
+          lastName: userData.lastName || '',
+          language: userData.language || 'en',
+          subscriptionStatus: 'free',
+        };
+
+        user = await UserModel.createOrUpdate(createData);
+        logger.info('New user created', { userId });
+      }
+
+      return user;
+    } catch (error) {
+      logger.error('Error getting/creating user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update user by ID
+   * @param {number|string} userId - User ID
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<boolean>} Success status
+   */
+  static async updateUser(userId, updates) {
+    try {
+      const success = await UserModel.updateProfile(userId, updates);
+      if (success) {
+        logger.debug('User updated', { userId, updates: Object.keys(updates) });
+      }
+      return success;
+    } catch (error) {
+      logger.error('Error updating user:', error);
+      return false;
+    }
+  }
+
+  /**
    * Create or get user from Telegram context
    * @param {Object} ctx - Telegraf context
    * @returns {Promise<Object>} User data
@@ -148,8 +213,8 @@ class UserService {
 
       if (!user) return false;
 
-      // If user has no subscription or status is not active, return false
-      if (user.subscriptionStatus !== 'active') return false;
+      // If user has no subscription or status is not active/prime, return false
+      if (user.subscriptionStatus !== 'active' && user.subscriptionStatus !== 'prime') return false;
 
       // Check if subscription is expired
       if (user.planExpiry) {

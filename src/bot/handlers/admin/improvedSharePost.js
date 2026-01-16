@@ -70,16 +70,23 @@ const registerImprovedSharePostHandlers = (bot) => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // DESTINATION CONFIGURATION - Hardcoded targets
+  // DESTINATION CONFIGURATION - From environment variables
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Available destinations
+  // Parse topic IDs from env (handles URL format like t.me/c/xxx/2)
+  const parseTopicId = (value) => {
+    if (!value) return null;
+    const parsed = parseInt(String(value).replace(/.*\//, ''));
+    return isNaN(parsed) ? null : parsed;
+  };
+
+  // Available destinations - dynamically configured from env
   const SHARE_DESTINATIONS = [
-    { id: 'prime', chatId: process.env.PRIME_CHANNEL_ID || '-1002997324714', threadId: null, name: '💎 Prime Channel', type: 'channel' },
-    { id: 'general', chatId: process.env.GROUP_ID || '-1003291737499', threadId: 1, name: '💬 General', type: 'topic' },
-    { id: 'walloffame', chatId: process.env.GROUP_ID || '-1003291737499', threadId: 3132, name: '🏆 Wall Of Fame', type: 'topic' },
-    { id: 'hangouts', chatId: process.env.GROUP_ID || '-1003291737499', threadId: 10682, name: '🎉 Hangouts Notifications', type: 'topic' },
-  ];
+    { id: 'prime', chatId: process.env.PRIME_CHANNEL_ID, threadId: null, name: '💎 Prime Channel', type: 'channel' },
+    { id: 'general', chatId: process.env.GROUP_ID, threadId: parseInt(process.env.GENERAL_TOPIC_ID) || 1, name: '💬 General', type: 'topic' },
+    { id: 'walloffame', chatId: process.env.GROUP_ID, threadId: parseTopicId(process.env.WALL_OF_FAME_TOPIC_ID) || 2, name: '🏆 Wall Of Fame', type: 'topic' },
+    { id: 'hangouts', chatId: process.env.GROUP_ID, threadId: parseInt(process.env.HANGOUTS_TOPIC_ID) || parseInt(process.env.NOTIFICATIONS_TOPIC_ID) || null, name: '🎉 Hangouts Notifications', type: 'topic' },
+  ].filter(d => d.chatId); // Only include destinations with valid chatId
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DESTINATION SELECTION HANDLERS

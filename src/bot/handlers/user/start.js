@@ -1,5 +1,6 @@
 const { getMainMenu, getLanguageMenu } = require('../../utils/menus');
 const { requirePrivateChat } = require('../../utils/notifications');
+const { isPrimeUser } = require('../../utils/helpers');
 const userService = require('../../services/userService');
 const i18n = require('../../utils/i18n');
 const logger = require('../../../utils/logger');
@@ -31,12 +32,12 @@ async function handleStart(ctx) {
     const user = await userService.getOrCreateUser(userId, userData);
 
     // Check if onboarding is complete
-    if (user.onboardingCompleted) {
-      // Show main menu
+    if (user.onboardingComplete) {
+      // Show main menu with PRIME-specific options if user is PRIME
       const language = user.language || 'en';
       await ctx.reply(
         i18n.t('welcome', language),
-        { reply_markup: getMainMenu(language) }
+        { reply_markup: getMainMenu(language, isPrimeUser(user)) }
       );
     } else {
       // Start onboarding - language selection
@@ -272,7 +273,10 @@ async function handleLocationInput(ctx) {
     }
 
     // Complete onboarding
-    await userService.updateUser(userId, { onboardingCompleted: true });
+    await userService.updateUser(userId, { onboardingComplete: true });
+
+    // Get updated user data for menu
+    const user = await userService.getUser(userId);
 
     // Clear session
     await ctx.clearSession();
@@ -281,7 +285,7 @@ async function handleLocationInput(ctx) {
     await ctx.reply(
       i18n.t('profile_complete', language),
       {
-        reply_markup: getMainMenu(language),
+        reply_markup: getMainMenu(language, isPrimeUser(user)),
       }
     );
 

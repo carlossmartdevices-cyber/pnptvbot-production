@@ -177,7 +177,8 @@
       "Bash(node -e:*)",
       "Bash(journalctl:*)",
       "Bash(node scripts/run-membership-cleanup.js:*)",
-      "Bash(NODE_OPTIONS=\"--dns-result-order=ipv4first\" node:*)"
+      "Bash(NODE_OPTIONS=\"--dns-result-order=ipv4first\" node:*)",
+      "Bash(sudo -u postgres psql:*)"
     ],
     "deny": [],
     "ask": []

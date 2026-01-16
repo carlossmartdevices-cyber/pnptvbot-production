@@ -267,13 +267,16 @@ class UserModel {
    */
   static async updateSubscription(userId, subscription) {
     try {
+      // Determine tier based on status - active status means PRIME tier
+      const tier = (subscription.status === 'active' || subscription.status === 'prime') ? 'Prime' : 'Free';
+
       await query(
-        `UPDATE ${TABLE} SET subscription_status = $2, plan_id = $3, plan_expiry = $4, updated_at = NOW() WHERE id = $1`,
-        [userId.toString(), subscription.status, subscription.planId, subscription.expiry]
+        `UPDATE ${TABLE} SET subscription_status = $2, plan_id = $3, plan_expiry = $4, tier = $5, updated_at = NOW() WHERE id = $1`,
+        [userId.toString(), subscription.status, subscription.planId, subscription.expiry, tier]
       );
       await cache.del(`user:${userId}`);
       await cache.delPattern('nearby:*');
-      logger.info('User subscription updated', { userId, subscription });
+      logger.info('User subscription updated', { userId, subscription, tier });
       return true;
     } catch (error) {
       logger.error('Error updating subscription:', error);
