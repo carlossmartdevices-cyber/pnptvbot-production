@@ -64,6 +64,7 @@ const GroupCleanupService = require('../services/groupCleanupService');
 const broadcastScheduler = require('../../services/broadcastScheduler');
 const SubscriptionReminderService = require('../services/subscriptionReminderService');
 const MembershipCleanupService = require('../services/membershipCleanupService');
+const TutorialReminderService = require('../services/tutorialReminderService');
 const radioStreamManager = require('../../services/radio/radioStreamManager');
 const CommunityPostScheduler = require('./schedulers/communityPostScheduler');
 const { startCronJobs } = require('../../../scripts/cron');
@@ -209,6 +210,9 @@ const startBot = async () => {
     // Initialize membership cleanup service (for daily status updates and channel management)
     MembershipCleanupService.initialize(bot);
     logger.info('✓ Membership cleanup service initialized');
+    // Initialize tutorial reminder service (proactive tutorials for FREE and PRIME users)
+    TutorialReminderService.initialize(bot);
+    logger.info('✓ Tutorial reminder service initialized');
     // Initialize group cleanup service
     const groupCleanup = new GroupCleanupService(bot);
     groupCleanup.initialize();

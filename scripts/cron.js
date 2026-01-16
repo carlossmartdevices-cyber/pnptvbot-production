@@ -5,6 +5,7 @@ const { initializeRedis } = require('../src/config/redis');
 const { initializePostgres } = require('../src/config/postgres');
 const UserService = require('../src/bot/services/userService');
 const MembershipCleanupService = require('../src/bot/services/membershipCleanupService');
+const TutorialReminderService = require('../src/bot/services/tutorialReminderService');
 const logger = require('../src/utils/logger');
 
 /**
@@ -19,9 +20,10 @@ const startCronJobs = async (bot = null) => {
     initializeRedis();
     await initializePostgres();
 
-    // Initialize MembershipCleanupService with bot if provided
+    // Initialize services with bot if provided
     if (bot) {
       MembershipCleanupService.initialize(bot);
+      TutorialReminderService.initialize(bot);
     }
 
     // Full membership cleanup daily at midnight
@@ -47,6 +49,28 @@ const startCronJobs = async (bot = null) => {
         logger.info(`Processed ${processed} expired subscriptions`);
       } catch (error) {
         logger.error('Error in subscription expiry cron:', error);
+      }
+    });
+
+    // Tutorial reminders for FREE users (how to become PRIME) - daily at 10 AM UTC
+    cron.schedule(process.env.FREE_TUTORIAL_CRON || '0 10 * * *', async () => {
+      try {
+        logger.info('Running FREE user tutorial reminders...');
+        const results = await TutorialReminderService.sendFreeTutorials(50);
+        logger.info('FREE tutorials completed', results);
+      } catch (error) {
+        logger.error('Error in FREE tutorial cron:', error);
+      }
+    });
+
+    // Tutorial reminders for PRIME users (how to use features) - daily at 2 PM UTC
+    cron.schedule(process.env.PRIME_TUTORIAL_CRON || '0 14 * * *', async () => {
+      try {
+        logger.info('Running PRIME user tutorial reminders...');
+        const results = await TutorialReminderService.sendPrimeTutorials(50);
+        logger.info('PRIME tutorials completed', results);
+      } catch (error) {
+        logger.error('Error in PRIME tutorial cron:', error);
       }
     });
 
