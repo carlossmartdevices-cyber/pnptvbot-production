@@ -177,16 +177,16 @@ async function sendWelcomeMessage(ctx, username, user, lang) {
 
 💎 PRIME te da: Videos completos, Nearby ilimitado, Hangouts, Videorama 24/7 y más.
 
-💰 $14.99/mes · Lifetime: $100
-👉 /subscribe`
+💰 $14.99/semana
+🔥 HOT LIFETIME SPECIAL: $100 → pnptv.app/lifetime100`
       : `👋 Hey ${username}, welcome to PNPtv!
 
 ⭐ Status: ${subscriptionStatus}
 
 💎 PRIME unlocks: Full videos, unlimited Nearby, Hangouts, Videorama 24/7 and more.
 
-💰 $14.99/month · Lifetime: $100
-👉 /subscribe`;
+💰 $14.99/week
+🔥 HOT LIFETIME SPECIAL: $100 → pnptv.app/lifetime100`;
 
     const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
 

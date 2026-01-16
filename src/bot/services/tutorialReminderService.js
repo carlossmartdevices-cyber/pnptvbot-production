@@ -113,7 +113,7 @@ class TutorialReminderService {
    * Send PRIME features tutorial to group
    */
   static async sendPrimeFeaturesTutorial() {
-    const message = '💎 PRIME: Full videos, unlimited Nearby, Hangouts, Videorama 24/7.\n\n💰 $14.99/month · Lifetime $100\n👉 /subscribe';
+    const message = '💎 PRIME: Full videos, unlimited Nearby, Hangouts, Videorama 24/7.\n\n💰 $14.99/week\n🔥 HOT LIFETIME SPECIAL: $100 → pnptv.app/lifetime100';
 
     try {
       await this.bot.telegram.sendMessage(this.GROUP_ID, message, {
@@ -191,7 +191,7 @@ Ready to unlock all the cloudy fun? Here's how:
 *Step 3:* Pay securely via Meru or crypto
 *Step 4:* Get instant PRIME access!
 
-💰 *Plans start at just $14.99/month*
+💰 *Plans start at just $14.99/week*
 
 🔒 All payments are secure and private.`,
         button: { text: '💎 View Plans', callback: 'show_subscription_plans' }
@@ -275,7 +275,7 @@ Lo que te estás perdiendo:
 *Paso 3:* Paga de forma segura via Meru o cripto
 *Paso 4:* ¡Obtén acceso PRIME instantáneo!
 
-💰 *Los planes empiezan en solo $14.99/mes*
+💰 *Los planes empiezan en solo $14.99/semana*
 
 🔒 Todos los pagos son seguros y privados.`,
         button: { text: '💎 Ver Planes', callback: 'show_subscription_plans' }
