@@ -3,6 +3,7 @@ const logger = require('../../../utils/logger');
 const { getLanguage, safeReplyOrEdit } = require('../../utils/helpers');
 const UserService = require('../../services/userService');
 const PermissionService = require('../../services/permissionService');
+const { showMainMenu: showUserMainMenu } = require('../user/menu');
 
 /**
  * Store the last menu message ID per user per chat
@@ -958,10 +959,20 @@ Click the button below to connect!`;
   /**
    * /menu command - Main entry point
    * Can be used in groups and private chats
+   * In private chats, uses the same menu as /start (from user/menu.js)
+   * In groups, uses the group-specific menu
    */
   bot.command('menu', async (ctx) => {
     try {
-      await showMainMenu(ctx);
+      const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+
+      if (isGroup) {
+        // Use group menu
+        await showMainMenu(ctx);
+      } else {
+        // Use the same menu as /start for private chats
+        await showUserMainMenu(ctx);
+      }
     } catch (error) {
       logger.error('Error in /menu command:', error);
       const lang = getLanguage(ctx);
