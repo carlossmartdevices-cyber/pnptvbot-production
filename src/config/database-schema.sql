@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
   location_name VARCHAR(255),
   location_geohash VARCHAR(50),
   location_updated_at TIMESTAMP,
+  location_sharing_enabled BOOLEAN DEFAULT TRUE,
 
   -- Subscription
   subscription_status VARCHAR(50) DEFAULT 'free',
@@ -84,6 +85,7 @@ CREATE INDEX IF NOT EXISTS idx_users_subscription_status ON users(subscription_s
 CREATE INDEX IF NOT EXISTS idx_users_tier ON users(tier);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_location ON users(location_lat, location_lng) WHERE location_lat IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_location_sharing ON users(location_sharing_enabled) WHERE location_sharing_enabled = TRUE;
 CREATE INDEX IF NOT EXISTS idx_users_plan_expiry ON users(plan_expiry) WHERE plan_expiry IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(last_active);
 

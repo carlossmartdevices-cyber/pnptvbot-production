@@ -256,7 +256,8 @@ class SubscriptionController {
           const plan = await PlanModel.getById(planId);
           if (plan) {
             const expiryDate = new Date();
-            expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
+            const durationDays = plan.duration_days || plan.duration || 30;
+            expiryDate.setDate(expiryDate.getDate() + durationDays);
 
             await UserModel.updateSubscription(telegramId, {
               status: 'active',

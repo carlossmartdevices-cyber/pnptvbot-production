@@ -377,7 +377,8 @@ class PaymentService {
           const plan = await PlanModel.getById(planId);
           if (plan) {
             const expiryDate = new Date();
-            expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
+            const durationDays = plan.duration_days || plan.duration || 30;
+            expiryDate.setDate(expiryDate.getDate() + durationDays);
 
             await UserModel.updateSubscription(userId, {
               status: 'active',
@@ -422,7 +423,8 @@ class PaymentService {
             // Get user language (from user record or default to Spanish)
             const userLanguage = user?.language || 'es';
             const expiryDate = new Date();
-            expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
+            const durationDays = plan.duration_days || plan.duration || 30;
+            expiryDate.setDate(expiryDate.getDate() + durationDays);
 
             // 1. Send invoice email from easybots.store
             try {
@@ -624,7 +626,8 @@ class PaymentService {
 
           if (plan) {
             const expiryDate = new Date();
-            expiryDate.setDate(expiryDate.getDate() + (plan.duration || 30));
+            const durationDays = plan.duration_days || plan.duration || 30;
+            expiryDate.setDate(expiryDate.getDate() + durationDays);
 
             await UserModel.updateSubscription(userId, {
               status: 'active',

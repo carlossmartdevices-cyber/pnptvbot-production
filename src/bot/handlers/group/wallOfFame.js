@@ -51,7 +51,7 @@ const registerWallOfFameHandlers = (bot) => {
       const lang = getLanguage(ctx);
 
       // Get user info
-      const user = await UserModel.getUserById(userId);
+      const user = await UserModel.getById(userId);
       if (!user) {
         logger.warn('User not found for wall of fame', { userId });
         return;

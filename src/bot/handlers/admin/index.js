@@ -3552,7 +3552,9 @@ let registerAdminHandlers = (bot) => {
         let text = '✅ **Usuario Encontrado**\n\n';
         text += `👤 ${safeName}\n`;
         text += `🆔 ${userId}\n`;
-        text += `📧 ${user.email || 'Sin email'}\n`;
+        // Escape markdown special characters in email
+        const emailDisplay = user.email ? user.email.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&') : 'Sin email';
+        text += `📧 ${emailDisplay}\n`;
         text += `💎 Estado actual: ${user.subscriptionStatus || 'free'}\n`;
         if (user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date()) {
           text += `⏰ Expira: ${new Date(user.subscriptionExpiry).toLocaleDateString('es-ES')}\n`;
@@ -3819,7 +3821,8 @@ let registerAdminHandlers = (bot) => {
 
         // Set new expiry date based on plan duration
         newExpiry = new Date();
-        newExpiry.setDate(newExpiry.getDate() + (plan.duration || 30));
+        const durationDays = plan.duration_days || plan.duration || 30;
+        newExpiry.setDate(newExpiry.getDate() + durationDays);
 
         await UserModel.updateSubscription(userId, {
           status: 'active',
@@ -4132,11 +4135,12 @@ let registerAdminHandlers = (bot) => {
 
       // Calculate expiry date based on plan duration
       let expiryDate;
-      if (plan.isLifetime || plan.duration >= 36500) {
+      const durationDays = plan.duration_days || plan.duration || 30;
+      if (plan.isLifetime || plan.is_lifetime || durationDays >= 36500) {
         expiryDate = null; // Lifetime = no expiry
       } else {
         expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + plan.duration);
+        expiryDate.setDate(expiryDate.getDate() + durationDays);
       }
 
       // Activate subscription
