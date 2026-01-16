@@ -173,65 +173,19 @@ async function sendWelcomeMessage(ctx, username, user, lang) {
     const message = lang === 'es'
       ? `👋 Ey ${username}, bienvenidx a PNPtv!
 
-Aquí la vuelta es simple: gente real, buena vibra, cero filtro. Antes de meterte de lleno, mira cómo entras hoy:
+⭐ Estado: ${subscriptionStatus}
 
-⭐ Tu membresía actual:
+💎 PRIME te da: Videos completos, Nearby ilimitado, Hangouts, Videorama 24/7 y más.
 
-${subscriptionStatus}
-
-🔥 Lo que tienes por ahora:
-
-• Acceso al grupo
-• Contenido corto
-• Music Library gratis
-• 3 vistas en Nearby
-
-💎 Si te haces PRIME, desbloqueas:
-
-• Videos completos de Santino, Lex y la comunidad
-• Nearby ilimitado
-• Hangouts privados (video rooms)
-• Videorama 24/7 (streaming de música y videos)
-• Canal PRIME exclusivo
-• Música + Podcasts premium
-• Contenido exclusivo que no sale en ningún otro lado
-• Soporte prioritario
-
-💰 Planes desde solo $14.99 USD/mes
-💎 Lifetime Pass: $100 USD (acceso de por vida)
-
-Si te quieres meter más duro en la comunidad:
+💰 $14.99/mes · Lifetime: $100
 👉 /subscribe`
       : `👋 Hey ${username}, welcome to PNPtv!
 
-This place is simple: real people, real vibes, no filters. Before you jump in, here's how you're entering today:
+⭐ Status: ${subscriptionStatus}
 
-⭐ Your current membership:
+💎 PRIME unlocks: Full videos, unlimited Nearby, Hangouts, Videorama 24/7 and more.
 
-${subscriptionStatus}
-
-🔥 What you get right now:
-
-• Group access
-• Short content
-• Free Music Library
-• 3 views in Nearby Members
-
-💎 If you go PRIME, you unlock:
-
-• Full-length videos from Santino, Lex, and the community
-• Unlimited Nearby Members
-• Private Hangouts (video rooms)
-• Videorama 24/7 (music & video streaming)
-• PRIME Channel (exclusive posts)
-• Premium Music & Podcasts
-• Exclusive content you won't see anywhere else
-• Priority Support
-
-💰 Plans start at just $14.99 USD/month
-💎 Lifetime Pass: $100 USD (lifetime access)
-
-If you want the full experience:
+💰 $14.99/month · Lifetime: $100
 👉 /subscribe`;
 
     const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });

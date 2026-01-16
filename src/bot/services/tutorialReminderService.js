@@ -45,16 +45,16 @@ class TutorialReminderService {
     // Send initial message immediately
     this.sendSingleScheduledTutorial(lastMessageType);
 
-    // Schedule to run every 3 hours (3 * 60 * 60 * 1000 milliseconds)
+    // Schedule to run every 6 hours (6 * 60 * 60 * 1000 milliseconds)
     const intervalId = setInterval(async () => {
       try {
         lastMessageType = await this.sendSingleScheduledTutorial(lastMessageType);
       } catch (error) {
         logger.error('Error in tutorial reminder scheduler:', error);
       }
-    }, 3 * 60 * 60 * 1000);
+    }, 6 * 60 * 60 * 1000);
 
-    logger.info('Tutorial reminder scheduler started - will send 1 message every 3 hours');
+    logger.info('Tutorial reminder scheduler started - will send 1 message every 6 hours');
     return intervalId;
   }
 
