@@ -238,7 +238,7 @@ Ready to unlock all the cloudy fun? Here's how:
 *Step 3:* Pay securely via Meru or crypto
 *Step 4:* Get instant PRIME access!
 
-💰 *Plans start at just $10/month*
+💰 *Plans start at just $14.99/month*
 
 🔒 All payments are secure and private.`,
         button: { text: '💎 View Plans', callback: 'show_subscription_plans' }
@@ -322,7 +322,7 @@ Lo que te estás perdiendo:
 *Paso 3:* Paga de forma segura via Meru o cripto
 *Paso 4:* ¡Obtén acceso PRIME instantáneo!
 
-💰 *Los planes empiezan en solo $10/mes*
+💰 *Los planes empiezan en solo $14.99/mes*
 
 🔒 Todos los pagos son seguros y privados.`,
         button: { text: '💎 Ver Planes', callback: 'show_subscription_plans' }

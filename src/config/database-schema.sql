@@ -381,6 +381,80 @@ CREATE TABLE IF NOT EXISTS user_moderation_actions (
 CREATE INDEX IF NOT EXISTS idx_moderation_actions_user_id ON user_moderation_actions(user_id);
 CREATE INDEX IF NOT EXISTS idx_moderation_actions_active ON user_moderation_actions(active);
 
+-- Warnings table for warning system
+CREATE TABLE IF NOT EXISTS warnings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  admin_id VARCHAR(255) NOT NULL REFERENCES users(id),
+  group_id VARCHAR(255) NOT NULL,
+  reason TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  cleared BOOLEAN DEFAULT FALSE,
+  cleared_at TIMESTAMP,
+  cleared_by VARCHAR(255),
+  expires_at TIMESTAMP
+);
+
+-- Indexes for warnings
+CREATE INDEX IF NOT EXISTS idx_warnings_user_id ON warnings(user_id);
+CREATE INDEX IF NOT EXISTS idx_warnings_group_id ON warnings(group_id);
+CREATE INDEX IF NOT EXISTS idx_warnings_active ON warnings(cleared);
+
+-- Banned users table
+CREATE TABLE IF NOT EXISTS banned_users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  group_id VARCHAR(255) NOT NULL,
+  reason TEXT,
+  banned_by VARCHAR(255) NOT NULL,
+  banned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP,
+  active BOOLEAN DEFAULT TRUE,
+  UNIQUE(user_id, group_id)
+);
+
+-- Indexes for banned users
+CREATE INDEX IF NOT EXISTS idx_banned_users_user_id ON banned_users(user_id);
+CREATE INDEX IF NOT EXISTS idx_banned_users_group_id ON banned_users(group_id);
+CREATE INDEX IF NOT EXISTS idx_banned_users_active ON banned_users(active);
+
+-- Moderation logs table
+CREATE TABLE IF NOT EXISTS moderation_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  group_id VARCHAR(255) NOT NULL,
+  action VARCHAR(50) NOT NULL,
+  user_id VARCHAR(255),
+  moderator_id VARCHAR(255),
+  target_user_id VARCHAR(255),
+  reason TEXT,
+  details JSONB,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for moderation logs
+CREATE INDEX IF NOT EXISTS idx_moderation_logs_group_id ON moderation_logs(group_id);
+CREATE INDEX IF NOT EXISTS idx_moderation_logs_action ON moderation_logs(action);
+CREATE INDEX IF NOT EXISTS idx_moderation_logs_user_id ON moderation_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_moderation_logs_created_at ON moderation_logs(created_at);
+
+-- Username history table
+CREATE TABLE IF NOT EXISTS username_history (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  old_username VARCHAR(255),
+  new_username VARCHAR(255),
+  group_id VARCHAR(255),
+  changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  flagged BOOLEAN DEFAULT FALSE,
+  flagged_by VARCHAR(255),
+  flag_reason TEXT
+);
+
+-- Indexes for username history
+CREATE INDEX IF NOT EXISTS idx_username_history_user_id ON username_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_username_history_group_id ON username_history(group_id);
+CREATE INDEX IF NOT EXISTS idx_username_history_flagged ON username_history(flagged);
+
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
