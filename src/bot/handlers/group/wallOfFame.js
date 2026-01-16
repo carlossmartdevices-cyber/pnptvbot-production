@@ -77,6 +77,20 @@ async function checkAndSelectLegendOfTheDay(userId) {
       });
     }
 
+    // Add PNPtv Legend badge to user profile
+    try {
+      await UserModel.addBadge(userId, 'pnptv_legend');
+      logger.info('PNPtv Legend badge added to user profile', {
+        userId,
+        badge: 'pnptv_legend'
+      });
+    } catch (badgeError) {
+      logger.error('Error adding PNPtv Legend badge:', {
+        userId,
+        error: badgeError.message
+      });
+    }
+
     return true;
   } catch (error) {
     logger.error('Error in checkAndSelectLegendOfTheDay:', error);
@@ -207,20 +221,24 @@ const registerWallOfFameHandlers = (bot) => {
 
 🏆 Tu foto/video ha sido seleccionado como el MEJOR del día
 💎 Has ganado 1 DÍA GRATIS de acceso PRIME
+👑 Has recibido la insignia exclusiva PNPtv LEGEND
 🔥 Disfruta de todos los beneficios exclusivos
 
 👑 ${user.name || user.username}
 
-📢 Tu logro ha sido anunciado en el Muro de la Fama`
+📢 Tu logro ha sido anunciado en el Muro de la Fama
+💫 ¡Revisa tu perfil para ver tu nueva insignia!`
               : `🎉 CONGRATULATIONS! YOU ARE THE PNPtv LEGEND OF THE DAY! 🎉
 
 🏆 Your photo/video has been selected as the BEST of the day
 💎 You have earned 1 FREE DAY of PRIME access
+👑 You have received the exclusive PNPtv LEGEND badge
 🔥 Enjoy all exclusive benefits
 
 👑 ${user.name || user.username}
 
-📢 Your achievement has been announced on the Wall of Fame`;
+📢 Your achievement has been announced on the Wall of Fame
+💫 Check your profile to see your new badge!`;
           } else {
             confirmMsg = lang === 'es'
               ? `✨ Tu foto/video ha sido publicado en el Muro de la Fama!\n\n👑 ${user.name || user.username}\n\n💡 ¿Quieres ser la próxima LEYENDA PNPtv DEL DÍA? ¡Sube más contenido de calidad!`
@@ -335,10 +353,12 @@ function buildMemberInfoCaption(user, lang, isLegendOfTheDay = false) {
     const rewardText = lang === 'es'
       ? '\n\n🎁 ¡FELICIDADES! Eres la LEYENDA PNPtv DEL DÍA' +
         '\n💎 Has ganado 1 DÍA GRATIS de acceso PRIME' +
+        '\n👑 Has recibido la insignia exclusiva PNPtv LEGEND' +
         '\n🔥 Tu membresía ha sido actualizada automáticamente' +
         '\n📅 Disfruta de todos los beneficios PRIME por 24 horas'
       : '\n\n🎁 CONGRATULATIONS! You are the PNPtv LEGEND OF THE DAY' +
         '\n💎 You have earned 1 FREE DAY of PRIME access' +
+        '\n👑 You have received the exclusive PNPtv LEGEND badge' +
         '\n🔥 Your membership has been automatically upgraded' +
         '\n📅 Enjoy all PRIME benefits for 24 hours';
     
