@@ -52,8 +52,8 @@ const startCronJobs = async (bot = null) => {
       }
     });
 
-    // Tutorial reminders for FREE users (how to become PRIME) - daily at 10 AM UTC
-    cron.schedule(process.env.FREE_TUTORIAL_CRON || '0 10 * * *', async () => {
+    // Tutorial reminders for FREE users (how to become PRIME) - every 60 minutes
+    cron.schedule(process.env.FREE_TUTORIAL_CRON || '0 */1 * * *', async () => {
       try {
         logger.info('Running FREE user tutorial reminders...');
         const results = await TutorialReminderService.sendFreeTutorials(50);
@@ -63,8 +63,8 @@ const startCronJobs = async (bot = null) => {
       }
     });
 
-    // Tutorial reminders for PRIME users (how to use features) - daily at 2 PM UTC
-    cron.schedule(process.env.PRIME_TUTORIAL_CRON || '0 14 * * *', async () => {
+    // Tutorial reminders for PRIME users (how to use features) - every 60 minutes
+    cron.schedule(process.env.PRIME_TUTORIAL_CRON || '0 */1 * * *', async () => {
       try {
         logger.info('Running PRIME user tutorial reminders...');
         const results = await TutorialReminderService.sendPrimeTutorials(50);

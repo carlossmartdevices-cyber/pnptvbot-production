@@ -521,8 +521,8 @@ Toca *"Contenido Exclusivo"* en el menú para explorar toda la biblioteca.
           failed++;
         }
 
-        // Rate limit protection
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Rate limit protection - 200ms for hourly scheduling
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
 
       logger.info(`FREE tutorials completed: ${sent} sent, ${failed} failed`);
@@ -562,8 +562,8 @@ Toca *"Contenido Exclusivo"* en el menú para explorar toda la biblioteca.
           failed++;
         }
 
-        // Rate limit protection
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Rate limit protection - 200ms for hourly scheduling
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
 
       logger.info(`PRIME tutorials completed: ${sent} sent, ${failed} failed`);
