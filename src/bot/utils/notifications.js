@@ -116,7 +116,7 @@ We're excited to have you join our community. Here's what you can do:
 📍 Connect with nearby users
 🎥 Watch live streams
 📻 Listen to our radio
-🎥 Join Zoom rooms
+🎥 Join private Hangouts (video rooms)
 💎 Subscribe for premium features
 
 Let's get started!`,
@@ -127,7 +127,7 @@ Estamos emocionados de que te unas a nuestra comunidad. Esto es lo que puedes ha
 📍 Conecta con usuarios cercanos
 🎥 Ver transmisiones en vivo
 📻 Escuchar nuestra radio
-🎥 Unirse a salas Zoom
+🎥 Unirse a Hangouts privados (video rooms)
 💎 Suscríbete para funciones premium
 
 ¡Comencemos!`,
