@@ -2,10 +2,16 @@ const { Markup } = require('telegraf');
 const UserModel = require('../../../models/userModel');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
+const SubscriptionService = require('../../services/subscriptionService');
+
+// Track daily legend selection
+let lastLegendSelectionDate = null;
+let todayLegendUserId = null;
 
 /**
- * Wall of Fame Handler
+ * Wall of Fame Handler - "PNPtv Legend of the Day"
  * Automatically posts photos/videos to Wall of Fame TOPIC with member info
+ * Selects one daily "Legend" to feature and rewards them with 1 day PRIME access
  * Deletes the original message from the group to avoid duplicates
  *
  * IMPORTANT RULES:
@@ -14,6 +20,7 @@ const { getLanguage } = require('../../utils/helpers');
  * - Original user messages in general group are deleted (to avoid duplicates)
  * - Wall of Fame messages are excluded from /cleanupcommunity command
  * - Only bot messages in main GROUP are deleted, not Wall of Fame topic
+ * - One "Legend of the Day" is selected daily and rewarded with 1 day PRIME
  */
 
 // Wall of Fame Topic ID in the group
@@ -28,6 +35,54 @@ const GROUP_ID = process.env.GROUP_ID || '-1003291737499';
  * These are protected from /cleanupcommunity cleanup command
  */
 const wallOfFameMessageIds = new Map();
+
+/**
+ * Check if user should be today's Legend of the Day and select if so
+ * @param {string} userId - User ID
+ * @returns {boolean} True if this user is today's legend
+ */
+async function checkAndSelectLegendOfTheDay(userId) {
+  try {
+    const today = new Date();
+    const todayKey = today.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // Reset legend selection if it's a new day
+    if (lastLegendSelectionDate !== todayKey) {
+      lastLegendSelectionDate = todayKey;
+      todayLegendUserId = null;
+    }
+
+    // If we already have a legend for today, don't select another
+    if (todayLegendUserId && todayLegendUserId !== userId) {
+      return false;
+    }
+
+    // Select this user as today's legend
+    todayLegendUserId = userId;
+
+    // Reward the user with 1 day of PRIME access
+    try {
+      const result = await SubscriptionService.addFreeTrial(userId, 1, 'legend_of_the_day');
+      if (result.success) {
+        logger.info('PNPtv Legend of the Day rewarded with 1 day PRIME', {
+          userId,
+          trialDays: 1,
+          reason: 'legend_of_the_day'
+        });
+      }
+    } catch (rewardError) {
+      logger.error('Error rewarding PNPtv Legend of the Day:', {
+        userId,
+        error: rewardError.message
+      });
+    }
+
+    return true;
+  } catch (error) {
+    logger.error('Error in checkAndSelectLegendOfTheDay:', error);
+    return false;
+  }
+}
 
 /**
  * Register wall of fame handlers
@@ -57,8 +112,11 @@ const registerWallOfFameHandlers = (bot) => {
         return;
       }
 
+      // Check if this user should be today's Legend of the Day
+      const isLegendOfTheDay = await checkAndSelectLegendOfTheDay(userId);
+
       // Build member info caption
-      const caption = buildMemberInfoCaption(user, lang);
+      const caption = buildMemberInfoCaption(user, lang, isLegendOfTheDay);
       const inlineKeyboard = buildMemberInlineKeyboard(user, userId, lang);
 
       // Prepare to forward to Wall of Fame
@@ -142,9 +200,32 @@ const registerWallOfFameHandlers = (bot) => {
 
         // Send confirmation to user in private chat
         try {
-          const confirmMsg = lang === 'es'
-            ? `✨ Tu foto/video ha sido publicado en el Muro de la Fama!\n\n👑 ${user.name || user.username}`
-            : `✨ Your photo/video has been posted to the Wall of Fame!\n\n👑 ${user.name || user.username}`;
+          let confirmMsg;
+          if (isLegendOfTheDay) {
+            confirmMsg = lang === 'es'
+              ? `🎉 ¡FELICIDADES! ¡ERES LA LEYENDA PNPtv DEL DÍA! 🎉
+
+🏆 Tu foto/video ha sido seleccionado como el MEJOR del día
+💎 Has ganado 1 DÍA GRATIS de acceso PRIME
+🔥 Disfruta de todos los beneficios exclusivos
+
+👑 ${user.name || user.username}
+
+📢 Tu logro ha sido anunciado en el Muro de la Fama`
+              : `🎉 CONGRATULATIONS! YOU ARE THE PNPtv LEGEND OF THE DAY! 🎉
+
+🏆 Your photo/video has been selected as the BEST of the day
+💎 You have earned 1 FREE DAY of PRIME access
+🔥 Enjoy all exclusive benefits
+
+👑 ${user.name || user.username}
+
+📢 Your achievement has been announced on the Wall of Fame`;
+          } else {
+            confirmMsg = lang === 'es'
+              ? `✨ Tu foto/video ha sido publicado en el Muro de la Fama!\n\n👑 ${user.name || user.username}\n\n💡 ¿Quieres ser la próxima LEYENDA PNPtv DEL DÍA? ¡Sube más contenido de calidad!`
+              : `✨ Your photo/video has been posted to the Wall of Fame!\n\n👑 ${user.name || user.username}\n\n💡 Want to be the next PNPtv LEGEND OF THE DAY? Upload more quality content!`;
+          }
 
           await ctx.telegram.sendMessage(userId, confirmMsg);
         } catch (dmError) {
@@ -176,10 +257,13 @@ const registerWallOfFameHandlers = (bot) => {
  * Build member information caption for Wall of Fame
  * @param {Object} user - User object
  * @param {string} lang - Language code
+ * @param {boolean} isLegendOfTheDay - Whether this user is today's legend
  * @returns {string} HTML formatted caption
  */
-function buildMemberInfoCaption(user, lang) {
-  const label = lang === 'es' ? '👑 Miembro Destacado' : '👑 Featured Member';
+function buildMemberInfoCaption(user, lang, isLegendOfTheDay = false) {
+  const label = isLegendOfTheDay
+    ? (lang === 'es' ? '🏆 LEYENDA PNPtv DEL DÍA 🏆' : '🏆 PNPtv LEGEND OF THE DAY 🏆')
+    : (lang === 'es' ? '👑 Miembro Destacado' : '👑 Featured Member');
   const nameLabel = lang === 'es' ? 'Nombre:' : 'Name:';
   const usernameLabel = lang === 'es' ? 'Usuario:' : 'Username:';
   const bioLabel = lang === 'es' ? 'Bio:' : 'Bio:';
@@ -245,6 +329,21 @@ function buildMemberInfoCaption(user, lang) {
   }
 
   caption += `\n✨ <i>${lang === 'es' ? 'Destacado en el Muro de la Fama' : 'Featured on Wall of Fame'}</i>`;
+
+  // Add Legend of the Day reward info
+  if (isLegendOfTheDay) {
+    const rewardText = lang === 'es'
+      ? '\n\n🎁 ¡FELICIDADES! Eres la LEYENDA PNPtv DEL DÍA' +
+        '\n💎 Has ganado 1 DÍA GRATIS de acceso PRIME' +
+        '\n🔥 Tu membresía ha sido actualizada automáticamente' +
+        '\n📅 Disfruta de todos los beneficios PRIME por 24 horas'
+      : '\n\n🎁 CONGRATULATIONS! You are the PNPtv LEGEND OF THE DAY' +
+        '\n💎 You have earned 1 FREE DAY of PRIME access' +
+        '\n🔥 Your membership has been automatically upgraded' +
+        '\n📅 Enjoy all PRIME benefits for 24 hours';
+    
+    caption += rewardText;
+  }
 
   return caption;
 }

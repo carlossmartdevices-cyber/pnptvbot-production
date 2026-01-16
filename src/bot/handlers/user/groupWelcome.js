@@ -306,6 +306,53 @@ Pick your energy and get your first badge. It saves instantly.`;
 }
 
 /**
+ * Send photo sharing invitation after badge selection
+ */
+async function sendPhotoSharingInvitation(ctx, username, lang) {
+  try {
+    const message = lang === 'es'
+      ? `📸 ¡COMPARTE TU ESTILO Y GANA! 📸
+
+💡 ¿Sabías que puedes ser la próxima LEYENDA PNPtv DEL DÍA?
+
+🏆 Cada día seleccionamos UN miembro para ser destacado
+🎁 El ganador recibe 1 DÍA GRATIS de acceso PRIME
+📢 Tu foto/video será publicada en el Muro de la Fama
+
+👉 Simplemente sube fotos/videos de calidad en el grupo
+👉 Usa tu mejor energía y estilo
+👉 ¡Sé auténtico y destaca!
+
+💎 ¿Listo para ser el próximo? ¡Sube tu mejor contenido ahora!`
+      : `📸 SHARE YOUR STYLE AND WIN! 📸
+
+💡 Did you know you can be the next PNPtv LEGEND OF THE DAY?
+
+🏆 We select ONE member daily to be featured
+🎁 The winner gets 1 FREE DAY of PRIME access
+📢 Your photo/video will be posted on the Wall of Fame
+
+👉 Just upload quality photos/videos in the group
+👉 Show your best energy and style
+👉 Be authentic and stand out!
+
+💎 Ready to be next? Upload your best content now!`;
+
+    const sentMessage = await ctx.reply(message);
+
+    // Use 1-minute auto-delete for temporary messages
+    ChatCleanupService.scheduleMenuMessage(ctx.telegram, sentMessage);
+
+    logger.info('Photo sharing invitation sent', {
+      chatId: ctx.chat.id,
+      language: lang,
+    });
+  } catch (error) {
+    logger.error('Error sending photo sharing invitation:', error);
+  }
+}
+
+/**
  * Handle badge selection
  */
 async function handleBadgeSelection(ctx) {
@@ -349,6 +396,9 @@ async function handleBadgeSelection(ctx) {
 
     // Send rules menu
     await sendRulesMenu(ctx, lang);
+
+    // Send photo sharing invitation
+    await sendPhotoSharingInvitation(ctx, username, lang);
 
     // Answer the callback query
     await ctx.answerCbQuery(`${badge.emoji} Badge saved!`);
