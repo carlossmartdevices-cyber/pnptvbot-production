@@ -556,7 +556,6 @@ const registerGamificationHandlers = require('./gamification');
 const registerRadioManagementHandlers = require('./radioManagement');
 const registerLiveStreamManagementHandlers = require('./liveStreamManagement');
 const registerCommunityPremiumBroadcast = require('./communityPremiumBroadcast');
-const registerCommunityPostHandlers = require('./sharePostToCommunityGroup');
 const registerImprovedSharePostHandlers = require('./improvedSharePost');
 
 let registerAdminHandlers = (bot) => {
@@ -566,7 +565,6 @@ let registerAdminHandlers = (bot) => {
   registerRadioManagementHandlers(bot);
   registerLiveStreamManagementHandlers(bot);
   registerCommunityPremiumBroadcast(bot);
-  registerCommunityPostHandlers(bot);
   registerImprovedSharePostHandlers(bot);
 
   bot.action('admin_home', async (ctx) => {
