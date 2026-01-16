@@ -26,8 +26,8 @@ class TutorialReminderService {
   }
 
   /**
-   * Start sending tutorial reminders every 3 hours
-   * Sends 1 message at a time, rotating through different types
+   * Start sending reminders every 6 hours
+   * Alternates between: health tip and tutorial
    */
   static startScheduling() {
     if (!this.bot) {
@@ -39,11 +39,8 @@ class TutorialReminderService {
       return;
     }
 
-    // Track the last message type sent (0: health, 1: tutorial, 2: subscription)
+    // Track the last message type sent (0: health, 1: tutorial)
     let lastMessageType = -1;
-
-    // Send initial message immediately
-    this.sendSingleScheduledTutorial(lastMessageType);
 
     // Schedule to run every 6 hours (6 * 60 * 60 * 1000 milliseconds)
     const intervalId = setInterval(async () => {
@@ -54,14 +51,14 @@ class TutorialReminderService {
       }
     }, 6 * 60 * 60 * 1000);
 
-    logger.info('Tutorial reminder scheduler started - will send 1 message every 6 hours');
+    logger.info('Tutorial reminder scheduler started - alternating health/tutorial every 6 hours');
     return intervalId;
   }
 
   /**
-   * Send a single scheduled tutorial message
-   * Rotates through: health message, PRIME features tutorial, subscription info
-   * @param {number} lastType - Last message type sent (0: health, 1: tutorial, 2: subscription)
+   * Send a single scheduled message
+   * Alternates between: health tip and tutorial
+   * @param {number} lastType - Last message type sent (0: health, 1: tutorial)
    * @returns {number} The message type that was just sent
    */
   static async sendSingleScheduledTutorial(lastType) {
@@ -71,48 +68,41 @@ class TutorialReminderService {
     }
 
     try {
-      logger.info('Sending scheduled tutorial reminder to group...');
+      // Alternate between health (0) and tutorial (1)
+      const nextType = (lastType + 1) % 2;
 
-      // Determine which message to send next (rotate through types)
-      const nextType = (lastType + 1) % 3;
-
-      switch (nextType) {
-        case 0:
-          await this.sendHealthMessage();
-          logger.info('Health message sent to group');
-          break;
-        case 1:
-          await this.sendPrimeFeaturesTutorial();
-          logger.info('PRIME features tutorial sent to group');
-          break;
-        case 2:
-          await this.sendSubscriptionInfo();
-          logger.info('Subscription info sent to group');
-          break;
+      if (nextType === 0) {
+        await this.sendHealthMessage();
+        logger.info('Health tip sent to group');
+      } else {
+        await this.sendPrimeFeaturesTutorial();
+        logger.info('Tutorial sent to group');
       }
 
-      logger.info('Single scheduled tutorial reminder completed');
       return nextType;
     } catch (error) {
-      logger.error('Error sending scheduled tutorial:', error);
+      logger.error('Error sending scheduled message:', error);
       return lastType;
     }
   }
 
   /**
-   * Send health message to group
+   * Send health tip to group
    */
   static async sendHealthMessage() {
-    const message = '💪 *Stay Healthy, Stay Strong!* \n\n' +
-      'Remember to take care of your physical and mental health. ' +
-      'Stay hydrated, exercise regularly, and take breaks from screens. ' +
-      'Your well-being is important to us! 💙';
+    const tips = [
+      '💧 Stay hydrated! Water is your best friend.',
+      '😴 Rest when you need to. Your body knows best.',
+      '🧘 Take a break, breathe deep, reset.',
+      '🍎 Nourish your body - eat something good today.',
+      '💙 Check in on a friend. Connection matters.'
+    ];
+    const tip = tips[Math.floor(Math.random() * tips.length)];
 
     try {
-      await this.bot.telegram.sendMessage(this.GROUP_ID, message, {
+      await this.bot.telegram.sendMessage(this.GROUP_ID, tip, {
         parse_mode: 'Markdown'
       });
-      logger.info('Health message sent to group');
     } catch (error) {
       logger.error('Error sending health message:', error.message);
       throw error;
@@ -123,51 +113,14 @@ class TutorialReminderService {
    * Send PRIME features tutorial to group
    */
   static async sendPrimeFeaturesTutorial() {
-    const message = '💎 *PRIME Features Tutorial* \n\n' +
-      'Did you know PRIME members get exclusive access to:\n\n' +
-      '✅ **Hangouts** - Create private video rooms\n' +
-      '✅ **Videorama** - Full video library access\n' +
-      '✅ **Nearby** - Find papis near you\n' +
-      '✅ **No Ads** - Clean, uninterrupted experience\n\n' +
-      'Already PRIME? Tap the menu button to explore! 🎬';
+    const message = '💎 PRIME: Full videos, unlimited Nearby, Hangouts, Videorama 24/7.\n\n💰 $14.99/month · Lifetime $100\n👉 /subscribe';
 
     try {
       await this.bot.telegram.sendMessage(this.GROUP_ID, message, {
-        parse_mode: 'Markdown',
-        reply_markup: {
-          inline_keyboard: [[
-            { text: '📱 Open Menu', callback_data: 'menu:main' }
-          ]]
-        }
+        parse_mode: 'Markdown'
       });
-      logger.info('PRIME features tutorial sent to group');
     } catch (error) {
       logger.error('Error sending PRIME features tutorial:', error.message);
-      throw error;
-    }
-  }
-
-  /**
-   * Send subscription info to group
-   */
-  static async sendSubscriptionInfo() {
-    const message = '🎁 *Upgrade to PRIME Today!* \n\n' +
-      'Unlock all features and support our community. ' +
-      'PRIME membership gives you full access to everything PNPtv has to offer.\n\n' +
-      '💎 *Tap below to see our plans and join the fun!*';
-
-    try {
-      await this.bot.telegram.sendMessage(this.GROUP_ID, message, {
-        parse_mode: 'Markdown',
-        reply_markup: {
-          inline_keyboard: [[
-            { text: '💎 View PRIME Plans', callback_data: 'show_subscription_plans' }
-          ]]
-        }
-      });
-      logger.info('Subscription info sent to group');
-    } catch (error) {
-      logger.error('Error sending subscription info:', error.message);
       throw error;
     }
   }
