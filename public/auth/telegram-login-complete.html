@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PNPtv - Telegram Login</title>
+    <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="pnptvbot" data-size="large" data-auth-url="/api/telegram-auth" data-request-access="write"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #2d1b69 100%);
+            color: white;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+        
+        .container {
+            background: linear-gradient(135deg, #6e48aa 0%, #9d50bb 100%);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+            max-width: 500px;
+            width: 90%;
+            margin: 20px;
+        }
+        
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 30px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #6e48aa;
+            font-size: 32px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: white;
+            margin-bottom: 15px;
+            font-size: 28px;
+        }
+        
+        p {
+            color: #e0e0e0;
+            margin-bottom: 30px;
+            line-height: 1.8;
+            font-size: 16px;
+        }
+        
+        .highlight {
+            color: #ffeb3b;
+            font-weight: bold;
+            background: rgba(255,255,255,0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        
+        .telegram-widget-container {
+            margin: 30px 0;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .features {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 30px 0;
+        }
+        
+        .feature {
+            background: rgba(255,255,255,0.1);
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .feature i {
+            margin-right: 8px;
+            color: #0088cc;
+        }
+        
+        .privacy-note {
+            font-size: 12px;
+            color: #b0b0b0;
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            line-height: 1.6;
+        }
+        
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0088cc;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            display: none;
+            color: #ff6b6b;
+            background: rgba(255,107,107,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid rgba(255,107,107,0.3);
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">PNPtv</div>
+        
+        <h1>🔒 Secure Login Required</h1>
+        
+        <p>
+            To access <span class="highlight">Hangouts</span> and <span class="highlight">Videorama</span>, 
+            please login with your Telegram account. This ensures only PNPtv members can use these features.
+        </p>
+        
+        <div class="features">
+            <div class="feature">
+                <i>🔐</i> Secure Telegram Login
+            </div>
+            <div class="feature">
+                <i>📱</i> One-Click Access
+            </div>
+            <div class="feature">
+                <i>💎</i> Member-Only Features
+            </div>
+        </div>
+        
+        <div class="telegram-widget-container">
+            <!-- Telegram Login Widget will be injected here -->
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Authenticating with Telegram...</p>
+        </div>
+        
+        <div class="error-message" id="errorMessage"></div>
+        
+        <div class="privacy-note">
+            <strong>📜 Privacy Note:</strong> We only use your Telegram ID to verify your membership. 
+            No personal data is stored beyond what's necessary for authentication. 
+            By logging in, you agree to our <a href="/auth/terms" style="color: #0088cc;">Terms and Conditions</a>.
+        </div>
+    </div>
+    
+    <script>
+        // Enhanced Telegram Login Widget integration
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if Telegram widget script is loaded
+            const checkWidget = setInterval(function() {
+                if (typeof window.TelegramLoginWidget !== 'undefined') {
+                    clearInterval(checkWidget);
+                    
+                    // Initialize the widget with proper styling
+                    const widget = new window.TelegramLoginWidget({
+                        botName: 'pnptvbot',
+                        buttonSize: 'large',
+                        requestAccess: 'write',
+                        cornerRadius: 12,
+                        lang: 'en'
+                    });
+                    
+                    // Inject widget into container
+                    const container = document.querySelector('.telegram-widget-container');
+                    if (container) {
+                        container.appendChild(widget.element);
+                    }
+                    
+                    // Handle authentication response
+                    widget.onAuth = function(user) {
+                        console.log('Telegram auth response:', user);
+                        
+                        // Show loading
+                        document.getElementById('loading').style.display = 'block';
+                        
+                        // Send user data to our backend for verification
+                        fetch('/api/telegram-auth', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                telegramUser: user
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('Backend response:', data);
+                            
+                            if (data.redirect) {
+                                // User needs to accept terms or is not registered
+                                window.location.href = data.redirect;
+                            } else if (data.success) {
+                                // Authentication successful, check if terms are accepted
+                                if (data.termsAccepted) {
+                                    // Redirect to the original destination
+                                    const redirectUrl = localStorage.getItem('originalUrl') || '/hangouts';
+                                    window.location.href = redirectUrl;
+                                } else {
+                                    // Store where user wanted to go
+                                    localStorage.setItem('originalUrl', localStorage.getItem('originalUrl') || '/hangouts');
+                                    // Redirect to terms
+                                    window.location.href = '/auth/terms';
+                                }
+                            } else {
+                                throw new Error(data.error || 'Authentication failed');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Authentication error:', error);
+                            document.getElementById('loading').style.display = 'none';
+                            const errorMsg = document.getElementById('errorMessage');
+                            errorMsg.textContent = '❌ Authentication failed: ' + error.message;
+                            errorMsg.style.display = 'block';
+                        });
+                    };
+                }
+            }, 100);
+            
+            // Store the original URL if not already stored
+            const urlParams = new URLSearchParams(window.location.search);
+            const fromUrl = urlParams.get('from');
+            if (fromUrl && !localStorage.getItem('originalUrl')) {
+                localStorage.setItem('originalUrl', fromUrl);
+            }
+        });
+    </script>
+</body>
+</html>

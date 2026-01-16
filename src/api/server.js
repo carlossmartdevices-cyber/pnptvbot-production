@@ -4,6 +4,7 @@ const { config } = require('../bot/config/botConfig');
 const paymentService = require('../bot/services/paymentService');
 const logger = require('../utils/logger');
 const { telegramAuth, checkTermsAccepted, requirePrime } = require('./middleware/telegramAuth');
+const { handleTelegramAuth, handleAcceptTerms, checkAuthStatus } = require('./handlers/telegramAuthHandler');
 
 const app = express();
 const port = config.port;
@@ -95,23 +96,22 @@ app.use((error, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Authentication API endpoints
-app.post('/api/accept-terms', telegramAuth, async (req, res) => {
-  try {
-    const { user } = req;
-    
-    // Update user's terms acceptance in database
-    await query(
-      'UPDATE users SET accepted_terms = TRUE WHERE id = $1',
-      [user.id]
-    );
-    
-    logger.info(`User ${user.id} accepted terms and conditions`);
+// Telegram Authentication API endpoints
+app.post('/api/telegram-auth', handleTelegramAuth);
+app.post('/api/accept-terms', handleAcceptTerms);
+app.get('/api/auth-status', checkAuthStatus);
+
+// Logout endpoint
+app.post('/api/logout', (req, res) => {
+  req.session.destroy(err => {
+    if (err) {
+      logger.error('Logout error:', err);
+      return res.status(500).json({ error: 'Logout failed' });
+    }
+    res.clearCookie('connect.sid');
+    logger.info('User logged out successfully');
     res.json({ success: true });
-  } catch (error) {
-    logger.error('Error accepting terms:', error);
-    res.status(500).json({ error: 'Failed to accept terms' });
-  }
+  });
 });
 
 // Entry points - serve auth wrappers

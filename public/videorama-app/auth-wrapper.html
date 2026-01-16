@@ -55,34 +55,67 @@
     </div>
     
     <script>
-        // Check if user is authenticated
-        fetch('/videorama/app', {
-            method: 'GET',
-            credentials: 'include'
-        })
-        .then(response => {
-            if (response.redirected) {
-                // Redirect to login/terms page
-                window.location.href = response.url;
-            } else if (response.ok) {
-                // User is authenticated, load the actual app
-                return response.text();
-            } else {
-                // Handle error
-                throw new Error('Authentication failed');
-            }
-        })
-        .then(html => {
-            // Replace this page with the actual app
-            document.open();
-            document.write(html);
-            document.close();
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            // Redirect to login page
-            window.location.href = '/auth/telegram-login';
+        // Enhanced authentication flow
+        document.addEventListener('DOMContentLoaded', function() {
+            // Store the original URL
+            localStorage.setItem('originalUrl', '/videorama');
+            
+            // Check authentication status
+            fetch('/api/auth-status', { credentials: 'include' })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.authenticated) {
+                    // Not authenticated, redirect to login
+                    window.location.href = '/auth/telegram-login-complete';
+                    return;
+                }
+                
+                // Check if terms are accepted
+                if (!data.user.acceptedTerms) {
+                    // Terms not accepted, redirect to terms page
+                    window.location.href = '/auth/terms';
+                    return;
+                }
+                
+                // User is fully authenticated, load the actual app
+                fetch('/videorama/app', { credentials: 'include' })
+                .then(response => response.text())
+                .then(html => {
+                    document.open();
+                    document.write(html);
+                    document.close();
+                })
+                .catch(error => {
+                    console.error('Error loading app:', error);
+                    document.getElementById('error').style.display = 'block';
+                });
+            })
+            .catch(error => {
+                console.error('Auth check error:', error);
+                window.location.href = '/auth/telegram-login-complete';
+            });
         });
+        
+        // Add error display element
+        const style = document.createElement('style');
+        style.textContent = '
+            .error-message {
+                display: none;
+                color: #ff6b6b;
+                background: rgba(255,107,107,0.1);
+                padding: 15px;
+                border-radius: 10px;
+                margin: 20px 0;
+                border: 1px solid rgba(255,107,107,0.3);
+            }
+        ';
+        document.head.appendChild(style);
+        
+        const errorDiv = document.createElement('div');
+        errorDiv.id = 'error';
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = '❌ Failed to load the application. Please try again.';
+        document.querySelector('.container').appendChild(errorDiv);
     </script>
 </body>
 </html>
