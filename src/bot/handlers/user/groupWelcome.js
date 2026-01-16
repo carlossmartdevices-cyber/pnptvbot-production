@@ -190,12 +190,11 @@ ${subscriptionStatus}
 
 • Videos completos de Santino, Lex y la comunidad
 • Nearby ilimitado
-• Zoom Calls + Live Performances
-• Música + Podcasts premium
-• Contenido que no sale en ningún otro lado
 • Hangouts privados (video rooms)
 • Videorama 24/7 (streaming de música y videos)
 • Canal PRIME exclusivo
+• Música + Podcasts premium
+• Contenido exclusivo que no sale en ningún otro lado
 • Soporte prioritario
 
 💰 Planes desde solo $14.99 USD/mes
@@ -222,12 +221,11 @@ ${subscriptionStatus}
 
 • Full-length videos from Santino, Lex, and the community
 • Unlimited Nearby Members
-• Zoom Calls + Live Performances
-• Premium Music & Podcasts
-• Exclusive content you won't see anywhere else
 • Private Hangouts (video rooms)
 • Videorama 24/7 (music & video streaming)
 • PRIME Channel (exclusive posts)
+• Premium Music & Podcasts
+• Exclusive content you won't see anywhere else
 • Priority Support
 
 💰 Plans start at just $14.99 USD/month
