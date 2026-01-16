@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PNPtv Videorama - Loading...</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a2e;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            background: linear-gradient(135deg, #6e48aa 0%, #9d50bb 100%);
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #e0e0e0;
+            margin-bottom: 30px;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #0088cc;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="spinner"></div>
+        <h1>🎵 PNPtv Videorama</h1>
+        <p>Loading authentication...</p>
+    </div>
+    
+    <script>
+        // Check if user is authenticated
+        fetch('/videorama/app', {
+            method: 'GET',
+            credentials: 'include'
+        })
+        .then(response => {
+            if (response.redirected) {
+                // Redirect to login/terms page
+                window.location.href = response.url;
+            } else if (response.ok) {
+                // User is authenticated, load the actual app
+                return response.text();
+            } else {
+                // Handle error
+                throw new Error('Authentication failed');
+            }
+        })
+        .then(html => {
+            // Replace this page with the actual app
+            document.open();
+            document.write(html);
+            document.close();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            // Redirect to login page
+            window.location.href = '/auth/telegram-login';
+        });
+    </script>
+</body>
+</html>

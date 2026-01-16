@@ -18,6 +18,7 @@ const config = {
   // Server configuration
   port: process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
+  webDomain: process.env.WEB_DOMAIN || 'https://pnptv.app',
 
   // Firebase configuration
   firebase: {

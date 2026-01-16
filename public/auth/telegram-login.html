@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PNPtv - Telegram Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a2e;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: linear-gradient(135deg, #6e48aa 0%, #9d50bb 100%);
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 500px;
+        }
+        h1 {
+            color: white;
+            margin-bottom: 30px;
+        }
+        p {
+            color: #e0e0e0;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        .telegram-login {
+            background: #0088cc;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .telegram-login:hover {
+            background: #0077b3;
+        }
+        .logo {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 20px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #6e48aa;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">PNPtv</div>
+        <h1>🔒 Login Required</h1>
+        <p>To access Hangouts and Videorama, you need to login with your Telegram account.</p>
+        <p>This ensures only PNPtv members can use these features.</p>
+        <script async src="https://telegram.org/js/telegram-web-app.js"></script>
+        <script>
+            // Simple Telegram login button
+            document.addEventListener('DOMContentLoaded', function() {
+                const btn = document.createElement('button');
+                btn.className = 'telegram-login';
+                btn.innerHTML = '📱 Login with Telegram';
+                btn.onclick = function() {
+                    // In a real implementation, this would use Telegram Login Widget
+                    // For now, we'll simulate the flow
+                    window.location.href = '/auth/check-telegram';
+                };
+                document.querySelector('.container').appendChild(btn);
+            });
+        </script>
+    </div>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PNPtv - Terms and Conditions</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a2e;
+            color: white;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1 {
+            color: #ff6b6b;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .terms-box {
+            background: linear-gradient(135deg, #6e48aa 0%, #9d50bb 100%);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        h2 {
+            color: white;
+            margin-top: 0;
+        }
+        p, ul {
+            color: #e0e0e0;
+            line-height: 1.8;
+            margin-bottom: 20px;
+        }
+        ul {
+            padding-left: 30px;
+        }
+        .accept-button {
+            background: #0088cc;
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            display: block;
+            margin: 0 auto;
+            transition: background 0.3s;
+        }
+        .accept-button:hover {
+            background: #0077b3;
+        }
+        .decline-button {
+            background: #666;
+            color: white;
+            padding: 10px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            display: block;
+            margin: 20px auto 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚠️ Important: Terms and Conditions</h1>
+        
+        <div class="terms-box">
+            <h2>📜 PNPtv Hangouts & Videorama Terms</h2>
+            
+            <p><strong>Last Updated:</strong> January 16, 2026</p>
+            
+            <h3>1. Responsibility and Liability</h3>
+            <ul>
+                <li><strong>You are solely responsible</strong> for any content you create, share, or broadcast using Hangouts or Videorama.</li>
+                <li>PNPtv is <strong>not responsible</strong> for any content, interactions, or consequences that occur in user-created rooms or playlists.</li>
+                <li>All liability falls on the <strong>room creator</strong> or <strong>content creator</strong>, never on PNPtv.</li>
+            </ul>
+            
+            <h3>2. Content Rules</h3>
+            <ul>
+                <li>No illegal content</li>
+                <li>No harassment or bullying</li>
+                <li>No explicit adult content</li>
+                <li>No copyright infringement</li>
+                <li>Follow all Telegram and local laws</li>
+            </ul>
+            
+            <h3>3. Access Levels</h3>
+            <ul>
+                <li><strong>FREE/Churned Users:</strong> Can join public hangouts and play public content</li>
+                <li><strong>PRIME Users:</strong> Can create private hangouts and private playlists</li>
+            </ul>
+            
+            <h3>4. Data Privacy</h3>
+            <p>By accepting these terms, you agree that your Telegram username and ID may be visible to other users in the same hangout or when viewing your public content.</p>
+            
+            <h3>5. Enforcement</h3>
+            <p>Violations may result in immediate account suspension without warning. PNPtv reserves the right to moderate and remove any content.</p>
+        </div>
+        
+        <button class="accept-button" onclick="acceptTerms()">✅ I Accept - Continue</button>
+        <button class="decline-button" onclick="declineTerms()">❌ I Decline - Go Back</button>
+        
+        <script>
+            function acceptTerms() {
+                // In a real implementation, this would call an API endpoint
+                // to record terms acceptance in the database
+                fetch('/api/accept-terms', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({accepted: true})
+                }).then(response => {
+                    if (response.ok) {
+                        // Redirect back to the original destination
+                        const redirectUrl = localStorage.getItem('redirectAfterTerms') || '/hangouts';
+                        window.location.href = redirectUrl;
+                    }
+                }).catch(error => {
+                    alert('Error accepting terms. Please try again.');
+                });
+            }
+            
+            function declineTerms() {
+                window.location.href = 'https://t.me/pnptvbot';
+            }
+        </script>
+    </div>
+</body>
+</html>

@@ -1,7 +1,9 @@
 const express = require('express');
+const session = require('express-session');
 const { config } = require('../bot/config/botConfig');
 const paymentService = require('../bot/services/paymentService');
 const logger = require('../utils/logger');
+const { telegramAuth, checkTermsAccepted, requirePrime } = require('./middleware/telegramAuth');
 
 const app = express();
 const port = config.port;
@@ -9,6 +11,17 @@ const port = config.port;
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Session middleware for Telegram auth
+app.use(session({
+  secret: config.sessionSecret || 'pnptv-secret-key',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 }
+}));
+
+// Serve static auth pages
+app.use('/auth', express.static(__dirname + '/../../public/auth'));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -80,6 +93,43 @@ app.post('/webhook/daimo', async (req, res) => {
 app.use((error, req, res, next) => {
   logger.error('Express error:', error);
   res.status(500).json({ error: 'Internal server error' });
+});
+
+// Authentication API endpoints
+app.post('/api/accept-terms', telegramAuth, async (req, res) => {
+  try {
+    const { user } = req;
+    
+    // Update user's terms acceptance in database
+    await query(
+      'UPDATE users SET accepted_terms = TRUE WHERE id = $1',
+      [user.id]
+    );
+    
+    logger.info(`User ${user.id} accepted terms and conditions`);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Error accepting terms:', error);
+    res.status(500).json({ error: 'Failed to accept terms' });
+  }
+});
+
+// Entry points - serve auth wrappers
+app.get('/hangouts', (req, res) => {
+  res.sendFile(__dirname + '/../../public/hangouts/auth-wrapper.html');
+});
+
+app.get('/videorama', (req, res) => {
+  res.sendFile(__dirname + '/../../public/videorama-app/auth-wrapper.html');
+});
+
+// Protected routes - serve actual apps after authentication
+app.get('/hangouts/app', telegramAuth, checkTermsAccepted, (req, res) => {
+  res.sendFile(__dirname + '/../../public/hangouts/index.html');
+});
+
+app.get('/videorama/app', telegramAuth, checkTermsAccepted, (req, res) => {
+  res.sendFile(__dirname + '/../../public/videorama-app/index.html');
 });
 
 // Start server
