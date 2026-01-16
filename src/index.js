@@ -1,3 +1,7 @@
+// Force IPv4 for DNS resolution (fixes IPv6 timeout issues with Telegram API)
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
+
 require('dotenv').config();
 const { startBot } = require('./bot/core/bot');
 const logger = require('./utils/logger');

@@ -39,7 +39,7 @@ const wallOfFameMessageIds = new Map();
 /**
  * Check if user should be today's Legend of the Day and select if so
  * @param {string} userId - User ID
- * @returns {boolean} True if this user is today's legend
+ * @returns {Object} { isLegend: boolean, isFirstSelection: boolean }
  */
 async function checkAndSelectLegendOfTheDay(userId) {
   try {
@@ -52,15 +52,21 @@ async function checkAndSelectLegendOfTheDay(userId) {
       todayLegendUserId = null;
     }
 
-    // If we already have a legend for today, don't select another
+    // If we already have a legend for today and it's a DIFFERENT user, they can't be legend
     if (todayLegendUserId && todayLegendUserId !== userId) {
-      return false;
+      return { isLegend: false, isFirstSelection: false };
     }
 
-    // Select this user as today's legend
+    // If this user is ALREADY today's legend, return true but don't reward again
+    if (todayLegendUserId === userId) {
+      logger.debug('User is already today\'s legend, skipping reward', { userId });
+      return { isLegend: true, isFirstSelection: false };
+    }
+
+    // Select this user as today's legend (FIRST TIME)
     todayLegendUserId = userId;
 
-    // Reward the user with 1 day of PRIME access
+    // Reward the user with 1 day of PRIME access (only on first selection)
     try {
       const result = await SubscriptionService.addFreeTrial(userId, 1, 'legend_of_the_day');
       if (result.success) {
@@ -77,7 +83,7 @@ async function checkAndSelectLegendOfTheDay(userId) {
       });
     }
 
-    // Add PNPtv Legend badge to user profile
+    // Add PNPtv Legend badge to user profile (only on first selection)
     try {
       await UserModel.addBadge(userId, 'pnptv_legend');
       logger.info('PNPtv Legend badge added to user profile', {
@@ -91,10 +97,10 @@ async function checkAndSelectLegendOfTheDay(userId) {
       });
     }
 
-    return true;
+    return { isLegend: true, isFirstSelection: true };
   } catch (error) {
     logger.error('Error in checkAndSelectLegendOfTheDay:', error);
-    return false;
+    return { isLegend: false, isFirstSelection: false };
   }
 }
 
@@ -109,6 +115,18 @@ const registerWallOfFameHandlers = (bot) => {
       // Only apply in groups
       if (!['group', 'supergroup'].includes(ctx.chat?.type)) {
         return;
+      }
+
+      // CRITICAL: Only process photos/videos from the TARGET group
+      const chatIdStr = ctx.chat?.id?.toString();
+      if (chatIdStr !== GROUP_ID) {
+        return; // Not our target group, skip
+      }
+
+      // Skip if photo/video is already in Wall of Fame topic (prevent re-posting)
+      const messageThreadId = ctx.message?.message_thread_id;
+      if (messageThreadId && Number(messageThreadId) === WALL_OF_FAME_TOPIC_ID) {
+        return; // Already in Wall of Fame, skip
       }
 
       // Skip if it's a forwarded message or reply
@@ -127,9 +145,11 @@ const registerWallOfFameHandlers = (bot) => {
       }
 
       // Check if this user should be today's Legend of the Day
-      const isLegendOfTheDay = await checkAndSelectLegendOfTheDay(userId);
+      const legendResult = await checkAndSelectLegendOfTheDay(userId);
+      const isLegendOfTheDay = legendResult.isLegend;
+      const isFirstLegendSelection = legendResult.isFirstSelection;
 
-      // Build member info caption
+      // Build member info caption (show legend badge if they are the legend)
       const caption = buildMemberInfoCaption(user, lang, isLegendOfTheDay);
       const inlineKeyboard = buildMemberInlineKeyboard(user, userId, lang);
 
@@ -215,7 +235,8 @@ const registerWallOfFameHandlers = (bot) => {
         // Send confirmation to user in private chat
         try {
           let confirmMsg;
-          if (isLegendOfTheDay) {
+          if (isFirstLegendSelection) {
+            // First time selected as Legend of the Day - full congratulations with reward info
             confirmMsg = lang === 'es'
               ? `🎉 ¡FELICIDADES! ¡ERES LA LEYENDA PNPtv DEL DÍA! 🎉
 
@@ -239,7 +260,13 @@ const registerWallOfFameHandlers = (bot) => {
 
 📢 Your achievement has been announced on the Wall of Fame
 💫 Check your profile to see your new badge!`;
+          } else if (isLegendOfTheDay) {
+            // Already today's legend, posting again - simpler message
+            confirmMsg = lang === 'es'
+              ? `✨ Tu foto/video ha sido publicado en el Muro de la Fama!\n\n🏆 ${user.name || user.username} - LEYENDA DEL DÍA\n\n💫 ¡Sigue compartiendo contenido increíble!`
+              : `✨ Your photo/video has been posted to the Wall of Fame!\n\n🏆 ${user.name || user.username} - LEGEND OF THE DAY\n\n💫 Keep sharing amazing content!`;
           } else {
+            // Not the legend - encourage them
             confirmMsg = lang === 'es'
               ? `✨ Tu foto/video ha sido publicado en el Muro de la Fama!\n\n👑 ${user.name || user.username}\n\n💡 ¿Quieres ser la próxima LEYENDA PNPtv DEL DÍA? ¡Sube más contenido de calidad!`
               : `✨ Your photo/video has been posted to the Wall of Fame!\n\n👑 ${user.name || user.username}\n\n💡 Want to be the next PNPtv LEGEND OF THE DAY? Upload more quality content!`;

@@ -1,3 +1,8 @@
+// Force IPv4 for DNS resolution BEFORE any network requests
+// This must be at the very top to fix IPv6 timeout issues with Telegram API
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
+
 require('dotenv-safe').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
 const { initializePostgres, testConnection } = require('../../config/postgres');
@@ -65,6 +70,7 @@ const broadcastScheduler = require('../../services/broadcastScheduler');
 const SubscriptionReminderService = require('../services/subscriptionReminderService');
 const MembershipCleanupService = require('../services/membershipCleanupService');
 const TutorialReminderService = require('../services/tutorialReminderService');
+const MessageRateLimiter = require('../services/messageRateLimiter');
 const radioStreamManager = require('../../services/radio/radioStreamManager');
 const CommunityPostScheduler = require('./schedulers/communityPostScheduler');
 const { startCronJobs } = require('../../../scripts/cron');
@@ -162,6 +168,11 @@ const startBot = async () => {
     // Register middleware
     bot.use(sessionMiddleware());
     bot.use(rateLimitMiddleware());
+
+    // CRITICAL: Group security enforcement - MUST be early in the chain
+    // This prevents the bot from operating in unauthorized groups/channels
+    bot.use(groupSecurityEnforcementMiddleware());
+
     bot.use(chatCleanupMiddleware());
     // DISABLED: bot.use(usernameEnforcement()); // Username enforcement rules disabled
     bot.use(botAdditionPreventionMiddleware()); // Prevent unauthorized bot additions
@@ -183,6 +194,12 @@ const startBot = async () => {
     bot.use(topicPermissionsMiddleware()); // Admin-only and approval queue
     bot.use(topicModerationMiddleware()); // Anti-spam, anti-flood for topics
     bot.use(mediaOnlyValidator()); // Media-only validation for PNPtv Gallery
+
+    // CRITICAL: Register group security handlers (my_chat_member events)
+    // This auto-leaves unauthorized groups when bot is added
+    registerGroupSecurityHandlers(bot);
+    logger.info('✓ Group security handlers registered');
+
     // Register handlers
     registerUserHandlers(bot);
     registerAdminHandlers(bot); // This registers gamification, radio, live streams, community premium, and community posts handlers
@@ -210,6 +227,10 @@ const startBot = async () => {
     // Initialize membership cleanup service (for daily status updates and channel management)
     MembershipCleanupService.initialize(bot);
     logger.info('✓ Membership cleanup service initialized');
+    // Initialize message rate limiter (to limit group messages to 6/day)
+    MessageRateLimiter.initialize();
+    logger.info('✓ Message rate limiter initialized');
+
     // Initialize tutorial reminder service (proactive tutorials for FREE and PRIME users)
     TutorialReminderService.initialize(bot);
     TutorialReminderService.startScheduling();

@@ -1,7 +1,7 @@
-const { query } = require('../../config/postgres');
 const { Markup } = require('telegraf');
 const logger = require('../../utils/logger');
 const config = require('../../config/config');
+const MessageRateLimiter = require('./messageRateLimiter');
 
 /**
  * Tutorial Reminder Service
@@ -26,7 +26,7 @@ class TutorialReminderService {
   }
 
   /**
-   * Start sending reminders every 6 hours
+   * Start sending reminders every 4 hours
    * Alternates between: health tip and tutorial
    */
   static startScheduling() {
@@ -42,16 +42,16 @@ class TutorialReminderService {
     // Track the last message type sent (0: health, 1: tutorial)
     let lastMessageType = -1;
 
-    // Schedule to run every 6 hours (6 * 60 * 60 * 1000 milliseconds)
+    // Schedule to run every 4 hours (4 * 60 * 60 * 1000 milliseconds) - reduced frequency due to rate limiting
     const intervalId = setInterval(async () => {
       try {
         lastMessageType = await this.sendSingleScheduledTutorial(lastMessageType);
       } catch (error) {
         logger.error('Error in tutorial reminder scheduler:', error);
       }
-    }, 6 * 60 * 60 * 1000);
+    }, 4 * 60 * 60 * 1000);
 
-    logger.info('Tutorial reminder scheduler started - alternating health/tutorial every 6 hours');
+    logger.info('Tutorial reminder scheduler started - alternating health/tutorial every 4 hours (rate limited to 6 messages/day)');
     return intervalId;
   }
 
@@ -100,9 +100,17 @@ class TutorialReminderService {
     const tip = tips[Math.floor(Math.random() * tips.length)];
 
     try {
+      // Atomic check and record to prevent race conditions
+      const rateLimitCheck = await MessageRateLimiter.checkAndRecordMessage(6);
+      if (!rateLimitCheck.canSend) {
+        logger.info(`Rate limit reached - cannot send health message. Messages today: ${rateLimitCheck.messagesSentToday}/6`);
+        return;
+      }
+
       await this.bot.telegram.sendMessage(this.GROUP_ID, tip, {
         parse_mode: 'Markdown'
       });
+
     } catch (error) {
       logger.error('Error sending health message:', error.message);
       throw error;
@@ -126,9 +134,17 @@ class TutorialReminderService {
 📸 ¡Comparte fotos y sé la LEYENDA PNPtv DEL DÍA! Gana 1 día PRIME gratis.`;
 
     try {
+      // Atomic check and record to prevent race conditions
+      const rateLimitCheck = await MessageRateLimiter.checkAndRecordMessage(6);
+      if (!rateLimitCheck.canSend) {
+        logger.info(`Rate limit reached - cannot send PRIME features tutorial. Messages today: ${rateLimitCheck.messagesSentToday}/6`);
+        return;
+      }
+
       await this.bot.telegram.sendMessage(this.GROUP_ID, message, {
         parse_mode: 'Markdown'
       });
+
     } catch (error) {
       logger.error('Error sending PRIME features tutorial:', error.message);
       throw error;
@@ -535,39 +551,8 @@ Toca *"Contenido Exclusivo"* en el menú para explorar toda la biblioteca.
     ]
   };
 
-  /**
-   * Get users by subscription status for tutorials
-   * @param {string} statusType - 'free' or 'prime'
-   * @returns {Promise<Array>} Array of users
-   */
-  static async getUsersByStatus(statusType) {
-    try {
-      let whereClause;
-      if (statusType === 'free') {
-        // Free and churned users
-        whereClause = "subscription_status IN ('free', 'churned') OR subscription_status IS NULL";
-      } else if (statusType === 'prime') {
-        // Active prime users
-        whereClause = "subscription_status = 'active'";
-      } else {
-        return [];
-      }
-
-      const result = await query(`
-        SELECT id, username, language, subscription_status
-        FROM users
-        WHERE ${whereClause}
-        AND onboarding_complete = true
-        ORDER BY RANDOM()
-        LIMIT 100
-      `);
-
-      return result.rows;
-    } catch (error) {
-      logger.error('Error getting users by status:', error);
-      return [];
-    }
-  }
+  // NOTE: getUsersByStatus was removed as dead code
+  // The service now sends tutorials to the GROUP, not individual users
 
   /**
    * Send tutorial to the group (not privately to users)
@@ -583,6 +568,13 @@ Toca *"Contenido Exclusivo"* en el menú para explorar toda la biblioteca.
 
       if (!this.GROUP_ID) {
         logger.error('GROUP_ID not configured - cannot send tutorials');
+        return false;
+      }
+
+      // Atomic check and record to prevent race conditions
+      const rateLimitCheck = await MessageRateLimiter.checkAndRecordMessage(6);
+      if (!rateLimitCheck.canSend) {
+        logger.info(`Rate limit reached - cannot send tutorial. Messages today: ${rateLimitCheck.messagesSentToday}/6`);
         return false;
       }
 

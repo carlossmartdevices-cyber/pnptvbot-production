@@ -3,6 +3,10 @@ const UserModel = require('../../../models/userModel');
 const ChatCleanupService = require('../../services/chatCleanupService');
 const logger = require('../../../utils/logger');
 
+// Authorized group ID from environment
+const GROUP_ID = process.env.GROUP_ID;
+const BOT_ID = process.env.BOT_TOKEN?.split(':')[0]; // Extract bot ID from token
+
 /**
  * Badge options for "Which vibe are you?"
  */
@@ -18,11 +22,13 @@ const BADGE_OPTIONS = {
  * @param {Telegraf} bot - Bot instance
  */
 const registerGroupWelcomeHandlers = (bot) => {
-  // Handle new members joining the group via message (traditional way)
-  bot.on('new_chat_members', handleNewMembers);
+  // PRIMARY: Handle chat_member updates (modern, webhook-compatible)
+  // This is the preferred method for detecting new members
+  bot.on('chat_member', handleMemberJoin);
 
-  // Also handle chat_member updates (webhook-compatible way)
-  bot.on('chat_member', handleChatMemberUpdate);
+  // FALLBACK: Handle new_chat_members message (legacy, polling-compatible)
+  // Kept for backward compatibility and edge cases
+  bot.on('new_chat_members', handleMemberJoin);
 
   // Handle badge selection
   bot.action(/^badge_select_(.+)$/, handleBadgeSelection);
@@ -32,101 +38,97 @@ const registerGroupWelcomeHandlers = (bot) => {
 };
 
 /**
- * Handle chat member updates (webhook-compatible way to detect new members)
- * This catches join/leave events from chat_member updates
+ * Unified handler for member join events
+ * Works with both chat_member updates and new_chat_members messages
  */
-async function handleChatMemberUpdate(ctx) {
+async function handleMemberJoin(ctx) {
   try {
-    const chatMember = ctx.chatMember;
-    if (!chatMember) return;
-
     const chatType = ctx.chat?.type;
-    // Only works in groups
+
+    // Only process in groups
     if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
       return;
     }
 
-    const newMember = chatMember.new_chat_member;
-    const oldMember = chatMember.old_chat_member;
+    // Only process events from the authorized GROUP_ID
+    const chatIdStr = ctx.chat?.id?.toString();
+    if (GROUP_ID && chatIdStr !== GROUP_ID) {
+      return;
+    }
 
-    // Check if this is a join event (user was not in chat before, now is)
+    // Extract members based on event type
+    const members = extractNewMembers(ctx);
+    if (!members || members.length === 0) {
+      return;
+    }
+
+    // Process each new member
+    for (const member of members) {
+      await processNewMember(ctx, member);
+    }
+  } catch (error) {
+    logger.error('Error handling member join:', error);
+  }
+}
+
+/**
+ * Extract new members from context based on event type
+ * Supports both chat_member updates and new_chat_members messages
+ */
+function extractNewMembers(ctx) {
+  // Check for chat_member update (modern way)
+  if (ctx.chatMember) {
+    const { old_chat_member: oldMember, new_chat_member: newMember } = ctx.chatMember;
+
+    // Check if this is a join event (user wasn't in chat, now is)
     const wasInChat = oldMember?.status && ['member', 'administrator', 'creator'].includes(oldMember.status);
     const isNowInChat = newMember?.status && ['member', 'administrator', 'creator'].includes(newMember.status);
 
-    if (!wasInChat && isNowInChat) {
-      // User joined the group
-      const member = newMember.user;
-      if (!member || member.is_bot) {
-        // Let bot removal be handled by the other handler if needed
-        return;
-      }
-
+    if (!wasInChat && isNowInChat && newMember?.user) {
       logger.debug('New member detected via chat_member update', {
-        userId: member.id,
-        username: member.username,
-        chatId: ctx.chat.id,
+        userId: newMember.user.id,
+        username: newMember.user.username,
       });
-
-      // Process the new member using same logic as message-based handler
-      await processNewMember(ctx, member);
+      return [newMember.user];
     }
-  } catch (error) {
-    logger.error('Error handling chat member update:', error);
+    return [];
   }
+
+  // Check for new_chat_members message (legacy way)
+  if (ctx.message?.new_chat_members) {
+    const members = ctx.message.new_chat_members;
+    if (members.length > 0) {
+      logger.debug('New members detected via new_chat_members', {
+        count: members.length,
+        userIds: members.map(m => m.id),
+      });
+    }
+    return members;
+  }
+
+  return [];
 }
 
 /**
- * Handle new members joining the group
- */
-async function handleNewMembers(ctx) {
-  try {
-    const chatType = ctx.chat?.type;
-
-    // Only works in groups
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
-      return;
-    }
-
-    const newMembers = ctx.message?.new_chat_members || [];
-
-    // Process each new member
-    for (const member of newMembers) {
-      await processNewMember(ctx, member);
-    }
-  } catch (error) {
-    logger.error('Error handling new members:', error);
-  }
-}
-
-/**
- * Process a new member joining (shared logic for both message and chat_member update handlers)
+ * Process a new member joining
  */
 async function processNewMember(ctx, member) {
   try {
-    // Remove all bots from the group (except this bot)
+    const userId = member.id;
+
+    // Handle bots (remove unauthorized bots)
     if (member.is_bot) {
-      try {
-        await ctx.kickChatMember(member.id);
-
-        // Send notification about bot removal
-        const botName = member.first_name || 'Bot';
-        const message = `🚫 **Bot Removed**\n\nNo other bots are allowed in this group. Only the official PNPtv bot is permitted.`;
-
-        const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
-
-        // Auto-delete notification after 2 minutes
-        ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000);
-
-        logger.info('Bot removed from group', {
-          botName,
-          botId: member.id,
-          chatId: ctx.chat.id,
-        });
-      } catch (error) {
-        logger.error('Error removing bot from group:', error);
-      }
+      await handleBotJoin(ctx, member);
       return;
     }
+
+    // Deduplication check - BEFORE any async operations
+    // Prevents duplicate welcomes when both events fire
+    if (ChatCleanupService.hasReceivedWelcome(userId)) {
+      logger.debug('User already welcomed (dedup)', { userId });
+      return;
+    }
+    ChatCleanupService.markWelcomeSent(userId);
 
     // Get or create user
     const user = await UserModel.createOrUpdate({
@@ -149,25 +151,52 @@ async function processNewMember(ctx, member) {
 
     // Send badge selection message
     await sendBadgeSelectionMessage(ctx, username, lang);
+
+    logger.info('New member welcomed', {
+      userId,
+      username: member.username,
+      chatId: ctx.chat.id,
+    });
   } catch (error) {
     logger.error('Error processing new member:', error);
   }
 }
 
 /**
+ * Handle bot joining the group (remove unauthorized bots)
+ */
+async function handleBotJoin(ctx, member) {
+  // Don't remove ourselves
+  const memberIdStr = member.id?.toString();
+  if (BOT_ID && memberIdStr === BOT_ID) {
+    logger.debug('Skipping self-removal');
+    return;
+  }
+
+  try {
+    await ctx.banChatMember(member.id);
+
+    const botName = member.first_name || 'Bot';
+    const message = `🚫 **Bot Removed**\n\nNo other bots are allowed in this group. Only the official PNPtv bot is permitted.`;
+
+    const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
+    ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000);
+
+    logger.info('Unauthorized bot removed', {
+      botName,
+      botId: member.id,
+      chatId: ctx.chat.id,
+    });
+  } catch (error) {
+    logger.error('Error removing bot:', error);
+  }
+}
+
+/**
  * Send welcome message with membership info
- * Only sends once per user (tracked via ChatCleanupService)
  */
 async function sendWelcomeMessage(ctx, username, user, lang) {
   try {
-    const userId = user.userId;
-    
-    // Check if user has already received welcome message
-    if (ChatCleanupService.hasReceivedWelcome(userId)) {
-      logger.debug('Welcome message already sent to user', { userId });
-      return; // Skip if already welcomed
-    }
-
     const subscriptionStatus = user.subscriptionStatus === 'active' ? 'PRIME Member' : 'Free Member';
 
     const message = lang === 'es'
@@ -221,18 +250,12 @@ This place is simple: real people, real vibes, no filters.
 👉 /subscribe`;
 
     const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
-
-    // Use 1-minute auto-delete for temporary messages
     ChatCleanupService.scheduleWelcomeMessage(ctx.telegram, sentMessage);
-
-    // Mark user as welcomed
-    ChatCleanupService.markWelcomeSent(userId);
 
     logger.info('Welcome message sent', {
       userId: user.userId,
       chatId: ctx.chat.id,
       language: lang,
-      firstTime: true,
     });
   } catch (error) {
     logger.error('Error sending welcome message:', error);
@@ -276,16 +299,14 @@ Pick your energy and get your first badge. It saves instantly.`;
     ]);
 
     const sentMessage = await ctx.reply(message, keyboard);
-
-    // Use 1-minute auto-delete for temporary messages
     ChatCleanupService.scheduleMenuMessage(ctx.telegram, sentMessage);
 
-    logger.info('Badge selection message sent', {
+    logger.info('Badge selection sent', {
       chatId: ctx.chat.id,
       language: lang,
     });
   } catch (error) {
-    logger.error('Error sending badge selection message:', error);
+    logger.error('Error sending badge selection:', error);
   }
 }
 
@@ -323,8 +344,6 @@ async function sendPhotoSharingInvitation(ctx, username, lang) {
 💎 Ready to be next? Upload your best content now!`;
 
     const sentMessage = await ctx.reply(message);
-
-    // Use 1-minute auto-delete for temporary messages
     ChatCleanupService.scheduleMenuMessage(ctx.telegram, sentMessage);
 
     logger.info('Photo sharing invitation sent', {
@@ -368,11 +387,11 @@ async function handleBadgeSelection(ctx) {
     // Save badge to user profile
     await UserModel.addBadge(userId, badgeKey);
 
-    // Delete the badge selection message (optional)
+    // Delete the badge selection message
     try {
       await ctx.deleteMessage();
     } catch (error) {
-      logger.warn('Could not delete badge selection message:', error);
+      logger.warn('Could not delete badge selection message:', error.message);
     }
 
     // Send congratulations message
@@ -387,7 +406,7 @@ async function handleBadgeSelection(ctx) {
     // Answer the callback query
     await ctx.answerCbQuery(`${badge.emoji} Badge saved!`);
 
-    logger.info('Badge selected and saved', {
+    logger.info('Badge selected', {
       userId,
       badge: badgeKey,
       chatId: ctx.chat.id,
@@ -505,14 +524,11 @@ async function handleViewRules(ctx) {
 • Support fellow community members
 • Mental health resources available`;
 
-    // Send rules as a reply or edit the message
+    // Try to edit the message, fallback to new message
     try {
       await ctx.editMessageText(rulesMessage, { parse_mode: 'Markdown' });
     } catch {
-      // If editing fails, send as new message
       const sentMessage = await ctx.reply(rulesMessage, { parse_mode: 'Markdown' });
-
-      // Auto-delete after 2 minutes
       ChatCleanupService.scheduleBotMessage(ctx.telegram, sentMessage, 2 * 60 * 1000);
     }
 

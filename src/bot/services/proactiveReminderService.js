@@ -1,6 +1,7 @@
 const logger = require('../../utils/logger');
 const ChatCleanupService = require('./chatCleanupService');
 const { t } = require('../../utils/i18n');
+const MessageRateLimiter = require('./messageRateLimiter');
 
 /**
  * Proactive Reminder Service
@@ -173,15 +174,15 @@ class ProactiveReminderService {
     const reminders = {
       ruleInterval: setInterval(async () => {
         await this.sendRuleReminder(telegram, chatId, language);
-      }, 6 * 60 * 60 * 1000), // Every 6 hours
+      }, 8 * 60 * 60 * 1000), // Every 8 hours (reduced frequency due to rate limiting)
 
       tipInterval: setInterval(async () => {
         await this.sendPreventionTip(telegram, chatId, language);
-      }, 12 * 60 * 60 * 1000), // Every 12 hours
+      }, 16 * 60 * 60 * 1000), // Every 16 hours (reduced frequency due to rate limiting)
 
       contentInterval: setInterval(async () => {
         await this.sendEducationalContent(telegram, chatId, language);
-      }, 24 * 60 * 60 * 1000), // Every 24 hours
+      }, 24 * 60 * 60 * 1000), // Every 24 hours (kept as is)
     };
 
     this.activeReminders.set(chatId, reminders);
@@ -192,9 +193,15 @@ class ProactiveReminderService {
       intervals: Object.keys(reminders).length,
     });
 
-    // Send initial reminders immediately
-    this.sendRuleReminder(telegram, chatId, language);
-    this.sendPreventionTip(telegram, chatId, language);
+    // Send initial reminder after a short delay (staggered to avoid race condition)
+    // Only send ONE initial message to conserve rate limit
+    setTimeout(async () => {
+      try {
+        await this.sendRuleReminder(telegram, chatId, language);
+      } catch (error) {
+        logger.error('Error sending initial rule reminder:', error.message);
+      }
+    }, 5000); // 5 second delay
   }
 
   /**
@@ -222,6 +229,13 @@ class ProactiveReminderService {
    */
   static async sendRuleReminder(telegram, chatId, language) {
     try {
+      // Atomic check and record to prevent race conditions
+      const rateLimitCheck = await MessageRateLimiter.checkAndRecordMessage(6);
+      if (!rateLimitCheck.canSend) {
+        logger.info(`Rate limit reached - cannot send rule reminder. Messages today: ${rateLimitCheck.messagesSentToday}/6`);
+        return;
+      }
+
       const messages = this.RULE_REMINDERS[language] || this.RULE_REMINDERS.en;
       const randomMessage = messages[Math.floor(Math.random() * messages.length)];
 
@@ -256,6 +270,13 @@ class ProactiveReminderService {
    */
   static async sendPreventionTip(telegram, chatId, language) {
     try {
+      // Atomic check and record to prevent race conditions
+      const rateLimitCheck = await MessageRateLimiter.checkAndRecordMessage(6);
+      if (!rateLimitCheck.canSend) {
+        logger.info(`Rate limit reached - cannot send prevention tip. Messages today: ${rateLimitCheck.messagesSentToday}/6`);
+        return;
+      }
+
       const tips = this.PREVENTION_TIPS[language] || this.PREVENTION_TIPS.en;
       const randomTip = tips[Math.floor(Math.random() * tips.length)];
 
@@ -290,6 +311,13 @@ class ProactiveReminderService {
    */
   static async sendEducationalContent(telegram, chatId, language) {
     try {
+      // Atomic check and record to prevent race conditions
+      const rateLimitCheck = await MessageRateLimiter.checkAndRecordMessage(6);
+      if (!rateLimitCheck.canSend) {
+        logger.info(`Rate limit reached - cannot send educational content. Messages today: ${rateLimitCheck.messagesSentToday}/6`);
+        return;
+      }
+
       const content = this.EDUCATIONAL_CONTENT[language] || this.EDUCATIONAL_CONTENT.en;
       const randomContent = content[Math.floor(Math.random() * content.length)];
 
@@ -324,6 +352,13 @@ class ProactiveReminderService {
    */
   static async sendSupportReminder(telegram, chatId, language) {
     try {
+      // Atomic check and record to prevent race conditions
+      const rateLimitCheck = await MessageRateLimiter.checkAndRecordMessage(6);
+      if (!rateLimitCheck.canSend) {
+        logger.info(`Rate limit reached - cannot send support reminder. Messages today: ${rateLimitCheck.messagesSentToday}/6`);
+        return;
+      }
+
       const supportMessage = language === 'es'
         ? '💙 **Recordatorio de Apoyo**\n\nSi necesitas ayuda inmediata, usa /support para acceder a recursos de crisis, líneas de ayuda y centros de pruebas. ¡No estás solo!'
         : '💙 **Support Reminder**\n\nIf you need immediate help, use /support to access crisis resources, hotlines, and testing centers. You\'re not alone!';

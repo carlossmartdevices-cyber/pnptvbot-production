@@ -184,9 +184,11 @@ async function deleteAndNotify(ctx, reason) {
     await ctx.deleteMessage();
 
     // Send notification (auto-delete after 30 seconds)
-    const notification = await ctx.reply(
-      `⚠️ @${ctx.from.username || ctx.from.first_name}, your message was removed: ${reason}`,
-      { reply_to_message_id: ctx.message.message_id }
+    // NOTE: Don't use reply_to_message_id since we just deleted the message
+    const username = ctx.from.username ? `@${ctx.from.username}` : ctx.from.first_name;
+    const notification = await ctx.telegram.sendMessage(
+      ctx.chat.id,
+      `⚠️ ${username}, your message was removed: ${reason}`
     );
 
     setTimeout(async () => {

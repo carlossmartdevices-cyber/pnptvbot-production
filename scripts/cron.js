@@ -52,27 +52,9 @@ const startCronJobs = async (bot = null) => {
       }
     });
 
-    // Tutorial reminders for FREE users (how to become PRIME) - every 60 minutes
-    cron.schedule(process.env.FREE_TUTORIAL_CRON || '0 */1 * * *', async () => {
-      try {
-        logger.info('Running FREE user tutorial reminders...');
-        const results = await TutorialReminderService.sendFreeTutorials(50);
-        logger.info('FREE tutorials completed', results);
-      } catch (error) {
-        logger.error('Error in FREE tutorial cron:', error);
-      }
-    });
-
-    // Tutorial reminders for PRIME users (how to use features) - every 60 minutes
-    cron.schedule(process.env.PRIME_TUTORIAL_CRON || '0 */1 * * *', async () => {
-      try {
-        logger.info('Running PRIME user tutorial reminders...');
-        const results = await TutorialReminderService.sendPrimeTutorials(50);
-        logger.info('PRIME tutorials completed', results);
-      } catch (error) {
-        logger.error('Error in PRIME tutorial cron:', error);
-      }
-    });
+    // NOTE: Tutorial reminders are handled by TutorialReminderService.startScheduling() in bot.js
+    // Do NOT duplicate them here to avoid exceeding the 6 messages/day rate limit
+    // The service alternates between health tips and PRIME feature tutorials every 4 hours
 
     logger.info('✓ Cron jobs started successfully');
     return true;
@@ -83,11 +65,8 @@ const startCronJobs = async (bot = null) => {
   }
 };
 
-// Start cron jobs if enabled
-if (process.env.ENABLE_CRON === 'true') {
-  startCronJobs();
-} else {
-  logger.info('Cron jobs disabled');
-}
+// NOTE: Cron jobs are started from bot.js via startCronJobs(bot)
+// Do NOT start them here to avoid double execution
+// The bot instance is needed for services like MembershipCleanupService
 
 module.exports = { startCronJobs };
