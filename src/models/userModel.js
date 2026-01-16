@@ -38,6 +38,13 @@ class UserModel {
       planId: row.plan_id,
       planExpiry: row.plan_expiry,
       tier: row.tier,
+      // Subscription object for access control compatibility
+      subscription: {
+        isPrime: row.subscription_status === 'active',
+        status: row.subscription_status,
+        planId: row.plan_id,
+        expiry: row.plan_expiry
+      },
       role: row.role,
       assignedBy: row.assigned_by,
       roleAssignedAt: row.role_assigned_at,

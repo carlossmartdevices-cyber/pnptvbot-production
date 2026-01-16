@@ -1,15 +1,17 @@
 const { query } = require('../../config/postgres');
 const { Markup } = require('telegraf');
 const logger = require('../../utils/logger');
+const { config } = require('../../config/config');
 
 /**
  * Tutorial Reminder Service
- * Sends proactive tutorial messages to users based on their subscription status:
+ * Sends proactive tutorial messages to the group (not privately) based on user subscription status:
  * - FREE/Churned users: How to subscribe and become PRIME
  * - PRIME users: How to use Nearby, Hangouts, and Videorama
  */
 class TutorialReminderService {
   static bot = null;
+  static GROUP_ID = config.GROUP_ID;
 
   /**
    * Initialize the service with bot instance
@@ -18,6 +20,9 @@ class TutorialReminderService {
   static initialize(bot) {
     this.bot = bot;
     logger.info('Tutorial reminder service initialized');
+    if (!this.GROUP_ID) {
+      logger.warn('GROUP_ID not configured - tutorials will not be sent');
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -455,15 +460,19 @@ Toca *"Contenido Exclusivo"* en el menú para explorar toda la biblioteca.
   }
 
   /**
-   * Send tutorial to a single user
-   * @param {Object} user - User object
+   * Send tutorial to the group (not privately to users)
    * @param {Object} tutorial - Tutorial object with title, message, button
    * @returns {Promise<boolean>} Success status
    */
-  static async sendTutorialToUser(user, tutorial) {
+  static async sendTutorialToGroup(tutorial) {
     try {
       if (!this.bot) {
         logger.error('Bot not initialized');
+        return false;
+      }
+
+      if (!this.GROUP_ID) {
+        logger.error('GROUP_ID not configured - cannot send tutorials');
         return false;
       }
 
@@ -473,48 +482,52 @@ Toca *"Contenido Exclusivo"* en el menú para explorar toda la biblioteca.
           ])
         : undefined;
 
-      await this.bot.telegram.sendMessage(user.id, tutorial.message, {
+      await this.bot.telegram.sendMessage(this.GROUP_ID, tutorial.message, {
         parse_mode: 'Markdown',
         ...(keyboard ? keyboard : {})
       });
 
-      logger.debug(`Tutorial sent to user ${user.id}: ${tutorial.title}`);
+      logger.info(`Tutorial sent to group ${this.GROUP_ID}: ${tutorial.title}`);
       return true;
     } catch (error) {
       if (error.response?.error_code === 403) {
-        logger.debug(`Cannot send tutorial to user ${user.id}: User blocked bot`);
+        logger.error(`Cannot send tutorial to group ${this.GROUP_ID}: Bot blocked in group`);
       } else if (error.response?.error_code === 400) {
-        logger.debug(`Cannot send tutorial to user ${user.id}: Chat not found`);
+        logger.error(`Cannot send tutorial to group ${this.GROUP_ID}: Group not found`);
       } else {
-        logger.error(`Error sending tutorial to user ${user.id}:`, error.message);
+        logger.error(`Error sending tutorial to group ${this.GROUP_ID}:`, error.message);
       }
       return false;
     }
   }
 
   /**
-   * Send tutorials to FREE/Churned users about becoming PRIME
-   * @param {number} maxUsers - Maximum users to send to (default 50)
+   * Send tutorials to the group about becoming PRIME (for FREE/Churned users)
+   * @param {number} maxTutorials - Maximum tutorials to send (default 1)
    * @returns {Promise<Object>} Results { sent, failed }
    */
-  static async sendFreeTutorials(maxUsers = 50) {
+  static async sendFreeTutorials(maxTutorials = 1) {
     try {
       logger.info('Starting FREE user tutorials...');
 
-      const users = await this.getUsersByStatus('free');
-      const limitedUsers = users.slice(0, maxUsers);
+      if (!this.GROUP_ID) {
+        logger.error('GROUP_ID not configured - cannot send tutorials');
+        return { sent: 0, failed: 1 };
+      }
 
       let sent = 0;
       let failed = 0;
 
-      for (const user of limitedUsers) {
-        const lang = user.language?.startsWith('es') ? 'es' : 'en';
+      // Send tutorials to the group instead of individual users
+      for (let i = 0; i < maxTutorials; i++) {
+        // Alternate between English and Spanish tutorials
+        const lang = i % 2 === 0 ? 'en' : 'es';
         const tutorials = this.FREE_USER_TUTORIALS[lang];
 
         // Pick a random tutorial
         const tutorial = tutorials[Math.floor(Math.random() * tutorials.length)];
 
-        const success = await this.sendTutorialToUser(user, tutorial);
+        const success = await this.sendTutorialToGroup(tutorial);
         if (success) {
           sent++;
         } else {
@@ -525,7 +538,7 @@ Toca *"Contenido Exclusivo"* en el menú para explorar toda la biblioteca.
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      logger.info(`FREE tutorials completed: ${sent} sent, ${failed} failed`);
+      logger.info(`FREE tutorials completed: ${sent} sent to group, ${failed} failed`);
       return { sent, failed };
     } catch (error) {
       logger.error('Error in sendFreeTutorials:', error);
@@ -534,28 +547,32 @@ Toca *"Contenido Exclusivo"* en el menú para explorar toda la biblioteca.
   }
 
   /**
-   * Send tutorials to PRIME users about using features
-   * @param {number} maxUsers - Maximum users to send to (default 50)
+   * Send tutorials to the group about using features (for PRIME users)
+   * @param {number} maxTutorials - Maximum tutorials to send (default 1)
    * @returns {Promise<Object>} Results { sent, failed }
    */
-  static async sendPrimeTutorials(maxUsers = 50) {
+  static async sendPrimeTutorials(maxTutorials = 1) {
     try {
       logger.info('Starting PRIME user tutorials...');
 
-      const users = await this.getUsersByStatus('prime');
-      const limitedUsers = users.slice(0, maxUsers);
+      if (!this.GROUP_ID) {
+        logger.error('GROUP_ID not configured - cannot send tutorials');
+        return { sent: 0, failed: 1 };
+      }
 
       let sent = 0;
       let failed = 0;
 
-      for (const user of limitedUsers) {
-        const lang = user.language?.startsWith('es') ? 'es' : 'en';
+      // Send tutorials to the group instead of individual users
+      for (let i = 0; i < maxTutorials; i++) {
+        // Alternate between English and Spanish tutorials
+        const lang = i % 2 === 0 ? 'en' : 'es';
         const tutorials = this.PRIME_USER_TUTORIALS[lang];
 
         // Pick a random tutorial
         const tutorial = tutorials[Math.floor(Math.random() * tutorials.length)];
 
-        const success = await this.sendTutorialToUser(user, tutorial);
+        const success = await this.sendTutorialToGroup(tutorial);
         if (success) {
           sent++;
         } else {
@@ -566,7 +583,7 @@ Toca *"Contenido Exclusivo"* en el menú para explorar toda la biblioteca.
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      logger.info(`PRIME tutorials completed: ${sent} sent, ${failed} failed`);
+      logger.info(`PRIME tutorials completed: ${sent} sent to group, ${failed} failed`);
       return { sent, failed };
     } catch (error) {
       logger.error('Error in sendPrimeTutorials:', error);

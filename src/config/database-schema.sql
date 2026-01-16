@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   username VARCHAR(255),
   first_name VARCHAR(255) NOT NULL,
   last_name VARCHAR(255),
-  email VARCHAR(255),
+  email VARCHAR(255) UNIQUE,
   email_verified BOOLEAN DEFAULT FALSE,
 
   -- Profile

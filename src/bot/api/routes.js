@@ -6,6 +6,7 @@ const cors = require('cors');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
+const session = require('express-session');
 const logger = require('../../utils/logger');
 
 // Controllers
@@ -21,6 +22,10 @@ const healthController = require('./controllers/healthController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
+
+// Authentication middleware and handlers
+const { telegramAuth, checkTermsAccepted } = require('../../api/middleware/telegramAuth');
+const { handleTelegramAuth, handleAcceptTerms, checkAuthStatus } = require('../../api/handlers/telegramAuthHandler');
 
 // Simple page limiter middleware stub (used by landing page routes).
 // In production this may be replaced with a proper rate-limiter or cache-based limiter.
@@ -40,11 +45,39 @@ app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Session middleware for Telegram auth
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'pnptv-secret-key',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 }
+}));
+
 // Logging (before other middleware for accurate request tracking)
 app.use(morgan('combined', { stream: logger.stream }));
 
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../../../public')));
+
+// Serve static auth pages
+app.use('/auth', express.static(path.join(__dirname, '../../../public/auth')));
+
+// Explicit routes for auth pages without .html extension
+app.get('/auth/telegram-login-complete', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/auth/telegram-login-complete.html'));
+});
+
+app.get('/auth/telegram-login', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/auth/telegram-login.html'));
+});
+
+app.get('/auth/terms', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/auth/terms.html'));
+});
+
+app.get('/auth/not-registered', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/auth/not-registered.html'));
+});
 
 // Add cache control headers for static assets to prevent browser caching issues
 app.use((req, res, next) => {
@@ -157,7 +190,21 @@ app.get('/policies', pageLimiter, (req, res) => {
 });
 
 // Videorama (new) - React app build output under /public/videorama-app
+// Serve auth wrapper first
 app.get(['/videorama-app', '/videorama-app/'], pageLimiter, (req, res) => {
+  const authWrapperPath = path.join(__dirname, '../../../public/videorama-app/auth-wrapper.html');
+  if (!fs.existsSync(authWrapperPath)) {
+    return res.status(404).send('Videorama auth wrapper not found.');
+  }
+  // Set cache control headers to prevent browser caching issues
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  return res.sendFile(authWrapperPath);
+});
+
+// Protected Videorama app - requires authentication
+app.get('/videorama/app', telegramAuth, checkTermsAccepted, (req, res) => {
   const indexPath = path.join(__dirname, '../../../public/videorama-app/index.html');
   if (!fs.existsSync(indexPath)) {
     return res.status(404).send('Videorama app not built. Deploy `public/videorama-app/`.');
@@ -172,8 +219,17 @@ app.get(['/videorama-app', '/videorama-app/'], pageLimiter, (req, res) => {
 // Music Collections and Playlists routes have been removed
 // These functionalities are now integrated into the Videorama app
 
-// Hangouts page
+// Hangouts page - serve auth wrapper
 app.get('/hangouts', pageLimiter, (req, res) => {
+  // Set cache control headers to prevent browser caching issues
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, '../../../public/hangouts/auth-wrapper.html'));
+});
+
+// Protected Hangouts app - requires authentication
+app.get('/hangouts/app', telegramAuth, checkTermsAccepted, (req, res) => {
   // Set cache control headers to prevent browser caching issues
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -304,6 +360,25 @@ app.get('/health', async (req, res) => {
 });
 
 // API routes
+// Authentication API endpoints
+app.post('/api/telegram-auth', handleTelegramAuth);
+app.post('/api/accept-terms', handleAcceptTerms);
+app.get('/api/auth-status', checkAuthStatus);
+
+// Logout endpoint
+app.post('/api/logout', (req, res) => {
+  req.session.destroy(err => {
+    if (err) {
+      logger.error('Logout error:', err);
+      return res.status(500).json({ error: 'Logout failed' });
+    }
+    res.clearCookie('connect.sid');
+    logger.info('User logged out successfully');
+    res.json({ success: true });
+  });
+});
+
+// Webhook endpoints
 app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
 app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
 app.get('/api/payment-response', webhookController.handlePaymentResponse);
