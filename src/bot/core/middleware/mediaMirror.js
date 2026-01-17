@@ -3,9 +3,13 @@ const logger = require('../../../utils/logger');
 const TopicConfigModel = require('../../../models/topicConfigModel');
 const UserModel = require('../../../models/userModel');
 
+// Counter for featured member selection (every 10th media post)
+let mediaPostCounter = 0;
+const FEATURED_INTERVAL = 10;
+
 /**
  * Media Mirror Middleware
- * Auto-mirrors media from general chat to configured topics (e.g., PNPtv Gallery!)
+ * Features every 10th media post as "Miembro Destacado" (Featured Member)
  * Includes rich user profile information with bio and clickable profile links
  */
 function mediaMirrorMiddleware() {
@@ -27,8 +31,18 @@ function mediaMirrorMiddleware() {
     const hasMedia = hasPhoto || hasVideo || hasAnimation;
 
     if (!hasMedia) {
-      return next(); // No media, skip mirroring
+      return next(); // No media, skip
     }
+
+    // Increment counter for every media post
+    mediaPostCounter++;
+
+    // Only feature every 10th post
+    if (mediaPostCounter % FEATURED_INTERVAL !== 0) {
+      return next(); // Not the 10th post, skip featuring
+    }
+
+    logger.info(`Featuring member - media post #${mediaPostCounter}`);
 
     // Get all topic configurations for this group
     const groupId = chatId.toString();
@@ -78,14 +92,14 @@ function mediaMirrorMiddleware() {
 
         // Header box
         mirrorCaption += '```\n';
-        mirrorCaption += '──────────────────────────────┐\n';
-        mirrorCaption += '    🔥 HOT PROFILE 🔥     \n';
-        mirrorCaption += '──────────────────────────────┘\n';
+        mirrorCaption += '══════════════════════════════\n';
+        mirrorCaption += '   ⭐ MIEMBRO DESTACADO ⭐   \n';
+        mirrorCaption += '══════════════════════════════\n';
         mirrorCaption += '```\n\n';
 
         // Username with looking for text (no bold, just plain text, escape special chars)
         const displayName = ctx.from.username ? `@${ctx.from.username.replace(/[_*[\]()~`>#+\-.!]/g, '\\$&')}` : firstName;
-        mirrorCaption += `👤 ${displayName} is looking for...\n\n`;
+        mirrorCaption += `👤 ${displayName} busca...\n\n`;
 
         // Add badges if user has any
         if (userProfile?.badges && userProfile.badges.length > 0) {
@@ -120,9 +134,9 @@ function mediaMirrorMiddleware() {
 
         // Fun footer
         mirrorCaption += '```\n';
-        mirrorCaption += '┌─────────────────────────┐\n';
-        mirrorCaption += '│  potential fuckbuddy 😏 │\n';
-        mirrorCaption += '└─────────────────────────┘\n';
+        mirrorCaption += '┌──────────────────────────┐\n';
+        mirrorCaption += '│  posible fuckbuddy 😏    │\n';
+        mirrorCaption += '└──────────────────────────┘\n';
         mirrorCaption += '```';
 
         // Build inline keyboard with DM button
