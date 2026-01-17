@@ -111,12 +111,33 @@ const registerNearbyHandlers = (bot) => {
 
       const userId = ctx.from.id;
 
+      // Check if user has location set
+      const currentUser = await UserService.getOrCreateFromContext(ctx);
+      if (!currentUser.location || !currentUser.location.lat) {
+        const noLocationText =
+          '`📍 Location Required`\n\n' +
+          'You need to share your location first!\n\n' +
+          '_Go to your Profile → Location to share your location, then come back here._';
+
+        await ctx.editMessageText(
+          noLocationText,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('📝 Go to Profile', 'edit_profile')],
+              [Markup.button.callback('🔙 Back', 'back_to_main')],
+            ]),
+          }
+        );
+        return;
+      }
+
       await ctx.editMessageText('🔍 _Scanning your area..._', { parse_mode: 'Markdown' });
 
       const nearbyUsers = await UserService.getNearbyUsers(userId, radius);
 
       if (nearbyUsers.length === 0) {
-        const noResultsText = 
+        const noResultsText =
           '`😢 No Results`\n\n' +
           `No users found within ${radius} km 😔\n\n` +
           '_Try a larger radius or check back later!_';
