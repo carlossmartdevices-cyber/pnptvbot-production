@@ -18,6 +18,7 @@ const { detectLanguage } = require('../../../utils/languageDetector');
 const { showProfile } = require('../user/profile');
 const UserModel = require('../../../models/userModel');
 const { isPrimeUser } = require('../../utils/helpers');
+const UserService = require('../../services/userService');
 
 /**
  * Store the last menu message ID per user per chat
@@ -561,6 +562,10 @@ async function handleMenuCallback(ctx) {
 
       case 'settings':
         await handleSettingsMenu(ctx, lang);
+        break;
+
+      case 'nearby':
+        await handleNearby(ctx, lang);
         break;
 
       default:
@@ -1125,6 +1130,52 @@ async function handleSettingsMenu(ctx, lang) {
     parse_mode: 'Markdown',
     ...keyboard
   });
+}
+
+/**
+ * Handle Nearby Users menu option
+ * Shows the nearby users interface with radius selection
+ */
+async function handleNearby(ctx, lang) {
+  try {
+    const user = await UserService.getOrCreateFromContext(ctx);
+    const locationSharing = user.locationSharingEnabled !== false;
+    const locationStatus = locationSharing
+      ? (lang === 'es' ? 'ON ✅' : 'ON ✅')
+      : (lang === 'es' ? 'OFF ❌' : 'OFF ❌');
+
+    const message = lang === 'es'
+      ? '📍 *Usuarios Cercanos*\n\n' +
+        '¡Encuentra usuarios cerca de ti!\n\n' +
+        '👇 Selecciona un radio de búsqueda:'
+      : '📍 *Nearby Users*\n\n' +
+        'Find users near you!\n\n' +
+        '👇 Select a search radius:';
+
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback('📍 5 km', 'nearby_radius_5'),
+        Markup.button.callback('📍 10 km', 'nearby_radius_10'),
+      ],
+      [
+        Markup.button.callback('📍 25 km', 'nearby_radius_25'),
+        Markup.button.callback('📍 50 km', 'nearby_radius_50'),
+      ],
+      [Markup.button.callback(`📍 Location: ${locationStatus}`, 'toggle_location_sharing')],
+      [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')],
+    ]);
+
+    await ctx.editMessageText(message, {
+      parse_mode: 'Markdown',
+      ...keyboard
+    });
+  } catch (error) {
+    logger.error('Error handling nearby menu:', error);
+    await ctx.editMessageText(
+      getMessage('ERROR_GENERIC', lang),
+      { parse_mode: 'Markdown' }
+    );
+  }
 }
 
 module.exports = {
