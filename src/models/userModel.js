@@ -285,7 +285,7 @@ class UserModel {
   }
 
   /**
-   * Get nearby users (with optimized caching)
+   * Get nearby users (with optimized caching and bounding box pre-filtering)
    */
   static async getNearby(location, radiusKm = 10) {
     try {
@@ -294,15 +294,33 @@ class UserModel {
       const cacheKey = `nearby:${lat},${lng}:${radiusKm}`;
 
       const fetchNearby = async () => {
+        // Calculate bounding box for SQL pre-filtering (approximate rectangular area)
+        // 1 degree latitude ≈ 111 km, 1 degree longitude varies by latitude
+        const latDelta = radiusKm / 111;
+        const lngDelta = radiusKm / (111 * Math.cos(this.toRad(location.lat)));
+
+        const minLat = location.lat - latDelta;
+        const maxLat = location.lat + latDelta;
+        const minLng = location.lng - lngDelta;
+        const maxLng = location.lng + lngDelta;
+
+        // Use bounding box to pre-filter in SQL, also filter by location_sharing_enabled
         const result = await query(
-          `SELECT * FROM ${TABLE} WHERE location_lat IS NOT NULL AND location_lng IS NOT NULL
-           AND subscription_status IN ('active', 'free') AND is_active = true LIMIT 100`
+          `SELECT * FROM ${TABLE}
+           WHERE location_lat IS NOT NULL AND location_lng IS NOT NULL
+           AND location_lat BETWEEN $1 AND $2
+           AND location_lng BETWEEN $3 AND $4
+           AND location_sharing_enabled = true
+           AND is_active = true
+           LIMIT 200`,
+          [minLat, maxLat, minLng, maxLng]
         );
 
         const users = [];
         for (const row of result.rows) {
           const userData = this.mapRowToUser(row);
           if (userData.location) {
+            // Calculate exact distance using Haversine formula
             const distance = this.calculateDistance(location.lat, location.lng, userData.location.lat, userData.location.lng);
             if (distance <= radiusKm) {
               users.push({ ...userData, distance });
@@ -310,7 +328,7 @@ class UserModel {
           }
         }
         users.sort((a, b) => a.distance - b.distance);
-        logger.info(`Found ${users.length} nearby users within ${radiusKm}km`);
+        logger.info(`Found ${users.length} nearby users within ${radiusKm}km (pre-filtered ${result.rows.length} from bounding box)`);
         return users;
       };
 
@@ -438,6 +456,7 @@ class UserModel {
   static async getAllAdmins() {
     try {
       const result = await query(`SELECT * FROM ${TABLE} WHERE role IN ('superadmin', 'admin', 'moderator')`);
+      const admins = result.rows.map((row) => this.mapRowToUser(row));
       logger.info(`Found ${admins.length} admin users`);
       return admins;
     } catch (error) {

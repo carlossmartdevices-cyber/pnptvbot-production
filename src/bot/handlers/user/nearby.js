@@ -181,7 +181,12 @@ const registerNearbyHandlers = (bot) => {
       const targetUserId = ctx.match[1];
       const lang = getLanguage(ctx);
 
-      const user = await UserService.getOrCreateFromContext({ from: { id: targetUserId } });
+      const user = await UserService.getById(targetUserId);
+
+      if (!user) {
+        await ctx.answerCbQuery(t('userNotFound', lang));
+        return;
+      }
 
       // Build sexy profile card
       let profileText = 

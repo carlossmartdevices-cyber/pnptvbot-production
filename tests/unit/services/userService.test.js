@@ -145,8 +145,8 @@ describe('UserService', () => {
       };
 
       const nearbyUsers = [
-        { id: '987654321', distance: 5 },
-        { id: '123456789', distance: 0 },
+        { id: '987654321', distance: 5, locationSharingEnabled: true },
+        { id: '123456789', distance: 0, locationSharingEnabled: true },
       ];
 
       UserModel.getById.mockResolvedValue(currentUser);
