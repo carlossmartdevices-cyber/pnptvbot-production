@@ -1,5 +1,7 @@
 const express = require('express');
 const session = require('express-session');
+const RedisStore = require('connect-redis').default;
+const { getRedis } = require('../config/redis');
 const { config } = require('../bot/config/botConfig');
 const paymentService = require('../bot/services/paymentService');
 const logger = require('../utils/logger');
@@ -14,11 +16,13 @@ const port = config.port;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session middleware for Telegram auth
+// Session middleware for Telegram auth with Redis store
+const redisClient = getRedis();
 app.use(session({
+  store: new RedisStore({ client: redisClient, prefix: 'sess:' }),
   secret: config.sessionSecret || 'pnptv-secret-key',
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
   cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 }
 }));
 

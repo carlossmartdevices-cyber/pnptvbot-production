@@ -1,18 +1,22 @@
 /**
  * AWS S3 Upload Service
  * Handles file uploads to S3 for broadcast media
+ * Updated to use AWS SDK v3
  */
 
-const AWS = require('aws-sdk');
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, CopyObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const crypto = require('crypto');
 const path = require('path');
 const config = require('../config/config');
 const logger = require('./logger');
 
-// Configure AWS SDK
-const s3 = new AWS.S3({
-  accessKeyId: config.AWS_ACCESS_KEY_ID,
-  secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
+// Configure AWS SDK v3 S3 Client
+const s3Client = new S3Client({
+  credentials: {
+    accessKeyId: config.AWS_ACCESS_KEY_ID,
+    secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
+  },
   region: config.AWS_REGION,
 });
 
@@ -49,7 +53,7 @@ async function uploadFile(fileBuffer, originalFilename, mimeType, options = {}) 
     const {
       bucket = DEFAULT_BUCKET,
       folder = BROADCAST_FOLDER,
-      acl = 'private', // Use 'public-read' for public files
+      acl = 'private',
       metadata = {},
     } = options;
 
@@ -59,27 +63,27 @@ async function uploadFile(fileBuffer, originalFilename, mimeType, options = {}) 
 
     const s3Key = generateFileKey(originalFilename, folder);
 
-    const uploadParams = {
+    const command = new PutObjectCommand({
       Bucket: bucket,
       Key: s3Key,
       Body: fileBuffer,
       ContentType: mimeType,
       ACL: acl,
       Metadata: metadata,
-    };
+    });
 
     logger.info(`Uploading file to S3: ${s3Key}`);
-    const uploadResult = await s3.upload(uploadParams).promise();
+    await s3Client.send(command);
 
-    logger.info(`File uploaded successfully to S3: ${uploadResult.Location}`);
+    const s3Url = `https://${bucket}.s3.${config.AWS_REGION}.amazonaws.com/${s3Key}`;
+    logger.info(`File uploaded successfully to S3: ${s3Url}`);
 
     return {
       success: true,
-      s3Key: uploadResult.Key,
-      s3Url: uploadResult.Location,
+      s3Key: s3Key,
+      s3Url: s3Url,
       s3Bucket: bucket,
       s3Region: config.AWS_REGION,
-      eTag: uploadResult.ETag,
     };
   } catch (error) {
     logger.error('Error uploading file to S3:', error);
@@ -161,21 +165,19 @@ async function getPresignedUrl(s3Key, options = {}) {
   try {
     const {
       bucket = DEFAULT_BUCKET,
-      expiresIn = 3600, // 1 hour default
-      operation = 'getObject', // 'getObject' or 'putObject'
+      expiresIn = 3600,
     } = options;
 
     if (!bucket) {
       throw new Error('S3 bucket not configured');
     }
 
-    const params = {
+    const command = new GetObjectCommand({
       Bucket: bucket,
       Key: s3Key,
-      Expires: expiresIn,
-    };
+    });
 
-    const url = await s3.getSignedUrlPromise(operation, params);
+    const url = await getSignedUrl(s3Client, command, { expiresIn });
     logger.info(`Generated presigned URL for ${s3Key}, expires in ${expiresIn}s`);
 
     return url;
@@ -197,12 +199,12 @@ async function deleteFile(s3Key, bucket = DEFAULT_BUCKET) {
       throw new Error('S3 bucket not configured');
     }
 
-    const params = {
+    const command = new DeleteObjectCommand({
       Bucket: bucket,
       Key: s3Key,
-    };
+    });
 
-    await s3.deleteObject(params).promise();
+    await s3Client.send(command);
     logger.info(`File deleted from S3: ${s3Key}`);
 
     return true;
@@ -224,15 +226,15 @@ async function fileExists(s3Key, bucket = DEFAULT_BUCKET) {
       throw new Error('S3 bucket not configured');
     }
 
-    const params = {
+    const command = new HeadObjectCommand({
       Bucket: bucket,
       Key: s3Key,
-    };
+    });
 
-    await s3.headObject(params).promise();
+    await s3Client.send(command);
     return true;
   } catch (error) {
-    if (error.code === 'NotFound') {
+    if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
       return false;
     }
     logger.error('Error checking file existence in S3:', error);
@@ -252,12 +254,12 @@ async function getFileMetadata(s3Key, bucket = DEFAULT_BUCKET) {
       throw new Error('S3 bucket not configured');
     }
 
-    const params = {
+    const command = new HeadObjectCommand({
       Bucket: bucket,
       Key: s3Key,
-    };
+    });
 
-    const metadata = await s3.headObject(params).promise();
+    const metadata = await s3Client.send(command);
 
     return {
       contentType: metadata.ContentType,
@@ -284,15 +286,20 @@ async function downloadFile(s3Key, bucket = DEFAULT_BUCKET) {
       throw new Error('S3 bucket not configured');
     }
 
-    const params = {
+    const command = new GetObjectCommand({
       Bucket: bucket,
       Key: s3Key,
-    };
+    });
 
-    const data = await s3.getObject(params).promise();
+    const data = await s3Client.send(command);
     logger.info(`File downloaded from S3: ${s3Key}`);
 
-    return data.Body;
+    // Convert stream to buffer
+    const chunks = [];
+    for await (const chunk of data.Body) {
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
   } catch (error) {
     logger.error('Error downloading file from S3:', error);
     throw new Error(`Failed to download file from S3: ${error.message}`);
@@ -318,20 +325,20 @@ async function copyFile(sourceKey, destinationKey, options = {}) {
       throw new Error('S3 bucket not configured');
     }
 
-    const params = {
+    const command = new CopyObjectCommand({
       Bucket: destinationBucket,
       CopySource: `${sourceBucket}/${sourceKey}`,
       Key: destinationKey,
       ACL: acl,
-    };
+    });
 
-    const result = await s3.copyObject(params).promise();
+    const result = await s3Client.send(command);
     logger.info(`File copied in S3: ${sourceKey} -> ${destinationKey}`);
 
     return {
       success: true,
       destinationKey,
-      eTag: result.ETag,
+      eTag: result.CopyObjectResult?.ETag,
     };
   } catch (error) {
     logger.error('Error copying file in S3:', error);

@@ -7,6 +7,8 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 const session = require('express-session');
+const RedisStore = require('connect-redis').default;
+const { getRedis } = require('../../config/redis');
 const logger = require('../../utils/logger');
 
 // Controllers
@@ -45,11 +47,13 @@ app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session middleware for Telegram auth
+// Session middleware for Telegram auth with Redis store
+const redisClient = getRedis();
 app.use(session({
+  store: new RedisStore({ client: redisClient, prefix: 'sess:' }),
   secret: process.env.SESSION_SECRET || 'pnptv-secret-key',
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
   cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 }
 }));
 
