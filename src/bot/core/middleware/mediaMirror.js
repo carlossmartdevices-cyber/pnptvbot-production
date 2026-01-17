@@ -84,6 +84,22 @@ function mediaMirrorMiddleware() {
       logger.debug('Could not fetch user profile for mirror:', e.message);
     }
 
+    // Detect user language (Spanish if 'es', otherwise English)
+    const userLang = ctx.from?.language_code?.startsWith('es') ? 'es' : 'en';
+    const texts = {
+      es: {
+        title: 'MIEMBRO DESTACADO',
+        lookingFor: 'busca...',
+        footer: 'posible fuckbuddy 😏'
+      },
+      en: {
+        title: 'FEATURED MEMBER',
+        lookingFor: 'is looking for...',
+        footer: 'potential fuckbuddy 😏'
+      }
+    };
+    const t = texts[userLang];
+
     // Mirror to each configured topic
     for (const mirrorTopic of mirrorTopics) {
       try {
@@ -93,13 +109,13 @@ function mediaMirrorMiddleware() {
         // Header box
         mirrorCaption += '```\n';
         mirrorCaption += '══════════════════════════════\n';
-        mirrorCaption += '   ⭐ MIEMBRO DESTACADO ⭐   \n';
+        mirrorCaption += `   ⭐ ${t.title} ⭐   \n`;
         mirrorCaption += '══════════════════════════════\n';
         mirrorCaption += '```\n\n';
 
         // Username with looking for text (no bold, just plain text, escape special chars)
         const displayName = ctx.from.username ? `@${ctx.from.username.replace(/[_*[\]()~`>#+\-.!]/g, '\\$&')}` : firstName;
-        mirrorCaption += `👤 ${displayName} busca...\n\n`;
+        mirrorCaption += `👤 ${displayName} ${t.lookingFor}\n\n`;
 
         // Add badges if user has any
         if (userProfile?.badges && userProfile.badges.length > 0) {
@@ -134,9 +150,9 @@ function mediaMirrorMiddleware() {
 
         // Fun footer
         mirrorCaption += '```\n';
-        mirrorCaption += '┌──────────────────────────┐\n';
-        mirrorCaption += '│  posible fuckbuddy 😏    │\n';
-        mirrorCaption += '└──────────────────────────┘\n';
+        mirrorCaption += '┌───────────────────────────┐\n';
+        mirrorCaption += `│  ${t.footer.padEnd(23)} │\n`;
+        mirrorCaption += '└───────────────────────────┘\n';
         mirrorCaption += '```';
 
         // Build inline keyboard with DM button
