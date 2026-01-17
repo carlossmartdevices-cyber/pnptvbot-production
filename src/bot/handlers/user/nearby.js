@@ -167,15 +167,18 @@ const registerNearbyHandlers = (bot) => {
         const emoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
         message += `${emoji} **${name}** - _${distance} km away_\n`;
 
+        // Create DM button (URL button for direct messaging)
+        const dmUrl = user.username
+          ? `https://t.me/${user.username}`
+          : `tg://user?id=${user.id}`;
+
         buttons.push([
-          Markup.button.callback(
-            `👁️ View ${name}`,
-            `view_user_${user.id}`,
-          ),
+          Markup.button.callback(`👁️ View`, `view_user_${user.id}`),
+          Markup.button.url(`💬 DM ${name}`, dmUrl),
         ]);
       });
 
-      message += '\n_Tap to view profile & slide into their DMs_ 😏';
+      message += '\n_Tap to view profile or slide into their DMs_ 😏';
 
       buttons.push([Markup.button.callback('🔙 Change Radius', 'show_nearby')]);
 
