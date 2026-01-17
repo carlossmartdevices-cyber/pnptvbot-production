@@ -1,28 +1,28 @@
-const { getFirestore, Collections } = require('../config/firebase');
+const { v4: uuidv4 } = require('uuid');
+const { query } = require('../../config/postgres');
 const logger = require('../../utils/logger');
 const userService = require('./userService');
 const broadcastUtils = require('../utils/broadcastUtils');
 
+/**
+ * Admin Service - Handles admin operations (PostgreSQL)
+ */
 class AdminService {
   constructor() {
-    this.db = getFirestore();
-    this.adminLogsCollection = this.db ? this.db.collection(Collections.ADMIN_LOGS) : null;
-    this.broadcastsCollection = this.db ? this.db.collection(Collections.BROADCASTS) : null;
+    // No Firestore dependency - using PostgreSQL
   }
 
   /**
-   * Log admin action
+   * Log admin action (logs to application logger)
    */
   async logAction(adminId, action, metadata = {}) {
     try {
-      if (!this.adminLogsCollection) return;
-      await this.adminLogsCollection.add({
+      logger.info(`Admin action: ${action}`, {
         adminId,
         action,
-        metadata,
-        timestamp: new Date(),
+        ...metadata,
+        timestamp: new Date().toISOString(),
       });
-      logger.info(`Admin action logged: ${action} by ${adminId}`);
     } catch (error) {
       logger.error('Error logging admin action:', error);
     }
@@ -36,12 +36,8 @@ class AdminService {
       const allUsers = await userService.getAllUsers();
 
       // Filter out bot users (user IDs ending with specific patterns or flagged as bots)
-      // Telegram bot IDs are typically identified by is_bot flag, but we check the stored data
       const users = allUsers.filter(user => {
-        // Skip if user is explicitly marked as bot
         if (user.is_bot === true) return false;
-        // Skip known bot user IDs (bots can't receive messages from other bots)
-        // User ID 1087968824 is a known bot (GroupAnonymousBot)
         if (user.id === '1087968824' || user.id === 1087968824) return false;
         return true;
       });
@@ -56,10 +52,30 @@ class AdminService {
 
       logger.info(`Starting broadcast to ${users.length} users (skipped ${results.skippedBots} bots)`);
 
+      // Create broadcast record in PostgreSQL
+      const broadcastId = uuidv4();
+      try {
+        await query(
+          `INSERT INTO broadcasts (id, title, message, media_url, media_type, status, target_tier, created_by, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
+          [
+            broadcastId,
+            options.title || 'Broadcast',
+            message,
+            options.mediaUrl || null,
+            options.mediaType || null,
+            'sending',
+            options.targetTier || 'all',
+            adminId.toString(),
+          ]
+        );
+      } catch (dbError) {
+        logger.warn('Could not create broadcast record:', dbError.message);
+      }
+
       for (const user of users) {
         try {
-          // Get standard buttons for broadcast messages (use user's language)
-          const userLanguage = user.language || 'en'; // Default to English if not set
+          const userLanguage = user.language || 'en';
           const standardButtons = broadcastUtils.getStandardButtonOptions(userLanguage);
           const replyMarkup = broadcastUtils.buildInlineKeyboard(standardButtons);
 
@@ -84,15 +100,6 @@ class AdminService {
 
           results.sent++;
 
-          // Log successful broadcast
-          await this.broadcastsCollection.add({
-            userId: user.id,
-            message,
-            status: 'sent',
-            sentAt: new Date(),
-            adminId,
-          });
-
           // Small delay to avoid rate limiting
           await new Promise(resolve => setTimeout(resolve, 50));
         } catch (error) {
@@ -102,18 +109,18 @@ class AdminService {
             error: error.message,
           });
 
-          // Log failed broadcast
-          await this.broadcastsCollection.add({
-            userId: user.id,
-            message,
-            status: 'failed',
-            error: error.message,
-            sentAt: new Date(),
-            adminId,
-          });
-
           logger.warn(`Failed to send broadcast to user ${user.id}: ${error.message}`);
         }
+      }
+
+      // Update broadcast status in PostgreSQL
+      try {
+        await query(
+          `UPDATE broadcasts SET status = $1, sent_at = NOW(), updated_at = NOW() WHERE id = $2`,
+          [results.failed === 0 ? 'completed' : 'completed_with_errors', broadcastId]
+        );
+      } catch (dbError) {
+        logger.warn('Could not update broadcast record:', dbError.message);
       }
 
       // Log admin action
@@ -136,35 +143,39 @@ class AdminService {
    */
   async getBroadcastHistory(limit = 50) {
     try {
-      if (!this.broadcastsCollection) return [];
-      const snapshot = await this.broadcastsCollection
-        .orderBy('sentAt', 'desc')
-        .limit(limit)
-        .get();
+      const result = await query(
+        `SELECT * FROM broadcasts ORDER BY created_at DESC LIMIT $1`,
+        [limit]
+      );
 
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return result.rows.map(row => ({
+        id: row.id,
+        title: row.title,
+        message: row.message,
+        mediaUrl: row.media_url,
+        mediaType: row.media_type,
+        scheduledAt: row.scheduled_at,
+        sentAt: row.sent_at,
+        status: row.status,
+        targetTier: row.target_tier,
+        createdBy: row.created_by,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
     } catch (error) {
       logger.error('Error getting broadcast history:', error);
-      throw error;
+      return [];
     }
   }
 
   /**
-   * Get admin logs
+   * Get admin logs (returns empty array - logging is done via application logger)
    */
   async getAdminLogs(limit = 100) {
-    try {
-      if (!this.adminLogsCollection) return [];
-      const snapshot = await this.adminLogsCollection
-        .orderBy('timestamp', 'desc')
-        .limit(limit)
-        .get();
-
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } catch (error) {
-      logger.error('Error getting admin logs:', error);
-      throw error;
-    }
+    // Admin logs are now written to application logger, not stored in database
+    // To view logs, check PM2 logs or log files
+    logger.info('Admin logs requested - check application logs for admin actions');
+    return [];
   }
 
   /**

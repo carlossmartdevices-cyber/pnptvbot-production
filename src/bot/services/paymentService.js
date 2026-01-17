@@ -414,7 +414,34 @@ class PaymentService {
           }
         }
 
-        // Send both emails after successful payment
+        // Send admin notification for purchase (always, regardless of email)
+        if (userId && planId) {
+          const plan = await PlanModel.getById(planId);
+          const user = await UserModel.getById(userId);
+
+          if (plan) {
+            try {
+              const bot = new Telegraf(process.env.BOT_TOKEN);
+              await PaymentNotificationService.sendAdminPaymentNotification({
+                bot,
+                userId,
+                planName: plan.display_name || plan.name,
+                amount: parseFloat(x_amount),
+                provider: 'ePayco',
+                transactionId: x_ref_payco,
+                customerName: x_customer_name || user?.first_name || 'Unknown',
+                customerEmail: x_customer_email || 'N/A',
+              });
+            } catch (adminError) {
+              logger.error('Error sending admin notification (non-critical):', {
+                error: adminError.message,
+                refPayco: x_ref_payco,
+              });
+            }
+          }
+        }
+
+        // Send both emails after successful payment (only if email available)
         if (x_customer_email && userId && planId) {
           const plan = await PlanModel.getById(planId);
           const user = await UserModel.getById(userId);
@@ -471,26 +498,6 @@ class PaymentService {
             } catch (emailError) {
               logger.error('Error sending welcome email (non-critical):', {
                 error: emailError.message,
-                refPayco: x_ref_payco,
-              });
-            }
-
-            // 3. Send admin notification for purchase
-            try {
-              const bot = new Telegraf(process.env.BOT_TOKEN);
-              await PaymentNotificationService.sendAdminPaymentNotification({
-                bot,
-                userId,
-                planName: plan.display_name || plan.name,
-                amount: parseFloat(x_amount),
-                provider: 'ePayco',
-                transactionId: x_ref_payco,
-                customerName: x_customer_name || user?.first_name || 'Unknown',
-                customerEmail: x_customer_email,
-              });
-            } catch (adminError) {
-              logger.error('Error sending admin notification (non-critical):', {
-                error: adminError.message,
                 refPayco: x_ref_payco,
               });
             }
@@ -673,6 +680,27 @@ class PaymentService {
               }
             }
 
+            // Send admin notification for purchase (always, regardless of email)
+            try {
+              const bot = new Telegraf(process.env.BOT_TOKEN);
+              const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
+              await PaymentNotificationService.sendAdminPaymentNotification({
+                bot,
+                userId,
+                planName: plan.display_name || plan.name,
+                amount: amountUSD,
+                provider: 'Daimo Pay',
+                transactionId: source?.txHash || id,
+                customerName: user?.first_name || user?.username || 'Unknown',
+                customerEmail: customerEmail || 'N/A',
+              });
+            } catch (adminError) {
+              logger.error('Error sending admin notification (non-critical):', {
+                error: adminError.message,
+                eventId: id,
+              });
+            }
+
             // Send both emails if we have an email
             if (customerEmail) {
               const userLanguage = user?.language || 'es';
@@ -723,27 +751,6 @@ class PaymentService {
               } catch (emailError) {
                 logger.error('Error sending welcome email (non-critical):', {
                   error: emailError.message,
-                  eventId: id,
-                });
-              }
-
-              // 3. Send admin notification for purchase
-              try {
-                const bot = new Telegraf(process.env.BOT_TOKEN);
-                const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
-                await PaymentNotificationService.sendAdminPaymentNotification({
-                  bot,
-                  userId,
-                  planName: plan.display_name || plan.name,
-                  amount: amountUSD,
-                  provider: 'Daimo Pay',
-                  transactionId: source?.txHash || id,
-                  customerName: user?.first_name || user?.username || 'Unknown',
-                  customerEmail,
-                });
-              } catch (adminError) {
-                logger.error('Error sending admin notification (non-critical):', {
-                  error: adminError.message,
                   eventId: id,
                 });
               }

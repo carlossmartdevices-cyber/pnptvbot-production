@@ -64,7 +64,7 @@ class PaymentModel {
     if (!row) return null;
     return {
       id: row.id,
-      paymentId: row.payment_id,
+      paymentId: row.id, // Use id as paymentId for backwards compatibility
       userId: row.user_id,
       planId: row.plan_id,
       planName: row.plan_name,
@@ -74,11 +74,9 @@ class PaymentModel {
       paymentMethod: row.payment_method,
       status: row.status,
       reference: row.reference,
-      destinationAddress: row.destination_address,
+      transactionId: row.transaction_id,
       paymentUrl: row.payment_url,
       daimoLink: row.daimo_link,
-      chain: row.chain,
-      chainId: row.chain_id,
       completedAt: row.completed_at,
       completedBy: row.completed_by,
       manualCompletion: row.manual_completion,
@@ -90,7 +88,7 @@ class PaymentModel {
 
   /**
    * Get payment by ID
-   * @param {string} paymentId - Payment ID
+   * @param {string} paymentId - Payment ID (UUID) or reference
    * @returns {Promise<Object|null>} Payment data
    */
   static async getById(paymentId) {
@@ -100,22 +98,15 @@ class PaymentModel {
 
       let result;
       if (isUuid) {
-        // Query by UUID id (cast to uuid)
+        // Query by UUID id
         result = await query(
           'SELECT * FROM payments WHERE id = $1::uuid',
           [paymentId]
         );
-        // If not found by id, try payment_id
-        if (!result.rows[0]) {
-          result = await query(
-            'SELECT * FROM payments WHERE payment_id = $1',
-            [paymentId]
-          );
-        }
       } else {
-        // Query only by payment_id (non-UUID string)
+        // Query by reference for non-UUID strings
         result = await query(
-          'SELECT * FROM payments WHERE payment_id = $1',
+          'SELECT * FROM payments WHERE reference = $1',
           [paymentId]
         );
       }
@@ -128,7 +119,7 @@ class PaymentModel {
 
   /**
    * Update payment status
-   * @param {string} paymentId - Payment ID
+   * @param {string} paymentId - Payment ID (UUID) or reference
    * @param {string} status - Payment status
    * @param {Object} metadata - Additional metadata
    * @returns {Promise<boolean>} Success status
@@ -155,6 +146,10 @@ class PaymentModel {
         updates.push(`reference = $${paramIndex++}`);
         values.push(metadata.reference);
       }
+      if (metadata.transaction_id) {
+        updates.push(`transaction_id = $${paramIndex++}`);
+        values.push(metadata.transaction_id);
+      }
       if (metadata.paymentUrl) {
         updates.push(`payment_url = $${paramIndex++}`);
         values.push(metadata.paymentUrl);
@@ -175,10 +170,11 @@ class PaymentModel {
 
       let queryStr;
       if (isUuid) {
-        // Only query by UUID id (cast to uuid)
+        // Query by UUID id
         queryStr = `UPDATE payments SET ${updates.join(', ')} WHERE id = $${paramIndex}::uuid`;
       } else {
-        queryStr = `UPDATE payments SET ${updates.join(', ')} WHERE payment_id = $${paramIndex}`;
+        // Query by reference for non-UUID strings
+        queryStr = `UPDATE payments SET ${updates.join(', ')} WHERE reference = $${paramIndex}`;
       }
 
       await query(queryStr, values);
