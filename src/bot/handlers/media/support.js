@@ -3,6 +3,7 @@ const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const SupportTopicModel = require('../../../models/supportTopicModel');
+const supportRoutingService = require('../../services/supportRoutingService');
 
 // Mistral AI integration
 let mistral = null;
@@ -333,8 +334,52 @@ const registerSupportHandlers = (bot) => {
       // Store cleaned message for processing
       ctx.cristinaMessage = cleanedMessage;
     } else {
-      // IN PRIVATE: Only process when AI chat session is active
-      if (!ctx.session.temp?.aiChatActive) {
+      // IN PRIVATE: Check if any support mode is active
+      const isAIChatActive = ctx.session.temp?.aiChatActive;
+      const isContactingAdmin = ctx.session.temp?.contactingAdmin;
+      const isRequestingActivation = ctx.session.temp?.requestingActivation;
+
+      // Check if user is replying to a support message
+      const replyToMessage = ctx.message?.reply_to_message;
+      const isReplyToSupport = replyToMessage && (
+        replyToMessage.text?.includes('(Soporte):') ||
+        replyToMessage.caption?.includes('(Soporte):') ||
+        replyToMessage.text?.includes('Para responder:') ||
+        replyToMessage.text?.includes('To reply:')
+      );
+
+      // If replying to a support message, forward to support topic
+      if (isReplyToSupport) {
+        try {
+          const userId = ctx.from.id;
+          logger.info('User replying to support message', { userId });
+
+          // Detect message type
+          let messageType = 'text';
+          if (ctx.message.photo) messageType = 'photo';
+          else if (ctx.message.document) messageType = 'document';
+          else if (ctx.message.video) messageType = 'video';
+          else if (ctx.message.voice) messageType = 'voice';
+          else if (ctx.message.sticker) messageType = 'sticker';
+
+          // Forward the reply to support topic
+          const supportTopic = await supportRoutingService.forwardUserMessage(ctx, messageType, 'support');
+
+          if (supportTopic) {
+            const lang = getLanguage(ctx);
+            const confirmMsg = lang === 'es'
+              ? '✅ Tu respuesta ha sido enviada al equipo de soporte.'
+              : '✅ Your reply has been sent to the support team.';
+            await ctx.reply(confirmMsg, { reply_to_message_id: ctx.message.message_id });
+          }
+        } catch (error) {
+          logger.error('Error forwarding user reply to support:', error);
+        }
+        return;
+      }
+
+      // If no support mode is active, pass to next handler
+      if (!isAIChatActive && !isContactingAdmin && !isRequestingActivation) {
         return next();
       }
       ctx.cristinaMessage = rawUserMessage;
@@ -383,38 +428,31 @@ const registerSupportHandlers = (bot) => {
           ctx.session.temp.aiChatActive = false; // Deactivate AI chat
           await ctx.saveSession();
 
-          // Auto-create support ticket for escalation
+          // Auto-create support ticket for escalation using routing service
           let ticketId = null;
           try {
             const userId = ctx.from.id;
             const firstName = ctx.from.first_name || 'Unknown';
-            let supportTopic = await SupportTopicModel.getByUserId(String(userId));
-            if (!supportTopic) {
-              supportTopic = await SupportTopicModel.create({
-                userId: String(userId),
-                threadId: Date.now(),
-                threadName: `Auto-Escalation: ${firstName} (${userId})`,
-              });
-            } else {
-              await SupportTopicModel.updateLastMessage(String(userId));
-              if (supportTopic.status !== 'open') {
-                await SupportTopicModel.updateStatus(String(userId), 'open');
-              }
-            }
+
+            // Use support routing service to create forum topic
+            const supportTopic = await supportRoutingService.getOrCreateUserTopic(ctx.from, 'escalation');
             ticketId = supportTopic.thread_id;
 
-            // Notify admin of escalation with AI conversation summary
+            // Send escalation details to the topic
             const supportGroupId = process.env.SUPPORT_GROUP_ID;
-            if (supportGroupId) {
+            if (supportGroupId && ticketId) {
               const lastQuestions = chatHistory
                 .filter(m => m.role === 'user')
                 .slice(-3)
                 .map(m => `• ${m.content.substring(0, 100)}${m.content.length > 100 ? '...' : ''}`)
                 .join('\n');
 
-              const escalationMessage = `🚨 *AUTO-ESCALACIÓN*\n\n👤 *Usuario:* ${firstName}\n🆔 *User ID:* \`${userId}\`\n🎫 *Ticket:* #${ticketId}\n\n📝 *Últimas preguntas:*\n${lastQuestions || 'N/A'}\n\n_El usuario ha alcanzado el límite de 5 preguntas con Cristina AI._`;
+              const escalationMessage = `🚨 *AUTO-ESCALACIÓN*\n\n_El usuario ha alcanzado el límite de 5 preguntas con Cristina AI._\n\n📝 *Últimas preguntas:*\n${lastQuestions || 'N/A'}`;
 
-              await ctx.telegram.sendMessage(supportGroupId, escalationMessage, { parse_mode: 'Markdown' });
+              await ctx.telegram.sendMessage(supportGroupId, escalationMessage, {
+                message_thread_id: ticketId,
+                parse_mode: 'Markdown'
+              });
             }
             logger.info(`Auto-escalation ticket created for user ${userId}`, { ticketId });
           } catch (escalationError) {
@@ -536,6 +574,7 @@ const registerSupportHandlers = (bot) => {
     if (ctx.session.temp?.contactingAdmin) {
       try {
         const lang = getLanguage(ctx);
+        logger.info('Contact admin mode active, processing message', { userId: ctx.from?.id });
 
         // Validate message text exists
         if (!ctx.message?.text) { logger.warn('Contact admin received message without text'); return next(); }
@@ -550,52 +589,23 @@ const registerSupportHandlers = (bot) => {
         const username = ctx.from.username ? `@${ctx.from.username}` : 'No username';
         const firstName = ctx.from.first_name || 'Unknown';
 
-        // Track support ticket in database
+        // Use support routing service to create forum topic and forward message
         let supportTopic = null;
         try {
-          supportTopic = await SupportTopicModel.getByUserId(String(userId));
-          if (supportTopic) {
-            // Update existing topic
-            await SupportTopicModel.updateLastMessage(String(userId));
-            // Reopen if it was closed/resolved
-            if (supportTopic.status !== 'open') {
-              await SupportTopicModel.updateStatus(String(userId), 'open');
+          supportTopic = await supportRoutingService.forwardUserMessage(ctx, 'text', 'support');
+          logger.info(`Support message routed to topic for user ${userId}`, { threadId: supportTopic?.thread_id });
+        } catch (routingError) {
+          logger.error('Support routing failed, using fallback:', routingError.message);
+
+          // Fallback: send directly to support group without topic
+          const supportGroupId = process.env.SUPPORT_GROUP_ID;
+          if (supportGroupId) {
+            const supportMessage = `📬 *SOLICITUD DE SOPORTE*\n\n👤 *Usuario:* ${firstName}\n🆔 *Telegram:* ${username}\n🔢 *User ID:* \`${userId}\`\n📅 *Fecha:* ${new Date().toLocaleString('es-ES')}\n\n💬 *Mensaje:*\n${message}`;
+            try {
+              await ctx.telegram.sendMessage(supportGroupId, supportMessage, { parse_mode: 'Markdown' });
+            } catch (groupError) {
+              logger.error('Error sending to support group:', groupError);
             }
-            logger.info(`Support ticket updated for user ${userId}`, { ticketId: supportTopic.thread_id });
-          } else {
-            // Create new support topic
-            const threadName = `Support: ${firstName} (${userId})`;
-            supportTopic = await SupportTopicModel.create({
-              userId: String(userId),
-              threadId: Date.now(), // Use timestamp as unique ID since we're not using forum topics
-              threadName,
-            });
-            logger.info(`New support ticket created for user ${userId}`, { ticketId: supportTopic.thread_id });
-          }
-        } catch (dbError) {
-          logger.warn('Failed to track support ticket in database:', dbError.message);
-          // Continue without database tracking
-        }
-
-        const ticketInfo = supportTopic ? `\n🎫 *Ticket:* #${supportTopic.thread_id}` : '';
-        const supportMessage = `📬 *SOLICITUD DE SOPORTE*
-
-👤 *Usuario:* ${firstName}
-🆔 *Telegram:* ${username}
-🔢 *User ID:* \`${userId}\`
-📅 *Fecha:* ${new Date().toLocaleString('es-ES')}${ticketInfo}
-
-💬 *Mensaje:*
-${message}`;
-
-        // Send to support group
-        const supportGroupId = process.env.SUPPORT_GROUP_ID;
-        if (supportGroupId) {
-          try {
-            await ctx.telegram.sendMessage(supportGroupId, supportMessage, { parse_mode: 'Markdown' });
-            logger.info(`Support request sent to support group`, { userId, username });
-          } catch (groupError) {
-            logger.error('Error sending to support group:', groupError);
           }
         }
 
@@ -608,10 +618,14 @@ ${message}`;
         ctx.session.temp.contactingAdmin = false; await ctx.saveSession();
 
         // Show confirmation with ticket number if available
+        const replyInstructions = lang === 'es'
+          ? `\n\n💡 *Para responder:* Mantén presionado el mensaje de soporte y selecciona "Responder".`
+          : `\n\n💡 *To reply:* Tap and hold the support message and select "Reply".`;
+
         const confirmationMessage = supportTopic
           ? (lang === 'es'
-              ? `✅ *Mensaje enviado*\n\n🎫 Tu ticket de soporte: #${supportTopic.thread_id}\n\nNuestro equipo te responderá pronto.`
-              : `✅ *Message sent*\n\n🎫 Your support ticket: #${supportTopic.thread_id}\n\nOur team will respond shortly.`)
+              ? `✅ *Mensaje enviado*\n\n🎫 Tu ticket de soporte: #${supportTopic.thread_id}\n\nNuestro equipo te responderá pronto. Recibirás las respuestas directamente aquí.${replyInstructions}`
+              : `✅ *Message sent*\n\n🎫 Your support ticket: #${supportTopic.thread_id}\n\nOur team will respond shortly. You'll receive responses directly here.${replyInstructions}`)
           : t('messageSent', lang);
 
         await ctx.reply(confirmationMessage, {
@@ -640,49 +654,27 @@ ${message}`;
         const username = ctx.from.username ? `@${ctx.from.username}` : 'No username';
         const firstName = ctx.from.first_name || 'Unknown';
 
-        // Track support ticket in database
+        // Use support routing service to create forum topic and forward message
         let supportTopic = null;
         try {
-          supportTopic = await SupportTopicModel.getByUserId(String(userId));
-          if (supportTopic) {
-            await SupportTopicModel.updateLastMessage(String(userId));
-            if (supportTopic.status !== 'open') {
-              await SupportTopicModel.updateStatus(String(userId), 'open');
+          supportTopic = await supportRoutingService.forwardUserMessage(ctx, 'text', 'activation');
+          logger.info(`Activation request routed to topic for user ${userId}`, { threadId: supportTopic?.thread_id });
+        } catch (routingError) {
+          logger.error('Activation routing failed, using fallback:', routingError.message);
+
+          // Fallback: send directly to support group without topic
+          const supportGroupId = process.env.SUPPORT_GROUP_ID;
+          if (supportGroupId) {
+            const activationMessage = `🎁 *SOLICITUD DE ACTIVACIÓN*\n\n👤 *Usuario:* ${firstName}\n🆔 *Telegram:* ${username}\n🔢 *User ID:* \`${userId}\`\n📅 *Fecha:* ${new Date().toLocaleString('es-ES')}\n\n📝 *Detalles de pago/activación:*\n${message}`;
+            try {
+              await ctx.telegram.sendMessage(supportGroupId, activationMessage, { parse_mode: 'Markdown' });
+            } catch (groupError) {
+              logger.error('Error sending activation request to support group:', groupError);
             }
-          } else {
-            supportTopic = await SupportTopicModel.create({
-              userId: String(userId),
-              threadId: Date.now(),
-              threadName: `Activation Request: ${firstName} (${userId})`,
-            });
-          }
-        } catch (dbError) {
-          logger.warn('Failed to track activation ticket in database:', dbError.message);
-        }
-
-        const ticketInfo = supportTopic ? `\n🎫 *Ticket:* #${supportTopic.thread_id}` : '';
-        const activationMessage = `🎁 *SOLICITUD DE ACTIVACIÓN*
-
-👤 *Usuario:* ${firstName}
-🆔 *Telegram:* ${username}
-🔢 *User ID:* \`${userId}\`
-📅 *Fecha:* ${new Date().toLocaleString('es-ES')}${ticketInfo}
-
-📝 *Detalles de pago/activación:*
-${message}`;
-
-        // Send to support group
-        const supportGroupId = process.env.SUPPORT_GROUP_ID;
-        if (supportGroupId) {
-          try {
-            await ctx.telegram.sendMessage(supportGroupId, activationMessage, { parse_mode: 'Markdown' });
-            logger.info(`Activation request sent to support group`, { userId, username });
-          } catch (groupError) {
-            logger.error('Error sending activation request to support group:', groupError);
           }
         }
 
-        // Also send to admin users
+        // Also send to admin users as backup
         const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
         for (const adminId of adminIds) {
           try { await ctx.telegram.sendMessage(adminId.trim(), `🎁 Activation Request from User ${ctx.from.id} (@${ctx.from.username || 'no username'}):\n\n${message}`); } catch (sendError) { logger.error('Error sending activation to admin:', sendError); }
@@ -690,10 +682,14 @@ ${message}`;
 
         ctx.session.temp.requestingActivation = false; await ctx.saveSession();
 
+        const activationReplyInstructions = lang === 'es'
+          ? `\n\n💡 *Para responder:* Mantén presionado el mensaje de soporte y selecciona "Responder".`
+          : `\n\n💡 *To reply:* Tap and hold the support message and select "Reply".`;
+
         const confirmationMessage = supportTopic
           ? (lang === 'es'
-              ? `✅ *Solicitud de activación recibida*\n\n🎫 Tu ticket: #${supportTopic.thread_id}\n\nRevisaremos tu solicitud y activaremos tu cuenta pronto.`
-              : `✅ *Activation request received*\n\n🎫 Your ticket: #${supportTopic.thread_id}\n\nWe'll review your request and activate your account shortly.`)
+              ? `✅ *Solicitud de activación recibida*\n\n🎫 Tu ticket: #${supportTopic.thread_id}\n\nRevisaremos tu solicitud y activaremos tu cuenta pronto. Recibirás las respuestas directamente aquí.${activationReplyInstructions}`
+              : `✅ *Activation request received*\n\n🎫 Your ticket: #${supportTopic.thread_id}\n\nWe'll review your request and activate your account shortly. You'll receive responses directly here.${activationReplyInstructions}`)
           : (lang === 'es' ? '✅ Solicitud de activación recibida. Te contactaremos pronto.' : '✅ Activation request received. We\'ll contact you soon.');
 
         await ctx.reply(confirmationMessage, {

@@ -78,6 +78,9 @@ const { startCronJobs } = require('../../../scripts/cron');
 const PlanModel = require('../../models/planModel');
 // Support model for ticket tracking
 const SupportTopicModel = require('../../models/supportTopicModel');
+// Support routing service and handlers
+const supportRoutingService = require('../services/supportRoutingService');
+const registerSupportRoutingHandlers = require('../handlers/support/supportRouting');
 // Async Broadcast Queue
 const { initializeAsyncBroadcastQueue } = require('../services/initializeQueue');
 // API Server
@@ -227,6 +230,11 @@ const startBot = async () => {
     registerUserCallManagementHandlers(bot);
     registerCallFeedbackHandlers(bot);
     registerCallPackageHandlers(bot);
+    // Register support routing handlers (for forum topic-based support)
+    registerSupportRoutingHandlers(bot);
+    // Initialize support routing service with telegram instance
+    supportRoutingService.initialize(bot.telegram);
+    logger.info('✓ Support routing service initialized');
     // Setup age verification middleware for protected features
     setupAgeVerificationMiddleware(bot);
     logger.info('✓ Age verification middleware configured');

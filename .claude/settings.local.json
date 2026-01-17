@@ -180,7 +180,8 @@
       "Bash(NODE_OPTIONS=\"--dns-result-order=ipv4first\" node:*)",
       "Bash(sudo -u postgres psql:*)",
       "Bash(systemctl status:*)",
-      "Bash(pm2 flush:*)"
+      "Bash(pm2 flush:*)",
+      "Bash(timeout 90 grep:*)"
     ],
     "deny": [],
     "ask": []
