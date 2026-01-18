@@ -317,13 +317,20 @@ const startBot = async () => {
     // Initialize proactive reminder service
     try {
       const ProactiveReminderService = require('../services/proactiveReminderService');
-      
-      // Start reminders for main group (replace with your actual group ID)
-      const GROUP_ID = process.env.GROUP_ID || '-1001234567890'; // Default fallback
-      const GROUP_LANGUAGE = 'en'; // Default language
-      
-      ProactiveReminderService.startReminders(bot.telegram, GROUP_ID, GROUP_LANGUAGE);
-      logger.info('✓ Proactive reminder service initialized and started');
+
+      // Check if proactive reminders are enabled (disabled by default if bot is kicked from group)
+      const PROACTIVE_REMINDERS_ENABLED = process.env.PROACTIVE_REMINDERS_ENABLED === 'true';
+
+      if (PROACTIVE_REMINDERS_ENABLED) {
+        // Start reminders for main group (replace with your actual group ID)
+        const GROUP_ID = process.env.GROUP_ID || '-1001234567890'; // Default fallback
+        const GROUP_LANGUAGE = 'en'; // Default language
+
+        ProactiveReminderService.startReminders(bot.telegram, GROUP_ID, GROUP_LANGUAGE);
+        logger.info('✓ Proactive reminder service initialized and started');
+      } else {
+        logger.info('✓ Proactive reminder service skipped (PROACTIVE_REMINDERS_ENABLED=false)');
+      }
       
       // Store reference for potential future use
       global.proactiveReminderService = ProactiveReminderService;

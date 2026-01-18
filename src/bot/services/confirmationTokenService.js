@@ -104,7 +104,7 @@ class ConfirmationTokenService {
    * @returns {string} Full confirmation URL
    */
   static getConfirmationLink(token) {
-    const domain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
+    const domain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
     return `${domain}/confirm-payment/${token}`;
   }
 

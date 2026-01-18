@@ -33,7 +33,7 @@
   "author": "PNPtv Team",
   "license": "MIT",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.967.0",
+    "@aws-sdk/client-s3": "^3.971.0",
     "@aws-sdk/s3-request-presigner": "^3.967.0",
     "@daimo/pay": "^1.19.0",
     "@daimo/pay-common": "^1.19.0",

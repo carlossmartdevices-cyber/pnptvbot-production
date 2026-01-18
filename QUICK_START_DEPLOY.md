@@ -41,7 +41,7 @@ pm2 logs pnptvbot
 
 ### Health Check
 ```bash
-curl https://easybots.store/health
+curl https://pnptv.app/health
 ```
 
 ### Database Check
@@ -188,7 +188,7 @@ pm2 monit
 
 ### Response Time
 ```bash
-time curl https://easybots.store/health
+time curl https://pnptv.app/health
 # Expected: <100ms
 ```
 

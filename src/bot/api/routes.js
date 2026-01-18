@@ -118,75 +118,42 @@ app.use((req, res, next) => {
 // Home page - domain aware routing
 app.get('/', (req, res) => {
   const host = req.get('host') || '';
-  // If the request is coming from easybots.store, serve a blank/generic page
-  // The actual easybots.store homepage should be served from port 3010
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    res.send('<h1>EasyBots</h1><p>Service under maintenance. Please visit the main website.</p>');
-  } else {
-    res.sendFile(path.join(__dirname, '../../../public/index.html'));
-  }
+  // Route all traffic to pnptv.app - easybots.store references removed
+  res.sendFile(path.join(__dirname, '../../../public/index.html'));
 });
 
 // PNPtv Haus page
 app.get('/community-room', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
   res.sendFile(path.join(__dirname, '../../../public/community-room.html'));
 });
 
 // PNPtv Haus alias
 app.get('/pnptv-haus', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
   res.sendFile(path.join(__dirname, '../../../public/community-room.html'));
 });
 
 // Community Features page
 app.get('/community-features', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
   res.sendFile(path.join(__dirname, '../../../public/community-features.html'));
 });
 
-// How to Use page (Bilingual)
+// How to Use page (Bilingual) - routes to pnptv.app
 app.get('/how-to-use', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
   res.sendFile(path.join(__dirname, '../../../public/how-to-use.html'));
 });
 
 // Videorama (legacy) now redirects to the new React app
 app.get('/videorama', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
   return res.redirect(301, '/videorama-app/');
 });
 
 // Legacy path redirect
 app.get('/video-rooms', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
   return res.redirect(301, '/videorama-app/');
 });
 
 // Lifetime Pass landing page
 app.get('/lifetime-pass', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
 });
 

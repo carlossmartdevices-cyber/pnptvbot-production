@@ -261,7 +261,7 @@ function verifyEpaycoSignature(req) {
 /**
  * Handle Daimo webhook
  * Receives payment events from Daimo Pay (Zelle, CashApp, Venmo, Revolut, Wise)
- * Webhook URL: easybots.store/api/daimo -> /api/webhooks/daimo
+ * Webhook URL: pnptv.app/api/daimo -> /api/webhooks/daimo
  * @param {Request} req - Express request
  * @param {Response} res - Express response
  */

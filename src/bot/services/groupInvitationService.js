@@ -111,7 +111,7 @@ class GroupInvitationService {
    * @returns {string} Full invitation URL
    */
   static getInvitationLink(token) {
-    const domain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
+    const domain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
     return `${domain}/join-group/${token}`;
   }
 

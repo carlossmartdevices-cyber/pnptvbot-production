@@ -3,7 +3,7 @@ const logger = require('../../utils/logger');
 
 /**
  * Email Service - Handles sending emails from multiple domains
- * - easybots.store for invoices/billing
+ * - pnptv.app for invoices/billing
  * - pnptv.app for welcome/instructions
  */
 class EmailService {
@@ -59,7 +59,7 @@ class EmailService {
   }
 
   /**
-   * Send invoice email from easybots.store
+   * Send invoice email from pnptv.app
    * @param {Object} options - Email options
    * @param {string} options.to - Recipient email
    * @param {string} options.subject - Email subject
@@ -78,9 +78,9 @@ class EmailService {
       }
 
       const mailOptions = {
-        from: `"Easy Bots Billing" <${process.env.EASYBOTS_FROM_EMAIL || 'billing@easybots.store'}>`,
+        from: `"PNPtv Billing" <${process.env.PNPTV_FROM_EMAIL || 'billing@pnptv.app'}>`,
         to,
-        subject: subject || `Invoice #${invoiceNumber} - Easy Bots`,
+        subject: subject || `Invoice #${invoiceNumber} - PNPtv`,
         html: this.generateInvoiceEmailHtml({
           customerName: customerName || 'Valued Customer',
           invoiceNumber,
@@ -219,7 +219,7 @@ class EmailService {
     </div>
 
     <div class="footer">
-      <p>Easy Bots | billing@easybots.store</p>
+      <p>PNPtv | billing@pnptv.app</p>
       <p>This is an automated email, please do not reply directly to this message.</p>
     </div>
   </div>

@@ -146,7 +146,7 @@ class PaymentService {
       });
 
       let paymentUrl;
-      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
+      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
 
       if (provider === 'epayco') {
         // Use fallback checkout page for ePayco
