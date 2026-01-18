@@ -15,7 +15,6 @@ const createHangout = async (req, res) => {
       creatorId,
       creatorName,
       title,
-      description,
       maxParticipants = 10,
       isPublic = false,
       allowGuests = true,

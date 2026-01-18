@@ -5,9 +5,12 @@ const { getRedis } = require('../config/redis');
 const { config } = require('../bot/config/botConfig');
 const paymentService = require('../bot/services/paymentService');
 const logger = require('../utils/logger');
-const { telegramAuth, checkTermsAccepted, requirePrime } = require('./middleware/telegramAuth');
+const { telegramAuth, checkTermsAccepted } = require('./middleware/telegramAuth');
 const { handleTelegramAuth, handleAcceptTerms, checkAuthStatus } = require('./handlers/telegramAuthHandler');
-const { healthCheck, authStatus, runAuthTests, getAuthActivity, getSystemMetrics } = require('./handlers/monitoringHandler');
+const {
+  healthCheck, authStatus, runAuthTests,
+  getAuthActivity, getSystemMetrics
+} = require('./handlers/monitoringHandler');
 
 const app = express();
 const port = config.port;
@@ -99,7 +102,7 @@ app.post('/webhook/daimo', async (req, res) => {
 });
 
 // Error handler
-app.use((error, req, res, next) => {
+app.use((error, req, res, _next) => {
   logger.error('Express error:', error);
   res.status(500).json({ error: 'Internal server error' });
 });

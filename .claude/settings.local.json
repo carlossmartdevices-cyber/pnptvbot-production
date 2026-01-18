@@ -181,7 +181,8 @@
       "Bash(sudo -u postgres psql:*)",
       "Bash(systemctl status:*)",
       "Bash(pm2 flush:*)",
-      "Bash(timeout 90 grep:*)"
+      "Bash(timeout 90 grep:*)",
+      "Bash(killall:*)"
     ],
     "deny": [],
     "ask": []

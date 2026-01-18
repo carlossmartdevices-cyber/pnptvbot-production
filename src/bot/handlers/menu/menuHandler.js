@@ -155,8 +155,9 @@ function buildGroupMenuKeyboard(lang = 'en') {
 
 /**
  * Build PRIME members menu keyboard (2-column layout for /start)
+ * This is the main PRIME menu used for the /start command
  */
-function buildPrimeMenuKeyboard(lang = 'en') {
+function buildPrimeStartMenuKeyboard(lang = 'en') {
   const buttons = [];
 
   // Add PRIME menu options (already organized in 2-column rows)

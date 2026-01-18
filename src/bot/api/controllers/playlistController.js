@@ -134,7 +134,8 @@ const createPlaylist = async (req, res) => {
 
     const result = await db.query(
       `INSERT INTO user_playlists
-        (user_id, title, description, category, icon, thumbnail, videos, is_public, video_count, creator_name, creator_badge)
+        (user_id, title, description, category, icon, thumbnail,
+         videos, is_public, video_count, creator_name, creator_badge)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [

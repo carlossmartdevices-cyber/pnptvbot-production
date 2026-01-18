@@ -207,6 +207,7 @@ class SubscriptionController {
         const p_key = process.env.EPAYCO_PRIVATE_KEY;
 
         // ePayco signature format: x_cust_id_cliente^x_ref_payco^x_amount^x_currency_code
+        // eslint-disable-next-line max-len
         const signatureString = `${p_cust_id_cliente}^${p_key}^${x_ref_payco}^${x_transaction_state}^${x_amount}^${x_currency_code}`;
         const expectedSignature = crypto.createHash('sha256').update(signatureString).digest('hex');
 

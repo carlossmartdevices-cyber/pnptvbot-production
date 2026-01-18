@@ -1,7 +1,4 @@
 const PaymentService = require('../../services/paymentService');
-const PaymentModel = require('../../../models/paymentModel');
-const PlanModel = require('../../../models/planModel');
-const UserModel = require('../../../models/userModel');
 const logger = require('../../../utils/logger');
 const DaimoConfig = require('../../../config/daimo');
 

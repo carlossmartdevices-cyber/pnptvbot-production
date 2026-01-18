@@ -1,6 +1,5 @@
 const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
-const PaymentService = require('../../services/paymentService');
 const ConfirmationTokenService = require('../../services/confirmationTokenService');
 const logger = require('../../../utils/logger');
 
@@ -171,7 +170,7 @@ class PaymentController {
         logger.warn('Invalid or expired confirmation token used', { tokenPrefix: token.substring(0, 8) + '...' });
         return res.status(400).json({
           success: false,
-          error: 'Invalid or expired confirmation link. Please use a valid confirmation link from your payment receipt.',
+          error: 'Invalid or expired confirmation link. Please use a valid link from your payment receipt.',
         });
       }
 

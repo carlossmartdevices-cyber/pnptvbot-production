@@ -89,24 +89,41 @@ app.use('/auth', express.static(path.join(__dirname, '../../../public/auth')));
 
 // Explicit routes for auth pages without .html extension
 app.get('/auth/telegram-login-complete', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   res.sendFile(path.join(__dirname, '../../../public/auth/telegram-login-complete.html'));
 });
 
 app.get('/auth/telegram-login', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   res.sendFile(path.join(__dirname, '../../../public/auth/telegram-login.html'));
 });
 
 app.get('/auth/terms', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   res.sendFile(path.join(__dirname, '../../../public/auth/terms.html'));
 });
 
 app.get('/auth/not-registered', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   res.sendFile(path.join(__dirname, '../../../public/auth/not-registered.html'));
 });
 
 // Add cache control headers for static assets to prevent browser caching issues
 app.use((req, res, next) => {
-  if (req.path.startsWith('/videorama-app/') && (req.path.endsWith('.js') || req.path.endsWith('.css') || req.path.endsWith('.html'))) {
+  if (req.path.startsWith('/videorama-app/') &&
+      (req.path.endsWith('.js') || req.path.endsWith('.css') || req.path.endsWith('.html'))) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
@@ -199,6 +216,10 @@ app.get('/videorama/app', telegramAuth, checkTermsAccepted, (req, res) => {
 
 // Protected Hangouts app - requires authentication
 app.get('/hangouts/app', telegramAuth, checkTermsAccepted, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   // Set cache control headers to prevent browser caching issues
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -208,11 +229,19 @@ app.get('/hangouts/app', telegramAuth, checkTermsAccepted, (req, res) => {
 
 // ePayco Checkout page - serves payment-checkout.html for /checkout/:paymentId
 app.get('/checkout/:paymentId', pageLimiter, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   res.sendFile(path.join(__dirname, '../../../public', 'payment-checkout.html'));
 });
 
 // Daimo Checkout page - serves daimo-checkout.html for /daimo-checkout/:paymentId
 app.get('/daimo-checkout/:paymentId', pageLimiter, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   res.sendFile(path.join(__dirname, '../../../public', 'daimo-checkout.html'));
 });
 
@@ -235,8 +264,6 @@ app.get('/payment/:paymentId', (req, res) => {
 const conditionalMiddleware = (middleware) => (req, res, next) => {
   // Skip middleware for Telegram webhook to prevent connection issues
   if (req.path === '/pnp/webhook/telegram') {
-    // Telegram Webhook
-    app.post('/pnp/webhook/telegram', webhookController.handleTelegramWebhook);
     return next();
   }
   return middleware(req, res, next);
