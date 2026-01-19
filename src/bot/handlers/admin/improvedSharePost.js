@@ -301,12 +301,12 @@ const registerImprovedSharePostHandlers = (bot) => {
 
       // Use batch session updates for better performance
       await performanceUtils.batchSessionUpdates(ctx, [
-        { key: 'sharePostData.sourceChatId', value: ctx.chat.id },
-        { key: 'sharePostData.sourceMessageId', value: ctx.message.message_id },
-        { key: 'sharePostData.mediaType', value: 'photo' },
-        { key: 'sharePostData.mediaFileId', value: photo.file_id },
-        { key: 'sharePostStep', value: 'write_text' },
-        { key: 'waitingForMedia', value: false }
+        { key: 'temp.sharePostData.sourceChatId', value: ctx.chat.id },
+        { key: 'temp.sharePostData.sourceMessageId', value: ctx.message.message_id },
+        { key: 'temp.sharePostData.mediaType', value: 'photo' },
+        { key: 'temp.sharePostData.mediaFileId', value: photo.file_id },
+        { key: 'temp.sharePostStep', value: 'write_text' },
+        { key: 'temp.waitingForMedia', value: false }
       ]);
 
       await ctx.reply('✅ Foto guardada');
@@ -329,13 +329,13 @@ const registerImprovedSharePostHandlers = (bot) => {
       const fileSizeMB = video.file_size ? Math.round((video.file_size / (1024 * 1024)) * 10) / 10 : 0;
       // Use batch session updates for better performance
       await performanceUtils.batchSessionUpdates(ctx, [
-        { key: 'sharePostData.sourceChatId', value: ctx.chat.id },
-        { key: 'sharePostData.sourceMessageId', value: ctx.message.message_id },
-        { key: 'sharePostData.mediaType', value: 'video' },
-        { key: 'sharePostData.mediaFileId', value: video.file_id },
-        { key: 'sharePostData.fileSizeMB', value: fileSizeMB },
-        { key: 'sharePostStep', value: 'write_text' },
-        { key: 'waitingForMedia', value: false }
+        { key: 'temp.sharePostData.sourceChatId', value: ctx.chat.id },
+        { key: 'temp.sharePostData.sourceMessageId', value: ctx.message.message_id },
+        { key: 'temp.sharePostData.mediaType', value: 'video' },
+        { key: 'temp.sharePostData.mediaFileId', value: video.file_id },
+        { key: 'temp.sharePostData.fileSizeMB', value: fileSizeMB },
+        { key: 'temp.sharePostStep', value: 'write_text' },
+        { key: 'temp.waitingForMedia', value: false }
       ]);
 
       await ctx.reply('✅ Video guardado' + (fileSizeMB ? ' (' + fileSizeMB + ' MB)' : ''));
