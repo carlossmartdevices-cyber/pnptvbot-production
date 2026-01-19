@@ -367,6 +367,9 @@ const showMainMenu = async (ctx) => {
         Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'https://pnptv.app/videorama'),
       ],
       [
+        Markup.button.callback(lang === 'es' ? '📞 Llamadas Privadas' : '📞 Private Calls', 'PRIVATECALL_START'),
+      ],
+      [
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
         Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings', 'show_settings'),
       ],
@@ -535,6 +538,9 @@ const showMainMenuEdit = async (ctx) => {
       ],
       [
         Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'https://pnptv.app/videorama'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '📞 Llamadas Privadas' : '📞 Private Calls', 'PRIVATECALL_START'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
