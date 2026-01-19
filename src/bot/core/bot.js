@@ -55,6 +55,7 @@ const registerLiveStreamManagementHandlers = require('../handlers/admin/liveStre
 const registerRadioManagementHandlers = require('../handlers/admin/radioManagement');
 const { registerWallOfFameHandlers } = require('../handlers/group/wallOfFame');
 const registerPrivateCallHandlers = require('../handlers/user/privateCalls');
+const registerPrivateCallsProntoHandlers = require('../handlers/user/privateCallsPronto');
 const registerPaymentHistoryHandlers = require('../handlers/user/paymentHistory');
 const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnalytics');
 const registerUserCallManagementHandlers = require('../handlers/user/callManagement');
@@ -72,6 +73,7 @@ const TutorialReminderService = require('../services/tutorialReminderService');
 const MessageRateLimiter = require('../services/messageRateLimiter');
 const radioStreamManager = require('../../services/radio/radioStreamManager');
 const CommunityPostScheduler = require('./schedulers/communityPostScheduler');
+const { initializeWorker: initializePrivateCallsWorker } = require('../../workers/privateCallsWorker');
 const { startCronJobs } = require('../../../scripts/cron');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
@@ -224,6 +226,7 @@ const startBot = async () => {
     registerRoleManagementHandlers(bot);
     registerWallOfFameHandlers(bot);
     registerPrivateCallHandlers(bot);
+    registerPrivateCallsProntoHandlers(bot);
     registerPaymentHistoryHandlers(bot);
     registerPaymentAnalyticsHandlers(bot);
     registerUserCallManagementHandlers(bot);
@@ -240,6 +243,14 @@ const startBot = async () => {
     // Initialize call reminder service
     CallReminderService.initialize(bot);
     logger.info('✓ Call reminder service initialized');
+    // Initialize private calls pronto worker (expiry, reminders, auto-end)
+    try {
+      const privateCallsWorker = initializePrivateCallsWorker(bot);
+      privateCallsWorker.start();
+      logger.info('✓ Private calls pronto worker initialized and started');
+    } catch (workerError) {
+      logger.warn('Private calls worker initialization failed, continuing without background jobs:', workerError.message);
+    }
     // Initialize membership cleanup service (for daily status updates and channel management)
     MembershipCleanupService.initialize(bot);
     logger.info('✓ Membership cleanup service initialized');

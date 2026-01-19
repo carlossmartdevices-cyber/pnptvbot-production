@@ -124,7 +124,7 @@ const registerZoomHandlers = (bot) => {
             });
 
             // Generate host join URL with special controls
-            const hostJoinUrl = `https://easybots.store/zoom/host/${room.room_code}`;
+            const hostJoinUrl = `https://pnptv.app/zoom/host/${room.room_code}`;
 
             // Update room with host URL
             await ZoomRoomModel.update(room.id, {
@@ -142,7 +142,7 @@ const registerZoomHandlers = (bot) => {
                 actorRole: 'host'
             });
 
-            const guestJoinUrl = `https://easybots.store/zoom/join/${room.room_code}`;
+            const guestJoinUrl = `https://pnptv.app/zoom/join/${room.room_code}`;
 
             let message = lang === 'es'
                 ? `✅ *Sala Creada Exitosamente*\n\n`
@@ -262,7 +262,7 @@ const registerZoomHandlers = (bot) => {
                 clearSessionState(ctx, 'zoom_joining');
                 await ctx.saveSession();
 
-                const joinUrl = `https://easybots.store/zoom/join/${roomCode}`;
+                const joinUrl = `https://pnptv.app/zoom/join/${roomCode}`;
 
                 let message = lang === 'es'
                     ? `✅ *Sala Encontrada*\n\n`
@@ -400,7 +400,7 @@ const registerZoomHandlers = (bot) => {
             if (room.status === 'active' && room.host_user_id === userId) {
                 buttons.push([Markup.button.url(
                     lang === 'es' ? '🎛️ Panel de Control' : '🎛️ Control Panel',
-                    room.host_join_url || `https://easybots.store/zoom/host/${room.room_code}`
+                    room.host_join_url || `https://pnptv.app/zoom/host/${room.room_code}`
                 )]);
 
                 buttons.push([
@@ -488,7 +488,7 @@ const registerZoomHandlers = (bot) => {
                 return;
             }
 
-            const shareUrl = `https://easybots.store/zoom/join/${room.room_code}`;
+            const shareUrl = `https://pnptv.app/zoom/join/${room.room_code}`;
 
             let shareMessage = lang === 'es'
                 ? `🎥 *Únete a mi sala de Zoom*\n\n📝 ${room.title}\n🔑 Código: ${room.room_code}\n\n🔗 ${shareUrl}\n\n¡Te espero!`

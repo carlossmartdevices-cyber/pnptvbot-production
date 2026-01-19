@@ -194,7 +194,7 @@ class EmailService {
 <body>
   <div class="container">
     <div class="header">
-      <h1>💼 Easy Bots</h1>
+      <h1>🎬 PNPtv</h1>
       <p>Payment Invoice</p>
     </div>
 
@@ -215,7 +215,7 @@ class EmailService {
       <p>If you have any questions about this invoice, please contact our support team.</p>
 
       <p>Best regards,<br>
-      <strong>Easy Bots Team</strong></p>
+      <strong>PNPtv Team</strong></p>
     </div>
 
     <div class="footer">

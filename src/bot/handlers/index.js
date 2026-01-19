@@ -8,6 +8,7 @@ module.exports = {
   user: {
     registerUserHandlers: require('./user'),
     registerPrivateCalls: require('./user/privateCallsBooking'),
+    registerPrivateCallsPronto: require('./user/privateCallsPronto'),
     registerPaymentHandlers: require('./payments'),
     registerMediaHandlers: require('./media'),
     registerCallManagement: require('./user/callManagement'),

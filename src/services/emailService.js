@@ -9,7 +9,7 @@ const sanitizeHtml = require('sanitize-html');
 class EmailService {
     constructor() {
         this.transporter = null;
-        this.from = process.env.EMAIL_FROM || 'noreply@easybots.store';
+        this.from = process.env.EMAIL_FROM || 'noreply@pnptv.app';
         this.initializeTransporter();
     }
 
@@ -150,7 +150,7 @@ class EmailService {
             hostName = 'Host'
         } = data;
 
-        const magicLinkUrl = `https://easybots.store/zoom/auth/${token}`;
+        const magicLinkUrl = `https://pnptv.app/zoom/auth/${token}`;
 
         const html = this.getHostMagicLinkTemplate({
             hostName,
@@ -181,7 +181,7 @@ class EmailService {
             message = ''
         } = data;
 
-        const joinUrl = `https://easybots.store/zoom/join/${roomCode}`;
+        const joinUrl = `https://pnptv.app/zoom/join/${roomCode}`;
 
         const html = this.getRoomInvitationTemplate({
             roomCode,
@@ -379,14 +379,14 @@ class EmailService {
         <div class="info-box">
             <strong>📤 Invite Guests:</strong><br>
             Share this link with participants:<br>
-            <code>https://easybots.store/zoom/join/${roomCode}</code><br>
+            <code>https://pnptv.app/zoom/join/${roomCode}</code><br>
             <small>Guests can join without any authentication!</small>
         </div>
 
         <div class="footer">
             <p><strong>PNP.tv</strong> - Premium Zoom Meetings</p>
             <p>This link expires in 24 hours for security.</p>
-            <p>Need help? Contact support at <a href="mailto:support@easybots.store">support@easybots.store</a></p>
+            <p>Need help? Contact support at <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>
         </div>
     </div>
 </body>

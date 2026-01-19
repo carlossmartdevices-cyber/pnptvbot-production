@@ -454,7 +454,7 @@ class PaymentService {
             const durationDays = plan.duration_days || plan.duration || 30;
             expiryDate.setDate(expiryDate.getDate() + durationDays);
 
-            // 1. Send invoice email from easybots.store
+            // 1. Send invoice email from pnptv.app
             try {
               const invoiceEmailResult = await EmailService.sendInvoiceEmail({
                 to: x_customer_email,
@@ -707,7 +707,7 @@ class PaymentService {
               const userLanguage = user?.language || 'es';
               const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
 
-              // 1. Send invoice email from easybots.store
+              // 1. Send invoice email from pnptv.app
               try {
                 const invoiceEmailResult = await EmailService.sendInvoiceEmail({
                   to: customerEmail,
