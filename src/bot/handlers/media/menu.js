@@ -568,7 +568,7 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
       await ctx.answerCbQuery();
 
       const userId = ctx.from?.id;
-      const user = userId ? await UserService.getUserById(userId) : null;
+      const user = userId ? await UserService.getUser(userId) : null;
       const isPrime = user ? await UserService.hasActiveSubscription(userId) : false;
 
       let privateCallsText;

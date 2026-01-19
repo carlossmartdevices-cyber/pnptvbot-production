@@ -846,6 +846,28 @@ class PaymentService {
       return [];
     }
   }
+
+  // Visa Cybersource methods
+  static createVisaCybersourceSubscription(params) {
+    return VisaCybersourceService.createRecurringSubscription(params);
+  }
+
+  static processVisaCybersourcePayment(params) {
+    return VisaCybersourceService.processRecurringPayment(params);
+  }
+
+  static cancelVisaCybersourceSubscription(subscriptionId) {
+    return VisaCybersourceService.cancelRecurringSubscription(subscriptionId);
+  }
+
+  static handleVisaCybersourceWebhook(webhookData, signature) {
+    return VisaCybersourceService.handleWebhook(webhookData, signature);
+  }
+
+  static isVisaCybersourceSupported(planId) {
+    const configData = require('../../config/payment.config').visaCybersource;
+    return configData.supportedPlans.includes(planId);
+  }
 }
 
 /**
@@ -973,7 +995,7 @@ async function sendPrimeConfirmation(userId, planName, expiryDate, source = 'man
     });
     return false;
   }
-}
+
 
 /**
  * Send payment notification (legacy function for backward compatibility)
@@ -995,67 +1017,8 @@ async function sendPaymentNotification(userId, paymentData) {
   } catch (error) {
     logger.error('Error in sendPaymentNotification:', error);
   }
-
-  /**
-   * Create Visa Cybersource recurring subscription
-   * @param {Object} params - Subscription parameters
-   * @param {string} params.userId - Telegram user ID
-   * @param {string} params.planId - Plan ID (monthly_crystal or monthly_diamond)
-   * @param {Object} params.paymentMethod - Payment method details
-   * @param {string} params.email - Customer email
-   * @returns {Promise<Object>} Subscription result
-   */
-  async function createVisaCybersourceSubscription(params) {
-    return VisaCybersourceService.createRecurringSubscription(params);
-  }
-
-  /**
-   * Process Visa Cybersource recurring payment
-   * @param {Object} params - Payment parameters
-   * @param {string} params.subscriptionId - Visa Cybersource subscription ID
-   * @param {number} params.amount - Payment amount
-   * @returns {Promise<Object>} Payment result
-   */
-  async function processVisaCybersourcePayment(params) {
-    return VisaCybersourceService.processRecurringPayment(params);
-  }
-
-  /**
-   * Cancel Visa Cybersource recurring subscription
-   * @param {string} subscriptionId - Visa Cybersource subscription ID
-   * @returns {Promise<Object>} Cancellation result
-   */
-  async function cancelVisaCybersourceSubscription(subscriptionId) {
-    return VisaCybersourceService.cancelRecurringSubscription(subscriptionId);
-  }
-
-  /**
-   * Handle Visa Cybersource webhook
-   * @param {Object} webhookData - Webhook payload
-   * @param {string} signature - Webhook signature
-   * @returns {Promise<Object>} Webhook processing result
-   */
-  async function handleVisaCybersourceWebhook(webhookData, signature) {
-    return VisaCybersourceService.handleWebhook(webhookData, signature);
-  }
-
-  /**
-   * Check if plan supports Visa Cybersource recurring payments
-   * @param {string} planId - Plan ID
-   * @returns {boolean} True if plan is supported
-   */
-  function isVisaCybersourceSupported(planId) {
-    const configData = require('../../config/payment.config').visaCybersource;
-    return configData.supportedPlans.includes(planId);
-  }
 }
 
-PaymentService.sendPrimeConfirmation = sendPrimeConfirmation;
-PaymentService.sendPaymentNotification = sendPaymentNotification;
-PaymentService.createVisaCybersourceSubscription = createVisaCybersourceSubscription;
-PaymentService.processVisaCybersourcePayment = processVisaCybersourcePayment;
-PaymentService.cancelVisaCybersourceSubscription = cancelVisaCybersourceSubscription;
-PaymentService.handleVisaCybersourceWebhook = handleVisaCybersourceWebhook;
-PaymentService.isVisaCybersourceSupported = isVisaCybersourceSupported;
+}
 
 module.exports = PaymentService;

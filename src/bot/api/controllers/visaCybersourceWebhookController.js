@@ -1,5 +1,5 @@
 const VisaCybersourceService = require('../../services/visaCybersourceService');
-const logger = require('../../utils/logger');
+const logger = require('../../../utils/logger');
 
 /**
  * Visa Cybersource Webhook Controller

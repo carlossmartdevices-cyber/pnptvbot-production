@@ -4,7 +4,7 @@ const PaymentModel = require('../../models/paymentModel');
 const SubscriberModel = require('../../models/subscriberModel');
 const PlanModel = require('../../models/planModel');
 const UserModel = require('../../models/userModel');
-const config = require('../../config/payment.config');
+const config = require('../../../config/payment.config');
 const logger = require('../../utils/logger');
 
 /**
