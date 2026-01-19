@@ -994,9 +994,7 @@ async function sendPaymentNotification(userId, paymentData) {
     });
   } catch (error) {
     logger.error('Error in sendPaymentNotification:', error);
-    return false;
   }
-}
 
   /**
    * Create Visa Cybersource recurring subscription
@@ -1050,6 +1048,7 @@ async function sendPaymentNotification(userId, paymentData) {
     const configData = require('../../config/payment.config').visaCybersource;
     return configData.supportedPlans.includes(planId);
   }
+}
 
 PaymentService.sendPrimeConfirmation = sendPrimeConfirmation;
 PaymentService.sendPaymentNotification = sendPaymentNotification;
