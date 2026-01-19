@@ -18,20 +18,23 @@ class CallModel {
     try {
       const callId = uuidv4();
       const performer = callData.performer || 'Santino';
+      const userId = callData.userId?.toString();
 
       const sql = `
         INSERT INTO ${TABLE} (
-          id, user_id, user_name, payment_id, scheduled_date, scheduled_time,
+          id, caller_id, receiver_id, user_id, user_name, payment_id, scheduled_date, scheduled_time,
           duration, performer, status, meeting_url, reminder_sent,
           reminder_24h_sent, reminder_1h_sent, reminder_15min_sent,
           feedback_submitted, amount, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())
         RETURNING *
       `;
 
       const result = await query(sql, [
         callId,
-        callData.userId?.toString(),
+        userId, // caller_id - the user booking the call
+        userId, // receiver_id - temporarily same as caller (will be updated when performer joins)
+        userId, // user_id
         callData.userName,
         callData.paymentId,
         callData.scheduledDate,
@@ -214,9 +217,10 @@ class CallModel {
    */
   static async setAvailability(availabilityData) {
     try {
+      // Use id=1 as singleton row for current availability
       const sql = `
         INSERT INTO ${AVAILABILITY_TABLE} (id, admin_id, available, message, valid_until, updated_at)
-        VALUES ('current', $1, $2, $3, $4, NOW())
+        VALUES (1, $1, $2, $3, $4, NOW())
         ON CONFLICT (id) DO UPDATE SET
           admin_id = EXCLUDED.admin_id,
           available = EXCLUDED.available,
@@ -250,7 +254,7 @@ class CallModel {
    */
   static async getAvailability() {
     try {
-      const result = await query(`SELECT * FROM ${AVAILABILITY_TABLE} WHERE id = 'current'`);
+      const result = await query(`SELECT * FROM ${AVAILABILITY_TABLE} WHERE id = 1`);
 
       if (result.rows.length === 0) {
         return { available: false, message: 'Not available' };
