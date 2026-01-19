@@ -14,13 +14,23 @@ const OPTIMISM_CHAIN_ID = 10;
 // Supported payment options (Daimo Pay API format)
 // AllWallets: Shows all crypto wallets (MetaMask, Rainbow, etc.)
 // AllExchanges: Shows all exchanges (Coinbase, Binance, etc.)
-// AllAddresses: Allows direct address input
+// AllPaymentApps: Desktop only - shows payment apps
+// Individual apps: Venmo, CashApp, Zelle, Wise, Revolut, MercadoPago, Coinbase, Binance, Lemon
 const SUPPORTED_PAYMENT_APPS = [
+  // Crypto wallets and exchanges
   'AllWallets',
   'AllExchanges',
-  // Enables payment apps like Cash App, Venmo, Zelle, Wise, Revolut (as supported by Daimo)
+  'Coinbase',
+  'Binance',
+  // Payment apps (explicitly listed for mobile compatibility)
+  'CashApp',
+  'Venmo',
+  'Zelle',
+  'Wise',
+  'Revolut',
+  'MercadoPago',
+  // Desktop fallback for any other payment apps
   'AllPaymentApps',
-  'AllAddresses',
 ];
 
 /**
@@ -157,7 +167,20 @@ const createDaimoPayment = async ({
     const requestBody = {
       display: {
         intent: description || `PNPtv ${planId} Subscription`,
-        paymentOptions: ['AllWallets', 'AllExchanges', 'AllPaymentApps'],
+        // Explicitly list payment apps for mobile compatibility (AllPaymentApps is desktop-only)
+        paymentOptions: [
+          'AllWallets',
+          'AllExchanges',
+          'Coinbase',
+          'Binance',
+          'CashApp',
+          'Venmo',
+          'Zelle',
+          'Wise',
+          'Revolut',
+          'MercadoPago',
+          'AllPaymentApps',
+        ],
         preferredChains: [config.chainId],
       },
       destination: {
