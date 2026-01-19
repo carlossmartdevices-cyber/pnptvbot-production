@@ -72,6 +72,12 @@ const MENU_CONFIG = {
           deepLink: 'video_calls'
         },
         {
+          id: 'private_calls',
+          title: { en: '📞 Private 1:1 Calls', es: '📞 Llamadas Privadas 1:1' },
+          callback: 'menu:private_calls',
+          deepLink: 'private_calls'
+        },
+        {
           id: 'photos',
           title: { en: '📸 Exclusive Photos', es: '📸 Fotos Exclusivas' },
           callback: 'menu:photos',

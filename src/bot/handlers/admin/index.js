@@ -506,6 +506,11 @@ async function showAdminPanel(ctx, edit = false) {
         Markup.button.callback('🎁 ' + (lang === 'es' ? 'Premium Comunitario' : 'Community Premium'), 'admin_community_premium_broadcast'),
       ]);
 
+      // ═══ PRIVATE CALLS ═══
+      buttons.push([
+        Markup.button.callback('📞 ' + (lang === 'es' ? 'Llamadas Privadas' : 'Private Calls'), 'admin_private_calls'),
+      ]);
+
       // ═══ PREVIEW MODE ═══
       buttons.push([
         Markup.button.callback('👁️ ' + (lang === 'es' ? 'Vista Previa' : 'Preview Mode'), 'admin_view_mode'),

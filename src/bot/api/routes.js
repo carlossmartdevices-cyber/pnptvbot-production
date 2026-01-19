@@ -89,20 +89,20 @@ app.get('/hangouts', pageLimiter, (req, res) => {
 const serveStaticWithBlocking = (path) => {
   return (req, res, next) => {
     const host = req.get('host') || '';
-    // Only block static file requests (HTML, CSS, JS, images, etc.)
-    // Don't block API endpoints or other dynamic routes
-    const isStaticFileRequest = req.path.endsWith('.html') || 
-                               req.path.endsWith('.css') || 
-                               req.path.endsWith('.js') || 
-                               req.path.endsWith('.jpg') || 
-                               req.path.endsWith('.png') || 
-                               req.path.endsWith('.gif') ||
-                               req.path === '/';
+    // Only block PNPtv-specific static files (HTML, CSS, JS, images, etc.)
+    // Don't block the root path - let the route handler serve easybots content
+    const isPnptvStaticFile = req.path.endsWith('.html') || 
+                              req.path.endsWith('.css') || 
+                              req.path.endsWith('.js') || 
+                              req.path.endsWith('.jpg') || 
+                              req.path.endsWith('.png') || 
+                              req.path.endsWith('.gif');
     
     if (host.includes('easybots.store') || host.includes('easybots')) {
-      if (isStaticFileRequest) {
+      if (isPnptvStaticFile) {
         return res.status(404).send('Page not found.');
       }
+      // Allow root path and other routes to be handled by route handlers
     }
     express.static(path)(req, res, next);
   };
@@ -163,7 +163,8 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
   const host = req.get('host') || '';
   if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
+    // Serve easybots-specific landing page (not PNPtv content)
+    return res.sendFile(path.join(__dirname, '../../../public/easybots.html'));
   }
   // Route all traffic to pnptv.app - easybots.store references removed
   res.sendFile(path.join(__dirname, '../../../public/index.html'));

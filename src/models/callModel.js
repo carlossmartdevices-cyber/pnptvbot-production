@@ -103,6 +103,38 @@ class CallModel {
   }
 
   /**
+   * Get calls by payment ID
+   */
+  static async getByPaymentId(paymentId) {
+    try {
+      const result = await query(
+        `SELECT * FROM ${TABLE} WHERE payment_id = $1`,
+        [paymentId]
+      );
+      return result.rows.map((row) => this.mapRowToCall(row));
+    } catch (error) {
+      logger.error('Error getting calls by payment ID:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get calls by performer ID
+   */
+  static async getByPerformer(performerId) {
+    try {
+      const result = await query(
+        `SELECT * FROM ${TABLE} WHERE performer_id = $1 ORDER BY created_at DESC`,
+        [performerId]
+      );
+      return result.rows.map((row) => this.mapRowToCall(row));
+    } catch (error) {
+      logger.error('Error getting calls by performer ID:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get user's calls
    */
   static async getByUser(userId, limit = 20) {

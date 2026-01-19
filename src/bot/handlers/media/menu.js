@@ -560,6 +560,113 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
   });
 
   /**
+   * Private Calls Menu
+   */
+  bot.action('menu_private_calls', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery();
+
+      const userId = ctx.from?.id;
+      const user = userId ? await UserService.getUserById(userId) : null;
+      const isPrime = user ? await UserService.hasActiveSubscription(userId) : false;
+
+      let privateCallsText;
+      let buttons;
+
+      if (isPrime) {
+        privateCallsText = lang === 'es'
+          ? `📞 Llamadas Privadas 1:1
+
+💎 *Disponible para miembros PRIME*
+
+🎭 *¿Qué incluye?*
+• Videollamada privada con un performer
+• Duración configurable (30-60 minutos)
+• Calidad HD y conexión segura
+• Horario flexible según disponibilidad
+
+💰 *Precio:* Desde $100 USD por sesión
+
+📅 *Disponibilidad:* Performers disponibles 24/7
+
+💡 *Cómo funciona:*
+1. Elige un performer
+2. Selecciona fecha y hora
+3. Confirma las reglas
+4. Completa el pago
+5. ¡Disfruta tu llamada!`
+          : `📞 Private 1:1 Calls
+
+💎 *Available for PRIME Members*
+
+🎭 *What's included?*
+• Private video call with a performer
+• Configurable duration (30-60 minutes)
+• HD quality and secure connection
+• Flexible scheduling based on availability
+
+💰 *Price:* From $100 USD per session
+
+📅 *Availability:* Performers available 24/7
+
+💡 *How it works:*
+1. Choose a performer
+2. Select date and time
+3. Confirm the rules
+4. Complete payment
+5. Enjoy your call!`;
+
+        buttons = [
+          [Markup.button.callback(lang === 'es' ? '📅 Reservar Llamada' : '📅 Book a Call', 'book_private_call')],
+          [Markup.button.callback(lang === 'es' ? '📋 Mis Llamadas' : '📋 My Calls', 'my_private_calls')],
+          [Markup.button.callback(lang === 'es' ? '🔙 Atrás' : '🔙 Back', 'menu_main')],
+        ];
+      } else {
+        privateCallsText = lang === 'es'
+          ? `📞 Llamadas Privadas 1:1
+
+🔒 *Función para miembros PRIME*
+
+💎 *Beneficios de las llamadas privadas:*
+• Acceso exclusivo a performers
+• Sesiones personalizadas
+• Conexión segura y privada
+• Agendamiento flexible
+
+💰 *Precio:* Desde $100 USD por sesión
+
+💡 *¿Quieres acceder?* Conviértete en PRIME para desbloquear esta función y muchas más.`
+          : `📞 Private 1:1 Calls
+
+🔒 *Feature for PRIME Members*
+
+💎 *Benefits of private calls:*
+• Exclusive access to performers
+• Personalized sessions
+• Secure and private connection
+• Flexible scheduling
+
+💰 *Price:* From $100 USD per session
+
+💡 *Want access?* Become PRIME to unlock this feature and many more.`;
+
+        buttons = [
+          [Markup.button.callback(lang === 'es' ? '💎 Convertirme en PRIME' : '💎 Become PRIME', 'menu_membership')],
+          [Markup.button.callback(lang === 'es' ? '🔙 Atrás' : '🔙 Back', 'menu_main')],
+        ];
+      }
+
+      await ctx.editMessageText(privateCallsText, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons),
+      });
+    } catch (error) {
+      logger.error('Error in private calls menu:', error);
+    }
+  });
+
+  /**
    * Videorama Menu
    */
   bot.action('menu_videorama', async (ctx) => {
