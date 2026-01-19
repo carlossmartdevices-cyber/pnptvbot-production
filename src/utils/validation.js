@@ -133,6 +133,7 @@ const schemas = {
     interests: Joi.array().items(Joi.string().max(50)).max(10).optional(),
     photoFileId: Joi.string().optional().allow(null),
     language: Joi.string().valid('en', 'es').optional(),
+    locationSharingEnabled: Joi.boolean().optional(),
   }).min(1),
 
   // Location schema
