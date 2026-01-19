@@ -78,7 +78,7 @@ class RadioModel {
       return await cache.getOrSet(
         cacheKey,
         async () => {
-          const result = await query('SELECT * FROM radio_now_playing WHERE id = 1');
+          const result = await query('SELECT * FROM radio_now_playing_fixed WHERE id = 1');
           if (result.rows.length === 0) return null;
           return this.mapRowToNowPlaying(result.rows[0]);
         },
@@ -99,7 +99,7 @@ class RadioModel {
     try {
       // Update singleton record
       const result = await query(
-        `UPDATE radio_now_playing
+        `UPDATE radio_now_playing_fixed
          SET title = $1, artist = $2, duration = $3, cover_url = $4,
              started_at = NOW(), updated_at = NOW()
          WHERE id = 1
@@ -680,7 +680,7 @@ class RadioModel {
 
       // Set as now playing
       await client.query(
-        `UPDATE radio_now_playing
+        `UPDATE radio_now_playing_fixed
          SET title = $1, artist = $2, duration = $3,
              started_at = NOW(), updated_at = NOW()
          WHERE id = 1`,
@@ -844,7 +844,7 @@ class RadioModel {
   static async getListenerCount() {
     try {
       const result = await query(
-        'SELECT listener_count FROM radio_now_playing WHERE id = 1',
+        'SELECT listener_count FROM radio_now_playing_fixed WHERE id = 1',
       );
       return result.rows[0]?.listener_count || 0;
     } catch (error) {
@@ -861,7 +861,7 @@ class RadioModel {
     try {
       // Get current track ID from now_playing
       const nowPlaying = await query(
-        'SELECT track_id FROM radio_now_playing WHERE id = $1',
+        'SELECT track_id FROM radio_now_playing_fixed WHERE id = $1',
         [NOW_PLAYING_ID],
       );
       
@@ -890,7 +890,7 @@ class RadioModel {
     try {
       // Get current track ID from now_playing
       const nowPlaying = await query(
-        'SELECT track_id FROM radio_now_playing WHERE id = $1',
+        'SELECT track_id FROM radio_now_playing_fixed WHERE id = $1',
         [NOW_PLAYING_ID],
       );
       

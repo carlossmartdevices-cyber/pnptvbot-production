@@ -612,7 +612,10 @@ const registerSupportHandlers = (bot) => {
         // Also send to admin users as backup
         const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
         for (const adminId of adminIds) {
-          try { await ctx.telegram.sendMessage(adminId.trim(), `📬 Support Message from User ${ctx.from.id} (@${ctx.from.username || 'no username'}):\n\n${message}`); } catch (sendError) { logger.error('Error sending to admin:', sendError); }
+          try { 
+            const escapedUsername = ctx.from.username ? ctx.from.username.replace(/@/g, '\\@') : 'no username';
+            await ctx.telegram.sendMessage(adminId.trim(), `📬 Support Message from User ${ctx.from.id} (@${escapedUsername}):\n\n${message}`); 
+          } catch (sendError) { logger.error('Error sending to admin:', sendError); }
         }
 
         ctx.session.temp.contactingAdmin = false; await ctx.saveSession();
@@ -677,7 +680,10 @@ const registerSupportHandlers = (bot) => {
         // Also send to admin users as backup
         const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
         for (const adminId of adminIds) {
-          try { await ctx.telegram.sendMessage(adminId.trim(), `🎁 Activation Request from User ${ctx.from.id} (@${ctx.from.username || 'no username'}):\n\n${message}`); } catch (sendError) { logger.error('Error sending activation to admin:', sendError); }
+          try { 
+            const escapedUsername = ctx.from.username ? ctx.from.username.replace(/@/g, '\\@') : 'no username';
+            await ctx.telegram.sendMessage(adminId.trim(), `🎁 Activation Request from User ${ctx.from.id} (@${escapedUsername}):\n\n${message}`); 
+          } catch (sendError) { logger.error('Error sending activation to admin:', sendError); }
         }
 
         ctx.session.temp.requestingActivation = false; await ctx.saveSession();

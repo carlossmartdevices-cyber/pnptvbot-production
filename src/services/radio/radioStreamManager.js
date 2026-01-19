@@ -110,7 +110,7 @@ class RadioStreamManager {
 
       // Update now playing in database (using new schema)
       await query(
-        `UPDATE radio_now_playing
+        `UPDATE radio_now_playing_fixed
          SET track_id = $1,
              started_at = NOW(),
              ends_at = NOW() + INTERVAL '${track.durationSeconds} seconds',
@@ -160,7 +160,7 @@ class RadioStreamManager {
     try {
       const result = await query(
         `SELECT np.*, rt.*
-         FROM radio_now_playing np
+         FROM radio_now_playing_fixed np
          LEFT JOIN radio_tracks rt ON np.track_id = rt.id
          WHERE np.id = 1`
       );
@@ -206,7 +206,7 @@ class RadioStreamManager {
 
       // Increment listener count
       await query(
-        `UPDATE radio_now_playing
+        `UPDATE radio_now_playing_fixed
          SET listener_count = listener_count + 1,
              updated_at = NOW()
          WHERE id = 1`
@@ -239,7 +239,7 @@ class RadioStreamManager {
     try {
       // Decrement listener count
       await query(
-        `UPDATE radio_now_playing
+        `UPDATE radio_now_playing_fixed
          SET listener_count = GREATEST(0, listener_count - 1),
              updated_at = NOW()
          WHERE id = 1`

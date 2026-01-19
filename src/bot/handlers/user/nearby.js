@@ -167,14 +167,10 @@ const registerNearbyHandlers = (bot) => {
         const emoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
         message += `${emoji} **${name}** - _${distance} km away_\n`;
 
-        // Create DM button (URL button for direct messaging)
-        const dmUrl = user.username
-          ? `https://t.me/${user.username}`
-          : `tg://user?id=${user.id}`;
-
+        // Create buttons - use callback for DM to avoid Telegram URL restrictions
         buttons.push([
           Markup.button.callback(`👁️ View`, `view_user_${user.id}`),
-          Markup.button.url(`💬 DM ${name}`, dmUrl),
+          Markup.button.callback(`💬 DM ${name}`, `dm_user_${user.id}`),
         ]);
       });
 
@@ -268,6 +264,56 @@ const registerNearbyHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error viewing user profile:', error);
+    }
+  });
+
+  // Handle DM button clicks
+  bot.action(/^dm_user_(.+)$/, async (ctx) => {
+    try {
+      // Validate match result exists
+      if (!ctx.match || !ctx.match[1]) {
+        logger.error('Invalid DM user action format');
+        return;
+      }
+
+      const targetUserId = ctx.match[1];
+      const lang = getLanguage(ctx);
+
+      // Get the target user
+      const targetUser = await UserService.getById(targetUserId);
+
+      if (!targetUser) {
+        await ctx.answerCbQuery(t('userNotFound', lang));
+        return;
+      }
+
+      // Try to open a chat with the user
+      try {
+        if (targetUser.username) {
+          // If user has a username, we can open a chat via URL
+          const chatUrl = `https://t.me/${targetUser.username}`;
+          await ctx.answerCbQuery(t('openingChat', lang), {
+            url: chatUrl,
+          });
+        } else {
+          // If no username, we can't directly open a chat
+          // Show a message with instructions
+          await ctx.answerCbQuery(t('userNoUsername', lang), {
+            show_alert: true,
+          });
+        }
+      } catch (chatError) {
+        logger.error('Error opening chat:', chatError);
+        await ctx.answerCbQuery(t('errorOpeningChat', lang), {
+          show_alert: true,
+        });
+      }
+    } catch (error) {
+      logger.error('Error handling DM action:', error);
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(t('error', lang), {
+        show_alert: true,
+      });
     }
   });
 };

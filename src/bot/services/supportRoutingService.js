@@ -127,7 +127,7 @@ _Responde en este topic para enviar mensajes al usuario._`;
     const user = ctx.from;
     const userId = String(user.id);
     const firstName = user.first_name || 'Unknown';
-    const username = user.username ? `@${user.username}` : 'No username';
+    const username = user.username ? user.username.replace(/@/g, '\\@') : 'No username';
 
     try {
       // Get or create user's support topic
@@ -136,7 +136,7 @@ _Responde en este topic para enviar mensajes al usuario._`;
 
       // Build message header
       const requestEmoji = this.getRequestEmoji(requestType);
-      const header = `${requestEmoji} *${firstName}* (${username}):\n\n`;
+      const header = `${requestEmoji} *${firstName}* (@${username}):\n\n`;
 
       // Send based on message type
       if (messageType === 'text' && ctx.message?.text) {
