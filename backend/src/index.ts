@@ -3,6 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import authRoutes from './modules/auth/auth.routes';
+import hangoutsRoutes from './modules/hangouts/hangouts.routes';
+import videoramaRoutes from './modules/videorama/videorama.routes';
 import { errorHandler } from './middleware/error';
 import { notFoundHandler } from './middleware/notFound';
 import logger from './utils/logger';
@@ -26,6 +28,8 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/hangouts', hangoutsRoutes);
+app.use('/api/videorama', videoramaRoutes);
 
 // Error handling middleware
 app.use(notFoundHandler);

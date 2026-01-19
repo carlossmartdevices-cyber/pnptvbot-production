@@ -193,7 +193,8 @@
       "Bash(source:*)",
       "Bash(PGPASSWORD=\"$PG_PASSWORD\" psql:*)",
       "Bash(yt-dlp:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(redis-cli:*)"
     ],
     "deny": [],
     "ask": []

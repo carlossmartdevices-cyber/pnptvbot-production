@@ -307,13 +307,19 @@ const MENU_CONFIG = {
           deepLink: 'videorama'
         },
         {
+          id: 'private_calls',
+          title: { en: '📞 Private Calls', es: '📞 Llamadas Privadas' },
+          callback: 'PRIVATECALL_START',
+          deepLink: 'private_calls'
+        }
+      ],
+      [
+        {
           id: 'settings',
           title: { en: '⚙️ Settings', es: '⚙️ Configuración' },
           callback: 'menu:settings',
           deepLink: 'settings'
-        }
-      ],
-      [
+        },
         {
           id: 'support',
           title: { en: '💬 Support', es: '💬 Soporte' },
