@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const { Telegraf } = require('telegraf');
 const DaimoService = require('./daimoService');
 const DaimoConfig = require('../../config/daimo');
+const VisaCybersourceService = require('./visaCybersourceService');
 const PaymentNotificationService = require('./paymentNotificationService');
 const MessageTemplates = require('./messageTemplates');
 
@@ -996,6 +997,59 @@ async function sendPaymentNotification(userId, paymentData) {
     return false;
   }
 }
+
+  /**
+   * Create Visa Cybersource recurring subscription
+   * @param {Object} params - Subscription parameters
+   * @param {string} params.userId - Telegram user ID
+   * @param {string} params.planId - Plan ID (monthly_crystal or monthly_diamond)
+   * @param {Object} params.paymentMethod - Payment method details
+   * @param {string} params.email - Customer email
+   * @returns {Promise<Object>} Subscription result
+   */
+  static async createVisaCybersourceSubscription(params) {
+    return VisaCybersourceService.createRecurringSubscription(params);
+  }
+
+  /**
+   * Process Visa Cybersource recurring payment
+   * @param {Object} params - Payment parameters
+   * @param {string} params.subscriptionId - Visa Cybersource subscription ID
+   * @param {number} params.amount - Payment amount
+   * @returns {Promise<Object>} Payment result
+   */
+  static async processVisaCybersourcePayment(params) {
+    return VisaCybersourceService.processRecurringPayment(params);
+  }
+
+  /**
+   * Cancel Visa Cybersource recurring subscription
+   * @param {string} subscriptionId - Visa Cybersource subscription ID
+   * @returns {Promise<Object>} Cancellation result
+   */
+  static async cancelVisaCybersourceSubscription(subscriptionId) {
+    return VisaCybersourceService.cancelRecurringSubscription(subscriptionId);
+  }
+
+  /**
+   * Handle Visa Cybersource webhook
+   * @param {Object} webhookData - Webhook payload
+   * @param {string} signature - Webhook signature
+   * @returns {Promise<Object>} Webhook processing result
+   */
+  static async handleVisaCybersourceWebhook(webhookData, signature) {
+    return VisaCybersourceService.handleWebhook(webhookData, signature);
+  }
+
+  /**
+   * Check if plan supports Visa Cybersource recurring payments
+   * @param {string} planId - Plan ID
+   * @returns {boolean} True if plan is supported
+   */
+  static isVisaCybersourceSupported(planId) {
+    const configData = require('../../config/payment.config').visaCybersource;
+    return configData.supportedPlans.includes(planId);
+  }
 
 PaymentService.sendPrimeConfirmation = sendPrimeConfirmation;
 PaymentService.sendPaymentNotification = sendPaymentNotification;
