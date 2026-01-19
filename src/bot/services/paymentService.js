@@ -1005,7 +1005,7 @@ async function sendPaymentNotification(userId, paymentData) {
    * @param {string} params.email - Customer email
    * @returns {Promise<Object>} Subscription result
    */
-  static async createVisaCybersourceSubscription(params) {
+  async function createVisaCybersourceSubscription(params) {
     return VisaCybersourceService.createRecurringSubscription(params);
   }
 
@@ -1016,7 +1016,7 @@ async function sendPaymentNotification(userId, paymentData) {
    * @param {number} params.amount - Payment amount
    * @returns {Promise<Object>} Payment result
    */
-  static async processVisaCybersourcePayment(params) {
+  async function processVisaCybersourcePayment(params) {
     return VisaCybersourceService.processRecurringPayment(params);
   }
 
@@ -1025,7 +1025,7 @@ async function sendPaymentNotification(userId, paymentData) {
    * @param {string} subscriptionId - Visa Cybersource subscription ID
    * @returns {Promise<Object>} Cancellation result
    */
-  static async cancelVisaCybersourceSubscription(subscriptionId) {
+  async function cancelVisaCybersourceSubscription(subscriptionId) {
     return VisaCybersourceService.cancelRecurringSubscription(subscriptionId);
   }
 
@@ -1035,7 +1035,7 @@ async function sendPaymentNotification(userId, paymentData) {
    * @param {string} signature - Webhook signature
    * @returns {Promise<Object>} Webhook processing result
    */
-  static async handleVisaCybersourceWebhook(webhookData, signature) {
+  async function handleVisaCybersourceWebhook(webhookData, signature) {
     return VisaCybersourceService.handleWebhook(webhookData, signature);
   }
 
@@ -1044,7 +1044,7 @@ async function sendPaymentNotification(userId, paymentData) {
    * @param {string} planId - Plan ID
    * @returns {boolean} True if plan is supported
    */
-  static isVisaCybersourceSupported(planId) {
+  function isVisaCybersourceSupported(planId) {
     const configData = require('../../config/payment.config').visaCybersource;
     return configData.supportedPlans.includes(planId);
   }
@@ -1052,5 +1052,10 @@ async function sendPaymentNotification(userId, paymentData) {
 
 PaymentService.sendPrimeConfirmation = sendPrimeConfirmation;
 PaymentService.sendPaymentNotification = sendPaymentNotification;
+PaymentService.createVisaCybersourceSubscription = createVisaCybersourceSubscription;
+PaymentService.processVisaCybersourcePayment = processVisaCybersourcePayment;
+PaymentService.cancelVisaCybersourceSubscription = cancelVisaCybersourceSubscription;
+PaymentService.handleVisaCybersourceWebhook = handleVisaCybersourceWebhook;
+PaymentService.isVisaCybersourceSupported = isVisaCybersourceSupported;
 
 module.exports = PaymentService;
