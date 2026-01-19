@@ -1210,12 +1210,21 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
         try { await ctx.deleteMessage(); } catch (e) { /* ignore */ }
       }
       const caption = buildProfileCardText();
-      await ctx.replyWithPhoto(targetUser.photoFileId, {
-        caption,
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(keyboard),
-      });
-      return;
+      try {
+        await ctx.replyWithPhoto(targetUser.photoFileId, {
+          caption,
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard(keyboard),
+        });
+        return;
+      } catch (photoError) {
+        logger.error('Error sending profile photo, falling back to text profile:', {
+          userId: targetUser.id,
+          photoFileId: targetUser.photoFileId,
+          error: photoError.message
+        });
+        // Fall back to text-based profile if photo fails
+      }
     }
 
     if (isOwnProfile) {
