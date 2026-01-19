@@ -729,4 +729,196 @@ class RadioModel {
   }
 }
 
+// ==========================================
+  // TRACK OPERATIONS
+  // ==========================================
+
+  /**
+   * Add a track to the radio playlist
+   * @param {Object} trackData - Track data { title, artist, album, audioUrl, durationSeconds, type, thumbnailUrl, sourceUrl, addedBy }
+   * @returns {Promise<Object|null>} Created track
+   */
+  static async addTrack(trackData) {
+    try {
+      const result = await query(
+        `INSERT INTO radio_tracks
+         (title, artist, album, audio_url, duration_seconds, type, thumbnail_url, source_url, added_by, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, NOW(), NOW())
+         RETURNING *`,
+        [
+          trackData.title,
+          trackData.artist || 'Unknown Artist',
+          trackData.album || null,
+          trackData.audioUrl,
+          trackData.durationSeconds || 180,
+          trackData.type || 'music',
+          trackData.thumbnailUrl || null,
+          trackData.sourceUrl || null,
+          trackData.addedBy || null,
+        ],
+      );
+
+      logger.info('Track added to radio playlist', { title: trackData.title, artist: trackData.artist });
+      return {
+        id: result.rows[0].id,
+        title: result.rows[0].title,
+        artist: result.rows[0].artist,
+        album: result.rows[0].album,
+        audioUrl: result.rows[0].audio_url,
+        durationSeconds: result.rows[0].duration_seconds,
+        type: result.rows[0].type,
+        thumbnailUrl: result.rows[0].thumbnail_url,
+      };
+    } catch (error) {
+      logger.error('Error adding track:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get track count
+   * @returns {Promise<number>} Number of tracks in playlist
+   */
+  static async getTrackCount() {
+    try {
+      const result = await query(
+        'SELECT COUNT(*) as count FROM radio_tracks WHERE is_active = true',
+      );
+      return parseInt(result.rows[0].count) || 0;
+    } catch (error) {
+      logger.error('Error getting track count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get all tracks
+   * @param {number} limit - Number of tracks to return
+   * @returns {Promise<Array>} Tracks
+   */
+  static async getTracks(limit = 50) {
+    try {
+      const result = await query(
+        `SELECT * FROM radio_tracks
+         WHERE is_active = true
+         ORDER BY created_at DESC
+         LIMIT $1`,
+        [limit],
+      );
+      return result.rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        artist: row.artist,
+        durationSeconds: row.duration_seconds,
+        type: row.type,
+        thumbnailUrl: row.thumbnail_url,
+      }));
+    } catch (error) {
+      logger.error('Error getting tracks:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Delete a track
+   * @param {string} trackId - Track ID
+   * @returns {Promise<boolean>} Success status
+   */
+  static async deleteTrack(trackId) {
+    try {
+      await query(
+        'UPDATE radio_tracks SET is_active = false, updated_at = NOW() WHERE id = $1',
+        [trackId],
+      );
+      logger.info('Track deactivated', { trackId });
+      return true;
+    } catch (error) {
+      logger.error('Error deleting track:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get listener count (from radio_now_playing)
+   * @returns {Promise<number>} Listener count
+   */
+  static async getListenerCount() {
+    try {
+      const result = await query(
+        'SELECT listener_count FROM radio_now_playing WHERE id = 1',
+      );
+      return result.rows[0]?.listener_count || 0;
+    } catch (error) {
+      logger.error('Error getting listener count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get like count for current track
+   * @returns {Promise<number>} Like count
+   */
+  static async getLikeCount() {
+    try {
+      // For now, return a placeholder - can be enhanced later with actual like tracking
+      return 0;
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  /**
+   * Get user's pending request count (today only for limit checking)
+   * @param {number|string} userId - User ID
+   * @returns {Promise<number>} Number of requests today
+   */
+  static async getUserDailyRequestCount(userId) {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const result = await query(
+        `SELECT COUNT(*) as count FROM radio_requests
+         WHERE user_id = $1 AND requested_at >= $2`,
+        [userId.toString(), today],
+      );
+
+      return parseInt(result.rows[0].count) || 0;
+    } catch (error) {
+      logger.error('Error getting user daily request count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get user's request queue position
+   * @param {number|string} userId - User ID
+   * @returns {Promise<Object|null>} Queue position info
+   */
+  static async getUserRequestPosition(userId) {
+    try {
+      // Get pending requests ordered by time
+      const result = await query(
+        `SELECT id, user_id, song_name, requested_at,
+                ROW_NUMBER() OVER (ORDER BY requested_at ASC) as position
+         FROM radio_requests
+         WHERE status = 'pending'
+         ORDER BY requested_at ASC`,
+      );
+
+      const userRequest = result.rows.find((r) => r.user_id === userId.toString());
+      if (!userRequest) return null;
+
+      return {
+        position: parseInt(userRequest.position),
+        total: result.rows.length,
+        songName: userRequest.song_name,
+      };
+    } catch (error) {
+      logger.error('Error getting user request position:', error);
+      return null;
+    }
+  }
+}
+
 module.exports = RadioModel;

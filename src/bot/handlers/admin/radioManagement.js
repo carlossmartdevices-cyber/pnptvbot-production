@@ -1,15 +1,177 @@
 const { Markup } = require('telegraf');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const path = require('path');
+const fs = require('fs').promises;
 const RadioModel = require('../../../models/radioModel');
 const UserModel = require('../../../models/userModel');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
-const { getLanguage } = require('../../utils/helpers');
+const { getLanguage, isAdmin } = require('../../utils/helpers');
+
+const execAsync = promisify(exec);
+
+// Audio download directory
+const AUDIO_DIR = path.join(process.cwd(), 'downloads', 'radio');
+
+/**
+ * Extract audio metadata and download using yt-dlp
+ * @param {string} url - SoundCloud or YouTube URL
+ * @returns {Promise<Object|null>} Track metadata
+ */
+async function extractAudioFromUrl(url) {
+  try {
+    // Ensure download directory exists
+    await fs.mkdir(AUDIO_DIR, { recursive: true });
+
+    const filename = `track_${Date.now()}`;
+    const outputPath = path.join(AUDIO_DIR, filename);
+
+    // First, get metadata
+    const metadataCmd = `yt-dlp --dump-json --no-download "${url}"`;
+    const { stdout: metadataJson } = await execAsync(metadataCmd, { timeout: 60000 });
+    const metadata = JSON.parse(metadataJson);
+
+    // Download audio
+    const downloadCmd = `yt-dlp -x --audio-format mp3 --audio-quality 0 -o "${outputPath}.%(ext)s" "${url}"`;
+    await execAsync(downloadCmd, { timeout: 300000 }); // 5 minute timeout
+
+    // Find the downloaded file
+    const files = await fs.readdir(AUDIO_DIR);
+    const downloadedFile = files.find((f) => f.startsWith(filename));
+
+    if (!downloadedFile) {
+      throw new Error('Downloaded file not found');
+    }
+
+    const audioUrl = `/downloads/radio/${downloadedFile}`;
+
+    return {
+      title: metadata.title || 'Unknown Track',
+      artist: metadata.uploader || metadata.artist || metadata.channel || 'Unknown Artist',
+      album: metadata.album || null,
+      durationSeconds: Math.floor(metadata.duration) || 180,
+      thumbnailUrl: metadata.thumbnail || null,
+      sourceUrl: url,
+      audioUrl,
+      localPath: path.join(AUDIO_DIR, downloadedFile),
+    };
+  } catch (error) {
+    logger.error('Error extracting audio from URL:', error);
+    return null;
+  }
+}
 
 /**
  * Radio management handlers for admin
  * @param {Telegraf} bot - Bot instance
  */
 const registerRadioManagementHandlers = (bot) => {
+  // /radio_add command - Add track via URL
+  bot.command('radio_add', async (ctx) => {
+    try {
+      // Check if user is admin
+      if (!isAdmin(ctx.from.id)) {
+        await ctx.reply('❌ This command is admin-only.');
+        return;
+      }
+
+      const args = ctx.message.text.split(' ').slice(1).join(' ').trim();
+
+      if (!args) {
+        await ctx.reply(
+          '📻 **Add Track to Radio**\n\n' +
+          'Usage: `/radio_add <url>`\n\n' +
+          'Supported sources:\n' +
+          '• SoundCloud\n' +
+          '• YouTube\n' +
+          '• Direct audio URLs\n\n' +
+          'Example:\n' +
+          '`/radio_add https://soundcloud.com/artist/track`',
+          { parse_mode: 'Markdown' },
+        );
+        return;
+      }
+
+      const url = args;
+
+      // Validate URL
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        await ctx.reply('❌ Please provide a valid URL starting with http:// or https://');
+        return;
+      }
+
+      // Send processing message
+      const processingMsg = await ctx.reply('⏳ Processing audio... This may take a moment.');
+
+      try {
+        // Extract metadata and download
+        const trackData = await extractAudioFromUrl(url);
+
+        if (!trackData) {
+          await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            processingMsg.message_id,
+            null,
+            '❌ Failed to process audio. Make sure the URL is valid and accessible.',
+          );
+          return;
+        }
+
+        // Add track to database
+        trackData.addedBy = ctx.from.id.toString();
+        const track = await RadioModel.addTrack(trackData);
+
+        if (!track) {
+          await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            processingMsg.message_id,
+            null,
+            '❌ Failed to save track to database.',
+          );
+          return;
+        }
+
+        // Format duration
+        const minutes = Math.floor(trackData.durationSeconds / 60);
+        const seconds = trackData.durationSeconds % 60;
+        const durationStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        // Get track count
+        const trackCount = await RadioModel.getTrackCount();
+
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          processingMsg.message_id,
+          null,
+          '✅ **Track Added Successfully!**\n\n' +
+          `🎵 **Title:** ${trackData.title}\n` +
+          `🎤 **Artist:** ${trackData.artist}\n` +
+          `⏱️ **Duration:** ${durationStr}\n` +
+          `📂 **Source:** ${url.includes('soundcloud') ? 'SoundCloud' : url.includes('youtube') || url.includes('youtu.be') ? 'YouTube' : 'Direct URL'}\n\n` +
+          `📻 **Total tracks in playlist:** ${trackCount}`,
+          { parse_mode: 'Markdown' },
+        );
+
+        logger.info('Track added via /radio_add', {
+          title: trackData.title,
+          addedBy: ctx.from.id,
+        });
+      } catch (error) {
+        logger.error('Error adding track:', error);
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          processingMsg.message_id,
+          null,
+          '❌ Error processing track: ' + error.message,
+        );
+      }
+    } catch (error) {
+      logger.error('Error in /radio_add command:', error);
+      await ctx.reply('❌ An error occurred. Please try again.');
+    }
+  });
+
   // Main radio admin menu
   bot.action('admin_radio', async (ctx) => {
     try {
@@ -17,6 +179,34 @@ const registerRadioManagementHandlers = (bot) => {
       await showRadioAdminMenu(ctx);
     } catch (error) {
       logger.error('Error showing radio admin menu:', error);
+    }
+  });
+
+  // Track management menu
+  bot.action('admin_radio_tracks', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      await showTrackManagement(ctx);
+    } catch (error) {
+      logger.error('Error showing track management:', error);
+    }
+  });
+
+  // Delete track
+  bot.action(/^admin_radio_delete_track_(\d+)$/, async (ctx) => {
+    try {
+      const trackId = ctx.match[1];
+      const success = await RadioModel.deleteTrack(trackId);
+
+      if (success) {
+        await ctx.answerCbQuery('✅ Track removed from playlist');
+      } else {
+        await ctx.answerCbQuery('❌ Failed to remove track');
+      }
+
+      await showTrackManagement(ctx);
+    } catch (error) {
+      logger.error('Error deleting track:', error);
     }
   });
 

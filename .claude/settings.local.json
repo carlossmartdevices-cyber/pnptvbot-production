@@ -188,7 +188,10 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nFix validation error for locationSharingEnabled toggle\n\nAdd locationSharingEnabled field to userProfileUpdate schema to allow\ntoggling location sharing from the nearby menu.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nUpdate Claude Code local settings\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(PGPASSWORD=$POSTGRES_PASSWORD psql:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix private call booking database compatibility\n\n- Fix call_availability table queries to use integer id instead of string\n- Fix private_calls INSERT to include required caller_id and receiver_id columns\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix private call booking database compatibility\n\n- Fix call_availability table queries to use integer id instead of string\n- Fix private_calls INSERT to include required caller_id and receiver_id columns\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(sudo ./deploy-pm2.sh)",
+      "Bash(source:*)",
+      "Bash(PGPASSWORD=\"$PG_PASSWORD\" psql:*)"
     ],
     "deny": [],
     "ask": []
