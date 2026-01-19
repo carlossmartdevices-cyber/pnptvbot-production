@@ -186,7 +186,8 @@
       "Bash(found\" and \"not a member\" cases\n\n4. easybots.store blocking - Restored comprehensive content blocking middleware \n   to prevent easybots.store from accessing PNPtv static files and routes, \n   ensuring it only displays the EasyBots landing page\n\nAll fixes deployed and tested in production.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(pm2 reload:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nFix validation error for locationSharingEnabled toggle\n\nAdd locationSharingEnabled field to userProfileUpdate schema to allow\ntoggling location sharing from the nearby menu.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nUpdate Claude Code local settings\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nUpdate Claude Code local settings\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(PGPASSWORD=$POSTGRES_PASSWORD psql:*)"
     ],
     "deny": [],
     "ask": []
