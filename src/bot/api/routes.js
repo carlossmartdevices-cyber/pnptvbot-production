@@ -86,25 +86,30 @@ app.get('/hangouts', pageLimiter, (req, res) => {
 });
 
 // Custom static file middleware with easybots.store blocking
-const serveStaticWithBlocking = (path) => {
+const serveStaticWithBlocking = (staticPath) => {
   return (req, res, next) => {
     const host = req.get('host') || '';
-    // Only block PNPtv-specific static files (HTML, CSS, JS, images, etc.)
-    // Don't block the root path - let the route handler serve easybots content
-    const isPnptvStaticFile = req.path.endsWith('.html') || 
-                              req.path.endsWith('.css') || 
-                              req.path.endsWith('.js') || 
-                              req.path.endsWith('.jpg') || 
-                              req.path.endsWith('.png') || 
-                              req.path.endsWith('.gif');
-    
+
+    // Block easybots.store from accessing PNPtv static files
     if (host.includes('easybots.store') || host.includes('easybots')) {
-      if (isPnptvStaticFile) {
-        return res.status(404).send('Page not found.');
+      const isPnptvStaticFile = req.path.endsWith('.html') ||
+                                req.path.endsWith('.css') ||
+                                req.path.endsWith('.js') ||
+                                req.path.endsWith('.jpg') ||
+                                req.path.endsWith('.png') ||
+                                req.path.endsWith('.gif') ||
+                                req.path.endsWith('.svg') ||
+                                req.path.endsWith('.ico') ||
+                                req.path.endsWith('.webp') ||
+                                req.path.endsWith('.mp4') ||
+                                req.path.endsWith('.webm');
+
+      if (isPnptvStaticFile && req.path !== '/') {
+        return res.status(404).send('Not found');
       }
-      // Allow root path and other routes to be handled by route handlers
     }
-    express.static(path)(req, res, next);
+
+    express.static(staticPath)(req, res, next);
   };
 };
 
@@ -164,7 +169,89 @@ app.get('/', (req, res) => {
   const host = req.get('host') || '';
   if (host.includes('easybots.store') || host.includes('easybots')) {
     // Serve easybots-specific landing page (not PNPtv content)
-    return res.sendFile(path.join(__dirname, '../../../public/easybots.html'));
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>EasyBots - AI and Automation Platform</title>
+          <style>
+              body {
+                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                  color: white;
+                  text-align: center;
+                  padding: 50px;
+                  min-height: 100vh;
+                  margin: 0;
+              }
+              
+              .container {
+                  max-width: 800px;
+                  margin: 0 auto;
+                  padding: 50px;
+                  background: rgba(0, 0, 0, 0.3);
+                  border-radius: 20px;
+                  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+              }
+              
+              h1 {
+                  font-size: 3rem;
+                  margin-bottom: 1rem;
+                  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
+              }
+              
+              p {
+                  font-size: 1.2rem;
+                  line-height: 1.8;
+                  margin-bottom: 2rem;
+              }
+              
+              .logo {
+                  font-size: 4rem;
+                  margin-bottom: 2rem;
+                  background: linear-gradient(90deg, #ffd700, #ff6b6b);
+                  -webkit-background-clip: text;
+                  -webkit-text-fill-color: transparent;
+                  background-clip: text;
+              }
+              
+              .contact {
+                  margin-top: 3rem;
+                  padding: 2rem;
+                  background: rgba(255, 255, 255, 0.1);
+                  border-radius: 10px;
+              }
+              
+              .contact a {
+                  color: #ffd700;
+                  text-decoration: none;
+                  font-weight: bold;
+              }
+              
+              .contact a:hover {
+                  text-decoration: underline;
+              }
+          </style>
+      </head>
+      <body>
+          <div class="container">
+              <div class="logo">🤖 EasyBots</div>
+              <h1>Welcome to EasyBots</h1>
+              <p>Your AI and Automation Platform</p>
+              <p>We're currently under construction, building amazing AI-powered solutions for businesses and individuals.</p>
+              
+              <div class="contact">
+                  <p>For inquiries, please contact us at:</p>
+                  <p><a href="mailto:contact@easybots.store">contact@easybots.store</a></p>
+                  <p>Follow us for updates on our progress!</p>
+              </div>
+          </div>
+      </body>
+      </html>
+    `);
+    return;
   }
   // Route all traffic to pnptv.app - easybots.store references removed
   res.sendFile(path.join(__dirname, '../../../public/index.html'));
@@ -172,58 +259,102 @@ app.get('/', (req, res) => {
 
 // PNPtv Haus page
 app.get('/community-room', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
   res.sendFile(path.join(__dirname, '../../../public/community-room.html'));
 });
 
 // PNPtv Haus alias
 app.get('/pnptv-haus', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
   res.sendFile(path.join(__dirname, '../../../public/community-room.html'));
 });
 
 // Community Features page
 app.get('/community-features', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
   res.sendFile(path.join(__dirname, '../../../public/community-features.html'));
 });
 
 // How to Use page (Bilingual) - routes to pnptv.app
 app.get('/how-to-use', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
   res.sendFile(path.join(__dirname, '../../../public/how-to-use.html'));
 });
 
 // Videorama (legacy) now redirects to the new React app
 app.get('/videorama', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
   return res.redirect(301, '/videorama-app/');
 });
 
 // Legacy path redirect
 app.get('/video-rooms', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
   return res.redirect(301, '/videorama-app/');
 });
 
 // Lifetime Pass landing page
 app.get('/lifetime-pass', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
   res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
 });
 
 // Lifetime Pass landing page ($100)
 app.get('/lifetime100', pageLimiter, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
   res.sendFile(path.join(__dirname, '../../../public', 'lifetime-pass.html'));
 });
 
 // Terms and Conditions / Privacy Policy
 app.get('/terms', pageLimiter, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
   const lang = req.query.lang || 'en';
   const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
   res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
 
 app.get('/privacy', pageLimiter, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
   const lang = req.query.lang || 'en';
   const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
   res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
 
 app.get('/policies', pageLimiter, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
   const lang = req.query.lang || 'en';
   const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
   res.sendFile(path.join(__dirname, '../../../public', fileName));
@@ -231,6 +362,10 @@ app.get('/policies', pageLimiter, (req, res) => {
 
 // Protected Videorama app - requires authentication
 app.get('/videorama/app', telegramAuth, checkTermsAccepted, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
   const indexPath = path.join(__dirname, '../../../public/videorama-app/index.html');
   if (!fs.existsSync(indexPath)) {
     return res.status(404).send('Videorama app not built. Deploy `public/videorama-app/`.');

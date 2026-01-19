@@ -189,12 +189,19 @@ class MembershipCleanupService {
           if (error.response?.error_code === 400 && error.response?.description?.includes('user not found')) {
             // User not in channel, skip
             results.skipped++;
+          } else if (error.response?.error_code === 400 && error.response?.description?.includes('PARTICIPANT_ID_INVALID')) {
+            // User was never in the channel or invalid ID, skip
+            results.skipped++;
           } else if (error.response?.error_code === 400 && error.response?.description?.includes('CHAT_ADMIN_REQUIRED')) {
             logger.error('Bot needs admin rights in PRIME channel to kick users');
             results.failed++;
           } else {
             results.failed++;
-            logger.error(`Error processing user ${user.id} for PRIME channel:`, error.message);
+            logger.error(`Error processing user ${user.id} for PRIME channel:`, {
+              message: error.message,
+              description: error.response?.description,
+              error_code: error.response?.error_code
+            });
           }
         }
       }

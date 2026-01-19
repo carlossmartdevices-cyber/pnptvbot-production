@@ -14,7 +14,7 @@ class ModerationModel {
   static async getGroupSettings(groupId) {
     try {
       const result = await query(
-        `SELECT * FROM moderation WHERE group_id = $1 LIMIT 1`,
+        `SELECT * FROM group_settings WHERE group_id = $1 LIMIT 1`,
         [groupId.toString()]
       );
 
@@ -81,7 +81,7 @@ class ModerationModel {
   static async updateGroupSettings(groupId, updates) {
     try {
       const result = await query(
-        `UPDATE moderation SET 
+        `UPDATE group_settings SET
          anti_links_enabled = $1,
          anti_spam_enabled = $2,
          anti_flood_enabled = $3,
@@ -112,7 +112,7 @@ class ModerationModel {
       if (result.rowCount === 0) {
         // Insert new settings if none exist
         await query(
-          `INSERT INTO moderation (
+          `INSERT INTO group_settings (
             group_id, anti_links_enabled, anti_spam_enabled, anti_flood_enabled,
             profanity_filter_enabled, max_warnings, flood_limit, flood_window,
             mute_duration, allowed_domains, banned_words, created_at, updated_at

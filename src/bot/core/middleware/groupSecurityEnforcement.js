@@ -42,13 +42,24 @@ function groupSecurityEnforcementMiddleware() {
 
         // Leave unauthorized group/channel immediately
         try {
-          await ctx.leaveChat();
+          await ctx.telegram.leaveChat(chatId);
           logger.info('Bot left unauthorized chat', {
             chatId: chatIdStr,
             chatTitle,
           });
         } catch (error) {
-          logger.error('Error leaving unauthorized chat:', error);
+          // Ignore "chat not found" errors - bot is already removed
+          if (error.response?.error_code === 400 &&
+              (error.response?.description?.includes('chat not found') ||
+               error.response?.description?.includes('not a member'))) {
+            logger.debug('Bot already removed from chat', { chatId: chatIdStr });
+          } else {
+            logger.error('Error leaving unauthorized chat:', {
+              chatId: chatIdStr,
+              error: error.message,
+              description: error.response?.description
+            });
+          }
         }
 
         return; // Stop processing
@@ -123,13 +134,6 @@ function registerGroupSecurityHandlers(bot) {
           });
 
           try {
-            // Leave the unauthorized chat
-            await ctx.leaveChat();
-            logger.info('✅ Bot left unauthorized chat', {
-              chatId: chatIdStr,
-              chatTitle,
-            });
-
             // Try to notify in the chat before leaving
             try {
               await ctx.reply(
@@ -141,8 +145,26 @@ function registerGroupSecurityHandlers(bot) {
             } catch (e) {
               // Message send failed, that's ok - we're leaving anyway
             }
+
+            // Leave the unauthorized chat
+            await ctx.telegram.leaveChat(chatId);
+            logger.info('✅ Bot left unauthorized chat', {
+              chatId: chatIdStr,
+              chatTitle,
+            });
           } catch (error) {
-            logger.error('Error leaving unauthorized chat:', error);
+            // Ignore "chat not found" errors - bot is already removed
+            if (error.response?.error_code === 400 &&
+                (error.response?.description?.includes('chat not found') ||
+                 error.response?.description?.includes('not a member'))) {
+              logger.debug('Bot already removed from chat', { chatId: chatIdStr });
+            } else {
+              logger.error('Error leaving unauthorized chat:', {
+                chatId: chatIdStr,
+                error: error.message,
+                description: error.response?.description
+              });
+            }
           }
 
           return;
@@ -210,13 +232,23 @@ function registerGroupSecurityHandlers(bot) {
       });
 
       try {
-        await ctx.leaveChat();
+        await ctx.telegram.leaveChat(chatId);
         logger.info('✅ Bot left unauthorized new group', {
           chatId: chatIdStr,
           chatTitle,
         });
       } catch (error) {
-        logger.error('Error leaving unauthorized group:', error);
+        // Ignore "chat not found" errors - bot is already removed
+        if (error.response?.error_code === 400 &&
+            (error.response?.description?.includes('chat not found') ||
+             error.response?.description?.includes('not a member'))) {
+          logger.debug('Bot already removed from group', { chatId: chatIdStr });
+        } else {
+          logger.error('Error leaving unauthorized group:', {
+            chatId: chatIdStr,
+            error: error.message
+          });
+        }
       }
     }
   });
@@ -241,13 +273,23 @@ function registerGroupSecurityHandlers(bot) {
       });
 
       try {
-        await ctx.leaveChat();
+        await ctx.telegram.leaveChat(chatId);
         logger.info('✅ Bot left unauthorized new supergroup', {
           chatId: chatIdStr,
           chatTitle,
         });
       } catch (error) {
-        logger.error('Error leaving unauthorized supergroup:', error);
+        // Ignore "chat not found" errors - bot is already removed
+        if (error.response?.error_code === 400 &&
+            (error.response?.description?.includes('chat not found') ||
+             error.response?.description?.includes('not a member'))) {
+          logger.debug('Bot already removed from supergroup', { chatId: chatIdStr });
+        } else {
+          logger.error('Error leaving unauthorized supergroup:', {
+            chatId: chatIdStr,
+            error: error.message
+          });
+        }
       }
     }
   });
@@ -272,13 +314,23 @@ function registerGroupSecurityHandlers(bot) {
       });
 
       try {
-        await ctx.leaveChat();
+        await ctx.telegram.leaveChat(chatId);
         logger.info('✅ Bot left unauthorized new channel', {
           chatId: chatIdStr,
           chatTitle,
         });
       } catch (error) {
-        logger.error('Error leaving unauthorized channel:', error);
+        // Ignore "chat not found" errors - bot is already removed
+        if (error.response?.error_code === 400 &&
+            (error.response?.description?.includes('chat not found') ||
+             error.response?.description?.includes('not a member'))) {
+          logger.debug('Bot already removed from channel', { chatId: chatIdStr });
+        } else {
+          logger.error('Error leaving unauthorized channel:', {
+            chatId: chatIdStr,
+            error: error.message
+          });
+        }
       }
     }
   });
