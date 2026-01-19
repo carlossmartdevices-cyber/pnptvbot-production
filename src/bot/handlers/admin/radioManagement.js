@@ -7,7 +7,8 @@ const RadioModel = require('../../../models/radioModel');
 const UserModel = require('../../../models/userModel');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
-const { getLanguage, isAdmin } = require('../../utils/helpers');
+const { getLanguage } = require('../../utils/helpers');
+const { isAdmin } = require('../../core/middleware/admin');
 
 const execAsync = promisify(exec);
 
@@ -437,14 +438,22 @@ const showRadioAdminMenu = async (ctx) => {
     await ctx.saveSession();
 
     const stats = await RadioModel.getStatistics();
+    const trackCount = await RadioModel.getTrackCount();
 
     let text = `📻 ${t('radio.admin.title', lang)}\n\n`;
     text += `${t('radio.admin.stats', lang)}:\n`;
+    text += `🎵 Tracks in Playlist: ${trackCount}\n`;
     text += `📊 ${t('radio.admin.totalRequests', lang)}: ${stats.totalRequests}\n`;
-    text += `🎵 ${t('radio.admin.songsPlayed', lang)}: ${stats.totalSongsPlayed}\n`;
+    text += `🎶 ${t('radio.admin.songsPlayed', lang)}: ${stats.totalSongsPlayed}\n`;
     text += `⏳ ${t('radio.admin.pendingRequests', lang)}: ${stats.pendingRequests}\n`;
 
+    if (trackCount === 0) {
+      text += '\n⚠️ **No tracks in playlist!** Radio is silent.\n';
+      text += 'Use `/radio_add <url>` to add tracks.\n';
+    }
+
     const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('📀 Manage Tracks', 'admin_radio_tracks')],
       [Markup.button.callback('🎵 Canción en Vivo', 'admin_radio_set_now_playing')],
       [Markup.button.callback('📋 Solicitudes', 'admin_radio_all_requests')],
       [Markup.button.callback('📅 Programación', 'admin_radio_schedule')],
@@ -454,9 +463,55 @@ const showRadioAdminMenu = async (ctx) => {
       [Markup.button.callback('◀️ Volver', 'admin_cancel')],
     ]);
 
-    await ctx.editMessageText(text, keyboard);
+    await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
   } catch (error) {
     logger.error('Error in showRadioAdminMenu:', error);
+  }
+};
+
+/**
+ * Show track management menu
+ */
+const showTrackManagement = async (ctx) => {
+  try {
+    const tracks = await RadioModel.getTracks(20);
+    const trackCount = await RadioModel.getTrackCount();
+
+    let text = '📀 **Radio Track Management**\n\n';
+    text += `Total tracks: ${trackCount}\n\n`;
+
+    if (tracks.length === 0) {
+      text += '⚠️ No tracks in playlist.\n\n';
+      text += 'Add tracks using:\n';
+      text += '`/radio_add <soundcloud_or_youtube_url>`\n';
+    } else {
+      text += '**Recent Tracks:**\n';
+      tracks.slice(0, 10).forEach((track, i) => {
+        const mins = Math.floor(track.durationSeconds / 60);
+        const secs = track.durationSeconds % 60;
+        text += `${i + 1}. ${track.title}\n`;
+        text += `   🎤 ${track.artist} | ⏱️ ${mins}:${secs.toString().padStart(2, '0')}\n`;
+      });
+    }
+
+    const keyboard = [];
+
+    // Add delete buttons for recent tracks
+    if (tracks.length > 0) {
+      tracks.slice(0, 5).forEach((track) => {
+        const title = track.title.length > 25 ? track.title.substring(0, 25) + '...' : track.title;
+        keyboard.push([
+          Markup.button.callback(`🗑️ ${title}`, `admin_radio_delete_track_${track.id}`),
+        ]);
+      });
+    }
+
+    keyboard.push([Markup.button.callback('🔄 Refresh', 'admin_radio_tracks')]);
+    keyboard.push([Markup.button.callback('◀️ Back', 'admin_radio')]);
+
+    await ctx.editMessageText(text, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(keyboard) });
+  } catch (error) {
+    logger.error('Error in showTrackManagement:', error);
   }
 };
 

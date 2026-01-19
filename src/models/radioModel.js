@@ -726,7 +726,6 @@ class RadioModel {
     } finally {
       client.release();
     }
-  }
 }
 
 // ==========================================
@@ -860,10 +859,58 @@ class RadioModel {
    */
   static async getLikeCount() {
     try {
-      // For now, return a placeholder - can be enhanced later with actual like tracking
-      return 0;
+      // Get current track ID from now_playing
+      const nowPlaying = await query(
+        'SELECT track_id FROM radio_now_playing WHERE id = $1',
+        [NOW_PLAYING_ID],
+      );
+      
+      const trackId = nowPlaying.rows[0]?.track_id;
+      if (!trackId) return 0;
+      
+      // Get like count from radio_tracks
+      const result = await query(
+        'SELECT like_count FROM radio_tracks WHERE id = $1',
+        [trackId],
+      );
+      
+      return result.rows[0]?.like_count || 0;
     } catch (error) {
+      logger.error('Error getting like count:', error);
       return 0;
+    }
+  }
+
+  /**
+   * Like current track
+   * @param {number|string} userId - User ID
+   * @returns {Promise<boolean>} Success status
+   */
+  static async likeCurrentTrack(userId) {
+    try {
+      // Get current track ID from now_playing
+      const nowPlaying = await query(
+        'SELECT track_id FROM radio_now_playing WHERE id = $1',
+        [NOW_PLAYING_ID],
+      );
+      
+      const trackId = nowPlaying.rows[0]?.track_id;
+      if (!trackId) {
+        logger.warn('No track currently playing to like');
+        return false;
+      }
+      
+      // Increment like count
+      await query(
+        'UPDATE radio_tracks SET like_count = like_count + 1 WHERE id = $1',
+        [trackId],
+      );
+      
+      logger.info('Track liked', { userId, trackId });
+      return true;
+    } catch (error) {
+      logger.error('Error liking track:', error);
+      return false;
     }
   }
 
@@ -917,6 +964,96 @@ class RadioModel {
     } catch (error) {
       logger.error('Error getting user request position:', error);
       return null;
+    }
+  }
+
+  // ==========================================
+  // RADIO SUBSCRIPTIONS (NOTIFICATIONS)
+  // ==========================================
+
+  /**
+   * Get user's radio notification preferences
+   * @param {number|string} userId - User ID
+   * @returns {Promise<Object|null>} Subscription info
+   */
+  static async getRadioSubscription(userId) {
+    try {
+      const result = await query(
+        'SELECT * FROM radio_subscribers WHERE user_id = $1',
+        [userId.toString()],
+      );
+      
+      if (result.rows.length === 0) return null;
+      
+      return {
+        userId: result.rows[0].user_id,
+        notifyNowPlaying: result.rows[0].notify_now_playing,
+        notifyTrackTypes: result.rows[0].notify_track_types,
+        notifyNewUploads: result.rows[0].notify_new_uploads,
+        subscribedAt: result.rows[0].subscribed_at,
+      };
+    } catch (error) {
+      logger.error('Error getting radio subscription:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Toggle user's radio notifications
+   * @param {number|string} userId - User ID
+   * @returns {Promise<boolean>} Success status
+   */
+  static async toggleRadioNotifications(userId) {
+    try {
+      const userIdStr = userId.toString();
+      
+      // Check if user exists in subscribers
+      const existing = await query(
+        'SELECT * FROM radio_subscribers WHERE user_id = $1',
+        [userIdStr],
+      );
+      
+      if (existing.rows.length === 0) {
+        // Create new subscription with notifications enabled
+        await query(
+          `INSERT INTO radio_subscribers 
+           (user_id, notify_now_playing, notify_track_types, notify_new_uploads)
+           VALUES ($1, true, ARRAY['music', 'podcast', 'talkshow'], true)`,
+          [userIdStr],
+        );
+        return true;
+      } else {
+        // Toggle notify_now_playing setting
+        const currentNotify = existing.rows[0].notify_now_playing;
+        await query(
+          'UPDATE radio_subscribers SET notify_now_playing = $1 WHERE user_id = $2',
+          [!currentNotify, userIdStr],
+        );
+        return true;
+      }
+    } catch (error) {
+      logger.error('Error toggling radio notifications:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get user's notification status
+   * @param {number|string} userId - User ID
+   * @returns {Promise<boolean>} Notification status
+   */
+  static async getNotificationStatus(userId) {
+    try {
+      const result = await query(
+        'SELECT notify_now_playing FROM radio_subscribers WHERE user_id = $1',
+        [userId.toString()],
+      );
+      
+      if (result.rows.length === 0) return false;
+      return result.rows[0].notify_now_playing;
+    } catch (error) {
+      logger.error('Error getting notification status:', error);
+      return false;
     }
   }
 }
