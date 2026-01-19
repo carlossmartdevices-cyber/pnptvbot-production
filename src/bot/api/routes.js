@@ -74,6 +74,10 @@ app.get(['/videorama-app', '/videorama-app/'], pageLimiter, (req, res) => {
 });
 
 app.get('/hangouts', pageLimiter, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   // Set cache control headers to prevent browser caching issues
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -81,11 +85,34 @@ app.get('/hangouts', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/hangouts/auth-wrapper.html'));
 });
 
-// Serve static files from public directory
-app.use(express.static(path.join(__dirname, '../../../public')));
+// Custom static file middleware with easybots.store blocking
+const serveStaticWithBlocking = (path) => {
+  return (req, res, next) => {
+    const host = req.get('host') || '';
+    // Only block static file requests (HTML, CSS, JS, images, etc.)
+    // Don't block API endpoints or other dynamic routes
+    const isStaticFileRequest = req.path.endsWith('.html') || 
+                               req.path.endsWith('.css') || 
+                               req.path.endsWith('.js') || 
+                               req.path.endsWith('.jpg') || 
+                               req.path.endsWith('.png') || 
+                               req.path.endsWith('.gif') ||
+                               req.path === '/';
+    
+    if (host.includes('easybots.store') || host.includes('easybots')) {
+      if (isStaticFileRequest) {
+        return res.status(404).send('Page not found.');
+      }
+    }
+    express.static(path)(req, res, next);
+  };
+};
 
-// Serve static auth pages
-app.use('/auth', express.static(path.join(__dirname, '../../../public/auth')));
+// Serve static files from public directory with blocking
+app.use(serveStaticWithBlocking(path.join(__dirname, '../../../public')));
+
+// Serve static auth pages with blocking
+app.use('/auth', serveStaticWithBlocking(path.join(__dirname, '../../../public/auth')));
 
 // Explicit routes for auth pages without .html extension
 app.get('/auth/telegram-login-complete', (req, res) => {
@@ -135,6 +162,9 @@ app.use((req, res, next) => {
 // Home page - domain aware routing
 app.get('/', (req, res) => {
   const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
   // Route all traffic to pnptv.app - easybots.store references removed
   res.sendFile(path.join(__dirname, '../../../public/index.html'));
 });
@@ -277,6 +307,29 @@ app.use(conditionalMiddleware(compression()));
 app.use(helmet());
 app.use(cors());
 app.use(compression());
+
+// Global middleware to block all PNPtv content for easybots.store
+app.use((req, res, next) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    // Allow only specific paths for easybots.store
+    const allowedPaths = [
+      '/health',
+      '/api/',
+      '/pnp/webhook/telegram',
+      '/webhook/telegram'
+    ];
+    
+    const isAllowed = allowedPaths.some(path => 
+      req.path.startsWith(path) || req.path === path
+    );
+    
+    if (!isAllowed) {
+      return res.status(404).send('Page not found.');
+    }
+  }
+  next();
+});
 
 // Rate limiting for API
 const limiter = rateLimit({
