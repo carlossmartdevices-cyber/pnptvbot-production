@@ -80,7 +80,7 @@ docker-compose logs bot | tail -30
 # 🚀 PNPtv Telegram Bot is running!
 
 # 3. Health check
-curl http://localhost:3000/health
+curl http://localhost:3020/health
 
 # Should return: {"status":"ok"}
 ```

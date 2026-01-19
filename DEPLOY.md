@@ -191,10 +191,10 @@ tail -f logs/error-*.log
 
 ```bash
 # API health endpoint
-curl http://localhost:3000/health
+curl http://localhost:3020/health
 
 # Check bot connectivity
-curl http://localhost:3000/api/stats
+curl http://localhost:3020/api/stats
 ```
 
 ### Database Connection

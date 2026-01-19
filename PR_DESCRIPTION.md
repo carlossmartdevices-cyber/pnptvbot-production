@@ -288,7 +288,7 @@ npm test tests/unit/services/paymentService.security.test.js
 docker-compose up -d
 
 # Check health
-curl http://localhost:3000/health
+curl http://localhost:3020/health
 
 # Monitor logs
 docker-compose logs -f bot
