@@ -53,7 +53,7 @@ echo "🎨 Copiando páginas de checkout..."
 mkdir -p "$EXPORT_PATH/public"
 cp public/daimo-checkout.html "$EXPORT_PATH/public/" 2>/dev/null
 cp public/lifetime-pass.html "$EXPORT_PATH/public/" 2>/dev/null
-cp public/epayco-checkout.html "$EXPORT_PATH/public/" 2>/dev/null || echo "⚠️  epayco-checkout.html no encontrado"
+cp public/payment-checkout.html "$EXPORT_PATH/public/" 2>/dev/null || echo "⚠️  payment-checkout.html no encontrado"
 
 # ==================== MIGRACIONES DB ====================
 echo "🗄️  Copiando migraciones de base de datos..."
