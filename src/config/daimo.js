@@ -15,15 +15,16 @@ const OPTIMISM_CHAIN_ID = 10;
 // P2P Apps: CashApp, Venmo, Zelle, Wise, Revolut, MercadoPago
 // Crypto: AllWallets, AllExchanges, Coinbase, Binance
 const SUPPORTED_PAYMENT_APPS = [
-  // P2P payment apps first (prioritized)
+  // P2P payment apps
   'CashApp',
   'Venmo',
   'Zelle',
   'Wise',
   'Revolut',
-  // Crypto wallets and exchanges
-  'AllWallets',
-  'AllExchanges',
+  // Crypto wallets/exchanges (specific options - cannot use AllWallets/AllExchanges)
+  'Coinbase',
+  'Binance',
+  'MiniPay',
 ];
 
 /**
@@ -160,15 +161,16 @@ const createDaimoPayment = async ({
     const requestBody = {
       display: {
         intent: description || `PNPtv ${planId} Subscription`,
-        // Prioritize P2P payment apps first, then crypto wallets/exchanges
+        // P2P payment apps + crypto (specific options only)
         paymentOptions: [
           'CashApp',
           'Venmo',
           'Zelle',
           'Wise',
           'Revolut',
-          'AllWallets',
-          'AllExchanges',
+          'Coinbase',
+          'Binance',
+          'MiniPay',
         ],
         preferredChains: [config.chainId],
       },
