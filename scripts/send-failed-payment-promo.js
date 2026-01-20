@@ -127,9 +127,9 @@ async function getFailedPaymentUsers() {
 }
 
 /**
- * Create promo payment record and get payment URL
+ * Create Daimo promo payment record and get payment URL
  */
-async function createPromoPayment(userId, planId, amount, description) {
+async function createDaimoPromoPayment(userId, planId, amount, description) {
   try {
     const paymentId = uuidv4();
     const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
@@ -164,9 +164,42 @@ async function createPromoPayment(userId, planId, amount, description) {
     }
 
     // Fallback to checkout page
-    return `${webhookDomain}/promo-checkout/${paymentId}`;
+    return `${webhookDomain}/daimo-checkout/${paymentId}`;
   } catch (error) {
-    console.error('Error creating promo payment:', error);
+    console.error('Error creating Daimo promo payment:', error);
+    return null;
+  }
+}
+
+/**
+ * Create ePayco promo payment record and get payment URL
+ */
+async function createEpaycoPromoPayment(userId, planId, amount, description) {
+  try {
+    const paymentId = uuidv4();
+    const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
+
+    // Create payment record
+    await PaymentModel.create({
+      paymentId,
+      userId,
+      planId,
+      provider: 'epayco',
+      amount,
+      currency: 'USD',
+      status: 'pending',
+    });
+
+    // ePayco uses checkout page
+    const paymentUrl = `${webhookDomain}/checkout/${paymentId}`;
+    await PaymentModel.updateStatus(paymentId, 'pending', {
+      paymentUrl,
+      provider: 'epayco',
+    });
+
+    return paymentUrl;
+  } catch (error) {
+    console.error('Error creating ePayco promo payment:', error);
     return null;
   }
 }
@@ -184,7 +217,7 @@ function buildPromoMessage(language, expiryTime) {
   if (language === 'es') {
     return `🔥 *¡OFERTA ESPECIAL SOLO PARA TI!* 🔥
 
-Notamos que tu pago anterior no se completó. ¡Queremos ayudarte a acceder a todo el contenido premium!
+Notamos que tu pago anterior no se completó. *¡Hemos solucionado los problemas de checkout!* 🛠️✅
 
 💎 *PROMO EXCLUSIVA - Solo 6 horas:*
 
@@ -199,13 +232,14 @@ Notamos que tu pago anterior no se completó. ¡Queremos ayudarte a acceder a to
 ✅ Acceso completo a PRIME
 ✅ Contenido exclusivo
 ✅ Todas las funciones premium
+✅ Paga con Venmo, CashApp, Zelle, Wise o tarjeta
 
 👇 *Elige tu plan y paga ahora:*`;
   }
 
   return `🔥 *SPECIAL OFFER JUST FOR YOU!* 🔥
 
-We noticed your previous payment didn't go through. We want to help you access all premium content!
+We noticed your previous payment didn't go through. *We've fixed the checkout issues!* 🛠️✅
 
 💎 *EXCLUSIVE PROMO - Only 6 hours:*
 
@@ -220,6 +254,7 @@ We noticed your previous payment didn't go through. We want to help you access a
 ✅ Full access to PRIME
 ✅ Exclusive content
 ✅ All premium features
+✅ Pay with Venmo, CashApp, Zelle, Wise or card
 
 👇 *Choose your plan and pay now:*`;
 }
@@ -227,23 +262,33 @@ We noticed your previous payment didn't go through. We want to help you access a
 /**
  * Send broadcast to a single user
  */
-async function sendToUser(bot, user, monthlyUrl, weeklyUrl) {
+async function sendToUser(bot, user, paymentUrls) {
   const language = user.language || 'en';
   const message = buildPromoMessage(language, PROMO_EXPIRY);
 
-  // Build inline keyboard with payment buttons
+  // Build inline keyboard with payment buttons for both ePayco (card) and Daimo (apps)
   const keyboard = {
     inline_keyboard: [
+      // Monthly plan - Card option
       [
         {
-          text: language === 'es' ? '💎 $10/mes - Pagar Ahora' : '💎 $10/month - Pay Now',
-          url: monthlyUrl,
+          text: language === 'es' ? '💳 $10/mes - Tarjeta' : '💳 $10/month - Card',
+          url: paymentUrls.monthlyEpayco,
+        },
+        {
+          text: language === 'es' ? '📱 $10/mes - Apps' : '📱 $10/month - Apps',
+          url: paymentUrls.monthlyDaimo,
         }
       ],
+      // Weekly plan - Card option
       [
         {
-          text: language === 'es' ? '⭐ $5/semana - Pagar Ahora' : '⭐ $5/week - Pay Now',
-          url: weeklyUrl,
+          text: language === 'es' ? '💳 $5/sem - Tarjeta' : '💳 $5/week - Card',
+          url: paymentUrls.weeklyEpayco,
+        },
+        {
+          text: language === 'es' ? '📱 $5/sem - Apps' : '📱 $5/week - Apps',
+          url: paymentUrls.weeklyDaimo,
         }
       ],
     ],
@@ -308,28 +353,49 @@ async function main() {
     const progress = `[${i + 1}/${users.length}]`;
 
     try {
-      // Create individual payment URLs for this user
-      const monthlyUrl = await createPromoPayment(
+      // Create payment URLs for both ePayco (card) and Daimo (apps) for each plan
+      const monthlyDaimo = await createDaimoPromoPayment(
         user.user_id,
         PROMO_MONTH_PLAN_ID,
         PROMO_MONTH_PRICE,
         'PNPtv PROMO - Monthly Pass ($10)'
       );
 
-      const weeklyUrl = await createPromoPayment(
+      const monthlyEpayco = await createEpaycoPromoPayment(
+        user.user_id,
+        PROMO_MONTH_PLAN_ID,
+        PROMO_MONTH_PRICE,
+        'PNPtv PROMO - Monthly Pass ($10)'
+      );
+
+      const weeklyDaimo = await createDaimoPromoPayment(
         user.user_id,
         PROMO_WEEK_PLAN_ID,
         PROMO_WEEK_PRICE,
         'PNPtv PROMO - Weekly Pass ($5)'
       );
 
-      if (!monthlyUrl || !weeklyUrl) {
+      const weeklyEpayco = await createEpaycoPromoPayment(
+        user.user_id,
+        PROMO_WEEK_PLAN_ID,
+        PROMO_WEEK_PRICE,
+        'PNPtv PROMO - Weekly Pass ($5)'
+      );
+
+      if (!monthlyDaimo || !monthlyEpayco || !weeklyDaimo || !weeklyEpayco) {
         console.log(`${progress} SKIP: Could not create payment URLs for user ${user.user_id}`);
         stats.failed++;
         continue;
       }
 
-      const result = await sendToUser(bot, user, monthlyUrl, weeklyUrl);
+      const paymentUrls = {
+        monthlyDaimo,
+        monthlyEpayco,
+        weeklyDaimo,
+        weeklyEpayco,
+      };
+
+      const result = await sendToUser(bot, user, paymentUrls);
 
       if (result.success) {
         console.log(`${progress} SENT: User ${user.user_id} (${user.username || 'no username'})`);

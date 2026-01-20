@@ -201,7 +201,10 @@
       "Bash(node scripts/send-failed-payment-promo.js:*)",
       "WebSearch",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Add CashApp, Venmo, Zelle, Wise payment options to Daimo\n\n- Explicitly list payment apps for mobile compatibility \\(AllPaymentApps is desktop-only\\)\n- Added: CashApp, Venmo, Zelle, Wise, Revolut, MercadoPago, Coinbase, Binance\n- Added promo broadcast script for failed payment users\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: Remove unused how-to-use.html page\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: Remove unused how-to-use.html page\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "WebFetch(domain:docs.daimo.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm show:*)"
     ],
     "deny": [],
     "ask": []
