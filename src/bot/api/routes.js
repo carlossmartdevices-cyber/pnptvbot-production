@@ -395,19 +395,11 @@ app.get('/hangouts/app', telegramAuth, checkTermsAccepted, (req, res) => {
 
 // ePayco Checkout page - serves payment-checkout.html for /checkout/:paymentId
 app.get('/checkout/:paymentId', pageLimiter, (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
   res.sendFile(path.join(__dirname, '../../../public', 'payment-checkout.html'));
 });
 
 // Daimo Checkout page - serves daimo-checkout.html for /daimo-checkout/:paymentId
 app.get('/daimo-checkout/:paymentId', pageLimiter, (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
   res.sendFile(path.join(__dirname, '../../../public', 'daimo-checkout.html'));
 });
 
@@ -453,7 +445,9 @@ app.use((req, res, next) => {
       '/health',
       '/api/',
       '/pnp/webhook/telegram',
-      '/webhook/telegram'
+      '/webhook/telegram',
+      '/checkout/',
+      '/daimo-checkout/'
     ];
     
     const isAllowed = allowedPaths.some(path => 
