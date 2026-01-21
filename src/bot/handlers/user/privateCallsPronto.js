@@ -26,26 +26,28 @@ const registerPrivateCallsProntoHandlers = (bot) => {
         // Handle different eligibility issues
         if (eligibility.reasons.includes('membership_required') || eligibility.reasons.includes('membership_expired')) {
           const message = lang === 'es'
-            ? '🔒 *Llamadas Privadas - Solo PRIME*\n\n' +
-              'Esta función está disponible solo para miembros PRIME.\n\n' +
-              '✨ Con PRIME puedes:\n' +
-              '• Reservar llamadas 1:1 con modelos\n' +
-              '• Elegir video o audio\n' +
-              '• Duración de 15, 30 o 60 min\n' +
-              '• Programar con anticipación'
-            : '🔒 *Private Calls - PRIME Only*\n\n' +
-              'This feature is only available for PRIME members.\n\n' +
-              '✨ With PRIME you can:\n' +
-              '• Book 1:1 calls with models\n' +
-              '• Choose video or audio\n' +
-              '• Duration of 15, 30 or 60 min\n' +
-              '• Schedule in advance';
+            ? '`🔒 VIDEO LLAMADA VIP - SOLO PRIME`\n\n' +
+              '¡Hola! Esta función exclusiva está disponible solo para miembros PRIME.\n\n' +
+              '**Con PRIME puedes disfrutar de:**\n\n' +
+              '📞 **Video Llamadas VIP 1:1** — Llamadas privadas con modelos\n' +
+              '🎥 **Video o Audio** — Elige tu formato preferido\n' +
+              '⏱️ **Duraciones Flexibles** — 15, 30 o 60 minutos\n' +
+              '📅 **Programación Anticipada** — Reserva con tiempo\n\n' +
+              '`¡Hazte PRIME y disfruta de llamadas exclusivas! 💎`'
+            : '`🔒 VIDEO CALL VIP - PRIME ONLY`\n\n' +
+              'Hey! This exclusive feature is only available for PRIME members.\n\n' +
+              '**With PRIME you can enjoy:**\n\n' +
+              '📞 **VIP 1:1 Video Calls** — Private calls with models\n' +
+              '🎥 **Video or Audio** — Choose your preferred format\n' +
+              '⏱️ **Flexible Durations** — 15, 30 or 60 minutes\n' +
+              '📅 **Advanced Scheduling** — Book in advance\n\n' +
+              '`Go PRIME and enjoy exclusive calls! 💎`';
 
           await ctx.editMessageText(message, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-              [Markup.button.callback(lang === 'es' ? '✨ Obtener PRIME' : '✨ Get PRIME', 'show_payments')],
-              [Markup.button.callback(lang === 'es' ? '🔙 Volver' : '🔙 Back', 'menu_main')],
+              [Markup.button.callback(lang === 'es' ? '💎 VER PLANES PRIME' : '💎 VIEW PRIME PLANS', 'show_subscription_plans')],
+              [Markup.button.callback(lang === 'es' ? '🔙 Volver al Menú' : '🔙 Back to Menu', 'back_to_main')],
             ]),
           });
           return;
