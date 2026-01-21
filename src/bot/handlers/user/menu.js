@@ -175,7 +175,7 @@ const registerMenuHandlers = (bot) => {
   // Back to main menu action
   bot.action('back_to_main', async (ctx) => {
     try {
-      await showMainMenuEdit(ctx);
+      await showMainMenu(ctx);
     } catch (error) {
       logger.error('Error in back to main:', error);
     }
@@ -184,7 +184,7 @@ const registerMenuHandlers = (bot) => {
   // Alternative back to main menu action
   bot.action('back_main', async (ctx) => {
     try {
-      await showMainMenuEdit(ctx);
+      await showMainMenu(ctx);
     } catch (error) {
       logger.error('Error in back_main:', error);
     }
