@@ -35,10 +35,8 @@ async function handleStart(ctx) {
     if (user.onboardingComplete) {
       // Show main menu with PRIME-specific options if user is PRIME
       const language = user.language || 'en';
-      await ctx.reply(
-        i18n.t('welcome', language),
-        { reply_markup: getMainMenu(language, isPrimeUser(user)) }
-      );
+      const { showMainMenu } = require('../menu/menuHandler');
+      await showMainMenu(ctx);
     } else {
       // Start onboarding - language selection
       await ctx.reply(
