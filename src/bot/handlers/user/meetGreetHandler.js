@@ -330,7 +330,7 @@ const registerMeetGreetHandlers = (bot) => {
       }
 
       const model = await ModelService.getModelById(selectedModel);
-      const slot = await AvailabilityService.getAvailability(selectedSlot);
+      const slot = await AvailabilityService.getAvailabilityById(selectedSlot);
       if (!model || !slot) {
         throw new Error('Model or slot not found');
       }
@@ -347,9 +347,9 @@ const registerMeetGreetHandlers = (bot) => {
       });
 
       const buttons = [
-        [Markup.button.callback('💳 Tarjeta de Crédito', 'pay_credit_card')],
-        [Markup.button.callback('₿ Crypto (USDC)', 'pay_crypto')],
-        [Markup.button.callback(lang === 'es' ? '🔙 Volver' : '🔙 Back', `select_slot_${selectedSlot}`)]
+        [Markup.button.callback(lang === 'es' ? '💳 Tarjeta de Crédito' : '💳 Credit Card', 'mg_pay_credit_card')],
+        [Markup.button.callback('₿ Crypto (USDC)', 'mg_pay_crypto')],
+        [Markup.button.callback(lang === 'es' ? '🔙 Volver' : '🔙 Back', `select_date_${selectedDate}`)]
       ];
 
       const message = lang === 'es'
@@ -366,54 +366,123 @@ const registerMeetGreetHandlers = (bot) => {
     }
   }
 
-  // Handle payment selection
-  bot.action(/^pay_(credit_card|crypto)$/, async (ctx) => {
+  // Handle payment selection - Credit Card (ePayco)
+  bot.action('mg_pay_credit_card', async (ctx) => {
     try {
       await ctx.answerCbQuery();
       const lang = getLanguage(ctx);
-      const paymentMethod = ctx.match[1] === 'credit_card' ? 'credit_card' : 'crypto';
-      
+
       // Create booking
       const { selectedModel, selectedDuration, selectedDate, selectedSlot } = ctx.session.meetGreet || {};
       const userId = ctx.from.id.toString();
-      
+
+      if (!selectedModel || !selectedDuration || !selectedSlot) {
+        throw new Error('Booking details incomplete');
+      }
+
       // Get slot details
-      const slot = await AvailabilityService.getAvailability(selectedSlot);
+      const slot = await AvailabilityService.getAvailabilityById(selectedSlot);
       if (!slot) {
         throw new Error('Slot not found');
       }
 
-      // Create booking
+      const model = await ModelService.getModelById(selectedModel);
+      const price = MeetGreetService.calculatePrice(selectedDuration);
+
+      // Create booking with pending status
       const booking = await MeetGreetService.createBooking(
         userId,
         selectedModel,
         selectedDuration,
         slot.available_from,
-        paymentMethod
+        'credit_card'
       );
 
-      // Mark slot as booked
+      // Mark slot as booked (temporarily - will be released if payment fails)
       await AvailabilityService.bookAvailability(selectedSlot, booking.id);
 
-      // Clear session
-      ctx.session.meetGreet = {};
+      // Store booking ID in session for webhook callback
+      ctx.session.meetGreet.bookingId = booking.id;
       await ctx.saveSession();
 
-      // Show confirmation
-      const confirmationMessage = lang === 'es'
-        ? `✅ *¡Reserva Confirmada!*\n\n📞 Video Llamada VIP\nID de Reserva: ${booking.id}\nEstado: ${booking.status}\n\nTu Video Llamada VIP ha sido reservada exitosamente.\nRecibirás un recordatorio antes de la llamada.\n\n💰 Pago: $${booking.price_usd} (${paymentMethod === 'credit_card' ? 'Tarjeta' : 'Crypto'})`
-        : `✅ *Booking Confirmed!*\n\n📞 VIP Video Call\nBooking ID: ${booking.id}\nStatus: ${booking.status}\n\nYour VIP Video Call has been successfully booked.\nYou will receive a reminder before the call.\n\n💰 Payment: $${booking.price_usd} (${paymentMethod === 'credit_card' ? 'Credit Card' : 'Crypto'})`;
+      // Generate ePayco checkout URL
+      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
+      const checkoutUrl = `${webhookDomain}/pnp/meet-greet/checkout/${booking.id}`;
 
-      await ctx.editMessageText(confirmationMessage, {
+      const message = lang === 'es'
+        ? `💳 *Pago con Tarjeta de Crédito*\n\n📞 Video Llamada VIP con ${model.name}\n💰 Total: $${price} USD\n\n👇 Haz clic en el botón para completar tu pago:`
+        : `💳 *Credit Card Payment*\n\n📞 VIP Video Call with ${model.name}\n💰 Total: $${price} USD\n\n👇 Click the button below to complete your payment:`;
+
+      await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback(lang === 'es' ? '📅 Mis Reservas' : '📅 My Bookings', 'my_bookings')],
-          [Markup.button.callback(lang === 'es' ? '🔙 Volver al Menú' : '🔙 Back to Menu', 'back_to_main')]
+          [Markup.button.url(lang === 'es' ? '💳 Pagar Ahora' : '💳 Pay Now', checkoutUrl)],
+          [Markup.button.callback(lang === 'es' ? '🔙 Volver' : '🔙 Back', 'MEET_GREET_START')]
         ])
       });
     } catch (error) {
-      logger.error('Error processing payment:', error);
-      await ctx.answerCbQuery('❌ Error processing payment: ' + error.message);
+      logger.error('Error processing credit card payment:', error);
+      await ctx.answerCbQuery('❌ Error: ' + error.message);
+    }
+  });
+
+  // Handle payment selection - Crypto (Daimo)
+  bot.action('mg_pay_crypto', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const lang = getLanguage(ctx);
+
+      // Create booking
+      const { selectedModel, selectedDuration, selectedDate, selectedSlot } = ctx.session.meetGreet || {};
+      const userId = ctx.from.id.toString();
+
+      if (!selectedModel || !selectedDuration || !selectedSlot) {
+        throw new Error('Booking details incomplete');
+      }
+
+      // Get slot details
+      const slot = await AvailabilityService.getAvailabilityById(selectedSlot);
+      if (!slot) {
+        throw new Error('Slot not found');
+      }
+
+      const model = await ModelService.getModelById(selectedModel);
+      const price = MeetGreetService.calculatePrice(selectedDuration);
+
+      // Create booking with pending status
+      const booking = await MeetGreetService.createBooking(
+        userId,
+        selectedModel,
+        selectedDuration,
+        slot.available_from,
+        'crypto'
+      );
+
+      // Mark slot as booked (temporarily - will be released if payment fails)
+      await AvailabilityService.bookAvailability(selectedSlot, booking.id);
+
+      // Store booking ID in session for webhook callback
+      ctx.session.meetGreet.bookingId = booking.id;
+      await ctx.saveSession();
+
+      // Generate Daimo checkout URL
+      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
+      const checkoutUrl = `${webhookDomain}/pnp/meet-greet/daimo-checkout/${booking.id}`;
+
+      const message = lang === 'es'
+        ? `₿ *Pago con Crypto (USDC)*\n\n📞 Video Llamada VIP con ${model.name}\n💰 Total: $${price} USDC\n\n👇 Haz clic en el botón para completar tu pago:`
+        : `₿ *Crypto Payment (USDC)*\n\n📞 VIP Video Call with ${model.name}\n💰 Total: $${price} USDC\n\n👇 Click the button below to complete your payment:`;
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.url(lang === 'es' ? '₿ Pagar con Crypto' : '₿ Pay with Crypto', checkoutUrl)],
+          [Markup.button.callback(lang === 'es' ? '🔙 Volver' : '🔙 Back', 'MEET_GREET_START')]
+        ])
+      });
+    } catch (error) {
+      logger.error('Error processing crypto payment:', error);
+      await ctx.answerCbQuery('❌ Error: ' + error.message);
     }
   });
 

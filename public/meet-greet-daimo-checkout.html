@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Meet & Greet Crypto Checkout - PNPtv</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #f7931a 0%, #ffb74d 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 24px; margin-bottom: 10px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+        .content { padding: 30px; }
+        .loading { text-align: center; padding: 40px 20px; }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #f7931a;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .booking-info {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        .booking-info h3 { font-size: 20px; margin-bottom: 15px; color: #333; }
+        .booking-detail { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+        .booking-detail:last-child { border-bottom: none; }
+        .booking-detail .label { color: #666; }
+        .booking-detail .value { font-weight: 600; color: #333; }
+        .price { font-size: 28px; font-weight: bold; color: #f7931a; text-align: center; margin: 20px 0; }
+        .crypto-badge {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        .error { background: #fee; color: #c00; padding: 15px; border-radius: 8px; text-align: center; }
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #f7931a 0%, #ffb74d 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            margin-bottom: 15px;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .wallet-info {
+            background: #fff3e0;
+            border: 1px solid #ffb74d;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        .wallet-info h4 { color: #e65100; margin-bottom: 10px; }
+        .wallet-address {
+            background: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            margin: 10px 0;
+        }
+        .copy-btn {
+            background: #f7931a;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .copy-btn:hover { background: #e68a00; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Meet & Greet</h1>
+            <p>Crypto Payment (USDC)</p>
+        </div>
+        <div class="content">
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Loading booking details...</p>
+            </div>
+            <div id="booking-details" style="display: none;">
+                <div class="booking-info">
+                    <h3>Booking Details</h3>
+                    <div class="booking-detail">
+                        <span class="label">Model:</span>
+                        <span class="value" id="model-name">-</span>
+                    </div>
+                    <div class="booking-detail">
+                        <span class="label">Duration:</span>
+                        <span class="value" id="duration">-</span>
+                    </div>
+                    <div class="booking-detail">
+                        <span class="label">Date & Time:</span>
+                        <span class="value" id="datetime">-</span>
+                    </div>
+                </div>
+                <div class="price">
+                    $<span id="price">0</span> <span class="crypto-badge">USDC</span>
+                </div>
+
+                <a id="daimo-link" href="#" class="btn" target="_blank">Pay with Daimo</a>
+
+                <div class="wallet-info">
+                    <h4>Manual Payment</h4>
+                    <p>Send exactly <strong>$<span id="price2">0</span> USDC</strong> to:</p>
+                    <div class="wallet-address" id="wallet-address">Loading...</div>
+                    <button class="copy-btn" onclick="copyAddress()">Copy Address</button>
+                    <p style="margin-top: 10px; font-size: 12px; color: #666;">
+                        After sending, your booking will be confirmed automatically.
+                    </p>
+                </div>
+            </div>
+            <div id="error" class="error" style="display: none;"></div>
+        </div>
+    </div>
+    <script>
+        const bookingId = window.location.pathname.split('/').pop();
+        const WALLET_ADDRESS = '0x1234567890abcdef1234567890abcdef12345678'; // Replace with actual wallet
+
+        async function loadBooking() {
+            try {
+                const response = await fetch(`/api/meet-greet/booking/${bookingId}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Booking not found');
+                }
+
+                const booking = data.booking;
+                document.getElementById('model-name').textContent = booking.modelName;
+                document.getElementById('duration').textContent = `${booking.durationMinutes} minutes`;
+                document.getElementById('datetime').textContent = new Date(booking.bookingTime).toLocaleString();
+                document.getElementById('price').textContent = booking.priceUsd;
+                document.getElementById('price2').textContent = booking.priceUsd;
+                document.getElementById('wallet-address').textContent = WALLET_ADDRESS;
+
+                // Generate Daimo payment link
+                const daimoLink = `https://daimo.com/link/pay?recipient=${WALLET_ADDRESS}&dollars=${booking.priceUsd}&note=MeetGreet-${booking.id}`;
+                document.getElementById('daimo-link').href = daimoLink;
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('booking-details').style.display = 'block';
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').textContent = error.message;
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+
+        function copyAddress() {
+            navigator.clipboard.writeText(WALLET_ADDRESS);
+            const btn = document.querySelector('.copy-btn');
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = 'Copy Address', 2000);
+        }
+
+        loadBooking();
+    </script>
+</body>
+</html>

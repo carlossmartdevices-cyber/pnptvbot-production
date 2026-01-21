@@ -50,6 +50,25 @@ class AvailabilityService {
   }
 
   /**
+   * Get availability slot by ID
+   * @param {number} availabilityId - Availability slot ID
+   * @returns {Promise<Object|null>} Availability slot or null if not found
+   */
+  static async getAvailabilityById(availabilityId) {
+    try {
+      const result = await query(
+        `SELECT * FROM model_availability WHERE id = $1`,
+        [availabilityId]
+      );
+
+      return result.rows && result.rows.length > 0 ? result.rows[0] : null;
+    } catch (error) {
+      logger.error('Error getting availability by ID:', error);
+      throw new Error('Failed to get availability');
+    }
+  }
+
+  /**
    * Get availability for a model
    * @param {number} modelId - Model ID
    * @param {Date} startDate - Start date (optional)
@@ -225,12 +244,13 @@ class AvailabilityService {
    */
   static async getAvailableSlots(modelId, startDate, endDate) {
     try {
+      // Find slots where the start time falls within the date range
       const result = await query(
         `SELECT * FROM model_availability
          WHERE model_id = $1
          AND is_booked = FALSE
          AND available_from >= $2
-         AND available_to <= $3
+         AND available_from < $3
          ORDER BY available_from`,
         [modelId, startDate, endDate]
       );
