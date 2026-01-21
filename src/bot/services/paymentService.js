@@ -330,6 +330,110 @@ class PaymentService {
   }
 
   /**
+   * Process Meet & Greet ePayco webhook confirmation
+   * @param {Object} params - Webhook data for Meet & Greet
+   * @returns {Object} { success: boolean, error?: string }
+   */
+  static async processMeetGreetEpaycoWebhook({
+    x_ref_payco,
+    x_transaction_id,
+    x_transaction_state,
+    x_approval_code,
+    x_amount,
+    userId,
+    bookingId,
+    x_customer_email,
+    x_customer_name,
+  }) {
+    try {
+      logger.info('Processing Meet & Greet ePayco webhook', {
+        x_ref_payco,
+        x_transaction_state,
+        userId,
+        bookingId,
+      });
+
+      // Get booking details
+      const booking = await MeetGreetService.getBookingById(bookingId);
+      if (!booking) {
+        logger.error('Meet & Greet booking not found', { bookingId });
+        return { success: false, error: 'Booking not found' };
+      }
+
+      // Process based on transaction state
+      if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
+        // Payment successful - confirm the booking
+        await MeetGreetService.updateBookingStatus(bookingId, 'confirmed');
+        await MeetGreetService.updatePaymentStatus(bookingId, 'paid', x_transaction_id);
+
+        logger.info('Meet & Greet booking confirmed via ePayco webhook', {
+          bookingId,
+          userId,
+          transactionId: x_transaction_id,
+          amount: x_amount,
+        });
+
+        // Send confirmation to user
+        try {
+          const bot = new Telegraf(process.env.BOT_TOKEN);
+          const user = await UserModel.getById(userId);
+          const userLanguage = user?.language || 'es';
+          const model = await ModelService.getModelById(booking.model_id);
+
+          const message = userLanguage === 'es'
+            ? `🎉 ¡Tu Video Llamada VIP ha sido confirmada!\n\n` +
+              `📅 Fecha: ${new Date(booking.booking_time).toLocaleString('es-ES')}\n` +
+              `🕒 Duración: ${booking.duration_minutes} minutos\n` +
+              `💃 Modelo: ${model?.name || 'Desconocido'}\n` +
+              `💰 Total: $${booking.price_usd} USD\n\n` +
+              `📞 Tu llamada está programada y confirmada. ¡Te esperamos!`
+            : `🎉 Your VIP Video Call has been confirmed!\n\n` +
+              `📅 Date: ${new Date(booking.booking_time).toLocaleString('en-US')}\n` +
+              `🕒 Duration: ${booking.duration_minutes} minutes\n` +
+              `💃 Model: ${model?.name || 'Unknown'}\n` +
+              `💰 Total: $${booking.price_usd} USD\n\n` +
+              `📞 Your call is scheduled and confirmed. We look forward to seeing you!`;
+
+          await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown' });
+
+        } catch (notificationError) {
+          logger.error('Error sending Meet & Greet confirmation notification (non-critical):', {
+            error: notificationError.message,
+            userId,
+            bookingId,
+          });
+        }
+
+        return { success: true };
+      } else if (x_transaction_state === 'Fallida' || x_transaction_state === 'Rechazada') {
+        // Payment failed - cancel the booking and release availability
+        await MeetGreetService.cancelBooking(bookingId, 'Payment failed');
+
+        logger.warn('Meet & Greet payment failed, booking cancelled', {
+          bookingId,
+          userId,
+          transactionId: x_transaction_id,
+        });
+
+        return { success: true, error: 'Payment failed, booking cancelled' };
+      }
+
+      // For other states, just log and return success
+      logger.info('Meet & Greet ePayco webhook received (no action taken)', {
+        x_ref_payco,
+        x_transaction_state,
+        bookingId,
+      });
+
+      return { success: true };
+
+    } catch (error) {
+      logger.error('Error processing Meet & Greet ePayco webhook:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Process ePayco webhook confirmation
    * @param {Object} webhookData - ePayco webhook data
    * @returns {Object} { success: boolean, error?: string }
@@ -344,8 +448,8 @@ class PaymentService {
         x_approval_code,
         x_amount,
         x_extra1: userId,
-        x_extra2: planId,
-        x_extra3: paymentId,
+        x_extra2: planIdOrBookingId,
+        x_extra3: paymentIdOrType,
         x_customer_email,
         x_customer_name,
       } = webhookData;
@@ -354,18 +458,36 @@ class PaymentService {
         x_ref_payco,
         x_transaction_state,
         userId,
-        planId,
-        paymentId,
+        planIdOrBookingId,
+        paymentIdOrType,
       });
 
-      // Check if payment exists
-      const payment = paymentId ? await PaymentModel.getById(paymentId) : null;
+      // Check if this is a Meet & Greet payment
+      const isMeetGreet = paymentIdOrType === 'meet_greet';
+
+      if (isMeetGreet) {
+        // Handle Meet & Greet payment
+        return await this.processMeetGreetEpaycoWebhook({
+          x_ref_payco,
+          x_transaction_id,
+          x_transaction_state,
+          x_approval_code,
+          x_amount,
+          userId,
+          bookingId: planIdOrBookingId,
+          x_customer_email,
+          x_customer_name,
+        });
+      }
+
+      // Check if payment exists (for regular subscriptions)
+      const payment = paymentIdOrType ? await PaymentModel.getById(paymentIdOrType) : null;
 
       // Process based on transaction state
       if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
         // Payment successful
         if (payment) {
-          await PaymentModel.updateStatus(paymentId, 'completed', {
+          await PaymentModel.updateStatus(paymentIdOrType, 'completed', {
             transaction_id: x_transaction_id,
             approval_code: x_approval_code,
             reference: x_ref_payco,
@@ -374,8 +496,8 @@ class PaymentService {
         }
 
         // Activate user subscription
-        if (userId && planId) {
-          const plan = await PlanModel.getById(planId);
+        if (userId && planIdOrBookingId) {
+          const plan = await PlanModel.getById(planIdOrBookingId);
           if (plan) {
             const expiryDate = new Date();
             const durationDays = plan.duration_days || plan.duration || 30;
@@ -383,13 +505,13 @@ class PaymentService {
 
             await UserModel.updateSubscription(userId, {
               status: 'active',
-              planId,
+              planId: planIdOrBookingId,
               expiry: expiryDate,
             });
 
             logger.info('User subscription activated via webhook', {
               userId,
-              planId,
+              planId: planIdOrBookingId,
               expiryDate,
               refPayco: x_ref_payco,
             });

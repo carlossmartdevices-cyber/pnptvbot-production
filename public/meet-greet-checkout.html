@@ -141,8 +141,8 @@
 
         function openEpaycoCheckout(booking) {
             const handler = ePayco.checkout.configure({
-                key: 'PUBLIC_KEY_HERE', // Will be replaced with actual key
-                test: false
+                key: process.env.EPAYCO_PUBLIC_KEY || 'PUBLIC_KEY_HERE',
+                test: process.env.EPAYCO_TEST_MODE === 'true'
             });
 
             handler.open({

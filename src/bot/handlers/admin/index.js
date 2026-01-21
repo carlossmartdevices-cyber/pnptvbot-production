@@ -511,6 +511,11 @@ async function showAdminPanel(ctx, edit = false) {
         Markup.button.callback('📞 ' + (lang === 'es' ? 'Llamadas Privadas' : 'Private Calls'), 'admin_private_calls'),
       ]);
 
+      // ═══ MEET & GREET ═══
+      buttons.push([
+        Markup.button.callback('💃 ' + (lang === 'es' ? 'Meet & Greet' : 'Meet & Greet'), 'admin_meet_greet'),
+      ]);
+
       // ═══ PREVIEW MODE ═══
       buttons.push([
         Markup.button.callback('👁️ ' + (lang === 'es' ? 'Vista Previa' : 'Preview Mode'), 'admin_view_mode'),
@@ -562,6 +567,7 @@ const registerRadioManagementHandlers = require('./radioManagement');
 const registerLiveStreamManagementHandlers = require('./liveStreamManagement');
 const registerCommunityPremiumBroadcast = require('./communityPremiumBroadcast');
 const registerImprovedSharePostHandlers = require('./improvedSharePost');
+const registerMeetGreetManagementHandlers = require('./meetGreetManagement');
 
 let registerAdminHandlers = (bot) => {
   logger.info('[DEBUG-INIT] registerAdminHandlers called - registering admin command handlers');
@@ -571,6 +577,7 @@ let registerAdminHandlers = (bot) => {
   registerLiveStreamManagementHandlers(bot);
   registerCommunityPremiumBroadcast(bot);
   registerImprovedSharePostHandlers(bot);
+  registerMeetGreetManagementHandlers(bot);
 
   bot.action('admin_home', async (ctx) => {
     try {

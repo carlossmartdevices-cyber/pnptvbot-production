@@ -1,6 +1,7 @@
 const { query } = require('../../config/postgres');
 const ModelService = require('./modelService');
 const AvailabilityService = require('./availabilityService');
+const MeetGreetTimeSlotService = require('./meetGreetTimeSlotService');
 const logger = require('../../utils/logger');
 
 /**
@@ -321,18 +322,44 @@ class MeetGreetService {
    */
   static async getAvailableSlots(modelId, date, durationMinutes) {
     try {
-      // Get start and end of day
+      // Use the new time slot service that implements the specific requirements:
+      // - Duration: 20 hours to 200 hours (next day)
+      // - Days: Thursday to Monday
+      // - Buffer: 15 minutes between slots
+      
+      const slots = await MeetGreetTimeSlotService.getAvailableSlots(
+        modelId, 
+        date, 
+        date, // Same start and end date for single day
+        durationMinutes
+      );
+
+      // Also check existing availability in database
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
 
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      // Get available slots
-      const slots = await AvailabilityService.getAvailableSlots(modelId, startOfDay, endOfDay);
+      const dbSlots = await AvailabilityService.getAvailableSlots(modelId, startOfDay, endOfDay);
+
+      // Combine both sources and remove duplicates
+      const combinedSlots = [...slots, ...dbSlots];
+      
+      // Remove duplicates by start time
+      const uniqueSlots = [];
+      const seenStartTimes = new Set();
+      
+      for (const slot of combinedSlots) {
+        const startTimeKey = new Date(slot.available_from).getTime().toString();
+        if (!seenStartTimes.has(startTimeKey)) {
+          seenStartTimes.add(startTimeKey);
+          uniqueSlots.push(slot);
+        }
+      }
 
       // Filter slots that are long enough for the requested duration
-      const validSlots = slots.filter(slot => {
+      const validSlots = uniqueSlots.filter(slot => {
         const slotDuration = (new Date(slot.available_to) - new Date(slot.available_from)) / (1000 * 60);
         return slotDuration >= durationMinutes;
       });
@@ -340,7 +367,7 @@ class MeetGreetService {
       return validSlots;
     } catch (error) {
       logger.error('Error getting available slots:', error);
-      throw new Error('Failed to get available slots');
+      throw new Error('Failed to get available slots: ' + error.message);
     }
   }
 

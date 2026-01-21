@@ -111,8 +111,16 @@ const registerMeetGreetHandlers = (bot) => {
       ];
 
       const message = lang === 'es'
-        ? `🕒 *Selecciona la Duración*\n\nModelo: ${model.name}\n\nElige la duración para tu Video Llamada VIP:`
-        : `🕒 *Select Duration*\n\nModel: ${model.name}\n\nChoose the duration for your VIP Video Call:`;
+        ? `🕒 *Selecciona la Duración*\n\nModelo: ${model.name}\n\n💰 *Opciones de Video Llamada VIP:*\n\n` +
+          `🔥 *30 min* - $60\n1:1 Video Call con tu Latino papi favorito\n\n` +
+          `🔥 *60 min* - $100\n1:1 Video Call con tu Latino papi favorito\n\n` +
+          `🔥 *90 min* - $250\n1:1 Video Call con tu Latino papi favorito + su boytoy de la temporada\n\n` +
+          `Elige la duración para tu experiencia:`
+        : `🕒 *Select Duration*\n\nModel: ${model.name}\n\n💰 *VIP Video Call Options:*\n\n` +
+          `🔥 *30 min* - $60\n1:1 Video Call with your fav Latino papi\n\n` +
+          `🔥 *60 min* - $100\n1:1 Video Call with your fav Latino papi\n\n` +
+          `🔥 *90 min* - $250\n1:1 Video Call with your fav Latino papi + his boytoy of the season\n\n` +
+          `Choose the duration for your experience:`;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
