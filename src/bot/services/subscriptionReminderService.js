@@ -107,7 +107,10 @@ class SubscriptionReminderService {
 • Música y podcasts premium
 • Acceso total sin anuncios
 
-Escribe /prime para renovar tu membresía.`;
+Escribe /prime para renovar tu membresía.
+
+🔄 *¿Quieres renovación automática?*
+Escribe /subscribe para activar la renovación mensual automática y nunca perder acceso!`;
         } else {
           message = `⏰ **Subscription Reminder**
 
@@ -131,7 +134,10 @@ Hey there! Your PNPtv PRIME membership will expire in **3 days**.
 • Premium music & podcasts
 • Zero ads, all access
 
-Type /prime to renew your membership.`;
+Type /prime to renew your membership.
+
+🔄 *Want automatic renewal?*
+Type /subscribe to enable monthly auto-renewal and never lose access!`;
         }
       } else if (daysBeforeExpiry === 1) {
         // 1-day reminder (more urgent)
@@ -154,7 +160,10 @@ Tu membresía PRIME de PNPtv expira **MAÑANA**.
 
 💎 **Renueva ahora para mantener tu acceso PRIME.**
 
-Escribe /prime ahora para renovar.`;
+Escribe /prime ahora para renovar.
+
+🔄 *¿Cansado de renovar manualmente?*
+Escribe /subscribe para activar la renovación automática mensual!`;
         } else {
           message = `🚨 **Last Chance!**
 
@@ -174,7 +183,10 @@ Your PNPtv PRIME membership expires **TOMORROW**.
 
 💎 **Renew now to keep your PRIME access.**
 
-Type /prime now to renew.`;
+Type /prime now to renew.
+
+🔄 *Tired of manual renewals?*
+Type /subscribe to enable monthly auto-renewal!`;
         }
       } else {
         logger.warn(`Invalid daysBeforeExpiry value: ${daysBeforeExpiry}`);
@@ -290,7 +302,10 @@ Tu suscripción PRIME de PNPtv ha finalizado. Ahora tienes acceso de miembro gra
 • Música y podcasts premium
 • Sin anuncios, acceso total
 
-Escribe /prime para reactivar tu membresía PRIME.`;
+Escribe /prime para reactivar tu membresía PRIME.
+
+🔄 *¡No te quedes sin acceso de nuevo!*
+Escribe /subscribe para activar la renovación mensual automática.`;
       } else {
         message = `😔 **Your PRIME membership has expired**
 
@@ -309,7 +324,10 @@ Your PNPtv PRIME subscription has ended. You now have free member access.
 • Premium music & podcasts
 • Zero ads, all access
 
-Type /prime to reactivate your PRIME membership.`;
+Type /prime to reactivate your PRIME membership.
+
+🔄 *Never miss out again!*
+Type /subscribe to enable automatic monthly renewal.`;
       }
 
       await this.bot.telegram.sendMessage(user.id, message, {

@@ -82,6 +82,16 @@ class UserModel {
       telegram: row.telegram || null,
       looking_for: row.looking_for || null,
       tribe: row.tribe || null,
+      // Recurring subscription fields
+      cardToken: row.card_token || null,
+      cardTokenMask: row.card_token_mask || null,
+      cardFranchise: row.card_franchise || null,
+      autoRenew: row.auto_renew || false,
+      subscriptionType: row.subscription_type || 'one_time',
+      recurringPlanId: row.recurring_plan_id || null,
+      nextBillingDate: row.next_billing_date || null,
+      billingFailures: row.billing_failures || 0,
+      lastBillingAttempt: row.last_billing_attempt || null,
     };
   }
 

@@ -620,6 +620,85 @@ app.post(
   asyncHandler(podcastController.uploadAudio)
 );
 
+// Recurring Checkout page - serves recurring-checkout.html for /recurring-checkout/:userId/:planId
+app.get('/recurring-checkout/:userId/:planId', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'recurring-checkout.html'));
+});
+
+// Recurring Subscription API routes
+const VisaCybersourceService = require('../services/visaCybersourceService');
+
+// Tokenize card for recurring subscription
+app.post('/api/recurring/tokenize', asyncHandler(async (req, res) => {
+  const { userId, cardNumber, expMonth, expYear, cvc, cardHolderName, email } = req.body;
+
+  if (!userId || !cardNumber || !expMonth || !expYear || !cvc) {
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
+  }
+
+  const result = await VisaCybersourceService.tokenizeCard({
+    userId,
+    cardNumber,
+    expMonth,
+    expYear,
+    cvc,
+    cardHolderName,
+    email,
+  });
+
+  res.json(result);
+}));
+
+// Create recurring subscription
+app.post('/api/recurring/subscribe', asyncHandler(async (req, res) => {
+  const { userId, planId, cardToken, email, trialDays } = req.body;
+
+  if (!userId || !planId) {
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
+  }
+
+  const result = await VisaCybersourceService.createRecurringSubscription({
+    userId,
+    planId,
+    cardToken,
+    email,
+    trialDays: trialDays || 0,
+  });
+
+  res.json(result);
+}));
+
+// Get subscription details
+app.get('/api/recurring/subscription/:userId', asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const subscription = await VisaCybersourceService.getSubscriptionDetails(userId);
+  res.json({ success: true, subscription });
+}));
+
+// Cancel subscription
+app.post('/api/recurring/cancel', asyncHandler(async (req, res) => {
+  const { userId, immediately } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ success: false, error: 'Missing userId' });
+  }
+
+  const result = await VisaCybersourceService.cancelRecurringSubscription(userId, immediately || false);
+  res.json(result);
+}));
+
+// Reactivate subscription
+app.post('/api/recurring/reactivate', asyncHandler(async (req, res) => {
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ success: false, error: 'Missing userId' });
+  }
+
+  const result = await VisaCybersourceService.reactivateSubscription(userId);
+  res.json(result);
+}));
+
 // Subscription API routes
 app.get('/api/subscription/plans', asyncHandler(subscriptionController.getPlans));
 app.post('/api/subscription/create-plan', asyncHandler(subscriptionController.createEpaycoPlan));

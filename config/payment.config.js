@@ -16,6 +16,10 @@ module.exports = {
     endpoint: process.env.VISA_CYBERSOURCE_ENDPOINT || 'https://api.cybersource.com',
     webhookSecret: process.env.VISA_CYBERSOURCE_WEBHOOK_SECRET || 'your_webhook_secret',
     recurringPayment: true, // Enable recurring payment processing
-    supportedPlans: ['monthly_crystal', 'monthly_diamond'], // Plans that use this provider
+    // Plans that support recurring subscriptions via ePayco tokenization
+    supportedPlans: ['monthly_pass', 'monthly_crystal', 'monthly_diamond'],
+    // Retry configuration for failed payments
+    maxRetries: 3,
+    retryDelaysDays: [1, 3, 7], // Days between retry attempts
   },
 };

@@ -6,6 +6,7 @@ const { initializePostgres } = require('../src/config/postgres');
 const UserService = require('../src/bot/services/userService');
 const MembershipCleanupService = require('../src/bot/services/membershipCleanupService');
 const TutorialReminderService = require('../src/bot/services/tutorialReminderService');
+const VisaCybersourceService = require('../src/bot/services/visaCybersourceService');
 const logger = require('../src/utils/logger');
 
 /**
@@ -72,6 +73,38 @@ const startCronJobs = async (bot = null) => {
     // NOTE: Tutorial reminders are handled by TutorialReminderService.startScheduling() in bot.js
     // Do NOT duplicate them here to avoid exceeding the 6 messages/day rate limit
     // The service alternates between health tips and PRIME feature tutorials every 4 hours
+
+    // Process recurring payments - runs daily at 8 AM UTC
+    // Charges cards for subscriptions that are due for renewal
+    cron.schedule(process.env.RECURRING_PAYMENTS_CRON || '0 8 * * *', async () => {
+      try {
+        logger.info('Running recurring payments processing...');
+        const results = await VisaCybersourceService.processDuePayments();
+        logger.info('Recurring payments processing completed', {
+          total: results.total,
+          successful: results.successful,
+          failed: results.failed,
+          errors: results.errors?.length || 0,
+        });
+      } catch (error) {
+        logger.error('Error in recurring payments cron:', error);
+      }
+    });
+
+    // Retry failed recurring payments - runs at 2 PM UTC (for retry after morning failures)
+    cron.schedule(process.env.RECURRING_RETRY_CRON || '0 14 * * *', async () => {
+      try {
+        logger.info('Running recurring payment retry...');
+        const results = await VisaCybersourceService.processDuePayments();
+        logger.info('Recurring payment retry completed', {
+          total: results.total,
+          successful: results.successful,
+          failed: results.failed,
+        });
+      } catch (error) {
+        logger.error('Error in recurring payment retry cron:', error);
+      }
+    });
 
     logger.info('✓ Cron jobs started successfully');
     return true;

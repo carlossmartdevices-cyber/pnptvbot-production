@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Suscripción Recurrente - PNPtv</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .recurring-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .plan-info {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .plan-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .plan-price {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 10px 0;
+        }
+
+        .plan-price .period {
+            font-size: 14px;
+            color: #666;
+            font-weight: normal;
+        }
+
+        .plan-features {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 8px 0;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .feature::before {
+            content: "✓";
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .card-icons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+
+        .card-icon {
+            width: 50px;
+            height: 32px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: #666;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .security-note {
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0fdf4;
+            border-radius: 10px;
+            font-size: 13px;
+            color: #166534;
+        }
+
+        .security-note::before {
+            content: "🔒 ";
+        }
+
+        .terms {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+
+        .terms a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .error-message {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .success-message {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .success-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+
+        .success-message h2 {
+            color: #28a745;
+            margin-bottom: 15px;
+        }
+
+        .success-message p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .telegram-btn {
+            display: inline-block;
+            padding: 14px 30px;
+            background: #0088cc;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        .telegram-btn:hover {
+            background: #006699;
+        }
+
+        .cancel-info {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #9a3412;
+        }
+
+        .cancel-info strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        @media (max-width: 480px) {
+            .form-row {
+                flex-direction: column;
+                gap: 0;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .plan-price {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💎 <span id="header-title">Suscripción PRIME</span></h1>
+            <p id="header-subtitle">Renovación automática mensual</p>
+            <div class="recurring-badge">🔄 Auto-renovación</div>
+        </div>
+
+        <div class="content">
+            <!-- Loading State -->
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p id="loading-text">Cargando información del plan...</p>
+            </div>
+
+            <!-- Checkout Form -->
+            <div id="checkout-form" style="display: none;">
+                <div class="plan-info">
+                    <div class="plan-name">
+                        <span>📋</span>
+                        <span id="plan-name">Monthly Pass</span>
+                    </div>
+                    <div class="plan-price">
+                        $<span id="plan-price">24.99</span> USD <span class="period">/ mes</span>
+                    </div>
+                    <div class="plan-features">
+                        <div class="feature" id="feature-1">Acceso ilimitado a contenido PRIME</div>
+                        <div class="feature" id="feature-2">Canal exclusivo de Telegram</div>
+                        <div class="feature" id="feature-3">Cancela cuando quieras</div>
+                    </div>
+                </div>
+
+                <div class="cancel-info">
+                    <strong>📌 Información importante:</strong>
+                    Puedes cancelar tu suscripción en cualquier momento desde el bot con el comando /subscription.
+                    No hay compromisos a largo plazo.
+                </div>
+
+                <div class="error-message" id="error-message"></div>
+
+                <div class="card-icons">
+                    <div class="card-icon">VISA</div>
+                    <div class="card-icon">MC</div>
+                    <div class="card-icon">AMEX</div>
+                </div>
+
+                <form id="payment-form" onsubmit="return handleSubmit(event)">
+                    <div class="form-group">
+                        <label for="card-holder" id="label-holder">Nombre en la tarjeta</label>
+                        <input type="text" id="card-holder" name="cardHolder" placeholder="JOHN DOE" required autocomplete="cc-name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="card-number" id="label-number">Número de tarjeta</label>
+                        <input type="text" id="card-number" name="cardNumber" placeholder="4242 4242 4242 4242" required maxlength="19" autocomplete="cc-number">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="expiry" id="label-expiry">Fecha de expiración</label>
+                            <input type="text" id="expiry" name="expiry" placeholder="MM/YY" required maxlength="5" autocomplete="cc-exp">
+                        </div>
+                        <div class="form-group">
+                            <label for="cvv" id="label-cvv">CVV</label>
+                            <input type="text" id="cvv" name="cvv" placeholder="123" required maxlength="4" autocomplete="cc-csc">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email" id="label-email">Correo electrónico</label>
+                        <input type="email" id="email" name="email" placeholder="tu@email.com" required autocomplete="email">
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="submit-btn">
+                        🔒 Activar Suscripción Mensual
+                    </button>
+                </form>
+
+                <div class="security-note" id="security-note">
+                    Tus datos están protegidos con encriptación SSL de 256 bits
+                </div>
+
+                <div class="terms" id="terms-text">
+                    Al suscribirte, aceptas nuestros <a href="/terms" target="_blank">Términos y Condiciones</a>
+                    y la <a href="/privacy" target="_blank">Política de Privacidad</a>
+                </div>
+            </div>
+
+            <!-- Success State -->
+            <div id="success" class="success-message" style="display: none;">
+                <div class="success-icon">🎉</div>
+                <h2 id="success-title">¡Suscripción Activada!</h2>
+                <p id="success-text">Tu membresía PRIME con renovación automática está activa. Revisa tu Telegram para el enlace de acceso.</p>
+                <a href="https://t.me/pnptv_bot" class="telegram-btn" id="telegram-link">Abrir Telegram</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get URL parameters
+        const pathParts = window.location.pathname.split('/');
+        const userId = pathParts[2];
+        const planId = pathParts[3];
+
+        // Language detection
+        const urlParams = new URLSearchParams(window.location.search);
+        const lang = urlParams.get('lang') || 'es';
+        const isSpanish = lang === 'es';
+
+        // Translations
+        const translations = {
+            es: {
+                headerTitle: 'Suscripción PRIME',
+                headerSubtitle: 'Renovación automática mensual',
+                loadingText: 'Cargando información del plan...',
+                planFeature1: 'Acceso ilimitado a contenido PRIME',
+                planFeature2: 'Canal exclusivo de Telegram',
+                planFeature3: 'Cancela cuando quieras',
+                cancelInfo: 'Puedes cancelar tu suscripción en cualquier momento desde el bot con el comando /subscription. No hay compromisos a largo plazo.',
+                labelHolder: 'Nombre en la tarjeta',
+                labelNumber: 'Número de tarjeta',
+                labelExpiry: 'Fecha de expiración',
+                labelCvv: 'CVV',
+                labelEmail: 'Correo electrónico',
+                submitBtn: '🔒 Activar Suscripción Mensual',
+                securityNote: 'Tus datos están protegidos con encriptación SSL de 256 bits',
+                termsText: 'Al suscribirte, aceptas nuestros',
+                successTitle: '¡Suscripción Activada!',
+                successText: 'Tu membresía PRIME con renovación automática está activa. Revisa tu Telegram para el enlace de acceso.',
+                telegramBtn: 'Abrir Telegram',
+                processing: 'Procesando...',
+                errorGeneric: 'Error al procesar el pago. Por favor intenta de nuevo.',
+                perMonth: '/ mes'
+            },
+            en: {
+                headerTitle: 'PRIME Subscription',
+                headerSubtitle: 'Automatic monthly renewal',
+                loadingText: 'Loading plan information...',
+                planFeature1: 'Unlimited access to PRIME content',
+                planFeature2: 'Exclusive Telegram channel',
+                planFeature3: 'Cancel anytime',
+                cancelInfo: 'You can cancel your subscription anytime from the bot with the /subscription command. No long-term commitments.',
+                labelHolder: 'Name on card',
+                labelNumber: 'Card number',
+                labelExpiry: 'Expiration date',
+                labelCvv: 'CVV',
+                labelEmail: 'Email address',
+                submitBtn: '🔒 Activate Monthly Subscription',
+                securityNote: 'Your data is protected with 256-bit SSL encryption',
+                termsText: 'By subscribing, you agree to our',
+                successTitle: 'Subscription Activated!',
+                successText: 'Your PRIME membership with auto-renewal is active. Check your Telegram for the access link.',
+                telegramBtn: 'Open Telegram',
+                processing: 'Processing...',
+                errorGeneric: 'Error processing payment. Please try again.',
+                perMonth: '/ month'
+            }
+        };
+
+        const t = translations[isSpanish ? 'es' : 'en'];
+
+        // Apply translations
+        document.getElementById('header-title').textContent = t.headerTitle;
+        document.getElementById('header-subtitle').textContent = t.headerSubtitle;
+        document.getElementById('loading-text').textContent = t.loadingText;
+        document.getElementById('feature-1').textContent = t.planFeature1;
+        document.getElementById('feature-2').textContent = t.planFeature2;
+        document.getElementById('feature-3').textContent = t.planFeature3;
+        document.querySelector('.cancel-info').innerHTML = `<strong>📌 ${isSpanish ? 'Información importante:' : 'Important information:'}</strong> ${t.cancelInfo}`;
+        document.getElementById('label-holder').textContent = t.labelHolder;
+        document.getElementById('label-number').textContent = t.labelNumber;
+        document.getElementById('label-expiry').textContent = t.labelExpiry;
+        document.getElementById('label-cvv').textContent = t.labelCvv;
+        document.getElementById('label-email').textContent = t.labelEmail;
+        document.getElementById('submit-btn').textContent = t.submitBtn;
+        document.getElementById('security-note').textContent = t.securityNote;
+        document.getElementById('success-title').textContent = t.successTitle;
+        document.getElementById('success-text').textContent = t.successText;
+        document.getElementById('telegram-link').textContent = t.telegramBtn;
+        document.querySelector('.plan-price .period').textContent = t.perMonth;
+
+        // Card number formatting
+        document.getElementById('card-number').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\s/g, '').replace(/\D/g, '');
+            let formatted = value.match(/.{1,4}/g)?.join(' ') || value;
+            e.target.value = formatted;
+        });
+
+        // Expiry formatting
+        document.getElementById('expiry').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 2) {
+                value = value.slice(0, 2) + '/' + value.slice(2);
+            }
+            e.target.value = value;
+        });
+
+        // CVV - numbers only
+        document.getElementById('cvv').addEventListener('input', function(e) {
+            e.target.value = e.target.value.replace(/\D/g, '');
+        });
+
+        // Load plan info
+        async function loadPlanInfo() {
+            try {
+                const response = await fetch(`/api/subscription/plans`);
+                const plans = await response.json();
+
+                // Find the plan
+                const plan = plans.find(p => p.id === planId) || plans.find(p => p.duration === 30);
+
+                if (plan) {
+                    document.getElementById('plan-name').textContent = isSpanish ? (plan.nameEs || plan.name) : plan.name;
+                    document.getElementById('plan-price').textContent = plan.price?.toFixed(2) || '24.99';
+                }
+
+                // Show form
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('checkout-form').style.display = 'block';
+            } catch (error) {
+                console.error('Error loading plan:', error);
+                // Show form with defaults
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('checkout-form').style.display = 'block';
+            }
+        }
+
+        // Handle form submission
+        async function handleSubmit(event) {
+            event.preventDefault();
+
+            const submitBtn = document.getElementById('submit-btn');
+            const errorDiv = document.getElementById('error-message');
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = t.processing;
+            errorDiv.style.display = 'none';
+
+            const cardNumber = document.getElementById('card-number').value.replace(/\s/g, '');
+            const expiry = document.getElementById('expiry').value.split('/');
+            const cvv = document.getElementById('cvv').value;
+            const cardHolder = document.getElementById('card-holder').value;
+            const email = document.getElementById('email').value;
+
+            try {
+                // First tokenize the card
+                const tokenResponse = await fetch('/api/recurring/tokenize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId,
+                        cardNumber,
+                        expMonth: expiry[0],
+                        expYear: '20' + expiry[1],
+                        cvc: cvv,
+                        cardHolderName: cardHolder,
+                        email
+                    })
+                });
+
+                const tokenResult = await tokenResponse.json();
+
+                if (!tokenResult.success) {
+                    throw new Error(tokenResult.error || t.errorGeneric);
+                }
+
+                // Then create the subscription
+                const subResponse = await fetch('/api/recurring/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId,
+                        planId: planId || 'monthly_pass',
+                        cardToken: tokenResult.token,
+                        email
+                    })
+                });
+
+                const subResult = await subResponse.json();
+
+                if (!subResult.success) {
+                    throw new Error(subResult.error || t.errorGeneric);
+                }
+
+                // Show success
+                document.getElementById('checkout-form').style.display = 'none';
+                document.getElementById('success').style.display = 'block';
+
+            } catch (error) {
+                console.error('Payment error:', error);
+                errorDiv.textContent = error.message || t.errorGeneric;
+                errorDiv.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = t.submitBtn;
+            }
+        }
+
+        // Initialize
+        loadPlanInfo();
+    </script>
+</body>
+</html>

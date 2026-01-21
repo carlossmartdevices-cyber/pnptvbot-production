@@ -251,8 +251,6 @@ If you have any questions, use /support to contact us.`;
     }
   });
 
-=======
-
   bot.action('provide_email', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
