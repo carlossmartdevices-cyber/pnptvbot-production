@@ -22,6 +22,15 @@ class UserService {
   }
 
   /**
+   * Get user by ID (alias for getUser)
+   * @param {number|string} userId - User ID
+   * @returns {Promise<Object|null>} User data or null
+   */
+  static async getById(userId) {
+    return this.getUser(userId);
+  }
+
+  /**
    * Get or create user by ID and data
    * @param {number|string} userId - User ID
    * @param {Object} userData - User data (username, firstName, lastName)

@@ -358,6 +358,7 @@ class ModerationModel {
    */
   static async addLog(logData) {
     try {
+      // Try with target_user_id column first
       const result = await query(
         `INSERT INTO moderation_logs (
           group_id, action, user_id, moderator_id, target_user_id, reason, details, created_at
@@ -376,6 +377,29 @@ class ModerationModel {
 
       return result.rows[0].id;
     } catch (error) {
+      // If target_user_id column doesn't exist, fall back to simpler insert
+      if (error.code === '42703') { // Column does not exist error
+        try {
+          const fallbackResult = await query(
+            `INSERT INTO moderation_logs (
+              group_id, action, user_id, moderator_id, reason, details
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id`,
+            [
+              logData.groupId,
+              logData.action,
+              logData.userId,
+              logData.moderatorId,
+              logData.reason,
+              JSON.stringify(logData.details || {})
+            ]
+          );
+          return fallbackResult.rows[0].id;
+        } catch (fallbackError) {
+          logger.error('Error adding moderation log (fallback):', fallbackError);
+          return null;
+        }
+      }
       logger.error('Error adding moderation log:', error);
       return null;
     }
@@ -387,7 +411,7 @@ class ModerationModel {
   static async getGroupLogs(groupId, limit = 50) {
     try {
       const result = await query(
-        `SELECT l.*, 
+        `SELECT l.*,
                 u.username as user_username,
                 m.username as moderator_username,
                 t.username as target_username
@@ -403,6 +427,27 @@ class ModerationModel {
 
       return result.rows;
     } catch (error) {
+      // If target_user_id column doesn't exist, fall back to simpler query
+      if (error.code === '42703') {
+        try {
+          const fallbackResult = await query(
+            `SELECT l.*,
+                    u.username as user_username,
+                    m.username as moderator_username
+             FROM moderation_logs l
+             LEFT JOIN users u ON l.user_id = u.id
+             LEFT JOIN users m ON l.moderator_id = m.id
+             WHERE l.group_id = $1
+             ORDER BY COALESCE(l.created_at, l.timestamp) DESC
+             LIMIT $2`,
+            [groupId.toString(), limit]
+          );
+          return fallbackResult.rows;
+        } catch (fallbackError) {
+          logger.error('Error getting group logs (fallback):', fallbackError);
+          return [];
+        }
+      }
       logger.error('Error getting group logs:', error);
       return [];
     }
@@ -414,7 +459,7 @@ class ModerationModel {
   static async getUserLogs(userId, groupId, limit = 20) {
     try {
       const result = await query(
-        `SELECT l.*, 
+        `SELECT l.*,
                 u.username as user_username,
                 m.username as moderator_username,
                 t.username as target_username
@@ -431,6 +476,28 @@ class ModerationModel {
 
       return result.rows;
     } catch (error) {
+      // If target_user_id column doesn't exist, fall back to simpler query
+      if (error.code === '42703') {
+        try {
+          const fallbackResult = await query(
+            `SELECT l.*,
+                    u.username as user_username,
+                    m.username as moderator_username
+             FROM moderation_logs l
+             LEFT JOIN users u ON l.user_id = u.id
+             LEFT JOIN users m ON l.moderator_id = m.id
+             WHERE l.user_id = $1
+               AND l.group_id = $2
+             ORDER BY COALESCE(l.created_at, l.timestamp) DESC
+             LIMIT $3`,
+            [userId.toString(), groupId.toString(), limit]
+          );
+          return fallbackResult.rows;
+        } catch (fallbackError) {
+          logger.error('Error getting user logs (fallback):', fallbackError);
+          return [];
+        }
+      }
       logger.error('Error getting user logs:', error);
       return [];
     }

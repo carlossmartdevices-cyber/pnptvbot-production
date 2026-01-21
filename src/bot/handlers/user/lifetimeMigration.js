@@ -3,6 +3,16 @@ const logger = require('../../../utils/logger');
 const { isValidEmail } = require('../../../utils/validation');
 
 /**
+ * Escape special Markdown characters in user-provided text
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text safe for Markdown
+ */
+const escapeMarkdown = (text) => {
+  if (!text) return '';
+  return String(text).replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+};
+
+/**
  * Lifetime Migration Wizard Handler
  * Allows users to request migration of their lifetime membership from old PNPtv
  * @param {Telegraf} bot - Bot instance
@@ -92,8 +102,9 @@ _Type your email now:_`;
       }
 
       const userId = ctx.from.id;
-      const username = ctx.from.username ? `@${ctx.from.username}` : 'No username';
-      const firstName = ctx.from.first_name || 'Unknown';
+      const username = ctx.from.username ? `@${escapeMarkdown(ctx.from.username)}` : 'No username';
+      const firstName = escapeMarkdown(ctx.from.first_name || 'Unknown');
+      const safeEmail = escapeMarkdown(migration.email);
 
       // Send to support group
       const supportGroupId = process.env.SUPPORT_GROUP_ID;
@@ -103,7 +114,7 @@ _Type your email now:_`;
 👤 *Usuario:* ${firstName}
 🆔 *Telegram:* ${username}
 🔢 *User ID:* \`${userId}\`
-📧 *Email:* ${migration.email}
+📧 *Email:* ${safeEmail}
 📅 *Fecha:* ${new Date().toLocaleString('es-ES')}
 
 📸 El usuario envió comprobante de pago arriba.
@@ -131,7 +142,7 @@ _Type your email now:_`;
 
 Hemos recibido tu solicitud de migración de *Lifetime Pass*.
 
-📧 *Email registrado:* ${migration.email}
+📧 *Email registrado:* ${safeEmail}
 📸 *Comprobante:* Recibido
 
 ⏱️ *Tiempo de respuesta:* 48 a 72 horas
@@ -145,7 +156,7 @@ Si tienes preguntas, usa /support para contactarnos.`
 
 We have received your *Lifetime Pass* migration request.
 
-📧 *Registered email:* ${migration.email}
+📧 *Registered email:* ${safeEmail}
 📸 *Proof:* Received
 
 ⏱️ *Response time:* 48 to 72 hours
@@ -235,7 +246,8 @@ _Send the image now:_`;
 
     const lang = ctx.session?.language || 'en';
     const userId = ctx.from.id;
-    const username = ctx.from.username ? `@${ctx.from.username}` : 'No username';
+    const username = ctx.from.username ? `@${escapeMarkdown(ctx.from.username)}` : 'No username';
+    const safeEmail = escapeMarkdown(migration.email);
 
     // Forward photo to support group
     const supportGroupId = process.env.SUPPORT_GROUP_ID;
@@ -248,7 +260,7 @@ _Send the image now:_`;
         const contextMsg = `📸 *Comprobante de pago para migración Lifetime*
 
 👤 User: ${username} (ID: \`${userId}\`)
-📧 Email: ${migration.email}`;
+📧 Email: ${safeEmail}`;
 
         await ctx.telegram.sendMessage(supportGroupId, contextMsg, { parse_mode: 'Markdown' });
       } catch (err) {
@@ -264,7 +276,7 @@ _Send the image now:_`;
     const confirmMsg = lang === 'es'
       ? `✅ *Comprobante Recibido*
 
-📧 *Email:* ${migration.email}
+📧 *Email:* ${safeEmail}
 📸 *Comprobante:* Recibido
 
 ¿Todo está correcto? Presiona confirmar para enviar tu solicitud.
@@ -272,7 +284,7 @@ _Send the image now:_`;
 ⚠️ *Importante:* Solo las membresías Lifetime serán transferidas.`
       : `✅ *Proof Received*
 
-📧 *Email:* ${migration.email}
+📧 *Email:* ${safeEmail}
 📸 *Proof:* Received
 
 Is everything correct? Press confirm to submit your request.

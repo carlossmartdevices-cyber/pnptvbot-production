@@ -204,7 +204,9 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: Remove unused how-to-use.html page\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "WebFetch(domain:docs.daimo.com)",
       "WebFetch(domain:github.com)",
-      "Bash(npm show:*)"
+      "Bash(npm show:*)",
+      "Bash(node --check:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix PaymentService.sendPrimeConfirmation and add how-to-use page\n\n- Move sendPrimeConfirmation from standalone function to static class method\n  to fix \"PaymentService.sendPrimeConfirmation is not a function\" error\n- Remove duplicate orphaned function code outside the class\n- Add public/how-to-use.html page to fix 404 errors on /how-to-use route\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ],
     "deny": [],
     "ask": []

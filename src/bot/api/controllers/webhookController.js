@@ -155,18 +155,21 @@ const validateDaimoPayload = (payload) => {
  */
 const handleEpaycoWebhook = async (req, res) => {
   try {
-    // Ensure transaction ID is present to build a stable idempotency key
-    if (!req.body.x_transaction_id) {
-      logger.warn('ePayco webhook missing transaction ID', {
-        transactionId: req.body.x_ref_payco,
+    // Ensure ref_payco is present to build a stable idempotency key
+    if (!req.body.x_ref_payco) {
+      logger.warn('ePayco webhook missing ref_payco', {
+        transactionId: req.body.x_transaction_id,
         signaturePresent: Boolean(req.body.x_signature),
         provider: 'epayco',
       });
-      return sendError(res, 400, 'MISSING_TRANSACTION_ID', 'x_transaction_id is required');
+      return sendError(res, 400, 'MISSING_REF_PAYCO', 'x_ref_payco is required');
     }
 
-    // Use transaction ID as idempotency key
-    const idempotencyKey = `epayco_${req.body.x_transaction_id}`;
+    // Use ref_payco + transaction state as idempotency key
+    // This allows pending -> accepted transitions to be processed
+    // x_cod_transaction_state: 1=Accepted, 2=Rejected, 3=Pending, 4=Failed
+    const stateCode = req.body.x_cod_transaction_state || req.body.x_transaction_state || 'unknown';
+    const idempotencyKey = `epayco_${req.body.x_ref_payco}_${stateCode}`;
 
     // Verify webhook signature before any processing
     const signatureCheck = verifyEpaycoSignature(req);
@@ -178,8 +181,9 @@ const handleEpaycoWebhook = async (req, res) => {
     // Check if this webhook was already processed
     if (isWebhookProcessed(idempotencyKey)) {
       logger.info('Duplicate ePayco webhook detected (already processed)', {
-        transactionId: req.body.x_ref_payco,
-        txId: req.body.x_transaction_id,
+        refPayco: req.body.x_ref_payco,
+        state: req.body.x_transaction_state,
+        stateCode: req.body.x_cod_transaction_state,
         idempotencyKey,
         provider: 'epayco',
         signaturePresent: Boolean(req.body.x_signature),

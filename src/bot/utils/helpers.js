@@ -178,6 +178,54 @@ const safeReplyOrEdit = async (ctx, text, options = {}) => {
   }
 };
 
+/**
+ * Safely edit message text, ignoring "message is not modified" errors
+ * Use this when you want to update a message but it's okay if content hasn't changed
+ * @param {Object} ctx - Telegraf context
+ * @param {string} text - Message text
+ * @param {Object} options - Additional options (parse_mode, reply_markup, etc.)
+ * @returns {Promise<Object|null>} Edited message or null if not modified
+ */
+const safeEditMessage = async (ctx, text, options = {}) => {
+  try {
+    return await ctx.editMessageText(text, options);
+  } catch (error) {
+    // Silently ignore "message is not modified" - this is expected behavior
+    if (error.message?.includes('message is not modified')) {
+      return null;
+    }
+    // For other common Telegram errors, log at debug level and return null
+    if (error.message?.includes('message to edit not found') ||
+        error.message?.includes('query is too old')) {
+      logger.debug('Safe edit message skipped:', error.message);
+      return null;
+    }
+    throw error;
+  }
+};
+
+/**
+ * Safely answer callback query, ignoring timeout errors
+ * @param {Object} ctx - Telegraf context
+ * @param {string} text - Optional notification text
+ * @param {boolean} showAlert - Show alert instead of notification
+ * @returns {Promise<boolean>} Success status
+ */
+const safeAnswerCbQuery = async (ctx, text = '', showAlert = false) => {
+  try {
+    await ctx.answerCbQuery(text, { show_alert: showAlert });
+    return true;
+  } catch (error) {
+    // Ignore timeout and already answered errors
+    if (error.message?.includes('query is too old') ||
+        error.message?.includes('query has already been answered')) {
+      return false;
+    }
+    logger.debug('Safe answer callback query failed:', error.message);
+    return false;
+  }
+};
+
 module.exports = {
   getLanguage,
   isPrimeUser,
@@ -189,4 +237,6 @@ module.exports = {
   clearSessionState,
   isMediaMessage,
   safeReplyOrEdit,
+  safeEditMessage,
+  safeAnswerCbQuery,
 };
