@@ -23,25 +23,26 @@ class AvailabilityService {
               OR (available_from >= $2 AND available_to <= $3))`,
         [modelId, from, to, to]
       );
-      
-      if (conflicts.length > 0) {
+
+      if (conflicts.rows && conflicts.rows.length > 0) {
         throw new Error('Availability conflict detected');
       }
-      
+
       const result = await query(
         `INSERT INTO model_availability (model_id, available_from, available_to)
          VALUES ($1, $2, $3)
          RETURNING *`,
         [modelId, from, to]
       );
-      
-      logger.info('Availability added successfully', { 
-        availabilityId: result.id, 
-        modelId, 
-        from, 
-        to 
+
+      const availability = result.rows && result.rows[0];
+      logger.info('Availability added successfully', {
+        availabilityId: availability?.id,
+        modelId,
+        from,
+        to
       });
-      return result;
+      return availability;
     } catch (error) {
       logger.error('Error adding availability:', error);
       throw new Error('Failed to add availability');
@@ -72,9 +73,9 @@ class AvailabilityService {
       }
       
       queryText += ` ORDER BY available_from`;
-      
+
       const result = await query(queryText, params);
-      return result;
+      return result.rows || [];
     } catch (error) {
       logger.error('Error getting availability:', error);
       throw new Error('Failed to get availability');
@@ -95,13 +96,13 @@ class AvailabilityService {
         `SELECT * FROM model_availability WHERE id = $1`,
         [availabilityId]
       );
-      
-      if (current.length === 0) {
+
+      if (!current.rows || current.rows.length === 0) {
         throw new Error('Availability not found');
       }
-      
-      const modelId = current[0].model_id;
-      
+
+      const modelId = current.rows[0].model_id;
+
       // Check for conflicts (excluding current availability)
       const conflicts = await query(
         `SELECT * FROM model_availability
@@ -112,11 +113,11 @@ class AvailabilityService {
               OR (available_from >= $3 AND available_to <= $4))`,
         [modelId, availabilityId, from, to, to]
       );
-      
-      if (conflicts.length > 0) {
+
+      if (conflicts.rows && conflicts.rows.length > 0) {
         throw new Error('Availability conflict detected');
       }
-      
+
       const result = await query(
         `UPDATE model_availability
          SET available_from = $2, available_to = $3, updated_at = NOW()
@@ -124,9 +125,9 @@ class AvailabilityService {
          RETURNING *`,
         [availabilityId, from, to]
       );
-      
+
       logger.info('Availability updated successfully', { availabilityId });
-      return result[0];
+      return result.rows && result.rows[0];
     } catch (error) {
       logger.error('Error updating availability:', error);
       throw new Error('Failed to update availability');
@@ -144,11 +145,11 @@ class AvailabilityService {
         `DELETE FROM model_availability WHERE id = $1 RETURNING id`,
         [availabilityId]
       );
-      
-      if (result.length === 0) {
+
+      if (!result.rows || result.rows.length === 0) {
         throw new Error('Availability not found');
       }
-      
+
       logger.info('Availability deleted successfully', { availabilityId });
       return true;
     } catch (error) {
@@ -172,16 +173,16 @@ class AvailabilityService {
          RETURNING *`,
         [availabilityId, bookingId]
       );
-      
-      if (result.length === 0) {
+
+      if (!result.rows || result.rows.length === 0) {
         throw new Error('Availability not found or already booked');
       }
-      
-      logger.info('Availability booked successfully', { 
-        availabilityId, 
-        bookingId 
+
+      logger.info('Availability booked successfully', {
+        availabilityId,
+        bookingId
       });
-      return result[0];
+      return result.rows[0];
     } catch (error) {
       logger.error('Error booking availability:', error);
       throw new Error('Failed to book availability');
@@ -202,13 +203,13 @@ class AvailabilityService {
          RETURNING *`,
         [availabilityId]
       );
-      
-      if (result.length === 0) {
+
+      if (!result.rows || result.rows.length === 0) {
         throw new Error('Availability not found or not booked');
       }
-      
+
       logger.info('Availability released successfully', { availabilityId });
-      return result[0];
+      return result.rows[0];
     } catch (error) {
       logger.error('Error releasing availability:', error);
       throw new Error('Failed to release availability');
@@ -233,8 +234,8 @@ class AvailabilityService {
          ORDER BY available_from`,
         [modelId, startDate, endDate]
       );
-      
-      return result;
+
+      return result.rows || [];
     } catch (error) {
       logger.error('Error getting available slots:', error);
       throw new Error('Failed to get available slots');
@@ -259,12 +260,12 @@ class AvailabilityService {
                 OR (available_from >= $2 AND available_to <= $3))`,
           [modelId, slot.from, slot.to, slot.to]
         );
-        
-        if (conflicts.length > 0) {
+
+        if (conflicts.rows && conflicts.rows.length > 0) {
           throw new Error(`Conflict detected for slot ${slot.from} to ${slot.to}`);
         }
       }
-      
+
       // Insert all slots
       const createdSlots = [];
       for (const slot of slots) {
@@ -274,10 +275,12 @@ class AvailabilityService {
            RETURNING *`,
           [modelId, slot.from, slot.to]
         );
-        createdSlots.push(result[0]);
+        if (result.rows && result.rows[0]) {
+          createdSlots.push(result.rows[0]);
+        }
       }
-      
-      logger.info('Bulk availability added successfully', { 
+
+      logger.info('Bulk availability added successfully', {
         modelId,
         count: createdSlots.length
       });

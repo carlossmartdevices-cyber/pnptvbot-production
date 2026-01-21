@@ -48,28 +48,29 @@ class MeetGreetService {
         [userId, bookingTime]
       );
 
-      if (existingBooking.length > 0) {
+      if (existingBooking.rows && existingBooking.rows.length > 0) {
         throw new Error('You already have a booking at this time');
       }
 
       // Create booking
       const booking = await query(
-        `INSERT INTO meet_greet_bookings 
+        `INSERT INTO meet_greet_bookings
          (user_id, model_id, duration_minutes, price_usd, booking_time, payment_method)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
         [userId, modelId, durationMinutes, price, bookingTime, paymentMethod]
       );
 
+      const newBooking = booking.rows && booking.rows[0];
       logger.info('Booking created successfully', {
-        bookingId: booking[0].id,
+        bookingId: newBooking?.id,
         userId,
         modelId,
         durationMinutes,
         price
       });
 
-      return booking[0];
+      return newBooking;
     } catch (error) {
       logger.error('Error creating booking:', error);
       throw new Error('Failed to create booking: ' + error.message);
@@ -88,7 +89,7 @@ class MeetGreetService {
         [bookingId]
       );
 
-      return result.length > 0 ? result[0] : null;
+      return result.rows && result.rows.length > 0 ? result.rows[0] : null;
     } catch (error) {
       logger.error('Error getting booking by ID:', error);
       throw new Error('Failed to get booking');
@@ -114,7 +115,7 @@ class MeetGreetService {
       queryText += ` ORDER BY booking_time DESC`;
 
       const result = await query(queryText, params);
-      return result;
+      return result.rows || [];
     } catch (error) {
       logger.error('Error getting bookings for user:', error);
       throw new Error('Failed to get bookings');
@@ -140,7 +141,7 @@ class MeetGreetService {
       queryText += ` ORDER BY booking_time DESC`;
 
       const result = await query(queryText, params);
-      return result;
+      return result.rows || [];
     } catch (error) {
       logger.error('Error getting bookings for model:', error);
       throw new Error('Failed to get bookings');
@@ -168,7 +169,7 @@ class MeetGreetService {
         [bookingId, status]
       );
 
-      if (result.length === 0) {
+      if (!result.rows || result.rows.length === 0) {
         throw new Error('Booking not found');
       }
 
@@ -177,7 +178,7 @@ class MeetGreetService {
         status
       });
 
-      return result[0];
+      return result.rows[0];
     } catch (error) {
       logger.error('Error updating booking status:', error);
       throw new Error('Failed to update booking status');
@@ -211,7 +212,7 @@ class MeetGreetService {
 
       const result = await query(queryText, params);
 
-      if (result.length === 0) {
+      if (!result.rows || result.rows.length === 0) {
         throw new Error('Booking not found');
       }
 
@@ -220,7 +221,7 @@ class MeetGreetService {
         paymentStatus
       });
 
-      return result[0];
+      return result.rows[0];
     } catch (error) {
       logger.error('Error updating payment status:', error);
       throw new Error('Failed to update payment status');
@@ -375,7 +376,7 @@ class MeetGreetService {
         [startDate, endDate]
       );
 
-      return result[0];
+      return result.rows && result.rows[0] ? result.rows[0] : null;
     } catch (error) {
       logger.error('Error getting statistics:', error);
       throw new Error('Failed to get statistics');
@@ -391,7 +392,7 @@ class MeetGreetService {
   static async getRevenueByModel(startDate, endDate) {
     try {
       const result = await query(
-        `SELECT 
+        `SELECT
             m.id as model_id,
             m.name as model_name,
             COUNT(b.id) as booking_count,
@@ -405,7 +406,7 @@ class MeetGreetService {
         [startDate, endDate]
       );
 
-      return result;
+      return result.rows || [];
     } catch (error) {
       logger.error('Error getting revenue by model:', error);
       throw new Error('Failed to get revenue by model');

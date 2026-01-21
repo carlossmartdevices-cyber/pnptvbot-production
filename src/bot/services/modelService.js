@@ -13,16 +13,17 @@ class ModelService {
   static async createModel(modelData) {
     try {
       const { name, username, bio, profile_image_url, is_active = true } = modelData;
-      
+
       const result = await query(
         `INSERT INTO models (name, username, bio, profile_image_url, is_active)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
         [name, username, bio, profile_image_url, is_active]
       );
-      
-      logger.info('Model created successfully', { modelId: result.id, username });
-      return result;
+
+      const model = result.rows && result.rows[0];
+      logger.info('Model created successfully', { modelId: model?.id, username });
+      return model;
     } catch (error) {
       logger.error('Error creating model:', error);
       throw new Error('Failed to create model');
@@ -40,8 +41,8 @@ class ModelService {
         `SELECT * FROM models WHERE id = $1`,
         [modelId]
       );
-      
-      return result.length > 0 ? result[0] : null;
+
+      return result.rows && result.rows.length > 0 ? result.rows[0] : null;
     } catch (error) {
       logger.error('Error getting model by ID:', error);
       throw new Error('Failed to get model');
@@ -59,8 +60,8 @@ class ModelService {
         `SELECT * FROM models WHERE username = $1`,
         [username]
       );
-      
-      return result.length > 0 ? result[0] : null;
+
+      return result.rows && result.rows.length > 0 ? result.rows[0] : null;
     } catch (error) {
       logger.error('Error getting model by username:', error);
       throw new Error('Failed to get model');
@@ -76,8 +77,8 @@ class ModelService {
       const result = await query(
         `SELECT * FROM models WHERE is_active = TRUE ORDER BY name`
       );
-      
-      return result;
+
+      return result.rows || [];
     } catch (error) {
       logger.error('Error getting active models:', error);
       throw new Error('Failed to get active models');
@@ -93,7 +94,7 @@ class ModelService {
   static async updateModel(modelId, updateData) {
     try {
       const { name, username, bio, profile_image_url, is_active } = updateData;
-      
+
       const result = await query(
         `UPDATE models
          SET name = COALESCE($1, name),
@@ -106,13 +107,13 @@ class ModelService {
          RETURNING *`,
         [name, username, bio, profile_image_url, is_active, modelId]
       );
-      
-      if (result.length === 0) {
+
+      if (!result.rows || result.rows.length === 0) {
         throw new Error('Model not found');
       }
-      
+
       logger.info('Model updated successfully', { modelId });
-      return result[0];
+      return result.rows[0];
     } catch (error) {
       logger.error('Error updating model:', error);
       throw new Error('Failed to update model');
@@ -133,11 +134,11 @@ class ModelService {
          RETURNING id`,
         [modelId]
       );
-      
-      if (result.length === 0) {
+
+      if (!result.rows || result.rows.length === 0) {
         throw new Error('Model not found');
       }
-      
+
       logger.info('Model deleted successfully', { modelId });
       return true;
     } catch (error) {
@@ -158,8 +159,8 @@ class ModelService {
         `SELECT m.*,
                 COUNT(ma.id) AS available_slots
          FROM models m
-         LEFT JOIN model_availability ma 
-           ON m.id = ma.model_id 
+         LEFT JOIN model_availability ma
+           ON m.id = ma.model_id
            AND ma.is_booked = FALSE
            AND ma.available_from >= $1
            AND ma.available_to <= $2
@@ -169,8 +170,8 @@ class ModelService {
          ORDER BY m.name`,
         [startDate, endDate]
       );
-      
-      return result;
+
+      return result.rows || [];
     } catch (error) {
       logger.error('Error getting models with availability:', error);
       throw new Error('Failed to get models with availability');
