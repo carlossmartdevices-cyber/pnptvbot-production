@@ -2,7 +2,7 @@ FEATURE_ID,CATEGORY,FEATURE_NAME,DESCRIPTION,HOW_TO_TEST,TEST_STATUS,NOTES,ACTIO
 001,Onboarding,Language Selection,User can select language (English/Spanish),Start bot with /start and select language,,,
 002,Onboarding,Age Verification,User must confirm they are 18+,Go through onboarding and confirm age,,,
 003,Onboarding,Terms & Privacy,User must accept terms and privacy policy,Accept terms during onboarding,,,
-004,Onboarding,Email Collection,Optional email input for updates,Provide or skip email during onboarding,,,
+004,Onboarding,Email Collection,Mandatory email input for communication,Provide valid email address during onboarding,,,
 005,Main Menu,Menu Navigation,Main menu with all feature buttons,Send /menu command,,,
 006,Main Menu,Subscribe Button,Opens subscription plans,Click Subscribe to PRIME button,,,
 007,Main Menu,My Profile Button,Opens user profile,Click My Profile button,,,

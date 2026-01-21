@@ -251,15 +251,7 @@ If you have any questions, use /support to contact us.`;
     }
   });
 
-  // Email prompt actions
-  bot.action('skip_email', async (ctx) => {
-    try {
-      // Move to location sharing prompt after skipping email
-      await showLocationSharingPrompt(ctx);
-    } catch (error) {
-      logger.error('Error skipping email:', error);
-    }
-  });
+=======
 
   bot.action('provide_email', async (ctx) => {
     try {
@@ -369,9 +361,10 @@ const showEmailPrompt = async (ctx) => {
     t('emailPrompt', lang),
     Markup.inlineKeyboard([
       [Markup.button.callback('📧 Provide Email', 'provide_email')],
-      [Markup.button.callback(t('skipEmail', lang), 'skip_email')],
     ]),
   );
+
+  await ctx.reply(t('emailRequiredNote', lang));
 };
 
 /**

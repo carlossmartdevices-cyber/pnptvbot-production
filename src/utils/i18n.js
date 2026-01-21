@@ -55,9 +55,9 @@ Tap "Subscribe to PRIME" below to get instant access.`,
     underAge: 'Sorry, you must be 18 or older to use this service.',
     termsAndPrivacy: 'Please read and accept our Terms of Service and Privacy Policy:',
     termsAccepted: 'Terms and Privacy Policy accepted ✅',
-    emailPrompt: 'Would you like to provide your email for updates? (Optional)',
+    emailPrompt: '📧 Please provide your email address:',
+    emailRequiredNote: '⚠️ Email is required to complete your registration. We need your email in case the community gets deleted for reasons out of our control, so we can communicate with you and provide important updates.',
     emailReceived: 'Email saved successfully!',
-    skipEmail: 'Skip',
     onboardingComplete: '🎉 Welcome aboard! Your profile is all set. Use /menu to get started.',
 
     // Main Menu
@@ -590,9 +590,9 @@ Toca "Suscribete a PRIME" para obtener acceso inmediato.`,
     underAge: 'Lo sentimos, debes tener 18 años o más para usar este servicio.',
     termsAndPrivacy: 'Por favor lee y acepta nuestros Términos de Servicio y Política de Privacidad:',
     termsAccepted: 'Términos y Política de Privacidad aceptados ✅',
-    emailPrompt: '¿Deseas proporcionar tu correo para actualizaciones? (Opcional)',
+    emailPrompt: '📧 Por favor proporciona tu dirección de correo electrónico:',
+    emailRequiredNote: '⚠️ El correo electrónico es obligatorio para completar tu registro. Necesitamos tu correo en caso de que la comunidad sea eliminada por razones fuera de nuestro control, para poder comunicarnos contigo y proporcionarte actualizaciones importantes.',
     emailReceived: '¡Correo guardado exitosamente!',
-    skipEmail: 'Omitir',
     onboardingComplete: '🎉 ¡Bienvenido! Tu perfil está configurado. Usa /menu para comenzar.',
 
     // Main Menu

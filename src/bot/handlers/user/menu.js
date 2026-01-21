@@ -349,29 +349,22 @@ const showMainMenu = async (ctx) => {
 
     buttons = [
       [
-        Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
+        Markup.button.url(lang === 'es' ? '💎 PNP Latino TV PRIME' : '💎 PNP Latino TV PRIME', 'https://t.me/+GDD0AAVbvGM3MGEx'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
+        Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
+        Markup.button.callback(lang === 'es' ? '🌎 ¿Quién está cerca?' : '🌎 Who is Nearby', 'show_nearby'),
       ],
       [
-        Markup.button.url(lang === 'es' ? '🎬 Ver Contenido' : '🎬 Watch Content', 'https://t.me/+GDD0AAVbvGM3MGEx'),
+        Markup.button.url(lang === 'es' ? '📲 Hangouts' : '📲 Hangouts', 'https://pnptv.app/hangouts'),
+        Markup.button.url(lang === 'es' ? '▶️ Videorama' : '▶️ Videorama', 'https://pnptv.app/videorama'),
       ],
       [
-        Markup.button.url(lang === 'es' ? '🎥 PNPtv main Room!' : '🎥 PNPtv main Room!', jitsiUrl),
+        Markup.button.callback(lang === 'es' ? '👥 Llamadas Privadas' : '👥 Meet & Greet', 'PRIVATECALL_START'),
       ],
       [
-        Markup.button.url(lang === 'es' ? '🎬 PNPtv Hangouts!' : '🎬 PNPtv Hangouts!', 'https://pnptv.app/hangouts'),
-      ],
-      [
-        Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'https://pnptv.app/videorama'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '📞 Llamadas Privadas' : '📞 Private Calls', 'PRIVATECALL_START'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
-        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings', 'show_settings'),
+        Markup.button.callback(lang === 'es' ? 'ℹ️ Ayuda' : 'ℹ️ Help', 'show_support'),
+        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙ Settings', 'show_settings'),
       ],
     ];
   } else {
@@ -522,29 +515,22 @@ const showMainMenuEdit = async (ctx) => {
 
     buttons = [
       [
-        Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
+        Markup.button.url(lang === 'es' ? '💎 PNP Latino TV PRIME' : '💎 PNP Latino TV PRIME', 'https://t.me/+GDD0AAVbvGM3MGEx'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who Is Nearby?', 'show_nearby'),
+        Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
+        Markup.button.callback(lang === 'es' ? '🌎 ¿Quién está cerca?' : '🌎 Who is Nearby', 'show_nearby'),
       ],
       [
-        Markup.button.url(lang === 'es' ? '🎬 Ver Contenido' : '🎬 Watch Content', 'https://t.me/+GDD0AAVbvGM3MGEx'),
+        Markup.button.url(lang === 'es' ? '📲 Hangouts' : '📲 Hangouts', 'https://pnptv.app/hangouts'),
+        Markup.button.url(lang === 'es' ? '▶️ Videorama' : '▶️ Videorama', 'https://pnptv.app/videorama'),
       ],
       [
-        Markup.button.url(lang === 'es' ? '🎥 PNPtv main Room!' : '🎥 PNPtv main Room!', jitsiUrl),
+        Markup.button.callback(lang === 'es' ? '👥 Llamadas Privadas' : '👥 Meet & Greet', 'PRIVATECALL_START'),
       ],
       [
-        Markup.button.url(lang === 'es' ? '🎬 PNPtv Hangouts!' : '🎬 PNPtv Hangouts!', 'https://pnptv.app/hangouts'),
-      ],
-      [
-        Markup.button.url(lang === 'es' ? '🎵 Videorama' : '🎵 Videorama', 'https://pnptv.app/videorama'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '📞 Llamadas Privadas' : '📞 Private Calls', 'PRIVATECALL_START'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
-        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings', 'show_settings'),
+        Markup.button.callback(lang === 'es' ? 'ℹ️ Ayuda' : 'ℹ️ Help', 'show_support'),
+        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙ Settings', 'show_settings'),
       ],
     ];
   } else {

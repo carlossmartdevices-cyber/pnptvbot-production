@@ -299,10 +299,7 @@ async function showEmailPrompt(ctx) {
   );
 
   await ctx.reply(
-    t('emailInstructions', lang),
-    Markup.inlineKeyboard([
-      [Markup.button.callback(t('skipEmail', lang), 'skip_email')],
-    ])
+    t('emailRequiredNote', lang)
   );
 }
 
@@ -351,30 +348,7 @@ async function handleEmailSubmission(ctx) {
   }
 }
 
-/**
- * Handle email skip
- * @param {Context} ctx - Telegraf context
- */
-async function handleSkipEmail(ctx) {
-  try {
-    try {
-      await ctx.answerCbQuery();
-    } catch (err) {
-      logger.warn(`Could not answer callback query: ${err.message}`);
-    }
 
-    console.log(`[Onboarding] User ${ctx.from.id} skipped email`);
-
-    // Clear awaiting email flag
-    ctx.session.awaitingEmail = false;
-
-    // Proceed to free channel invite
-    await generateFreeChannelInvite(ctx);
-  } catch (error) {
-    logger.error('Error in handleSkipEmail:', error);
-    await ctx.reply(t('error', ctx.session?.language || 'en'));
-  }
-}
 
 /**
  * Generate and send free channel invite link
@@ -537,14 +511,13 @@ async function showMainMenu(ctx) {
     Markup.inlineKeyboard([
       [
         Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
+      ],
+      [
         Markup.button.callback(t('myProfile', lang), 'show_profile'),
-      ],
-      [
         Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
-        Markup.button.callback(t('liveStreams', lang), 'show_live'),
       ],
       [
-        Markup.button.callback(t('radio', lang), 'show_radio'),
+        Markup.button.callback(t('liveStreams', lang), 'show_live'),
         Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
       ],
       [
@@ -563,7 +536,6 @@ module.exports = {
   handlePrivacyAcceptance,
   handlePrivacyDecline,
   handleEmailSubmission,
-  handleSkipEmail,
   showAgeVerification,
   showTerms,
   showPrivacyPolicy,
