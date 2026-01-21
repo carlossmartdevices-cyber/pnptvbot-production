@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Use PNPtv - Getting Started Guide</title>
+    <meta name="description" content="Learn how to use PNPtv - Step by step guide to access premium content through our Telegram bot.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/unified-design.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --dark-bg: rgba(0, 0, 0, 0.85);
+            --card-bg: rgba(255, 255, 255, 0.1);
+            --accent-gold: #ffd700;
+            --text-light: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.8);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-gradient);
+            color: var(--text-light);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* Navigation */
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: var(--dark-bg);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: bold;
+            background: linear-gradient(90deg, #ffd700, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-light);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent-gold);
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-top: 80px;
+            padding: 3rem 2rem;
+            max-width: 1000px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .page-header h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
+        }
+
+        .page-header p {
+            font-size: 1.2rem;
+            color: var(--text-dim);
+        }
+
+        /* Steps Section */
+        .steps-container {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            margin-bottom: 4rem;
+        }
+
+        .step-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 1.5rem;
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .step-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .step-number {
+            background: var(--secondary-gradient);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .step-content h3 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+            color: var(--accent-gold);
+        }
+
+        .step-content p {
+            color: var(--text-dim);
+            margin-bottom: 1rem;
+        }
+
+        .step-content code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        /* CTA Button */
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #00b4db 0%, #0083b0 100%);
+            color: white;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .cta-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0, 180, 219, 0.4);
+        }
+
+        .cta-button.telegram {
+            background: linear-gradient(135deg, #0088cc 0%, #00aced 100%);
+        }
+
+        /* Features Section */
+        .features-section {
+            margin-bottom: 4rem;
+        }
+
+        .features-section h2 {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .feature-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h3 {
+            margin-bottom: 0.5rem;
+            color: var(--accent-gold);
+        }
+
+        .feature-card p {
+            color: var(--text-dim);
+            font-size: 0.95rem;
+        }
+
+        /* FAQ Section */
+        .faq-section {
+            margin-bottom: 4rem;
+        }
+
+        .faq-section h2 {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .faq-item {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .faq-item h3 {
+            color: var(--accent-gold);
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .faq-item p {
+            color: var(--text-dim);
+        }
+
+        /* Footer CTA */
+        .footer-cta {
+            text-align: center;
+            padding: 3rem;
+            background: var(--dark-bg);
+            border-radius: 16px;
+            margin-bottom: 2rem;
+        }
+
+        .footer-cta h2 {
+            margin-bottom: 1rem;
+        }
+
+        .footer-cta p {
+            color: var(--text-dim);
+            margin-bottom: 1.5rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .page-header h1 {
+                font-size: 2rem;
+            }
+
+            .step-card {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .step-number {
+                margin: 0 auto;
+            }
+
+            .nav-links {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="/" class="logo">PNPtv</a>
+        <ul class="nav-links">
+            <li><a href="/">Home</a></li>
+            <li><a href="/how-to-use">How to Use</a></li>
+            <li><a href="/policies_en.html">Policies</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <div class="page-header">
+            <h1>How to Use PNPtv</h1>
+            <p>Get started in just 3 simple steps</p>
+        </div>
+
+        <!-- Steps -->
+        <div class="steps-container">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h3>Open Telegram</h3>
+                    <p>PNPtv works through Telegram, a free messaging app. If you don't have it yet, download it from your app store.</p>
+                    <a href="https://telegram.org/apps" class="cta-button" target="_blank">Download Telegram</a>
+                </div>
+            </div>
+
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h3>Find Our Bot</h3>
+                    <p>Search for <code>@PNPtv_bot</code> in Telegram or click the button below to open our bot directly.</p>
+                    <a href="https://t.me/PNPtv_bot" class="cta-button telegram" target="_blank">Open PNPtv Bot</a>
+                </div>
+            </div>
+
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h3>Start the Bot</h3>
+                    <p>Press the <code>/start</code> button or type <code>/start</code> to begin. Follow the on-screen instructions to complete your registration and access all features.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features -->
+        <section class="features-section">
+            <h2>What You Can Do</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">📺</div>
+                    <h3>Stream Content</h3>
+                    <p>Access exclusive premium content in HD and 4K quality, available 24/7.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎵</div>
+                    <h3>Live Radio</h3>
+                    <p>Listen to our live radio stream with curated music and entertainment.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💬</div>
+                    <h3>Community</h3>
+                    <p>Join our verified community and connect with like-minded members.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎁</div>
+                    <h3>Exclusive Perks</h3>
+                    <p>PRIME members get access to exclusive channels and special content.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ -->
+        <section class="faq-section">
+            <h2>Frequently Asked Questions</h2>
+
+            <div class="faq-item">
+                <h3>Do I need to download an app?</h3>
+                <p>You only need Telegram, which is free and available on iOS, Android, Windows, Mac, and web browsers.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>How do I upgrade to PRIME?</h3>
+                <p>In the bot, use the /menu command and select "Subscribe" to see available plans and payment options.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What payment methods are accepted?</h3>
+                <p>We accept credit/debit cards, cryptocurrency, and popular payment apps like CashApp, Venmo, and more.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>How do I get help?</h3>
+                <p>Use the <code>/support</code> command in the bot to contact our support team directly.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Is my information secure?</h3>
+                <p>Yes! We prioritize your privacy and security. Read our <a href="/policies_en.html" style="color: var(--accent-gold);">privacy policy</a> for details.</p>
+            </div>
+        </section>
+
+        <!-- Footer CTA -->
+        <div class="footer-cta">
+            <h2>Ready to Get Started?</h2>
+            <p>Join thousands of members enjoying PNPtv today!</p>
+            <a href="https://t.me/PNPtv_bot" class="cta-button telegram" target="_blank">Open PNPtv Bot</a>
+        </div>
+    </main>
+</body>
+</html>
