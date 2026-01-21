@@ -40,11 +40,11 @@ const integratePrivateCallsToMenu = (bot) => {
             callback_data: 'videos_menu'
           }
         ],
-        // NEW: Private Calls option
+        // NEW: Meet & Greet option
         [
           {
-            text: lang === 'es' ? '📞 Video Llamada VIP' : '📞 Private Calls',
-            callback_data: 'book_private_call'
+            text: lang === 'es' ? '📞 Video Llamada VIP' : '📞 Meet & Greet',
+            callback_data: 'MEET_GREET_START'
           }
         ],
         // Existing options
