@@ -30,10 +30,8 @@ const registerMeetGreetHandlers = (bot) => {
       
       if (models.length === 0) {
         const message = lang === 'es'
-          ? '🔍 *No hay modelos disponibles*
-\nNo hay modelos disponibles en este momento. Por favor, intenta más tarde.'
-          : '🔍 *No Models Available*
-\nNo models are available at this time. Please try again later.';
+          ? `🔍 *No hay modelos disponibles*\n\nNo hay modelos disponibles en este momento. Por favor, intenta más tarde.`
+          : `🔍 *No Models Available*\n\nNo models are available at this time. Please try again later.`;
         
         await ctx.editMessageText(message, {
           parse_mode: 'Markdown',
@@ -64,10 +62,8 @@ const registerMeetGreetHandlers = (bot) => {
       ]);
 
       const message = lang === 'es'
-        ? '💃 *Selecciona un Modelo*
-\nElige un modelo para tu Video Llamada VIP:'
-        : '💃 *Select a Model*
-\nChoose a model for your VIP Video Call:';
+        ? `💃 *Selecciona un Modelo*\n\nElige un modelo para tu Video Llamada VIP:`
+        : `💃 *Select a Model*\n\nChoose a model for your VIP Video Call:`;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -115,12 +111,8 @@ const registerMeetGreetHandlers = (bot) => {
       ];
 
       const message = lang === 'es'
-        ? `🕒 *Selecciona la Duración*
-\nModelo: ${model.name}
-\nElige la duración para tu Video Llamada VIP:`
-        : `🕒 *Select Duration*
-\nModel: ${model.name}
-\nChoose the duration for your VIP Video Call:`;
+        ? `🕒 *Selecciona la Duración*\n\nModelo: ${model.name}\n\nElige la duración para tu Video Llamada VIP:`
+        : `🕒 *Select Duration*\n\nModel: ${model.name}\n\nChoose the duration for your VIP Video Call:`;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -201,16 +193,8 @@ const registerMeetGreetHandlers = (bot) => {
         : `${selectedDuration} minutes`;
 
       const message = lang === 'es'
-        ? `📅 *Selecciona una Fecha*
-\nModelo: ${model.name}
-Duración: ${durationText}
-Precio: $${price}
-\nElige una fecha disponible:`
-        : `📅 *Select a Date*
-\nModel: ${model.name}
-Duration: ${durationText}
-Price: $${price}
-\nChoose an available date:`;
+        ? `📅 *Selecciona una Fecha*\n\nModelo: ${model.name}\nDuración: ${durationText}\nPrecio: $${price}\n\nElige una fecha disponible:`
+        : `📅 *Select a Date*\n\nModel: ${model.name}\nDuration: ${durationText}\nPrice: $${price}\n\nChoose an available date:`;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -261,10 +245,8 @@ Price: $${price}
 
       if (slots.length === 0) {
         const message = lang === 'es'
-          ? '⏰ *No hay horarios disponibles*
-\nNo hay horarios disponibles para esta fecha. Por favor, elige otra fecha.'
-          : '⏰ *No Time Slots Available*
-\nNo time slots are available for this date. Please choose another date.';
+          ? `⏰ *No hay horarios disponibles*\n\nNo hay horarios disponibles para esta fecha. Por favor, elige otra fecha.`
+          : `⏰ *No Time Slots Available*\n\nNo time slots are available for this date. Please choose another date.`;
         
         await ctx.editMessageText(message, {
           parse_mode: 'Markdown',
@@ -306,18 +288,8 @@ Price: $${price}
         : `${selectedDuration} minutes`;
 
       const message = lang === 'es'
-        ? `⏰ *Selecciona un Horario*
-\nModelo: ${model.name}
-Fecha: ${dateStr}
-Duración: ${durationText}
-Precio: $${price}
-\nHorarios disponibles:`
-        : `⏰ *Select a Time Slot*
-\nModel: ${model.name}
-Date: ${dateStr}
-Duration: ${durationText}
-Price: $${price}
-\nAvailable time slots:`;
+        ? `⏰ *Selecciona un Horario*\n\nModelo: ${model.name}\nFecha: ${dateStr}\nDuración: ${durationText}\nPrecio: $${price}\n\nHorarios disponibles:`
+        : `⏰ *Select a Time Slot*\n\nModel: ${model.name}\nDate: ${dateStr}\nDuration: ${durationText}\nPrice: $${price}\n\nAvailable time slots:`;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -381,22 +353,8 @@ Price: $${price}
       ];
 
       const message = lang === 'es'
-        ? `💰 *Selecciona Método de Pago*
-\n📞 Video Llamada VIP
-Modelo: ${model.name}
-Fecha: ${selectedDate}
-Hora: ${startTime}
-Duración: ${durationText}
-Precio: $${price}
-\nSelecciona tu método de pago:`
-        : `💰 *Select Payment Method*
-\n📞 VIP Video Call
-Model: ${model.name}
-Date: ${selectedDate}
-Time: ${startTime}
-Duration: ${durationText}
-Price: $${price}
-\nSelect your payment method:`;
+        ? `💰 *Selecciona Método de Pago*\n\n📞 Video Llamada VIP\nModelo: ${model.name}\nFecha: ${selectedDate}\nHora: ${startTime}\nDuración: ${durationText}\nPrecio: $${price}\n\nSelecciona tu método de pago:`
+        : `💰 *Select Payment Method*\n\n📞 VIP Video Call\nModel: ${model.name}\nDate: ${selectedDate}\nTime: ${startTime}\nDuration: ${durationText}\nPrice: $${price}\n\nSelect your payment method:`;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -443,20 +401,8 @@ Price: $${price}
 
       // Show confirmation
       const confirmationMessage = lang === 'es'
-        ? `✅ *¡Reserva Confirmada!*
-\n📞 Video Llamada VIP
-ID de Reserva: ${booking.id}
-Estado: ${booking.status}
-\nTu Video Llamada VIP ha sido reservada exitosamente.
-Recibirás un recordatorio antes de la llamada.
-\n💰 Pago: $${booking.price_usd} (${paymentMethod === 'credit_card' ? 'Tarjeta' : 'Crypto'})`
-        : `✅ *Booking Confirmed!*
-\n📞 VIP Video Call
-Booking ID: ${booking.id}
-Status: ${booking.status}
-\nYour VIP Video Call has been successfully booked.
-You will receive a reminder before the call.
-\n💰 Payment: $${booking.price_usd} (${paymentMethod === 'credit_card' ? 'Credit Card' : 'Crypto'})`;
+        ? `✅ *¡Reserva Confirmada!*\n\n📞 Video Llamada VIP\nID de Reserva: ${booking.id}\nEstado: ${booking.status}\n\nTu Video Llamada VIP ha sido reservada exitosamente.\nRecibirás un recordatorio antes de la llamada.\n\n💰 Pago: $${booking.price_usd} (${paymentMethod === 'credit_card' ? 'Tarjeta' : 'Crypto'})`
+        : `✅ *Booking Confirmed!*\n\n📞 VIP Video Call\nBooking ID: ${booking.id}\nStatus: ${booking.status}\n\nYour VIP Video Call has been successfully booked.\nYou will receive a reminder before the call.\n\n💰 Payment: $${booking.price_usd} (${paymentMethod === 'credit_card' ? 'Credit Card' : 'Crypto'})`;
 
       await ctx.editMessageText(confirmationMessage, {
         parse_mode: 'Markdown',
@@ -483,10 +429,8 @@ You will receive a reminder before the call.
       
       if (bookings.length === 0) {
         const message = lang === 'es'
-          ? '📅 *No tienes reservas*
-\nNo tienes reservas de Video Llamadas VIP.'
-          : '📅 *No Bookings*
-\nYou have no VIP Video Call bookings.';
+          ? `📅 *No tienes reservas*\n\nNo tienes reservas de Video Llamadas VIP.`
+          : `📅 *No Bookings*\n\nYou have no VIP Video Call bookings.`;
         
         await ctx.editMessageText(message, {
           parse_mode: 'Markdown',

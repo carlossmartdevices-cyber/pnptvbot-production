@@ -7,7 +7,7 @@ const groupWelcomeHandlers = require('./groupWelcome');
 const { registerAgeVerificationHandlers } = require('./ageVerificationHandler');
 const lifetimeMigrationHandlers = require('./lifetimeMigration');
 const { registerSubscriptionHandlers } = require('./subscriptionManagement');
-const { registerMeetGreetHandlers } = require('./meetGreetHandler');
+const registerMeetGreetHandlers = require('./meetGreetHandler');
 
 /**
  * Register all user handlers
