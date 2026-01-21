@@ -548,8 +548,12 @@ const registerMeetGreetManagementHandlers = (bot) => {
 
       const keyboard = [
         [{
-          text: lang === 'es' ? '➕ Agregar Disponibilidad' : '➕ Add Availability',
-          callback_data: `mg_add_availability_${modelId}`
+          text: lang === 'es' ? '➕ Agregar Marco de Tiempo' : '➕ Add Time Frame',
+          callback_data: `mg_add_time_frame_${modelId}`
+        }],
+        [{
+          text: lang === 'es' ? '📅 Ver Disponibilidad' : '📅 View Availability',
+          callback_data: `mg_view_availability_${modelId}`
         }],
         [{
           text: lang === 'es' ? '🗑️ Eliminar Disponibilidad' : '🗑️ Delete Availability',
@@ -575,6 +579,263 @@ const registerMeetGreetManagementHandlers = (bot) => {
       await ctx.answerCbQuery();
     } catch (error) {
       logger.error('Error in mg_manage_model_availability:', error);
+      await ctx.answerCbQuery('❌ Error');
+    }
+  });
+
+  /**
+   * Add time frame for availability (NEW IMPROVED METHOD)
+   */
+  bot.action(/^mg_add_time_frame_(\d+)$/, async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      const modelId = parseInt(ctx.match[1]);
+      const model = await ModelService.getModelById(modelId);
+
+      if (!model) {
+        await ctx.answerCbQuery(lang === 'es' ? 'Modelo no encontrado' : 'Model not found');
+        return;
+      }
+
+      // Store in session
+      ctx.session.meetGreetAdmin = ctx.session.meetGreetAdmin || {};
+      ctx.session.meetGreetAdmin.addingTimeFrameFor = modelId;
+      ctx.session.meetGreetAdmin.timeFrameStep = 'date';
+
+      // Show suggested time frames
+      const suggestedFrames = AdminAvailabilityService.getSuggestedTimeFrames();
+      
+      const keyboard = suggestedFrames.map(frame => [{
+        text: lang === 'es' ? `🕒 ${frame.name}` : `🕒 ${frame.name}`,
+        callback_data: `mg_suggested_frame_${modelId}_${frame.startHour}_${frame.endHour}`
+      }]);
+
+      keyboard.push([{
+        text: lang === 'es' ? '📅 Personalizado' : '📅 Custom',
+        callback_data: `mg_custom_time_frame_${modelId}`
+      }]);
+
+      keyboard.push([{
+        text: lang === 'es' ? '❌ Cancelar' : '❌ Cancel',
+        callback_data: `mg_manage_model_availability_${modelId}`
+      }]);
+
+      await ctx.editMessageText(
+        lang === 'es' ? '🕒 **Agregar Marco de Tiempo**\n\nSelecciona un marco de tiempo sugerido o personaliza:' : '🕒 **Add Time Frame**\n\nSelect a suggested time frame or customize:',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: keyboard
+          }
+        }
+      );
+
+      await ctx.answerCbQuery();
+    } catch (error) {
+      logger.error('Error in mg_add_time_frame:', error);
+      await ctx.answerCbQuery('❌ Error');
+    }
+  });
+
+  /**
+   * Handle suggested time frame selection
+   */
+  bot.action(/^mg_suggested_frame_(\d+)_(\d+)_(\d+)$/, async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      const modelId = parseInt(ctx.match[1]);
+      const startHour = parseInt(ctx.match[2]);
+      const endHour = parseInt(ctx.match[3]);
+
+      // Get today's date
+      const today = new Date();
+      
+      // Set to next valid day (Thursday-Monday)
+      let startDate = new Date(today);
+      while (!MeetGreetTimeSlotService.isDayInWindow(startDate)) {
+        startDate.setDate(startDate.getDate() + 1);
+      }
+
+      // Set hours
+      startDate.setHours(startHour, 0, 0, 0);
+      const endDate = new Date(startDate);
+      endDate.setHours(endHour, 0, 0, 0);
+
+      // Validate
+      const validation = AdminAvailabilityService.validateTimeFrame(startDate, endDate);
+      
+      if (!validation.valid) {
+        await ctx.answerCbQuery(lang === 'es' ? 'Marco de tiempo inválido' : 'Invalid time frame');
+        return;
+      }
+
+      // Create availability
+      const slots = await AdminAvailabilityService.createAvailabilityForTimeFrame(modelId, startDate, endDate);
+
+      await ctx.answerCbQuery(lang === 'es' ? `✅ ${slots.length} slots creados` : `✅ ${slots.length} slots created`);
+
+      // Refresh view
+      ctx.match = [`mg_manage_model_availability_${modelId}`, `${modelId}`];
+      ctx.callbackQuery.data = `mg_manage_model_availability_${modelId}`;
+      return bot.action(/^mg_manage_model_availability_(\d+)$/, async (ctx) => {
+        const mId = parseInt(ctx.match[1]);
+        const m = await ModelService.getModelById(mId);
+        const availability = await AvailabilityService.getAvailability(mId);
+        
+        const availText = availability.length > 0
+          ? availability.map((a, index) => {
+              const start = new Date(a.available_from).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+              const end = new Date(a.available_to).toLocaleTimeString(lang === 'es' ? 'es-ES' : 'en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+              return `${index + 1}. ${start} - ${end} [${a.is_booked ? (lang === 'es' ? 'Reservado' : 'Booked') : (lang === 'es' ? 'Disponible' : 'Available')}]`;
+            }).join('\n')
+          : lang === 'es' ? 'Sin disponibilidad configurada' : 'No availability configured';
+
+        const keyboard = [
+          [{
+            text: lang === 'es' ? '➕ Agregar Marco de Tiempo' : '➕ Add Time Frame',
+            callback_data: `mg_add_time_frame_${mId}`
+          }],
+          [{
+            text: lang === 'es' ? '📅 Ver Disponibilidad' : '📅 View Availability',
+            callback_data: `mg_view_availability_${mId}`
+          }],
+          [{
+            text: lang === 'es' ? '🗑️ Eliminar Disponibilidad' : '🗑️ Delete Availability',
+            callback_data: `mg_delete_availability_${mId}`
+          }],
+          [{
+            text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
+            callback_data: `mg_view_model_${mId}`
+          }]
+        ];
+
+        await ctx.editMessageText(
+          `⏱️ **Disponibilidad de ${m.name}**\n\n` +
+          `📅 **Horarios Configurados:**\n${availText}`,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: keyboard
+            }
+          }
+        );
+      })(ctx);
+    } catch (error) {
+      logger.error('Error in mg_suggested_frame:', error);
+      await ctx.answerCbQuery('❌ Error');
+    }
+  });
+
+  /**
+   * Handle custom time frame selection
+   */
+  bot.action(/^mg_custom_time_frame_(\d+)$/, async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      const modelId = parseInt(ctx.match[1]);
+
+      // Store in session
+      ctx.session.meetGreetAdmin = ctx.session.meetGreetAdmin || {};
+      ctx.session.meetGreetAdmin.addingTimeFrameFor = modelId;
+      ctx.session.meetGreetAdmin.timeFrameStep = 'date';
+
+      await ctx.editMessageText(
+        lang === 'es' ? '📅 **Marco de Tiempo Personalizado**\n\nIngresa la fecha (YYYY-MM-DD):' : '📅 **Custom Time Frame**\n\nEnter the date (YYYY-MM-DD):',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [[{
+              text: lang === 'es' ? '❌ Cancelar' : '❌ Cancel',
+              callback_data: `mg_manage_model_availability_${modelId}`
+            }]]
+          }
+        }
+      );
+
+      await ctx.answerCbQuery();
+    } catch (error) {
+      logger.error('Error in mg_custom_time_frame:', error);
+      await ctx.answerCbQuery('❌ Error');
+    }
+  });
+
+  /**
+   * View availability in calendar format
+   */
+  bot.action(/^mg_view_availability_(\d+)$/, async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      const modelId = parseInt(ctx.match[1]);
+      const model = await ModelService.getModelById(modelId);
+
+      if (!model) {
+        await ctx.answerCbQuery(lang === 'es' ? 'Modelo no encontrado' : 'Model not found');
+        return;
+      }
+
+      // Get availability data
+      const adminService = require('../../services/adminAvailabilityService');
+      const availabilityData = await adminService.getAvailabilityForAdminInterface(modelId);
+
+      // Format availability by date
+      const availabilityText = availabilityData.availability.map(day => {
+        const slotsText = day.slots.map(slot => {
+          const start = new Date(slot.start).toLocaleTimeString(lang === 'es' ? 'es-ES' : 'en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          const end = new Date(slot.end).toLocaleTimeString(lang === 'es' ? 'es-ES' : 'en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          return `• ${start}-${end} (${slot.duration}min) ${slot.isBooked ? (lang === 'es' ? '[Reservado]' : '[Booked]') : (lang === 'es' ? '[Disponible]' : '[Available]')}`;
+        }).join('\n');
+
+        return `📅 **${day.dayName}, ${day.dateStr}**\n${slotsText}`;
+      }).join('\n\n');
+
+      const keyboard = [
+        [{
+          text: lang === 'es' ? '➕ Agregar Marco de Tiempo' : '➕ Add Time Frame',
+          callback_data: `mg_add_time_frame_${modelId}`
+        }],
+        [{
+          text: lang === 'es' ? '🗑️ Eliminar Disponibilidad' : '🗑️ Delete Availability',
+          callback_data: `mg_delete_availability_${modelId}`
+        }],
+        [{
+          text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
+          callback_data: `mg_manage_model_availability_${modelId}`
+        }]
+      ];
+
+      await ctx.editMessageText(
+        `📅 **Calendario de Disponibilidad - ${model.name}**\n\n` +
+        `📊 **Estadísticas:**\n` +
+        `• Total: ${availabilityData.totalSlots} slots\n` +
+        `• Disponibles: ${availabilityData.availableSlots} slots\n` +
+        `• Reservados: ${availabilityData.bookedSlots} slots\n\n` +
+        `📅 **Disponibilidad por Día:**\n${availabilityText}`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: keyboard
+          }
+        }
+      );
+
+      await ctx.answerCbQuery();
+    } catch (error) {
+      logger.error('Error in mg_view_availability:', error);
       await ctx.answerCbQuery('❌ Error');
     }
   });
