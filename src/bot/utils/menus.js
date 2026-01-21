@@ -30,7 +30,7 @@ const getMainMenu = (language = 'en', isPrime = false) => {
       nearby: '📍 Usuarios Cercanos',
       hangouts: '🎥 Hangouts',
       videorama: '📹 Videorama',
-      privateCalls: '📞 Llamadas Privadas',
+      privateCalls: '📞 Video Llamada VIP',
       streams: '🎥 Transmisiones en Vivo',
       radio: '📻 Radio',
       support: '💬 Soporte',

@@ -43,7 +43,7 @@ const integratePrivateCallsToMenu = (bot) => {
         // NEW: Private Calls option
         [
           {
-            text: lang === 'es' ? '📞 Llamadas Privadas' : '📞 Private Calls',
+            text: lang === 'es' ? '📞 Video Llamada VIP' : '📞 Private Calls',
             callback_data: 'book_private_call'
           }
         ],
