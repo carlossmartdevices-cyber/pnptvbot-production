@@ -465,53 +465,43 @@ async function showAdminPanel(ctx, edit = false) {
     // Build menu based on role with organized sections
     const buttons = [];
 
-    // Top controls
+    // ═══ TOP CONTROLS ═══
     buttons.push([
       Markup.button.callback(lang === 'es' ? '🔄 Actualizar' : '🔄 Refresh', 'admin_refresh'),
+      Markup.button.callback('🧪 Test', 'test_callback'),
     ]);
 
-    // Common for all admin roles
-    buttons.push([Markup.button.callback('👥 Usuarios', 'admin_users')]);
-    buttons.push([Markup.button.callback('🎁 Activar Membresía', 'admin_activate_membership')]);
-    
-    // 🧪 TEST BUTTON: Add test callback button for debugging
-    buttons.push([Markup.button.callback('🧪 Test Callback', 'test_callback')]);
+    // ═══ USER MANAGEMENT ═══
+    buttons.push([
+      Markup.button.callback('👥 ' + (lang === 'es' ? 'Usuarios' : 'Users'), 'admin_users'),
+      Markup.button.callback('🎁 ' + (lang === 'es' ? 'Membresía' : 'Membership'), 'admin_activate_membership'),
+    ]);
 
     // Admin and SuperAdmin features
     if (userRole === 'superadmin' || userRole === 'admin') {
-      // ═══ CONTENT & MEDIA ═══
+      // ═══ CONTENT & COMMUNICATION ═══
       buttons.push([
         Markup.button.callback('📢 ' + (lang === 'es' ? 'Difusión' : 'Broadcast'), 'admin_broadcast'),
+        Markup.button.callback('📤 ' + (lang === 'es' ? 'Compartir' : 'Share'), 'admin_improved_share_post'),
       ]);
 
-      // ═══ OPERATIONS ═══
+      // ═══ LIVE & INTERACTIVE ═══
+      buttons.push([
+        Markup.button.callback('📹 PNP Latino Live', 'admin_pnp_live'),
+      ]);
+
+      // ═══ SYSTEM & TOOLS ═══
       buttons.push([
         Markup.button.callback('📦 ' + (lang === 'es' ? 'Cola' : 'Queue'), 'admin_queue_status'),
-      ]);
-
-      // ═══ COMMUNITY POSTS ═══
-      buttons.push([
-        Markup.button.callback('📤 ' + (lang === 'es' ? 'Compartir Publicación' : 'Share Post'), 'admin_improved_share_post'),
-      ]);
-
-      // ═══ MEET & GREET ═══
-      buttons.push([
-        Markup.button.callback('📹 ' + (lang === 'es' ? 'PNP Latino Live' : 'PNP Latino Live'), 'admin_pnp_live'),
-      ]);
-
-      // ═══ PREVIEW MODE ═══
-      buttons.push([
-        Markup.button.callback('👁️ ' + (lang === 'es' ? 'Vista Previa' : 'Preview Mode'), 'admin_view_mode'),
+        Markup.button.callback('👁️ ' + (lang === 'es' ? 'Vista Previa' : 'Preview'), 'admin_view_mode'),
       ]);
     }
 
     // SuperAdmin only features
     if (userRole === 'superadmin') {
-      // ═══ SYSTEM CONFIG ═══
+      // ═══ ADMINISTRATION ═══
       buttons.push([
         Markup.button.callback('👑 Roles', 'admin_roles'),
-      ]);
-      buttons.push([
         Markup.button.callback('📜 Logs', 'admin_logs'),
       ]);
     }
