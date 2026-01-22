@@ -60,6 +60,10 @@ const getMainMenu = (language = 'en', isPrime = false) => {
     // FREE user menu - show subscribe button prominently
     buttons.push([{ text: l.subscribe, callback_data: 'menu_subscribe' }]);
     buttons.push([{ text: l.nearby, callback_data: 'menu_nearby' }]);
+    buttons.push([
+      { text: l.hangouts, callback_data: 'menu_hangouts' },
+      { text: l.videorama, callback_data: 'menu_videorama' },
+    ]);
     buttons.push([{ text: l.privateCalls, callback_data: 'PRIVATECALL_START' }]);
     buttons.push([{ text: l.streams, callback_data: 'menu_streams' }]);
     buttons.push([{ text: l.radio, callback_data: 'menu_radio' }]);

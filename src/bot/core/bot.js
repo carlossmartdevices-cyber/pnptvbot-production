@@ -184,6 +184,32 @@ const startBot = async () => {
       }
     });
 
+    // FIX: Register /admin command early using admin handler directly  
+    bot.command('admin', async (ctx) => {
+      logger.info('[ADMIN-EARLY] /admin command received');
+      try {
+        const PermissionService = require('../services/permissionService');
+        const { getLanguage, t } = require('../utils/helpers');
+        const { showAdminPanel } = require('../handlers/admin/index');
+        
+        const isAdmin = await PermissionService.isAdmin(ctx.from?.id);
+        logger.info(`[ADMIN-EARLY] Permission check: isAdmin=${isAdmin}`);
+        
+        if (!isAdmin) {
+          logger.info(`[ADMIN-EARLY] User not authorized`);
+          await ctx.reply(t('unauthorized', getLanguage(ctx)));
+          return;
+        }
+
+        logger.info('[ADMIN-EARLY] User authorized, calling showAdminPanel...');
+        await showAdminPanel(ctx, false);
+        logger.info('[ADMIN-EARLY] showAdminPanel completed successfully');
+      } catch (error) {
+        logger.error('[ADMIN-EARLY] Error in /admin handler:', error.message, error.stack);
+        await ctx.reply('❌ Error loading admin panel.');
+      }
+    });
+
     // DEBUG: Log all updates
     bot.use(async (ctx, next) => {
       if (ctx.message?.text?.startsWith('/')) {
@@ -523,7 +549,7 @@ const startBot = async () => {
     logger.info('✓ Error handlers registered');
     // Start API server
     const PORT = process.env.PORT || 3000;
-    const server = apiApp.listen(PORT, () => {
+    const server = apiApp.listen(PORT, '0.0.0.0', () => {
       logger.info(`✓ API server running on port ${PORT}`);
     });
     server.keepAliveTimeout = 65000;
@@ -539,7 +565,7 @@ const startBot = async () => {
     logger.warn('⚠️  Some features may not work properly. Check logs above for details.');
     try {
       const PORT = process.env.PORT || 3000;
-      apiApp.listen(PORT, () => {
+      apiApp.listen(PORT, '0.0.0.0', () => {
         logger.info(`⚠️  Emergency API server running on port ${PORT} (degraded mode)`);
         logger.info('Bot is NOT fully functional. Fix configuration and restart.');
       });

@@ -801,57 +801,8 @@ let registerAdminHandlers = (bot) => {
     }
   });
 
-  // Admin command
-  bot.command('admin', async (ctx) => {
-    logger.info(`[HANDLER-COMMAND] ✅ /admin command matched by Telegraf! User: ${ctx.from.id}`);
-    try {
-      // Check if user is admin using new permission system
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      logger.info(`[HANDLER-COMMAND] isAdmin check result: ${isAdmin} for user ${ctx.from.id}`);
-
-      if (!isAdmin) {
-        logger.info(`[HANDLER-COMMAND] User ${ctx.from.id} is NOT admin`);
-        await ctx.reply(t('unauthorized', getLanguage(ctx)));
-        return;
-      }
-
-      logger.info(`[HANDLER-COMMAND] User ${ctx.from.id} IS admin, calling showAdminPanel`);
-      await showAdminPanel(ctx, false);
-      logger.info(`[HANDLER-COMMAND] showAdminPanel completed for user ${ctx.from.id}`);
-    } catch (error) {
-      logger.error(`[HANDLER-COMMAND] ERROR in /admin command: ${error.message}`);
-      logger.error('[HANDLER-COMMAND] Error stack:', error);
-    }
-  });
-
-  // FALLBACK: Handle /admin as text for webhook compatibility
-  bot.on('text', async (ctx, next) => {
-    // Check if message is just "/admin"
-    if (ctx.message.text === '/admin') {
-      logger.info(`[HANDLER-FALLBACK] /admin text fallback triggered for user ${ctx.from.id}`);
-      try {
-        const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-        logger.info(`[HANDLER-FALLBACK] isAdmin check result: ${isAdmin} for user ${ctx.from.id}`);
-
-        if (!isAdmin) {
-          logger.info(`[HANDLER-FALLBACK] User ${ctx.from.id} is NOT admin`);
-          await ctx.reply(t('unauthorized', getLanguage(ctx)));
-          return;
-        }
-
-        logger.info(`[HANDLER-FALLBACK] User ${ctx.from.id} IS admin, calling showAdminPanel`);
-        await showAdminPanel(ctx, false);
-        return; // Don't call next() - we handled it
-      } catch (error) {
-        logger.error(`[HANDLER-FALLBACK] Error: ${error.message}`);
-        logger.error('Error in /admin fallback:', error);
-        return;
-      }
-    }
-
-    // Not /admin, continue to next handler
-    return next();
-  });
+  // NOTE: /admin command is now registered early in bot.js to ensure proper handler execution
+  // The showAdminPanel function is called directly from there
 
   // Quick view mode command: /viewas free | /viewas prime | /viewas normal
   bot.command('viewas', async (ctx) => {
@@ -1716,35 +1667,45 @@ let registerAdminHandlers = (bot) => {
 
   bot.action('broadcast_ai_en', async (ctx) => {
     try {
+      logger.info('[GROK-BUTTON] broadcast_ai_en clicked', { userId: ctx.from.id });
       await ctx.answerCbQuery();
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
+      if (!isAdmin) {
+        logger.warn('[GROK-BUTTON] User not admin, ignoring broadcast_ai_en');
+        return;
+      }
       if (!ctx.session.temp?.broadcastData) ctx.session.temp.broadcastData = {};
       ctx.session.temp.broadcastStep = 'ai_prompt_en';
       await ctx.saveSession();
+      logger.info('[GROK-BUTTON] Set broadcastStep to ai_prompt_en', { userId: ctx.from.id });
       await ctx.reply(
         '🤖 *AI Write (EN)*\n\nDescribe what you want to announce.\nExample:\n`Promote Lifetime Pass with urgency + link pnptv.app/lifetime100`',
         { parse_mode: 'Markdown' },
       );
     } catch (error) {
-      logger.error('Error in broadcast_ai_en:', error);
+      logger.error('[GROK-BUTTON] Error in broadcast_ai_en:', { error: error.message, stack: error.stack });
     }
   });
 
   bot.action('broadcast_ai_es', async (ctx) => {
     try {
+      logger.info('[GROK-BUTTON] broadcast_ai_es clicked', { userId: ctx.from.id });
       await ctx.answerCbQuery();
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
+      if (!isAdmin) {
+        logger.warn('[GROK-BUTTON] User not admin, ignoring broadcast_ai_es');
+        return;
+      }
       if (!ctx.session.temp?.broadcastData) ctx.session.temp.broadcastData = {};
       ctx.session.temp.broadcastStep = 'ai_prompt_es';
       await ctx.saveSession();
+      logger.info('[GROK-BUTTON] Set broadcastStep to ai_prompt_es', { userId: ctx.from.id });
       await ctx.reply(
         '🤖 *AI Write (ES)*\n\nDescribe lo que quieres anunciar.\nEjemplo:\n`Promociona Lifetime Pass con urgencia + link pnptv.app/lifetime100`',
         { parse_mode: 'Markdown' },
       );
     } catch (error) {
-      logger.error('Error in broadcast_ai_es:', error);
+      logger.error('[GROK-BUTTON] Error in broadcast_ai_es:', { error: error.message, stack: error.stack });
     }
   });
 
@@ -2639,13 +2600,32 @@ let registerAdminHandlers = (bot) => {
 
   // Handle admin text inputs
   bot.on('text', async (ctx, next) => {
+    logger.info('[TEXT-HANDLER-RAW] Raw text message received BEFORE admin check', {
+      userId: ctx.from.id,
+      messageText: (ctx.message.text || '').substring(0, 50),
+      chatId: ctx.chat.id,
+      chatType: ctx.chat.type,
+      hasSession: !!ctx.session,
+      broadcastStep: ctx.session?.temp?.broadcastStep
+    });
+
     const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    logger.info('[TEXT-HANDLER] Text message received', {
+      userId: ctx.from.id,
+      isAdmin,
+      messageText: (ctx.message.text || '').substring(0, 50),
+      broadcastStep: ctx.session.temp?.broadcastStep,
+      adminSearchingUser: ctx.session.temp?.adminSearchingUser
+    });
+
     if (!isAdmin) {
+      logger.info('[TEXT-HANDLER] User is not admin, passing to next handler', { userId: ctx.from.id });
       return next();
     }
 
     // User search
     if (ctx.session.temp?.adminSearchingUser) {
+      logger.info('[TEXT-HANDLER] Processing adminSearchingUser flow', { userId: ctx.from.id });
       try {
         const lang = getLanguage(ctx);
         const query = ctx.message.text;
@@ -2686,6 +2666,7 @@ let registerAdminHandlers = (bot) => {
 
     // Message to user after activation
     if (ctx.session.temp?.awaitingMessageInput) {
+      logger.info('[TEXT-HANDLER] Processing awaitingMessageInput flow', { userId: ctx.from.id });
       try {
         const message = ctx.message.text;
         const recipientId = ctx.session.temp.messageRecipientId;
@@ -2781,6 +2762,12 @@ let registerAdminHandlers = (bot) => {
     // Check if we have a max completed step to prevent regression
     const maxCompletedStep = ctx.session.temp?.maxCompletedStep;
     const currentStep = ctx.session.temp?.broadcastStep;
+    
+    logger.info('[TEXT-HANDLER] Checking step regression guard', {
+      userId: ctx.from.id,
+      currentStep,
+      maxCompletedStep
+    });
     
     if (maxCompletedStep && currentStep) {
       const stepOrder = ['media', 'text_en', 'text_es', 'buttons', 'preview', 'sending'];
@@ -3080,20 +3067,46 @@ let registerAdminHandlers = (bot) => {
 
     // Broadcast flow - AI prompt EN/ES
     if (ctx.session.temp?.broadcastStep === 'ai_prompt_en' || ctx.session.temp?.broadcastStep === 'ai_prompt_es') {
+      logger.info('[TEXT-HANDLER] MATCHED ai_prompt step!', {
+        userId: ctx.from.id,
+        step: ctx.session.temp.broadcastStep,
+        messageLength: (ctx.message.text || '').length
+      });
       try {
         const prompt = (ctx.message.text || '').trim();
-        if (!prompt) return;
+        if (!prompt) {
+          logger.info('Empty AI prompt received, ignoring');
+          return;
+        }
+
+        logger.info('[GROK] AI prompt received', { 
+          step: ctx.session.temp.broadcastStep, 
+          promptLength: prompt.length,
+          userId: ctx.from.id
+        });
 
         const isEn = ctx.session.temp.broadcastStep === 'ai_prompt_en';
         const hasMedia = !!ctx.session.temp.broadcastData?.mediaFileId;
         const maxTokens = hasMedia ? 260 : 380;
         const language = isEn ? 'English' : 'Spanish';
 
+        logger.info('[GROK] Calling GrokService', {
+          language,
+          maxTokens,
+          hasMedia,
+          isEn
+        });
+
         const result = await GrokService.chat({
           mode: 'broadcast',
           language,
           prompt,
           maxTokens,
+        });
+
+        logger.info('[GROK] GrokService returned result', {
+          resultLength: result.length,
+          isEn
         });
 
         if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
@@ -3130,7 +3143,11 @@ let registerAdminHandlers = (bot) => {
           await showBroadcastButtonsPicker(ctx);
         }
       } catch (error) {
-        logger.error('Error generating AI broadcast text:', error);
+        logger.error('[GROK] Error generating AI broadcast text:', {
+          error: error.message,
+          stack: error.stack,
+          step: ctx.session.temp?.broadcastStep
+        });
         await ctx.reply(`❌ AI error: ${error.message}`);
         // Reset to previous step on error using fallback logic
         const fallbackStep = getFallbackStep(ctx.session.temp.broadcastStep);
@@ -3592,6 +3609,12 @@ let registerAdminHandlers = (bot) => {
       }
       return;
     }
+
+    logger.info('[TEXT-HANDLER] No matching broadcast/admin condition found, passing to next handler', {
+      userId: ctx.from.id,
+      broadcastStep: ctx.session.temp?.broadcastStep,
+      messageLength: (ctx.message.text || '').length
+    });
 
     return next();
   });
@@ -4962,3 +4985,4 @@ const finalRegisterAdminHandlers = (bot) => {
 };
 
 module.exports = finalRegisterAdminHandlers;
+module.exports.showAdminPanel = showAdminPanel;

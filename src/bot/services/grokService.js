@@ -27,13 +27,17 @@ function buildSystemPrompt({ mode, language }) {
 async function chat({ mode, language, prompt, maxTokens = 300 }) {
   const cfg = getGrokConfig();
   if (!cfg.apiKey) {
-    throw new Error('GROK_API_KEY not configured');
+    const err = new Error('GROK_API_KEY not configured');
+    logger.error('Grok config error', { error: err.message });
+    throw err;
   }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), cfg.timeoutMs);
 
   try {
+    logger.info('Calling Grok API', { model: cfg.model, maxTokens });
+    
     const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -52,17 +56,32 @@ async function chat({ mode, language, prompt, maxTokens = 300 }) {
       signal: controller.signal,
     });
 
+    logger.info('Grok API response received', { status: res.status });
+
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
-      throw new Error(`Grok API error ${res.status}: ${txt || res.statusText}`);
+      const errorMsg = `Grok API error ${res.status}: ${txt || res.statusText}`;
+      logger.error('Grok API error', { status: res.status, response: txt });
+      throw new Error(errorMsg);
     }
 
     const data = await res.json();
+    logger.info('Grok API response parsed', { hasChoices: !!data?.choices });
+    
     const content = data?.choices?.[0]?.message?.content;
-    if (!content) throw new Error('Grok returned empty response');
+    if (!content) {
+      logger.error('Grok returned empty response', { data });
+      throw new Error('Grok returned empty response');
+    }
+    
+    logger.info('Grok API success', { contentLength: content.length });
     return String(content).trim();
   } catch (error) {
-    logger.error('Grok chat failed', { error: error.message });
+    if (error.name === 'AbortError') {
+      logger.error('Grok API timeout', { timeoutMs: cfg.timeoutMs, error: error.message });
+      throw new Error('Grok API request timed out');
+    }
+    logger.error('Grok chat failed', { error: error.message, stack: error.stack });
     throw error;
   } finally {
     clearTimeout(timeout);

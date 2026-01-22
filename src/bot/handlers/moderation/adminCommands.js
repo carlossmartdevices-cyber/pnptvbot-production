@@ -240,8 +240,8 @@ async function handleBanUser(ctx) {
     // Ban user
     await ModerationService.banUser(targetUserId, groupId, reason, ctx.from.id);
 
-    // Kick from Telegram
-    await ctx.kickChatMember(targetUserId);
+    // Ban from Telegram
+    await ctx.banChatMember(targetUserId);
 
     await ctx.reply(
       `🚫 **${targetUserName}** has been banned.\n\n**Reason:** ${reason}`,
@@ -293,7 +293,7 @@ async function handleUnbanUser(ctx) {
     await ModerationService.unbanUser(targetUserId, groupId, ctx.from.id);
 
     // Unban from Telegram
-    await ctx.unbanChatMember(targetUserId);
+    await ctx.telegram.unbanChatMember(ctx.chat.id, targetUserId);
 
     await ctx.reply('✅ User has been unbanned and can rejoin the group.', {
       parse_mode: 'Markdown',
