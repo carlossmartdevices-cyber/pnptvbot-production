@@ -204,12 +204,8 @@ const registerActivationHandlers = (bot) => {
       if (parts.length < 2) {
         return ctx.reply(
           lang === 'es'
-            ? '❌ Por favor proporciona un código válido.
-\nUso: /lifetime100 TU_CODIGO
-\nEjemplo: /lifetime100 ABC123XYZ'
-            : '❌ Please provide a valid code.
-\nUsage: /lifetime100 YOUR_CODE
-\nExample: /lifetime100 ABC123XYZ',
+            ? '❌ Por favor proporciona un código válido.\n\nUso: /lifetime100 TU_CODIGO\n\nEjemplo: /lifetime100 ABC123XYZ'
+            : '❌ Please provide a valid code.\n\nUsage: /lifetime100 YOUR_CODE\n\nExample: /lifetime100 ABC123XYZ',
         );
       }
 
