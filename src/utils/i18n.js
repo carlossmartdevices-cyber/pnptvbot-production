@@ -1147,6 +1147,132 @@ Tu acceso FREE incluye:
 🤖 ¿Preguntas? Cristina IA está aquí para ayudarte.
 
 ¡Disfruta de PNP LATINO! 🔥`,
+
+      // Proactive and Tutorial Messages
+      pnpLatinoWelcomeTutorial: `🎉 ¡Bienvenido a PNP LATINO! 🔥
+
+📚 *Tutorial Rápido:*
+
+1️⃣ *💬 Chat Privado:* Todos los comandos funcionan en privado
+2️⃣ *📱 /menu:* Accede a todas las funciones
+3️⃣ *💎 /subscribe:* Conviértete en PRIME para contenido exclusivo
+4️⃣ *🤖 Cristina IA:* Tu asistente 24/7
+
+📢 *Reglas de la Comunidad:*
+• No spam (máx 3 mensajes seguidos)
+• Contenido apropiado
+• Respeto mutuo
+
+🚫 *Evita ser bloqueado:* No envíes mensajes repetidos o publicidad.
+
+💬 ¿Necesitas ayuda? Usa /support o pregunta a Cristina IA!`,
+
+      pnpLatinoGroupRules: `📜 *Reglas del Grupo PNP LATINO*
+
+✅ *Permitido:*
+• Conversaciones relacionadas con PNP
+• Preguntas sobre el bot y sus funciones
+• Contenido SFW (aptos para todos)
+
+❌ *Prohibido:*
+• Spam o mensajes repetidos
+• Publicidad no autorizada
+• Contenido NSFW explícito
+• Insultos o descalificaciones
+
+🔒 *Consecuencias:*
+• 1ra advertencia: Mensaje privado
+• 2da advertencia: Silencio temporal
+• 3ra advertencia: Expulsión
+
+💡 *Consejo:* Usa el bot en privado para comandos: /menu, /subscribe, /profile`,
+
+      pnpLatinoAntiSpamWarning: `⚠️ *Advertencia Anti-Spam*
+
+📢 Has enviado {count} mensajes en {time} segundos.
+
+🔥 *Reglas del grupo:*
+• Máximo 3 mensajes seguidos
+• Espera 10 segundos entre mensajes
+• No repitas el mismo contenido
+
+⏳ Por favor espera antes de enviar más mensajes para evitar ser silenciado.`,
+
+      pnpLatinoSpamMuted: `🔇 *Cuenta Silenciada*
+
+🚫 Has sido silenciado por {duration} minutos por violar las reglas anti-spam.
+
+📚 *Lo que happened:*
+• Enviaste {count} mensajes en {time} segundos
+• Esto supera el límite permitido
+
+⏰ Tu silencio expirará automáticamente.
+
+💬 Para evitar esto en el futuro:
+• No envíes mensajes repetidos
+• Espera entre mensajes
+• Usa el bot en privado para comandos`,
+
+      pnpLatinoTutorialStep1: `🎬 *Tutorial PNP LATINO - Paso 1/3*
+
+💎 *Conoce tu Nivel:*
+
+🆓 *FREE:*
+• Acceso básico a Nearby
+• Hangouts públicos
+• Contenido limitado
+
+💎 *PRIME:*
+• Nearby completo + filtros
+• Hangouts privados
+• PNP Latino Live (en vivo)
+• Videorama completo
+• Eventos exclusivos
+
+📱 *Cómo actualizar:* /subscribe`,
+
+      pnpLatinoTutorialStep2: `🎥 *Tutorial PNP LATINO - Paso 2/3*
+
+🔥 *Funciones Principales:*
+
+📍 *Nearby:*
+• Encuentra miembros cercanos
+• Filtra por intereses
+• Conecta en privado
+
+🎥 *Hangouts:*
+• Salas de video temáticas
+• Eventos en vivo
+• Chat comunitario
+
+🎶 *Videorama:*
+• Playlists exclusivas
+• Podcasts PNP
+• Contenido bajo demanda
+
+💡 *Consejo:* Usa /menu para acceder rápidamente!`,
+
+      pnpLatinoTutorialStep3: `🤖 *Tutorial PNP LATINO - Paso 3/3*
+
+💬 *Soporte y Comunidad:*
+
+🤖 *Cristina IA:*
+• Asistente 24/7
+• Responde preguntas
+• Guía de uso
+• Activación: /cristina_ai
+
+👥 *Comunidad:*
+• Grupo oficial: [Únete aquí](https://t.me/pnptv_community)
+• Eventos semanales
+• Soporte entre miembros
+
+📢 *Recuerda:*
+• Respeta las reglas
+• No spam
+• Disfruta del contenido
+
+✅ *Tutorial completado!* Usa /menu para empezar.`,
     },
   },
   es: {

@@ -237,6 +237,7 @@ class UserModel {
         telegram: 'telegram',
         locationSharingEnabled: 'location_sharing_enabled',
         onboardingComplete: 'onboarding_complete',
+        hasSeenTutorial: 'has_seen_tutorial',
         ageVerified: 'age_verified',
         termsAccepted: 'terms_accepted',
         privacyAccepted: 'privacy_accepted',
