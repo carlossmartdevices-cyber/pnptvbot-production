@@ -475,7 +475,15 @@ const completeOnboarding = async (ctx) => {
     ctx.session.temp = {};
     await ctx.saveSession();
 
-    await ctx.reply(t('onboardingComplete', lang));
+    // Check if user is PRIME to send appropriate onboarding completion message
+    const user = await UserService.getById(userId);
+    const isPrime = user && user.isPremium;
+    
+    const messageKey = isPrime 
+      ? (lang === 'es' ? 'pnpLatinoPrimeOnboardingComplete' : 'pnpLatinoPrimeOnboardingComplete')
+      : (lang === 'es' ? 'pnpLatinoFreeOnboardingComplete' : 'pnpLatinoFreeOnboardingComplete');
+    
+    await ctx.reply(t(messageKey, lang));
 
     // Send Telegram group invite via API
     try {

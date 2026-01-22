@@ -318,23 +318,7 @@ const showMainMenu = async (ctx) => {
 
   if (isPremium || isAdmin) {
     // PRIME MEMBER VERSION - BENEFITS FOCUSED
-    menuText = previewBanner + (lang === 'es'
-      ? '`💎 TU ÁREA PRIME`\n\n' +
-        `¡Hola ${username}! Bienvenido a tu área exclusiva. 🔥\n\n` +
-        '**Accede a todo tu contenido:**\n\n' +
-        '🎬 **Ver Contenido** — Videos completos, shows y contenido exclusivo\n' +
-        '📍 **Nearby** — Encuentra papis cerca de ti\n' +
-        '🎥 **PNPtv main Room!** — Sala de video en vivo principal\n' +
-        '**Cristina**, tu asistente IA, está lista para ayudarte.\n\n' +
-        '`¡Disfruta todo tu contenido PRIME! 🎬`'
-      : '`💎 YOUR PRIME AREA`\n\n' +
-        `Hey ${username}! Welcome to your exclusive area. 🔥\n\n` +
-        '**Access all your content:**\n\n' +
-        '🎬 **Watch Content** — Full videos, shows & exclusive content\n' +
-        '📍 **Nearby** — Find papis near you\n' +
-        '🎥 **PNPtv main Room!** — Main live video room\n' +
-        '**Cristina**, your AI assistant, is ready to help.\n\n' +
-        '`Enjoy all your PRIME content! 🎬`');
+    menuText = previewBanner + t(lang === 'es' ? 'pnpLatinoPrimeMenu' : 'pnpLatinoPrimeMenu', lang);
 
     // Get user's display name for Jitsi
     const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
@@ -364,25 +348,7 @@ const showMainMenu = async (ctx) => {
     ];
   } else {
     // FREE MEMBER VERSION - SALES FOCUSED
-    menuText = previewBanner + (lang === 'es'
-      ? '`🔒 DESBLOQUEA TODO EL CONTENIDO`\n\n' +
-        `Hola ${username}, estás usando la versión FREE.\n\n` +
-        '**Con PRIME obtienes acceso ilimitado a:**\n\n' +
-        '🎬 Videos completos y shows exclusivos\n' +
-        '📍 Encuentra papis cerca de ti (Nearby)\n' +
-        '🎥 Salas de video en vivo 24/7\n' +
-        '📻 Radio y contenido sin restricciones\n' +
-        '💬 Chat y soporte prioritario\n\n' +
-        '**¡Hazte PRIME!** $14.99 USD/semana 💎'
-      : '`🔒 UNLOCK ALL CONTENT`\n\n' +
-        `Hey ${username}, you\'re on the FREE version.\n\n` +
-        '**With PRIME you get unlimited access to:**\n\n' +
-        '🎬 Full videos & exclusive shows\n' +
-        '📍 Find papis near you (Nearby)\n' +
-        '🎥 Live video rooms 24/7\n' +
-        '📻 Radio & unrestricted content\n' +
-        '💬 Priority chat & support\n\n' +
-        '**Go PRIME!** $14.99 USD/week 💎');
+    menuText = previewBanner + t(lang === 'es' ? 'pnpLatinoFreeMenu' : 'pnpLatinoFreeMenu', lang);
 
     buttons = [
       [
@@ -549,6 +515,8 @@ const showMainMenuEdit = async (ctx) => {
         '📻 Radio & unrestricted content\n' +
         '💬 Priority chat & support\n\n' +
         '**Go PRIME!** $14.99 USD/week 💎');
+
+    menuText = previewBanner + t(lang === 'es' ? 'pnpLatinoFreeMenu' : 'pnpLatinoFreeMenu', lang);
 
     buttons = [
       [
