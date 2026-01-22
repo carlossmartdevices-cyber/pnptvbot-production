@@ -544,13 +544,11 @@ async function showAdminPanel(ctx, edit = false) {
  */
 // Import handlers
 const registerImprovedSharePostHandlers = require('./improvedSharePost');
-const registerPNPLiveManagementHandlers = require('./pnpLiveManagement');
 
 let registerAdminHandlers = (bot) => {
   logger.info('[DEBUG-INIT] registerAdminHandlers called - registering admin command handlers');
   // Register handlers
   registerImprovedSharePostHandlers(bot);
-  registerPNPLiveManagementHandlers(bot);
 
   bot.action('admin_home', async (ctx) => {
     try {
