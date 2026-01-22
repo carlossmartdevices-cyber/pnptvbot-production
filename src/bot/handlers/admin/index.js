@@ -1833,11 +1833,6 @@ let registerAdminHandlers = (bot) => {
     }
   });
 
-      logger.error('Error deleting plan:', error);
-      await ctx.answerCbQuery('Error al eliminar plan');
-    }
-  });
-
   // Analytics
   bot.action('admin_analytics', async (ctx) => {
     try {
