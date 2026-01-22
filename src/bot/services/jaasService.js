@@ -180,6 +180,84 @@ class JaaSService {
     }
 
     /**
+     * Generate PNP Live room configuration for private shows
+     * @param {string} roomName - Room name
+     * @param {number} bookingId - Booking ID
+     * @param {string} modelName - Model name
+     * @returns {Object} Room configuration with tokens
+     */
+    generatePNPLiveRoom(roomName, bookingId, modelName) {
+        // Generate tokens for both model (moderator) and client (viewer)
+        const modelToken = this.generateToken({
+            roomName,
+            userId: `model-${bookingId}`,
+            userName: `${modelName} (Model)`,
+            isModerator: true,
+            enableLivestreaming: false,
+            enableRecording: false, // NO RECORDING - Privacy First
+            enableTranscription: false, // Model doesn't see transcription
+            expiresIn: '4h'
+        });
+
+        const clientToken = this.generateToken({
+            roomName,
+            userId: `client-${bookingId}`,
+            userName: `Client`,
+            isModerator: false,
+            enableLivestreaming: false,
+            enableRecording: false,
+            enableTranscription: true, // Client gets Spanish->English transcription
+            expiresIn: '2h'
+        });
+
+        return {
+            roomName,
+            modelUrl: this.generateMeetingUrl(roomName, modelToken),
+            clientUrl: this.generateMeetingUrl(roomName, clientToken),
+            tokens: {
+                model: modelToken,
+                client: clientToken
+            }
+        };
+    }
+
+    /**
+     * Generate PNP Live model token with enhanced features
+     */
+    generatePNPLiveModelToken(roomName, userId, userName, userEmail = '', userAvatar = '') {
+        return this.generateToken({
+            roomName,
+            userId,
+            userName,
+            userEmail,
+            userAvatar,
+            isModerator: true,
+            enableLivestreaming: false,
+            enableRecording: false,
+            enableTranscription: false,
+            expiresIn: '4h'
+        });
+    }
+
+    /**
+     * Generate PNP Live client token with transcription
+     */
+    generatePNPLiveClientToken(roomName, userId, userName, userEmail = '', userAvatar = '') {
+        return this.generateToken({
+            roomName,
+            userId,
+            userName,
+            userEmail,
+            userAvatar,
+            isModerator: false,
+            enableLivestreaming: false,
+            enableRecording: false,
+            enableTranscription: true, // Enable Spanish->English transcription for client
+            expiresIn: '2h'
+        });
+    }
+
+    /**
      * Generate Jitsi Meet URL with JWT token
      */
     generateMeetingUrl(roomName, token) {

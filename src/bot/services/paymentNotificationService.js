@@ -60,14 +60,20 @@ class PaymentNotificationService {
       // Determine language (default to Spanish if not set)
       const lang = user.language || 'es';
 
-      // Build confirmation message
+      // Build enhanced confirmation message with all important details
       let message = '';
       let confirmButtonText = '';
 
       if (lang === 'es') {
-        message = `🎉 ¡Pago Confirmado!\n\n`;
-        message += `✅ Tu suscripción a ${planName} ha sido completada con éxito\n\n`;
-        message += `📋 Detalles de tu compra:\n`;
+        message = `🎉 ¡Gracias por tu compra y por apoyar a PNPtv!\n\n`;
+        message += `✅ Tu membresía ha sido activada automáticamente—sin espera, sin aprobación manual.\n\n`;
+
+        message += `📦 *Lo que incluye tu membresía:*\n\n`;
+        message += `• Videorama – Listas de reproducción de videos, música y podcasts\n`;
+        message += `• Hangouts – Salas de videollamadas comunitarias\n`;
+        message += `• PNP Latino Live – Transmisiones en vivo y grabaciones exclusivas\n\n`;
+
+        message += `📋 *Detalles de tu compra:*\n`;
         message += `• Plan: ${planName}\n`;
         message += `• Monto: $${formattedAmount}\n`;
         message += `• Proveedor: ${this.getProviderName(provider, lang)}\n`;
@@ -79,16 +85,30 @@ class PaymentNotificationService {
           message += `• Duración: Permanente ♾️\n`;
         }
 
-        message += `\n🔐 Verifica tu compra usando el enlace seguro de abajo.\n`;
-        message += `Este enlace es única y solo puede ser usado una vez.\n\n`;
-        message += `¡Gracias por tu confianza en PNPtv! 🙏\n\n`;
+        message += `\n📢 *Aviso importante*\n\n`;
+        message += `Nuestro canal fue reportado recientemente y estamos volviendo a subir contenido.\n`;
+        message += `Ya estamos en producción y se está lanzando nuevo contenido continuamente.\n\n`;
+
+        message += `💰 *Política de reembolso (ventas regulares)*\n\n`;
+        message += `Como la activación es automática, puedes solicitar un reembolso dentro de los 30 minutos DESPUÉS DE LA COMPRA si no estás satisfecho.\n`;
+        message += `Los reembolsos aprobados pueden tardar hasta 15 días hábiles en procesarse.\n\n`;
+
+        message += `🔐 Verifica tu compra usando el enlace seguro de abajo.\n`;
+        message += `Este enlace es único y solo puede ser usado una vez.\n\n`;
+        message += `¡Gracias por apoyar un proyecto independiente y impulsado por la comunidad! 🔥\n\n`;
         message += `✨ Aprende sobre todas las características de la comunidad:\n`;
         message += `https://pnptv.app/community-features`;
         confirmButtonText = '✅ Confirmar Compra';
       } else {
-        message = `🎉 Payment Confirmed!\n\n`;
-        message += `✅ Your subscription to ${planName} has been completed successfully\n\n`;
-        message += `📋 Purchase Details:\n`;
+        message = `🎉 Thank you for your purchase and for supporting PNPtv!\n\n`;
+        message += `✅ Your membership is activated automatically—no waiting, no manual approval.\n\n`;
+
+        message += `📦 *What's included in your membership:*\n\n`;
+        message += `• Videorama – Video, music, and podcast playlists\n`;
+        message += `• Hangouts – Community video call rooms\n`;
+        message += `• PNP Latino Live – Live streams and exclusive recordings\n\n`;
+
+        message += `📋 *Purchase Details:*\n`;
         message += `• Plan: ${planName}\n`;
         message += `• Amount: $${formattedAmount}\n`;
         message += `• Provider: ${this.getProviderName(provider, lang)}\n`;
@@ -100,9 +120,17 @@ class PaymentNotificationService {
           message += `• Duration: Permanent ♾️\n`;
         }
 
-        message += `\n🔐 Verify your purchase using the secure link below.\n`;
+        message += `\n📢 *Important notice*\n\n`;
+        message += `Our channel was recently reported, and we are re-uploading content.\n`;
+        message += `We are back in production, and new content is being released continuously.\n\n`;
+
+        message += `💰 *Refund policy (Regular sales)*\n\n`;
+        message += `Because activation is automatic, you may request a refund within 30 minutes AFTER PURCHASE if you are not satisfied.\n`;
+        message += `Approved refunds may take up to 15 business days to be processed.\n\n`;
+
+        message += `🔐 Verify your purchase using the secure link below.\n`;
         message += `This link is unique and can only be used once.\n\n`;
-        message += `Thank you for your trust in PNPtv! 🙏\n\n`;
+        message += `Thank you for supporting an independent, community-powered project! 🔥\n\n`;
         message += `✨ Learn about all community features:\n`;
         message += `https://pnptv.app/community-features`;
         confirmButtonText = '✅ Confirm Purchase';

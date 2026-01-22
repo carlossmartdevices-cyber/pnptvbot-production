@@ -5,15 +5,76 @@ Esta guía explica cómo configurar y usar el sistema de Lifetime Pass para vend
 ## 📋 Tabla de Contenidos
 
 1. [Descripción General](#descripción-general)
-2. [Arquitectura del Sistema](#arquitectura-del-sistema)
-3. [Configuración Inicial](#configuración-inicial)
-4. [Estructura de Firestore](#estructura-de-firestore)
-5. [Uso del Sistema](#uso-del-sistema)
-6. [Comandos del Bot](#comandos-del-bot)
-7. [Scripts de Administración](#scripts-de-administración)
-8. [Solución de Problemas](#solución-de-problemas)
+2. [Lifetime100 Promo - Nuevo Sistema](#lifetime100-promo---nuevo-sistema)
+3. [Arquitectura del Sistema](#arquitectura-del-sistema)
+4. [Configuración Inicial](#configuración-inicial)
+5. [Estructura de Firestore](#estructura-de-firestore)
+6. [Uso del Sistema](#uso-del-sistema)
+7. [Comandos del Bot](#comandos-del-bot)
+8. [Scripts de Administración](#scripts-de-administración)
+9. [Solución de Problemas](#solución-de-problemas)
 
 ---
+
+## Lifetime100 Promo - Nuevo Sistema
+
+El sistema Lifetime100 Promo es una variante especial del Lifetime Pass con un flujo de activación diferente que requiere verificación manual de recibos.
+
+### Características Especiales
+
+- 💰 **Precio Promocional**: $100 USD (vs $249 del Lifetime Pass regular)
+- 📝 **Verificación Manual**: Requiere adjuntar recibo de pago
+- 🔒 **Excluido de Pagos Automatizados**: No disponible en ePayco o Daimo
+- 🎁 **Mensaje de Activación Personalizado**: Mensaje especial de agradecimiento
+
+### Flujo de Activación Lifetime100
+
+```
+┌─────────────────────────────────────────────────────┐
+│                  Landing Page                        │
+│              (lifetime100.html)                      │
+│                                                       │
+│  - Muestra información del promo                     │
+│  - Enlace a pnptv.app/lifetime100                    │
+└─────────────────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────┐
+│              Pago Manual (Fuera del Bot)             │
+│  (Transferencia, PayPal, etc.)                       │
+│                                                       │
+│  - Usuario realiza pago                               │
+│  - Recibe código de activación                       │
+└─────────────────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────┐
+│                  Bot de Telegram                      │
+│              (/lifetime100 CODE123)                   │
+│                                                       │
+│  - Valida código                                     │
+│  - Solicita recibo de pago                           │
+│  - Almacena recibo en Firestore                      │
+└─────────────────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────┐
+│              Revisión Manual por Admin                │
+│              (/activate_lifetime100 USERID CODE)      │
+│                                                       │
+│  - Admin verifica recibo                             │
+│  - Admin activa membresía                            │
+└─────────────────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────┐
+│                  Firestore                           │
+│              (lifetime100Receipts, activationLogs)    │
+│                                                       │
+│  - Almacena recibos                                  │
+│  - Registra activaciones                            │
+└─────────────────────────────────────────────────────┘
+```
 
 ## Descripción General
 
@@ -229,6 +290,37 @@ Almacena los códigos de activación.
 - `used` (ASC)
 - `product` (ASC)
 
+### Collection: `lifetime100Receipts`
+
+Almacena los recibos de pago para Lifetime100 Promo.
+
+**Estructura:**
+
+```javascript
+{
+  userId: 123456789,
+  username: "usuario_telegram",
+  code: "A1B2C3D4E5F6",
+  messageId: 456,
+  chatId: -1001234567890,
+  date: Timestamp,
+  type: "photo" | "document",
+  fileId: "AgADBAADZRAxGw",
+  fileName: "receipt.jpg",  // Opcional para documentos
+  caption: "Payment receipt",
+  status: "pending" | "approved" | "rejected",
+  reviewedBy: number | null,  // Admin user ID
+  reviewedAt: Timestamp | null,
+  notes: string | null
+}
+```
+
+**Índices recomendados:**
+- `date` (DESC)
+- `userId` (ASC)
+- `code` (ASC)
+- `status` (ASC)
+
 ### Collection: `activationLogs`
 
 Registro de todas las activaciones.
@@ -240,11 +332,19 @@ Registro de todas las activaciones.
   userId: 123456789,
   username: "usuario_telegram",
   code: "A1B2C3D4E5F6",
-  product: "lifetime-pass",
+  product: "lifetime-pass" | "lifetime100-promo",
   activatedAt: Timestamp,
-  success: true
+  success: true,
+  ip: "192.168.1.1",
+  userAgent: "Mozilla/5.0...",
+  activatedByAdmin: number | null  // Para activaciones manuales
 }
 ```
+
+**Índices recomendados:**
+- `activatedAt` (DESC)
+- `userId` (ASC)
+- `product` (ASC)
 
 ---
 
@@ -352,6 +452,88 @@ Activa una membresía usando un código de activación.
 ❌ Este código ya ha sido utilizado.
 
 Cada código solo puede ser activado una vez.
+```
+
+### `/lifetime100 CODE`
+
+Inicia el proceso de activación para Lifetime100 Promo (requiere verificación manual).
+
+**Uso:**
+```
+/lifetime100 A1B2C3D4E5F6
+```
+
+**Flujo:**
+1. Bot valida el código
+2. Bot solicita adjuntar recibo de pago
+3. Usuario envía foto/documento del recibo
+4. Bot confirma recepción y notifica que está en revisión
+5. Admin revisa y activa manualmente
+
+**Respuestas:**
+
+✅ **Código válido - Solicitud de recibo:**
+```
+📝 Por favor adjunta tu recibo de pago
+
+Para completar la activación de tu Lifetime100 Promo, por favor envía tu recibo de pago como respuesta a este mensaje.
+
+Puedes adjuntar una imagen o documento que muestre la transacción.
+```
+
+✅ **Recibo recibido:**
+```
+✅ Recibo recibido
+
+Tu recibo de pago ha sido recibido y está siendo procesado.
+
+Recibirás una notificación cuando tu Lifetime100 Promo sea activado.
+
+📝 Nota: Esto puede tomar hasta 24 horas.
+```
+
+### `/activate_lifetime100 USERID CODE` (Solo Admin)
+
+Activa manualmente un Lifetime100 Promo después de verificar el recibo.
+
+**Uso:**
+```
+/activate_lifetime100 123456789 A1B2C3D4E5F6
+```
+
+**Respuesta:**
+```
+✅ Lifetime100 promo successfully activated for user 123456789 with code A1B2C3D4E5F6
+```
+
+**Mensaje al usuario:**
+```
+🎉 Gracias por comprar el Lifetime100 promo y por apoyar este proyecto independiente impulsado por la comunidad.
+
+Tu apoyo nos ayuda a seguir creando, grabando y construyendo PNPtv.
+
+📋 Lo que incluye tu acceso Lifetime100:
+
+• Videorama – Listas de reproducción curadas de videos, música y podcasts (también puedes crear las tuyas propias)
+
+• Hangouts – Salas de video públicas y privadas para conectar en tiempo real
+
+• PNP Latino Live – Shows en vivo, sesiones especiales y grabaciones exclusivas
+
+📢 Aviso importante
+
+Nuestro canal fue reportado nuevamente, así que estamos volviendo a subir algunos contenidos de video.
+La buena noticia: hemos vuelto a la producción y nuevo contenido ya se está grabando y lanzando progresivamente.
+
+💰 Política de reembolso (Lifetime100)
+
+Para Lifetime100, puedes solicitar un reembolso dentro de los 30 minutos DESPUÉS de que tu membresía sea ACTIVADA si no estás satisfecho.
+Los reembolsos aprobados pueden tardar hasta 15 días hábiles en procesarse.
+
+🙏 Gracias por confiar y apoyar PNPtv. 💎🔥
+
+🌟 ¡Accede al canal PRIME!
+👉 [🔗 Ingresar a PRIME](https://t.me/PNPTV_PRIME)
 ```
 
 ### `/checkcode CODE` (Solo Admin)

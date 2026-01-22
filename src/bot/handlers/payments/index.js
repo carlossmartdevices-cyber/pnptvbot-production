@@ -249,15 +249,32 @@ const registerPaymentHandlers = (bot) => {
       planHeader += `${t('paymentMethod', lang)}`;
       planHeader += `${t('paymentFooter', lang)}`;
 
+      // Check if this is the lifetime100 promo - exclude ePayco and Daimo
+      const isLifetime100Promo = plan.id === 'lifetime100_promo' || plan.sku === 'EASYBOTS-PNP-100';
+
+      const paymentButtons = [];
+      
+      if (!isLifetime100Promo) {
+        paymentButtons.push([Markup.button.callback(t('payWithEpayco', lang), `pay_epayco_${planId}`)]);
+        paymentButtons.push([Markup.button.callback(t('payWithDaimo', lang), `pay_daimo_${planId}`)]);
+      }
+
+      // For lifetime100 promo, show manual payment instructions
+      if (isLifetime100Promo) {
+        const manualPaymentMsg = lang === 'es'
+          ? '\n\n📝 *Pago manual requerido*\n\nPara el Lifetime100 Promo, por favor envía tu recibo de pago a soporte. Puedes comprar en: https://pnptv.app/lifetime100'
+          : '\n\n📝 *Manual payment required*\n\nFor Lifetime100 Promo, please send your payment receipt to support. You can purchase at: https://pnptv.app/lifetime100';
+        
+        planHeader += manualPaymentMsg;
+      }
+
+      paymentButtons.push([Markup.button.callback(t('back', lang), 'show_subscription_plans')]);
+
       await ctx.editMessageText(
         planHeader,
         {
           parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback(t('payWithEpayco', lang), `pay_epayco_${planId}`)],
-            [Markup.button.callback(t('payWithDaimo', lang), `pay_daimo_${planId}`)],
-            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
-          ]),
+          ...Markup.inlineKeyboard(paymentButtons),
         },
       );
     } catch (error) {

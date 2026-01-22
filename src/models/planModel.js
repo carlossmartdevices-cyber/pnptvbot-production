@@ -344,6 +344,40 @@ class Plan {
         ],
         active: true,
       },
+      {
+        id: 'lifetime100_promo',
+        sku: 'EASYBOTS-PNP-100',
+        name: 'Lifetime100 Promo',
+        nameEs: 'Lifetime100 Promo',
+        price: 100.00,
+        currency: 'USD',
+        duration: 36500, // 100 years as "lifetime" - equivalent to lifetime
+        features: [
+          'All premium features',
+          'Video calls',
+          'VIP access',
+          'Priority support',
+          'Exclusive content',
+          'Lifetime access',
+          'Access to Nearby Members feature',
+          'Zoom meeting access: 5 per month',
+          'Exclusive: Live streaming with Santino',
+        ],
+        featuresEs: [
+          'Todas las características premium',
+          'Llamadas de video',
+          'Acceso VIP',
+          'Soporte prioritario',
+          'Contenido exclusivo',
+          'Acceso de por vida',
+          'Acceso a Miembros Cercanos',
+          'Acceso a reuniones Zoom: 5 por mes',
+          'Exclusivo: Transmisión en vivo con Santino',
+        ],
+        active: true,
+        isLifetime: true,
+        isPromo: true,
+      },
     ];
   }
 

@@ -39,6 +39,28 @@ A comprehensive, production-ready Telegram bot for PNPtv featuring live streamin
 - (Optional) Zoom API credentials
 - (Optional) ePayco and Daimo payment provider accounts
 
+## 🎟️ Lifetime100 Promo Activation Flow
+
+The bot now supports a special Lifetime100 promo activation flow that includes:
+
+### User Flow
+1. **Command**: User sends `/lifetime100 CODE123` with their activation code
+2. **Validation**: Bot validates the code format and checks if it's a valid lifetime100 promo code
+3. **Receipt Request**: Bot requests the user to attach their payment receipt
+4. **Receipt Processing**: User uploads a photo or document showing their payment
+5. **Admin Review**: Admins review the receipt and manually activate the membership
+6. **Activation**: User receives confirmation with the special Lifetime100 activation message
+
+### Admin Flow
+1. **Manual Activation**: Admins use `/activate_lifetime100 USERID CODE123` to activate after receipt verification
+2. **Automatic Notification**: User receives the activation confirmation with channel invite
+3. **Logging**: All activations are logged in Firestore for audit purposes
+
+### Payment Methods
+- **Excluded from ePayco/Daimo**: Lifetime100 promo is not available through automated payment processors
+- **Manual Payment Only**: Users must purchase through the lifetime100 landing page and provide receipt
+- **Receipt Storage**: All receipts are stored in Firestore collection `lifetime100Receipts`
+
 ## 🚀 Quick Start
 
 ### 1. Clone and Install

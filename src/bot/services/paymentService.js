@@ -25,10 +25,11 @@ class PaymentService {
      * @param {number} params.amount - Payment amount
      * @param {Date} params.expiryDate - Subscription expiry date
      * @param {string} params.language - User language ('es' or 'en')
+     * @param {string} params.provider - Payment provider ('epayco' or 'daimo')
      * @returns {Promise<boolean>} Success status
      */
     static async sendPaymentConfirmationNotification({
-      userId, plan, transactionId, amount, expiryDate, language = 'es',
+      userId, plan, transactionId, amount, expiryDate, language = 'es', provider = 'epayco',
     }) {
       try {
         const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -65,14 +66,15 @@ class PaymentService {
           }
         }
 
-        // Use unified message template
-        const message = MessageTemplates.buildPrimeActivationMessage({
+        // Use enhanced message template for ePayco and Daimo payments
+        const message = MessageTemplates.buildEnhancedPaymentConfirmation({
           planName: plan.display_name || plan.name,
           amount,
           expiryDate,
           transactionId,
           inviteLink,
           language,
+          provider,
         });
 
         // Send notification
@@ -524,7 +526,7 @@ class PaymentService {
               refPayco: x_ref_payco,
             });
 
-            // Send payment confirmation notification via bot (with PRIME channel link)
+            // Send enhanced payment confirmation notification via bot (with PRIME channel link)
             const user = await UserModel.getById(userId);
             const userLanguage = user?.language || 'es';
             try {
@@ -535,6 +537,7 @@ class PaymentService {
                 amount: parseFloat(x_amount),
                 expiryDate,
                 language: userLanguage,
+                provider: 'epayco',
               });
             } catch (notifError) {
               logger.error('Error sending payment confirmation notification (non-critical):', {
@@ -787,7 +790,7 @@ class PaymentService {
               txHash: source?.txHash,
             });
 
-            // Send payment confirmation notification via bot (with PRIME channel link)
+            // Send enhanced payment confirmation notification via bot (with PRIME channel link)
             const userLanguage = user?.language || 'es';
             const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
             try {
@@ -798,6 +801,7 @@ class PaymentService {
                 amount: amountUSD,
                 expiryDate,
                 language: userLanguage,
+                provider: 'daimo',
               });
             } catch (notifError) {
               logger.error('Error sending payment confirmation notification (non-critical):', {
