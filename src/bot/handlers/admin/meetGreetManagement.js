@@ -267,7 +267,8 @@ const registerMeetGreetManagementHandlers = (bot) => {
         }
       );
 
-      await ctx.answerCbQuery();
+      // Remove answerCbQuery() as this is a message context, not a callback query context
+      // await ctx.answerCbQuery();
     } catch (error) {
       logger.error('Error creating new Meet & Greet model:', error);
       await ctx.reply(lang === 'es' ? '❌ Error creando el modelo' : '❌ Error creating model');
@@ -443,69 +444,64 @@ const registerMeetGreetManagementHandlers = (bot) => {
         ? (lang === 'es' ? '✅ Modelo activado' : '✅ Model activated')
         : (lang === 'es' ? '❌ Modelo desactivado' : '❌ Model deactivated'));
 
-      // Refresh view
-      ctx.match = [`mg_view_model_${modelId}`, `${modelId}`];
-      ctx.callbackQuery.data = `mg_view_model_${modelId}`;
-      return bot.action(/^mg_view_model_(\d+)$/, async (ctx) => {
-        const mId = parseInt(ctx.match[1]);
-        const m = await ModelService.getModelById(mId);
-        const availability = await AvailabilityService.getAvailability(mId);
-        
-        const availText = availability.length > 0
-          ? availability.map(a => {
-              const start = new Date(a.available_from).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              });
-              const end = new Date(a.available_to).toLocaleTimeString(lang === 'es' ? 'es-ES' : 'en-US', {
-                hour: '2-digit',
-                minute: '2-digit'
-              });
-              return `${start} - ${end}`;
-            }).join('\n')
-          : lang === 'es' ? 'Sin disponibilidad configurada' : 'No availability configured';
+      // Refresh view by showing the model details directly
+      const m = await ModelService.getModelById(modelId);
+      const availability = await AvailabilityService.getAvailability(modelId);
+      
+      const availText = availability.length > 0
+        ? availability.map(a => {
+            const start = new Date(a.available_from).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+            const end = new Date(a.available_to).toLocaleTimeString(lang === 'es' ? 'es-ES' : 'en-US', {
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+            return `${start} - ${end}`;
+          }).join('\n')
+        : lang === 'es' ? 'Sin disponibilidad configurada' : 'No availability configured';
 
-        const keyboard = [
-          [{
-            text: m.is_active 
-              ? (lang === 'es' ? '❌ Desactivar' : '❌ Deactivate') 
-              : (lang === 'es' ? '✅ Activar' : '✅ Activate'),
-            callback_data: `mg_toggle_model_${m.id}`
-          }],
-          [{
-            text: lang === 'es' ? '⏱️ Gestionar Disponibilidad' : '⏱️ Manage Availability',
-            callback_data: `mg_manage_model_availability_${m.id}`
-          }],
-          [{
-            text: lang === 'es' ? '✏️ Editar Modelo' : '✏️ Edit Model',
-            callback_data: `mg_edit_model_${m.id}`
-          }],
-          [{
-            text: lang === 'es' ? '🗑️ Eliminar Modelo' : '🗑️ Delete Model',
-            callback_data: `mg_delete_model_${m.id}`
-          }],
-          [{
-            text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
-            callback_data: 'mg_view_models'
-          }]
-        ];
+      const keyboard = [
+        [{
+          text: m.is_active 
+            ? (lang === 'es' ? '❌ Desactivar' : '❌ Deactivate') 
+            : (lang === 'es' ? '✅ Activar' : '✅ Activate'),
+          callback_data: `mg_toggle_model_${m.id}`
+        }],
+        [{
+          text: lang === 'es' ? '⏱️ Gestionar Disponibilidad' : '⏱️ Manage Availability',
+          callback_data: `mg_manage_model_availability_${m.id}`
+        }],
+        [{
+          text: lang === 'es' ? '✏️ Editar Modelo' : '✏️ Edit Model',
+          callback_data: `mg_edit_model_${m.id}`
+        }],
+        [{
+          text: lang === 'es' ? '🗑️ Eliminar Modelo' : '🗑️ Delete Model',
+          callback_data: `mg_delete_model_${m.id}`
+        }],
+        [{
+          text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
+          callback_data: 'mg_view_models'
+        }]
+      ];
 
-        await ctx.editMessageText(
-          `👤 **${m.name}**\n\n` +
-          `📛 Username: @${m.username}\n` +
-          `📝 Bio: ${m.bio || lang === 'es' ? 'Sin bio' : 'No bio'}\n` +
-          `📅 **Disponibilidad:**\n${availText}`,
-          {
-            parse_mode: 'Markdown',
-            reply_markup: {
-              inline_keyboard: keyboard
-            }
+      await ctx.editMessageText(
+        `👤 **${m.name}**\n\n` +
+        `📛 Username: @${m.username}\n` +
+        `📝 Bio: ${m.bio || lang === 'es' ? 'Sin bio' : 'No bio'}\n` +
+        `📅 **Disponibilidad:**\n${availText}`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: keyboard
           }
-        );
-      })(ctx);
+        }
+      );
     } catch (error) {
       logger.error('Error toggling model status:', error);
       await ctx.answerCbQuery('❌ Error');
@@ -676,61 +672,56 @@ const registerMeetGreetManagementHandlers = (bot) => {
 
       await ctx.answerCbQuery(lang === 'es' ? `✅ ${slots.length} slots creados` : `✅ ${slots.length} slots created`);
 
-      // Refresh view
-      ctx.match = [`mg_manage_model_availability_${modelId}`, `${modelId}`];
-      ctx.callbackQuery.data = `mg_manage_model_availability_${modelId}`;
-      return bot.action(/^mg_manage_model_availability_(\d+)$/, async (ctx) => {
-        const mId = parseInt(ctx.match[1]);
-        const m = await ModelService.getModelById(mId);
-        const availability = await AvailabilityService.getAvailability(mId);
-        
-        const availText = availability.length > 0
-          ? availability.map((a, index) => {
-              const start = new Date(a.available_from).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              });
-              const end = new Date(a.available_to).toLocaleTimeString(lang === 'es' ? 'es-ES' : 'en-US', {
-                hour: '2-digit',
-                minute: '2-digit'
-              });
-              return `${index + 1}. ${start} - ${end} [${a.is_booked ? (lang === 'es' ? 'Reservado' : 'Booked') : (lang === 'es' ? 'Disponible' : 'Available')}]`;
-            }).join('\n')
-          : lang === 'es' ? 'Sin disponibilidad configurada' : 'No availability configured';
+      // Refresh view by showing availability management directly
+      const m = await ModelService.getModelById(modelId);
+      const availability = await AvailabilityService.getAvailability(modelId);
+      
+      const availText = availability.length > 0
+        ? availability.map((a, index) => {
+            const start = new Date(a.available_from).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+            const end = new Date(a.available_to).toLocaleTimeString(lang === 'es' ? 'es-ES' : 'en-US', {
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+            return `${index + 1}. ${start} - ${end} [${a.is_booked ? (lang === 'es' ? 'Reservado' : 'Booked') : (lang === 'es' ? 'Disponible' : 'Available')}]`;
+          }).join('\n')
+        : lang === 'es' ? 'Sin disponibilidad configurada' : 'No availability configured';
 
-        const keyboard = [
-          [{
-            text: lang === 'es' ? '➕ Agregar Marco de Tiempo' : '➕ Add Time Frame',
-            callback_data: `mg_add_time_frame_${mId}`
-          }],
-          [{
-            text: lang === 'es' ? '📅 Ver Disponibilidad' : '📅 View Availability',
-            callback_data: `mg_view_availability_${mId}`
-          }],
-          [{
-            text: lang === 'es' ? '🗑️ Eliminar Disponibilidad' : '🗑️ Delete Availability',
-            callback_data: `mg_delete_availability_${mId}`
-          }],
-          [{
-            text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
-            callback_data: `mg_view_model_${mId}`
-          }]
-        ];
+      const keyboard = [
+        [{
+          text: lang === 'es' ? '➕ Agregar Marco de Tiempo' : '➕ Add Time Frame',
+          callback_data: `mg_add_time_frame_${modelId}`
+        }],
+        [{
+          text: lang === 'es' ? '📅 Ver Disponibilidad' : '📅 View Availability',
+          callback_data: `mg_view_availability_${modelId}`
+        }],
+        [{
+          text: lang === 'es' ? '🗑️ Eliminar Disponibilidad' : '🗑️ Delete Availability',
+          callback_data: `mg_delete_availability_${modelId}`
+        }],
+        [{
+          text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
+          callback_data: `mg_view_model_${modelId}`
+        }]
+      ];
 
-        await ctx.editMessageText(
-          `⏱️ **Disponibilidad de ${m.name}**\n\n` +
-          `📅 **Horarios Configurados:**\n${availText}`,
-          {
-            parse_mode: 'Markdown',
-            reply_markup: {
-              inline_keyboard: keyboard
-            }
+      await ctx.editMessageText(
+        `⏱️ **Disponibilidad de ${m.name}**\n\n` +
+        `📅 **Horarios Configurados:**\n${availText}`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: keyboard
           }
-        );
-      })(ctx);
+        }
+      );
     } catch (error) {
       logger.error('Error in mg_suggested_frame:', error);
       await ctx.answerCbQuery('❌ Error');
@@ -941,47 +932,44 @@ const registerMeetGreetManagementHandlers = (bot) => {
 
       await ctx.answerCbQuery(lang === 'es' ? '✅ Disponibilidad eliminada' : '✅ Availability deleted');
 
-      // Refresh view
-      ctx.match = [`mg_manage_model_availability_${availability.model_id}`, `${availability.model_id}`];
-      ctx.callbackQuery.data = `mg_manage_model_availability_${availability.model_id}`;
-      return bot.action(/^mg_manage_model_availability_(\d+)$/, async (ctx) => {
-        const mId = parseInt(ctx.match[1]);
-        const m = await ModelService.getModelById(mId);
-        const avail = await AvailabilityService.getAvailability(mId);
-        
-        const availText = avail.length > 0
-          ? avail.map((a, index) => {
-              const start = new Date(a.available_from).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              });
-              const end = new Date(a.available_to).toLocaleTimeString(lang === 'es' ? 'es-ES' : 'en-US', {
-                hour: '2-digit',
-                minute: '2-digit'
-              });
-              return `${index + 1}. ${start} - ${end} [${a.is_booked ? (lang === 'es' ? 'Reservado' : 'Booked') : (lang === 'es' ? 'Disponible' : 'Available')}]`;
-            }).join('\n')
-          : lang === 'es' ? 'Sin disponibilidad configurada' : 'No availability configured';
+      // Refresh view by showing availability management directly
+      const mId = availability.model_id;
+      const m = await ModelService.getModelById(mId);
+      const avail = await AvailabilityService.getAvailability(mId);
+      
+      const availText = avail.length > 0
+        ? avail.map((a, index) => {
+            const start = new Date(a.available_from).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+            const end = new Date(a.available_to).toLocaleTimeString(lang === 'es' ? 'es-ES' : 'en-US', {
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+            return `${index + 1}. ${start} - ${end} [${a.is_booked ? (lang === 'es' ? 'Reservado' : 'Booked') : (lang === 'es' ? 'Disponible' : 'Available')}]`;
+          }).join('\n')
+        : lang === 'es' ? 'Sin disponibilidad configurada' : 'No availability configured';
 
-        const keyboard = [
-          [{
-            text: lang === 'es' ? '➕ Agregar Disponibilidad' : '➕ Add Availability',
-            callback_data: `mg_add_availability_${mId}`
-          }],
-          [{
-            text: lang === 'es' ? '🗑️ Eliminar Disponibilidad' : '🗑️ Delete Availability',
-            callback_data: `mg_delete_availability_${mId}`
-          }],
-          [{
-            text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
-            callback_data: `mg_view_model_${mId}`
-          }]
-        ];
+      const keyboard = [
+        [{
+          text: lang === 'es' ? '➕ Agregar Disponibilidad' : '➕ Add Availability',
+          callback_data: `mg_add_availability_${mId}`
+        }],
+        [{
+          text: lang === 'es' ? '🗑️ Eliminar Disponibilidad' : '🗑️ Delete Availability',
+          callback_data: `mg_delete_availability_${mId}`
+        }],
+        [{
+          text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
+          callback_data: `mg_view_model_${mId}`
+        }]
+      ];
 
-        await ctx.editMessageText(
+      await ctx.editMessageText(
           `⏱️ **Disponibilidad de ${m.name}**\n\n` +
           `📅 **Horarios Configurados:**\n${availText}`,
           {
@@ -991,7 +979,6 @@ const registerMeetGreetManagementHandlers = (bot) => {
             }
           }
         );
-      })(ctx);
     } catch (error) {
       logger.error('Error confirming delete availability:', error);
       await ctx.answerCbQuery('❌ Error');
@@ -1228,66 +1215,62 @@ const registerMeetGreetManagementHandlers = (bot) => {
 
       await ctx.answerCbQuery(lang === 'es' ? '✅ Modelo eliminado' : '✅ Model deleted');
 
-      // Refresh models list
-      ctx.match = ['mg_view_models'];
-      ctx.callbackQuery.data = 'mg_view_models';
-      return bot.action('mg_view_models', async (ctx) => {
-        const models = await ModelService.getAllActiveModels();
-        
-        if (models.length === 0) {
-          const keyboard = [
-            [{
-              text: lang === 'es' ? '➕ Agregar Modelo' : '➕ Add Model',
-              callback_data: 'mg_add_model'
-            }],
-            [{
-              text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
-              callback_data: 'admin_meet_greet'
-            }]
-          ];
-
-          await ctx.editMessageText(
-            lang === 'es' ? '📋 **Todos los Modelos**\n\nNo hay modelos disponibles.' : '📋 **All Models**\n\nNo models available.',
-            {
-              parse_mode: 'Markdown',
-              reply_markup: {
-                inline_keyboard: keyboard
-              }
-            }
-          );
-          return;
-        }
-
-        // Create model buttons (2 per row)
-        const buttons = [];
-        for (let i = 0; i < models.length; i += 2) {
-          const row = [];
-          for (let j = 0; j < 2 && i + j < models.length; j++) {
-            const model = models[i + j];
-            row.push({
-              text: `${model.name} ${model.is_active ? '🟢' : '⚪'}`,
-              callback_data: `mg_view_model_${model.id}`
-            });
-          }
-          buttons.push(row);
-        }
-
-        // Add navigation buttons
-        buttons.push([{
-          text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
-          callback_data: 'admin_meet_greet'
-        }]);
+      // Refresh models list by calling the view models function directly
+      const models = await ModelService.getAllActiveModels();
+      
+      if (models.length === 0) {
+        const keyboard = [
+          [{
+            text: lang === 'es' ? '➕ Agregar Modelo' : '➕ Add Model',
+            callback_data: 'mg_add_model'
+          }],
+          [{
+            text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
+            callback_data: 'admin_meet_greet'
+          }]
+        ];
 
         await ctx.editMessageText(
-          lang === 'es' ? '📋 **Todos los Modelos**\n\nSelecciona un modelo para ver detalles:' : '📋 **All Models**\n\nSelect a model to view details:',
+          lang === 'es' ? '📋 **Todos los Modelos**\n\nNo hay modelos disponibles.' : '📋 **All Models**\n\nNo models available.',
           {
             parse_mode: 'Markdown',
             reply_markup: {
-              inline_keyboard: buttons
+              inline_keyboard: keyboard
             }
           }
         );
-      })(ctx);
+        return;
+      }
+
+      // Create model buttons (2 per row)
+      const buttons = [];
+      for (let i = 0; i < models.length; i += 2) {
+        const row = [];
+        for (let j = 0; j < 2 && i + j < models.length; j++) {
+          const model = models[i + j];
+          row.push({
+            text: `${model.name} ${model.is_active ? '🟢' : '⚪'}`,
+            callback_data: `mg_view_model_${model.id}`
+          });
+        }
+        buttons.push(row);
+      }
+
+      // Add navigation buttons
+      buttons.push([{
+        text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
+        callback_data: 'admin_meet_greet'
+      }]);
+
+      await ctx.editMessageText(
+        lang === 'es' ? '📋 **Todos los Modelos**\n\nSelecciona un modelo para ver detalles:' : '📋 **All Models**\n\nSelect a model to view details:',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: buttons
+          }
+        }
+      );
     } catch (error) {
       logger.error('Error confirming delete model:', error);
       await ctx.answerCbQuery('❌ Error');

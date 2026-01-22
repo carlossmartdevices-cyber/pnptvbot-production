@@ -350,7 +350,10 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
         Markup.button.callback(lang === 'es' ? '🌎 ¿Quién está cerca?' : '🌎 Who is Nearby', 'show_nearby'),
       ],
-
+      [
+        Markup.button.callback(lang === 'es' ? '🎥 Hangouts' : '🎥 Hangouts', 'menu_hangouts'),
+        Markup.button.callback(lang === 'es' ? '📹 Videorama' : '📹 Videorama', 'menu_videorama'),
+      ],
       [
         Markup.button.callback(lang === 'es' ? '👥 Video Llamada VIP' : '👥 Meet & Greet', 'MEET_GREET_START'),
       ],
@@ -387,6 +390,10 @@ const showMainMenu = async (ctx) => {
       ],
       [
         Markup.button.callback(lang === 'es' ? '🔄 Migrar Lifetime del viejo PNPtv' : '🔄 Migrate Lifetime from old PNPtv', 'migrate_lifetime_start'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '🎥 Hangouts' : '🎥 Hangouts', 'menu_hangouts'),
+        Markup.button.callback(lang === 'es' ? '📹 Videorama' : '📹 Videorama', 'menu_videorama'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
@@ -508,6 +515,10 @@ const showMainMenuEdit = async (ctx) => {
       [
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
         Markup.button.callback(lang === 'es' ? '🌎 ¿Quién está cerca?' : '🌎 Who is Nearby', 'show_nearby'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '🎥 Hangouts' : '🎥 Hangouts', 'menu_hangouts'),
+        Markup.button.callback(lang === 'es' ? '📹 Videorama' : '📹 Videorama', 'menu_videorama'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '👥 Video Llamada VIP' : '👥 Meet & Greet', 'MEET_GREET_START'),

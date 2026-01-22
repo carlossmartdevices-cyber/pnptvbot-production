@@ -589,24 +589,13 @@ const registerSupportHandlers = (bot) => {
         const username = ctx.from.username ? `@${ctx.from.username}` : 'No username';
         const firstName = ctx.from.first_name || 'Unknown';
 
-        // Use support routing service to create forum topic and forward message
+        // Use the new centralized method to send to support group
         let supportTopic = null;
         try {
-          supportTopic = await supportRoutingService.forwardUserMessage(ctx, 'text', 'support');
-          logger.info(`Support message routed to topic for user ${userId}`, { threadId: supportTopic?.thread_id });
+          supportTopic = await supportRoutingService.sendToSupportGroup(message, 'support', ctx.from, 'text', ctx);
+          logger.info(`Support message sent to group for user ${userId}`, { threadId: supportTopic?.thread_id });
         } catch (routingError) {
-          logger.error('Support routing failed, using fallback:', routingError.message);
-
-          // Fallback: send directly to support group without topic
-          const supportGroupId = process.env.SUPPORT_GROUP_ID;
-          if (supportGroupId) {
-            const supportMessage = `📬 *SOLICITUD DE SOPORTE*\n\n👤 *Usuario:* ${firstName}\n🆔 *Telegram:* ${username}\n🔢 *User ID:* \`${userId}\`\n📅 *Fecha:* ${new Date().toLocaleString('es-ES')}\n\n💬 *Mensaje:*\n${message}`;
-            try {
-              await ctx.telegram.sendMessage(supportGroupId, supportMessage, { parse_mode: 'Markdown' });
-            } catch (groupError) {
-              logger.error('Error sending to support group:', groupError);
-            }
-          }
+          logger.error('Failed to send message to support group:', routingError.message);
         }
 
         // Also send to admin users as backup
@@ -660,21 +649,10 @@ const registerSupportHandlers = (bot) => {
         // Use support routing service to create forum topic and forward message
         let supportTopic = null;
         try {
-          supportTopic = await supportRoutingService.forwardUserMessage(ctx, 'text', 'activation');
-          logger.info(`Activation request routed to topic for user ${userId}`, { threadId: supportTopic?.thread_id });
+          supportTopic = await supportRoutingService.sendToSupportGroup(message, 'activation', ctx.from, 'text', ctx);
+          logger.info(`Activation request sent to group for user ${userId}`, { threadId: supportTopic?.thread_id });
         } catch (routingError) {
-          logger.error('Activation routing failed, using fallback:', routingError.message);
-
-          // Fallback: send directly to support group without topic
-          const supportGroupId = process.env.SUPPORT_GROUP_ID;
-          if (supportGroupId) {
-            const activationMessage = `🎁 *SOLICITUD DE ACTIVACIÓN*\n\n👤 *Usuario:* ${firstName}\n🆔 *Telegram:* ${username}\n🔢 *User ID:* \`${userId}\`\n📅 *Fecha:* ${new Date().toLocaleString('es-ES')}\n\n📝 *Detalles de pago/activación:*\n${message}`;
-            try {
-              await ctx.telegram.sendMessage(supportGroupId, activationMessage, { parse_mode: 'Markdown' });
-            } catch (groupError) {
-              logger.error('Error sending activation request to support group:', groupError);
-            }
-          }
+          logger.error('Failed to send activation request to support group:', routingError.message);
         }
 
         // Also send to admin users as backup

@@ -1,6 +1,7 @@
 const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
 const { isValidEmail } = require('../../../utils/validation');
+const supportRoutingService = require('../../services/supportRoutingService');
 
 /**
  * Escape special Markdown characters in user-provided text
@@ -106,16 +107,10 @@ _Type your email now:_`;
       const firstName = escapeMarkdown(ctx.from.first_name || 'Unknown');
       const safeEmail = escapeMarkdown(migration.email);
 
-      // Send to support group
-      const supportGroupId = process.env.SUPPORT_GROUP_ID;
-      if (supportGroupId) {
-        const supportMessage = `🔄 *SOLICITUD DE MIGRACIÓN LIFETIME*
-
-👤 *Usuario:* ${firstName}
-🆔 *Telegram:* ${username}
-🔢 *User ID:* \`${userId}\`
-📧 *Email:* ${safeEmail}
-📅 *Fecha:* ${new Date().toLocaleString('es-ES')}
+      // Send to support group using centralized method
+      try {
+        const user = ctx.from;
+        const supportMessage = `📧 *Email:* ${safeEmail}
 
 📸 El usuario envió comprobante de pago arriba.
 
@@ -123,16 +118,11 @@ _Type your email now:_`;
 • Verificar que el email coincida con registros del viejo PNPtv
 • Verificar el comprobante de pago
 • Si es válido, activar manualmente con /activate ${userId} lifetime`;
-
-        try {
-          await ctx.telegram.sendMessage(supportGroupId, supportMessage, { parse_mode: 'Markdown' });
-          logger.info('Lifetime migration request sent to support group', { userId, email: migration.email });
-        } catch (err) {
-          logger.error('Failed to send migration request to support group:', err);
-        }
-      }
-
-      // Clear migration session
+        const supportTopic = await supportRoutingService.sendToSupportGroup(supportMessage, 'activation', user, 'text', ctx);
+        logger.info('Lifetime migration request sent to support group', { userId, email: migration.email, threadId: supportTopic?.thread_id });
+      } catch (err) {
+        logger.error('Failed to send migration request to support group:', err);
+      }      // Clear migration session
       delete ctx.session.temp.lifetimeMigration;
       await ctx.saveSession();
 

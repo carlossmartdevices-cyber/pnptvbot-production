@@ -5,6 +5,7 @@ const { isValidEmail } = require('../../../utils/validation');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const { showMainMenu } = require('./menu');
+const supportRoutingService = require('../../services/supportRoutingService');
 
 /**
  * Onboarding handlers
@@ -97,25 +98,14 @@ If you have any questions, use /support to contact us.`;
 
         await ctx.reply(userMessage, { parse_mode: 'Markdown' });
 
-        // Send notification to support group
-        const supportGroupId = process.env.SUPPORT_GROUP_ID;
-        if (supportGroupId) {
-          const supportMessage = `🔔 *SOLICITUD DE ACTIVACIÓN LIFETIME*
-
-👤 *Usuario:* ${firstName}
-🆔 *Telegram:* ${username}
-🔢 *User ID:* \`${userId}\`
-💎 *Plan:* Lifetime Pass ($100 USD)
-📅 *Fecha:* ${new Date().toLocaleString('es-ES')}
-
-⚠️ Verificar pago en Meru y activar manualmente.`;
-
-          try {
-            await ctx.telegram.sendMessage(supportGroupId, supportMessage, { parse_mode: 'Markdown' });
-            logger.info(`Lifetime activation request sent to support group`, { userId, username });
-          } catch (err) {
-            logger.error('Failed to send activation request to support group:', err);
-          }
+        // Send notification to support group using centralized method
+        try {
+          const user = ctx.from;
+          const supportMessage = `💎 *Plan:* Lifetime Pass ($100 USD)\n\n⚠️ Verificar pago en Meru y activar manualmente.`;
+          const supportTopic = await supportRoutingService.sendToSupportGroup(supportMessage, 'activation', user, 'text', ctx);
+          logger.info(`Lifetime activation request sent to support group`, { userId, username, threadId: supportTopic?.thread_id });
+        } catch (err) {
+          logger.error('Failed to send activation request to support group:', err);
         }
 
         return;

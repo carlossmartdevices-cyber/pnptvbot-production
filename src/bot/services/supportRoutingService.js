@@ -425,6 +425,127 @@ _Responde en este topic para enviar mensajes al usuario._`;
     };
     return labels[requestType] || labels.default;
   }
+
+  /**
+   * Send a message directly to the support group (centralized method)
+   * @param {string} message - Message text
+   * @param {string} requestType - Type of request ('support', 'activation', 'escalation')
+   * @param {Object} user - User information
+   * @param {string} messageType - Type of message ('text', 'photo', 'document', etc.)
+   * @param {Object} ctx - Telegraf context (optional, for media messages)
+   * @returns {Promise<Object>} Support topic data
+   */
+  async sendToSupportGroup(message, requestType, user, messageType = 'text', ctx = null) {
+    if (!this.telegram || !this.supportGroupId) {
+      logger.warn('Support routing service not initialized');
+      throw new Error('Support routing not configured');
+    }
+
+    try {
+      // Get or create user's support topic
+      const supportTopic = await this.getOrCreateUserTopic(user, requestType);
+      const threadId = supportTopic.thread_id;
+
+      // Build message header
+      const requestEmoji = this.getRequestEmoji(requestType);
+      const requestLabel = this.getRequestLabel(requestType);
+      const firstName = user.first_name || 'Unknown';
+      const username = user.username ? `@${user.username}` : 'No username';
+
+      const header = `${requestEmoji} *${requestLabel}*
+
+👤 *Usuario:* ${firstName} ${username}
+🆔 *User ID:* \`${user.id}\`
+📅 *Fecha:* ${new Date().toLocaleString('es-ES')}
+
+`;
+
+      // Send based on message type
+      if (messageType === 'text') {
+        await this.telegram.sendMessage(
+          this.supportGroupId,
+          header + message,
+          {
+            message_thread_id: threadId,
+            parse_mode: 'Markdown',
+          }
+        );
+      } else if (messageType === 'photo' && ctx?.message?.photo) {
+        const photo = ctx.message.photo[ctx.message.photo.length - 1];
+        await this.telegram.sendPhoto(
+          this.supportGroupId,
+          photo.file_id,
+          {
+            message_thread_id: threadId,
+            caption: header + (ctx.message.caption || ''),
+            parse_mode: 'Markdown',
+          }
+        );
+      } else if (messageType === 'document' && ctx?.message?.document) {
+        await this.telegram.sendDocument(
+          this.supportGroupId,
+          ctx.message.document.file_id,
+          {
+            message_thread_id: threadId,
+            caption: header + (ctx.message.caption || ''),
+            parse_mode: 'Markdown',
+          }
+        );
+      } else if (messageType === 'video' && ctx?.message?.video) {
+        await this.telegram.sendVideo(
+          this.supportGroupId,
+          ctx.message.video.file_id,
+          {
+            message_thread_id: threadId,
+            caption: header + (ctx.message.caption || ''),
+            parse_mode: 'Markdown',
+          }
+        );
+      } else if (messageType === 'voice' && ctx?.message?.voice) {
+        await this.telegram.sendVoice(
+          this.supportGroupId,
+          ctx.message.voice.file_id,
+          {
+            message_thread_id: threadId,
+            caption: header,
+            parse_mode: 'Markdown',
+          }
+        );
+      } else if (messageType === 'sticker' && ctx?.message?.sticker) {
+        // Send header first, then sticker
+        await this.telegram.sendMessage(
+          this.supportGroupId,
+          header.trim(),
+          { message_thread_id: threadId, parse_mode: 'Markdown' }
+        );
+        await this.telegram.sendSticker(
+          this.supportGroupId,
+          ctx.message.sticker.file_id,
+          { message_thread_id: threadId }
+        );
+      } else {
+        // Fallback to text message
+        await this.telegram.sendMessage(
+          this.supportGroupId,
+          header + message,
+          {
+            message_thread_id: threadId,
+            parse_mode: 'Markdown',
+          }
+        );
+      }
+
+      // Update message count
+      await SupportTopicModel.updateLastMessage(user.id);
+
+      logger.info('Message sent to support group', { userId: user.id, threadId, messageType });
+      return supportTopic;
+
+    } catch (error) {
+      logger.error('Failed to send message to support group:', error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance

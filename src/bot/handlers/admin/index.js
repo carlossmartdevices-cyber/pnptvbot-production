@@ -196,7 +196,7 @@ async function showBroadcastButtonsPicker(ctx) {
   const maxCompletedStep = ctx.session.temp.maxCompletedStep;
   
   // Define step order for progression validation
-  const stepOrder = ['media', 'text_en', 'text_es', 'buttons', 'preview', 'sending'];
+  const stepOrder = ['media', 'text_en', 'ai_prompt_en', 'text_es', 'ai_prompt_es', 'buttons', 'preview', 'sending'];
   
   if (maxCompletedStep) {
     const currentStepIndex = stepOrder.indexOf(currentStep);
@@ -2770,14 +2770,17 @@ let registerAdminHandlers = (bot) => {
     });
     
     if (maxCompletedStep && currentStep) {
-      const stepOrder = ['media', 'text_en', 'text_es', 'buttons', 'preview', 'sending'];
+      const stepOrder = ['media', 'text_en', 'ai_prompt_en', 'text_es', 'ai_prompt_es', 'buttons', 'preview', 'sending'];
       const currentStepIndex = stepOrder.indexOf(currentStep);
       const maxStepIndex = stepOrder.indexOf(maxCompletedStep);
       
       // If current step is before max completed step, prevent regression
-      // EXCEPT: Allow normal step progression (text_en -> text_es -> buttons)
+      // EXCEPT: Allow normal step progression (text_en -> ai_prompt_en -> text_es -> ai_prompt_es -> buttons)
       const isNormalProgression = 
-        (currentStep === 'text_en' && maxCompletedStep === 'text_es') ||
+        (currentStep === 'text_en' && maxCompletedStep === 'ai_prompt_en') ||
+        (currentStep === 'ai_prompt_en' && maxCompletedStep === 'text_es') ||
+        (currentStep === 'text_es' && maxCompletedStep === 'ai_prompt_es') ||
+        (currentStep === 'ai_prompt_es' && maxCompletedStep === 'buttons') ||
         (currentStep === 'text_es' && maxCompletedStep === 'buttons');
       
       if (currentStepIndex < maxStepIndex && !isNormalProgression) {
