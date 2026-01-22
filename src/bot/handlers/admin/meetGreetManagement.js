@@ -92,9 +92,11 @@ const registerMeetGreetManagementHandlers = (bot) => {
   /**
    * Handle text input for model creation
    */
-  bot.on('text', async (ctx) => {
+  bot.on('text', async (ctx, next) => {
     try {
-      if (!ctx.session.meetGreetAdmin || !ctx.session.meetGreetAdmin.step) return;
+      if (!ctx.session.meetGreetAdmin || !ctx.session.meetGreetAdmin.step) {
+        return next();
+      }
 
       const lang = getLanguage(ctx);
       const step = ctx.session.meetGreetAdmin.step;
@@ -1038,9 +1040,11 @@ const registerMeetGreetManagementHandlers = (bot) => {
   /**
    * Handle edit steps
    */
-  bot.on('text', async (ctx) => {
+  bot.on('text', async (ctx, next) => {
     try {
-      if (!ctx.session.meetGreetAdmin || !ctx.session.meetGreetAdmin.editStep) return;
+      if (!ctx.session.meetGreetAdmin || !ctx.session.meetGreetAdmin.editStep) {
+        return next();
+      }
 
       const lang = getLanguage(ctx);
       const step = ctx.session.meetGreetAdmin.editStep;

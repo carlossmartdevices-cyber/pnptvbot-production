@@ -454,6 +454,14 @@ class PaymentService {
         x_customer_name,
       } = webhookData;
 
+      // Validate required fields
+      if (!x_ref_payco || !x_transaction_state) {
+        logger.warn('Invalid ePayco webhook - missing required fields', {
+          webhookData,
+        });
+        return { success: false, error: 'Missing required webhook fields' };
+      }
+
       logger.info('Processing ePayco webhook', {
         x_ref_payco,
         x_transaction_state,
@@ -539,11 +547,11 @@ class PaymentService {
 
         // Send admin notification for purchase (always, regardless of email)
         if (userId && planIdOrBookingId) {
-          const plan = await PlanModel.getById(planIdOrBookingId);
-          const user = await UserModel.getById(userId);
+          try {
+            const plan = await PlanModel.getById(planIdOrBookingId);
+            const user = await UserModel.getById(userId);
 
-          if (plan) {
-            try {
+            if (plan) {
               const bot = new Telegraf(process.env.BOT_TOKEN);
               await PaymentNotificationService.sendAdminPaymentNotification({
                 bot,
@@ -555,18 +563,25 @@ class PaymentService {
                 customerName: x_customer_name || user?.first_name || 'Unknown',
                 customerEmail: x_customer_email || 'N/A',
               });
-            } catch (adminError) {
-              logger.error('Error sending admin notification (non-critical):', {
-                error: adminError.message,
-                refPayco: x_ref_payco,
-              });
             }
+          } catch (adminError) {
+            logger.error('Error sending admin notification (non-critical):', {
+              error: adminError.message,
+              refPayco: x_ref_payco,
+            });
           }
+        } else {
+          logger.warn('ePayco webhook missing required data', {
+            userId,
+            planIdOrBookingId,
+            x_ref_payco,
+            x_transaction_state,
+          });
         }
 
         // Send both emails after successful payment (only if email available)
-        if (x_customer_email && userId && planId) {
-          const plan = await PlanModel.getById(planId);
+        if (x_customer_email && userId && planIdOrBookingId) {
+          const plan = await PlanModel.getById(planIdOrBookingId);
           const user = await UserModel.getById(userId);
 
           if (plan) {
@@ -614,7 +629,7 @@ class PaymentService {
               if (welcomeEmailResult.success) {
                 logger.info('Welcome email sent successfully', {
                   to: x_customer_email,
-                  planId,
+                  planId: planIdOrBookingId,
                   language: userLanguage,
                 });
               }
@@ -631,7 +646,7 @@ class PaymentService {
       } else if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Fallida') {
         // Payment failed
         if (payment) {
-          await PaymentModel.updateStatus(paymentId, 'failed', {
+          await PaymentModel.updateStatus(paymentIdOrType, 'failed', {
             transaction_id: x_transaction_id,
             reference: x_ref_payco,
             epayco_ref: x_ref_payco,
@@ -641,7 +656,7 @@ class PaymentService {
         logger.info('ePayco payment failed', {
           x_ref_payco,
           userId,
-          planId,
+          planId: planIdOrBookingId,
         });
 
         return { success: true };

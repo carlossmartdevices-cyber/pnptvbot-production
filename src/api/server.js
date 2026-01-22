@@ -132,23 +132,7 @@ app.post('/api/logout', (req, res) => {
   });
 });
 
-// Entry points - serve auth wrappers
-app.get('/hangouts', (req, res) => {
-  res.sendFile(__dirname + '/../../public/hangouts/auth-wrapper.html');
-});
 
-app.get('/videorama', (req, res) => {
-  res.sendFile(__dirname + '/../../public/videorama-app/auth-wrapper.html');
-});
-
-// Protected routes - serve actual apps after authentication
-app.get('/hangouts/app', telegramAuth, checkTermsAccepted, (req, res) => {
-  res.sendFile(__dirname + '/../../public/hangouts/index.html');
-});
-
-app.get('/videorama/app', telegramAuth, checkTermsAccepted, (req, res) => {
-  res.sendFile(__dirname + '/../../public/videorama-app/index.html');
-});
 
 // Start server
 function startServer() {

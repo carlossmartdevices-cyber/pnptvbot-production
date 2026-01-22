@@ -301,12 +301,6 @@ const MENU_CONFIG = {
       ],
       [
         {
-          id: 'videorama',
-          title: { en: '🎬 PNPtv Videorama', es: '🎬 Videorama PNPtv' },
-          callback: 'menu:videorama',
-          deepLink: 'videorama'
-        },
-        {
           id: 'private_calls',
           title: { en: '📞 Private Calls', es: '📞 Llamadas Privadas' },
           callback: 'PRIVATECALL_START',

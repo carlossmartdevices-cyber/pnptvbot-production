@@ -7,7 +7,7 @@ const MessageRateLimiter = require('./messageRateLimiter');
  * Tutorial Reminder Service
  * Sends proactive tutorial messages to the group (not privately) based on user subscription status:
  * - FREE/Churned users: How to subscribe and become PRIME
- * - PRIME users: How to use Nearby, Hangouts, and Videorama
+ * - PRIME users: How to use Nearby
  */
 class TutorialReminderService {
   static bot = null;
@@ -124,8 +124,6 @@ class TutorialReminderService {
     const message = `💎 PRIME te da:
 • Videos completos de Santino, Lex y latinos hot 🔥
 • Nearby ilimitado
-• Hangouts privados (video rooms)
-• Videorama (música y podcasts 24/7)
 • Canal PRIME exclusivo
 
 💰 $14.99/semana
@@ -190,22 +188,7 @@ PRIME members enjoy:
 💎 *Upgrade to PRIME* and never miss a connection!`,
         button: { text: '💎 Upgrade Now', callback: 'show_subscription_plans' }
       },
-      {
-        title: 'Live Hangouts Access',
-        message: `🎥 *Join Live Video Hangouts!*
 
-PRIME members can join our *live video rooms* and connect face-to-face with the community!
-
-What you're missing:
-
-✅ Weekly live hangouts with members
-✅ Private video rooms
-✅ Meet papis from around the world
-✅ Exclusive live performances
-
-💎 *Become PRIME* to join the party!`,
-        button: { text: '💎 Get PRIME Access', callback: 'show_subscription_plans' }
-      },
       {
         title: 'How to Subscribe',
         message: `💳 *How to Become PRIME - It's Easy!*
@@ -274,22 +257,7 @@ Los miembros PRIME disfrutan:
 💎 *¡Hazte PRIME* y nunca pierdas una conexión!`,
         button: { text: '💎 Actualizar Ahora', callback: 'show_subscription_plans' }
       },
-      {
-        title: 'Acceso a Hangouts en Vivo',
-        message: `🎥 *¡Únete a Hangouts de Video en Vivo!*
 
-¡Los miembros PRIME pueden unirse a nuestras *salas de video en vivo* y conectar cara a cara con la comunidad!
-
-Lo que te estás perdiendo:
-
-✅ Hangouts semanales con miembros
-✅ Salas de video privadas
-✅ Conoce papis de todo el mundo
-✅ Presentaciones en vivo exclusivas
-
-💎 *¡Hazte PRIME* para unirte a la fiesta!`,
-        button: { text: '💎 Obtener Acceso PRIME', callback: 'show_subscription_plans' }
-      },
       {
         title: 'Cómo Suscribirse',
         message: `💳 *Cómo Hacerte PRIME - ¡Es Fácil!*
@@ -353,52 +321,8 @@ Find cloudy papis near you in seconds!
 🔥 *Start exploring!*`,
         button: { text: '📍 Open Nearby', callback: 'menu_nearby' }
       },
-      {
-        title: 'How to Use Hangouts',
-        message: `🎥 *Tutorial: How to Join Video Hangouts*
 
-Connect face-to-face with the community!
 
-*How to join a Hangout:*
-
-1️⃣ Tap *"PNPtv Video Rooms"* in the menu
-2️⃣ See available rooms and who's inside
-3️⃣ Tap *"Join Room"* to enter
-4️⃣ Allow camera/mic access when prompted
-
-💡 *Tips:*
-• You can join with camera off
-• Be respectful - consent matters!
-• Check the schedule for special events
-• Create your own private room anytime
-
-🎉 *Join the party!*`,
-        button: { text: '🎥 Open Hangouts', callback: 'menu_hangouts' }
-      },
-      {
-        title: 'How to Use Videorama',
-        message: `🎵 *Tutorial: How to Use Videorama*
-
-Your 24/7 cloudy music & video experience!
-
-*What is Videorama?*
-A continuous stream of curated music videos, performances, and community content.
-
-*How to access:*
-
-1️⃣ Tap *"Videorama"* in the menu
-2️⃣ Open the Videorama web player
-3️⃣ Sit back and enjoy the vibes!
-
-💡 *Features:*
-• 24/7 streaming - always something playing
-• Curated playlists for the community
-• Music, performances, and more
-• Works on any device
-
-🎶 *Tune in now!*`,
-        button: { text: '🎵 Open Videorama', callback: 'menu_videorama' }
-      },
       {
         title: 'Your PRIME Benefits',
         message: `💎 *Reminder: Your PRIME Benefits*
@@ -407,8 +331,6 @@ Thank you for being a PRIME member! Here's everything you have access to:
 
 ✅ *Full Videos* - Complete exclusive content
 ✅ *Unlimited Nearby* - Find papis anytime
-✅ *Video Hangouts* - Live video rooms
-✅ *Videorama* - 24/7 music stream
 ✅ *PRIME Channel* - Exclusive posts
 ✅ *Priority Support* - We're here for you!
 
@@ -484,30 +406,7 @@ Tap *"Exclusive Content"* in the menu to browse the full library.
 🎉 *¡Únete a la fiesta!*`,
         button: { text: '🎥 Abrir Hangouts', callback: 'menu_hangouts' }
       },
-      {
-        title: 'Cómo Usar Videorama',
-        message: `🎵 *Tutorial: Cómo Usar Videorama*
 
-¡Tu experiencia de música y video 24/7!
-
-*¿Qué es Videorama?*
-Un stream continuo de videos musicales curados, presentaciones y contenido de la comunidad.
-
-*Cómo acceder:*
-
-1️⃣ Toca *"Videorama"* en el menú
-2️⃣ Abre el reproductor web de Videorama
-3️⃣ ¡Relájate y disfruta las vibras!
-
-💡 *Características:*
-• Streaming 24/7 - siempre hay algo
-• Playlists curadas para la comunidad
-• Música, presentaciones y más
-• Funciona en cualquier dispositivo
-
-🎶 *¡Sintoniza ahora!*`,
-        button: { text: '🎵 Abrir Videorama', callback: 'menu_videorama' }
-      },
       {
         title: 'Tus Beneficios PRIME',
         message: `💎 *Recordatorio: Tus Beneficios PRIME*
@@ -516,8 +415,6 @@ Un stream continuo de videos musicales curados, presentaciones y contenido de la
 
 ✅ *Videos Completos* - Contenido exclusivo completo
 ✅ *Nearby Ilimitado* - Encuentra papis cuando quieras
-✅ *Video Hangouts* - Salas de video en vivo
-✅ *Videorama* - Stream de música 24/7
 ✅ *Canal PRIME* - Posts exclusivos
 ✅ *Soporte Prioritario* - ¡Estamos aquí para ti!
 

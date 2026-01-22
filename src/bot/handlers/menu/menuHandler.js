@@ -63,8 +63,6 @@ function buildPrimeMenuKeyboard(lang = 'en') {
     profile: '👤 Mi Perfil',
     membership: '💎 Mi Membresía PRIME',
     nearby: '📍 Usuarios Cercanos',
-    hangouts: '🎥 Hangouts',
-    videorama: '📹 Videorama',
     privateCalls: '📞 Video Llamada VIP',
     streams: '🔴 Transmisiones en Vivo',
     radio: '📻 Radio',
@@ -74,8 +72,6 @@ function buildPrimeMenuKeyboard(lang = 'en') {
     profile: '👤 My Profile',
     membership: '💎 My PRIME Membership',
     nearby: '📍 Nearby Users',
-    hangouts: '🎥 Hangouts',
-    videorama: '📹 Videorama',
     privateCalls: '📞 Private Calls',
     streams: '🔴 Live Streams',
     radio: '📻 Radio',
@@ -87,10 +83,6 @@ function buildPrimeMenuKeyboard(lang = 'en') {
     [Markup.button.callback(labels.profile, 'menu:profile')],
     [Markup.button.callback(labels.membership, 'menu:subscription_status')],
     [Markup.button.callback(labels.nearby, 'menu:nearby')],
-    [
-      Markup.button.callback(labels.hangouts, 'menu:video_calls'),
-      Markup.button.callback(labels.videorama, 'menu:videorama'),
-    ],
     [Markup.button.callback(labels.privateCalls, 'PRIVATECALL_START')],
     [Markup.button.callback(labels.streams, 'menu:live_streams')],
     [Markup.button.callback(labels.radio, 'menu:radio')],
@@ -563,10 +555,6 @@ async function handleMenuCallback(ctx) {
         await handleVCRooms(ctx, lang);
         break;
 
-      case 'videorama':
-        await handleVideorama(ctx, lang);
-        break;
-
       case 'settings':
         await handleSettingsMenu(ctx, lang);
         break;
@@ -637,7 +625,6 @@ async function handleSubscribeMenu(ctx, lang) {
   const message = lang === 'es'
     ? '✨ *Suscripción PRIME*\n\n' +
       '💎 Con PRIME obtienes acceso a:\n\n' +
-      '• 🎥 Hangouts y Videorama\n' +
       '• 📹 Salas de video exclusivas\n' +
       '• 🔴 Transmisiones en vivo premium\n' +
       '• 📍 Usuarios cercanos sin límites\n' +
@@ -645,7 +632,6 @@ async function handleSubscribeMenu(ctx, lang) {
       '¡Únete ahora y disfruta de todos los beneficios!'
     : '✨ *PRIME Subscription*\n\n' +
       '💎 With PRIME you get access to:\n\n' +
-      '• 🎥 Hangouts and Videorama\n' +
       '• 📹 Exclusive video rooms\n' +
       '• 🔴 Premium live streams\n' +
       '• 📍 Unlimited nearby users\n' +
@@ -1054,11 +1040,6 @@ async function handleVCRooms(ctx, lang) {
       '📹 Grabación de pantalla deshabilitada\n' +
       '✅ Usuarios verificados por edad\n' +
       '👥 Videollamadas de grupo en vivo\n\n' +
-      '*PNPtv Hangouts*\n' +
-      '🎭 Salas temáticas de networking\n' +
-      '💬 Interacciones sociales enfocadas\n' +
-      '🎯 Conexiones auténticas\n' +
-      '🔒 Privacidad garantizada\n\n' +
       '_Selecciona una sala para acceder:_'
     : '🎥 *PNPtv VC Rooms*\n\n' +
       '*PNPtv Main Room*\n' +
@@ -1067,21 +1048,14 @@ async function handleVCRooms(ctx, lang) {
       '📹 Screen recording disabled\n' +
       '✅ Age-verified users\n' +
       '👥 Live group video calls\n\n' +
-      '*PNPtv Hangouts*\n' +
-      '🎭 Themed networking rooms\n' +
-      '💬 Social interactions\n' +
-      '🎯 Authentic connections\n' +
-      '🔒 Privacy guaranteed\n\n' +
       '_Select a room to join:_';
 
   const displayName = ctx.from.first_name || 'Guest';
   const mainRoomUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
-  const hangoutsUrl = `https://meet.jit.si/pnptv-hangouts#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
 
   const keyboard = Markup.inlineKeyboard([
     [
-      Markup.button.url(lang === 'es' ? '🎥 Main Room' : '🎥 Main Room', mainRoomUrl),
-      Markup.button.url(lang === 'es' ? '🎭 Hangouts' : '🎭 Hangouts', hangoutsUrl)
+      Markup.button.url(lang === 'es' ? '🎥 Main Room' : '🎥 Main Room', mainRoomUrl)
     ],
     [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
   ]);
@@ -1092,31 +1066,7 @@ async function handleVCRooms(ctx, lang) {
   });
 }
 
-async function handleVideorama(ctx, lang) {
-  const message = lang === 'es'
-    ? '🎬 *PNPtv Videorama*\n\n' +
-      'Accede a Videorama y reproduce la playlist completa (auto-secuencial) con descripciones.\n\n' +
-      'Pulsa el botón de abajo:'
-    : '🎬 *PNPtv Videorama*\n\n' +
-      'Open Videorama and play the full sequence (auto-advance) with descriptions.\n\n' +
-      'Tap the button below:';
 
-  const keyboard = Markup.inlineKeyboard([
-    [Markup.button.url(
-      lang === 'es' ? '🎬 Abrir Videorama' : '🎬 Open Videorama',
-      (() => {
-        const tg = ctx.from?.username ? `@${ctx.from.username}` : '';
-        return tg ? `https://pnptv.app/videorama-app/?tg=${encodeURIComponent(tg)}` : 'https://pnptv.app/videorama-app/';
-      })()
-    )],
-    [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
-  ]);
-
-  await ctx.editMessageText(message, {
-    parse_mode: 'Markdown',
-    ...keyboard
-  });
-}
 
 async function handleSettingsMenu(ctx, lang) {
   const message = lang === 'es'

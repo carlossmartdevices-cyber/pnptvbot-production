@@ -87,7 +87,6 @@ const registerMenuHandlers = (bot) => {
     'show_profile',
     'show_nearby',
     'show_radio',
-    'hangouts_join_main',
     'show_support',
     'show_settings',
     'admin_panel'
@@ -326,8 +325,6 @@ const showMainMenu = async (ctx) => {
         '🎬 **Ver Contenido** — Videos completos, shows y contenido exclusivo\n' +
         '📍 **Nearby** — Encuentra papis cerca de ti\n' +
         '🎥 **PNPtv main Room!** — Sala de video en vivo principal\n' +
-        '🎬 **PNPtv Hangouts!** — Página de hangouts\n' +
-        '🎵 **Videorama** — Colecciones de música y videos\n\n' +
         '**Cristina**, tu asistente IA, está lista para ayudarte.\n\n' +
         '`¡Disfruta todo tu contenido PRIME! 🎬`'
       : '`💎 YOUR PRIME AREA`\n\n' +
@@ -336,8 +333,6 @@ const showMainMenu = async (ctx) => {
         '🎬 **Watch Content** — Full videos, shows & exclusive content\n' +
         '📍 **Nearby** — Find papis near you\n' +
         '🎥 **PNPtv main Room!** — Main live video room\n' +
-        '🎬 **PNPtv Hangouts!** — Hangouts page\n' +
-        '🎵 **Videorama** — Music and video collections\n\n' +
         '**Cristina**, your AI assistant, is ready to help.\n\n' +
         '`Enjoy all your PRIME content! 🎬`');
 
@@ -345,7 +340,7 @@ const showMainMenu = async (ctx) => {
     const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
     const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
     const tg = ctx.from?.username ? `@${ctx.from.username}` : '';
-    // Videorama now uses authenticated route: https://pnptv.app/videorama
+
 
     buttons = [
       [
@@ -355,10 +350,7 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
         Markup.button.callback(lang === 'es' ? '🌎 ¿Quién está cerca?' : '🌎 Who is Nearby', 'show_nearby'),
       ],
-      [
-        Markup.button.url(lang === 'es' ? '📲 Hangouts' : '📲 Hangouts', 'https://pnptv.app/hangouts'),
-        Markup.button.url(lang === 'es' ? '▶️ Videorama' : '▶️ Videorama', 'https://pnptv.app/videorama'),
-      ],
+
       [
         Markup.button.callback(lang === 'es' ? '👥 Video Llamada VIP' : '👥 Meet & Greet', 'MEET_GREET_START'),
       ],
@@ -494,8 +486,6 @@ const showMainMenuEdit = async (ctx) => {
         '🎬 **Ver Contenido** — Videos completos, shows y contenido exclusivo\n' +
         '📍 **Nearby** — Encuentra papis cerca de ti\n' +
         '🎥 **PNPtv main Room!** — Sala de video en vivo principal\n' +
-        '🎬 **PNPtv Hangouts!** — Página de hangouts\n' +
-        '🎵 **Videorama** — Colecciones de música y videos\n\n' +
         '**Cristina**, tu asistente IA, está lista para ayudarte.\n\n' +
         '`¡Disfruta todo tu contenido PRIME! 🎬`'
       : '`💎 YOUR PRIME AREA`\n\n' +
@@ -504,8 +494,6 @@ const showMainMenuEdit = async (ctx) => {
         '🎬 **Watch Content** — Full videos, shows & exclusive content\n' +
         '📍 **Nearby** — Find papis near you\n' +
         '🎥 **PNPtv main Room!** — Main live video room\n' +
-        '🎬 **PNPtv Hangouts!** — Hangouts page\n' +
-        '🎵 **Videorama** — Music and video collections\n\n' +
         '**Cristina**, your AI assistant, is ready to help.\n\n' +
         '`Enjoy all your PRIME content! 🎬`');
 
@@ -520,10 +508,6 @@ const showMainMenuEdit = async (ctx) => {
       [
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
         Markup.button.callback(lang === 'es' ? '🌎 ¿Quién está cerca?' : '🌎 Who is Nearby', 'show_nearby'),
-      ],
-      [
-        Markup.button.url(lang === 'es' ? '📲 Hangouts' : '📲 Hangouts', 'https://pnptv.app/hangouts'),
-        Markup.button.url(lang === 'es' ? '▶️ Videorama' : '▶️ Videorama', 'https://pnptv.app/videorama'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '👥 Video Llamada VIP' : '👥 Meet & Greet', 'MEET_GREET_START'),
@@ -627,7 +611,6 @@ const showLiveRadioTopicMenu = async (ctx) => {
     keyboard = Markup.inlineKeyboard([
       [
         Markup.button.url('📻 Radio', `https://t.me/${botUsername}?start=show_radio`),
-        Markup.button.url('🎥 Salas 24/7', `https://t.me/${botUsername}?start=hangouts_join_main`),
       ],
       [
         Markup.button.url('🎬 Live Shows', `https://t.me/${botUsername}?start=show_live`),
@@ -645,7 +628,6 @@ const showLiveRadioTopicMenu = async (ctx) => {
       'This topic is for **PRIME members** to get live updates on shows, calls & radio!\n\n' +
       '**With PRIME you get:**\n' +
       '• 📻 24/7 Radio access\n' +
-      '• 🎥 Join video hangouts\n' +
       '• 🎬 Watch live performer shows\n' +
       '• 📍 Find nearby cloudy papis\n' +
       '• 📹 Full-length videos\n\n' +

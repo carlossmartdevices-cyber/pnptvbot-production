@@ -36,7 +36,7 @@ async function setupCollections() {
 
     const samplePaymentLinks = [
       {
-        url: 'https://pay.getmeru.com/CtJb_x',
+        url: 'https://pay.getmeru.com/8nADxy',
         used: false,
         product: 'lifetime-pass',
         price: 80,
@@ -44,7 +44,7 @@ async function setupCollections() {
         createdAt: new Date(),
       },
       {
-        url: 'https://pay.getmeru.com/Dt8c_y',
+        url: 'https://pay.getmeru.com/-f68mX',
         used: false,
         product: 'lifetime-pass',
         price: 80,
@@ -52,7 +52,7 @@ async function setupCollections() {
         createdAt: new Date(),
       },
       {
-        url: 'https://pay.getmeru.com/Et9d_z',
+        url: 'https://pay.getmeru.com/V5mPb9',
         used: false,
         product: 'lifetime-pass',
         price: 80,
@@ -60,7 +60,7 @@ async function setupCollections() {
         createdAt: new Date(),
       },
       {
-        url: 'https://pay.getmeru.com/Ft0e_a',
+        url: 'https://pay.getmeru.com/Cg41My',
         used: false,
         product: 'lifetime-pass',
         price: 80,
@@ -68,7 +68,7 @@ async function setupCollections() {
         createdAt: new Date(),
       },
       {
-        url: 'https://pay.getmeru.com/Gt1f_b',
+        url: 'https://pay.getmeru.com/hr5o0k',
         used: false,
         product: 'lifetime-pass',
         price: 80,

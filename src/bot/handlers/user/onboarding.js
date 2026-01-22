@@ -145,7 +145,38 @@ If you have any questions, use /support to contact us.`;
       await showLanguageSelection(ctx);
     } catch (error) {
       logger.error('Error in /start command:', error);
-      await ctx.reply('An error occurred. Please try again.');
+      
+      // Handle Telegram API errors gracefully
+      if (error.message && error.message.includes('chat not found')) {
+        logger.warn('Chat not found in /start command - user may have blocked bot or deleted chat', {
+          userId: ctx.from?.id,
+          chatId: ctx.chat?.id
+        });
+        return; // Don't try to send message to non-existent chat
+      }
+
+      // Handle other Telegram API errors (Bad Request, Forbidden, etc.)
+      if (error.message && (error.message.includes('Bad Request') || error.message.includes('Forbidden') || error.message.includes('message is not modified'))) {
+        logger.warn('Telegram API error in /start command', {
+          error: error.message,
+          userId: ctx.from?.id,
+          chatId: ctx.chat?.id
+        });
+        return; // Don't try to send message if Telegram API is having issues
+      }
+
+      try {
+        await ctx.reply('An error occurred. Please try again.');
+      } catch (replyError) {
+        if (replyError.message && replyError.message.includes('chat not found')) {
+          logger.warn('Cannot send error message - chat not found', {
+            userId: ctx.from?.id,
+            chatId: ctx.chat?.id
+          });
+        } else {
+          logger.error('Failed to send error message in /start:', replyError);
+        }
+      }
     }
   });
 

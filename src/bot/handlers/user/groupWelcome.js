@@ -215,8 +215,6 @@ Aquí la vuelta es simple: gente real, buena vibra, cero filtro.
 💎 Si te haces PRIME, desbloqueas:
 • Videos completos de Santino, Lex y latinos hot 🔥
 • Nearby ilimitado
-• Hangouts privados (video rooms)
-• Videorama (música y podcasts 24/7)
 • Canal PRIME exclusivo
 
 💰 $14.99/semana
@@ -239,8 +237,6 @@ This place is simple: real people, real vibes, no filters.
 💎 If you go PRIME, you unlock:
 • Full-length videos from Santino, Lex & hot latinos 🔥
 • Unlimited Nearby Members
-• Private Hangouts (video rooms)
-• Videorama (music & podcasts 24/7)
 • Exclusive PRIME Channel
 
 💰 $14.99/week

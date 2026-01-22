@@ -32,10 +32,6 @@ const integratePrivateCallsToMenu = (bot) => {
         ],
         [
           {
-            text: lang === 'es' ? '🎥 Hangouts' : '🎥 Hangouts',
-            callback_data: 'hangouts_menu'
-          },
-          {
             text: lang === 'es' ? '🎬 Videos' : '🎬 Videos',
             callback_data: 'videos_menu'
           }

@@ -5,7 +5,6 @@ const supportHandlers = require('./support');
 const playerHandlers = require('./player');
 const membersAreaHandlers = require('./membersArea');
 const menuHandlers = require('./menu');
-const hangoutsHandlers = require('./hangouts');
 
 /**
  * Register all media handlers
@@ -22,7 +21,6 @@ const registerMediaHandlers = (bot) => {
   console.log('>>> MEDIA HANDLERS: About to register menu handlers');
   menuHandlers(bot);
   console.log('>>> MEDIA HANDLERS: Menu handlers registered');
-  hangoutsHandlers(bot);
   console.log('>>> MEDIA HANDLERS: All registered');
 };
 

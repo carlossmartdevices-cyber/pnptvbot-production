@@ -26,7 +26,6 @@ const registerPaymentHandlers = (bot) => {
           '¡Únete a la familia PRIME, papi! 🔥\n\n' +
           '**Con PRIME obtienes:**\n' +
           '• 📻 Radio 24/7\n' +
-          '• 🎥 Video hangouts\n' +
           '• 🎬 Shows en vivo de performers\n' +
           '• 📍 Encuentra papis cerca de ti\n' +
           '• 📹 Videos completos\n\n' +
@@ -35,7 +34,6 @@ const registerPaymentHandlers = (bot) => {
           'Join the PRIME family, papi! 🔥\n\n' +
           '**With PRIME you get:**\n' +
           '• 📻 24/7 Radio access\n' +
-          '• 🎥 Join video hangouts\n' +
           '• 🎬 Watch live performer shows\n' +
           '• 📍 Find nearby cloudy papis\n' +
           '• 📹 Full-length videos\n\n' +

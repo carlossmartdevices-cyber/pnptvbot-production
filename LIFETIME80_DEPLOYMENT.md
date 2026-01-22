@@ -136,17 +136,16 @@ All of these URLs serve the Lifetime Pass landing page:
 
 **Payment Provider:** Meru  
 **Amount:** $80 USD  
-**Load Balancing:** 10 different payment links for distribution:
-- pays.getmeru.com/curX9Q
-- pays.getmeru.com/_VlAog
-- pays.getmeru.com/HcxJnS
-- pays.getmeru.com/vjQREi
-- pays.getmeru.com/u9PTJd
-- pays.getmeru.com/KVWbaA
-- pays.getmeru.com/I3pPQW
-- pays.getmeru.com/Ma76qv
-- pays.getmeru.com/4AHHS9
-- pays.getmeru.com/nM1nUt
+**Load Balancing:** 9 different payment links for distribution:
+- pay.getmeru.com/8nADxy
+- pay.getmeru.com/-f68mX
+- pay.getmeru.com/V5mPb9
+- pay.getmeru.com/Cg41My
+- pay.getmeru.com/hr5o0k
+- pay.getmeru.com/VonEE6
+- pay.getmeru.com/-xTS7C
+- pay.getmeru.com/keLZmK
+- pay.getmeru.com/YxBcQw
 
 **Random Selection:** Each "Pay Now" click randomly selects one of the 10 links
 

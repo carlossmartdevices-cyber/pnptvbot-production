@@ -77,16 +77,8 @@ function buildGroupMenuPayload(ctx) {
       'menu_nearby'
     )],
     [Markup.button.callback(
-      lang === 'es' ? '🎥 PNPtv Video Rooms' : '🎥 PNPtv Video Rooms',
-      'menu_hangouts'
-    )],
-    [Markup.button.callback(
       lang === 'es' ? '🎬 Contenido Exclusivo' : '🎬 Exclusive Content',
       'menu_content'
-    )],
-    [Markup.button.callback(
-      lang === 'es' ? '🎵 Videorama' : '🎵 Videorama',
-      'menu_videorama'
     )],
   ];
 
@@ -131,7 +123,7 @@ const registerMenuHandlers = (bot) => {
 
 ¡Gracias por ser PRIME, papi! 🔥
 
-Pulsa los botones de abajo y disfruta todo lo que hemos preparado para ti — videos, Nearby, hangouts, lives, shows, y más.
+Pulsa los botones de abajo y disfruta todo lo que hemos preparado para ti — videos, Nearby, lives, shows, y más.
 
 *Cristina*, nuestra asistente IA, está aquí para guiarte y responder tus preguntas.
 
@@ -140,7 +132,7 @@ Pulsa los botones de abajo y disfruta todo lo que hemos preparado para ti — vi
 
 Thank you for being PRIME, papi! 🔥
 
-Tap the buttons below and enjoy everything we've prepared for you — videos, Nearby, hangouts, lives, shows, and more.
+Tap the buttons below and enjoy everything we've prepared for you — videos, Nearby, lives, shows, and more.
 
 *Cristina*, our AI assistant, is here to guide you and answer questions.
 
@@ -160,16 +152,8 @@ Tap the buttons below and enjoy everything we've prepared for you — videos, Ne
             'menu_nearby'
           )],
           [Markup.button.callback(
-            lang === 'es' ? '🎥 PNPtv Video Rooms' : '🎥 PNPtv Video Rooms',
-            'menu_hangouts'
-          )],
-          [Markup.button.callback(
             lang === 'es' ? '🎬 Contenido Exclusivo' : '🎬 Exclusive Content',
             'menu_content'
-          )],
-          [Markup.button.callback(
-            lang === 'es' ? '🎵 Videorama' : '🎵 Videorama',
-            'menu_videorama'
           )],
           [Markup.button.callback(
             lang === 'es' ? '💎 Mi Membresía' : '💎 My Membership',
@@ -191,7 +175,7 @@ Tap the buttons below and enjoy everything we've prepared for you — videos, Ne
 
 @${username} ¡nos encanta tenerte en la Comunidad PNPtv! 💜
 
-Pulsa *Desbloquear PRIME* para más diversión — videos completos, lives, hangouts, Nearby, y todas las funciones de miembro.
+Pulsa *Desbloquear PRIME* para más diversión — videos completos, lives, Nearby, y todas las funciones de miembro.
 
 *Cristina*, nuestra asistente IA, está aquí para guiarte y responder tus preguntas.
 
@@ -200,7 +184,7 @@ Pulsa *Desbloquear PRIME* para más diversión — videos completos, lives, hang
 
 @${username} we love having you in the PNPtv Community! 💜
 
-Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, hangouts, Nearby, and all member features.
+Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, Nearby, and all member features.
 
 *Cristina*, our AI assistant, is here to guide you and answer questions.
 
@@ -220,16 +204,8 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
             'menu_nearby'
           )],
           [Markup.button.callback(
-            lang === 'es' ? '🎥 PNPtv Video Rooms' : '🎥 PNPtv Video Rooms',
-            'menu_hangouts'
-          )],
-          [Markup.button.callback(
             lang === 'es' ? '🎬 Contenido Exclusivo 🔒' : '🎬 Exclusive Content 🔒',
             'menu_content'
-          )],
-          [Markup.button.url(
-            lang === 'es' ? '🎵 Videorama' : '🎵 Videorama',
-            'https://pnptv.app/videorama-app'
           )],
           [Markup.button.callback(
             lang === 'es' ? '🆘 Ayuda' : '🆘 Help',
@@ -667,71 +643,7 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
     }
   });
 
-  /**
-   * Videorama Menu
-   */
-  bot.action('menu_videorama', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      await ctx.answerCbQuery();
 
-      const videoramaText = lang === 'es'
-        ? `🎵 *Videorama - Tu Biblioteca de Videos*
-
-🎬 *Descubre y disfruta contenido de video de la comunidad*
-
-🎯 *Características:*
-✅ Explora videos de miembros de PNPtv
-✅ Filtra por categorías y popularidad
-✅ Guarda tus videos favoritos
-✅ Acceso rápido a contenido nuevo
-✅ Interfaz intuitiva y rápida
-
-📱 *Cómo usar:*
-1. Abre Videorama desde el menú principal
-2. Explora las categorías disponibles
-3. Selecciona un video para verlo
-4. Usa los filtros para encontrar lo que buscas
-5. Guarda tus favoritos para acceso rápido
-
-💡 *Consejo:* Videorama muestra contenido de toda la comunidad. Más interacciones = más contenido recomendado para ti!`
-        : `🎵 *Videorama - Your Video Library*
-
-🎬 *Discover and enjoy video content from the community*
-
-🎯 *Features:*
-✅ Browse videos from PNPtv members
-✅ Filter by categories and popularity
-✅ Save your favorite videos
-✅ Quick access to new content
-✅ Intuitive and fast interface
-
-📱 *How to use:*
-1. Open Videorama from the main menu
-2. Explore available categories
-3. Select a video to watch
-4. Use filters to find what you're looking for
-5. Save favorites for quick access
-
-💡 *Tip:* Videorama shows content from the entire community. More interactions = more recommended content for you!`;
-
-      await ctx.editMessageText(videoramaText, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.url(
-            lang === 'es' ? '🌐 Abrir Videorama' : '🌐 Open Videorama',
-            (() => {
-              const tg = ctx.from?.username ? `@${ctx.from.username}` : '';
-              return tg ? `https://pnptv.app/videorama-app/?tg=${encodeURIComponent(tg)}` : 'https://pnptv.app/videorama-app/';
-            })()
-          )],
-          [Markup.button.callback(lang === 'es' ? '🔙 Atrás' : '🔙 Back', 'menu_main')],
-        ]),
-      });
-    } catch (error) {
-      logger.error('Error in videorama menu:', error);
-    }
-  });
 
   /**
    * Membership Menu
@@ -836,76 +748,7 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, ha
     }
   });
 
-  /**
-   * PNPtv Hangouts! - Video rooms
-   */
-  bot.action('menu_hangouts', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      await ctx.answerCbQuery();
 
-      const hangoutsText = lang === 'es'
-        ? `🎥 PNPtv Video Room!
-
-Salas de video en vivo para conectar con otros miembros.
-
-**Características:**
-• 👥 Sala Comunitaria 24/7 - Siempre abierta para conocer gente
-• 🔒 Salas privadas - Crea salas exclusivas con amigos
-• 👫 Hasta 4 participantes por sala
-• 🎬 Video y audio de alta calidad
-• 💬 Chat en tiempo real
-
-**Sala Comunitaria 24/7:**
-Nuestra sala principal está abierta 24 horas para que conozcas miembros nuevos, hagas amigos y disfrutes de conexiones sin presión.
-
-**Cómo usar:**
-1. Entra a la Sala Comunitaria 24/7 para empezar
-2. O crea tu propia sala privada
-3. Invita amigos a tu sala personal
-4. ¡Disfruta conexiones en video de calidad!`
-        : `🎥 PNPtv Video Room!
-
-Live video rooms to connect with other members.
-
-**Features:**
-• 👥 24/7 PNPtv Haus - Always open to meet new people
-• 🔒 Private rooms - Create exclusive rooms with friends
-• 👫 Up to 4 participants per room
-• 🎬 High-quality video and audio
-• 💬 Real-time chat
-
-**24/7 PNPtv Haus:**
-Our main room is open around the clock for you to meet new members, make friends, and enjoy pressure-free connections.
-
-**How to use:**
-1. Join the 24/7 PNPtv Haus to get started
-2. Or create your own private room
-3. Invite friends to your personal room
-4. Enjoy quality video connections!`;
-
-      // Get user's display name for Jitsi
-      const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
-      const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
-
-      await ctx.editMessageText(hangoutsText, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.url(
-            lang === 'es' ? '👥 PNPtv Haus 24/7' : '👥 PNPtv Haus 24/7',
-            jitsiUrl
-          )],
-          [Markup.button.url(
-            lang === 'es' ? '📱 Abre Hangouts' : '📱 Open Hangouts',
-            process.env.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts'
-          )],
-          [Markup.button.callback(lang === 'es' ? '🔙 Atrás' : '🔙 Back', 'menu_main')],
-        ]),
-      });
-    } catch (error) {
-      logger.error('Error in hangouts menu:', error);
-    }
-  });
 
   /**
    * PNPtv Live! - Coming soon

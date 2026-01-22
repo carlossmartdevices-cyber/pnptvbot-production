@@ -29,7 +29,7 @@ const logger = require('../src/utils/logger');
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 const DONATION_LINK = 'https://www.paypal.com/donate/?hosted_button_id=JP32JBXXNMYLN';
-const PRIVATE_CALL_LINK = 'https://pay.getmeru.com/DxMlZO';
+const PRIVATE_CALL_LINK = 'https://pay.getmeru.com/8nADxy';
 
 const broadcastMessages = {
   en: `🇻🇪 *Venezuela Fundraising Initiative*

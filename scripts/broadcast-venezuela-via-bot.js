@@ -13,7 +13,7 @@ const logger = require('../src/utils/logger');
 const adminService = require('../src/bot/services/adminService');
 
 const DONATION_LINK = 'https://www.paypal.com/donate/?hosted_button_id=JP32JBXXNMYLN';
-const PRIVATE_CALL_LINK = 'https://pay.getmeru.com/DxMlZO';
+const PRIVATE_CALL_LINK = 'https://pay.getmeru.com/8nADxy';
 const ADMIN_ID = process.env.ADMIN_ID || '8365312597';
 
 const broadcastMessages = {

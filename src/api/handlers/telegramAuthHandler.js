@@ -20,7 +20,7 @@ const handleTelegramAuth = async (req, res) => {
     
     // Check if user exists in our database
     const userQuery = await query(
-      'SELECT id, telegram_id, username, subscription_status, accepted_terms FROM users WHERE telegram_id = $1',
+      'SELECT id, telegram, username, subscription_status, accepted_terms FROM users WHERE telegram = $1',
       [telegramUser.id]
     );
     

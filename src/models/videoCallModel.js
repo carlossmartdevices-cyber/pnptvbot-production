@@ -307,7 +307,7 @@ class VideoCallModel {
    */
   static async getAllPublic() {
     try {
-      logger.info('Fetching public hangouts from database');
+      logger.info('Fetching public video calls from database');
       const result = await query(
         `SELECT * FROM video_calls
          WHERE is_public = true AND is_active = true
@@ -315,7 +315,7 @@ class VideoCallModel {
          LIMIT 50`
       );
 
-      logger.info('Successfully fetched public hangouts', { count: result.rows.length });
+      logger.info('Successfully fetched public video calls', { count: result.rows.length });
       return result.rows.map(row => this._mapCallFromDb(row));
     } catch (error) {
       logger.error('Error getting public calls:', error, {
@@ -494,7 +494,7 @@ class VideoCallModel {
         `INSERT INTO agora_channels (
           channel_name, channel_type, feature_name, created_by,
           max_participants, is_active, metadata
-        ) VALUES ($1, 'call', 'hangouts', $2, $3, true, $4)`,
+        ) VALUES ($1, 'call', 'video', $2, $3, true, $4)`,
         [channelName, callId, maxParticipants, JSON.stringify({ callId })]
       );
     } catch (error) {

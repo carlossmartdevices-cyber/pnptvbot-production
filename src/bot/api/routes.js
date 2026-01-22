@@ -16,9 +16,7 @@ const webhookController = require('./controllers/webhookController');
 const subscriptionController = require('./controllers/subscriptionController');
 const paymentController = require('./controllers/paymentController');
 const invitationController = require('./controllers/invitationController');
-const hangoutsController = require('./controllers/hangoutsController');
 const playlistController = require('./controllers/playlistController');
-const videoramaController = require('./controllers/videoramaController');
 const podcastController = require('./controllers/podcastController');
 const healthController = require('./controllers/healthController');
 
@@ -60,30 +58,7 @@ app.use(session({
 // Logging (before other middleware for accurate request tracking)
 app.use(morgan('combined', { stream: logger.stream }));
 
-// Serve auth wrappers before static middleware to prevent conflicts
-app.get(['/videorama-app', '/videorama-app/'], pageLimiter, (req, res) => {
-  const authWrapperPath = path.join(__dirname, '../../../public/videorama-app/auth-wrapper.html');
-  if (!fs.existsSync(authWrapperPath)) {
-    return res.status(404).send('Videorama auth wrapper not found.');
-  }
-  // Set cache control headers to prevent browser caching issues
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  return res.sendFile(authWrapperPath);
-});
 
-app.get('/hangouts', pageLimiter, (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
-  // Set cache control headers to prevent browser caching issues
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(__dirname, '../../../public/hangouts/auth-wrapper.html'));
-});
 
 // Custom static file middleware with easybots.store blocking
 const serveStaticWithBlocking = (staticPath) => {
@@ -293,23 +268,7 @@ app.get('/how-to-use', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/how-to-use.html'));
 });
 
-// Videorama (legacy) now redirects to the new React app
-app.get('/videorama', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Not found');
-  }
-  return res.redirect(301, '/videorama-app/');
-});
 
-// Legacy path redirect
-app.get('/video-rooms', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Not found');
-  }
-  return res.redirect(301, '/videorama-app/');
-});
 
 // Lifetime Pass landing page
 app.get('/lifetime-pass', (req, res) => {
@@ -360,38 +319,7 @@ app.get('/policies', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public', fileName));
 });
 
-// Protected Videorama app - requires authentication
-app.get('/videorama/app', telegramAuth, checkTermsAccepted, (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Not found');
-  }
-  const indexPath = path.join(__dirname, '../../../public/videorama-app/index.html');
-  if (!fs.existsSync(indexPath)) {
-    return res.status(404).send('Videorama app not built. Deploy `public/videorama-app/`.');
-  }
-  // Set cache control headers to prevent browser caching issues
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  return res.sendFile(indexPath);
-});
 
-// Music Collections and Playlists routes have been removed
-// These functionalities are now integrated into the Videorama app
-
-// Protected Hangouts app - requires authentication
-app.get('/hangouts/app', telegramAuth, checkTermsAccepted, (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
-  // Set cache control headers to prevent browser caching issues
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(__dirname, '../../../public/hangouts', 'index.html'));
-});
 
 // ePayco Checkout page - serves payment-checkout.html for /checkout/:paymentId
 app.get('/checkout/:paymentId', pageLimiter, (req, res) => {
@@ -643,17 +571,7 @@ app.get('/api/stats', asyncHandler(async (req, res) => {
   res.json(stats);
 }));
 
-// Hangouts API routes
-app.post('/api/hangouts/create', asyncHandler(hangoutsController.createHangout));
-app.get('/api/hangouts/public', asyncHandler(hangoutsController.getPublicHangouts));
-app.get('/api/hangouts/my-rooms', asyncHandler(hangoutsController.getMyHangouts));
-app.post('/api/hangouts/join/:roomId', asyncHandler(hangoutsController.joinHangout));
-app.post('/api/hangouts/end/:roomId', asyncHandler(hangoutsController.endHangout));
-app.get('/api/hangouts/:roomId', asyncHandler(hangoutsController.getHangoutDetails));
-// Delete room endpoints
-app.delete('/api/hangouts/video-call/:roomId', asyncHandler(hangoutsController.deleteVideoCallRoom));
-app.delete('/api/hangouts/jitsi/:roomId', asyncHandler(hangoutsController.deleteJitsiRoom));
-app.delete('/api/hangouts/main/:roomId', asyncHandler(hangoutsController.deleteMainRoom));
+
 
 // Playlist API routes
 app.get('/api/playlists/user', asyncHandler(playlistController.getUserPlaylists));
@@ -663,12 +581,7 @@ app.post('/api/playlists/:playlistId/videos', asyncHandler(playlistController.ad
 app.delete('/api/playlists/:playlistId/videos/:videoId', asyncHandler(playlistController.removeFromPlaylist));
 app.delete('/api/playlists/:playlistId', asyncHandler(playlistController.deletePlaylist));
 
-// Videorama uploads (local storage under /public/uploads/videorama)
-app.post(
-  '/api/videorama/upload',
-  videoramaController.upload.single('video'),
-  asyncHandler(videoramaController.uploadVideo)
-);
+
 
 // Podcasts uploads (local storage under /public/uploads/podcasts)
 app.post(

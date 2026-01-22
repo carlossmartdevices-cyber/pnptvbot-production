@@ -85,7 +85,6 @@ const registerImprovedSharePostHandlers = (bot) => {
     { id: 'prime', chatId: process.env.PRIME_CHANNEL_ID, threadId: null, name: '💎 Prime Channel', type: 'channel' },
     { id: 'general', chatId: process.env.GROUP_ID, threadId: parseInt(process.env.GENERAL_TOPIC_ID) || 1, name: '💬 General', type: 'topic' },
     { id: 'walloffame', chatId: process.env.GROUP_ID, threadId: parseTopicId(process.env.WALL_OF_FAME_TOPIC_ID) || 2, name: '🏆 Wall Of Fame', type: 'topic' },
-    { id: 'hangouts', chatId: process.env.GROUP_ID, threadId: parseInt(process.env.HANGOUTS_TOPIC_ID) || parseInt(process.env.NOTIFICATIONS_TOPIC_ID) || null, name: '🎉 Hangouts Notifications', type: 'topic' },
   ].filter(d => d.chatId); // Only include destinations with valid chatId
 
   // ═══════════════════════════════════════════════════════════════════════════

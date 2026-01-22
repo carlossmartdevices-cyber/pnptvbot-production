@@ -2045,8 +2045,9 @@ let registerAdminHandlers = (bot) => {
       }
 
       // Toggle active status
+      const planData = plan.dataValues ? plan.dataValues : plan;
       await PlanModel.createOrUpdate(planId, {
-        ...plan.dataValues,
+        ...planData,
         active: !plan.active,
       });
 
@@ -3408,7 +3409,8 @@ let registerAdminHandlers = (bot) => {
           return;
         }
 
-        let updateData = { ...plan.dataValues };
+        const planData = plan.dataValues ? plan.dataValues : plan;
+        let updateData = { ...planData };
         let successMessage = '';
 
         switch (field) {

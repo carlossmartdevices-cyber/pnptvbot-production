@@ -83,13 +83,36 @@ class Plan {
       price: parseFloat(row.price),
       currency: row.currency || 'USD',
       duration: row.duration_days || row.duration || 30,
-      features: row.features || [],
-      featuresEs: row.features_es || [],
+      features: this.normalizeFeatures(row.features),
+      featuresEs: this.normalizeFeatures(row.features_es),
       active: row.active,
       isLifetime: row.is_lifetime || false,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+  }
+
+  /**
+   * Normalize features fields to a consistent array shape.
+   * @param {any} value - Features value from DB
+   * @returns {Array<string>} Features array
+   */
+  static normalizeFeatures(value) {
+    if (Array.isArray(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        logger.warn('Failed to parse plan features JSON', { error: error.message });
+        return [];
+      }
+    }
+
+    return [];
   }
 
   /**

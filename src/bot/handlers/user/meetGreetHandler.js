@@ -2,7 +2,7 @@ const { Markup } = require('telegraf');
 const ModelService = require('../../services/modelService');
 const MeetGreetService = require('../../services/meetGreetService');
 const AvailabilityService = require('../../services/availabilityService');
-const { getLanguage } = require('../../utils/helpers');
+const { getLanguage, safeEditMessage } = require('../../utils/helpers');
 const logger = require('../../../utils/logger');
 
 /**
@@ -33,7 +33,7 @@ const registerMeetGreetHandlers = (bot) => {
           ? `🔍 *No hay modelos disponibles*\n\nNo hay modelos disponibles en este momento. Por favor, intenta más tarde.`
           : `🔍 *No Models Available*\n\nNo models are available at this time. Please try again later.`;
         
-        await ctx.editMessageText(message, {
+        await safeEditMessage(ctx, message, {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback(lang === 'es' ? '🔙 Volver al Menú' : '🔙 Back to Menu', 'back_to_main')]
@@ -65,7 +65,7 @@ const registerMeetGreetHandlers = (bot) => {
         ? `💃 *Selecciona un Modelo*\n\nElige un modelo para tu Video Llamada VIP:`
         : `💃 *Select a Model*\n\nChoose a model for your VIP Video Call:`;
 
-      await ctx.editMessageText(message, {
+      await safeEditMessage(ctx, message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard(buttons)
       });
@@ -122,7 +122,7 @@ const registerMeetGreetHandlers = (bot) => {
           `🔥 *90 min* - $250\n1:1 Video Call with your fav Latino papi + his boytoy of the season\n\n` +
           `Choose the duration for your experience:`;
 
-      await ctx.editMessageText(message, {
+      await safeEditMessage(ctx, message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard(buttons)
       });
@@ -204,7 +204,7 @@ const registerMeetGreetHandlers = (bot) => {
         ? `📅 *Selecciona una Fecha*\n\nModelo: ${model.name}\nDuración: ${durationText}\nPrecio: $${price}\n\nElige una fecha disponible:`
         : `📅 *Select a Date*\n\nModel: ${model.name}\nDuration: ${durationText}\nPrice: $${price}\n\nChoose an available date:`;
 
-      await ctx.editMessageText(message, {
+      await safeEditMessage(ctx, message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard(buttons)
       });
@@ -256,7 +256,7 @@ const registerMeetGreetHandlers = (bot) => {
           ? `⏰ *No hay horarios disponibles*\n\nNo hay horarios disponibles para esta fecha. Por favor, elige otra fecha.`
           : `⏰ *No Time Slots Available*\n\nNo time slots are available for this date. Please choose another date.`;
         
-        await ctx.editMessageText(message, {
+        await safeEditMessage(ctx, message, {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback(lang === 'es' ? '🔙 Volver' : '🔙 Back', `select_date_${dateStr}`)]
@@ -299,7 +299,7 @@ const registerMeetGreetHandlers = (bot) => {
         ? `⏰ *Selecciona un Horario*\n\nModelo: ${model.name}\nFecha: ${dateStr}\nDuración: ${durationText}\nPrecio: $${price}\n\nHorarios disponibles:`
         : `⏰ *Select a Time Slot*\n\nModel: ${model.name}\nDate: ${dateStr}\nDuration: ${durationText}\nPrice: $${price}\n\nAvailable time slots:`;
 
-      await ctx.editMessageText(message, {
+      await safeEditMessage(ctx, message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard(buttons)
       });
@@ -333,14 +333,54 @@ const registerMeetGreetHandlers = (bot) => {
   async function showPaymentSelection(ctx, lang) {
     try {
       const { selectedModel, selectedDuration, selectedDate, selectedSlot } = ctx.session.meetGreet || {};
+      
+      // Validate booking details with user-friendly feedback
       if (!selectedModel || !selectedDuration || !selectedDate || !selectedSlot) {
-        throw new Error('Booking details incomplete');
+        logger.warn('Incomplete booking details in session', {
+          userId: ctx.from?.id,
+          session: ctx.session.meetGreet
+        });
+        
+        const missingMessage = lang === 'es' 
+          ? '❌ Por favor completa todos los pasos de reserva primero.'
+          : '❌ Please complete all booking steps first.';
+        
+        try {
+          await ctx.answerCbQuery(missingMessage);
+        } catch (cbError) {
+          logger.warn('Failed to answer callback query for incomplete booking', {
+            error: cbError.message,
+            userId: ctx.from?.id
+          });
+          // Try to send as a regular message if callback fails
+          try {
+            await ctx.reply(missingMessage);
+          } catch (replyError) {
+            logger.error('Failed to send incomplete booking message', {
+              error: replyError.message,
+              userId: ctx.from?.id
+            });
+          }
+        }
+        return;
       }
 
       const model = await ModelService.getModelById(selectedModel);
       const slot = await AvailabilityService.getAvailabilityById(selectedSlot);
+      
       if (!model || !slot) {
-        throw new Error('Model or slot not found');
+        logger.warn('Model or slot not found', {
+          selectedModel,
+          selectedSlot,
+          userId: ctx.from?.id
+        });
+        
+        const notFoundMessage = lang === 'es'
+          ? '❌ Modelo o horario no disponible. Por favor selecciona nuevamente.'
+          : '❌ Model or time slot not available. Please select again.';
+        
+        await ctx.answerCbQuery(notFoundMessage);
+        return;
       }
 
       const price = MeetGreetService.calculatePrice(selectedDuration);
@@ -364,7 +404,7 @@ const registerMeetGreetHandlers = (bot) => {
         ? `💰 *Selecciona Método de Pago*\n\n📞 Video Llamada VIP\nModelo: ${model.name}\nFecha: ${selectedDate}\nHora: ${startTime}\nDuración: ${durationText}\nPrecio: $${price}\n\nSelecciona tu método de pago:`
         : `💰 *Select Payment Method*\n\n📞 VIP Video Call\nModel: ${model.name}\nDate: ${selectedDate}\nTime: ${startTime}\nDuration: ${durationText}\nPrice: $${price}\n\nSelect your payment method:`;
 
-      await ctx.editMessageText(message, {
+      await safeEditMessage(ctx, message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard(buttons)
       });
@@ -384,14 +424,35 @@ const registerMeetGreetHandlers = (bot) => {
       const { selectedModel, selectedDuration, selectedDate, selectedSlot } = ctx.session.meetGreet || {};
       const userId = ctx.from.id.toString();
 
+      // Validate booking details with user-friendly feedback
       if (!selectedModel || !selectedDuration || !selectedSlot) {
-        throw new Error('Booking details incomplete');
+        logger.warn('Incomplete booking details for payment', {
+          userId,
+          session: ctx.session.meetGreet
+        });
+        
+        const missingMessage = lang === 'es'
+          ? '❌ Por favor completa todos los pasos de reserva primero.'
+          : '❌ Please complete all booking steps first.';
+        
+        await safeEditMessage(ctx, missingMessage);
+        return;
       }
 
       // Get slot details
       const slot = await AvailabilityService.getAvailabilityById(selectedSlot);
       if (!slot) {
-        throw new Error('Slot not found');
+        logger.warn('Slot not found for booking', {
+          selectedSlot,
+          userId
+        });
+        
+        const notFoundMessage = lang === 'es'
+          ? '❌ Horario seleccionado no disponible. Por favor elige otro.'
+          : '❌ Selected time slot not available. Please choose another.';
+        
+        await safeEditMessage(ctx, notFoundMessage);
+        return;
       }
 
       const model = await ModelService.getModelById(selectedModel);
@@ -421,7 +482,7 @@ const registerMeetGreetHandlers = (bot) => {
         ? `💳 *Pago con Tarjeta de Crédito*\n\n📞 Video Llamada VIP con ${model.name}\n💰 Total: $${price} USD\n\n👇 Haz clic en el botón para completar tu pago:`
         : `💳 *Credit Card Payment*\n\n📞 VIP Video Call with ${model.name}\n💰 Total: $${price} USD\n\n👇 Click the button below to complete your payment:`;
 
-      await ctx.editMessageText(message, {
+      await safeEditMessage(ctx, message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.url(lang === 'es' ? '💳 Pagar Ahora' : '💳 Pay Now', checkoutUrl)],
@@ -444,14 +505,35 @@ const registerMeetGreetHandlers = (bot) => {
       const { selectedModel, selectedDuration, selectedDate, selectedSlot } = ctx.session.meetGreet || {};
       const userId = ctx.from.id.toString();
 
+      // Validate booking details with user-friendly feedback
       if (!selectedModel || !selectedDuration || !selectedSlot) {
-        throw new Error('Booking details incomplete');
+        logger.warn('Incomplete booking details for crypto payment', {
+          userId,
+          session: ctx.session.meetGreet
+        });
+        
+        const missingMessage = lang === 'es'
+          ? '❌ Por favor completa todos los pasos de reserva primero.'
+          : '❌ Please complete all booking steps first.';
+        
+        await safeEditMessage(ctx, missingMessage);
+        return;
       }
 
       // Get slot details
       const slot = await AvailabilityService.getAvailabilityById(selectedSlot);
       if (!slot) {
-        throw new Error('Slot not found');
+        logger.warn('Slot not found for crypto booking', {
+          selectedSlot,
+          userId
+        });
+        
+        const notFoundMessage = lang === 'es'
+          ? '❌ Horario seleccionado no disponible. Por favor elige otro.'
+          : '❌ Selected time slot not available. Please choose another.';
+        
+        await safeEditMessage(ctx, notFoundMessage);
+        return;
       }
 
       const model = await ModelService.getModelById(selectedModel);
@@ -481,7 +563,7 @@ const registerMeetGreetHandlers = (bot) => {
         ? `₿ *Pago con Crypto (USDC)*\n\n📞 Video Llamada VIP con ${model.name}\n💰 Total: $${price} USDC\n\n👇 Haz clic en el botón para completar tu pago:`
         : `₿ *Crypto Payment (USDC)*\n\n📞 VIP Video Call with ${model.name}\n💰 Total: $${price} USDC\n\n👇 Click the button below to complete your payment:`;
 
-      await ctx.editMessageText(message, {
+      await safeEditMessage(ctx, message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.url(lang === 'es' ? '₿ Pagar con Crypto' : '₿ Pay with Crypto', checkoutUrl)],
@@ -509,7 +591,7 @@ const registerMeetGreetHandlers = (bot) => {
           ? `📅 *No tienes reservas*\n\nNo tienes reservas de Video Llamadas VIP.`
           : `📅 *No Bookings*\n\nYou have no VIP Video Call bookings.`;
         
-        await ctx.editMessageText(message, {
+        await safeEditMessage(ctx, message, {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback(lang === 'es' ? '🔙 Volver' : '🔙 Back', 'back_to_main')]
