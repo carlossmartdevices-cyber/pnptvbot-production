@@ -538,8 +538,8 @@ class PaymentService {
         }
 
         // Send admin notification for purchase (always, regardless of email)
-        if (userId && planId) {
-          const plan = await PlanModel.getById(planId);
+        if (userId && planIdOrBookingId) {
+          const plan = await PlanModel.getById(planIdOrBookingId);
           const user = await UserModel.getById(userId);
 
           if (plan) {
@@ -648,7 +648,7 @@ class PaymentService {
       } else if (x_transaction_state === 'Pendiente') {
         // Payment pending
         if (payment) {
-          await PaymentModel.updateStatus(paymentId, 'pending', {
+          await PaymentModel.updateStatus(paymentIdOrType, 'pending', {
             transaction_id: x_transaction_id,
             reference: x_ref_payco,
             epayco_ref: x_ref_payco,
@@ -658,7 +658,7 @@ class PaymentService {
         logger.info('ePayco payment pending', {
           x_ref_payco,
           userId,
-          planId,
+          planId: planIdOrBookingId,
         });
 
         return { success: true };

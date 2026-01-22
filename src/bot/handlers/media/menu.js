@@ -94,6 +94,7 @@ function buildGroupMenuPayload(ctx) {
 }
 
 const registerMenuHandlers = (bot) => {
+  logger.info('DEBUG: registerMenuHandlers called - registering /menu command');
 
   /**
    * Show main menu with all options
@@ -1070,7 +1071,11 @@ Click the button below to connect!`;
    * In groups, uses the group-specific menu
    */
   bot.command('menu', async (ctx) => {
+    logger.info('/menu command received', { chatType: ctx.chat?.type, userId: ctx.from?.id });
     try {
+      // TEMPORARY FIX: Send immediate response first
+      await ctx.reply('Loading menu...');
+
       const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
 
       if (isGroup) {
@@ -1091,6 +1096,7 @@ Click the button below to connect!`;
       );
     }
   });
+  logger.info('DEBUG: /menu command handler registered successfully');
 };
 
 registerMenuHandlers.buildGroupMenuPayload = buildGroupMenuPayload;

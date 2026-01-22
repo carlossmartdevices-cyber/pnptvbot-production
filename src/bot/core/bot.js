@@ -170,6 +170,20 @@ const startBot = async () => {
     // Create bot instance
     const bot = new Telegraf(process.env.BOT_TOKEN);
 
+    // FIX: Register /menu command early to avoid middleware conflicts
+    const { showMainMenu: showPrivateMenu } = require('../handlers/user/menu');
+    bot.command('menu', async (ctx) => {
+      logger.info('/menu command handler reached', { userId: ctx.from?.id, chatType: ctx.chat?.type });
+      try {
+        logger.info('Calling showPrivateMenu...');
+        const result = await showPrivateMenu(ctx);
+        logger.info('showPrivateMenu completed', { result });
+      } catch (error) {
+        logger.error('Error in /menu handler:', error.message, error.stack);
+        await ctx.reply('Error loading menu. Please try again.');
+      }
+    });
+
     // DEBUG: Log all updates
     bot.use(async (ctx, next) => {
       if (ctx.message?.text?.startsWith('/')) {
