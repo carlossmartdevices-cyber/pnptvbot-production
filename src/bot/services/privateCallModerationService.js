@@ -91,8 +91,7 @@ class PrivateCallModerationService {
       
       // Notify user
       const userId = call.user_id;
-      const message = '⏰ *Call Ended*
-\nYour call has been automatically ended as it reached the maximum duration.';
+      const message = '⏰ *Call Ended*\n\nYour call has been automatically ended as it reached the maximum duration.';
       
       await bot.telegram.sendMessage(userId, message, {
         parse_mode: 'Markdown',

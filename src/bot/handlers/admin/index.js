@@ -496,7 +496,7 @@ async function showAdminPanel(ctx, edit = false) {
 
       // ═══ MEET & GREET ═══
       buttons.push([
-        Markup.button.callback('💃 ' + (lang === 'es' ? 'Meet & Greet' : 'Meet & Greet'), 'admin_meet_greet'),
+        Markup.button.callback('📹 ' + (lang === 'es' ? 'PNP Latino Live' : 'PNP Latino Live'), 'admin_pnp_live'),
       ]);
 
       // ═══ PREVIEW MODE ═══
@@ -544,13 +544,13 @@ async function showAdminPanel(ctx, edit = false) {
  */
 // Import handlers
 const registerImprovedSharePostHandlers = require('./improvedSharePost');
-const registerMeetGreetManagementHandlers = require('./meetGreetManagement');
+const registerPNPLiveManagementHandlers = require('./pnpLiveManagement');
 
 let registerAdminHandlers = (bot) => {
   logger.info('[DEBUG-INIT] registerAdminHandlers called - registering admin command handlers');
   // Register handlers
   registerImprovedSharePostHandlers(bot);
-  registerMeetGreetManagementHandlers(bot);
+  registerPNPLiveManagementHandlers(bot);
 
   bot.action('admin_home', async (ctx) => {
     try {
