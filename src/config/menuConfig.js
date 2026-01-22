@@ -60,22 +60,10 @@ const MENU_CONFIG = {
       emoji: '🎬',
       options: [
         {
-          id: 'live_streams',
-          title: { en: '🔴 Live Streams', es: '🔴 Transmisiones en Vivo' },
-          callback: 'menu:live_streams',
-          deepLink: 'live_streams'
-        },
-        {
           id: 'video_calls',
           title: { en: '📹 Video Calls', es: '📹 Videollamadas' },
           callback: 'menu:video_calls',
           deepLink: 'video_calls'
-        },
-        {
-          id: 'private_calls',
-          title: { en: '📞 Private 1:1 Calls', es: '📞 Llamadas Privadas 1:1' },
-          callback: 'menu:private_calls',
-          deepLink: 'private_calls'
         },
         {
           id: 'photos',
@@ -299,14 +287,7 @@ const MENU_CONFIG = {
           deepLink: 'vc_rooms'
         }
       ],
-      [
-        {
-          id: 'private_calls',
-          title: { en: '📞 Private Calls', es: '📞 Llamadas Privadas' },
-          callback: 'PRIVATECALL_START',
-          deepLink: 'private_calls'
-        }
-      ],
+
       [
         {
           id: 'settings',
@@ -324,23 +305,17 @@ const MENU_CONFIG = {
     ]
   },
 
-  // Topic 3809 specific menu (only live streams & video calls)
+  // Topic 3809 specific menu (only video calls)
   TOPIC_3809_MENU: {
     title: {
       en: '🎬 Content Menu',
       es: '🎬 Menú de Contenido'
     },
     description: {
-      en: 'Access live streams and video calls',
-      es: 'Accede a transmisiones en vivo y videollamadas'
+      en: 'Access video calls',
+      es: 'Accede a videollamadas'
     },
     options: [
-      {
-        id: 'live_streams',
-        title: { en: '🔴 Live Streams', es: '🔴 Transmisiones en Vivo' },
-        callback: 'menu:live_streams',
-        deepLink: 'live_streams'
-      },
       {
         id: 'video_calls',
         title: { en: '📹 Video Calls', es: '📹 Videollamadas' },

@@ -481,14 +481,7 @@ async function showAdminPanel(ctx, edit = false) {
     if (userRole === 'superadmin' || userRole === 'admin') {
       // ═══ CONTENT & MEDIA ═══
       buttons.push([
-        Markup.button.callback('📻 Radio', 'admin_radio'),
-        Markup.button.callback('📺 ' + (lang === 'es' ? 'En Vivo' : 'Live'), 'admin_live_streams'),
-      ]);
-
-      // ═══ ENGAGEMENT ═══
-      buttons.push([
         Markup.button.callback('📢 ' + (lang === 'es' ? 'Difusión' : 'Broadcast'), 'admin_broadcast'),
-        Markup.button.callback('🎮 ' + (lang === 'es' ? 'Gamificación' : 'Gamification'), 'admin_gamification'),
       ]);
 
       // ═══ OPERATIONS ═══
@@ -499,16 +492,6 @@ async function showAdminPanel(ctx, edit = false) {
       // ═══ COMMUNITY POSTS ═══
       buttons.push([
         Markup.button.callback('📤 ' + (lang === 'es' ? 'Compartir Publicación' : 'Share Post'), 'admin_improved_share_post'),
-      ]);
-
-      // ═══ COMMUNITY REWARDS ═══
-      buttons.push([
-        Markup.button.callback('🎁 ' + (lang === 'es' ? 'Premium Comunitario' : 'Community Premium'), 'admin_community_premium_broadcast'),
-      ]);
-
-      // ═══ PRIVATE CALLS ═══
-      buttons.push([
-        Markup.button.callback('📞 ' + (lang === 'es' ? 'Llamadas Privadas' : 'Private Calls'), 'admin_private_calls'),
       ]);
 
       // ═══ MEET & GREET ═══
@@ -526,11 +509,9 @@ async function showAdminPanel(ctx, edit = false) {
     if (userRole === 'superadmin') {
       // ═══ SYSTEM CONFIG ═══
       buttons.push([
-        Markup.button.callback('💎 ' + (lang === 'es' ? 'Planes' : 'Plans'), 'admin_plans'),
         Markup.button.callback('👑 Roles', 'admin_roles'),
       ]);
       buttons.push([
-        Markup.button.callback('📋 ' + (lang === 'es' ? 'Menús' : 'Menus'), 'admin_menus'),
         Markup.button.callback('📜 Logs', 'admin_logs'),
       ]);
     }
@@ -561,21 +542,13 @@ async function showAdminPanel(ctx, edit = false) {
  * Admin handlers
  * @param {Telegraf} bot - Bot instance
  */
-// Import gamification handler
-const registerGamificationHandlers = require('./gamification');
-const registerRadioManagementHandlers = require('./radioManagement');
-const registerLiveStreamManagementHandlers = require('./liveStreamManagement');
-const registerCommunityPremiumBroadcast = require('./communityPremiumBroadcast');
+// Import handlers
 const registerImprovedSharePostHandlers = require('./improvedSharePost');
 const registerMeetGreetManagementHandlers = require('./meetGreetManagement');
 
 let registerAdminHandlers = (bot) => {
   logger.info('[DEBUG-INIT] registerAdminHandlers called - registering admin command handlers');
-  // Register gamification handlers
-  registerGamificationHandlers(bot);
-  registerRadioManagementHandlers(bot);
-  registerLiveStreamManagementHandlers(bot);
-  registerCommunityPremiumBroadcast(bot);
+  // Register handlers
   registerImprovedSharePostHandlers(bot);
   registerMeetGreetManagementHandlers(bot);
 
@@ -1860,321 +1833,6 @@ let registerAdminHandlers = (bot) => {
     }
   });
 
-  // Plan management - List all plans
-  bot.action('admin_plans', async (ctx) => {
-    try {
-      await ctx.answerCbQuery(); // Answer immediately
-
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      const lang = getLanguage(ctx);
-
-      // Clear any ongoing admin tasks
-      ctx.session.temp = {};
-      await ctx.saveSession();
-
-      const plans = await PlanModel.getAll();
-
-      let message = `💎 **Gestión de Planes**\n\n`;
-      message += `Total de planes activos: ${plans.length}\n\n`;
-      message += `Selecciona un plan para editar o eliminar:`;
-
-      const keyboard = [];
-
-      // Add button for each plan
-      plans.forEach((plan) => {
-        keyboard.push([
-          Markup.button.callback(
-            `${plan.nameEs || plan.name} - $${plan.price}`,
-            `admin_plan_view_${plan.id}`,
-          ),
-        ]);
-      });
-
-      keyboard.push([Markup.button.callback('➕ Agregar Plan', 'admin_plan_add')]);
-      keyboard.push([Markup.button.callback('◀️ Volver', 'admin_cancel')]);
-
-      await ctx.editMessageText(
-        message,
-        Markup.inlineKeyboard(keyboard),
-      );
-    } catch (error) {
-      logger.error('Error in admin plans:', error);
-      await ctx.answerCbQuery('Error al cargar planes');
-    }
-  });
-
-  // View plan details
-  bot.action(/^admin_plan_view_(.+)$/, async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      const planId = ctx.match[1];
-      const plan = await PlanModel.getById(planId);
-
-      if (!plan) {
-        await ctx.answerCbQuery('Plan no encontrado');
-        return;
-      }
-
-      let message = `💎 **Detalles del Plan**\n\n`;
-      message += `📋 ID: ${plan.id}\n`;
-      message += `📦 SKU: ${plan.sku || 'N/A'}\n`;
-      message += `🏷️ Nombre (EN): ${plan.name}\n`;
-      message += `🏷️ Nombre (ES): ${plan.nameEs}\n`;
-      message += `💰 Precio: $${plan.price} ${plan.currency}\n`;
-      message += `⏱️ Duración: ${plan.duration} días\n`;
-      message += `✅ Activo: ${plan.active ? 'Sí' : 'No'}\n\n`;
-
-      message += `📝 Características (EN):\n`;
-      plan.features.forEach((feature, index) => {
-        message += `  ${index + 1}. ${feature}\n`;
-      });
-
-      message += `\n📝 Características (ES):\n`;
-      plan.featuresEs.forEach((feature, index) => {
-        message += `  ${index + 1}. ${feature}\n`;
-      });
-
-      await ctx.editMessageText(
-        message,
-        Markup.inlineKeyboard([
-          [Markup.button.callback('✏️ Editar', `admin_plan_edit_${planId}`)],
-          [Markup.button.callback('🗑️ Eliminar', `admin_plan_delete_${planId}`)],
-          [Markup.button.callback('◀️ Volver a Planes', 'admin_plans')],
-        ]),
-      );
-    } catch (error) {
-      logger.error('Error viewing plan:', error);
-      await ctx.answerCbQuery('Error al cargar plan');
-    }
-  });
-
-  // Edit plan - Show edit menu
-  bot.action(/^admin_plan_edit_(.+)$/, async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      const planId = ctx.match[1];
-      const plan = await PlanModel.getById(planId);
-
-      if (!plan) {
-        await ctx.answerCbQuery('Plan no encontrado');
-        return;
-      }
-
-      // Store plan ID in session for editing
-      ctx.session.temp = ctx.session.temp || {};
-      ctx.session.temp.editingPlanId = planId;
-      await ctx.saveSession();
-
-      let message = `✏️ **Editar Plan: ${plan.nameEs}**\n\n`;
-      message += `Selecciona qué campo deseas modificar:\n`;
-
-      await ctx.editMessageText(
-        message,
-        Markup.inlineKeyboard([
-          [Markup.button.callback('🏷️ Nombre', `admin_plan_edit_field_${planId}_name`)],
-          [Markup.button.callback('💰 Precio', `admin_plan_edit_field_${planId}_price`)],
-          [Markup.button.callback('⏱️ Duración', `admin_plan_edit_field_${planId}_duration`)],
-          [Markup.button.callback('📝 Características', `admin_plan_edit_field_${planId}_features`)],
-          [Markup.button.callback('✅ Activar/Desactivar', `admin_plan_toggle_active_${planId}`)],
-          [Markup.button.callback('◀️ Volver', `admin_plan_view_${planId}`)],
-        ]),
-      );
-    } catch (error) {
-      logger.error('Error showing edit menu:', error);
-      await ctx.answerCbQuery('Error al mostrar menú de edición');
-    }
-  });
-
-  // Toggle plan active status
-  bot.action(/^admin_plan_toggle_active_(.+)$/, async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      const planId = ctx.match[1];
-      const plan = await PlanModel.getById(planId);
-
-      if (!plan) {
-        await ctx.answerCbQuery('Plan no encontrado');
-        return;
-      }
-
-      // Toggle active status
-      const planData = plan.dataValues ? plan.dataValues : plan;
-      await PlanModel.createOrUpdate(planId, {
-        ...planData,
-        active: !plan.active,
-      });
-
-      await ctx.answerCbQuery(`Plan ${!plan.active ? 'activado' : 'desactivado'} exitosamente`);
-
-      // Refresh the view
-      ctx.match = [null, planId];
-      await bot.handleUpdate({
-        ...ctx.update,
-        callback_query: {
-          ...ctx.update.callback_query,
-          data: `admin_plan_view_${planId}`,
-        },
-      });
-    } catch (error) {
-      logger.error('Error toggling plan active status:', error);
-      await ctx.answerCbQuery('Error al cambiar estado');
-    }
-  });
-
-  // Edit plan field - Prompt for input
-  bot.action(/^admin_plan_edit_field_(.+)_(name|price|duration|features)$/, async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      const planId = ctx.match[1];
-      const field = ctx.match[2];
-      const plan = await PlanModel.getById(planId);
-
-      if (!plan) {
-        await ctx.answerCbQuery('Plan no encontrado');
-        return;
-      }
-
-      // Store edit context in session
-      ctx.session.temp = ctx.session.temp || {};
-      ctx.session.temp.editingPlanId = planId;
-      ctx.session.temp.editingPlanField = field;
-      await ctx.saveSession();
-
-      let message = '';
-      let currentValue = '';
-
-      switch (field) {
-        case 'name':
-          currentValue = `EN: ${plan.name}\nES: ${plan.nameEs}`;
-          message = `✏️ **Editar Nombre del Plan**\n\n`;
-          message += `Valor actual:\n${currentValue}\n\n`;
-          message += `Envía el nuevo nombre en formato:\n`;
-          message += `EN: Nombre en inglés\n`;
-          message += `ES: Nombre en español\n\n`;
-          message += `Ejemplo:\n`;
-          message += `EN: Premium Plan\n`;
-          message += `ES: Plan Premium`;
-          break;
-
-        case 'price':
-          currentValue = `$${plan.price}`;
-          message = `💰 **Editar Precio del Plan**\n\n`;
-          message += `Precio actual: ${currentValue}\n\n`;
-          message += `Envía el nuevo precio (solo el número):\n`;
-          message += `Ejemplo: 29.99`;
-          break;
-
-        case 'duration':
-          currentValue = `${plan.duration} días`;
-          message = `⏱️ **Editar Duración del Plan**\n\n`;
-          message += `Duración actual: ${currentValue}\n\n`;
-          message += `Envía la nueva duración en días:\n`;
-          message += `Ejemplo: 30`;
-          break;
-
-        case 'features':
-          currentValue = `EN:\n${plan.features.map((f, i) => `${i + 1}. ${f}`).join('\n')}\n\n`;
-          currentValue += `ES:\n${plan.featuresEs.map((f, i) => `${i + 1}. ${f}`).join('\n')}`;
-          message = `📝 **Editar Características del Plan**\n\n`;
-          message += `Características actuales:\n${currentValue}\n\n`;
-          message += `Envía las nuevas características en formato:\n`;
-          message += `EN:\n`;
-          message += `- Característica 1\n`;
-          message += `- Característica 2\n`;
-          message += `ES:\n`;
-          message += `- Característica 1\n`;
-          message += `- Característica 2`;
-          break;
-      }
-
-      await ctx.editMessageText(
-        message,
-        Markup.inlineKeyboard([
-          [Markup.button.callback('❌ Cancelar', `admin_plan_edit_${planId}`)],
-        ]),
-      );
-    } catch (error) {
-      logger.error('Error prompting for plan field edit:', error);
-      await ctx.answerCbQuery('Error al iniciar edición');
-    }
-  });
-
-  // Delete plan - Confirmation
-  bot.action(/^admin_plan_delete_(.+)$/, async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      const planId = ctx.match[1];
-      const plan = await PlanModel.getById(planId);
-
-      if (!plan) {
-        await ctx.answerCbQuery('Plan no encontrado');
-        return;
-      }
-
-      let message = `⚠️ **Confirmar Eliminación**\n\n`;
-      message += `¿Estás seguro de que deseas eliminar este plan?\n\n`;
-      message += `📋 Plan: ${plan.nameEs}\n`;
-      message += `💰 Precio: $${plan.price}\n\n`;
-      message += `⚠️ Esta acción no se puede deshacer.\n`;
-      message += `Los usuarios con este plan no se verán afectados.`;
-
-      await ctx.editMessageText(
-        message,
-        Markup.inlineKeyboard([
-          [Markup.button.callback('✅ Sí, eliminar', `admin_plan_delete_confirm_${planId}`)],
-          [Markup.button.callback('❌ Cancelar', `admin_plan_view_${planId}`)],
-        ]),
-      );
-    } catch (error) {
-      logger.error('Error showing delete confirmation:', error);
-      await ctx.answerCbQuery('Error al mostrar confirmación');
-    }
-  });
-
-  // Delete plan - Confirmed
-  bot.action(/^admin_plan_delete_confirm_(.+)$/, async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return;
-
-      const planId = ctx.match[1];
-      const plan = await PlanModel.getById(planId);
-
-      if (!plan) {
-        await ctx.answerCbQuery('Plan no encontrado');
-        return;
-      }
-
-      const planName = plan.nameEs;
-      const success = await PlanModel.delete(planId);
-
-      if (success) {
-        await ctx.editMessageText(
-          `✅ **Plan Eliminado**\n\n` +
-          `El plan "${planName}" ha sido eliminado exitosamente.`,
-          Markup.inlineKeyboard([
-            [Markup.button.callback('◀️ Volver a Planes', 'admin_plans')],
-          ]),
-        );
-
-        logger.info('Plan deleted by admin', { adminId: ctx.from.id, planId, planName });
-        await ctx.answerCbQuery('Plan eliminado exitosamente');
-      } else {
-        await ctx.answerCbQuery('Error al eliminar plan');
-      }
-    } catch (error) {
       logger.error('Error deleting plan:', error);
       await ctx.answerCbQuery('Error al eliminar plan');
     }
