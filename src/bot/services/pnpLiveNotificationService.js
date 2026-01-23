@@ -3,7 +3,7 @@ const { query } = require('../../config/postgres');
 const PNPLiveService = require('./pnpLiveService');
 
 /**
- * PNP Latino Live Notification Service
+ * PNP Television Live Notification Service
  * Handles all notifications for bookings, reminders, and system alerts
  */
 
@@ -36,7 +36,7 @@ class PNPLiveNotificationService {
       });
 
       const message = lang === 'es'
-        ? `🎉 *¡Reserva Confirmada - PNP Latino Live!*\n\n` +
+        ? `🎉 *¡Reserva Confirmada - PNP Television Live!*\n\n` +
           `📹 *Show Privado con ${modelName}*\n` +
           `📅 *Fecha:* ${startTime}\n` +
           `⏱️ *Duración:* ${booking.duration_minutes} minutos\n` +
@@ -44,7 +44,7 @@ class PNPLiveNotificationService {
           `✅ *Tu sala privada está lista*\n` +
           `🔔 *Recibirás un recordatorio 1 hora antes*\n` +
           `💬 *¿Preguntas? Responde a este mensaje*`
-        : `🎉 *Booking Confirmed - PNP Latino Live!*\n\n` +
+        : `🎉 *Booking Confirmed - PNP Television Live!*\n\n` +
           `📹 *Private Show with ${modelName}*\n` +
           `📅 *Date:* ${startTime}\n` +
           `⏱️ *Duration:* ${booking.duration_minutes} minutes\n` +
@@ -96,7 +96,7 @@ class PNPLiveNotificationService {
       });
 
       const message = lang === 'es'
-        ? `🔔 *Recordatorio - PNP Latino Live*\n\n` +
+        ? `🔔 *Recordatorio - PNP Television Live*\n\n` +
           `📹 *Tu Show Privado con ${modelName} comienza en 1 hora*\n` +
           `⏰ *Hora:* ${startTime}\n` +
           `📱 *Prepárate para una experiencia increíble*\n\n` +
@@ -104,7 +104,7 @@ class PNPLiveNotificationService {
           `- Usa auriculares para mejor audio\n` +
           `- Conéctate desde un lugar privado\n` +
           `- Ten tu cámara y micrófono listos`
-        : `🔔 *Reminder - PNP Latino Live*\n\n` +
+        : `🔔 *Reminder - PNP Television Live*\n\n` +
           `📹 *Your Private Show with ${modelName} starts in 1 hour*\n` +
           `⏰ *Time:* ${startTime}\n` +
           `📱 *Get ready for an amazing experience*\n\n` +
@@ -154,13 +154,13 @@ class PNPLiveNotificationService {
       });
 
       const message = lang === 'es'
-        ? `📅 *Nuevo Show - PNP Latino Live*\n\n` +
+        ? `📅 *Nuevo Show - PNP Television Live*\n\n` +
           `👤 *Cliente:* @${username}\n` +
           `⏰ *Hora:* ${startTime}\n` +
           `⏱️ *Duración:* ${booking.duration_minutes} minutos\n` +
           `💰 *Ingresos:* $${booking.price_usd}\n\n` +
           `💡 *Prepárate para entrar a la sala 5 minutos antes*`
-        : `📅 *New Show - PNP Latino Live*\n\n` +
+        : `📅 *New Show - PNP Television Live*\n\n` +
           `👤 *Client:* @${username}\n` +
           `⏰ *Time:* ${startTime}\n` +
           `⏱️ *Duration:* ${booking.duration_minutes} minutes\n` +
@@ -204,12 +204,12 @@ class PNPLiveNotificationService {
       const modelName = model.rows?.[0]?.name || 'Model';
 
       const message = lang === 'es'
-        ? `💳 *Pago Recibido - PNP Latino Live*\n\n` +
+        ? `💳 *Pago Recibido - PNP Television Live*\n\n` +
           `✅ *Tu pago para el Show con ${modelName} ha sido procesado*\n` +
           `📹 *Tu sala privada está lista y segura*\n` +
           `🔒 *Todos los datos están encriptados*\n\n` +
           `💬 *¿Necesitas ayuda? Responde a este mensaje*`
-        : `💳 *Payment Received - PNP Latino Live*\n\n` +
+        : `💳 *Payment Received - PNP Television Live*\n\n` +
           `✅ *Your payment for the Show with ${modelName} has been processed*\n` +
           `📹 *Your private room is ready and secure*\n` +
           `🔒 *All data is encrypted*\n\n` +
@@ -256,14 +256,14 @@ class PNPLiveNotificationService {
       const statusEmoji = approved ? '✅' : '❌';
 
       const message = lang === 'es'
-        ? `${statusEmoji} *Reembolso ${statusText} - PNP Latino Live*\n\n` +
+        ? `${statusEmoji} *Reembolso ${statusText} - PNP Television Live*\n\n` +
           `💸 *Monto:* $${amount_usd}\n` +
           `📝 *Motivo:* ${reason}\n` +
           `📅 *Procesado:* ${new Date(processed_at).toLocaleString()}\n\n` +
           (approved 
             ? `💰 *El reembolso será acreditado en 3-5 días hábiles*`
             : `📋 *Revisa nuestras políticas de reembolso*`)
-        : `${statusEmoji} *Refund ${approved ? 'Approved' : 'Rejected'} - PNP Latino Live*\n\n` +
+        : `${statusEmoji} *Refund ${approved ? 'Approved' : 'Rejected'} - PNP Television Live*\n\n` +
           `💸 *Amount:* $${amount_usd}\n` +
           `📝 *Reason:* ${reason}\n` +
           `📅 *Processed:* ${new Date(processed_at).toLocaleString()}\n\n` +
@@ -312,12 +312,12 @@ class PNPLiveNotificationService {
       const stars = '⭐'.repeat(rating);
 
       const message = lang === 'es'
-        ? `🌟 *Nuevo Feedback - PNP Latino Live*\n\n` +
+        ? `🌟 *Nuevo Feedback - PNP Television Live*\n\n` +
           `🌟 *Calificación:* ${stars}\n` +
           `👤 *Cliente:* @${user_id}\n` +
           `💬 *Comentarios:* ${comments || 'Ninguno'}\n\n` +
           `💡 *¡Gracias por tu excelente servicio!*`
-        : `🌟 *New Feedback - PNP Latino Live*\n\n` +
+        : `🌟 *New Feedback - PNP Television Live*\n\n` +
           `🌟 *Rating:* ${stars}\n` +
           `👤 *Client:* @${user_id}\n` +
           `💬 *Comments:* ${comments || 'None'}\n\n` +
@@ -363,22 +363,22 @@ class PNPLiveNotificationService {
 
       // Notification for user
       const userMessage = lang === 'es'
-        ? `🚀 *¡Tu Show está por comenzar! - PNP Latino Live*\n\n` +
+        ? `🚀 *¡Tu Show está por comenzar! - PNP Television Live*\n\n` +
           `📹 *Con ${modelName} en 5 minutos*\n` +
           `🔗 *Prepárate para unirte a la sala*\n` +
           `💬 *¡Disfruta tu experiencia!*`
-        : `🚀 *Your Show is about to start! - PNP Latino Live*\n\n` +
+        : `🚀 *Your Show is about to start! - PNP Television Live*\n\n` +
           `📹 *With ${modelName} in 5 minutes*\n` +
           `🔗 *Get ready to join the room*\n` +
           `💬 *Enjoy your experience!*`;
 
       // Notification for model
       const modelMessage = lang === 'es'
-        ? `🚀 *¡Show por comenzar! - PNP Latino Live*\n\n` +
+        ? `🚀 *¡Show por comenzar! - PNP Television Live*\n\n` +
           `📹 *Con tu cliente en 5 minutos*\n` +
           `🔗 *Prepárate para entrar a la sala*\n` +
           `💬 *¡Brinda una experiencia increíble!*`
-        : `🚀 *Show about to start! - PNP Latino Live*\n\n` +
+        : `🚀 *Show about to start! - PNP Television Live*\n\n` +
           `📹 *With your client in 5 minutes*\n` +
           `🔗 *Get ready to join the room*\n` +
           `💬 *Provide an amazing experience!*`;
@@ -415,8 +415,8 @@ class PNPLiveNotificationService {
   static async sendSystemAlert(userId, title, message, lang) {
     try {
       const alertMessage = lang === 'es'
-        ? `⚠️ *${title} - PNP Latino Live*\n\n${message}`
-        : `⚠️ *${title} - PNP Latino Live*\n\n${message}`;
+        ? `⚠️ *${title} - PNP Television Live*\n\n${message}`
+        : `⚠️ *${title} - PNP Television Live*\n\n${message}`;
 
       if (userId) {
         logger.info('System alert notification', {
@@ -517,8 +517,8 @@ class PNPLiveNotificationService {
       );
 
       const broadcastMessage = lang === 'es'
-        ? `📢 *Anuncio Importante - PNP Latino Live*\n\n${message}`
-        : `📢 *Important Announcement - PNP Latino Live*\n\n${message}`;
+        ? `📢 *Anuncio Importante - PNP Television Live*\n\n${message}`
+        : `📢 *Important Announcement - PNP Television Live*\n\n${message}`;
 
       logger.info('Broadcast notification to models', {
         modelCount: models.rows?.length,
@@ -544,8 +544,8 @@ class PNPLiveNotificationService {
       );
 
       const broadcastMessage = lang === 'es'
-        ? `📢 *Anuncio - PNP Latino Live*\n\n${message}`
-        : `📢 *Announcement - PNP Latino Live*\n\n${message}`;
+        ? `📢 *Anuncio - PNP Television Live*\n\n${message}`
+        : `📢 *Announcement - PNP Television Live*\n\n${message}`;
 
       logger.info('Broadcast notification to users', {
         userCount: users.rows?.length,

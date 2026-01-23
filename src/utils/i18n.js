@@ -1088,7 +1088,7 @@ Tu acceso PRIME incluye:
 
 📍 Nearby — Grinder PNP de la comunidad
 🎥 Hangouts — Salas de video privadas y públicas
-🔴 PNP Latino Live — Shows y eventos en vivo
+🔴 PNP Television Live — Shows y eventos en vivo
 🎶 Videorama — Playlists y podcasts PNP
 
 🤖 Cristina IA — Soporte 24/7
@@ -1116,7 +1116,7 @@ Tu acceso FREE incluye:
 • Contenido exclusivo sin censura
 • PNP Nearby - Conecta con la comunidad
 • PNP Hangouts - Salas de video privadas
-• PNP Latino Live - Eventos en vivo
+• PNP Television Live - Eventos en vivo
 • PNP Videorama - Playlists completas
 
 📱 Usa /menu para explorar todas las funciones.
@@ -1135,7 +1135,7 @@ Tu acceso FREE incluye:
 
 💎 ¿Quieres contenido exclusivo?
 • Videos completos sin censura
-• Eventos en vivo PNP Latino Live
+• Eventos en vivo PNP Television Live
 • Salas de video privadas
 • Todas las funciones premium
 
@@ -1222,7 +1222,7 @@ Tu acceso FREE incluye:
 💎 *PRIME:*
 • Nearby completo + filtros
 • Hangouts privados
-• PNP Latino Live (en vivo)
+• PNP Television Live (en vivo)
 • Videorama completo
 • Eventos exclusivos
 

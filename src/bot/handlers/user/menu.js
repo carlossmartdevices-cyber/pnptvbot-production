@@ -3,7 +3,8 @@ const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const ChatCleanupService = require('../../services/chatCleanupService');
 const PermissionService = require('../../services/permissionService');
-const { isPrimeUser } = require('../../utils/helpers');
+const { isPrimeUser, safeReplyOrEdit } = require('../../utils/helpers');
+const config = require('../../../config/config');
 const UserModel = require('../../../models/userModel');
 
 /**
@@ -164,13 +165,80 @@ const registerMenuHandlers = (bot) => {
     });
   });
 
-  // Bloquear Live Streams y mostrar "Coming soon"
-  bot.action('show_live', async (ctx) => {
+  // Gate Live Streams when disabled (otherwise let the live handler handle it)
+  bot.action('show_live', async (ctx, next) => {
     const lang = ctx.session?.language || 'en';
-    await ctx.answerCbQuery(
-      lang === 'es' ? '🚧 Próximamente: Transmisiones en Vivo.' : '🚧 Coming Soon: Live Streaming.',
-      { show_alert: true }
-    );
+    if (config.ENABLE_LIVE_STREAMS === false) {
+      await ctx.answerCbQuery(
+        lang === 'es' ? '🚧 Próximamente: Transmisiones en Vivo.' : '🚧 Coming Soon: Live Streaming.',
+        { show_alert: true }
+      );
+      return;
+    }
+    return next();
+  });
+
+  bot.action('menu_hangouts', async (ctx) => {
+    try {
+      const lang = ctx.session?.language || 'en';
+      const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
+      const hangoutsUrl = config.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts';
+      const mainRoomUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+
+      await ctx.answerCbQuery();
+
+      const message = lang === 'es'
+        ? `🎥 *PNP Hangouts*\n\n` +
+          `Únete a salas de video de la comunidad o abre la app de Hangouts.\n` +
+          `Crea salas privadas, entra al Haus 24/7 y conecta en tiempo real.\n\n` +
+          `Elige una opción:`
+        : `🎥 *PNP Hangouts*\n\n` +
+          `Join community video rooms or open the Hangouts app.\n` +
+          `Create private rooms, hop into the 24/7 Haus, and connect live.\n\n` +
+          `Choose an option:`;
+
+      await safeReplyOrEdit(ctx, message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.url(lang === 'es' ? '🎥 Abrir Hangouts' : '🎥 Open Hangouts', hangoutsUrl)],
+          [Markup.button.url(lang === 'es' ? '🏠 Entrar al Haus 24/7' : '🏠 Join 24/7 Haus', mainRoomUrl)],
+          [Markup.button.callback(lang === 'es' ? '🧩 Administrar Salas' : '🧩 Manage Rooms', 'show_jitsi')],
+          [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'back_to_main')],
+        ])
+      });
+    } catch (error) {
+      logger.error('Error handling menu_hangouts:', error);
+    }
+  });
+
+  bot.action('menu_videorama', async (ctx) => {
+    try {
+      const lang = ctx.session?.language || 'en';
+      const videoramaUrl = process.env.VIDEORAMA_URL || 'https://pnptv.app/videorama-app/';
+
+      await ctx.answerCbQuery();
+
+      const message = lang === 'es'
+        ? `🎶 *PNP Videorama*\n\n` +
+          `Explora playlists curadas de video, música y podcasts.\n` +
+          `También puedes usar el reproductor dentro de Telegram.\n\n` +
+          `Elige una opción:`
+        : `🎶 *PNP Videorama*\n\n` +
+          `Explore curated playlists for video, music, and podcasts.\n` +
+          `You can also use the built-in Telegram player.\n\n` +
+          `Choose an option:`;
+
+      await safeReplyOrEdit(ctx, message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.url(lang === 'es' ? '🎬 Abrir Videorama' : '🎬 Open Videorama', videoramaUrl)],
+          [Markup.button.callback(lang === 'es' ? '🎧 Reproductor' : '🎧 Player', 'player_menu')],
+          [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'back_to_main')],
+        ])
+      });
+    } catch (error) {
+      logger.error('Error handling menu_videorama:', error);
+    }
   });
     // Locked feature handler for free users
     bot.action('locked_feature', async (ctx) => {
@@ -384,7 +452,7 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '🔴 PNP Latino Live' : '🔴 PNP Latino Live', 'MEET_GREET_START'),
+        Markup.button.callback(lang === 'es' ? '📺 PNP Television Live' : '📺 PNP Television Live', 'PNP_LIVE_START'),
       ],
       [
         Markup.button.callback(lang === 'es' ? 'ℹ️ Ayuda' : 'ℹ️ Help', 'show_support'),
@@ -522,7 +590,7 @@ const showMainMenuEdit = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '🔴 PNP Latino Live' : '🔴 PNP Latino Live', 'MEET_GREET_START'),
+        Markup.button.callback(lang === 'es' ? '📺 PNP Television Live' : '📺 PNP Television Live', 'PNP_LIVE_START'),
       ],
       [
         Markup.button.callback(lang === 'es' ? 'ℹ️ Ayuda' : 'ℹ️ Help', 'show_support'),

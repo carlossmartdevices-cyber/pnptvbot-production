@@ -2,7 +2,7 @@ const logger = require('../../utils/logger');
 const { query } = require('../../config/postgres');
 
 /**
- * PNP Latino Live Media Service
+ * PNP Television Live Media Service
  * Handles model images, galleries, and media assets
  */
 
@@ -134,7 +134,7 @@ class PNPLiveMediaService {
   }
 
   /**
-   * Get PNP Latino Live branding assets
+   * Get PNP Television Live branding assets
    * @returns {Object} Branding assets
    */
   static getBrandingAssets() {

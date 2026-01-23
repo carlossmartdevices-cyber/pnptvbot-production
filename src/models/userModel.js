@@ -33,7 +33,9 @@ class UserModel {
         geohash: row.location_geohash,
       } : null,
       locationUpdatedAt: row.location_updated_at,
-      locationSharingEnabled: row.location_sharing_enabled !== undefined ? row.location_sharing_enabled : true,
+      locationSharingEnabled: row.location_sharing_enabled === null || row.location_sharing_enabled === undefined
+        ? true
+        : row.location_sharing_enabled,
       subscriptionStatus: row.subscription_status,
       planId: row.plan_id,
       planExpiry: row.plan_expiry,
@@ -68,7 +70,9 @@ class UserModel {
       timezoneDetected: row.timezone_detected,
       timezoneUpdatedAt: row.timezone_updated_at,
       language: row.language,
-      isActive: row.is_active,
+      isActive: row.is_active === null || row.is_active === undefined
+        ? true
+        : row.is_active,
       deactivatedAt: row.deactivated_at,
       deactivationReason: row.deactivation_reason,
       createdAt: row.created_at,
@@ -265,6 +269,9 @@ class UserModel {
 
       await query(`UPDATE ${TABLE} SET ${setClauses.join(', ')} WHERE id = $1`, values);
       await cache.del(`user:${userId}`);
+      if (updates.location || Object.prototype.hasOwnProperty.call(updates, 'locationSharingEnabled')) {
+        await cache.delPattern('nearby:*');
+      }
       logger.info('User profile updated', { userId });
       return true;
     } catch (error) {
@@ -321,8 +328,8 @@ class UserModel {
            WHERE location_lat IS NOT NULL AND location_lng IS NOT NULL
            AND location_lat BETWEEN $1 AND $2
            AND location_lng BETWEEN $3 AND $4
-           AND location_sharing_enabled = true
-           AND is_active = true
+           AND COALESCE(location_sharing_enabled, true) = true
+           AND COALESCE(is_active, true) = true
            LIMIT 200`,
           [minLat, maxLat, minLng, maxLng]
         );

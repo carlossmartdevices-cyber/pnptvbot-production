@@ -71,7 +71,7 @@ class PaymentNotificationService {
         message += `📦 *Lo que incluye tu membresía:*\n\n`;
         message += `• Videorama – Listas de reproducción de videos, música y podcasts\n`;
         message += `• Hangouts – Salas de videollamadas comunitarias\n`;
-        message += `• PNP Latino Live – Transmisiones en vivo y grabaciones exclusivas\n\n`;
+        message += `• PNP Television Live – Transmisiones en vivo y grabaciones exclusivas\n\n`;
 
         message += `📋 *Detalles de tu compra:*\n`;
         message += `• Plan: ${planName}\n`;
@@ -106,7 +106,7 @@ class PaymentNotificationService {
         message += `📦 *What's included in your membership:*\n\n`;
         message += `• Videorama – Video, music, and podcast playlists\n`;
         message += `• Hangouts – Community video call rooms\n`;
-        message += `• PNP Latino Live – Live streams and exclusive recordings\n\n`;
+        message += `• PNP Television Live – Live streams and exclusive recordings\n\n`;
 
         message += `📋 *Purchase Details:*\n`;
         message += `• Plan: ${planName}\n`;

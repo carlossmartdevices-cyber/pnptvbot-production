@@ -1,7 +1,7 @@
 const logger = require('../../utils/logger');
 
 /**
- * PNP Latino Live Time Slot Service
+ * PNP Television Live Time Slot Service
  * Generates time slots with PNP-specific constraints:
  * - Duration: 30, 60, or 90 minutes
  * - Days: Thursday to Monday only

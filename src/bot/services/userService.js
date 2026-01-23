@@ -191,11 +191,13 @@ class UserService {
       }
 
       const nearby = await UserModel.getNearby(user.location, radiusKm);
+      const userIdStr = userId.toString();
 
       // Filter out the requesting user and users who have disabled location sharing
       return nearby.filter((u) => 
-        u.id !== userId.toString() && 
-        u.locationSharingEnabled === true
+        String(u.id) !== userIdStr &&
+        u.locationSharingEnabled !== false &&
+        u.isActive !== false
       );
     } catch (error) {
       logger.error('Error getting nearby users:', error);

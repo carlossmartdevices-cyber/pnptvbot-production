@@ -487,7 +487,7 @@ async function showAdminPanel(ctx, edit = false) {
 
       // ═══ LIVE & INTERACTIVE ═══
       buttons.push([
-        Markup.button.callback('📹 PNP Latino Live', 'admin_pnp_live'),
+        Markup.button.callback('📹 PNP Television Live', 'admin_pnp_live'),
       ]);
 
       // ═══ SYSTEM & TOOLS ═══

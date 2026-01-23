@@ -6,11 +6,11 @@ const JaaSService = require('./jaasService');
 const logger = require('../../utils/logger');
 
 /**
- * PNP Latino Live Service - Handles private show bookings and video sessions
+ * PNP Television Live Service - Handles private show bookings and video sessions
  * Replaces MeetGreetService with enhanced features
  */
 class PNPLiveService {
-  // Updated pricing structure for PNP Latino Live
+  // Updated pricing structure for PNP Television Live
   static PRICING = {
     30: 60,    // 30 minutes: $60
     60: 100,   // 60 minutes: $100  

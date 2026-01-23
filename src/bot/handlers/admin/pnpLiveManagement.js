@@ -7,8 +7,8 @@ const { getLanguage } = require('../../utils/helpers');
 const { query } = require('../../config/postgres');
 
 /**
- * Admin PNP Latino Live Management Handler
- * Complete admin interface for managing PNP Latino Live models, availability, and bookings
+ * Admin PNP Television Live Management Handler
+ * Complete admin interface for managing PNP Television Live models, availability, and bookings
  */
 
 const registerPNPLiveManagementHandlers = (bot) => {
@@ -43,7 +43,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
       ];
 
       await ctx.editMessageText(
-        lang === 'es' ? '📹 **Gestión de PNP Latino Live**\n\nAdministra modelos, disponibilidad, reservas y reembolsos.' : '📹 **PNP Latino Live Management**\n\nManage models, availability, bookings, and refunds.',
+        lang === 'es' ? '📹 **Gestión de PNP Television Live**\n\nAdministra modelos, disponibilidad, reservas y reembolsos.' : '📹 **PNP Television Live Management**\n\nManage models, availability, bookings, and refunds.',
         {
           parse_mode: 'Markdown',
           reply_markup: {
@@ -72,7 +72,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
       ctx.session.pnpLiveAdmin.step = 'name';
       
       await ctx.editMessageText(
-        lang === 'es' ? '📛 **Agregar Nuevo Modelo - PNP Latino Live**\n\nPaso 1/4: Ingresa el nombre del modelo:' : '📛 **Add New Model - PNP Latino Live**\n\nStep 1/4: Enter the model\'s name:',
+        lang === 'es' ? '📛 **Agregar Nuevo Modelo - PNP Television Live**\n\nPaso 1/4: Ingresa el nombre del modelo:' : '📛 **Add New Model - PNP Television Live**\n\nStep 1/4: Enter the model\'s name:',
         {
           parse_mode: 'Markdown',
           reply_markup: {
@@ -235,7 +235,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
         ];
 
         await ctx.editMessageText(
-          lang === 'es' ? '📋 **Todos los Modelos - PNP Latino Live**\n\nNo hay modelos disponibles.' : '📋 **All Models - PNP Latino Live**\n\nNo models available.',
+          lang === 'es' ? '📋 **Todos los Modelos - PNP Television Live**\n\nNo hay modelos disponibles.' : '📋 **All Models - PNP Television Live**\n\nNo models available.',
           {
             parse_mode: 'Markdown',
             reply_markup: {
@@ -267,7 +267,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
       }]);
 
       await ctx.editMessageText(
-        lang === 'es' ? '📋 **Todos los Modelos - PNP Latino Live**\n\nSelecciona un modelo para ver detalles:' : '📋 **All Models - PNP Latino Live**\n\nSelect a model to view details:',
+        lang === 'es' ? '📋 **Todos los Modelos - PNP Television Live**\n\nSelecciona un modelo para ver detalles:' : '📋 **All Models - PNP Television Live**\n\nSelect a model to view details:',
         {
           parse_mode: 'Markdown',
           reply_markup: {
@@ -469,7 +469,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
       ctx.session.pnpLiveAdmin.editStep = 'name';
 
       await ctx.editMessageText(
-        lang === 'es' ? `✏️ **Editar Modelo: ${model.name} - PNP Latino Live**\n\nPaso 1/4: Nuevo nombre (actual: ${model.name}):` : `✏️ **Edit Model: ${model.name} - PNP Latino Live**\n\nStep 1/4: New name (current: ${model.name}):`,
+        lang === 'es' ? `✏️ **Editar Modelo: ${model.name} - PNP Television Live**\n\nPaso 1/4: Nuevo nombre (actual: ${model.name}):` : `✏️ **Edit Model: ${model.name} - PNP Television Live**\n\nStep 1/4: New name (current: ${model.name}):`,
         {
           parse_mode: 'Markdown',
           reply_markup: {
@@ -650,7 +650,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
       ];
 
       await ctx.editMessageText(
-        lang === 'es' ? `🗑️ **Eliminar Modelo - PNP Latino Live**\n\n¿Estás seguro de eliminar a ${model.name}? Esta acción no se puede deshacer.` : `🗑️ **Delete Model - PNP Latino Live**\n\nAre you sure you want to delete ${model.name}? This action cannot be undone.`,
+        lang === 'es' ? `🗑️ **Eliminar Modelo - PNP Television Live**\n\n¿Estás seguro de eliminar a ${model.name}? Esta acción no se puede deshacer.` : `🗑️ **Delete Model - PNP Television Live**\n\nAre you sure you want to delete ${model.name}? This action cannot be undone.`,
         {
           parse_mode: 'Markdown',
           reply_markup: {
@@ -695,7 +695,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
         ];
 
         await ctx.editMessageText(
-          lang === 'es' ? '📋 **Todos los Modelos - PNP Latino Live**\n\nNo hay modelos disponibles.' : '📋 **All Models - PNP Latino Live**\n\nNo models available.',
+          lang === 'es' ? '📋 **Todos los Modelos - PNP Television Live**\n\nNo hay modelos disponibles.' : '📋 **All Models - PNP Television Live**\n\nNo models available.',
           {
             parse_mode: 'Markdown',
             reply_markup: {
@@ -727,7 +727,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
       }]);
 
       await ctx.editMessageText(
-        lang === 'es' ? '📋 **Todos los Modelos - PNP Latino Live**\n\nSelecciona un modelo para ver detalles:' : '📋 **All Models - PNP Latino Live**\n\nSelect a model to view details:',
+        lang === 'es' ? '📋 **Todos los Modelos - PNP Television Live**\n\nSelecciona un modelo para ver detalles:' : '📋 **All Models - PNP Television Live**\n\nSelect a model to view details:',
         {
           parse_mode: 'Markdown',
           reply_markup: {
@@ -768,7 +768,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
       ];
 
       await ctx.editMessageText(
-        lang === 'es' ? '📊 **Estadísticas de PNP Latino Live**\n\nSelecciona el tipo de estadísticas:' : '📊 **PNP Latino Live Statistics**\n\nSelect statistics type:',
+        lang === 'es' ? '📊 **Estadísticas de PNP Television Live**\n\nSelecciona el tipo de estadísticas:' : '📊 **PNP Television Live Statistics**\n\nSelect statistics type:',
         {
           parse_mode: 'Markdown',
           reply_markup: {
@@ -810,13 +810,13 @@ const registerPNPLiveManagementHandlers = (bot) => {
 
       await ctx.editMessageText(
         lang === 'es' 
-          ? `📊 **Resumen General - PNP Latino Live**\n\n*Últimos 30 días:*\n\n` +
+          ? `📊 **Resumen General - PNP Television Live**\n\n*Últimos 30 días:*\n\n` +
             `📅 *Total de Reservas:* ${totalBookings}\n` +
             `✅ *Shows Completados:* ${completedBookings}\n` +
             `💰 *Ingresos Totales:* $${totalRevenue.toFixed(2)}\n` +
             `💳 *Ingresos Pagados:* $${paidRevenue.toFixed(2)}\n` +
             `📈 *Tasa de Conversión:* ${totalBookings > 0 ? Math.round((completedBookings / totalBookings) * 100) : 0}%`
-          : `📊 **General Summary - PNP Latino Live**\n\n*Last 30 days:*\n\n` +
+          : `📊 **General Summary - PNP Television Live**\n\n*Last 30 days:*\n\n` +
             `📅 *Total Bookings:* ${totalBookings}\n` +
             `✅ *Completed Shows:* ${completedBookings}\n` +
             `💰 *Total Revenue:* $${totalRevenue.toFixed(2)}\n` +
@@ -851,8 +851,8 @@ const registerPNPLiveManagementHandlers = (bot) => {
       const revenueByModel = await PNPLiveService.getRevenueByModel(startDate, endDate);
       
       let message = lang === 'es' 
-        ? `💰 **Ingresos por Modelo - PNP Latino Live**\n\n*Últimos 30 días:*\n\n`
-        : `💰 **Revenue by Model - PNP Latino Live**\n\n*Last 30 days:*\n\n`;
+        ? `💰 **Ingresos por Modelo - PNP Television Live**\n\n*Últimos 30 días:*\n\n`
+        : `💰 **Revenue by Model - PNP Television Live**\n\n*Last 30 days:*\n\n`;
       
       if (revenueByModel.length === 0) {
         message += lang === 'es' ? 'No hay datos de ingresos disponibles.' : 'No revenue data available.';
@@ -903,8 +903,8 @@ const registerPNPLiveManagementHandlers = (bot) => {
         .slice(0, 10);
       
       let message = lang === 'es' 
-        ? `📅 **Reservas Recientes - PNP Latino Live**\n\n*Últimos 7 días:*\n\n`
-        : `📅 **Recent Bookings - PNP Latino Live**\n\n*Last 7 days:*\n\n`;
+        ? `📅 **Reservas Recientes - PNP Television Live**\n\n*Últimos 7 días:*\n\n`
+        : `📅 **Recent Bookings - PNP Television Live**\n\n*Last 7 days:*\n\n`;
       
       if (recentBookings.length === 0) {
         message += lang === 'es' ? 'No hay reservas recientes.' : 'No recent bookings.';
@@ -973,7 +973,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
         ];
 
         await ctx.editMessageText(
-          lang === 'es' ? '💸 **Solicitudes de Reembolso - PNP Latino Live**\n\nNo hay solicitudes de reembolso pendientes.' : '💸 **Refund Requests - PNP Latino Live**\n\nNo pending refund requests.',
+          lang === 'es' ? '💸 **Solicitudes de Reembolso - PNP Television Live**\n\nNo hay solicitudes de reembolso pendientes.' : '💸 **Refund Requests - PNP Television Live**\n\nNo pending refund requests.',
           {
             parse_mode: 'Markdown',
             reply_markup: {
@@ -1007,7 +1007,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
       }]);
 
       await ctx.editMessageText(
-        lang === 'es' ? '💸 **Solicitudes de Reembolso - PNP Latino Live**\n\nSelecciona una solicitud para procesar:' : '💸 **Refund Requests - PNP Latino Live**\n\nSelect a request to process:',
+        lang === 'es' ? '💸 **Solicitudes de Reembolso - PNP Television Live**\n\nSelecciona una solicitud para procesar:' : '💸 **Refund Requests - PNP Television Live**\n\nSelect a request to process:',
         {
           parse_mode: 'Markdown',
           reply_markup: {
@@ -1065,7 +1065,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
 
       await ctx.editMessageText(
         lang === 'es' 
-          ? `💸 **Procesar Reembolso - PNP Latino Live**\n\n` +
+          ? `💸 **Procesar Reembolso - PNP Television Live**\n\n` +
             `📅 *Fecha de Solicitud:* ${new Date(refund.created_at).toLocaleString()}\n` +
             `👤 *Usuario:* ${refund.user_id}\n` +
             `💃 *Modelo:* ${model?.name || 'Desconocido'}\n` +
@@ -1073,7 +1073,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
             `💰 *Monto:* $${refund.amount_usd}\n` +
             `📝 *Motivo:* ${refund.reason}\n\n` +
             `📝 *Selecciona una acción:*`
-          : `💸 **Process Refund - PNP Latino Live**\n\n` +
+          : `💸 **Process Refund - PNP Television Live**\n\n` +
             `📅 *Request Date:* ${new Date(refund.created_at).toLocaleString()}\n` +
             `👤 *User:* ${refund.user_id}\n` +
             `💃 *Model:* ${model?.name || 'Unknown'}\n` +
@@ -1130,7 +1130,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
         ];
 
         await ctx.editMessageText(
-          lang === 'es' ? '💸 **Solicitudes de Reembolso - PNP Latino Live**\n\nNo hay solicitudes de reembolso pendientes.' : '💸 **Refund Requests - PNP Latino Live**\n\nNo pending refund requests.',
+          lang === 'es' ? '💸 **Solicitudes de Reembolso - PNP Television Live**\n\nNo hay solicitudes de reembolso pendientes.' : '💸 **Refund Requests - PNP Television Live**\n\nNo pending refund requests.',
           {
             parse_mode: 'Markdown',
             reply_markup: {
@@ -1164,7 +1164,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
       }]);
 
       await ctx.editMessageText(
-        lang === 'es' ? '💸 **Solicitudes de Reembolso - PNP Latino Live**\n\nSelecciona una solicitud para procesar:' : '💸 **Refund Requests - PNP Latino Live**\n\nSelect a request to process:',
+        lang === 'es' ? '💸 **Solicitudes de Reembolso - PNP Television Live**\n\nSelecciona una solicitud para procesar:' : '💸 **Refund Requests - PNP Television Live**\n\nSelect a request to process:',
         {
           parse_mode: 'Markdown',
           reply_markup: {
@@ -1212,7 +1212,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
         ];
 
         await ctx.editMessageText(
-          lang === 'es' ? '💸 **Solicitudes de Reembolso - PNP Latino Live**\n\nNo hay solicitudes de reembolso pendientes.' : '💸 **Refund Requests - PNP Latino Live**\n\nNo pending refund requests.',
+          lang === 'es' ? '💸 **Solicitudes de Reembolso - PNP Television Live**\n\nNo hay solicitudes de reembolso pendientes.' : '💸 **Refund Requests - PNP Television Live**\n\nNo pending refund requests.',
           {
             parse_mode: 'Markdown',
             reply_markup: {
@@ -1246,7 +1246,7 @@ const registerPNPLiveManagementHandlers = (bot) => {
       }]);
 
       await ctx.editMessageText(
-        lang === 'es' ? '💸 **Solicitudes de Reembolso - PNP Latino Live**\n\nSelecciona una solicitud para procesar:' : '💸 **Refund Requests - PNP Latino Live**\n\nSelect a request to process:',
+        lang === 'es' ? '💸 **Solicitudes de Reembolso - PNP Television Live**\n\nSelecciona una solicitud para procesar:' : '💸 **Refund Requests - PNP Television Live**\n\nSelect a request to process:',
         {
           parse_mode: 'Markdown',
           reply_markup: {
