@@ -272,34 +272,85 @@ class PaymentService {
 
   // Verify signature for ePayco
   static verifyEpaycoSignature(webhookData) {
-    const signature = webhookData.x_signature;
+    const signature = webhookData?.x_signature;
     if (!signature) return false;
 
-    // ePayco uses p_key for signature verification, not the private key
-    const pKey = process.env.EPAYCO_P_KEY;
+    // ePayco uses p_key (private key) for signature verification
+    const pKey = process.env.EPAYCO_P_KEY || process.env.EPAYCO_PRIVATE_KEY;
     if (!pKey) {
       if (process.env.NODE_ENV === 'production') {
-        throw new Error('EPAYCO_P_KEY must be configured in production');
+        throw new Error('EPAYCO_P_KEY or EPAYCO_PRIVATE_KEY must be configured in production');
       }
       // In non-production allow bypass for testing/dev
       return true;
     }
 
-    // Expected signature string per ePayco documentation:
-    // SHA256(x_cust_id_cliente^p_key^x_ref_payco^x_transaction_id^x_amount^x_currency_code)
-    const { x_cust_id_cliente, x_ref_payco, x_transaction_id, x_amount, x_currency_code } = webhookData;
-    const signatureParts = [
-      x_cust_id_cliente || '',
-      pKey,
-      x_ref_payco || '',
-      x_transaction_id || '',
-      x_amount || '',
-      x_currency_code || '',
-    ];
-    const signatureString = signatureParts.join('^');
-    // ePayco uses SHA256 hash (not HMAC)
-    const expected = crypto.createHash('sha256').update(signatureString).digest('hex');
-    return expected === signature;
+    const envCustId = process.env.EPAYCO_P_CUST_ID || process.env.EPAYCO_PUBLIC_KEY;
+    if (!envCustId && process.env.NODE_ENV === 'production') {
+      throw new Error('EPAYCO_P_CUST_ID or EPAYCO_PUBLIC_KEY must be configured in production');
+    }
+
+    const custId = envCustId || webhookData?.x_cust_id_cliente;
+    if (!custId) {
+      return false;
+    }
+
+    const signatureValue = String(signature).toLowerCase();
+
+    // Expected signature string per ePayco webhook documentation:
+    // SHA256(p_cust_id_cliente^p_key^x_ref_payco^x_transaction_id^x_amount^x_currency_code)
+    const {
+      x_ref_payco,
+      x_transaction_id,
+      x_amount,
+      x_currency_code,
+      x_id_invoice,
+      x_invoice,
+    } = webhookData || {};
+
+    const sha256Ready = x_ref_payco && x_transaction_id && x_amount && x_currency_code;
+    let sha256Valid = false;
+    if (sha256Ready) {
+      const signatureString = `${custId}^${pKey}^${x_ref_payco}^${x_transaction_id}^${x_amount}^${x_currency_code}`;
+      const expected = crypto.createHash('sha256').update(signatureString).digest('hex');
+      sha256Valid = expected === signatureValue;
+    }
+
+    // Checkout 2.0 signature validation (MD5):
+    // MD5(p_cust_id_cliente + p_key + p_id_invoice + p_amount + p_currency_code)
+    const invoice = x_id_invoice || x_invoice;
+    const md5Ready = invoice && x_amount && x_currency_code;
+    let md5Valid = false;
+    if (md5Ready) {
+      const md5String = `${custId}${pKey}${invoice}${x_amount}${x_currency_code}`;
+      const expected = crypto.createHash('md5').update(md5String).digest('hex');
+      md5Valid = expected === signatureValue;
+    }
+
+    return sha256Valid || md5Valid;
+  }
+
+  static generateEpaycoCheckoutSignature({
+    invoice,
+    amount,
+    currencyCode,
+  }) {
+    const pKey = process.env.EPAYCO_P_KEY || process.env.EPAYCO_PRIVATE_KEY;
+    const custId = process.env.EPAYCO_P_CUST_ID || process.env.EPAYCO_PUBLIC_KEY;
+
+    if (!pKey || !custId) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('EPAYCO_P_KEY or EPAYCO_PRIVATE_KEY and EPAYCO_P_CUST_ID or EPAYCO_PUBLIC_KEY must be configured in production');
+      }
+      return null;
+    }
+
+    if (!invoice || !amount || !currencyCode) {
+      return null;
+    }
+
+    const signatureString = `${custId}${pKey}${invoice}${amount}${currencyCode}`;
+    return crypto.createHash('md5').update(signatureString).digest('hex');
   }
 
   // Verify signature for Daimo

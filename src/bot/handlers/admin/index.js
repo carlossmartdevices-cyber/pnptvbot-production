@@ -1872,12 +1872,23 @@ let registerAdminHandlers = (bot) => {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
-      ctx.session.temp = {};
-      await ctx.saveSession();
+      // Safely clear session temp data
+      if (ctx.session) {
+        ctx.session.temp = {};
+        if (typeof ctx.saveSession === 'function') {
+          await ctx.saveSession();
+        }
+      }
 
       await showAdminPanel(ctx, true);
     } catch (error) {
       logger.error('Error in admin cancel:', error);
+      // Try to show admin panel even if session operations fail
+      try {
+        await showAdminPanel(ctx, true);
+      } catch (panelError) {
+        await ctx.reply('❌ Error. Please use /admin to return to the panel.');
+      }
     }
   });
 
@@ -1889,12 +1900,23 @@ let registerAdminHandlers = (bot) => {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
-      ctx.session.temp = {};
-      await ctx.saveSession();
+      // Safely clear session temp data
+      if (ctx.session) {
+        ctx.session.temp = {};
+        if (typeof ctx.saveSession === 'function') {
+          await ctx.saveSession();
+        }
+      }
 
       await showAdminPanel(ctx, true);
     } catch (error) {
       logger.error('Error in back_admin:', error);
+      // Try to show admin panel even if session operations fail
+      try {
+        await showAdminPanel(ctx, true);
+      } catch (panelError) {
+        await ctx.reply('❌ Error. Please use /admin to return to the panel.');
+      }
     }
   });
 

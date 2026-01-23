@@ -8,3 +8,16 @@ process.env.FIREBASE_CLIENT_EMAIL = 'test@test.com';
 process.env.BROADCAST_QUEUE_POLL_INTERVAL_MS = '50';
 process.env.BROADCAST_QUEUE_RETRY_DELAY_MS = '50';
 process.env.SKIP_DB_TESTS = 'true';
+
+jest.mock('../src/utils/logger', () => ({
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+  addUserContext: jest.fn((userId, action) => ({
+    userId,
+    action,
+    timestamp: new Date().toISOString(),
+  })),
+  stream: { write: () => {} },
+}));

@@ -312,7 +312,7 @@
 
         // Initialize ePayco Checkout
         function initializeEpayco() {
-            if (!paymentData.epaycoPublicKey) {
+            if (!paymentData.epaycoPublicKey || !paymentData.epaycoSignature) {
                 showError('Payment configuration incomplete');
                 return;
             }
@@ -338,12 +338,13 @@
                 name: paymentData.plan.sku,
                 description: paymentData.plan.sku,
                 invoice: paymentData.paymentRef,
-                currency: "cop",
+                currency: paymentData.currencyCode || "COP",
                 amount: paymentData.amountCOP.toString(),
                 tax_base: "0",
                 tax: "0",
                 country: "co",
                 lang: "en",
+                signature: paymentData.epaycoSignature,
 
                 // Extra data for webhook (no customer data - ePayco will collect it)
                 extra1: paymentData.userId.toString(),

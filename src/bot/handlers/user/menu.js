@@ -20,6 +20,48 @@ const sanitizeMarkdown = (text) => {
 };
 
 /**
+ * Format membership expiration date
+ * @param {Date|string} expiry - Expiration date
+ * @param {string} lang - Language code
+ * @returns {string} Formatted date string
+ */
+const formatMembershipExpiry = (expiry, lang) => {
+  if (!expiry) return lang === 'es' ? 'Sin fecha de vencimiento' : 'No expiration date';
+
+  const date = expiry instanceof Date ? expiry : new Date(expiry);
+  if (isNaN(date.getTime())) return lang === 'es' ? 'Fecha no disponible' : 'Date not available';
+
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return date.toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', options);
+};
+
+/**
+ * Build membership status header
+ * @param {Object} user - User object
+ * @param {boolean} isPremium - Whether user is premium
+ * @param {string} lang - Language code
+ * @returns {string} Membership status header
+ */
+const buildMembershipHeader = (user, isPremium, lang) => {
+  const memberType = isPremium ? 'PRIME' : 'FREE';
+  const emoji = isPremium ? '💎' : '🆓';
+  const memberLabel = lang === 'es' ? 'Membresía' : 'Membership';
+
+  if (isPremium && user?.planExpiry) {
+    const expiryDate = formatMembershipExpiry(user.planExpiry, lang);
+    const validUntil = lang === 'es' ? 'Válido hasta' : 'Valid until';
+    return `${emoji} *${memberLabel}: ${memberType}*\n📅 ${validUntil}: ${expiryDate}\n\n`;
+  } else if (isPremium) {
+    // PRIME without expiry (lifetime or similar)
+    const lifetime = lang === 'es' ? 'Lifetime' : 'Lifetime';
+    return `${emoji} *${memberLabel}: ${memberType}* (${lifetime})\n\n`;
+  } else {
+    // FREE user
+    return `${emoji} *${memberLabel}: ${memberType}*\n\n`;
+  }
+};
+
+/**
  * Envía mensaje de bienvenida y link de ingreso al canal PRIME
  * @param {Telegraf} bot - Bot instance
  * @param {string|number} userId - Telegram user ID
@@ -313,12 +355,15 @@ const showMainMenu = async (ctx) => {
     previewBanner = `\`${modeLabel}\`\n\n`;
   }
 
+  // Build membership status header
+  const membershipHeader = buildMembershipHeader(user, isPremium || isAdmin, lang);
+
   // Build keyboard buttons array
   let buttons = [];
 
   if (isPremium || isAdmin) {
     // PRIME MEMBER VERSION - BENEFITS FOCUSED
-    menuText = previewBanner + t(lang === 'es' ? 'pnpLatinoPrimeMenu' : 'pnpLatinoPrimeMenu', lang);
+    menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoPrimeMenu' : 'pnpLatinoPrimeMenu', lang);
 
     // Get user's display name for Jitsi
     const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
@@ -332,14 +377,14 @@ const showMainMenu = async (ctx) => {
       ],
       [
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
-        Markup.button.callback(lang === 'es' ? '🌎 ¿Quién está cerca?' : '🌎 Who is Nearby', 'show_nearby'),
+        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '🎥 Hangouts' : '🎥 Hangouts', 'menu_hangouts'),
-        Markup.button.callback(lang === 'es' ? '📹 Videorama' : '📹 Videorama', 'menu_videorama'),
+        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'menu_hangouts'),
+        Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '👥 Video Llamada VIP' : '👥 Meet & Greet', 'MEET_GREET_START'),
+        Markup.button.callback(lang === 'es' ? '🔴 PNP Latino Live' : '🔴 PNP Latino Live', 'MEET_GREET_START'),
       ],
       [
         Markup.button.callback(lang === 'es' ? 'ℹ️ Ayuda' : 'ℹ️ Help', 'show_support'),
@@ -348,7 +393,7 @@ const showMainMenu = async (ctx) => {
     ];
   } else {
     // FREE MEMBER VERSION - SALES FOCUSED
-    menuText = previewBanner + t(lang === 'es' ? 'pnpLatinoFreeMenu' : 'pnpLatinoFreeMenu', lang);
+    menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoFreeMenu' : 'pnpLatinoFreeMenu', lang);
 
     buttons = [
       [
@@ -358,11 +403,14 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '🔄 Migrar Lifetime del viejo PNPtv' : '🔄 Migrate Lifetime from old PNPtv', 'migrate_lifetime_start'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '🎥 Hangouts' : '🎥 Hangouts', 'menu_hangouts'),
-        Markup.button.callback(lang === 'es' ? '📹 Videorama' : '📹 Videorama', 'menu_videorama'),
+        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
+        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'menu_hangouts'),
+        Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
       ],
       [
@@ -450,25 +498,12 @@ const showMainMenuEdit = async (ctx) => {
     previewBanner = `\`${modeLabel}\`\n\n`;
   }
 
+  // Build membership status header
+  const membershipHeader = buildMembershipHeader(user, isPremium || isAdmin, lang);
+
   if (isPremium || isAdmin) {
     // PRIME MEMBER VERSION - BENEFITS FOCUSED
-    menuText = previewBanner + (lang === 'es'
-      ? '`💎 TU ÁREA PRIME`\n\n' +
-        `¡Hola ${username}! Bienvenido a tu área exclusiva. 🔥\n\n` +
-        '**Accede a todo tu contenido:**\n\n' +
-        '🎬 **Ver Contenido** — Videos completos, shows y contenido exclusivo\n' +
-        '📍 **Nearby** — Encuentra papis cerca de ti\n' +
-        '🎥 **PNPtv main Room!** — Sala de video en vivo principal\n' +
-        '**Cristina**, tu asistente IA, está lista para ayudarte.\n\n' +
-        '`¡Disfruta todo tu contenido PRIME! 🎬`'
-      : '`💎 YOUR PRIME AREA`\n\n' +
-        `Hey ${username}! Welcome to your exclusive area. 🔥\n\n` +
-        '**Access all your content:**\n\n' +
-        '🎬 **Watch Content** — Full videos, shows & exclusive content\n' +
-        '📍 **Nearby** — Find papis near you\n' +
-        '🎥 **PNPtv main Room!** — Main live video room\n' +
-        '**Cristina**, your AI assistant, is ready to help.\n\n' +
-        '`Enjoy all your PRIME content! 🎬`');
+    menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoPrimeMenu' : 'pnpLatinoPrimeMenu', lang);
 
     // Get user's display name for Jitsi
     const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
@@ -480,14 +515,14 @@ const showMainMenuEdit = async (ctx) => {
       ],
       [
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
-        Markup.button.callback(lang === 'es' ? '🌎 ¿Quién está cerca?' : '🌎 Who is Nearby', 'show_nearby'),
+        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '🎥 Hangouts' : '🎥 Hangouts', 'menu_hangouts'),
-        Markup.button.callback(lang === 'es' ? '📹 Videorama' : '📹 Videorama', 'menu_videorama'),
+        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'menu_hangouts'),
+        Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '👥 Video Llamada VIP' : '👥 Meet & Greet', 'MEET_GREET_START'),
+        Markup.button.callback(lang === 'es' ? '🔴 PNP Latino Live' : '🔴 PNP Latino Live', 'MEET_GREET_START'),
       ],
       [
         Markup.button.callback(lang === 'es' ? 'ℹ️ Ayuda' : 'ℹ️ Help', 'show_support'),
@@ -496,27 +531,7 @@ const showMainMenuEdit = async (ctx) => {
     ];
   } else {
     // FREE MEMBER VERSION - SALES FOCUSED
-    menuText = previewBanner + (lang === 'es'
-      ? '`🔒 DESBLOQUEA TODO EL CONTENIDO`\n\n' +
-        `Hola ${username}, estás usando la versión FREE.\n\n` +
-        '**Con PRIME obtienes acceso ilimitado a:**\n\n' +
-        '🎬 Videos completos y shows exclusivos\n' +
-        '📍 Encuentra papis cerca de ti (Nearby)\n' +
-        '🎥 Salas de video en vivo 24/7\n' +
-        '📻 Radio y contenido sin restricciones\n' +
-        '💬 Chat y soporte prioritario\n\n' +
-        '**¡Hazte PRIME!** $14.99 USD/semana 💎'
-      : '`🔒 UNLOCK ALL CONTENT`\n\n' +
-        `Hey ${username}, you\'re on the FREE version.\n\n` +
-        '**With PRIME you get unlimited access to:**\n\n' +
-        '🎬 Full videos & exclusive shows\n' +
-        '📍 Find papis near you (Nearby)\n' +
-        '🎥 Live video rooms 24/7\n' +
-        '📻 Radio & unrestricted content\n' +
-        '💬 Priority chat & support\n\n' +
-        '**Go PRIME!** $14.99 USD/week 💎');
-
-    menuText = previewBanner + t(lang === 'es' ? 'pnpLatinoFreeMenu' : 'pnpLatinoFreeMenu', lang);
+    menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoFreeMenu' : 'pnpLatinoFreeMenu', lang);
 
     buttons = [
       [
@@ -526,7 +541,14 @@ const showMainMenuEdit = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '🔄 Migrar Lifetime del viejo PNPtv' : '🔄 Migrate Lifetime from old PNPtv', 'migrate_lifetime_start'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
+        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'menu_hangouts'),
+        Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
       ],
       [

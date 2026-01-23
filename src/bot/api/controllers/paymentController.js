@@ -1,6 +1,7 @@
 const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
 const ConfirmationTokenService = require('../../services/confirmationTokenService');
+const PaymentService = require('../../services/paymentService');
 const logger = require('../../../utils/logger');
 
 /**
@@ -58,6 +59,8 @@ class PaymentController {
 
       // Calculate price in COP
       const priceInCOP = plan.price_in_cop || (parseFloat(plan.price) * 4000);
+      const amountCOPString = String(priceInCOP);
+      const currencyCode = 'COP';
 
       // Create payment reference
       const actualPaymentId = payment.id || payment.paymentId;
@@ -87,6 +90,7 @@ class PaymentController {
         status: payment.status,
         amountUSD: parseFloat(plan.price),
         amountCOP: priceInCOP,
+        currencyCode,
         plan: {
           id: plan.id,
           sku: plan.sku || 'EASYBOTS-PNP-030',
@@ -104,6 +108,11 @@ class PaymentController {
         basePaymentData.testMode = process.env.EPAYCO_TEST_MODE === 'true';
         basePaymentData.confirmationUrl = `${webhookDomain}/api/webhooks/epayco`;
         basePaymentData.responseUrl = `${webhookDomain}/api/payment-response`;
+        basePaymentData.epaycoSignature = PaymentService.generateEpaycoCheckoutSignature({
+          invoice: paymentRef,
+          amount: amountCOPString,
+          currencyCode,
+        });
       } else if (provider === 'daimo') {
         // For Daimo, generate the payment link using DaimoService
         const DaimoService = require('../../services/daimoService');

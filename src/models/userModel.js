@@ -533,6 +533,82 @@ class UserModel {
   }
 
   /**
+   * Get extended statistics for admin dashboard
+   */
+  static async getExtendedStatistics() {
+    try {
+      const cacheKey = 'stats:users:extended';
+
+      const fetchStats = async () => {
+        // Get comprehensive statistics
+        const statsResult = await query(`
+          SELECT
+            COUNT(*) as total_users,
+            COUNT(*) FILTER (WHERE subscription_status = 'active') as active_subscriptions,
+            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') as new_users_30_days
+          FROM ${TABLE}
+        `);
+
+        // Get users by plan breakdown
+        const planResult = await query(`
+          SELECT
+            COALESCE(plan_id, 'No Plan') as plan_name,
+            COUNT(*) as count
+          FROM ${TABLE}
+          GROUP BY plan_id
+          ORDER BY count DESC
+        `);
+
+        const row = statsResult.rows[0] || {};
+        const totalUsers = parseInt(row.total_users) || 0;
+        const activeSubscriptions = parseInt(row.active_subscriptions) || 0;
+        const newUsersLast30Days = parseInt(row.new_users_30_days) || 0;
+
+        // Build byPlan object
+        const byPlan = {};
+        for (const planRow of planResult.rows) {
+          byPlan[planRow.plan_name] = parseInt(planRow.count) || 0;
+        }
+
+        // If no plans found, add a default
+        if (Object.keys(byPlan).length === 0) {
+          byPlan['Free'] = totalUsers;
+        }
+
+        const stats = {
+          totalUsers,
+          activeSubscriptions,
+          newUsersLast30Days,
+          byPlan,
+          timestamp: new Date().toISOString()
+        };
+
+        logger.info('Extended user statistics calculated', { totalUsers, activeSubscriptions, newUsersLast30Days });
+        return stats;
+      };
+
+      if (cache.getOrSet && typeof cache.getOrSet === 'function') {
+        return await cache.getOrSet(cacheKey, fetchStats, 60);
+      }
+
+      const cached = await cache.get(cacheKey);
+      if (cached) return cached;
+
+      const stats = await fetchStats();
+      if (cache.set) await cache.set(cacheKey, stats, 60);
+      return stats;
+    } catch (error) {
+      logger.error('Error getting extended user statistics:', error);
+      return {
+        totalUsers: 0,
+        activeSubscriptions: 0,
+        newUsersLast30Days: 0,
+        byPlan: { 'Free': 0 }
+      };
+    }
+  }
+
+  /**
    * Invalidate user cache
    */
   static async invalidateCache(userId) {

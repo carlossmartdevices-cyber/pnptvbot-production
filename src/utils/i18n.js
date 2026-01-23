@@ -1077,10 +1077,10 @@ explorar Cercanos sin limites y unirte a eventos privados.`,
         repeated_characters: 'Caracteres repetidos',
         excessive_punctuation: 'Puntuación excesiva',
       },
-      // New PNP Latino messages
-      pnpLatinoPrimeMenu: `💎 PNP LATINO PRIME
+    },
+    // PNP Latino messages
+    pnpLatinoPrimeMenu: `💎 PNP LATINO PRIME
 
-🔥 Contenido Exclusivo
 Disfruta del contenido más hot con Santino, Lex y otros latinos:
 videos reales, sesiones intensas y vibes PNP sin censura, solo aquí en Telegram.
 
@@ -1094,9 +1094,8 @@ Tu acceso PRIME incluye:
 🤖 Cristina IA — Soporte 24/7
 
 💎 Contenido, conexión y experiencia PRIME.`,
-      pnpLatinoFreeMenu: `🆓 PNP LATINO FREE
+    pnpLatinoFreeMenu: `🆓 PNP LATINO FREE
 
-🔥 Contenido y Comunidad
 Únete a la comunidad PNP más grande con Santino, Lex y otros latinos.
 Accede a contenido básico y conecta con la comunidad.
 
@@ -1108,33 +1107,31 @@ Tu acceso FREE incluye:
 
 🤖 Cristina IA — Soporte 24/7
 
-💎 ¿Quieres más? Actualiza a PRIME para contenido exclusivo, eventos en vivo y todas las funciones premium.
-
-📱 Usa /subscribe para convertirte en PRIME.`,
-      pnpLatinoPrimeOnboardingComplete: `🎉 ¡Bienvenido a PNP LATINO PRIME!
+💎 ¿Quieres más? Sube a PRIME para contenido exclusivo.`,
+    pnpLatinoPrimeOnboardingComplete: `🎉 ¡Bienvenido a PNP LATINO PRIME!
 
 🔥 Tu membresía PRIME está activa y lista para usar.
 
 💎 Disfruta de:
 • Contenido exclusivo sin censura
-• Nearby - Conecta con la comunidad
-• Hangouts - Salas de video privadas
+• PNP Nearby - Conecta con la comunidad
+• PNP Hangouts - Salas de video privadas
 • PNP Latino Live - Eventos en vivo
-• Videorama - Playlists completas
+• PNP Videorama - Playlists completas
 
 📱 Usa /menu para explorar todas las funciones.
 
 🤖 ¿Necesitas ayuda? Cristina IA está disponible 24/7.
 
 ¡Bienvenido a la experiencia PRIME! 🔥`,
-      pnpLatinoFreeOnboardingComplete: `🎉 ¡Bienvenido a PNP LATINO FREE!
+    pnpLatinoFreeOnboardingComplete: `🎉 ¡Bienvenido a PNP LATINO FREE!
 
 🔥 Ahora eres parte de la comunidad PNP más grande.
 
 🆓 Tu acceso FREE incluye:
-• Nearby básico - Conecta con la comunidad
-• Hangouts - Salas de video públicas
-• Videorama - Selección de playlists
+• PNP Nearby básico - Conecta con la comunidad
+• PNP Hangouts - Salas de video públicas
+• PNP Videorama - Selección de playlists
 
 💎 ¿Quieres contenido exclusivo?
 • Videos completos sin censura
@@ -1148,8 +1145,8 @@ Tu acceso FREE incluye:
 
 ¡Disfruta de PNP LATINO! 🔥`,
 
-      // Proactive and Tutorial Messages
-      pnpLatinoWelcomeTutorial: `🎉 ¡Bienvenido a PNP LATINO! 🔥
+    // Proactive and Tutorial Messages
+    pnpLatinoWelcomeTutorial: `🎉 ¡Bienvenido a PNP LATINO! 🔥
 
 📚 *Tutorial Rápido:*
 
@@ -1167,7 +1164,7 @@ Tu acceso FREE incluye:
 
 💬 ¿Necesitas ayuda? Usa /support o pregunta a Cristina IA!`,
 
-      pnpLatinoGroupRules: `📜 *Reglas del Grupo PNP LATINO*
+    pnpLatinoGroupRules: `📜 *Reglas del Grupo PNP LATINO*
 
 ✅ *Permitido:*
 • Conversaciones relacionadas con PNP
@@ -1187,7 +1184,7 @@ Tu acceso FREE incluye:
 
 💡 *Consejo:* Usa el bot en privado para comandos: /menu, /subscribe, /profile`,
 
-      pnpLatinoAntiSpamWarning: `⚠️ *Advertencia Anti-Spam*
+    pnpLatinoAntiSpamWarning: `⚠️ *Advertencia Anti-Spam*
 
 📢 Has enviado {count} mensajes en {time} segundos.
 
@@ -1198,7 +1195,7 @@ Tu acceso FREE incluye:
 
 ⏳ Por favor espera antes de enviar más mensajes para evitar ser silenciado.`,
 
-      pnpLatinoSpamMuted: `🔇 *Cuenta Silenciada*
+    pnpLatinoSpamMuted: `🔇 *Cuenta Silenciada*
 
 🚫 Has sido silenciado por {duration} minutos por violar las reglas anti-spam.
 
@@ -1213,7 +1210,7 @@ Tu acceso FREE incluye:
 • Espera entre mensajes
 • Usa el bot en privado para comandos`,
 
-      pnpLatinoTutorialStep1: `🎬 *Tutorial PNP LATINO - Paso 1/3*
+    pnpLatinoTutorialStep1: `🎬 *Tutorial PNP LATINO - Paso 1/3*
 
 💎 *Conoce tu Nivel:*
 
@@ -1231,7 +1228,7 @@ Tu acceso FREE incluye:
 
 📱 *Cómo actualizar:* /subscribe`,
 
-      pnpLatinoTutorialStep2: `🎥 *Tutorial PNP LATINO - Paso 2/3*
+    pnpLatinoTutorialStep2: `🎥 *Tutorial PNP LATINO - Paso 2/3*
 
 🔥 *Funciones Principales:*
 
@@ -1252,7 +1249,7 @@ Tu acceso FREE incluye:
 
 💡 *Consejo:* Usa /menu para acceder rápidamente!`,
 
-      pnpLatinoTutorialStep3: `🤖 *Tutorial PNP LATINO - Paso 3/3*
+    pnpLatinoTutorialStep3: `🤖 *Tutorial PNP LATINO - Paso 3/3*
 
 💬 *Soporte y Comunidad:*
 
@@ -1273,80 +1270,6 @@ Tu acceso FREE incluye:
 • Disfruta del contenido
 
 ✅ *Tutorial completado!* Usa /menu para empezar.`,
-    },
-  },
-  es: {
-    // ... existing Spanish translations ...
-    // Add Spanish versions of the new messages
-    pnpLatinoPrimeMenu: `💎 PNP LATINO PRIME
-
-🔥 Contenido Exclusivo
-Disfruta del contenido más hot con Santino, Lex y otros latinos:
-videos reales, sesiones intensas y vibes PNP sin censura, solo aquí en Telegram.
-
-Tu acceso PRIME incluye:
-
-📍 Nearby — Grinder PNP de la comunidad
-🎥 Hangouts — Salas de video privadas y públicas
-🔴 PNP Latino Live — Shows y eventos en vivo
-🎶 Videorama — Playlists y podcasts PNP
-
-🤖 Cristina IA — Soporte 24/7
-
-💎 Contenido, conexión y experiencia PRIME.`,
-    pnpLatinoFreeMenu: `🆓 PNP LATINO FREE
-
-🔥 Contenido y Comunidad
-Únete a la comunidad PNP más grande con Santino, Lex y otros latinos.
-Accede a contenido básico y conecta con la comunidad.
-
-Tu acceso FREE incluye:
-
-📍 Nearby — Grinder PNP de la comunidad (básico)
-🎥 Hangouts — Salas de video públicas
-🎶 Videorama — Playlists y podcasts PNP (selección limitada)
-
-🤖 Cristina IA — Soporte 24/7
-
-💎 ¿Quieres más? Actualiza a PRIME para contenido exclusivo, eventos en vivo y todas las funciones premium.
-
-📱 Usa /subscribe para convertirte en PRIME.`,
-    pnpLatinoPrimeOnboardingComplete: `🎉 ¡Bienvenido a PNP LATINO PRIME!
-
-🔥 Tu membresía PRIME está activa y lista para usar.
-
-💎 Disfruta de:
-• Contenido exclusivo sin censura
-• Nearby - Conecta con la comunidad
-• Hangouts - Salas de video privadas
-• PNP Latino Live - Eventos en vivo
-• Videorama - Playlists completas
-
-📱 Usa /menu para explorar todas las funciones.
-
-🤖 ¿Necesitas ayuda? Cristina IA está disponible 24/7.
-
-¡Bienvenido a la experiencia PRIME! 🔥`,
-    pnpLatinoFreeOnboardingComplete: `🎉 ¡Bienvenido a PNP LATINO FREE!
-
-🔥 Ahora eres parte de la comunidad PNP más grande.
-
-🆓 Tu acceso FREE incluye:
-• Nearby básico - Conecta con la comunidad
-• Hangouts - Salas de video públicas
-• Videorama - Selección de playlists
-
-💎 ¿Quieres contenido exclusivo?
-• Videos completos sin censura
-• Eventos en vivo PNP Latino Live
-• Salas de video privadas
-• Todas las funciones premium
-
-📱 Usa /subscribe para actualizar a PRIME.
-
-🤖 ¿Preguntas? Cristina IA está aquí para ayudarte.
-
-¡Disfruta de PNP LATINO! 🔥`,
   },
 };
 

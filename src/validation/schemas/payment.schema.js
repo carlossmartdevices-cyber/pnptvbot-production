@@ -119,12 +119,12 @@ const schemas = {
    * ePayco webhook payload validation
    */
   epaycoWebhook: Joi.object({
-    x_cust_id_cliente: Joi.string().required(),
+    x_cust_id_cliente: Joi.string().optional(),
     x_ref_payco: Joi.string().required(),
     x_transaction_id: Joi.string().required(),
-    x_amount: Joi.number().positive().required(),
-    x_currency_code: Joi.string().valid('COP', 'USD').required(),
-    x_transaction_state: Joi.string().valid('Aceptada', 'Rechazada', 'Pendiente').required(),
+    x_amount: Joi.alternatives().try(Joi.string(), Joi.number().positive()).required(),
+    x_currency_code: Joi.string().valid('COP', 'USD', 'cop', 'usd').required(),
+    x_transaction_state: Joi.string().valid('Aceptada', 'Aprobada', 'Rechazada', 'Pendiente', 'Fallida').required(),
     x_signature: Joi.string().required(),
   }),
 

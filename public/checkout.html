@@ -465,20 +465,22 @@
           test: checkout.test,
         });
 
-        // Generate unique invoice number
-        const invoice = `INV-${Date.now()}`;
+        if (!checkout.epaycoSignature || !checkout.invoice) {
+          throw new Error('Configuración de pago incompleta');
+        }
 
         // Open ePayco popup
         handler.open({
           name: checkout.planName,
           description: checkout.description,
-          invoice: invoice,
-          currency: 'cop',
-          amount: checkout.amountCOP.toString(),
+          invoice: checkout.invoice,
+          currency: checkout.currencyCode || 'COP',
+          amount: String(checkout.amountCOP),
           tax_base: '0',
           tax: '0',
           country: 'co',
           lang: 'es',
+          signature: checkout.epaycoSignature,
           external: 'false', // This ensures popup mode
           response: checkout.responseUrl,
           confirmation: checkout.confirmationUrl,

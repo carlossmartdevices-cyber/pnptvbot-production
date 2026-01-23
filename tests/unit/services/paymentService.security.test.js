@@ -28,7 +28,6 @@ describe('PaymentService Security Tests', () => {
       const webhookData = {
         x_ref_payco: 'ref123',
         x_transaction_id: 'txn123',
-        x_cust_id_cliente: 'cust123',
         x_amount: '9.99',
         // Missing x_signature
       };
@@ -41,6 +40,7 @@ describe('PaymentService Security Tests', () => {
     it('should throw ConfigurationError in production when private key is missing', () => {
       process.env.NODE_ENV = 'production';
       delete process.env.EPAYCO_PRIVATE_KEY;
+      delete process.env.EPAYCO_P_KEY;
 
       const webhookData = {
         x_ref_payco: 'ref123',
@@ -49,12 +49,13 @@ describe('PaymentService Security Tests', () => {
 
       expect(() => {
         PaymentService.verifyEpaycoSignature(webhookData);
-      }).toThrow('EPAYCO_PRIVATE_KEY must be configured in production');
+      }).toThrow('EPAYCO_P_KEY or EPAYCO_PRIVATE_KEY must be configured in production');
     });
 
     it('should allow bypass in development when private key is missing', () => {
       process.env.NODE_ENV = 'development';
       delete process.env.EPAYCO_PRIVATE_KEY;
+      delete process.env.EPAYCO_P_KEY;
 
       const webhookData = {
         x_ref_payco: 'ref123',
@@ -68,20 +69,19 @@ describe('PaymentService Security Tests', () => {
 
     it('should verify valid ePayco signature correctly', () => {
       const secret = 'test-secret-key';
-      process.env.EPAYCO_PRIVATE_KEY = secret;
+      process.env.EPAYCO_P_KEY = secret;
+      process.env.EPAYCO_P_CUST_ID = 'cust123';
 
       const webhookData = {
-        x_cust_id_cliente: 'cust123',
         x_ref_payco: 'ref456',
         x_transaction_id: 'txn789',
         x_amount: '19.99',
+        x_currency_code: 'USD',
       };
 
-      // Generate valid signature
-      const signatureString = `${webhookData.x_cust_id_cliente}^${secret}^${webhookData.x_ref_payco}^${webhookData.x_transaction_id}^${webhookData.x_amount}`;
-      const hmac = crypto.createHmac('sha256', secret);
-      hmac.update(signatureString);
-      const validSignature = hmac.digest('hex');
+      // Generate valid signature (ePayco uses SHA256 hash, not HMAC)
+      const signatureString = `${process.env.EPAYCO_P_CUST_ID}^${secret}^${webhookData.x_ref_payco}^${webhookData.x_transaction_id}^${webhookData.x_amount}^${webhookData.x_currency_code}`;
+      const validSignature = crypto.createHash('sha256').update(signatureString).digest('hex');
 
       webhookData.x_signature = validSignature;
 
@@ -91,10 +91,10 @@ describe('PaymentService Security Tests', () => {
     });
 
     it('should reject invalid ePayco signature', () => {
-      process.env.EPAYCO_PRIVATE_KEY = 'test-secret-key';
+      process.env.EPAYCO_P_KEY = 'test-secret-key';
+      process.env.EPAYCO_P_CUST_ID = 'cust123';
 
       const webhookData = {
-        x_cust_id_cliente: 'cust123',
         x_ref_payco: 'ref456',
         x_transaction_id: 'txn789',
         x_amount: '19.99',
@@ -108,17 +108,17 @@ describe('PaymentService Security Tests', () => {
 
     it('should reject tampered webhook data', () => {
       const secret = 'test-secret-key';
-      process.env.EPAYCO_PRIVATE_KEY = secret;
+      process.env.EPAYCO_P_KEY = secret;
+      process.env.EPAYCO_P_CUST_ID = 'cust123';
 
       const webhookData = {
-        x_cust_id_cliente: 'cust123',
         x_ref_payco: 'ref456',
         x_transaction_id: 'txn789',
         x_amount: '19.99',
       };
 
       // Generate signature for original amount
-      const signatureString = `${webhookData.x_cust_id_cliente}^${secret}^${webhookData.x_ref_payco}^${webhookData.x_transaction_id}^${webhookData.x_amount}`;
+      const signatureString = `${process.env.EPAYCO_P_CUST_ID}^${secret}^${webhookData.x_ref_payco}^${webhookData.x_transaction_id}^${webhookData.x_amount}`;
       const hmac = crypto.createHmac('sha256', secret);
       hmac.update(signatureString);
       const validSignature = hmac.digest('hex');

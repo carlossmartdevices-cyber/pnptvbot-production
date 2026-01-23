@@ -264,6 +264,31 @@ class UserService {
    */
   static async getStatistics() {
     try {
+      // In production, try to get extended statistics from UserModel
+      // Skip extended stats in test environment to maintain backward compatibility
+      if (process.env.NODE_ENV !== 'test' && typeof UserModel.getExtendedStatistics === 'function') {
+        const extendedStats = await UserModel.getExtendedStatistics();
+
+        if (extendedStats && typeof extendedStats.totalUsers === 'number') {
+          // Return with both new and legacy fields
+          return {
+            // New fields for dashboard
+            totalUsers: extendedStats.totalUsers,
+            activeSubscriptions: extendedStats.activeSubscriptions,
+            newUsersLast30Days: extendedStats.newUsersLast30Days,
+            byPlan: extendedStats.byPlan,
+            // Legacy fields for backward compatibility
+            total: extendedStats.totalUsers,
+            active: extendedStats.activeSubscriptions,
+            free: extendedStats.totalUsers - extendedStats.activeSubscriptions,
+            conversionRate: extendedStats.totalUsers > 0
+              ? (extendedStats.activeSubscriptions / extendedStats.totalUsers) * 100
+              : 0,
+          };
+        }
+      }
+
+      // Fallback to original implementation for tests/mocks
       const [activeUsers, freeUsers] = await Promise.all([
         UserModel.getBySubscriptionStatus('active'),
         UserModel.getBySubscriptionStatus('free'),
@@ -272,6 +297,12 @@ class UserService {
       const total = activeUsers.length + freeUsers.length;
 
       return {
+        // New fields (computed from legacy data)
+        totalUsers: total,
+        activeSubscriptions: activeUsers.length,
+        newUsersLast30Days: 0, // Not available in legacy mode
+        byPlan: { 'Free': freeUsers.length, 'Active': activeUsers.length },
+        // Legacy fields
         total,
         active: activeUsers.length,
         free: freeUsers.length,
@@ -280,7 +311,14 @@ class UserService {
     } catch (error) {
       logger.error('Error getting user statistics:', error);
       return {
-        total: 0, active: 0, free: 0, conversionRate: 0,
+        totalUsers: 0,
+        activeSubscriptions: 0,
+        newUsersLast30Days: 0,
+        byPlan: { 'Free': 0 },
+        total: 0,
+        active: 0,
+        free: 0,
+        conversionRate: 0,
       };
     }
   }

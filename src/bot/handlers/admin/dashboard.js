@@ -12,16 +12,31 @@ async function handleAdminDashboard(ctx) {
 
     // Get dashboard stats
     const stats = await adminService.getDashboardStats();
+    const users = stats.users || {};
+
+    // Safely get values with fallbacks
+    const totalUsers = users.totalUsers ?? users.total ?? 0;
+    const activeSubscriptions = users.activeSubscriptions ?? users.active ?? 0;
+    const newUsersLast30Days = users.newUsersLast30Days ?? 0;
+    const byPlan = users.byPlan || {};
+
+    // Build plans distribution text
+    let plansText = '';
+    if (Object.keys(byPlan).length > 0) {
+      plansText = Object.entries(byPlan)
+        .map(([plan, count]) => `• ${plan}: ${count}`)
+        .join('\n');
+    } else {
+      plansText = '• No plan data available';
+    }
 
     const dashboardMessage = `🔐 **Admin Dashboard**\n\n` +
       `**User Statistics:**\n` +
-      `• Total Users: ${stats.users.totalUsers}\n` +
-      `• Active Subscriptions: ${stats.users.activeSubscriptions}\n` +
-      `• New Users (30 days): ${stats.users.newUsersLast30Days}\n\n` +
+      `• Total Users: ${totalUsers}\n` +
+      `• Active Subscriptions: ${activeSubscriptions}\n` +
+      `• New Users (30 days): ${newUsersLast30Days}\n\n` +
       `**Plans Distribution:**\n` +
-      `${Object.entries(stats.users.byPlan)
-        .map(([plan, count]) => `• ${plan}: ${count}`)
-        .join('\n')}\n\n` +
+      `${plansText}\n\n` +
       `Use the buttons below to manage your bot:`;
 
     await ctx.reply(dashboardMessage, {

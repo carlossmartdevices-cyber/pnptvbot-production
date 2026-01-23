@@ -8,15 +8,18 @@ const webhookCache = new Map();
 const IDEMPOTENCY_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Cleanup interval to prevent memory leaks - runs every 10 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, timestamp] of webhookCache.entries()) {
-    if (now - timestamp >= IDEMPOTENCY_TTL) {
-      webhookCache.delete(key);
+if (process.env.NODE_ENV !== 'test') {
+  const cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [key, timestamp] of webhookCache.entries()) {
+      if (now - timestamp >= IDEMPOTENCY_TTL) {
+        webhookCache.delete(key);
+      }
     }
-  }
-  logger.debug(`Webhook cache cleanup: ${webhookCache.size} entries remaining`);
-}, 10 * 60 * 1000); // Run every 10 minutes
+    logger.debug(`Webhook cache cleanup: ${webhookCache.size} entries remaining`);
+  }, 10 * 60 * 1000); // Run every 10 minutes
+  cleanupInterval.unref();
+}
 
 /**
  * Check if webhook was already processed using idempotency key

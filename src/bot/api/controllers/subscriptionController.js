@@ -141,6 +141,15 @@ class SubscriptionController {
         amountUSD = await CurrencyConverter.copToUsd(plan.price);
       }
 
+      const invoice = `INV-${Date.now()}`;
+      const currencyCode = 'COP';
+      const amountCOPString = String(amountCOP);
+      const epaycoSignature = PaymentService.generateEpaycoCheckoutSignature({
+        invoice,
+        amount: amountCOPString,
+        currencyCode,
+      });
+
       // Create checkout data for frontend
       const baseUrl = process.env.BOT_WEBHOOK_DOMAIN || 'http://localhost:3000';
       const checkoutData = {
@@ -149,6 +158,9 @@ class SubscriptionController {
         description: `PNPtv ${plan.name} - ${plan.duration || 30} days`,
         amountUSD,
         amountCOP,
+        currencyCode,
+        invoice,
+        epaycoSignature,
         email,
         name,
         telegramId,
@@ -191,6 +203,7 @@ class SubscriptionController {
 
       const {
         x_ref_payco,
+        x_transaction_id,
         x_transaction_state,
         x_amount,
         x_currency_code,
@@ -200,29 +213,24 @@ class SubscriptionController {
         x_extra3, // planId
       } = req.body;
 
-      // Verify ePayco signature for security
-      if (x_signature && process.env.EPAYCO_PRIVATE_KEY) {
-        const crypto = require('crypto');
-        const p_cust_id_cliente = process.env.EPAYCO_P_CUST_ID || '';
-        const p_key = process.env.EPAYCO_PRIVATE_KEY;
+      let signatureValid = false;
+      try {
+        signatureValid = PaymentService.verifyEpaycoSignature(req.body);
+      } catch (error) {
+        logger.error('ePayco signature verification error', {
+          error: error.message,
+          transactionId: x_ref_payco,
+          signaturePresent: Boolean(x_signature),
+        });
+        return res.status(500).send('Signature verification error');
+      }
 
-        // ePayco signature format: x_cust_id_cliente^x_ref_payco^x_amount^x_currency_code
-        // eslint-disable-next-line max-len
-        const signatureString = `${p_cust_id_cliente}^${p_key}^${x_ref_payco}^${x_transaction_state}^${x_amount}^${x_currency_code}`;
-        const expectedSignature = crypto.createHash('sha256').update(signatureString).digest('hex');
-
-        if (x_signature !== expectedSignature) {
-          logger.error('Invalid ePayco signature', {
-            received: x_signature,
-            expected: expectedSignature,
-            transactionId: x_ref_payco,
-          });
-          return res.status(400).send('Invalid signature');
-        }
-
-        logger.info('ePayco signature verified successfully');
-      } else {
-        logger.warn('ePayco signature verification skipped (missing signature or private key)');
+      if (!signatureValid) {
+        logger.error('Invalid ePayco signature', {
+          transactionId: x_ref_payco,
+          signaturePresent: Boolean(x_signature),
+        });
+        return res.status(400).send('Invalid signature');
       }
 
       if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {

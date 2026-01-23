@@ -18,6 +18,8 @@ describe('Payment Methods Integration Tests', () => {
     // Set environment variables for testing
     process.env.BOT_WEBHOOK_DOMAIN = 'https://test.easybots.store';
     process.env.EPAYCO_PUBLIC_KEY = 'test_public_key';
+    delete process.env.EPAYCO_P_CUST_ID;
+    delete process.env.EPAYCO_P_KEY;
     process.env.DAIMO_API_KEY = 'test_daimo_key';
   });
 
@@ -334,25 +336,37 @@ describe('Payment Methods Integration Tests', () => {
 
   describe('Payment Signature Verification', () => {
     it('should verify ePayco signature correctly', () => {
+      process.env.EPAYCO_P_KEY = 'test_secret';
+      process.env.EPAYCO_P_CUST_ID = 'client_123';
+      process.env.NODE_ENV = 'development';
+
       const webhookData = {
-        x_cust_id_cliente: 'client_123',
         x_ref_payco: 'ref_123',
         x_transaction_id: 'txn_123',
         x_amount: '10.00',
-        x_signature: 'valid_signature',
+        x_currency_code: 'cop',
       };
 
-      // Mock crypto to return expected signature
       const crypto = require('crypto');
-      jest.spyOn(crypto, 'createHmac').mockReturnValue({
-        update: jest.fn().mockReturnThis(),
-        digest: jest.fn().mockReturnValue('valid_signature'),
-      });
-
-      process.env.EPAYCO_PRIVATE_KEY = 'test_secret';
-      process.env.NODE_ENV = 'development';
+      const signatureString = [
+        process.env.EPAYCO_P_CUST_ID,
+        process.env.EPAYCO_P_KEY,
+        webhookData.x_ref_payco,
+        webhookData.x_transaction_id,
+        webhookData.x_amount,
+        webhookData.x_currency_code,
+      ].join('^');
+      webhookData.x_signature = crypto.createHash('sha256').update(signatureString).digest('hex');
 
       const result = PaymentService.verifyEpaycoSignature(webhookData);
+      expect(result).toBe(true);
+    });
+
+    it('should allow ePayco signature bypass without private key in non-production', () => {
+      delete process.env.EPAYCO_PRIVATE_KEY;
+      process.env.NODE_ENV = 'test';
+
+      const result = PaymentService.verifyEpaycoSignature({ x_signature: 'sig' });
       expect(result).toBe(true);
     });
 

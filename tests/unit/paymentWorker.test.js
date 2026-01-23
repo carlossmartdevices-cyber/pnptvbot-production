@@ -42,6 +42,14 @@ describe('PaymentWorker', () => {
   let worker;
   let mockAxios;
 
+  beforeEach(() => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   beforeAll(() => {
     mockAxios = new MockAdapter(axios);
     worker = new PaymentWorker();

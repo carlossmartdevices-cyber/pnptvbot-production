@@ -37,8 +37,8 @@ describe('handleEpaycoWebhook', () => {
     PaymentService.verifyEpaycoSignature.mockReturnValue({ valid: true });
   });
 
-  test('rejects when transaction id is missing', async () => {
-    const req = { body: { ...basePayload, x_transaction_id: undefined } };
+  test('rejects when ref_payco is missing', async () => {
+    const req = { body: { ...basePayload, x_ref_payco: undefined } };
     const res = createRes();
 
     await handleEpaycoWebhook(req, res);
@@ -46,7 +46,7 @@ describe('handleEpaycoWebhook', () => {
     expect(res.statusCode).toBe(400);
     expect(res.body).toMatchObject({
       success: false,
-      code: 'MISSING_TRANSACTION_ID',
+      code: 'MISSING_REF_PAYCO',
     });
   });
 
