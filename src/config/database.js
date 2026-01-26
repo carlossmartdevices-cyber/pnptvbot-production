@@ -2,28 +2,29 @@ const { initializeFirebase, getFirestore } = require('./firebase');
 const logger = require('../utils/logger');
 
 /**
- * Initialize Database (uses Firestore)
- * This function initializes the Firestore connection
- * @returns {admin.firestore.Firestore} Firestore instance
+ * Initialize Database (uses PostgreSQL)
+ * This function is kept for backwards compatibility
+ * @returns {null} Always returns null since we use PostgreSQL
+ * @throws {Error} Always throws error since Firebase is disabled
  */
 const initializeDatabase = () => {
-  try {
-    const db = initializeFirebase();
-    logger.info('Firestore database initialized successfully');
-    return db;
-  } catch (error) {
-    logger.error('Failed to initialize database:', error);
-    throw error;
-  }
+  logger.error('❌ initializeDatabase() called but Firebase is DISABLED');
+  logger.error('❌ This is a BUG - code should use PostgreSQL directly!');
+  logger.error('❌ Please update the calling code to use postgres.js instead.');
+  throw new Error('Firebase is disabled. Use PostgreSQL via postgres.js instead.');
 };
 
 /**
- * Get Firestore instance
- * Creates connection if not already created
- * @returns {admin.firestore.Firestore}
+ * Get Database instance
+ * This function is kept for backwards compatibility
+ * @returns {null} Always returns null since we use PostgreSQL
+ * @throws {Error} Always throws error since Firebase is disabled
  */
 const getDatabase = () => {
-  return getFirestore();
+  logger.error('❌ getDatabase() called but Firebase is DISABLED');
+  logger.error('❌ This is a BUG - code should use PostgreSQL directly!');
+  logger.error('❌ Please update the calling code to use postgres.js instead.');
+  throw new Error('Firebase is disabled. Use PostgreSQL via postgres.js instead.');
 };
 
 /**

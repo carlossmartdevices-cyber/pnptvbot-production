@@ -6,13 +6,17 @@
 const logger = require('../utils/logger');
 
 function initializeFirebase() {
-  logger.info('Firebase is disabled - using PostgreSQL instead');
-  return null;
+  logger.error('❌ Firebase is DISABLED - using PostgreSQL instead');
+  logger.error('❌ If you see this message, code is still trying to use Firebase!');
+  logger.error('❌ Please update the calling code to use PostgreSQL.');
+  throw new Error('Firebase is disabled. Use PostgreSQL instead.');
 }
 
 function getFirestore() {
-  logger.warn('getFirestore called but Firebase is disabled - use PostgreSQL instead');
-  return null;
+  logger.error('❌ getFirestore() called but Firebase is DISABLED');
+  logger.error('❌ This is a BUG - code should use PostgreSQL instead!');
+  logger.error('❌ Please update the calling code immediately.');
+  throw new Error('Firebase is disabled. Use PostgreSQL instead.');
 }
 
 function getAdmin() {
