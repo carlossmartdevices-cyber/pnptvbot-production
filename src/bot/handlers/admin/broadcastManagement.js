@@ -82,7 +82,47 @@ const registerBroadcastHandlers = (bot) => {
         ctx.session.temp = {};
       }
 
+      ctx.session.temp.broadcastStep = 'schedule_type';
+      ctx.session.temp.scheduledTimes = [];
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery();
+
+      await ctx.editMessageText(
+        '📅 *Tipo de Programación*\n\n'
+        + '¿Qué tipo de programación deseas?\n\n'
+        + '📆 *Una vez:* Envío único en fecha/hora específica\n'
+        + '🔄 *Recurrente:* Envíos repetidos (diario, semanal, mensual)',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('📆 Una vez', 'schedule_type_once')],
+            [Markup.button.callback('🔄 Recurrente', 'schedule_type_recurring')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error scheduling broadcast:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Schedule type: one-time
+  bot.action('schedule_type_once', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
+
       ctx.session.temp.broadcastStep = 'schedule_count';
+      ctx.session.temp.isRecurring = false;
       ctx.session.temp.scheduledTimes = [];
       await ctx.saveSession();
 
@@ -100,15 +140,266 @@ const registerBroadcastHandlers = (bot) => {
             [Markup.button.callback('4️⃣ Cuatro', 'schedule_count_4'), Markup.button.callback('5️⃣ Cinco', 'schedule_count_5'), Markup.button.callback('6️⃣ Seis', 'schedule_count_6')],
             [Markup.button.callback('7️⃣ Siete', 'schedule_count_7'), Markup.button.callback('8️⃣ Ocho', 'schedule_count_8'), Markup.button.callback('9️⃣ Nueve', 'schedule_count_9')],
             [Markup.button.callback('🔟 Diez', 'schedule_count_10'), Markup.button.callback('1️⃣1️⃣ Once', 'schedule_count_11'), Markup.button.callback('1️⃣2️⃣ Doce', 'schedule_count_12')],
-            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            [Markup.button.callback('◀️ Volver', 'broadcast_schedule_later')],
           ]),
         }
       );
     } catch (error) {
-      logger.error('Error scheduling broadcast:', error);
+      logger.error('Error selecting one-time schedule:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
+
+  // Schedule type: recurring
+  bot.action('schedule_type_recurring', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
+
+      ctx.session.temp.broadcastStep = 'recurring_pattern';
+      ctx.session.temp.isRecurring = true;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery();
+
+      await ctx.editMessageText(
+        '🔄 *Broadcast Recurrente*\n\n'
+        + '¿Con qué frecuencia deseas enviar este broadcast?\n\n'
+        + '📅 *Diario:* Todos los días a la misma hora\n'
+        + '📆 *Semanal:* Una vez por semana\n'
+        + '🗓️ *Mensual:* Una vez al mes\n'
+        + '⚙️ *Personalizado:* Expresión cron personalizada',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('📅 Diario', 'recurring_pattern_daily')],
+            [Markup.button.callback('📆 Semanal', 'recurring_pattern_weekly')],
+            [Markup.button.callback('🗓️ Mensual', 'recurring_pattern_monthly')],
+            [Markup.button.callback('⚙️ Personalizado (Cron)', 'recurring_pattern_custom')],
+            [Markup.button.callback('◀️ Volver', 'broadcast_schedule_later')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error selecting recurring schedule:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Handle recurring pattern selection
+  const recurringPatterns = ['daily', 'weekly', 'monthly'];
+  const patternLabels = {
+    daily: 'Diario',
+    weekly: 'Semanal',
+    monthly: 'Mensual',
+    custom: 'Personalizado',
+  };
+
+  // Handle custom cron pattern
+  bot.action('recurring_pattern_custom', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
+
+      ctx.session.temp.recurrencePattern = 'custom';
+      ctx.session.temp.broadcastStep = 'custom_cron_expression';
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery();
+
+      await ctx.editMessageText(
+        '⚙️ *Expresión Cron Personalizada*\n\n'
+        + 'Por favor envía una expresión cron en el siguiente formato:\n\n'
+        + '`minuto hora día_mes mes día_semana`\n\n'
+        + '*Ejemplos:*\n'
+        + '• `0 9 * * *` - Todos los días a las 9:00 AM\n'
+        + '• `0 9 * * 1` - Cada lunes a las 9:00 AM\n'
+        + '• `0 9 1 * *` - El día 1 de cada mes a las 9:00 AM\n'
+        + '• `0 9,18 * * *` - Dos veces al día (9 AM y 6 PM)\n'
+        + '• `0 */6 * * *` - Cada 6 horas\n\n'
+        + '💡 Usa * para "cualquier valor"',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Volver', 'schedule_type_recurring')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error selecting custom cron:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  for (const pattern of recurringPatterns) {
+    bot.action(`recurring_pattern_${pattern}`, async (ctx) => {
+      try {
+        const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+        if (!isAdmin) {
+          await ctx.answerCbQuery('❌ No autorizado');
+          return;
+        }
+
+        if (!ctx.session.temp) {
+          ctx.session.temp = {};
+        }
+
+        ctx.session.temp.recurrencePattern = pattern;
+        ctx.session.temp.broadcastStep = 'recurring_max_occurrences';
+        await ctx.saveSession();
+
+        await ctx.answerCbQuery();
+
+        await ctx.editMessageText(
+          `🔄 *Broadcast ${patternLabels[pattern]}*\n\n`
+          + '¿Cuántas veces debe repetirse?\n\n'
+          + '♾️ *Sin límite:* Continúa indefinidamente\n'
+          + '🔢 *Con límite:* Especifica número de repeticiones',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('♾️ Sin límite', 'recurring_max_unlimited')],
+              [Markup.button.callback('5️⃣ 5 veces', 'recurring_max_5'), Markup.button.callback('🔟 10 veces', 'recurring_max_10')],
+              [Markup.button.callback('2️⃣0️⃣ 20 veces', 'recurring_max_20'), Markup.button.callback('3️⃣0️⃣ 30 veces', 'recurring_max_30')],
+              [Markup.button.callback('◀️ Volver', 'schedule_type_recurring')],
+            ]),
+          }
+        );
+      } catch (error) {
+        logger.error('Error selecting recurring pattern:', error);
+        await ctx.answerCbQuery('❌ Error').catch(() => {});
+      }
+    });
+  }
+
+  // Handle max occurrences selection
+  const maxOccurrences = [
+    { key: 'unlimited', value: null, label: 'Sin límite' },
+    { key: '5', value: 5, label: '5 veces' },
+    { key: '10', value: 10, label: '10 veces' },
+    { key: '20', value: 20, label: '20 veces' },
+    { key: '30', value: 30, label: '30 veces' },
+  ];
+
+  for (const opt of maxOccurrences) {
+    bot.action(`recurring_max_${opt.key}`, async (ctx) => {
+      try {
+        const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+        if (!isAdmin) {
+          await ctx.answerCbQuery('❌ No autorizado');
+          return;
+        }
+
+        if (!ctx.session.temp) {
+          ctx.session.temp = {};
+        }
+
+        ctx.session.temp.maxOccurrences = opt.value;
+        ctx.session.temp.broadcastStep = 'recurring_timezone';
+        await ctx.saveSession();
+
+        await ctx.answerCbQuery();
+
+        await showTimezoneSelection(ctx);
+      } catch (error) {
+        logger.error('Error selecting max occurrences:', error);
+        await ctx.answerCbQuery('❌ Error').catch(() => {});
+      }
+    });
+  }
+
+  // Timezone selection helper
+  async function showTimezoneSelection(ctx) {
+    await ctx.editMessageText(
+      '🌍 *Zona Horaria*\n\n'
+      + 'Selecciona la zona horaria para la programación:\n\n'
+      + '⏰ La hora que ingreses será interpretada en esta zona',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('🌎 América/New York (EST)', 'tz_America/New_York')],
+          [Markup.button.callback('🌎 América/Los Angeles (PST)', 'tz_America/Los_Angeles')],
+          [Markup.button.callback('🌎 América/Mexico City (CST)', 'tz_America/Mexico_City')],
+          [Markup.button.callback('🌍 Europa/Madrid (CET)', 'tz_Europe/Madrid')],
+          [Markup.button.callback('🌍 Europa/London (GMT)', 'tz_Europe/London')],
+          [Markup.button.callback('🌏 UTC', 'tz_UTC')],
+          [Markup.button.callback('◀️ Volver', 'schedule_type_recurring')],
+        ]),
+      }
+    );
+  }
+
+  // Handle timezone selection
+  const timezones = [
+    'America/New_York',
+    'America/Los_Angeles',
+    'America/Mexico_City',
+    'Europe/Madrid',
+    'Europe/London',
+    'UTC',
+  ];
+
+  for (const tz of timezones) {
+    bot.action(`tz_${tz}`, async (ctx) => {
+      try {
+        const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+        if (!isAdmin) {
+          await ctx.answerCbQuery('❌ No autorizado');
+          return;
+        }
+
+        if (!ctx.session.temp) {
+          ctx.session.temp = {};
+        }
+
+        ctx.session.temp.timezone = tz;
+        ctx.session.temp.broadcastStep = 'recurring_start_datetime';
+        await ctx.saveSession();
+
+        await ctx.answerCbQuery();
+
+        const patternLabel = patternLabels[ctx.session.temp.recurrencePattern] || ctx.session.temp.recurrencePattern;
+        const maxLabel = ctx.session.temp.maxOccurrences
+          ? `${ctx.session.temp.maxOccurrences} veces`
+          : 'Sin límite';
+
+        await ctx.editMessageText(
+          `🔄 *Broadcast Recurrente - ${patternLabel}*\n\n`
+          + `📊 Repeticiones: ${maxLabel}\n`
+          + `🌍 Zona horaria: ${tz}\n\n`
+          + 'Por favor envía la fecha y hora de inicio:\n\n'
+          + '`YYYY-MM-DD HH:MM`\n\n'
+          + '*Ejemplos:*\n'
+          + '• `2025-12-15 14:30` (15 dic 2025, 2:30 PM)\n'
+          + '• `2025-12-25 09:00` (25 dic 2025, 9:00 AM)\n\n'
+          + '💡 El primer envío será en esta fecha/hora',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            ]),
+          }
+        );
+      } catch (error) {
+        logger.error('Error selecting timezone:', error);
+        await ctx.answerCbQuery('❌ Error').catch(() => {});
+      }
+    });
+  }
 
   // Handle schedule count selection (1-12)
   for (let i = 1; i <= 12; i++) {
@@ -124,7 +415,7 @@ const registerBroadcastHandlers = (bot) => {
           ctx.session.temp = {};
         }
 
-        ctx.session.temp.broadcastStep = 'schedule_datetime';
+        ctx.session.temp.broadcastStep = 'onetime_timezone';
         ctx.session.temp.scheduleCount = i;
         ctx.session.temp.scheduledTimes = [];
         ctx.session.temp.currentScheduleIndex = 0;
@@ -132,14 +423,61 @@ const registerBroadcastHandlers = (bot) => {
 
         await ctx.answerCbQuery();
 
+        // Show timezone selection for one-time schedules
         await ctx.editMessageText(
-          `📅 *Programar Broadcasts (1/${i})*\n\n`
+          '🌍 *Zona Horaria*\n\n'
+          + `Programando ${i} broadcast(s)\n\n`
+          + 'Selecciona la zona horaria para la programación:\n\n'
+          + '⏰ Las horas que ingreses serán interpretadas en esta zona',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('🌎 América/New York (EST)', 'onetime_tz_America/New_York')],
+              [Markup.button.callback('🌎 América/Los Angeles (PST)', 'onetime_tz_America/Los_Angeles')],
+              [Markup.button.callback('🌎 América/Mexico City (CST)', 'onetime_tz_America/Mexico_City')],
+              [Markup.button.callback('🌍 Europa/Madrid (CET)', 'onetime_tz_Europe/Madrid')],
+              [Markup.button.callback('🌍 Europa/London (GMT)', 'onetime_tz_Europe/London')],
+              [Markup.button.callback('🌏 UTC', 'onetime_tz_UTC')],
+              [Markup.button.callback('◀️ Volver', 'schedule_type_once')],
+            ]),
+          }
+        );
+      } catch (error) {
+        logger.error('Error selecting schedule count:', error);
+        await ctx.answerCbQuery('❌ Error').catch(() => {});
+      }
+    });
+  }
+
+  // Handle one-time timezone selection
+  for (const tz of timezones) {
+    bot.action(`onetime_tz_${tz}`, async (ctx) => {
+      try {
+        const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+        if (!isAdmin) {
+          await ctx.answerCbQuery('❌ No autorizado');
+          return;
+        }
+
+        if (!ctx.session.temp) {
+          ctx.session.temp = {};
+        }
+
+        const scheduleCount = ctx.session.temp.scheduleCount || 1;
+        ctx.session.temp.timezone = tz;
+        ctx.session.temp.broadcastStep = 'schedule_datetime';
+        await ctx.saveSession();
+
+        await ctx.answerCbQuery();
+
+        await ctx.editMessageText(
+          `📅 *Programar Broadcasts (1/${scheduleCount})*\n\n`
+          + `🌍 Zona horaria: ${tz}\n\n`
           + 'Por favor envía la fecha y hora en el siguiente formato:\n\n'
           + '`YYYY-MM-DD HH:MM`\n\n'
           + '*Ejemplos:*\n'
           + '• `2025-12-15 14:30` (15 dic 2025, 2:30 PM)\n'
           + '• `2025-12-25 09:00` (25 dic 2025, 9:00 AM)\n\n'
-          + '⏰ *Zona horaria:* UTC\n\n'
           + '💡 Tip: Asegúrate de que la fecha sea en el futuro',
           {
             parse_mode: 'Markdown',
@@ -149,7 +487,7 @@ const registerBroadcastHandlers = (bot) => {
           }
         );
       } catch (error) {
-        logger.error('Error selecting schedule count:', error);
+        logger.error('Error selecting one-time timezone:', error);
         await ctx.answerCbQuery('❌ Error').catch(() => {});
       }
     });

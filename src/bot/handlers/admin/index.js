@@ -2924,6 +2924,7 @@ let registerAdminHandlers = (bot) => {
           return;
         }
 
+        const timezone = ctx.session.temp.timezone || 'UTC';
         const scheduledDate = new Date(input);
         if (scheduledDate <= new Date()) {
           await ctx.reply('❌ La fecha debe ser en el futuro.');
@@ -2942,14 +2943,14 @@ let registerAdminHandlers = (bot) => {
         if (currentIndex + 1 < scheduleCount) {
           await ctx.reply(
             `✅ Programación ${currentIndex + 1}/${scheduleCount} confirmada\n`
-            + `📅 ${scheduledDate.toLocaleString('es-ES', { timeZone: 'UTC' })} UTC\n\n`
+            + `📅 ${scheduledDate.toLocaleString('es-ES', { timeZone: timezone })} (${timezone})\n\n`
             + `📅 *Programación ${currentIndex + 2}/${scheduleCount}*\n\n`
+            + `🌍 Zona horaria: ${timezone}\n\n`
             + 'Por favor envía la fecha y hora en el siguiente formato:\n\n'
             + '`YYYY-MM-DD HH:MM`\n\n'
             + '*Ejemplos:*\n'
             + '• `2025-12-15 14:30` (15 dic 2025, 2:30 PM)\n'
-            + '• `2025-12-25 09:00` (25 dic 2025, 9:00 AM)\n\n'
-            + '⏰ *Zona horaria:* UTC',
+            + '• `2025-12-25 09:00` (25 dic 2025, 9:00 AM)',
             { parse_mode: 'Markdown' }
           );
           return;
@@ -2980,7 +2981,7 @@ let registerAdminHandlers = (bot) => {
             const broadcast = await broadcastService.createBroadcast({
               adminId: String(ctx.from.id),
               adminUsername: ctx.from.username || 'Admin',
-              title: `Broadcast programado ${scheduledTime.toLocaleDateString()} ${scheduledTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} UTC`,
+              title: `Broadcast programado ${scheduledTime.toLocaleDateString()} ${scheduledTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} (${timezone})`,
               messageEn: broadcastData.textEn,
               messageEs: broadcastData.textEs,
               targetType: broadcastTarget,
@@ -2990,7 +2991,7 @@ let registerAdminHandlers = (bot) => {
               s3Key: broadcastData.s3Key || null,
               s3Bucket: broadcastData.s3Bucket || null,
               scheduledAt: scheduledTime,
-              timezone: 'UTC',
+              timezone: timezone,
             });
 
             // Add buttons to the broadcast if they exist
@@ -3021,6 +3022,10 @@ let registerAdminHandlers = (bot) => {
           }
         }
 
+        // Store timezone before clearing (for result message)
+        const savedTimezone = timezone;
+        const savedScheduledTimes = [...ctx.session.temp.scheduledTimes];
+
         // Clear session data
         ctx.session.temp.broadcastTarget = null;
         ctx.session.temp.broadcastStep = null;
@@ -3028,6 +3033,7 @@ let registerAdminHandlers = (bot) => {
         ctx.session.temp.scheduledTimes = null;
         ctx.session.temp.scheduleCount = null;
         ctx.session.temp.currentScheduleIndex = null;
+        ctx.session.temp.timezone = null;
         await ctx.saveSession();
 
         // Show results
@@ -3038,12 +3044,13 @@ let registerAdminHandlers = (bot) => {
           resultMessage += `✗ Errores: ${errorCount}\n`;
         }
         resultMessage += `\n🎯 Audiencia: ${broadcastTarget === 'all' ? 'Todos' : broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Gratis' : 'Churned'}\n`;
+        resultMessage += `🌍 Zona horaria: ${savedTimezone}\n`;
         resultMessage += `🌐 Mensajes bilingües: EN / ES\n`;
         resultMessage += `${broadcastData.mediaType ? `📎 Con media: ${broadcastData.mediaType}` : '📝 Solo texto'}\n`;
         resultMessage += `\n📅 *Programaciones:*\n`;
 
-        ctx.session.temp.scheduledTimes?.forEach((time, idx) => {
-          resultMessage += `${idx + 1}. ${time.toLocaleString('es-ES', { timeZone: 'UTC' })} UTC\n`;
+        savedScheduledTimes.forEach((time, idx) => {
+          resultMessage += `${idx + 1}. ${time.toLocaleString('es-ES', { timeZone: savedTimezone })} (${savedTimezone})\n`;
         });
 
         resultMessage += `\n💡 Los broadcasts se enviarán automáticamente a la hora programada.`;
@@ -3069,6 +3076,188 @@ let registerAdminHandlers = (bot) => {
         logger.error('Error scheduling broadcasts:', error);
         await ctx.reply(
           '❌ *Error al programar broadcasts*\n\n'
+          + `Detalles: ${error.message}`,
+          { parse_mode: 'Markdown' }
+        );
+      }
+      return;
+    }
+
+    // Recurring broadcast start datetime handling
+    if (ctx.session.temp?.broadcastStep === 'recurring_start_datetime') {
+      try {
+        const input = ctx.message.text;
+
+        // Parse date/time - expecting format: YYYY-MM-DD HH:MM
+        const dateMatch = input.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+        if (!dateMatch) {
+          await ctx.reply(
+            '❌ Formato de fecha inválido.\n\n'
+            + 'Usa el formato: YYYY-MM-DD HH:MM\n'
+            + 'Ejemplo: 2025-01-20 15:30'
+          );
+          return;
+        }
+
+        // Parse date in the selected timezone
+        const timezone = ctx.session.temp.timezone || 'UTC';
+        const scheduledDate = new Date(input);
+
+        if (scheduledDate <= new Date()) {
+          await ctx.reply('❌ La fecha debe ser en el futuro.');
+          return;
+        }
+
+        const { broadcastTarget, broadcastData, recurrencePattern, maxOccurrences, isRecurring, cronExpression } = ctx.session.temp;
+
+        if (!broadcastData || !broadcastData.textEn || !broadcastData.textEs) {
+          await ctx.reply('❌ Error: Faltan datos del broadcast');
+          return;
+        }
+
+        const patternLabels = {
+          daily: 'Diario',
+          weekly: 'Semanal',
+          monthly: 'Mensual',
+          custom: 'Personalizado',
+        };
+
+        await ctx.reply(
+          '📤 *Creando broadcast recurrente...*',
+          { parse_mode: 'Markdown' }
+        );
+
+        // Create the recurring broadcast
+        const broadcast = await broadcastService.createRecurringBroadcast({
+          adminId: String(ctx.from.id),
+          adminUsername: ctx.from.username || 'Admin',
+          title: `Broadcast recurrente ${patternLabels[recurrencePattern] || recurrencePattern} - ${scheduledDate.toLocaleDateString()}`,
+          messageEn: broadcastData.textEn,
+          messageEs: broadcastData.textEs,
+          targetType: broadcastTarget,
+          mediaType: broadcastData.mediaType || null,
+          mediaUrl: broadcastData.s3Url || broadcastData.mediaFileId || null,
+          mediaFileId: broadcastData.mediaFileId || null,
+          s3Key: broadcastData.s3Key || null,
+          s3Bucket: broadcastData.s3Bucket || null,
+          scheduledAt: scheduledDate,
+          timezone: timezone,
+          isRecurring: true,
+          recurrencePattern: recurrencePattern,
+          cronExpression: cronExpression || null,
+          maxOccurrences: maxOccurrences,
+        });
+
+        // Add buttons to the broadcast if they exist
+        if (broadcastData.buttons && broadcastData.buttons.length > 0) {
+          try {
+            await BroadcastButtonModel.addButtonsToBroadcast(broadcast.broadcast_id, broadcastData.buttons);
+            logger.info(`Buttons added to recurring broadcast ${broadcast.broadcast_id}`, {
+              buttonCount: broadcastData.buttons.length
+            });
+          } catch (buttonError) {
+            logger.error(`Error adding buttons to broadcast ${broadcast.broadcast_id}:`, buttonError);
+          }
+        }
+
+        // Clear session data
+        ctx.session.temp.broadcastTarget = null;
+        ctx.session.temp.broadcastStep = null;
+        ctx.session.temp.broadcastData = null;
+        ctx.session.temp.isRecurring = null;
+        ctx.session.temp.recurrencePattern = null;
+        ctx.session.temp.cronExpression = null;
+        ctx.session.temp.maxOccurrences = null;
+        ctx.session.temp.timezone = null;
+        await ctx.saveSession();
+
+        // Show confirmation
+        const maxLabel = maxOccurrences ? `${maxOccurrences} veces` : 'Sin límite';
+        const cronInfo = cronExpression ? `\n⚙️ Cron: \`${cronExpression}\`` : '';
+        await ctx.reply(
+          `✅ *Broadcast Recurrente Creado*\n\n`
+          + `🔄 Frecuencia: ${patternLabels[recurrencePattern] || recurrencePattern}${cronInfo}\n`
+          + `📊 Repeticiones: ${maxLabel}\n`
+          + `📅 Primer envío: ${scheduledDate.toLocaleString('es-ES', { timeZone: timezone })} (${timezone})\n`
+          + `🎯 Audiencia: ${broadcastTarget === 'all' ? 'Todos' : broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Gratis' : 'Churned'}\n`
+          + `🆔 ID: \`${broadcast.broadcast_id}\`\n`
+          + `${broadcastData.mediaType ? `📎 Con media (${broadcastData.mediaType})` : '📝 Solo texto'}\n\n`
+          + `💡 El broadcast se enviará automáticamente según la programación.`,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('◀️ Volver al Panel Admin', 'admin_cancel')],
+            ]),
+          }
+        );
+
+        logger.info('Recurring broadcast created', {
+          broadcastId: broadcast.broadcast_id,
+          adminId: ctx.from.id,
+          pattern: recurrencePattern,
+          cronExpression,
+          maxOccurrences,
+          scheduledAt: scheduledDate,
+          timezone,
+        });
+      } catch (error) {
+        logger.error('Error creating recurring broadcast:', error);
+        await ctx.reply(
+          '❌ *Error al crear broadcast recurrente*\n\n'
+          + `Detalles: ${error.message}`,
+          { parse_mode: 'Markdown' }
+        );
+      }
+      return;
+    }
+
+    // Custom cron expression handling
+    if (ctx.session.temp?.broadcastStep === 'custom_cron_expression') {
+      try {
+        const input = ctx.message.text.trim();
+
+        // Validate cron expression
+        const cronParser = require('cron-parser');
+        try {
+          cronParser.parseExpression(input);
+        } catch (cronError) {
+          await ctx.reply(
+            '❌ *Expresión cron inválida*\n\n'
+            + `Error: ${cronError.message}\n\n`
+            + 'Por favor usa el formato: `minuto hora día_mes mes día_semana`\n'
+            + 'Ejemplo: `0 9 * * *` (todos los días a las 9 AM)',
+            { parse_mode: 'Markdown' }
+          );
+          return;
+        }
+
+        if (!ctx.session.temp) {
+          ctx.session.temp = {};
+        }
+
+        ctx.session.temp.cronExpression = input;
+        ctx.session.temp.broadcastStep = 'recurring_max_occurrences';
+        await ctx.saveSession();
+
+        await ctx.reply(
+          `✅ *Expresión cron válida*: \`${input}\`\n\n`
+          + '¿Cuántas veces debe repetirse?\n\n'
+          + '♾️ *Sin límite:* Continúa indefinidamente\n'
+          + '🔢 *Con límite:* Especifica número de repeticiones',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('♾️ Sin límite', 'recurring_max_unlimited')],
+              [Markup.button.callback('5️⃣ 5 veces', 'recurring_max_5'), Markup.button.callback('🔟 10 veces', 'recurring_max_10')],
+              [Markup.button.callback('2️⃣0️⃣ 20 veces', 'recurring_max_20'), Markup.button.callback('3️⃣0️⃣ 30 veces', 'recurring_max_30')],
+              [Markup.button.callback('◀️ Volver', 'schedule_type_recurring')],
+            ]),
+          }
+        );
+      } catch (error) {
+        logger.error('Error processing cron expression:', error);
+        await ctx.reply(
+          '❌ *Error al procesar expresión cron*\n\n'
           + `Detalles: ${error.message}`,
           { parse_mode: 'Markdown' }
         );

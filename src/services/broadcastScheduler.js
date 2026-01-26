@@ -1,6 +1,7 @@
 /**
  * Broadcast Scheduler Service
  * Manages scheduled broadcasts using cron jobs
+ * Supports both one-time and recurring broadcasts with database persistence
  */
 
 const cron = require('node-cron');
@@ -11,7 +12,7 @@ const { cache } = require('../config/redis');
 
 class BroadcastScheduler {
   constructor() {
-    this.scheduledTasks = new Map(); // Map of broadcast_id -> cron task
+    this.scheduledTasks = new Map(); // Map of broadcast_id -> cron task (for in-memory scheduled tasks)
     this.isRunning = false;
     this.bot = null;
   }
@@ -32,7 +33,7 @@ class BroadcastScheduler {
   /**
    * Start the scheduler (checks for pending broadcasts every minute)
    */
-  start() {
+  async start() {
     if (this.isRunning) {
       logger.warn('Broadcast scheduler is already running');
       return;
@@ -46,13 +47,22 @@ class BroadcastScheduler {
     this.mainTask = cron.schedule('* * * * *', async () => {
       try {
         await this.processPendingBroadcasts();
+        await this.processRecurringSchedules();
       } catch (error) {
-        logger.error('Error processing pending broadcasts:', error);
+        logger.error('Error processing broadcasts:', error);
       }
     });
 
     this.isRunning = true;
     logger.info('Broadcast scheduler started - checking for pending broadcasts every minute');
+
+    // Run initial check for any pending broadcasts
+    try {
+      await this.processPendingBroadcasts();
+      await this.processRecurringSchedules();
+    } catch (error) {
+      logger.error('Error in initial broadcast check:', error);
+    }
   }
 
   /**
@@ -73,7 +83,7 @@ class BroadcastScheduler {
   }
 
   /**
-   * Process all pending scheduled broadcasts
+   * Process all pending scheduled broadcasts (one-time)
    */
   async processPendingBroadcasts() {
     try {
@@ -108,6 +118,96 @@ class BroadcastScheduler {
       }
     } catch (error) {
       logger.error('Error processing pending broadcasts:', error);
+    }
+  }
+
+  /**
+   * Process all pending recurring broadcast schedules
+   */
+  async processRecurringSchedules() {
+    try {
+      const pendingSchedules = await broadcastService.getPendingRecurringSchedules();
+
+      if (pendingSchedules.length === 0) {
+        return;
+      }
+
+      logger.info(`Found ${pendingSchedules.length} pending recurring schedules`);
+
+      for (const schedule of pendingSchedules) {
+        try {
+          // Use Redis lock to ensure schedule is only processed once
+          const lockKey = `schedule:executing:${schedule.schedule_id}`;
+          const acquired = await cache.acquireLock(lockKey);
+
+          if (!acquired) {
+            logger.warn(`Schedule ${schedule.schedule_id} is already being processed, skipping`);
+            continue;
+          }
+
+          try {
+            await this.executeRecurringSchedule(schedule);
+          } finally {
+            // Always release the lock
+            await cache.releaseLock(lockKey);
+          }
+        } catch (error) {
+          logger.error(`Error executing recurring schedule ${schedule.schedule_id}:`, error);
+        }
+      }
+    } catch (error) {
+      logger.error('Error processing recurring schedules:', error);
+    }
+  }
+
+  /**
+   * Execute a recurring schedule
+   * @param {Object} schedule - Schedule record with broadcast data
+   */
+  async executeRecurringSchedule(schedule) {
+    try {
+      logger.info(`Executing recurring schedule: ${schedule.schedule_id} for broadcast ${schedule.broadcast_id}`);
+
+      // Execute the broadcast
+      const results = await this.executeBroadcast(schedule.broadcast_id);
+
+      // Calculate next execution time
+      const nextExecution = broadcastService.calculateNextExecution(schedule);
+
+      if (nextExecution) {
+        // Update schedule with next execution time
+        await broadcastService.updateScheduleExecution(
+          schedule.schedule_id,
+          nextExecution,
+          'scheduled'
+        );
+        logger.info(`Recurring schedule ${schedule.schedule_id} updated, next execution: ${nextExecution.toISOString()}`);
+      } else {
+        // No more executions - mark as completed
+        await broadcastService.updateScheduleExecution(
+          schedule.schedule_id,
+          null,
+          'completed'
+        );
+        logger.info(`Recurring schedule ${schedule.schedule_id} completed (max occurrences or end date reached)`);
+      }
+
+      return results;
+    } catch (error) {
+      logger.error(`Error executing recurring schedule ${schedule.schedule_id}:`, error);
+
+      // Mark schedule as failed
+      try {
+        await broadcastService.updateScheduleExecution(
+          schedule.schedule_id,
+          schedule.next_execution_at, // Keep the same time for retry
+          'failed'
+        );
+      } catch (updateError) {
+        logger.error('Error updating schedule status:', updateError);
+      }
+
+      throw error;
     }
   }
 

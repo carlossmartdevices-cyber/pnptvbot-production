@@ -273,10 +273,18 @@ class CommunityPostScheduler {
           break;
 
         case 'custom':
-          // For custom cron expressions, would need cron-parser library
-          // For now, skip custom
-          logger.warn('Custom cron pattern not yet implemented');
-          return null;
+          // Use cron-parser for custom cron expressions
+          try {
+            const cronParser = require('cron-parser');
+            const interval = cronParser.parseExpression(post.cron_expression, {
+              currentDate: lastExecution,
+            });
+            nextExecution = interval.next().toDate();
+          } catch (cronError) {
+            logger.error('Error parsing custom cron expression:', cronError.message);
+            return null;
+          }
+          break;
 
         default:
           return null;

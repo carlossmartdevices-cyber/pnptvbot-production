@@ -108,6 +108,309 @@ class BroadcastService {
   }
 
   /**
+   * Create a recurring broadcast with schedule
+   * @param {Object} broadcastData - Broadcast configuration with recurrence settings
+   * @returns {Promise<Object>} Created broadcast with schedule
+   */
+  async createRecurringBroadcast(broadcastData) {
+    const {
+      adminId,
+      adminUsername,
+      title,
+      messageEn,
+      messageEs,
+      targetType = 'all',
+      mediaType = null,
+      mediaUrl = null,
+      mediaFileId = null,
+      s3Key = null,
+      s3Bucket = null,
+      scheduledAt,
+      timezone = 'UTC',
+      isRecurring = true,
+      recurrencePattern = 'daily',
+      cronExpression = null,
+      recurrenceEndDate = null,
+      maxOccurrences = null,
+      includeFilters = {},
+      excludeUserIds = [],
+    } = broadcastData;
+
+    const broadcastId = uuidv4();
+    const scheduleId = uuidv4();
+
+    try {
+      // Start transaction
+      const client = await getPool().connect();
+      try {
+        await client.query('BEGIN');
+
+        // Create broadcast record
+        const broadcastQuery = `
+          INSERT INTO broadcasts (
+            broadcast_id, admin_id, admin_username, title,
+            message_en, message_es, target_type,
+            media_type, media_url, media_file_id, s3_key, s3_bucket,
+            scheduled_at, timezone, include_filters, exclude_user_ids,
+            status
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+          ) RETURNING *
+        `;
+
+        const broadcastResult = await client.query(broadcastQuery, [
+          broadcastId,
+          adminId,
+          adminUsername,
+          title,
+          messageEn,
+          messageEs,
+          targetType,
+          mediaType,
+          mediaUrl,
+          mediaFileId,
+          s3Key,
+          s3Bucket,
+          scheduledAt,
+          timezone,
+          JSON.stringify(includeFilters),
+          excludeUserIds,
+          'scheduled',
+        ]);
+
+        // Create schedule record
+        const scheduleQuery = `
+          INSERT INTO broadcast_schedules (
+            schedule_id, broadcast_id, scheduled_for, timezone,
+            is_recurring, recurrence_pattern, cron_expression,
+            recurrence_end_date, max_occurrences, next_execution_at, status
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+          ) RETURNING *
+        `;
+
+        const scheduleResult = await client.query(scheduleQuery, [
+          scheduleId,
+          broadcastId,
+          scheduledAt,
+          timezone,
+          isRecurring,
+          recurrencePattern,
+          cronExpression,
+          recurrenceEndDate,
+          maxOccurrences,
+          scheduledAt, // next_execution_at starts as the scheduled time
+          'scheduled',
+        ]);
+
+        await client.query('COMMIT');
+
+        logger.info(`Recurring broadcast created: ${broadcastId} with schedule ${scheduleId}`, {
+          pattern: recurrencePattern,
+          maxOccurrences,
+          adminUsername,
+        });
+
+        return {
+          ...broadcastResult.rows[0],
+          schedule: scheduleResult.rows[0],
+        };
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      logger.error('Error creating recurring broadcast:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get pending recurring broadcast schedules
+   * @returns {Promise<Array>} List of pending recurring schedules
+   */
+  async getPendingRecurringSchedules() {
+    const query = `
+      SELECT
+        bs.*,
+        b.message_en, b.message_es, b.target_type,
+        b.media_type, b.media_url, b.media_file_id, b.s3_key, b.s3_bucket,
+        b.admin_id, b.admin_username, b.title, b.include_filters, b.exclude_user_ids
+      FROM broadcast_schedules bs
+      JOIN broadcasts b ON bs.broadcast_id = b.broadcast_id
+      WHERE bs.status = 'scheduled'
+        AND bs.next_execution_at <= CURRENT_TIMESTAMP
+      ORDER BY bs.next_execution_at ASC
+    `;
+
+    try {
+      const result = await getPool().query(query);
+      return result.rows;
+    } catch (error) {
+      logger.error('Error getting pending recurring schedules:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update schedule after execution
+   * @param {string} scheduleId - Schedule ID
+   * @param {Date} nextExecution - Next execution time (null if completed)
+   * @param {string} status - New status
+   */
+  async updateScheduleExecution(scheduleId, nextExecution, status = 'scheduled') {
+    const query = `
+      UPDATE broadcast_schedules
+      SET
+        executed_at = CURRENT_TIMESTAMP,
+        current_occurrence = current_occurrence + 1,
+        next_execution_at = $1,
+        status = $2,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE schedule_id = $3
+      RETURNING *
+    `;
+
+    try {
+      const result = await getPool().query(query, [nextExecution, status, scheduleId]);
+      return result.rows[0];
+    } catch (error) {
+      logger.error('Error updating schedule execution:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate next execution time for recurring schedule
+   * @param {Object} schedule - Schedule record
+   * @returns {Date|null} Next execution time or null if limit reached
+   */
+  calculateNextExecution(schedule) {
+    const {
+      recurrence_pattern,
+      cron_expression,
+      recurrence_end_date,
+      max_occurrences,
+      current_occurrence,
+      next_execution_at,
+    } = schedule;
+
+    // Check if max occurrences reached
+    if (max_occurrences && current_occurrence >= max_occurrences) {
+      return null;
+    }
+
+    const lastExecution = new Date(next_execution_at);
+    let nextExecution;
+
+    switch (recurrence_pattern) {
+      case 'daily':
+        nextExecution = new Date(lastExecution);
+        nextExecution.setDate(nextExecution.getDate() + 1);
+        break;
+
+      case 'weekly':
+        nextExecution = new Date(lastExecution);
+        nextExecution.setDate(nextExecution.getDate() + 7);
+        break;
+
+      case 'monthly':
+        nextExecution = new Date(lastExecution);
+        nextExecution.setMonth(nextExecution.getMonth() + 1);
+        break;
+
+      case 'custom':
+        // Custom cron expressions - use cron-parser if available
+        try {
+          const cronParser = require('cron-parser');
+          const interval = cronParser.parseExpression(cron_expression, {
+            currentDate: lastExecution,
+          });
+          nextExecution = interval.next().toDate();
+        } catch (error) {
+          logger.warn('Custom cron pattern parsing failed:', error.message);
+          return null;
+        }
+        break;
+
+      default:
+        return null;
+    }
+
+    // Check if end date exceeded
+    if (recurrence_end_date) {
+      const endDate = new Date(recurrence_end_date);
+      if (nextExecution > endDate) {
+        return null;
+      }
+    }
+
+    return nextExecution;
+  }
+
+  /**
+   * Get all scheduled broadcasts (including recurring)
+   * @param {number} limit - Number of results
+   * @param {number} offset - Offset for pagination
+   * @returns {Promise<Array>} List of scheduled broadcasts with their schedules
+   */
+  async getScheduledBroadcasts(limit = 50, offset = 0) {
+    const query = `
+      SELECT
+        b.*,
+        bs.schedule_id,
+        bs.is_recurring,
+        bs.recurrence_pattern,
+        bs.next_execution_at,
+        bs.current_occurrence,
+        bs.max_occurrences,
+        bs.status as schedule_status
+      FROM broadcasts b
+      LEFT JOIN broadcast_schedules bs ON b.broadcast_id = bs.broadcast_id
+      WHERE b.status IN ('scheduled', 'pending')
+      ORDER BY COALESCE(bs.next_execution_at, b.scheduled_at) ASC
+      LIMIT $1 OFFSET $2
+    `;
+
+    try {
+      const result = await getPool().query(query, [limit, offset]);
+      return result.rows;
+    } catch (error) {
+      logger.error('Error getting scheduled broadcasts:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel a recurring schedule
+   * @param {string} scheduleId - Schedule ID
+   * @param {string} cancelledBy - User who cancelled
+   * @returns {Promise<Object>} Updated schedule
+   */
+  async cancelSchedule(scheduleId, cancelledBy) {
+    const query = `
+      UPDATE broadcast_schedules
+      SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+      WHERE schedule_id = $1
+      RETURNING *
+    `;
+
+    try {
+      const result = await getPool().query(query, [scheduleId]);
+      if (result.rows.length === 0) {
+        throw new Error('Schedule not found');
+      }
+      logger.info(`Schedule ${scheduleId} cancelled by ${cancelledBy}`);
+      return result.rows[0];
+    } catch (error) {
+      logger.error('Error cancelling schedule:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Upload media to S3 and create broadcast media record
    * @param {Object} bot - Telegram bot instance
    * @param {string} fileId - Telegram file ID
