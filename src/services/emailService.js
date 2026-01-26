@@ -200,6 +200,79 @@ class EmailService {
     }
 
     /**
+     * Send broadcast email to user
+     * @param {Object} data - Broadcast data
+     * @returns {Promise<Object>} Send result
+     */
+    async sendBroadcastEmail(data) {
+        const {
+            email,
+            userName = 'PNP Latino Member',
+            messageEn,
+            messageEs,
+            userLanguage = 'en',
+            mediaUrl = null,
+            buttons = []
+        } = data;
+
+        const message = userLanguage === 'es' ? messageEs : messageEn;
+        const html = this.getBroadcastEmailTemplate({
+            userName,
+            message,
+            mediaUrl,
+            buttons,
+            language: userLanguage
+        });
+
+        return await this.send({
+            to: email,
+            subject: 'PNP Latino Update! Noticias de PNP Latino',
+            html
+        });
+    }
+
+    /**
+     * Send broadcast emails to multiple users
+     * @param {Array} users - Array of user objects with email
+     * @param {Object} broadcastData - Broadcast content
+     * @returns {Promise<Object>} Results summary
+     */
+    async sendBroadcastEmails(users, broadcastData) {
+        const { messageEn, messageEs, mediaUrl, buttons } = broadcastData;
+
+        let sent = 0;
+        let failed = 0;
+        const errors = [];
+
+        for (const user of users) {
+            if (!user.email || !this.isEmailSafe(user.email)) {
+                continue; // Skip users without valid email
+            }
+
+            try {
+                await this.sendBroadcastEmail({
+                    email: user.email,
+                    userName: user.first_name || user.username || 'PNP Latino Member',
+                    messageEn,
+                    messageEs,
+                    userLanguage: user.language || 'en',
+                    mediaUrl,
+                    buttons
+                });
+                sent++;
+
+                // Small delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 100));
+            } catch (error) {
+                failed++;
+                errors.push({ email: user.email, error: error.message });
+            }
+        }
+
+        return { sent, failed, errors };
+    }
+
+    /**
      * Send recording ready notification
      * @param {Object} data - Recording data
      * @returns {Promise<Object>} Send result
@@ -510,6 +583,164 @@ class EmailService {
         <div class="footer">
             <p><strong>PNP.tv</strong> - Premium Zoom Meetings</p>
             <p>Having trouble? Copy and paste the join link into your browser.</p>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+    }
+
+    /**
+     * Get broadcast email template
+     * @param {Object} data - Template data
+     * @returns {string} HTML template
+     */
+    getBroadcastEmailTemplate(data) {
+        const { userName, message, mediaUrl, buttons, language } = data;
+
+        const isSpanish = language === 'es';
+        const greeting = isSpanish ? `¡Hola ${userName}!` : `Hey ${userName}!`;
+        const footerText = isSpanish
+            ? 'Recibiste este correo porque eres miembro de PNP Latino TV.'
+            : 'You received this email because you are a member of PNP Latino TV.';
+        const unsubText = isSpanish
+            ? 'Para dejar de recibir estos correos, actualiza tus preferencias en el bot.'
+            : 'To stop receiving these emails, update your preferences in the bot.';
+
+        // Build button HTML
+        let buttonsHtml = '';
+        if (buttons && buttons.length > 0) {
+            const buttonItems = buttons.map(btn => {
+                const buttonObj = typeof btn === 'string' ? JSON.parse(btn) : btn;
+                if (buttonObj.type === 'url' && buttonObj.target) {
+                    return `<a href="${buttonObj.target}" class="button">${buttonObj.text}</a>`;
+                }
+                return '';
+            }).filter(b => b).join('\n');
+
+            if (buttonItems) {
+                buttonsHtml = `<div style="text-align: center; margin: 25px 0;">${buttonItems}</div>`;
+            }
+        }
+
+        // Media HTML
+        const mediaHtml = mediaUrl
+            ? `<div style="text-align: center; margin: 20px 0;"><img src="${mediaUrl}" alt="PNP Latino" style="max-width: 100%; border-radius: 10px;"></div>`
+            : '';
+
+        // Convert message line breaks to HTML
+        const formattedMessage = message
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/\n/g, '<br>');
+
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a2e;
+        }
+        .container {
+            background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            color: #ffffff;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            background: linear-gradient(90deg, #e94560, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .greeting {
+            font-size: 22px;
+            margin-bottom: 20px;
+            color: #ff6b6b;
+        }
+        .content {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #e0e0e0;
+        }
+        .button {
+            display: inline-block;
+            background: linear-gradient(90deg, #e94560, #ff6b6b);
+            color: white !important;
+            padding: 14px 35px;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: bold;
+            margin: 10px 5px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(233, 69, 96, 0.4);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            color: #888;
+            font-size: 12px;
+        }
+        .social-links {
+            margin: 15px 0;
+        }
+        .social-links a {
+            color: #e94560;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🔥 PNP Latino TV</div>
+        </div>
+
+        <h1 class="greeting">${greeting}</h1>
+
+        ${mediaHtml}
+
+        <div class="content">
+            ${formattedMessage}
+        </div>
+
+        ${buttonsHtml}
+
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="https://t.me/pnplatinotv_bot" class="button">💬 Open Bot</a>
+        </div>
+
+        <div class="footer">
+            <div class="social-links">
+                <a href="https://t.me/pnplatinotv_bot">Telegram</a>
+            </div>
+            <p>${footerText}</p>
+            <p>${unsubText}</p>
+            <p>© ${new Date().getFullYear()} PNP Latino TV. All rights reserved.</p>
         </div>
     </div>
 </body>

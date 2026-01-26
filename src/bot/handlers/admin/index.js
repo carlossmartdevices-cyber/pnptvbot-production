@@ -127,7 +127,14 @@ async function sendBroadcastPreview(ctx) {
     (lang === 'es' ? '*Botones:*' : '*Buttons:*') + `\n${buttonsText}\n\n` +
     (lang === 'es' ? '¿Listo para enviar?' : 'Ready to send?');
 
+  // Check if email sending is enabled
+  const sendEmail = ctx.session.temp?.broadcastData?.sendEmail || false;
+  const emailToggleText = sendEmail
+    ? (lang === 'es' ? '✅ También enviar por Email' : '✅ Also send via Email')
+    : (lang === 'es' ? '📧 También enviar por Email' : '📧 Also send via Email');
+
   const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback(emailToggleText, 'broadcast_toggle_email')],
     [Markup.button.callback(lang === 'es' ? '📤 Enviar Ahora' : '📤 Send Now', 'broadcast_send_now_with_buttons')],
     [Markup.button.callback(lang === 'es' ? '📅 Programar Envío' : '📅 Schedule Send', 'broadcast_schedule_with_buttons')],
     [Markup.button.callback(lang === 'es' ? '◀️ Volver a Botones' : '◀️ Back to Buttons', 'broadcast_resume_buttons')],
@@ -1777,6 +1784,33 @@ let registerAdminHandlers = (bot) => {
     } catch (error) {
       logger.error('Error in broadcast send now with buttons:', error);
       await ctx.reply('❌ Error al enviar broadcast').catch(() => {});
+    }
+  });
+
+  // Broadcast - Toggle email sending
+  bot.action('broadcast_toggle_email', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      // Toggle email sending flag
+      if (!ctx.session.temp.broadcastData) {
+        ctx.session.temp.broadcastData = {};
+      }
+      ctx.session.temp.broadcastData.sendEmail = !ctx.session.temp.broadcastData.sendEmail;
+      await ctx.saveSession();
+
+      const sendEmail = ctx.session.temp.broadcastData.sendEmail;
+      await ctx.answerCbQuery(sendEmail ? '✅ Email habilitado' : '📧 Email deshabilitado');
+
+      // Refresh preview with updated toggle
+      await showBroadcastPreviewWithButtons(ctx);
+    } catch (error) {
+      logger.error('Error toggling email in broadcast:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
 
@@ -4361,6 +4395,7 @@ async function sendBroadcastWithButtons(ctx, bot) {
   try {
     const { broadcastTarget, broadcastData } = ctx.session.temp;
     const { getLanguage } = require('../../utils/helpers');
+    const emailService = require('../../../services/emailService');
 
     if (!broadcastData || !broadcastData.textEn || !broadcastData.textEs) {
       await ctx.reply('❌ Error: Faltan datos del broadcast');
@@ -4369,6 +4404,7 @@ async function sendBroadcastWithButtons(ctx, bot) {
 
     // Get admin ID to send completion notification
     const adminId = ctx.from.id;
+    const sendEmail = broadcastData.sendEmail || false;
 
     // Get target users
     let users = [];
@@ -4494,6 +4530,40 @@ async function sendBroadcastWithButtons(ctx, bot) {
       }
     }
 
+    // Send emails if enabled
+    let emailSent = 0;
+    let emailFailed = 0;
+
+    if (sendEmail) {
+      try {
+        // Filter users with valid emails
+        const usersWithEmail = users.filter(u => u.email && emailService.isEmailSafe(u.email));
+
+        logger.info('Starting email broadcast', {
+          totalUsers: usersWithEmail.length,
+          adminId
+        });
+
+        const emailResult = await emailService.sendBroadcastEmails(usersWithEmail, {
+          messageEn: broadcastData.textEn,
+          messageEs: broadcastData.textEs,
+          mediaUrl: broadcastData.mediaUrl || null,
+          buttons: broadcastData.buttons || []
+        });
+
+        emailSent = emailResult.sent;
+        emailFailed = emailResult.failed;
+
+        logger.info('Email broadcast completed', {
+          sent: emailSent,
+          failed: emailFailed,
+          adminId
+        });
+      } catch (emailError) {
+        logger.error('Error sending broadcast emails:', emailError);
+      }
+    }
+
     // Clear broadcast session data
     ctx.session.temp.broadcastTarget = null;
     ctx.session.temp.broadcastStep = null;
@@ -4505,16 +4575,21 @@ async function sendBroadcastWithButtons(ctx, bot) {
       ? `\n🔘 Botones: ${Array.isArray(broadcastData.buttons) ? broadcastData.buttons.length : JSON.parse(broadcastData.buttons).length}`
       : '';
 
+    const emailInfo = sendEmail
+      ? `\n\n📧 *Email:*\n✓ Enviados: ${emailSent}\n✗ Fallidos: ${emailFailed}`
+      : '';
+
     await bot.telegram.sendMessage(
       adminId,
       `✅ *Broadcast Completado*\n\n`
-      + `📊 Estadísticas:\n`
+      + `📱 *Telegram:*\n`
       + `✓ Enviados: ${sent}\n`
       + `✗ Fallidos: ${failed}\n`
       + `📈 Total intentos: ${sent + failed}\n`
       + `🎯 Audiencia: ${broadcastTarget}\n`
       + `🌐 Mensajes bilingües: EN / ES`
-      + buttonInfo,
+      + buttonInfo
+      + emailInfo,
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
