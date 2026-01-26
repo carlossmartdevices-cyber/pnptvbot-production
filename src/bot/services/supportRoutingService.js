@@ -30,9 +30,10 @@ class SupportRoutingService {
    * Get or create a forum topic for a user in the support group
    * @param {Object} user - Telegram user object (from, id, first_name, username, etc.)
    * @param {string} requestType - Type of request ('support', 'activation', 'escalation')
+   * @param {string} messageText - Optional message text for category/priority detection
    * @returns {Promise<Object>} Support topic data with thread_id
    */
-  async getOrCreateUserTopic(user, requestType = 'support') {
+  async getOrCreateUserTopic(user, requestType = 'support', messageText = '') {
     if (!this.telegram || !this.supportGroupId) {
       throw new Error('Support routing service not initialized');
     }
@@ -49,18 +50,27 @@ class SupportRoutingService {
       await SupportTopicModel.updateLastMessage(userId);
       if (supportTopic.status !== 'open') {
         await SupportTopicModel.updateStatus(userId, 'open');
+        // Reopen the forum topic in Telegram
+        try {
+          await this.telegram.reopenForumTopic(this.supportGroupId, supportTopic.thread_id);
+          logger.info('Forum topic reopened', { userId, threadId: supportTopic.thread_id });
+        } catch (reopenError) {
+          logger.warn('Could not reopen forum topic:', reopenError.message);
+        }
       }
       logger.info('Using existing support topic', { userId, threadId: supportTopic.thread_id });
       return supportTopic;
     }
 
     // Detect category and priority from user message
-    const category = this.detectCategory(messageText);
-    const priority = this.detectPriority(messageText, user);
+    const category = this.detectCategory(messageText || '');
+    const priority = this.detectPriority(messageText || '', user);
     const language = user.language_code || 'es';
 
-    // Create new forum topic in support group
-    const topicName = `${userId}`;
+    // Create descriptive topic name with user info
+    const requestEmoji = this.getRequestEmoji(requestType);
+    const displayName = username || firstName;
+    const topicName = `${requestEmoji} ${displayName} (${userId})`;
     const iconColor = this.getIconColor(requestType);
 
     try {
@@ -151,8 +161,11 @@ _Responde en este topic para enviar mensajes al usuario._`;
     const username = user.username ? user.username.replace(/@/g, '\\@') : 'No username';
 
     try {
+      // Extract message text for category/priority detection
+      const messageText = ctx.message?.text || ctx.message?.caption || '';
+
       // Get or create user's support topic
-      const supportTopic = await this.getOrCreateUserTopic(user, requestType);
+      const supportTopic = await this.getOrCreateUserTopic(user, requestType, messageText);
       const threadId = supportTopic.thread_id;
 
       // Build message header
@@ -878,8 +891,8 @@ ${categoryEmoji} *Ticket:* ${topic.user_id}
     }
 
     try {
-      // Get or create user's support topic
-      const supportTopic = await this.getOrCreateUserTopic(user, requestType);
+      // Get or create user's support topic (pass message for category/priority detection)
+      const supportTopic = await this.getOrCreateUserTopic(user, requestType, message);
       const threadId = supportTopic.thread_id;
 
       // Build message header
