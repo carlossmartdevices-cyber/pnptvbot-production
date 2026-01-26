@@ -2,9 +2,11 @@ const { query } = require('../../config/postgres');
 const logger = require('../../utils/logger');
 
 /**
- * Model Service - Manages models for Meet & Greet system
+ * Model Service - Manages models for PNP Television Live system
  */
 class ModelService {
+  static TABLE = 'pnp_models';
+
   /**
    * Create a new model
    * @param {Object} modelData - Model data
@@ -15,7 +17,7 @@ class ModelService {
       const { name, username, bio, profile_image_url, is_active = true } = modelData;
 
       const result = await query(
-        `INSERT INTO models (name, username, bio, profile_image_url, is_active)
+        `INSERT INTO ${ModelService.TABLE} (name, username, bio, profile_image_url, is_active)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
         [name, username, bio, profile_image_url, is_active]
@@ -38,7 +40,7 @@ class ModelService {
   static async getModelById(modelId) {
     try {
       const result = await query(
-        `SELECT * FROM models WHERE id = $1`,
+        `SELECT * FROM pnp_models WHERE id = $1`,
         [modelId]
       );
 
@@ -57,7 +59,7 @@ class ModelService {
   static async getModelByUsername(username) {
     try {
       const result = await query(
-        `SELECT * FROM models WHERE username = $1`,
+        `SELECT * FROM pnp_models WHERE username = $1`,
         [username]
       );
 
@@ -75,7 +77,7 @@ class ModelService {
   static async getAllActiveModels() {
     try {
       const result = await query(
-        `SELECT * FROM models WHERE is_active = TRUE ORDER BY name`
+        `SELECT * FROM pnp_models WHERE is_active = TRUE ORDER BY name`
       );
 
       return result.rows || [];
@@ -96,7 +98,7 @@ class ModelService {
       const { name, username, bio, profile_image_url, is_active } = updateData;
 
       const result = await query(
-        `UPDATE models
+        `UPDATE pnp_models
          SET name = COALESCE($1, name),
              username = COALESCE($2, username),
              bio = COALESCE($3, bio),
@@ -128,7 +130,7 @@ class ModelService {
   static async deleteModel(modelId) {
     try {
       const result = await query(
-        `UPDATE models
+        `UPDATE pnp_models
          SET is_active = FALSE, updated_at = NOW()
          WHERE id = $1
          RETURNING id`,

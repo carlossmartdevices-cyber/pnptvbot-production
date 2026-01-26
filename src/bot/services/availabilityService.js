@@ -16,7 +16,7 @@ class AvailabilityService {
     try {
       // Check for conflicts
       const conflicts = await query(
-        `SELECT * FROM model_availability
+        `SELECT * FROM pnp_availability
          WHERE model_id = $1
          AND ((available_from < $3 AND available_to > $2)
               OR (available_from < $4 AND available_to > $2)
@@ -29,7 +29,7 @@ class AvailabilityService {
       }
 
       const result = await query(
-        `INSERT INTO model_availability (model_id, available_from, available_to)
+        `INSERT INTO pnp_availability (model_id, available_from, available_to)
          VALUES ($1, $2, $3)
          RETURNING *`,
         [modelId, from, to]
@@ -57,7 +57,7 @@ class AvailabilityService {
   static async getAvailabilityById(availabilityId) {
     try {
       const result = await query(
-        `SELECT * FROM model_availability WHERE id = $1`,
+        `SELECT * FROM pnp_availability WHERE id = $1`,
         [availabilityId]
       );
 
@@ -77,7 +77,7 @@ class AvailabilityService {
    */
   static async getAvailability(modelId, startDate = null, endDate = null) {
     try {
-      let queryText = `SELECT * FROM model_availability WHERE model_id = $1`;
+      let queryText = `SELECT * FROM pnp_availability WHERE model_id = $1`;
       let params = [modelId];
       
       if (startDate && endDate) {
@@ -112,7 +112,7 @@ class AvailabilityService {
     try {
       // Get current availability to check for conflicts
       const current = await query(
-        `SELECT * FROM model_availability WHERE id = $1`,
+        `SELECT * FROM pnp_availability WHERE id = $1`,
         [availabilityId]
       );
 
@@ -124,7 +124,7 @@ class AvailabilityService {
 
       // Check for conflicts (excluding current availability)
       const conflicts = await query(
-        `SELECT * FROM model_availability
+        `SELECT * FROM pnp_availability
          WHERE model_id = $1
          AND id != $2
          AND ((available_from < $4 AND available_to > $3)
@@ -138,7 +138,7 @@ class AvailabilityService {
       }
 
       const result = await query(
-        `UPDATE model_availability
+        `UPDATE pnp_availability
          SET available_from = $2, available_to = $3, updated_at = NOW()
          WHERE id = $1
          RETURNING *`,
@@ -161,7 +161,7 @@ class AvailabilityService {
   static async deleteAvailability(availabilityId) {
     try {
       const result = await query(
-        `DELETE FROM model_availability WHERE id = $1 RETURNING id`,
+        `DELETE FROM pnp_availability WHERE id = $1 RETURNING id`,
         [availabilityId]
       );
 
@@ -186,7 +186,7 @@ class AvailabilityService {
   static async bookAvailability(availabilityId, bookingId) {
     try {
       const result = await query(
-        `UPDATE model_availability
+        `UPDATE pnp_availability
          SET is_booked = TRUE, booking_id = $2, updated_at = NOW()
          WHERE id = $1 AND is_booked = FALSE
          RETURNING *`,
@@ -216,7 +216,7 @@ class AvailabilityService {
   static async releaseAvailability(availabilityId) {
     try {
       const result = await query(
-        `UPDATE model_availability
+        `UPDATE pnp_availability
          SET is_booked = FALSE, booking_id = NULL, updated_at = NOW()
          WHERE id = $1 AND is_booked = TRUE
          RETURNING *`,
@@ -246,7 +246,7 @@ class AvailabilityService {
     try {
       // Find slots where the start time falls within the date range
       const result = await query(
-        `SELECT * FROM model_availability
+        `SELECT * FROM pnp_availability
          WHERE model_id = $1
          AND is_booked = FALSE
          AND available_from >= $2
@@ -273,7 +273,7 @@ class AvailabilityService {
       // Check for conflicts first
       for (const slot of slots) {
         const conflicts = await query(
-          `SELECT * FROM model_availability
+          `SELECT * FROM pnp_availability
            WHERE model_id = $1
            AND ((available_from < $3 AND available_to > $2)
                 OR (available_from < $4 AND available_to > $2)
@@ -290,7 +290,7 @@ class AvailabilityService {
       const createdSlots = [];
       for (const slot of slots) {
         const result = await query(
-          `INSERT INTO model_availability (model_id, available_from, available_to)
+          `INSERT INTO pnp_availability (model_id, available_from, available_to)
            VALUES ($1, $2, $3)
            RETURNING *`,
           [modelId, slot.from, slot.to]

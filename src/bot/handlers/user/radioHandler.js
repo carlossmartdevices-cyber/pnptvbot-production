@@ -29,11 +29,6 @@ const registerRadioHandlers = (bot) => {
       logger.error('Error handling menu_radio:', error);
     }
   });
-          [Markup.button.callback(
-            lang === 'es' ? '📋 Ver Playlist' : '📋 View Playlist',
-            'radio_playlist'
-          )],
-
 
   // ==========================================
   // LISTEN TO RADIO

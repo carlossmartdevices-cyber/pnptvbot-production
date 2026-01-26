@@ -432,16 +432,29 @@ const registerImprovedSharePostHandlers = (bot) => {
         try {
           const hasMedia = !!ctx.session.temp.sharePostData.mediaFileId;
           const maxTokens = hasMedia ? 260 : 380;
-          const result = await GrokService.chat({
+          
+          // Generate both Spanish and English text
+          const spanishResult = await GrokService.chat({
             mode: 'post',
             language: 'Spanish',
             prompt,
             maxTokens,
           });
-          ctx.session.temp.sharePostData.text = result;
+          
+          const englishResult = await GrokService.chat({
+            mode: 'post',
+            language: 'English',
+            prompt,
+            maxTokens,
+          });
+          
+          // Combine both languages with clear separation
+          const combinedText = `🇪🇸 *Español:*\n${spanishResult}\n\n🇬🇧 *English:*\n${englishResult}`;
+          
+          ctx.session.temp.sharePostData.text = combinedText;
           ctx.session.temp.sharePostStep = 'select_buttons';
           await ctx.saveSession();
-          await ctx.reply('✅ *AI draft saved*\n\n' + result, { parse_mode: 'Markdown' });
+          await ctx.reply('✅ *AI draft saved (bilingual)*\n\n' + combinedText, { parse_mode: 'Markdown' });
           await showButtonSelectionStep(ctx);
         } catch (e) {
           await ctx.reply('❌ AI error: ' + e.message);

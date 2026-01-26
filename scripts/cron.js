@@ -17,7 +17,6 @@ const startCronJobs = async (bot = null) => {
     logger.info('Initializing cron jobs...');
 
     // Initialize dependencies
-    initializeFirebase();
     initializeRedis();
     await initializePostgres();
 

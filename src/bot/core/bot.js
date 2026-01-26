@@ -53,6 +53,7 @@ const registerRoleManagementHandlers = require('../handlers/admin/roleManagement
 const registerGamificationHandlers = require('../handlers/admin/gamification');
 const registerLiveStreamManagementHandlers = require('../handlers/admin/liveStreamManagement');
 const registerRadioManagementHandlers = require('../handlers/admin/radioManagement');
+const registerPNPLiveManagementHandlers = require('../handlers/admin/pnpLiveManagement');
 const { registerWallOfFameHandlers } = require('../handlers/group/wallOfFame');
 const registerPrivateCallHandlers = require('../handlers/user/privateCalls');
 const registerPrivateCallsProntoHandlers = require('../handlers/user/privateCallsPronto');
@@ -257,6 +258,7 @@ const startBot = async () => {
     // Register handlers
     registerUserHandlers(bot);
     registerAdminHandlers(bot); // This registers gamification, radio, live streams, community premium, and community posts handlers
+    registerPNPLiveManagementHandlers(bot); // Register PNP Television Live management handlers
     registerPaymentHandlers(bot);
     registerMediaHandlers(bot);
     registerModerationHandlers(bot);

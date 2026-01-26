@@ -4,7 +4,7 @@ const AvailabilityService = require('../../services/availabilityService');
 const PNPLiveService = require('../../services/pnpLiveService');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
-const { query } = require('../../config/postgres');
+const { query } = require('../../../config/postgres');
 
 /**
  * Admin PNP Television Live Management Handler
