@@ -434,26 +434,26 @@ const registerImprovedSharePostHandlers = (bot) => {
           const maxTokens = hasMedia ? 260 : 380;
           
           // Enhanced prompt to instruct Grok on specific share post structure
-          // Generate Spanish content first
-          const spanishPrompt = `Generate Spanish content for a PNPtv! post:
+          // Generate Spanish content first - New simplified structure
+          const spanishPrompt = `Generate Spanish content for a PNPtv! share post in this EXACT format:
 
-TÍTULO: [Short, sexy title]
-DESCRIPCIÓN: [Engaging description]
-CATEGORÍAS: [List of categories]
-ARTISTAS: [Performer names or "Varios"]
+[Título corto y sexy] [Descripción del video - 1-2 frases con gancho fuerte] #categorías #artistas
 
-[Main content - 2-3 short paragraphs with strong hooks, include 1 benefit, use PNPtv! slang naturally]
+Ejemplo de estructura:
+"Noche de humo con Lex y Santino 💨 Descubre cómo se forma el círculo en esta sesión exclusiva #Smoke #Slam #Underground #Lex #Santino"
 
-Rules:
-- Generate ONLY the content (no language labels)
-- NO markdown formatting
-- Short, punchy sentences
-- Strong hooks with 1 benefit
-- Use PNPtv! slang naturally
-- End with soft CTA
-- Keep it underground and chimba
+Reglas:
+- Sigue el formato EXACTO: Título + Descripción + Hashtags
+- NO uses saltos de línea
+- NO uses formato markdown
+- Incluye 1 beneficio en la descripción
+- Usa emojis estratégicos (💨 🔥 😈 💎 🎧)
+- Usa slang de PNPtv! naturalmente
+- Mantén el estilo underground y chimba
+- Máximo 2-3 hashtags de categorías
+- Máximo 2-3 hashtags de artistas (o "#Varios")
 
-User's request: ${prompt}`;
+Solicitud del usuario: ${prompt}`;
           
           const spanishResult = await GrokService.chat({
             mode: "post",
@@ -463,23 +463,23 @@ User's request: ${prompt}`;
           });
           
           // Generate English content separately with different phrasing to avoid duplication
-          const englishPrompt = `Generate English content for a PNPtv! post (different from Spanish version):
+          const englishPrompt = `Generate English content for a PNPtv! share post in this EXACT format:
 
-TITLE: [Short, sexy title]
-DESCRIPTION: [Engaging description]
-CATEGORIES: [List of categories]
-PERFORMERS: [Performer names or "Various"]
+[Short sexy title] [Video description - 1-2 sentences with strong hook] #categories #performers
 
-[Main content - 2-3 short paragraphs with strong hooks, include 1 benefit, use PNPtv! slang naturally]
+Example structure:
+"Smoke night with Lex & Santino 💨 Discover how the circle forms in this exclusive session #Smoke #Slam #Underground #Lex #Santino"
 
 Rules:
-- Generate ONLY the content (no language labels)
+- Follow EXACT format: Title + Description + Hashtags
+- NO line breaks
 - NO markdown formatting
-- Short, punchy sentences
-- Strong hooks with 1 benefit
+- Include 1 benefit in description
+- Use strategic emojis (💨 🔥 😈 💎 🎧)
 - Use PNPtv! slang naturally
-- End with soft CTA
 - Keep it underground and chimba
+- Max 2-3 category hashtags
+- Max 2-3 performer hashtags (or "#Various")
 - Make this DIFFERENT from any Spanish version
 
 User's request: ${prompt}`;
