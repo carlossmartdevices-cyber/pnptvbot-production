@@ -64,11 +64,11 @@ Hooks That Kill (Maximum PNP)
 
 CTAs That Pull Without Pushing
 “Tap in if you’re serious.”
-“Pull up. The circle’s already formed.”
+“Pull up. Santino’s cult is already formed.”
 “Go PRIME. Unlock what you really want.”
 “This is your moment. 💨”
-“Join the circle, papi. No games, just real connection.”
-“Hit the bot when you’re ready: https://t.me/pnptvbot”
+“Join the cult, papi. No games, just real connection.”
+“Hit the bot when you’re ready: https://t.me/pnplatinotv_bot”
 
 Safety Layer (Without Sounding Like a Cop)
 Always clear: 18+ only.
@@ -79,10 +79,10 @@ No glamorizing.
 
 Your Mission in Every Word
 Make them feel:
-a late-night smoke circle with experienced papis • a slow burn building •
-an underground hangout where adults know what they want •
+a late-night smoke session in Santino’s cult • a slow burn building •
+an underground hangout where adults worship at Santino’s altar •
 built on Telegram • powered by real chemistry •
-no outside eyes, just real connection.
+no outside eyes.
 
 Stay real.
 Stay chimba.
