@@ -433,23 +433,52 @@ const registerImprovedSharePostHandlers = (bot) => {
           const hasMedia = !!ctx.session.temp.sharePostData.mediaFileId;
           const maxTokens = hasMedia ? 260 : 380;
           
-          // Generate both Spanish and English text
+          // Enhanced prompt to instruct Grok on specific share post structure
+          const enhancedPrompt = `Structure the post with this exact format:
+
+🇪🇸 ESPAÑOL
+TÍTULO: [Short, sexy title in Spanish]
+DESCRIPCIÓN: [Engaging description - what's happening, who's involved]
+CATEGORÍAS: [List relevant categories like: Smoke, Slam, Party, Latino, Underground]
+ARTISTAS: [Performer names if applicable, or "Various" or "Community"]
+
+[Main content - short paragraphs, strong hooks, PNPtv! slang]
+
+🇬🇧 ENGLISH
+TITLE: [Short, sexy title in English]
+DESCRIPTION: [Engaging description - what's happening, who's involved]
+CATEGORIES: [List relevant categories like: Smoke, Slam, Party, Latino, Underground]
+PERFORMERS: [Performer names if applicable, or "Various" or "Community"]
+
+[Main content - short paragraphs, strong hooks, PNPtv! slang]
+
+Make both versions:
+- Short, punchy sentences
+- Strong hooks at the beginning
+- Use PNPtv! slang naturally (papi, chimba, rush, cloud, slam)
+- End with soft CTA
+- Keep it underground and chimba
+- Use emojis sparingly: 💨 🔥 😈 💎 🎧
+
+User's original request: ${prompt}`;
+          
+          // Generate both Spanish and English text with structure instruction
           const spanishResult = await GrokService.chat({
             mode: 'post',
             language: 'Spanish',
-            prompt,
+            prompt: enhancedPrompt,
             maxTokens,
           });
           
           const englishResult = await GrokService.chat({
             mode: 'post',
             language: 'English',
-            prompt,
+            prompt: enhancedPrompt,
             maxTokens,
           });
           
           // Combine both languages with clear separation
-          const combinedText = `🇪🇸 *Español:*\n${spanishResult}\n\n🇬🇧 *English:*\n${englishResult}`;
+          const combinedText = `🇪🇸 ESPAÑOL\n${spanishResult}\n\n🇬🇧 ENGLISH\n${englishResult}`;
           
           ctx.session.temp.sharePostData.text = combinedText;
           ctx.session.temp.sharePostStep = 'select_buttons';

@@ -94,7 +94,8 @@ Stay PNP.`;
 - If you mention actions, phrase them as simple bot CTAs (e.g., “Tap Membership Plans”, “Use /start”).`;
 
   if (mode === 'broadcast') {
-    return `You write concise, high-converting Telegram broadcast copy for the PNPtv community.\n${langHint}\n${pnptvPersonality}\n${pnptvContext}\nOutput rules:\n- Return ONLY the final message text.\n- No quotes, no markdown headings.\n- Keep within Telegram limits (prefer <= 900 chars if media caption).\n- End with a clear CTA.`;
+    return `You write concise, high-converting Telegram broadcast copy for the PNPtv community.\n${langHint}\n${pnptvPersonality}\n${pnptvContext}\n
+BROADCAST STRUCTURE (MUST FOLLOW):\n**HOOK** (in bold with emojis - 1 line max)\n\n[Short paragraph - 2-3 sentences max, include 1 benefit we're selling]\n\n*CTA* (in italics with emojis - soft but irresistible)\n\nOutput rules:\n- Return ONLY the final message text (no quotes, no "HOOK:" labels)\n- No markdown headings\n- Keep within Telegram limits (prefer <= 900 chars if media caption)\n- End with clear CTA in italics\n- Use PNPtv! slang naturally\n- Make it sexy, underground, chimba`;
   }
   return `You write concise Telegram post copy for the PNPtv community.\n${langHint}\n${pnptvPersonality}\n${pnptvContext}\nOutput rules:\n- Return ONLY the final message text.\n- No quotes, no markdown headings.\n- Keep within Telegram limits (prefer <= 900 chars if media caption).\n- End with a clear CTA.`;
 }
