@@ -448,10 +448,11 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'menu_hangouts'),
+        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'hangouts_menu'),
         Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
       ],
       [
+        Markup.button.callback(lang === 'es' ? '📻 PNP Radio' : '📻 PNP Radio', 'menu_radio'),
         Markup.button.callback(lang === 'es' ? '📺 PNP Television Live' : '📺 PNP Television Live', 'PNP_LIVE_START'),
       ],
       [
@@ -474,8 +475,11 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'menu_hangouts'),
+        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'hangouts_menu'),
         Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '📻 PNP Radio' : '📻 PNP Radio', 'menu_radio'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
@@ -586,10 +590,11 @@ const showMainMenuEdit = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'menu_hangouts'),
+        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'hangouts_menu'),
         Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
       ],
       [
+        Markup.button.callback(lang === 'es' ? '📻 PNP Radio' : '📻 PNP Radio', 'menu_radio'),
         Markup.button.callback(lang === 'es' ? '📺 PNP Television Live' : '📺 PNP Television Live', 'PNP_LIVE_START'),
       ],
       [
@@ -612,8 +617,11 @@ const showMainMenuEdit = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'menu_hangouts'),
+        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'hangouts_menu'),
         Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '📻 PNP Radio' : '📻 PNP Radio', 'menu_radio'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),

@@ -9,6 +9,8 @@ const lifetimeMigrationHandlers = require('./lifetimeMigration');
 const { registerSubscriptionHandlers } = require('./subscriptionManagement');
 const registerPNPLiveHandlers = require('./pnpLiveHandler');
 const PNPLiveNotificationService = require('../../services/pnpLiveNotificationService');
+const registerHangoutsHandlers = require('./hangoutsHandler');
+const registerRadioHandlers = require('./radioHandler');
 
 /**
  * Register all user handlers
@@ -25,6 +27,8 @@ const registerUserHandlers = (bot) => {
   lifetimeMigrationHandlers(bot);
   registerSubscriptionHandlers(bot);
   registerPNPLiveHandlers(bot);
+  registerHangoutsHandlers(bot);
+  registerRadioHandlers(bot);
 
   // Initialize PNP Live notification service with bot instance
   PNPLiveNotificationService.init(bot);
