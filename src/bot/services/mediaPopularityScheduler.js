@@ -41,23 +41,28 @@ class MediaPopularityScheduler {
    */
   scheduleDailyAnnouncement() {
     try {
+      // Clear existing job first to prevent duplicates
+      if (this.scheduledJobs.daily) {
+        clearTimeout(this.scheduledJobs.daily);
+      }
+
       // Calculate time until next 8 PM
       const now = new Date();
       const next8PM = new Date();
       next8PM.setHours(20, 0, 0, 0);
-      
-      if (now > next8PM) {
+
+      if (now >= next8PM) {
         next8PM.setDate(next8PM.getDate() + 1); // Tomorrow
       }
-      
-      const delay = next8PM - now;
-      
+
+      const delay = Math.max(next8PM - now, 60000); // Minimum 1 minute
+
       // Schedule the first announcement
       this.scheduledJobs.daily = setTimeout(async () => {
         await this.runDailyAnnouncement();
         this.scheduleDailyAnnouncement(); // Reschedule for next day
       }, delay);
-      
+
       logger.info(`Daily winner announcement scheduled for ${next8PM}`);
     } catch (error) {
       logger.error('Error scheduling daily announcement:', error);
@@ -82,23 +87,58 @@ class MediaPopularityScheduler {
    */
   scheduleWeeklyAnnouncement() {
     try {
+      // Clear existing job first to prevent duplicates
+      if (this.scheduledJobs.weekly) {
+        clearTimeout(this.scheduledJobs.weekly);
+      }
+
       const now = new Date();
       const nextMonday = new Date();
-      
-      // Find next Monday
-      const day = now.getDay();
-      const daysUntilMonday = day === 0 ? 1 : (8 - day) % 7;
+
+      // Find next Monday at 8 PM
+      const day = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      let daysUntilMonday;
+
+      if (day === 1) {
+        // It's Monday
+        const today8PM = new Date();
+        today8PM.setHours(20, 0, 0, 0);
+
+        if (now >= today8PM) {
+          // Already past 8 PM Monday, schedule for next Monday
+          daysUntilMonday = 7;
+        } else {
+          // Before 8 PM Monday, schedule for today
+          daysUntilMonday = 0;
+        }
+      } else if (day === 0) {
+        // Sunday - next Monday is tomorrow
+        daysUntilMonday = 1;
+      } else {
+        // Tuesday-Saturday - calculate days until Monday
+        daysUntilMonday = 8 - day;
+      }
+
       nextMonday.setDate(now.getDate() + daysUntilMonday);
       nextMonday.setHours(20, 0, 0, 0);
-      
+
       const delay = nextMonday - now;
-      
+
+      // Safety check: ensure delay is positive and reasonable
+      if (delay <= 0 || delay > 8 * 24 * 60 * 60 * 1000) {
+        logger.warn('Invalid weekly announcement delay, defaulting to 7 days', { delay });
+        nextMonday.setDate(now.getDate() + 7);
+        nextMonday.setHours(20, 0, 0, 0);
+      }
+
+      const finalDelay = Math.max(nextMonday - now, 60000); // Minimum 1 minute
+
       // Schedule the announcement
       this.scheduledJobs.weekly = setTimeout(async () => {
         await this.runWeeklyAnnouncement();
         this.scheduleWeeklyAnnouncement(); // Reschedule for next week
-      }, delay);
-      
+      }, finalDelay);
+
       logger.info(`Weekly top sharer announcement scheduled for ${nextMonday}`);
     } catch (error) {
       logger.error('Error scheduling weekly announcement:', error);
@@ -123,18 +163,23 @@ class MediaPopularityScheduler {
    */
   scheduleMonthlyAnnouncement() {
     try {
+      // Clear existing job first to prevent duplicates
+      if (this.scheduledJobs.monthly) {
+        clearTimeout(this.scheduledJobs.monthly);
+      }
+
       const now = new Date();
       const nextFirst = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       nextFirst.setHours(20, 0, 0, 0);
-      
-      const delay = nextFirst - now;
-      
+
+      const delay = Math.max(nextFirst - now, 60000); // Minimum 1 minute
+
       // Schedule the announcement
       this.scheduledJobs.monthly = setTimeout(async () => {
         await this.runMonthlyAnnouncement();
         this.scheduleMonthlyAnnouncement(); // Reschedule for next month
       }, delay);
-      
+
       logger.info(`Monthly top contributor announcement scheduled for ${nextFirst}`);
     } catch (error) {
       logger.error('Error scheduling monthly announcement:', error);
