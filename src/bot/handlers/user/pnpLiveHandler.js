@@ -60,11 +60,12 @@ const registerPNPLiveHandlers = (bot) => {
     }
   }
 
-  // Show model selection with online status
+  // Show model selection with online status and ratings
   async function showModelSelection(ctx, lang) {
     try {
-      const models = await ModelService.getAllActiveModels();
-      
+      // Use enhanced method that includes ratings
+      const models = await PNPLiveService.getActiveModelsWithRatings();
+
       if (models.length === 0) {
         const message = lang === 'es'
           ? `🔍 *No hay modelos disponibles*
@@ -73,7 +74,7 @@ No hay modelos disponibles en este momento. Por favor, intenta más tarde.`
           : `🔍 *No Models Available*
 
 No models are available at this time. Please try again later.`;
-        
+
         await safeEditMessage(ctx, message, {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -83,15 +84,19 @@ No models are available at this time. Please try again later.`;
         return;
       }
 
-      // Create model buttons with online status (3 per row)
+      // Create model buttons with online status and ratings (2 per row for more info)
       const buttons = [];
-      for (let i = 0; i < models.length; i += 3) {
+      for (let i = 0; i < models.length; i += 2) {
         const row = [];
-        for (let j = 0; j < 3 && i + j < models.length; j++) {
+        for (let j = 0; j < 2 && i + j < models.length; j++) {
           const model = models[i + j];
           const onlineStatus = model.is_online ? '🟢' : '⚪';
+          // Show rating if available
+          const ratingDisplay = model.avg_rating > 0
+            ? `⭐${parseFloat(model.avg_rating).toFixed(1)}`
+            : '';
           row.push(Markup.button.callback(
-            `${model.name} ${onlineStatus}`,
+            `${model.name} ${onlineStatus} ${ratingDisplay}`.trim(),
             `pnp_select_model_${model.id}`
           ));
         }
@@ -106,14 +111,12 @@ No models are available at this time. Please try again later.`;
       const message = lang === 'es'
         ? `📹 *PNP Television Live - Selecciona un Modelo*
 
-🟢 = Online ahora
-⚪ = Disponible pronto
+🟢 Online ahora | ⚪ Disponible | ⭐ Rating
 
 Elige un modelo para tu Show Privado:`
         : `📹 *PNP Television Live - Select a Model*
 
-🟢 = Online now
-⚪ = Available soon
+🟢 Online now | ⚪ Available | ⭐ Rating
 
 Choose a model for your Private Show:`;
 

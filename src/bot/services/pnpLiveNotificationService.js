@@ -1,70 +1,110 @@
 const logger = require('../../utils/logger');
 const { query } = require('../../config/postgres');
-const PNPLiveService = require('./pnpLiveService');
+const { Markup } = require('telegraf');
 
 /**
  * PNP Television Live Notification Service
  * Handles all notifications for bookings, reminders, and system alerts
+ * Now with actual Telegram message sending
  */
+
+// Store bot reference for sending messages
+let botInstance = null;
 
 class PNPLiveNotificationService {
   /**
-   * Send booking confirmation notification to user
-   * @param {number} bookingId - Booking ID
-   * @param {string} userId - User Telegram ID
-   * @param {string} lang - Language code
+   * Initialize the notification service with bot instance
+   * @param {Telegraf} bot - Telegraf bot instance
    */
-  static async sendBookingConfirmation(bookingId, userId, lang) {
-    try {
-      const booking = await PNPLiveService.getBookingById(bookingId);
-      if (!booking) {
-        throw new Error('Booking not found');
-      }
+  static init(bot) {
+    botInstance = bot;
+    logger.info('PNP Live Notification Service initialized');
+  }
 
-      const model = await query(
-        `SELECT name FROM pnp_models WHERE id = $1`,
-        [booking.model_id]
+  /**
+   * Send a Telegram message safely
+   * @param {string|number} chatId - Chat ID to send to
+   * @param {string} message - Message text
+   * @param {Object} options - Message options
+   * @returns {Promise<boolean>} Success status
+   */
+  static async sendMessage(chatId, message, options = {}) {
+    if (!botInstance) {
+      logger.warn('Bot instance not initialized for notifications');
+      return false;
+    }
+
+    try {
+      await botInstance.telegram.sendMessage(chatId, message, {
+        parse_mode: 'Markdown',
+        ...options
+      });
+      return true;
+    } catch (error) {
+      if (error.code === 403) {
+        logger.warn('User blocked the bot', { chatId });
+      } else if (error.code === 400 && error.description?.includes('chat not found')) {
+        logger.warn('Chat not found', { chatId });
+      } else {
+        logger.error('Error sending notification:', { chatId, error: error.message });
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Send booking confirmation notification to user
+   */
+  static async sendBookingConfirmation(bookingId, userId, lang = 'es') {
+    try {
+      const booking = await this.getBookingDetails(bookingId);
+      if (!booking) return false;
+
+      const startTime = new Date(booking.booking_time).toLocaleString(
+        lang === 'es' ? 'es-ES' : 'en-US',
+        { weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }
       );
 
-      const modelName = model.rows?.[0]?.name || 'Model';
-      const startTime = new Date(booking.booking_time).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
       const message = lang === 'es'
-        ? `🎉 *¡Reserva Confirmada - PNP Television Live!*\n\n` +
-          `📹 *Show Privado con ${modelName}*\n` +
+        ? `🎉 *¡Reserva Confirmada!*\n\n` +
+          `📹 *PNP Television Live*\n` +
+          `💃 *Modelo:* ${booking.model_name}\n` +
           `📅 *Fecha:* ${startTime}\n` +
-          `⏱️ *Duración:* ${booking.duration_minutes} minutos\n` +
-          `💰 *Precio:* $${booking.price_usd}\n\n` +
-          `✅ *Tu sala privada está lista*\n` +
-          `🔔 *Recibirás un recordatorio 1 hora antes*\n` +
-          `💬 *¿Preguntas? Responde a este mensaje*`
-        : `🎉 *Booking Confirmed - PNP Television Live!*\n\n` +
-          `📹 *Private Show with ${modelName}*\n` +
+          `⏱️ *Duración:* ${booking.duration_minutes} min\n` +
+          `💰 *Total:* $${booking.price_usd}\n\n` +
+          `✅ Tu sala privada está lista\n` +
+          `🔔 Recibirás recordatorio 1 hora antes\n\n` +
+          `🆔 Reserva #${bookingId}`
+        : `🎉 *Booking Confirmed!*\n\n` +
+          `📹 *PNP Television Live*\n` +
+          `💃 *Model:* ${booking.model_name}\n` +
           `📅 *Date:* ${startTime}\n` +
-          `⏱️ *Duration:* ${booking.duration_minutes} minutes\n` +
-          `💰 *Price:* $${booking.price_usd}\n\n` +
-          `✅ *Your private room is ready*\n` +
-          `🔔 *You\'ll receive a reminder 1 hour before*\n` +
-          `💬 *Questions? Reply to this message*`;
+          `⏱️ *Duration:* ${booking.duration_minutes} min\n` +
+          `💰 *Total:* $${booking.price_usd}\n\n` +
+          `✅ Your private room is ready\n` +
+          `🔔 You'll receive a reminder 1 hour before\n\n` +
+          `🆔 Booking #${bookingId}`;
 
-      // Send notification via bot
-      if (userId) {
-        // This would be called from the bot instance
-        // For now, log the notification
-        logger.info('Booking confirmation notification', {
-          bookingId,
-          userId,
-          message: 'Notification would be sent to user'
-        });
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback(
+          lang === 'es' ? '📹 Ver Mi Reserva' : '📹 View My Booking',
+          `pnp_live_view_booking_${bookingId}`
+        )],
+        [Markup.button.callback(
+          lang === 'es' ? '📋 Mis Reservas' : '📋 My Bookings',
+          'pnp_live_my_bookings'
+        )]
+      ]);
+
+      const sent = await this.sendMessage(userId, message, keyboard);
+
+      // Also notify the model
+      if (booking.model_telegram_id) {
+        await this.sendModelBookingAlert(bookingId, booking.model_telegram_id, lang);
       }
 
-      return true;
+      logger.info('Booking confirmation sent', { bookingId, userId, sent });
+      return sent;
     } catch (error) {
       logger.error('Error sending booking confirmation:', error);
       return false;
@@ -73,56 +113,43 @@ class PNPLiveNotificationService {
 
   /**
    * Send booking reminder notification (1 hour before)
-   * @param {number} bookingId - Booking ID
-   * @param {string} userId - User Telegram ID
-   * @param {string} lang - Language code
    */
-  static async sendBookingReminder(bookingId, userId, lang) {
+  static async sendBookingReminder(bookingId, userId, lang = 'es') {
     try {
-      const booking = await PNPLiveService.getBookingById(bookingId);
-      if (!booking) {
-        throw new Error('Booking not found');
-      }
+      const booking = await this.getBookingDetails(bookingId);
+      if (!booking) return false;
 
-      const model = await query(
-        `SELECT name FROM pnp_models WHERE id = $1`,
-        [booking.model_id]
+      const startTime = new Date(booking.booking_time).toLocaleTimeString(
+        lang === 'es' ? 'es-ES' : 'en-US',
+        { hour: '2-digit', minute: '2-digit' }
       );
 
-      const modelName = model.rows?.[0]?.name || 'Model';
-      const startTime = new Date(booking.booking_time).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
       const message = lang === 'es'
-        ? `🔔 *Recordatorio - PNP Television Live*\n\n` +
-          `📹 *Tu Show Privado con ${modelName} comienza en 1 hora*\n` +
-          `⏰ *Hora:* ${startTime}\n` +
-          `📱 *Prepárate para una experiencia increíble*\n\n` +
-          `💡 *Consejos:*\n` +
-          `- Usa auriculares para mejor audio\n` +
-          `- Conéctate desde un lugar privado\n` +
-          `- Ten tu cámara y micrófono listos`
-        : `🔔 *Reminder - PNP Television Live*\n\n` +
-          `📹 *Your Private Show with ${modelName} starts in 1 hour*\n` +
-          `⏰ *Time:* ${startTime}\n` +
-          `📱 *Get ready for an amazing experience*\n\n` +
-          `💡 *Tips:*\n` +
-          `- Use headphones for better audio\n` +
-          `- Connect from a private location\n` +
-          `- Have your camera and microphone ready`;
+        ? `🔔 *Recordatorio - 1 Hora*\n\n` +
+          `📹 *Tu show con ${booking.model_name}*\n` +
+          `⏰ Comienza a las ${startTime}\n\n` +
+          `💡 *Prepárate:*\n` +
+          `• Usa auriculares\n` +
+          `• Lugar privado\n` +
+          `• Cámara y mic listos\n\n` +
+          `🆔 Reserva #${bookingId}`
+        : `🔔 *Reminder - 1 Hour*\n\n` +
+          `📹 *Your show with ${booking.model_name}*\n` +
+          `⏰ Starts at ${startTime}\n\n` +
+          `💡 *Get ready:*\n` +
+          `• Use headphones\n` +
+          `• Private location\n` +
+          `• Camera and mic ready\n\n` +
+          `🆔 Booking #${bookingId}`;
 
-      // Send notification via bot
-      if (userId) {
-        logger.info('Booking reminder notification', {
-          bookingId,
-          userId,
-          message: 'Reminder would be sent to user'
-        });
-      }
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.url(
+          lang === 'es' ? '🎥 Entrar a la Sala' : '🎥 Join Room',
+          booking.video_room_url || 'https://meet.jit.si'
+        )]
+      ]);
 
-      return true;
+      return await this.sendMessage(userId, message, keyboard);
     } catch (error) {
       logger.error('Error sending booking reminder:', error);
       return false;
@@ -130,272 +157,51 @@ class PNPLiveNotificationService {
   }
 
   /**
-   * Send notification to model about upcoming booking
-   * @param {number} bookingId - Booking ID
-   * @param {string} modelId - Model Telegram ID
-   * @param {string} lang - Language code
+   * Send 5-minute alert before show starts
    */
-  static async sendModelBookingAlert(bookingId, modelId, lang) {
+  static async sendShowStartingSoon(bookingId, userId, modelTelegramId, lang = 'es') {
     try {
-      const booking = await PNPLiveService.getBookingById(bookingId);
-      if (!booking) {
-        throw new Error('Booking not found');
-      }
+      const booking = await this.getBookingDetails(bookingId);
+      if (!booking) return false;
 
-      const user = await query(
-        `SELECT username FROM users WHERE id = $1`,
-        [booking.user_id]
-      );
-
-      const username = user.rows?.[0]?.username || 'Client';
-      const startTime = new Date(booking.booking_time).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
-      const message = lang === 'es'
-        ? `📅 *Nuevo Show - PNP Television Live*\n\n` +
-          `👤 *Cliente:* @${username}\n` +
-          `⏰ *Hora:* ${startTime}\n` +
-          `⏱️ *Duración:* ${booking.duration_minutes} minutos\n` +
-          `💰 *Ingresos:* $${booking.price_usd}\n\n` +
-          `💡 *Prepárate para entrar a la sala 5 minutos antes*`
-        : `📅 *New Show - PNP Television Live*\n\n` +
-          `👤 *Client:* @${username}\n` +
-          `⏰ *Time:* ${startTime}\n` +
-          `⏱️ *Duration:* ${booking.duration_minutes} minutes\n` +
-          `💰 *Earnings:* $${booking.price_usd}\n\n` +
-          `💡 *Be ready to join the room 5 minutes before*`;
-
-      // Send notification via bot
-      if (modelId) {
-        logger.info('Model booking alert notification', {
-          bookingId,
-          modelId,
-          message: 'Alert would be sent to model'
-        });
-      }
-
-      return true;
-    } catch (error) {
-      logger.error('Error sending model booking alert:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Send payment received notification
-   * @param {number} bookingId - Booking ID
-   * @param {string} userId - User Telegram ID
-   * @param {string} lang - Language code
-   */
-  static async sendPaymentReceived(bookingId, userId, lang) {
-    try {
-      const booking = await PNPLiveService.getBookingById(bookingId);
-      if (!booking) {
-        throw new Error('Booking not found');
-      }
-
-      const model = await query(
-        `SELECT name FROM pnp_models WHERE id = $1`,
-        [booking.model_id]
-      );
-
-      const modelName = model.rows?.[0]?.name || 'Model';
-
-      const message = lang === 'es'
-        ? `💳 *Pago Recibido - PNP Television Live*\n\n` +
-          `✅ *Tu pago para el Show con ${modelName} ha sido procesado*\n` +
-          `📹 *Tu sala privada está lista y segura*\n` +
-          `🔒 *Todos los datos están encriptados*\n\n` +
-          `💬 *¿Necesitas ayuda? Responde a este mensaje*`
-        : `💳 *Payment Received - PNP Television Live*\n\n` +
-          `✅ *Your payment for the Show with ${modelName} has been processed*\n` +
-          `📹 *Your private room is ready and secure*\n` +
-          `🔒 *All data is encrypted*\n\n` +
-          `💬 *Need help? Reply to this message*`;
-
-      // Send notification via bot
-      if (userId) {
-        logger.info('Payment received notification', {
-          bookingId,
-          userId,
-          message: 'Payment notification would be sent to user'
-        });
-      }
-
-      return true;
-    } catch (error) {
-      logger.error('Error sending payment received notification:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Send refund processed notification
-   * @param {number} refundId - Refund ID
-   * @param {string} userId - User Telegram ID
-   * @param {string} lang - Language code
-   * @param {boolean} approved - Whether refund was approved
-   */
-  static async sendRefundProcessed(refundId, userId, lang, approved) {
-    try {
-      const refund = await query(
-        `SELECT amount_usd, reason, processed_at 
-         FROM pnp_refunds 
-         WHERE id = $1`,
-        [refundId]
-      );
-
-      if (!refund.rows?.[0]) {
-        throw new Error('Refund not found');
-      }
-
-      const { amount_usd, reason, processed_at } = refund.rows[0];
-      const statusText = approved ? 'aprobado' : 'rechazado';
-      const statusEmoji = approved ? '✅' : '❌';
-
-      const message = lang === 'es'
-        ? `${statusEmoji} *Reembolso ${statusText} - PNP Television Live*\n\n` +
-          `💸 *Monto:* $${amount_usd}\n` +
-          `📝 *Motivo:* ${reason}\n` +
-          `📅 *Procesado:* ${new Date(processed_at).toLocaleString()}\n\n` +
-          (approved 
-            ? `💰 *El reembolso será acreditado en 3-5 días hábiles*`
-            : `📋 *Revisa nuestras políticas de reembolso*`)
-        : `${statusEmoji} *Refund ${approved ? 'Approved' : 'Rejected'} - PNP Television Live*\n\n` +
-          `💸 *Amount:* $${amount_usd}\n` +
-          `📝 *Reason:* ${reason}\n` +
-          `📅 *Processed:* ${new Date(processed_at).toLocaleString()}\n\n` +
-          (approved 
-            ? `💰 *Refund will be credited in 3-5 business days*`
-            : `📋 *Please review our refund policies*`);
-
-      // Send notification via bot
-      if (userId) {
-        logger.info('Refund processed notification', {
-          refundId,
-          userId,
-          approved,
-          message: 'Refund notification would be sent to user'
-        });
-      }
-
-      return true;
-    } catch (error) {
-      logger.error('Error sending refund processed notification:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Send feedback received notification to model
-   * @param {number} feedbackId - Feedback ID
-   * @param {string} modelId - Model Telegram ID
-   * @param {string} lang - Language code
-   */
-  static async sendFeedbackReceived(feedbackId, modelId, lang) {
-    try {
-      const feedback = await query(
-        `SELECT rating, comments, created_at, 
-                (SELECT user_id FROM pnp_bookings WHERE id = booking_id) as user_id 
-         FROM pnp_feedback 
-         WHERE id = $1`,
-        [feedbackId]
-      );
-
-      if (!feedback.rows?.[0]) {
-        throw new Error('Feedback not found');
-      }
-
-      const { rating, comments, user_id } = feedback.rows[0];
-      const stars = '⭐'.repeat(rating);
-
-      const message = lang === 'es'
-        ? `🌟 *Nuevo Feedback - PNP Television Live*\n\n` +
-          `🌟 *Calificación:* ${stars}\n` +
-          `👤 *Cliente:* @${user_id}\n` +
-          `💬 *Comentarios:* ${comments || 'Ninguno'}\n\n` +
-          `💡 *¡Gracias por tu excelente servicio!*`
-        : `🌟 *New Feedback - PNP Television Live*\n\n` +
-          `🌟 *Rating:* ${stars}\n` +
-          `👤 *Client:* @${user_id}\n` +
-          `💬 *Comments:* ${comments || 'None'}\n\n` +
-          `💡 *Thank you for your excellent service!*`;
-
-      // Send notification via bot
-      if (modelId) {
-        logger.info('Feedback received notification', {
-          feedbackId,
-          modelId,
-          rating,
-          message: 'Feedback notification would be sent to model'
-        });
-      }
-
-      return true;
-    } catch (error) {
-      logger.error('Error sending feedback received notification:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Send show starting soon notification to both parties
-   * @param {number} bookingId - Booking ID
-   * @param {string} userId - User Telegram ID
-   * @param {string} modelId - Model Telegram ID
-   * @param {string} lang - Language code
-   */
-  static async sendShowStartingSoon(bookingId, userId, modelId, lang) {
-    try {
-      const booking = await PNPLiveService.getBookingById(bookingId);
-      if (!booking) {
-        throw new Error('Booking not found');
-      }
-
-      const model = await query(
-        `SELECT name FROM pnp_models WHERE id = $1`,
-        [booking.model_id]
-      );
-
-      const modelName = model.rows?.[0]?.name || 'Model';
-
-      // Notification for user
+      // User notification
       const userMessage = lang === 'es'
-        ? `🚀 *¡Tu Show está por comenzar! - PNP Television Live*\n\n` +
-          `📹 *Con ${modelName} en 5 minutos*\n` +
-          `🔗 *Prepárate para unirte a la sala*\n` +
-          `💬 *¡Disfruta tu experiencia!*`
-        : `🚀 *Your Show is about to start! - PNP Television Live*\n\n` +
-          `📹 *With ${modelName} in 5 minutes*\n` +
-          `🔗 *Get ready to join the room*\n` +
-          `💬 *Enjoy your experience!*`;
+        ? `🚀 *¡5 MINUTOS!*\n\n` +
+          `📹 Tu show con *${booking.model_name}* está por comenzar\n\n` +
+          `👆 Toca el botón para unirte ahora`
+        : `🚀 *5 MINUTES!*\n\n` +
+          `📹 Your show with *${booking.model_name}* is about to start\n\n` +
+          `👆 Tap the button to join now`;
 
-      // Notification for model
-      const modelMessage = lang === 'es'
-        ? `🚀 *¡Show por comenzar! - PNP Television Live*\n\n` +
-          `📹 *Con tu cliente en 5 minutos*\n` +
-          `🔗 *Prepárate para entrar a la sala*\n` +
-          `💬 *¡Brinda una experiencia increíble!*`
-        : `🚀 *Show about to start! - PNP Television Live*\n\n` +
-          `📹 *With your client in 5 minutes*\n` +
-          `🔗 *Get ready to join the room*\n` +
-          `💬 *Provide an amazing experience!*`;
+      const userKeyboard = Markup.inlineKeyboard([
+        [Markup.button.url(
+          lang === 'es' ? '🎥 UNIRME AHORA' : '🎥 JOIN NOW',
+          booking.video_room_url || 'https://meet.jit.si'
+        )]
+      ]);
 
-      // Send notifications
-      if (userId) {
-        logger.info('Show starting soon notification to user', {
-          bookingId,
-          userId
-        });
-      }
+      await this.sendMessage(userId, userMessage, userKeyboard);
 
-      if (modelId) {
-        logger.info('Show starting soon notification to model', {
-          bookingId,
-          modelId
-        });
+      // Model notification
+      if (modelTelegramId) {
+        const modelMessage = lang === 'es'
+          ? `🚀 *¡5 MINUTOS!*\n\n` +
+            `📹 Tu show está por comenzar\n` +
+            `💰 Ganancias: $${booking.model_earnings || booking.price_usd}\n\n` +
+            `👆 Únete a la sala ahora`
+          : `🚀 *5 MINUTES!*\n\n` +
+            `📹 Your show is about to start\n` +
+            `💰 Earnings: $${booking.model_earnings || booking.price_usd}\n\n` +
+            `👆 Join the room now`;
+
+        const modelKeyboard = Markup.inlineKeyboard([
+          [Markup.button.url(
+            lang === 'es' ? '🎥 ENTRAR AHORA' : '🎥 JOIN NOW',
+            booking.video_room_url || 'https://meet.jit.si'
+          )]
+        ]);
+
+        await this.sendMessage(modelTelegramId, modelMessage, modelKeyboard);
       }
 
       return true;
@@ -406,36 +212,190 @@ class PNPLiveNotificationService {
   }
 
   /**
-   * Send system alert notification
-   * @param {string} userId - User Telegram ID
-   * @param {string} title - Alert title
-   * @param {string} message - Alert message
-   * @param {string} lang - Language code
+   * Send notification to model about new booking
    */
-  static async sendSystemAlert(userId, title, message, lang) {
+  static async sendModelBookingAlert(bookingId, modelTelegramId, lang = 'es') {
     try {
-      const alertMessage = lang === 'es'
-        ? `⚠️ *${title} - PNP Television Live*\n\n${message}`
-        : `⚠️ *${title} - PNP Television Live*\n\n${message}`;
+      const booking = await this.getBookingDetails(bookingId);
+      if (!booking || !modelTelegramId) return false;
 
-      if (userId) {
-        logger.info('System alert notification', {
-          userId,
-          title,
-          message: 'Alert would be sent to user'
-        });
-      }
+      const startTime = new Date(booking.booking_time).toLocaleString(
+        lang === 'es' ? 'es-ES' : 'en-US',
+        { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+      );
 
-      return true;
+      const earnings = booking.model_earnings || (booking.price_usd * 0.7);
+
+      const message = lang === 'es'
+        ? `💃 *¡Nueva Reserva!*\n\n` +
+          `📹 *PNP Television Live*\n` +
+          `📅 ${startTime}\n` +
+          `⏱️ ${booking.duration_minutes} minutos\n` +
+          `💰 *Tus ganancias:* $${earnings.toFixed(2)}\n\n` +
+          `✅ Prepárate 5 min antes`
+        : `💃 *New Booking!*\n\n` +
+          `📹 *PNP Television Live*\n` +
+          `📅 ${startTime}\n` +
+          `⏱️ ${booking.duration_minutes} minutes\n` +
+          `💰 *Your earnings:* $${earnings.toFixed(2)}\n\n` +
+          `✅ Be ready 5 min before`;
+
+      return await this.sendMessage(modelTelegramId, message);
     } catch (error) {
-      logger.error('Error sending system alert:', error);
+      logger.error('Error sending model booking alert:', error);
       return false;
     }
   }
 
   /**
-   * Get upcoming bookings that need notifications
-   * @returns {Promise<Array>} Bookings needing notifications
+   * Send payment received notification
+   */
+  static async sendPaymentReceived(bookingId, userId, lang = 'es') {
+    try {
+      const booking = await this.getBookingDetails(bookingId);
+      if (!booking) return false;
+
+      const message = lang === 'es'
+        ? `💳 *¡Pago Recibido!*\n\n` +
+          `✅ Tu pago de *$${booking.price_usd}* fue procesado\n` +
+          `📹 Show con ${booking.model_name}\n` +
+          `🔒 Sala privada asegurada\n\n` +
+          `🆔 Reserva #${bookingId}`
+        : `💳 *Payment Received!*\n\n` +
+          `✅ Your payment of *$${booking.price_usd}* was processed\n` +
+          `📹 Show with ${booking.model_name}\n` +
+          `🔒 Private room secured\n\n` +
+          `🆔 Booking #${bookingId}`;
+
+      return await this.sendMessage(userId, message);
+    } catch (error) {
+      logger.error('Error sending payment received notification:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Send show completed notification with rating request
+   */
+  static async sendShowCompleted(bookingId, userId, lang = 'es') {
+    try {
+      const booking = await this.getBookingDetails(bookingId);
+      if (!booking) return false;
+
+      const message = lang === 'es'
+        ? `🎉 *¡Show Completado!*\n\n` +
+          `📹 Gracias por tu show con *${booking.model_name}*\n\n` +
+          `⭐ ¿Cómo fue tu experiencia?\n` +
+          `Tu opinión ayuda a otros usuarios`
+        : `🎉 *Show Completed!*\n\n` +
+          `📹 Thanks for your show with *${booking.model_name}*\n\n` +
+          `⭐ How was your experience?\n` +
+          `Your feedback helps other users`;
+
+      const keyboard = Markup.inlineKeyboard([
+        [
+          Markup.button.callback('⭐', `pnp_rate_${bookingId}_1`),
+          Markup.button.callback('⭐⭐', `pnp_rate_${bookingId}_2`),
+          Markup.button.callback('⭐⭐⭐', `pnp_rate_${bookingId}_3`),
+        ],
+        [
+          Markup.button.callback('⭐⭐⭐⭐', `pnp_rate_${bookingId}_4`),
+          Markup.button.callback('⭐⭐⭐⭐⭐', `pnp_rate_${bookingId}_5`),
+        ],
+        [Markup.button.callback(
+          lang === 'es' ? '⏭️ Saltar' : '⏭️ Skip',
+          'pnp_live_my_bookings'
+        )]
+      ]);
+
+      return await this.sendMessage(userId, message, keyboard);
+    } catch (error) {
+      logger.error('Error sending show completed notification:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Send refund processed notification
+   */
+  static async sendRefundProcessed(bookingId, userId, approved, amount, lang = 'es') {
+    try {
+      const statusEmoji = approved ? '✅' : '❌';
+      const statusText = approved
+        ? (lang === 'es' ? 'Aprobado' : 'Approved')
+        : (lang === 'es' ? 'Rechazado' : 'Rejected');
+
+      const message = lang === 'es'
+        ? `${statusEmoji} *Reembolso ${statusText}*\n\n` +
+          `💸 Monto: $${amount}\n` +
+          `🆔 Reserva #${bookingId}\n\n` +
+          (approved
+            ? `💰 Se acreditará en 3-5 días hábiles`
+            : `📋 Contacta soporte para más información`)
+        : `${statusEmoji} *Refund ${statusText}*\n\n` +
+          `💸 Amount: $${amount}\n` +
+          `🆔 Booking #${bookingId}\n\n` +
+          (approved
+            ? `💰 Will be credited in 3-5 business days`
+            : `📋 Contact support for more information`);
+
+      return await this.sendMessage(userId, message);
+    } catch (error) {
+      logger.error('Error sending refund processed notification:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Send feedback received notification to model
+   */
+  static async sendFeedbackToModel(bookingId, modelTelegramId, rating, comment, lang = 'es') {
+    try {
+      if (!modelTelegramId) return false;
+
+      const stars = '⭐'.repeat(rating);
+
+      const message = lang === 'es'
+        ? `🌟 *Nuevo Feedback*\n\n` +
+          `Calificación: ${stars}\n` +
+          (comment ? `💬 "${comment}"\n\n` : '\n') +
+          `¡Gracias por tu excelente servicio!`
+        : `🌟 *New Feedback*\n\n` +
+          `Rating: ${stars}\n` +
+          (comment ? `💬 "${comment}"\n\n` : '\n') +
+          `Thanks for your excellent service!`;
+
+      return await this.sendMessage(modelTelegramId, message);
+    } catch (error) {
+      logger.error('Error sending feedback to model:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get booking details with model info
+   */
+  static async getBookingDetails(bookingId) {
+    try {
+      const result = await query(
+        `SELECT b.*,
+                m.name as model_name,
+                m.telegram_id as model_telegram_id,
+                m.commission_percent
+         FROM pnp_bookings b
+         JOIN pnp_models m ON b.model_id = m.id
+         WHERE b.id = $1`,
+        [bookingId]
+      );
+      return result.rows?.[0] || null;
+    } catch (error) {
+      logger.error('Error getting booking details:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get upcoming bookings needing notifications
    */
   static async getBookingsNeedingNotifications() {
     try {
@@ -443,24 +403,32 @@ class PNPLiveNotificationService {
       const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
       const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
 
-      // Get bookings that need 1-hour reminders
+      // 1-hour reminders (55-65 min window)
       const oneHourReminders = await query(
-        `SELECT id, user_id, model_id 
-         FROM pnp_bookings 
-         WHERE booking_time BETWEEN $1 AND $2
-         AND status = 'confirmed'
-         AND payment_status = 'paid'`,
-        [now, oneHourFromNow]
+        `SELECT b.id, b.user_id, m.telegram_id as model_telegram_id
+         FROM pnp_bookings b
+         JOIN pnp_models m ON b.model_id = m.id
+         WHERE b.booking_time BETWEEN $1 AND $2
+         AND b.status = 'confirmed'
+         AND b.payment_status = 'paid'`,
+        [
+          new Date(now.getTime() + 55 * 60 * 1000),
+          new Date(now.getTime() + 65 * 60 * 1000)
+        ]
       );
 
-      // Get bookings that need 5-minute alerts
+      // 5-minute alerts (4-6 min window)
       const fiveMinuteAlerts = await query(
-        `SELECT id, user_id, model_id 
-         FROM pnp_bookings 
-         WHERE booking_time BETWEEN $1 AND $2
-         AND status = 'confirmed'
-         AND payment_status = 'paid'`,
-        [now, fiveMinutesFromNow]
+        `SELECT b.id, b.user_id, m.telegram_id as model_telegram_id
+         FROM pnp_bookings b
+         JOIN pnp_models m ON b.model_id = m.id
+         WHERE b.booking_time BETWEEN $1 AND $2
+         AND b.status = 'confirmed'
+         AND b.payment_status = 'paid'`,
+        [
+          new Date(now.getTime() + 4 * 60 * 1000),
+          new Date(now.getTime() + 6 * 60 * 1000)
+        ]
       );
 
       return {
@@ -474,29 +442,41 @@ class PNPLiveNotificationService {
   }
 
   /**
-   * Process all pending notifications
+   * Process all pending notifications (called by cron/worker)
    */
   static async processPendingNotifications() {
     try {
       const { oneHourReminders, fiveMinuteAlerts } = await this.getBookingsNeedingNotifications();
-      
+
+      let sent = 0;
+
       // Process 1-hour reminders
       for (const booking of oneHourReminders) {
-        const userLang = 'es'; // Would get from user preferences
-        await this.sendBookingReminder(booking.id, booking.user_id, userLang);
-        await this.sendModelBookingAlert(booking.id, booking.model_id, userLang);
+        await this.sendBookingReminder(booking.id, booking.user_id, 'es');
+        if (booking.model_telegram_id) {
+          await this.sendModelBookingAlert(booking.id, booking.model_telegram_id, 'es');
+        }
+        sent++;
       }
 
       // Process 5-minute alerts
       for (const booking of fiveMinuteAlerts) {
-        const userLang = 'es'; // Would get from user preferences
-        await this.sendShowStartingSoon(booking.id, booking.user_id, booking.model_id, userLang);
+        await this.sendShowStartingSoon(
+          booking.id,
+          booking.user_id,
+          booking.model_telegram_id,
+          'es'
+        );
+        sent++;
       }
 
-      logger.info('Pending notifications processed', {
-        oneHourReminders: oneHourReminders.length,
-        fiveMinuteAlerts: fiveMinuteAlerts.length
-      });
+      if (sent > 0) {
+        logger.info('PNP Live notifications processed', {
+          oneHourReminders: oneHourReminders.length,
+          fiveMinuteAlerts: fiveMinuteAlerts.length,
+          totalSent: sent
+        });
+      }
 
       return true;
     } catch (error) {
@@ -506,56 +486,31 @@ class PNPLiveNotificationService {
   }
 
   /**
-   * Send broadcast notification to all active models
-   * @param {string} message - Broadcast message
-   * @param {string} lang - Language code
+   * Send broadcast to all active models
    */
-  static async sendBroadcastToModels(message, lang) {
+  static async broadcastToModels(message, lang = 'es') {
     try {
       const models = await query(
-        `SELECT id FROM pnp_models WHERE is_active = TRUE`
+        `SELECT telegram_id FROM pnp_models WHERE is_active = TRUE AND telegram_id IS NOT NULL`
       );
 
-      const broadcastMessage = lang === 'es'
-        ? `📢 *Anuncio Importante - PNP Television Live*\n\n${message}`
-        : `📢 *Important Announcement - PNP Television Live*\n\n${message}`;
+      const broadcastMsg = lang === 'es'
+        ? `📢 *Anuncio PNP Live*\n\n${message}`
+        : `📢 *PNP Live Announcement*\n\n${message}`;
 
-      logger.info('Broadcast notification to models', {
-        modelCount: models.rows?.length,
-        message: 'Broadcast would be sent to all models'
-      });
+      let sent = 0;
+      for (const model of models.rows || []) {
+        if (model.telegram_id) {
+          const success = await this.sendMessage(model.telegram_id, broadcastMsg);
+          if (success) sent++;
+        }
+      }
 
-      return true;
+      logger.info('Broadcast to models completed', { total: models.rows?.length, sent });
+      return sent;
     } catch (error) {
-      logger.error('Error sending broadcast to models:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Send broadcast notification to all users with bookings
-   * @param {string} message - Broadcast message
-   * @param {string} lang - Language code
-   */
-  static async sendBroadcastToUsers(message, lang) {
-    try {
-      const users = await query(
-        `SELECT DISTINCT user_id FROM pnp_bookings WHERE status != 'cancelled'`
-      );
-
-      const broadcastMessage = lang === 'es'
-        ? `📢 *Anuncio - PNP Television Live*\n\n${message}`
-        : `📢 *Announcement - PNP Television Live*\n\n${message}`;
-
-      logger.info('Broadcast notification to users', {
-        userCount: users.rows?.length,
-        message: 'Broadcast would be sent to all users'
-      });
-
-      return true;
-    } catch (error) {
-      logger.error('Error sending broadcast to users:', error);
-      return false;
+      logger.error('Error broadcasting to models:', error);
+      return 0;
     }
   }
 }

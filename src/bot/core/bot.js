@@ -74,6 +74,7 @@ const MessageRateLimiter = require('../services/messageRateLimiter');
 const radioStreamManager = require('../../services/radio/radioStreamManager');
 const CommunityPostScheduler = require('./schedulers/communityPostScheduler');
 const { initializeWorker: initializePrivateCallsWorker } = require('../../workers/privateCallsWorker');
+const PNPLiveWorker = require('../../workers/pnpLiveWorker');
 const { startCronJobs } = require('../../../scripts/cron');
 // Models for cache prewarming
 const PlanModel = require('../../models/planModel');
@@ -290,6 +291,15 @@ const startBot = async () => {
       logger.info('✓ Private calls pronto worker initialized and started');
     } catch (workerError) {
       logger.warn('Private calls worker initialization failed, continuing without background jobs:', workerError.message);
+    }
+
+    // Initialize PNP Live worker (notifications, auto-complete, model status)
+    try {
+      const pnpLiveWorker = new PNPLiveWorker(bot);
+      pnpLiveWorker.start();
+      logger.info('✓ PNP Live worker initialized and started');
+    } catch (workerError) {
+      logger.warn('PNP Live worker initialization failed, continuing without background jobs:', workerError.message);
     }
     // Initialize membership cleanup service (for daily status updates and channel management)
     MembershipCleanupService.initialize(bot);

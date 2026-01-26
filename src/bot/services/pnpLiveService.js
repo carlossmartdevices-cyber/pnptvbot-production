@@ -10,12 +10,117 @@ const logger = require('../../utils/logger');
  * Replaces MeetGreetService with enhanced features
  */
 class PNPLiveService {
-  // Updated pricing structure for PNP Television Live
-  static PRICING = {
+  // Default pricing structure (used when model doesn't have custom pricing)
+  static DEFAULT_PRICING = {
     30: 60,    // 30 minutes: $60
-    60: 100,   // 60 minutes: $100  
+    60: 100,   // 60 minutes: $100
     90: 250    // 90 minutes: $250 (includes extra model)
   };
+
+  // Default commission for models (70% to model, 30% platform)
+  static DEFAULT_COMMISSION = 70;
+
+  /**
+   * Get model-specific pricing or default
+   * @param {number} modelId - Model ID
+   * @param {number} durationMinutes - Duration
+   * @returns {Promise<Object>} Pricing info with price and commission
+   */
+  static async getModelPricing(modelId, durationMinutes) {
+    try {
+      const result = await query(
+        `SELECT price_30min, price_60min, price_90min, commission_percent
+         FROM pnp_models WHERE id = $1`,
+        [modelId]
+      );
+
+      const model = result.rows?.[0];
+      if (!model) {
+        return {
+          price: this.DEFAULT_PRICING[durationMinutes] || 60,
+          commission: this.DEFAULT_COMMISSION
+        };
+      }
+
+      const priceMap = {
+        30: model.price_30min || this.DEFAULT_PRICING[30],
+        60: model.price_60min || this.DEFAULT_PRICING[60],
+        90: model.price_90min || this.DEFAULT_PRICING[90]
+      };
+
+      return {
+        price: parseFloat(priceMap[durationMinutes]) || this.DEFAULT_PRICING[durationMinutes],
+        commission: parseFloat(model.commission_percent) || this.DEFAULT_COMMISSION
+      };
+    } catch (error) {
+      logger.error('Error getting model pricing:', error);
+      return {
+        price: this.DEFAULT_PRICING[durationMinutes] || 60,
+        commission: this.DEFAULT_COMMISSION
+      };
+    }
+  }
+
+  /**
+   * Calculate earnings split between model and platform
+   * @param {number} price - Total price
+   * @param {number} commissionPercent - Model's commission percentage
+   * @returns {Object} { modelEarnings, platformFee }
+   */
+  static calculateEarningsSplit(price, commissionPercent = 70) {
+    const modelEarnings = (price * commissionPercent) / 100;
+    const platformFee = price - modelEarnings;
+    return {
+      modelEarnings: parseFloat(modelEarnings.toFixed(2)),
+      platformFee: parseFloat(platformFee.toFixed(2))
+    };
+  }
+
+  /**
+   * Get model with ratings and stats
+   * @param {number} modelId - Model ID
+   * @returns {Promise<Object>} Model with enhanced info
+   */
+  static async getModelWithStats(modelId) {
+    try {
+      const result = await query(
+        `SELECT m.*,
+                COALESCE(m.avg_rating, 0) as avg_rating,
+                COALESCE(m.rating_count, 0) as rating_count,
+                COALESCE(m.total_shows, 0) as total_shows,
+                COALESCE(m.total_earnings, 0) as total_earnings
+         FROM pnp_models m
+         WHERE m.id = $1`,
+        [modelId]
+      );
+      return result.rows?.[0] || null;
+    } catch (error) {
+      logger.error('Error getting model with stats:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all active models with ratings
+   * @returns {Promise<Array>} Models with ratings
+   */
+  static async getActiveModelsWithRatings() {
+    try {
+      const result = await query(
+        `SELECT m.*,
+                COALESCE(m.avg_rating, 0) as avg_rating,
+                COALESCE(m.rating_count, 0) as rating_count,
+                COALESCE(m.total_shows, 0) as total_shows
+         FROM pnp_models m
+         WHERE m.is_active = TRUE
+         ORDER BY m.is_online DESC, m.avg_rating DESC, m.total_shows DESC`
+      );
+      return result.rows || [];
+    } catch (error) {
+      logger.error('Error getting active models with ratings:', error);
+      return [];
+    }
+  }
 
   /**
    * Create a new PNP Live booking with JaaS video room integration
@@ -29,12 +134,14 @@ class PNPLiveService {
   static async createBooking(userId, modelId, durationMinutes, bookingTime, paymentMethod) {
     try {
       // Validate duration
-      if (!this.PRICING[durationMinutes]) {
+      if (![30, 60, 90].includes(durationMinutes)) {
         throw new Error('Invalid duration. Must be 30, 60, or 90 minutes.');
       }
 
-      // Get price
-      const price = this.PRICING[durationMinutes];
+      // Get model-specific pricing
+      const pricing = await this.getModelPricing(modelId, durationMinutes);
+      const price = pricing.price;
+      const { modelEarnings, platformFee } = this.calculateEarningsSplit(price, pricing.commission);
 
       // Check if model exists
       const model = await ModelService.getModelById(modelId);
@@ -55,13 +162,13 @@ class PNPLiveService {
         throw new Error('You already have a booking at this time');
       }
 
-      // Create booking
+      // Create booking with earnings split
       const booking = await query(
         `INSERT INTO pnp_bookings
-         (user_id, model_id, duration_minutes, price_usd, booking_time, payment_method)
-         VALUES ($1, $2, $3, $4, $5, $6)
+         (user_id, model_id, duration_minutes, price_usd, booking_time, payment_method, model_earnings, platform_fee)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
-        [userId, modelId, durationMinutes, price, bookingTime, paymentMethod]
+        [userId, modelId, durationMinutes, price, bookingTime, paymentMethod, modelEarnings, platformFee]
       );
 
       const newBooking = booking.rows && booking.rows[0];
@@ -324,7 +431,7 @@ class PNPLiveService {
   }
 
   /**
-   * Complete booking and generate feedback request
+   * Complete booking, track earnings, and generate feedback request
    * @param {number} bookingId - Booking ID
    * @returns {Promise<Object>} Completed booking
    */
@@ -347,10 +454,37 @@ class PNPLiveService {
         throw new Error('Booking not paid');
       }
 
-      const updatedBooking = await this.updateBookingStatus(bookingId, 'completed');
+      // Update booking status with show end time
+      const result = await query(
+        `UPDATE pnp_bookings
+         SET status = 'completed', show_ended_at = NOW(), updated_at = NOW()
+         WHERE id = $1 RETURNING *`,
+        [bookingId]
+      );
+
+      const updatedBooking = result.rows?.[0];
+
+      // Record earnings in history
+      if (booking.model_earnings) {
+        await query(
+          `INSERT INTO pnp_model_earnings
+           (model_id, booking_id, gross_amount, commission_percent, model_earnings, platform_fee)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            booking.model_id,
+            bookingId,
+            booking.price_usd,
+            70, // Default, could be retrieved from model
+            booking.model_earnings,
+            booking.platform_fee || (booking.price_usd - booking.model_earnings)
+          ]
+        );
+      }
 
       logger.info('Booking completed', {
-        bookingId
+        bookingId,
+        modelEarnings: booking.model_earnings,
+        platformFee: booking.platform_fee
       });
 
       return updatedBooking;
@@ -569,28 +703,62 @@ class PNPLiveService {
         throw new Error('Can only submit feedback for completed bookings');
       }
 
-      if (booking.user_id !== userId) {
+      if (booking.user_id !== userId.toString()) {
         throw new Error('Only the booking user can submit feedback');
       }
 
+      // Check if already submitted
+      if (booking.rating) {
+        throw new Error('Feedback already submitted for this booking');
+      }
+
+      // Save to pnp_feedback table
       const result = await query(
         `INSERT INTO pnp_feedback (booking_id, user_id, rating, comments) VALUES ($1, $2, $3, $4) RETURNING *`,
         [bookingId, userId, rating, comments]
       );
 
+      // Also update the booking with rating (triggers model stats update)
+      await query(
+        `UPDATE pnp_bookings SET rating = $2, feedback_text = $3, updated_at = NOW() WHERE id = $1`,
+        [bookingId, rating, comments]
+      );
+
+      // Get model telegram ID for notification
+      const PNPLiveNotificationService = require('./pnpLiveNotificationService');
+      const modelInfo = await query(
+        `SELECT m.telegram_id FROM pnp_models m
+         JOIN pnp_bookings b ON b.model_id = m.id
+         WHERE b.id = $1`,
+        [bookingId]
+      );
+
+      // Send notification to model
+      if (modelInfo.rows?.[0]?.telegram_id) {
+        await PNPLiveNotificationService.sendFeedbackToModel(
+          bookingId,
+          modelInfo.rows[0].telegram_id,
+          rating,
+          comments,
+          'es'
+        );
+      }
+
       logger.info('Feedback submitted', {
         bookingId,
         userId,
-        rating
+        rating,
+        modelId: booking.model_id
       });
 
       return result.rows[0];
     } catch (error) {
       logger.error('Error submitting feedback:', error);
       // Re-throw specific errors we want to expose
-      if (error.message === 'Booking not found' || 
+      if (error.message === 'Booking not found' ||
           error.message === 'Can only submit feedback for completed bookings' ||
           error.message === 'Only the booking user can submit feedback' ||
+          error.message === 'Feedback already submitted for this booking' ||
           error.message.includes('Rating must be between 1 and 5')) {
         throw error;
       }
