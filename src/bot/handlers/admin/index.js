@@ -2753,21 +2753,20 @@ let registerAdminHandlers = (bot) => {
 
         const isEn = ctx.session.temp.broadcastStep === 'ai_prompt_en';
         const hasMedia = !!ctx.session.temp.broadcastData?.mediaFileId;
-        const maxTokens = hasMedia ? 260 : 380;
         const language = isEn ? 'English' : 'Spanish';
 
         logger.info('[GROK] Calling GrokService', {
           language,
-          maxTokens,
           hasMedia,
           isEn
         });
 
+        // Use optimized chat with hasMedia for automatic token calculation
         const result = await GrokService.chat({
           mode: 'broadcast',
           language,
           prompt,
-          maxTokens,
+          hasMedia,
         });
 
         logger.info('[GROK] GrokService returned result', {

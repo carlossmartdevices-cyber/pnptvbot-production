@@ -681,12 +681,12 @@ const registerCommunityPostHandlers = (bot) => {
         if (!prompt) return;
         try {
           const hasMedia = !!ctx.session.temp.communityPostData.mediaFileId;
-          const maxTokens = hasMedia ? 260 : 380;
+          // Use optimized chat with hasMedia parameter for automatic token calculation
           const result = await GrokService.chat({
             mode: 'post',
             language: 'Spanish',
             prompt,
-            maxTokens,
+            hasMedia,
           });
           ctx.session.temp.communityPostData.text = result;
           ctx.session.temp.communityPostStep = 'select_buttons';
@@ -694,6 +694,7 @@ const registerCommunityPostHandlers = (bot) => {
           await ctx.reply(`✅ *AI draft saved*\n\n${result}`, { parse_mode: 'Markdown' });
           await showButtonSelectionStep(ctx);
         } catch (e) {
+          logger.error('AI generation error:', e);
           await ctx.reply(`❌ AI error: ${e.message}`);
         }
         return;

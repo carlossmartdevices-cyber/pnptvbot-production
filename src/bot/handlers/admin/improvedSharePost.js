@@ -431,83 +431,21 @@ const registerImprovedSharePostHandlers = (bot) => {
         if (!prompt) return;
         try {
           const hasMedia = !!ctx.session.temp.sharePostData.mediaFileId;
-          const maxTokens = hasMedia ? 260 : 380;
-          
-          // Enhanced prompt to instruct Grok on specific share post structure
-          // Generate Spanish content first - New simplified structure (Telegram-safe)
-          const spanishPrompt = `Generate Spanish content for a PNPtv! share post in this EXACT format:
 
-[Título corto y sexy] [Descripción del video - 1-2 frases con gancho fuerte] #categorías#artistas
-
-Ejemplo de estructura SIN emojis (para evitar errores de Telegram):
-"Noche de humo con Lex y Santino Descubre como se forma el circulo en esta sesion exclusiva SmokeSlamUndergroundLexSantino"
-
-Reglas ESTRICTAS para evitar errores de Telegram:
-- Sigue el formato EXACTO: Titulo + Descripcion + Hashtags (TODO JUNTO SIN ESPACIOS ENTRE HASHTAGS)
-- NO uses saltos de linea
-- NO uses formato markdown
-- NO uses emojis (causan errores de parsing)
-- NO uses caracteres especiales (solo letras, numeros, #)
-- Incluye 1 beneficio en la descripcion
-- Usa slang de PNPtv! naturalmente
-- Mantén el estilo underground y chimba
-- Hashtags SIN espacios: #SmokeSlamLex (no #Smoke #Slam #Lex)
-- Todo en MINUSCULAS
-- Maximo 600 caracteres totales
-
-Solicitud del usuario: ${prompt}`;
-          
-          const spanishResult = await GrokService.chat({
-            mode: "post",
-            language: "Spanish",
-            prompt: spanishPrompt,
-            maxTokens,
+          // Use optimized parallel bilingual generation
+          const result = await GrokService.generateSharePost({
+            prompt,
+            hasMedia,
           });
-          
-          // Generate English content separately with different phrasing to avoid duplication (Telegram-safe)
-          const englishPrompt = `Generate English content for a PNPtv! share post in this EXACT format:
 
-[Short sexy title] [Video description - 1-2 sentences with strong hook] #categories#performers
+          ctx.session.temp.sharePostData.text = result.combined;
 
-Example structure SIN emojis (to avoid Telegram parsing errors):
-"Smoke night with Lex and Santino Discover how the circle forms in this exclusive session SmokeSlamUndergroundLexSantino"
-
-STRICT Rules to avoid Telegram errors:
-- Follow EXACT format: Title + Description + Hashtags (ALL TOGETHER NO SPACES BETWEEN HASHTAGS)
-- NO line breaks
-- NO markdown formatting
-- NO emojis (cause parsing errors)
-- NO special characters (letters, numbers, # only)
-- Include 1 benefit in description
-- Use PNPtv! slang naturally
-- Keep it underground and chimba
-- Hashtags NO spaces: #SmokeSlamLex (not #Smoke #Slam #Lex)
-- All lowercase
-- Maximum 600 total characters
-- Make this DIFFERENT from any Spanish version
-
-User's request: ${prompt}`;
-          
-          const englishResult = await GrokService.chat({
-            mode: "post",
-            language: "English",
-            prompt: englishPrompt,
-            maxTokens,
-          });
-          
-          // Combine both languages with clear separation
-          const combinedText = `🇪🇸 ESPAÑOL
-${spanishResult}
-
-🇬🇧 ENGLISH
-${englishResult}`;
-          ctx.session.temp.sharePostData.text = combinedText;
-          
           ctx.session.temp.sharePostStep = 'select_buttons';
           await ctx.saveSession();
-          await ctx.reply('✅ *AI draft saved (bilingual)*\n\n' + combinedText, { parse_mode: 'Markdown' });
+          await ctx.reply('✅ *AI draft saved (bilingual)*\n\n' + result.combined, { parse_mode: 'Markdown' });
           await showButtonSelectionStep(ctx);
         } catch (e) {
+          logger.error('AI generation error:', e);
           await ctx.reply('❌ AI error: ' + e.message);
         }
         return;

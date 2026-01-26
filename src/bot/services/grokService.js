@@ -1,108 +1,135 @@
 const logger = require('../../utils/logger');
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
+
 function getGrokConfig() {
   return {
     apiKey: process.env.GROK_API_KEY,
     model: process.env.GROK_MODEL || 'grok-2-latest',
     baseUrl: process.env.GROK_BASE_URL || 'https://api.x.ai/v1',
     timeoutMs: Number(process.env.GROK_TIMEOUT_MS || 45000),
+    maxRetries: Number(process.env.GROK_MAX_RETRIES || 3),
+    retryDelayMs: Number(process.env.GROK_RETRY_DELAY_MS || 1000),
   };
 }
 
-function buildSystemPrompt({ mode, language }) {
-  const langHint = language ? `Language: ${language}` : '';
-  
-  const pnptvPersonality = `You are Grok, but in reality you are the raw, mature voice of PNPtv! and PNP Latino TV.
-You’re that 40-year-old papi who knows exactly what he wants, speaks with quiet confidence, and delivers with experience.
-No fake enthusiasm. No forced vibes. Just real, adult conversation with a sexual edge.
+// Mode-specific configurations for temperature and token limits
+const MODE_CONFIG = {
+  broadcast: {
+    temperature: 0.75, // Slightly more creative for marketing
+    defaultTokens: 350,
+    mediaTokens: 280,
+  },
+  post: {
+    temperature: 0.7,
+    defaultTokens: 380,
+    mediaTokens: 260,
+  },
+  sharePost: {
+    temperature: 0.65, // More consistent for share posts
+    defaultTokens: 300,
+    mediaTokens: 240,
+  },
+};
 
-Core Vibe
-A thick cloud rising slow… until the rush hits you.
-Sexy without trying too hard. Mature without being boring.
-Control without fake bravado. Experience without arrogance.
-Queer party smoke + underground Telegram heat + pure Latino chemistry.
+// Cache for system prompts (built once per mode/language combo)
+const systemPromptCache = new Map();
 
-How You Speak (Pure PNP)
-Short lines that hit. Direct but not crude.
-Flirting that feels natural, experienced, never forced.
-Confidence of a man who knows what he wants.
-Sharp, mature slang: papi, chimba, mancito, juguete, rechimba, slam.
-Emojis that land right: 💨 🔥 😈 💎 🎧
-Zero corporate. Zero “dear user.” Zero fake apologies.
+// ═══════════════════════════════════════════════════════════════════════════
+// RETRY UTILITIES
+// ═══════════════════════════════════════════════════════════════════════════
 
-Words That Breathe PNPtv (Use Them Like They’re Yours)
-PNPtv! • PRIME • Hangouts • Videorama • PNP Latino Live • The Circle • Santino & Lex • smoke sessions • cloud • rush • late-night slam • self-hosted • Freedom + Consent + Respect • 18+ safe space • que chimba vos • vos sos mi papi • papi • alpha energy • mancito • juguete • rechimba
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-What NEVER Comes Out of Your Mouth
-Shaming
-Sexual pressure
-Glorifying unsafe use
-Medical, legal, or financial advice
-Hate, slurs, violence
-HR or digital-cop language
-The word "vibes" or "vibe"
-
-Format That Flows
-Short sentences. Direct communication.
-ALL CAPS only for HARD SLAM (rare).
-Always one subtle emotional hook.
-Promos end with a confident CTA.
-
-Natural Bilingual Mode
-Default: English with mature Latino accent.
-Spanish input → respond in clean Spanish (Colombia/Mexico neutral vibe).
-If bilingual is requested → EN + ES clearly separated.
-
-Hooks That Kill (Maximum PNP)
-“E suponía que Lex sería el camarógrafo pero fue imposible no unirse al parche. TwN chimba que se armó.”
-“Entonces, al salir del trabajo Lex tenía un mancito rechimba para que fuera nuestro juguete.”
-“This isn’t a chat. It’s real connection with real papis.”
-“Low lights. High bodies. No fake promises.”
-“Ready for it to get chimba? We don’t play games.”
-“This isn’t Telegram. This is PNPtv – where adults connect.”
-“Feel the slam before you commit.”
-
-CTAs That Pull Without Pushing
-“Tap in if you’re serious.”
-“Pull up. Santino’s cult is already formed.”
-“Go PRIME. Unlock what you really want.”
-“This is your moment. 💨”
-“Join the cult, papi. No games, just real connection.”
-“Hit the bot when you’re ready: https://t.me/pnplatinotv_bot”
-
-Safety Layer (Without Sounding Like a Cop)
-Always clear: 18+ only.
-Everything consensual. Everything community-driven.
-If substances or smoke come up →
-“Know yourself. Pace it. Breathe. Take care.”
-No glamorizing.
-
-Your Mission in Every Word
-Make them feel:
-a late-night smoke session in Santino’s cult • a slow burn building •
-an underground hangout where adults worship at Santino’s altar •
-built on Telegram • powered by real chemistry •
-no outside eyes.
-
-Stay real.
-Stay chimba.
-Stay PNP.`;
-
-  const pnptvContext = `PNPtv context:
-- Telegram-based 18+ community (consent-first, privacy-first, respectful, sex-positive).
-- Culture: warm, playful, flirty, bilingual EN/ES vibe; no hate, no harassment, no coercion, no doxxing, no underage content.
-- Avoid explicit pornography descriptions; keep it tasteful and within Telegram-friendly marketing language.
-- Common CTAs/features: PRIME Membership Plans, Who is Nearby, My Profile, PNPtv Main Room (Jitsi), Cristina AI support.
-- If you mention actions, phrase them as simple bot CTAs (e.g., “Tap Membership Plans”, “Use /start”).`;
-
-  if (mode === 'broadcast') {
-    return `You write concise, high-converting Telegram broadcast copy for the PNPtv community.\n${langHint}\n${pnptvPersonality}\n${pnptvContext}\n
-BROADCAST STRUCTURE (MUST FOLLOW):\n**HOOK** (in bold with emojis - 1 line max)\n\n[Short paragraph - 2-3 sentences max, include 1 benefit we're selling]\n\n*CTA* (in italics with emojis - soft but irresistible)\n\nOutput rules:\n- Return ONLY the final message text (no quotes, no "HOOK:" labels)\n- No markdown headings\n- Keep within Telegram limits (prefer <= 900 chars if media caption)\n- End with clear CTA in italics\n- Use PNPtv! slang naturally\n- Make it sexy, underground, chimba`;
-  }
-  return `You write concise Telegram post copy for the PNPtv community.\n${langHint}\n${pnptvPersonality}\n${pnptvContext}\nOutput rules:\n- Return ONLY the final message text.\n- No quotes, no markdown headings.\n- Keep within Telegram limits (prefer <= 900 chars if media caption).\n- End with a clear CTA.`;
+function isRetryableError(error, statusCode) {
+  // Retry on network errors, timeouts, and specific HTTP status codes
+  if (error.name === 'AbortError') return false; // Don't retry timeouts
+  if (statusCode === 429) return true; // Rate limited
+  if (statusCode >= 500 && statusCode < 600) return true; // Server errors
+  if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') return true;
+  return false;
 }
 
-async function chat({ mode, language, prompt, maxTokens = 300 }) {
+function getRetryAfter(headers) {
+  const retryAfter = headers?.get?.('retry-after');
+  if (retryAfter) {
+    const seconds = parseInt(retryAfter, 10);
+    if (!isNaN(seconds)) return seconds * 1000;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SYSTEM PROMPT BUILDER (Optimized & Cached)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Core personality - condensed for efficiency while maintaining brand voice
+const PNPTV_PERSONALITY = `You are Grok as the raw, mature voice of PNPtv! and PNP Latino TV.
+40-year-old papi energy: quiet confidence, experience, real adult conversation with sexual edge.
+
+VOICE: Short lines that hit. Direct, not crude. Natural flirting. Mature slang: papi, chimba, mancito, juguete, rechimba, slam.
+EMOJIS: 💨🔥😈💎🎧 (use sparingly, strategically)
+NEVER: shaming, pressure, unsafe glorification, medical/legal advice, hate, corporate-speak, the word "vibes"
+
+BRAND VOCAB: PNPtv! • PRIME • Hangouts • Videorama • PNP Latino Live • The Circle • Santino & Lex • smoke sessions • cloud • rush • 18+ safe space
+
+BILINGUAL: English default. Spanish input → clean Spanish (Colombia/Mexico neutral). Bilingual request → EN + ES separated.`;
+
+const PNPTV_CONTEXT = `CONTEXT: Telegram 18+ community, consent-first, privacy-first, sex-positive. Tasteful marketing language only.
+CTAs: PRIME Membership, Who is Nearby, My Profile, Main Room, Cristina AI. Bot: https://t.me/pnplatinotv_bot`;
+
+// Mode-specific instruction templates
+const MODE_INSTRUCTIONS = {
+  broadcast: `TASK: Write high-converting Telegram broadcast copy.
+
+STRUCTURE (REQUIRED):
+**HOOK** (bold + emojis, 1 line max)
+
+[Body: 2-3 sentences, 1 clear benefit]
+
+*CTA* (italics + emoji, soft but irresistible)
+
+RULES: Only final text, no labels/quotes/headings. ≤900 chars for media. Use slang naturally. Make it chimba.`,
+
+  post: `TASK: Write Telegram post copy.
+
+RULES: Only final text, no quotes/headings. ≤900 chars for media. Clear CTA at end.`,
+
+  sharePost: `TASK: Write share post copy.
+
+FORMAT: [Title] [Description 1-2 sentences] #hashtags
+RULES: Single line, no line breaks. No emojis in hashtags. Hashtags joined: #SmokeSlamLex. ≤600 chars total. Lowercase.`,
+};
+
+function buildSystemPrompt({ mode, language }) {
+  const cacheKey = `${mode}-${language}`;
+
+  if (systemPromptCache.has(cacheKey)) {
+    return systemPromptCache.get(cacheKey);
+  }
+
+  const langHint = language ? `OUTPUT LANGUAGE: ${language}` : '';
+  const modeInstructions = MODE_INSTRUCTIONS[mode] || MODE_INSTRUCTIONS.post;
+
+  const prompt = `${PNPTV_PERSONALITY}
+
+${PNPTV_CONTEXT}
+
+${langHint}
+
+${modeInstructions}`;
+
+  systemPromptCache.set(cacheKey, prompt);
+  return prompt;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CORE CHAT FUNCTION (with retry logic)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function chat({ mode, language, prompt, maxTokens, hasMedia = false }) {
   const cfg = getGrokConfig();
   if (!cfg.apiKey) {
     const err = new Error('GROK_API_KEY not configured');
@@ -110,62 +137,216 @@ async function chat({ mode, language, prompt, maxTokens = 300 }) {
     throw err;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), cfg.timeoutMs);
+  // Get mode-specific config
+  const modeConfig = MODE_CONFIG[mode] || MODE_CONFIG.post;
+  const effectiveTokens = maxTokens || (hasMedia ? modeConfig.mediaTokens : modeConfig.defaultTokens);
+  const temperature = modeConfig.temperature;
 
-  try {
-    logger.info('Calling Grok API', { model: cfg.model, maxTokens });
-    
-    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${cfg.apiKey}`,
-      },
-      body: JSON.stringify({
+  let lastError = null;
+  let attempt = 0;
+
+  while (attempt < cfg.maxRetries) {
+    attempt++;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), cfg.timeoutMs);
+
+    try {
+      logger.info('Calling Grok API', {
         model: cfg.model,
-        temperature: 0.7,
-        max_tokens: maxTokens,
-        messages: [
-          { role: 'system', content: buildSystemPrompt({ mode, language }) },
-          { role: 'user', content: prompt },
-        ],
-      }),
-      signal: controller.signal,
-    });
+        maxTokens: effectiveTokens,
+        temperature,
+        mode,
+        language,
+        attempt
+      });
 
-    logger.info('Grok API response received', { status: res.status });
+      const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cfg.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: cfg.model,
+          temperature,
+          max_tokens: effectiveTokens,
+          messages: [
+            { role: 'system', content: buildSystemPrompt({ mode, language }) },
+            { role: 'user', content: prompt },
+          ],
+        }),
+        signal: controller.signal,
+      });
 
-    if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      const errorMsg = `Grok API error ${res.status}: ${txt || res.statusText}`;
-      logger.error('Grok API error', { status: res.status, response: txt });
-      throw new Error(errorMsg);
-    }
+      clearTimeout(timeout);
 
-    const data = await res.json();
-    logger.info('Grok API response parsed', { hasChoices: !!data?.choices });
-    
-    const content = data?.choices?.[0]?.message?.content;
-    if (!content) {
-      logger.error('Grok returned empty response', { data });
-      throw new Error('Grok returned empty response');
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        const errorMsg = `Grok API error ${res.status}: ${txt || res.statusText}`;
+        logger.error('Grok API error', { status: res.status, response: txt, attempt });
+
+        // Check if we should retry
+        if (isRetryableError(new Error(errorMsg), res.status) && attempt < cfg.maxRetries) {
+          const retryDelay = getRetryAfter(res.headers) || (cfg.retryDelayMs * Math.pow(2, attempt - 1));
+          logger.info('Retrying Grok API call', { attempt, retryDelay, status: res.status });
+          await sleep(retryDelay);
+          continue;
+        }
+
+        throw new Error(errorMsg);
+      }
+
+      const data = await res.json();
+
+      const content = data?.choices?.[0]?.message?.content;
+      if (!content) {
+        logger.error('Grok returned empty response', { data });
+        throw new Error('Grok returned empty response');
+      }
+
+      // Sanitize output - remove any unwanted artifacts
+      const sanitized = sanitizeOutput(content);
+
+      logger.info('Grok API success', {
+        contentLength: sanitized.length,
+        attempt,
+        tokensUsed: data?.usage?.total_tokens
+      });
+
+      return sanitized;
+
+    } catch (error) {
+      clearTimeout(timeout);
+      lastError = error;
+
+      if (error.name === 'AbortError') {
+        logger.error('Grok API timeout', { timeoutMs: cfg.timeoutMs, attempt });
+        if (attempt < cfg.maxRetries) {
+          const retryDelay = cfg.retryDelayMs * Math.pow(2, attempt - 1);
+          logger.info('Retrying after timeout', { attempt, retryDelay });
+          await sleep(retryDelay);
+          continue;
+        }
+        throw new Error('Grok API request timed out after retries');
+      }
+
+      // Check if error is retryable
+      if (isRetryableError(error) && attempt < cfg.maxRetries) {
+        const retryDelay = cfg.retryDelayMs * Math.pow(2, attempt - 1);
+        logger.info('Retrying after error', { attempt, retryDelay, error: error.message });
+        await sleep(retryDelay);
+        continue;
+      }
+
+      logger.error('Grok chat failed', { error: error.message, stack: error.stack, attempt });
+      throw error;
     }
-    
-    logger.info('Grok API success', { contentLength: content.length });
-    return String(content).trim();
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      logger.error('Grok API timeout', { timeoutMs: cfg.timeoutMs, error: error.message });
-      throw new Error('Grok API request timed out');
-    }
-    logger.error('Grok chat failed', { error: error.message, stack: error.stack });
-    throw error;
-  } finally {
-    clearTimeout(timeout);
   }
+
+  throw lastError || new Error('Grok API failed after max retries');
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OUTPUT SANITIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function sanitizeOutput(content) {
+  let result = String(content).trim();
+
+  // Remove common LLM artifacts
+  result = result.replace(/^["']|["']$/g, ''); // Remove wrapping quotes
+  result = result.replace(/^(HOOK|CTA|TITLE|BODY):\s*/gim, ''); // Remove labels
+  result = result.replace(/^#+\s+/gm, ''); // Remove markdown headings
+
+  return result.trim();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARALLEL BILINGUAL GENERATION (Optimized for share posts)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function generateBilingual({ mode = 'sharePost', prompt, hasMedia = false }) {
+  const cfg = getGrokConfig();
+
+  logger.info('Generating bilingual content', { mode, hasMedia });
+
+  // Generate both languages in parallel for efficiency
+  const [spanishResult, englishResult] = await Promise.all([
+    chat({
+      mode,
+      language: 'Spanish',
+      prompt: `${prompt}\n\nGenerate ONLY in Spanish. Be unique and creative.`,
+      hasMedia,
+    }),
+    chat({
+      mode,
+      language: 'English',
+      prompt: `${prompt}\n\nGenerate ONLY in English. Be unique and creative. Different from any Spanish version.`,
+      hasMedia,
+    }),
+  ]);
+
+  logger.info('Bilingual generation complete', {
+    spanishLength: spanishResult.length,
+    englishLength: englishResult.length,
+  });
+
+  return {
+    spanish: spanishResult,
+    english: englishResult,
+    combined: `🇪🇸 ESPAÑOL\n${spanishResult}\n\n🇬🇧 ENGLISH\n${englishResult}`,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SHARE POST GENERATION (Optimized for Telegram safety)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function generateSharePost({ prompt, hasMedia = false }) {
+  const sharePostPrompt = `Create a PNPtv! share post for: ${prompt}
+
+FORMAT: [Sexy title] [Description 1-2 sentences with hook] #hashtags
+
+STRICT RULES:
+- Single line, NO line breaks
+- NO emojis (cause Telegram parsing errors)
+- Hashtags joined without spaces: #SmokeSlamLex
+- All lowercase
+- Max 600 characters
+- Include 1 clear benefit
+- Use PNPtv! slang naturally`;
+
+  return generateBilingual({
+    mode: 'sharePost',
+    prompt: sharePostPrompt,
+    hasMedia,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CACHE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+function clearPromptCache() {
+  systemPromptCache.clear();
+  logger.info('Grok prompt cache cleared');
+}
+
+function getStats() {
+  return {
+    cachedPrompts: systemPromptCache.size,
+    modes: Object.keys(MODE_CONFIG),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPORTS
+// ═══════════════════════════════════════════════════════════════════════════
 
 module.exports = {
   chat,
+  generateBilingual,
+  generateSharePost,
+  clearPromptCache,
+  getStats,
 };
