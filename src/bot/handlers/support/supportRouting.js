@@ -209,6 +209,48 @@ const registerSupportRoutingHandlers = (bot) => {
   });
 
   /**
+   * Handle satisfaction feedback from users
+   * This should be registered after other handlers to catch unprocessed messages
+   */
+  bot.on('message', async (ctx, next) => {
+    try {
+      // Skip if not a text message
+      if (!ctx.message?.text) {
+        return next();
+      }
+
+      const userId = String(ctx.from?.id);
+      const messageText = ctx.message.text.trim();
+
+      // Check if this is satisfaction feedback (1-5 rating or text feedback)
+      const isRating = /^\s*[1-5]\s*$/.test(messageText);
+      const isTextFeedback = messageText.length > 10 && messageText.length < 500;
+
+      if (isRating || isTextFeedback) {
+        // Check if user has a recently closed ticket
+        const supportTopic = await SupportTopicModel.getByUserId(userId);
+        
+        if (supportTopic && supportTopic.status === 'closed' && !supportTopic.user_satisfaction) {
+          // Handle the feedback
+          const handled = await supportRoutingService.handleSatisfactionFeedback(userId, messageText);
+          
+          if (handled) {
+            // Don't process this message further
+            return;
+          }
+        }
+      }
+
+      // Continue with other handlers
+      return next();
+      
+    } catch (error) {
+      logger.error('Error handling satisfaction feedback:', error);
+      return next();
+    }
+  });
+
+  /**
    * Command to close a support ticket
    * Usage: /close (in support topic) or /close USER_ID (anywhere in support group)
    */
@@ -382,7 +424,9 @@ const registerSupportRoutingHandlers = (bot) => {
 
       for (const topic of openTopics.slice(0, 20)) { // Limit to 20
         const lastMsg = topic.last_message_at ? new Date(topic.last_message_at).toLocaleString('es-ES') : 'N/A';
-        message += `• **${topic.user_id}** - ${topic.message_count || 0} msgs\n  _Último:_ ${lastMsg}\n`;
+        const priorityEmoji = supportRoutingService.getPriorityEmoji(topic.priority);
+        const categoryEmoji = supportRoutingService.getCategoryEmoji(topic.category);
+        message += `${priorityEmoji} ${categoryEmoji} **${topic.user_id}** - ${topic.message_count || 0} msgs\n  _Prioridad:_ ${topic.priority} | _Categoría:_ ${topic.category}\n  _Último:_ ${lastMsg}\n`;
       }
 
       if (openTopics.length > 20) {
@@ -394,6 +438,412 @@ const registerSupportRoutingHandlers = (bot) => {
     } catch (error) {
       logger.error('Error listing open tickets:', error);
       await ctx.reply('❌ Error al listar tickets: ' + error.message);
+    }
+  });
+
+  /**
+   * Command to change ticket priority
+   * Usage: /prioridad [alta|media|baja|crítica]
+   */
+  bot.command('prioridad', async (ctx) => {
+    // Only in support group
+    if (String(ctx.chat?.id) !== String(SUPPORT_GROUP_ID)) {
+      return;
+    }
+
+    const threadId = ctx.message?.message_thread_id;
+    const args = ctx.message?.text?.split(' ').slice(1) || [];
+    const priority = args[0]?.toLowerCase();
+
+    const validPriorities = {
+      'alta': 'high',
+      'media': 'medium',
+      'baja': 'low',
+      'crítica': 'critical',
+      'high': 'high',
+      'medium': 'medium',
+      'low': 'low',
+      'critical': 'critical'
+    };
+
+    if (!priority || !validPriorities[priority]) {
+      await ctx.reply('❌ Uso: /prioridad [alta|media|baja|crítica|high|medium|low|critical]');
+      return;
+    }
+
+    try {
+      let supportTopic = null;
+      
+      // If in a topic, use that topic
+      if (threadId) {
+        supportTopic = await SupportTopicModel.getByThreadId(threadId);
+      }
+
+      if (!supportTopic) {
+        await ctx.reply('❌ Este comando solo puede usarse dentro de un topic de soporte.');
+        return;
+      }
+
+      const normalizedPriority = validPriorities[priority];
+      await SupportTopicModel.updatePriority(supportTopic.user_id, normalizedPriority);
+
+      const priorityEmoji = supportRoutingService.getPriorityEmoji(normalizedPriority);
+      await ctx.reply(`✅ Prioridad actualizada a: ${priorityEmoji} *${normalizedPriority}*`, {
+        message_thread_id: threadId,
+        parse_mode: 'Markdown'
+      });
+
+    } catch (error) {
+      logger.error('Error changing ticket priority:', error);
+      await ctx.reply('❌ Error al cambiar prioridad: ' + error.message);
+    }
+  });
+
+  /**
+   * Command to change ticket category
+   * Usage: /categoria [facturación|técnico|suscripción|cuenta|general]
+   */
+  bot.command('categoria', async (ctx) => {
+    // Only in support group
+    if (String(ctx.chat?.id) !== String(SUPPORT_GROUP_ID)) {
+      return;
+    }
+
+    const threadId = ctx.message?.message_thread_id;
+    const args = ctx.message?.text?.split(' ').slice(1) || [];
+    const category = args[0]?.toLowerCase();
+
+    const validCategories = {
+      'facturación': 'billing',
+      'técnico': 'technical',
+      'suscripción': 'subscription',
+      'cuenta': 'account',
+      'general': 'general',
+      'billing': 'billing',
+      'technical': 'technical',
+      'subscription': 'subscription',
+      'account': 'account'
+    };
+
+    if (!category || !validCategories[category]) {
+      await ctx.reply('❌ Uso: /categoria [facturación|técnico|suscripción|cuenta|general|billing|technical|subscription|account]');
+      return;
+    }
+
+    try {
+      let supportTopic = null;
+      
+      // If in a topic, use that topic
+      if (threadId) {
+        supportTopic = await SupportTopicModel.getByThreadId(threadId);
+      }
+
+      if (!supportTopic) {
+        await ctx.reply('❌ Este comando solo puede usarse dentro de un topic de soporte.');
+        return;
+      }
+
+      const normalizedCategory = validCategories[category];
+      await SupportTopicModel.updateCategory(supportTopic.user_id, normalizedCategory);
+
+      const categoryEmoji = supportRoutingService.getCategoryEmoji(normalizedCategory);
+      await ctx.reply(`✅ Categoría actualizada a: ${categoryEmoji} *${normalizedCategory}*`, {
+        message_thread_id: threadId,
+        parse_mode: 'Markdown'
+      });
+
+    } catch (error) {
+      logger.error('Error changing ticket category:', error);
+      await ctx.reply('❌ Error al cambiar categoría: ' + error.message);
+    }
+  });
+
+  /**
+   * Command to assign ticket to agent
+   * Usage: /asignar AGENT_ID
+   */
+  bot.command('asignar', async (ctx) => {
+    // Only in support group
+    if (String(ctx.chat?.id) !== String(SUPPORT_GROUP_ID)) {
+      return;
+    }
+
+    const threadId = ctx.message?.message_thread_id;
+    const args = ctx.message?.text?.split(' ').slice(1) || [];
+    const agentId = args[0];
+
+    if (!agentId) {
+      await ctx.reply('❌ Uso: /asignar AGENT_ID');
+      return;
+    }
+
+    try {
+      let supportTopic = null;
+      
+      // If in a topic, use that topic
+      if (threadId) {
+        supportTopic = await SupportTopicModel.getByThreadId(threadId);
+      }
+
+      if (!supportTopic) {
+        await ctx.reply('❌ Este comando solo puede usarse dentro de un topic de soporte.');
+        return;
+      }
+
+      await SupportTopicModel.assignTo(supportTopic.user_id, agentId);
+
+      // Get agent name if possible
+      let agentName = agentId;
+      try {
+        const agentInfo = await ctx.telegram.getChat(agentId);
+        agentName = agentInfo.first_name || agentName;
+      } catch (agentError) {
+        // Agent might not have started the bot
+      }
+
+      await ctx.reply(`✅ Ticket asignado a: *${agentName}* (ID: ${agentId})`, {
+        message_thread_id: threadId,
+        parse_mode: 'Markdown'
+      });
+
+    } catch (error) {
+      logger.error('Error assigning ticket:', error);
+      await ctx.reply('❌ Error al asignar ticket: ' + error.message);
+    }
+  });
+
+  /**
+   * Command to escalate ticket
+   * Usage: /escalar NIVEL (1-3)
+   */
+  bot.command('escalar', async (ctx) => {
+    // Only in support group
+    if (String(ctx.chat?.id) !== String(SUPPORT_GROUP_ID)) {
+      return;
+    }
+
+    const threadId = ctx.message?.message_thread_id;
+    const args = ctx.message?.text?.split(' ').slice(1) || [];
+    const level = parseInt(args[0]);
+
+    if (isNaN(level) || level < 1 || level > 3) {
+      await ctx.reply('❌ Uso: /escalar NIVEL (1-3)');
+      return;
+    }
+
+    try {
+      let supportTopic = null;
+      
+      // If in a topic, use that topic
+      if (threadId) {
+        supportTopic = await SupportTopicModel.getByThreadId(threadId);
+      }
+
+      if (!supportTopic) {
+        await ctx.reply('❌ Este comando solo puede usarse dentro de un topic de soporte.');
+        return;
+      }
+
+      await SupportTopicModel.updateEscalationLevel(supportTopic.user_id, level);
+      await SupportTopicModel.updatePriority(supportTopic.user_id, 'high'); // Escalated tickets become high priority
+
+      const escalationEmojis = {1: '⚠️', 2: '🚨', 3: '🔥'};
+      const emoji = escalationEmojis[level] || '⚠️';
+
+      await ctx.reply(`✅ Ticket escalado a nivel: ${emoji} *${level}*\nPrioridad actualizada a: *high*`, {
+        message_thread_id: threadId,
+        parse_mode: 'Markdown'
+      });
+
+    } catch (error) {
+      logger.error('Error escalating ticket:', error);
+      await ctx.reply('❌ Error al escalar ticket: ' + error.message);
+    }
+  });
+
+  /**
+   * Command to get enhanced statistics
+   * Usage: /stats
+   */
+  bot.command('stats', async (ctx) => {
+    // Only in support group or from admins
+    const isInSupportGroup = String(ctx.chat?.id) === String(SUPPORT_GROUP_ID);
+    const isAdmin = ADMIN_USER_IDS.includes(String(ctx.from?.id));
+
+    if (!isInSupportGroup && !isAdmin) {
+      return;
+    }
+
+    try {
+      const stats = await SupportTopicModel.getStatistics();
+
+      const message = `📊 *Estadísticas de Soporte Mejoradas*
+
+📋 *Tickets Totales:* ${stats.total_topics || 0}
+🟢 *Abiertos:* ${stats.open_topics || 0}
+✅ *Resueltos:* ${stats.resolved_topics || 0}
+🔒 *Cerrados:* ${stats.closed_topics || 0}
+
+💬 *Mensajes Totales:* ${stats.total_messages || 0}
+📝 *Promedio msgs/ticket:* ${Math.round(stats.avg_messages_per_topic || 0)}
+
+🔥 *Prioridad Alta:* ${stats.high_priority || 0}
+🚨 *Prioridad Crítica:* ${stats.critical_priority || 0}
+⚠️ *Incumplimientos SLA:* ${stats.sla_breaches || 0}`;
+
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+
+    } catch (error) {
+      logger.error('Error getting enhanced stats:', error);
+      await ctx.reply('❌ Error al obtener estadísticas: ' + error.message);
+    }
+  });
+
+  /**
+   * Command to search tickets
+   * Usage: /buscar TERMINO
+   */
+  bot.command('buscar', async (ctx) => {
+    // Only in support group
+    if (String(ctx.chat?.id) !== String(SUPPORT_GROUP_ID)) {
+      return;
+    }
+
+    const args = ctx.message?.text?.split(' ').slice(1) || [];
+    const searchTerm = args.join(' ');
+
+    if (!searchTerm) {
+      await ctx.reply('❌ Uso: /buscar TERMINO_O_USUARIO_ID');
+      return;
+    }
+
+    try {
+      const results = await SupportTopicModel.searchTopics(searchTerm);
+
+      if (results.length === 0) {
+        await ctx.reply('🔍 No se encontraron tickets que coincidan con: *' + searchTerm + '*', {
+          parse_mode: 'Markdown'
+        });
+        return;
+      }
+
+      let message = `🔍 *Resultados de búsqueda para "${searchTerm}" (${results.length})*\n\n`;
+
+      for (const topic of results.slice(0, 10)) { // Limit to 10
+        const lastMsg = topic.last_message_at ? new Date(topic.last_message_at).toLocaleString('es-ES') : 'N/A';
+        const priorityEmoji = supportRoutingService.getPriorityEmoji(topic.priority);
+        const categoryEmoji = supportRoutingService.getCategoryEmoji(topic.category);
+        const statusEmoji = topic.status === 'open' ? '🟢' : topic.status === 'closed' ? '🔴' : '🟡';
+        
+        message += `${statusEmoji} ${priorityEmoji} ${categoryEmoji} **${topic.user_id}**\n`;
+        message += `   *Estado:* ${topic.status} | *Prioridad:* ${topic.priority}\n`;
+        message += `   *Categoría:* ${topic.category} | *Último:* ${lastMsg}\n`;
+      }
+
+      if (results.length > 10) {
+        message += `\n_...y ${results.length - 10} más_`;
+      }
+
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+
+    } catch (error) {
+      logger.error('Error searching tickets:', error);
+      await ctx.reply('❌ Error al buscar tickets: ' + error.message);
+    }
+  });
+
+  /**
+   * Command to show SLA breached tickets
+   * Usage: /sla
+   */
+  bot.command('sla', async (ctx) => {
+    // Only in support group
+    if (String(ctx.chat?.id) !== String(SUPPORT_GROUP_ID)) {
+      return;
+    }
+
+    try {
+      const breachedTopics = await SupportTopicModel.getSlaBreachedTopics();
+
+      if (breachedTopics.length === 0) {
+        await ctx.reply('✅ No hay incumplimientos de SLA activos.');
+        return;
+      }
+
+      let message = `⚠️ *Incumplimientos de SLA (${breachedTopics.length})*\n\n`;
+
+      for (const topic of breachedTopics.slice(0, 15)) { // Limit to 15
+        const lastMsg = topic.last_message_at ? new Date(topic.last_message_at).toLocaleString('es-ES') : 'N/A';
+        const priorityEmoji = supportRoutingService.getPriorityEmoji(topic.priority);
+        const categoryEmoji = supportRoutingService.getCategoryEmoji(topic.category);
+        
+        // Calculate time since creation
+        const createdAt = new Date(topic.created_at);
+        const now = new Date();
+        const hours = Math.floor((now - createdAt) / (1000 * 60 * 60));
+        
+        message += `${priorityEmoji} ${categoryEmoji} **${topic.user_id}**\n`;
+        message += `   *Prioridad:* ${topic.priority} | *Categoría:* ${topic.category}\n`;
+        message += `   *Tiempo:* ${hours}h sin respuesta | *Creado:* ${lastMsg}\n`;
+      }
+
+      if (breachedTopics.length > 15) {
+        message += `\n_...y ${breachedTopics.length - 15} más_`;
+      }
+
+      message += `\n\n💡 *Sugerencia:* Usa /buscar USER_ID para encontrar y responder a estos tickets.`;
+
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+
+    } catch (error) {
+      logger.error('Error getting SLA breached tickets:', error);
+      await ctx.reply('❌ Error al obtener incumplimientos de SLA: ' + error.message);
+    }
+  });
+
+  /**
+   * Command to show tickets needing first response
+   * Usage: /sinrespuesta
+   */
+  bot.command('sinrespuesta', async (ctx) => {
+    // Only in support group
+    if (String(ctx.chat?.id) !== String(SUPPORT_GROUP_ID)) {
+      return;
+    }
+
+    try {
+      const noResponseTopics = await SupportTopicModel.getTopicsNeedingFirstResponse();
+
+      if (noResponseTopics.length === 0) {
+        await ctx.reply('✅ Todos los tickets tienen respuesta inicial.');
+        return;
+      }
+
+      let message = `📩 *Tickets sin Primera Respuesta (${noResponseTopics.length})*\n\n`;
+
+      for (const topic of noResponseTopics.slice(0, 15)) { // Limit to 15
+        const createdAt = new Date(topic.created_at);
+        const now = new Date();
+        const hours = Math.floor((now - createdAt) / (1000 * 60 * 60));
+        const priorityEmoji = supportRoutingService.getPriorityEmoji(topic.priority);
+        const categoryEmoji = supportRoutingService.getCategoryEmoji(topic.category);
+        
+        message += `${priorityEmoji} ${categoryEmoji} **${topic.user_id}**\n`;
+        message += `   *Prioridad:* ${topic.priority} | *Categoría:* ${topic.category}\n`;
+        message += `   *Esperando:* ${hours}h | *Creado:* ${createdAt.toLocaleString('es-ES')}\n`;
+      }
+
+      if (noResponseTopics.length > 15) {
+        message += `\n_...y ${noResponseTopics.length - 15} más_`;
+      }
+
+      message += `\n\n💡 *Sugerencia:* Responde a los tickets de mayor prioridad primero.`;
+
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+
+    } catch (error) {
+      logger.error('Error getting tickets needing first response:', error);
+      await ctx.reply('❌ Error al obtener tickets sin respuesta: ' + error.message);
     }
   });
 

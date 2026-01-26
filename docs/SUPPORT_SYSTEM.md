@@ -48,11 +48,21 @@ Agrega estas variables a tu archivo `.env`:
 # Support System - Customer Support Group with Topics
 SUPPORT_GROUP_ID=-1001234567890
 SUPPORT_GROUP_NAME=Soporte al Cliente
+
+# Enhanced Support Features (Optional)
+AUTO_ASSIGN_TICKETS=true
+SEND_SATISFACTION_SURVEY=true
+SLA_CHECK_INTERVAL=3600000
+SLA_MONITOR_ENABLED=true
 ```
 
 **Variables:**
 - `SUPPORT_GROUP_ID`: ID del grupo de soporte (debe ser negativo)
 - `SUPPORT_GROUP_NAME`: Nombre del grupo (informativo)
+- `AUTO_ASSIGN_TICKETS`: Habilitar asignación automática de tickets (true/false)
+- `SEND_SATISFACTION_SURVEY`: Enviar encuestas de satisfacción al cerrar tickets (true/false)
+- `SLA_CHECK_INTERVAL`: Intervalo en milisegundos para verificar incumplimientos de SLA (default: 1 hora)
+- `SLA_MONITOR_ENABLED`: Habilitar monitor de SLA (true/false, default: true)
 
 ### Paso 3: Inicializar la Base de Datos
 
@@ -235,6 +245,14 @@ Usuario: 👤 John Doe (@johndoe) - ID: 123456789
 |---------|-------------|
 | `/cerrar` | Cierra el ticket actual (debe usarse dentro de un topic) |
 | `/reabrir` | Reabre un ticket cerrado (debe usarse dentro de un topic) |
+| `/prioridad [alta|media|baja|crítica]` | Cambia la prioridad del ticket actual |
+| `/categoria [facturación|técnico|suscripción|cuenta]` | Cambia la categoría del ticket actual |
+| `/asignar AGENT_ID` | Asigna el ticket a un agente específico |
+| `/escalar NIVEL` | Escalar ticket (1-3) |
+| `/stats` | Muestra estadísticas detalladas de soporte |
+| `/buscar TERMINO` | Busca tickets por usuario o término |
+| `/sla` | Muestra tickets con incumplimiento de SLA |
+| `/sinrespuesta` | Muestra tickets sin primera respuesta |
 | Cualquier mensaje en un topic | Se envía automáticamente al usuario |
 
 ## 📊 Modelo de Base de Datos
@@ -251,6 +269,16 @@ Usuario: 👤 John Doe (@johndoe) - ID: 123456789
 | `message_count` | INTEGER | Número total de mensajes |
 | `status` | VARCHAR(50) | Estado: open, resolved, closed |
 | `assigned_to` | VARCHAR(255) | ID del agente asignado (opcional) |
+| `priority` | VARCHAR(20) | Prioridad: low, medium, high, critical |
+| `category` | VARCHAR(50) | Categoría: billing, technical, subscription, etc. |
+| `language` | VARCHAR(10) | Código de idioma (es, en, etc.) |
+| `first_response_at` | TIMESTAMP | Fecha de primera respuesta |
+| `resolution_time` | TIMESTAMP | Fecha de resolución |
+| `sla_breached` | BOOLEAN | Indicador de incumplimiento de SLA |
+| `escalation_level` | INTEGER | Nivel de escalación (0-3) |
+| `last_agent_message_at` | TIMESTAMP | Último mensaje del agente |
+| `user_satisfaction` | INTEGER | Calificación de satisfacción (1-5) |
+| `feedback` | TEXT | Comentarios del usuario |
 | `updated_at` | TIMESTAMP | Última actualización |
 
 ### Métodos del Modelo
@@ -470,18 +498,68 @@ El bot **NO NECESITA**:
 3. **Usa descripción**: Explica el propósito del grupo
 4. **Reglas del equipo**: Establece SLAs (tiempo de respuesta esperado)
 
+## ✨ Nuevas Funcionalidades
+
+### 🎯 Priorización Automática
+
+El sistema ahora detecta automáticamente la prioridad de los tickets basándose en palabras clave:
+
+- **Crítica**: Mensajes con "urgente", "emergencia", "inmediato"
+- **Alta**: Mensajes con "importante", "prioridad", "problema grave"
+- **Media**: Prioridad por defecto
+- **Baja**: Preguntas generales o solicitudes de información
+
+### 🏷️ Categorización Automática
+
+Los tickets se clasifican automáticamente en categorías:
+
+- **Facturación**: Pagos, tarjetas, facturas
+- **Suscripción**: Membresías, renovaciones, cancelaciones
+- **Técnico**: Errores, bugs, problemas técnicos
+- **Cuenta**: Login, contraseñas, información de usuario
+- **General**: Otras consultas
+
+### ⏱️ Seguimiento de SLA
+
+El sistema monitorea los tiempos de respuesta según la prioridad:
+
+- **Crítica**: 1 hora para primera respuesta
+- **Alta**: 4 horas para primera respuesta
+- **Media**: 8 horas para primera respuesta
+- **Baja**: 24 horas para primera respuesta
+
+Cuando se incumple un SLA, se envía una alerta automática al grupo de soporte.
+
+### 🤖 Asignación Automática
+
+Con `AUTO_ASSIGN_TICKETS=true`, los tickets se asignan automáticamente a los agentes disponibles usando un sistema de round-robin.
+
+### 🌟 Encuestas de Satisfacción
+
+Al cerrar un ticket, se envía automáticamente una encuesta de satisfacción al usuario para recopilar feedback y mejorar el servicio.
+
+### 📊 Estadísticas Mejoradas
+
+Las estadísticas ahora incluyen:
+
+- Tickets por prioridad
+- Tickets por categoría
+- Incumplimientos de SLA
+- Tiempos promedio de respuesta y resolución
+- Satisfacción del cliente
+
 ## 🚀 Funciones Futuras
 
-Posibles mejoras para el sistema:
+Posibles mejoras adicionales:
 
-1. **Auto-asignación**: Distribuir tickets automáticamente
-2. **Tags/Categorías**: Clasificar tickets por tipo de problema
-3. **Plantillas**: Respuestas rápidas para problemas comunes
-4. **SLA tracking**: Alertas para tickets sin respuesta
-5. **Satisfacción**: Encuesta post-cierre del ticket
-6. **Escalación**: Marcar tickets urgentes
-7. **Integración con CRM**: Sincronizar con sistemas externos
-8. **Analytics dashboard**: Panel web con métricas
+1. **Plantillas de Respuesta**: Respuestas rápidas para problemas comunes
+2. **Integración con CRM**: Sincronizar con sistemas externos
+3. **Analytics Dashboard**: Panel web con métricas en tiempo real
+4. **Chatbot AI**: Respuestas automáticas para preguntas frecuentes
+5. **Escalación Multinivel**: Flujo de trabajo de escalación más complejo
+6. **Notificaciones Push**: Alertas para agentes móviles
+7. **Integración con Helpdesk**: Conexión con Zendesk, Freshdesk, etc.
+8. **Análisis de Sentimiento**: Detección automática de clientes insatisfechos
 
 ## 📞 Soporte
 

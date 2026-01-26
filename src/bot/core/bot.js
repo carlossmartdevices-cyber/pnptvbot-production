@@ -84,6 +84,7 @@ const SupportTopicModel = require('../../models/supportTopicModel');
 // Support routing service and handlers
 const supportRoutingService = require('../services/supportRoutingService');
 const registerSupportRoutingHandlers = require('../handlers/support/supportRouting');
+const slaMonitor = require('../services/slaMonitor');
 // Async Broadcast Queue
 const { initializeAsyncBroadcastQueue } = require('../services/initializeQueue');
 // API Server
@@ -277,6 +278,15 @@ const startBot = async () => {
     registerCallPackageHandlers(bot);
     // Register support routing handlers (for forum topic-based support)
     registerSupportRoutingHandlers(bot);
+
+    // Start SLA monitor if configured
+    const slaCheckInterval = parseInt(process.env.SLA_CHECK_INTERVAL) || 3600000;
+    if (process.env.SUPPORT_GROUP_ID && process.env.SLA_MONITOR_ENABLED !== 'false') {
+      slaMonitor.start(slaCheckInterval);
+      logger.info('SLA monitor initialized', { intervalMs: slaCheckInterval });
+    } else {
+      logger.info('SLA monitor disabled (SUPPORT_GROUP_ID not configured or SLA_MONITOR_ENABLED=false)');
+    }
     // Initialize support routing service with telegram instance
     supportRoutingService.initialize(bot.telegram);
     logger.info('✓ Support routing service initialized');

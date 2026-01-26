@@ -54,6 +54,11 @@ class SupportRoutingService {
       return supportTopic;
     }
 
+    // Detect category and priority from user message
+    const category = this.detectCategory(messageText);
+    const priority = this.detectPriority(messageText, user);
+    const language = user.language_code || 'es';
+
     // Create new forum topic in support group
     const topicName = `${userId}`;
     const iconColor = this.getIconColor(requestType);
@@ -68,20 +73,36 @@ class SupportRoutingService {
 
       const threadId = topic.message_thread_id;
 
-      // Save to database
+      // Save to database with enhanced metadata
       supportTopic = await SupportTopicModel.create({
         userId,
         threadId,
         threadName: topicName,
       });
 
-      // Send initial info message in the topic
+      // Update with additional metadata
+      await SupportTopicModel.updateCategory(userId, category);
+      await SupportTopicModel.updatePriority(userId, priority);
+      await SupportTopicModel.updateLanguage(userId, language);
+
+      // Auto-assign ticket if enabled
+      if (process.env.AUTO_ASSIGN_TICKETS === 'true') {
+        await this.autoAssignTicket(userId);
+      }
+
+      // Send initial info message in the topic with enhanced details
       const infoEmoji = this.getRequestEmoji(requestType);
       const requestLabel = this.getRequestLabel(requestType);
+      const priorityEmoji = this.getPriorityEmoji(priority);
+      const categoryEmoji = this.getCategoryEmoji(category);
+      
       const infoMessage = `${infoEmoji} *${requestLabel}*
 
+${priorityEmoji} *Prioridad:* ${priority}
+${categoryEmoji} *Categoría:* ${category}
 👤 *Usuario:* ${firstName} ${username}
 🆔 *User ID:* \`${userId}\`
+🌍 *Idioma:* ${language}
 📅 *Creado:* ${new Date().toLocaleString('es-ES')}
 
 _Responde en este topic para enviar mensajes al usuario._`;
@@ -91,7 +112,7 @@ _Responde en este topic para enviar mensajes al usuario._`;
         parse_mode: 'Markdown',
       });
 
-      logger.info('Created new support topic', { userId, threadId, topicName });
+      logger.info('Created new support topic', { userId, threadId, topicName, priority, category });
       return supportTopic;
 
     } catch (error) {
@@ -246,6 +267,17 @@ _Responde en este topic para enviar mensajes al usuario._`;
 
       const userId = supportTopic.user_id;
       const adminName = ctx.from.first_name || 'Support';
+      
+      // Check if this is the first response
+      const isFirstResponse = !supportTopic.first_response_at;
+      
+      if (isFirstResponse) {
+        await SupportTopicModel.updateFirstResponse(userId);
+        logger.info('First response recorded', { userId, threadId });
+      }
+      
+      // Update last agent message timestamp
+      await SupportTopicModel.updateLastAgentMessage(userId);
 
       // Reply instructions in both languages
       const replyInstructions = `\n\n💡 _Para responder: Mantén presionado este mensaje y selecciona "Responder"._\n💡 _To reply: Tap and hold this message and select "Reply"._`;
@@ -360,6 +392,9 @@ _Responde en este topic para enviar mensajes al usuario._`;
         return false;
       }
 
+      // Update resolution time
+      await SupportTopicModel.updateResolutionTime(userId);
+      
       // Update status to closed
       await SupportTopicModel.updateStatus(userId, 'closed');
 
@@ -372,6 +407,12 @@ _Responde en este topic para enviar mensajes al usuario._`;
           // Topic might already be closed or doesn't exist
           logger.warn('Could not close forum topic:', closeError.message);
         }
+      }
+
+      // Send satisfaction survey after closing
+      if (process.env.SEND_SATISFACTION_SURVEY === 'true') {
+        const language = supportTopic.language || 'es';
+        await this.sendSatisfactionSurvey(userId, language);
       }
 
       return true;
@@ -394,6 +435,401 @@ _Responde en este topic para enviar mensajes al usuario._`;
       default: 0x8EEE98,     // Green
     };
     return colors[requestType] || colors.default;
+  }
+
+  /**
+   * Get icon color based on priority level
+   * @param {string} priority - Priority level
+   * @returns {number} Telegram icon color ID
+   */
+  getPriorityIconColor(priority) {
+    const colors = {
+      critical: 0xFF0000,    // Red
+      high: 0xFFA500,       // Orange
+      medium: 0xFFFF00,     // Yellow
+      low: 0x00FF00,        // Green
+      default: 0x8EEE98,     // Default Green
+    };
+    return colors[priority] || colors.default;
+  }
+
+  /**
+   * Get emoji based on priority level
+   * @param {string} priority - Priority level
+   * @returns {string} Emoji
+   */
+  getPriorityEmoji(priority) {
+    const emojis = {
+      critical: '🚨',
+      high: '⚠️',
+      medium: 'ℹ️',
+      low: '📌',
+      default: '💬',
+    };
+    return emojis[priority] || emojis.default;
+  }
+
+  /**
+   * Get category emoji
+   * @param {string} category - Category name
+   * @returns {string} Emoji
+   */
+  getCategoryEmoji(category) {
+    const emojis = {
+      billing: '💳',
+      technical: '🛠️',
+      subscription: '🎫',
+      account: '👤',
+      payment: '💰',
+      general: 'ℹ️',
+      bug: '🐛',
+      feature: '🚀',
+      default: '📋',
+    };
+    return emojis[category] || emojis.default;
+  }
+
+  /**
+   * Detect message category based on keywords
+   * @param {string} message - User message
+   * @returns {string} Detected category
+   */
+  detectCategory(message) {
+    if (!message) return 'general';
+
+    const lowerMessage = message.toLowerCase();
+
+    // Billing/payment keywords
+    if (lowerMessage.includes('pago') || lowerMessage.includes('payment') ||
+        lowerMessage.includes('factura') || lowerMessage.includes('invoice') ||
+        lowerMessage.includes('tarjeta') || lowerMessage.includes('card') ||
+        lowerMessage.includes('paypal') || lowerMessage.includes('epayco')) {
+      return 'billing';
+    }
+
+    // Subscription keywords
+    if (lowerMessage.includes('suscripción') || lowerMessage.includes('subscription') ||
+        lowerMessage.includes('membresía') || lowerMessage.includes('membership') ||
+        lowerMessage.includes('renovar') || lowerMessage.includes('renew') ||
+        lowerMessage.includes('cancelar') || lowerMessage.includes('cancel')) {
+      return 'subscription';
+    }
+
+    // Technical keywords
+    if (lowerMessage.includes('error') || lowerMessage.includes('bug') ||
+        lowerMessage.includes('fallo') || lowerMessage.includes('crash') ||
+        lowerMessage.includes('no funciona') || lowerMessage.includes('not working') ||
+        lowerMessage.includes('problema técnico') || lowerMessage.includes('technical issue')) {
+      return 'technical';
+    }
+
+    // Account keywords
+    if (lowerMessage.includes('cuenta') || lowerMessage.includes('account') ||
+        lowerMessage.includes('usuario') || lowerMessage.includes('user') ||
+        lowerMessage.includes('contraseña') || lowerMessage.includes('password') ||
+        lowerMessage.includes('login') || lowerMessage.includes('iniciar sesión')) {
+      return 'account';
+    }
+
+    return 'general';
+  }
+
+  /**
+   * Detect message priority based on keywords and context
+   * @param {string} message - User message
+   * @param {Object} user - User information
+   * @returns {string} Detected priority (low, medium, high, critical)
+   */
+  detectPriority(message, user) {
+    if (!message) return 'medium';
+
+    const lowerMessage = message.toLowerCase();
+
+    // Critical priority - urgent issues
+    if (lowerMessage.includes('urgente') || lowerMessage.includes('urgent') ||
+        lowerMessage.includes('emergencia') || lowerMessage.includes('emergency') ||
+        lowerMessage.includes('inmediato') || lowerMessage.includes('immediate') ||
+        lowerMessage.includes('ahora mismo') || lowerMessage.includes('right now')) {
+      return 'critical';
+    }
+
+    // High priority - important issues
+    if (lowerMessage.includes('importante') || lowerMessage.includes('important') ||
+        lowerMessage.includes('prioridad') || lowerMessage.includes('priority') ||
+        lowerMessage.includes('problema grave') || lowerMessage.includes('serious issue') ||
+        lowerMessage.includes('no puedo acceder') || lowerMessage.includes('cannot access') ||
+        lowerMessage.includes('pago fallido') || lowerMessage.includes('payment failed')) {
+      return 'high';
+    }
+
+    // Low priority - minor issues or questions
+    if (lowerMessage.includes('pregunta') || lowerMessage.includes('question') ||
+        lowerMessage.includes('consulta') || lowerMessage.includes('inquiry') ||
+        lowerMessage.includes('información') || lowerMessage.includes('information') ||
+        lowerMessage.includes('cómo funciona') || lowerMessage.includes('how does it work')) {
+      return 'low';
+    }
+
+    // Default to medium priority
+    return 'medium';
+  }
+
+  /**
+   * Check if SLA is breached for a ticket
+   * @param {Object} topic - Support topic data
+   * @returns {boolean} True if SLA is breached
+   */
+  checkSlaBreach(topic) {
+    if (!topic || !topic.created_at) return false;
+
+    const createdAt = new Date(topic.created_at);
+    const now = new Date();
+    const hoursSinceCreation = (now - createdAt) / (1000 * 60 * 60);
+
+    // SLA rules:
+    // Critical: 1 hour response time
+    // High: 4 hours response time  
+    // Medium: 8 hours response time
+    // Low: 24 hours response time
+
+    const prioritySlaHours = {
+      critical: 1,
+      high: 4,
+      medium: 8,
+      low: 24,
+    };
+
+    const slaHours = prioritySlaHours[topic.priority] || 8;
+    
+    // If first response hasn't been made yet
+    if (!topic.first_response_at && hoursSinceCreation > slaHours) {
+      return true;
+    }
+
+    // If first response was made, check resolution SLA
+    if (topic.first_response_at && topic.status === 'open') {
+      const firstResponseAt = new Date(topic.first_response_at);
+      const hoursSinceFirstResponse = (now - firstResponseAt) / (1000 * 60 * 60);
+      
+      // Resolution SLA: 2x the initial response SLA
+      if (hoursSinceFirstResponse > slaHours * 2) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Auto-assign ticket to available agent
+   * @param {string} userId - User ID
+   * @returns {Promise<string|null>} Assigned agent ID or null
+   */
+  async autoAssignTicket(userId) {
+    // This would be enhanced with actual agent availability logic
+    // For now, we'll implement a simple round-robin assignment
+    
+    const admins = process.env.ADMIN_USER_IDS?.split(',').map(id => id.trim()) || [];
+    
+    if (admins.length === 0) {
+      logger.warn('No admin users configured for auto-assignment');
+      return null;
+    }
+
+    // Simple round-robin: assign to first admin (would be enhanced with load balancing)
+    const assignedAgent = admins[0];
+    
+    try {
+      await SupportTopicModel.assignTo(userId, assignedAgent);
+      logger.info('Ticket auto-assigned', { userId, agentId: assignedAgent });
+      return assignedAgent;
+    } catch (error) {
+      logger.error('Error auto-assigning ticket:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Send satisfaction survey to user
+   * @param {string} userId - User ID
+   * @param {string} language - Language code
+   */
+  async sendSatisfactionSurvey(userId, language) {
+    if (!this.telegram) {
+      logger.warn('Support routing not initialized');
+      return;
+    }
+
+    const messages = {
+      es: `🌟 *Valora tu experiencia de soporte*
+
+¿Cómo calificarías la atención recibida?
+
+🌟🌟🌟🌟🌟 (5) - Excelente
+🌟🌟🌟🌟 (4) - Muy bueno  
+🌟🌟🌟 (3) - Bueno
+🌟🌟 (2) - Regular
+🌟 (1) - Malo
+
+Responde con un número del 1 al 5 o comparte tus comentarios.`,
+      en: `🌟 *Rate your support experience*
+
+How would you rate the support you received?
+
+🌟🌟🌟🌟🌟 (5) - Excellent
+🌟🌟🌟🌟 (4) - Very Good
+🌟🌟🌟 (3) - Good
+🌟🌟 (2) - Fair
+🌟 (1) - Poor
+
+Reply with a number from 1 to 5 or share your feedback.`
+    };
+
+    const message = messages[language] || messages.en;
+
+    try {
+      await this.telegram.sendMessage(userId, message, { parse_mode: 'Markdown' });
+      logger.info('Satisfaction survey sent', { userId });
+    } catch (error) {
+      logger.error('Error sending satisfaction survey:', error);
+    }
+  }
+
+  /**
+   * Handle satisfaction feedback from user
+   * @param {string} userId - User ID
+   * @param {string} message - User message containing feedback
+   * @returns {Promise<boolean>} True if feedback was processed
+   */
+  async handleSatisfactionFeedback(userId, message) {
+    if (!message) return false;
+
+    try {
+      const supportTopic = await SupportTopicModel.getByUserId(userId);
+      
+      if (!supportTopic || supportTopic.status !== 'closed') {
+        return false;
+      }
+
+      // Check if message is a rating (1-5)
+      const ratingMatch = message.match(/^\s*(\d)\s*$/);
+      if (ratingMatch) {
+        const rating = parseInt(ratingMatch[1]);
+        if (rating >= 1 && rating <= 5) {
+          await SupportTopicModel.updateSatisfaction(userId, rating, null);
+          
+          // Send thank you message
+          if (this.telegram) {
+            const thankYouMessages = {
+              es: '🙏 *¡Gracias por tu valoración!*\n\nTu feedback nos ayuda a mejorar el servicio.',
+              en: '🙏 *Thank you for your rating!*\n\nYour feedback helps us improve our service.'
+            };
+            const language = supportTopic.language || 'es';
+            const thankYouMessage = thankYouMessages[language] || thankYouMessages.en;
+            
+            await this.telegram.sendMessage(userId, thankYouMessage, { parse_mode: 'Markdown' });
+          }
+          
+          logger.info('Satisfaction rating received', { userId, rating });
+          return true;
+        }
+      }
+
+      // If not a rating, treat as text feedback
+      await SupportTopicModel.updateSatisfaction(userId, null, message);
+      
+      // Send thank you message for text feedback
+      if (this.telegram) {
+        const thankYouMessages = {
+          es: '🙏 *¡Gracias por tu feedback!*\n\nApreciamos que compartas tu experiencia con nosotros.',
+          en: '🙏 *Thank you for your feedback!*\n\nWe appreciate you sharing your experience with us.'
+        };
+        const language = supportTopic.language || 'es';
+        const thankYouMessage = thankYouMessages[language] || thankYouMessages.en;
+        
+        await this.telegram.sendMessage(userId, thankYouMessage, { parse_mode: 'Markdown' });
+      }
+      
+      logger.info('Satisfaction feedback received', { userId, feedback: message.substring(0, 50) });
+      return true;
+      
+    } catch (error) {
+      logger.error('Error handling satisfaction feedback:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check and update SLA breaches for all open tickets
+   * This should be called periodically (e.g., every hour)
+   */
+  async checkSlaBreaches() {
+    if (!this.telegram || !this.supportGroupId) {
+      logger.warn('Support routing not initialized for SLA checking');
+      return;
+    }
+
+    try {
+      const openTopics = await SupportTopicModel.getOpenTopics();
+      
+      for (const topic of openTopics) {
+        const isBreached = this.checkSlaBreach(topic);
+        
+        if (isBreached && !topic.sla_breached) {
+          // Mark as breached
+          await SupportTopicModel.updateSlaBreach(topic.user_id, true);
+          
+          // Notify in the support group
+          const priorityEmoji = this.getPriorityEmoji(topic.priority);
+          const categoryEmoji = this.getCategoryEmoji(topic.category);
+          
+          const alertMessage = `${priorityEmoji} *ALERTA: SLA INCUMPLIDO*
+
+${categoryEmoji} *Ticket:* ${topic.user_id}
+👤 *Usuario:* ${topic.thread_name}
+⏰ *Tiempo sin respuesta:* ${this.getSlaBreachTime(topic)}
+📅 *Creado:* ${new Date(topic.created_at).toLocaleString('es-ES')}
+
+*Prioridad:* ${topic.priority}
+*Categoría:* ${topic.category}`;
+          
+          try {
+            await this.telegram.sendMessage(
+              this.supportGroupId,
+              alertMessage,
+              {
+                message_thread_id: topic.thread_id,
+                parse_mode: 'Markdown',
+              }
+            );
+            
+            logger.warn('SLA breach alert sent', { userId: topic.user_id, threadId: topic.thread_id });
+          } catch (notifyError) {
+            logger.error('Failed to send SLA breach alert:', notifyError.message);
+          }
+        }
+      }
+      
+      logger.info('SLA breach check completed', { checked: openTopics.length });
+    } catch (error) {
+      logger.error('Error checking SLA breaches:', error);
+    }
+  }
+
+  /**
+   * Get SLA breach time description
+   * @param {Object} topic - Support topic data
+   * @returns {string} Human-readable breach time
+   */
+  getSlaBreachTime(topic) {
+    if (!topic.created_at) return 'Desconocido';
+    
+    const createdAt = new Date(topic.created_at);
+    const now = new Date();
+    const hours = Math.floor((now - createdAt) / (1000 * 60 * 60));
+    const minutes = Math.floor(((now - createdAt) % (1000 * 60 * 60)) / (1000 * 60));
+    
+    return `${hours}h ${minutes}m`;
   }
 
   /**
