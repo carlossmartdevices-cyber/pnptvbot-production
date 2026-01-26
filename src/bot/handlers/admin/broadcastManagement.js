@@ -87,29 +87,83 @@ const registerBroadcastHandlers = (bot) => {
       await ctx.saveSession();
 
       await ctx.answerCbQuery();
+      const lang = ctx.session?.language || 'es';
 
-      await ctx.editMessageText(
-        '📅 *Tipo de Programación*\n\n'
-        + '¿Qué tipo de programación deseas?\n\n'
-        + '📆 *Una vez:* Envío único en fecha/hora específica\n'
-        + '🔄 *Recurrente:* Envíos repetidos (diario, semanal, mensual)',
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
+      const text = lang === 'es'
+        ? '📅 *Tipo de Programación*\n\n' +
+          '¿Qué tipo de programación deseas?\n\n' +
+          '📆 *Una vez:* Envío único en fecha/hora específica\n' +
+          '📅 *Múltiples:* Programar varias fechas diferentes\n' +
+          '🔄 *Recurrente:* Envíos repetidos (diario, semanal, mensual)'
+        : '📅 *Scheduling Type*\n\n' +
+          'What type of schedule do you want?\n\n' +
+          '📆 *One time:* Single send at specific date/time\n' +
+          '📅 *Multiple:* Schedule for several different dates\n' +
+          '🔄 *Recurring:* Repeated sends (daily, weekly, monthly)';
+
+      const buttons = lang === 'es'
+        ? [
             [Markup.button.callback('📆 Una vez', 'schedule_type_once')],
+            [Markup.button.callback('📅 Múltiples fechas', 'schedule_type_multiple')],
             [Markup.button.callback('🔄 Recurrente', 'schedule_type_recurring')],
             [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
-          ]),
-        }
-      );
+          ]
+        : [
+            [Markup.button.callback('📆 One time', 'schedule_type_once')],
+            [Markup.button.callback('📅 Multiple dates', 'schedule_type_multiple')],
+            [Markup.button.callback('🔄 Recurring', 'schedule_type_recurring')],
+            [Markup.button.callback('❌ Cancel', 'admin_cancel')],
+          ];
+
+      await ctx.editMessageText(text, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons),
+      });
     } catch (error) {
       logger.error('Error scheduling broadcast:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
 
-  // Schedule type: one-time
+  // Schedule type: one-time - Show visual date/time picker
   bot.action('schedule_type_once', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
+
+      ctx.session.temp.isRecurring = false;
+      ctx.session.temp.scheduledTimes = [];
+      ctx.session.temp.scheduleCount = 1;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery();
+
+      // Trigger the visual date/time picker
+      const lang = ctx.session?.language || 'es';
+      const dateTimePicker = require('../../utils/dateTimePicker');
+      const PREFIX = 'bcast_sched';
+
+      const { text, keyboard } = dateTimePicker.getSchedulingMenu(lang, PREFIX);
+
+      await ctx.editMessageText(text, {
+        parse_mode: 'Markdown',
+        ...keyboard,
+      });
+    } catch (error) {
+      logger.error('Error selecting one-time schedule:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Multiple schedule count selection (for 2+ broadcasts)
+  bot.action('schedule_type_multiple', async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) {
@@ -129,23 +183,23 @@ const registerBroadcastHandlers = (bot) => {
       await ctx.answerCbQuery();
 
       await ctx.editMessageText(
-        '📅 *Programar Broadcasts*\n\n'
+        '📅 *Programar Múltiples Broadcasts*\n\n'
         + '¿Cuántas veces deseas programar este broadcast?\n\n'
-        + '🔄 *Opciones:* 1 a 12 programaciones diferentes\n\n'
+        + '🔄 *Opciones:* 2 a 12 programaciones diferentes\n\n'
         + 'Ejemplo: Puedes programar el mismo mensaje para 3 fechas/horas diferentes',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('1️⃣ Una vez', 'schedule_count_1'), Markup.button.callback('2️⃣ Dos veces', 'schedule_count_2'), Markup.button.callback('3️⃣ Tres veces', 'schedule_count_3')],
-            [Markup.button.callback('4️⃣ Cuatro', 'schedule_count_4'), Markup.button.callback('5️⃣ Cinco', 'schedule_count_5'), Markup.button.callback('6️⃣ Seis', 'schedule_count_6')],
-            [Markup.button.callback('7️⃣ Siete', 'schedule_count_7'), Markup.button.callback('8️⃣ Ocho', 'schedule_count_8'), Markup.button.callback('9️⃣ Nueve', 'schedule_count_9')],
-            [Markup.button.callback('🔟 Diez', 'schedule_count_10'), Markup.button.callback('1️⃣1️⃣ Once', 'schedule_count_11'), Markup.button.callback('1️⃣2️⃣ Doce', 'schedule_count_12')],
+            [Markup.button.callback('2️⃣ Dos veces', 'schedule_count_2'), Markup.button.callback('3️⃣ Tres veces', 'schedule_count_3'), Markup.button.callback('4️⃣ Cuatro', 'schedule_count_4')],
+            [Markup.button.callback('5️⃣ Cinco', 'schedule_count_5'), Markup.button.callback('6️⃣ Seis', 'schedule_count_6'), Markup.button.callback('7️⃣ Siete', 'schedule_count_7')],
+            [Markup.button.callback('8️⃣ Ocho', 'schedule_count_8'), Markup.button.callback('9️⃣ Nueve', 'schedule_count_9'), Markup.button.callback('🔟 Diez', 'schedule_count_10')],
+            [Markup.button.callback('1️⃣1️⃣ Once', 'schedule_count_11'), Markup.button.callback('1️⃣2️⃣ Doce', 'schedule_count_12')],
             [Markup.button.callback('◀️ Volver', 'broadcast_schedule_later')],
           ]),
         }
       );
     } catch (error) {
-      logger.error('Error selecting one-time schedule:', error);
+      logger.error('Error selecting multiple schedule:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
@@ -492,6 +546,150 @@ const registerBroadcastHandlers = (bot) => {
       }
     });
   }
+
+  // Handler for creating scheduled broadcast after visual date/time picker confirmation
+  bot.action('broadcast_create_scheduled', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      await ctx.answerCbQuery();
+      const lang = ctx.session?.language || 'es';
+
+      // Validate session data
+      const confirmedSchedule = ctx.session.temp?.confirmedSchedule;
+      const broadcastData = ctx.session.temp?.broadcastData;
+      const broadcastTarget = ctx.session.temp?.broadcastTarget;
+
+      if (!confirmedSchedule || !confirmedSchedule.date) {
+        const msg = lang === 'es' ? '❌ Sesión expirada. Por favor inicia de nuevo.' : '❌ Session expired. Please start again.';
+        await ctx.editMessageText(msg, {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(lang === 'es' ? '◀️ Volver al Panel' : '◀️ Back to Panel', 'admin_cancel')],
+          ]),
+        });
+        return;
+      }
+
+      if (!broadcastData || (!broadcastData.textEn && !broadcastData.textEs && !broadcastData.mediaFileId)) {
+        const msg = lang === 'es' ? '❌ Faltan datos del broadcast.' : '❌ Missing broadcast data.';
+        await ctx.editMessageText(msg, {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(lang === 'es' ? '◀️ Volver al Panel' : '◀️ Back to Panel', 'admin_cancel')],
+          ]),
+        });
+        return;
+      }
+
+      // Show creating message
+      await ctx.editMessageText(
+        lang === 'es'
+          ? '📤 *Creando broadcast programado...*'
+          : '📤 *Creating scheduled broadcast...*',
+        { parse_mode: 'Markdown' }
+      );
+
+      try {
+        const scheduledDate = new Date(confirmedSchedule.date);
+        const timezone = confirmedSchedule.timezone || 'UTC';
+
+        // Create the scheduled broadcast
+        const broadcast = await broadcastService.createBroadcast({
+          adminId: String(ctx.from.id),
+          adminUsername: ctx.from.username || 'Admin',
+          title: `Broadcast programado ${scheduledDate.toLocaleDateString()} ${scheduledDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} (${timezone})`,
+          messageEn: broadcastData.textEn || '',
+          messageEs: broadcastData.textEs || '',
+          targetType: broadcastTarget || 'all',
+          mediaType: broadcastData.mediaType || null,
+          mediaUrl: broadcastData.s3Url || broadcastData.mediaFileId || null,
+          mediaFileId: broadcastData.mediaFileId || null,
+          s3Key: broadcastData.s3Key || null,
+          s3Bucket: broadcastData.s3Bucket || null,
+          scheduledAt: scheduledDate,
+          timezone: timezone,
+        });
+
+        // Add buttons to the broadcast if they exist
+        if (broadcastData.buttons && broadcastData.buttons.length > 0) {
+          try {
+            const BroadcastButtonModel = require('../../../models/broadcastButtonModel');
+            await BroadcastButtonModel.addButtonsToBroadcast(broadcast.broadcast_id, broadcastData.buttons);
+            logger.info(`Buttons added to broadcast ${broadcast.broadcast_id}`, {
+              buttonCount: broadcastData.buttons.length
+            });
+          } catch (buttonError) {
+            logger.error(`Error adding buttons to broadcast ${broadcast.broadcast_id}:`, buttonError);
+          }
+        }
+
+        logger.info('Broadcast scheduled via visual picker', {
+          broadcastId: broadcast.broadcast_id,
+          scheduledAt: scheduledDate,
+          timezone: timezone,
+        });
+
+        // Format date for display
+        const dateTimePicker = require('../../utils/dateTimePicker');
+        const formattedDate = dateTimePicker.formatDate(scheduledDate, lang);
+
+        // Clear session data
+        ctx.session.temp.broadcastTarget = null;
+        ctx.session.temp.broadcastStep = null;
+        ctx.session.temp.broadcastData = null;
+        ctx.session.temp.confirmedSchedule = null;
+        ctx.session.temp.scheduledDate = null;
+        ctx.session.temp.timezone = null;
+        ctx.session.temp.schedulingStep = null;
+        await ctx.saveSession();
+
+        // Show success message
+        const successText = lang === 'es'
+          ? `✅ *Broadcast Programado*\n\n` +
+            `📅 ${formattedDate}\n` +
+            `🌍 ${timezone}\n` +
+            `🎯 Audiencia: ${broadcastTarget === 'all' ? 'Todos' : broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Gratis' : broadcastTarget}\n` +
+            `🆔 ID: \`${broadcast.broadcast_id}\`\n` +
+            `${broadcastData.mediaType ? `📎 Con media (${broadcastData.mediaType})` : '📝 Solo texto'}\n` +
+            `${broadcastData.s3Key ? '☁️ Almacenado en S3\n' : ''}` +
+            `\n💡 El broadcast se enviará automáticamente.`
+          : `✅ *Broadcast Scheduled*\n\n` +
+            `📅 ${formattedDate}\n` +
+            `🌍 ${timezone}\n` +
+            `🎯 Audience: ${broadcastTarget === 'all' ? 'All' : broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Free' : broadcastTarget}\n` +
+            `🆔 ID: \`${broadcast.broadcast_id}\`\n` +
+            `${broadcastData.mediaType ? `📎 With media (${broadcastData.mediaType})` : '📝 Text only'}\n` +
+            `${broadcastData.s3Key ? '☁️ Stored in S3\n' : ''}` +
+            `\n💡 The broadcast will be sent automatically.`;
+
+        await ctx.reply(successText, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(lang === 'es' ? '◀️ Volver al Panel Admin' : '◀️ Back to Admin Panel', 'admin_cancel')],
+          ]),
+        });
+      } catch (createError) {
+        logger.error('Error creating scheduled broadcast:', createError);
+        await ctx.reply(
+          lang === 'es'
+            ? `❌ *Error al crear broadcast*\n\nDetalles: ${createError.message}`
+            : `❌ *Error creating broadcast*\n\nDetails: ${createError.message}`,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', 'admin_cancel')],
+            ]),
+          }
+        );
+      }
+    } catch (error) {
+      logger.error('Error in broadcast_create_scheduled:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
 
   // Upload media with S3 support (called when media is uploaded)
   const uploadMediaToS3 = async (ctx, fileId, mediaType) => {

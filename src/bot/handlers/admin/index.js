@@ -2906,6 +2906,92 @@ let registerAdminHandlers = (bot) => {
       return;
     }
 
+    // Visual date/time picker - Custom time input handling
+    if (ctx.session.temp?.schedulingStep === 'custom_time_input') {
+      try {
+        const input = ctx.message.text.trim();
+        const lang = getLanguage(ctx);
+
+        // Parse time - expecting format: HH:MM
+        const timeMatch = input.match(/^(\d{1,2}):(\d{2})$/);
+        if (!timeMatch) {
+          await ctx.reply(
+            lang === 'es'
+              ? '❌ Formato inválido.\n\nUsa el formato: HH:MM (24 horas)\nEjemplo: 14:30'
+              : '❌ Invalid format.\n\nUse format: HH:MM (24-hour)\nExample: 14:30'
+          );
+          return;
+        }
+
+        const hour = parseInt(timeMatch[1]);
+        const minute = parseInt(timeMatch[2]);
+
+        if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+          await ctx.reply(
+            lang === 'es'
+              ? '❌ Hora inválida. La hora debe ser 00-23 y los minutos 00-59.'
+              : '❌ Invalid time. Hour must be 00-23 and minutes 00-59.'
+          );
+          return;
+        }
+
+        // Get selected date from session
+        const { selectedYear, selectedMonth, selectedDay } = ctx.session.temp;
+        if (!selectedYear || selectedMonth === undefined || !selectedDay) {
+          await ctx.reply(
+            lang === 'es' ? '❌ Sesión expirada. Por favor selecciona la fecha de nuevo.' : '❌ Session expired. Please select the date again.'
+          );
+          return;
+        }
+
+        // Create the scheduled date
+        const scheduledDate = new Date(selectedYear, selectedMonth, selectedDay, hour, minute);
+
+        // Validate it's in the future
+        if (scheduledDate <= new Date()) {
+          await ctx.reply(
+            lang === 'es' ? '❌ La fecha/hora debe ser en el futuro.' : '❌ Date/time must be in the future.'
+          );
+          return;
+        }
+
+        // Store in session and move to timezone selection
+        ctx.session.temp.scheduledDate = scheduledDate.toISOString();
+        ctx.session.temp.schedulingStep = 'selecting_timezone';
+        await ctx.saveSession();
+
+        // Show timezone selection
+        const dateTimePicker = require('../../utils/dateTimePicker');
+        const PREFIX = 'bcast_sched';
+
+        const text = lang === 'es'
+          ? `🌍 *Zona Horaria*\n\n` +
+            `Selecciona tu zona horaria:\n\n` +
+            `⏰ La programación será en esta zona`
+          : `🌍 *Timezone*\n\n` +
+            `Select your timezone:\n\n` +
+            `⏰ Scheduling will be in this timezone`;
+
+        await ctx.reply(text, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🌎 New York (EST)', `${PREFIX}_tz_America/New_York`)],
+            [Markup.button.callback('🌎 Los Angeles (PST)', `${PREFIX}_tz_America/Los_Angeles`)],
+            [Markup.button.callback('🌎 Mexico City (CST)', `${PREFIX}_tz_America/Mexico_City`)],
+            [Markup.button.callback('🌎 Bogotá (COT)', `${PREFIX}_tz_America/Bogota`)],
+            [Markup.button.callback('🌍 Madrid (CET)', `${PREFIX}_tz_Europe/Madrid`)],
+            [Markup.button.callback('🌍 London (GMT)', `${PREFIX}_tz_Europe/London`)],
+            [Markup.button.callback('🌏 UTC', `${PREFIX}_tz_UTC`)],
+            [Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', `${PREFIX}_back_to_presets`)],
+          ]),
+        });
+      } catch (error) {
+        logger.error('Error handling custom time input:', error);
+        await ctx.reply('❌ Error processing time. Please try again.');
+      }
+      return;
+    }
+
     // Broadcast schedule datetime handling (collect up to 12 scheduled times)
     if (ctx.session.temp?.broadcastStep === 'schedule_datetime') {
       try {
@@ -4466,6 +4552,7 @@ async function sendBroadcastWithButtons(ctx, bot) {
 
 // Import and register audio management handlers
 const registerAudioManagementHandlers = require('./audioManagement');
+const registerDateTimePickerHandlers = require('./dateTimePickerHandlers');
 const ChatCleanupService = require('../../services/chatCleanupService');
 
 // Group cleanup command for admins
@@ -4835,6 +4922,7 @@ const addBroadcastButtonHandlers = (bot) => {
 const finalRegisterAdminHandlers = (bot) => {
   wrappedRegisterAdminHandlers(bot);
   registerAudioManagementHandlers(bot);
+  registerDateTimePickerHandlers(bot);
   registerGroupCleanupCommand(bot);
   addBroadcastButtonHandlers(bot);
 };
