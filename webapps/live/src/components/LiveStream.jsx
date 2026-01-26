@@ -151,7 +151,7 @@ const LiveStream = ({ stream, token, uid, username, role, appId }) => {
       </div>
 
       <div className="stream-player">
-        <div id="stream-player" style={{ width: '100%', height: '100%' }}></div>
+        <div id="stream-player" style={{ width: '100%', height: '100%', position: 'relative' }}></div>
 
         {!isLive && !isHost && (
           <div className="loading">
