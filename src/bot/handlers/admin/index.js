@@ -4397,10 +4397,15 @@ async function sendBroadcastWithButtons(ctx, bot) {
     const { getLanguage } = require('../../utils/helpers');
     const emailService = require('../../../services/emailService');
 
-    if (!broadcastData || !broadcastData.textEn || !broadcastData.textEs) {
+    if (!broadcastData || (!broadcastData.textEn && !broadcastData.textEs)) {
+      logger.error('Broadcast data missing', { broadcastData: !!broadcastData, textEn: !!broadcastData?.textEn, textEs: !!broadcastData?.textEs });
       await ctx.reply('❌ Error: Faltan datos del broadcast');
       return;
     }
+
+    // Use available text, fallback to the other language if one is missing
+    const textEn = broadcastData.textEn || broadcastData.textEs;
+    const textEs = broadcastData.textEs || broadcastData.textEn;
 
     // Get admin ID to send completion notification
     const adminId = ctx.from.id;
@@ -4483,7 +4488,7 @@ async function sendBroadcastWithButtons(ctx, bot) {
     for (const user of users) {
       try {
         const userLang = user.language || 'en';
-        const textToSend = userLang === 'es' ? broadcastData.textEs : broadcastData.textEn;
+        const textToSend = userLang === 'es' ? textEs : textEn;
         const buttonMarkup = buildButtonMarkup(broadcastData.buttons, userLang);
 
         // Send with media if available
@@ -4545,8 +4550,8 @@ async function sendBroadcastWithButtons(ctx, bot) {
         });
 
         const emailResult = await emailService.sendBroadcastEmails(usersWithEmail, {
-          messageEn: broadcastData.textEn,
-          messageEs: broadcastData.textEs,
+          messageEn: textEn,
+          messageEs: textEs,
           mediaUrl: broadcastData.mediaUrl || null,
           buttons: broadcastData.buttons || []
         });

@@ -208,7 +208,9 @@
       "Bash(node --check:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nFix PaymentService.sendPrimeConfirmation and add how-to-use page\n\n- Move sendPrimeConfirmation from standalone function to static class method\n  to fix \"PaymentService.sendPrimeConfirmation is not a function\" error\n- Remove duplicate orphaned function code outside the class\n- Add public/how-to-use.html page to fix 404 errors on /how-to-use route\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(bash -)",
-      "Bash(ssh-add:*)"
+      "Bash(ssh-add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nOptimize Grok service for broadcasts and posts\n\n- Add retry logic with exponential backoff for transient API errors\n- Implement mode-specific temperature and token configurations\n- Cache system prompts per mode/language combination\n- Add parallel bilingual generation \\(generateSharePost, generateBilingual\\)\n- Condense system prompts by ~60% while maintaining brand voice\n- Add output sanitization to remove LLM artifacts\n- Improve error handling with detailed logging and attempt tracking\n- Update handlers to use optimized hasMedia parameter for automatic token calculation\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)"
     ],
     "deny": [],
     "ask": []
