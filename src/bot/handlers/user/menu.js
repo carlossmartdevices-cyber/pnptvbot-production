@@ -170,7 +170,7 @@ const registerMenuHandlers = (bot) => {
     const lang = ctx.session?.language || 'en';
     if (config.ENABLE_LIVE_STREAMS === false) {
       await ctx.answerCbQuery(
-        lang === 'es' ? '🚧 Próximamente: Transmisiones en Vivo.' : '🚧 Coming Soon: Live Streaming.',
+        lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
         { show_alert: true }
       );
       return;
@@ -178,64 +178,25 @@ const registerMenuHandlers = (bot) => {
     return next();
   });
 
-  bot.action('menu_hangouts', async (ctx) => {
+  bot.action('hangouts_menu', async (ctx) => {
     try {
       const lang = ctx.session?.language || 'en';
-      const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
-      const hangoutsUrl = config.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts';
-      const mainRoomUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
-
-      await ctx.answerCbQuery();
-
-      const message = lang === 'es'
-        ? `🎥 *PNP Hangouts*\n\n` +
-          `Únete a salas de video de la comunidad o abre la app de Hangouts.\n` +
-          `Crea salas privadas, entra al Haus 24/7 y conecta en tiempo real.\n\n` +
-          `Elige una opción:`
-        : `🎥 *PNP Hangouts*\n\n` +
-          `Join community video rooms or open the Hangouts app.\n` +
-          `Create private rooms, hop into the 24/7 Haus, and connect live.\n\n` +
-          `Choose an option:`;
-
-      await safeReplyOrEdit(ctx, message, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.url(lang === 'es' ? '🎥 Abrir Hangouts' : '🎥 Open Hangouts', hangoutsUrl)],
-          [Markup.button.url(lang === 'es' ? '🏠 Entrar al Haus 24/7' : '🏠 Join 24/7 Haus', mainRoomUrl)],
-          [Markup.button.callback(lang === 'es' ? '🧩 Administrar Salas' : '🧩 Manage Rooms', 'show_jitsi')],
-          [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'back_to_main')],
-        ])
-      });
+      await ctx.answerCbQuery(
+        lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
+        { show_alert: true }
+      );
     } catch (error) {
-      logger.error('Error handling menu_hangouts:', error);
+      logger.error('Error handling hangouts_menu:', error);
     }
   });
 
   bot.action('menu_videorama', async (ctx) => {
     try {
       const lang = ctx.session?.language || 'en';
-      const videoramaUrl = process.env.VIDEORAMA_URL || 'https://pnptv.app/videorama-app/';
-
-      await ctx.answerCbQuery();
-
-      const message = lang === 'es'
-        ? `🎶 *PNP Videorama*\n\n` +
-          `Explora playlists curadas de video, música y podcasts.\n` +
-          `También puedes usar el reproductor dentro de Telegram.\n\n` +
-          `Elige una opción:`
-        : `🎶 *PNP Videorama*\n\n` +
-          `Explore curated playlists for video, music, and podcasts.\n` +
-          `You can also use the built-in Telegram player.\n\n` +
-          `Choose an option:`;
-
-      await safeReplyOrEdit(ctx, message, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.url(lang === 'es' ? '🎬 Abrir Videorama' : '🎬 Open Videorama', videoramaUrl)],
-          [Markup.button.callback(lang === 'es' ? '🎧 Reproductor' : '🎧 Player', 'player_menu')],
-          [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'back_to_main')],
-        ])
-      });
+      await ctx.answerCbQuery(
+        lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
+        { show_alert: true }
+      );
     } catch (error) {
       logger.error('Error handling menu_videorama:', error);
     }
@@ -249,6 +210,19 @@ const registerMenuHandlers = (bot) => {
           : '🔒 Feature for premium users only. Subscribe to unlock.',
         { show_alert: true }
       );
+    });
+
+    // Radio button handler - coming soon
+    bot.action('menu_radio', async (ctx) => {
+      try {
+        const lang = ctx.session?.language || 'en';
+        await ctx.answerCbQuery(
+          lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
+          { show_alert: true }
+        );
+      } catch (error) {
+        logger.error('Error handling menu_radio:', error);
+      }
     });
 
     // Already PRIME handler
@@ -411,8 +385,6 @@ const showMainMenu = async (ctx) => {
 
   let menuText;
   let keyboard;
-
-  const creatorBtnText = lang === 'es' ? '🎬 ¡Sé Creador! - Próximamente' : '🎬 Be a Creator! - Coming Soon';
 
   // Add preview mode indicator for admins
   let previewBanner = '';

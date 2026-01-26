@@ -22,66 +22,13 @@ const registerHangoutsHandlers = (bot) => {
    */
   bot.action('hangouts_menu', async (ctx) => {
     try {
-      await ctx.answerCbQuery();
       const lang = ctx.session?.language || 'en';
-      const user = ctx.session?.user || {};
-      const isPremium = isPrimeUser(user);
-
-      // Get room statuses
-      const rooms = await MainRoomModel.getAll();
-      const roomButtons = rooms.map(room => {
-        const participantCount = room.currentParticipants || 0;
-        const emoji = participantCount > 0 ? '🟢' : '⚪';
-        const label = lang === 'es'
-          ? `${emoji} Sala ${room.id} (${participantCount}/50)`
-          : `${emoji} Room ${room.id} (${participantCount}/50)`;
-        return Markup.button.callback(label, `join_main_room_${room.id}`);
-      });
-
-      const message = lang === 'es'
-        ? `📞 *PNPtv Hangouts!*\n\n` +
-          `Videollamadas y salas de la comunidad.\n\n` +
-          `🎥 *Videollamadas:* Hasta 10 personas (PRIME)\n` +
-          `🏠 *Salas 24/7:* Hasta 50 personas cada una\n\n` +
-          `Elige una opción:`
-        : `📞 *PNPtv Hangouts!*\n\n` +
-          `Video calls and community rooms.\n\n` +
-          `🎥 *Video Calls:* Up to 10 people (PRIME)\n` +
-          `🏠 *24/7 Rooms:* Up to 50 people each\n\n` +
-          `Choose an option:`;
-
-      const buttons = [
-        // Video call button - requires PRIME
-        isPremium
-          ? [Markup.button.callback(
-              lang === 'es' ? '🎥 Crear Videollamada' : '🎥 Create Video Call',
-              'create_video_call'
-            )]
-          : [Markup.button.callback(
-              lang === 'es' ? '🔒 Crear Videollamada (PRIME)' : '🔒 Create Video Call (PRIME)',
-              'show_subscription_plans'
-            )],
-        // Main rooms - available to all
-        [roomButtons[0], roomButtons[1]],
-        [roomButtons[2]],
-        // My active calls
-        isPremium
-          ? [Markup.button.callback(
-              lang === 'es' ? '📋 Mis Llamadas Activas' : '📋 My Active Calls',
-              'my_active_calls'
-            )]
-          : [],
-        // Back button
-        [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'back_to_main')],
-      ].filter(row => row.length > 0);
-
-      await safeReplyOrEdit(ctx, message, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(buttons),
-      });
+      await ctx.answerCbQuery(
+        lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
+        { show_alert: true }
+      );
     } catch (error) {
       logger.error('Error in hangouts_menu:', error);
-      await ctx.answerCbQuery(ctx.session?.language === 'es' ? '❌ Error' : '❌ Error');
     }
   });
 

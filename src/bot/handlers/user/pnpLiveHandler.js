@@ -14,11 +14,11 @@ const registerPNPLiveHandlers = (bot) => {
   // Start PNP Live flow
   bot.action('PNP_LIVE_START', async (ctx) => {
     try {
-      await ctx.answerCbQuery();
       const lang = getLanguage(ctx);
-      
-      // Show featured models carousel first
-      await showFeaturedModelsCarousel(ctx, lang);
+      await ctx.answerCbQuery(
+        lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
+        { show_alert: true }
+      );
     } catch (error) {
       logger.error('Error starting PNP Live:', error);
       await ctx.answerCbQuery('❌ Error starting PNP Live');

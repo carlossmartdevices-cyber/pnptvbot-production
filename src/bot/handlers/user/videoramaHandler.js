@@ -22,59 +22,17 @@ const registerVideoramaHandlers = (bot) => {
    */
   bot.action('menu_videorama', async (ctx) => {
     try {
-      await ctx.answerCbQuery();
       const lang = ctx.session?.language || 'en';
-
-      // Get media stats
-      const mediaStats = await getMediaStats();
-      const radioStatus = await getRadioStatus();
-
-      const radioStatusText = radioStatus.isPlaying
-        ? (lang === 'es'
-          ? `🎵 *En Vivo:* ${radioStatus.track?.title || 'PNPtv Radio'}`
-          : `🎵 *Live:* ${radioStatus.track?.title || 'PNPtv Radio'}`)
-        : (lang === 'es' ? '📻 Radio disponible 24/7' : '📻 Radio available 24/7');
-
-      const message = lang === 'es'
-        ? `🎬 *PNPtv Videorama*\n\n` +
-          `Tu centro de entretenimiento.\n\n` +
-          `📹 *${mediaStats.videos}* Videos\n` +
-          `🎵 *${mediaStats.music}* Pistas de Música\n` +
-          `🎙️ *${mediaStats.podcasts}* Podcasts\n\n` +
-          `${radioStatusText}\n\n` +
-          `Elige una opción:`
-        : `🎬 *PNPtv Videorama*\n\n` +
-          `Your entertainment center.\n\n` +
-          `📹 *${mediaStats.videos}* Videos\n` +
-          `🎵 *${mediaStats.music}* Music Tracks\n` +
-          `🎙️ *${mediaStats.podcasts}* Podcasts\n\n` +
-          `${radioStatusText}\n\n` +
-          `Choose an option:`;
-
-      await safeReplyOrEdit(ctx, message, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.webApp(
-            lang === 'es' ? '🎬 Abrir Videorama' : '🎬 Open Videorama',
-            VIDEORAMA_WEB_APP_URL
-          )],
-          [
-            Markup.button.callback(lang === 'es' ? '📹 Videos' : '📹 Videos', 'videorama_videos'),
-            Markup.button.callback(lang === 'es' ? '🎵 Música' : '🎵 Music', 'videorama_music'),
-          ],
-          [
-            Markup.button.callback(lang === 'es' ? '🎙️ Podcasts' : '🎙️ Podcasts', 'videorama_podcasts'),
-            Markup.button.callback(lang === 'es' ? '📻 Radio' : '📻 Radio', 'menu_radio'),
-          ],
-          [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'back_to_main')],
-        ]),
-      });
+      await ctx.answerCbQuery(
+        lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
+        { show_alert: true }
+      );
     } catch (error) {
       logger.error('Error in menu_videorama:', error);
-      const lang = ctx.session?.language || 'en';
-      await ctx.answerCbQuery(lang === 'es' ? '❌ Error' : '❌ Error');
     }
   });
+
+
 
   // ==========================================
   // CATEGORY HANDLERS

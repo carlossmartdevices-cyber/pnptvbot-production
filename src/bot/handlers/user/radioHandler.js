@@ -20,74 +20,20 @@ const registerRadioHandlers = (bot) => {
    */
   bot.action('menu_radio', async (ctx) => {
     try {
-      await ctx.answerCbQuery();
       const lang = ctx.session?.language || 'en';
-
-      // Get now playing info
-      const nowPlaying = await radioStreamManager.getNowPlaying();
-      const isSubscribed = await isUserSubscribed(ctx.from.id);
-      const channelInfo = radioStreamManager.getChannelInfo();
-
-      let nowPlayingText;
-      let remainingText = '';
-
-      if (nowPlaying && nowPlaying.track) {
-        nowPlayingText = `🎵 ${nowPlaying.track.title}\n` +
-          `🎤 ${nowPlaying.track.artist || (lang === 'es' ? 'Artista Desconocido' : 'Unknown Artist')}`;
-
-        if (nowPlaying.remaining > 0) {
-          const minutes = Math.floor(nowPlaying.remaining / 60);
-          const seconds = nowPlaying.remaining % 60;
-          remainingText = lang === 'es'
-            ? `\n⏱ ${minutes}:${seconds.toString().padStart(2, '0')} restantes`
-            : `\n⏱ ${minutes}:${seconds.toString().padStart(2, '0')} remaining`;
-        }
-      } else {
-        nowPlayingText = lang === 'es' ? '🔇 Sin reproducción' : '🔇 Nothing playing';
-      }
-
-      const listenerCount = nowPlaying?.listenerCount || 0;
-
-      const message = lang === 'es'
-        ? `📻 *PNPtv Radio!* - En Vivo 24/7\n\n` +
-          `*Reproduciendo Ahora:*\n${nowPlayingText}${remainingText}\n\n` +
-          `👥 ${listenerCount} oyente(s)\n` +
-          `📡 Estado: ${channelInfo.isPlaying ? '🟢 En Vivo' : '🔴 Fuera de línea'}`
-        : `📻 *PNPtv Radio!* - Live 24/7\n\n` +
-          `*Now Playing:*\n${nowPlayingText}${remainingText}\n\n` +
-          `👥 ${listenerCount} listener(s)\n` +
-          `📡 Status: ${channelInfo.isPlaying ? '🟢 Live' : '🔴 Offline'}`;
-
-      await safeReplyOrEdit(ctx, message, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback(
-            lang === 'es' ? '🎧 Escuchar En Vivo' : '🎧 Listen Live',
-            'radio_listen'
-          )],
+      await ctx.answerCbQuery(
+        lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
+        { show_alert: true }
+      );
+    } catch (error) {
+      logger.error('Error handling menu_radio:', error);
+    }
+  });
           [Markup.button.callback(
             lang === 'es' ? '📋 Ver Playlist' : '📋 View Playlist',
             'radio_playlist'
           )],
-          [Markup.button.callback(
-            lang === 'es' ? '🎵 Solicitar Canción' : '🎵 Request Song',
-            'radio_request'
-          )],
-          [Markup.button.callback(
-            isSubscribed
-              ? (lang === 'es' ? '🔕 Cancelar Suscripción' : '🔕 Unsubscribe')
-              : (lang === 'es' ? '🔔 Suscribirse' : '🔔 Subscribe'),
-            isSubscribed ? 'radio_unsubscribe' : 'radio_subscribe'
-          )],
-          [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'back_to_main')],
-        ]),
-      });
-    } catch (error) {
-      logger.error('Error in radio_menu:', error);
-      const lang = ctx.session?.language || 'en';
-      await ctx.answerCbQuery(lang === 'es' ? '❌ Error' : '❌ Error');
-    }
-  });
+
 
   // ==========================================
   // LISTEN TO RADIO

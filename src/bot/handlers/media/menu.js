@@ -322,20 +322,10 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, Ne
   bot.action('menu_radio', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
-      await ctx.answerCbQuery();
-
-      // Redirect to the existing radio handler
-      const radioText = lang === 'es'
-        ? '📻 *Radio PNPtv* 📻\n\nRedirigiendo a la radio...'
-        : '📻 *PNPtv Radio* 📻\n\nRedirecting to radio...';
-
-      await ctx.editMessageText(radioText, {
-        parse_mode: 'Markdown'
-      });
-
-      // Trigger the show_radio action
-      ctx.callbackQuery.data = 'show_radio';
-      await bot.handleUpdate(ctx.update);
+      await ctx.answerCbQuery(
+        lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
+        { show_alert: true }
+      );
     } catch (error) {
       logger.error('Error handling menu_radio:', error);
     }
