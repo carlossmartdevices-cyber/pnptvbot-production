@@ -111,7 +111,7 @@ Choose your plan and get instant access to all premium features:
     paymentMethod: 'Choose payment method:',
     payWithEpayco: '💳 Pay with Debit/Credit Card',
     payWithDaimo: '🪙 Pay with Crypto and Payment Apps',
-    paymentFooter: '',
+    paymentFooter: '\n\n🔒 *No recurring payments* • 🕶️ *Discreet billing* • ✅ *100% guaranteed membership*',
     paymentInstructions: '💳 *Payment Instructions*\n\n'
       + 'Please tap the button below to go to the checkout page.\n'
       + 'There you\'ll be able to review the price, plan details, and all benefits included before confirming your purchase.\n\n'
@@ -677,7 +677,7 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
     paymentMethod: 'Elige método de pago:',
     payWithEpayco: '💳 Pagar con Tarjeta Débito/Crédito',
     payWithDaimo: '🪙 Pagar con Crypto y Apps de Pago',
-    paymentFooter: '',
+    paymentFooter: '\n\n🔒 *Sin pagos recurrentes* • 🕶️ *Cobro discreto* • ✅ *Membresía 100% garantizada*',
     paymentInstructions: '💳 *Instrucciones de Pago*\n\n'
       + 'Por favor toca el botón de abajo para ir a la página de checkout.\n'
       + 'Ahí podrás revisar el precio, los detalles del plan y todos los beneficios incluidos antes de confirmar tu compra.\n\n'
