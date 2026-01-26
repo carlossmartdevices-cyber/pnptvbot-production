@@ -1796,18 +1796,43 @@ let registerAdminHandlers = (bot) => {
         return;
       }
 
-      // Toggle email sending flag
+      // Ensure session structure exists
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
       if (!ctx.session.temp.broadcastData) {
         ctx.session.temp.broadcastData = {};
       }
+
+      // Toggle email sending flag
       ctx.session.temp.broadcastData.sendEmail = !ctx.session.temp.broadcastData.sendEmail;
       await ctx.saveSession();
 
       const sendEmail = ctx.session.temp.broadcastData.sendEmail;
+      const lang = getLanguage(ctx);
+
+      // Update button text based on new state
+      const emailToggleText = sendEmail
+        ? (lang === 'es' ? '✅ También enviar por Email' : '✅ Also send via Email')
+        : (lang === 'es' ? '📧 También enviar por Email' : '📧 Also send via Email');
+
+      // Edit the keyboard in place
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback(emailToggleText, 'broadcast_toggle_email')],
+        [Markup.button.callback(lang === 'es' ? '📤 Enviar Ahora' : '📤 Send Now', 'broadcast_send_now_with_buttons')],
+        [Markup.button.callback(lang === 'es' ? '📅 Programar Envío' : '📅 Schedule Send', 'broadcast_schedule_with_buttons')],
+        [Markup.button.callback(lang === 'es' ? '◀️ Volver a Botones' : '◀️ Back to Buttons', 'broadcast_resume_buttons')],
+        [Markup.button.callback(lang === 'es' ? '❌ Cancelar Broadcast' : '❌ Cancel Broadcast', 'admin_cancel')],
+      ]);
+
       await ctx.answerCbQuery(sendEmail ? '✅ Email habilitado' : '📧 Email deshabilitado');
 
-      // Refresh preview with updated toggle
-      await showBroadcastPreviewWithButtons(ctx);
+      // Edit message to update the keyboard
+      try {
+        await ctx.editMessageReplyMarkup(keyboard.reply_markup);
+      } catch (editError) {
+        logger.warn('Could not edit message for email toggle:', editError.message);
+      }
     } catch (error) {
       logger.error('Error toggling email in broadcast:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
