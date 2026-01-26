@@ -434,53 +434,49 @@ const registerImprovedSharePostHandlers = (bot) => {
           const maxTokens = hasMedia ? 260 : 380;
           
           // Enhanced prompt to instruct Grok on specific share post structure
-          const enhancedPrompt = `Structure the post with this exact format:
+          const enhancedPrompt = `Generate a complete bilingual post with the following structure:
 
 🇪🇸 ESPAÑOL
 TÍTULO: [Short, sexy title in Spanish]
-DESCRIPCIÓN: [Engaging description - what's happening, who's involved]
-CATEGORÍAS: [List relevant categories like: Smoke, Slam, Party, Latino, Underground]
-ARTISTAS: [Performer names if applicable, or "Various" or "Community"]
+DESCRIPCIÓN: [Engaging description in Spanish]
+CATEGORÍAS: [List of categories in Spanish]
+ARTISTAS: [Performer names in Spanish or "Varios"]
 
-[Main content - short paragraphs, strong hooks, PNPtv! slang]
+[Main content in Spanish - 2-3 short paragraphs with strong hooks, include 1 benefit, use PNPtv! slang naturally]
 
 🇬🇧 ENGLISH
 TITLE: [Short, sexy title in English]
-DESCRIPTION: [Engaging description - what's happening, who's involved]
-CATEGORIES: [List relevant categories like: Smoke, Slam, Party, Latino, Underground]
-PERFORMERS: [Performer names if applicable, or "Various" or "Community"]
+DESCRIPTION: [Engaging description in English]
+CATEGORIES: [List of categories in English]
+PERFORMERS: [Performer names in English or "Various"]
 
-[Main content - short paragraphs, strong hooks, PNPtv! slang]
+[Main content in English - 2-3 short paragraphs with strong hooks, include 1 benefit, use PNPtv! slang naturally]
 
-Make both versions:
-- Short, punchy sentences
-- Strong hooks at the beginning
-- Use PNPtv! slang naturally (papi, chimba, rush, cloud, slam)
-- End with soft CTA
+Rules:
+- Generate BOTH languages in a SINGLE response with the exact structure shown above
+- Include the language labels (🇪🇸/🇬🇧) and section headers
+- NO additional markdown formatting
+- Short, punchy sentences in both languages
+- Strong hooks with 1 benefit in each language section
+- Use PNPtv! slang naturally in both languages
+- End each language section with a soft CTA
 - Keep it underground and chimba
-- Use emojis sparingly: 💨 🔥 😈 💎 🎧
+- Make Spanish and English content distinct but related to the same topic
 
-User's original request: ${prompt}`;
+User's request: ${prompt}`;
           
-          // Generate both Spanish and English text with structure instruction
-          const spanishResult = await GrokService.chat({
-            mode: 'post',
-            language: 'Spanish',
+          // Generate bilingual content in a single call to avoid duplication
+          const bilingualResult = await GrokService.chat({
+            mode: "post",
+            language: "Bilingual",
             prompt: enhancedPrompt,
-            maxTokens,
+            maxTokens: maxTokens * 2,  // Double tokens for bilingual content
           });
           
-          const englishResult = await GrokService.chat({
-            mode: 'post',
-            language: 'English',
-            prompt: enhancedPrompt,
-            maxTokens,
-          });
-          
-          // Combine both languages with clear separation
-          const combinedText = `🇪🇸 ESPAÑOL\n${spanishResult}\n\n🇬🇧 ENGLISH\n${englishResult}`;
-          
+          // Use the result directly as it already includes the complete structure
+          const combinedText = bilingualResult;
           ctx.session.temp.sharePostData.text = combinedText;
+          
           ctx.session.temp.sharePostStep = 'select_buttons';
           await ctx.saveSession();
           await ctx.reply('✅ *AI draft saved (bilingual)*\n\n' + combinedText, { parse_mode: 'Markdown' });
