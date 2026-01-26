@@ -434,24 +434,26 @@ const registerImprovedSharePostHandlers = (bot) => {
           const maxTokens = hasMedia ? 260 : 380;
           
           // Enhanced prompt to instruct Grok on specific share post structure
-          // Generate Spanish content first - New simplified structure
+          // Generate Spanish content first - New simplified structure (Telegram-safe)
           const spanishPrompt = `Generate Spanish content for a PNPtv! share post in this EXACT format:
 
-[Título corto y sexy] [Descripción del video - 1-2 frases con gancho fuerte] #categorías #artistas
+[Título corto y sexy] [Descripción del video - 1-2 frases con gancho fuerte] #categorías#artistas
 
-Ejemplo de estructura:
-"Noche de humo con Lex y Santino 💨 Descubre cómo se forma el círculo en esta sesión exclusiva #Smoke #Slam #Underground #Lex #Santino"
+Ejemplo de estructura SIN emojis (para evitar errores de Telegram):
+"Noche de humo con Lex y Santino Descubre como se forma el circulo en esta sesion exclusiva SmokeSlamUndergroundLexSantino"
 
-Reglas:
-- Sigue el formato EXACTO: Título + Descripción + Hashtags
-- NO uses saltos de línea
+Reglas ESTRICTAS para evitar errores de Telegram:
+- Sigue el formato EXACTO: Titulo + Descripcion + Hashtags (TODO JUNTO SIN ESPACIOS ENTRE HASHTAGS)
+- NO uses saltos de linea
 - NO uses formato markdown
-- Incluye 1 beneficio en la descripción
-- Usa emojis estratégicos (💨 🔥 😈 💎 🎧)
+- NO uses emojis (causan errores de parsing)
+- NO uses caracteres especiales (solo letras, numeros, #)
+- Incluye 1 beneficio en la descripcion
 - Usa slang de PNPtv! naturalmente
 - Mantén el estilo underground y chimba
-- Máximo 2-3 hashtags de categorías
-- Máximo 2-3 hashtags de artistas (o "#Varios")
+- Hashtags SIN espacios: #SmokeSlamLex (no #Smoke #Slam #Lex)
+- Todo en MINUSCULAS
+- Maximo 600 caracteres totales
 
 Solicitud del usuario: ${prompt}`;
           
@@ -462,24 +464,26 @@ Solicitud del usuario: ${prompt}`;
             maxTokens,
           });
           
-          // Generate English content separately with different phrasing to avoid duplication
+          // Generate English content separately with different phrasing to avoid duplication (Telegram-safe)
           const englishPrompt = `Generate English content for a PNPtv! share post in this EXACT format:
 
-[Short sexy title] [Video description - 1-2 sentences with strong hook] #categories #performers
+[Short sexy title] [Video description - 1-2 sentences with strong hook] #categories#performers
 
-Example structure:
-"Smoke night with Lex & Santino 💨 Discover how the circle forms in this exclusive session #Smoke #Slam #Underground #Lex #Santino"
+Example structure SIN emojis (to avoid Telegram parsing errors):
+"Smoke night with Lex and Santino Discover how the circle forms in this exclusive session SmokeSlamUndergroundLexSantino"
 
-Rules:
-- Follow EXACT format: Title + Description + Hashtags
+STRICT Rules to avoid Telegram errors:
+- Follow EXACT format: Title + Description + Hashtags (ALL TOGETHER NO SPACES BETWEEN HASHTAGS)
 - NO line breaks
 - NO markdown formatting
+- NO emojis (cause parsing errors)
+- NO special characters (letters, numbers, # only)
 - Include 1 benefit in description
-- Use strategic emojis (💨 🔥 😈 💎 🎧)
 - Use PNPtv! slang naturally
 - Keep it underground and chimba
-- Max 2-3 category hashtags
-- Max 2-3 performer hashtags (or "#Various")
+- Hashtags NO spaces: #SmokeSlamLex (not #Smoke #Slam #Lex)
+- All lowercase
+- Maximum 600 total characters
 - Make this DIFFERENT from any Spanish version
 
 User's request: ${prompt}`;
