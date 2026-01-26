@@ -434,47 +434,69 @@ const registerImprovedSharePostHandlers = (bot) => {
           const maxTokens = hasMedia ? 260 : 380;
           
           // Enhanced prompt to instruct Grok on specific share post structure
-          const enhancedPrompt = `Generate a complete bilingual post with the following structure:
+          // Generate Spanish content first
+          const spanishPrompt = `Generate Spanish content for a PNPtv! post:
 
-🇪🇸 ESPAÑOL
-TÍTULO: [Short, sexy title in Spanish]
-DESCRIPCIÓN: [Engaging description in Spanish]
-CATEGORÍAS: [List of categories in Spanish]
-ARTISTAS: [Performer names in Spanish or "Varios"]
+TÍTULO: [Short, sexy title]
+DESCRIPCIÓN: [Engaging description]
+CATEGORÍAS: [List of categories]
+ARTISTAS: [Performer names or "Varios"]
 
-[Main content in Spanish - 2-3 short paragraphs with strong hooks, include 1 benefit, use PNPtv! slang naturally]
-
-🇬🇧 ENGLISH
-TITLE: [Short, sexy title in English]
-DESCRIPTION: [Engaging description in English]
-CATEGORIES: [List of categories in English]
-PERFORMERS: [Performer names in English or "Various"]
-
-[Main content in English - 2-3 short paragraphs with strong hooks, include 1 benefit, use PNPtv! slang naturally]
+[Main content - 2-3 short paragraphs with strong hooks, include 1 benefit, use PNPtv! slang naturally]
 
 Rules:
-- Generate BOTH languages in a SINGLE response with the exact structure shown above
-- Include the language labels (🇪🇸/🇬🇧) and section headers
-- NO additional markdown formatting
-- Short, punchy sentences in both languages
-- Strong hooks with 1 benefit in each language section
-- Use PNPtv! slang naturally in both languages
-- End each language section with a soft CTA
+- Generate ONLY the content (no language labels)
+- NO markdown formatting
+- Short, punchy sentences
+- Strong hooks with 1 benefit
+- Use PNPtv! slang naturally
+- End with soft CTA
 - Keep it underground and chimba
-- Make Spanish and English content distinct but related to the same topic
 
 User's request: ${prompt}`;
           
-          // Generate bilingual content in a single call to avoid duplication
-          const bilingualResult = await GrokService.chat({
+          const spanishResult = await GrokService.chat({
             mode: "post",
-            language: "Bilingual",
-            prompt: enhancedPrompt,
-            maxTokens: maxTokens * 2,  // Double tokens for bilingual content
+            language: "Spanish",
+            prompt: spanishPrompt,
+            maxTokens,
           });
           
-          // Use the result directly as it already includes the complete structure
-          const combinedText = bilingualResult;
+          // Generate English content separately with different phrasing to avoid duplication
+          const englishPrompt = `Generate English content for a PNPtv! post (different from Spanish version):
+
+TITLE: [Short, sexy title]
+DESCRIPTION: [Engaging description]
+CATEGORIES: [List of categories]
+PERFORMERS: [Performer names or "Various"]
+
+[Main content - 2-3 short paragraphs with strong hooks, include 1 benefit, use PNPtv! slang naturally]
+
+Rules:
+- Generate ONLY the content (no language labels)
+- NO markdown formatting
+- Short, punchy sentences
+- Strong hooks with 1 benefit
+- Use PNPtv! slang naturally
+- End with soft CTA
+- Keep it underground and chimba
+- Make this DIFFERENT from any Spanish version
+
+User's request: ${prompt}`;
+          
+          const englishResult = await GrokService.chat({
+            mode: "post",
+            language: "English",
+            prompt: englishPrompt,
+            maxTokens,
+          });
+          
+          // Combine both languages with clear separation
+          const combinedText = `🇪🇸 ESPAÑOL
+${spanishResult}
+
+🇬🇧 ENGLISH
+${englishResult}`;
           ctx.session.temp.sharePostData.text = combinedText;
           
           ctx.session.temp.sharePostStep = 'select_buttons';
