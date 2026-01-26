@@ -284,7 +284,7 @@ class BroadcastEnhancements {
   async getBroadcastAnalytics(broadcastId) {
     const query = `
       SELECT
-        b.broadcast_id,
+        b.id as broadcast_id,
         b.total_recipients,
         b.sent_count,
         b.failed_count,
@@ -298,7 +298,7 @@ class BroadcastEnhancements {
         b.completed_at,
         EXTRACT(EPOCH FROM (b.completed_at - b.created_at)) as execution_time_seconds
       FROM broadcasts b
-      WHERE broadcast_id = $1
+      WHERE b.id = $1
     `;
 
     try {
@@ -318,7 +318,7 @@ class BroadcastEnhancements {
   async getTopPerformingBroadcasts(limit = 10) {
     const query = `
       SELECT
-        b.broadcast_id,
+        b.id as broadcast_id,
         b.title,
         b.sent_count,
         ROUND((b.sent_count::float / NULLIF(b.total_recipients, 0) * 100)::numeric, 2) as delivery_rate,
@@ -326,9 +326,9 @@ class BroadcastEnhancements {
         ROUND((COUNT(DISTINCT CASE WHEN be.event_type IN ('opened', 'clicked', 'replied') THEN be.user_id END)::float / NULLIF(b.sent_count, 0) * 100)::numeric, 2) as engagement_rate,
         b.created_at
       FROM broadcasts b
-      LEFT JOIN broadcast_engagement be ON b.broadcast_id = be.broadcast_id
+      LEFT JOIN broadcast_engagement be ON b.id = be.broadcast_id
       WHERE b.status = 'completed'
-      GROUP BY b.broadcast_id, b.title, b.sent_count, b.total_recipients, b.created_at
+      GROUP BY b.id, b.title, b.sent_count, b.total_recipients, b.created_at
       ORDER BY engagement_rate DESC NULLS LAST
       LIMIT $1
     `;

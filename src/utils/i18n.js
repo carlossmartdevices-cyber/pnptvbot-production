@@ -538,6 +538,37 @@ explore Nearby without limits, and join private events.`,
         excessive_punctuation: 'Excessive punctuation',
       },
     },
+
+    // PNP Latino messages (English)
+    pnpLatinoPrimeMenu: `💎 PNP LATINO PRIME
+
+Enjoy the hottest content with Santino, Lex and other Latinos:
+real videos, intense sessions and uncensored PNP vibes, only here on Telegram.
+
+Your PRIME access includes:
+
+📍 Nearby — Community PNP Grindr
+🎥 Hangouts — Private and public video rooms
+🔴 PNP Television Live — Live shows and events
+🎶 Videorama — PNP playlists and podcasts
+
+🤖 Cristina AI — 24/7 Support
+
+💎 Content, connection and PRIME experience.`,
+    pnpLatinoFreeMenu: `🆓 PNP LATINO FREE
+
+Join the largest PNP community with Santino, Lex and other Latinos.
+Access basic content and connect with the community.
+
+Your FREE access includes:
+
+📍 Nearby — Community PNP Grindr (basic)
+🎥 Hangouts — Public video rooms
+🎶 Videorama — PNP playlists and podcasts (limited selection)
+
+🤖 Cristina AI — 24/7 Support
+
+💎 Want more? Upgrade to PRIME for exclusive content.`,
   },
   es: {
         groupRedirect: ({ username, command, botUsername }) =>

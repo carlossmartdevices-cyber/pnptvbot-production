@@ -275,8 +275,13 @@ If you have any questions, use /support to contact us.`;
   bot.action('provide_email', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
+      // Ensure temp object exists
+      if (!ctx.session.temp) {
+        ctx.session.temp = {};
+      }
       ctx.session.temp.waitingForEmail = true;
       await ctx.saveSession();
+      logger.info('Email input mode activated', { userId: ctx.from?.id });
 
       await ctx.editMessageText(
         '📧 Please send your email address:',
@@ -288,7 +293,13 @@ If you have any questions, use /support to contact us.`;
 
   // Listen for email input
   bot.on('text', async (ctx, next) => {
-    if (ctx.session.temp?.waitingForEmail) {
+    logger.info('Onboarding text handler checking for email', {
+      userId: ctx.from?.id,
+      waitingForEmail: ctx.session?.temp?.waitingForEmail,
+      text: ctx.message?.text?.substring(0, 50)
+    });
+
+    if (ctx.session?.temp?.waitingForEmail) {
       const lang = getLanguage(ctx);
 
       // Validate message text exists

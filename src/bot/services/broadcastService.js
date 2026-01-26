@@ -368,7 +368,7 @@ class BroadcastService {
         bs.max_occurrences,
         bs.status as schedule_status
       FROM broadcasts b
-      LEFT JOIN broadcast_schedules bs ON b.broadcast_id = bs.broadcast_id
+      LEFT JOIN broadcast_schedules bs ON b.id = bs.broadcast_id
       WHERE b.status IN ('scheduled', 'pending')
       ORDER BY COALESCE(bs.next_execution_at, b.scheduled_at) ASC
       LIMIT $1 OFFSET $2
@@ -811,8 +811,8 @@ class BroadcastService {
         COUNT(CASE WHEN br.status = 'failed' THEN 1 END) as recipients_failed,
         COUNT(CASE WHEN br.status = 'blocked' THEN 1 END) as recipients_blocked
       FROM broadcasts b
-      LEFT JOIN broadcast_recipients br ON b.broadcast_id = br.broadcast_id
-      WHERE b.broadcast_id = $1
+      LEFT JOIN broadcast_recipients br ON b.id = br.broadcast_id
+      WHERE b.id = $1
       GROUP BY b.id
     `;
 
