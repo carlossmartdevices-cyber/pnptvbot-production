@@ -23,30 +23,30 @@ const { sanitizeInput } = broadcastUtils;
 
 function getBroadcastStepLabel(step, lang) {
   const labels = {
-    // Step 1/5: Audience selection (shown before wizard starts)
-    audience: lang === 'es' ? 'Paso 1/5: Seleccionar Audiencia' : 'Step 1/5: Select Audience',
+    // Paso 1/5: Selección de audiencia
+    audience: 'Paso 1/5: Seleccionar Audiencia',
 
-    // Step 2/5: Media (optional)
-    media: lang === 'es' ? 'Paso 2/5: Media (Opcional)' : 'Step 2/5: Media (Optional)',
+    // Paso 2/5: Media (opcional)
+    media: 'Paso 2/5: Media (Opcional)',
 
-    // Step 3/5: English text (optional)
-    text_en: lang === 'es' ? 'Paso 3/5: Texto en Inglés (Opcional)' : 'Step 3/5: Text in English (Optional)',
-    ai_prompt_en: lang === 'es' ? 'Paso 3/5: AI (Inglés)' : 'Step 3/5: AI (English)',
+    // Paso 3/5: Texto en inglés (opcional)
+    text_en: 'Paso 3/5: Texto en Inglés (Opcional)',
+    ai_prompt_en: 'Paso 3/5: AI (Inglés)',
 
-    // Step 4/5: Spanish text (optional)
-    text_es: lang === 'es' ? 'Paso 4/5: Texto en Español (Opcional)' : 'Step 4/5: Text in Spanish (Optional)',
-    ai_prompt_es: lang === 'es' ? 'Paso 4/5: AI (Español)' : 'Step 4/5: AI (Spanish)',
+    // Paso 4/5: Texto en español (opcional)
+    text_es: 'Paso 4/5: Texto en Español (Opcional)',
+    ai_prompt_es: 'Paso 4/5: AI (Español)',
 
-    // Step 5/5: Buttons and send (unified)
-    buttons: lang === 'es' ? 'Paso 5/5: Botones y Envío' : 'Step 5/5: Buttons & Send',
-    custom_buttons: lang === 'es' ? 'Paso 5/5: Botones Personalizados' : 'Step 5/5: Custom Buttons',
-    preview: lang === 'es' ? 'Paso 5/5: Vista Previa y Envío' : 'Step 5/5: Preview & Send',
-    schedule_options: lang === 'es' ? 'Paso 5/5: Programación' : 'Step 5/5: Scheduling',
-    schedule_datetime: lang === 'es' ? 'Programación (Fecha/Hora)' : 'Scheduling (Date/Time)',
-    schedule_count: lang === 'es' ? 'Programación (Cantidad)' : 'Scheduling (Count)',
-    sending: lang === 'es' ? 'Enviando…' : 'Sending…',
+    // Paso 5/5: Botones y envío (unificado)
+    buttons: 'Paso 5/5: Botones y Envío',
+    custom_buttons: 'Paso 5/5: Botones Personalizados',
+    preview: 'Paso 5/5: Vista Previa y Envío',
+    schedule_options: 'Paso 5/5: Programación',
+    schedule_datetime: 'Programación (Fecha/Hora)',
+    schedule_count: 'Programación (Cantidad)',
+    sending: 'Enviando…',
   };
-  return labels[step] || step || (lang === 'es' ? 'Desconocido' : 'Unknown');
+  return labels[step] || step || 'Desconocido';
 }
 
 // Use shared utilities for button management
@@ -79,7 +79,7 @@ async function sendBroadcastPreview(ctx) {
 
   // Validate session exists
   if (!ctx.session?.temp?.broadcastTarget) {
-    await ctx.reply(lang === 'es' ? '❌ Sesión expirada. Inicia de nuevo.' : '❌ Session expired. Start again.');
+    await ctx.reply('❌ Sesión expirada. Inicia de nuevo.');
     return;
   }
 
@@ -90,9 +90,7 @@ async function sendBroadcastPreview(ctx) {
 
   if (!hasTextEn && !hasTextEs && !hasMedia) {
     await ctx.reply(
-      lang === 'es'
-        ? '❌ Debes proporcionar al menos uno de los siguientes:\n• Texto en inglés\n• Texto en español\n• Media (imagen/video/archivo)'
-        : '❌ You must provide at least one of:\n• English text\n• Spanish text\n• Media (image/video/file)'
+      '❌ Debes proporcionar al menos uno de los siguientes:\n• Texto en inglés\n• Texto en español\n• Media (imagen/video/archivo)'
     );
     return;
   }
@@ -109,36 +107,31 @@ async function sendBroadcastPreview(ctx) {
   }
 
   const buttons = summarizeBroadcastButtons(data.buttons);
-  const buttonsText = buttons.length ? buttons.map((t) => `• ${t}`).join('\n') : (lang === 'es' ? '_Sin botones_' : '_No buttons_');
-  const mediaText = data.mediaType ? `📎 ${data.mediaType}` : (lang === 'es' ? '📝 Solo texto' : '📝 Text only');
+  const buttonsText = buttons.length ? buttons.map((t) => `• ${t}`).join('\n') : '_Sin botones_';
+  const mediaText = data.mediaType ? `📎 ${data.mediaType}` : '📝 Solo texto';
 
   const previewText =
-    (lang === 'es'
-      ? '🎯 *Paso 5/5: Botones y Envío*\n\n'
-        + '📌 *Parte 2: Vista Previa y Envío*\n\n'
-        + '👀 *Vista previa del Broadcast:*'
-      : '🎯 *Step 5/5: Buttons & Send*\n\n'
-        + '📌 *Part 2: Preview & Send*\n\n'
-        + '👀 *Broadcast Preview:*'
-    ) +
+    '🎯 *Paso 5/5: Botones y Envío*\n\n' +
+    '📌 *Parte 2: Vista Previa y Envío*\n\n' +
+    '👀 *Vista previa del Broadcast:*' +
     `\n\n${mediaText}\n\n` +
     (hasTextEn ? `*EN:*\n${data.textEn}\n\n` : '') +
     (hasTextEs ? `*ES:*\n${data.textEs}\n\n` : '') +
-    (lang === 'es' ? '*Botones:*' : '*Buttons:*') + `\n${buttonsText}\n\n` +
-    (lang === 'es' ? '¿Listo para enviar?' : 'Ready to send?');
+    `*Botones:*\n${buttonsText}\n\n` +
+    '¿Listo para enviar?';
 
   // Check if email sending is enabled
   const sendEmail = ctx.session.temp?.broadcastData?.sendEmail || false;
   const emailToggleText = sendEmail
-    ? (lang === 'es' ? '✅ También enviar por Email' : '✅ Also send via Email')
-    : (lang === 'es' ? '📧 También enviar por Email' : '📧 Also send via Email');
+    ? '✅ También enviar por Email'
+    : '📧 También enviar por Email';
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback(emailToggleText, 'broadcast_toggle_email')],
-    [Markup.button.callback(lang === 'es' ? '📤 Enviar Ahora' : '📤 Send Now', 'broadcast_send_now_with_buttons')],
-    [Markup.button.callback(lang === 'es' ? '📅 Programar Envío' : '📅 Schedule Send', 'broadcast_schedule_with_buttons')],
-    [Markup.button.callback(lang === 'es' ? '◀️ Volver a Botones' : '◀️ Back to Buttons', 'broadcast_resume_buttons')],
-    [Markup.button.callback(lang === 'es' ? '❌ Cancelar Broadcast' : '❌ Cancel Broadcast', 'admin_cancel')],
+    [Markup.button.callback('📤 Enviar Ahora', 'broadcast_send_now_with_buttons')],
+    [Markup.button.callback('📅 Programar Envío', 'broadcast_schedule_with_buttons')],
+    [Markup.button.callback('◀️ Volver a Botones', 'broadcast_resume_buttons')],
+    [Markup.button.callback('❌ Cancelar Broadcast', 'admin_cancel')],
   ]);
 
   // Also send a "rendered" preview with buttons for one language (EN) so admin sees layout.
@@ -263,21 +256,16 @@ async function showBroadcastButtonsPicker(ctx) {
     return [Markup.button.callback(label, `broadcast_toggle_${opt.key}`)];
   });
 
-  rows.push([Markup.button.callback('➕ Custom Link', 'broadcast_add_custom_link')]);
-  rows.push([Markup.button.callback(lang === 'es' ? '✅ Continuar a Vista Previa' : '✅ Continue to Preview', 'broadcast_continue_with_buttons')]);
-  rows.push([Markup.button.callback(lang === 'es' ? '⏭️ Sin Botones' : '⏭️ No Buttons', 'broadcast_no_buttons')]);
-  rows.push([Markup.button.callback(lang === 'es' ? '❌ Cancelar' : '❌ Cancel', 'admin_cancel')]);
+  rows.push([Markup.button.callback('➕ Link Personalizado', 'broadcast_add_custom_link')]);
+  rows.push([Markup.button.callback('✅ Continuar a Vista Previa', 'broadcast_continue_with_buttons')]);
+  rows.push([Markup.button.callback('⏭️ Sin Botones', 'broadcast_no_buttons')]);
+  rows.push([Markup.button.callback('❌ Cancelar', 'admin_cancel')]);
 
   await ctx.reply(
-    lang === 'es'
-      ? '🎯 *Paso 5/5: Botones y Envío*\n\n'
-        + '📌 *Parte 1: Seleccionar Botones*\n\n'
-        + 'Selecciona 1 o varios botones para incluir en el broadcast, o elige "Sin Botones" para continuar.\n\n'
-        + 'Cuando estés listo, presiona "✅ Continuar" para ver la vista previa y enviar.'
-      : '🎯 *Step 5/5: Buttons & Send*\n\n'
-        + '📌 *Part 1: Select Buttons*\n\n'
-        + 'Select 1 or more buttons to include in the broadcast, or choose "No Buttons" to continue.\n\n'
-        + 'When ready, press "✅ Continue" to preview and send.',
+    '🎯 *Paso 5/5: Botones y Envío*\n\n' +
+    '📌 *Parte 1: Seleccionar Botones*\n\n' +
+    'Selecciona 1 o varios botones para incluir en el broadcast, o elige "Sin Botones" para continuar.\n\n' +
+    'Cuando estés listo, presiona "✅ Continuar" para ver la vista previa y enviar.',
     { parse_mode: 'Markdown', ...Markup.inlineKeyboard(rows) },
   );
 }
@@ -287,15 +275,13 @@ async function showBroadcastResumePrompt(ctx) {
   const step = ctx.session?.temp?.broadcastStep;
   const label = getBroadcastStepLabel(step, lang);
   await ctx.editMessageText(
-    lang === 'es'
-      ? `⚠️ Tienes un broadcast en progreso.\n\n*Estado:* ${label}\n\n¿Deseas reanudar o reiniciar?`
-      : `⚠️ You have a broadcast in progress.\n\n*Status:* ${label}\n\nDo you want to resume or restart?`,
+    `⚠️ Tienes un broadcast en progreso.\n\n*Estado:* ${label}\n\n¿Deseas reanudar o reiniciar?`,
     {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
-        [Markup.button.callback(lang === 'es' ? '▶️ Reanudar' : '▶️ Resume', 'broadcast_resume')],
-        [Markup.button.callback(lang === 'es' ? '🔁 Reiniciar' : '🔁 Restart', 'broadcast_restart')],
-        [Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', 'admin_cancel')],
+        [Markup.button.callback('▶️ Reanudar', 'broadcast_resume')],
+        [Markup.button.callback('🔁 Reiniciar', 'broadcast_restart')],
+        [Markup.button.callback('◀️ Volver', 'admin_cancel')],
       ]),
     },
   );
@@ -363,8 +349,8 @@ async function renderBroadcastStep(ctx) {
   if (!ctx.session?.temp?.broadcastTarget) {
     logger.warn('No broadcast target found in session', { userId: ctx.from.id });
     await ctx.editMessageText(
-      lang === 'es' ? '❌ Sesión expirada. Inicia de nuevo desde /admin.' : '❌ Session expired. Start again from /admin.',
-      Markup.inlineKeyboard([[Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', 'admin_cancel')]]),
+      '❌ Sesión expirada. Inicia de nuevo desde /admin.',
+      Markup.inlineKeyboard([[Markup.button.callback('◀️ Volver', 'admin_cancel')]]),
     );
     return;
   }
@@ -436,12 +422,10 @@ async function renderBroadcastStep(ctx) {
   }
 
   await ctx.editMessageText(
-    lang === 'es'
-      ? `ℹ️ Broadcast en progreso (${getBroadcastStepLabel(step, lang)}).\n\nUsa Reiniciar si no avanza.`
-      : `ℹ️ Broadcast in progress (${getBroadcastStepLabel(step, lang)}).\n\nUse Restart if it does not advance.`,
+    `ℹ️ Broadcast en progreso (${getBroadcastStepLabel(step, lang)}).\n\nUsa Reiniciar si no avanza.`,
     Markup.inlineKeyboard([
-      [Markup.button.callback(lang === 'es' ? '🔁 Reiniciar' : '🔁 Restart', 'broadcast_restart')],
-      [Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', 'admin_cancel')],
+      [Markup.button.callback('🔁 Reiniciar', 'broadcast_restart')],
+      [Markup.button.callback('◀️ Volver', 'admin_cancel')],
     ]),
   );
 }
@@ -472,51 +456,51 @@ async function showAdminPanel(ctx, edit = false) {
     // Build menu based on role with organized sections
     const buttons = [];
 
-    // ═══ TOP CONTROLS ═══
+    // ═══ CONTROLES PRINCIPALES ═══
     buttons.push([
-      Markup.button.callback(lang === 'es' ? '🔄 Actualizar' : '🔄 Refresh', 'admin_refresh'),
-      Markup.button.callback('🧪 Test', 'test_callback'),
+      Markup.button.callback('🔄 Actualizar', 'admin_refresh'),
+      Markup.button.callback('🧪 Prueba', 'test_callback'),
     ]);
 
-    // ═══ USER MANAGEMENT ═══
+    // ═══ GESTIÓN DE USUARIOS ═══
     buttons.push([
-      Markup.button.callback('👥 ' + (lang === 'es' ? 'Usuarios' : 'Users'), 'admin_users'),
-      Markup.button.callback('🎁 ' + (lang === 'es' ? 'Membresía' : 'Membership'), 'admin_activate_membership'),
+      Markup.button.callback('👥 Usuarios', 'admin_users'),
+      Markup.button.callback('🎁 Membresía', 'admin_activate_membership'),
     ]);
 
-    // Admin and SuperAdmin features
+    // Funciones de Admin y SuperAdmin
     if (userRole === 'superadmin' || userRole === 'admin') {
-      // ═══ CONTENT & COMMUNICATION ═══
+      // ═══ CONTENIDO Y COMUNICACIÓN ═══
       buttons.push([
-        Markup.button.callback('📢 ' + (lang === 'es' ? 'Difusión' : 'Broadcast'), 'admin_broadcast'),
-        Markup.button.callback('📤 ' + (lang === 'es' ? 'Compartir' : 'Share'), 'admin_improved_share_post'),
+        Markup.button.callback('📢 Difusión', 'admin_broadcast'),
+        Markup.button.callback('📤 Compartir', 'admin_improved_share_post'),
       ]);
 
-      // ═══ LIVE & INTERACTIVE ═══
+      // ═══ EN VIVO E INTERACTIVO ═══
       buttons.push([
-        Markup.button.callback('📹 PNP Television Live', 'admin_pnp_live'),
+        Markup.button.callback('📹 PNP Television En Vivo', 'admin_pnp_live'),
       ]);
 
-      // ═══ SYSTEM & TOOLS ═══
+      // ═══ SISTEMA Y HERRAMIENTAS ═══
       buttons.push([
-        Markup.button.callback('📦 ' + (lang === 'es' ? 'Cola' : 'Queue'), 'admin_queue_status'),
-        Markup.button.callback('👁️ ' + (lang === 'es' ? 'Vista Previa' : 'Preview'), 'admin_view_mode'),
+        Markup.button.callback('📦 Cola', 'admin_queue_status'),
+        Markup.button.callback('👁️ Vista Previa', 'admin_view_mode'),
       ]);
     }
 
-    // SuperAdmin only features
+    // Funciones solo para SuperAdmin
     if (userRole === 'superadmin') {
-      // ═══ ADMINISTRATION ═══
+      // ═══ ADMINISTRACIÓN ═══
       buttons.push([
         Markup.button.callback('👑 Roles', 'admin_roles'),
-        Markup.button.callback('📜 Logs', 'admin_logs'),
+        Markup.button.callback('📜 Registros', 'admin_logs'),
       ]);
     }
 
-    // Build styled message
-    const header = lang === 'es' ? '`⚙️ Panel de Administración`' : '`⚙️ Admin Panel`';
+    // Construir mensaje con estilo
+    const header = '`⚙️ Panel de Administración`';
     const divider = '━━━━━━━━━━━━━━━━━━━━';
-    const footer = lang === 'es' ? '`Selecciona una opción 💜`' : '`Choose an option 💜`';
+    const footer = '`Selecciona una opción 💜`';
 
     const message = `${header}\n${divider}\n\n${roleDisplay}\n\n${statsText}${footer}`;
 
@@ -582,39 +566,38 @@ let registerAdminHandlers = (bot) => {
 
       if (status?.error) {
         await ctx.editMessageText(
-          (lang === 'es' ? '❌ Error al cargar el estado de la cola:\n\n' : '❌ Failed to load queue status:\n\n') +
-            sanitizeInput(status.error),
+          '❌ Error al cargar el estado de la cola:\n\n' + sanitizeInput(status.error),
           Markup.inlineKeyboard([
-            [Markup.button.callback(lang === 'es' ? '🔄 Actualizar' : '🔄 Refresh', 'admin_queue_status')],
-            [Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', 'admin_cancel')],
+            [Markup.button.callback('🔄 Actualizar', 'admin_queue_status')],
+            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
           ])
         );
         return;
       }
 
-      const running = status.running ? (lang === 'es' ? '✅ Activa' : '✅ Running') : (lang === 'es' ? '⏸️ Pausada' : '⏸️ Stopped');
+      const running = status.running ? '✅ Activa' : '⏸️ Pausada';
       const activeJobs = status.activeJobs ?? 0;
       const totalFailed = status.statistics?.totalFailed ?? '-';
       const totalCompleted = status.statistics?.totalCompleted ?? '-';
       const totalPending = status.statistics?.totalPending ?? '-';
 
       const msg =
-        (lang === 'es' ? '`📦 Estado de Cola`' : '`📦 Queue Status`') +
+        '`📦 Estado de Cola`' +
         '\n━━━━━━━━━━━━━━━━━━━━\n\n' +
-        `${lang === 'es' ? '• Estado' : '• Status'}: ${running}\n` +
-        `${lang === 'es' ? '• Trabajos activos' : '• Active jobs'}: ${activeJobs}\n` +
-        `${lang === 'es' ? '• Pendientes' : '• Pending'}: ${totalPending}\n` +
-        `${lang === 'es' ? '• Completados' : '• Completed'}: ${totalCompleted}\n` +
-        `${lang === 'es' ? '• Fallidos' : '• Failed'}: ${totalFailed}\n`;
+        `• Estado: ${running}\n` +
+        `• Trabajos activos: ${activeJobs}\n` +
+        `• Pendientes: ${totalPending}\n` +
+        `• Completados: ${totalCompleted}\n` +
+        `• Fallidos: ${totalFailed}\n`;
 
       const controlsRow = [];
       if (isSuperAdmin) {
         if (status.running) {
-          controlsRow.push(Markup.button.callback(lang === 'es' ? '⏸️ Pausar' : '⏸️ Pause', 'admin_queue_pause_confirm'));
+          controlsRow.push(Markup.button.callback('⏸️ Pausar', 'admin_queue_pause_confirm'));
         } else {
           controlsRow.push(
-            Markup.button.callback((lang === 'es' ? '▶️ Reanudar x1' : '▶️ Resume x1'), 'admin_queue_resume_1'),
-            Markup.button.callback((lang === 'es' ? '▶️ Reanudar x2' : '▶️ Resume x2'), 'admin_queue_resume_2'),
+            Markup.button.callback('▶️ Reanudar x1', 'admin_queue_resume_1'),
+            Markup.button.callback('▶️ Reanudar x2', 'admin_queue_resume_2'),
           );
         }
       }
@@ -622,8 +605,8 @@ let registerAdminHandlers = (bot) => {
       const controlsRow2 = [];
       if (isSuperAdmin && !status.running) {
         controlsRow2.push(
-          Markup.button.callback((lang === 'es' ? '▶️ Reanudar x3' : '▶️ Resume x3'), 'admin_queue_resume_3'),
-          Markup.button.callback((lang === 'es' ? '▶️ Reanudar x5' : '▶️ Resume x5'), 'admin_queue_resume_5'),
+          Markup.button.callback('▶️ Reanudar x3', 'admin_queue_resume_3'),
+          Markup.button.callback('▶️ Reanudar x5', 'admin_queue_resume_5'),
         );
       }
 
@@ -633,12 +616,12 @@ let registerAdminHandlers = (bot) => {
           { parse_mode: 'Markdown' },
           Markup.inlineKeyboard([
             [
-              Markup.button.callback(lang === 'es' ? '🧯 Ver fallidos' : '🧯 View failed', 'admin_queue_failed'),
-              Markup.button.callback(lang === 'es' ? '🔄 Actualizar' : '🔄 Refresh', 'admin_queue_status'),
+              Markup.button.callback('🧯 Ver fallidos', 'admin_queue_failed'),
+              Markup.button.callback('🔄 Actualizar', 'admin_queue_status'),
             ],
             ...(controlsRow.length ? [controlsRow] : []),
             ...(controlsRow2.length ? [controlsRow2] : []),
-            [Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', 'admin_cancel')],
+            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
           ])
         )
       );
@@ -653,15 +636,12 @@ let registerAdminHandlers = (bot) => {
       const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
       if (!isSuperAdmin) return;
 
-      const lang = getLanguage(ctx);
       await ctx.editMessageText(
-        lang === 'es'
-          ? '⏸️ ¿Pausar la cola de broadcasts?\n\nEsto detiene el procesador y el scheduler de retries/cleanup.'
-          : '⏸️ Pause the broadcast queue?\n\nThis stops the processor and the retry/cleanup schedulers.',
+        '⏸️ ¿Pausar la cola de broadcasts?\n\nEsto detiene el procesador y el scheduler de retries/cleanup.',
         Markup.inlineKeyboard([
           [
-            Markup.button.callback(lang === 'es' ? '✅ Sí, pausar' : '✅ Yes, pause', 'admin_queue_pause'),
-            Markup.button.callback(lang === 'es' ? '❌ Cancelar' : '❌ Cancel', 'admin_queue_status'),
+            Markup.button.callback('✅ Sí, pausar', 'admin_queue_pause'),
+            Markup.button.callback('❌ Cancelar', 'admin_queue_status'),
           ],
         ])
       );
@@ -712,10 +692,10 @@ let registerAdminHandlers = (bot) => {
 
       if (!failed?.length) {
         await ctx.editMessageText(
-          lang === 'es' ? '✅ No hay broadcasts fallidos.' : '✅ No failed broadcasts.',
+          '✅ No hay broadcasts fallidos.',
           Markup.inlineKeyboard([
-            [Markup.button.callback(lang === 'es' ? '🔄 Actualizar' : '🔄 Refresh', 'admin_queue_failed')],
-            [Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', 'admin_queue_status')],
+            [Markup.button.callback('🔄 Actualizar', 'admin_queue_failed')],
+            [Markup.button.callback('◀️ Volver', 'admin_queue_status')],
           ])
         );
         return;
@@ -732,17 +712,17 @@ let registerAdminHandlers = (bot) => {
         .map((job) => {
           const id = job.job_id || job.id;
           if (!id) return null;
-          return [Markup.button.callback((lang === 'es' ? 'Reintentar ' : 'Retry ') + String(id).slice(0, 8), `admin_queue_retry_${id}`)];
+          return [Markup.button.callback('Reintentar ' + String(id).slice(0, 8), `admin_queue_retry_${id}`)];
         })
         .filter(Boolean);
 
       keyboard.push([
-        Markup.button.callback(lang === 'es' ? '🔄 Actualizar' : '🔄 Refresh', 'admin_queue_failed'),
-        Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', 'admin_queue_status'),
+        Markup.button.callback('🔄 Actualizar', 'admin_queue_failed'),
+        Markup.button.callback('◀️ Volver', 'admin_queue_status'),
       ]);
 
       await ctx.editMessageText(
-        (lang === 'es' ? '`🧯 Broadcasts fallidos`' : '`🧯 Failed broadcasts`') +
+        '`🧯 Broadcasts fallidos`' +
           '\n━━━━━━━━━━━━━━━━━━━━\n\n' +
           lines.join('\n\n'),
         Object.assign({ parse_mode: 'Markdown' }, Markup.inlineKeyboard(keyboard))
@@ -758,12 +738,11 @@ let registerAdminHandlers = (bot) => {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
-      const lang = getLanguage(ctx);
       const jobId = ctx.match[1];
       const queueIntegration = getBroadcastQueueIntegration();
       await queueIntegration.retryFailedBroadcast(jobId);
 
-      await ctx.reply(lang === 'es' ? `✅ Reintento programado: ${jobId}` : `✅ Retry scheduled: ${jobId}`);
+      await ctx.reply(`✅ Reintento programado: ${jobId}`);
     } catch (error) {
       logger.error('Error in admin_queue_retry:', error);
     }
@@ -781,26 +760,17 @@ let registerAdminHandlers = (bot) => {
         return;
       }
 
-      const lang = getLanguage(ctx);
       const args = ctx.message.text.split(' ');
       const mode = args[1]?.toLowerCase();
 
       if (!mode || !['free', 'prime', 'normal'].includes(mode)) {
-        const helpMsg = lang === 'es'
-          ? '👁️ **Comando de Vista Previa**\n\n' +
+        const helpMsg = '👁️ **Comando de Vista Previa**\n\n' +
             'Uso: `/viewas <modo>`\n\n' +
             'Modos disponibles:\n' +
             '• `free` - Ver como usuario FREE\n' +
             '• `prime` - Ver como usuario PRIME\n' +
             '• `normal` - Vista normal (admin)\n\n' +
-            'Ejemplo: `/viewas free`'
-          : '👁️ **Preview Mode Command**\n\n' +
-            'Usage: `/viewas <mode>`\n\n' +
-            'Available modes:\n' +
-            '• `free` - View as FREE user\n' +
-            '• `prime` - View as PRIME user\n' +
-            '• `normal` - Normal view (admin)\n\n' +
-            'Example: `/viewas free`';
+            'Ejemplo: `/viewas free`';
         await ctx.reply(helpMsg, { parse_mode: 'Markdown' });
         return;
       }
@@ -813,15 +783,13 @@ let registerAdminHandlers = (bot) => {
       await ctx.saveSession();
 
       const modeText = mode === 'free'
-        ? (lang === 'es' ? '🆓 FREE' : '🆓 FREE')
+        ? '🆓 FREE'
         : mode === 'prime'
-        ? (lang === 'es' ? '💎 PRIME' : '💎 PRIME')
-        : (lang === 'es' ? '🔙 Normal' : '🔙 Normal');
+        ? '💎 PRIME'
+        : '🔙 Normal';
 
       await ctx.reply(
-        lang === 'es'
-          ? `👁️ Vista activada: ${modeText}\n\nUsa /menu para ver el menú.`
-          : `👁️ View activated: ${modeText}\n\nUse /menu to see the menu.`,
+        `👁️ Vista activada: ${modeText}\n\nUsa /menu para ver el menú.`,
         { parse_mode: 'Markdown' }
       );
 
@@ -858,40 +826,40 @@ let registerAdminHandlers = (bot) => {
       ]);
 
       // Build comprehensive stats message
-      const statsMessage = '📊 *Real-Time Statistics*\n\n'
-        + '*User Metrics:*\n'
-        + `👥 Total Users: ${userStats.total}\n`
-        + `💎 Premium Users: ${userStats.active}\n`
-        + `🆓 Free Users: ${userStats.free}\n`
-        + `📈 Conversion Rate: ${userStats.conversionRate.toFixed(2)}%\n\n`
-        + '*Revenue - Today:*\n'
+      const statsMessage = '📊 *Estadísticas en Tiempo Real*\n\n'
+        + '*Métricas de Usuarios:*\n'
+        + `👥 Total Usuarios: ${userStats.total}\n`
+        + `💎 Usuarios Premium: ${userStats.active}\n`
+        + `🆓 Usuarios Free: ${userStats.free}\n`
+        + `📈 Tasa de Conversión: ${userStats.conversionRate.toFixed(2)}%\n\n`
+        + '*Ingresos - Hoy:*\n'
         + `💰 Total: $${todayRevenue.total.toFixed(2)}\n`
-        + `📦 Payments: ${todayRevenue.count}\n`
-        + `📊 Average: $${todayRevenue.average.toFixed(2)}\n\n`
-        + '*Revenue - This Month:*\n'
+        + `📦 Pagos: ${todayRevenue.count}\n`
+        + `📊 Promedio: $${todayRevenue.average.toFixed(2)}\n\n`
+        + '*Ingresos - Este Mes:*\n'
         + `💰 Total: $${monthRevenue.total.toFixed(2)}\n`
-        + `📦 Payments: ${monthRevenue.count}\n`
-        + `📊 Average: $${monthRevenue.average.toFixed(2)}\n\n`
-        + '*Revenue - Last 30 Days:*\n'
+        + `📦 Pagos: ${monthRevenue.count}\n`
+        + `📊 Promedio: $${monthRevenue.average.toFixed(2)}\n\n`
+        + '*Ingresos - Últimos 30 Días:*\n'
         + `💰 Total: $${last30Revenue.total.toFixed(2)}\n`
-        + `📦 Payments: ${last30Revenue.count}\n`
-        + `📊 Average: $${last30Revenue.average.toFixed(2)}\n\n`
-        + '*Payment Breakdown (Last 30 Days):*\n'
+        + `📦 Pagos: ${last30Revenue.count}\n`
+        + `📊 Promedio: $${last30Revenue.average.toFixed(2)}\n\n`
+        + '*Desglose por Plan (Últimos 30 Días):*\n'
         + `${Object.entries(last30Revenue.byPlan)
           .map(([plan, count]) => `  ${plan}: ${count}`)
-          .join('\n') || '  No data'}\n\n`
-        + '*Provider Breakdown:*\n'
+          .join('\n') || '  Sin datos'}\n\n`
+        + '*Desglose por Proveedor:*\n'
         + `${Object.entries(last30Revenue.byProvider)
           .map(([provider, count]) => `  ${provider}: ${count}`)
-          .join('\n') || '  No data'}\n\n`
-        + `_Updated: ${now.toLocaleString()}_`;
+          .join('\n') || '  Sin datos'}\n\n`
+        + `_Actualizado: ${now.toLocaleString()}_`;
 
       await ctx.reply(statsMessage, { parse_mode: 'Markdown' });
 
       logger.info('Stats command executed', { adminId: ctx.from.id });
     } catch (error) {
       logger.error('Error in /stats command:', error);
-      await ctx.reply('Error fetching statistics. Please try again.');
+      await ctx.reply('Error al obtener estadísticas. Por favor intenta de nuevo.');
     }
   });
 
@@ -930,34 +898,31 @@ let registerAdminHandlers = (bot) => {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
-      const lang = getLanguage(ctx);
       const currentMode = ctx.session?.adminViewMode;
 
       let statusText = '';
       if (currentMode === 'free') {
-        statusText = lang === 'es' ? '\n\n_Actualmente: Vista FREE_' : '\n\n_Currently: FREE View_';
+        statusText = '\n\n_Actualmente: Vista FREE_';
       } else if (currentMode === 'prime') {
-        statusText = lang === 'es' ? '\n\n_Actualmente: Vista PRIME_' : '\n\n_Currently: PRIME View_';
+        statusText = '\n\n_Actualmente: Vista PRIME_';
       } else {
-        statusText = lang === 'es' ? '\n\n_Actualmente: Vista Normal (Admin)_' : '\n\n_Currently: Normal View (Admin)_';
+        statusText = '\n\n_Actualmente: Vista Normal (Admin)_';
       }
 
-      const message = lang === 'es'
-        ? '👁️ **Vista Previa de Menú**\n\nSelecciona cómo quieres ver el menú para probar la experiencia del usuario:' + statusText
-        : '👁️ **Menu Preview Mode**\n\nSelect how you want to view the menu to test the user experience:' + statusText;
+      const message = '👁️ **Vista Previa de Menú**\n\nSelecciona cómo quieres ver el menú para probar la experiencia del usuario:' + statusText;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [
-            Markup.button.callback(lang === 'es' ? '🆓 Ver como FREE' : '🆓 View as FREE', 'admin_view_as_free'),
-            Markup.button.callback(lang === 'es' ? '💎 Ver como PRIME' : '💎 View as PRIME', 'admin_view_as_prime'),
+            Markup.button.callback('🆓 Ver como FREE', 'admin_view_as_free'),
+            Markup.button.callback('💎 Ver como PRIME', 'admin_view_as_prime'),
           ],
           [
-            Markup.button.callback(lang === 'es' ? '🔙 Vista Normal' : '🔙 Normal View', 'admin_view_as_normal'),
+            Markup.button.callback('🔙 Vista Normal', 'admin_view_as_normal'),
           ],
           [
-            Markup.button.callback(lang === 'es' ? '↩️ Volver' : '↩️ Back', 'admin_cancel'),
+            Markup.button.callback('↩️ Volver', 'admin_cancel'),
           ],
         ]),
       });
@@ -978,8 +943,7 @@ let registerAdminHandlers = (bot) => {
       ctx.session.adminViewMode = 'free';
       await ctx.saveSession();
 
-      const lang = getLanguage(ctx);
-      await ctx.answerCbQuery(lang === 'es' ? '👁️ Vista FREE activada' : '👁️ FREE View activated');
+      await ctx.answerCbQuery('👁️ Vista FREE activada');
 
       // Show menu with new view mode
       const { showMainMenu } = require('../user/menu');
@@ -1002,8 +966,7 @@ let registerAdminHandlers = (bot) => {
       ctx.session.adminViewMode = 'prime';
       await ctx.saveSession();
 
-      const lang = getLanguage(ctx);
-      await ctx.answerCbQuery(lang === 'es' ? '👁️ Vista PRIME activada' : '👁️ PRIME View activated');
+      await ctx.answerCbQuery('👁️ Vista PRIME activada');
 
       // Show menu with new view mode
       const { showMainMenu } = require('../user/menu');
@@ -1026,8 +989,7 @@ let registerAdminHandlers = (bot) => {
       delete ctx.session.adminViewMode;
       await ctx.saveSession();
 
-      const lang = getLanguage(ctx);
-      await ctx.answerCbQuery(lang === 'es' ? '🔙 Vista Normal activada' : '🔙 Normal View activated');
+      await ctx.answerCbQuery('🔙 Vista Normal activada');
 
       // Show menu with normal view
       const { showMainMenu } = require('../user/menu');
@@ -1050,8 +1012,7 @@ let registerAdminHandlers = (bot) => {
       delete ctx.session.adminViewMode;
       await ctx.saveSession();
 
-      const lang = getLanguage(ctx);
-      await ctx.answerCbQuery(lang === 'es' ? '🔙 Vista Normal' : '🔙 Normal View');
+      await ctx.answerCbQuery('🔙 Vista Normal');
 
       // Show menu with normal view
       const { showMainMenu } = require('../user/menu');
@@ -1073,18 +1034,14 @@ let registerAdminHandlers = (bot) => {
         return;
       }
 
-      const lang = getLanguage(ctx);
-
       // Broadcast flow must run in private chat, otherwise session state splits across chats/topics
       if (ctx.chat?.type !== 'private') {
         const botUsername = process.env.BOT_USERNAME || 'PNPtv_bot';
         await ctx.editMessageText(
-          lang === 'es'
-            ? '⚠️ Para enviar un broadcast, abre el bot en privado.\n\nEsto evita que el proceso se quede atascado entre topics/chats.'
-            : '⚠️ To send a broadcast, open the bot in a private chat.\n\nThis prevents the flow from getting stuck across topics/chats.',
+          '⚠️ Para enviar un broadcast, abre el bot en privado.\n\nEsto evita que el proceso se quede atascado entre topics/chats.',
           Markup.inlineKeyboard([
-            [Markup.button.url(lang === 'es' ? '🔗 Abrir bot' : '🔗 Open bot', `https://t.me/${botUsername}`)],
-            [Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', 'admin_cancel')],
+            [Markup.button.url('🔗 Abrir bot', `https://t.me/${botUsername}`)],
+            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
           ]),
         );
         return;
@@ -1102,9 +1059,7 @@ let registerAdminHandlers = (bot) => {
       await ctx.saveSession();
 
       await ctx.editMessageText(
-        (lang === 'es'
-          ? '📢 *Broadcast Wizard*\n\n🎯 *Paso 1/5: Seleccionar Audiencia*\n\nElige a quién enviar este broadcast:'
-          : '📢 *Broadcast Wizard*\n\n🎯 *Step 1/5: Select Target Audience*\n\nChoose who will receive this broadcast:'),
+        '📢 *Asistente de Difusión*\n\n🎯 *Paso 1/5: Seleccionar Audiencia*\n\nElige a quién enviar este broadcast:',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -1120,7 +1075,7 @@ let registerAdminHandlers = (bot) => {
       logger.error('Error in admin broadcast:', error);
       try {
         await ctx.answerCbQuery('Error al iniciar broadcast');
-        await ctx.reply('❌ Error loading broadcast menu. Please try again.').catch(() => {});
+        await ctx.reply('❌ Error al cargar el menú de broadcast. Por favor intenta de nuevo.').catch(() => {});
       } catch (e) {
         logger.error('Failed to send error message:', e);
       }
@@ -1809,20 +1764,19 @@ let registerAdminHandlers = (bot) => {
       await ctx.saveSession();
 
       const sendEmail = ctx.session.temp.broadcastData.sendEmail;
-      const lang = getLanguage(ctx);
 
       // Update button text based on new state
       const emailToggleText = sendEmail
-        ? (lang === 'es' ? '✅ También enviar por Email' : '✅ Also send via Email')
-        : (lang === 'es' ? '📧 También enviar por Email' : '📧 Also send via Email');
+        ? '✅ También enviar por Email'
+        : '📧 También enviar por Email';
 
       // Edit the keyboard in place
       const keyboard = Markup.inlineKeyboard([
         [Markup.button.callback(emailToggleText, 'broadcast_toggle_email')],
-        [Markup.button.callback(lang === 'es' ? '📤 Enviar Ahora' : '📤 Send Now', 'broadcast_send_now_with_buttons')],
-        [Markup.button.callback(lang === 'es' ? '📅 Programar Envío' : '📅 Schedule Send', 'broadcast_schedule_with_buttons')],
-        [Markup.button.callback(lang === 'es' ? '◀️ Volver a Botones' : '◀️ Back to Buttons', 'broadcast_resume_buttons')],
-        [Markup.button.callback(lang === 'es' ? '❌ Cancelar Broadcast' : '❌ Cancel Broadcast', 'admin_cancel')],
+        [Markup.button.callback('📤 Enviar Ahora', 'broadcast_send_now_with_buttons')],
+        [Markup.button.callback('📅 Programar Envío', 'broadcast_schedule_with_buttons')],
+        [Markup.button.callback('◀️ Volver a Botones', 'broadcast_resume_buttons')],
+        [Markup.button.callback('❌ Cancelar Broadcast', 'admin_cancel')],
       ]);
 
       await ctx.answerCbQuery(sendEmail ? '✅ Email habilitado' : '📧 Email deshabilitado');
@@ -2985,20 +2939,14 @@ let registerAdminHandlers = (bot) => {
         const minute = parseInt(timeMatch[2]);
 
         if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-          await ctx.reply(
-            lang === 'es'
-              ? '❌ Hora inválida. La hora debe ser 00-23 y los minutos 00-59.'
-              : '❌ Invalid time. Hour must be 00-23 and minutes 00-59.'
-          );
+          await ctx.reply('❌ Hora inválida. La hora debe ser 00-23 y los minutos 00-59.');
           return;
         }
 
         // Get selected date from session
         const { selectedYear, selectedMonth, selectedDay } = ctx.session.temp;
         if (!selectedYear || selectedMonth === undefined || !selectedDay) {
-          await ctx.reply(
-            lang === 'es' ? '❌ Sesión expirada. Por favor selecciona la fecha de nuevo.' : '❌ Session expired. Please select the date again.'
-          );
+          await ctx.reply('❌ Sesión expirada. Por favor selecciona la fecha de nuevo.');
           return;
         }
 
@@ -3007,9 +2955,7 @@ let registerAdminHandlers = (bot) => {
 
         // Validate it's in the future
         if (scheduledDate <= new Date()) {
-          await ctx.reply(
-            lang === 'es' ? '❌ La fecha/hora debe ser en el futuro.' : '❌ Date/time must be in the future.'
-          );
+          await ctx.reply('❌ La fecha/hora debe ser en el futuro.');
           return;
         }
 
@@ -3022,13 +2968,9 @@ let registerAdminHandlers = (bot) => {
         const dateTimePicker = require('../../utils/dateTimePicker');
         const PREFIX = 'bcast_sched';
 
-        const text = lang === 'es'
-          ? `🌍 *Zona Horaria*\n\n` +
-            `Selecciona tu zona horaria:\n\n` +
-            `⏰ La programación será en esta zona`
-          : `🌍 *Timezone*\n\n` +
-            `Select your timezone:\n\n` +
-            `⏰ Scheduling will be in this timezone`;
+        const text = '🌍 *Zona Horaria*\n\n' +
+            'Selecciona tu zona horaria:\n\n' +
+            '⏰ La programación será en esta zona';
 
         await ctx.reply(text, {
           parse_mode: 'Markdown',
@@ -3040,7 +2982,7 @@ let registerAdminHandlers = (bot) => {
             [Markup.button.callback('🌍 Madrid (CET)', `${PREFIX}_tz_Europe/Madrid`)],
             [Markup.button.callback('🌍 London (GMT)', `${PREFIX}_tz_Europe/London`)],
             [Markup.button.callback('🌏 UTC', `${PREFIX}_tz_UTC`)],
-            [Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', `${PREFIX}_back_to_presets`)],
+            [Markup.button.callback('◀️ Volver', `${PREFIX}_back_to_presets`)],
           ]),
         });
       } catch (error) {
@@ -4939,27 +4881,23 @@ const addBroadcastButtonHandlers = (bot) => {
         // For most actions, redirect to main menu where these are available
         // This is the safest approach that won't break existing functionality
         await ctx.answerCbQuery();
-        
+
         // Show a helpful message
         const messages = {
-          'show_subscription_plans': lang === 'es' ? '💎 Abriendo planes de membresía...' : '💎 Opening membership plans...',
-          'menu_nearby': lang === 'es' ? '📍 Mostrando usuarios cercanos...' : '📍 Showing nearby users...',
-          'show_profile': lang === 'es' ? '👤 Abriendo tu perfil...' : '👤 Opening your profile...',
-          'support': lang === 'es' ? '💬 Abriendo soporte...' : '💬 Opening support...',
-          'share': lang === 'es' ? '📢 Abriendo opciones para compartir...' : '📢 Opening share options...',
-          'features': lang === 'es' ? '✨ Mostrando todas las funciones...' : '✨ Showing all features...'
+          'show_subscription_plans': '💎 Abriendo planes de membresía...',
+          'menu_nearby': '📍 Mostrando usuarios cercanos...',
+          'show_profile': '👤 Abriendo tu perfil...',
+          'support': '💬 Abriendo soporte...',
+          'share': '📢 Abriendo opciones para compartir...',
+          'features': '✨ Mostrando todas las funciones...'
         };
-        
-        await ctx.reply(messages[targetAction] || (lang === 'es' ? '💡 Abriendo función solicitada...' : '💡 Opening requested feature...'));
+
+        await ctx.reply(messages[targetAction] || '💡 Abriendo función solicitada...');
         
         // Enter main menu where all these features are accessible
         await ctx.scene.enter('main_menu');
       } else {
-        await ctx.answerCbQuery(
-          lang === 'es' 
-            ? '❌ Acción no soportada'
-            : '❌ Action not supported'
-        );
+        await ctx.answerCbQuery('❌ Acción no soportada');
       }
     } catch (error) {
       logger.error('Error handling broadcast action:', error);
@@ -4970,15 +4908,10 @@ const addBroadcastButtonHandlers = (bot) => {
   // Handle broadcast plan buttons
   bot.action(/^broadcast_plan_(\S+)$/, async (ctx) => {
     try {
-      const planType = ctx.match[1]; // Extract the plan type
-      const lang = ctx.session?.language || 'en';
-      
       await ctx.answerCbQuery();
-      
+
       // Show message and redirect to main menu where plans are accessible
-      await ctx.reply(lang === 'es' 
-        ? '💎 Abriendo planes de membresía...'
-        : '💎 Opening membership plans...');
+      await ctx.reply('💎 Abriendo planes de membresía...');
       await ctx.scene.enter('main_menu');
     } catch (error) {
       logger.error('Error handling broadcast plan:', error);
@@ -4989,15 +4922,10 @@ const addBroadcastButtonHandlers = (bot) => {
   // Handle broadcast feature buttons
   bot.action(/^broadcast_feature_(\S+)$/, async (ctx) => {
     try {
-      const feature = ctx.match[1]; // Extract the feature
-      const lang = ctx.session?.language || 'en';
-      
       await ctx.answerCbQuery();
-      
+
       // Show message and redirect to main menu where features are accessible
-      await ctx.reply(lang === 'es' 
-        ? '✨ Mostrando todas las funciones...'
-        : '✨ Showing all features...');
+      await ctx.reply('✨ Mostrando todas las funciones...');
       await ctx.scene.enter('main_menu');
     } catch (error) {
       logger.error('Error handling broadcast feature:', error);
