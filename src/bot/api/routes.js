@@ -494,12 +494,8 @@ app.post('/api/logout', (req, res) => {
   });
 });
 
-// Legacy webhook redirect - forward old path to new path
-app.post('/webhook/telegram', (req, res, next) => {
-  logger.info('Legacy webhook redirect: /webhook/telegram -> /pnp/webhook/telegram');
-  req.url = '/pnp/webhook/telegram';
-  next('route');
-});
+// Telegram webhook is handled in bot.js, not here
+// The webhook handler is registered via apiApp.post(webhookPath, ...) in bot.js
 
 // Webhook endpoints
 app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
