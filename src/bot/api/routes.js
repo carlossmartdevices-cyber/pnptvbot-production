@@ -751,6 +751,168 @@ app.delete('/api/audio/:filename', asyncHandler(async (req, res) => {
   }
 }));
 
+// ==========================================
+// Media Library API (for Videorama)
+// ==========================================
+const MediaPlayerModel = require('../../models/mediaPlayerModel');
+const radioStreamManager = require('../../services/radio/radioStreamManager');
+
+// Get media library
+app.get('/api/media/library', asyncHandler(async (req, res) => {
+  const { type = 'all', category, limit = 50 } = req.query;
+
+  try {
+    let media;
+    if (category) {
+      media = await MediaPlayerModel.getMediaByCategory(category, parseInt(limit));
+    } else {
+      media = await MediaPlayerModel.getMediaLibrary(type, parseInt(limit));
+    }
+
+    res.json({
+      success: true,
+      data: media,
+      count: media.length
+    });
+  } catch (error) {
+    logger.error('Error fetching media library:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch media library',
+      data: []
+    });
+  }
+}));
+
+// Get media categories
+app.get('/api/media/categories', asyncHandler(async (req, res) => {
+  try {
+    const { getPool } = require('../../config/postgres');
+    const result = await getPool().query(`
+      SELECT DISTINCT category FROM media_library
+      WHERE is_public = true AND category IS NOT NULL
+      ORDER BY category
+    `);
+
+    const categories = result.rows.map(r => r.category);
+    res.json({
+      success: true,
+      data: categories.length > 0 ? categories : ['music', 'videos', 'podcast', 'featured']
+    });
+  } catch (error) {
+    logger.error('Error fetching categories:', error);
+    res.json({
+      success: true,
+      data: ['music', 'videos', 'podcast', 'featured']
+    });
+  }
+}));
+
+// Get single media item
+app.get('/api/media/:mediaId', asyncHandler(async (req, res) => {
+  const { mediaId } = req.params;
+
+  try {
+    const media = await MediaPlayerModel.getMediaById(mediaId);
+
+    if (!media) {
+      return res.status(404).json({
+        success: false,
+        message: 'Media not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: media
+    });
+  } catch (error) {
+    logger.error('Error fetching media:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch media'
+    });
+  }
+}));
+
+// Get playlists
+app.get('/api/media/playlists', asyncHandler(async (req, res) => {
+  try {
+    const { getPool } = require('../../config/postgres');
+    const result = await getPool().query(`
+      SELECT * FROM media_playlists
+      WHERE is_public = true
+      ORDER BY created_at DESC
+      LIMIT 20
+    `);
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    logger.error('Error fetching playlists:', error);
+    res.json({
+      success: true,
+      data: []
+    });
+  }
+}));
+
+// ==========================================
+// Radio API (for Videorama integration)
+// ==========================================
+
+// Get radio now playing
+app.get('/api/radio/now-playing', asyncHandler(async (req, res) => {
+  try {
+    const nowPlaying = await radioStreamManager.getNowPlaying();
+    const channelInfo = radioStreamManager.getChannelInfo();
+
+    res.json({
+      success: true,
+      track: nowPlaying?.track || null,
+      remaining: nowPlaying?.remaining || 0,
+      listenerCount: nowPlaying?.listenerCount || 0,
+      isPlaying: channelInfo?.isPlaying || false
+    });
+  } catch (error) {
+    logger.error('Error fetching radio now playing:', error);
+    res.json({
+      success: true,
+      track: null,
+      remaining: 0,
+      listenerCount: 0,
+      isPlaying: false
+    });
+  }
+}));
+
+// Get radio playlist
+app.get('/api/radio/playlist', asyncHandler(async (req, res) => {
+  try {
+    const { getPool } = require('../../config/postgres');
+    const result = await getPool().query(`
+      SELECT id, title, artist, type, duration_seconds, thumbnail_url
+      FROM radio_tracks
+      WHERE is_active = true
+      ORDER BY play_order ASC NULLS LAST, created_at DESC
+      LIMIT 20
+    `);
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    logger.error('Error fetching radio playlist:', error);
+    res.json({
+      success: true,
+      data: []
+    });
+  }
+}));
+
 // Broadcast Queue API Routes
 const broadcastQueueRoutes = require('./broadcastQueueRoutes');
 app.use('/api/admin/queue', broadcastQueueRoutes);

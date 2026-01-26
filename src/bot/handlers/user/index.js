@@ -11,6 +11,7 @@ const registerPNPLiveHandlers = require('./pnpLiveHandler');
 const PNPLiveNotificationService = require('../../services/pnpLiveNotificationService');
 const registerHangoutsHandlers = require('./hangoutsHandler');
 const registerRadioHandlers = require('./radioHandler');
+const registerVideoramaHandlers = require('./videoramaHandler');
 
 /**
  * Register all user handlers
@@ -29,6 +30,7 @@ const registerUserHandlers = (bot) => {
   registerPNPLiveHandlers(bot);
   registerHangoutsHandlers(bot);
   registerRadioHandlers(bot);
+  registerVideoramaHandlers(bot);
 
   // Initialize PNP Live notification service with bot instance
   PNPLiveNotificationService.init(bot);
