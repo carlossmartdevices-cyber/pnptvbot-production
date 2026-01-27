@@ -181,10 +181,28 @@ const registerMenuHandlers = (bot) => {
   bot.action('hangouts_menu', async (ctx) => {
     try {
       const lang = ctx.session?.language || 'en';
-      await ctx.answerCbQuery(
-        lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
-        { show_alert: true }
-      );
+      const userId = ctx.from?.id;
+      
+      // Check if user is admin for testing access
+      const isAdmin = await PermissionService.isAdmin(userId);
+      
+      if (isAdmin) {
+        // Allow admin to access the feature for testing
+        const HangoutsHandler = require('../hangoutsHandler');
+        if (HangoutsHandler.handleHangoutsMenu) {
+          await HangoutsHandler.handleHangoutsMenu(ctx);
+        } else {
+          await ctx.answerCbQuery(
+            lang === 'es' ? '👷 MODALIDAD DE PRUEBA (ADMIN)' : '👷 TEST MODE (ADMIN)',
+            { show_alert: true }
+          );
+        }
+      } else {
+        await ctx.answerCbQuery(
+          lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
+          { show_alert: true }
+        );
+      }
     } catch (error) {
       logger.error('Error handling hangouts_menu:', error);
     }
@@ -193,10 +211,28 @@ const registerMenuHandlers = (bot) => {
   bot.action('menu_videorama', async (ctx) => {
     try {
       const lang = ctx.session?.language || 'en';
-      await ctx.answerCbQuery(
-        lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
-        { show_alert: true }
-      );
+      const userId = ctx.from?.id;
+      
+      // Check if user is admin for testing access
+      const isAdmin = await PermissionService.isAdmin(userId);
+      
+      if (isAdmin) {
+        // Allow admin to access the feature for testing
+        const VideoramaHandler = require('../videoramaHandler');
+        if (VideoramaHandler.handleVideoramaMenu) {
+          await VideoramaHandler.handleVideoramaMenu(ctx);
+        } else {
+          await ctx.answerCbQuery(
+            lang === 'es' ? '👷 MODALIDAD DE PRUEBA (ADMIN)' : '👷 TEST MODE (ADMIN)',
+            { show_alert: true }
+          );
+        }
+      } else {
+        await ctx.answerCbQuery(
+          lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
+          { show_alert: true }
+        );
+      }
     } catch (error) {
       logger.error('Error handling menu_videorama:', error);
     }
@@ -216,10 +252,28 @@ const registerMenuHandlers = (bot) => {
     bot.action('menu_radio', async (ctx) => {
       try {
         const lang = ctx.session?.language || 'en';
-        await ctx.answerCbQuery(
-          lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
-          { show_alert: true }
-        );
+        const userId = ctx.from?.id;
+        
+        // Check if user is admin for testing access
+        const isAdmin = await PermissionService.isAdmin(userId);
+        
+        if (isAdmin) {
+          // Allow admin to access the feature for testing
+          const RadioHandler = require('../radioHandler');
+          if (RadioHandler.handleRadioMenu) {
+            await RadioHandler.handleRadioMenu(ctx);
+          } else {
+            await ctx.answerCbQuery(
+              lang === 'es' ? '👷 MODALIDAD DE PRUEBA (ADMIN)' : '👷 TEST MODE (ADMIN)',
+              { show_alert: true }
+            );
+          }
+        } else {
+          await ctx.answerCbQuery(
+            lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
+            { show_alert: true }
+          );
+        }
       } catch (error) {
         logger.error('Error handling menu_radio:', error);
       }
