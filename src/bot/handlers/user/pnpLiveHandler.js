@@ -37,36 +37,63 @@ const registerPNPLiveHandlers = (bot) => {
     }
   });
 
-  // Show featured models carousel
+  // Show featured models with enhanced sales display
   async function showFeaturedModelsCarousel(ctx, lang) {
     try {
-      // Get featured models with images
+      // Get featured models with images and pricing
       const featuredModels = await PNPLiveMediaService.getFeaturedModelsWithImages(6);
       
       if (featuredModels.length > 0) {
         const branding = PNPLiveMediaService.getBrandingAssets();
         
         let message = lang === 'es'
-          ? `📹 *${branding.icon} PNP Television Live - Modelos Destacados*\n\n` +
+          ? `📹 *${branding.icon} PNP Television Live - Modelos Disponibles*\n\n` +
             `🟢 *Online Ahora* | ⚪ *Disponibles*\n\n` +
-            `💃 *Selecciona un modelo destacado o explora todos:*`
-          : `📹 *${branding.icon} PNP Television Live - Featured Models*\n\n` +
+            `💃 *Selecciona un modelo para tu Show Privado:*`
+          : `📹 *${branding.icon} PNP Television Live - Available Models*\n\n` +
             `🟢 *Online Now* | ⚪ *Available*\n\n` +
-            `💃 *Select a featured model or browse all:*`;
+            `💃 *Select a model for your Private Show:*`;
         
-        // Create carousel markup
-        const carouselMarkup = PNPLiveMediaService.createMediaCarousel(featuredModels, lang);
+        // Create enhanced sales-oriented buttons with status and ratings
+        const buttons = [];
+        
+        for (const model of featuredModels) {
+          const statusEmoji = model.isOnline ? '🟢' : '⚪';
+          const ratingDisplay = model.avg_rating > 0 ? ` ⭐${parseFloat(model.avg_rating).toFixed(1)}` : '';
+          
+          buttons.push([{
+            text: `${model.name} ${statusEmoji}${ratingDisplay}`,
+            callback_data: `pnp_select_model_${model.modelId}`
+          }]);
+        }
+        
+        // Add pricing info and call-to-action
+        buttons.push([
+          {
+            text: lang === 'es' ? '💰 Desde $60 - 30 min' : '💰 From $60 - 30 min',
+            callback_data: 'pnp_show_pricing'
+          }
+        ]);
+        
+        buttons.push([
+          {
+            text: lang === 'es' ? '🔍 Ver Todos los Modelos' : '🔍 View All Models',
+            callback_data: 'pnp_show_all_models'
+          }
+        ]);
         
         await safeEditMessage(ctx, message, {
           parse_mode: 'Markdown',
-          ...carouselMarkup
+          reply_markup: {
+            inline_keyboard: buttons
+          }
         });
       } else {
         // If no featured models, show regular model selection
         await showModelSelection(ctx, lang);
       }
     } catch (error) {
-      logger.error('Error showing featured models carousel:', error);
+      logger.error('Error showing featured models:', error);
       // Fallback to regular model selection
       await showModelSelection(ctx, lang);
     }
@@ -142,6 +169,64 @@ Choose a model for your Private Show:`;
     }
   }
 
+  // Handle pricing info request
+  bot.action('pnp_show_pricing', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const lang = getLanguage(ctx);
+      
+      const pricingMessage = lang === 'es'
+        ? `💰 *Precios de Shows Privados*
+
+` +
+          `🕒 30 min: $60 USD
+` +
+          `🕒 60 min: $100 USD
+` +
+          `🕒 90 min: $250 USD
+
+` +
+          `💜 *Incluye:* Sala privada, modelo exclusivo, soporte 24/7`
+        : `💰 *Private Show Pricing*
+
+` +
+          `🕒 30 min: $60 USD
+` +
+          `🕒 60 min: $100 USD
+` +
+          `🕒 90 min: $250 USD
+
+` +
+          `💜 *Includes:* Private room, exclusive model, 24/7 support`;
+      
+      await safeEditMessage(ctx, pricingMessage, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [{
+              text: lang === 'es' ? '🔙 Volver a Modelos' : '🔙 Back to Models',
+              callback_data: 'PNP_LIVE_START'
+            }]
+          ]
+        }
+      });
+    } catch (error) {
+      logger.error('Error showing pricing:', error);
+      await ctx.answerCbQuery('❌ Error loading pricing');
+    }
+  });
+  
+  // Handle "show all models" request
+  bot.action('pnp_show_all_models', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      await showModelSelection(ctx, getLanguage(ctx));
+    } catch (error) {
+      logger.error('Error showing all models:', error);
+      await ctx.answerCbQuery('❌ Error loading models');
+    }
+  });
+  
   // Handle model selection
   bot.action(/^pnp_select_model_(\d+)$/, async (ctx) => {
     try {
