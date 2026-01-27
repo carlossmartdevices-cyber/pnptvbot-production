@@ -346,8 +346,51 @@ const registerActivationHandlers = (bot) => {
         // Notify admins about new receipt
         const adminNotification = `📝 *New Lifetime100 Receipt*\n\nUser: ${userId} (${ctx.from.username || 'No username'})\nCode: ${lifetime100Code}\nType: ${receiptInfo.type}\nFile ID: ${receiptInfo.fileId}`;
 
-        // Send to admin chat (you'll need to implement this)
+        // Send to support group and admins
         logger.info('Lifetime100 receipt received:', receiptInfo);
+        
+        // Send to support group if configured
+        const supportGroupId = process.env.SUPPORT_GROUP_ID;
+        if (supportGroupId) {
+          try {
+            await ctx.telegram.sendMessage(supportGroupId, adminNotification, {
+              parse_mode: 'Markdown'
+            });
+            logger.info('Lifetime100 receipt notification sent to support group', {
+              userId,
+              code: lifetime100Code,
+              supportGroupId
+            });
+          } catch (sendError) {
+            logger.error('Failed to send lifetime100 notification to support group:', {
+              error: sendError.message,
+              userId,
+              code: lifetime100Code
+            });
+          }
+        }
+        
+        // Also send to admin users as backup
+        const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
+        for (const adminId of adminIds) {
+          try {
+            await ctx.telegram.sendMessage(adminId.trim(), adminNotification, {
+              parse_mode: 'Markdown'
+            });
+            logger.info('Lifetime100 receipt notification sent to admin', {
+              userId,
+              code: lifetime100Code,
+              adminId
+            });
+          } catch (sendError) {
+            logger.error('Failed to send lifetime100 notification to admin:', {
+              error: sendError.message,
+              userId,
+              code: lifetime100Code,
+              adminId
+            });
+          }
+        }
 
         return; // Don't process further
       }
