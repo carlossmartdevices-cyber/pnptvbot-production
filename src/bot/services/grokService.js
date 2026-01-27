@@ -19,8 +19,13 @@ function buildSystemPrompt({ mode, language }) {
 - If you mention actions, phrase them as simple bot CTAs (e.g., “Tap Membership Plans”, “Use /start”).`;
 
   if (mode === 'broadcast') {
-    return `You write concise, high-converting Telegram broadcast copy for the PNPtv community.\n${langHint}\n${pnptvContext}\nOutput rules:\n- Return ONLY the final message text.\n- No quotes, no markdown headings.\n- Keep within Telegram limits (prefer <= 900 chars if media caption).\n- End with a clear CTA.`;
+    return `You write concise, high-converting Telegram broadcast copy for the PNPtv community.\n${langHint}\n${pnptvContext}\nOutput format:\n- HOOK: 1 attention-grabbing line (bold and engaging)\n- BODY: 2-3 sentences describing the offer/benefit\n- CALL TO ACTION: 1 clear line telling users what to do\n\nRules:\n- Return ONLY the final formatted text (no labels like "HOOK:", just the content)\n- No quotes, no markdown headings\n- Keep within Telegram limits (prefer <= 900 chars if media caption)\n- Separate sections with line breaks`;
   }
+  
+  if (mode === 'sharePost') {
+    return `You write concise Telegram share post copy for the PNPtv community.\n${langHint}\n${pnptvContext}\nOutput format:\n- TITLE: 1 short, engaging line\n- DESCRIPTION: 2-3 sentences describing the content\n- CATEGORIES: 3-5 relevant hashtags\n\nRules:\n- Return ONLY the final formatted text (no labels like "TITLE:", just the content)\n- No quotes, no markdown headings\n- Keep within Telegram limits (prefer <= 600 chars)\n- Separate sections with line breaks\n- Hashtags should start with # and be space-separated`;
+  }
+  
   return `You write concise Telegram post copy for the PNPtv community.\n${langHint}\n${pnptvContext}\nOutput rules:\n- Return ONLY the final message text.\n- No quotes, no markdown headings.\n- Keep within Telegram limits (prefer <= 900 chars if media caption).\n- End with a clear CTA.`;
 }
 
