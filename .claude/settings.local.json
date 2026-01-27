@@ -212,7 +212,14 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nOptimize Grok service for broadcasts and posts\n\n- Add retry logic with exponential backoff for transient API errors\n- Implement mode-specific temperature and token configurations\n- Cache system prompts per mode/language combination\n- Add parallel bilingual generation \\(generateSharePost, generateBilingual\\)\n- Condense system prompts by ~60% while maintaining brand voice\n- Add output sanitization to remove LLM artifacts\n- Improve error handling with detailed logging and attempt tracking\n- Update handlers to use optimized hasMedia parameter for automatic token calculation\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git push)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\n🔧 PRIME Channel & Grok Improvements\n\n- PRIME channel 100% clean: block ALL bot messages, silent redirects\n- Grok output now clean \\(no labels like TITLE:, HOOK:, CTA:\\)\n- Grok instructions always in Spanish, output in requested language\n- Added concrete examples for broadcast and sharePost modes\n- Added hasFullAccess\\(\\) and isAdminUser\\(\\) for admin pre-launch testing\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\n🔄 Session updates: handlers, services, models\n\n- Updated payment handlers and services\n- Updated user handlers \\(menu, onboarding, hangouts, pnpLive\\)\n- Updated admin handlers\n- Updated models \\(user, radio\\)\n- Updated lifetime-pass.html with new Meru links\n- Config updates\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\n🔄 Session updates: handlers, services, models\n\n- Updated payment handlers and services\n- Updated user handlers \\(menu, onboarding, hangouts, pnpLive\\)\n- Updated admin handlers\n- Updated models \\(user, radio\\)\n- Updated lifetime-pass.html with new Meru links\n- Config updates\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(top:*)",
+      "Bash(git -C /root/pnptvbot-production show HEAD -- src/bot/handlers/user/pnpLiveHandler.js)",
+      "Bash(git -C /root/pnptvbot-production diff --stat)",
+      "Bash(git -C /root/pnptvbot-production log --oneline -3)",
+      "Bash(git -C /root/pnptvbot-production diff src/bot/handlers/admin/index.js src/bot/handlers/user/profile.js)",
+      "Bash(PGPASSWORD='Apelo801050#' psql -U pnptvbot -d pnptvbot -h localhost -c \"SELECT COUNT\\(*\\) as total_tickets, COUNT\\(*\\) FILTER \\(WHERE status = ''open''\\) as open_tickets FROM support_topics;\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: Update Claude Code local settings\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ],
     "deny": [],
     "ask": []
