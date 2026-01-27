@@ -37,7 +37,7 @@ const registerPNPLiveHandlers = (bot) => {
     }
   });
 
-  // Show featured models with enhanced sales display
+  // Show featured models with enhanced sales display and profile images
   async function showFeaturedModelsCarousel(ctx, lang) {
     try {
       // Get featured models with images and pricing
@@ -54,13 +54,14 @@ const registerPNPLiveHandlers = (bot) => {
             `🟢 *Online Now* | ⚪ *Available*\n\n` +
             `💃 *Select a model for your Private Show:*`;
         
-        // Create enhanced sales-oriented buttons with status and ratings
+        // Create enhanced sales-oriented buttons with status, ratings, and profile info
         const buttons = [];
         
         for (const model of featuredModels) {
           const statusEmoji = model.isOnline ? '🟢' : '⚪';
           const ratingDisplay = model.avg_rating > 0 ? ` ⭐${parseFloat(model.avg_rating).toFixed(1)}` : '';
           
+          // Enhanced button with model name, status, and rating
           buttons.push([{
             text: `${model.name} ${statusEmoji}${ratingDisplay}`,
             callback_data: `pnp_select_model_${model.modelId}`
@@ -72,6 +73,18 @@ const registerPNPLiveHandlers = (bot) => {
           {
             text: lang === 'es' ? '💰 Desde $60 - 30 min' : '💰 From $60 - 30 min',
             callback_data: 'pnp_show_pricing'
+          }
+        ]);
+        
+        // Add payment options
+        buttons.push([
+          {
+            text: lang === 'es' ? '💳 Pagar con ePayco' : '💳 Pay with ePayco',
+            callback_data: 'pnp_show_payment_options'
+          },
+          {
+            text: lang === 'es' ? '🪙 Pagar con Crypto (Daimo)' : '🪙 Pay with Crypto (Daimo)',
+            callback_data: 'pnp_show_crypto_options'
           }
         ]);
         
@@ -224,6 +237,152 @@ Choose a model for your Private Show:`;
     } catch (error) {
       logger.error('Error showing all models:', error);
       await ctx.answerCbQuery('❌ Error loading models');
+    }
+  });
+  
+  // Handle payment options display
+  bot.action('pnp_show_payment_options', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const lang = getLanguage(ctx);
+      
+      const paymentMessage = lang === 'es'
+        ? `💳 *Opciones de Pago - ePayco*
+\n` +
+          `🏦 *Métodos disponibles:*
+` +
+          `• Tarjetas de crédito/débito
+` +
+          `• PSE (Bancos colombianos)
+` +
+          `• Transferencias bancarias
+` +
+          `• Efecty, Baloto, y más
+\n` +
+          `🔒 *Seguro y discreto*
+` +
+          `• Facturación como: "Servicio de Entretenimiento Digital"
+` +
+          `• Protección de datos garantizada`
+        : `💳 *Payment Options - ePayco*
+\n` +
+          `🏦 *Available methods:*
+` +
+          `• Credit/Debit cards
+` +
+          `• PSE (Colombian banks)
+` +
+          `• Bank transfers
+` +
+          `• Efecty, Baloto, and more
+\n` +
+          `🔒 *Secure and discreet*
+` +
+          `• Billed as: "Digital Entertainment Service"
+` +
+          `• Data protection guaranteed`;
+      
+      await safeEditMessage(ctx, paymentMessage, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [{
+              text: lang === 'es' ? '💰 Ver Precios' : '💰 View Pricing',
+              callback_data: 'pnp_show_pricing'
+            }],
+            [{
+              text: lang === 'es' ? '🔙 Volver a Modelos' : '🔙 Back to Models',
+              callback_data: 'PNP_LIVE_START'
+            }]
+          ]
+        }
+      });
+    } catch (error) {
+      logger.error('Error showing payment options:', error);
+      await ctx.answerCbQuery('❌ Error loading payment options');
+    }
+  });
+  
+  // Handle crypto payment options display
+  bot.action('pnp_show_crypto_options', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const lang = getLanguage(ctx);
+      
+      const cryptoMessage = lang === 'es'
+        ? `🪙 *Opciones de Pago - Daimo (Crypto)*
+\n` +
+          `💱 *Métodos disponibles:*
+` +
+          `• USDC (USD Coin)
+` +
+          `• ETH (Ethereum)
+` +
+          `• DAI (Stablecoin)
+` +
+          `• Otras criptomonedas
+\n` +
+          `⚡ *Ventajas:*
+` +
+          `• Transacciones instantáneas
+` +
+          `• Sin intermediarios bancarios
+` +
+          `• Privacidad mejorada
+` +
+          `• Facturación discreta
+\n` +
+          `🔒 *Seguro y discreto*
+` +
+          `• Facturación como: "Servicio Digital Premium"
+` +
+          `• Sin registros bancarios`
+        : `🪙 *Payment Options - Daimo (Crypto)*
+\n` +
+          `💱 *Available methods:*
+` +
+          `• USDC (USD Coin)
+` +
+          `• ETH (Ethereum)
+` +
+          `• DAI (Stablecoin)
+` +
+          `• Other cryptocurrencies
+\n` +
+          `⚡ *Benefits:*
+` +
+          `• Instant transactions
+` +
+          `• No bank intermediaries
+` +
+          `• Enhanced privacy
+` +
+          `• Discreet billing
+\n` +
+          `🔒 *Secure and discreet*
+` +
+          `• Billed as: "Premium Digital Service"
+` +
+          `• No bank records`;
+      
+      await safeEditMessage(ctx, cryptoMessage, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [{
+              text: lang === 'es' ? '💰 Ver Precios' : '💰 View Pricing',
+              callback_data: 'pnp_show_pricing'
+            }],
+            [{
+              text: lang === 'es' ? '🔙 Volver a Modelos' : '🔙 Back to Models',
+              callback_data: 'PNP_LIVE_START'
+            }]
+          ]
+        }
+      });
+    } catch (error) {
+      logger.error('Error showing crypto options:', error);
+      await ctx.answerCbQuery('❌ Error loading crypto options');
     }
   });
   
