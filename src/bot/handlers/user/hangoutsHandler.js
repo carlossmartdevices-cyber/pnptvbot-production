@@ -2,7 +2,7 @@ const { Markup } = require('telegraf');
 const VideoCallModel = require('../../../models/videoCallModel');
 const MainRoomModel = require('../../../models/mainRoomModel');
 const logger = require('../../../utils/logger');
-const { isPrimeUser, safeReplyOrEdit } = require('../../utils/helpers');
+const { isPrimeUser, hasFullAccess, safeReplyOrEdit } = require('../../utils/helpers');
 const config = require('../../../config/config');
 
 /**
@@ -44,9 +44,10 @@ const registerHangoutsHandlers = (bot) => {
       await ctx.answerCbQuery();
       const lang = ctx.session?.language || 'en';
       const user = ctx.session?.user || {};
+      const userId = ctx.from?.id;
 
-      // Check PRIME status
-      if (!isPrimeUser(user)) {
+      // Check access (PRIME or Admin for pre-launch testing)
+      if (!hasFullAccess(user, userId)) {
         const message = lang === 'es'
           ? '🔒 *Función PRIME*\n\nLas videollamadas requieren membresía PRIME.'
           : '🔒 *PRIME Feature*\n\nVideo calls require PRIME membership.';

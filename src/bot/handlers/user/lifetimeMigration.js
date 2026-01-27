@@ -194,8 +194,11 @@ If you have questions, use /support to contact us.`;
     ctx.session.temp.lifetimeMigration.step = 'proof';
     await ctx.saveSession();
 
+    // Escape underscores in email to prevent Markdown parsing issues
+    const safeEmail = rawEmail.replace(/_/g, '\\_');
+
     const proofMessage = lang === 'es'
-      ? `✅ *Email registrado:* ${rawEmail}
+      ? `✅ *Email registrado:* ${safeEmail}
 
 📸 *Paso 2 de 2:* Ahora envía una captura de pantalla o foto del comprobante de pago.
 
@@ -205,8 +208,8 @@ Puede ser:
 • Email de confirmación de compra
 • Cualquier prueba del pago original
 
-_Envía la imagen ahora:_`
-      : `✅ *Email registered:* ${rawEmail}
+Envía la imagen ahora:`
+      : `✅ *Email registered:* ${safeEmail}
 
 📸 *Step 2 of 2:* Now send a screenshot or photo of your payment proof.
 
@@ -216,7 +219,7 @@ This can be:
 • Purchase confirmation email
 • Any proof of original payment
 
-_Send the image now:_`;
+Send the image now:`;
 
     await ctx.reply(proofMessage, {
       parse_mode: 'Markdown',

@@ -5,6 +5,7 @@
  */
 
 const { getAddress } = require('viem');
+const { fetch } = require('node-fetch');
 const logger = require('../utils/logger');
 
 // Optimism USDC Token Address (official)

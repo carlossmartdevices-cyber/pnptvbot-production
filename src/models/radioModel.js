@@ -2,6 +2,9 @@ const { query, getClient } = require('../config/postgres');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
 
+// Radio now playing ID constant
+const NOW_PLAYING_ID = 1;
+
 /**
  * Radio Model - Handles radio streaming, requests, and scheduling
  * PostgreSQL implementation

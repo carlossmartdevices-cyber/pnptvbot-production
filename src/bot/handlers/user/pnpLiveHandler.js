@@ -2,6 +2,7 @@ const { Markup } = require('telegraf');
 const ModelService = require('../../services/modelService');
 const PNPLiveService = require('../../services/pnpLiveService');
 const PNPLiveMediaService = require('../../services/pnpLiveMediaService');
+const PNPLiveTimeSlotService = require('../../services/pnpLiveTimeSlotService');
 const AvailabilityService = require('../../services/availabilityService');
 const { getLanguage, safeEditMessage } = require('../../utils/helpers');
 const logger = require('../../../utils/logger');

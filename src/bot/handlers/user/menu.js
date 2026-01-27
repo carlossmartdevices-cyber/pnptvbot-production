@@ -3,7 +3,7 @@ const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const ChatCleanupService = require('../../services/chatCleanupService');
 const PermissionService = require('../../services/permissionService');
-const { isPrimeUser, safeReplyOrEdit } = require('../../utils/helpers');
+const { isPrimeUser, hasFullAccess, safeReplyOrEdit } = require('../../utils/helpers');
 const config = require('../../../config/config');
 const UserModel = require('../../../models/userModel');
 
@@ -317,6 +317,7 @@ const registerMenuHandlers = (bot) => {
 
 /**
  * Get the effective view mode for admin preview
+ * Admins get full access to all features (pre-launch testing)
  * @param {Context} ctx - Telegraf context
  * @returns {Object} { isPremium, isAdmin, viewMode }
  */
@@ -338,8 +339,8 @@ const getEffectiveViewMode = async (ctx) => {
                         user?.role === 'admin' ||
                         user?.role === 'superadmin';
 
-  // Check PRIME status from fresh database data
-  const actualIsPremium = isPrimeUser(user);
+  // Check PRIME status - admins get full access (pre-launch testing)
+  const actualIsPremium = hasFullAccess(user, userId);
 
   // Check if admin has set a view mode
   const adminViewMode = ctx.session?.adminViewMode;
@@ -636,16 +637,15 @@ const showMainMenuEdit = async (ctx) => {
  */
 const showLiveRadioTopicMenu = async (ctx) => {
   const user = ctx.session?.user || {};
-  const isPremium = isPrimeUser(user);
   const userId = ctx.from?.id;
-  const isAdmin = user.role === 'admin' || PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId);
+  const hasAccess = hasFullAccess(user, userId);
   const firstName = ctx.from?.first_name || 'friend';
   const botUsername = ctx.botInfo?.username || 'PNPtvbot';
 
   let menuText;
   let keyboard;
 
-  if (isPremium || isAdmin) {
+  if (hasAccess) {
     // PRIME member - show quick links
     menuText = 
       '`📻 LIVE & RADIO HUB 🎙️`\n\n' +

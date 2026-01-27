@@ -8,6 +8,7 @@ const PlanModel = require('../../../models/planModel');
 const PaymentService = require('../../services/paymentService');
 const adminService = require('../../services/adminService');
 const { getBroadcastQueueIntegration } = require('../../services/broadcastQueueIntegration');
+const BroadcastService = require('../../services/broadcastService');
 const GrokService = require('../../services/grokService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
@@ -3064,7 +3065,7 @@ let registerAdminHandlers = (bot) => {
         for (let i = 0; i < ctx.session.temp.scheduledTimes.length; i += 1) {
           try {
             const scheduledTime = ctx.session.temp.scheduledTimes[i];
-            const broadcast = await broadcastService.createBroadcast({
+            const broadcast = await BroadcastService.createBroadcast({
               adminId: String(ctx.from.id),
               adminUsername: ctx.from.username || 'Admin',
               title: `Broadcast programado ${scheduledTime.toLocaleDateString()} ${scheduledTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} (${timezone})`,
@@ -3214,7 +3215,7 @@ let registerAdminHandlers = (bot) => {
         );
 
         // Create the recurring broadcast
-        const broadcast = await broadcastService.createRecurringBroadcast({
+        const broadcast = await BroadcastService.createRecurringBroadcast({
           adminId: String(ctx.from.id),
           adminUsername: ctx.from.username || 'Admin',
           title: `Broadcast recurrente ${patternLabels[recurrencePattern] || recurrencePattern} - ${scheduledDate.toLocaleDateString()}`,

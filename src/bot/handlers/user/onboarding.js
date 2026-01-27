@@ -386,15 +386,18 @@ const showTermsAndPrivacy = async (ctx) => {
  */
 const showEmailPrompt = async (ctx) => {
   const lang = getLanguage(ctx);
+  const isSpanish = lang === 'es';
+
+  // Combine prompt and required note in one message with button
+  const message = `${t('emailPrompt', lang)}\n\n${t('emailRequiredNote', lang)}`;
+  const buttonText = isSpanish ? '📧 Enviar Email' : '📧 Provide Email';
 
   await ctx.reply(
-    t('emailPrompt', lang),
+    message,
     Markup.inlineKeyboard([
-      [Markup.button.callback('📧 Provide Email', 'provide_email')],
+      [Markup.button.callback(buttonText, 'provide_email')],
     ]),
   );
-
-  await ctx.reply(t('emailRequiredNote', lang));
 };
 
 /**

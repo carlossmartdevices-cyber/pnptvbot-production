@@ -11,8 +11,8 @@ const UserService = require('../../services/userService');
 const registerMembersAreaHandlers = (bot) => {
     // Main PRIME Members Area menu
     bot.action('show_members_area', async (ctx) => {
+        const lang = getLanguage(ctx);
         try {
-            const lang = getLanguage(ctx);
             const userId = ctx.from.id.toString();
 
             // Check if user has active subscription

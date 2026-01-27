@@ -11,12 +11,12 @@ module.exports = {
     cwd: '/root/pnptvbot-production',
     env: {
       NODE_ENV: 'production',
-      PORT: '3020',
+      PORT: '3000',
       NODE_OPTIONS: '--dns-result-order=ipv4first',
     },
     env_production: {
       NODE_ENV: 'production',
-      PORT: '3020',
+      PORT: '3000',
       NODE_OPTIONS: '--dns-result-order=ipv4first',
     },
     env_development: {

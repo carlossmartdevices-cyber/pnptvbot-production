@@ -545,7 +545,7 @@ async function handleMenuCallback(ctx) {
         break;
 
       case 'view_plans':
-        await handleViewPlans(ctx, lang);
+        await handleSubscribeMenu(ctx, lang);
         break;
 
       case 'vc_rooms':

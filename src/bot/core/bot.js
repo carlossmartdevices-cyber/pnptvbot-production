@@ -3,7 +3,7 @@
 const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 
-require('dotenv-safe').config({ allowEmptyValues: true });
+require('dotenv').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
 const { initializePostgres, testConnection } = require('../../config/postgres');
 const { initializeRedis } = require('../../config/redis');
@@ -29,7 +29,8 @@ const {
   groupBehaviorMiddleware,
   cristinaGroupFilterMiddleware,
   groupMenuRedirectMiddleware,
-  groupCommandDeleteMiddleware
+  groupCommandDeleteMiddleware,
+  primeChannelSilentRedirectMiddleware
 } = require('./middleware/groupBehavior');
 const groupCommandRestrictionMiddleware = require('./middleware/groupCommandRestriction');
 const wallOfFameGuard = require('./middleware/wallOfFameGuard');
@@ -237,6 +238,7 @@ const startBot = async () => {
     bot.use(activityTrackerMiddleware());
 
     // Group behavior rules (OVERRIDE all previous rules)
+    bot.use(primeChannelSilentRedirectMiddleware()); // PRIME channel: silent redirect to private (no messages in channel)
     bot.use(groupBehaviorMiddleware()); // Route all bot messages to topic 3135, 3-min delete
     bot.use(cristinaGroupFilterMiddleware()); // Filter personal info from Cristina in groups
     bot.use(groupMenuRedirectMiddleware()); // Redirect menu button clicks to private

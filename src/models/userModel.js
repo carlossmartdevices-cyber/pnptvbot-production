@@ -282,19 +282,29 @@ class UserModel {
 
   /**
    * Update user subscription
+   * Unified logic: prime/active = membership active, churned/free = membership not active
    */
   static async updateSubscription(userId, subscription) {
     try {
-      // Determine tier based on status - active status means PRIME tier
-      const tier = (subscription.status === 'active' || subscription.status === 'prime') ? 'Prime' : 'Free';
+      const status = (subscription.status || '').toLowerCase();
+
+      // Determine tier based on status
+      // prime/active = PRIME tier (membership active)
+      // churned/free/empty = Free tier (membership not active)
+      const isActive = status === 'active' || status === 'prime';
+      const tier = isActive ? 'Prime' : 'Free';
+
+      // Normalize status: churned should remain as 'churned' for tracking,
+      // but tier will be 'Free' for access control
+      const normalizedStatus = isActive ? 'active' : (status === 'churned' ? 'churned' : 'free');
 
       await query(
         `UPDATE ${TABLE} SET subscription_status = $2, plan_id = $3, plan_expiry = $4, tier = $5, updated_at = NOW() WHERE id = $1`,
-        [userId.toString(), subscription.status, subscription.planId, subscription.expiry, tier]
+        [userId.toString(), normalizedStatus, subscription.planId, subscription.expiry, tier]
       );
       await cache.del(`user:${userId}`);
       await cache.delPattern('nearby:*');
-      logger.info('User subscription updated', { userId, subscription, tier });
+      logger.info('User subscription updated', { userId, status: normalizedStatus, tier });
       return true;
     } catch (error) {
       logger.error('Error updating subscription:', error);

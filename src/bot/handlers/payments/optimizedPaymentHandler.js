@@ -4,6 +4,7 @@
  */
 
 const { Markup } = require('telegraf');
+const { t } = require('../../../utils/i18n');
 const logger = require('../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const PaymentService = require('../../services/paymentService');
@@ -14,8 +15,8 @@ const UserService = require('../../services/userService');
  * Enhanced Payment Selection Menu
  */
 async function showEnhancedPaymentSelection(ctx, planId) {
+  const lang = getLanguage(ctx);
   try {
-    const lang = getLanguage(ctx);
     const userId = ctx.from?.id;
     const plan = await PlanModel.getById(planId);
     

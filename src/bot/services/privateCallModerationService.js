@@ -676,32 +676,5 @@ class PrivateCallModerationService {
   }
 }
 
-// Create CallModerationLogModel if it doesn't exist
-class CallModerationLogModel {
-  static async create(logData) {
-    // In a real implementation, this would use the actual model
-    // For now, we'll simulate it
-    logger.info('Moderation log created (simulated)', {
-      actionType: logData.actionType,
-      callId: logData.callId,
-    });
-    
-    return {
-      id: 'simulated-id',
-      ...logData,
-      createdAt: new Date(),
-    };
-  }
-  
-  static async getByCallId(callId) {
-    // Simulated implementation
-    return [];
-  }
-  
-  static async getByUserId(userId, filters = {}) {
-    // Simulated implementation
-    return [];
-  }
-}
 
 module.exports = PrivateCallModerationService;

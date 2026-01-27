@@ -1,4 +1,7 @@
 const ModelManagementModel = require('../../models/modelManagementModel');
+const PaymentModel = require('../../models/paymentModel');
+const PaymentSecurityService = require('../../services/paymentSecurityService');
+const UserModel = require('../../models/userModel');
 const logger = require('../../utils/logger');
 
 /**
@@ -371,7 +374,7 @@ class BookingPaymentService {
   /**
    * Record user feedback for the model
    */
-  static async recordFeedback(bookingId, feedbackData) {
+  static async recordFeedback(bookingId, feedbackData, bot) {
     try {
       const { rating, review_text } = feedbackData;
       const booking = await ModelManagementModel.getBookingDetails(bookingId);
