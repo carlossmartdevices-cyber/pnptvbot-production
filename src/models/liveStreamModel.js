@@ -7,6 +7,7 @@ const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
 const { getFirestore } = require('../config/firebase');
 const logger = require('../utils/logger');
 const redisClient = require('../config/redis');
+const AIModerationService = require('../services/aiModerationService');
 
 const COLLECTION = 'live_streams';
 const VIEWERS_COLLECTION = 'stream_viewers';
@@ -557,6 +558,36 @@ class LiveStreamModel {
           if (timeSinceLastComment < stream.chatSettings.slowModeDelay) {
             throw new Error(`Please wait ${Math.ceil(stream.chatSettings.slowModeDelay - timeSinceLastComment)} seconds before commenting again`);
           }
+        }
+      }
+
+      // AI Content Moderation
+      const moderationEnabled = stream.ai_moderation_enabled || false;
+      if (moderationEnabled) {
+        const moderationResult = await AIModerationService.moderateChatMessage(
+          streamId, 
+          userId, 
+          text
+        );
+
+        if (!moderationResult.allowed) {
+          // Record violation
+          await AIModerationService.recordViolation(streamId, userId, {
+            violations: moderationResult.analysis.violations,
+            messageText: text,
+            action: moderationResult.action
+          });
+
+          // Take appropriate action
+          if (moderationResult.action.type === 'BAN') {
+            await this.banUser(streamId, userId, 'system');
+          } else if (moderationResult.action.type === 'MUTE') {
+            // In a real implementation, you would implement mute functionality
+            logger.info('User should be muted', { streamId, userId });
+          }
+
+          // Throw error with user-friendly message
+          throw new Error(moderationResult.message);
         }
       }
 
@@ -1222,6 +1253,49 @@ class LiveStreamModel {
       return stats;
     } catch (error) {
       logger.error('Error getting stream statistics:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get AI moderation settings for a stream
+   * @param {string} streamId - Stream ID
+   * @returns {Promise<Object>} Moderation settings
+   */
+  static async getAIModerationSettings(streamId) {
+    try {
+      return await AIModerationService.getStreamModerationSettings(streamId);
+    } catch (error) {
+      logger.error('Error getting AI moderation settings:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update AI moderation settings for a stream
+   * @param {string} streamId - Stream ID
+   * @param {Object} settings - Moderation settings
+   * @returns {Promise<boolean>} Success
+   */
+  static async updateAIModerationSettings(streamId, settings) {
+    try {
+      return await AIModerationService.updateStreamModerationSettings(streamId, settings);
+    } catch (error) {
+      logger.error('Error updating AI moderation settings:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get moderation statistics for a stream
+   * @param {string} streamId - Stream ID
+   * @returns {Promise<Object>} Moderation statistics
+   */
+  static async getModerationStats(streamId) {
+    try {
+      return await AIModerationService.getModerationStats(streamId);
+    } catch (error) {
+      logger.error('Error getting moderation stats:', error);
       throw error;
     }
   }
