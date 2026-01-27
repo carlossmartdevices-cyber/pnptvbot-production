@@ -1,6 +1,24 @@
 const logger = require('../../utils/logger');
 const { t } = require('../../utils/i18n');
 
+// Admin IDs from environment for pre-launch testing
+const getAdminIds = () => {
+  const superAdmin = process.env.ADMIN_ID?.trim();
+  const adminIds = (process.env.ADMIN_USER_IDS || '').split(',').map(id => id.trim()).filter(id => id);
+  return superAdmin ? [superAdmin, ...adminIds] : adminIds;
+};
+
+/**
+ * Check if user ID is an admin (for pre-launch testing access)
+ * @param {number|string} userId - User ID to check
+ * @returns {boolean} True if user is admin
+ */
+const isAdminUser = (userId) => {
+  if (!userId) return false;
+  const adminIds = getAdminIds();
+  return adminIds.includes(String(userId));
+};
+
 /**
  * Get user language from context safely
  * @param {Context} ctx - Telegraf context
@@ -9,15 +27,54 @@ const { t } = require('../../utils/i18n');
 const getLanguage = (ctx) => ctx.session?.language || 'en';
 
 /**
- * Check if user has PRIME subscription
- * Handles both 'active' and 'prime' status values
- * @param {Object} user - User object with subscriptionStatus
- * @returns {boolean} True if user is PRIME
+ * Check if user has PRIME/active membership
+ * Unified logic: prime = active, churned = free = not active
+ * Checks both tier and subscriptionStatus for consistency
+ * @param {Object} user - User object with subscriptionStatus and/or tier
+ * @returns {boolean} True if user has active PRIME membership
  */
 const isPrimeUser = (user) => {
   if (!user) return false;
-  const status = user.subscriptionStatus || user.subscription_status;
-  return status === 'active' || status === 'prime';
+
+  // Check subscription status (primary indicator)
+  const status = (user.subscriptionStatus || user.subscription_status || '').toLowerCase();
+
+  // Check tier (secondary indicator)
+  const tier = (user.tier || '').toLowerCase();
+
+  // User is PRIME if:
+  // - subscription_status is 'active' or 'prime'
+  // - OR tier is 'prime'
+  // User is NOT PRIME if:
+  // - subscription_status is 'free', 'churned', or empty
+  // - AND tier is 'free' or empty
+
+  const isActiveStatus = status === 'active' || status === 'prime';
+  const isPrimeTier = tier === 'prime';
+
+  return isActiveStatus || isPrimeTier;
+};
+
+/**
+ * Check if user has full feature access (PRIME or Admin)
+ * Admins get full access for pre-launch testing
+ * @param {Object} user - User object
+ * @param {number|string} userId - User ID (optional, for admin check)
+ * @returns {boolean} True if user has full access
+ */
+const hasFullAccess = (user, userId) => {
+  // Admins always have full access (pre-launch testing)
+  if (userId && isAdminUser(userId)) {
+    return true;
+  }
+
+  // Check user object for admin role
+  if (user?.role === 'admin' || user?.role === 'superadmin') {
+    return true;
+  }
+
+  // Otherwise check PRIME status
+  return isPrimeUser(user);
 };
 
 /**
@@ -229,6 +286,8 @@ const safeAnswerCbQuery = async (ctx, text = '', showAlert = false) => {
 module.exports = {
   getLanguage,
   isPrimeUser,
+  isAdminUser,
+  hasFullAccess,
   safeHandler,
   validateUserInput,
   isSessionExpired,

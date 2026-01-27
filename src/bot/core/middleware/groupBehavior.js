@@ -3,11 +3,127 @@ const ChatCleanupService = require('../../services/chatCleanupService');
 const PermissionService = require('../../services/permissionService');
 
 const GROUP_ID = process.env.GROUP_ID;
+const PRIME_CHANNEL_ID = process.env.PRIME_CHANNEL_ID;
 const NOTIFICATIONS_TOPIC_ID = parseInt(process.env.NOTIFICATIONS_TOPIC_ID || '10682', 10);
 const AUTO_DELETE_DELAY = 3 * 60 * 1000; // 3 minutes
 
 // Cache valid topic IDs per chat to avoid repeated failed attempts
 const validTopicsPerChat = {};
+
+/**
+ * PRIME Channel Silent Redirect Middleware
+ * Makes PRIME channel 100% clean - NO bot messages at all
+ * Silently redirects ALL user interactions to private chat
+ */
+function primeChannelSilentRedirectMiddleware() {
+  return async (ctx, next) => {
+    const chatId = ctx.chat?.id?.toString();
+    const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+
+    // Only apply to PRIME channel
+    if (!isGroup || !PRIME_CHANNEL_ID || chatId !== PRIME_CHANNEL_ID) {
+      return next();
+    }
+
+    const userId = ctx.from?.id;
+    const isAdmin = userId && (
+      PermissionService.isEnvSuperAdmin(userId) ||
+      PermissionService.isEnvAdmin(userId)
+    );
+
+    // Admins can use bot normally in PRIME channel
+    if (isAdmin) {
+      return next();
+    }
+
+    // BLOCK ALL BOT RESPONSES IN PRIME CHANNEL
+    // Override ctx.reply to silently block any message
+    const originalReply = ctx.reply?.bind(ctx);
+    ctx.reply = async () => {
+      logger.debug('Blocked bot reply in PRIME channel', { chatId, userId });
+      return null; // Silently block
+    };
+
+    // Override ctx.replyWithMarkdown
+    ctx.replyWithMarkdown = async () => null;
+    ctx.replyWithHTML = async () => null;
+    ctx.replyWithPhoto = async () => null;
+    ctx.replyWithVideo = async () => null;
+    ctx.replyWithDocument = async () => null;
+    ctx.replyWithAudio = async () => null;
+    ctx.replyWithVoice = async () => null;
+    ctx.replyWithSticker = async () => null;
+    ctx.replyWithAnimation = async () => null;
+
+    // Override editMessageText to block edits
+    const originalEditMessageText = ctx.editMessageText?.bind(ctx);
+    ctx.editMessageText = async () => {
+      logger.debug('Blocked bot edit in PRIME channel', { chatId, userId });
+      return null;
+    };
+
+    // Store original sendMessage to use for private messages
+    const originalSendMessage = ctx.telegram.sendMessage.bind(ctx.telegram);
+
+    // Override ctx.telegram.sendMessage to block messages TO the PRIME channel
+    ctx.telegram.sendMessage = async (targetChatId, text, extra = {}) => {
+      const targetChatIdStr = targetChatId?.toString();
+      // Block messages to PRIME channel, allow to other chats
+      if (targetChatIdStr === PRIME_CHANNEL_ID) {
+        logger.debug('Blocked sendMessage to PRIME channel', { targetChatId });
+        return null;
+      }
+      return originalSendMessage(targetChatId, text, extra);
+    };
+
+    // Check if this is any user interaction
+    const messageText = ctx.message?.text || '';
+    const isCommand = messageText.startsWith('/');
+    const isCallback = ctx.callbackQuery;
+    const isAnyMessage = ctx.message;
+
+    // Delete user's message silently if it's a command or bot mention
+    if (ctx.message?.message_id && (isCommand || messageText.includes('@'))) {
+      try {
+        await ctx.deleteMessage();
+      } catch (error) {
+        logger.debug('Could not delete user message in PRIME channel:', error.message);
+      }
+    }
+
+    // Answer callback silently if it's a callback query
+    if (isCallback) {
+      try {
+        await ctx.answerCbQuery();
+      } catch (error) {
+        logger.debug('Could not answer callback in PRIME channel:', error.message);
+      }
+    }
+
+    // Only send private redirect for commands/callbacks (not every message)
+    if (isCommand || isCallback) {
+      const userLang = ctx.session?.language || ctx.from?.language_code || 'en';
+      const isSpanish = userLang.startsWith('es');
+      const botUsername = ctx.botInfo?.username || 'PNPLatinoTV_bot';
+
+      // Send private message to user redirecting them to bot
+      try {
+        const privateMessage = isSpanish
+          ? `👋 ¡Hola! Para usar el menú y todas las funciones del bot, por favor usa nuestro chat privado.\n\n👉 Toca aquí: @${botUsername}`
+          : `👋 Hi! To use the menu and all bot features, please use our private chat.\n\n👉 Tap here: @${botUsername}`;
+
+        await originalSendMessage(userId, privateMessage);
+        logger.info('User silently redirected from PRIME channel to private chat', { userId, chatId });
+      } catch (error) {
+        // User might have blocked the bot or never started it
+        logger.debug('Could not send private redirect message:', error.message);
+      }
+    }
+
+    // Don't proceed with normal handler chain - channel stays 100% clean
+    return;
+  };
+}
 
 /**
  * Group Behavior Middleware
@@ -304,4 +420,5 @@ module.exports = {
   cristinaGroupFilterMiddleware,
   groupMenuRedirectMiddleware,
   groupCommandDeleteMiddleware,
+  primeChannelSilentRedirectMiddleware,
 };
