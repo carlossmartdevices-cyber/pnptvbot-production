@@ -116,6 +116,7 @@ class PNPLivePromoService {
 
   /**
    * Apply a promo code to a booking
+   * Uses atomic transaction to prevent race conditions
    * @param {number} promoId - Promo ID
    * @param {number} bookingId - Booking ID
    * @param {string} userId - User ID
@@ -123,28 +124,59 @@ class PNPLivePromoService {
    * @returns {Promise<Object>} Promo usage record
    */
   static async applyPromoCode(promoId, bookingId, userId, discountAmount) {
+    const client = await require('../../config/postgres').getClient();
+
     try {
-      // Increment promo usage
-      await query(
-        `UPDATE pnp_live_promo_codes 
-         SET current_uses = current_uses + 1 
-         WHERE id = $1`,
+      await client.query('BEGIN');
+
+      // Atomic increment with validation (using FOR UPDATE to lock the row)
+      const updateResult = await client.query(
+        `UPDATE pnp_live_promo_codes
+         SET current_uses = current_uses + 1
+         WHERE id = $1
+           AND active = TRUE
+           AND (max_uses IS NULL OR current_uses < max_uses)
+           AND (valid_until IS NULL OR valid_until > NOW())
+         RETURNING *`,
         [promoId]
       );
-      
+
+      if (updateResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        throw new Error('Promo code no longer valid or has reached maximum uses');
+      }
+
+      // Check if user already used this promo (within transaction)
+      const usageCheck = await client.query(
+        `SELECT 1 FROM pnp_live_promo_usage WHERE promo_id = $1 AND user_id = $2`,
+        [promoId, userId]
+      );
+
+      if (usageCheck.rows.length > 0) {
+        await client.query('ROLLBACK');
+        throw new Error('You have already used this promo code');
+      }
+
       // Record usage
-      const result = await query(
-        `INSERT INTO pnp_live_promo_usage 
+      const result = await client.query(
+        `INSERT INTO pnp_live_promo_usage
          (promo_id, booking_id, user_id, discount_amount, used_at)
          VALUES ($1, $2, $3, $4, NOW())
          RETURNING *`,
         [promoId, bookingId, userId, discountAmount]
       );
-      
+
+      await client.query('COMMIT');
+
       return result.rows && result.rows[0] ? result.rows[0] : null;
     } catch (error) {
+      await client.query('ROLLBACK');
       logger.error('Error applying promo code:', error);
-      throw new Error('Failed to apply promo code');
+      throw error.message.includes('already used') || error.message.includes('no longer valid')
+        ? error
+        : new Error('Failed to apply promo code');
+    } finally {
+      client.release();
     }
   }
 

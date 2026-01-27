@@ -12,6 +12,28 @@ const logger = require('../../../utils/logger');
  * Replaces Meet & Greet with enhanced private shows
  */
 const registerPNPLiveHandlers = (bot) => {
+  /**
+   * Helper function to clean up PNP Live session data
+   * Call this after booking completion, payment success, or errors
+   * @param {Object} ctx - Telegraf context
+   */
+  async function cleanupPNPLiveSession(ctx) {
+    try {
+      if (ctx.session && ctx.session.pnpLive) {
+        // Clear all PNP Live session data
+        ctx.session.pnpLive = null;
+        await ctx.saveSession();
+        logger.debug('PNP Live session cleaned up', { userId: ctx.from?.id });
+      }
+      if (ctx.session && ctx.session.temp && ctx.session.temp.selectedModel) {
+        ctx.session.temp.selectedModel = null;
+        await ctx.saveSession();
+      }
+    } catch (error) {
+      logger.warn('Error cleaning up PNP Live session:', { error: error.message });
+    }
+  }
+
   // Start PNP Live flow
   bot.action('PNP_LIVE_START', async (ctx) => {
     try {
@@ -482,7 +504,7 @@ Choose a model for your Private Show:`;
       
       // Check model availability
       const isAvailableNow = model.is_online;
-      const availability = await AvailabilityService.getModelAvailability(modelId);
+      const availability = await AvailabilityService.getAvailability(modelId);
       
       // Show booking options
       const statusEmoji = isAvailableNow ? '🟢' : '⚪';
@@ -1271,13 +1293,26 @@ You haven't booked any Private Shows yet.`;
   async function showBookingsList(ctx, lang, bookings) {
     try {
       // Sort bookings by date (upcoming first)
-      const upcomingBookings = bookings.filter(b => 
+      const upcomingBookings = bookings.filter(b =>
         new Date(b.booking_time) > new Date() && b.status !== 'cancelled'
       ).sort((a, b) => new Date(a.booking_time) - new Date(b.booking_time));
 
-      const pastBookings = bookings.filter(b => 
+      const pastBookings = bookings.filter(b =>
         new Date(b.booking_time) <= new Date() || b.status === 'cancelled'
       ).sort((a, b) => new Date(b.booking_time) - new Date(a.booking_time));
+
+      // OPTIMIZATION: Batch fetch all model IDs at once instead of N+1 queries
+      const allBookings = [...upcomingBookings, ...pastBookings];
+      const uniqueModelIds = [...new Set(allBookings.map(b => b.model_id))];
+      const modelsMap = new Map();
+
+      // Fetch all models in parallel
+      const models = await Promise.all(
+        uniqueModelIds.map(id => ModelService.getModelById(id))
+      );
+      uniqueModelIds.forEach((id, index) => {
+        modelsMap.set(id, models[index]);
+      });
 
       // Create message
       let message = lang === 'es'
@@ -1291,9 +1326,9 @@ You haven't booked any Private Shows yet.`;
       // Upcoming bookings
       if (upcomingBookings.length > 0) {
         message += lang === 'es' ? `💬 *Próximos Shows:*\n\n` : `💬 *Upcoming Shows:*\n\n`;
-        
+
         for (const booking of upcomingBookings) {
-          const model = await ModelService.getModelById(booking.model_id);
+          const model = modelsMap.get(booking.model_id);
           const startTime = new Date(booking.booking_time).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
             weekday: 'short',
             month: 'short',
@@ -1301,7 +1336,7 @@ You haven't booked any Private Shows yet.`;
             hour: '2-digit',
             minute: '2-digit'
           });
-          
+
           const statusEmoji = booking.payment_status === 'paid' ? '✅' : '⏳';
           message += `${statusEmoji} ${startTime} - ${model?.name || 'Modelo'} (${booking.duration_minutes} min)\n`;
         }
@@ -1311,9 +1346,9 @@ You haven't booked any Private Shows yet.`;
       // Past bookings
       if (pastBookings.length > 0) {
         message += lang === 'es' ? `📅 *Shows Pasados:*\n\n` : `📅 *Past Shows:*\n\n`;
-        
+
         for (const booking of pastBookings) {
-          const model = await ModelService.getModelById(booking.model_id);
+          const model = modelsMap.get(booking.model_id);
           const startTime = new Date(booking.booking_time).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
             weekday: 'short',
             month: 'short',
@@ -1321,8 +1356,8 @@ You haven't booked any Private Shows yet.`;
             hour: '2-digit',
             minute: '2-digit'
           });
-          
-          const statusText = booking.status === 'completed' ? '✅' : 
+
+          const statusText = booking.status === 'completed' ? '✅' :
                            booking.status === 'cancelled' ? '❌' : '⏳';
           message += `${statusText} ${startTime} - ${model?.name || 'Modelo'} (${booking.duration_minutes} min)\n`;
         }
@@ -1492,14 +1527,11 @@ Send a message with your comments or type "/skip" to skip.`;
         // Submit feedback
         const comments = text === '/skip' ? '' : text;
         const userId = ctx.from.id.toString();
-        
+
         await PNPLiveService.submitFeedback(feedbackBookingId, userId, rating, comments);
-        
-        // Clean up session
-        ctx.session.pnpLive.feedbackStep = null;
-        ctx.session.pnpLive.feedbackBookingId = null;
-        ctx.session.pnpLive.rating = null;
-        await ctx.saveSession();
+
+        // Clean up entire PNP Live session after feedback submission
+        await cleanupPNPLiveSession(ctx);
         
         const message = lang === 'es'
           ? `✅ *¡Gracias por tu Feedback!*
@@ -1621,13 +1653,12 @@ Your feedback helps improve PNP Television Live.`;
 
       const reason = reasonMap[reasonType] || 'Other reason';
       const userId = ctx.from.id.toString();
-      
+
       // Request refund
       await PNPLiveService.requestRefund(refundBookingId, userId, reason);
-      
-      // Clean up session
-      ctx.session.pnpLive.refundBookingId = null;
-      await ctx.saveSession();
+
+      // Clean up entire PNP Live session after refund request
+      await cleanupPNPLiveSession(ctx);
       
       const message = lang === 'es'
         ? `✅ *Solicitud de Reembolso Enviada*

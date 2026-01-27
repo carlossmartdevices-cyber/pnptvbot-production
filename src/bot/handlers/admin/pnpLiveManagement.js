@@ -909,8 +909,18 @@ const registerPNPLiveManagementHandlers = (bot) => {
       if (recentBookings.length === 0) {
         message += lang === 'es' ? 'No hay reservas recientes.' : 'No recent bookings.';
       } else {
+        // OPTIMIZATION: Batch fetch all models instead of N+1 queries
+        const uniqueModelIds = [...new Set(recentBookings.map(b => b.model_id))];
+        const modelsMap = new Map();
+        const models = await Promise.all(
+          uniqueModelIds.map(id => ModelService.getModelById(id))
+        );
+        uniqueModelIds.forEach((id, index) => {
+          modelsMap.set(id, models[index]);
+        });
+
         for (const booking of recentBookings) {
-          const model = await ModelService.getModelById(booking.model_id);
+          const model = modelsMap.get(booking.model_id);
           const startTime = new Date(booking.booking_time).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
             weekday: 'short',
             month: 'short',
@@ -918,8 +928,8 @@ const registerPNPLiveManagementHandlers = (bot) => {
             hour: '2-digit',
             minute: '2-digit'
           });
-          
-          const statusEmoji = booking.status === 'completed' ? '✅' : 
+
+          const statusEmoji = booking.status === 'completed' ? '✅' :
                            booking.status === 'cancelled' ? '❌' : '⏳';
           message += `${statusEmoji} ${startTime} - ${model?.name || 'Model'} (${booking.duration_minutes} min) - $${booking.price_usd}\n`;
         }
@@ -984,17 +994,27 @@ const registerPNPLiveManagementHandlers = (bot) => {
         return;
       }
       
+      // OPTIMIZATION: Batch fetch all models instead of N+1 queries
+      const uniqueModelIds = [...new Set(refunds.map(r => r.model_id))];
+      const modelsMap = new Map();
+      const models = await Promise.all(
+        uniqueModelIds.map(id => ModelService.getModelById(id))
+      );
+      uniqueModelIds.forEach((id, index) => {
+        modelsMap.set(id, models[index]);
+      });
+
       // Show list of refund requests
       const buttons = [];
       for (const refund of refunds) {
-        const model = await ModelService.getModelById(refund.model_id);
+        const model = modelsMap.get(refund.model_id);
         const bookingTime = new Date(refund.created_at).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
           month: 'short',
           day: 'numeric',
           hour: '2-digit',
           minute: '2-digit'
         });
-        
+
         buttons.push([{
           text: `${bookingTime} - ${model?.name || 'Model'} - $${refund.amount_usd}`,
           callback_data: `pnplive_process_refund_${refund.id}`
@@ -1141,23 +1161,33 @@ const registerPNPLiveManagementHandlers = (bot) => {
         return;
       }
       
+      // OPTIMIZATION: Batch fetch all models
+      const uniqueModelIds = [...new Set(refunds.map(r => r.model_id))];
+      const modelsMap = new Map();
+      const models = await Promise.all(
+        uniqueModelIds.map(id => ModelService.getModelById(id))
+      );
+      uniqueModelIds.forEach((id, index) => {
+        modelsMap.set(id, models[index]);
+      });
+
       // Show updated list
       const buttons = [];
       for (const refund of refunds) {
-        const model = await ModelService.getModelById(refund.model_id);
+        const model = modelsMap.get(refund.model_id);
         const bookingTime = new Date(refund.created_at).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
           month: 'short',
           day: 'numeric',
           hour: '2-digit',
           minute: '2-digit'
         });
-        
+
         buttons.push([{
           text: `${bookingTime} - ${model?.name || 'Model'} - $${refund.amount_usd}`,
           callback_data: `pnplive_process_refund_${refund.id}`
         }]);
       }
-      
+
       buttons.push([{
         text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
         callback_data: 'admin_pnp_live'
@@ -1186,23 +1216,23 @@ const registerPNPLiveManagementHandlers = (bot) => {
       const lang = getLanguage(ctx);
       const refundId = parseInt(ctx.match[1]);
       const adminId = ctx.from.id.toString();
-      
+
       // Process refund
       await PNPLiveService.processRefund(refundId, 'rejected', adminId);
-      
+
       await ctx.answerCbQuery(lang === 'es' ? '❌ Reembolso rechazado' : '❌ Refund rejected');
-      
+
       // Refresh refund requests list
       const refundsResult = await query(
-        `SELECT r.*, b.user_id, b.model_id, b.duration_minutes, b.price_usd 
+        `SELECT r.*, b.user_id, b.model_id, b.duration_minutes, b.price_usd
          FROM pnp_refunds r
          JOIN pnp_bookings b ON r.booking_id = b.id
          WHERE r.status = 'pending'
          ORDER BY r.created_at DESC`
       );
-      
+
       const refunds = refundsResult.rows || [];
-      
+
       if (refunds.length === 0) {
         const keyboard = [
           [{
@@ -1222,24 +1252,34 @@ const registerPNPLiveManagementHandlers = (bot) => {
         );
         return;
       }
-      
+
+      // OPTIMIZATION: Batch fetch all models
+      const uniqueModelIds = [...new Set(refunds.map(r => r.model_id))];
+      const modelsMap = new Map();
+      const models = await Promise.all(
+        uniqueModelIds.map(id => ModelService.getModelById(id))
+      );
+      uniqueModelIds.forEach((id, index) => {
+        modelsMap.set(id, models[index]);
+      });
+
       // Show updated list
       const buttons = [];
       for (const refund of refunds) {
-        const model = await ModelService.getModelById(refund.model_id);
+        const model = modelsMap.get(refund.model_id);
         const bookingTime = new Date(refund.created_at).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US', {
           month: 'short',
           day: 'numeric',
           hour: '2-digit',
           minute: '2-digit'
         });
-        
+
         buttons.push([{
           text: `${bookingTime} - ${model?.name || 'Model'} - $${refund.amount_usd}`,
           callback_data: `pnplive_process_refund_${refund.id}`
         }]);
       }
-      
+
       buttons.push([{
         text: lang === 'es' ? '🔙 Volver' : '🔙 Back',
         callback_data: 'admin_pnp_live'

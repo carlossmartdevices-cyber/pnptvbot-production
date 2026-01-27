@@ -396,35 +396,36 @@ class PNPLiveNotificationService {
 
   /**
    * Get upcoming bookings needing notifications
+   * Uses notification tracking columns to prevent duplicate sends
    */
   static async getBookingsNeedingNotifications() {
     try {
       const now = new Date();
-      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
-      const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
 
-      // 1-hour reminders (55-65 min window)
+      // 1-hour reminders (55-65 min window) - only if not already sent
       const oneHourReminders = await query(
         `SELECT b.id, b.user_id, m.telegram_id as model_telegram_id
          FROM pnp_bookings b
          JOIN pnp_models m ON b.model_id = m.id
          WHERE b.booking_time BETWEEN $1 AND $2
          AND b.status = 'confirmed'
-         AND b.payment_status = 'paid'`,
+         AND b.payment_status = 'paid'
+         AND (b.reminder_1h_sent IS NULL OR b.reminder_1h_sent = FALSE)`,
         [
           new Date(now.getTime() + 55 * 60 * 1000),
           new Date(now.getTime() + 65 * 60 * 1000)
         ]
       );
 
-      // 5-minute alerts (4-6 min window)
+      // 5-minute alerts (4-6 min window) - only if not already sent
       const fiveMinuteAlerts = await query(
         `SELECT b.id, b.user_id, m.telegram_id as model_telegram_id
          FROM pnp_bookings b
          JOIN pnp_models m ON b.model_id = m.id
          WHERE b.booking_time BETWEEN $1 AND $2
          AND b.status = 'confirmed'
-         AND b.payment_status = 'paid'`,
+         AND b.payment_status = 'paid'
+         AND (b.reminder_5m_sent IS NULL OR b.reminder_5m_sent = FALSE)`,
         [
           new Date(now.getTime() + 4 * 60 * 1000),
           new Date(now.getTime() + 6 * 60 * 1000)
@@ -442,32 +443,58 @@ class PNPLiveNotificationService {
   }
 
   /**
+   * Mark notification as sent to prevent duplicates
+   */
+  static async markNotificationSent(bookingId, notificationType) {
+    try {
+      const column = notificationType === '1h' ? 'reminder_1h_sent' : 'reminder_5m_sent';
+      await query(
+        `UPDATE pnp_bookings SET ${column} = TRUE, updated_at = NOW() WHERE id = $1`,
+        [bookingId]
+      );
+    } catch (error) {
+      logger.error('Error marking notification sent:', { bookingId, notificationType, error: error.message });
+    }
+  }
+
+  /**
    * Process all pending notifications (called by cron/worker)
+   * Includes rate limiting and duplicate prevention
    */
   static async processPendingNotifications() {
     try {
       const { oneHourReminders, fiveMinuteAlerts } = await this.getBookingsNeedingNotifications();
 
       let sent = 0;
+      const RATE_LIMIT_DELAY = 50; // 50ms between messages to avoid Telegram limits
 
       // Process 1-hour reminders
       for (const booking of oneHourReminders) {
-        await this.sendBookingReminder(booking.id, booking.user_id, 'es');
-        if (booking.model_telegram_id) {
-          await this.sendModelBookingAlert(booking.id, booking.model_telegram_id, 'es');
+        const success = await this.sendBookingReminder(booking.id, booking.user_id, 'es');
+        if (success) {
+          await this.markNotificationSent(booking.id, '1h');
+          if (booking.model_telegram_id) {
+            await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY));
+            await this.sendModelBookingAlert(booking.id, booking.model_telegram_id, 'es');
+          }
+          sent++;
         }
-        sent++;
+        await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY));
       }
 
       // Process 5-minute alerts
       for (const booking of fiveMinuteAlerts) {
-        await this.sendShowStartingSoon(
+        const success = await this.sendShowStartingSoon(
           booking.id,
           booking.user_id,
           booking.model_telegram_id,
           'es'
         );
-        sent++;
+        if (success) {
+          await this.markNotificationSent(booking.id, '5m');
+          sent++;
+        }
+        await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY));
       }
 
       if (sent > 0) {

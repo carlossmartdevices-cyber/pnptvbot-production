@@ -17,8 +17,38 @@ class PNPLiveWorker {
     this.intervals = [];
     this.isRunning = false;
 
+    // Job locks to prevent overlapping executions
+    this.jobLocks = {
+      notifications: false,
+      autoComplete: false,
+      statusUpdate: false,
+      feedbackRequests: false
+    };
+
     // Initialize notification service with bot
     PNPLiveNotificationService.init(bot);
+  }
+
+  /**
+   * Acquire a lock for a job
+   * @param {string} jobName - Name of the job
+   * @returns {boolean} True if lock acquired, false if already locked
+   */
+  acquireLock(jobName) {
+    if (this.jobLocks[jobName]) {
+      logger.debug(`PNP Live worker: ${jobName} job already running, skipping`);
+      return false;
+    }
+    this.jobLocks[jobName] = true;
+    return true;
+  }
+
+  /**
+   * Release a lock for a job
+   * @param {string} jobName - Name of the job
+   */
+  releaseLock(jobName) {
+    this.jobLocks[jobName] = false;
   }
 
   /**
@@ -33,20 +63,24 @@ class PNPLiveWorker {
     logger.info('Starting PNP Live worker...');
     this.isRunning = true;
 
-    // Job 1: Send booking notifications (every minute)
+    // Job 1: Send booking notifications (every minute) - with lock
     this.intervals.push(
       setInterval(async () => {
+        if (!this.acquireLock('notifications')) return;
         try {
           await PNPLiveNotificationService.processPendingNotifications();
         } catch (error) {
           logger.error('PNP Live worker: error processing notifications', { error: error.message });
+        } finally {
+          this.releaseLock('notifications');
         }
       }, 60 * 1000) // 1 minute
     );
 
-    // Job 2: Auto-complete shows after duration (every 5 minutes)
+    // Job 2: Auto-complete shows after duration (every 5 minutes) - with lock
     this.intervals.push(
       setInterval(async () => {
+        if (!this.acquireLock('autoComplete')) return;
         try {
           const completed = await this.autoCompleteShows();
           if (completed > 0) {
@@ -54,24 +88,30 @@ class PNPLiveWorker {
           }
         } catch (error) {
           logger.error('PNP Live worker: error auto-completing shows', { error: error.message });
+        } finally {
+          this.releaseLock('autoComplete');
         }
       }, 5 * 60 * 1000) // 5 minutes
     );
 
-    // Job 3: Update model online status (every 2 minutes)
+    // Job 3: Update model online status (every 2 minutes) - with lock
     this.intervals.push(
       setInterval(async () => {
+        if (!this.acquireLock('statusUpdate')) return;
         try {
           await this.updateModelOnlineStatus();
         } catch (error) {
           logger.error('PNP Live worker: error updating model status', { error: error.message });
+        } finally {
+          this.releaseLock('statusUpdate');
         }
       }, 2 * 60 * 1000) // 2 minutes
     );
 
-    // Job 4: Send feedback requests (every 5 minutes)
+    // Job 4: Send feedback requests (every 5 minutes) - with lock
     this.intervals.push(
       setInterval(async () => {
+        if (!this.acquireLock('feedbackRequests')) return;
         try {
           const sent = await this.sendFeedbackRequests();
           if (sent > 0) {
@@ -79,6 +119,8 @@ class PNPLiveWorker {
           }
         } catch (error) {
           logger.error('PNP Live worker: error sending feedback requests', { error: error.message });
+        } finally {
+          this.releaseLock('feedbackRequests');
         }
       }, 5 * 60 * 1000) // 5 minutes
     );

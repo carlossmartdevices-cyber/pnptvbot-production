@@ -1,9 +1,13 @@
 const { query } = require('../../config/postgres');
+const { cache } = require('../../config/redis');
 const ModelService = require('./modelService');
 const AvailabilityService = require('./availabilityService');
 const PNPLiveTimeSlotService = require('./pnpLiveTimeSlotService');
 const JaaSService = require('./jaasService');
 const logger = require('../../utils/logger');
+
+// Cache TTL for model pricing (1 hour)
+const MODEL_PRICING_CACHE_TTL = 3600;
 
 /**
  * PNP Television Live Service - Handles private show bookings and video sessions
@@ -21,13 +25,31 @@ class PNPLiveService {
   static DEFAULT_COMMISSION = 70;
 
   /**
-   * Get model-specific pricing or default
+   * Get model-specific pricing or default (with caching)
    * @param {number} modelId - Model ID
    * @param {number} durationMinutes - Duration
    * @returns {Promise<Object>} Pricing info with price and commission
    */
   static async getModelPricing(modelId, durationMinutes) {
+    const cacheKey = `pnp:model:pricing:${modelId}`;
+
     try {
+      // Try cache first
+      const cached = await cache.get(cacheKey);
+      if (cached) {
+        const model = JSON.parse(cached);
+        const priceMap = {
+          30: model.price_30min || this.DEFAULT_PRICING[30],
+          60: model.price_60min || this.DEFAULT_PRICING[60],
+          90: model.price_90min || this.DEFAULT_PRICING[90]
+        };
+        return {
+          price: parseFloat(priceMap[durationMinutes]) || this.DEFAULT_PRICING[durationMinutes],
+          commission: parseFloat(model.commission_percent) || this.DEFAULT_COMMISSION
+        };
+      }
+
+      // Fetch from database
       const result = await query(
         `SELECT price_30min, price_60min, price_90min, commission_percent
          FROM pnp_models WHERE id = $1`,
@@ -41,6 +63,9 @@ class PNPLiveService {
           commission: this.DEFAULT_COMMISSION
         };
       }
+
+      // Cache the pricing data
+      await cache.setex(cacheKey, MODEL_PRICING_CACHE_TTL, JSON.stringify(model));
 
       const priceMap = {
         30: model.price_30min || this.DEFAULT_PRICING[30],
@@ -58,6 +83,19 @@ class PNPLiveService {
         price: this.DEFAULT_PRICING[durationMinutes] || 60,
         commission: this.DEFAULT_COMMISSION
       };
+    }
+  }
+
+  /**
+   * Invalidate model pricing cache (call when pricing is updated)
+   * @param {number} modelId - Model ID
+   */
+  static async invalidateModelPricingCache(modelId) {
+    try {
+      await cache.del(`pnp:model:pricing:${modelId}`);
+      logger.debug('Model pricing cache invalidated', { modelId });
+    } catch (error) {
+      logger.warn('Error invalidating model pricing cache:', { modelId, error: error.message });
     }
   }
 
@@ -232,22 +270,27 @@ class PNPLiveService {
   }
 
   /**
-   * Get bookings for a user
+   * Get bookings for a user with pagination
    * @param {string} userId - User ID
    * @param {string} status - Filter by status (optional)
+   * @param {number} limit - Max records to return (default 50)
+   * @param {number} offset - Offset for pagination (default 0)
    * @returns {Promise<Array>} User's bookings
    */
-  static async getBookingsForUser(userId, status = null) {
+  static async getBookingsForUser(userId, status = null, limit = 50, offset = 0) {
     try {
       let queryText = `SELECT * FROM pnp_bookings WHERE user_id = $1`;
       let params = [userId];
+      let paramIndex = 2;
 
       if (status) {
-        queryText += ` AND status = $2`;
+        queryText += ` AND status = $${paramIndex}`;
         params.push(status);
+        paramIndex++;
       }
 
-      queryText += ` ORDER BY booking_time DESC`;
+      queryText += ` ORDER BY booking_time DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      params.push(limit, offset);
 
       const result = await query(queryText, params);
       return result.rows || [];
@@ -258,22 +301,27 @@ class PNPLiveService {
   }
 
   /**
-   * Get bookings for a model
+   * Get bookings for a model with pagination
    * @param {number} modelId - Model ID
    * @param {string} status - Filter by status (optional)
+   * @param {number} limit - Max records to return (default 50)
+   * @param {number} offset - Offset for pagination (default 0)
    * @returns {Promise<Array>} Model's bookings
    */
-  static async getBookingsForModel(modelId, status = null) {
+  static async getBookingsForModel(modelId, status = null, limit = 50, offset = 0) {
     try {
       let queryText = `SELECT * FROM pnp_bookings WHERE model_id = $1`;
       let params = [modelId];
+      let paramIndex = 2;
 
       if (status) {
-        queryText += ` AND status = $2`;
+        queryText += ` AND status = $${paramIndex}`;
         params.push(status);
+        paramIndex++;
       }
 
-      queryText += ` ORDER BY booking_time DESC`;
+      queryText += ` ORDER BY booking_time DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      params.push(limit, offset);
 
       const result = await query(queryText, params);
       return result.rows || [];
@@ -321,7 +369,7 @@ class PNPLiveService {
   }
 
   /**
-   * Update payment status
+   * Update payment status with idempotency check
    * @param {number} bookingId - Booking ID
    * @param {string} paymentStatus - New payment status
    * @param {string} transactionId - Transaction ID (optional)
@@ -332,6 +380,25 @@ class PNPLiveService {
       const validStatuses = ['pending', 'paid', 'failed', 'refunded'];
       if (!validStatuses.includes(paymentStatus)) {
         throw new Error('Invalid payment status');
+      }
+
+      // IDEMPOTENCY CHECK: If transactionId provided, check if already processed
+      if (transactionId) {
+        const existingTx = await query(
+          `SELECT id, payment_status FROM pnp_bookings WHERE transaction_id = $1`,
+          [transactionId]
+        );
+
+        if (existingTx.rows && existingTx.rows.length > 0) {
+          const existing = existingTx.rows[0];
+          logger.info('Payment already processed (idempotent)', {
+            bookingId: existing.id,
+            transactionId,
+            existingStatus: existing.payment_status
+          });
+          // Return existing record instead of duplicate processing
+          return await this.getBookingById(existing.id);
+        }
       }
 
       let queryText = `UPDATE pnp_bookings
@@ -353,7 +420,8 @@ class PNPLiveService {
 
       logger.info('Payment status updated', {
         bookingId,
-        paymentStatus
+        paymentStatus,
+        transactionId
       });
 
       return result.rows[0];
