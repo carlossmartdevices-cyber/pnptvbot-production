@@ -299,22 +299,30 @@ async function generateBilingual({ mode = 'sharePost', prompt, hasMedia = false 
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SHARE POST GENERATION (Optimized for Telegram safety)
-// ═══════════════════════════════════════════════════════════════════════════
+// SHARE POST GENERATION (Structured format with line breaks)
+// ════════╕══════════════════════════════════════════════════════════════════════
 
 async function generateSharePost({ prompt, hasMedia = false }) {
   const sharePostPrompt = `Create a PNPtv! share post for: ${prompt}
 
-FORMAT: [Sexy title] [Description 1-2 sentences with hook] #hashtags
+FORMAT:
+[Sexy title of video]
+---
+[Description of video - 1-2 sentences with hook]
+---
+[Hashtags for categories - joined without spaces: #SmokeSlamLex]
+---
+[Performers - names separated by commas]
 
 STRICT RULES:
-- Single line, NO line breaks
+- Use line breaks (---) to separate sections
 - NO emojis (cause Telegram parsing errors)
 - Hashtags joined without spaces: #SmokeSlamLex
-- All lowercase
-- Max 600 characters
+- All lowercase for hashtags
+- Max 600 characters total
 - Include 1 clear benefit
-- Use PNPtv! slang naturally`;
+- Use PNPtv! slang naturally
+- Generate in both Spanish and English with clear separation`;
 
   return generateBilingual({
     mode: 'sharePost',
