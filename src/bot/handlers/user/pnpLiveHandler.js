@@ -4,6 +4,7 @@ const PNPLiveService = require('../../services/pnpLiveService');
 const PNPLiveMediaService = require('../../services/pnpLiveMediaService');
 const PNPLiveTimeSlotService = require('../../services/pnpLiveTimeSlotService');
 const AvailabilityService = require('../../services/availabilityService');
+const PNPLiveAvailabilityService = require('../../services/pnpLiveAvailabilityService');
 const { getLanguage, safeEditMessage } = require('../../utils/helpers');
 const logger = require('../../../utils/logger');
 
@@ -912,19 +913,32 @@ Choose a time slot for your Private Show:`;
     }
   }
 
-  // Handle time slot selection
+  // Handle time slot selection - Hold slot before payment
   bot.action(/^pnp_select_slot_(\d+)$/, async (ctx) => {
     try {
       await ctx.answerCbQuery();
       const lang = getLanguage(ctx);
       const slotId = parseInt(ctx.match[1]);
-      
-      // Store selected slot in session
+      const userId = ctx.from.id.toString();
+
+      // Try to hold the slot (10 minute hold for payment)
+      const holdResult = await PNPLiveAvailabilityService.holdSlot(slotId, userId, 10);
+
+      if (!holdResult.success) {
+        const errorMessage = lang === 'es'
+          ? '❌ Este horario ya no está disponible. Por favor, elige otro.'
+          : '❌ This time slot is no longer available. Please choose another.';
+        await ctx.answerCbQuery(errorMessage, { show_alert: true });
+        return;
+      }
+
+      // Store selected slot and hold expiry in session
       ctx.session.pnpLive = ctx.session.pnpLive || {};
       ctx.session.pnpLive.selectedSlot = slotId;
+      ctx.session.pnpLive.holdExpiresAt = holdResult.holdExpiresAt;
       await ctx.saveSession();
-      
-      // Show payment selection
+
+      // Show payment selection with hold timer info
       await showPaymentSelection(ctx, lang);
     } catch (error) {
       logger.error('Error selecting time slot:', error);
@@ -1003,6 +1017,16 @@ Choose a time slot for your Private Show:`;
         [Markup.button.callback(lang === 'es' ? '🔙 Volver' : '🔙 Back', `pnp_select_date_${selectedDate}`)]
       ];
 
+      // Calculate remaining hold time if available
+      const holdExpiresAt = ctx.session.pnpLive?.holdExpiresAt;
+      let holdWarning = '';
+      if (holdExpiresAt) {
+        const expiresIn = Math.max(0, Math.floor((new Date(holdExpiresAt) - new Date()) / 60000));
+        holdWarning = lang === 'es'
+          ? `\n⏳ *Reserva válida por ${expiresIn} minutos*\n`
+          : `\n⏳ *Reservation valid for ${expiresIn} minutes*\n`;
+      }
+
       const message = lang === 'es'
         ? `💰 *PNP Television Live - Método de Pago*
 
@@ -1011,7 +1035,7 @@ Choose a time slot for your Private Show:`;
 ⏰ Hora: ${startTime}
 ⏱️ Duración: ${durationText}
 💰 Total: $${price} USD
-
+${holdWarning}
 🔒 *Tu pago está protegido*
 ✅ Sala privada garantizada
 ✅ Reembolso disponible (15 min)
@@ -1025,7 +1049,7 @@ Selecciona tu método de pago:`
 ⏰ Time: ${startTime}
 ⏱️ Duration: ${durationText}
 💰 Total: $${price} USD
-
+${holdWarning}
 🔒 *Your payment is protected*
 ✅ Guaranteed private room
 ✅ Refund available (15 min)
@@ -1096,8 +1120,9 @@ Select your payment method:`;
         'credit_card'
       );
 
-      // Mark slot as booked (temporarily - will be released if payment fails)
-      await AvailabilityService.bookAvailability(selectedSlot, booking.id);
+      // Set payment expiry (10 minutes from now)
+      const paymentExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      await PNPLiveAvailabilityService.confirmSlotBooking(selectedSlot, booking.id, paymentExpiresAt);
 
       // Store booking ID in session for webhook callback
       ctx.session.pnpLive.bookingId = booking.id;
@@ -1201,8 +1226,9 @@ Select your payment method:`;
         'crypto'
       );
 
-      // Mark slot as booked (temporarily - will be released if payment fails)
-      await AvailabilityService.bookAvailability(selectedSlot, booking.id);
+      // Set payment expiry (10 minutes from now)
+      const paymentExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      await PNPLiveAvailabilityService.confirmSlotBooking(selectedSlot, booking.id, paymentExpiresAt);
 
       // Store booking ID in session for webhook callback
       ctx.session.pnpLive.bookingId = booking.id;

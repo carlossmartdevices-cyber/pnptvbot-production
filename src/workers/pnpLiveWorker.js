@@ -1,5 +1,6 @@
 const PNPLiveNotificationService = require('../bot/services/pnpLiveNotificationService');
 const PNPLiveService = require('../bot/services/pnpLiveService');
+const PNPLiveAvailabilityService = require('../bot/services/pnpLiveAvailabilityService');
 const { query } = require('../config/postgres');
 const logger = require('../utils/logger');
 
@@ -22,7 +23,9 @@ class PNPLiveWorker {
       notifications: false,
       autoComplete: false,
       statusUpdate: false,
-      feedbackRequests: false
+      feedbackRequests: false,
+      autoOffline: false,
+      releaseHolds: false
     };
 
     // Initialize notification service with bot
@@ -123,6 +126,40 @@ class PNPLiveWorker {
           this.releaseLock('feedbackRequests');
         }
       }, 5 * 60 * 1000) // 5 minutes
+    );
+
+    // Job 5: Auto-offline inactive models (every 5 minutes) - with lock
+    this.intervals.push(
+      setInterval(async () => {
+        if (!this.acquireLock('autoOffline')) return;
+        try {
+          const offlined = await PNPLiveAvailabilityService.autoOfflineInactiveModels();
+          if (offlined > 0) {
+            logger.info('PNP Live worker: auto-offlined inactive models', { count: offlined });
+          }
+        } catch (error) {
+          logger.error('PNP Live worker: error auto-offlining models', { error: error.message });
+        } finally {
+          this.releaseLock('autoOffline');
+        }
+      }, 5 * 60 * 1000) // 5 minutes
+    );
+
+    // Job 6: Release expired slot holds (every minute) - with lock
+    this.intervals.push(
+      setInterval(async () => {
+        if (!this.acquireLock('releaseHolds')) return;
+        try {
+          const released = await PNPLiveAvailabilityService.releaseExpiredHolds();
+          if (released > 0) {
+            logger.info('PNP Live worker: released expired slot holds', { count: released });
+          }
+        } catch (error) {
+          logger.error('PNP Live worker: error releasing expired holds', { error: error.message });
+        } finally {
+          this.releaseLock('releaseHolds');
+        }
+      }, 60 * 1000) // 1 minute
     );
 
     logger.info('PNP Live worker started with all jobs');
