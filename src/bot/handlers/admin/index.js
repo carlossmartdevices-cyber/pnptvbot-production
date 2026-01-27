@@ -1784,7 +1784,9 @@ let registerAdminHandlers = (bot) => {
 
       // Edit message to update the keyboard
       try {
-        await ctx.editMessageReplyMarkup(keyboard.reply_markup);
+        await ctx.editMessageReplyMarkup({
+          inline_keyboard: keyboard.reply_markup.inline_keyboard
+        });
       } catch (editError) {
         logger.warn('Could not edit message for email toggle:', editError.message);
       }
