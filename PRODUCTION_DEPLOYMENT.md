@@ -1,506 +1,306 @@
-# Production Deployment - Async Broadcast Queue System
+# PNP Live Production Deployment Guide
 
-**Status**: ✅ **READY FOR PRODUCTION**
-**Date**: 2025-12-29
-**Version**: 1.0
+## 🎯 Deployment Summary
 
----
+This guide provides step-by-step instructions for deploying the complete PNP Live system to production, including AI moderation, comprehensive availability management, and model self-service features.
 
-## 🎯 Executive Summary
+## 📋 Deployment Checklist
 
-The async broadcast queue system is fully implemented, tested, and ready for production deployment. This system provides:
+### Pre-Deployment
+- [x] Code committed and pushed to repository
+- [x] Database migrations prepared
+- [x] Services implemented and tested
+- [x] Documentation completed
+- [x] Verification scripts created
+- [ ] Backup current production database
+- [ ] Notify team of deployment window
+- [ ] Set up maintenance page (if needed)
 
-- **Non-blocking async broadcasting** with 500-1000 jobs/minute throughput
-- **Automatic retries** with exponential backoff
-- **Comprehensive monitoring** via REST API
-- **PostgreSQL-backed persistence** (no external queue needed)
-- **Full backward compatibility** with existing broadcast service
+### Database Migrations
+- [ ] Apply migration 046 (AI moderation tables)
+- [ ] Apply migration 047 (Comprehensive availability system)
+- [ ] Apply migration 048 (Add user_id to models)
+- [ ] Verify all tables and indexes created
+- [ ] Test database constraints and triggers
 
----
+### Service Deployment
+- [ ] Deploy backend services
+- [ ] Configure environment variables
+- [ ] Set up Redis caching
+- [ ] Configure logging and monitoring
+- [ ] Verify service health checks
 
-## 📦 What's Deployed
+### Feature Activation
+- [ ] Enable AI moderation for streams
+- [ ] Configure moderation thresholds
+- [ ] Set up recurring schedule generation
+- [ ] Configure availability settings
+- [ ] Enable model self-service access
 
-### Core Services (4 files)
-✅ `asyncBroadcastQueue.js` - Core job queue (657 lines)
-✅ `broadcastQueueIntegration.js` - Service integration (450+ lines)
-✅ `initializeQueue.js` - Initialization helper
-✅ `broadcastQueueRoutes.js` - REST API endpoints (200+ lines)
+### Post-Deployment
+- [ ] Monitor system performance
+- [ ] Verify all features working
+- [ ] Test user flows
+- [ ] Test admin flows
+- [ ] Test model self-service flows
+- [ ] Gather initial feedback
+- [ ] Address any issues
 
-### Database Schema
-✅ `broadcast_queue_jobs` table - Main queue storage
-✅ 5 optimized indexes for performance
-✅ Automatic cleanup jobs
+## 🚀 Step-by-Step Deployment
 
-### Testing & Verification
-✅ 15+ integration tests (600+ lines)
-✅ Setup verification script
-✅ Deployment verification script
+### 1. Pre-Deployment Preparation
 
-### Documentation
-✅ `ASYNC_QUEUE_IMPLEMENTATION.md` - Complete guide
-✅ `DEPLOYMENT_GUIDE.md` - Deployment instructions
-✅ `PRODUCTION_DEPLOYMENT.md` - This file
-
----
-
-## 🚀 Quick Deployment (5 Steps)
-
-### Step 1: Verify Files (< 1 minute)
 ```bash
-node scripts/verifyDeployment.js
-```
-Verifies all files are in place and configuration is correct.
+# Notify team
+echo "📢 PNP Live deployment starting at $(date)" | mail -s "PNP Live Deployment" team@pnptv.com
 
-### Step 2: Setup Database (< 2 minutes)
+# Backup database
+pg_dump -U postgres -d pnptvbot -F c -f pnptvbot_backup_$(date +%Y%m%d_%H%M%S).dump
+
+# Set maintenance mode (if needed)
+# Update nginx configuration to show maintenance page
+```
+
+### 2. Database Migrations
+
 ```bash
-node scripts/setupAsyncQueue.js
-```
-Creates database tables, indexes, and runs verification tests.
+# Connect to PostgreSQL
+psql -U postgres -d pnptvbot
 
-### Step 3: Initialize Queue (Code Update)
-Add to your bot startup code:
-```javascript
-const { initializeAsyncBroadcastQueue } = require('./services/initializeQueue');
+# Apply AI moderation migration (046)
+\i database/migrations/046_add_ai_moderation_tables.sql
 
-const queueIntegration = await initializeAsyncBroadcastQueue(bot, {
-  concurrency: 2,
-  autoStart: true,
-});
-```
+# Apply comprehensive availability migration (047)
+\i database/migrations/047_comprehensive_availability_system.sql
 
-### Step 4: Add API Routes (Code Update)
-```javascript
-const broadcastQueueRoutes = require('./api/broadcastQueueRoutes');
-app.use('/api/admin/queue', broadcastQueueRoutes);
-```
+# Apply user_id to models migration (048)
+\i database/migrations/048_add_user_id_to_models.sql
 
-### Step 5: Update Broadcast Calls (Code Update)
-Replace:
-```javascript
-await broadcastService.sendBroadcast(bot, broadcastId);
+# Verify tables
+\dt pnp_models
+\dt pnp_availability
+\dt pnp_model_schedules
+\dt pnp_model_blocked_dates
+\dt user_notifications
+\dt availability_change_log
+\dt booking_holds
+
+# Exit PostgreSQL
+\q
 ```
 
-With:
-```javascript
-const job = await queueIntegration.queueBroadcast(broadcastId);
-res.json({ success: true, jobId: job.job_id });
+### 3. Code Deployment
+
+```bash
+# Pull latest code
+cd /var/www/pnptvbot-production
+git pull origin main
+
+# Install dependencies
+npm install --production
+
+# Restart services
+pm2 restart all
+
+# Verify services
+pm2 list
+pm2 logs
 ```
 
----
+### 4. Configuration
 
-## ✅ Pre-Deployment Checklist
+```bash
+# Set environment variables in .env
+cat >> .env << 'EOF'
+# AI Moderation Settings
+AI_MODERATION_ENABLED=true
+AI_MODERATION_DEFAULT_THRESHOLD=0.7
 
-- [ ] Run verification script: `node scripts/verifyDeployment.js`
-- [ ] Review `DEPLOYMENT_GUIDE.md`
-- [ ] Review `ASYNC_QUEUE_IMPLEMENTATION.md`
-- [ ] Backup PostgreSQL database
-- [ ] Test in staging environment
-- [ ] Update bot initialization code
-- [ ] Add API routes
-- [ ] Update broadcast sending code
-- [ ] Configure monitoring/alerts
-- [ ] Plan rollback procedure
-- [ ] Notify team of changes
+# Availability System Settings
+AVAILABILITY_CACHE_TTL=300
+HOLD_DURATION_MINUTES=10
+MAX_ADVANCE_BOOKING_DAYS=90
 
----
+# Database Settings
+PG_HOST=localhost
+PG_USER=postgres
+PG_PASSWORD=your_secure_password
+PG_DATABASE=pnptvbot
 
-## 📊 Performance Expectations
+# Redis Settings
+REDIS_HOST=localhost
+REDIS_PORT=6379
+EOF
 
-### Throughput
-- **Job Addition**: <1ms per broadcast
-- **Job Processing**: 2-5 seconds per broadcast
-- **Concurrent Throughput**: 500-1000 jobs/minute
-- **Queue Response**: <100ms API response
+# Restart to apply config
+pm2 restart all
+```
+
+### 5. Feature Activation
+
+```bash
+# Enable AI moderation for all streams (example)
+# This would be done through admin interface or script
+
+# Generate initial availability from schedules
+# This would be done through admin interface or script
+
+# Verify features
+curl -I http://localhost:3000/health
+curl -X GET http://localhost:3000/api/models
+```
+
+### 6. Testing
+
+```bash
+# Test AI moderation
+curl -X POST http://localhost:3000/api/moderation/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"text": "test message", "streamId": "test_123"}'
+
+# Test availability
+curl -X GET http://localhost:3000/api/availability/42
+
+# Test model self-service
+curl -X GET http://localhost:3000/api/model/me \
+  -H "Authorization: Bearer model_token"
+```
+
+### 7. Monitoring Setup
+
+```bash
+# Set up monitoring
+# Configure Prometheus, Grafana, or other monitoring tools
+
+# Set up alerts
+# Configure alerting for errors, performance issues, etc.
+
+# Verify monitoring
+curl -I http://localhost:3000/metrics
+```
+
+### 8. Post-Deployment
+
+```bash
+# Monitor logs
+pm2 logs
+
+# Check performance
+top
+htop
+
+# Verify database
+tail -f /var/log/postgresql/postgresql.log
+
+# Check Redis
+redis-cli info
+redis-cli monitor
+```
+
+## 📊 Verification Checklist
 
 ### Database
-- **Storage**: ~2KB per job
-- **Query Performance**: <10ms for status queries
-- **Index Coverage**: All critical queries optimized
+- [ ] All tables created successfully
+- [ ] Indexes created and optimized
+- [ ] Constraints working properly
+- [ ] Triggers functioning correctly
 
-### Scalability
-- **Memory**: ~5-10MB per 1000 active jobs
-- **CPU**: Minimal (mostly I/O bound)
-- **Disk**: Only accumulated completed jobs
+### Services
+- [ ] All services running
+- [ ] No errors in logs
+- [ ] Response times acceptable
+- [ ] Cache working properly
 
----
+### Features
+- [ ] AI moderation working
+- [ ] Availability management working
+- [ ] Smart booking working
+- [ ] Model self-service working
+- [ ] Admin interface working
+- [ ] User interface working
 
-## 🔄 Retry Strategy
+### Performance
+- [ ] Response times < 500ms
+- [ ] Database queries optimized
+- [ ] Cache hit rate > 80%
+- [ ] No memory leaks
+- [ ] CPU usage normal
 
-The system automatically retries failed broadcasts with exponential backoff:
-
-```
-Attempt 1: Immediate (on failure)
-Attempt 2: After 60 seconds
-Attempt 3: After 120 seconds
-Attempt 4: After 240 seconds
-Attempt 5: After 480 seconds
-Max: 5 retries (configurable)
-```
-
-Non-retriable errors (user deactivated, invalid chat) fail immediately.
-
----
-
-## 📡 Monitoring APIs
-
-### Health Check
-```bash
-curl http://localhost:3000/api/admin/queue/health
-# Returns: { "status": "healthy", "running": true, ... }
-```
-
-### Queue Status
-```bash
-curl http://localhost:3000/api/admin/queue/status
-# Returns: { "pending": 10, "processing": 2, "completed": 500, ... }
-```
-
-### Failed Jobs
-```bash
-curl http://localhost:3000/api/admin/queue/broadcasts/failed
-# Returns array of failed job details
-```
-
-### Detailed Stats
-```bash
-curl http://localhost:3000/api/admin/queue/statistics
-# Returns: { "total_jobs": 1000, "completed": 950, "failed": 50, ... }
-```
-
----
-
-## 🎛️ Configuration Options
-
-### Default Configuration
-```javascript
-{
-  concurrency: 2,           // Concurrent jobs
-  maxAttempts: 3,           // Retry attempts
-  autoStart: true,          // Auto-start processor
-  cleanupDays: 7,           // Delete jobs older than 7 days
-}
-```
-
-### For High Volume
-```javascript
-await queueIntegration.start(10);  // 10 concurrent jobs
-```
-
-### For Low Latency
-```javascript
-await queueIntegration.start(2);   // 2 concurrent jobs
-```
-
-### For High Reliability
-```javascript
-await queueIntegration.queueBroadcast(id, {
-  maxAttempts: 5,  // More retries
-  delay: 0,        // No delay
-});
-```
-
----
-
-## 🔍 Monitoring & Alerts
-
-### Recommended Alert Thresholds
-
-| Metric | Threshold | Action |
-|--------|-----------|--------|
-| Failed Jobs | > 10 | Review errors |
-| Queue Depth | > 100 | Increase concurrency |
-| Processing Time | > 30s | Check system resources |
-| Active Jobs | = 0 for > 5min | Check logs |
-
-### Monitoring Commands
+## 🔧 Rollback Procedure
 
 ```bash
-# Real-time monitoring
-watch -n 10 "curl -s http://localhost:3000/api/admin/queue/status | jq '.'"
+# If issues occur, rollback to previous version
+cd /var/www/pnptvbot-production
+git checkout 319a813
+npm install --production
+pm2 restart all
 
-# Failed jobs tracking
-watch -n 30 "curl -s http://localhost:3000/api/admin/queue/broadcasts/failed | jq 'length'"
+# Restore database from backup if needed
+pg_restore -U postgres -d pnptvbot -c -j 4 pnptvbot_backup_*.dump
 
-# Queue logs
-tail -f logs/app.log | grep -E "queue|broadcast"
+# Notify team of rollback
+echo "⚠️ PNP Live rollback completed" | mail -s "PNP Live Rollback" team@pnptv.com
 ```
 
----
+## 📈 Success Metrics
 
-## 🚨 Troubleshooting
+Track these metrics post-deployment:
 
-### Issue: Jobs Not Processing
-**Check 1**: Queue processor running?
-```bash
-curl http://localhost:3000/api/admin/queue/health
-# Should return "running": true
-```
+### System Health
+- **Uptime**: > 99.9%
+- **Response Time**: < 500ms
+- **Error Rate**: < 0.1%
+- **Cache Hit Rate**: > 80%
 
-**Check 2**: Database tables exist?
-```bash
-psql -U postgres -d pnptv_db -c "SELECT COUNT(*) FROM broadcast_queue_jobs"
-```
+### User Engagement
+- **Active Users**: Track daily/monthly active users
+- **Session Duration**: Average session length
+- **Retention Rate**: User return rate
+- **Booking Success**: Successful bookings vs attempts
 
-**Check 3**: Check logs for errors
-```bash
-tail -f logs/app.log | grep -i error
-```
+### Business Metrics
+- **Revenue**: Total platform revenue
+- **Bookings**: Number of successful bookings
+- **Utilization**: Availability slot utilization
+- **Conversion**: Visitors to bookings ratio
 
-**Solution**: Restart queue processor
-```javascript
-const queueIntegration = getBroadcastQueueIntegration();
-await queueIntegration.stop();
-await queueIntegration.start(2);
-```
+### Feature Adoption
+- **AI Moderation**: Percentage of messages moderated
+- **Smart Booking**: Percentage of bookings using smart matching
+- **Model Self-Service**: Percentage of models using self-service
+- **Recurring Schedules**: Percentage of models using schedules
 
-### Issue: High Failure Rate
-**Check**: Review failed jobs
-```bash
-curl http://localhost:3000/api/admin/queue/broadcasts/failed | jq '.[]'
-```
+## 🎉 Deployment Complete
 
-**Solutions**:
-1. Check broadcast service functionality
-2. Verify bot token is valid
-3. Monitor user status changes
-4. Check system resources
+Once all steps are completed:
 
-### Issue: Queue Memory Growing
-**Check**: Monitor active jobs
-```bash
-curl http://localhost:3000/api/admin/queue/status | jq '.activeJobs'
-```
+1. **Notify Team**: Deployment successful
+2. **Monitor Closely**: First 24-48 hours critical
+3. **Gather Feedback**: From users, models, and admins
+4. **Address Issues**: Quickly resolve any problems
+5. **Plan Next Iteration**: Based on feedback and metrics
 
-**Solutions**:
-1. Reduce concurrency: `queue.start(1)`
-2. Run cleanup: `queue.clearCompletedJobs('broadcasts', 7)`
-3. Check for stuck jobs
-4. Monitor system resources
+## 📚 Documentation
 
----
+- **PNP_LIVE_INTEGRATION.md**: Complete integration guide
+- **DEPLOYMENT_GUIDE.md**: Detailed deployment instructions
+- **AVAILABILITY_SYSTEM_IMPLEMENTATION.md**: Availability system details
+- **PNP_LIVE_ENHANCEMENTS.md**: AI moderation details
 
-## 🔄 Rollback Procedure
+## 💡 Tips for Success
 
-If issues occur during deployment:
+1. **Communicate Clearly**: Keep team informed throughout deployment
+2. **Monitor Actively**: Watch logs and metrics closely
+3. **Test Thoroughly**: Verify all features before announcing
+4. **Gather Feedback**: Listen to users and models
+5. **Iterate Quickly**: Address issues and improve continuously
 
-### Step 1: Stop Queue Processing
-```javascript
-const queueIntegration = getBroadcastQueueIntegration();
-await queueIntegration.stop();
-```
+## 🚀 Next Steps
 
-### Step 2: Revert to Synchronous Broadcasting
-```javascript
-// Use original synchronous service
-const result = await broadcastService.sendBroadcast(bot, broadcastId);
-```
+1. **Monitor**: Track performance and usage
+2. **Optimize**: Improve based on real-world data
+3. **Enhance**: Add advanced features
+4. **Expand**: Grow user base and model community
+5. **Innovate**: Stay ahead with new technologies
 
-### Step 3: Restart Bot
-```bash
-pm2 restart pnptv-bot
-# or
-systemctl restart pnptv-bot
-```
-
-### Step 4: Verify Status
-```bash
-curl http://localhost:3000/api/admin/queue/health
-# Should show: "running": false
-```
-
----
-
-## 📅 Post-Deployment Timeline
-
-### Day 1: Intensive Monitoring
-- Monitor queue every 30 minutes
-- Check failed jobs hourly
-- Review error logs continuously
-- Adjust concurrency if needed
-
-### Days 2-7: Daily Monitoring
-- Check queue status daily
-- Review failed jobs daily
-- Monitor performance metrics
-- Fine-tune configuration
-
-### Week 2+: Weekly Maintenance
-- Weekly statistics review
-- Monthly cleanup execution
-- Quarterly optimization review
-- Ongoing alert monitoring
-
----
-
-## 📚 Documentation References
-
-| Document | Purpose |
-|----------|---------|
-| `ASYNC_QUEUE_IMPLEMENTATION.md` | Complete technical guide |
-| `DEPLOYMENT_GUIDE.md` | Step-by-step deployment |
-| `BROADCAST_ENHANCEMENTS.md` | Feature documentation |
-| `BROADCAST_INTEGRATION_GUIDE.md` | Integration details |
-
----
-
-## 🎓 Key Metrics to Monitor
-
-### Performance Metrics
-- **Jobs/minute**: Target 500-1000
-- **Average processing time**: Target < 5 seconds
-- **Concurrent jobs**: Configured value
-- **Success rate**: Target > 95%
-
-### Health Metrics
-- **Failed jobs count**: Target < 10
-- **Queue depth**: Target < 50
-- **Error rate**: Target < 5%
-- **Retry rate**: Target < 10%
-
-### System Metrics
-- **CPU usage**: Monitor baseline
-- **Memory usage**: Monitor for growth
-- **Disk space**: Monitor for cleanup
-- **Database performance**: Monitor queries
-
----
-
-## 💼 Deployment Configuration Example
-
-For a production deployment with moderate volume:
-
-```javascript
-// Bot initialization
-const { initializeAsyncBroadcastQueue } = require('./services/initializeQueue');
-
-const queueIntegration = await initializeAsyncBroadcastQueue(bot, {
-  concurrency: 2,           // 2 concurrent broadcasts
-  maxAttempts: 3,           // 3 retry attempts
-  autoStart: true,          // Auto-start on init
-});
-
-// Express routes
-const broadcastQueueRoutes = require('./api/broadcastQueueRoutes');
-app.use('/api/admin/queue', broadcastQueueRoutes);
-
-// Broadcast endpoint
-app.post('/api/broadcasts/send', async (req, res) => {
-  try {
-    const { broadcastId } = req.body;
-
-    // Queue the broadcast
-    const job = await queueIntegration.queueBroadcast(broadcastId);
-
-    // Return immediately
-    res.json({
-      success: true,
-      jobId: job.job_id,
-      message: 'Broadcast queued for processing',
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Monitoring endpoint
-app.get('/api/admin/broadcasts/status', async (req, res) => {
-  const status = await queueIntegration.getStatus();
-  res.json(status);
-});
-```
-
----
-
-## ✨ Features Available Post-Deployment
-
-### Immediate
-✅ Async broadcast processing
-✅ Automatic retries
-✅ Queue monitoring
-✅ Health checks
-
-### With Enhancement Integration
-✅ User preferences (opt-out, frequency limits)
-✅ User segmentation (6+ filter types)
-✅ Analytics & engagement tracking
-✅ A/B testing support
-
-### Future Enhancements
-📋 Webhook notifications on job completion
-📋 Prometheus metrics export
-📋 Distributed queue for multi-server setup
-📋 Job dependencies and workflows
-
----
-
-## 📞 Support & Escalation
-
-### First Line: Check Documentation
-1. Review `ASYNC_QUEUE_IMPLEMENTATION.md`
-2. Review `DEPLOYMENT_GUIDE.md`
-3. Check troubleshooting section
-
-### Second Line: Verify System
-1. Run: `node scripts/verifyDeployment.js`
-2. Check: `curl http://localhost:3000/api/admin/queue/health`
-3. Review: Queue status and failed jobs
-
-### Third Line: Debug
-1. Check system resources (CPU, memory, disk)
-2. Review database performance
-3. Check application logs
-4. Consider rollback if critical
-
----
-
-## 🎉 Deployment Success Criteria
-
-✅ **All verification checks pass**
-✅ **Database tables created successfully**
-✅ **Queue processor running**
-✅ **Health endpoint returning 200**
-✅ **Sample broadcasts queued successfully**
-✅ **Failed jobs < 5% of total**
-✅ **API endpoints responding correctly**
-✅ **No critical errors in logs**
-
----
-
-## 📋 Final Checklist Before Going Live
-
-- [ ] Verification script passes: `node scripts/verifyDeployment.js`
-- [ ] Database setup completed: `node scripts/setupAsyncQueue.js`
-- [ ] Bot code updated with initialization
-- [ ] API routes added to Express
-- [ ] Broadcast sending code updated
-- [ ] Staging environment tested
-- [ ] Monitoring configured
-- [ ] Alert thresholds set
-- [ ] Team notified of changes
-- [ ] Rollback procedure documented
-- [ ] Go-live window scheduled
-- [ ] On-call person assigned
-
----
-
-## 🚀 Ready for Production!
-
-The async broadcast queue system is **fully tested, documented, and ready for production deployment**.
-
-**Status**: ✅ PRODUCTION READY
-**Confidence**: HIGH
-**Risk Level**: LOW
-
----
-
-**Deployment Guide**: See `DEPLOYMENT_GUIDE.md`
-**Technical Details**: See `ASYNC_QUEUE_IMPLEMENTATION.md`
-**Setup Instructions**: Run `node scripts/setupAsyncQueue.js`
-**Verify Deployment**: Run `node scripts/verifyDeployment.js`
-
----
-
-**Version**: 1.0
-**Created**: 2025-12-29
-**Last Updated**: 2025-12-29
-**Status**: Ready for Production ✅
+The PNP Live system is now **production-ready** with comprehensive features for admins, users, and models. All core functionality has been implemented, tested, and documented. The foundation is in place for a world-class live streaming platform! 🎉
