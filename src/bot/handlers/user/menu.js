@@ -433,6 +433,31 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙ Settings', 'show_settings'),
       ],
     ];
+  } else if (actualIsAdmin) {
+    // ADMIN PREVIEW MODE - SHOW ALL FEATURES FOR TESTING
+    menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoPrimeMenu' : 'pnpLatinoPrimeMenu', lang);
+
+    buttons = [
+      [
+        Markup.button.url(lang === 'es' ? '💎 PNP Latino TV PRIME' : '💎 PNP Latino TV PRIME', 'https://t.me/+GDD0AAVbvGM3MGEx'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
+        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'hangouts_menu'),
+        Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '📻 PNP Radio' : '📻 PNP Radio', 'menu_radio'),
+        Markup.button.callback(lang === 'es' ? '📺 PNP Television Live' : '📺 PNP Television Live', 'PNP_LIVE_START'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? 'ℹ️ Ayuda' : 'ℹ️ Help', 'show_support'),
+        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙ Settings', 'show_settings'),
+      ],
+    ];
   } else {
     // FREE MEMBER VERSION - SALES FOCUSED
     menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoFreeMenu' : 'pnpLatinoFreeMenu', lang);
@@ -553,6 +578,31 @@ const showMainMenuEdit = async (ctx) => {
     // Get user's display name for Jitsi
     const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
     const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+
+    buttons = [
+      [
+        Markup.button.url(lang === 'es' ? '💎 PNP Latino TV PRIME' : '💎 PNP Latino TV PRIME', 'https://t.me/+GDD0AAVbvGM3MGEx'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
+        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'hangouts_menu'),
+        Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '📻 PNP Radio' : '📻 PNP Radio', 'menu_radio'),
+        Markup.button.callback(lang === 'es' ? '📺 PNP Television Live' : '📺 PNP Television Live', 'PNP_LIVE_START'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? 'ℹ️ Ayuda' : 'ℹ️ Help', 'show_support'),
+        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙ Settings', 'show_settings'),
+      ],
+    ];
+  } else if (actualIsAdmin) {
+    // ADMIN PREVIEW MODE - SHOW ALL FEATURES FOR TESTING
+    menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoPrimeMenu' : 'pnpLatinoPrimeMenu', lang);
 
     buttons = [
       [
