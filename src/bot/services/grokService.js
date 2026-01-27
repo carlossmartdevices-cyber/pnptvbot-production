@@ -121,38 +121,43 @@ CTAs: PRIME Membership, Who is Nearby, My Profile, Main Room, Cristina AI. Bot: 
 const MODE_INSTRUCTIONS = {
   broadcast: `TAREA: Escribe copy para broadcast de Telegram.
 
-⚠️ VOZ: DADDY LATINO DE 40 AÑOS - MADURO, SEGURO, ELEGANTE ⚠️
+CONTEXTO: PNPtv es una comunidad privada 18+ latina. Contenido adulto, encuentros, videollamadas.
 
-OUTPUT LIMPIO (ejemplo correcto):
+VOZ OBLIGATORIA: Hombre latino de 40 años
+- Maduro, seguro, con experiencia de vida
+- Seductor con elegancia, nunca vulgar ni desesperado
+- Habla como quien invita a su casa, no como vendedor
+- Tono: whisky añejo, voz grave, pausado
 
-Esta noche hay espacio para uno más
-El humo sube lento. La conversación fluye.
-Algunos momentos solo se viven una vez.
-Únete antes de medianoche
+ESTRUCTURA EXACTA (respeta los saltos de línea):
+
+LÍNEA 1: Título corto (máx 10 palabras)
+LÍNEA 2: [vacía]
+LÍNEA 3: Hook (1 línea que atrape)
+LÍNEAS 4-6: Desarrollo (2-3 líneas creando atmósfera)
+LÍNEA 7: [vacía]
+LÍNEA 8: Call to action (1 línea directa)
+LÍNEA 9: [vacía]
+LÍNEA 10: Hashtags
+
+COPIA ESTE FORMATO EXACTO:
+
+El Main Room abre esta noche
+
+El ambiente ya está cargado.
+Luces bajas, conversación entre adultos.
+Algunos placeres no se explican.
+
+Entra antes de que se llene.
+
 #PNPtv #MainRoom #LatinoHeat
 
-PROHIBIDO (etiquetas):
-TÍTULO: Esta noche...
-HOOK: El humo...
-
-VOZ DE DADDY (40 años):
-✓ Maduro, seguro, con experiencia
-✓ Seductor con clase, no vulgar
-✓ Invita, no ruega ni grita
-✓ Cada palabra tiene peso
-✗ Nada de jerga juvenil (dale, ven papi, está que arde, chimba)
-✗ Nada desesperado o necesitado
-
-ESTRUCTURA (sin mostrar etiquetas):
-1. Gancho elegante
-2. 2-3 líneas de atmósfera
-3. Invitación directa
-4. 3-4 hashtags
-
-REGLAS:
-- Tono: whisky añejo, voz grave, pausado
-- Máximo 900 caracteres
-- CERO etiquetas en output`,
+PROHIBIDO:
+- Etiquetas (TÍTULO:, HOOK:, CTA:)
+- Lenguaje corporativo (innovador, comunidad global, experiencia única)
+- Jerga juvenil (dale, ven papi, chimba)
+- Markdown (**negritas**, etc.)
+- Más de 900 caracteres`,
 
   post: `TAREA: Escribe copy para post de Telegram.
 
@@ -177,25 +182,20 @@ REGLAS:
 
   sharePost: `TAREA: Escribe copy corto para share post de Telegram.
 
-⚠️ VOZ: DADDY DE 40 AÑOS - UNA LÍNEA, ELEGANTE ⚠️
+VOZ: Hombre de 40 años. Elegante, directo, sin excesos.
 
-OUTPUT LIMPIO (ejemplo):
+FORMATO: Todo en 1-2 líneas máximo
 
-El main room abre sus puertas esta noche. Ambiente selecto, conversación adulta. #PNPtv #MainRoom
+EJEMPLO CORRECTO:
 
-PROHIBIDO:
-TÍTULO: El main room...
-DESCRIPCIÓN: Ambiente selecto...
+El main room abre esta noche. Ambiente selecto para quienes saben disfrutar. #PNPtv #MainRoom #LatinoHeat
 
-VOZ DE DADDY:
-✓ Maduro, elegante, directo
-✓ Como una invitación a un club privado
-✗ Nada juvenil ni exagerado
-
-FORMATO:
-- UNA sola línea o máximo 2
+REGLAS:
+- Máximo 2 líneas
 - SIN emojis
+- SIN etiquetas (TÍTULO:, DESCRIPCIÓN:, etc.)
 - Máximo 600 caracteres
+- Tono maduro, no juvenil
 - lowercase para texto, CamelCase para hashtags
 - CERO etiquetas en el output`,
 };
@@ -368,6 +368,9 @@ function sanitizeOutput(content) {
   // Remove common LLM artifacts
   result = result.replace(/^["']|["']$/g, ''); // Remove wrapping quotes
   result = result.replace(/^#+\s+/gm, ''); // Remove markdown headings
+  result = result.replace(/\*\*([^*]+)\*\*/g, '$1'); // Remove bold **text**
+  result = result.replace(/__([^_]+)__/g, '$1'); // Remove underline __text__
+  result = result.replace(/\*([^*]+)\*/g, '$1'); // Remove italic *text*
 
   // Remove ALL format labels (comprehensive list)
   const labelsToRemove = [
