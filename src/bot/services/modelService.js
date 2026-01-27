@@ -123,6 +123,54 @@ class ModelService {
   }
 
   /**
+   * Get model by user ID
+   * @param {number} userId - User ID
+   * @returns {Promise<Object|null>} Model or null if not found
+   */
+  static async getModelByUserId(userId) {
+    try {
+      const result = await query(
+        `SELECT m.* FROM pnp_models m
+         WHERE m.user_id = $1`,
+        [userId]
+      );
+
+      return result.rows && result.rows.length > 0 ? result.rows[0] : null;
+    } catch (error) {
+      logger.error('Error getting model by user ID:', error);
+      throw new Error('Failed to get model');
+    }
+  }
+
+  /**
+   * Update model online status
+   * @param {number} modelId - Model ID
+   * @param {boolean} isOnline - Online status
+   * @returns {Promise<Object>} Updated model
+   */
+  static async updateModelStatus(modelId, isOnline) {
+    try {
+      const result = await query(
+        `UPDATE pnp_models
+         SET is_online = $1, updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [isOnline, modelId]
+      );
+
+      if (!result.rows || result.rows.length === 0) {
+        throw new Error('Model not found');
+      }
+
+      logger.info(`Model status updated to ${isOnline ? 'online' : 'offline'}`, { modelId });
+      return result.rows[0];
+    } catch (error) {
+      logger.error('Error updating model status:', error);
+      throw new Error('Failed to update model status');
+    }
+  }
+
+  /**
    * Delete model (soft delete - mark as inactive)
    * @param {number} modelId - Model ID
    * @returns {Promise<boolean>} True if successful
