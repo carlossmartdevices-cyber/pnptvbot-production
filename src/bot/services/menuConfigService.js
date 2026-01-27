@@ -34,6 +34,14 @@ class MenuConfigService {
       const user = await UserModel.getById(userId);
       const userPlanId = user?.planId || 'free';
 
+      // Admins have access to all menus
+      const PermissionService = require('../services/permissionService');
+      const isAdmin = await PermissionService.isAdmin(userId);
+      
+      if (isAdmin) {
+        return await MenuConfigModel.getAll();
+      }
+
       return await MenuConfigModel.getAvailableMenusForTier(userPlanId);
     } catch (error) {
       logger.error('Error getting available menus for user:', error);
@@ -51,6 +59,14 @@ class MenuConfigService {
     try {
       const user = await UserModel.getById(userId);
       const userPlanId = user?.planId || 'free';
+
+      // Admins have access to all menus
+      const PermissionService = require('../services/permissionService');
+      const isAdmin = await PermissionService.isAdmin(userId);
+      
+      if (isAdmin) {
+        return true;
+      }
 
       return await MenuConfigModel.isMenuAvailable(menuId, userPlanId);
     } catch (error) {
