@@ -473,6 +473,15 @@ const completeOnboarding = async (ctx) => {
     const userId = ctx.from.id;
 
     // Update user profile
+    // Double-check that onboarding is not already complete to prevent duplicates
+    const userCheck = await UserService.getById(userId);
+    if (userCheck && userCheck.onboardingComplete) {
+      logger.warn('Onboarding completion attempted for already completed user', { userId });
+      await ctx.reply('You have already completed onboarding. Enjoy the platform!');
+      await showMainMenu(ctx);
+      return;
+    }
+
     const result = await UserService.updateProfile(userId, {
       language: lang,
       email: ctx.session.temp?.email || null,
@@ -484,6 +493,9 @@ const completeOnboarding = async (ctx) => {
       await ctx.reply('An error occurred. Please try /start again.');
       return;
     }
+
+    // Log onboarding completion
+    logger.info('User completed onboarding', { userId, language: lang });
 
     // Clear temp session data
     ctx.session.temp = {};
