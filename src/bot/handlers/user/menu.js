@@ -349,7 +349,7 @@ const getEffectiveViewMode = async (ctx) => {
     // Admin is previewing as a specific user type
     return {
       isPremium: adminViewMode === 'prime',
-      isAdmin: false, // Don't show admin features when previewing
+      isAdmin: true, // Keep admin access even when previewing
       viewMode: adminViewMode,
       isPreviewMode: true,
       actualIsAdmin: true
