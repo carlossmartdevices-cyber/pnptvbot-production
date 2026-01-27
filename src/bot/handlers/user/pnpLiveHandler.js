@@ -386,22 +386,219 @@ Choose a model for your Private Show:`;
     }
   });
   
-  // Handle model selection
+  // Handle duration selection
+  bot.action(/^pnp_set_duration_(\d+)_(\d+)$/, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const lang = getLanguage(ctx);
+      const modelId = parseInt(ctx.match[1]);
+      const duration = parseInt(ctx.match[2]);
+      
+      // Get pricing for selected duration
+      const pricing = await PNPLiveService.getModelPricing(modelId, duration);
+      
+      // Update session with selected duration
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.selectedModel = ctx.session.temp.selectedModel || {};
+      ctx.session.temp.selectedModel.duration = duration;
+      ctx.session.temp.selectedModel.price = pricing.price;
+      await ctx.saveSession();
+      
+      const confirmationMessage = lang === 'es'
+        ? `✅ *Duración seleccionada: ${duration} minutos*
+\n` +
+          `💰 *Precio: $${pricing.price} USD*
+\n` +
+          `💃 *¿Cuándo quieres tu show?*`
+        : `✅ *Selected duration: ${duration} minutes*
+\n` +
+          `💰 *Price: $${pricing.price} USD*
+\n` +
+          `💃 *When do you want your show?*`;
+      
+      // Check if model is available now
+      const model = await PNPLiveService.getModelWithStats(modelId);
+      const isAvailableNow = model.is_online;
+      
+      const buttons = [];
+      
+      // Immediate booking option
+      if (isAvailableNow) {
+        buttons.push([{
+          text: lang === 'es' ? '🚀 ¡QUERO AHORA! (Inmediato)' : '🚀 I WANT IT NOW! (Immediate)',
+          callback_data: `pnp_book_now_${modelId}_${duration}`
+        }]);
+      }
+      
+      // Schedule for later option
+      buttons.push([{
+        text: lang === 'es' ? '📅 Programar para más tarde' : '📅 Schedule for later',
+        callback_data: `pnp_schedule_booking_${modelId}_${duration}`
+      }]);
+      
+      // Payment options
+      buttons.push([
+        {
+          text: lang === 'es' ? '💳 Pagar con ePayco' : '💳 Pay with ePayco',
+          callback_data: `pnp_pay_epayco_${modelId}_${duration}`
+        },
+        {
+          text: lang === 'es' ? '🪙 Pagar con Crypto' : '🪙 Pay with Crypto',
+          callback_data: `pnp_pay_crypto_${modelId}_${duration}`
+        }
+      ]);
+      
+      buttons.push([{
+        text: lang === 'es' ? '🔙 Cambiar duración' : '🔙 Change duration',
+        callback_data: `pnp_select_model_${modelId}`
+      }]);
+      
+      await safeEditMessage(ctx, confirmationMessage, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: buttons
+        }
+      });
+      
+    } catch (error) {
+      logger.error('Error setting duration:', error);
+      await ctx.answerCbQuery('❌ Error setting duration');
+    }
+  });
+  
+  // Handle model selection with booking options
   bot.action(/^pnp_select_model_(\d+)$/, async (ctx) => {
     try {
       await ctx.answerCbQuery();
       const lang = getLanguage(ctx);
       const modelId = parseInt(ctx.match[1]);
       
+      // Get model details
+      const model = await PNPLiveService.getModelWithStats(modelId);
+      if (!model) {
+        await ctx.answerCbQuery(lang === 'es' ? '❌ Modelo no encontrado' : '❌ Model not found');
+        return;
+      }
+      
+      // Check model availability
+      const isAvailableNow = model.is_online;
+      const availability = await AvailabilityService.getModelAvailability(modelId);
+      
+      // Show booking options
+      const statusEmoji = isAvailableNow ? '🟢' : '⚪';
+      const ratingDisplay = model.avg_rating > 0 ? ` ⭐${parseFloat(model.avg_rating).toFixed(1)}` : '';
+      
+      const bookingMessage = lang === 'es'
+        ? `📹 *${model.name} ${statusEmoji}${ratingDisplay}*
+\n` +
+          `📅 *Disponibilidad:* ${isAvailableNow ? '🟢 Disponible AHORA' : '⚪ No disponible ahora'}
+\n` +
+          `💃 *Sobre ${model.name}:*
+` +
+          `• ${model.total_shows || 0} shows completados
+` +
+          `• ${model.rating_count || 0} reseñas
+` +
+          `• Rating: ${model.avg_rating || 'Nuevo'}
+\n` +
+          `💰 *Precios:*
+` +
+          `• 30 min: $60 USD
+` +
+          `• 60 min: $100 USD
+` +
+          `• 90 min: $250 USD`
+        : `📹 *${model.name} ${statusEmoji}${ratingDisplay}*
+\n` +
+          `📅 *Availability:* ${isAvailableNow ? '🟢 Available NOW' : '⚪ Not available now'}
+\n` +
+          `💃 *About ${model.name}:*
+` +
+          `• ${model.total_shows || 0} completed shows
+` +
+          `• ${model.rating_count || 0} reviews
+` +
+          `• Rating: ${model.avg_rating || 'New'}
+\n` +
+          `💰 *Pricing:*
+` +
+          `• 30 min: $60 USD
+` +
+          `• 60 min: $100 USD
+` +
+          `• 90 min: $250 USD`;
+      
+      // Create booking options based on availability
+      const buttons = [];
+      
+      // Immediate booking option (if available now)
+      if (isAvailableNow) {
+        buttons.push([{
+          text: lang === 'es' ? '🚀 Reservar AHORA (Inmediato)' : '🚀 Book NOW (Immediate)',
+          callback_data: `pnp_book_now_${modelId}_30`
+        }]);
+      }
+      
+      // Future booking options
+      buttons.push([{
+        text: lang === 'es' ? '📅 Reservar para más tarde' : '📅 Book for later',
+        callback_data: `pnp_schedule_booking_${modelId}`
+      }]);
+      
+      // Duration options
+      buttons.push([
+        {
+          text: lang === 'es' ? '⏱️ 30 min ($60)' : '⏱️ 30 min ($60)',
+          callback_data: `pnp_set_duration_${modelId}_30`
+        },
+        {
+          text: lang === 'es' ? '⏱️ 60 min ($100)' : '⏱️ 60 min ($100)',
+          callback_data: `pnp_set_duration_${modelId}_60`
+        }
+      ]);
+      
+      buttons.push([
+        {
+          text: lang === 'es' ? '⏱️ 90 min ($250)' : '⏱️ 90 min ($250)',
+          callback_data: `pnp_set_duration_${modelId}_90`
+        }
+      ]);
+      
+      // Payment and back options
+      buttons.push([
+        {
+          text: lang === 'es' ? '💳 Métodos de Pago' : '💳 Payment Methods',
+          callback_data: 'pnp_show_payment_options'
+        }
+      ]);
+      
+      buttons.push([
+        {
+          text: lang === 'es' ? '🔙 Volver a Modelos' : '🔙 Back to Models',
+          callback_data: 'PNP_LIVE_START'
+        }
+      ]);
+      
       // Store selected model in session
-      ctx.session.pnpLive = ctx.session.pnpLive || {};
-      ctx.session.pnpLive.selectedModel = modelId;
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.selectedModel = {
+        modelId: modelId,
+        modelName: model.name,
+        isAvailableNow: isAvailableNow,
+        duration: 30, // default duration
+        price: 60
+      };
       await ctx.saveSession();
       
-      // Show duration selection
-      await showDurationSelection(ctx, lang, modelId);
+      await safeEditMessage(ctx, bookingMessage, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: buttons
+        }
+      });
+      
     } catch (error) {
-      logger.error('Error selecting model:', error);
+      logger.error('Error in model selection:', error);
       await ctx.answerCbQuery('❌ Error selecting model');
     }
   });
