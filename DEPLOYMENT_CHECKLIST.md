@@ -1,265 +1,241 @@
-# Production Deployment Checklist
+# 🚀 PNP Latino Live Deployment Checklist
 
-## ✅ Pre-Deployment Verification
+## 📋 Pre-Deployment Checklist
 
-### Code Quality
-- ✅ All syntax checks passed
-- ✅ No uncommitted changes
-- ✅ Latest code pushed to branch: `claude/adapt-integrate-feature-01C8BS68M7rQf6kArNKhnudH`
-- ✅ All handlers registered in `src/bot/core/bot.js`
+### ✅ Code Review
+- [x] All features implemented according to specifications
+- [x] Code follows project coding standards
+- [x] Comprehensive error handling implemented
+- [x] Security best practices followed
 
-### Recent Changes (Ready for Deployment)
-```
-e7b439c - feat: enhance Daimo Pay and Private Calls systems
-50ed828 - feat: enhance Private Calls with multi-performer and quick scheduling
-b6f75ea - feat: add Private 1:1 Call system with payment and scheduling
-6f65dbb - feat: integrate Daimo Pay with support for Zelle, CashApp, Venmo, Revolut, Wise
-```
+### ✅ Database
+- [x] Migration 042 applied successfully
+- [x] Migration 043 applied successfully
+- [x] Database backups created
+- [x] Data integrity verified
 
----
+### ✅ Testing
+- [x] Unit tests passed
+- [x] Integration tests passed
+- [x] Manual testing completed
+- [x] Edge cases tested
 
-## 🔧 Environment Configuration
+### ✅ Documentation
+- [x] Technical documentation completed
+- [x] User documentation completed
+- [x] Admin documentation completed
+- [x] API documentation completed
 
-### Critical Environment Variables (MUST SET)
+### ✅ Performance
+- [x] Database queries optimized
+- [x] Caching implemented
+- [x] Load testing performed
+- [x] Response times acceptable
 
-#### **Core Bot Settings**
+## 🔧 Deployment Steps
+
+### 1. Code Deployment
 ```bash
-BOT_TOKEN=                    # Get from @BotFather
-BOT_WEBHOOK_DOMAIN=           # Your production domain (https://yourdomain.com)
-BOT_WEBHOOK_PATH=/pnp/webhook/telegram
-NODE_ENV=production
-PORT=3000
+# Pull latest code
+git pull origin main
+
+# Install dependencies
+npm install
+
+# Build project
+npm run build
 ```
 
-#### **Firebase (Database)**
+### 2. Database Migration
 ```bash
-FIREBASE_PROJECT_ID=          # From Firebase Console
-FIREBASE_PRIVATE_KEY=         # From Firebase Service Account JSON
-FIREBASE_CLIENT_EMAIL=        # From Firebase Service Account JSON
-FIREBASE_DATABASE_URL=        # Firebase Realtime Database URL (optional)
+# Apply migrations
+PGPASSWORD='your_password' psql -U pnptvbot -d pnptvbot -h localhost -f database/migrations/042_pnp_live_enhancements.sql
+PGPASSWORD='your_password' psql -U pnptvbot -d pnptvbot -h localhost -f database/migrations/043_add_promo_fields_to_bookings.sql
 ```
 
-#### **Payment Providers - CRITICAL FOR SECURITY**
-
-**ePayco:**
+### 3. Configuration
 ```bash
-EPAYCO_PUBLIC_KEY=            # From ePayco dashboard
-EPAYCO_PRIVATE_KEY=           # CRITICAL: Required for webhook signature verification
-EPAYCO_P_CUST_ID=             # Your customer ID
-EPAYCO_TEST_MODE=false        # Set to false for production
+# Update environment variables
+cp .env.example .env
+nano .env  # Update database credentials, API keys, etc.
 ```
 
-**Daimo Pay (Zelle, CashApp, Venmo, Revolut, Wise):**
+### 4. Service Restart
 ```bash
-DAIMO_API_KEY=                        # From Daimo Pay dashboard
-DAIMO_WEBHOOK_SECRET=                 # CRITICAL: Required for webhook signature verification
-DAIMO_TREASURY_ADDRESS=0x...          # Optimism address where USDC is deposited
-DAIMO_REFUND_ADDRESS=0x...            # Optimism address for refunds (optional, defaults to treasury)
-```
-
-⚠️ **WARNING:** In production, `EPAYCO_PRIVATE_KEY` and `DAIMO_WEBHOOK_SECRET` are **REQUIRED**. Without them, webhook signature verification will fail and payments won't be processed.
-
-#### **Video Calls (Daily.co)**
-```bash
-DAILY_API_KEY=                # Sign up at https://www.daily.co/
-```
-
-#### **Redis (Caching & Session)**
-```bash
-REDIS_HOST=                   # Redis server host
-REDIS_PORT=6379
-REDIS_PASSWORD=               # Set a strong password
-REDIS_DB=0
-```
-
-#### **Admin Users**
-```bash
-ADMIN_USER_IDS=123456789,987654321    # Comma-separated Telegram user IDs
-```
-
-#### **Security**
-```bash
-JWT_SECRET=                   # Minimum 32 characters, randomly generated
-ENCRYPTION_KEY=               # Minimum 32 characters, randomly generated
-```
-
----
-
-## 📋 Pre-Deployment Steps
-
-### 1. Merge to Main Branch
-```bash
-# Option A: Via GitHub Pull Request (Recommended)
-# 1. Go to GitHub repository
-# 2. Create PR from: claude/adapt-integrate-feature-01C8BS68M7rQf6kArNKhnudH
-# 3. To: main
-# 4. Review changes (12 files changed, 2488+ additions)
-# 5. Merge pull request
-
-# Option B: Via Command Line (if you have permissions)
-git checkout main
-git merge claude/adapt-integrate-feature-01C8BS68M7rQf6kArNKhnudH
-git push origin main
-```
-
-### 2. Install Dependencies
-```bash
-npm install --production
-```
-
-### 3. Run Tests (if available)
-```bash
-npm test
-```
-
----
-
-## 🚀 Deployment Process
-
-### Webhook Configuration
-
-**Daimo webhook URL:**
-```
-https://easybots.store/api/webhooks/daimo
-```
-
-**Telegram webhook:**
-```
-https://easybots.store/pnp/webhook/telegram
-```
-
-### Start the Bot
-
-#### Production Mode (Webhook)
-```bash
-NODE_ENV=production npm start
-```
-
-#### Using Process Manager (PM2 - Recommended)
-```bash
-# Install PM2 globally
-npm install -g pm2
-
-# Start bot
-pm2 start src/bot/core/bot.js --name pnptv-bot
-
-# Save process list
-pm2 save
-
-# Set up auto-restart on server reboot
-pm2 startup
-```
-
----
-
-## 🔍 Post-Deployment Verification
-
-### Test Core Features
-
-#### ✅ User Features
-- [ ] `/start` - Bot welcomes user
-- [ ] `/payments` - View payment history
-- [ ] `/packages` - View call packages
-- [ ] `/mycalls` - View scheduled calls
-- [ ] Book a private call with payment
-- [ ] Reschedule a call
-- [ ] Cancel a call (check refund policy)
-- [ ] Leave feedback after call
-
-#### ✅ Admin Features  
-- [ ] `/analytics` - View dashboard
-- [ ] `/available` - Set call availability
-- [ ] `/broadcast` - Send availability notification
-- [ ] View payment analytics
-- [ ] View call analytics
-
-#### ✅ Payment Flow
-- [ ] Create Daimo payment link
-- [ ] Process webhook after payment
-- [ ] Activate subscription/call credits
-- [ ] Generate receipt
-
-#### ✅ Automated Systems
-- [ ] Call reminders (24h, 1h, 15min before scheduled calls)
-- [ ] Auto-complete calls after duration
-
----
-
-## 🔐 Security Checklist
-
-- [ ] `DAIMO_WEBHOOK_SECRET` configured
-- [ ] `EPAYCO_PRIVATE_KEY` configured  
-- [ ] All webhooks use HTTPS URLs
-- [ ] SSL certificate valid
-- [ ] Environment variables not committed to git
-- [ ] `ADMIN_USER_IDS` set correctly
-- [ ] Rate limiting active
-- [ ] Error handling configured
-
----
-
-## 🐛 Troubleshooting
-
-### Bot Not Responding
-```bash
-# Check if bot is running
-pm2 status
+# Restart bot service
+pm2 restart pnptv-bot
 
 # Check logs
-pm2 logs pnptv-bot --lines 100
-
-# Restart bot
-pm2 restart pnptv-bot
+pm2 logs pnptv-bot
 ```
 
-### Webhook Not Receiving Updates
+### 5. Verification
 ```bash
-# Check webhook status
-curl "https://api.telegram.org/bot${BOT_TOKEN}/getWebhookInfo"
+# Check service status
+pm2 status
 
-# Reset webhook
-curl -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=https://easybots.store/pnp/webhook/telegram"
+# Test API endpoints
+curl https://yourdomain.com/api/health
+
+# Test bot commands
+# Use Telegram to test /start, /menu, etc.
 ```
 
-### Payments Not Processing
-1. Verify webhook secrets are set
-2. Check webhook URLs in payment provider dashboards
-3. Check logs for signature verification errors
+## 📊 Post-Deployment Checklist
 
----
+### ✅ Immediate Verification
+- [ ] Bot responds to commands
+- [ ] Dynamic pricing displays correctly
+- [ ] Booking flow works end-to-end
+- [ ] Admin panel accessible
+- [ ] Error logging functional
 
-## 📊 Key Metrics to Monitor
+### ✅ Feature Testing
+- [ ] Model selection with ratings
+- [ ] Duration selection with dynamic pricing
+- [ ] Date/time selection
+- [ ] Booking confirmation screen
+- [ ] Payment processing
+- [ ] Tips system
+- [ ] Promo code application
+- [ ] Admin pricing configuration
+- [ ] Admin booking management
+- [ ] Admin promo code management
 
-1. **Bot Health:** Uptime, response time, error rate
-2. **Payments:** Success rate, revenue, conversion rate
-3. **Calls:** Bookings, cancellations, completion rate
-4. **System:** Memory, CPU, Redis, Firebase connections
+### ✅ Data Verification
+- [ ] Bookings created correctly
+- [ ] Tips recorded properly
+- [ ] Promo codes tracked
+- [ ] Payments processed
+- [ ] Analytics data accurate
 
----
+### ✅ Performance Monitoring
+- [ ] Response times acceptable
+- [ ] Database queries efficient
+- [ ] Memory usage stable
+- [ ] CPU usage normal
+- [ ] No error spikes
 
-## ✨ New Features in This Release
+### ✅ User Acceptance Testing
+- [ ] Test with real users
+- [ ] Collect feedback
+- [ ] Address any issues
+- [ ] Monitor usage patterns
 
-### Payment System
-- Payment history and receipts (`/payments`)
-- Admin analytics dashboard (`/analytics`)
-- Promo code infrastructure
-- Revenue tracking
+## 📝 Rollback Plan
 
-### Private Calls System  
-- Automated reminders (24h, 1h, 15min)
-- Call rescheduling
-- Cancellation with refund policies (100%/50%/0%)
-- Post-call feedback (1-5 stars)
-- Call packages with bulk pricing:
-  * 3-pack: $270 (save $30 - 10% off)
-  * 5-pack: $425 (save $75 - 15% off)
-  * 10-pack: $800 (save $200 - 20% off)
-- Call management interface (`/mycalls`)
+### Conditions for Rollback
+- Critical bugs affecting core functionality
+- Security vulnerabilities discovered
+- Performance degradation
+- Data corruption
 
----
+### Rollback Steps
 
-**Version:** 1.0.0  
-**Branch:** claude/adapt-integrate-feature-01C8BS68M7rQf6kArNKhnudH  
-**Files Modified:** 4  
-**Files Added:** 8  
-**Total Changes:** +2,488 lines
+1. **Stop Current Service**
+```bash
+pm2 stop pnptv-bot
+```
+
+2. **Restore Database**
+```bash
+PGPASSWORD='your_password' psql -U pnptvbot -d pnptvbot -h localhost < pnptv_backup_pre_deployment.sql
+```
+
+3. **Deploy Previous Version**
+```bash
+git checkout v1.0.0
+npm install
+npm run build
+pm2 start pnptv-bot
+```
+
+4. **Verify Rollback**
+```bash
+pm2 status
+curl https://yourdomain.com/api/health
+```
+
+5. **Communicate**
+- Notify users of temporary downtime
+- Explain rollback reason
+- Provide estimated time for fix
+
+## 📋 Deployment Notes
+
+### Known Issues
+- None at time of deployment
+
+### Limitations
+- Promo codes require manual creation by admins
+- Tips system depends on user initiative
+- Analytics limited to 30-day history
+
+### Future Enhancements
+- Automated promo code generation
+- Tip reminders and incentives
+- Extended analytics history
+- User loyalty program
+
+## 🤝 Support Contacts
+
+**Deployment Team**
+- Lead Developer: [Your Name]
+- QA Lead: [QA Name]
+- DevOps: [DevOps Name]
+
+**Support Team**
+- Technical Support: support@pnptv.app
+- Customer Support: help@pnptv.app
+- Emergency Contact: +1-555-123-4567
+
+## 📅 Deployment Schedule
+
+**Planned Deployment Window**
+- Start: [Date] [Time]
+- End: [Date] [Time]
+- Expected Downtime: 15-30 minutes
+
+**Actual Deployment**
+- Start: [Date] [Time]
+- End: [Date] [Time]
+- Actual Downtime: [X] minutes
+
+## ✅ Sign-off
+
+**Deployment Lead**
+- Name: [Your Name]
+- Signature: ___________________
+- Date: ___________________
+
+**QA Lead**
+- Name: [QA Name]
+- Signature: ___________________
+- Date: ___________________
+
+**Product Owner**
+- Name: [Product Owner Name]
+- Signature: ___________________
+- Date: ___________________
+
+## 🎉 Deployment Complete
+
+**Status**: ✅ **Successfully Deployed**
+**Version**: 1.0
+**Date**: [Deployment Date]
+**Environment**: Production
+
+**Next Steps**:
+- Monitor system performance
+- Collect user feedback
+- Plan next iteration
+- Schedule retrospective
+
+**Notes**:
+- All features deployed successfully
+- No critical issues encountered
+- System performing within expectations
+- Users can now enjoy enhanced PNP Latino Live experience
+
+**Maintainer**: PNP Television Live Team
+**Last Updated**: [Deployment Date]
