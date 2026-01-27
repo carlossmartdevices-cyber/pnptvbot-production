@@ -3693,6 +3693,8 @@ let registerAdminHandlers = (bot) => {
   // Deactivate user
   bot.action('admin_deactivate', async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -3715,6 +3717,7 @@ let registerAdminHandlers = (bot) => {
       logger.info('User deactivated by admin', { adminId: ctx.from.id, userId });
     } catch (error) {
       logger.error('Error deactivating user:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
 
@@ -3844,6 +3847,8 @@ let registerAdminHandlers = (bot) => {
   // Start membership activation flow
   bot.action('admin_activate_membership', async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -3869,12 +3874,15 @@ let registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error starting membership activation:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
 
   // Handle membership type selection
   bot.action(/^admin_activate_type_(.+)_(plan|courtesy)$/, async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -3883,7 +3891,6 @@ let registerAdminHandlers = (bot) => {
 
       const user = await UserModel.getById(userId);
       if (!user) {
-        await ctx.answerCbQuery('Usuario no encontrado');
         return;
       }
 
@@ -3947,6 +3954,8 @@ let registerAdminHandlers = (bot) => {
   // Activate courtesy pass
   bot.action(/^admin_activate_courtesy_(.+)_(\d+)$/, async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -3955,7 +3964,6 @@ let registerAdminHandlers = (bot) => {
 
       const user = await UserModel.getById(userId);
       if (!user) {
-        await ctx.answerCbQuery('Usuario no encontrado');
         return;
       }
 
@@ -4096,6 +4104,8 @@ let registerAdminHandlers = (bot) => {
   // Activate specific plan
   bot.action(/^admin_activate_plan_(.+)_(.+)$/, async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -4104,7 +4114,6 @@ let registerAdminHandlers = (bot) => {
 
       const user = await UserModel.getById(userId);
       if (!user) {
-        await ctx.answerCbQuery('Usuario no encontrado');
         return;
       }
 
@@ -4278,6 +4287,8 @@ let registerAdminHandlers = (bot) => {
   // Handle send message button after activation
   bot.action(/^admin_send_message_(.+)$/, async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -4285,7 +4296,6 @@ let registerAdminHandlers = (bot) => {
       const user = await UserModel.getById(userId);
 
       if (!user) {
-        await ctx.answerCbQuery('Usuario no encontrado');
         return;
       }
 
@@ -4318,6 +4328,8 @@ let registerAdminHandlers = (bot) => {
   // Show type selection (plan or courtesy)
   bot.action(/^admin_activate_select_type_(.+)$/, async (ctx) => {
     try {
+      await ctx.answerCbQuery();
+
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
@@ -4325,7 +4337,6 @@ let registerAdminHandlers = (bot) => {
       const user = await UserModel.getById(userId);
 
       if (!user) {
-        await ctx.answerCbQuery('Usuario no encontrado');
         return;
       }
 

@@ -58,28 +58,34 @@ const registerProfileHandlers = (bot) => {
   // Show privacy settings
   bot.action('privacy_settings', async (ctx) => {
     try {
+      await ctx.answerCbQuery();
       await showPrivacySettings(ctx);
     } catch (error) {
       logger.error('Error showing privacy settings:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
 
   // Toggle privacy settings
   bot.action(/^privacy_toggle_(.+)$/, async (ctx) => {
     try {
+      await ctx.answerCbQuery();
       const setting = ctx.match[1];
       await togglePrivacySetting(ctx, setting);
     } catch (error) {
       logger.error('Error toggling privacy setting:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
 
   // Show favorites
   bot.action('show_favorites', async (ctx) => {
     try {
+      await ctx.answerCbQuery();
       await showFavorites(ctx);
     } catch (error) {
       logger.error('Error showing favorites:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
 
