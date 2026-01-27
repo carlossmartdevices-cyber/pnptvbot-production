@@ -863,6 +863,154 @@ class UserModel {
       return [];
     }
   }
+
+  /**
+   * Find legacy user by email or username
+   * Legacy users have IDs starting with 'legacy_'
+   */
+  static async findLegacyUser(email, username) {
+    try {
+      let legacyUser = null;
+
+      // Try to match by email first (more reliable)
+      if (email) {
+        const emailResult = await query(
+          `SELECT * FROM ${TABLE} WHERE id LIKE 'legacy_%' AND LOWER(email) = LOWER($1) LIMIT 1`,
+          [email.trim()]
+        );
+        if (emailResult.rows.length > 0) {
+          legacyUser = this.mapRowToUser(emailResult.rows[0]);
+          logger.info('Found legacy user by email', { email, legacyId: legacyUser.id });
+          return { user: legacyUser, matchedBy: 'email' };
+        }
+      }
+
+      // Try to match by username
+      if (username) {
+        const cleanUsername = username.replace(/^@/, '').trim().toLowerCase();
+        const usernameResult = await query(
+          `SELECT * FROM ${TABLE} WHERE id LIKE 'legacy_%' AND LOWER(username) = $1 LIMIT 1`,
+          [cleanUsername]
+        );
+        if (usernameResult.rows.length > 0) {
+          legacyUser = this.mapRowToUser(usernameResult.rows[0]);
+          logger.info('Found legacy user by username', { username, legacyId: legacyUser.id });
+          return { user: legacyUser, matchedBy: 'username' };
+        }
+      }
+
+      return null;
+    } catch (error) {
+      logger.error('Error finding legacy user:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Merge legacy user data into a new user account
+   * Transfers subscription, badges, and other data, then deletes the legacy record
+   */
+  static async mergeLegacyUser(newUserId, legacyUser) {
+    try {
+      const newUserIdStr = newUserId.toString();
+      const legacyId = legacyUser.id;
+
+      logger.info('Merging legacy user', { newUserId: newUserIdStr, legacyId });
+
+      // Build the update query to transfer subscription data
+      const updateSql = `
+        UPDATE ${TABLE}
+        SET
+          subscription_status = $2,
+          plan_id = $3,
+          plan_expiry = $4,
+          tier = $5,
+          badges = array_cat(badges, $6),
+          email = COALESCE(email, $7),
+          updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+      `;
+
+      // Add 'legacy_migrated' badge to track this was a merged account
+      const badgesToAdd = ['legacy_migrated'];
+      if (legacyUser.badges && Array.isArray(legacyUser.badges)) {
+        legacyUser.badges.forEach(badge => {
+          if (badge !== 'legacy_member' && !badgesToAdd.includes(badge)) {
+            badgesToAdd.push(badge);
+          }
+        });
+      }
+
+      const result = await query(updateSql, [
+        newUserIdStr,
+        legacyUser.subscriptionStatus || 'free',
+        legacyUser.planId || null,
+        legacyUser.planExpiry || null,
+        legacyUser.tier || 'Free',
+        badgesToAdd,
+        legacyUser.email || null,
+      ]);
+
+      if (result.rows.length === 0) {
+        logger.error('Failed to update new user with legacy data', { newUserId: newUserIdStr, legacyId });
+        return null;
+      }
+
+      // Delete the legacy placeholder record
+      await query(`DELETE FROM ${TABLE} WHERE id = $1`, [legacyId]);
+      logger.info('Legacy user record deleted', { legacyId });
+
+      // Clear cache for both users
+      await cache.del(`user:${newUserIdStr}`);
+      await cache.del(`user:${legacyId}`);
+
+      const mergedUser = this.mapRowToUser(result.rows[0]);
+      logger.info('Legacy user merged successfully', {
+        newUserId: newUserIdStr,
+        legacyId,
+        subscriptionStatus: mergedUser.subscriptionStatus,
+        planId: mergedUser.planId,
+      });
+
+      return mergedUser;
+    } catch (error) {
+      logger.error('Error merging legacy user:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check and merge legacy user during user creation/update
+   * Returns the merged user if a legacy match was found, null otherwise
+   */
+  static async checkAndMergeLegacy(userId, email, username) {
+    try {
+      // Find matching legacy user
+      const legacyMatch = await this.findLegacyUser(email, username);
+
+      if (!legacyMatch) {
+        return null;
+      }
+
+      // Merge the legacy user data
+      const mergedUser = await this.mergeLegacyUser(userId, legacyMatch.user);
+
+      if (mergedUser) {
+        logger.info('Auto-merged legacy user', {
+          userId: userId.toString(),
+          legacyId: legacyMatch.user.id,
+          matchedBy: legacyMatch.matchedBy,
+          plan: mergedUser.planId,
+        });
+      }
+
+      return mergedUser;
+    } catch (error) {
+      logger.error('Error in checkAndMergeLegacy:', error);
+      return null;
+    }
+  }
 }
 
 module.exports = UserModel;

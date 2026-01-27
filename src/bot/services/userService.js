@@ -33,7 +33,7 @@ class UserService {
   /**
    * Get or create user by ID and data
    * @param {number|string} userId - User ID
-   * @param {Object} userData - User data (username, firstName, lastName)
+   * @param {Object} userData - User data (username, firstName, lastName, email)
    * @returns {Promise<Object>} User data
    */
   static async getOrCreateUser(userId, userData = {}) {
@@ -41,7 +41,31 @@ class UserService {
       let user = await UserModel.getById(userId);
 
       if (!user) {
-        // Create new user
+        // Check for legacy user match before creating
+        const legacyMerged = await UserModel.checkAndMergeLegacy(
+          userId,
+          userData.email,
+          userData.username
+        );
+
+        if (legacyMerged) {
+          // Legacy user was found and merged, update with current info
+          await UserModel.updateProfile(userId, {
+            username: userData.username || legacyMerged.username,
+            firstName: userData.firstName || legacyMerged.firstName,
+            lastName: userData.lastName || legacyMerged.lastName,
+            language: userData.language || legacyMerged.language || 'en',
+          });
+          user = await UserModel.getById(userId);
+          logger.info('Legacy user merged and updated', {
+            userId,
+            plan: user.planId,
+            subscription: user.subscriptionStatus,
+          });
+          return user;
+        }
+
+        // No legacy match, create new user
         const createData = {
           userId: userId,
           username: userData.username || '',
@@ -83,6 +107,7 @@ class UserService {
 
   /**
    * Create or get user from Telegram context
+   * Automatically matches and merges legacy users by username
    * @param {Object} ctx - Telegraf context
    * @returns {Promise<Object>} User data
    */
@@ -96,7 +121,32 @@ class UserService {
       let user = await UserModel.getById(from.id);
 
       if (!user) {
-        // Create new user
+        // Check for legacy user match before creating
+        const legacyMerged = await UserModel.checkAndMergeLegacy(
+          from.id,
+          null, // email not available from Telegram context
+          from.username
+        );
+
+        if (legacyMerged) {
+          // Legacy user was found and merged, update with current Telegram info
+          await UserModel.updateProfile(from.id, {
+            username: from.username || legacyMerged.username,
+            firstName: from.first_name || legacyMerged.firstName,
+            lastName: from.last_name || legacyMerged.lastName,
+            language: from.language_code || legacyMerged.language || 'en',
+          });
+          user = await UserModel.getById(from.id);
+          logger.info('Legacy user merged from context', {
+            userId: from.id,
+            username: from.username,
+            plan: user.planId,
+            subscription: user.subscriptionStatus,
+          });
+          return user;
+        }
+
+        // No legacy match, create new user
         const userData = {
           userId: from.id,
           username: from.username || '',
@@ -119,9 +169,10 @@ class UserService {
 
   /**
    * Update user profile
+   * Also checks for legacy user merge when email is provided
    * @param {number|string} userId - User ID
    * @param {Object} updates - Profile updates
-   * @returns {Promise<Object>} { success, error, data }
+   * @returns {Promise<Object>} { success, error, data, legacyMerged }
    */
   static async updateProfile(userId, updates) {
     try {
@@ -139,6 +190,24 @@ class UserService {
         return { success: false, error, data: null };
       }
 
+      // Check for legacy user merge if email is being set
+      let legacyMerged = false;
+      if (value.email) {
+        const currentUser = await UserModel.getById(userId);
+        // Only check if user doesn't already have an active subscription
+        if (currentUser && currentUser.subscriptionStatus !== 'active') {
+          const merged = await UserModel.checkAndMergeLegacy(userId, value.email, value.username);
+          if (merged) {
+            legacyMerged = true;
+            logger.info('Legacy user merged during profile update', {
+              userId,
+              email: value.email,
+              plan: merged.planId,
+            });
+          }
+        }
+      }
+
       const success = await UserModel.updateProfile(userId, value);
 
       if (!success) {
@@ -146,10 +215,73 @@ class UserService {
       }
 
       const user = await UserModel.getById(userId);
-      return { success: true, error: null, data: user };
+      return { success: true, error: null, data: user, legacyMerged };
     } catch (error) {
       logger.error('Error in updateProfile service:', error);
       return { success: false, error: error.message, data: null };
+    }
+  }
+
+  /**
+   * Check and merge legacy user account
+   * Can be called manually to link a user's email to their legacy subscription
+   * @param {number|string} userId - User ID
+   * @param {string} email - Email to check for legacy match
+   * @returns {Promise<Object>} { success, merged, user, message }
+   */
+  static async checkLegacyAccount(userId, email) {
+    try {
+      const currentUser = await UserModel.getById(userId);
+
+      if (!currentUser) {
+        return { success: false, merged: false, user: null, message: 'User not found' };
+      }
+
+      // Check if user already has an active subscription
+      if (currentUser.subscriptionStatus === 'active') {
+        return {
+          success: true,
+          merged: false,
+          user: currentUser,
+          message: 'User already has an active subscription',
+        };
+      }
+
+      // Check for legacy match
+      const legacyMatch = await UserModel.findLegacyUser(email, currentUser.username);
+
+      if (!legacyMatch) {
+        return {
+          success: true,
+          merged: false,
+          user: currentUser,
+          message: 'No legacy account found for this email/username',
+        };
+      }
+
+      // Merge the legacy account
+      const mergedUser = await UserModel.mergeLegacyUser(userId, legacyMatch.user);
+
+      if (!mergedUser) {
+        return {
+          success: false,
+          merged: false,
+          user: currentUser,
+          message: 'Failed to merge legacy account',
+        };
+      }
+
+      return {
+        success: true,
+        merged: true,
+        user: mergedUser,
+        matchedBy: legacyMatch.matchedBy,
+        legacyPlan: legacyMatch.user.planId,
+        message: `Legacy subscription restored: ${legacyMatch.user.planId}`,
+      };
+    } catch (error) {
+      logger.error('Error checking legacy account:', error);
+      return { success: false, merged: false, user: null, message: error.message };
     }
   }
 
