@@ -299,14 +299,15 @@ async function generateBilingual({ mode = 'sharePost', prompt, hasMedia = false 
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SHARE POST GENERATION (Structured format with line breaks)
+// SHARE POST GENERATION (Structured format with proper grammar and line breaks)
+// Ensures grammatically correct, professional content in both Spanish and English
 // ════════╕══════════════════════════════════════════════════════════════════════
 
 async function generateSharePost({ prompt, hasMedia = false }) {
   const sharePostPrompt = `Create a PNPtv! share post for: ${prompt}
 
 FORMAT:
-[Sexy title of video]
+[Clear title of video]
 ---
 [Description of video - 1-2 sentences with hook]
 ---
@@ -321,8 +322,12 @@ STRICT RULES:
 - All lowercase for hashtags
 - Max 600 characters total
 - Include 1 clear benefit
-- Use PNPtv! slang naturally
-- Generate in both Spanish and English with clear separation`;
+- Use proper grammar and punctuation
+- Maintain professional and clear language
+- Avoid excessive slang or informal expressions
+- Generate in both Spanish and English with clear separation
+- Ensure sentences are complete and grammatically correct
+- Use appropriate capitalization and punctuation marks`;
 
   return generateBilingual({
     mode: 'sharePost',
