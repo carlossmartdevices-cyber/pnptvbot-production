@@ -365,6 +365,15 @@ class PaymentNotificationService {
             userId,
             error: sendError.message,
           });
+          
+          // Enhanced error handling for Telegram API issues
+          if (sendError.description && sendError.description.includes('Forbidden')) {
+            logger.error('❌ Bot does not have permission to send messages to support group');
+            logger.error('   Please ensure the bot is an admin in the support group with post permissions');
+          } else if (sendError.description && sendError.description.includes('chat not found')) {
+            logger.error('❌ Support group chat not found');
+            logger.error('   Please verify SUPPORT_GROUP_ID is correct');
+          }
         }
       }
 

@@ -992,6 +992,19 @@ ${categoryEmoji} *Ticket:* ${topic.user_id}
 
     } catch (error) {
       logger.error('Failed to send message to support group:', error);
+      
+      // Enhanced error handling for common Telegram API issues
+      if (error.description && error.description.includes('Forbidden')) {
+        logger.error('❌ Bot does not have permission to send messages to support group');
+        logger.error('   Please ensure the bot is an admin in the support group with post permissions');
+      } else if (error.description && error.description.includes('chat not found')) {
+        logger.error('❌ Support group chat not found');
+        logger.error('   Please verify SUPPORT_GROUP_ID is correct');
+      } else if (error.description && error.description.includes('topic not found')) {
+        logger.error('❌ Forum topic not found - the support group may not have topics enabled');
+        logger.error('   Please ensure the support group is a supergroup with forum topics enabled');
+      }
+      
       throw error;
     }
   }
