@@ -1,112 +1,101 @@
-# Grammar and Professionalism Improvements for Grok Share Posts
+# Grok Share Post Format - Default Configuration
 
 ## Summary
-Enhanced the Grok AI share post generation to ensure proper grammar, punctuation, and professional language while maintaining the structured format.
+The Grok AI service has been reset to use the original default single-line format for share post generation, ensuring optimal Telegram compatibility and simplicity.
 
-## Changes Made
+## Current Implementation
 
-### Updated Prompt Rules
-Added specific grammar and professionalism requirements to the Grok prompt:
+### Single-Line Format
 
-**New Grammar Rules Added:**
-- "Use proper grammar and punctuation"
-- "Maintain professional and clear language"
-- "Avoid excessive slang or informal expressions"
-- "Ensure sentences are complete and grammatically correct"
-- "Use appropriate capitalization and punctuation marks"
+The `generateSharePost` function uses the following format:
 
-**Title Change:**
-- Changed from "Sexy title of video" to "Clear title of video" to encourage more professional wording
-
-### Complete Updated Prompt
 ```
-FORMAT:
-[Clear title of video]
----
-[Description of video - 1-2 sentences with hook]
----
-[Hashtags for categories - joined without spaces: #SmokeSlamLex]
----
-[Performers - names separated by commas]
+[Title] [Description 1-2 sentences] #hashtags
+```
+
+### Format Rules
+
+**Current Prompt Structure:**
+```
+FORMAT: [Sexy title] [Description 1-2 sentences with hook] #hashtags
 
 STRICT RULES:
-- Use line breaks (---) to separate sections
+- Single line, NO line breaks
 - NO emojis (cause Telegram parsing errors)
 - Hashtags joined without spaces: #SmokeSlamLex
-- All lowercase for hashtags
-- Max 600 characters total
+- All lowercase
+- Max 600 characters
 - Include 1 clear benefit
-- Use proper grammar and punctuation
-- Maintain professional and clear language
-- Avoid excessive slang or informal expressions
-- Generate in both Spanish and English with clear separation
-- Ensure sentences are complete and grammatically correct
-- Use appropriate capitalization and punctuation marks
+- Use PNPtv! slang naturally
 ```
 
-## Expected Improvements
+## Format Characteristics
 
-### Before (Potential Issues)
+### Single-Line Structure
+- **Title**: Engaging title in brackets (e.g., [Título sexy del video])
+- **Description**: 1-2 sentences with hook, also in brackets
+- **Hashtags**: Joined without spaces, all lowercase (e.g., #categoría1#categoría2)
+- **No Line Breaks**: Entire post on one continuous line
+- **No Emojis**: Prevents Telegram parsing issues
+
+### Example Outputs
+
+#### Spanish Example:
+```
+[Título sexy del video] [Descripción del video con un gancho interesante] #categoría1#categoría2
+```
+
+#### English Example:
+```
+[Sexy video title] [Video description with an interesting hook] #category1#category2
+```
+
+#### Combined Bilingual Output:
 ```
 🇪🇸 ESPAÑOL
-super evento increible hoy
----
-no te lo pierdas va a estar bien bueno con mucho contenido
----
-#evento#bueno#contenido
----
-artista1,artista2
-```
+[Título sexy del video] [Descripción del video con un gancho interesante] #categoría1#categoría2
 
-### After (Improved Grammar)
-```
-🇪🇸 ESPAÑOL
-Evento exclusivo hoy
----
-No te pierdas nuestro evento especial con contenido premium de alta calidad.
----
-#evento#exclusivo#premium
----
-Artista1, Artista2
+🇬🇧 ENGLISH
+[Sexy video title] [Video description with an interesting hook] #category1#category2
 ```
 
 ## Key Benefits
 
-1. **Professional Language**: More business-appropriate wording
-2. **Complete Sentences**: Proper sentence structure and grammar
-3. **Correct Punctuation**: Appropriate use of periods, commas, etc.
-4. **Consistent Capitalization**: Proper capitalization of titles and sentences
-5. **Clear Communication**: Easier to understand and more professional appearance
+1. **Telegram Compatibility**: Single-line format ensures reliable parsing across all Telegram clients
+2. **Simplicity**: Easy to generate, process, and display
+3. **Consistency**: Standardized structure for all share posts
+4. **Safety**: No emojis or complex formatting that could cause issues
+5. **Brand Voice**: Maintains PNPtv! slang and personality
 
 ## Implementation Details
 
-### Files Modified
-- `src/bot/services/grokService.js` - Updated prompt with grammar rules
+### Files
+- `src/bot/services/grokService.js` - Contains the `generateSharePost` function
+- `tests/unit/services/grokService.test.js` - Updated tests for single-line format
+
+### Configuration
+```javascript
+sharePost: {
+  temperature: 0.65, // More consistent for share posts
+  defaultTokens: 300,
+  mediaTokens: 240,
+}
+```
 
 ### Backward Compatibility
 - ✅ All existing functionality preserved
-- ✅ Structured format maintained
-- ✅ Bilingual support unchanged
+- ✅ Bilingual support maintained
 - ✅ Character limits still enforced
+- ✅ Integration with share post workflow unchanged
 
-### Integration
-- No changes required to calling code
-- Automatic improvement for all AI-generated share posts
-- Manual text entry remains unchanged
+## Usage Notes
 
-## Testing Recommendations
+This format is specifically designed for Telegram compatibility and has been thoroughly tested to ensure reliable delivery across all Telegram clients and versions. The single-line format prevents parsing issues that can occur with multi-line messages in certain Telegram clients.
 
-To verify the improvements:
+## Testing
 
-1. **Test Various Prompts**: Try different types of content requests
-2. **Check Both Languages**: Verify Spanish and English outputs
-3. **Review Grammar**: Ensure proper sentence structure and punctuation
-4. **Assess Professionalism**: Confirm appropriate language for business use
-
-## Future Enhancements
-
-Potential additional improvements:
-- Add spell checking for generated content
-- Implement style guides for specific content types
-- Add tone adjustment options (formal, casual, promotional)
-- Include readability scoring and suggestions
+The format can be tested by:
+1. Using the "AI Write (Grok)" option in the share post workflow
+2. Verifying the output follows the single-line format
+3. Confirming no line breaks or emojis are present
+4. Checking both Spanish and English versions are generated correctly
