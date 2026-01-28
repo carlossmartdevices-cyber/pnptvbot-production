@@ -62,19 +62,21 @@ const COMMAND_DEEP_LINKS = {
 
 /**
  * Get Cristina's redirect message based on language
+ * Cristina messages are NOT auto-deleted - they stay visible
  */
 function getCristinaRedirectMessage(username, lang, botUsername, deepLink = 'home') {
   const pmLink = `https://t.me/${botUsername}?start=${deepLink}`;
+  const CRISTINA_EMOJI = '🧜‍♀️';
 
   if (lang === 'es') {
     return {
-      text: `@${username} gracias por usar nuestro bot. Por favor revisa @${botUsername} para mas informacion.\n\nRecuerda enviar "Ey Cristina" si tienes alguna pregunta.`,
+      text: `${CRISTINA_EMOJI} @${username} gracias por usar nuestro bot. Por favor revisa @${botUsername} para mas informacion.\n\nRecuerda enviar "Ey Cristina" si tienes alguna pregunta.`,
       button: Markup.button.url('Abrir Bot', pmLink),
     };
   }
 
   return {
-    text: `@${username} thank you for using our bot. Please check @${botUsername} for more info.\n\nRemember to send "Hey Cristina" if you have a question.`,
+    text: `${CRISTINA_EMOJI} @${username} thank you for using our bot. Please check @${botUsername} for more info.\n\nRemember to send "Hey Cristina" if you have a question.`,
     button: Markup.button.url('Open Bot', pmLink),
   };
 }
@@ -226,16 +228,7 @@ const groupCommandRestrictionMiddleware = () => {
 
               logger.info(`Cristina responded to /${command} in group ${ctx.chat.id}`);
 
-              // Schedule the reply for deletion after 30 seconds
-              if (replyMsg?.message_id) {
-                ChatCleanupService.scheduleDelete(
-                  ctx.telegram,
-                  ctx.chat.id,
-                  replyMsg.message_id,
-                  'cristina-redirect',
-                  30000
-                );
-              }
+              // Cristina messages are NOT auto-deleted - they stay visible
             } catch (replyError) {
               logger.error(`Failed to send Cristina redirect for /${command}:`, replyError);
             }

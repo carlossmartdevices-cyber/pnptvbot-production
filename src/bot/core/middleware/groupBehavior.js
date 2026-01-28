@@ -332,10 +332,11 @@ function cristinaGroupFilterMiddleware() {
     if (containsPersonalInfo) {
       const userLang = ctx.from?.language_code || 'en';
       const isSpanish = userLang.startsWith('es');
+      const CRISTINA_EMOJI = '🧜‍♀️';
 
       const redirectMessage = isSpanish
-        ? '🔒 Esta pregunta contiene información personal. Por favor, contáctame en privado para proteger tu privacidad.'
-        : '🔒 This question contains personal information. Please contact me privately to protect your privacy.';
+        ? `${CRISTINA_EMOJI} Esta pregunta contiene información personal. Por favor, contáctame en privado para proteger tu privacidad.`
+        : `${CRISTINA_EMOJI} This question contains personal information. Please contact me privately to protect your privacy.`;
 
       // Delete original message
       try {
@@ -344,17 +345,8 @@ function cristinaGroupFilterMiddleware() {
         logger.debug('Could not delete message with personal info:', error.message);
       }
 
-      // Send redirect notice
-      const sentMessage = await ctx.reply(redirectMessage);
-
-      // Auto-delete warning after 30 seconds
-      setTimeout(async () => {
-        try {
-          await ctx.telegram.deleteMessage(ctx.chat.id, sentMessage.message_id);
-        } catch (error) {
-          logger.debug('Could not delete warning:', error.message);
-        }
-      }, 30000);
+      // Send redirect notice - Cristina messages are NOT auto-deleted
+      await ctx.reply(redirectMessage);
 
       logger.info('Personal info detected in group, message redirected to private', {
         userId: ctx.from?.id,
