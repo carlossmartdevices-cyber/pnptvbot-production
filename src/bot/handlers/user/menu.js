@@ -451,12 +451,13 @@ const showMainMenu = async (ctx) => {
   }
 
   // Build membership status header
-  const membershipHeader = buildMembershipHeader(user, isPremium || isAdmin, lang);
+  const membershipHeader = buildMembershipHeader(user, isPremium, lang);
 
   // Build keyboard buttons array
   let buttons = [];
 
-  if (isPremium || isAdmin) {
+  // Show PRIME menu only when user has premium access (isPremium handles admin preview mode)
+  if (isPremium) {
     // PRIME MEMBER VERSION - BENEFITS FOCUSED
     menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoPrimeMenu' : 'pnpLatinoPrimeMenu', lang);
 
@@ -487,34 +488,29 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙ Settings', 'show_settings'),
       ],
     ];
-  } else if (actualIsAdmin) {
-    // ADMIN PREVIEW MODE - SHOW ALL FEATURES FOR TESTING
-    menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoPrimeMenu' : 'pnpLatinoPrimeMenu', lang);
-
-    buttons = [
-      [
-        Markup.button.url(lang === 'es' ? '💎 PNP Latino TV PRIME' : '💎 PNP Latino TV PRIME', 'https://t.me/+GDD0AAVbvGM3MGEx'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
-        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'hangouts_menu'),
-        Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '📻 PNP Radio' : '📻 PNP Radio', 'menu_radio'),
-        Markup.button.callback(lang === 'es' ? '📺 PNP Television Live' : '📺 PNP Television Live', 'PNP_LIVE_START'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? 'ℹ️ Ayuda' : 'ℹ️ Help', 'show_support'),
-        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙ Settings', 'show_settings'),
-      ],
-    ];
   } else {
     // FREE MEMBER VERSION - SALES FOCUSED
-    menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoFreeMenu' : 'pnpLatinoFreeMenu', lang);
+    menuText = previewBanner + membershipHeader + (lang === 'es'
+      ? '`🔒 DESBLOQUEA TODO EL CONTENIDO`\n\n' +
+        `Hola ${username}, estás usando la versión FREE.\n\n` +
+        '**Con PRIME obtienes acceso ilimitado a:**\n\n' +
+        '🎬 Videos completos y shows exclusivos\n' +
+        '📍 Encuentra papis cerca de ti (Nearby)\n' +
+        '🎥 Salas de video en vivo 24/7\n' +
+        '📻 Radio y contenido sin restricciones\n' +
+        '💬 Chat y soporte prioritario\n\n' +
+        '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
+        '`Desde solo $14.99 USD/semana 💎`'
+      : '`🔒 UNLOCK ALL CONTENT`\n\n' +
+        `Hey ${username}, you're on the FREE version.\n\n` +
+        '**With PRIME you get unlimited access to:**\n\n' +
+        '🎬 Full videos & exclusive shows\n' +
+        '📍 Find papis near you (Nearby)\n' +
+        '🎥 Live video rooms 24/7\n' +
+        '📻 Radio & unrestricted content\n' +
+        '💬 Priority chat & support\n\n' +
+        '**Go PRIME now and enjoy everything!**\n\n' +
+        '`Starting at just $14.99 USD/week 💎`');
 
     buttons = [
       [
@@ -524,17 +520,7 @@ const showMainMenu = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '🔄 Migrar Lifetime del viejo PNPtv' : '🔄 Migrate Lifetime from old PNPtv', 'migrate_lifetime_start'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'hangouts_menu'),
-        Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '📻 PNP Radio' : '📻 PNP Radio', 'menu_radio'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
+        Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
       ],
       [
@@ -623,9 +609,10 @@ const showMainMenuEdit = async (ctx) => {
   }
 
   // Build membership status header
-  const membershipHeader = buildMembershipHeader(user, isPremium || isAdmin, lang);
+  const membershipHeader = buildMembershipHeader(user, isPremium, lang);
 
-  if (isPremium || isAdmin) {
+  // Show PRIME menu only when user has premium access (isPremium handles admin preview mode)
+  if (isPremium) {
     // PRIME MEMBER VERSION - BENEFITS FOCUSED
     menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoPrimeMenu' : 'pnpLatinoPrimeMenu', lang);
 
@@ -654,34 +641,29 @@ const showMainMenuEdit = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙ Settings', 'show_settings'),
       ],
     ];
-  } else if (actualIsAdmin) {
-    // ADMIN PREVIEW MODE - SHOW ALL FEATURES FOR TESTING
-    menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoPrimeMenu' : 'pnpLatinoPrimeMenu', lang);
-
-    buttons = [
-      [
-        Markup.button.url(lang === 'es' ? '💎 PNP Latino TV PRIME' : '💎 PNP Latino TV PRIME', 'https://t.me/+GDD0AAVbvGM3MGEx'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
-        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'hangouts_menu'),
-        Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '📻 PNP Radio' : '📻 PNP Radio', 'menu_radio'),
-        Markup.button.callback(lang === 'es' ? '📺 PNP Television Live' : '📺 PNP Television Live', 'PNP_LIVE_START'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? 'ℹ️ Ayuda' : 'ℹ️ Help', 'show_support'),
-        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙ Settings', 'show_settings'),
-      ],
-    ];
   } else {
     // FREE MEMBER VERSION - SALES FOCUSED
-    menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoFreeMenu' : 'pnpLatinoFreeMenu', lang);
+    menuText = previewBanner + membershipHeader + (lang === 'es'
+      ? '`🔒 DESBLOQUEA TODO EL CONTENIDO`\n\n' +
+        `Hola ${username}, estás usando la versión FREE.\n\n` +
+        '**Con PRIME obtienes acceso ilimitado a:**\n\n' +
+        '🎬 Videos completos y shows exclusivos\n' +
+        '📍 Encuentra papis cerca de ti (Nearby)\n' +
+        '🎥 Salas de video en vivo 24/7\n' +
+        '📻 Radio y contenido sin restricciones\n' +
+        '💬 Chat y soporte prioritario\n\n' +
+        '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
+        '`Desde solo $14.99 USD/semana 💎`'
+      : '`🔒 UNLOCK ALL CONTENT`\n\n' +
+        `Hey ${username}, you're on the FREE version.\n\n` +
+        '**With PRIME you get unlimited access to:**\n\n' +
+        '🎬 Full videos & exclusive shows\n' +
+        '📍 Find papis near you (Nearby)\n' +
+        '🎥 Live video rooms 24/7\n' +
+        '📻 Radio & unrestricted content\n' +
+        '💬 Priority chat & support\n\n' +
+        '**Go PRIME now and enjoy everything!**\n\n' +
+        '`Starting at just $14.99 USD/week 💎`');
 
     buttons = [
       [
@@ -691,17 +673,7 @@ const showMainMenuEdit = async (ctx) => {
         Markup.button.callback(lang === 'es' ? '🔄 Migrar Lifetime del viejo PNPtv' : '🔄 Migrate Lifetime from old PNPtv', 'migrate_lifetime_start'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'hangouts_menu'),
-        Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '📻 PNP Radio' : '📻 PNP Radio', 'menu_radio'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
+        Markup.button.callback(lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile', 'show_profile'),
         Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
       ],
       [

@@ -906,16 +906,13 @@ Click the button below to connect!`;
   bot.command('menu', async (ctx) => {
     logger.info('/menu command received', { chatType: ctx.chat?.type, userId: ctx.from?.id });
     try {
-      // TEMPORARY FIX: Send immediate response first
-      await ctx.reply('Loading menu...');
-
       const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
 
       if (isGroup) {
         // Use group menu
         await showMainMenu(ctx);
       } else {
-        // Use the same menu as /start for private chats
+        // Use the same sales-focused menu as /start for private chats
         await showUserMainMenu(ctx);
       }
     } catch (error) {

@@ -4,6 +4,7 @@ const { isPrimeUser } = require('../../utils/helpers');
 const userService = require('../../services/userService');
 const i18n = require('../../utils/i18n');
 const logger = require('../../../utils/logger');
+const { showMainMenu } = require('./menu');
 
 /**
  * Handle /start command
@@ -31,11 +32,10 @@ async function handleStart(ctx) {
     // Get or create user
     const user = await userService.getOrCreateUser(userId, userData);
 
-    // Check if onboarding is complete
+    // For returning users (onboarding complete), show main menu directly
+    // For new users, start onboarding
     if (user.onboardingComplete) {
-      // Show main menu with PRIME-specific options if user is PRIME
-      const language = user.language || 'en';
-      const { showMainMenu } = require('../menu/menuHandler');
+      // Show main menu (sales-focused for FREE, benefits for PRIME)
       await showMainMenu(ctx);
     } else {
       // Start onboarding - language selection
