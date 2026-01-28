@@ -9,25 +9,29 @@ const { getLanguage } = require('../../utils/helpers');
  * @param {Telegraf} bot - Bot instance
  */
 const registerNearbyHandlers = (bot) => {
-  // Show nearby users menu
+  // Show nearby menu - redirects to enhanced nearby menu
   bot.action('show_nearby', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
 
-      // Sexy monospace design
-      const headerText = 
-        '`🔥 Find Nearby Users`\n\n' +
-        'Looking for that meth alpha, that cloudy papi,\n' +
-        'or a slam slut close to you?\n\n' +
-        '💡 _Complete your PNPtv! profile so the right\n' +
-        'guys can spot you, hit you up, and get the\n' +
-        'fun started fast._\n\n' +
-        '`📍 Select distance:`';
-
       // Get user's current location sharing preference
       const user = await UserService.getOrCreateFromContext(ctx);
       const locationStatus = user.locationSharingEnabled ? '🟢 ON' : '🔴 OFF';
-      const toggleText = user.locationSharingEnabled ? '🔴 Turn OFF' : '🟢 Turn ON';
+
+      const headerText = lang === 'es'
+        ? '`🔥 Buscar Usuarios Cerca`\n\n' +
+          '¿Buscando ese papi, ese meth alpha,\n' +
+          'o un slam slut cerca de ti?\n\n' +
+          '💡 _Completa tu perfil PNPtv para que\n' +
+          'los chicos correctos te encuentren._\n\n' +
+          '`📍 Selecciona distancia:`'
+        : '`🔥 Find Nearby Users`\n\n' +
+          'Looking for that meth alpha, that cloudy papi,\n' +
+          'or a slam slut close to you?\n\n' +
+          '💡 _Complete your PNPtv! profile so the right\n' +
+          'guys can spot you, hit you up, and get the\n' +
+          'fun started fast._\n\n' +
+          '`📍 Select distance:`';
 
       await ctx.editMessageText(
         headerText,
@@ -43,6 +47,7 @@ const registerNearbyHandlers = (bot) => {
               Markup.button.callback('📍 50 km', 'nearby_radius_50'),
             ],
             [Markup.button.callback(`📍 Location: ${locationStatus}`, 'toggle_location_sharing')],
+            [Markup.button.callback(lang === 'es' ? '🏪 Negocios y Lugares' : '🏪 Businesses & Places', 'show_nearby_menu')],
             [Markup.button.callback('🔙 Back', 'back_to_main')],
           ]),
         }

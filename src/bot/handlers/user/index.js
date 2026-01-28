@@ -2,6 +2,7 @@ const onboardingHandlers = require('./onboarding');
 const menuHandlers = require('./menu');
 const profileHandlers = require('./profile');
 const nearbyHandlers = require('./nearby');
+const nearbyPlacesHandlers = require('./nearbyPlaces');
 const settingsHandlers = require('./settings');
 const groupWelcomeHandlers = require('./groupWelcome');
 const { registerAgeVerificationHandlers } = require('./ageVerificationHandler');
@@ -23,6 +24,7 @@ const registerUserHandlers = (bot) => {
   menuHandlers(bot);
   profileHandlers(bot);
   nearbyHandlers(bot);
+  nearbyPlacesHandlers(bot);
   settingsHandlers(bot);
   groupWelcomeHandlers(bot);
   lifetimeMigrationHandlers(bot);

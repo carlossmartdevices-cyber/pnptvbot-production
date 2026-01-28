@@ -482,6 +482,11 @@ async function showAdminPanel(ctx, edit = false) {
         Markup.button.callback('📹 PNP Television En Vivo', 'admin_pnp_live'),
       ]);
 
+      // ═══ LUGARES Y NEGOCIOS ═══
+      buttons.push([
+        Markup.button.callback('📍 Nearby Places', 'admin_nearby_places'),
+      ]);
+
       // ═══ SISTEMA Y HERRAMIENTAS ═══
       buttons.push([
         Markup.button.callback('📦 Cola', 'admin_queue_status'),
@@ -4613,6 +4618,7 @@ async function sendBroadcastWithButtons(ctx, bot) {
 // Import and register audio management handlers
 const registerAudioManagementHandlers = require('./audioManagement');
 const registerDateTimePickerHandlers = require('./dateTimePickerHandlers');
+const registerNearbyPlacesAdminHandlers = require('./nearbyPlacesAdmin');
 const ChatCleanupService = require('../../services/chatCleanupService');
 
 // Group cleanup command for admins
@@ -4969,6 +4975,7 @@ const finalRegisterAdminHandlers = (bot) => {
   wrappedRegisterAdminHandlers(bot);
   registerAudioManagementHandlers(bot);
   registerDateTimePickerHandlers(bot);
+  registerNearbyPlacesAdminHandlers(bot);
   registerGroupCleanupCommand(bot);
   addBroadcastButtonHandlers(bot);
 };
