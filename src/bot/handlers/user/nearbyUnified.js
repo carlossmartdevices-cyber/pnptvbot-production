@@ -6,17 +6,16 @@ const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 
 /**
- * Unified Nearby handlers - shows all categories by default with filtering
+ * Unified Nearby handlers - MAIN nearby handler file
+ * All nearby functionality is consolidated here to avoid duplicate callbacks
  * @param {Telegraf} bot - Bot instance
  */
 const registerNearbyUnifiedHandlers = (bot) => {
-  
-  // Main unified nearby menu
-  bot.action('show_nearby_unified', async (ctx) => {
+
+  // Helper function for showing the main nearby menu
+  const showNearbyMenu = async (ctx, isNewMessage = false) => {
     try {
       const lang = getLanguage(ctx);
-      
-      // Get user's current location sharing preference
       const user = await UserService.getOrCreateFromContext(ctx);
       const locationStatus = user.locationSharingEnabled ? '🟢 ON' : '🔴 OFF';
 
@@ -34,26 +33,79 @@ const registerNearbyUnifiedHandlers = (bot) => {
           '📍 Places of interest\n\n' +
           '_Select a category or see all:_';
 
-      await ctx.editMessageText(
-        headerText,
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [
-              Markup.button.callback('🌐 Todo', 'nearby_all'),
-              Markup.button.callback('👥 Miembros', 'nearby_users'),
-            ],
-            [
-              Markup.button.callback('🏪 Negocios', 'nearby_businesses'),
-              Markup.button.callback('📍 Lugares', 'nearby_places'),
-            ],
-            [Markup.button.callback(`📍 Location: ${locationStatus}`, 'toggle_location_sharing')],
-            [Markup.button.callback('🔙 Back', 'back_to_main')],
-          ]),
-        }
-      );
+      const keyboard = Markup.inlineKeyboard([
+        [
+          Markup.button.callback(lang === 'es' ? '🌐 Todo' : '🌐 All', 'nearby_all'),
+          Markup.button.callback(lang === 'es' ? '👥 Miembros' : '👥 Members', 'nearby_users'),
+        ],
+        [
+          Markup.button.callback(lang === 'es' ? '🏪 Negocios' : '🏪 Businesses', 'nearby_businesses'),
+          Markup.button.callback(lang === 'es' ? '📍 Lugares' : '📍 Places', 'nearby_places_categories'),
+        ],
+        [Markup.button.callback(`📍 Location: ${locationStatus}`, 'toggle_location_sharing')],
+        [
+          Markup.button.callback(lang === 'es' ? '➕ Proponer' : '➕ Suggest', 'submit_place_start'),
+          Markup.button.callback(lang === 'es' ? '📋 Mis Propuestas' : '📋 My Submissions', 'my_place_submissions'),
+        ],
+        [Markup.button.callback('🔙 Back', 'back_to_main')],
+      ]);
+
+      if (isNewMessage) {
+        await ctx.reply(headerText, { parse_mode: 'Markdown', ...keyboard });
+      } else {
+        await ctx.editMessageText(headerText, { parse_mode: 'Markdown', ...keyboard });
+      }
     } catch (error) {
-      logger.error('Error showing unified nearby menu:', error);
+      logger.error('Error showing nearby menu:', error);
+    }
+  };
+
+  // Main unified nearby menu - handles all entry point action names for compatibility
+  bot.action(['show_nearby_unified', 'show_nearby', 'show_nearby_menu'], async (ctx) => {
+    await showNearbyMenu(ctx);
+  });
+
+  // Toggle location sharing
+  bot.action('toggle_location_sharing', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+
+      if (!ctx.from?.id) {
+        logger.error('Missing user context in location sharing toggle');
+        await ctx.answerCbQuery(t('error', lang));
+        return;
+      }
+
+      const userId = ctx.from.id;
+      const user = await UserService.getOrCreateFromContext(ctx);
+
+      // Toggle the current setting
+      const newSetting = !user.locationSharingEnabled;
+
+      await UserService.updateProfile(userId, {
+        locationSharingEnabled: newSetting
+      });
+
+      const message = newSetting
+        ? t('locationSharingToggleEnabled', lang)
+        : t('locationSharingToggleDisabled', lang);
+
+      await ctx.answerCbQuery(message);
+
+      // Update the button text
+      await ctx.editMessageReplyMarkup({
+        inline_keyboard: ctx.callbackQuery.message.reply_markup.inline_keyboard.map(row => {
+          if (row[0]?.callback_data === 'toggle_location_sharing') {
+            const newStatus = newSetting ? '🟢 ON' : '🔴 OFF';
+            return [Markup.button.callback(`📍 Location: ${newStatus}`, 'toggle_location_sharing')];
+          }
+          return row;
+        })
+      });
+    } catch (error) {
+      logger.error('Error toggling location sharing:', error);
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery(t('error', lang));
     }
   });
 
@@ -81,7 +133,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback(lang === 'es' ? '📝 Ir al Perfil' : '📝 Go to Profile', 'edit_profile')],
-              [Markup.button.callback('🔙 Back', 'show_nearby_unified')],
+              [Markup.button.callback('🔙 Back', 'show_nearby')],
             ]),
           }
         );
@@ -154,7 +206,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback(lang === 'es' ? '➕ Proponer Lugar' : '➕ Suggest Place', 'submit_place_start')],
-              [Markup.button.callback('🔙 Back', 'show_nearby_unified')],
+              [Markup.button.callback('🔙 Back', 'show_nearby')],
             ]),
           }
         );
@@ -193,7 +245,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
 
       message += '\n_Toca para ver detalles o contactar_ 😏';
 
-      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby_unified')]);
+      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -230,7 +282,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback(lang === 'es' ? '📝 Ir al Perfil' : '📝 Go to Profile', 'edit_profile')],
-              [Markup.button.callback('🔙 Back', 'show_nearby_unified')],
+              [Markup.button.callback('🔙 Back', 'show_nearby')],
             ]),
           }
         );
@@ -257,7 +309,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback('🔄 Try Again', 'nearby_users')],
-              [Markup.button.callback('🔙 Back', 'show_nearby_unified')],
+              [Markup.button.callback('🔙 Back', 'show_nearby')],
             ]),
           }
         );
@@ -286,7 +338,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
 
       message += '\n_Tap to view profile or slide into their DMs_ 😏';
 
-      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby_unified')]);
+      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -320,7 +372,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback(lang === 'es' ? '📝 Ir al Perfil' : '📝 Go to Profile', 'edit_profile')],
-              [Markup.button.callback('🔙 Back', 'show_nearby_unified')],
+              [Markup.button.callback('🔙 Back', 'show_nearby')],
             ]),
           }
         );
@@ -340,7 +392,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback(lang === 'es' ? '➕ Proponer Negocio' : '➕ Suggest Business', 'submit_place_business')],
-              [Markup.button.callback('🔙 Back', 'show_nearby_unified')],
+              [Markup.button.callback('🔙 Back', 'show_nearby')],
             ]),
           }
         );
@@ -365,7 +417,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
       });
 
       buttons.push([Markup.button.callback(lang === 'es' ? '➕ Proponer Negocio' : '➕ Suggest Business', 'submit_place_business')]);
-      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby_unified')]);
+      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
       await ctx.editMessageText(headerText, {
         parse_mode: 'Markdown',
@@ -397,7 +449,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback(lang === 'es' ? '📝 Ir al Perfil' : '📝 Go to Profile', 'edit_profile')],
-              [Markup.button.callback('🔙 Back', 'show_nearby_unified')],
+              [Markup.button.callback('🔙 Back', 'show_nearby')],
             ]),
           }
         );
@@ -417,7 +469,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback(lang === 'es' ? '➕ Proponer Lugar' : '➕ Suggest Place', 'submit_place_start')],
-              [Markup.button.callback('🔙 Back', 'show_nearby_unified')],
+              [Markup.button.callback('🔙 Back', 'show_nearby')],
             ]),
           }
         );
@@ -442,7 +494,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
       });
 
       buttons.push([Markup.button.callback(lang === 'es' ? '➕ Proponer Lugar' : '➕ Suggest Place', 'submit_place_start')]);
-      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby_unified')]);
+      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
       await ctx.editMessageText(headerText, {
         parse_mode: 'Markdown',
@@ -630,7 +682,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
         )]);
       }
 
-      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby_unified')]);
+      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
       if (place.photoFileId) {
         try {

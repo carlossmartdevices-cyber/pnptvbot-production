@@ -26,9 +26,10 @@ const registerUserHandlers = (bot) => {
   registerAgeVerificationHandlers(bot);
   menuHandlers(bot);
   profileHandlers(bot);
-  nearbyHandlers(bot);
+  // Nearby handlers - unified must be first to handle main callbacks
   nearbyUnifiedHandlers(bot);
   nearbyPlacesHandlers(bot);
+  nearbyHandlers(bot); // Legacy radius handler only
   businessSubmissionHandlers(bot);
   enhancedProfileCards(bot);
   settingsHandlers(bot);

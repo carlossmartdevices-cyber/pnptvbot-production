@@ -5,94 +5,11 @@ const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 
 /**
- * Nearby places handlers
+ * Nearby places handlers - Place categories and submission functionality
+ * Main nearby menu is in nearbyUnified.js
  * @param {Telegraf} bot - Bot instance
  */
 const registerNearbyPlacesHandlers = (bot) => {
-  // ===========================================
-  // MAIN NEARBY MENU (Enhanced)
-  // ===========================================
-  bot.action('show_nearby_menu', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-
-      const menuText = lang === 'es'
-        ? '`📍 PNP Nearby`\n\n' +
-          '¿Qué te gustaría explorar?\n\n' +
-          '👥 Encuentra miembros cerca de ti\n' +
-          '🏪 Negocios de la comunidad\n' +
-          '📍 Lugares de interés\n\n' +
-          '_Selecciona una opción:_'
-        : '`📍 PNP Nearby`\n\n' +
-          'What would you like to explore?\n\n' +
-          '👥 Find members near you\n' +
-          '🏪 Community businesses\n' +
-          '📍 Places of interest\n\n' +
-          '_Select an option:_';
-
-      const buttons = [
-        [Markup.button.callback(lang === 'es' ? '👥 Miembros Cerca' : '👥 Members Near You', 'show_nearby')],
-        [Markup.button.callback(lang === 'es' ? '🏪 Negocios Comunitarios' : '🏪 Community Businesses', 'nearby_businesses')],
-        [Markup.button.callback(lang === 'es' ? '📍 Lugares de Interés' : '📍 Places of Interest', 'nearby_places_categories')],
-        [Markup.button.callback(lang === 'es' ? '➕ Proponer un Lugar' : '➕ Suggest a Place', 'submit_place_start')],
-        [Markup.button.callback(lang === 'es' ? '📋 Mis Propuestas' : '📋 My Submissions', 'my_place_submissions')],
-        [Markup.button.callback('🔙 Back', 'back_to_main')],
-      ];
-
-      await ctx.editMessageText(menuText, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(buttons),
-      });
-    } catch (error) {
-      logger.error('Error showing nearby menu:', error);
-    }
-  });
-
-  // ===========================================
-  // COMMUNITY BUSINESSES
-  // ===========================================
-  bot.action('nearby_businesses', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      const userId = ctx.from.id.toString();
-
-      await ctx.editMessageText(
-        lang === 'es' ? '🔍 _Buscando negocios cerca de ti..._' : '🔍 _Searching for businesses near you..._',
-        { parse_mode: 'Markdown' }
-      );
-
-      const result = await NearbyPlaceService.getNearbyBusinesses(userId, 50);
-
-      if (!result.success && result.error === 'no_location') {
-        await showNoLocationMessage(ctx, lang, 'show_nearby_menu');
-        return;
-      }
-
-      if (result.places.length === 0) {
-        await ctx.editMessageText(
-          lang === 'es'
-            ? '🏪 *Negocios Comunitarios*\n\n' +
-              'No hay negocios cerca de ti aún.\n\n' +
-              '¿Conoces alguno? ¡Propónlo!'
-            : '🏪 *Community Businesses*\n\n' +
-              'No businesses near you yet.\n\n' +
-              'Know any? Suggest one!',
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(lang === 'es' ? '➕ Proponer Negocio' : '➕ Suggest Business', 'submit_business_profile')],
-              [Markup.button.callback('🔙 Back', 'show_nearby_menu')],
-            ]),
-          }
-        );
-        return;
-      }
-
-      await showPlacesList(ctx, result.places, lang, 'business', null);
-    } catch (error) {
-      logger.error('Error showing businesses:', error);
-    }
-  });
 
   // ===========================================
   // PLACES OF INTEREST - Categories
@@ -112,7 +29,7 @@ const registerNearbyPlacesHandlers = (bot) => {
         ),
       ]);
 
-      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby_menu')]);
+      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
       await ctx.editMessageText(
         lang === 'es'
@@ -201,103 +118,6 @@ const registerNearbyPlacesHandlers = (bot) => {
   });
 
   // ===========================================
-  // VIEW PLACE DETAILS
-  // ===========================================
-  bot.action(/^view_place_(\d+)$/, async (ctx) => {
-    try {
-      const placeId = parseInt(ctx.match[1]);
-      const lang = getLanguage(ctx);
-
-      const place = await NearbyPlaceService.getPlaceDetails(placeId, true);
-
-      if (!place) {
-        await ctx.answerCbQuery(lang === 'es' ? 'Lugar no encontrado' : 'Place not found');
-        return;
-      }
-
-      let detailsText = `${place.categoryEmoji || '📍'} *${escapeMarkdown(place.name)}*\n\n`;
-
-      if (place.description) {
-        detailsText += `${escapeMarkdown(place.description)}\n\n`;
-      }
-
-      if (place.address) {
-        detailsText += `📍 ${escapeMarkdown(place.address)}`;
-        if (place.city) detailsText += `, ${escapeMarkdown(place.city)}`;
-        detailsText += '\n';
-      }
-
-      if (place.distance !== undefined) {
-        detailsText += `📏 ${place.distance.toFixed(1)} km ${lang === 'es' ? 'de distancia' : 'away'}\n`;
-      }
-
-      if (place.priceRange) {
-        detailsText += `💰 ${place.priceRange}\n`;
-      }
-
-      if (place.phone) {
-        detailsText += `📞 ${place.phone}\n`;
-      }
-
-      detailsText += `\n👁️ ${place.viewCount} ${lang === 'es' ? 'vistas' : 'views'}`;
-
-      const buttons = [];
-
-      // Contact buttons
-      if (place.telegramUsername) {
-        buttons.push([Markup.button.url('💬 Telegram', `https://t.me/${place.telegramUsername}`)]);
-      }
-
-      if (place.website) {
-        buttons.push([Markup.button.url('🌐 Website', place.website)]);
-      }
-
-      if (place.instagram) {
-        buttons.push([Markup.button.url('📸 Instagram', `https://instagram.com/${place.instagram}`)]);
-      }
-
-      // Navigation button
-      if (place.location) {
-        buttons.push([Markup.button.url(
-          '🗺️ Open in Maps',
-          `https://www.google.com/maps/search/?api=1&query=${place.location.lat},${place.location.lng}`
-        )]);
-      }
-
-      // Back button
-      const backAction = place.placeType === 'business'
-        ? 'nearby_businesses'
-        : `nearby_cat_${place.categoryId}`;
-      buttons.push([Markup.button.callback('🔙 Back', backAction)]);
-
-      // Send photo if available, otherwise just text
-      if (place.photoFileId) {
-        try {
-          await ctx.deleteMessage().catch(() => {});
-          await ctx.replyWithPhoto(place.photoFileId, {
-            caption: detailsText,
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard(buttons),
-          });
-        } catch (photoError) {
-          logger.error('Error sending photo:', photoError);
-          await ctx.editMessageText(detailsText, {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard(buttons),
-          });
-        }
-      } else {
-        await ctx.editMessageText(detailsText, {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard(buttons),
-        });
-      }
-    } catch (error) {
-      logger.error('Error viewing place details:', error);
-    }
-  });
-
-  // ===========================================
   // SUBMIT PLACE FLOW - Start
   // ===========================================
   bot.action('submit_place_start', async (ctx) => {
@@ -328,7 +148,7 @@ const registerNearbyPlacesHandlers = (bot) => {
               lang === 'es' ? '📍 Lugar de Interés' : '📍 Place of Interest',
               'submit_type_place'
             )],
-            [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
+            [Markup.button.callback('❌ Cancel', 'show_nearby')],
           ]),
         }
       );
@@ -342,7 +162,7 @@ const registerNearbyPlacesHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
       await ctx.answerCbQuery(lang === 'es' ? 'Redirigiendo...' : 'Redirecting...');
-      
+
       // Call the new business submission handler
       ctx.callbackQuery.data = 'submit_business_profile';
       await bot.handleUpdate(ctx.update);
@@ -374,7 +194,7 @@ const registerNearbyPlacesHandlers = (bot) => {
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
+            [Markup.button.callback('❌ Cancel', 'show_nearby')],
           ]),
         }
       );
@@ -413,7 +233,7 @@ const registerNearbyPlacesHandlers = (bot) => {
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
+            [Markup.button.callback('❌ Cancel', 'show_nearby')],
           ]),
         }
       );
@@ -444,7 +264,7 @@ const registerNearbyPlacesHandlers = (bot) => {
           `submit_select_cat_${cat.id}`
         ),
       ]);
-      buttons.push([Markup.button.callback('❌ Cancel', 'show_nearby_menu')]);
+      buttons.push([Markup.button.callback('❌ Cancel', 'show_nearby')]);
 
       await ctx.editMessageText(
         lang === 'es'
@@ -483,7 +303,7 @@ const registerNearbyPlacesHandlers = (bot) => {
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
+            [Markup.button.callback('❌ Cancel', 'show_nearby')],
           ]),
         }
       );
@@ -513,7 +333,7 @@ const registerNearbyPlacesHandlers = (bot) => {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback(lang === 'es' ? '⏭️ Omitir' : '⏭️ Skip', 'submit_skip_address')],
-            [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
+            [Markup.button.callback('❌ Cancel', 'show_nearby')],
           ]),
         }
       );
@@ -540,7 +360,7 @@ const registerNearbyPlacesHandlers = (bot) => {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback(lang === 'es' ? '⏭️ Omitir' : '⏭️ Skip', 'submit_skip_city')],
-            [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
+            [Markup.button.callback('❌ Cancel', 'show_nearby')],
           ]),
         }
       );
@@ -577,7 +397,7 @@ const registerNearbyPlacesHandlers = (bot) => {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback(lang === 'es' ? '⏭️ Omitir' : '⏭️ Skip', 'submit_skip_contact')],
-            [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
+            [Markup.button.callback('❌ Cancel', 'show_nearby')],
           ]),
         }
       );
@@ -624,7 +444,7 @@ const registerNearbyPlacesHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback(lang === 'es' ? '➕ Proponer Lugar' : '➕ Suggest Place', 'submit_place_start')],
-              [Markup.button.callback('🔙 Back', 'show_nearby_menu')],
+              [Markup.button.callback('🔙 Back', 'show_nearby')],
             ]),
           }
         );
@@ -666,7 +486,7 @@ const registerNearbyPlacesHandlers = (bot) => {
       });
 
       buttons.push([Markup.button.callback(lang === 'es' ? '➕ Nueva Propuesta' : '➕ New Submission', 'submit_place_start')]);
-      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby_menu')]);
+      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
       await ctx.editMessageText(text, {
         parse_mode: 'Markdown',
@@ -905,7 +725,7 @@ const registerNearbyPlacesHandlers = (bot) => {
               parse_mode: 'Markdown',
               ...Markup.inlineKeyboard([
                 [Markup.button.callback(lang === 'es' ? '⏭️ Omitir' : '⏭️ Skip', 'submit_skip_description')],
-                [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
+                [Markup.button.callback('❌ Cancel', 'show_nearby')],
               ]),
             }
           );
@@ -928,7 +748,7 @@ const registerNearbyPlacesHandlers = (bot) => {
               parse_mode: 'Markdown',
               ...Markup.inlineKeyboard([
                 [Markup.button.callback(lang === 'es' ? '⏭️ Omitir' : '⏭️ Skip', 'submit_skip_address')],
-                [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
+                [Markup.button.callback('❌ Cancel', 'show_nearby')],
               ]),
             }
           );
@@ -949,7 +769,7 @@ const registerNearbyPlacesHandlers = (bot) => {
               parse_mode: 'Markdown',
               ...Markup.inlineKeyboard([
                 [Markup.button.callback(lang === 'es' ? '⏭️ Omitir' : '⏭️ Skip', 'submit_skip_city')],
-                [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
+                [Markup.button.callback('❌ Cancel', 'show_nearby')],
               ]),
             }
           );
@@ -980,7 +800,7 @@ const registerNearbyPlacesHandlers = (bot) => {
               parse_mode: 'Markdown',
               ...Markup.inlineKeyboard([
                 [Markup.button.callback(lang === 'es' ? '⏭️ Omitir' : '⏭️ Skip', 'submit_skip_contact')],
-                [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
+                [Markup.button.callback('❌ Cancel', 'show_nearby')],
               ]),
             }
           );
@@ -1064,7 +884,7 @@ const registerNearbyPlacesHandlers = (bot) => {
       }
 
       // Back button
-      const backAction = type === 'business' ? 'show_nearby_menu' : 'nearby_places_categories';
+      const backAction = type === 'business' ? 'show_nearby' : 'nearby_places_categories';
       buttons.push([Markup.button.callback('🔙 Back', backAction)]);
 
       await ctx.editMessageText(headerText, {
@@ -1147,7 +967,7 @@ const registerNearbyPlacesHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback(lang === 'es' ? '➕ Proponer Otro' : '➕ Suggest Another', 'submit_place_start')],
-              [Markup.button.callback('🔙 Back to Nearby', 'show_nearby_menu')],
+              [Markup.button.callback('🔙 Back to Nearby', 'show_nearby')],
             ]),
           }
         );
@@ -1162,7 +982,7 @@ const registerNearbyPlacesHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback('🔄 Try Again', 'submit_place_start')],
-              [Markup.button.callback('🔙 Back', 'show_nearby_menu')],
+              [Markup.button.callback('🔙 Back', 'show_nearby')],
             ]),
           }
         );

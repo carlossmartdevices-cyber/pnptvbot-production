@@ -1,112 +1,22 @@
 const { Markup } = require('telegraf');
 const UserService = require('../../services/userService');
-const NearbyPlaceService = require('../../services/nearbyPlaceService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 
 /**
- * Nearby users handlers
+ * Legacy nearby users handlers - kept for backward compatibility
+ * Main nearby functionality is now in nearbyUnified.js
  * @param {Telegraf} bot - Bot instance
  */
 const registerNearbyHandlers = (bot) => {
-  // Redirect old nearby action to new unified nearby
-  bot.action('show_nearby', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      
-      // Get user's current location sharing preference
-      const user = await UserService.getOrCreateFromContext(ctx);
-      const locationStatus = user.locationSharingEnabled ? '🟢 ON' : '🔴 OFF';
 
-      const headerText = lang === 'es'
-        ? '`🔥 PNP Nearby`\n\n' +
-          'Explora todo lo que está cerca de ti:\n' +
-          '👥 Miembros\n' +
-          '🏪 Negocios\n' +
-          '📍 Lugares de interés\n\n' +
-          '_Selecciona una categoría o ve todo:_'
-        : '`🔥 PNP Nearby`\n\n' +
-          'Explore everything near you:\n' +
-          '👥 Members\n' +
-          '🏪 Businesses\n' +
-          '📍 Places of interest\n\n' +
-          '_Select a category or see all:_';
-
-      await ctx.editMessageText(
-        headerText,
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [
-              Markup.button.callback('🌐 Todo', 'nearby_all'),
-              Markup.button.callback('👥 Miembros', 'nearby_users'),
-            ],
-            [
-              Markup.button.callback('🏪 Negocios', 'nearby_businesses'),
-              Markup.button.callback('📍 Lugares', 'nearby_places'),
-            ],
-            [Markup.button.callback(`📍 Location: ${locationStatus}`, 'toggle_location_sharing')],
-            [Markup.button.callback('🔙 Back', 'back_to_main')],
-          ]),
-        }
-      );
-    } catch (error) {
-      logger.error('Error showing unified nearby menu:', error);
-    }
-  });
-
-  // Toggle location sharing
-  bot.action('toggle_location_sharing', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      
-      if (!ctx.from?.id) {
-        logger.error('Missing user context in location sharing toggle');
-        await ctx.answerCbQuery(t('error', lang));
-        return;
-      }
-
-      const userId = ctx.from.id;
-      const user = await UserService.getOrCreateFromContext(ctx);
-      
-      // Toggle the current setting
-      const newSetting = !user.locationSharingEnabled;
-      
-      await UserService.updateProfile(userId, {
-        locationSharingEnabled: newSetting
-      });
-
-      const message = newSetting 
-        ? t('locationSharingToggleEnabled', lang)
-        : t('locationSharingToggleDisabled', lang);
-
-      await ctx.answerCbQuery(message);
-      
-      // Update the button text
-      await ctx.editMessageReplyMarkup({
-        inline_keyboard: ctx.callbackQuery.message.reply_markup.inline_keyboard.map(row => {
-          if (row[0]?.callback_data === 'toggle_location_sharing') {
-            const newStatus = newSetting ? '🟢 ON' : '🔴 OFF';
-            return [Markup.button.callback(`📍 Location: ${newStatus}`, 'toggle_location_sharing')];
-          }
-          return row;
-        })
-      });
-    } catch (error) {
-      logger.error('Error toggling location sharing:', error);
-      const lang = getLanguage(ctx);
-      await ctx.answerCbQuery(t('error', lang));
-    }
-  });
-
-  // Handle radius selection
+  // Legacy radius selection handler (for old UI that used radius buttons)
   bot.action(/^nearby_radius_(\d+)$/, async (ctx) => {
     try {
       const radius = parseInt(ctx.match[1], 10);
       const lang = getLanguage(ctx);
 
-      // Validate user context exists
       if (!ctx.from?.id) {
         logger.error('Missing user context in nearby users search');
         await ctx.reply(t('error', lang));
@@ -119,32 +29,43 @@ const registerNearbyHandlers = (bot) => {
       const currentUser = await UserService.getOrCreateFromContext(ctx);
       if (!currentUser.location || !currentUser.location.lat) {
         const noLocationText =
-          '`📍 Location Required`\n\n' +
-          'You need to share your location first!\n\n' +
-          '_Go to your Profile → Location to share your location, then come back here._';
+          lang === 'es'
+            ? '`📍 Ubicación Requerida`\n\n' +
+              'Necesitas compartir tu ubicación primero!\n\n' +
+              '_Ve a tu Perfil → Ubicación para compartir tu ubicación._'
+            : '`📍 Location Required`\n\n' +
+              'You need to share your location first!\n\n' +
+              '_Go to your Profile → Location to share your location._';
 
         await ctx.editMessageText(
           noLocationText,
           {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-              [Markup.button.callback('📝 Go to Profile', 'edit_profile')],
-              [Markup.button.callback('🔙 Back', 'back_to_main')],
+              [Markup.button.callback(lang === 'es' ? '📝 Ir al Perfil' : '📝 Go to Profile', 'edit_profile')],
+              [Markup.button.callback('🔙 Back', 'show_nearby')],
             ]),
           }
         );
         return;
       }
 
-      await ctx.editMessageText('🔍 _Scanning your area..._', { parse_mode: 'Markdown' });
+      await ctx.editMessageText(
+        lang === 'es' ? '🔍 _Escaneando tu área..._' : '🔍 _Scanning your area..._',
+        { parse_mode: 'Markdown' }
+      );
 
       const nearbyUsers = await UserService.getNearbyUsers(userId, radius);
 
       if (nearbyUsers.length === 0) {
         const noResultsText =
-          '`😢 No Results`\n\n' +
-          `No users found within ${radius} km 😔\n\n` +
-          '_Try a larger radius or check back later!_';
+          lang === 'es'
+            ? '`😢 Sin Resultados`\n\n' +
+              `No se encontraron usuarios dentro de ${radius} km 😔\n\n` +
+              '_Intenta un radio más grande o vuelve más tarde!_'
+            : '`😢 No Results`\n\n' +
+              `No users found within ${radius} km 😔\n\n` +
+              '_Try a larger radius or check back later!_';
 
         await ctx.editMessageText(
           noResultsText,
@@ -159,10 +80,13 @@ const registerNearbyHandlers = (bot) => {
         return;
       }
 
-      // Show list of nearby users with sexy design
-      let message = 
-        '`🔥 Nearby Hotties 🔥`\n\n' +
-        `Found **${nearbyUsers.length}** users within ${radius} km 👀\n\n`;
+      // Show list of nearby users
+      let message =
+        lang === 'es'
+          ? '`🔥 Usuarios Cercanos 🔥`\n\n' +
+            `Encontrados **${nearbyUsers.length}** usuarios dentro de ${radius} km 👀\n\n`
+          : '`🔥 Nearby Users 🔥`\n\n' +
+            `Found **${nearbyUsers.length}** users within ${radius} km 👀\n\n`;
 
       const buttons = [];
       nearbyUsers.slice(0, 10).forEach((user, index) => {
@@ -171,292 +95,15 @@ const registerNearbyHandlers = (bot) => {
         const emoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
         message += `${emoji} **${name}** - _${distance} km away_\n`;
 
-        // Create buttons - use callback for DM to avoid Telegram URL restrictions
         buttons.push([
           Markup.button.callback(`👁️ View`, `view_user_${user.id}`),
           Markup.button.callback(`💬 DM ${name}`, `dm_user_${user.id}`),
         ]);
       });
 
-      message += '\n_Tap to view profile or slide into their DMs_ 😏';
-
-      buttons.push([Markup.button.callback('🔙 Change Radius', 'show_nearby')]);
-
-      await ctx.editMessageText(message, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(buttons),
-      });
-    } catch (error) {
-      logger.error('Error showing nearby users:', error);
-      const lang = getLanguage(ctx);
-      await ctx.reply(t('error', lang));
-    }
-  });
-
-  // View user profile
-  bot.action(/^view_user_(.+)$/, async (ctx) => {
-    try {
-      // Validate match result exists
-      if (!ctx.match || !ctx.match[1]) {
-        logger.error('Invalid view user action format');
-        return;
-      }
-
-      const targetUserId = ctx.match[1];
-      const lang = getLanguage(ctx);
-
-      const user = await UserService.getById(targetUserId);
-
-      if (!user) {
-        await ctx.answerCbQuery(t('userNotFound', lang));
-        return;
-      }
-
-      // Build sexy profile card
-      let profileText = 
-        '`👤 PROFILE CARD`\n\n';
-
-      const displayName = user.firstName || 'Anonymous';
-      profileText += `**${displayName}**`;
-      if (user.lastName) profileText += ` ${user.lastName}`;
-      profileText += '\n';
-      
-      if (user.username) {
-        profileText += `@${user.username}\n`;
-      }
-
-      profileText += '\n';
-
-      if (user.bio) {
-        profileText += `💭 _"${user.bio}"_\n\n`;
-      }
-
-      if (user.interests && user.interests.length > 0) {
-        profileText += `🎯 **Into:** ${user.interests.join(', ')}\n\n`;
-      }
-
-      // Add social media if available
-      const socials = [];
-      if (user.twitter) socials.push(`𝕏 ${user.twitter}`);
-      if (user.instagram) socials.push(`IG ${user.instagram}`);
-      if (user.tiktok) socials.push(`TT ${user.tiktok}`);
-      
-      if (socials.length > 0) {
-        profileText += `🔗 ${socials.join(' • ')}\n\n`;
-      }
-
-      profileText += 
-        '`Don\'t be shy... DM! 💬`';
-
-      // Build DM button
-      let dmButton;
-      if (user.username) {
-        dmButton = Markup.button.url(`💬 Message ${displayName}`, `https://t.me/${user.username}`);
-      } else {
-        dmButton = Markup.button.url(`💬 Message ${displayName}`, `tg://user?id=${targetUserId}`);
-      }
-
-      await ctx.editMessageText(
-        profileText,
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [dmButton],
-            [Markup.button.callback('🔙 Back to List', 'show_nearby')],
-          ]),
-        }
-      );
-    } catch (error) {
-      logger.error('Error viewing user profile:', error);
-    }
-  });
-
-  // Handle DM button clicks
-  bot.action(/^dm_user_(.+)$/, async (ctx) => {
-    try {
-      // Validate match result exists
-      if (!ctx.match || !ctx.match[1]) {
-        logger.error('Invalid DM user action format');
-        return;
-      }
-
-      const targetUserId = ctx.match[1];
-      const lang = getLanguage(ctx);
-
-      // Get the target user
-      const targetUser = await UserService.getById(targetUserId);
-
-      if (!targetUser) {
-        await ctx.answerCbQuery(t('userNotFound', lang));
-        return;
-      }
-
-      // Try to open a chat with the user
-      try {
-        if (targetUser.username) {
-          // If user has a username, we can open a chat via URL
-          const chatUrl = `https://t.me/${targetUser.username}`;
-          await ctx.answerCbQuery(t('openingChat', lang), {
-            url: chatUrl,
-          });
-        } else {
-          // If no username, we can't directly open a chat
-          // Show a message with instructions
-          await ctx.answerCbQuery(t('userNoUsername', lang), {
-            show_alert: true,
-          });
-        }
-      } catch (chatError) {
-        logger.error('Error opening chat:', chatError);
-        await ctx.answerCbQuery(t('errorOpeningChat', lang), {
-          show_alert: true,
-        });
-      }
-    } catch (error) {
-      logger.error('Error handling DM action:', error);
-      const lang = getLanguage(ctx);
-      await ctx.answerCbQuery(t('error', lang), {
-        show_alert: true,
-      });
-    }
-  });
-
-  // Add new unified nearby actions to maintain compatibility
-  // Show all nearby items (users + businesses + places)
-  bot.action('nearby_all', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      const userId = ctx.from.id.toString();
-
-      // Check if user has location set
-      const currentUser = await UserService.getOrCreateFromContext(ctx);
-      if (!currentUser.location || !currentUser.location.lat) {
-        const noLocationText =
-          lang === 'es'
-            ? '`📍 Ubicación Requerida`\n\n' +
-              'Necesitas compartir tu ubicación primero!\n\n' +
-              '_Ve a tu Perfil → Ubicación para compartir tu ubicación._'
-            : '`📍 Location Required`\n\n' +
-              'You need to share your location first!\n\n' +
-              '_Go to your Profile → Location to share your location._';
-
-        await ctx.editMessageText(
-          noLocationText,
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(lang === 'es' ? '📝 Ir al Perfil' : '📝 Go to Profile', 'edit_profile')],
-              [Markup.button.callback('🔙 Back', 'show_nearby')],
-            ]),
-          }
-        );
-        return;
-      }
-
-      await ctx.editMessageText(lang === 'es' ? '🔍 _Buscando todo cerca de ti..._' : '🔍 _Searching everything near you..._', { parse_mode: 'Markdown' });
-
-      // Get all nearby items
-      const [nearbyUsers, nearbyBusinesses, nearbyPlaces] = await Promise.all([
-        UserService.getNearbyUsers(userId, 10),
-        NearbyPlaceService.getNearbyBusinesses(userId, 10),
-        NearbyPlaceService.getNearbyPlacesOfInterest(userId, 10)
-      ]);
-
-      // Combine all results
-      const allItems = [];
-      
-      // Add users
-      nearbyUsers.forEach(user => {
-        allItems.push({
-          type: 'user',
-          id: user.id,
-          name: user.firstName || 'Anonymous',
-          distance: user.distance,
-          emoji: '👥'
-        });
-      });
-
-      // Add businesses
-      nearbyBusinesses.places.forEach(business => {
-        allItems.push({
-          type: 'business',
-          id: business.id,
-          name: business.name,
-          distance: business.distance,
-          emoji: '🏪',
-          categoryEmoji: business.categoryEmoji
-        });
-      });
-
-      // Add places
-      nearbyPlaces.places.forEach(place => {
-        allItems.push({
-          type: 'place',
-          id: place.id,
-          name: place.name,
-          distance: place.distance,
-          emoji: '📍',
-          categoryEmoji: place.categoryEmoji
-        });
-      });
-
-      // Sort by distance
-      allItems.sort((a, b) => a.distance - b.distance);
-
-      if (allItems.length === 0) {
-        const noResultsText =
-          lang === 'es'
-            ? '`😢 Sin Resultados`\n\n' +
-              'No se encontró nada cerca de ti 😔\n\n' +
-              '_Intenta más tarde o sugiere un lugar!_'
-            : '`😢 No Results`\n\n' +
-              'Nothing found near you 😔\n\n' +
-              '_Try again later or suggest a place!_';
-
-        await ctx.editMessageText(
-          noResultsText,
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(lang === 'es' ? '➕ Proponer Lugar' : '➕ Suggest Place', 'submit_place_start')],
-              [Markup.button.callback('🔙 Back', 'show_nearby')],
-            ]),
-          }
-        );
-        return;
-      }
-
-      // Show results
-      let message = lang === 'es'
-        ? '`🔥 Todo Cerca de Ti 🔥`\n\n' +
-          `Encontrados **${allItems.length}** items cerca 👀\n\n`
-        : '`🔥 Everything Near You 🔥`\n\n' +
-          `Found **${allItems.length}** items nearby 👀\n\n`;
-
-      const buttons = [];
-      
-      // Show top 15 items
-      allItems.slice(0, 15).forEach((item, index) => {
-        const displayEmoji = item.categoryEmoji || item.emoji;
-        const distance = item.distance.toFixed(1);
-        const displayName = item.name.length > 20 ? item.name.substring(0, 20) + '...' : item.name;
-        
-        message += `${index + 1}. ${displayEmoji} **${displayName}** - _${distance} km_\n`;
-        
-        // Create action based on type
-        if (item.type === 'user') {
-          buttons.push([
-            Markup.button.callback(`👁️ ${displayName}`, `view_user_${item.id}`),
-            Markup.button.callback(`💬 DM`, `dm_user_${item.id}`),
-          ]);
-        } else if (item.type === 'business' || item.type === 'place') {
-          buttons.push([
-            Markup.button.callback(`📍 ${displayName}`, `view_place_${item.id}`),
-          ]);
-        }
-      });
-
-      message += '\n_Toca para ver detalles o contactar_ 😏';
+      message += lang === 'es'
+        ? '\n_Toca para ver perfil o enviar DM_ 😏'
+        : '\n_Tap to view profile or slide into their DMs_ 😏';
 
       buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
@@ -465,351 +112,11 @@ const registerNearbyHandlers = (bot) => {
         ...Markup.inlineKeyboard(buttons),
       });
     } catch (error) {
-      logger.error('Error showing all nearby items:', error);
+      logger.error('Error showing nearby users by radius:', error);
       const lang = getLanguage(ctx);
       await ctx.reply(t('error', lang));
     }
   });
-
-  // Show only nearby users
-  bot.action('nearby_users', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      const userId = ctx.from.id.toString();
-
-      // Check if user has location set
-      const currentUser = await UserService.getOrCreateFromContext(ctx);
-      if (!currentUser.location || !currentUser.location.lat) {
-        const noLocationText =
-          lang === 'es'
-            ? '`📍 Ubicación Requerida`\n\n' +
-              'Necesitas compartir tu ubicación primero!\n\n' +
-              '_Ve a tu Perfil → Ubicación para compartir tu ubicación._'
-            : '`📍 Location Required`\n\n' +
-              'You need to share your location first!\n\n' +
-              '_Go to your Profile → Location to share your location._';
-
-        await ctx.editMessageText(
-          noLocationText,
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(lang === 'es' ? '📝 Ir al Perfil' : '📝 Go to Profile', 'edit_profile')],
-              [Markup.button.callback('🔙 Back', 'show_nearby')],
-            ]),
-          }
-        );
-        return;
-      }
-
-      await ctx.editMessageText(lang === 'es' ? '🔍 _Buscando miembros cerca..._' : '🔍 _Searching for members..._', { parse_mode: 'Markdown' });
-
-      const nearbyUsers = await UserService.getNearbyUsers(userId, 10);
-
-      if (nearbyUsers.length === 0) {
-        const noResultsText =
-          lang === 'es'
-            ? '`😢 Sin Miembros`\n\n' +
-              'No se encontraron miembros cerca 😔\n\n' +
-              '_Intenta un radio más grande!_'
-            : '`😢 No Members`\n\n' +
-              'No members found nearby 😔\n\n' +
-              '_Try a larger radius!_';
-
-        await ctx.editMessageText(
-          noResultsText,
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback('🔄 Try Again', 'nearby_users')],
-              [Markup.button.callback('🔙 Back', 'show_nearby')],
-            ]),
-          }
-        );
-        return;
-      }
-
-      // Show list of nearby users
-      let message = lang === 'es'
-        ? '`🔥 Miembros Cercanos 🔥`\n\n' +
-          `Encontrados **${nearbyUsers.length}** miembros cerca 👀\n\n`
-        : '`🔥 Nearby Members 🔥`\n\n' +
-          `Found **${nearbyUsers.length}** members nearby 👀\n\n`;
-
-      const buttons = [];
-      nearbyUsers.slice(0, 10).forEach((user, index) => {
-        const name = user.firstName || 'Anonymous';
-        const distance = user.distance.toFixed(1);
-        const emoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👥';
-        message += `${emoji} **${name}** - _${distance} km away_\n`;
-
-        buttons.push([
-          Markup.button.callback(`👁️ View`, `view_user_${user.id}`),
-          Markup.button.callback(`💬 DM`, `dm_user_${user.id}`),
-        ]);
-      });
-
-      message += '\n_Tap to view profile or slide into their DMs_ 😏';
-
-      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
-
-      await ctx.editMessageText(message, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(buttons),
-      });
-    } catch (error) {
-      logger.error('Error showing nearby users:', error);
-      const lang = getLanguage(ctx);
-      await ctx.reply(t('error', lang));
-    }
-  });
-
-  // Show only nearby businesses
-  bot.action('nearby_businesses', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      const userId = ctx.from.id.toString();
-
-      await ctx.editMessageText(lang === 'es' ? '🔍 _Buscando negocios..._' : '🔍 _Searching for businesses..._', { parse_mode: 'Markdown' });
-
-      const result = await NearbyPlaceService.getNearbyBusinesses(userId, 10);
-
-      if (!result.success && result.error === 'no_location') {
-        await ctx.editMessageText(
-          lang === 'es'
-            ? '`📍 Ubicación Requerida`\n\n' +
-              'Necesitas compartir tu ubicación primero.'
-            : '`📍 Location Required`\n\n' +
-              'You need to share your location first.',
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(lang === 'es' ? '📝 Ir al Perfil' : '📝 Go to Profile', 'edit_profile')],
-              [Markup.button.callback('🔙 Back', 'show_nearby')],
-            ]),
-          }
-        );
-        return;
-      }
-
-      if (result.places.length === 0) {
-        await ctx.editMessageText(
-          lang === 'es'
-            ? '🏪 *Negocios Comunitarios*\n\n' +
-              'No hay negocios cerca de ti aún.\n\n' +
-              '¿Conoces alguno? ¡Propónlo!'
-            : '🏪 *Community Businesses*\n\n' +
-              'No businesses near you yet.\n\n' +
-              'Know any? Suggest one!',
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(lang === 'es' ? '➕ Proponer Negocio' : '➕ Suggest Business', 'submit_place_business')],
-              [Markup.button.callback('🔙 Back', 'show_nearby')],
-            ]),
-          }
-        );
-        return;
-      }
-
-      let headerText = '🏪 *Community Businesses*\n\n' +
-        `Found: ${result.places.length}\n\n`;
-
-      const buttons = [];
-      result.places.slice(0, 10).forEach((place, index) => {
-        const emoji = place.categoryEmoji || '🏪';
-        const distance = place.distance !== undefined ? ` (${place.distance.toFixed(1)} km)` : '';
-        headerText += `${index + 1}. ${emoji} *${place.name}*${distance}\n`;
-
-        buttons.push([
-          Markup.button.callback(
-            `${place.categoryEmoji || '🏪'} ${place.name.substring(0, 25)}${place.name.length > 25 ? '...' : ''}`,
-            `view_place_${place.id}`
-          ),
-        ]);
-      });
-
-      buttons.push([Markup.button.callback(lang === 'es' ? '➕ Proponer Negocio' : '➕ Suggest Business', 'submit_place_business')]);
-      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
-
-      await ctx.editMessageText(headerText, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(buttons),
-      });
-    } catch (error) {
-      logger.error('Error showing businesses:', error);
-    }
-  });
-
-  // Show only nearby places
-  bot.action('nearby_places', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      const userId = ctx.from.id.toString();
-
-      await ctx.editMessageText(lang === 'es' ? '🔍 _Buscando lugares..._' : '🔍 _Searching for places..._', { parse_mode: 'Markdown' });
-
-      const result = await NearbyPlaceService.getNearbyPlacesOfInterest(userId, 10);
-
-      if (!result.success && result.error === 'no_location') {
-        await ctx.editMessageText(
-          lang === 'es'
-            ? '`📍 Ubicación Requerida`\n\n' +
-              'Necesitas compartir tu ubicación primero.'
-            : '`📍 Location Required`\n\n' +
-              'You need to share your location first.',
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(lang === 'es' ? '📝 Ir al Perfil' : '📝 Go to Profile', 'edit_profile')],
-              [Markup.button.callback('🔙 Back', 'show_nearby')],
-            ]),
-          }
-        );
-        return;
-      }
-
-      if (result.places.length === 0) {
-        await ctx.editMessageText(
-          lang === 'es'
-            ? '📍 *Lugares de Interés*\n\n' +
-              'No hay lugares cerca de ti aún.\n\n' +
-              '¿Conoces alguno? ¡Propónlo!'
-            : '📍 *Places of Interest*\n\n' +
-              'No places near you yet.\n\n' +
-              'Know any? Suggest one!',
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(lang === 'es' ? '➕ Proponer Lugar' : '➕ Suggest Place', 'submit_place_start')],
-              [Markup.button.callback('🔙 Back', 'show_nearby')],
-            ]),
-          }
-        );
-        return;
-      }
-
-      let headerText = '📍 *Places of Interest*\n\n' +
-        `Found: ${result.places.length}\n\n`;
-
-      const buttons = [];
-      result.places.slice(0, 10).forEach((place, index) => {
-        const emoji = place.categoryEmoji || '📍';
-        const distance = place.distance !== undefined ? ` (${place.distance.toFixed(1)} km)` : '';
-        headerText += `${index + 1}. ${emoji} *${place.name}*${distance}\n`;
-
-        buttons.push([
-          Markup.button.callback(
-            `${place.categoryEmoji || '📍'} ${place.name.substring(0, 25)}${place.name.length > 25 ? '...' : ''}`,
-            `view_place_${place.id}`
-          ),
-        ]);
-      });
-
-      buttons.push([Markup.button.callback(lang === 'es' ? '➕ Proponer Lugar' : '➕ Suggest Place', 'submit_place_start')]);
-      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
-
-      await ctx.editMessageText(headerText, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(buttons),
-      });
-    } catch (error) {
-      logger.error('Error showing places:', error);
-    }
-  });
-
-  // Import place viewing functionality from nearbyPlaces.js
-  bot.action(/^view_place_(\d+)$/, async (ctx) => {
-    try {
-      const placeId = parseInt(ctx.match[1]);
-      const lang = getLanguage(ctx);
-
-      const place = await NearbyPlaceService.getPlaceDetails(placeId, true);
-
-      if (!place) {
-        await ctx.answerCbQuery(lang === 'es' ? 'Lugar no encontrado' : 'Place not found');
-        return;
-      }
-
-      let detailsText = `${place.categoryEmoji || '📍'} *${escapeMarkdown(place.name)}*\n\n`;
-
-      if (place.description) {
-        detailsText += `${escapeMarkdown(place.description)}\n\n`;
-      }
-
-      if (place.address) {
-        detailsText += `📍 ${escapeMarkdown(place.address)}`;
-        if (place.city) detailsText += `, ${escapeMarkdown(place.city)}`;
-        detailsText += '\n';
-      }
-
-      if (place.distance !== undefined) {
-        detailsText += `📏 ${place.distance.toFixed(1)} km ${lang === 'es' ? 'de distancia' : 'away'}\n`;
-      }
-
-      if (place.priceRange) {
-        detailsText += `💰 ${place.priceRange}\n`;
-      }
-
-      if (place.phone) {
-        detailsText += `📞 ${place.phone}\n`;
-      }
-
-      detailsText += `\n👁️ ${place.viewCount} ${lang === 'es' ? 'vistas' : 'views'}`;
-
-      const buttons = [];
-
-      if (place.telegramUsername) {
-        buttons.push([Markup.button.url('💬 Telegram', `https://t.me/${place.telegramUsername}`)]);
-      }
-
-      if (place.website) {
-        buttons.push([Markup.button.url('🌐 Website', place.website)]);
-      }
-
-      if (place.instagram) {
-        buttons.push([Markup.button.url('📸 Instagram', `https://instagram.com/${place.instagram}`)]);
-      }
-
-      if (place.location) {
-        buttons.push([Markup.button.url(
-          '🗺️ Open in Maps',
-          `https://www.google.com/maps/search/?api=1&query=${place.location.lat},${place.location.lng}`
-        )]);
-      }
-
-      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
-
-      if (place.photoFileId) {
-        try {
-          await ctx.deleteMessage().catch(() => {});
-          await ctx.replyWithPhoto(place.photoFileId, {
-            caption: detailsText,
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard(buttons),
-          });
-        } catch (photoError) {
-          logger.error('Error sending photo:', photoError);
-          await ctx.editMessageText(detailsText, {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard(buttons),
-          });
-        }
-      } else {
-        await ctx.editMessageText(detailsText, {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard(buttons),
-        });
-      }
-    } catch (error) {
-      logger.error('Error viewing place details:', error);
-    }
-  });
-
-  function escapeMarkdown(text) {
-    if (!text) return '';
-    return text.replace(/[_*\\[\]()~`>#+=|{}.!-]/g, '\\$&');
-  }
 };
 
 module.exports = registerNearbyHandlers;
