@@ -830,9 +830,37 @@ const shareProfile = async (ctx) => {
 
     await ctx.answerCbQuery();
 
-    // Build clean card
-    const displayName = user.username ? `@${user.username}` : (user.firstName || 'User');
+    // Build profile card in the same format as nearby members
+    let profileText = '`👤 PROFILE CARD`\n\n';
 
+    const displayName = user.firstName || 'Anonymous';
+    profileText += `**${displayName}**`;
+    if (user.lastName) profileText += ` ${user.lastName}`;
+    profileText += '\n';
+    
+    if (user.username) {
+      profileText += `@${user.username}\n`;
+    }
+
+    profileText += '\n';
+
+    if (user.bio) {
+      profileText += `💭 _"${user.bio}"_\n\n`;
+    }
+
+    // Add tribe and looking_for like in nearby display
+    if (user.tribe) {
+      profileText += `🏳️‍🌈 **Tribe:** ${user.tribe}\n`;
+    }
+    if (user.looking_for) {
+      profileText += `🔎 **Looking For:** ${user.looking_for}\n`;
+    }
+
+    if (user.interests && user.interests.length > 0) {
+      profileText += `🎯 **Into:** ${user.interests.join(', ')}\n\n`;
+    }
+
+    // Location
     let locationStr = '';
     if (user.city && user.country) {
       locationStr = `📍 ${user.city}, ${user.country}`;
@@ -841,46 +869,21 @@ const shareProfile = async (ctx) => {
     } else if (user.country) {
       locationStr = `📍 ${user.country}`;
     }
-
-    const cardLines = [
-      '╔══════════════════════════╗',
-      '║     💎 MEMBER CARD      ║',
-      '╚══════════════════════════╝',
-      '',
-      `👤 ${displayName}`,
-    ];
-
-    if (user.badges?.length > 0) {
-      const badges = user.badges.map(b => typeof b === 'string' ? b : (b.name || '')).filter(Boolean).join(' • ');
-      if (badges) cardLines.push(`🏆 ${badges}`);
-    }
-
-    cardLines.push('');
-
-    if (user.bio) cardLines.push(`📝 ${user.bio}`);
-    if (user.tribe) cardLines.push(`🏳️‍🌈 ${user.tribe}`);
-    if (user.looking_for) cardLines.push(`🔎 ${user.looking_for}`);
-    if (locationStr) cardLines.push(locationStr);
-
-    if (user.interests?.length > 0) {
-      cardLines.push(`🎯 ${user.interests.slice(0, 5).join(', ')}`);
+    if (locationStr) {
+      profileText += `${locationStr}\n\n`;
     }
 
     // Social media
     const socials = [];
-    if (user.twitter) socials.push(`X: @${user.twitter}`);
-    if (user.instagram) socials.push(`IG: @${user.instagram}`);
-    if (user.tiktok) socials.push(`TT: @${user.tiktok}`);
+    if (user.twitter) socials.push(`𝕏 ${user.twitter}`);
+    if (user.instagram) socials.push(`IG ${user.instagram}`);
+    if (user.tiktok) socials.push(`TT ${user.tiktok}`);
+    
     if (socials.length > 0) {
-      cardLines.push('');
-      cardLines.push(`🔗 ${socials.join(' | ')}`);
+      profileText += `🔗 ${socials.join(' • ')}\n\n`;
     }
 
-    cardLines.push('');
-    cardLines.push('─────────────────────────');
-    cardLines.push('🎬 PNPtv! | Entertainment Hub');
-
-    const cardText = cardLines.join('\n');
+    profileText += '_Don\'t be shy... DM! 💬_';
 
     // Keyboard with share options
     const keyboard = Markup.inlineKeyboard([
@@ -890,22 +893,26 @@ const shareProfile = async (ctx) => {
       )],
       [Markup.button.switchToChat(
         lang === 'es' ? '📨 Enviar a Chat' : '📨 Send to Chat',
-        cardText
+        profileText
       )],
       [Markup.button.callback(t('back', lang), 'show_profile')],
     ]);
 
     if (user.photoFileId) {
       await ctx.replyWithPhoto(user.photoFileId, {
-        caption: cardText,
-        ...keyboard,
+        caption: profileText,
+        parse_mode: 'Markdown',
+        ...keyboard
       });
     } else {
-      await ctx.reply(cardText, keyboard);
+      await ctx.reply(profileText, {
+        parse_mode: 'Markdown',
+        ...keyboard
+      });
     }
   } catch (error) {
     logger.error('Error sharing profile:', error);
-    await ctx.reply(t('error', getLanguage(ctx)));
+    await ctx.reply(t('error', lang));
   }
 };
 
