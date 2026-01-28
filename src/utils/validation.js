@@ -134,6 +134,18 @@ const schemas = {
     photoFileId: Joi.string().optional().allow(null),
     language: Joi.string().valid('en', 'es').optional(),
     locationSharingEnabled: Joi.boolean().optional(),
+    // Profile info fields
+    looking_for: Joi.string().max(200).optional().allow('', null),
+    tribe: Joi.string().max(100).optional().allow('', null),
+    city: Joi.string().max(100).optional().allow('', null),
+    country: Joi.string().max(100).optional().allow('', null),
+    // Social media fields
+    instagram: Joi.string().max(100).optional().allow('', null),
+    twitter: Joi.string().max(100).optional().allow('', null),
+    facebook: Joi.string().max(100).optional().allow('', null),
+    tiktok: Joi.string().max(100).optional().allow('', null),
+    youtube: Joi.string().max(200).optional().allow('', null),
+    telegram: Joi.string().max(100).optional().allow('', null),
     // Onboarding and verification flags
     onboardingComplete: Joi.boolean().optional(),
     ageVerified: Joi.boolean().optional(),
