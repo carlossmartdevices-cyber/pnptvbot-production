@@ -55,15 +55,15 @@ function getStandardButtonOptions(language = 'en') {
   const t = translations[language] || translations.en;
 
   return [
-    { key: 'home', text: t.home, type: 'url', target: `https://t.me/${botUsername}?start=1` },
-    { key: 'plans', text: t.plans, type: 'callback', data: 'show_subscription_plans' },
+    { key: 'home', text: t.home, type: 'url', target: `https://t.me/${botUsername}?start=home` },
+    { key: 'plans', text: t.plans, type: 'url', target: `https://t.me/${botUsername}?start=plans` },
     { key: 'main_room', text: t.main_room, type: 'url', target: mainRoomUrl },
     { key: 'hangouts', text: t.hangouts, type: 'url', target: hangoutsUrl },
     { key: 'videorama', text: t.videorama, type: 'url', target: videoramaUrl },
-    { key: 'nearby', text: t.nearby, type: 'callback', data: 'menu_nearby' },
-    { key: 'profile', text: t.profile, type: 'callback', data: 'show_profile' },
-    { key: 'cristina', text: t.cristina, type: 'callback', data: 'broadcast_cristina_ai' },
-    { key: 'all_features', text: t.all_features, type: 'url', target: `https://t.me/${botUsername}` },
+    { key: 'nearby', text: t.nearby, type: 'url', target: `https://t.me/${botUsername}?start=nearby` },
+    { key: 'profile', text: t.profile, type: 'url', target: `https://t.me/${botUsername}?start=profile` },
+    { key: 'cristina', text: t.cristina, type: 'url', target: `https://t.me/${botUsername}?start=cristina` },
+    { key: 'all_features', text: t.all_features, type: 'url', target: `https://t.me/${botUsername}?start=home` },
   ];
 }
 

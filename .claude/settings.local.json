@@ -219,7 +219,10 @@
       "Bash(git -C /root/pnptvbot-production log --oneline -3)",
       "Bash(git -C /root/pnptvbot-production diff src/bot/handlers/admin/index.js src/bot/handlers/user/profile.js)",
       "Bash(PGPASSWORD='Apelo801050#' psql -U pnptvbot -d pnptvbot -h localhost -c \"SELECT COUNT\\(*\\) as total_tickets, COUNT\\(*\\) FILTER \\(WHERE status = ''open''\\) as open_tickets FROM support_topics;\")",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: Update Claude Code local settings\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: Update Claude Code local settings\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(node scripts/export-unified-users.js:*)",
+      "Bash(node scripts/import-unmatched-legacy-users.js:*)",
+      "Bash(node scripts/send-welcome-to-active-subscribers.js:*)"
     ],
     "deny": [],
     "ask": []

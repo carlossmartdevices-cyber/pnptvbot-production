@@ -374,10 +374,49 @@ async function handleDeepLinkStart(ctx) {
       return handleMenuCommand(ctx);
     }
 
+    const lang = await getUserLanguage(ctx);
+
+    // Handle specific broadcast/share post deep links
+    // These take users directly to specific bot features
+    switch (startPayload) {
+      case 'home':
+      case '1': // Legacy support for ?start=1
+        return handleMenuCommand(ctx);
+
+      case 'plans':
+        // Show subscription plans screen (using reply since we're in /start context)
+        await handleDeepLinkPlans(ctx, lang);
+        return;
+
+      case 'nearby':
+        // Show nearby users screen (using reply since we're in /start context)
+        await handleDeepLinkNearby(ctx, lang);
+        return;
+
+      case 'profile':
+        // Show user profile
+        await handleProfile(ctx, lang);
+        return;
+
+      case 'cristina':
+        // Show Cristina AI assistant (using reply since we're in /start context)
+        await handleDeepLinkCristina(ctx, lang);
+        return;
+
+      case 'content':
+        // Show exclusive content screen (using reply since we're in /start context)
+        await handleDeepLinkContent(ctx, lang);
+        return;
+
+      case 'hangouts':
+        // Show hangouts/video rooms screen (using reply since we're in /start context)
+        await handleDeepLinkHangouts(ctx, lang);
+        return;
+    }
+
     // Check if it's a menu deep link
     if (startPayload.startsWith('menu_')) {
       const optionId = startPayload.replace('menu_', '');
-      const lang = await getUserLanguage(ctx);
 
       // Get the option
       const option = getOptionById(optionId);
@@ -406,6 +445,203 @@ async function handleDeepLinkStart(ctx) {
     logger.error('Error handling deep link start:', error);
     return handleMenuCommand(ctx);
   }
+}
+
+/**
+ * Handle deep link to plans screen (uses ctx.reply instead of editMessageText)
+ */
+async function handleDeepLinkPlans(ctx, lang) {
+  // Check if user is already PRIME
+  const user = await UserModel.getById(ctx.from.id);
+  const userIsPrime = isPrimeUser(user);
+
+  if (userIsPrime) {
+    // User is already PRIME - show membership status
+    const expiryText = user.planExpiry
+      ? new Date(user.planExpiry).toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+      : (lang === 'es' ? 'Sin vencimiento' : 'No expiration');
+
+    const message = lang === 'es'
+      ? `💎 *¡Ya eres miembro PRIME!*\n\n` +
+        `✅ Estado: Activo\n` +
+        `📅 Expira: ${expiryText}\n` +
+        `📦 Plan: ${user.planId || 'PRIME'}\n\n` +
+        `🎉 Disfruta de todos los beneficios exclusivos de tu membresía.`
+      : `💎 *You're already a PRIME member!*\n\n` +
+        `✅ Status: Active\n` +
+        `📅 Expires: ${expiryText}\n` +
+        `📦 Plan: ${user.planId || 'PRIME'}\n\n` +
+        `🎉 Enjoy all the exclusive benefits of your membership.`;
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')]
+    ]);
+
+    await ctx.reply(message, {
+      parse_mode: 'Markdown',
+      ...keyboard
+    });
+    return;
+  }
+
+  // User is FREE - show subscription options
+  const message = lang === 'es'
+    ? '✨ *Suscripción PRIME*\n\n' +
+      '💎 Con PRIME obtienes acceso a:\n\n' +
+      '• 📹 Salas de video exclusivas\n' +
+      '• 🔴 Transmisiones en vivo premium\n' +
+      '• 📍 Usuarios cercanos sin límites\n' +
+      '• 💬 Canal PRIME exclusivo\n\n' +
+      '¡Únete ahora y disfruta de todos los beneficios!'
+    : '✨ *PRIME Subscription*\n\n' +
+      '💎 With PRIME you get access to:\n\n' +
+      '• 📹 Exclusive video rooms\n' +
+      '• 🔴 Premium live streams\n' +
+      '• 📍 Unlimited nearby users\n' +
+      '• 💬 Exclusive PRIME channel\n\n' +
+      'Join now and enjoy all the benefits!';
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback(lang === 'es' ? '💳 Ver Planes' : '💳 View Plans', 'show_subscription_plans')],
+    [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')]
+  ]);
+
+  await ctx.reply(message, {
+    parse_mode: 'Markdown',
+    ...keyboard
+  });
+}
+
+/**
+ * Handle deep link to nearby screen (uses ctx.reply instead of editMessageText)
+ */
+async function handleDeepLinkNearby(ctx, lang) {
+  try {
+    const user = await UserService.getOrCreateFromContext(ctx);
+    const locationSharing = user.locationSharingEnabled !== false;
+    const locationStatus = locationSharing
+      ? (lang === 'es' ? 'ON ✅' : 'ON ✅')
+      : (lang === 'es' ? 'OFF ❌' : 'OFF ❌');
+
+    const message = lang === 'es'
+      ? '📍 *Usuarios Cercanos*\n\n' +
+        '¡Encuentra usuarios cerca de ti!\n\n' +
+        '👇 Selecciona un radio de búsqueda:'
+      : '📍 *Nearby Users*\n\n' +
+        'Find users near you!\n\n' +
+        '👇 Select a search radius:';
+
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback('📍 5 km', 'nearby_radius_5'),
+        Markup.button.callback('📍 10 km', 'nearby_radius_10'),
+      ],
+      [
+        Markup.button.callback('📍 25 km', 'nearby_radius_25'),
+        Markup.button.callback('📍 50 km', 'nearby_radius_50'),
+      ],
+      [Markup.button.callback(`📍 Location: ${locationStatus}`, 'toggle_location_sharing')],
+      [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')],
+    ]);
+
+    await ctx.reply(message, {
+      parse_mode: 'Markdown',
+      ...keyboard
+    });
+  } catch (error) {
+    logger.error('Error handling deep link nearby:', error);
+    await ctx.reply(
+      getMessage('ERROR_GENERIC', lang),
+      { parse_mode: 'Markdown' }
+    );
+  }
+}
+
+/**
+ * Handle deep link to Cristina AI (uses ctx.reply instead of editMessageText)
+ */
+async function handleDeepLinkCristina(ctx, lang) {
+  const message = lang === 'es'
+    ? '🤖 *Asistente IA Cristina*\n\nHola! Soy Cristina, tu asistente de IA.\n\nUsa el comando /cristina para hablar conmigo en cualquier momento.'
+    : '🤖 *Cristina AI Assistant*\n\nHi! I\'m Cristina, your AI assistant.\n\nUse the /cristina command to talk to me anytime.';
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback(lang === 'es' ? '💬 Hablar con Cristina' : '💬 Chat with Cristina', 'support_ai_chat')],
+    [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')]
+  ]);
+
+  await ctx.reply(message, {
+    parse_mode: 'Markdown',
+    ...keyboard
+  });
+}
+
+/**
+ * Handle deep link to exclusive content (uses ctx.reply instead of editMessageText)
+ */
+async function handleDeepLinkContent(ctx, lang) {
+  const message = lang === 'es'
+    ? '🎬 *Contenido Exclusivo*\n\n' +
+      'Accede a nuestra biblioteca de videos exclusivos:\n\n' +
+      '📹 Videos completos de Santino, Lex y el equipo\n' +
+      '🔥 Contenido detrás de cámaras\n' +
+      '🎭 Presentaciones especiales\n' +
+      '📺 ¡Contenido nuevo cada semana!\n\n' +
+      '💎 *Solo para miembros PRIME*'
+    : '🎬 *Exclusive Content*\n\n' +
+      'Access our exclusive video library:\n\n' +
+      '📹 Full-length videos from Santino, Lex & crew\n' +
+      '🔥 Behind-the-scenes content\n' +
+      '🎭 Special performances\n' +
+      '📺 New content added weekly!\n\n' +
+      '💎 *PRIME members only*';
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback(lang === 'es' ? '🎬 Ver Contenido' : '🎬 View Content', 'menu_content')],
+    [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')]
+  ]);
+
+  await ctx.reply(message, {
+    parse_mode: 'Markdown',
+    ...keyboard
+  });
+}
+
+/**
+ * Handle deep link to hangouts/video rooms (uses ctx.reply instead of editMessageText)
+ */
+async function handleDeepLinkHangouts(ctx, lang) {
+  const displayName = ctx.from.first_name || 'Guest';
+  const mainRoomUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+
+  const message = lang === 'es'
+    ? '🎥 *PNPtv Video Hangouts*\n\n' +
+      '¡Conecta cara a cara con la comunidad!\n\n' +
+      '✨ Salas seguras y privadas\n' +
+      '🔐 Auto-alojadas (self-hosted)\n' +
+      '📹 Grabación de pantalla deshabilitada\n' +
+      '✅ Usuarios verificados por edad\n' +
+      '👥 Videollamadas de grupo en vivo\n\n' +
+      '💡 Puedes unirte con la cámara apagada'
+    : '🎥 *PNPtv Video Hangouts*\n\n' +
+      'Connect face-to-face with the community!\n\n' +
+      '✨ Safe and private rooms\n' +
+      '🔐 Self-hosted infrastructure\n' +
+      '📹 Screen recording disabled\n' +
+      '✅ Age-verified users\n' +
+      '👥 Live group video calls\n\n' +
+      '💡 You can join with camera off';
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.url(lang === 'es' ? '🎥 Entrar a Main Room' : '🎥 Join Main Room', mainRoomUrl)],
+    [Markup.button.callback(lang === 'es' ? '🎥 Ver Todas las Salas' : '🎥 View All Rooms', 'menu_hangouts')],
+    [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')]
+  ]);
+
+  await ctx.reply(message, {
+    parse_mode: 'Markdown',
+    ...keyboard
+  });
 }
 
 /**

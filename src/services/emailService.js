@@ -87,7 +87,8 @@ class EmailService {
             subject,
             html,
             text,
-            from = this.from
+            from = this.from,
+            attachments = []
         } = options;
 
         try {
@@ -101,7 +102,8 @@ class EmailService {
                 logger.info('Email would be sent (no transporter configured):', {
                     to,
                     subject,
-                    from
+                    from,
+                    attachments: attachments.length
                 });
                 return { success: true, messageId: 'logged', mode: 'logging' };
             }
@@ -111,14 +113,16 @@ class EmailService {
                 to,
                 subject,
                 html,
-                text: text || this.stripHtml(html)
+                text: text || this.stripHtml(html),
+                attachments: attachments
             };
 
             const info = await this.transporter.sendMail(mailOptions);
             logger.info('Email sent successfully:', {
                 to,
                 subject,
-                messageId: info.messageId
+                messageId: info.messageId,
+                attachments: attachments.length
             });
 
             return {
@@ -196,6 +200,32 @@ class EmailService {
             to: email,
             subject: `📅 Invitation: ${roomTitle} - ${roomCode}`,
             html
+        });
+    }
+
+    /**
+     * Send welcome email to new user
+     * @param {Object} data - Welcome email data
+     * @returns {Promise<Object>} Send result
+     */
+    async sendWelcomeEmail(data) {
+        const {
+            email,
+            userName = 'New User',
+            attachments = [],
+            userLanguage = 'en'
+        } = data;
+
+        const html = this.getWelcomeEmailTemplate({
+            userName,
+            language: userLanguage
+        });
+
+        return await this.send({
+            to: email,
+            subject: userLanguage === 'es' ? '🎉 ¡Bienvenido a PNP TV Bot!' : '🎉 Welcome to PNP TV Bot!',
+            html,
+            attachments: attachments
         });
     }
 
@@ -742,6 +772,197 @@ class EmailService {
             <p>${unsubText}</p>
             <p>© ${new Date().getFullYear()} PNP Latino TV. All rights reserved.</p>
         </div>
+    </div>
+</body>
+</html>
+        `;
+    }
+
+    /**
+     * Get welcome email template
+     * @param {Object} data - Template data
+     * @returns {string} HTML template
+     */
+    getWelcomeEmailTemplate(data) {
+        const { userName, language = 'en' } = data;
+        const isSpanish = language === 'es';
+
+        const welcomeTitle = isSpanish ? '¡Bienvenido a PNP TV Bot!' : 'Welcome to PNP TV Bot!';
+        const greeting = isSpanish ? `Estimado ${userName},` : `Dear ${userName},`;
+        const welcomeMessage = isSpanish 
+            ? '¡Estamos encantados de darle la bienvenida a la comunidad de PNP TV! Nuestro bot y canal de Telegram están diseñados para brindarle una experiencia emocionante y atractiva.'
+            : 'We\'re thrilled to welcome you to the PNP TV community! Our Telegram bot and channel are designed to provide you with an exciting and engaging experience.';
+        
+        const whatIsPNP = isSpanish ? '¿Qué es PNP TV?' : 'What is PNP TV?';
+        const communityDesc = isSpanish 
+            ? 'PNP TV es una comunidad vibrante donde puedes:'
+            : 'PNP TV is a vibrant community where you can:';
+        
+        const communityBenefits = isSpanish ? [
+            'Conectar con personas afines',
+            'Disfrutar de contenido exclusivo y transmisiones en vivo',
+            'Participar en eventos interactivos',
+            'Acceder a funciones premium a través de nuestro bot'
+        ] : [
+            'Connect with like-minded individuals',
+            'Enjoy exclusive content and live streams',
+            'Participate in interactive events',
+            'Access premium features through our bot'
+        ];
+        
+        const botFeaturesDesc = isSpanish 
+            ? 'Nuestro bot mejora tu experiencia proporcionando:'
+            : 'Our bot enhances your experience by providing:';
+        
+        const botFeatures = isSpanish ? [
+            'Notificaciones personalizadas',
+            'Acceso fácil a contenido exclusivo',
+            'Características y juegos interactivos',
+            'Comunicación segura y privada'
+        ] : [
+            'Personalized notifications',
+            'Easy access to exclusive content',
+            'Interactive features and games',
+            'Secure and private communication'
+        ];
+        
+        const getStarted = isSpanish 
+            ? 'Para comenzar y obtener más información sobre lo que ofrecemos, visite nuestra página de inicio:'
+            : 'To get started and learn more about what we offer, visit our landing page:';
+        
+        const buttonText = isSpanish ? 'Visitar Página de Inicio de PNP TV' : 'Visit PNP TV Landing Page';
+        
+        const excitedMessage = isSpanish 
+            ? '¡Estamos emocionados de que te unas a nuestra comunidad y esperamos brindarte una experiencia increíble!'
+            : 'We\'re excited to have you join our community and look forward to providing you with an amazing experience!';
+        
+        const regards = isSpanish ? 'Atentamente,' : 'Best regards,';
+        const teamName = isSpanish ? 'El Equipo de PNP TV' : 'The PNP TV Team';
+        
+        const footerText = isSpanish 
+            ? 'Si tiene alguna pregunta, no dude en ponerse en contacto con nuestro equipo de soporte.'
+            : 'If you have any questions, please don\'t hesitate to contact our support team.';
+
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>${welcomeTitle}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #4a148c;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 0 0 5px 5px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4a148c;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .attachment-note {
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: center;
+            font-style: italic;
+        }
+        .hot-content-banner {
+            background: linear-gradient(45deg, #ff1744, #f50057);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 4px 8px rgba(244, 67, 54, 0.3);
+            border: 2px solid #ffebee;
+        }
+        .hot-content-text {
+            color: #ffeb3b;
+            font-style: italic;
+            margin-top: 8px;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #777;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>${welcomeTitle}</h1>
+    </div>
+    <div class="content">
+        <p>${greeting}</p>
+        <p>${welcomeMessage}</p>
+        
+        <div class="hot-content-banner">
+            🔥 HOT PNP ADULT CONTENT 🔥
+            <div class="hot-content-text">
+                ${isSpanish 
+                    ? '¡El corazón de nuestra comunidad es el contenido adulto PNP caliente creado por Santino y Lex!' 
+                    : 'The core of our community is the HOT PNP adult content created by Santino and Lex!'}
+            </div>
+            <div style="margin-top: 8px; font-size: 14px;">
+                🎬 Clouds & Slamming - 100% REAL 🎬
+            </div>
+        </div>
+        
+        <h2>${whatIsPNP}</h2>
+        <p>${communityDesc}</p>
+        <ul>
+            ${communityBenefits.map(benefit => `<li>${benefit}</li>`).join('')}
+        </ul>
+        
+        <p>${botFeaturesDesc}</p>
+        <ul>
+            ${botFeatures.map(feature => `<li>${feature}</li>`).join('')}
+        </ul>
+        
+        <div class="attachment-note">
+            ${isSpanish 
+                ? '📎 ¡Hemos incluido algunos documentos útiles como archivos adjuntos para ayudarle a comenzar!' 
+                : '📎 We\'ve included some helpful documents as attachments to get you started!'}
+        </div>
+        
+        <p>${getStarted}</p>
+        
+        <div style="text-align: center;">
+            <a href="https://pnptv.app/landing.html" class="button">${buttonText}</a>
+        </div>
+        
+        <p>${excitedMessage}</p>
+        
+        <p>${regards}<br>
+        ${teamName}</p>
+    </div>
+    <div class="footer">
+        <p>© ${new Date().getFullYear()} PNP TV. All rights reserved.</p>
+        <p>${footerText}</p>
     </div>
 </body>
 </html>

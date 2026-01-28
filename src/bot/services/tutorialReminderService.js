@@ -3,6 +3,9 @@ const logger = require('../../utils/logger');
 const config = require('../../config/config');
 const MessageRateLimiter = require('./messageRateLimiter');
 
+// Bot username for deep links
+const BOT_USERNAME = process.env.BOT_USERNAME || 'PNPtv_bot';
+
 /**
  * Tutorial Reminder Service
  * Sends proactive tutorial messages to the group (not privately) based on user subscription status:
@@ -170,7 +173,7 @@ As a free member, you only see previews. Upgrade to PRIME and enjoy:
 💎 *Ready to unlock everything?*
 
 Tap the button below to see our plans!`,
-        button: { text: '💎 View PRIME Plans', callback: 'show_subscription_plans' }
+        button: { text: '💎 View PRIME Plans', url: `https://t.me/${BOT_USERNAME}?start=plans` }
       },
       {
         title: 'Unlimited Nearby',
@@ -186,7 +189,7 @@ PRIME members enjoy:
 ✅ Real-time location sharing
 
 💎 *Upgrade to PRIME* and never miss a connection!`,
-        button: { text: '💎 Upgrade Now', callback: 'show_subscription_plans' }
+        button: { text: '💎 Upgrade Now', url: `https://t.me/${BOT_USERNAME}?start=plans` }
       },
 
       {
@@ -203,7 +206,7 @@ Ready to unlock all the cloudy fun? Here's how:
 💰 *Plans start at just $14.99/week*
 
 🔒 All payments are secure and private.`,
-        button: { text: '💎 View Plans', callback: 'show_subscription_plans' }
+        button: { text: '💎 View Plans', url: `https://t.me/${BOT_USERNAME}?start=plans` }
       },
       {
         title: 'Lifetime Pass',
@@ -220,7 +223,7 @@ Our *Lifetime Pass* is the best value:
 This is perfect for our most dedicated members.
 
 🔥 *Limited availability!*`,
-        button: { text: '💎 Get Lifetime Pass', callback: 'show_subscription_plans' }
+        button: { text: '💎 Get Lifetime Pass', url: `https://t.me/${BOT_USERNAME}?start=plans` }
       }
     ],
     es: [
@@ -239,7 +242,7 @@ Como miembro gratis, solo ves previews. Hazte PRIME y disfruta:
 💎 *¿Listo para desbloquear todo?*
 
 ¡Toca el botón para ver nuestros planes!`,
-        button: { text: '💎 Ver Planes PRIME', callback: 'show_subscription_plans' }
+        button: { text: '💎 Ver Planes PRIME', url: `https://t.me/${BOT_USERNAME}?start=plans` }
       },
       {
         title: 'Nearby Ilimitado',
@@ -255,7 +258,7 @@ Los miembros PRIME disfrutan:
 ✅ Ubicación en tiempo real
 
 💎 *¡Hazte PRIME* y nunca pierdas una conexión!`,
-        button: { text: '💎 Actualizar Ahora', callback: 'show_subscription_plans' }
+        button: { text: '💎 Actualizar Ahora', url: `https://t.me/${BOT_USERNAME}?start=plans` }
       },
 
       {
@@ -272,7 +275,7 @@ Los miembros PRIME disfrutan:
 💰 *Los planes empiezan en solo $14.99/semana*
 
 🔒 Todos los pagos son seguros y privados.`,
-        button: { text: '💎 Ver Planes', callback: 'show_subscription_plans' }
+        button: { text: '💎 Ver Planes', url: `https://t.me/${BOT_USERNAME}?start=plans` }
       },
       {
         title: 'Pase de por Vida',
@@ -289,7 +292,7 @@ Nuestro *Lifetime Pass* es el mejor valor:
 Esto es perfecto para nuestros miembros más dedicados.
 
 🔥 *¡Disponibilidad limitada!*`,
-        button: { text: '💎 Obtener Lifetime Pass', callback: 'show_subscription_plans' }
+        button: { text: '💎 Obtener Lifetime Pass', url: `https://t.me/${BOT_USERNAME}?start=plans` }
       }
     ]
   };
@@ -319,7 +322,7 @@ Find cloudy papis near you in seconds!
 • Refresh anytime to see who's online now
 
 🔥 *Start exploring!*`,
-        button: { text: '📍 Open Nearby', callback: 'menu_nearby' }
+        button: { text: '📍 Open Nearby', url: `https://t.me/${BOT_USERNAME}?start=nearby` }
       },
 
 
@@ -340,7 +343,7 @@ Thank you for being a PRIME member! Here's everything you have access to:
 • /support - Get help
 
 💜 *Thanks for being part of the community!*`,
-        button: { text: '📱 Open Menu', callback: 'back_to_main' }
+        button: { text: '📱 Open Menu', url: `https://t.me/${BOT_USERNAME}?start=home` }
       },
       {
         title: 'Exclusive Content',
@@ -359,7 +362,7 @@ As a PRIME member, you have access to our *exclusive video library*!
 Tap *"Exclusive Content"* in the menu to browse the full library.
 
 🍿 *What are you watching today?*`,
-        button: { text: '🎬 View Content', callback: 'menu_content' }
+        button: { text: '🎬 View Content', url: `https://t.me/${BOT_USERNAME}?start=content` }
       }
     ],
     es: [
@@ -382,7 +385,7 @@ Tap *"Exclusive Content"* in the menu to browse the full library.
 • Actualiza en cualquier momento para ver quién está en línea
 
 🔥 *¡Empieza a explorar!*`,
-        button: { text: '📍 Abrir Nearby', callback: 'menu_nearby' }
+        button: { text: '📍 Abrir Nearby', url: `https://t.me/${BOT_USERNAME}?start=nearby` }
       },
       {
         title: 'Cómo Usar Hangouts',
@@ -404,7 +407,7 @@ Tap *"Exclusive Content"* in the menu to browse the full library.
 • Crea tu propia sala privada en cualquier momento
 
 🎉 *¡Únete a la fiesta!*`,
-        button: { text: '🎥 Abrir Hangouts', callback: 'menu_hangouts' }
+        button: { text: '🎥 Abrir Hangouts', url: `https://t.me/${BOT_USERNAME}?start=hangouts` }
       },
 
       {
@@ -424,7 +427,7 @@ Tap *"Exclusive Content"* in the menu to browse the full library.
 • /support - Obtener ayuda
 
 💜 *¡Gracias por ser parte de la comunidad!*`,
-        button: { text: '📱 Abrir Menú', callback: 'back_to_main' }
+        button: { text: '📱 Abrir Menú', url: `https://t.me/${BOT_USERNAME}?start=home` }
       },
       {
         title: 'Contenido Exclusivo',
@@ -443,7 +446,7 @@ Como miembro PRIME, ¡tienes acceso a nuestra *biblioteca de videos exclusivos*!
 Toca *"Contenido Exclusivo"* en el menú para explorar toda la biblioteca.
 
 🍿 *¿Qué vas a ver hoy?*`,
-        button: { text: '🎬 Ver Contenido', callback: 'menu_content' }
+        button: { text: '🎬 Ver Contenido', url: `https://t.me/${BOT_USERNAME}?start=content` }
       }
     ]
   };
@@ -477,7 +480,9 @@ Toca *"Contenido Exclusivo"* en el menú para explorar toda la biblioteca.
 
       const keyboard = tutorial.button
         ? Markup.inlineKeyboard([
-            [Markup.button.callback(tutorial.button.text, tutorial.button.callback)]
+            tutorial.button.url
+              ? [Markup.button.url(tutorial.button.text, tutorial.button.url)]
+              : [Markup.button.callback(tutorial.button.text, tutorial.button.callback)]
           ])
         : undefined;
 
