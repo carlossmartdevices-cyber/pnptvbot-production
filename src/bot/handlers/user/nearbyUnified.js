@@ -662,6 +662,55 @@ const registerNearbyUnifiedHandlers = (bot) => {
     if (!text) return '';
     return text.replace(/[_*\\[\]()~`>#+=|{}.!-]/g, '\\$&');
   }
+
+  // Add text command support for nearby feature
+  bot.command('nearby', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      
+      // Redirect to the unified nearby menu
+      ctx.callbackQuery = { data: 'show_nearby_unified' };
+      await bot.handleUpdate(ctx.update);
+    } catch (error) {
+      logger.error('Error handling /nearby command:', error);
+    }
+  });
+
+  // Add support for "pno nearbt" command pattern
+  bot.on('text', async (ctx, next) => {
+    try {
+      const text = ctx.message.text?.trim()?.toLowerCase();
+      
+      // Check for "pno nearbt" pattern
+      if (text && (text === 'pno nearbt' || text.startsWith('pno nearbt '))) {
+        const lang = getLanguage(ctx);
+        
+        // Extract any additional parameters (like "burton")
+        const parts = text.split(' ');
+        const locationFilter = parts.length > 2 ? parts.slice(2).join(' ') : null;
+        
+        // Store location filter in session if provided
+        if (locationFilter) {
+          ctx.session.temp = ctx.session.temp || {};
+          ctx.session.temp.nearbyLocationFilter = locationFilter;
+          await ctx.saveSession();
+        }
+        
+        // Show the unified nearby menu
+        ctx.callbackQuery = { data: 'show_nearby_unified' };
+        await bot.handleUpdate(ctx.update);
+        
+        return; // Don't continue to other handlers
+      }
+      
+      // Continue to other text handlers
+      return next();
+    } catch (error) {
+      logger.error('Error handling pno nearbt command:', error);
+      return next();
+    }
+  });
+
 };
 
 module.exports = registerNearbyUnifiedHandlers;
