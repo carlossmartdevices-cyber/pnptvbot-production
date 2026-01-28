@@ -218,7 +218,7 @@ const registerMenuHandlers = (bot) => {
       
       if (isAdmin) {
         // Allow admin to access the feature for testing
-        const VideoramaHandler = require('../videoramaHandler');
+        const VideoramaHandler = require('./videoramaHandler');
         if (VideoramaHandler.handleVideoramaMenu) {
           await VideoramaHandler.handleVideoramaMenu(ctx);
         } else {
