@@ -86,6 +86,8 @@ class UserModel {
       telegram: row.telegram || null,
       looking_for: row.looking_for || null,
       tribe: row.tribe || null,
+      city: row.city || null,
+      country: row.country || null,
       // Recurring subscription fields
       cardToken: row.card_token || null,
       cardTokenMask: row.card_token_mask || null,
@@ -233,6 +235,8 @@ class UserModel {
         interests: 'interests',
         looking_for: 'looking_for',
         tribe: 'tribe',
+        city: 'city',
+        country: 'country',
         instagram: 'instagram',
         twitter: 'twitter',
         facebook: 'facebook',

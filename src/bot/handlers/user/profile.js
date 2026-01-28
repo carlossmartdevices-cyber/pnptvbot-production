@@ -6,12 +6,14 @@ const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput, safeReplyOrEdit } = require('../../utils/helpers');
 
+const GROUP_ID = process.env.GROUP_ID;
+
 /**
  * Profile handlers
  * @param {Telegraf} bot - Bot instance
  */
 const registerProfileHandlers = (bot) => {
-  // Show all interests as a popup (used by profile inline button)
+  // Show all interests as a popup
   bot.action(/^profile_interests_(\d+)$/, async (ctx) => {
     try {
       const targetUserId = ctx.match[1];
@@ -25,33 +27,24 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
-  // Show a single interest as a popup (used by profile inline buttons)
-  bot.action(/^profile_interest_(\d+)_(\d+)$/, async (ctx) => {
-    try {
-      const targetUserId = ctx.match[1];
-      const interestIndex = parseInt(ctx.match[2], 10);
-      const targetUser = await UserModel.getById(targetUserId);
-      const interests = Array.isArray(targetUser?.interests) ? targetUser.interests : [];
-      const interest = interests[interestIndex];
-      if (!interest) {
-        await ctx.answerCbQuery('Not available', { show_alert: false });
-        return;
-      }
-      await ctx.answerCbQuery(String(interest).slice(0, 200), { show_alert: true });
-    } catch (error) {
-      logger.error('Error showing profile interest:', error);
-      await ctx.answerCbQuery('Error', { show_alert: false }).catch(() => {});
-    }
-  });
-
   // Show own profile
   bot.action('show_profile', async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      logger.info(`>>> show_profile action triggered for user ${ctx.from.id}`);
       await showProfile(ctx, ctx.from.id, true, true);
     } catch (error) {
       logger.error('Error showing profile:', error);
+    }
+  });
+
+  // Edit Profile (consolidated menu)
+  bot.action(['edit_profile', 'edit_profile_info'], async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const lang = getLanguage(ctx);
+      await showEditProfileMenu(ctx, lang);
+    } catch (error) {
+      logger.error('Error showing edit profile menu:', error);
     }
   });
 
@@ -62,7 +55,6 @@ const registerProfileHandlers = (bot) => {
       await showPrivacySettings(ctx);
     } catch (error) {
       logger.error('Error showing privacy settings:', error);
-      await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
 
@@ -74,7 +66,6 @@ const registerProfileHandlers = (bot) => {
       await togglePrivacySetting(ctx, setting);
     } catch (error) {
       logger.error('Error toggling privacy setting:', error);
-      await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
 
@@ -85,7 +76,6 @@ const registerProfileHandlers = (bot) => {
       await showFavorites(ctx);
     } catch (error) {
       logger.error('Error showing favorites:', error);
-      await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
 
@@ -108,7 +98,7 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
-  // Add to favorites
+  // Add/Remove favorites
   bot.action(/^add_favorite_(\d+)$/, async (ctx) => {
     try {
       const targetUserId = ctx.match[1];
@@ -118,7 +108,6 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
-  // Remove from favorites
   bot.action(/^remove_favorite_(\d+)$/, async (ctx) => {
     try {
       const targetUserId = ctx.match[1];
@@ -128,7 +117,7 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
-  // Block user
+  // Block/Unblock user
   bot.action(/^block_user_(\d+)$/, async (ctx) => {
     try {
       const targetUserId = ctx.match[1];
@@ -138,7 +127,6 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
-  // Unblock user
   bot.action(/^unblock_user_(\d+)$/, async (ctx) => {
     try {
       const targetUserId = ctx.match[1];
@@ -148,7 +136,7 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
-  // Share profile
+  // Print/Share Profile
   bot.action('share_profile', async (ctx) => {
     try {
       await shareProfile(ctx);
@@ -157,7 +145,16 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
-  // Edit profile actions
+  // Share to group
+  bot.action('share_to_group', async (ctx) => {
+    try {
+      await shareToGroup(ctx);
+    } catch (error) {
+      logger.error('Error sharing to group:', error);
+    }
+  });
+
+  // Edit actions
   bot.action('edit_photo', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
@@ -166,27 +163,6 @@ const registerProfileHandlers = (bot) => {
       await ctx.editMessageText(t('sendPhoto', lang));
     } catch (error) {
       logger.error('Error in edit photo:', error);
-    }
-  });
-
-  // Edit 'looking_for' field
-  bot.action('edit_looking_for', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      ctx.session.temp.waitingForLookingFor = true;
-      await ctx.saveSession();
-      try {
-        await ctx.editMessageText(t('sendLookingFor', lang));
-      } catch (editError) {
-        if (editError.response?.description?.includes("can't be edited")) {
-          // Message can't be edited, send as new message instead
-          await ctx.reply(t('sendLookingFor', lang));
-        } else {
-          throw editError; // Re-throw other errors
-        }
-      }
-    } catch (error) {
-      logger.error('Error in edit looking_for:', error);
     }
   });
 
@@ -201,27 +177,6 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
-  bot.action('edit_location', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      ctx.session.temp.waitingForLocation = true;
-      await ctx.saveSession();
-
-      await ctx.answerCbQuery();
-
-      // Send new message with location request keyboard
-      await ctx.reply(
-        t('sendLocation', lang),
-        Markup.keyboard([
-          [Markup.button.locationRequest(lang === 'es' ? '📍 Compartir Ubicación' : '📍 Share Location')],
-          [lang === 'es' ? '❌ Cancelar' : '❌ Cancel'],
-        ]).resize(),
-      );
-    } catch (error) {
-      logger.error('Error in edit location:', error);
-    }
-  });
-
   bot.action('edit_interests', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
@@ -233,55 +188,6 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
-  // Social Media Handlers
-  bot.action('edit_social', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      await showSocialMediaMenu(ctx, lang);
-    } catch (error) {
-      logger.error('Error showing social media menu:', error);
-    }
-  });
-
-  // Edit Looking For
-  bot.action('edit_looking_for', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      ctx.session.temp.waitingForLookingFor = true;
-      await ctx.saveSession();
-      
-      const text = lang === 'es'
-        ? '🔎 ¿Qué estás buscando?\n\nEjemplos: "Un slam buddy", "Amigos cloudy", "Relación seria", "Diversión casual", etc.\n\nEnvía lo que buscas o "borrar" para eliminar:'
-        : '🔎 What are you looking for?\n\nExamples: "A slam buddy", "Cloudy friends", "Serious relationship", "Casual fun", etc.\n\nSend what you\'re looking for or "delete" to remove:';
-      
-      await ctx.editMessageText(text);
-    } catch (error) {
-      logger.error('Error in edit looking for:', error);
-    }
-  });
-
-  // Edit Profile (alias for edit_profile_info - used by nearby)
-  bot.action('edit_profile', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      await ctx.answerCbQuery();
-      await showEditProfileMenu(ctx, lang);
-    } catch (error) {
-      logger.error('Error showing edit profile menu:', error);
-    }
-  });
-
-  // Edit Profile Info (Bio, Interests, Tribe, Looking For)
-  bot.action('edit_profile_info', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      await showEditProfileMenu(ctx, lang);
-    } catch (error) {
-      logger.error('Error showing edit profile menu:', error);
-    }
-  });
-
-  // Edit Tribe
   bot.action('edit_tribe', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
@@ -297,23 +203,81 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
-  // Apply to PNP Contacto!
-  bot.action('apply_pnp_contacto', async (ctx) => {
+  bot.action('edit_looking_for', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
-      await showPnpContactoApplication(ctx, lang);
+      ctx.session.temp.waitingForLookingFor = true;
+      await ctx.saveSession();
+      const text = lang === 'es'
+        ? '🔎 ¿Qué estás buscando?\n\nEjemplos: "Un slam buddy", "Amigos cloudy", "Relación seria", "Diversión casual", etc.\n\nEnvía lo que buscas o "borrar" para eliminar:'
+        : '🔎 What are you looking for?\n\nExamples: "A slam buddy", "Cloudy friends", "Serious relationship", "Casual fun", etc.\n\nSend what you\'re looking for or "delete" to remove:';
+      try {
+        await ctx.editMessageText(text);
+      } catch (e) {
+        await ctx.reply(text);
+      }
     } catch (error) {
-      logger.error('Error showing PNP Contacto application:', error);
+      logger.error('Error in edit looking_for:', error);
     }
   });
 
-  // Confirm PNP Contacto Application
-  bot.action('confirm_pnp_contacto', async (ctx) => {
+  bot.action('edit_location', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
-      await submitPnpContactoApplication(ctx, lang);
+      ctx.session.temp.waitingForLocation = true;
+      await ctx.saveSession();
+      await ctx.answerCbQuery();
+      await ctx.reply(
+        t('sendLocation', lang),
+        Markup.keyboard([
+          [Markup.button.locationRequest(lang === 'es' ? '📍 Compartir Ubicación' : '📍 Share Location')],
+          [lang === 'es' ? '❌ Cancelar' : '❌ Cancel'],
+        ]).resize(),
+      );
     } catch (error) {
-      logger.error('Error submitting PNP Contacto application:', error);
+      logger.error('Error in edit location:', error);
+    }
+  });
+
+  // City editing
+  bot.action('edit_city', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      ctx.session.temp.waitingForCity = true;
+      await ctx.saveSession();
+      await ctx.editMessageText(
+        lang === 'es'
+          ? '🏙️ ¿En qué ciudad estás?\n\nEnvía el nombre de tu ciudad o "borrar" para eliminar:'
+          : '🏙️ What city are you in?\n\nSend your city name or "delete" to remove:'
+      );
+    } catch (error) {
+      logger.error('Error in edit city:', error);
+    }
+  });
+
+  // Country editing
+  bot.action('edit_country', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      ctx.session.temp.waitingForCountry = true;
+      await ctx.saveSession();
+      await ctx.editMessageText(
+        lang === 'es'
+          ? '🌍 ¿En qué país estás?\n\nEnvía el nombre de tu país o "borrar" para eliminar:'
+          : '🌍 What country are you in?\n\nSend your country name or "delete" to remove:'
+      );
+    } catch (error) {
+      logger.error('Error in edit country:', error);
+    }
+  });
+
+  // Social Media Menu
+  bot.action('edit_social', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await showSocialMediaMenu(ctx, lang);
+    } catch (error) {
+      logger.error('Error showing social media menu:', error);
     }
   });
 
@@ -324,8 +288,8 @@ const registerProfileHandlers = (bot) => {
       await ctx.saveSession();
       await ctx.editMessageText(
         lang === 'es'
-          ? '📱 Envía tu nombre de usuario de TikTok (sin @) o "borrar" para eliminar.\nEjemplo: miperfil'
-          : '📱 Send your TikTok username (without @) or "delete" to remove.\nExample: myprofile'
+          ? '📱 Envía tu nombre de usuario de TikTok (sin @) o "borrar" para eliminar:'
+          : '📱 Send your TikTok username (without @) or "delete" to remove:'
       );
     } catch (error) {
       logger.error('Error in edit tiktok:', error);
@@ -339,8 +303,8 @@ const registerProfileHandlers = (bot) => {
       await ctx.saveSession();
       await ctx.editMessageText(
         lang === 'es'
-          ? '🐦 Envía tu nombre de usuario de X/Twitter (sin @) o "borrar" para eliminar.\nEjemplo: miperfil'
-          : '🐦 Send your X/Twitter username (without @) or "delete" to remove.\nExample: myprofile'
+          ? '🐦 Envía tu nombre de usuario de X/Twitter (sin @) o "borrar" para eliminar:'
+          : '🐦 Send your X/Twitter username (without @) or "delete" to remove:'
       );
     } catch (error) {
       logger.error('Error in edit twitter:', error);
@@ -354,8 +318,8 @@ const registerProfileHandlers = (bot) => {
       await ctx.saveSession();
       await ctx.editMessageText(
         lang === 'es'
-          ? '📘 Envía tu nombre de usuario de Facebook o "borrar" para eliminar.\nEjemplo: miperfil'
-          : '📘 Send your Facebook username or "delete" to remove.\nExample: myprofile'
+          ? '📘 Envía tu nombre de usuario de Facebook o "borrar" para eliminar:'
+          : '📘 Send your Facebook username or "delete" to remove:'
       );
     } catch (error) {
       logger.error('Error in edit facebook:', error);
@@ -369,8 +333,8 @@ const registerProfileHandlers = (bot) => {
       await ctx.saveSession();
       await ctx.editMessageText(
         lang === 'es'
-          ? '📷 Envía tu nombre de usuario de Instagram (sin @) o "borrar" para eliminar.\nEjemplo: miperfil'
-          : '📷 Send your Instagram username (without @) or "delete" to remove.\nExample: myprofile'
+          ? '📷 Envía tu nombre de usuario de Instagram (sin @) o "borrar" para eliminar:'
+          : '📷 Send your Instagram username (without @) or "delete" to remove:'
       );
     } catch (error) {
       logger.error('Error in edit instagram:', error);
@@ -382,23 +346,14 @@ const registerProfileHandlers = (bot) => {
     if (ctx.session.temp?.waitingForPhoto) {
       try {
         const lang = getLanguage(ctx);
-
-        // Validate photo exists
         if (!ctx.message?.photo || ctx.message.photo.length === 0) {
-          logger.warn('Photo handler triggered but no photo found');
           await ctx.reply(t('invalidInput', lang));
           return;
         }
-
         const photo = ctx.message.photo[ctx.message.photo.length - 1];
-
-        await UserService.updateProfile(ctx.from.id, {
-          photoFileId: photo.file_id,
-        });
-
+        await UserService.updateProfile(ctx.from.id, { photoFileId: photo.file_id });
         ctx.session.temp.waitingForPhoto = false;
         await ctx.saveSession();
-
         await ctx.reply(t('photoUpdated', lang));
         await showProfile(ctx, ctx.from.id, false, true);
       } catch (error) {
@@ -406,7 +361,6 @@ const registerProfileHandlers = (bot) => {
       }
       return;
     }
-
     return next();
   });
 
@@ -414,25 +368,15 @@ const registerProfileHandlers = (bot) => {
   bot.on('location', async (ctx, next) => {
     if (ctx.session.temp?.waitingForLocation) {
       const lang = getLanguage(ctx);
-
       try {
-        // Validate location exists
-        if (!ctx.message?.location || !ctx.message.location.latitude || !ctx.message.location.longitude) {
-          logger.warn('Location handler triggered but no valid location found');
+        if (!ctx.message?.location?.latitude || !ctx.message?.location?.longitude) {
           await ctx.reply(t('invalidInput', lang), Markup.removeKeyboard());
           return;
         }
-
         const { latitude, longitude } = ctx.message.location;
-
-        const result = await UserService.updateLocation(ctx.from.id, {
-          lat: latitude,
-          lng: longitude,
-        });
-
+        const result = await UserService.updateLocation(ctx.from.id, { lat: latitude, lng: longitude });
         ctx.session.temp.waitingForLocation = false;
         await ctx.saveSession();
-
         if (result.success) {
           await ctx.reply(t('locationUpdated', lang), Markup.removeKeyboard());
           await showProfile(ctx, ctx.from.id, false, true);
@@ -445,283 +389,240 @@ const registerProfileHandlers = (bot) => {
       }
       return;
     }
-
     return next();
   });
 
-  // Handle text inputs (bio, interests, cancel)
+  // Handle text inputs
   bot.on('text', async (ctx, next) => {
     const { temp } = ctx.session;
+    const lang = getLanguage(ctx);
+    const input = ctx.message.text;
 
-    // Handle cancel for location
-    if (temp?.waitingForLocation && (ctx.message.text === '❌ Cancelar' || ctx.message.text === '❌ Cancel')) {
-      try {
-        const lang = getLanguage(ctx);
-        ctx.session.temp.waitingForLocation = false;
-        await ctx.saveSession();
-
-        await ctx.reply(t('operationCancelled', lang) || 'Operation cancelled', Markup.removeKeyboard());
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error cancelling location update:', error);
-      }
+    // Cancel location
+    if (temp?.waitingForLocation && (input === '❌ Cancelar' || input === '❌ Cancel')) {
+      ctx.session.temp.waitingForLocation = false;
+      await ctx.saveSession();
+      await ctx.reply(t('operationCancelled', lang) || 'Cancelled', Markup.removeKeyboard());
+      await showProfile(ctx, ctx.from.id, false, true);
       return;
     }
 
+    // Bio
     if (temp?.waitingForBio) {
-      try {
-        const lang = getLanguage(ctx);
-        const bio = validateUserInput(ctx.message.text, 500);
-        if (!bio) {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-        await UserService.updateProfile(ctx.from.id, { bio });
-        ctx.session.temp.waitingForBio = false;
-        await ctx.saveSession();
-        await ctx.reply(t('bioUpdated', lang));
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating bio:', error);
-      }
+      const bio = validateUserInput(input, 500);
+      if (!bio) { await ctx.reply(t('invalidInput', lang)); return; }
+      await UserService.updateProfile(ctx.from.id, { bio });
+      ctx.session.temp.waitingForBio = false;
+      await ctx.saveSession();
+      await ctx.reply(t('bioUpdated', lang));
+      await showEditProfileMenu(ctx, lang);
       return;
     }
 
-    if (temp?.waitingForLookingFor) {
-      try {
-        const lang = getLanguage(ctx);
-        const lookingFor = validateUserInput(ctx.message.text, 200);
-        if (!lookingFor) {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-        await UserService.updateProfile(ctx.from.id, { looking_for: lookingFor });
-        ctx.session.temp.waitingForLookingFor = false;
-        await ctx.saveSession();
-        await ctx.reply(t('lookingForUpdated', lang));
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating looking_for:', error);
-      }
-      return;
-    }
-
-    if (temp?.waitingForTribe) {
-      try {
-        const lang = getLanguage(ctx);
-        const input = validateUserInput(ctx.message.text, 100);
-
-        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
-          await UserService.updateProfile(ctx.from.id, { tribe: null });
-          ctx.session.temp.waitingForTribe = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ Tribu eliminada' : '✅ Tribe removed');
-        } else if (input) {
-          await UserService.updateProfile(ctx.from.id, { tribe: input });
-          ctx.session.temp.waitingForTribe = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ Tribu actualizada' : '✅ Tribe updated');
-        } else {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating tribe:', error);
-      }
-      return;
-    }
-
+    // Interests
     if (temp?.waitingForInterests) {
-      try {
-        const lang = getLanguage(ctx);
-        const inputText = validateUserInput(ctx.message.text, 500);
-
-        if (!inputText) {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-
-        const interests = inputText
-          .split(',')
-          .map((i) => i.trim())
-          .filter((i) => i.length > 0)
-          .slice(0, 10);
-
-        if (interests.length === 0) {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-
-        await UserService.updateProfile(ctx.from.id, { interests });
-
-        ctx.session.temp.waitingForInterests = false;
-        await ctx.saveSession();
-
-        await ctx.reply(t('interestsUpdated', lang));
-
-        // Small delay to ensure DB update is complete
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating interests:', error);
-      }
+      const text = validateUserInput(input, 500);
+      if (!text) { await ctx.reply(t('invalidInput', lang)); return; }
+      const interests = text.split(',').map(i => i.trim()).filter(i => i.length > 0).slice(0, 10);
+      if (interests.length === 0) { await ctx.reply(t('invalidInput', lang)); return; }
+      await UserService.updateProfile(ctx.from.id, { interests });
+      ctx.session.temp.waitingForInterests = false;
+      await ctx.saveSession();
+      await ctx.reply(t('interestsUpdated', lang));
+      await showEditProfileMenu(ctx, lang);
       return;
     }
 
-    // Looking For Handler
+    // Tribe
+    if (temp?.waitingForTribe) {
+      const value = validateUserInput(input, 100);
+      if (value && (value.toLowerCase() === 'delete' || value.toLowerCase() === 'borrar')) {
+        await UserService.updateProfile(ctx.from.id, { tribe: null });
+        await ctx.reply(lang === 'es' ? '✅ Tribu eliminada' : '✅ Tribe removed');
+      } else if (value) {
+        await UserService.updateProfile(ctx.from.id, { tribe: value });
+        await ctx.reply(lang === 'es' ? '✅ Tribu actualizada' : '✅ Tribe updated');
+      } else {
+        await ctx.reply(t('invalidInput', lang)); return;
+      }
+      ctx.session.temp.waitingForTribe = false;
+      await ctx.saveSession();
+      await showEditProfileMenu(ctx, lang);
+      return;
+    }
+
+    // Looking for
     if (temp?.waitingForLookingFor) {
-      try {
-        const lang = getLanguage(ctx);
-        const input = validateUserInput(ctx.message.text, 200);
-
-        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
-          await UserService.updateProfile(ctx.from.id, { looking_for: null });
-          ctx.session.temp.waitingForLookingFor = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ Buscando eliminado' : '✅ Looking for removed');
-        } else if (input) {
-          await UserService.updateProfile(ctx.from.id, { looking_for: input });
-          ctx.session.temp.waitingForLookingFor = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ Buscando actualizado' : '✅ Looking for updated');
-        } else {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating looking for:', error);
+      const value = validateUserInput(input, 200);
+      if (value && (value.toLowerCase() === 'delete' || value.toLowerCase() === 'borrar')) {
+        await UserService.updateProfile(ctx.from.id, { looking_for: null });
+        await ctx.reply(lang === 'es' ? '✅ Eliminado' : '✅ Removed');
+      } else if (value) {
+        await UserService.updateProfile(ctx.from.id, { looking_for: value });
+        await ctx.reply(lang === 'es' ? '✅ Actualizado' : '✅ Updated');
+      } else {
+        await ctx.reply(t('invalidInput', lang)); return;
       }
+      ctx.session.temp.waitingForLookingFor = false;
+      await ctx.saveSession();
+      await showEditProfileMenu(ctx, lang);
       return;
     }
 
-    // Social Media Handlers
-    if (temp?.waitingForTikTok) {
-      try {
-        const lang = getLanguage(ctx);
-        const input = validateUserInput(ctx.message.text, 100);
-
-        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
-          await UserService.updateProfile(ctx.from.id, { tiktok: null });
-          ctx.session.temp.waitingForTikTok = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ TikTok eliminado' : '✅ TikTok removed');
-        } else if (input) {
-          const username = input.replace('@', '').trim();
-          await UserService.updateProfile(ctx.from.id, { tiktok: username });
-          ctx.session.temp.waitingForTikTok = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ TikTok actualizado' : '✅ TikTok updated');
-        } else {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating TikTok:', error);
+    // City
+    if (temp?.waitingForCity) {
+      const value = validateUserInput(input, 100);
+      if (value && (value.toLowerCase() === 'delete' || value.toLowerCase() === 'borrar')) {
+        await UserService.updateProfile(ctx.from.id, { city: null });
+        await ctx.reply(lang === 'es' ? '✅ Ciudad eliminada' : '✅ City removed');
+      } else if (value) {
+        await UserService.updateProfile(ctx.from.id, { city: value });
+        await ctx.reply(lang === 'es' ? '✅ Ciudad actualizada' : '✅ City updated');
+      } else {
+        await ctx.reply(t('invalidInput', lang)); return;
       }
+      ctx.session.temp.waitingForCity = false;
+      await ctx.saveSession();
+      await showEditProfileMenu(ctx, lang);
       return;
     }
 
-    if (temp?.waitingForTwitter) {
-      try {
-        const lang = getLanguage(ctx);
-        const input = validateUserInput(ctx.message.text, 100);
-
-        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
-          await UserService.updateProfile(ctx.from.id, { twitter: null });
-          ctx.session.temp.waitingForTwitter = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ X/Twitter eliminado' : '✅ X/Twitter removed');
-        } else if (input) {
-          const username = input.replace('@', '').trim();
-          await UserService.updateProfile(ctx.from.id, { twitter: username });
-          ctx.session.temp.waitingForTwitter = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ X/Twitter actualizado' : '✅ X/Twitter updated');
-        } else {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating Twitter:', error);
+    // Country
+    if (temp?.waitingForCountry) {
+      const value = validateUserInput(input, 100);
+      if (value && (value.toLowerCase() === 'delete' || value.toLowerCase() === 'borrar')) {
+        await UserService.updateProfile(ctx.from.id, { country: null });
+        await ctx.reply(lang === 'es' ? '✅ País eliminado' : '✅ Country removed');
+      } else if (value) {
+        await UserService.updateProfile(ctx.from.id, { country: value });
+        await ctx.reply(lang === 'es' ? '✅ País actualizado' : '✅ Country updated');
+      } else {
+        await ctx.reply(t('invalidInput', lang)); return;
       }
+      ctx.session.temp.waitingForCountry = false;
+      await ctx.saveSession();
+      await showEditProfileMenu(ctx, lang);
       return;
     }
 
-    if (temp?.waitingForFacebook) {
-      try {
-        const lang = getLanguage(ctx);
-        const input = validateUserInput(ctx.message.text, 100);
+    // Social media handlers
+    const socialFields = [
+      { flag: 'waitingForTikTok', field: 'tiktok', name: 'TikTok' },
+      { flag: 'waitingForTwitter', field: 'twitter', name: 'X/Twitter' },
+      { flag: 'waitingForFacebook', field: 'facebook', name: 'Facebook' },
+      { flag: 'waitingForInstagram', field: 'instagram', name: 'Instagram' },
+    ];
 
-        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
-          await UserService.updateProfile(ctx.from.id, { facebook: null });
-          ctx.session.temp.waitingForFacebook = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ Facebook eliminado' : '✅ Facebook removed');
-        } else if (input) {
-          const username = input.trim();
-          await UserService.updateProfile(ctx.from.id, { facebook: username });
-          ctx.session.temp.waitingForFacebook = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ Facebook actualizado' : '✅ Facebook updated');
+    for (const { flag, field, name } of socialFields) {
+      if (temp?.[flag]) {
+        const value = validateUserInput(input, 100);
+        if (value && (value.toLowerCase() === 'delete' || value.toLowerCase() === 'borrar')) {
+          await UserService.updateProfile(ctx.from.id, { [field]: null });
+          await ctx.reply(lang === 'es' ? `✅ ${name} eliminado` : `✅ ${name} removed`);
+        } else if (value) {
+          const username = value.replace('@', '').trim();
+          await UserService.updateProfile(ctx.from.id, { [field]: username });
+          await ctx.reply(lang === 'es' ? `✅ ${name} actualizado` : `✅ ${name} updated`);
         } else {
-          await ctx.reply(t('invalidInput', lang));
-          return;
+          await ctx.reply(t('invalidInput', lang)); return;
         }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating Facebook:', error);
+        ctx.session.temp[flag] = false;
+        await ctx.saveSession();
+        await showSocialMediaMenu(ctx, lang);
+        return;
       }
-      return;
-    }
-
-    if (temp?.waitingForInstagram) {
-      try {
-        const lang = getLanguage(ctx);
-        const input = validateUserInput(ctx.message.text, 100);
-
-        if (input && (input.toLowerCase() === 'delete' || input.toLowerCase() === 'borrar')) {
-          await UserService.updateProfile(ctx.from.id, { instagram: null });
-          ctx.session.temp.waitingForInstagram = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ Instagram eliminado' : '✅ Instagram removed');
-        } else if (input) {
-          const username = input.replace('@', '').trim();
-          await UserService.updateProfile(ctx.from.id, { instagram: username });
-          ctx.session.temp.waitingForInstagram = false;
-          await ctx.saveSession();
-          await ctx.reply(lang === 'es' ? '✅ Instagram actualizado' : '✅ Instagram updated');
-        } else {
-          await ctx.reply(t('invalidInput', lang));
-          return;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await showProfile(ctx, ctx.from.id, false, true);
-      } catch (error) {
-        logger.error('Error updating Instagram:', error);
-      }
-      return;
     }
 
     return next();
   });
+};
+
+/**
+ * Show consolidated edit profile menu
+ */
+const showEditProfileMenu = async (ctx, lang) => {
+  try {
+    const user = await UserModel.getById(ctx.from.id);
+    if (!user) { await ctx.reply(t('error', lang)); return; }
+
+    // Build location string
+    let locationStr = '—';
+    if (user.city && user.country) {
+      locationStr = `${user.city}, ${user.country}`;
+    } else if (user.city) {
+      locationStr = user.city;
+    } else if (user.country) {
+      locationStr = user.country;
+    } else if (user.location) {
+      locationStr = lang === 'es' ? '📍 Coordenadas guardadas' : '📍 Coordinates saved';
+    }
+
+    const text = lang === 'es'
+      ? [
+          '`📝 Editar Perfil`',
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━━',
+          '',
+          `📝 *Bio:* ${user.bio || '—'}`,
+          `🎯 *Intereses:* ${user.interests?.length ? user.interests.join(', ') : '—'}`,
+          `🏳️‍🌈 *Tribu:* ${user.tribe || '—'}`,
+          `🔎 *Buscando:* ${user.looking_for || '—'}`,
+          '',
+          `🏙️ *Ciudad:* ${user.city || '—'}`,
+          `🌍 *País:* ${user.country || '—'}`,
+          `📍 *Ubicación:* ${locationStr}`,
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━━',
+          '',
+          '_Selecciona qué deseas actualizar:_',
+        ].join('\n')
+      : [
+          '`📝 Edit Profile`',
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━━',
+          '',
+          `📝 *Bio:* ${user.bio || '—'}`,
+          `🎯 *Interests:* ${user.interests?.length ? user.interests.join(', ') : '—'}`,
+          `🏳️‍🌈 *Tribe:* ${user.tribe || '—'}`,
+          `🔎 *Looking for:* ${user.looking_for || '—'}`,
+          '',
+          `🏙️ *City:* ${user.city || '—'}`,
+          `🌍 *Country:* ${user.country || '—'}`,
+          `📍 *Location:* ${locationStr}`,
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━━',
+          '',
+          '_Select what you want to update:_',
+        ].join('\n');
+
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback('📝 Bio', 'edit_bio'),
+        Markup.button.callback('🎯 ' + (lang === 'es' ? 'Intereses' : 'Interests'), 'edit_interests'),
+      ],
+      [
+        Markup.button.callback('🏳️‍🌈 ' + (lang === 'es' ? 'Tribu' : 'Tribe'), 'edit_tribe'),
+        Markup.button.callback('🔎 ' + (lang === 'es' ? 'Buscando' : 'Looking For'), 'edit_looking_for'),
+      ],
+      [
+        Markup.button.callback('🏙️ ' + (lang === 'es' ? 'Ciudad' : 'City'), 'edit_city'),
+        Markup.button.callback('🌍 ' + (lang === 'es' ? 'País' : 'Country'), 'edit_country'),
+      ],
+      [
+        Markup.button.callback('📍 ' + (lang === 'es' ? 'GPS' : 'GPS Location'), 'edit_location'),
+        Markup.button.callback('🔗 ' + (lang === 'es' ? 'Redes' : 'Social'), 'edit_social'),
+      ],
+      [Markup.button.callback(t('back', lang), 'show_profile')],
+    ]);
+
+    try {
+      await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
+    } catch (e) {
+      await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
+    }
+  } catch (error) {
+    logger.error('Error showing edit profile menu:', error);
+  }
 };
 
 /**
@@ -730,20 +631,33 @@ const registerProfileHandlers = (bot) => {
 const showSocialMediaMenu = async (ctx, lang) => {
   try {
     const user = await UserModel.getById(ctx.from.id);
+    if (!user) { await ctx.reply(t('error', lang)); return; }
 
-    if (!user) {
-      await ctx.reply(t('error', lang));
-      return;
-    }
-
-    let text = lang === 'es'
-      ? '📱 *Redes Sociales*\n\nEdita tus redes sociales:\n\n'
-      : '📱 *Social Media*\n\nEdit your social media:\n\n';
-
-    text += user.tiktok ? `📱 TikTok: @${user.tiktok}\n` : '📱 TikTok: -\n';
-    text += user.twitter ? `🐦 X: @${user.twitter}\n` : '🐦 X: -\n';
-    text += user.facebook ? `📘 Facebook: ${user.facebook}\n` : '📘 Facebook: -\n';
-    text += user.instagram ? `📷 Instagram: @${user.instagram}\n` : '📷 Instagram: -\n';
+    const text = lang === 'es'
+      ? [
+          '`🔗 Redes Sociales`',
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━━',
+          '',
+          `📱 *TikTok:* ${user.tiktok ? '@' + user.tiktok : '—'}`,
+          `🐦 *X/Twitter:* ${user.twitter ? '@' + user.twitter : '—'}`,
+          `📘 *Facebook:* ${user.facebook || '—'}`,
+          `📷 *Instagram:* ${user.instagram ? '@' + user.instagram : '—'}`,
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━━',
+        ].join('\n')
+      : [
+          '`🔗 Social Media`',
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━━',
+          '',
+          `📱 *TikTok:* ${user.tiktok ? '@' + user.tiktok : '—'}`,
+          `🐦 *X/Twitter:* ${user.twitter ? '@' + user.twitter : '—'}`,
+          `📘 *Facebook:* ${user.facebook || '—'}`,
+          `📷 *Instagram:* ${user.instagram ? '@' + user.instagram : '—'}`,
+          '',
+          '━━━━━━━━━━━━━━━━━━━━━━',
+        ].join('\n');
 
     const keyboard = Markup.inlineKeyboard([
       [
@@ -754,590 +668,302 @@ const showSocialMediaMenu = async (ctx, lang) => {
         Markup.button.callback('📘 Facebook', 'edit_facebook'),
         Markup.button.callback('📷 Instagram', 'edit_instagram'),
       ],
-      [Markup.button.callback(t('back', lang), 'show_profile')],
+      [Markup.button.callback(t('back', lang), 'edit_profile')],
     ]);
 
-    await ctx.editMessageText(text, {
-      parse_mode: 'Markdown',
-      ...keyboard,
-    });
+    await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
   } catch (error) {
     logger.error('Error showing social media menu:', error);
   }
 };
 
 /**
- * Show edit profile menu (Bio, Interests, Tribe, Looking For)
- */
-const showEditProfileMenu = async (ctx, lang) => {
-  try {
-    const user = await UserModel.getById(ctx.from.id);
-
-    if (!user) {
-      await ctx.reply(t('error', lang));
-      return;
-    }
-
-    let text = lang === 'es'
-      ? [
-          '📝 *Actualizar Perfil*',
-          '',
-          'Edita la información de tu perfil:',
-          '',
-          `📝 Bio: ${user.bio || '-'}`,
-          `🎯 Intereses: ${user.interests?.join(', ') || '-'}`,
-          `🏳️‍🌈 Tribu: ${user.tribe || '-'}`,
-          `🔎 Buscando: ${user.looking_for || '-'}`,
-          '',
-          'Selecciona qué deseas actualizar:',
-        ].join('\n')
-      : [
-          '📝 *Update Profile*',
-          '',
-          'Edit your profile information:',
-          '',
-          `📝 Bio: ${user.bio || '-'}`,
-          `🎯 Interests: ${user.interests?.join(', ') || '-'}`,
-          `🏳️‍🌈 Tribe: ${user.tribe || '-'}`,
-          `🔎 Looking for: ${user.looking_for || '-'}`,
-          '',
-          'Select what you want to update:',
-        ].join('\n');
-
-    const keyboard = Markup.inlineKeyboard([
-      [
-        Markup.button.callback(lang === 'es' ? '📝 Bio' : '📝 Bio', 'edit_bio'),
-        Markup.button.callback(lang === 'es' ? '🎯 Intereses' : '🎯 Interests', 'edit_interests'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '🏳️‍🌈 Tribu' : '🏳️‍🌈 Tribe', 'edit_tribe'),
-        Markup.button.callback(lang === 'es' ? '🔎 Buscando' : '🔎 Looking For', 'edit_looking_for'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '📍 Ubicación' : '📍 Location', 'edit_location'),
-      ],
-      [Markup.button.callback(t('back', lang), 'show_profile')],
-    ]);
-
-    await ctx.editMessageText(text, {
-      parse_mode: 'Markdown',
-      ...keyboard,
-    });
-  } catch (error) {
-    logger.error('Error showing edit profile menu:', error);
-  }
-};
-
-/**
- * Show PNP Contacto! application page
- */
-const showPnpContactoApplication = async (ctx, lang) => {
-  try {
-    const user = await UserModel.getById(ctx.from.id);
-
-    if (!user) {
-      await ctx.reply(t('error', lang));
-      return;
-    }
-
-    // Check if already applied
-    const alreadyApplied = user.pnpContactoStatus === 'pending' || user.pnpContactoStatus === 'approved';
-
-    let text = lang === 'es'
-      ? [
-          '⭐ *Aplicar a PNP Contacto!*',
-          '',
-          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-          '',
-          'PNP Contacto! es el roster de performers de PNPtv!',
-          '',
-          'Como miembro de PNP Contacto! podrás:',
-          '• Aparecer en el directorio de performers',
-          '• Recibir solicitudes de shows en vivo',
-          '• Conectar con otros performers',
-          '• Acceso a eventos exclusivos',
-          '• Badge especial en tu perfil',
-          '',
-          '*Requisitos:*',
-          '• Perfil completo con foto',
-          '• Membresía PRIME activa',
-          '• Bio y descripción de servicios',
-          '',
-        ].join('\n')
-      : [
-          '⭐ *Apply to PNP Contacto!*',
-          '',
-          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-          '',
-          'PNP Contacto! is PNPtv!\'s performer roster!',
-          '',
-          'As a PNP Contacto! member you can:',
-          '• Appear in the performers directory',
-          '• Receive live show requests',
-          '• Connect with other performers',
-          '• Access to exclusive events',
-          '• Special badge on your profile',
-          '',
-          '*Requirements:*',
-          '• Complete profile with photo',
-          '• Active PRIME membership',
-          '• Bio and service description',
-          '',
-        ].join('\n');
-
-    let keyboard;
-
-    if (alreadyApplied) {
-      const statusText = user.pnpContactoStatus === 'approved'
-        ? (lang === 'es' ? '✅ Ya eres miembro de PNP Contacto!' : '✅ You\'re already a PNP Contacto! member')
-        : (lang === 'es' ? '⏳ Tu aplicación está pendiente de revisión' : '⏳ Your application is pending review');
-
-      text += `\n${statusText}`;
-
-      keyboard = Markup.inlineKeyboard([
-        [Markup.button.callback(t('back', lang), 'show_profile')],
-      ]);
-    } else {
-      // Check requirements
-      const hasPhoto = !!user.photoFileId;
-      const hasBio = !!user.bio;
-      const isPrime = user.subscriptionStatus === 'active';
-
-      text += lang === 'es'
-        ? [
-            '*Tu estado:*',
-            `${hasPhoto ? '✅' : '❌'} Foto de perfil`,
-            `${hasBio ? '✅' : '❌'} Bio completada`,
-            `${isPrime ? '✅' : '❌'} Membresía PRIME`,
-          ].join('\n')
-        : [
-            '*Your status:*',
-            `${hasPhoto ? '✅' : '❌'} Profile photo`,
-            `${hasBio ? '✅' : '❌'} Bio completed`,
-            `${isPrime ? '✅' : '❌'} PRIME membership`,
-          ].join('\n');
-
-      const canApply = hasPhoto && hasBio && isPrime;
-
-      if (canApply) {
-        keyboard = Markup.inlineKeyboard([
-          [Markup.button.callback(
-            lang === 'es' ? '✨ Enviar Aplicación' : '✨ Submit Application',
-            'confirm_pnp_contacto'
-          )],
-          [Markup.button.callback(t('back', lang), 'show_profile')],
-        ]);
-      } else {
-        text += lang === 'es'
-          ? '\n\n⚠️ Completa los requisitos antes de aplicar.'
-          : '\n\n⚠️ Complete the requirements before applying.';
-
-        keyboard = Markup.inlineKeyboard([
-          [Markup.button.callback(t('back', lang), 'show_profile')],
-        ]);
-      }
-    }
-
-    await ctx.editMessageText(text, {
-      parse_mode: 'Markdown',
-      ...keyboard,
-    });
-  } catch (error) {
-    logger.error('Error showing PNP Contacto application:', error);
-  }
-};
-
-/**
- * Submit PNP Contacto! application
- */
-const submitPnpContactoApplication = async (ctx, lang) => {
-  try {
-    // Update user's PNP Contacto status
-    await UserService.updateProfile(ctx.from.id, {
-      pnpContactoStatus: 'pending',
-      pnpContactoAppliedAt: new Date(),
-    });
-
-    const text = lang === 'es'
-      ? [
-          '✅ *¡Aplicación Enviada!*',
-          '',
-          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-          '',
-          'Tu aplicación a PNP Contacto! ha sido recibida.',
-          '',
-          'Nuestro equipo revisará tu perfil y te notificaremos',
-          'cuando tu aplicación sea aprobada.',
-          '',
-          '¡Gracias por tu interés en unirte al roster de performers!',
-        ].join('\n')
-      : [
-          '✅ *Application Submitted!*',
-          '',
-          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-          '',
-          'Your application to PNP Contacto! has been received.',
-          '',
-          'Our team will review your profile and notify you',
-          'when your application is approved.',
-          '',
-          'Thank you for your interest in joining the performer roster!',
-        ].join('\n');
-
-    const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(t('back', lang), 'show_profile')],
-    ]);
-
-    await ctx.editMessageText(text, {
-      parse_mode: 'Markdown',
-      ...keyboard,
-    });
-
-    await ctx.answerCbQuery(lang === 'es' ? '✅ Aplicación enviada' : '✅ Application submitted');
-  } catch (error) {
-    logger.error('Error submitting PNP Contacto application:', error);
-  }
-};
-
-/**
- * Show user profile
- * @param {Context} ctx - Telegraf context
- * @param {string|number} targetUserId - User ID to show
- * @param {boolean} edit - Whether to edit existing message
- * @param {boolean} isOwnProfile - Whether this is the user's own profile
+ * Show user profile - Clean design
  */
 const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false) => {
   try {
     const lang = getLanguage(ctx);
     const viewerId = ctx.from.id;
-    const botUsername = ctx.botInfo?.username || process.env.BOT_USERNAME || 'pnptv_bot';
+    const botUsername = ctx.botInfo?.username || 'PNPLatinoTV_bot';
 
-    // Get target user
     const targetUser = await UserModel.getById(targetUserId);
+    if (!targetUser) { await ctx.reply(t('userNotFound', lang)); return; }
 
-    if (!targetUser) {
-      await ctx.reply(t('userNotFound', lang));
-      return;
-    }
-
-    // Check if viewer is blocked
+    // Check blocks
     if (!isOwnProfile) {
       const isBlocked = await UserModel.isBlocked(targetUserId, viewerId);
       const hasBlockedTarget = await UserModel.isBlocked(viewerId, targetUserId);
-
-      if (isBlocked || hasBlockedTarget) {
-        await ctx.reply(t('cannotViewProfile', lang));
-        return;
-      }
-
-      // Increment profile views
+      if (isBlocked || hasBlockedTarget) { await ctx.reply(t('cannotViewProfile', lang)); return; }
       await UserModel.incrementProfileViews(targetUserId);
     }
 
-    // Build profile text with new design
-    let profileText = '';
+    // Build profile card text
+    const displayName = targetUser.username ? `@${targetUser.username}` : (targetUser.firstName || 'User');
 
-    if (isOwnProfile) {
-      // New header design for own profile
-      profileText = lang === 'es'
-        ? '`📸 Mi Perfil PNPtv`\n\n' +
-          'Tu perfil es tu identidad en la comunidad.\n' +
-          'Se mostrará junto a cada foto que compartas,\n' +
-          'ayudando a otros a conectar contigo.\n\n'
-        : '`📸 My PNPtv Profile`\n\n' +
-          'Your profile is your identity in the community.\n' +
-          'It shows alongside every photo you share,\n' +
-          'helping others connect with you.\n\n';
+    // Location string
+    let locationStr = '';
+    if (targetUser.city && targetUser.country) {
+      locationStr = `${targetUser.city}, ${targetUser.country}`;
+    } else if (targetUser.city) {
+      locationStr = targetUser.city;
+    } else if (targetUser.country) {
+      locationStr = targetUser.country;
     }
 
-    // Username header
-    const displayName = targetUser.username 
-      ? `@${targetUser.username}` 
-      : targetUser.firstName || 'User';
-    profileText += `**${displayName}**\n`;
-    profileText += '______________________________\n\n';
+    // Build card lines
+    const cardLines = [
+      `👤 *${displayName}*`,
+    ];
 
-    // Badges line (emojis only)
-    if (targetUser.badges && targetUser.badges.length > 0) {
-      const badgeEmojis = targetUser.badges.map(badge => {
-        if (typeof badge === 'string') {
-          // Map known badge names to emojis
-          const badgeEmojiMap = {
-            'verified': '✅',
-            'premium': '💎',
-            'vip': '👑',
-            'moderator': '🛡️',
-            'admin': '👨‍💼',
-            'trailblazer': '🏆',
-            'Trailblazer': '🏆',
-          };
-          return badgeEmojiMap[badge] || '⭐';
-        }
-        if (typeof badge === 'object' && badge.emoji) {
-          return badge.emoji;
-        }
-        if (typeof badge === 'object' && badge.icon) {
-          return badge.icon;
-        }
-        return '';
-      }).filter(Boolean).join(' ');
-      
-      if (badgeEmojis) {
-        profileText += `${badgeEmojis}\n\n`;
-      }
+    // Badges
+    if (targetUser.badges?.length > 0) {
+      const badgeEmojis = targetUser.badges.map(b => {
+        const map = { verified: '✅', premium: '💎', vip: '👑', moderator: '🛡️', trailblazer: '🏆' };
+        return typeof b === 'string' ? (map[b] || '⭐') : (b.emoji || b.icon || '⭐');
+      }).join(' ');
+      if (badgeEmojis) cardLines.push(badgeEmojis);
     }
 
-    // Bio
-    if (targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
-      profileText += `📝 ${targetUser.bio}\n`;
+    cardLines.push('');
+
+    if (targetUser.bio) cardLines.push(`📝 ${targetUser.bio}`);
+    if (targetUser.tribe) cardLines.push(`🏳️‍🌈 ${targetUser.tribe}`);
+    if (targetUser.looking_for) cardLines.push(`🔎 ${targetUser.looking_for}`);
+    if (locationStr) cardLines.push(`📍 ${locationStr}`);
+
+    // Subscription
+    if (targetUser.subscriptionStatus === 'active') {
+      cardLines.push(`💎 PRIME`);
     }
 
-    // Location
-    if (targetUser.location && (isOwnProfile || targetUser.privacy?.showLocation !== false)) {
-      profileText += `📍 ${lang === 'es' ? 'Ubicación compartida' : 'Location shared'}\n`;
-    }
+    cardLines.push('');
+    cardLines.push(`💜 PNPtv`);
 
-    // Location sharing status (only for own profile)
-    if (isOwnProfile && targetUser.locationSharingEnabled !== undefined) {
-      const locationStatus = targetUser.locationSharingEnabled 
-        ? lang === 'es' ? '🟢 Visible en Cercanos' : '🟢 Visible on Nearby'
-        : lang === 'es' ? '🔴 Oculto en Cercanos' : '🔴 Hidden on Nearby';
-      profileText += `🌍 ${lang === 'es' ? 'Compartir ubicación' : 'Location sharing'}: ${locationStatus}\n`;
-    }
-
-    // Looking for
-    if (targetUser.looking_for && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
-      profileText += `🔎 ${lang === 'es' ? 'Buscando' : 'Looking for'}: ${targetUser.looking_for}\n`;
-    }
-
-    // Tribe
-    if (targetUser.tribe && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
-      profileText += `🏳️‍🌈 ${lang === 'es' ? 'Tribu' : 'Tribe'}: ${targetUser.tribe}\n`;
-    }
-
-    // Interests
-    if (targetUser.interests && targetUser.interests.length > 0 && (isOwnProfile || targetUser.privacy?.showInterests !== false)) {
-      profileText += `🎯 ${targetUser.interests.join(', ')}\n`;
-    }
-
-    profileText += '______________________________\n';
-
-    // Social media section
-    const hasSocialMedia = targetUser.tiktok || targetUser.twitter || targetUser.youtube || targetUser.instagram || targetUser.telegram;
-    if (hasSocialMedia) {
-      profileText += `\n📱 ${lang === 'es' ? 'Redes Sociales' : 'Social Media'}:\n`;
-      if (targetUser.tiktok) profileText += `  TikTok: @${targetUser.tiktok}\n`;
-      if (targetUser.twitter) profileText += `  X: @${targetUser.twitter}\n`;
-      if (targetUser.youtube) profileText += `  YouTube: ${targetUser.youtube}\n`;
-      if (targetUser.instagram) profileText += `  Instagram: @${targetUser.instagram}\n`;
-      if (targetUser.telegram) profileText += `  Telegram: @${targetUser.telegram}\n`;
-    }
-
-    // Subscription status
-    if (targetUser.subscriptionStatus === 'active' && targetUser.planExpiry) {
-      let expiry;
-      if (targetUser.planExpiry.toDate && typeof targetUser.planExpiry.toDate === 'function') {
-        expiry = targetUser.planExpiry.toDate();
-      } else if (targetUser.planExpiry._seconds) {
-        expiry = new Date(targetUser.planExpiry._seconds * 1000);
-      } else {
-        expiry = new Date(targetUser.planExpiry);
-      }
-      if (expiry && !isNaN(expiry.getTime())) {
-        profileText += `\n💎 PRIME ${lang === 'es' ? 'hasta' : 'until'} ${moment(expiry).format('MMM DD, YYYY')}\n`;
-      }
-    } else if (isOwnProfile) {
-      profileText += `\n⭐ ${lang === 'es' ? 'Plan Gratis' : 'Free Plan'}\n`;
-    }
-
-    // Member since
-    let createdAtDate;
-    if (targetUser.createdAt) {
-      if (typeof targetUser.createdAt === 'object' && typeof targetUser.createdAt.toDate === 'function') {
-        createdAtDate = targetUser.createdAt.toDate();
-      } else if (targetUser.createdAt._seconds) {
-        createdAtDate = new Date(targetUser.createdAt._seconds * 1000);
-      } else if (typeof targetUser.createdAt === 'string' || typeof targetUser.createdAt === 'number') {
-        createdAtDate = new Date(targetUser.createdAt);
-      }
-    }
-    const validDate = createdAtDate && !isNaN(createdAtDate.getTime())
-      ? moment(createdAtDate).format('MMM DD, YYYY')
-      : lang === 'es' ? 'Recientemente' : 'Recently';
-    profileText += `${lang === 'es' ? 'Miembro desde' : 'Member since'}: ${validDate}\n`;
-
-    // Profile views (only for own profile)
-    if (isOwnProfile) {
-      profileText += `👁️ ${lang === 'es' ? 'Vistas' : 'Views'}: ${targetUser.profileViews || 0}\n`;
-    }
-
-    const normalizeHandle = (value) => String(value || '').trim().replace(/^@/, '');
-
-    const buildProfileCardText = () => {
-      const lines = [];
-      const displayNameLine = targetUser.username ? `@${targetUser.username}` : (targetUser.firstName || 'User');
-      lines.push(`👤 ${displayNameLine}`);
-      if (targetUser.bio && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
-        lines.push(`📝 ${String(targetUser.bio).trim().slice(0, 240)}`);
-      }
-      if (targetUser.looking_for && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
-        lines.push(`🔎 ${lang === 'es' ? 'Buscando' : 'Looking for'}: ${String(targetUser.looking_for).trim().slice(0, 120)}`);
-      }
-      if (targetUser.tribe && (isOwnProfile || targetUser.privacy?.showBio !== false)) {
-        lines.push(`🏳️‍🌈 ${lang === 'es' ? 'Tribu' : 'Tribe'}: ${String(targetUser.tribe).trim().slice(0, 60)}`);
-      }
-      lines.push(lang === 'es' ? '💜 PNPtv' : '💜 PNPtv');
-      return ['```', ...lines, '```'].join('\n');
-    };
+    const profileText = cardLines.join('\n');
 
     // Build keyboard
     const keyboard = [];
 
-    // Interests popup button
-    if (targetUser.interests && targetUser.interests.length > 0 && (isOwnProfile || targetUser.privacy?.showInterests !== false)) {
-      keyboard.push([Markup.button.callback(lang === 'es' ? '🎯 Intereses' : '🎯 Interests', `profile_interests_${targetUserId}`)]);
+    // Interests popup button (if has interests)
+    if (targetUser.interests?.length > 0) {
+      keyboard.push([Markup.button.callback(`🎯 ${lang === 'es' ? 'Ver Intereses' : 'View Interests'}`, `profile_interests_${targetUserId}`)]);
     }
 
-    // Social inline buttons (only active fields): X, Facebook, TikTok, YouTube
+    // Social media links
     const socialButtons = [];
-    if (targetUser.twitter) {
-      socialButtons.push(Markup.button.url('X', `https://x.com/${encodeURIComponent(normalizeHandle(targetUser.twitter))}`));
-    }
-    if (targetUser.facebook) {
-      socialButtons.push(Markup.button.url('Facebook', `https://facebook.com/${encodeURIComponent(normalizeHandle(targetUser.facebook))}`));
-    }
-    if (targetUser.tiktok) {
-      socialButtons.push(Markup.button.url('TikTok', `https://www.tiktok.com/@${encodeURIComponent(normalizeHandle(targetUser.tiktok))}`));
-    }
-    if (targetUser.youtube) {
-      const youtubeValue = String(targetUser.youtube).trim();
-      const youtubeUrl = youtubeValue.startsWith('http') ? youtubeValue : `https://www.youtube.com/@${encodeURIComponent(normalizeHandle(youtubeValue))}`;
-      socialButtons.push(Markup.button.url('YouTube', youtubeUrl));
-    }
-    for (let i = 0; i < socialButtons.length; i += 2) {
-      keyboard.push(socialButtons.slice(i, i + 2));
-    }
+    if (targetUser.twitter) socialButtons.push(Markup.button.url('X', `https://x.com/${targetUser.twitter}`));
+    if (targetUser.instagram) socialButtons.push(Markup.button.url('IG', `https://instagram.com/${targetUser.instagram}`));
+    if (targetUser.tiktok) socialButtons.push(Markup.button.url('TikTok', `https://tiktok.com/@${targetUser.tiktok}`));
+    if (targetUser.facebook) socialButtons.push(Markup.button.url('FB', `https://facebook.com/${targetUser.facebook}`));
 
-    // Always show "All features" link for convenience
-    keyboard.push([Markup.button.url(lang === 'es' ? '✨ Todas las funciones' : '✨ All features', `https://t.me/${botUsername}?start=from_profile`)]);
-
-    // If user has a profile photo, show the profile as a photo + card caption
-    if (targetUser.photoFileId) {
-      if (edit && ctx.callbackQuery?.message?.message_id) {
-        try { await ctx.deleteMessage(); } catch (e) { /* ignore */ }
-      }
-      const caption = buildProfileCardText();
-      try {
-        await ctx.replyWithPhoto(targetUser.photoFileId, {
-          caption,
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard(keyboard),
-        });
-        return;
-      } catch (photoError) {
-        logger.error('Error sending profile photo, falling back to text profile:', {
-          userId: targetUser.id,
-          photoFileId: targetUser.photoFileId,
-          error: photoError.message
-        });
-        // Fall back to text-based profile if photo fails
-      }
+    for (let i = 0; i < socialButtons.length; i += 3) {
+      keyboard.push(socialButtons.slice(i, i + 3));
     }
 
     if (isOwnProfile) {
-      // Options footer
-      profileText += `\n\`${lang === 'es' ? 'Edita tu perfil abajo 💜' : 'Edit your profile below 💜'}\`\n`;
-
-      // Row 1: Update Profile | Update Picture
+      // Own profile actions
       keyboard.push([
-        Markup.button.callback(
-          lang === 'es' ? '📝 Actualizar Perfil' : '📝 Update Profile',
-          'edit_profile_info'
-        ),
-        Markup.button.callback(
-          lang === 'es' ? '📸 Actualizar Foto' : '📸 Update Picture',
-          'edit_photo'
-        ),
+        Markup.button.callback(`📝 ${lang === 'es' ? 'Editar' : 'Edit'}`, 'edit_profile'),
+        Markup.button.callback(`📸 ${lang === 'es' ? 'Foto' : 'Photo'}`, 'edit_photo'),
       ]);
-
-      // Row 2: Quick Access - Looking For | Tribe
       keyboard.push([
-        Markup.button.callback(
-          lang === 'es' ? '🔎 Buscando' : '🔎 Looking For',
-          'edit_looking_for'
-        ),
-        Markup.button.callback(
-          lang === 'es' ? '🏳️‍🌈 Tribu' : '🏳️‍🌈 Tribe',
-          'edit_tribe'
-        ),
+        Markup.button.callback(`🖨️ ${lang === 'es' ? 'Imprimir Tarjeta' : 'Print Card'}`, 'share_profile'),
       ]);
-
-      // Row 3: Location | Profile Settings
       keyboard.push([
-        Markup.button.callback(
-          lang === 'es' ? '📍 Ubicación' : '📍 Location',
-          'edit_location'
-        ),
-        Markup.button.callback(
-          lang === 'es' ? '⚙️ Ajustes de Perfil' : '⚙️ Profile Settings',
-          'privacy_settings'
-        ),
+        Markup.button.callback(`⚙️ ${lang === 'es' ? 'Privacidad' : 'Privacy'}`, 'privacy_settings'),
       ]);
-
-      // Row 4: Social Media | Print My Profile
-      keyboard.push([
-        Markup.button.callback(
-          lang === 'es' ? '🔗 Redes Sociales' : '🔗 Social Media',
-          'edit_social'
-        ),
-        Markup.button.callback(
-          lang === 'es' ? '🖨️ Imprimir Mi Perfil' : '🖨️ Print My Profile',
-          'share_profile'
-        ),
-      ]);
-
-      // Row 5: Apply to PNP Contacto!
-      keyboard.push([
-        Markup.button.callback(
-          lang === 'es' ? '⭐ Aplicar a PNP Contacto!' : '⭐ Apply to PNP Contacto!',
-          'apply_pnp_contacto'
-        ),
-      ]);
-
-      // Row 4: Favorites | Blocked
       keyboard.push([
         Markup.button.callback(t('myFavorites', lang), 'show_favorites'),
         Markup.button.callback(t('blockedUsers', lang), 'show_blocked'),
       ]);
-
-      // Back button
       keyboard.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
     } else {
-      // Other user's profile - interaction options
+      // Other user actions
       const viewer = await UserModel.getById(viewerId);
-      const isFavorite = viewer.favorites && viewer.favorites.includes(targetUserId.toString());
-
-      if (isFavorite) {
-        keyboard.push([Markup.button.callback(t('removeFromFavorites', lang), `remove_favorite_${targetUserId}`)]);
-      } else {
-        keyboard.push([Markup.button.callback(t('addToFavorites', lang), `add_favorite_${targetUserId}`)]);
-      }
-
+      const isFavorite = viewer.favorites?.includes(targetUserId.toString());
+      keyboard.push([Markup.button.callback(
+        isFavorite ? t('removeFromFavorites', lang) : t('addToFavorites', lang),
+        isFavorite ? `remove_favorite_${targetUserId}` : `add_favorite_${targetUserId}`
+      )]);
       keyboard.push([Markup.button.callback(t('blockUser', lang), `block_user_${targetUserId}`)]);
       keyboard.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
     }
 
+    // Send with photo if available
+    if (targetUser.photoFileId) {
+      if (edit && ctx.callbackQuery?.message?.message_id) {
+        try { await ctx.deleteMessage(); } catch (e) {}
+      }
+      try {
+        await ctx.replyWithPhoto(targetUser.photoFileId, {
+          caption: profileText,
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard(keyboard),
+        });
+        return;
+      } catch (e) {
+        logger.error('Photo send failed, falling back to text:', e.message);
+      }
+    }
+
+    // Text fallback
     if (edit) {
-      // Use safeReplyOrEdit to handle both text and media message callbacks
       await safeReplyOrEdit(ctx, profileText, Markup.inlineKeyboard(keyboard));
     } else {
-      await ctx.reply(profileText, Markup.inlineKeyboard(keyboard));
+      await ctx.reply(profileText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(keyboard) });
     }
 
   } catch (error) {
     logger.error('Error in showProfile:', error);
-    const lang = ctx.session?.language || 'en';
-    await ctx.reply(t('error', lang));
+    await ctx.reply(t('error', getLanguage(ctx)));
+  }
+};
+
+/**
+ * Share/Print profile card - Clean design with group share option
+ */
+const shareProfile = async (ctx) => {
+  try {
+    const lang = getLanguage(ctx);
+    const user = await UserModel.getById(ctx.from.id);
+    if (!user) { await ctx.reply(t('error', lang)); return; }
+
+    await ctx.answerCbQuery();
+
+    // Build clean card
+    const displayName = user.username ? `@${user.username}` : (user.firstName || 'User');
+
+    let locationStr = '';
+    if (user.city && user.country) {
+      locationStr = `📍 ${user.city}, ${user.country}`;
+    } else if (user.city) {
+      locationStr = `📍 ${user.city}`;
+    } else if (user.country) {
+      locationStr = `📍 ${user.country}`;
+    }
+
+    const cardLines = [
+      '╔══════════════════════════╗',
+      '║     💎 MEMBER CARD      ║',
+      '╚══════════════════════════╝',
+      '',
+      `👤 ${displayName}`,
+    ];
+
+    if (user.badges?.length > 0) {
+      const badges = user.badges.map(b => typeof b === 'string' ? b : (b.name || '')).filter(Boolean).join(' • ');
+      if (badges) cardLines.push(`🏆 ${badges}`);
+    }
+
+    cardLines.push('');
+
+    if (user.bio) cardLines.push(`📝 ${user.bio}`);
+    if (user.tribe) cardLines.push(`🏳️‍🌈 ${user.tribe}`);
+    if (user.looking_for) cardLines.push(`🔎 ${user.looking_for}`);
+    if (locationStr) cardLines.push(locationStr);
+
+    if (user.interests?.length > 0) {
+      cardLines.push(`🎯 ${user.interests.slice(0, 5).join(', ')}`);
+    }
+
+    // Social media
+    const socials = [];
+    if (user.twitter) socials.push(`X: @${user.twitter}`);
+    if (user.instagram) socials.push(`IG: @${user.instagram}`);
+    if (user.tiktok) socials.push(`TT: @${user.tiktok}`);
+    if (socials.length > 0) {
+      cardLines.push('');
+      cardLines.push(`🔗 ${socials.join(' | ')}`);
+    }
+
+    cardLines.push('');
+    cardLines.push('─────────────────────────');
+    cardLines.push('🎬 PNPtv! | Entertainment Hub');
+
+    const cardText = cardLines.join('\n');
+
+    // Keyboard with share options
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback(
+        lang === 'es' ? '📤 Compartir en Grupo' : '📤 Share to Group',
+        'share_to_group'
+      )],
+      [Markup.button.switchToChat(
+        lang === 'es' ? '📨 Enviar a Chat' : '📨 Send to Chat',
+        cardText
+      )],
+      [Markup.button.callback(t('back', lang), 'show_profile')],
+    ]);
+
+    if (user.photoFileId) {
+      await ctx.replyWithPhoto(user.photoFileId, {
+        caption: cardText,
+        ...keyboard,
+      });
+    } else {
+      await ctx.reply(cardText, keyboard);
+    }
+  } catch (error) {
+    logger.error('Error sharing profile:', error);
+    await ctx.reply(t('error', getLanguage(ctx)));
+  }
+};
+
+/**
+ * Share profile card to group
+ */
+const shareToGroup = async (ctx) => {
+  try {
+    const lang = getLanguage(ctx);
+    const user = await UserModel.getById(ctx.from.id);
+    if (!user) { await ctx.reply(t('error', lang)); return; }
+
+    if (!GROUP_ID) {
+      await ctx.answerCbQuery(lang === 'es' ? 'Grupo no configurado' : 'Group not configured', { show_alert: true });
+      return;
+    }
+
+    // Build card
+    const displayName = user.username ? `@${user.username}` : (user.firstName || 'User');
+
+    let locationStr = '';
+    if (user.city && user.country) {
+      locationStr = `📍 ${user.city}, ${user.country}`;
+    } else if (user.city) {
+      locationStr = `📍 ${user.city}`;
+    } else if (user.country) {
+      locationStr = `📍 ${user.country}`;
+    }
+
+    const cardLines = [
+      `👤 *${displayName}*`,
+    ];
+
+    if (user.bio) cardLines.push(`📝 ${user.bio}`);
+    if (user.tribe) cardLines.push(`🏳️‍🌈 ${user.tribe}`);
+    if (locationStr) cardLines.push(locationStr);
+
+    cardLines.push('');
+    cardLines.push('💜 _PNPtv Member_');
+
+    const cardText = cardLines.join('\n');
+
+    try {
+      if (user.photoFileId) {
+        await ctx.telegram.sendPhoto(GROUP_ID, user.photoFileId, {
+          caption: cardText,
+          parse_mode: 'Markdown',
+        });
+      } else {
+        await ctx.telegram.sendMessage(GROUP_ID, cardText, { parse_mode: 'Markdown' });
+      }
+      await ctx.answerCbQuery(lang === 'es' ? '✅ Tarjeta compartida en el grupo!' : '✅ Card shared to group!', { show_alert: true });
+    } catch (error) {
+      logger.error('Error sharing to group:', error);
+      await ctx.answerCbQuery(lang === 'es' ? '❌ Error al compartir' : '❌ Error sharing', { show_alert: true });
+    }
+  } catch (error) {
+    logger.error('Error in shareToGroup:', error);
   }
 };
 
@@ -1348,26 +974,21 @@ const showPrivacySettings = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
     const user = await UserModel.getById(ctx.from.id);
-
-    if (!user) {
-      await ctx.reply(t('error', lang));
-      return;
-    }
+    if (!user) { await ctx.reply(t('error', lang)); return; }
 
     const privacy = user.privacy || {
-      showLocation: true,
-      showInterests: true,
-      showBio: true,
-      allowMessages: true,
-      showOnline: true,
+      showLocation: true, showInterests: true, showBio: true, allowMessages: true, showOnline: true,
     };
 
-    let text = `${t('privacyTitle', lang)}\n\n`;
-    text += `${privacy.showLocation ? '✅' : '❌'} ${t('showLocation', lang)}\n`;
-    text += `${privacy.showInterests ? '✅' : '❌'} ${t('showInterests', lang)}\n`;
-    text += `${privacy.showBio ? '✅' : '❌'} ${t('showBio', lang)}\n`;
-    text += `${privacy.allowMessages ? '✅' : '❌'} ${t('allowMessages', lang)}\n`;
-    text += `${privacy.showOnline ? '✅' : '❌'} ${t('showOnline', lang)}\n`;
+    const text = [
+      `\`${lang === 'es' ? '⚙️ Privacidad' : '⚙️ Privacy Settings'}\``,
+      '',
+      `${privacy.showLocation ? '✅' : '❌'} ${t('showLocation', lang)}`,
+      `${privacy.showInterests ? '✅' : '❌'} ${t('showInterests', lang)}`,
+      `${privacy.showBio ? '✅' : '❌'} ${t('showBio', lang)}`,
+      `${privacy.allowMessages ? '✅' : '❌'} ${t('allowMessages', lang)}`,
+      `${privacy.showOnline ? '✅' : '❌'} ${t('showOnline', lang)}`,
+    ].join('\n');
 
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.callback(`${privacy.showLocation ? '✅' : '❌'} ${t('showLocation', lang)}`, 'privacy_toggle_showLocation')],
@@ -1378,7 +999,7 @@ const showPrivacySettings = async (ctx) => {
       [Markup.button.callback(t('back', lang), 'show_profile')],
     ]);
 
-    await ctx.editMessageText(text, keyboard);
+    await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
   } catch (error) {
     logger.error('Error showing privacy settings:', error);
   }
@@ -1391,25 +1012,14 @@ const togglePrivacySetting = async (ctx, setting) => {
   try {
     const lang = getLanguage(ctx);
     const user = await UserModel.getById(ctx.from.id);
-
-    if (!user) {
-      await ctx.reply(t('error', lang));
-      return;
-    }
+    if (!user) { await ctx.reply(t('error', lang)); return; }
 
     const privacy = user.privacy || {
-      showLocation: true,
-      showInterests: true,
-      showBio: true,
-      allowMessages: true,
-      showOnline: true,
+      showLocation: true, showInterests: true, showBio: true, allowMessages: true, showOnline: true,
     };
-
-    // Toggle the setting
     privacy[setting] = !privacy[setting];
 
     await UserModel.updatePrivacy(ctx.from.id, privacy);
-
     await ctx.answerCbQuery(t('privacyUpdated', lang));
     await showPrivacySettings(ctx);
   } catch (error) {
@@ -1418,14 +1028,14 @@ const togglePrivacySetting = async (ctx, setting) => {
 };
 
 /**
- * Show favorites list
+ * Show favorites
  */
 const showFavorites = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
     const favorites = await UserModel.getFavorites(ctx.from.id);
 
-    if (!favorites || favorites.length === 0) {
+    if (!favorites?.length) {
       await ctx.editMessageText(
         t('noFavorites', lang),
         Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'show_profile')]]),
@@ -1433,16 +1043,11 @@ const showFavorites = async (ctx) => {
       return;
     }
 
-    let text = [
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      '⭐ My Favorites',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      ''
-    ].join('\n');
+    let text = `\`⭐ ${lang === 'es' ? 'Mis Favoritos' : 'My Favorites'}\`\n\n`;
     const keyboard = [];
 
-    favorites.forEach((user, index) => {
-      text += `${index + 1}. ${user.firstName} ${user.lastName || ''}${user.username ? ` (@${user.username})` : ''}\n`;
+    favorites.forEach((user, i) => {
+      text += `${i + 1}. ${user.firstName}${user.username ? ` (@${user.username})` : ''}\n`;
       keyboard.push([
         Markup.button.callback(`👁️ ${user.firstName}`, `view_user_${user.id}`),
         Markup.button.callback('❌', `remove_favorite_${user.id}`),
@@ -1450,22 +1055,21 @@ const showFavorites = async (ctx) => {
     });
 
     keyboard.push([Markup.button.callback(t('back', lang), 'show_profile')]);
-
-    await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
+    await ctx.editMessageText(text, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(keyboard) });
   } catch (error) {
     logger.error('Error showing favorites:', error);
   }
 };
 
 /**
- * Show blocked users list
+ * Show blocked users
  */
 const showBlockedUsers = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
     const user = await UserModel.getById(ctx.from.id);
 
-    if (!user || !user.blocked || user.blocked.length === 0) {
+    if (!user?.blocked?.length) {
       await ctx.editMessageText(
         t('noBlockedUsers', lang),
         Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'show_profile')]]),
@@ -1473,35 +1077,24 @@ const showBlockedUsers = async (ctx) => {
       return;
     }
 
-    let text = [
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      '🚫 Blocked Users',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      ''
-    ].join('\n');
+    let text = `\`🚫 ${lang === 'es' ? 'Usuarios Bloqueados' : 'Blocked Users'}\`\n\n`;
     const keyboard = [];
 
     for (const blockedId of user.blocked) {
       const blockedUser = await UserModel.getById(blockedId);
       if (blockedUser) {
-        text += `• ${blockedUser.firstName} ${blockedUser.lastName || ''}${blockedUser.username ? ` (@${blockedUser.username})` : ''}\n`;
-        keyboard.push([
-          Markup.button.callback(`✅ Unblock ${blockedUser.firstName}`, `unblock_user_${blockedId}`),
-        ]);
+        text += `• ${blockedUser.firstName}${blockedUser.username ? ` (@${blockedUser.username})` : ''}\n`;
+        keyboard.push([Markup.button.callback(`✅ Unblock ${blockedUser.firstName}`, `unblock_user_${blockedId}`)]);
       }
     }
 
     keyboard.push([Markup.button.callback(t('back', lang), 'show_profile')]);
-
-    await ctx.editMessageText(text, Markup.inlineKeyboard(keyboard));
+    await ctx.editMessageText(text, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(keyboard) });
   } catch (error) {
     logger.error('Error showing blocked users:', error);
   }
 };
 
-/**
- * Add user to favorites
- */
 const addToFavorites = async (ctx, targetUserId) => {
   try {
     const lang = getLanguage(ctx);
@@ -1513,17 +1106,12 @@ const addToFavorites = async (ctx, targetUserId) => {
   }
 };
 
-/**
- * Remove user from favorites
- */
 const removeFromFavorites = async (ctx, targetUserId) => {
   try {
     const lang = getLanguage(ctx);
     await UserModel.removeFromFavorites(ctx.from.id, targetUserId);
     await ctx.answerCbQuery(t('removedFromFavorites', lang));
-
-    // Check if we're in the favorites list view or profile view
-    if (ctx.callbackQuery?.message?.text?.includes(t('myFavorites', lang))) {
+    if (ctx.callbackQuery?.message?.text?.includes('Favorites')) {
       await showFavorites(ctx);
     } else {
       await showProfile(ctx, targetUserId, true, false);
@@ -1533,9 +1121,6 @@ const removeFromFavorites = async (ctx, targetUserId) => {
   }
 };
 
-/**
- * Block user
- */
 const blockUser = async (ctx, targetUserId) => {
   try {
     const lang = getLanguage(ctx);
@@ -1550,9 +1135,6 @@ const blockUser = async (ctx, targetUserId) => {
   }
 };
 
-/**
- * Unblock user
- */
 const unblockUser = async (ctx, targetUserId) => {
   try {
     const lang = getLanguage(ctx);
@@ -1561,157 +1143,6 @@ const unblockUser = async (ctx, targetUserId) => {
     await showBlockedUsers(ctx);
   } catch (error) {
     logger.error('Error unblocking user:', error);
-  }
-};
-
-/**
- * Share profile - Generate Member Card with Photo (Pseudo-code format)
- */
-const shareProfile = async (ctx) => {
-  try {
-    const lang = getLanguage(ctx);
-    const user = await UserModel.getById(ctx.from.id);
-
-    if (!user) {
-      await ctx.reply(t('error', lang));
-      return;
-    }
-
-    await ctx.answerCbQuery();
-
-    // Build clean pseudo-code style Member Card
-    let cardText = '';
-
-    // Header
-    cardText += `╔════════════════════════════════╗\n`;
-    cardText += `║      💎  MEMBER  PROFILE      ║\n`;
-    cardText += `╚════════════════════════════════╝\n\n`;
-
-    // Badges section
-    if (user.badges && user.badges.length > 0) {
-      const badgeList = user.badges.map((badge) => {
-        if (typeof badge === 'string') {
-          const badgeKey = `badges.${badge}`;
-          return t(badgeKey, lang) || badge;
-        }
-        if (typeof badge === 'object' && badge.emoji && badge.name) {
-          return `${badge.emoji} ${badge.name}`;
-        }
-        if (typeof badge === 'object' && badge.icon && badge.name) {
-          return `${badge.icon} ${badge.name}`;
-        }
-        return '';
-      }).filter(Boolean).join('  ');
-      if (badgeList) {
-        cardText += `${badgeList}\n\n`;
-      }
-    }
-
-    // Main Profile Section
-    cardText += `<b>// USER IDENTITY</b>\n`;
-    cardText += `name: "${user.firstName || 'User'}${user.lastName ? ' ' + user.lastName : ''}"\n`;
-    if (user.username) cardText += `handle: "@${user.username}"\n`;
-
-    // Membership status
-    if (user.subscriptionStatus === 'active' && user.planExpiry) {
-      try {
-        let expiry;
-        if (user.planExpiry.toDate && typeof user.planExpiry.toDate === 'function') {
-          expiry = user.planExpiry.toDate();
-        } else if (user.planExpiry._seconds) {
-          expiry = new Date(user.planExpiry._seconds * 1000);
-        } else {
-          expiry = new Date(user.planExpiry);
-        }
-
-        if (expiry && !isNaN(expiry.getTime())) {
-          cardText += `status: "💎 PRIME"\n`;
-          cardText += `expires: "${moment(expiry).format('MMM DD, YYYY')}"\n`;
-        }
-      } catch (error) {
-        logger.warn('Error parsing planExpiry in share:', error);
-        cardText += `status: "⭐ FREE"\n`;
-      }
-    } else {
-      cardText += `status: "⭐ FREE"\n`;
-    }
-
-    // Bio section
-    if (user.bio) {
-      cardText += `\n<b>// ABOUT</b>\n`;
-      const escapedBio = user.bio.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      cardText += `bio: "${escapedBio}"\n`;
-    }
-
-    // Looking for section
-    if (user.looking_for) {
-      cardText += `\n<b>// SEEKING</b>\n`;
-      const escapedLookingFor = user.looking_for.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      cardText += `looking_for: "${escapedLookingFor}"\n`;
-    }
-
-    // Interests section
-    if (user.interests && user.interests.length > 0) {
-      cardText += `\n<b>// INTERESTS</b>\n`;
-      const escapedInterests = user.interests.map(i =>
-        i.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      );
-      cardText += `interests: [\n`;
-      escapedInterests.forEach((interest, index) => {
-        const comma = index < escapedInterests.length - 1 ? ',' : '';
-        cardText += `  "${interest}"${comma}\n`;
-      });
-      cardText += `]\n`;
-    }
-
-    // Social media section (only show if any are filled)
-    const hasSocialMedia = user.tiktok || user.twitter || user.facebook || user.instagram;
-    if (hasSocialMedia) {
-      cardText += `\n<b>// SOCIAL MEDIA</b>\n`;
-      cardText += `connect: {\n`;
-      if (user.tiktok) cardText += `  tiktok: "@${user.tiktok}",\n`;
-      if (user.twitter) cardText += `  x: "@${user.twitter}",\n`;
-      if (user.facebook) cardText += `  facebook: "${user.facebook}",\n`;
-      if (user.instagram) cardText += `  instagram: "@${user.instagram}",\n`;
-      cardText += `}\n`;
-    }
-
-    // Footer with profile link
-    cardText += `\n<b>// ACTIONS</b>\n`;
-    cardText += `view_profile() {\n`;
-    cardText += `  url: "https://t.me/${ctx.botInfo.username}?start=viewprofile_${ctx.from.id}"\n`;
-    cardText += `}\n\n`;
-    cardText += `─────────────────────────────────\n`;
-    cardText += `🎬 <b>PNPtv!</b> | Entertainment Hub`;
-
-    // Share keyboard
-    const shareKeyboard = Markup.inlineKeyboard([
-      [Markup.button.switchToChat(
-        t('shareProfileCard', lang) || '📤 Share Profile Card',
-        cardText,
-      )],
-      [Markup.button.callback(t('back', lang), 'show_profile')],
-    ]);
-
-    // Check if user has a profile photo
-    if (user.photoFileId) {
-      // Send with photo
-      await ctx.replyWithPhoto(user.photoFileId, {
-        caption: cardText,
-        parse_mode: 'HTML',
-        ...shareKeyboard,
-      });
-    } else {
-      // Send without photo (text only)
-      await ctx.reply(cardText, {
-        parse_mode: 'HTML',
-        ...shareKeyboard,
-      });
-    }
-  } catch (error) {
-    logger.error('Error sharing profile:', error);
-    const lang = ctx.session?.language || 'en';
-    await ctx.reply(t('error', lang));
   }
 };
 
