@@ -92,14 +92,9 @@ class PNPLiveMediaService {
    * @returns {Promise<Array>} Array of gallery images
    */
   static async getModelGalleryImages(modelId) {
-    try {
-      // Future implementation for model galleries
-      // For now, return empty array
-      return [];
-    } catch (error) {
-      logger.error('Error getting model gallery images:', error);
-      return [];
-    }
+    // Future implementation for model galleries
+    // For now, return empty array
+    return [];
   }
 
   /**

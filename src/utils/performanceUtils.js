@@ -1,1 +1,1 @@
-/root/pnptvbot-production/src/bot/utils/performanceUtils.js
+module.exports = require('../bot/utils/performanceUtils');

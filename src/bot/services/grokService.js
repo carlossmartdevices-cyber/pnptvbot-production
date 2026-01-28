@@ -1,4 +1,5 @@
 const logger = require('../../utils/logger');
+const { AbortController, fetch } = global;
 
 // Node.js 18+ has global fetch and AbortController
 // Use global versions (no import needed)

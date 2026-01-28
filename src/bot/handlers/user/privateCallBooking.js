@@ -20,9 +20,9 @@ const registerPrivateCallBookingHandlers = (bot) => {
    * Check if user is eligible to book private calls
    */
   const checkBookingEligibility = async (ctx) => {
+    const lang = getLanguage(ctx);
     try {
       const userId = ctx.from.id;
-      const lang = getLanguage(ctx);
       
       // Get user data
       const user = await UserModel.getById(userId);
@@ -102,12 +102,12 @@ const registerPrivateCallBookingHandlers = (bot) => {
       
       if (performers.length === 0) {
         const message = lang === 'es'
-          ? '📞 *Llamadas Privadas 1:1*
+          ? `📞 *Llamadas Privadas 1:1*
 \n🔴 *No hay performers disponibles en este momento.*
-\nPor favor, inténtalo más tarde.'
-          : '📞 *Private 1:1 Calls*
+\nPor favor, inténtalo más tarde.`
+          : `📞 *Private 1:1 Calls*
 \n🔴 *No performers available at this time.*
-\nPlease try again later.';
+\nPlease try again later.`;
         
         await ctx.editMessageText(message, {
           parse_mode: 'Markdown',
@@ -120,20 +120,20 @@ const registerPrivateCallBookingHandlers = (bot) => {
       
       // Show performer selection
       const message = lang === 'es'
-        ? '📞 *Llamada Privada 1:1*
+        ? `📞 *Llamada Privada 1:1*
 \n💎 *¿Qué incluye?*
 \n• Videollamada privada con un performer
 • Duración configurable (30-60 minutos)
 • Calidad HD y conexión segura
 • Horario flexible según disponibilidad
-\n👥 *Elige con quién quieres la llamada:*'
-        : '📞 *Private 1:1 Call*
-\n💎 *What\'s included:*
+\n👥 *Elige con quién quieres la llamada:*`
+        : `📞 *Private 1:1 Call*
+\n💎 *What's included:*
 \n• Private video call with a performer
 • Configurable duration (30-60 minutes)
 • HD quality and secure connection
 • Flexible scheduling based on availability
-\n👥 *Choose who you want to talk to:*';
+\n👥 *Choose who you want to talk to:*`;
       
       const buttons = performers.map(performer => [
         Markup.button.callback(`🎭 ${performer.displayName}`, `select_performer_${performer.id}`)
@@ -525,7 +525,7 @@ const registerPrivateCallBookingHandlers = (bot) => {
 • Hora: ${slot.startTime} - ${slot.endTime}
 • Duración: ${duration} minutos
 • Precio: $${price.toFixed(2)} USD
-\n💰 *Método de pago:* ${this.getPaymentMethodName(paymentMethod, lang)}
+\n💰 *Método de pago:* ${getPaymentMethodName(paymentMethod, lang)}
 \n🔗 *Por favor completa el pago haciendo clic en el botón de abajo:*
 \n⏰ *Tienes 10 minutos para completar el pago antes de que la reserva se cancele.*`
         : `💳 *Private Call Payment*
@@ -535,7 +535,7 @@ const registerPrivateCallBookingHandlers = (bot) => {
 • Time: ${slot.startTime} - ${slot.endTime}
 • Duration: ${duration} minutes
 • Price: $${price.toFixed(2)} USD
-\n💰 *Payment Method:* ${this.getPaymentMethodName(paymentMethod, lang)}
+\n💰 *Payment Method:* ${getPaymentMethodName(paymentMethod, lang)}
 \n🔗 *Please complete the payment by clicking the button below:*
 \n⏰ *You have 10 minutes to complete payment before the booking is cancelled.*`;
       
@@ -550,7 +550,7 @@ const registerPrivateCallBookingHandlers = (bot) => {
       });
       
       // Start payment timeout check
-      this.schedulePaymentTimeoutCheck(ctx, paymentResult.paymentId);
+      schedulePaymentTimeoutCheck(ctx, paymentResult.paymentId);
     } catch (error) {
       logger.error('Error processing payment:', error);
       const lang = getLanguage(ctx);
@@ -566,7 +566,7 @@ const registerPrivateCallBookingHandlers = (bot) => {
   });
 
   // Helper method to get payment method name
-  getPaymentMethodName = (method, lang) => {
+  const getPaymentMethodName = (method, lang) => {
     const methods = {
       card: lang === 'es' ? 'Tarjeta de Crédito/Débito' : 'Credit/Debit Card',
       crypto: lang === 'es' ? 'Crypto (USDC)' : 'Crypto (USDC)',
@@ -576,7 +576,7 @@ const registerPrivateCallBookingHandlers = (bot) => {
   };
 
   // Schedule payment timeout check
-  schedulePaymentTimeoutCheck = (ctx, paymentId) => {
+  const schedulePaymentTimeoutCheck = (ctx, paymentId) => {
     setTimeout(async () => {
       try {
         const paymentStatus = await PrivateCallService.checkPaymentStatus(paymentId);
@@ -589,10 +589,10 @@ const registerPrivateCallBookingHandlers = (bot) => {
           await ctx.telegram.sendMessage(
             ctx.from.id,
             lang === 'es'
-              ? '⏰ *Pago no completado*
-\nTu reserva ha sido cancelada debido a que el pago no se completó a tiempo.'
-              : '⏰ *Payment Not Completed*
-\nYour booking has been cancelled because payment was not completed on time.'
+              ? `⏰ *Pago no completado*
+\nTu reserva ha sido cancelada debido a que el pago no se completó a tiempo.`
+              : `⏰ *Payment Not Completed*
+\nYour booking has been cancelled because payment was not completed on time.`
           );
         }
       } catch (error) {
@@ -633,10 +633,10 @@ const registerPrivateCallBookingHandlers = (bot) => {
         
         await ctx.editMessageText(
           lang === 'es'
-            ? '✅ *Reserva Cancelada*
-\nTu reserva ha sido cancelada exitosamente.'
-            : '✅ *Booking Cancelled*
-\nYour booking has been successfully cancelled.',
+            ? `✅ *Reserva Cancelada*
+\nTu reserva ha sido cancelada exitosamente.`
+            : `✅ *Booking Cancelled*
+\nYour booking has been successfully cancelled.`,
           {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
@@ -734,7 +734,7 @@ const registerPrivateCallBookingHandlers = (bot) => {
 💰 *Precio:* $${bookingResult.booking.price.toFixed(2)} USD
 \n🔗 *Link de la llamada:*
 ${bookingResult.booking.meetingUrl}
-\n⚡ *Tu llamada comienza en ${this.calculateTimeUntilCall(bookingResult.booking.date, bookingResult.booking.time, lang)}*
+\n⚡ *Tu llamada comienza en ${calculateTimeUntilCall(bookingResult.booking.date, bookingResult.booking.time, lang)}*
 \n📧 Recibirás recordatorios 24h, 1h y 15 minutos antes de la llamada.
 \n💡 *Importante:*
 • Únete a tiempo usando el link de arriba
@@ -749,7 +749,7 @@ ${bookingResult.booking.meetingUrl}
 💰 *Price:* $${bookingResult.booking.price.toFixed(2)} USD
 \n🔗 *Join Link:*
 ${bookingResult.booking.meetingUrl}
-\n⚡ *Your call starts in ${this.calculateTimeUntilCall(bookingResult.booking.date, bookingResult.booking.time, lang)}*
+\n⚡ *Your call starts in ${calculateTimeUntilCall(bookingResult.booking.date, bookingResult.booking.time, lang)}*
 \n📧 You'll receive reminders 24h, 1h, and 15 minutes before the call.
 \n💡 *Important:*
 • Join on time using the link above
@@ -780,7 +780,7 @@ ${bookingResult.booking.meetingUrl}
   });
 
   // Helper method to calculate time until call
-  calculateTimeUntilCall = (date, time, lang) => {
+  const calculateTimeUntilCall = (date, time, lang) => {
     try {
       const callDateTime = new Date(`${date}T${time}`);
       const now = new Date();
@@ -817,10 +817,10 @@ ${bookingResult.booking.meetingUrl}
       if (bookings.length === 0) {
         await ctx.editMessageText(
           lang === 'es'
-            ? '📅 *Mis Llamadas*
-\nNo has reservado ninguna llamada aún.'
-            : '📅 *My Calls*
-\nYou haven\'t booked any calls yet.',
+            ? `📅 *Mis Llamadas*
+\nNo has reservado ninguna llamada aún.`
+            : `📅 *My Calls*
+\nYou haven't booked any calls yet.`,
           {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
@@ -833,10 +833,10 @@ ${bookingResult.booking.meetingUrl}
       }
       
       let message = lang === 'es'
-        ? '📅 *Mis Llamadas Privadas*
-\nAquí están tus reservas:'
-        : '📅 *My Private Calls*
-\nHere are your bookings:';
+        ? `📅 *Mis Llamadas Privadas*
+\nAquí están tus reservas:`
+        : `📅 *My Private Calls*
+\nHere are your bookings:`;
       
       bookings.forEach((booking, index) => {
         const statusEmoji = {
@@ -848,7 +848,7 @@ ${bookingResult.booking.meetingUrl}
         
         message += `
 
-${index + 1}. ${statusEmoji} ${this.getBookingStatusText(booking.status, lang)}
+${index + 1}. ${statusEmoji} ${getBookingStatusText(booking.status, lang)}
    🎭 ${booking.performerName}
    📅 ${booking.date} at ${booking.time}
    ⏱ ${booking.duration} minutes`;
@@ -872,7 +872,7 @@ ${index + 1}. ${statusEmoji} ${this.getBookingStatusText(booking.status, lang)}
   });
 
   // Helper method to get booking status text
-  getBookingStatusText = (status, lang) => {
+  const getBookingStatusText = (status, lang) => {
     const statusTexts = {
       pending: lang === 'es' ? 'Pendiente' : 'Pending',
       confirmed: lang === 'es' ? 'Confirmada' : 'Confirmed',
@@ -892,7 +892,7 @@ ${index + 1}. ${statusEmoji} ${this.getBookingStatusText(booking.status, lang)}
       const lang = getLanguage(ctx);
       
       const message = lang === 'es'
-        ? '🔒 *Función para Usuarios PRIME*
+        ? `🔒 *Función para Usuarios PRIME*
 \n📞 *Llamadas Privadas 1:1*
 \nEsta función está disponible para usuarios PRIME. Con PRIME obtienes:
 \n💎 Acceso a llamadas privadas con performers
@@ -900,8 +900,8 @@ ${index + 1}. ${statusEmoji} ${this.getBookingStatusText(booking.status, lang)}
 📅 Agendamiento flexible
 🔒 Conexión segura y privada
 \n💰 *Precio:* $14.99 USD/semana
-\n¿Quieres convertirte en PRIME para acceder a esta función?'
-        : '🔒 *Feature for PRIME Users*
+\n¿Quieres convertirte en PRIME para acceder a esta función?`
+        : `🔒 *Feature for PRIME Users*
 \n📞 *Private 1:1 Calls*
 \nThis feature is available for PRIME users. With PRIME you get:
 \n💎 Access to private calls with performers
@@ -909,7 +909,7 @@ ${index + 1}. ${statusEmoji} ${this.getBookingStatusText(booking.status, lang)}
 📅 Flexible scheduling
 🔒 Secure and private connection
 \n💰 *Price:* $14.99 USD/week
-\nDo you want to become PRIME to access this feature?';
+\nDo you want to become PRIME to access this feature?`;
       
       const buttons = [
         [Markup.button.callback('💎 Yes, Upgrade to PRIME', 'show_subscription_plans')],
