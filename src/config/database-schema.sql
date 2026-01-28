@@ -18,6 +18,20 @@ CREATE TABLE IF NOT EXISTS users (
   photo_file_id VARCHAR(255),
   photo_updated_at TIMESTAMP,
   interests TEXT[], -- Array of interests
+  looking_for VARCHAR(200),
+  tribe VARCHAR(100),
+
+  -- Location & Address
+  city VARCHAR(100),
+  country VARCHAR(100),
+
+  -- Social Media
+  instagram VARCHAR(100),
+  twitter VARCHAR(100),
+  facebook VARCHAR(100),
+  tiktok VARCHAR(100),
+  youtube VARCHAR(200),
+  telegram VARCHAR(100),
 
   -- Location
   location_lat DECIMAL(10, 8),
