@@ -828,7 +828,51 @@ async function handleMenuCallback(ctx) {
         break;
 
       case 'nearby':
-        await handleNearby(ctx, lang);
+        // Show unified nearby menu instead of old radius-based UI
+        const showNearbyMenu = async (ctx, isNewMessage = false) => {
+          try {
+            const lang = getLanguage(ctx);
+            const user = await UserService.getOrCreateFromContext(ctx);
+            const locationStatus = user.locationSharingEnabled ? '🟢 ON' : '🔴 OFF';
+
+            const headerText = lang === 'es'
+              ? '`🔥 PNP Nearby`\n\n' +
+                'Explora todo lo que está cerca de ti:\n' +
+                '👥 Miembros\n' +
+                '🏪 Negocios\n' +
+                '📍 Lugares de interés\n\n' +
+                '_Selecciona una categoría o ve todo:_'
+              : '`🔥 PNP Nearby`\n\n' +
+                'Explore everything near you:\n' +
+                '👥 Members\n' +
+                '🏪 Businesses\n' +
+                '📍 Places of interest\n\n' +
+                '_Select a category or see all:_';
+
+            const keyboard = Markup.inlineKeyboard([
+              [
+                Markup.button.callback(lang === 'es' ? '🌐 Todo' : '🌐 All', 'nearby_all'),
+                Markup.button.callback(lang === 'es' ? '👥 Miembros' : '👥 Members', 'nearby_users'),
+              ],
+              [
+                Markup.button.callback(lang === 'es' ? '🏪 Negocios' : '🏪 Businesses', 'nearby_businesses'),
+                Markup.button.callback(lang === 'es' ? '📍 Lugares' : '📍 Places', 'nearby_places_categories'),
+              ],
+              [Markup.button.callback(`📍 Location: ${locationStatus}`, 'toggle_location_sharing')],
+              [
+                Markup.button.callback(lang === 'es' ? '➕ Proponer' : '➕ Suggest', 'submit_place_start'),
+                Markup.button.callback(lang === 'es' ? '📋 Mis Propuestas' : '📋 My Submissions', 'my_place_submissions'),
+              ],
+              [Markup.button.callback('🔙 Back', 'back_to_main')],
+            ]);
+
+            await ctx.editMessageText(headerText, { parse_mode: 'Markdown', ...keyboard });
+          } catch (error) {
+            logger.error('Error showing nearby menu:', error);
+          }
+        };
+        
+        await showNearbyMenu(ctx);
         break;
 
       default:
