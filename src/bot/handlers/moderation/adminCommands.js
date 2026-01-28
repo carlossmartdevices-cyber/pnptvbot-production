@@ -2,24 +2,17 @@ const ModerationService = require('../../services/moderationService');
 const TopicModerationService = require('../../services/topicModerationService');
 const ModerationModel = require('../../../models/moderationModel');
 const logger = require('../../../utils/logger');
-const { t } = require('../../../utils/i18n');
+const { isAdmin, isGroupChat } = require('../../../utils/adminUtils');
 
 /**
  * Register moderation admin handlers
+ * These are admin-only commands for configuring moderation settings.
+ * Note: /ban, /unban, /clearwarnings are handled in moderationCommands.js
  * @param {Telegraf} bot - Bot instance
  */
 const registerModerationAdminHandlers = (bot) => {
   // /moderation - Toggle moderation on/off
   bot.command('moderation', handleModerationToggle);
-
-  // /ban - Ban user
-  bot.command('ban', handleBanUser);
-
-  // /unban - Unban user
-  bot.command('unban', handleUnbanUser);
-
-  // /clearwarnings - Clear user warnings
-  bot.command('clearwarnings', handleClearWarnings);
 
   // /modlogs - View moderation logs
   bot.command('modlogs', handleModLogs);
@@ -39,23 +32,9 @@ const registerModerationAdminHandlers = (bot) => {
   // Topic moderation commands
   bot.command('topicmod', handleTopicModeration);
   bot.command('settopicmod', handleSetTopicModeration);
-};
 
-/**
- * Check if user is admin in the chat
- * @param {Object} ctx - Telegraf context
- * @returns {Promise<boolean>} Is admin
- */
-async function isAdmin(ctx) {
-  try {
-    const userId = ctx.from.id;
-    const chatMember = await ctx.getChatMember(userId);
-    return ['creator', 'administrator'].includes(chatMember.status);
-  } catch (error) {
-    logger.error('Error checking admin status:', error);
-    return false;
-  }
-}
+  logger.info('Moderation admin handlers registered');
+};
 
 /**
  * Handle /moderation command
@@ -63,9 +42,7 @@ async function isAdmin(ctx) {
  */
 async function handleModerationToggle(ctx) {
   try {
-    const chatType = ctx.chat?.type;
-
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+    if (!isGroupChat(ctx)) {
       return ctx.reply('This command only works in groups.');
     }
 
@@ -143,9 +120,7 @@ async function handleModerationToggle(ctx) {
  */
 async function handleSetLinks(ctx) {
   try {
-    const chatType = ctx.chat?.type;
-
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+    if (!isGroupChat(ctx)) {
       return ctx.reply('This command only works in groups.');
     }
 
@@ -188,173 +163,6 @@ async function handleSetLinks(ctx) {
   } catch (error) {
     logger.error('Error setting link policy:', error);
     await ctx.reply('Error updating link policy.');
-  }
-}
-
-/**
- * Handle /ban command
- * Ban user from group
- */
-async function handleBanUser(ctx) {
-  try {
-    const chatType = ctx.chat?.type;
-
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
-      return ctx.reply('This command only works in groups.');
-    }
-
-    if (!(await isAdmin(ctx))) {
-      return ctx.reply('⛔ Only administrators can use this command.');
-    }
-
-    const groupId = ctx.chat.id;
-    const { message } = ctx;
-
-    // Get user from reply or mention
-    let targetUserId;
-    let targetUserName;
-
-    if (message.reply_to_message) {
-      targetUserId = message.reply_to_message.from.id;
-      targetUserName = message.reply_to_message.from.first_name;
-    } else {
-      const args = message.text.split(' ').slice(1);
-      const mention = args[0];
-
-      if (!mention || !mention.startsWith('@')) {
-        return ctx.reply('Usage: `/ban @username [reason]` or reply to a message with `/ban [reason]`', {
-          parse_mode: 'Markdown',
-        });
-      }
-
-      // Note: Getting user ID from username requires additional API calls
-      // For simplicity, we'll require reply-to-message for now
-      return ctx.reply('Please reply to the user\'s message with `/ban [reason]`', {
-        parse_mode: 'Markdown',
-      });
-    }
-
-    const args = message.text.split(' ').slice(1);
-    const reason = args.join(' ') || 'Banned by administrator';
-
-    // Ban user
-    await ModerationService.banUser(targetUserId, groupId, reason, ctx.from.id);
-
-    // Ban from Telegram
-    await ctx.banChatMember(targetUserId);
-
-    await ctx.reply(
-      `🚫 **${targetUserName}** has been banned.\n\n**Reason:** ${reason}`,
-      { parse_mode: 'Markdown' },
-    );
-
-    logger.info('User banned by admin', {
-      groupId,
-      adminId: ctx.from.id,
-      targetUserId,
-      reason,
-    });
-  } catch (error) {
-    logger.error('Error banning user:', error);
-    await ctx.reply('Error banning user. Make sure I have admin permissions.');
-  }
-}
-
-/**
- * Handle /unban command
- * Unban user from group
- */
-async function handleUnbanUser(ctx) {
-  try {
-    const chatType = ctx.chat?.type;
-
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
-      return ctx.reply('This command only works in groups.');
-    }
-
-    if (!(await isAdmin(ctx))) {
-      return ctx.reply('⛔ Only administrators can use this command.');
-    }
-
-    const groupId = ctx.chat.id;
-    const { message } = ctx;
-
-    let targetUserId;
-
-    if (message.reply_to_message) {
-      targetUserId = message.reply_to_message.from.id;
-    } else {
-      return ctx.reply('Please reply to the user\'s message with `/unban`', {
-        parse_mode: 'Markdown',
-      });
-    }
-
-    // Unban user
-    await ModerationService.unbanUser(targetUserId, groupId, ctx.from.id);
-
-    // Unban from Telegram
-    await ctx.telegram.unbanChatMember(ctx.chat.id, targetUserId);
-
-    await ctx.reply('✅ User has been unbanned and can rejoin the group.', {
-      parse_mode: 'Markdown',
-    });
-
-    logger.info('User unbanned by admin', {
-      groupId,
-      adminId: ctx.from.id,
-      targetUserId,
-    });
-  } catch (error) {
-    logger.error('Error unbanning user:', error);
-    await ctx.reply('Error unbanning user.');
-  }
-}
-
-/**
- * Handle /clearwarnings command
- * Clear user warnings
- */
-async function handleClearWarnings(ctx) {
-  try {
-    const chatType = ctx.chat?.type;
-
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
-      return ctx.reply('This command only works in groups.');
-    }
-
-    if (!(await isAdmin(ctx))) {
-      return ctx.reply('⛔ Only administrators can use this command.');
-    }
-
-    const groupId = ctx.chat.id;
-    const { message } = ctx;
-
-    let targetUserId;
-    let targetUserName;
-
-    if (message.reply_to_message) {
-      targetUserId = message.reply_to_message.from.id;
-      targetUserName = message.reply_to_message.from.first_name;
-    } else {
-      return ctx.reply('Please reply to the user\'s message with `/clearwarnings`', {
-        parse_mode: 'Markdown',
-      });
-    }
-
-    await ModerationService.clearWarnings(targetUserId, groupId, ctx.from.id);
-
-    await ctx.reply(`✅ Warnings cleared for **${targetUserName}**.`, {
-      parse_mode: 'Markdown',
-    });
-
-    logger.info('Warnings cleared by admin', {
-      groupId,
-      adminId: ctx.from.id,
-      targetUserId,
-    });
-  } catch (error) {
-    logger.error('Error clearing warnings:', error);
-    await ctx.reply('Error clearing warnings.');
   }
 }
 
