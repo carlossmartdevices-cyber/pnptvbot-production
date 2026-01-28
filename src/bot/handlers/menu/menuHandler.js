@@ -412,6 +412,12 @@ async function handleDeepLinkStart(ctx) {
         // Show hangouts/video rooms screen (using reply since we're in /start context)
         await handleDeepLinkHangouts(ctx, lang);
         return;
+
+      case 'pnp_live':
+      case 'show_live':
+        // Show PNP Live screen (using reply since we're in /start context)
+        await handleDeepLinkPNPLive(ctx, lang);
+        return;
     }
 
     // Check if it's a menu deep link
@@ -635,6 +641,35 @@ async function handleDeepLinkHangouts(ctx, lang) {
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.url(lang === 'es' ? '🎥 Entrar a Main Room' : '🎥 Join Main Room', mainRoomUrl)],
     [Markup.button.callback(lang === 'es' ? '🎥 Ver Todas las Salas' : '🎥 View All Rooms', 'menu_hangouts')],
+    [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')]
+  ]);
+
+  await ctx.reply(message, {
+    parse_mode: 'Markdown',
+    ...keyboard
+  });
+}
+
+/**
+ * Handle deep link to PNP Live (uses ctx.reply instead of editMessageText)
+ */
+async function handleDeepLinkPNPLive(ctx, lang) {
+  const message = lang === 'es'
+    ? '📺 *PNP Television Live*\n\n' +
+      '¡Sintoniza nuestras transmisiones en vivo!\n\n' +
+      '🔴 Transmisiones en vivo exclusivas\n' +
+      '🎭 Shows de la comunidad\n' +
+      '📹 Contenido premium en directo\n\n' +
+      '💎 *Disponible para miembros PRIME*'
+    : '📺 *PNP Television Live*\n\n' +
+      'Tune in to our live broadcasts!\n\n' +
+      '🔴 Exclusive live streams\n' +
+      '🎭 Community shows\n' +
+      '📹 Premium live content\n\n' +
+      '💎 *Available for PRIME members*';
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback(lang === 'es' ? '📺 Ver PNP Live' : '📺 Watch PNP Live', 'PNP_LIVE_START')],
     [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')]
   ]);
 
