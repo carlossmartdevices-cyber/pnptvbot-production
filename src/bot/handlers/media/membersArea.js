@@ -65,8 +65,8 @@ const registerMembersAreaHandlers = (bot) => {
 
     // Live Shows menu
     bot.action('show_live_shows', async (ctx) => {
+        const lang = getLanguage(ctx);
         try {
-            const lang = getLanguage(ctx);
             const userId = ctx.from.id.toString();
 
             // Check if user has active subscription

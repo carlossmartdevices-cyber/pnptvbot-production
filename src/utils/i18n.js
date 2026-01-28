@@ -11,29 +11,6 @@ const translations = {
     welcome: '👋 Welcome to PNPtv!',
       welcomeScreen: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          Welcome to PNPtv! Premium\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThis is your control dashboard.\nFrom here, you can access all your premium features:\nopen Call Rooms, start live streams, watch full videos,\nexplore Nearby without limits, and join private events.`,
       welcomeScreenFree: `PNPtv!\n------------\n\nWelcome to PNPtv!  \nEnjoy the full experience from here.\n\nUnlock all premium features:\n• Full videos  \n• Live streams  \n• Unlimited Nearby  \n• Call Rooms  \n• Private community events\n\nTap "Subscribe to PRIME" below to get instant access.`,
-      welcomeScreen: `-----------------------------]
-        Welcome to PNPtv! Premium
--------------------------------]
-
-This is your control dashboard.
-From here, you can access all your premium features:
-open Video Rooms, start live streams, watch full videos,
-explore Nearby without limits, and join private events.`,
-      welcomeScreenFree: `-----------------------------]
-            PNPtv!
--------------------------------]
-
-Welcome to PNPtv!  
-Enjoy the full experience from here.
-
-Unlock all premium features:
-• Full videos  
-• Live streams  
-• Unlimited Nearby  
-• Video Rooms  
-• Private community events
-
-Tap "Subscribe to PRIME" below to get instant access.`,
     back: '🔙 Back',
     cancel: '❌ Cancel',
     next: '➡️ Next',
@@ -98,14 +75,6 @@ Choose your plan and get instant access to all premium features:
     planMonthlyDesc: 'Our most popular plan with full access and no limits. Includes:\n\n• Unlimited access to all PNPtv! channels and group\n• Full videography of Santino plus sexy Latinos smoking and slamming\n• Long-session videos with weekly new releases\n• Invites to Call rooms and Live Stream PNP shows\n• Unlimited Nearby access\n• Profile card with photo, badges and bio',
     planTrial: '⭐ Trial Week',
     planTrialDesc: '7 days of pure PNP bliss.\nUnlimited access to videos, weekly drops, Nearby, profile tools, radio, hangouts, lives, and video rooms.\n💜 Perfect for first-timers — try EVERYTHING before committing.',
-    planCrystal: '⭐ Crystal PRIME',
-    planCrystalDesc: '180 days with premium glamour.\nFull videos, weekly drops, unlimited Nearby, priority tools, exclusive Crystal events, lives, radio, hangouts, and early feature access.\n✨ Best balance of value + status — shine brighter in the community.',
-    planDiamond: '⭐ Diamond PRIME',
-    planDiamondDesc: 'The elite PNPtv! experience.\nFull video library, premium releases, boosted visibility, Diamond badges, priority Santino access, exclusive streams, hangouts, radio, and private pop-ups.\n💎 For elite members only — the highest-tier, VIP-level access.',
-    planLifetime: '⭐ Lifetime PRIME',
-    planLifetimeDesc: 'Forever access. One single payment.\nFull videos forever, all weekly drops unlocked, unlimited Nearby, all lives, all hangouts, all radio, all video rooms, all events — permanent PRIME badge included.\n♾️ Best deal ever — no renewals, no limits, no expiration, just one time payment.',
-    planMonthly: '⭐ Monthly PRIME',
-    planMonthlyDesc: '30 days of full PNPtv! power.\nFull video access, weekly drops, Nearby, boosted profile, lives, hangouts, radio, and premium tools.\n🔥 Most popular — the standard PRIME experience everyone loves.',
     planDetails: 'Plan Details:',
     selectPlan: 'Select Plan',
     paymentMethod: 'Choose payment method:',
@@ -168,15 +137,7 @@ Choose your plan and get instant access to all premium features:
     myFavorites: '⭐ My Favorites',
     noFavorites: 'You have no favorites yet.',
     blockedUsers: '🚫 Blocked Users',
-      welcomeScreenPrime: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv PRIME!\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel PRIME.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas de Video, iniciar transmisiones en vivo, ver videos completos,\nexplorar Cercanos sin límites y unirte a eventos privados.`,
-      welcomeScreenPrime: `-----------------------------]
-       Welcome to PNPtv PRIME!
--------------------------------]
-
-This is your PRIME dashboard.
-From here you can access all your premium features:
-open Video Rooms, start live streams, watch full videos,
-explore Nearby without limits, and join private events.`,
+    welcomeScreenPrime: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          Welcome to PNPtv PRIME!\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThis is your PRIME dashboard.\nFrom here you can access all your premium features:\nopen Video Rooms, start live streams, watch full videos,\nexplore Nearby without limits, and join private events.`,
     noBlockedUsers: 'You have no blocked users.',
     shareProfile: '📤 Share Profile',
     profileShared: 'Profile card created! Tap to share it.',
@@ -577,29 +538,6 @@ Your FREE access includes:
     welcome: '👋 ¡Bienvenido a PNPtv!',
     welcomeScreen: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv! Premium\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel de control.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas de Video, iniciar transmisiones en vivo, ver videos completos,\nexplorar Cercanos sin límites y unirte a eventos privados.',
     welcomeScreenFree: `PNPtv!\n------------\n\nBienvenido a PNPtv!  \nDisfruta la experiencia completa desde aquí.\n\nDesbloquea todas las funciones premium:\n• Videos completos  \n• Transmisiones en vivo  \n• Nearby ilimitado  \n• Salas de Video  \n• Eventos privados de la comunidad\n\nToca "Suscríbete a PRIME" para obtener acceso inmediato.`,
-    welcomeScreen: `-----------------------------]
-      Bienvenido a PNPtv! Premium
--------------------------------]
-
-Este es tu panel de control.
-Desde aqui puedes acceder a todas tus funciones premium:
-abrir Video Rooms, iniciar transmisiones en vivo, ver videos completos,
-explorar Cercanos sin limites y unirte a eventos privados.`,
-    welcomeScreenFree: `-----------------------------]
-              PNPtv!
--------------------------------]
-
-Bienvenido a PNPtv!  
-Disfruta la experiencia completa desde aqui.
-
-Desbloquea todas las funciones premium:
-• Videos completos  
-• Transmisiones en vivo  
-• Nearby ilimitado  
-• Video Rooms  
-• Eventos privados de la comunidad
-
-Toca "Suscribete a PRIME" para obtener acceso inmediato.`,
     back: '🔙 Atrás',
     cancel: '❌ Cancelar',
     next: '➡️ Siguiente',
@@ -664,14 +602,6 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
     planMonthlyDesc: 'Nuestro plan más popular con acceso total y sin límites. Incluye:\n\n• Acceso ilimitado a todos los canales y grupo de PNPtv!\n• Videografía completa de Santino y latinos sexys fumando y slameando\n• Videos largos con estrenos semanales\n• Invitaciones a salas de video y shows en vivo de PNP\n• Acceso ilimitado a Cercanos\n• Tarjeta de perfil con foto, badges y bio',
     planTrial: '⭐ Semana de Prueba',
     planTrialDesc: '7 días de puro placer PNP.\nAcceso ilimitado a videos, estrenos semanales, Cercanos, herramientas de perfil, radio, hangouts, lives y salas de video.\n💜 Perfecto para nuevos — prueba TODO antes de comprometerte.',
-    planCrystal: '⭐ Crystal PRIME',
-    planCrystalDesc: '180 días con glamour premium.\nVideos completos, estrenos semanales, Cercanos ilimitado, herramientas prioritarias, eventos Crystal exclusivos, lives, radio, hangouts y acceso anticipado a funciones.\n✨ Mejor balance de valor + estatus — brilla más en la comunidad.',
-    planDiamond: '⭐ Diamond PRIME',
-    planDiamondDesc: 'La experiencia elite de PNPtv!\nBiblioteca completa de videos, estrenos premium, visibilidad aumentada, insignias Diamond, acceso prioritario a Santino, streams exclusivos, hangouts, radio y pop-ups privados.\n💎 Solo para miembros elite — el acceso de más alto nivel VIP.',
-    planLifetime: '⭐ Lifetime PRIME',
-    planLifetimeDesc: 'Acceso para siempre. Un solo pago.\nVideos completos para siempre, todos los estrenos semanales, Cercanos ilimitado, todos los lives, hangouts, radio, salas de video, eventos — insignia PRIME permanente incluida.\n♾️ Mejor oferta — sin renovaciones, sin límites, sin expiración, solo un pago.',
-    planMonthly: '⭐ Monthly PRIME',
-    planMonthlyDesc: '30 días de poder completo PNPtv!\nAcceso completo a videos, estrenos semanales, Cercanos, perfil mejorado, lives, hangouts, radio y herramientas premium.\n🔥 Más popular — la experiencia PRIME estándar que todos aman.',
     planDetails: 'Detalles del Plan:',
     selectPlan: 'Seleccionar Plan',
     paymentMethod: 'Elige método de pago:',
@@ -734,15 +664,7 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
     myFavorites: '⭐ Mis Favoritos',
     noFavorites: 'Aún no tienes favoritos.',
     blockedUsers: '🚫 Usuarios Bloqueados',
-      welcomeScreenPrime: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv PRIME!\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel PRIME.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas de Video, iniciar transmisiones en vivo, ver videos completos,\nexplorar Cercanos sin límites y unirte a eventos privados.`,
-      welcomeScreenPrime: `-----------------------------]
-      Bienvenido a PNPtv PRIME!
--------------------------------]
-
-Este es tu panel PRIME.
-Desde aqui puedes acceder a todas tus funciones premium:
-abrir Video Rooms, iniciar transmisiones en vivo, ver videos completos,
-explorar Cercanos sin limites y unirte a eventos privados.`,
+    welcomeScreenPrime: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv PRIME!\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel PRIME.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas de Video, iniciar transmisiones en vivo, ver videos completos,\nexplorar Cercanos sin límites y unirte a eventos privados.`,
     noBlockedUsers: 'No tienes usuarios bloqueados.',
     shareProfile: '📤 Compartir Perfil',
     profileShared: '¡Tarjeta de perfil creada! Toca para compartirla.',

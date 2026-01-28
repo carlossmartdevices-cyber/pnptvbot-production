@@ -531,7 +531,7 @@ ${performer.bio || 'No bio'}
       
       await ctx.editMessageText(
         lang === 'es'
-          ? '➕ *Añadir Nuevo Performer*
+          ? `➕ *Añadir Nuevo Performer*
 \n*Funcionalidad simulada*
 \nEn una implementación real, esto mostraría un formulario para añadir un nuevo performer con:
 • Nombre de display
@@ -539,8 +539,8 @@ ${performer.bio || 'No bio'}
 • Foto
 • Precio base
 • Horario de disponibilidad
-• Tipos de llamadas permitidas'
-          : '➕ *Add New Performer*
+• Tipos de llamadas permitidas`
+          : `➕ *Add New Performer*
 \n*Simulated functionality*
 \nIn a real implementation, this would show a form to add a new performer with:
 • Display name
@@ -548,7 +548,7 @@ ${performer.bio || 'No bio'}
 • Photo
 • Base price
 • Availability schedule
-• Allowed call types',
+• Allowed call types`,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -574,22 +574,22 @@ ${performer.bio || 'No bio'}
       
       await ctx.editMessageText(
         lang === 'es'
-          ? '📈 *Tendencias de Llamadas Privadas*
+          ? `📈 *Tendencias de Llamadas Privadas*
 \n*Funcionalidad simulada*
 \nEn una implementación real, esto mostraría gráficos y tendencias de:
 • Llamadas por día/semana/mes
 • Ingresos por período
 • Performers más populares
 • Duración promedio de llamadas
-• Tasa de satisfacción'
-          : '📈 *Private Call Trends*
+• Tasa de satisfacción`
+          : `📈 *Private Call Trends*
 \n*Simulated functionality*
 \nIn a real implementation, this would show charts and trends for:
 • Calls per day/week/month
 • Revenue per period
 • Most popular performers
 • Average call duration
-• Satisfaction rate',
+• Satisfaction rate`,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -615,22 +615,22 @@ ${performer.bio || 'No bio'}
       
       await ctx.editMessageText(
         lang === 'es'
-          ? '💰 *Ingresos de Llamadas Privadas*
+          ? `💰 *Ingresos de Llamadas Privadas*
 \n*Funcionalidad simulada*
 \nEn una implementación real, esto mostraría:
 • Ingresos totales y por período
 • Desglose por performer
 • Métodos de pago más usados
 • Proyecciones de ingresos
-• Comparación con períodos anteriores'
-          : '💰 *Private Call Revenue*
+• Comparación con períodos anteriores`
+          : `💰 *Private Call Revenue*
 \n*Simulated functionality*
 \nIn a real implementation, this would show:
 • Total and period-based revenue
 • Breakdown by performer
 • Most used payment methods
 • Revenue projections
-• Comparison with previous periods',
+• Comparison with previous periods`,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([

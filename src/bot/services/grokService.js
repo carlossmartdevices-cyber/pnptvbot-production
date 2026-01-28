@@ -1,4 +1,5 @@
 const logger = require('../../utils/logger');
+const { AbortController, fetch } = global;
 
 function getGrokConfig() {
   return {

@@ -1,1 +1,1 @@
-/root/pnptvbot-production/src/bot/utils/uxUtils.js
+module.exports = require('../bot/utils/uxUtils');
