@@ -8,7 +8,14 @@ const logger = require('../../../utils/logger');
  * @param {Telegraf} bot - Bot instance
  */
 const registerNearbyPlacesAdminHandlers = (bot) => {
+  // APPROVE PLACE (from All Places view)
+  // ======================================================================================
+  // APPROVE PLACE (from All Places view)
   // ===========================================
+=======
+  // ===========================================
+  // APPROVE PLACE (from All Places view)
+  // ======================================================================================
   // ADMIN PANEL ENTRY
   // ===========================================
   bot.action('admin_nearby_places', async (ctx) => {
@@ -613,6 +620,7 @@ const registerNearbyPlacesAdminHandlers = (bot) => {
       }
 
       buttons.push([Markup.button.callback('🗑️ Delete', `admin_delete_place_${placeId}`)]);
+      buttons.push([Markup.button.callback('✏️ Edit', `admin_edit_place_${placeId}`)]);
 
       if (place.location) {
         buttons.push([Markup.button.url(
@@ -621,6 +629,9 @@ const registerNearbyPlacesAdminHandlers = (bot) => {
         )]);
       }
 
+  // APPROVE PLACE (from All Places view)
+  // ===========================================
+=======
       buttons.push([Markup.button.callback('🔙 Back', 'admin_all_places')]);
 
       await ctx.editMessageText(text, {
@@ -633,6 +644,312 @@ const registerNearbyPlacesAdminHandlers = (bot) => {
   });
 
   // ===========================================
+  // EDIT PLACE
+  // ===========================================
+  bot.action(/^admin_edit_place_(\d+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const placeId = parseInt(ctx.match[1]);
+      const place = await NearbyPlaceService.getPlaceDetails(placeId, false);
+
+      if (!place) {
+        await ctx.answerCbQuery('Place not found');
+        return;
+      }
+
+      // Store editing place in session
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.editingPlaceId = placeId;
+      ctx.session.temp.editingPlaceData = place;
+      await ctx.saveSession();
+
+      // Show edit menu
+      let text = `📝 *Edit Place: ${escapeMarkdown(place.name)}*
+\n`;
+      text += `Select what you want to edit:\n`;
+
+      const buttons = [
+        [Markup.button.callback('📛 Name', 'admin_edit_place_name')],
+        [Markup.button.callback('📝 Description', 'admin_edit_place_description')],
+        [Markup.button.callback('📍 Location', 'admin_edit_place_location')],
+        [Markup.button.callback('📞 Contact Info', 'admin_edit_place_contact')],
+        [Markup.button.callback('🏷️ Category', 'admin_edit_place_category')],
+        [Markup.button.callback('🔙 Back', `admin_view_place_${placeId}`)],
+      ];
+
+      await ctx.editMessageText(text, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons),
+      });
+    } catch (error) {
+      logger.error('Error starting place edit:', error);
+    }
+  });
+
+  // Edit place name
+  bot.action('admin_edit_place_name', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const placeId = ctx.session.temp?.editingPlaceId;
+      if (!placeId) {
+        await ctx.answerCbQuery('No place selected for editing');
+        return;
+      }
+
+      ctx.session.temp.editingField = 'name';
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        '📛 *Edit Place Name*\n\n' +
+        'Please send the new name for this place:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancel', `admin_edit_place_${placeId}`)],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error editing place name:', error);
+    }
+  });
+
+  // Edit place description
+  bot.action('admin_edit_place_description', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const placeId = ctx.session.temp?.editingPlaceId;
+      if (!placeId) {
+        await ctx.answerCbQuery('No place selected for editing');
+        return;
+      }
+
+      ctx.session.temp.editingField = 'description';
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        '📝 *Edit Place Description*\n\n' +
+        'Please send the new description for this place:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancel', `admin_edit_place_${placeId}`)],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error editing place description:', error);
+    }
+  });
+
+  // Edit place location
+  bot.action('admin_edit_place_location', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const placeId = ctx.session.temp?.editingPlaceId;
+      if (!placeId) {
+        await ctx.answerCbQuery('No place selected for editing');
+        return;
+      }
+
+      ctx.session.temp.editingField = 'location';
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        '📍 *Edit Place Location*\n\n' +
+        'Please send the new location in format: `latitude,longitude`\n' +
+        'Example: `40.7128,-74.0060`',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancel', `admin_edit_place_${placeId}`)],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error editing place location:', error);
+    }
+  });
+
+  // Edit place contact info
+  bot.action('admin_edit_place_contact', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const placeId = ctx.session.temp?.editingPlaceId;
+      if (!placeId) {
+        await ctx.answerCbQuery('No place selected for editing');
+        return;
+      }
+
+      ctx.session.temp.editingField = 'contact';
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        '📞 *Edit Contact Info*\n\n' +
+        'Please send the new contact info in format:\n' +
+        'phone,website,telegram,instagram\n' +
+        'Example: `+1234567890,https://example.com,@example,tiktokexample`',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancel', `admin_edit_place_${placeId}`)],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error editing place contact:', error);
+    }
+  });
+
+  // Edit place category
+  bot.action('admin_edit_place_category', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const placeId = ctx.session.temp?.editingPlaceId;
+      if (!placeId) {
+        await ctx.answerCbQuery('No place selected for editing');
+        return;
+      }
+
+      ctx.session.temp.editingField = 'category';
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        '🏷️ *Edit Place Category*\n\n' +
+        'Please send the new category ID:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancel', `admin_edit_place_${placeId}`)],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error editing place category:', error);
+    }
+  });
+
+  // Handle text input for place editing
+  bot.on('text', async (ctx, next) => {
+    try {
+      if (!ctx.session?.temp?.editingPlaceId || !ctx.session.temp.editingField) {
+        return next();
+      }
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        delete ctx.session.temp.editingPlaceId;
+        delete ctx.session.temp.editingField;
+        await ctx.saveSession();
+        return next();
+      }
+
+      const placeId = ctx.session.temp.editingPlaceId;
+      const field = ctx.session.temp.editingField;
+      const input = ctx.message.text.trim();
+
+      // Clear editing state
+      delete ctx.session.temp.editingPlaceId;
+      delete ctx.session.temp.editingField;
+      await ctx.saveSession();
+
+      // Validate and update based on field
+      let updateData = {};
+      let success = true;
+      let errorMessage = '';
+
+      switch (field) {
+        case 'name':
+          if (input.length < 3 || input.length > 100) {
+            success = false;
+            errorMessage = 'Name must be between 3-100 characters';
+          } else {
+            updateData.name = input;
+          }
+          break;
+
+        case 'description':
+          if (input.length > 1000) {
+            success = false;
+            errorMessage = 'Description must be less than 1000 characters';
+          } else {
+            updateData.description = input;
+          }
+          break;
+
+        case 'location':
+          const locationMatch = input.match(/^([-+]?\d+\.?\d*),\s*([-+]?\d+\.?\d*)$/);
+          if (!locationMatch) {
+            success = false;
+            errorMessage = 'Invalid location format. Use: latitude,longitude';
+          } else {
+            updateData.location = {
+              lat: parseFloat(locationMatch[1]),
+              lng: parseFloat(locationMatch[2])
+            };
+          }
+          break;
+
+        case 'contact':
+          const contactParts = input.split(',').map(p => p.trim());
+          if (contactParts.length >= 1) updateData.phone = contactParts[0] || null;
+          if (contactParts.length >= 2) updateData.website = contactParts[1] || null;
+          if (contactParts.length >= 3) updateData.telegramUsername = contactParts[2] || null;
+          if (contactParts.length >= 4) updateData.instagram = contactParts[3] || null;
+          break;
+
+        case 'category':
+          const categoryId = parseInt(input);
+          if (isNaN(categoryId) || categoryId < 1) {
+            success = false;
+            errorMessage = 'Invalid category ID';
+          } else {
+            updateData.categoryId = categoryId;
+          }
+          break;
+
+        default:
+          success = false;
+          errorMessage = 'Invalid field to edit';
+      }
+
+      if (!success) {
+        await ctx.reply(`❌ Error: ${errorMessage}`);
+        return;
+      }
+
+      // Update the place
+      const result = await NearbyPlaceService.updatePlace(placeId, updateData);
+
+      if (result.success) {
+        await ctx.reply(`✅ Place updated successfully!`);
+        // Show the updated place details
+        ctx.callbackQuery = { data: `admin_view_place_${placeId}` };
+        await bot.handleUpdate(ctx.update);
+      } else {
+        await ctx.reply(`❌ Error updating place: ${result.error}`);
+      }
+    } catch (error) {
+      logger.error('Error handling place edit input:', error);
+      await ctx.reply('❌ Error processing your request');
+    }
+  });
+
+  // ===========================================
+  // APPROVE PLACE (from All Places view)
+  // ======================================================================================
   // APPROVE PLACE (from All Places view)
   // ===========================================
   bot.action(/^admin_approve_place_(\d+)$/, async (ctx) => {
