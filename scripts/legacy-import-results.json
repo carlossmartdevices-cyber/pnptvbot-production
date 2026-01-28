@@ -1,0 +1,826 @@
+{
+  "imported": 89,
+  "skipped": 2,
+  "failed": 0,
+  "details": [
+    {
+      "timestamp": "4/5/2025 23:40:02",
+      "email": "chtownntucar@hotmail.com",
+      "username": "sluTvrspaTy",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_db11ea10"
+    },
+    {
+      "timestamp": "4/6/2025 0:19:26",
+      "email": "jayyykavy2912@gmail.com",
+      "username": "jayy_kavy2912",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_7192717c"
+    },
+    {
+      "timestamp": "4/7/2025 2:56:25",
+      "email": "iunkrafo@gmail.com",
+      "username": "smurfgjunk25",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_27034459"
+    },
+    {
+      "timestamp": "4/9/2025 12:36:44",
+      "email": "forpomonly990@gmail.com",
+      "username": "clouduba99",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_dcb3f15d"
+    },
+    {
+      "timestamp": "4/9/2025 15:10:20",
+      "email": "j.tolsol@gmail.com",
+      "username": "Rubber_masker",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_4f8dc4ff"
+    },
+    {
+      "timestamp": "4/10/2025 13:07:02",
+      "email": "hiep626@gmail.com",
+      "username": "DelightfulFemboy",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_cc6b8fc1"
+    },
+    {
+      "timestamp": "4/11/2025 1:28:26",
+      "email": "flintbucks@gmail.com",
+      "username": "Flintbucks",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_26514161"
+    },
+    {
+      "timestamp": "4/12/2025 13:38:59",
+      "email": "andrew.thurman95@gmail.com",
+      "username": "jwentworth222",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_071a09f4"
+    },
+    {
+      "timestamp": "4/15/2025 3:14:32",
+      "email": "experiment798@gmail.com",
+      "username": "V3rsangel",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_641b2721"
+    },
+    {
+      "timestamp": "4/15/2025 12:48:11",
+      "email": "eugenehill@yahoo.com",
+      "username": "BLKPersuasion",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_caeb0d32"
+    },
+    {
+      "timestamp": "4/16/2025 10:31:44",
+      "email": "maurizio.iapicca@gmail.com",
+      "username": "M ike myname",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_760ab489"
+    },
+    {
+      "timestamp": "4/17/2025 9:38:26",
+      "email": "nicholas.ralph@hotmail.com",
+      "username": "manc_guy2",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_7ee9e417"
+    },
+    {
+      "timestamp": "4/18/2025 4:01:53",
+      "email": "justanotheraddy@gmail.com",
+      "username": "remmett18",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_4e830293"
+    },
+    {
+      "timestamp": "4/18/2025 18:37:48",
+      "email": "juehnhof@me.com",
+      "username": "DerekSub7",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_0fe5f827"
+    },
+    {
+      "timestamp": "4/19/2025 1:32:59",
+      "email": "94jpm75@gmail.com",
+      "username": "Bbslam505",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_fc50e131"
+    },
+    {
+      "timestamp": "4/19/2025 17:09:40",
+      "email": "phillupmy4ss4fun@gmail.com",
+      "username": "Phillupmy4ss",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_47b00271"
+    },
+    {
+      "timestamp": "4/19/2025 19:08:33",
+      "email": "leo.h58@gmail.com",
+      "username": "txiang58",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_1cf85a29"
+    },
+    {
+      "timestamp": "4/20/2025 2:01:36",
+      "email": "arief.mohammadkhsa@gmail.com",
+      "username": "mohayiep",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_9d424402"
+    },
+    {
+      "timestamp": "4/20/2025 3:03:08",
+      "email": "rjv65@msn.com",
+      "username": "sfdiver",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_87bb5a3a"
+    },
+    {
+      "timestamp": "4/20/2025 20:24:29",
+      "email": "eladiaz@yahoo.com",
+      "username": "augustosNYC",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_57e93d2c"
+    },
+    {
+      "timestamp": "4/20/2025 22:06:49",
+      "email": "sirdan1993@gmail.com",
+      "username": "Ron que",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_7fecb930"
+    },
+    {
+      "timestamp": "4/21/2025 2:08:43",
+      "email": "hmarquez0079@gmail.com",
+      "username": "did12216",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_018fd63c"
+    },
+    {
+      "timestamp": "4/21/2025 5:14:28",
+      "email": "csmurphy20@gmail.com",
+      "username": "StrokeTheOtter",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_0912bb41"
+    },
+    {
+      "timestamp": "4/21/2025 10:12:18",
+      "email": "raunchybikdawg@proton.me",
+      "username": "nchaos247",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_38c545d2"
+    },
+    {
+      "timestamp": "4/21/2025 18:08:18",
+      "email": "jay.nicholson1997@gmail.com",
+      "username": "ajajyyyy457",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_1e9caf82"
+    },
+    {
+      "timestamp": "4/22/2025 4:11:44",
+      "email": "caffybois@gmail.com",
+      "username": "justhere1229",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_a65576c5"
+    },
+    {
+      "timestamp": "5/1/2025 3:36:06",
+      "email": "ianescarcha@yahoo.com",
+      "username": "e1991",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_e2d7e493"
+    },
+    {
+      "timestamp": "5/1/2025 6:46:09",
+      "email": "tx4msguy@gmail.com",
+      "username": "ms60tx",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_c896d187"
+    },
+    {
+      "timestamp": "5/1/2025 9:19:58",
+      "email": "urs.walther@gmx.de",
+      "username": "panoramastitcher",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_f3ca3758"
+    },
+    {
+      "timestamp": "5/1/2025 15:52:03",
+      "email": "petersburggg@gmail.com",
+      "username": "pzecve",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_a0d0a987"
+    },
+    {
+      "timestamp": "5/1/2025 13:43:34",
+      "email": "oyakoslmers@gmail.com",
+      "username": "NYCripepeach",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_e45e9bf2"
+    },
+    {
+      "timestamp": "5/1/2025 13:46:03",
+      "email": "jeffry456@gmail.com",
+      "username": "jeffry456",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_ed6680a8"
+    },
+    {
+      "timestamp": "5/1/2025 15:12:05",
+      "email": "chona.blood@gmail.com",
+      "username": "Raccoone3",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_7fc37909"
+    },
+    {
+      "timestamp": "5/1/2025 15:15:34",
+      "email": "jeviseta@gmail.com",
+      "username": "daddyzapig",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_dc4e37e0"
+    },
+    {
+      "timestamp": "5/1/2025 17:08:46",
+      "email": "john.shean@gmail.com",
+      "username": "jonsean",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_945516e6"
+    },
+    {
+      "timestamp": "5/2/2025 0:24:57",
+      "email": "miller.greg.s@gmail.com",
+      "username": "fitness_mgs",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_6c6a6e38"
+    },
+    {
+      "timestamp": "5/2/2025 1:09:24",
+      "email": "bourdonmusic@gmail.com",
+      "username": "sublars",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_3f5ae221"
+    },
+    {
+      "timestamp": "5/2/2025 7:12:59",
+      "email": "saymorea@icloud.com",
+      "username": "Nokao Boi",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_ff46e947"
+    },
+    {
+      "timestamp": "5/2/2025 17:27:01",
+      "email": "teerex2000@gmail.com",
+      "username": "subbottomthai",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_3f2096dc"
+    },
+    {
+      "timestamp": "5/2/2025 18:22:14",
+      "email": "m85088@gmail.com",
+      "username": "akin1007",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_660e9fee"
+    },
+    {
+      "timestamp": "5/2/2025 20:20:46",
+      "email": "dazza_210975@yahoo.com",
+      "username": "daren_p",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_3ab48c37"
+    },
+    {
+      "timestamp": "5/3/2025 10:09:39",
+      "email": "dbyoung@mac.com",
+      "username": "Blueyesd510",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_f1f40a59"
+    },
+    {
+      "timestamp": "5/3/2025 12:40:46",
+      "email": "shaunizzkkool@gmail.com",
+      "username": "Deskisd2050",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_59033f26"
+    },
+    {
+      "timestamp": "5/3/2025 14:14:09",
+      "email": "calva1996@yahoo.com",
+      "username": "justlookin123",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_8cc186d2"
+    },
+    {
+      "timestamp": "5/3/2025 15:17:55",
+      "email": "davidmok0911@gmail.com",
+      "username": "christopherwai",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_c0d1b35c"
+    },
+    {
+      "timestamp": "5/3/2025 19:05:41",
+      "email": "kdarkstar@aol.com",
+      "username": "VnxCrsntBm",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_c96e978e"
+    },
+    {
+      "timestamp": "5/3/2025 22:01:17",
+      "email": "buddystb@gmail.com",
+      "username": "buddystb",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_d0fd7556"
+    },
+    {
+      "timestamp": "5/3/2025 23:59:37",
+      "email": "bdudenude@gmail.com",
+      "username": "BBearPigSub - Santino (aka Carlos) - knows",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_5b84c5f1"
+    },
+    {
+      "timestamp": "5/4/2025 2:30:57",
+      "email": "aaalinda0045aaa@yahoo.com",
+      "username": "galaxcuy1111",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_b340f932"
+    },
+    {
+      "timestamp": "5/4/2025 8:41:38",
+      "email": "farr75500@gmail.com",
+      "username": "Tallgaveyy",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_60922404"
+    },
+    {
+      "timestamp": "5/4/2025 14:10:50",
+      "email": "kingslesson90@gmail.com",
+      "username": "DeizApollo",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_9cdbb817"
+    },
+    {
+      "timestamp": "5/4/2025 14:30:06",
+      "email": "experiment798@gmail.com",
+      "username": "3rsangel",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "skipped",
+      "reason": "email exists"
+    },
+    {
+      "timestamp": "5/4/2025 21:05:49",
+      "email": "jeffluvs@icloud.com",
+      "username": "UWS_Jeff",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_663b6f48"
+    },
+    {
+      "timestamp": "5/6/2025 2:04:08",
+      "email": "micahirs@yahoo.com",
+      "username": "kiddsnowww",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_0c12174a"
+    },
+    {
+      "timestamp": "5/7/2025 1:09:59",
+      "email": "aaronugaytan@gmail.com",
+      "username": "bcrxx",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_0e324876"
+    },
+    {
+      "timestamp": "5/7/2025 14:17:06",
+      "email": "yoshivasp@yahoo.de",
+      "username": "yoshvasp",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_deb66a24"
+    },
+    {
+      "timestamp": "5/8/2025 4:49:42",
+      "email": "sayhtoduy@gmail.com",
+      "username": "tcbcn22",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_55ed47de"
+    },
+    {
+      "timestamp": "5/9/2025 4:33:32",
+      "email": "studiopigsha@outlook.com",
+      "username": "aTspnewyork",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_31d79bcd"
+    },
+    {
+      "timestamp": "5/10/2025 0:09:31",
+      "email": "josephbutcher14@gmail.com",
+      "username": "MikeAlexander",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_eb732e8c"
+    },
+    {
+      "timestamp": "5/13/2025 2:24:47",
+      "email": "limlaptop@gmail.com",
+      "username": "Oracle0218",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_68a69138"
+    },
+    {
+      "timestamp": "5/14/2025 4:56:59",
+      "email": "tuoiomai0216@yahoo.com",
+      "username": "lukel02",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_3632bb17"
+    },
+    {
+      "timestamp": "5/15/2025 21:25:28",
+      "email": "whocaresnotme.kb@gmail.com",
+      "username": "thatonepigboy",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_26201ef0"
+    },
+    {
+      "timestamp": "5/19/2025 3:37:05",
+      "email": "psthngx@gmail.com",
+      "username": "owl_who_who",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_51808a2f"
+    },
+    {
+      "timestamp": "5/28/2025 17:13:04",
+      "email": "justforonepurpose63@gmail.com",
+      "username": "needybtchkitty",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_32ac4fd9"
+    },
+    {
+      "timestamp": "5/28/2025 17:13:30",
+      "email": "daniel.yfu.chen@gmail.com",
+      "username": "Vetrate",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_9ee102e2"
+    },
+    {
+      "timestamp": "5/29/2025 1:26:40",
+      "email": "jsfaban007@gmail.com",
+      "username": "ade_ultra",
+      "legacyPlan": "PRIME Lifetime Pass",
+      "planId": "lifetime_pass",
+      "status": "imported",
+      "id": "legacy_05052cdb"
+    },
+    {
+      "timestamp": "4/14/2025 6:35:02",
+      "email": "rightguyyinghtnow99@gmail.com",
+      "username": "downassed99",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_855b229f"
+    },
+    {
+      "timestamp": "4/14/2025 20:31:23",
+      "email": "aaandrea.tata@gmail.com",
+      "username": "Clytemn3stra",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_3c08a4ea"
+    },
+    {
+      "timestamp": "4/20/2025 4:32:32",
+      "email": "vicjwoj@gmail.com",
+      "username": "Godric wu",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_eca5c743"
+    },
+    {
+      "timestamp": "3/28/2025 11:42:37",
+      "email": "demarcodakara@yahoo.com",
+      "username": "cjtakarai",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_e91217b8"
+    },
+    {
+      "timestamp": "4/30/2025 0:43:38",
+      "email": "rankenking223@gmail.com",
+      "username": "franken22293",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_b5d75dd7"
+    },
+    {
+      "timestamp": "5/3/2025 1:01:57",
+      "email": "maxc.king@gmail.com",
+      "username": "maksbknyc",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_f3fae4a9"
+    },
+    {
+      "timestamp": "5/4/2025 14:02:10",
+      "email": "borhand784@gmail.com",
+      "username": "hanlxx",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_2065f411"
+    },
+    {
+      "timestamp": "5/4/2025 20:41:08",
+      "email": "agguinner87@yahoo.com",
+      "username": "tml_1987",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_a19d43ad"
+    },
+    {
+      "timestamp": "5/10/2025 8:59:54",
+      "email": "mark.liang_1978@gmail.com",
+      "username": "Liang Mark",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_5eee7982"
+    },
+    {
+      "timestamp": "5/28/2025 16:33:02",
+      "email": "scottdmccoy@gmail.com",
+      "username": "WombatWM",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_89ffc314"
+    },
+    {
+      "timestamp": "5/29/2025 7:08:53",
+      "email": "fleweldewi@gmail.com",
+      "username": "dedeeffy",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_444f7c1c"
+    },
+    {
+      "timestamp": "5/29/2025 18:19:55",
+      "email": "bryan.trumbul@proton.me",
+      "username": "sbboy1965",
+      "legacyPlan": "PRIME Monthly Subscription",
+      "planId": "pnp_member",
+      "status": "imported",
+      "id": "legacy_fcbc7d9d"
+    },
+    {
+      "timestamp": "6/1/2025 6:07:00",
+      "email": "tumblejem@gmail.com",
+      "username": "PupFlip",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_e3c605fd"
+    },
+    {
+      "timestamp": "6/2/2025 4:12:13",
+      "email": "cakingipson@gmail.com",
+      "username": "milenhigh22",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_b15cf464"
+    },
+    {
+      "timestamp": "6/4/2025 2:13:23",
+      "email": "thomas.bore@gmail.com",
+      "username": "Leatherdom",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_9cd5b85c"
+    },
+    {
+      "timestamp": "6/17/2025 2:56:27",
+      "email": "jiend935@gmail.com",
+      "username": "Jaynd935",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_0b1fde8c"
+    },
+    {
+      "timestamp": "6/26/2025 2:09:48",
+      "email": "naphaajohn@gmail.com",
+      "username": "PupChrome",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_5ad8edd9"
+    },
+    {
+      "timestamp": "7/1/2025 20:34:19",
+      "email": "jimmywong19890914@gmail.com",
+      "username": "jwm1289",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_b49598ee"
+    },
+    {
+      "timestamp": "7/5/2025 7:56:09",
+      "email": "kaneginmory@gmail.com",
+      "username": "kingchaos095",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_9c21cc3e"
+    },
+    {
+      "timestamp": "7/10/2025 2:40:21",
+      "email": "mike.jennings279@gmail.com",
+      "username": "pzipglad",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_a9854466"
+    },
+    {
+      "timestamp": "7/15/2025 4:50:53",
+      "email": "theostogaymer@gmail.com",
+      "username": "Bewear_the_derpybear",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_d4cf358a"
+    },
+    {
+      "timestamp": "7/31/2025 13:45:47",
+      "email": "jdwil12@icloud.com",
+      "username": "sttl191",
+      "legacyPlan": "Week Trial",
+      "planId": "trial_week",
+      "status": "imported",
+      "id": "legacy_ca60ac74"
+    },
+    {
+      "timestamp": "8/9/2025 5:16:21",
+      "email": "john@amafilim.com",
+      "username": "workingclass25",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_15cf3e00"
+    },
+    {
+      "timestamp": "8/10/2025 12:06:34",
+      "email": "vargassaarmando@gmail.com",
+      "username": "Armando Vargas",
+      "legacyPlan": "PRIME Yearly Pass",
+      "planId": "diamond_member",
+      "status": "imported",
+      "id": "legacy_dfdd492d"
+    },
+    {
+      "timestamp": "8/25/2025 7:29:39",
+      "email": "koeindream@gmail.com",
+      "username": "SUIRODEF",
+      "legacyPlan": "Perrius",
+      "planId": null,
+      "status": "skipped",
+      "reason": "username exists"
+    }
+  ]
+}

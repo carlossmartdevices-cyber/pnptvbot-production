@@ -80,7 +80,7 @@ const registerNearbyPlacesHandlers = (bot) => {
           {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-              [Markup.button.callback(lang === 'es' ? '➕ Proponer Negocio' : '➕ Suggest Business', 'submit_place_business')],
+              [Markup.button.callback(lang === 'es' ? '➕ Proponer Negocio' : '➕ Suggest Business', 'submit_business_profile')],
               [Markup.button.callback('🔙 Back', 'show_nearby_menu')],
             ]),
           }
@@ -337,42 +337,17 @@ const registerNearbyPlacesHandlers = (bot) => {
     }
   });
 
-  // Quick submission for business
+  // Redirect old business submission to new enhanced system
   bot.action('submit_place_business', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
-
-      ctx.session.temp = ctx.session.temp || {};
-      ctx.session.temp.placeSubmission = {
-        step: 'name',
-        placeType: 'business',
-        categoryId: null, // Will be set to community_business category
-      };
-      await ctx.saveSession();
-
-      // Get community business category ID
-      const categories = await NearbyPlaceService.getCategories(lang);
-      const communityBizCat = categories.find(c => c.slug === 'community_business');
-      if (communityBizCat) {
-        ctx.session.temp.placeSubmission.categoryId = communityBizCat.id;
-        await ctx.saveSession();
-      }
-
-      await ctx.editMessageText(
-        lang === 'es'
-          ? '📝 *Paso 1/5: Nombre*\n\n' +
-            'Escribe el nombre del negocio:'
-          : '📝 *Step 1/5: Name*\n\n' +
-            'Enter the name of the business:',
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
-          ]),
-        }
-      );
+      await ctx.answerCbQuery(lang === 'es' ? 'Redirigiendo...' : 'Redirecting...');
+      
+      // Call the new business submission handler
+      ctx.callbackQuery.data = 'submit_business_profile';
+      await bot.handleUpdate(ctx.update);
     } catch (error) {
-      logger.error('Error starting business submission:', error);
+      logger.error('Error redirecting to new business submission:', error);
     }
   });
 
@@ -832,7 +807,7 @@ const registerNearbyPlacesHandlers = (bot) => {
       if (type === 'business') {
         buttons.push([Markup.button.callback(
           lang === 'es' ? '➕ Proponer Negocio' : '➕ Suggest Business',
-          'submit_place_business'
+          'submit_business_profile'
         )]);
       } else if (categoryId) {
         buttons.push([Markup.button.callback(

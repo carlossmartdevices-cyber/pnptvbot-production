@@ -484,6 +484,7 @@ async function showAdminPanel(ctx, edit = false) {
 
       // ═══ LUGARES Y NEGOCIOS ═══
       buttons.push([
+        Markup.button.callback('🏪 Business Admin', 'admin_business_dashboard'),
         Markup.button.callback('📍 Nearby Places', 'admin_nearby_places'),
       ]);
 
@@ -4619,6 +4620,7 @@ async function sendBroadcastWithButtons(ctx, bot) {
 const registerAudioManagementHandlers = require('./audioManagement');
 const registerDateTimePickerHandlers = require('./dateTimePickerHandlers');
 const registerNearbyPlacesAdminHandlers = require('./nearbyPlacesAdmin');
+const registerEnhancedBusinessAdminHandlers = require('./enhancedBusinessAdmin');
 const ChatCleanupService = require('../../services/chatCleanupService');
 
 // Group cleanup command for admins
@@ -4976,6 +4978,7 @@ const finalRegisterAdminHandlers = (bot) => {
   registerAudioManagementHandlers(bot);
   registerDateTimePickerHandlers(bot);
   registerNearbyPlacesAdminHandlers(bot);
+  registerEnhancedBusinessAdminHandlers(bot);
   registerGroupCleanupCommand(bot);
   addBroadcastButtonHandlers(bot);
 };

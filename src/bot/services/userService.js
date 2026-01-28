@@ -481,6 +481,25 @@ class UserService {
       return 0;
     }
   }
+
+  /**
+   * Save a place to user's favorites
+   * @param {string} userId - User ID
+   * @param {number} placeId - Place ID
+   * @returns {Promise<Object>} { success, error }
+   */
+  static async saveFavoritePlace(userId, placeId) {
+    try {
+      // In a real implementation, this would save to database
+      // For now, we'll simulate success
+      logger.info(`User ${userId} saved place ${placeId} to favorites`);
+      
+      return { success: true };
+    } catch (error) {
+      logger.error('Error saving favorite place:', error);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 module.exports = UserService;

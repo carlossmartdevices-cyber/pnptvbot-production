@@ -258,7 +258,7 @@ class MenuConfigModel {
         allowedTiers: [],
         order: 3,
         icon: '🌍',
-        action: 'show_nearby',
+        action: 'show_nearby_unified',
         type: 'default',
         actionType: 'submenu',
         actionData: {},

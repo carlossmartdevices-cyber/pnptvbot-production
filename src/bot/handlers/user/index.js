@@ -1,8 +1,10 @@
 const onboardingHandlers = require('./onboarding');
 const menuHandlers = require('./menu');
 const profileHandlers = require('./profile');
-const nearbyHandlers = require('./nearby');
+const nearbyUnifiedHandlers = require('./nearbyUnified');
 const nearbyPlacesHandlers = require('./nearbyPlaces');
+const businessSubmissionHandlers = require('./businessSubmission');
+const enhancedProfileCards = require('./enhancedProfileCards');
 const settingsHandlers = require('./settings');
 const groupWelcomeHandlers = require('./groupWelcome');
 const { registerAgeVerificationHandlers } = require('./ageVerificationHandler');
@@ -23,8 +25,10 @@ const registerUserHandlers = (bot) => {
   registerAgeVerificationHandlers(bot);
   menuHandlers(bot);
   profileHandlers(bot);
-  nearbyHandlers(bot);
+  nearbyUnifiedHandlers(bot);
   nearbyPlacesHandlers(bot);
+  businessSubmissionHandlers(bot);
+  enhancedProfileCards(bot);
   settingsHandlers(bot);
   groupWelcomeHandlers(bot);
   lifetimeMigrationHandlers(bot);

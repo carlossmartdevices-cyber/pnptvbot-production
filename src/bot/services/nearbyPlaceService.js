@@ -246,6 +246,84 @@ class NearbyPlaceService {
   }
 
   /**
+   * Get submission details with enhanced information
+   * @param {number} submissionId - Submission ID
+   * @returns {Promise<Object|null>} Submission details
+   */
+  static async getSubmissionDetails(submissionId) {
+    try {
+      const submission = await NearbyPlaceSubmissionModel.getById(submissionId);
+      
+      if (!submission) return null;
+
+      // Enhance with category information
+      if (submission.categoryId) {
+        const category = await NearbyPlaceCategoryModel.getById(submission.categoryId);
+        if (category) {
+          submission.categoryName = category.nameEn;
+          submission.categoryNameEs = category.nameEs;
+          submission.categoryEmoji = category.emoji;
+        }
+      }
+
+      // Enhance with submitter information
+      if (submission.submittedByUserId) {
+        const user = await UserService.getById(submission.submittedByUserId);
+        if (user) {
+          submission.submitterUsername = user.username;
+          submission.userTier = user.subscriptionStatus;
+        }
+      }
+
+      return submission;
+    } catch (error) {
+      logger.error('Error getting submission details:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get recently approved submissions
+   * @param {number} limit - Max results
+   * @returns {Promise<Array>} Recently approved submissions
+   */
+  static async getRecentApproved(limit = 10) {
+    try {
+      return await NearbyPlaceSubmissionModel.getRecentApproved(limit);
+    } catch (error) {
+      logger.error('Error getting recent approved submissions:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get recently rejected submissions
+   * @param {number} limit - Max results
+   * @returns {Promise<Array>} Recently rejected submissions
+   */
+  static async getRecentRejected(limit = 10) {
+    try {
+      return await NearbyPlaceSubmissionModel.getRecentRejected(limit);
+    } catch (error) {
+      logger.error('Error getting recent rejected submissions:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Count pending submissions
+   * @returns {Promise<number>} Count of pending submissions
+   */
+  static async countPending() {
+    try {
+      return await NearbyPlaceSubmissionModel.countPending();
+    } catch (error) {
+      logger.error('Error counting pending submissions:', error);
+      return 0;
+    }
+  }
+
+  /**
    * Get pending places for admin
    * @param {number} limit - Max results
    * @returns {Promise<Array>} Pending places

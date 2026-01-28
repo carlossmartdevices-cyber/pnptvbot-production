@@ -14,7 +14,7 @@ function extractMenuIdFromAction(action) {
   const actionToMenuId = {
     show_subscription_plans: 'subscribe',
     show_profile: 'profile',
-    show_nearby: 'nearby',
+    show_nearby_unified: 'nearby',
     show_live: 'live',
     show_radio: 'radio',
     show_jitsi: 'jitsi',

@@ -13,7 +13,7 @@ const UserModel = require('../../../models/userModel');
  */
 
 const FEATURES_REQUIRING_AGE_VERIFICATION = [
-  'show_nearby',
+  'show_nearby_unified',
   'show_profile',
   'show_members_area',
   'show_subscription_plans',

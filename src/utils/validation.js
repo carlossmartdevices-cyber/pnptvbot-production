@@ -134,6 +134,12 @@ const schemas = {
     photoFileId: Joi.string().optional().allow(null),
     language: Joi.string().valid('en', 'es').optional(),
     locationSharingEnabled: Joi.boolean().optional(),
+    // Onboarding and verification flags
+    onboardingComplete: Joi.boolean().optional(),
+    ageVerified: Joi.boolean().optional(),
+    termsAccepted: Joi.boolean().optional(),
+    privacyAccepted: Joi.boolean().optional(),
+    hasSeenTutorial: Joi.boolean().optional(),
   }).min(1),
 
   // Location schema

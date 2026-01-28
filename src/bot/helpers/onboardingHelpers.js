@@ -514,7 +514,7 @@ async function showMainMenu(ctx) {
       ],
       [
         Markup.button.callback(t('myProfile', lang), 'show_profile'),
-        Markup.button.callback(t('nearbyUsers', lang), 'show_nearby'),
+        Markup.button.callback(t('nearbyUsers', lang), 'show_nearby_unified'),
       ],
       [
         Markup.button.callback(t('liveStreams', lang), 'show_live'),

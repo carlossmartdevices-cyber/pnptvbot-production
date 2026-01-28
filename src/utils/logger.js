@@ -30,10 +30,12 @@ const consoleFormat = winston.format.combine(
 
 // Create transports
 const transports = [
-  // Console transport
+  // Console transport with error handling
   new winston.transports.Console({
     format: consoleFormat,
     level: logLevel,
+    handleExceptions: true,
+    handleRejections: true,
   }),
 
   // Error log file
@@ -64,6 +66,17 @@ const logger = winston.createLogger({
   format: logFormat,
   transports,
   exitOnError: false,
+  handleExceptions: true,
+  handleRejections: true,
+});
+
+// Handle uncaught exceptions and rejections
+logger.on('error', (error) => {
+  // Ignore EPIPE errors as they are not critical
+  if (error.code === 'EPIPE') {
+    return;
+  }
+  console.error('Logger error:', error.message);
 });
 
 /**

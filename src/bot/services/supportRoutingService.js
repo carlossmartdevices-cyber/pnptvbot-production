@@ -54,6 +54,24 @@ class SupportRoutingService {
         try {
           await this.telegram.reopenForumTopic(this.supportGroupId, supportTopic.thread_id);
           logger.info('Forum topic reopened', { userId, threadId: supportTopic.thread_id });
+
+          // Send reopen notification with quick commands
+          const reopenMessage = `🔄 *TICKET REABIERTO*
+
+👤 *Usuario:* ${firstName} ${username}
+🆔 *User ID:* \`${userId}\`
+📅 *Reabierto:* ${new Date().toLocaleString('es-ES')}
+
+⚡ *Comandos Rápidos:*
+\`/activate_${userId}_30\` - Activar 30 días
+\`/activate_${userId}_lifetime\` - Lifetime
+\`/user_${userId}\` - Ver info
+\`/solved_${userId}\` - Resolver`;
+
+          await this.telegram.sendMessage(this.supportGroupId, reopenMessage, {
+            message_thread_id: supportTopic.thread_id,
+            parse_mode: 'Markdown',
+          });
         } catch (reopenError) {
           logger.warn('Could not reopen forum topic:', reopenError.message);
         }
@@ -105,7 +123,7 @@ class SupportRoutingService {
       const requestLabel = this.getRequestLabel(requestType);
       const priorityEmoji = this.getPriorityEmoji(priority);
       const categoryEmoji = this.getCategoryEmoji(category);
-      
+
       const infoMessage = `${infoEmoji} *${requestLabel}*
 
 ${priorityEmoji} *Prioridad:* ${priority}
@@ -114,6 +132,13 @@ ${categoryEmoji} *Categoría:* ${category}
 🆔 *User ID:* \`${userId}\`
 🌍 *Idioma:* ${language}
 📅 *Creado:* ${new Date().toLocaleString('es-ES')}
+
+⚡ *Comandos Rápidos:*
+\`/activate_${userId}_30\` - Activar 30 días
+\`/activate_${userId}_lifetime\` - Activar lifetime
+\`/user_${userId}\` - Ver info usuario
+\`/solved_${userId}\` - Marcar resuelto
+\`/r2\` - Pedir comprobante
 
 _Responde en este topic para enviar mensajes al usuario._`;
 
@@ -168,9 +193,29 @@ _Responde en este topic para enviar mensajes al usuario._`;
       const supportTopic = await this.getOrCreateUserTopic(user, requestType, messageText);
       const threadId = supportTopic.thread_id;
 
-      // Build message header
+      // Build file info if attachment present
+      let fileInfo = '';
+      if (ctx.message?.photo) {
+        const photo = ctx.message.photo[ctx.message.photo.length - 1];
+        fileInfo = `\n📎 *Archivo:* Imagen (${photo.width}x${photo.height})`;
+      } else if (ctx.message?.document) {
+        const doc = ctx.message.document;
+        const sizeKB = doc.file_size ? Math.round(doc.file_size / 1024) : '?';
+        fileInfo = `\n📎 *Archivo:* ${doc.file_name || 'documento'} (${sizeKB} KB)`;
+      } else if (ctx.message?.video) {
+        const video = ctx.message.video;
+        const sizeMB = video.file_size ? Math.round(video.file_size / (1024 * 1024)) : '?';
+        fileInfo = `\n📎 *Archivo:* Video (${video.duration}s, ${sizeMB} MB)`;
+      } else if (ctx.message?.voice) {
+        fileInfo = `\n📎 *Archivo:* Nota de voz (${ctx.message.voice.duration}s)`;
+      } else if (ctx.message?.audio) {
+        const audio = ctx.message.audio;
+        fileInfo = `\n📎 *Archivo:* Audio - ${audio.title || audio.file_name || 'audio'} (${audio.duration}s)`;
+      }
+
+      // Build message header with file info
       const requestEmoji = this.getRequestEmoji(requestType);
-      const header = `${requestEmoji} *${firstName}* (@${username}):\n\n`;
+      const header = `${requestEmoji} *${firstName}* (@${username}):${fileInfo}\n\n`;
 
       // Send based on message type
       if (messageType === 'text' && ctx.message?.text) {
