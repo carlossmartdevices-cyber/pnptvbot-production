@@ -260,6 +260,17 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
+  // Edit Profile (alias for edit_profile_info - used by nearby)
+  bot.action('edit_profile', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+      await ctx.answerCbQuery();
+      await showEditProfileMenu(ctx, lang);
+    } catch (error) {
+      logger.error('Error showing edit profile menu:', error);
+    }
+  });
+
   // Edit Profile Info (Bio, Interests, Tribe, Looking For)
   bot.action('edit_profile_info', async (ctx) => {
     try {
