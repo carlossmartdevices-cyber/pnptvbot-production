@@ -45,7 +45,7 @@ const registerNearbyPlacesAdminHandlers = (bot) => {
         )],
         [Markup.button.callback('📋 All Places', 'admin_all_places')],
         [Markup.button.callback('📊 Statistics', 'admin_places_stats')],
-        [Markup.button.callback('🔙 Back', 'admin_panel')],
+        [Markup.button.callback('🔙 Back', 'admin_home')],
       ];
 
       await ctx.editMessageText(text, {
@@ -361,7 +361,7 @@ const registerNearbyPlacesAdminHandlers = (bot) => {
     }
   });
 
-  // Handle custom rejection reason text
+  // Handle custom rejection reason text (for submissions)
   bot.on('text', async (ctx, next) => {
     try {
       if (!ctx.session?.temp?.awaitingCustomRejection) {
@@ -422,6 +422,57 @@ const registerNearbyPlacesAdminHandlers = (bot) => {
       }
     } catch (error) {
       logger.error('Error handling custom rejection:', error);
+      return next();
+    }
+  });
+
+  // Handle custom rejection reason text (for places)
+  bot.on('text', async (ctx, next) => {
+    try {
+      if (!ctx.session?.temp?.awaitingCustomPlaceRejection) {
+        return next();
+      }
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        delete ctx.session.temp.awaitingCustomPlaceRejection;
+        await ctx.saveSession();
+        return next();
+      }
+
+      const placeId = ctx.session.temp.awaitingCustomPlaceRejection;
+      const reason = ctx.message.text.trim();
+      const adminUserId = ctx.from.id.toString();
+
+      // Clear session
+      delete ctx.session.temp.awaitingCustomPlaceRejection;
+      delete ctx.session.temp.rejectingPlaceId;
+      await ctx.saveSession();
+
+      if (reason.length < 5) {
+        await ctx.reply('Rejection reason is too short. Please try again.');
+        return;
+      }
+
+      const result = await NearbyPlaceService.rejectPlace(placeId, adminUserId, reason);
+
+      if (result.success) {
+        await ctx.reply(
+          '`❌ Place Rejected`\n\n' +
+          `Reason: ${escapeMarkdown(reason)}`,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('📋 Browse Places', 'admin_all_places')],
+              [Markup.button.callback('🔙 Back', 'admin_nearby_places')],
+            ]),
+          }
+        );
+      } else {
+        await ctx.reply(`Error rejecting place: ${result.error}`);
+      }
+    } catch (error) {
+      logger.error('Error handling custom place rejection:', error);
       return next();
     }
   });
@@ -578,6 +629,147 @@ const registerNearbyPlacesAdminHandlers = (bot) => {
       });
     } catch (error) {
       logger.error('Error viewing place details:', error);
+    }
+  });
+
+  // ===========================================
+  // APPROVE PLACE (from All Places view)
+  // ===========================================
+  bot.action(/^admin_approve_place_(\d+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const placeId = parseInt(ctx.match[1]);
+      const adminUserId = ctx.from.id.toString();
+
+      const result = await NearbyPlaceService.toggleSuspend(placeId, false, adminUserId);
+
+      if (result.success) {
+        await ctx.answerCbQuery('Place approved');
+        await ctx.editMessageText(
+          '`✅ Place Approved`\n\n' +
+          'The place has been approved and is now visible to users.',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('👁️ View Details', `admin_view_place_${placeId}`)],
+              [Markup.button.callback('🔙 Back', 'admin_all_places')],
+            ]),
+          }
+        );
+      } else {
+        await ctx.answerCbQuery(`Error: ${result.error}`, { show_alert: true });
+      }
+    } catch (error) {
+      logger.error('Error approving place:', error);
+      await ctx.answerCbQuery('Error approving place');
+    }
+  });
+
+  // ===========================================
+  // REJECT PLACE (from All Places view)
+  // ===========================================
+  bot.action(/^admin_reject_place_(\d+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const placeId = parseInt(ctx.match[1]);
+
+      // Store in session for custom reason
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.rejectingPlaceId = placeId;
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        '`❌ Reject Place`\n\n' +
+        'Select a rejection reason:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 Duplicate place', `admin_reject_place_reason_duplicate_${placeId}`)],
+            [Markup.button.callback('⚠️ Inappropriate content', `admin_reject_place_reason_inappropriate_${placeId}`)],
+            [Markup.button.callback('📍 Invalid location', `admin_reject_place_reason_location_${placeId}`)],
+            [Markup.button.callback('📝 Incomplete info', `admin_reject_place_reason_incomplete_${placeId}`)],
+            [Markup.button.callback('✏️ Custom reason...', `admin_reject_place_custom_${placeId}`)],
+            [Markup.button.callback('🔙 Back', `admin_view_place_${placeId}`)],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error showing place rejection options:', error);
+    }
+  });
+
+  // Quick rejection of place with preset reason
+  bot.action(/^admin_reject_place_reason_(duplicate|inappropriate|location|incomplete)_(\d+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const reasonType = ctx.match[1];
+      const placeId = parseInt(ctx.match[2]);
+      const adminUserId = ctx.from.id.toString();
+
+      const reasonMap = {
+        duplicate: 'This place already exists in our directory.',
+        inappropriate: 'This place does not meet our community guidelines.',
+        location: 'The location information is invalid or incomplete.',
+        incomplete: 'The listing is missing required information.',
+      };
+
+      const reason = reasonMap[reasonType] || 'This place was not approved.';
+
+      await ctx.editMessageText('`⏳ Processing rejection...`', { parse_mode: 'Markdown' });
+
+      const result = await NearbyPlaceService.rejectPlace(placeId, adminUserId, reason);
+
+      if (result.success) {
+        await ctx.editMessageText(
+          '`❌ Place Rejected`\n\n' +
+          `Reason: ${reason}`,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('📋 Browse Places', 'admin_all_places')],
+              [Markup.button.callback('🔙 Back', 'admin_nearby_places')],
+            ]),
+          }
+        );
+      } else {
+        await ctx.answerCbQuery(`Error: ${result.error}`, { show_alert: true });
+      }
+    } catch (error) {
+      logger.error('Error rejecting place:', error);
+      await ctx.answerCbQuery('Error rejecting place');
+    }
+  });
+
+  // Custom rejection reason for place
+  bot.action(/^admin_reject_place_custom_(\d+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const placeId = parseInt(ctx.match[1]);
+
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.awaitingCustomPlaceRejection = placeId;
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        '`✏️ Custom Rejection Reason`\n\n' +
+        'Please type your rejection reason:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Cancel', `admin_reject_place_${placeId}`)],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error prompting for custom rejection:', error);
     }
   });
 

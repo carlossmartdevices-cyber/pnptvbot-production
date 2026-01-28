@@ -434,6 +434,29 @@ class NearbyPlaceService {
   }
 
   /**
+   * Reject place directly (admin)
+   * @param {number} placeId - Place ID
+   * @param {string} adminUserId - Admin user ID
+   * @param {string} reason - Rejection reason
+   * @returns {Promise<Object>} { success, place, error }
+   */
+  static async rejectPlace(placeId, adminUserId, reason) {
+    try {
+      const place = await NearbyPlaceModel.updateStatus(placeId, 'rejected', adminUserId, reason);
+
+      if (!place) {
+        return { success: false, error: 'Place not found' };
+      }
+
+      logger.info('Place rejected', { placeId, adminUserId, reason });
+      return { success: true, place };
+    } catch (error) {
+      logger.error('Error rejecting place:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Delete place (admin)
    * @param {number} placeId - Place ID
    * @returns {Promise<Object>} { success, error }

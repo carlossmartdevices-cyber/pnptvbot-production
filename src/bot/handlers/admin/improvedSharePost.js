@@ -199,7 +199,7 @@ const registerImprovedSharePostHandlers = (bot) => {
     buttons.push([Markup.button.callback('✅ Seleccionar Todo', 'share_post_select_all')]);
     buttons.push([Markup.button.callback('⬜ Limpiar', 'share_post_clear_selection')]);
     buttons.push([Markup.button.callback('➡️ Continuar', 'share_post_continue_to_media')]);
-    buttons.push([Markup.button.callback('❌ Cancelar', 'admin_cancel')]);
+    buttons.push([Markup.button.callback('❌ Cancelar', 'share_post_cancel')]);
 
     const selectedCount = selectedDestinations.length;
     const message = '📤 *Compartir Publicación*\n\n'
@@ -252,7 +252,7 @@ const registerImprovedSharePostHandlers = (bot) => {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('⬜ Sin Media', 'share_post_skip_media')],
-            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
           ]),
         }
       );
@@ -363,7 +363,7 @@ const registerImprovedSharePostHandlers = (bot) => {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('🤖 AI Write (Grok)', 'share_post_ai_text')],
-            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
           ]),
         }
       );
@@ -380,7 +380,7 @@ const registerImprovedSharePostHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback('🤖 AI Write (Grok)', 'share_post_ai_text')],
-              [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+              [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
             ]),
           }
         );
@@ -493,7 +493,7 @@ const registerImprovedSharePostHandlers = (bot) => {
 
       buttons.push([Markup.button.callback('➕ Custom Link', 'share_post_add_custom_link')]);
       buttons.push([Markup.button.callback('👀 Preview', 'share_post_preview')]);
-      buttons.push([Markup.button.callback('❌ Cancelar', 'admin_cancel')]);
+      buttons.push([Markup.button.callback('❌ Cancelar', 'share_post_cancel')]);
 
       try {
         await ctx.editMessageText(
@@ -576,7 +576,7 @@ const registerImprovedSharePostHandlers = (bot) => {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('⬅️ Back', 'share_post_back_to_buttons')],
-            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
           ]),
         }
       );
@@ -679,7 +679,7 @@ const registerImprovedSharePostHandlers = (bot) => {
             [Markup.button.callback('📤 Send Now', 'share_post_send_now')],
             [Markup.button.callback('📅 Schedule', 'share_post_schedule')],
             [Markup.button.callback('🔘 Edit Buttons', 'share_post_back_to_buttons')],
-            [Markup.button.callback('❌ Cancel', 'admin_cancel')],
+            [Markup.button.callback('❌ Cancel', 'share_post_cancel')],
           ]),
         }
       );
@@ -736,7 +736,7 @@ const registerImprovedSharePostHandlers = (bot) => {
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
           ]),
         }
       );
@@ -813,7 +813,7 @@ const registerImprovedSharePostHandlers = (bot) => {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('✅ Confirmar', 'share_post_confirm_schedule')],
-            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
           ]),
         }
       );
@@ -920,7 +920,7 @@ const registerImprovedSharePostHandlers = (bot) => {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.callback('📤 Nueva Publicación', 'admin_improved_share_post')],
-          [Markup.button.callback('⬅️ Panel Admin', 'admin_dashboard')],
+          [Markup.button.callback('⬅️ Panel Admin', 'admin_home')],
         ]),
       });
 
@@ -1009,7 +1009,7 @@ const registerImprovedSharePostHandlers = (bot) => {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.callback('📤 Nueva Publicación', 'admin_improved_share_post')],
-          [Markup.button.callback('⬅️ Panel Admin', 'admin_dashboard')],
+          [Markup.button.callback('⬅️ Panel Admin', 'admin_home')],
         ]),
       });
 
@@ -1027,9 +1027,9 @@ const registerImprovedSharePostHandlers = (bot) => {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Cancel action
+  // Cancel action for share post
   // ═══════════════════════════════════════════════════════════════════════════
-  bot.action('admin_cancel', async (ctx) => {
+  bot.action('share_post_cancel', async (ctx) => {
     try {
       ctx.session.temp = {};
       await ctx.saveSession();
@@ -1040,7 +1040,7 @@ const registerImprovedSharePostHandlers = (bot) => {
         {
           ...Markup.inlineKeyboard([
             [Markup.button.callback('📤 Nueva Publicacion', 'admin_improved_share_post')],
-            [Markup.button.callback('⬅️ Panel Admin', 'admin_dashboard')],
+            [Markup.button.callback('⬅️ Panel Admin', 'admin_home')],
           ]),
         }
       );

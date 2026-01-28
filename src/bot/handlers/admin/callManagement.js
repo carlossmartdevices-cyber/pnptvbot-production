@@ -49,7 +49,7 @@ const registerCallManagementHandlers = (bot) => {
               'view_upcoming_calls',
             ),
           ],
-          [Markup.button.callback('🔙 Back', 'admin_menu')],
+          [Markup.button.callback('🔙 Back', 'admin_home')],
         ]),
       });
     } catch (error) {

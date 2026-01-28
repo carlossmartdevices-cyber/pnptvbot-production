@@ -89,7 +89,7 @@ const registerPrivateCallAdminHandlers = (bot) => {
         [Markup.button.callback(lang === 'es' ? '📅 Ver Todas las Llamadas' : '📅 View All Calls', 'admin_view_all_calls')],
         [Markup.button.callback(lang === 'es' ? '👥 Gestionar Performers' : '👥 Manage Performers', 'admin_manage_performers')],
         [Markup.button.callback(lang === 'es' ? '📈 Estadísticas Detalladas' : '📈 Detailed Statistics', 'admin_detailed_stats')],
-        [Markup.button.callback(lang === 'es' ? '🔙 Volver' : '🔙 Back', 'admin_panel')],
+        [Markup.button.callback(lang === 'es' ? '🔙 Volver' : '🔙 Back', 'admin_home')],
       ];
       
       await ctx.editMessageText(dashboardText, {

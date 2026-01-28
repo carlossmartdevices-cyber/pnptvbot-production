@@ -66,7 +66,7 @@ const registerEnhancedBusinessAdminHandlers = (bot) => {
           Markup.button.callback('⚙️ Settings', 'admin_business_settings'),
           Markup.button.callback('📋 Submission Logs', 'admin_business_submission_logs')
         ],
-        [Markup.button.callback('🔙 Back to Admin Panel', 'admin_panel')],
+        [Markup.button.callback('🔙 Back to Admin Panel', 'admin_home')],
       ];
 
       await ctx.editMessageText(text, {
