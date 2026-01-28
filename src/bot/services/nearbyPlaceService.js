@@ -268,7 +268,7 @@ class NearbyPlaceService {
 
       // Enhance with submitter information
       if (submission.submittedByUserId) {
-        const user = await UserService.getById(submission.submittedByUserId);
+        const user = await UserModel.getById(submission.submittedByUserId);
         if (user) {
           submission.submitterUsername = user.username;
           submission.userTier = user.subscriptionStatus;
@@ -349,6 +349,44 @@ class NearbyPlaceService {
     } catch (error) {
       logger.error('Error getting user submissions:', error);
       return [];
+    }
+  }
+
+  /**
+   * Update submission (user editing their pending submission)
+   * @param {number} submissionId - Submission ID
+   * @param {string} userId - User ID (must be the submitter)
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<Object>} { success, submission, error }
+   */
+  static async updateSubmission(submissionId, userId, updates) {
+    try {
+      // Verify the submission belongs to this user and is pending
+      const submission = await NearbyPlaceSubmissionModel.getById(submissionId);
+
+      if (!submission) {
+        return { success: false, error: 'Submission not found' };
+      }
+
+      if (submission.submittedByUserId !== userId) {
+        return { success: false, error: 'Not authorized to edit this submission' };
+      }
+
+      if (submission.status !== 'pending') {
+        return { success: false, error: 'Can only edit pending submissions' };
+      }
+
+      const updated = await NearbyPlaceSubmissionModel.update(submissionId, updates);
+
+      if (!updated) {
+        return { success: false, error: 'Failed to update submission' };
+      }
+
+      logger.info('Submission updated by user', { submissionId, userId });
+      return { success: true, submission: updated };
+    } catch (error) {
+      logger.error('Error updating submission:', error);
+      return { success: false, error: error.message };
     }
   }
 

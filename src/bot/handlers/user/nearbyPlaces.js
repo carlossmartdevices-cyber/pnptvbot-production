@@ -367,9 +367,9 @@ const registerNearbyPlacesHandlers = (bot) => {
 
       await ctx.editMessageText(
         lang === 'es'
-          ? '📝 *Paso 1/5: Nombre*\n\n' +
+          ? '📝 *Paso 1/6: Nombre*\n\n' +
             'Escribe el nombre del lugar:'
-          : '📝 *Step 1/5: Name*\n\n' +
+          : '📝 *Step 1/6: Name*\n\n' +
             'Enter the name of the place:',
         {
           parse_mode: 'Markdown',
@@ -406,9 +406,9 @@ const registerNearbyPlacesHandlers = (bot) => {
 
       await ctx.editMessageText(
         lang === 'es'
-          ? '📝 *Paso 1/5: Nombre*\n\n' +
+          ? '📝 *Paso 1/6: Nombre*\n\n' +
             'Escribe el nombre del negocio:'
-          : '📝 *Step 1/5: Name*\n\n' +
+          : '📝 *Step 1/6: Name*\n\n' +
             'Enter the name of the business:',
         {
           parse_mode: 'Markdown',
@@ -476,9 +476,9 @@ const registerNearbyPlacesHandlers = (bot) => {
 
       await ctx.editMessageText(
         lang === 'es'
-          ? '📝 *Paso 1/5: Nombre*\n\n' +
+          ? '📝 *Paso 1/6: Nombre*\n\n' +
             'Escribe el nombre del lugar:'
-          : '📝 *Step 1/5: Name*\n\n' +
+          : '📝 *Step 1/6: Name*\n\n' +
             'Enter the name of the place:',
         {
           parse_mode: 'Markdown',
@@ -503,10 +503,10 @@ const registerNearbyPlacesHandlers = (bot) => {
 
       await ctx.editMessageText(
         lang === 'es'
-          ? '📝 *Paso 3/5: Dirección*\n\n' +
+          ? '📝 *Paso 3/6: Dirección*\n\n' +
             'Escribe la dirección del lugar:\n\n' +
             '_Ejemplo: Calle 123, Ciudad_'
-          : '📝 *Step 3/5: Address*\n\n' +
+          : '📝 *Step 3/6: Address*\n\n' +
             'Enter the address of the place:\n\n' +
             '_Example: 123 Main St, City_',
         {
@@ -526,20 +526,47 @@ const registerNearbyPlacesHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
 
-      ctx.session.temp.placeSubmission.step = 'contact';
+      ctx.session.temp.placeSubmission.step = 'city';
       ctx.session.temp.placeSubmission.address = null;
       await ctx.saveSession();
 
       await ctx.editMessageText(
         lang === 'es'
-          ? '📝 *Paso 4/5: Contacto (opcional)*\n\n' +
+          ? '📝 *Paso 4/6: Ciudad*\n\n' +
+            'Escribe la ciudad donde se encuentra:'
+          : '📝 *Step 4/6: City*\n\n' +
+            'Enter the city where it is located:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(lang === 'es' ? '⏭️ Omitir' : '⏭️ Skip', 'submit_skip_city')],
+            [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error skipping address:', error);
+    }
+  });
+
+  bot.action('submit_skip_city', async (ctx) => {
+    try {
+      const lang = getLanguage(ctx);
+
+      ctx.session.temp.placeSubmission.step = 'contact';
+      ctx.session.temp.placeSubmission.city = null;
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        lang === 'es'
+          ? '📝 *Paso 5/6: Contacto (opcional)*\n\n' +
             'Escribe información de contacto:\n' +
             '- Teléfono\n' +
             '- Website\n' +
             '- @usuario de Telegram\n' +
             '- Instagram\n\n' +
             '_Puedes enviar uno o varios_'
-          : '📝 *Step 4/5: Contact (optional)*\n\n' +
+          : '📝 *Step 5/6: Contact (optional)*\n\n' +
             'Enter contact information:\n' +
             '- Phone\n' +
             '- Website\n' +
@@ -555,7 +582,7 @@ const registerNearbyPlacesHandlers = (bot) => {
         }
       );
     } catch (error) {
-      logger.error('Error skipping address:', error);
+      logger.error('Error skipping city:', error);
     }
   });
 
@@ -605,8 +632,12 @@ const registerNearbyPlacesHandlers = (bot) => {
       }
 
       let text = lang === 'es'
-        ? '📋 *Mis Propuestas*\n\n'
-        : '📋 *My Submissions*\n\n';
+        ? '📋 *Mis Propuestas*\n\n' +
+          '_Toca una propuesta pendiente para editarla_\n\n'
+        : '📋 *My Submissions*\n\n' +
+          '_Tap a pending submission to edit it_\n\n';
+
+      const buttons = [];
 
       submissions.forEach((sub, i) => {
         const statusEmoji = sub.status === 'pending' ? '⏳'
@@ -619,26 +650,227 @@ const registerNearbyPlacesHandlers = (bot) => {
           : (lang === 'es' ? 'Rechazado' : 'Rejected');
 
         text += `${i + 1}. ${sub.categoryEmoji || '📍'} *${escapeMarkdown(sub.name)}*\n`;
-        text += `   ${statusEmoji} ${statusText}\n\n`;
+        text += `   ${statusEmoji} ${statusText}`;
+        if (sub.city) text += ` • ${escapeMarkdown(sub.city)}`;
+        text += '\n\n';
+
+        // Only allow editing pending submissions
+        if (sub.status === 'pending') {
+          buttons.push([
+            Markup.button.callback(
+              `✏️ ${sub.name.substring(0, 20)}${sub.name.length > 20 ? '...' : ''}`,
+              `view_my_submission_${sub.id}`
+            ),
+          ]);
+        }
       });
+
+      buttons.push([Markup.button.callback(lang === 'es' ? '➕ Nueva Propuesta' : '➕ New Submission', 'submit_place_start')]);
+      buttons.push([Markup.button.callback('🔙 Back', 'show_nearby_menu')]);
 
       await ctx.editMessageText(text, {
         parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback(lang === 'es' ? '➕ Nueva Propuesta' : '➕ New Submission', 'submit_place_start')],
-          [Markup.button.callback('🔙 Back', 'show_nearby_menu')],
-        ]),
+        ...Markup.inlineKeyboard(buttons),
       });
     } catch (error) {
       logger.error('Error showing user submissions:', error);
     }
   });
 
+  // View submission details with edit options
+  bot.action(/^view_my_submission_(\d+)$/, async (ctx) => {
+    try {
+      const submissionId = parseInt(ctx.match[1]);
+      const lang = getLanguage(ctx);
+      const userId = ctx.from.id.toString();
+
+      const submission = await NearbyPlaceService.getSubmissionDetails(submissionId);
+
+      if (!submission || submission.submittedByUserId !== userId) {
+        await ctx.answerCbQuery(lang === 'es' ? 'Propuesta no encontrada' : 'Submission not found');
+        return;
+      }
+
+      let text = `${submission.categoryEmoji || '📍'} *${escapeMarkdown(submission.name)}*\n\n`;
+
+      if (submission.description) {
+        text += `📝 ${escapeMarkdown(submission.description)}\n\n`;
+      }
+
+      if (submission.address) {
+        text += `📍 ${escapeMarkdown(submission.address)}`;
+        if (submission.city) text += `, ${escapeMarkdown(submission.city)}`;
+        text += '\n';
+      } else if (submission.city) {
+        text += `🏙️ ${escapeMarkdown(submission.city)}\n`;
+      }
+
+      if (submission.phone) text += `📞 ${submission.phone}\n`;
+      if (submission.website) text += `🌐 ${submission.website}\n`;
+      if (submission.telegramUsername) text += `💬 @${submission.telegramUsername}\n`;
+      if (submission.instagram) text += `📸 @${submission.instagram}\n`;
+
+      const statusEmoji = submission.status === 'pending' ? '⏳' : submission.status === 'approved' ? '✅' : '❌';
+      text += `\n${statusEmoji} ${lang === 'es' ? 'Estado' : 'Status'}: ${submission.status}\n`;
+
+      if (submission.rejectionReason) {
+        text += `\n❌ ${lang === 'es' ? 'Razón' : 'Reason'}: ${escapeMarkdown(submission.rejectionReason)}\n`;
+      }
+
+      const buttons = [];
+
+      if (submission.status === 'pending') {
+        buttons.push([
+          Markup.button.callback(lang === 'es' ? '✏️ Editar Nombre' : '✏️ Edit Name', `edit_sub_name_${submissionId}`),
+          Markup.button.callback(lang === 'es' ? '✏️ Editar Descripción' : '✏️ Edit Description', `edit_sub_desc_${submissionId}`),
+        ]);
+        buttons.push([
+          Markup.button.callback(lang === 'es' ? '✏️ Editar Ciudad' : '✏️ Edit City', `edit_sub_city_${submissionId}`),
+          Markup.button.callback(lang === 'es' ? '✏️ Editar Dirección' : '✏️ Edit Address', `edit_sub_addr_${submissionId}`),
+        ]);
+        buttons.push([
+          Markup.button.callback(lang === 'es' ? '✏️ Editar Contacto' : '✏️ Edit Contact', `edit_sub_contact_${submissionId}`),
+        ]);
+      }
+
+      buttons.push([Markup.button.callback('🔙 Back', 'my_place_submissions')]);
+
+      await ctx.editMessageText(text, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons),
+      });
+    } catch (error) {
+      logger.error('Error viewing submission details:', error);
+    }
+  });
+
+  // Edit submission handlers
+  bot.action(/^edit_sub_(name|desc|city|addr|contact)_(\d+)$/, async (ctx) => {
+    try {
+      const field = ctx.match[1];
+      const submissionId = parseInt(ctx.match[2]);
+      const lang = getLanguage(ctx);
+
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.editSubmission = {
+        submissionId,
+        field,
+      };
+      await ctx.saveSession();
+
+      const prompts = {
+        name: {
+          es: '✏️ *Editar Nombre*\n\nEscribe el nuevo nombre:',
+          en: '✏️ *Edit Name*\n\nEnter the new name:'
+        },
+        desc: {
+          es: '✏️ *Editar Descripción*\n\nEscribe la nueva descripción:',
+          en: '✏️ *Edit Description*\n\nEnter the new description:'
+        },
+        city: {
+          es: '✏️ *Editar Ciudad*\n\nEscribe la nueva ciudad:',
+          en: '✏️ *Edit City*\n\nEnter the new city:'
+        },
+        addr: {
+          es: '✏️ *Editar Dirección*\n\nEscribe la nueva dirección:',
+          en: '✏️ *Edit Address*\n\nEnter the new address:'
+        },
+        contact: {
+          es: '✏️ *Editar Contacto*\n\nEscribe la información de contacto:\n- Teléfono\n- Website\n- @telegram\n- @instagram',
+          en: '✏️ *Edit Contact*\n\nEnter contact information:\n- Phone\n- Website\n- @telegram\n- @instagram'
+        },
+      };
+
+      await ctx.editMessageText(
+        lang === 'es' ? prompts[field].es : prompts[field].en,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancel', `view_my_submission_${submissionId}`)],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error starting edit:', error);
+    }
+  });
+
   // ===========================================
-  // TEXT HANDLER FOR SUBMISSION FLOW
+  // TEXT HANDLER FOR SUBMISSION AND EDIT FLOW
   // ===========================================
   bot.on('text', async (ctx, next) => {
     try {
+      // Check if we're in edit mode
+      if (ctx.session?.temp?.editSubmission) {
+        const { submissionId, field } = ctx.session.temp.editSubmission;
+        const lang = getLanguage(ctx);
+        const userId = ctx.from.id.toString();
+        const text = ctx.message.text.trim();
+
+        let updates = {};
+
+        switch (field) {
+          case 'name':
+            if (text.length < 2 || text.length > 200) {
+              await ctx.reply(lang === 'es' ? 'El nombre debe tener entre 2 y 200 caracteres.' : 'Name must be between 2 and 200 characters.');
+              return;
+            }
+            updates.name = text;
+            break;
+          case 'desc':
+            updates.description = text.substring(0, 1000);
+            break;
+          case 'city':
+            updates.city = text.substring(0, 100);
+            break;
+          case 'addr':
+            updates.address = text.substring(0, 500);
+            break;
+          case 'contact':
+            const lines = text.split('\n');
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                updates.website = trimmed;
+              } else if (trimmed.startsWith('@')) {
+                updates.telegramUsername = trimmed.substring(1);
+              } else if (/^\+?[\d\s\-()]+$/.test(trimmed) && trimmed.length >= 7) {
+                updates.phone = trimmed;
+              } else if (trimmed.includes('.') && !trimmed.includes(' ')) {
+                updates.website = 'https://' + trimmed;
+              }
+            }
+            break;
+        }
+
+        const result = await NearbyPlaceService.updateSubmission(submissionId, userId, updates);
+
+        delete ctx.session.temp.editSubmission;
+        await ctx.saveSession();
+
+        if (result.success) {
+          await ctx.reply(
+            lang === 'es' ? '✅ ¡Actualizado correctamente!' : '✅ Updated successfully!',
+            {
+              ...Markup.inlineKeyboard([
+                [Markup.button.callback(lang === 'es' ? '👁️ Ver Propuesta' : '👁️ View Submission', `view_my_submission_${submissionId}`)],
+                [Markup.button.callback('🔙 Back', 'my_place_submissions')],
+              ]),
+            }
+          );
+        } else {
+          await ctx.reply(
+            lang === 'es' ? `❌ Error: ${result.error}` : `❌ Error: ${result.error}`,
+            {
+              ...Markup.inlineKeyboard([
+                [Markup.button.callback('🔙 Back', 'my_place_submissions')],
+              ]),
+            }
+          );
+        }
+        return;
+      }
+
       // Check if we're in submission flow
       if (!ctx.session?.temp?.placeSubmission || !ctx.session.temp.placeSubmission.step) {
         return next();
@@ -665,9 +897,9 @@ const registerNearbyPlacesHandlers = (bot) => {
 
           await ctx.reply(
             lang === 'es'
-              ? '📝 *Paso 2/5: Descripción*\n\n' +
+              ? '📝 *Paso 2/6: Descripción*\n\n' +
                 'Escribe una descripción del lugar:'
-              : '📝 *Step 2/5: Description*\n\n' +
+              : '📝 *Step 2/6: Description*\n\n' +
                 'Enter a description of the place:',
             {
               parse_mode: 'Markdown',
@@ -686,10 +918,10 @@ const registerNearbyPlacesHandlers = (bot) => {
 
           await ctx.reply(
             lang === 'es'
-              ? '📝 *Paso 3/5: Dirección*\n\n' +
+              ? '📝 *Paso 3/6: Dirección*\n\n' +
                 'Escribe la dirección del lugar:\n\n' +
                 '_Ejemplo: Calle 123, Ciudad, País_'
-              : '📝 *Step 3/5: Address*\n\n' +
+              : '📝 *Step 3/6: Address*\n\n' +
                 'Enter the address of the place:\n\n' +
                 '_Example: 123 Main St, City, Country_',
             {
@@ -704,25 +936,40 @@ const registerNearbyPlacesHandlers = (bot) => {
 
         case 'address':
           submission.address = text.length > 0 ? text.substring(0, 500) : null;
-          // Try to extract city
-          const parts = text.split(',');
-          if (parts.length >= 2) {
-            submission.city = parts[parts.length - 2]?.trim() || null;
-            submission.country = parts[parts.length - 1]?.trim() || null;
-          }
+          submission.step = 'city';
+          await ctx.saveSession();
+
+          await ctx.reply(
+            lang === 'es'
+              ? '📝 *Paso 4/6: Ciudad*\n\n' +
+                'Escribe la ciudad donde se encuentra:'
+              : '📝 *Step 4/6: City*\n\n' +
+                'Enter the city where it is located:',
+            {
+              parse_mode: 'Markdown',
+              ...Markup.inlineKeyboard([
+                [Markup.button.callback(lang === 'es' ? '⏭️ Omitir' : '⏭️ Skip', 'submit_skip_city')],
+                [Markup.button.callback('❌ Cancel', 'show_nearby_menu')],
+              ]),
+            }
+          );
+          break;
+
+        case 'city':
+          submission.city = text.length > 0 ? text.substring(0, 100) : null;
           submission.step = 'contact';
           await ctx.saveSession();
 
           await ctx.reply(
             lang === 'es'
-              ? '📝 *Paso 4/5: Contacto (opcional)*\n\n' +
+              ? '📝 *Paso 5/6: Contacto (opcional)*\n\n' +
                 'Escribe información de contacto:\n' +
                 '- Teléfono\n' +
                 '- Website (https://...)\n' +
                 '- @usuario de Telegram\n' +
                 '- @instagram\n\n' +
                 '_Puedes enviar uno o varios, separados por líneas_'
-              : '📝 *Step 4/5: Contact (optional)*\n\n' +
+              : '📝 *Step 5/6: Contact (optional)*\n\n' +
                 'Enter contact information:\n' +
                 '- Phone\n' +
                 '- Website (https://...)\n' +

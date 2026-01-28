@@ -303,6 +303,61 @@ class NearbyPlaceSubmissionModel {
   }
 
   /**
+   * Update submission (for user edits on pending submissions)
+   */
+  static async update(submissionId, updates) {
+    try {
+      const allowedFields = [
+        'name', 'description', 'address', 'city', 'country',
+        'phone', 'email', 'website', 'telegram_username', 'instagram',
+        'photo_file_id', 'hours_of_operation', 'price_range'
+      ];
+
+      const setClauses = [];
+      const params = [submissionId];
+      let paramIndex = 2;
+
+      // Map camelCase to snake_case
+      const fieldMap = {
+        telegramUsername: 'telegram_username',
+        photoFileId: 'photo_file_id',
+        hoursOfOperation: 'hours_of_operation',
+        priceRange: 'price_range'
+      };
+
+      for (const [key, value] of Object.entries(updates)) {
+        const dbField = fieldMap[key] || key;
+        if (allowedFields.includes(dbField)) {
+          setClauses.push(`${dbField} = $${paramIndex++}`);
+          params.push(key === 'hoursOfOperation' ? JSON.stringify(value) : value);
+        }
+      }
+
+      if (setClauses.length === 0) {
+        return null;
+      }
+
+      setClauses.push('updated_at = NOW()');
+
+      const sql = `
+        UPDATE ${TABLE}
+        SET ${setClauses.join(', ')}
+        WHERE id = $1 AND status = 'pending'
+        RETURNING *
+      `;
+
+      const result = await query(sql, params);
+      await cache.delPattern(`${CACHE_PREFIX}:*`);
+
+      if (result.rows.length === 0) return null;
+      return this.mapRowToSubmission(result.rows[0]);
+    } catch (error) {
+      logger.error('Error updating submission:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Delete submission
    */
   static async delete(submissionId) {
