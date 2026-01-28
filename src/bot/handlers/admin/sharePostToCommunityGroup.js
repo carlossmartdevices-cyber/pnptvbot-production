@@ -1315,26 +1315,7 @@ const registerCommunityPostHandlers = (bot) => {
     }
   });
 
-  // Cancel action
-  bot.action('admin_cancel', async (ctx) => {
-    try {
-      ctx.session.temp = {};
-      await ctx.saveSession();
 
-      await ctx.answerCbQuery('❌ Cancelado');
-      await ctx.editMessageText(
-        '❌ Publicación cancelada',
-        {
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('📤 Nueva Publicación', 'admin_share_post_to_groups')],
-            [Markup.button.callback('⬅️ Panel Admin', 'admin_dashboard')],
-          ]),
-        }
-      );
-    } catch (error) {
-      logger.error('Error cancelling:', error);
-    }
-  });
 };
 
 module.exports = registerCommunityPostHandlers;
