@@ -930,9 +930,37 @@ const shareToGroup = async (ctx) => {
       return;
     }
 
-    // Build card
-    const displayName = user.username ? `@${user.username}` : (user.firstName || 'User');
+    // Build card with same format as nearby members
+    let profileText = '`👤 PROFILE CARD`\n\n';
 
+    const displayName = user.firstName || 'Anonymous';
+    profileText += `**${displayName}**`;
+    if (user.lastName) profileText += ` ${user.lastName}`;
+    profileText += '\n';
+    
+    if (user.username) {
+      profileText += `@${user.username}\n`;
+    }
+
+    profileText += '\n';
+
+    if (user.bio) {
+      profileText += `💭 _"${user.bio}"_\n\n`;
+    }
+
+    // Add tribe and looking_for
+    if (user.tribe) {
+      profileText += `🏳️‍🌈 **Tribe:** ${user.tribe}\n`;
+    }
+    if (user.looking_for) {
+      profileText += `🔎 **Looking For:** ${user.looking_for}\n`;
+    }
+
+    if (user.interests && user.interests.length > 0) {
+      profileText += `🎯 **Into:** ${user.interests.join(', ')}\n\n`;
+    }
+
+    // Location
     let locationStr = '';
     if (user.city && user.country) {
       locationStr = `📍 ${user.city}, ${user.country}`;
@@ -941,28 +969,45 @@ const shareToGroup = async (ctx) => {
     } else if (user.country) {
       locationStr = `📍 ${user.country}`;
     }
+    if (locationStr) {
+      profileText += `${locationStr}\n\n`;
+    }
 
-    const cardLines = [
-      `👤 *${displayName}*`,
-    ];
+    profileText += '_Don\'t be shy... DM! 💬_';
 
-    if (user.bio) cardLines.push(`📝 ${user.bio}`);
-    if (user.tribe) cardLines.push(`🏳️‍🌈 ${user.tribe}`);
-    if (locationStr) cardLines.push(locationStr);
+    // Build inline keyboard with social media and interests
+    const buttons = [];
+    
+    // Social media buttons
+    if (user.twitter) {
+      buttons.push([Markup.button.url('𝕏 Twitter', `https://twitter.com/${user.twitter}`)]);
+    }
+    if (user.instagram) {
+      buttons.push([Markup.button.url('IG Instagram', `https://instagram.com/${user.instagram}`)]);
+    }
+    if (user.tiktok) {
+      buttons.push([Markup.button.url('TT TikTok', `https://tiktok.com/@${user.tiktok}`)]);
+    }
+    
+    // Add DM button if username available
+    if (user.username) {
+      buttons.push([Markup.button.url('💬 DM', `https://t.me/${user.username}`)]);
+    }
 
-    cardLines.push('');
-    cardLines.push('💜 _PNPtv Member_');
-
-    const cardText = cardLines.join('\n');
+    const keyboard = buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined;
 
     try {
       if (user.photoFileId) {
         await ctx.telegram.sendPhoto(GROUP_ID, user.photoFileId, {
-          caption: cardText,
+          caption: profileText,
           parse_mode: 'Markdown',
+          ...keyboard
         });
       } else {
-        await ctx.telegram.sendMessage(GROUP_ID, cardText, { parse_mode: 'Markdown' });
+        await ctx.telegram.sendMessage(GROUP_ID, profileText, {
+          parse_mode: 'Markdown',
+          ...keyboard
+        });
       }
       await ctx.answerCbQuery(lang === 'es' ? '✅ Tarjeta compartida en el grupo!' : '✅ Card shared to group!', { show_alert: true });
     } catch (error) {
