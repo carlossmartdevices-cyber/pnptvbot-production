@@ -2,57 +2,10 @@ const { Markup } = require('telegraf');
 const WarningService = require('../../../services/warningService');
 const logger = require('../../../utils/logger');
 const MODERATION_CONFIG = require('../../../config/moderationConfig');
+const { isAdmin, getUserFromContext, isGroupChat } = require('../../../utils/adminUtils');
 
 const GROUP_ID = process.env.GROUP_ID;
 const AUTO_DELETE_DELAY = MODERATION_CONFIG.MOD_MESSAGE_DELAY;
-
-/**
- * Check if user is admin
- */
-async function isAdmin(ctx) {
-  try {
-    const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
-    return ['creator', 'administrator'].includes(member.status);
-  } catch (error) {
-    logger.error('Error checking admin status:', error);
-    return false;
-  }
-}
-
-/**
- * Get user ID from message (mention or reply)
- */
-function getUserFromContext(ctx) {
-  // Check if replying to a message
-  if (ctx.message.reply_to_message) {
-    return {
-      id: ctx.message.reply_to_message.from.id,
-      username: ctx.message.reply_to_message.from.username || ctx.message.reply_to_message.from.first_name,
-    };
-  }
-
-  // Check if user ID or username in command
-  if (!ctx.message?.text) {
-    return null;
-  }
-
-  const args = ctx.message.text.split(' ').slice(1);
-  if (args.length > 0) {
-    const userRef = args[0];
-
-    // Check if it's a user ID (numeric)
-    if (/^\d+$/.test(userRef)) {
-      return { id: userRef, username: null };
-    }
-
-    // Check if it's a mention (@username)
-    if (userRef.startsWith('@')) {
-      return { username: userRef.substring(1), id: null };
-    }
-  }
-
-  return null;
-}
 
 /**
  * Send auto-deleting message
