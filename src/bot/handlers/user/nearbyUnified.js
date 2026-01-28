@@ -681,8 +681,8 @@ const registerNearbyUnifiedHandlers = (bot) => {
     try {
       const text = ctx.message.text?.trim()?.toLowerCase();
       
-      // Check for "pno nearbt" pattern
-      if (text && (text === 'pno nearbt' || text.startsWith('pno nearbt '))) {
+      // Check for "pnp nearby" pattern
+      if (text && (text === 'pnp nearby' || text.startsWith('pnp nearby '))) {
         const lang = getLanguage(ctx);
         
         // Extract any additional parameters (like "burton")
@@ -706,7 +706,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
       // Continue to other text handlers
       return next();
     } catch (error) {
-      logger.error('Error handling pno nearbt command:', error);
+      logger.error('Error handling pnp nearby command:', error);
       return next();
     }
   });
