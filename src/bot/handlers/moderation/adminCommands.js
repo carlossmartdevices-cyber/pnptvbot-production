@@ -172,9 +172,7 @@ async function handleSetLinks(ctx) {
  */
 async function handleModLogs(ctx) {
   try {
-    const chatType = ctx.chat?.type;
-
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+    if (!isGroupChat(ctx)) {
       return ctx.reply('This command only works in groups.');
     }
 
@@ -228,9 +226,7 @@ async function handleModLogs(ctx) {
  */
 async function handleModStats(ctx) {
   try {
-    const chatType = ctx.chat?.type;
-
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+    if (!isGroupChat(ctx)) {
       return ctx.reply('This command only works in groups.');
     }
 
@@ -265,9 +261,7 @@ async function handleModStats(ctx) {
  */
 async function handleUserHistory(ctx) {
   try {
-    const chatType = ctx.chat?.type;
-
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+    if (!isGroupChat(ctx)) {
       return ctx.reply('This command only works in groups.');
     }
 
@@ -340,9 +334,7 @@ async function handleUserHistory(ctx) {
  */
 async function handleUsernameChanges(ctx) {
   try {
-    const chatType = ctx.chat?.type;
-
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+    if (!isGroupChat(ctx)) {
       return ctx.reply('This command only works in groups.');
     }
 
@@ -404,9 +396,7 @@ async function handleUsernameChanges(ctx) {
  */
 async function handleTopicModeration(ctx) {
   try {
-    const chatType = ctx.chat?.type;
-
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+    if (!isGroupChat(ctx)) {
       return ctx.reply('This command only works in groups.');
     }
 
@@ -454,9 +444,7 @@ async function handleTopicModeration(ctx) {
  */
 async function handleSetTopicModeration(ctx) {
   try {
-    const chatType = ctx.chat?.type;
-
-    if (!chatType || (chatType !== 'group' && chatType !== 'supergroup')) {
+    if (!isGroupChat(ctx)) {
       return ctx.reply('This command only works in groups.');
     }
 

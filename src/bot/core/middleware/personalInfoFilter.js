@@ -1,4 +1,5 @@
 const logger = require('../../../utils/logger');
+const { isAdmin } = require('../../../utils/adminUtils');
 
 const GROUP_ID = process.env.GROUP_ID;
 
@@ -75,19 +76,6 @@ function detectPersonalInfo(text) {
     detected: detectedTypes.length > 0,
     types: detectedTypes,
   };
-}
-
-/**
- * Check if user is admin
- */
-async function isAdmin(ctx) {
-  try {
-    const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
-    return ['creator', 'administrator'].includes(member.status);
-  } catch (error) {
-    logger.error('Error checking admin status:', error);
-    return false;
-  }
 }
 
 /**

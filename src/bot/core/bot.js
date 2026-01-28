@@ -29,6 +29,7 @@ const {
   groupBehaviorMiddleware,
   cristinaGroupFilterMiddleware,
   groupMenuRedirectMiddleware,
+  groupCallbackRedirectMiddleware,
   groupCommandDeleteMiddleware,
   primeChannelSilentRedirectMiddleware
 } = require('./middleware/groupBehavior');
@@ -243,6 +244,7 @@ const startBot = async () => {
     bot.use(groupBehaviorMiddleware()); // Route all bot messages to topic 3135, 3-min delete
     bot.use(cristinaGroupFilterMiddleware()); // Filter personal info from Cristina in groups
     bot.use(groupMenuRedirectMiddleware()); // Redirect menu button clicks to private
+    bot.use(groupCallbackRedirectMiddleware()); // Redirect inline button callbacks to deep links
     bot.use(wallOfFameGuard()); // Wall of Fame topic is bot-only
     bot.use(notificationsTopicGuard()); // Notifications topic is bot-only (and env admins)
     bot.use(groupCommandRestrictionMiddleware()); // Block all commands except /menu in groups

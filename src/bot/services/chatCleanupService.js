@@ -424,7 +424,28 @@ class ChatCleanupService {
    */
   static markWelcomeSent(userId) {
     this.welcomeMessagesSent.set(userId, true);
-    
+    this._cleanupWelcomeCache();
+  }
+
+  /**
+   * Atomically check and mark welcome sent (prevents race condition)
+   * Returns true if this is the first call for this user, false if already marked
+   * @param {number|string} userId - User ID
+   * @returns {boolean} True if successfully marked as first, false if already sent
+   */
+  static tryMarkWelcomeSent(userId) {
+    if (this.welcomeMessagesSent.has(userId)) {
+      return false; // Already sent
+    }
+    this.welcomeMessagesSent.set(userId, true);
+    this._cleanupWelcomeCache();
+    return true; // Successfully marked as first
+  }
+
+  /**
+   * Internal cleanup for welcome cache
+   */
+  static _cleanupWelcomeCache() {
     // Cleanup old entries periodically
     if (this.welcomeMessagesSent.size > 1000) {
       // Keep only the most recent 1000 entries

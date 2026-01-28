@@ -369,12 +369,92 @@ function cristinaGroupFilterMiddleware() {
 }
 
 /**
- * Group Menu Button Redirect Middleware
- * Allows menu buttons to work directly in group chat
+ * Group Callback Redirect Middleware
+ * Redirects inline button clicks to deep links instead of processing in group
+ */
+function groupCallbackRedirectMiddleware() {
+  return async (ctx, next) => {
+    const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+    const isCallback = ctx.callbackQuery;
+
+    if (!isGroup || !isCallback) {
+      return next();
+    }
+
+    const chatIdStr = ctx.chat?.id?.toString();
+
+    // Only apply to configured community group
+    if (GROUP_ID && chatIdStr !== GROUP_ID) {
+      return next();
+    }
+
+    // Check if user is admin
+    const userId = ctx.from?.id;
+    const isAdmin = userId && (
+      PermissionService.isEnvSuperAdmin(userId) ||
+      PermissionService.isEnvAdmin(userId)
+    );
+
+    // Admins can use callbacks normally
+    if (isAdmin) {
+      return next();
+    }
+
+    const callbackData = ctx.callbackQuery.data || '';
+    const userLang = ctx.from?.language_code || 'en';
+    const isSpanish = userLang.startsWith('es');
+    const botUsername = ctx.botInfo?.username || 'PNPLatinoTV_bot';
+
+    // Map callback actions to deep links
+    const CALLBACK_DEEP_LINKS = {
+      'show_subscription_plans': 'plans',
+      'menu_nearby': 'nearby',
+      'menu_content': 'content',
+      'menu_profile': 'profile',
+      'show_profile': 'profile',
+      'menu_hangouts': 'hangouts',
+      'show_hangouts': 'hangouts',
+      'cristina': 'cristina',
+      'menu_cristina': 'cristina',
+      'show_radio': 'show_radio',
+      'show_live': 'show_live',
+      'pnp_live': 'pnp_live',
+      'show_leaderboard': 'leaderboard',
+      'menu_leaderboard': 'leaderboard',
+    };
+
+    // Check if this callback should be redirected
+    const deepLink = CALLBACK_DEEP_LINKS[callbackData];
+
+    if (deepLink) {
+      const pmLink = `https://t.me/${botUsername}?start=${deepLink}`;
+
+      // Answer callback with redirect message
+      const redirectText = isSpanish
+        ? `Por favor usa el bot en privado para esta funcion`
+        : `Please use the bot in private for this feature`;
+
+      try {
+        await ctx.answerCbQuery(redirectText, { show_alert: false, url: pmLink });
+        logger.info('Callback redirected to deep link', { callbackData, deepLink, userId });
+      } catch (error) {
+        logger.debug('Could not answer callback with redirect:', error.message);
+      }
+
+      return; // Don't proceed with callback handler
+    }
+
+    // Allow other callbacks to proceed
+    return next();
+  };
+}
+
+/**
+ * Group Menu Button Redirect Middleware (Legacy - kept for compatibility)
+ * @deprecated Use groupCallbackRedirectMiddleware instead
  */
 function groupMenuRedirectMiddleware() {
   return async (ctx, next) => {
-    // Allow all callbacks to process normally, including menu buttons in groups
     return next();
   };
 }
@@ -419,6 +499,7 @@ module.exports = {
   groupBehaviorMiddleware,
   cristinaGroupFilterMiddleware,
   groupMenuRedirectMiddleware,
+  groupCallbackRedirectMiddleware,
   groupCommandDeleteMiddleware,
   primeChannelSilentRedirectMiddleware,
 };

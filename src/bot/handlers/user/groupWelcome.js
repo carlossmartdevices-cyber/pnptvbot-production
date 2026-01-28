@@ -122,13 +122,11 @@ async function processNewMember(ctx, member) {
       return;
     }
 
-    // Deduplication check - BEFORE any async operations
-    // Prevents duplicate welcomes when both events fire
-    if (ChatCleanupService.hasReceivedWelcome(userId)) {
+    // Atomic deduplication check - prevents race condition when both events fire
+    if (!ChatCleanupService.tryMarkWelcomeSent(userId)) {
       logger.debug('User already welcomed (dedup)', { userId });
       return;
     }
-    ChatCleanupService.markWelcomeSent(userId);
 
     // Get or create user
     const user = await UserModel.createOrUpdate({
