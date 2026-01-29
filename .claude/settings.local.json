@@ -225,7 +225,9 @@
       "Bash(node scripts/send-welcome-to-active-subscribers.js:*)",
       "Bash(PGPASSWORD='Apelo801050#' psql -h localhost -U pnptvbot -d pnptvbot -c \"SELECT id, name, display_name, price, duration_days, active, is_lifetime FROM plans ORDER BY price;\")",
       "Bash(__NEW_LINE_bedf0833f6cd6c69__ echo \"\")",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(timeout 2 cat:*)",
+      "Bash(git tag:*)"
     ],
     "deny": [],
     "ask": []

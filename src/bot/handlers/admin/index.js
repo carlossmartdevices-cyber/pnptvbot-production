@@ -1043,7 +1043,7 @@ let registerAdminHandlers = (bot) => {
 
       // Broadcast flow must run in private chat, otherwise session state splits across chats/topics
       if (ctx.chat?.type !== 'private') {
-        const botUsername = process.env.BOT_USERNAME || 'PNPtv_bot';
+        const botUsername = process.env.BOT_USERNAME || 'pnplatinotv_bot';
         await ctx.editMessageText(
           '⚠️ Para enviar un broadcast, abre el bot en privado.\n\nEsto evita que el proceso se quede atascado entre topics/chats.',
           Markup.inlineKeyboard([

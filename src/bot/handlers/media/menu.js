@@ -59,7 +59,7 @@ function storeMenuMessage(ctx, messageId) {
  */
 function buildGroupMenuPayload(ctx) {
   const lang = getLanguage(ctx);
-  const botUsername = ctx.botInfo?.username || process.env.BOT_USERNAME || 'pnptv_bot';
+  const botUsername = ctx.botInfo?.username || process.env.BOT_USERNAME || 'pnplatinotv_bot';
   const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
   const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
 
@@ -96,7 +96,7 @@ const registerMenuHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
       const userId = ctx.from?.id;
-      const botUsername = ctx.botInfo?.username || process.env.BOT_USERNAME || 'pnptv_bot';
+      const botUsername = ctx.botInfo?.username || process.env.BOT_USERNAME || 'pnplatinotv_bot';
       const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
 
       // Delete previous menu message if in group

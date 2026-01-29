@@ -50,7 +50,7 @@ const ENHANCED_LINK_PATTERNS = [
   // Short URLs
   /(?:bit\.ly|t\.me|tinyurl\.com|goo\.gl|ow\.ly|buff\.ly|is\.gd|v\.gd)\/[^\s]+/gi,
   // Telegram links (non-official)
-  /(?:@[a-zA-Z0-9_]{5,}|t\.me\/[a-zA-Z0-9_]+)(?<!pnptv_bot|PNPtvBot|PNPtvOfficialBot)/gi,
+  /(?:@[a-zA-Z0-9_]{5,}|t\.me\/[a-zA-Z0-9_]+)(?<!pnplatinotv_bot|pnptv_bot|PNPtvBot|PNPtvOfficialBot)/gi,
   // IP addresses
   /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g,
   // Email addresses

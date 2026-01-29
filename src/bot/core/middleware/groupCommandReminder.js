@@ -43,7 +43,7 @@ const groupCommandReminder = () => {
 
       // Show reminder message
       const lang = ctx.session?.language || 'en';
-      const botUsername = ctx.botInfo?.username || 'pnptv_bot';
+      const botUsername = ctx.botInfo?.username || 'pnplatinotv_bot';
       const firstName = ctx.from?.first_name || 'User';
 
       const messageEs = `👋 Hola ${firstName}!\n\n` +

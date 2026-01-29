@@ -22,7 +22,7 @@ function translateButtonText(buttonKey, language = 'en') {
  * @returns {Array} Array of button configuration objects
  */
 function getStandardButtonOptions(language = 'en') {
-  const botUsername = process.env.BOT_USERNAME || 'PNPtv_bot';
+  const botUsername = process.env.BOT_USERNAME || 'pnplatinotv_bot';
   const mainRoomUrl = 'https://meet.jit.si/pnptv-main-room#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false';
   const hangoutsUrl = process.env.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts';
   const videoramaUrl = process.env.VIDEORAMA_URL || 'https://pnptv.app/videorama-app/';

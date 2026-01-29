@@ -65,9 +65,9 @@ const sendError = (res, status, code, message) => res.status(status).json({
  * @returns {string} Sanitized username
  */
 const sanitizeBotUsername = (username) => {
-  if (!username) return 'pnptv_bot';
+  if (!username) return 'pnplatinotv_bot';
   // Remove any HTML/script characters, keep only alphanumeric and underscore
-  return username.replace(/[^a-zA-Z0-9_]/g, '') || 'pnptv_bot';
+  return username.replace(/[^a-zA-Z0-9_]/g, '') || 'pnplatinotv_bot';
 };
 
 /**

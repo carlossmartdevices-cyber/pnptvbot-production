@@ -16,7 +16,7 @@ const { getLanguage } = require('../../utils/helpers');
 
 const GROUP_ID = process.env.GROUP_ID;
 const WALL_OF_FAME_TOPIC_ID = parseInt(process.env.WALL_OF_FAME_TOPIC_ID || '3132', 10);
-const BOT_USERNAME = process.env.BOT_USERNAME || 'PNPLatinoTV_bot';
+const BOT_USERNAME = process.env.BOT_USERNAME || 'pnplatinotv_bot';
 
 /**
  * Admin/Moderator commands that should be silent in group

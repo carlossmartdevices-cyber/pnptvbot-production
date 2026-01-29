@@ -4,7 +4,7 @@ const config = require('../../config/config');
 const MessageRateLimiter = require('./messageRateLimiter');
 
 // Bot username for deep links
-const BOT_USERNAME = process.env.BOT_USERNAME || 'PNPtv_bot';
+const BOT_USERNAME = process.env.BOT_USERNAME || 'pnplatinotv_bot';
 
 /**
  * Tutorial Reminder Service

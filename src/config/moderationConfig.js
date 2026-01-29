@@ -85,7 +85,7 @@ const MODERATION_CONFIG = {
     BOT_ADDITION: {
       enabled: true,
       allowOnlyAdmins: true,
-      officialBots: ['pnptv_bot', 'PNPtvBot', 'PNPtvOfficialBot'],
+      officialBots: ['pnplatinotv_bot', 'pnptv_bot', 'PNPtvBot', 'PNPtvOfficialBot'],
     },
 
     // Profanity Filter (basic - can be expanded)
