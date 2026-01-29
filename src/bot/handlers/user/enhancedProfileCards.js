@@ -141,7 +141,7 @@ const registerEnhancedProfileCards = (bot) => {
       text += `🏷️ ${user.tribe}`;
     }
     
-    if (user.lookingFor || user.tribe) {
+    if (user.looking_for || user.tribe) {
       text += '\n\n';
     } else {
       text += '\n';
@@ -252,7 +252,7 @@ const registerEnhancedProfileCards = (bot) => {
     
     // Interests button (if user has interests)
     if (user.interests && user.interests.length > 0) {
-      inlineMenuButtons.push(Markup.button.callback('🎯', 'show_interests'));
+      inlineMenuButtons.push(Markup.button.callback('🎯', 'show_interests_'));
     }
     
     // Social media buttons
@@ -393,7 +393,7 @@ const registerEnhancedProfileCards = (bot) => {
     // Personal info
     if (user.age) score += 0.5;
     if (user.gender) score += 0.5;
-    if (user.lookingFor) score += 0.5;
+    if (user.looking_for) score += 0.5;
     
     return Math.round((score / maxScore) * 100);
   }
