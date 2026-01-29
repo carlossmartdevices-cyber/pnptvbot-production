@@ -38,11 +38,11 @@ const initializePostgres = () => {
       user,
       password,
       ssl: sslConfig,
-      max: process.env.POSTGRES_POOL_MAX ? parseInt(process.env.POSTGRES_POOL_MAX) : 20,
-      min: process.env.POSTGRES_POOL_MIN ? parseInt(process.env.POSTGRES_POOL_MIN) : 4,
-      idleTimeoutMillis: process.env.POSTGRES_IDLE_TIMEOUT ? parseInt(process.env.POSTGRES_IDLE_TIMEOUT) : 30000,
-      connectionTimeoutMillis: process.env.POSTGRES_CONNECTION_TIMEOUT ? parseInt(process.env.POSTGRES_CONNECTION_TIMEOUT) : 10000,
-      maxUses: process.env.POSTGRES_MAX_USES ? parseInt(process.env.POSTGRES_MAX_USES) : 10000,
+      max: process.env.POSTGRES_POOL_MAX ? parseInt(process.env.POSTGRES_POOL_MAX) : 10,
+      min: process.env.POSTGRES_POOL_MIN ? parseInt(process.env.POSTGRES_POOL_MIN) : 2,
+      idleTimeoutMillis: process.env.POSTGRES_IDLE_TIMEOUT ? parseInt(process.env.POSTGRES_IDLE_TIMEOUT) : 10000,
+      connectionTimeoutMillis: process.env.POSTGRES_CONNECTION_TIMEOUT ? parseInt(process.env.POSTGRES_CONNECTION_TIMEOUT) : 5000,
+      maxUses: process.env.POSTGRES_MAX_USES ? parseInt(process.env.POSTGRES_MAX_USES) : 5000,
       // Enable connection validation to prevent using stale connections
       validate: process.env.POSTGRES_VALIDATE_CONNECTIONS !== 'false',
       // Log connection events for monitoring
@@ -107,6 +107,8 @@ const closePool = async () => {
       logger.error('Error closing PostgreSQL pool:', error);
     }
   }
+  // Stop cache cleanup when pool is closed
+  stopCacheCleanup();
 };
 
 /**
@@ -134,10 +136,44 @@ const getClient = async () => {
  */
 const queryCache = {
   enabled: process.env.POSTGRES_QUERY_CACHE_ENABLED !== 'false',
-  ttl: process.env.POSTGRES_QUERY_CACHE_TTL ? parseInt(process.env.POSTGRES_QUERY_CACHE_TTL) : 60, // 60 seconds default
-  maxSize: process.env.POSTGRES_QUERY_CACHE_MAX_SIZE ? parseInt(process.env.POSTGRES_QUERY_CACHE_MAX_SIZE) : 1000,
-  cache: new Map()
+  ttl: process.env.POSTGRES_QUERY_CACHE_TTL ? parseInt(process.env.POSTGRES_QUERY_CACHE_TTL) : 120, // 120 seconds default
+  maxSize: process.env.POSTGRES_QUERY_CACHE_MAX_SIZE ? parseInt(process.env.POSTGRES_QUERY_CACHE_MAX_SIZE) : 2000,
+  cache: new Map(),
+  // Add cache cleanup interval
+  cleanupInterval: null
 };
+
+// Start cache cleanup interval
+const startCacheCleanup = () => {
+  if (queryCache.cleanupInterval) return;
+  
+  queryCache.cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    let deleted = 0;
+    
+    for (const [key, value] of queryCache.cache.entries()) {
+      if (value.expires < now) {
+        queryCache.cache.delete(key);
+        deleted++;
+      }
+    }
+    
+    if (deleted > 0) {
+      logger.debug(`Cleaned up ${deleted} expired query cache entries`);
+    }
+  }, 300000); // Run every 5 minutes
+};
+
+// Stop cache cleanup interval
+const stopCacheCleanup = () => {
+  if (queryCache.cleanupInterval) {
+    clearInterval(queryCache.cleanupInterval);
+    queryCache.cleanupInterval = null;
+  }
+};
+
+// Start cache cleanup when module is loaded
+startCacheCleanup();
 
 /**
  * Generate cache key for query
@@ -169,8 +205,12 @@ const query = async (text, params, { cache = queryCache.enabled, ttl = queryCach
         query: text.length > 100 ? `${text.substring(0, 100)}...` : text,
         source: 'cache'
       });
+      // Track cache hit
+      module.exports.incrementCacheHits();
       return cachedResult.result;
     }
+    // Track cache miss
+    module.exports.incrementCacheMisses();
   }
   
   try {
@@ -226,6 +266,14 @@ module.exports = {
     size: queryCache.cache.size,
     enabled: queryCache.enabled,
     ttl: queryCache.ttl,
-    maxSize: queryCache.maxSize
-  })
+    maxSize: queryCache.maxSize,
+    hitRate: queryCache.hits ? (queryCache.hits / (queryCache.hits + queryCache.misses || 1)) * 100 : 0
+  }),
+  // Add cache statistics tracking
+  incrementCacheHits: () => {
+    queryCache.hits = (queryCache.hits || 0) + 1;
+  },
+  incrementCacheMisses: () => {
+    queryCache.misses = (queryCache.misses || 0) + 1;
+  }
 };
