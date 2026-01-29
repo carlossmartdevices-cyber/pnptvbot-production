@@ -73,20 +73,33 @@ const registerImprovedSharePostHandlers = (bot) => {
   // DESTINATION CONFIGURATION - From environment variables
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Parse topic IDs from env (handles URL format like t.me/c/xxx/2)
+  // Parse topic IDs from env (handles both numeric and URL format like t.me/c/xxx/2)
   const parseTopicId = (value) => {
     if (!value) return null;
-    const parsed = parseInt(String(value).replace(/.*\//, ''));
+    const str = String(value);
+    // If it's already numeric, parse directly
+    if (/^\d+$/.test(str)) {
+      return parseInt(str);
+    }
+    // Otherwise extract from URL format
+    const parsed = parseInt(str.replace(/.*\//, ''));
     return isNaN(parsed) ? null : parsed;
   };
 
   // Available destinations - dynamically configured from env
+  // NOTE: General topic removed - thread ID 1 doesn't work for this forum group
   const SHARE_DESTINATIONS = [
     { id: 'prime', chatId: process.env.PRIME_CHANNEL_ID, threadId: null, name: '💎 Prime Channel', type: 'channel' },
-    // Only include General topic if GENERAL_TOPIC_ID is explicitly set
-    process.env.GENERAL_TOPIC_ID ? { id: 'general', chatId: process.env.GROUP_ID, threadId: parseInt(process.env.GENERAL_TOPIC_ID), name: '💬 General', type: 'topic' } : null,
-    { id: 'walloffame', chatId: process.env.GROUP_ID, threadId: parseTopicId(process.env.WALL_OF_FAME_TOPIC_ID) || 2, name: '🏆 Wall Of Fame', type: 'topic' },
-  ].filter(d => d && d.chatId); // Only include destinations with valid chatId
+    { id: 'walloffame', chatId: process.env.GROUP_ID, threadId: parseTopicId(process.env.WALL_OF_FAME_TOPIC_ID), name: '🏆 Wall Of Fame', type: 'topic' },
+  ].filter(d => d && d.chatId);
+
+  // Log destinations at startup for debugging
+  logger.info('Share post destinations configured:', SHARE_DESTINATIONS.map(d => ({
+    id: d.id,
+    chatId: d.chatId,
+    threadId: d.threadId,
+    name: d.name
+  })));
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DESTINATION SELECTION HANDLERS
@@ -1043,10 +1056,15 @@ const registerImprovedSharePostHandlers = (bot) => {
           }
 
           sent++;
-          logger.info(`Post sent to ${dest.name} (${dest.chatId}${dest.threadId ? ', topic ' + dest.threadId : ''})`);
+          logger.info(`Post sent to ${dest.name}`, { chatId: dest.chatId, threadId: dest.threadId });
         } catch (sendError) {
           failed++;
-          logger.error(`Failed to send to ${dest.name}:`, sendError.message);
+          const errMsg = sendError.response?.description || sendError.message || 'Unknown error';
+          logger.error(`Failed to send to ${dest.name}`, {
+            chatId: dest.chatId,
+            threadId: dest.threadId,
+            error: errMsg
+          });
         }
       }
 
