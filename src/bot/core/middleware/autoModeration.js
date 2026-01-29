@@ -206,12 +206,21 @@ async function deleteAndNotify(ctx, reason) {
 }
 
 /**
+ * Check for URL entities in message
+ */
+function hasUrlEntities(message) {
+  if (!message) return false;
+  const entities = message.entities || message.caption_entities || [];
+  return entities.some(e => e.type === 'url' || e.type === 'text_link');
+}
+
+/**
  * Auto-moderation middleware
  */
 const autoModerationMiddleware = () => async (ctx, next) => {
   try {
-    // Only process text messages in groups
-    if (!ctx.message?.text || ctx.chat.type === 'private') {
+    // Only process messages in groups
+    if (!ctx.message || ctx.chat.type === 'private') {
       return next();
     }
 
@@ -228,8 +237,9 @@ const autoModerationMiddleware = () => async (ctx, next) => {
     }
 
     const userId = ctx.from.id;
-    const messageText = ctx.message.text;
     const message = ctx.message;
+    // Get text from message or caption (for photos/videos)
+    const messageText = message.text || message.caption || '';
 
     // ENHANCED: Check for forwarded messages - BLOCK ALL
     if (isForwardedMessage(message)) {
@@ -246,25 +256,27 @@ const autoModerationMiddleware = () => async (ctx, next) => {
       return; // Don't proceed
     }
 
-    // Add message to history
-    addToHistory(userId, messageText);
+    // Add message to history (only if has text)
+    if (messageText) {
+      addToHistory(userId, messageText);
 
-    // Check for spam
-    if (checkSpam(userId, messageText)) {
-      await deleteAndNotify(ctx, 'Spam detected (duplicate messages)');
+      // Check for spam
+      if (checkSpam(userId, messageText)) {
+        await deleteAndNotify(ctx, 'Spam detected (duplicate messages)');
 
-      // Issue auto-warning
-      await WarningService.addWarning({
-        userId,
-        adminId: 'system',
-        reason: 'Auto-moderation: Spam',
-        groupId: ctx.chat.id,
-      });
+        // Issue auto-warning
+        await WarningService.addWarning({
+          userId,
+          adminId: 'system',
+          reason: 'Auto-moderation: Spam',
+          groupId: ctx.chat.id,
+        });
 
-      return; // Don't proceed
+        return; // Don't proceed
+      }
     }
 
-    // Check for flooding
+    // Check for flooding (all message types)
     if (checkFlood(userId)) {
       await deleteAndNotify(ctx, 'Too many messages too quickly');
 
@@ -290,7 +302,8 @@ const autoModerationMiddleware = () => async (ctx, next) => {
     }
 
     // ENHANCED: Check for ANY links - COMPLETE BLOCK
-    if (detectAnyLink(messageText)) {
+    // Check both text patterns and URL entities
+    if (messageText && (detectAnyLink(messageText) || hasUrlEntities(message))) {
       await deleteAndNotify(ctx, 'Links are not allowed in this group');
 
       // Issue auto-warning
@@ -304,8 +317,8 @@ const autoModerationMiddleware = () => async (ctx, next) => {
       return; // Don't proceed
     }
 
-    // Check for profanity
-    if (checkProfanity(messageText)) {
+    // Check for profanity (only if has text)
+    if (messageText && checkProfanity(messageText)) {
       await deleteAndNotify(ctx, 'Inappropriate language detected');
 
       // Issue auto-warning
