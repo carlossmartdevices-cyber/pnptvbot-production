@@ -507,76 +507,36 @@ const registerNearbyUnifiedHandlers = (bot) => {
 
   // Import existing handlers for user viewing and DM functionality
   // View user profile (imported from original nearby.js)
-  bot.action(/^view_user_(.+)$/, async (ctx) => {
-    try {
-      if (!ctx.match || !ctx.match[1]) {
-        logger.error('Invalid view user action format');
-        return;
-      }
-
-      const targetUserId = ctx.match[1];
-      const lang = getLanguage(ctx);
-
-      const user = await UserService.getById(targetUserId);
-
-      if (!user) {
-        await ctx.answerCbQuery(t('userNotFound', lang));
-        return;
-      }
-
-      let profileText = '`👤 PROFILE CARD`\n\n';
-
-      const displayName = user.firstName || 'Anonymous';
-      profileText += `**${displayName}**`;
-      if (user.lastName) profileText += ` ${user.lastName}`;
-      profileText += '\n';
-      
-      if (user.username) {
-        profileText += `@${user.username}\n`;
-      }
-
-      profileText += '\n';
-
-      if (user.bio) {
-        profileText += `💭 _"${user.bio}"_\n\n`;
-      }
-
-      if (user.interests && user.interests.length > 0) {
-        profileText += `🎯 **Into:** ${user.interests.join(', ')}\n\n`;
-      }
-
-      const socials = [];
-      if (user.twitter) socials.push(`𝕏 ${user.twitter}`);
-      if (user.instagram) socials.push(`IG ${user.instagram}`);
-      if (user.tiktok) socials.push(`TT ${user.tiktok}`);
-      
-      if (socials.length > 0) {
-        profileText += `🔗 ${socials.join(' • ')}\n\n`;
-      }
-
-      profileText += '`Don\'t be shy... DM! 💬`';
-
-      let dmButton;
-      if (user.username) {
-        dmButton = Markup.button.url(`💬 Message ${displayName}`, `https://t.me/${user.username}`);
-      } else {
-        dmButton = Markup.button.url(`💬 Message ${displayName}`, `tg://user?id=${targetUserId}`);
-      }
-
-      await ctx.editMessageText(
-        profileText,
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [dmButton],
-            [Markup.button.callback('🔙 Back to List', 'show_nearby_unified')],
-          ]),
-        }
-      );
-    } catch (error) {
-      logger.error('Error viewing user profile:', error);
-    }
-  });
+  // NOTE: This handler has been removed to avoid conflict with enhancedProfileCards.js
+  // The enhanced profile cards provide more comprehensive profile viewing functionality
+  // bot.action(/^view_user_(.+)$/, async (ctx) => {
+  //   try {
+  //     if (!ctx.match || !ctx.match[1]) {
+  //       logger.error('Invalid view user action format');
+  //       return;
+  //     }
+  //
+  //     const targetUserId = ctx.match[1];
+  //     const lang = getLanguage(ctx);
+  //
+  //     const user = await UserService.getById(targetUserId);
+  //
+  //     if (!user) {
+  //       await ctx.answerCbQuery(t('userNotFound', lang));
+  //       return;
+  //     }
+  //
+  //     let profileText = '`👤 PROFILE CARD`\n\n';
+  //
+  //     const displayName = user.firstName || 'Anonymous';
+  //     profileText += `**${displayName}**`;
+  //     if (user.lastName) profileText += ` ${user.lastName}`;
+  //     profileText += '\n';
+  //     
+  //     if (user.username) {
+  //       profileText += `@${user.username}\n`;
+  //     }
+  //
 
   // Handle DM button clicks (imported from original nearby.js)
   bot.action(/^dm_user_(.+)$/, async (ctx) => {

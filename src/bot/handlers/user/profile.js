@@ -89,14 +89,16 @@ const registerProfileHandlers = (bot) => {
   });
 
   // View user profile
-  bot.action(/^view_user_(\d+)$/, async (ctx) => {
-    try {
-      const targetUserId = ctx.match[1];
-      await showProfile(ctx, targetUserId, true, false);
-    } catch (error) {
-      logger.error('Error viewing user profile:', error);
-    }
-  });
+  // NOTE: This handler has been removed to avoid conflict with enhancedProfileCards.js
+  // The enhanced profile cards provide more comprehensive profile viewing functionality
+  // bot.action(/^view_user_(\d+)$/, async (ctx) => {
+  //   try {
+  //     const targetUserId = ctx.match[1];
+  //     await showProfile(ctx, targetUserId, true, false);
+  //   } catch (error) {
+  //     logger.error('Error viewing user profile:', error);
+  //   }
+  // });
 
   // Add/Remove favorites
   bot.action(/^add_favorite_(\d+)$/, async (ctx) => {
