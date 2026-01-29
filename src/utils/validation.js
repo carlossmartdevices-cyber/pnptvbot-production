@@ -170,15 +170,6 @@ const schemas = {
     provider: Joi.string().valid('epayco', 'daimo').required(),
   }),
 
-  // Zoom room schema
-  zoomRoom: Joi.object({
-    roomName: Joi.string().min(3).max(100).required(),
-    privacy: Joi.string().valid('public', 'private').required(),
-    duration: Joi.number().integer().min(15).max(480)
-      .default(60),
-    password: Joi.string().min(6).max(20).optional(),
-  }),
-
   // Live stream schema
   liveStream: Joi.object({
     title: Joi.string().min(3).max(100).required(),

@@ -20,13 +20,6 @@ const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   webDomain: process.env.WEB_DOMAIN || 'https://pnptv.app',
 
-  // Firebase configuration
-  firebase: {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY,
-  },
-
   // Payment configuration
   payments: {
     epayco: {
@@ -56,7 +49,6 @@ const config = {
   features: {
     liveStreams: true,
     radio: true,
-    zoomRooms: true,
     nearbyUsers: true,
     payments: true,
   },
@@ -79,9 +71,6 @@ function validateConfig() {
     logger.warn('⚠️  WARNING: No admin IDs configured. Admin features will be unavailable.');
   }
 
-  if (!config.firebase.privateKey) {
-    logger.warn('⚠️  WARNING: Firebase private key not configured. Database features will fail.');
-  }
 }
 
 module.exports = {

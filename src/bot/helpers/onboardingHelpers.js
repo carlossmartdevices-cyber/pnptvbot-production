@@ -1,9 +1,8 @@
 const { Markup } = require('telegraf');
-const { getFirestore } = require('../../config/firebase');
 const { t } = require('../../utils/i18n');
 const { isValidEmail } = require('../../utils/validation');
 const logger = require('../../utils/logger');
-const { activateMembership } = require('../../utils/membershipManager');
+const UserModel = require('../../models/userModel');
 
 /**
  * Handle language selection
@@ -93,19 +92,9 @@ async function handleAgeConfirmation(ctx) {
 
     console.log(`[Onboarding] User ${userId} confirmed age, valid until ${expiresAt.toISOString()}`);
 
-    // Update Firestore immediately with age verification
-    try {
-      const db = getFirestore();
-      await db.collection('users').doc(userId).set({
-        ageVerified: true,
-        ageVerifiedAt: now,
-        ageVerificationExpiresAt: expiresAt,
-        ageVerificationIntervalHours: 168,
-        updatedAt: now,
-      }, { merge: true });
-    } catch (dbError) {
-      logger.error('Failed to save age verification to Firestore:', dbError);
-    }
+    await UserModel.updateProfile(userId, {
+      ageVerified: true,
+    });
 
     // Confirm and proceed to terms
     try {
@@ -324,19 +313,10 @@ async function handleEmailSubmission(ctx) {
     ctx.session.email = email;
     ctx.session.awaitingEmail = false;
 
-    // Save to Firestore immediately
-    try {
-      const db = getFirestore();
-      await db.collection('users').doc(ctx.from.id.toString()).set({
-        email,
-        emailVerified: false, // Can add verification later
-        updatedAt: new Date(),
-      }, { merge: true });
-
-      console.log(`[Onboarding] Email saved to Firestore for user ${ctx.from.id}`);
-    } catch (dbError) {
-      logger.error('Failed to save email to Firestore:', dbError);
-    }
+    await UserModel.updateProfile(ctx.from.id.toString(), {
+      email,
+      emailVerified: false,
+    });
 
     await ctx.reply(t('emailConfirmed', lang));
 
@@ -433,10 +413,6 @@ async function completeOnboarding(ctx) {
 
     console.log(`[Onboarding] Completing onboarding for user ${userId}`);
 
-    // Create complete user document in Firestore
-    const db = getFirestore();
-    const userRef = db.collection('users').doc(userId);
-
     const now = new Date();
     const userData = {
       userId,
@@ -447,40 +423,24 @@ async function completeOnboarding(ctx) {
       email: ctx.session.email || null,
       emailVerified: false,
 
-      // Onboarding tracking
       onboardingComplete: true,
       createdAt: now,
       lastActive: now,
-
-      // Age verification
       ageVerified: ctx.session.ageVerified || false,
-      ageVerifiedAt: ctx.session.ageVerifiedAt || now,
-      ageVerificationExpiresAt: ctx.session.ageVerificationExpiresAt || null,
-      ageVerificationIntervalHours: 168,
-
-      // Legal compliance
       termsAccepted: ctx.session.termsAccepted || false,
       privacyAccepted: ctx.session.privacyAccepted || false,
-
-      // Membership (will be set by auto-activation)
-      tier: 'Free',
-      membershipExpiresAt: null,
-
-      // Profile (optional fields)
-      bio: null,
-      location: null,
-      photoUrl: null,
-
-      updatedAt: now,
     };
-
-    await userRef.set(userData, { merge: true });
-    console.log(`[Onboarding] User document created in Firestore for user ${userId}`);
+    await UserModel.createOrUpdate(userData);
+    console.log(`[Onboarding] User record created in PostgreSQL for user ${userId}`);
 
     // Auto-activate free membership if enabled
     if (process.env.AUTO_ACTIVATE_FREE_USERS === 'true') {
       console.log(`[Onboarding] Auto-activating Free membership for user ${userId}`);
-      await activateMembership(userId, 'Free', 'system', 0, ctx.telegram);
+      await UserModel.updateSubscription(userId, {
+        status: 'free',
+        planId: 'free',
+        expiry: null,
+      });
     }
 
     // Clear onboarding session data
@@ -518,7 +478,6 @@ async function showMainMenu(ctx) {
       ],
       [
         Markup.button.callback(t('liveStreams', lang), 'show_live'),
-        Markup.button.callback(t('zoomRooms', lang), 'show_zoom'),
       ],
       [
         Markup.button.callback(t('support', lang), 'show_support'),
