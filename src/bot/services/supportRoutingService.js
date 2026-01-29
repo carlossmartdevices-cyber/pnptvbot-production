@@ -62,6 +62,13 @@ class SupportRoutingService {
 🆔 *User ID:* \`${userId}\`
 📅 *Reabierto:* ${new Date().toLocaleString('es-ES')}
 
+⚡ *Comandos Rápidos:*
+\`/activate_${userId}_30\` - Activar 30 días
+\`/activate_${userId}_lifetime\` - Lifetime
+\`/user_${userId}\` - Ver info
+\`/solved_${userId}\` - Resolver
+\`/r2\` - Pedir comprobante
+
 ⚡ *Acciones rápidas:* Usa los botones abajo.`;
 
           const quickActionsKeyboard = {
@@ -145,6 +152,8 @@ ${categoryEmoji} *Categoría:* ${category}
 🆔 *User ID:* \`${userId}\`
 🌍 *Idioma:* ${language}
 📅 *Creado:* ${new Date().toLocaleString('es-ES')}
+
+⚡ *Acciones rápidas:* Usa los botones abajo.
 
 ⚡ *Acciones rápidas:* Usa los botones abajo.
 

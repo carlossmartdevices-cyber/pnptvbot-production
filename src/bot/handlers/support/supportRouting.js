@@ -1328,7 +1328,19 @@ ${subscriptionEmoji} *Estado:* ${user.subscriptionStatus || 'free'}
 
     const message = `📋 *Respuestas Rápidas / Quick Answers*
 
-Usa los botones para enviar una respuesta rápida al usuario del topic actual.`;
+Usa los botones para enviar una respuesta rápida al usuario del topic actual.
+También puedes ejecutar acciones del ticket con los botones superiores.`;
+
+    const actionButtons = [
+      [
+        { text: '✅ Activar 30 días', callback_data: `support_cmd:activate:${supportTopic.user_id}:30` },
+        { text: '♾️ Activar lifetime', callback_data: `support_cmd:activate:${supportTopic.user_id}:lifetime` },
+      ],
+      [
+        { text: '👤 Ver usuario', callback_data: `support_cmd:user:${supportTopic.user_id}` },
+        { text: '✅ Marcar resuelto', callback_data: `support_cmd:solved:${supportTopic.user_id}` },
+      ],
+    ];
 
     const quickButtons = Object.keys(QUICK_ANSWERS).map((key) => {
       const answerId = Number(key);
@@ -1339,7 +1351,7 @@ Usa los botones para enviar una respuesta rápida al usuario del topic actual.`;
       };
     });
 
-    const inlineKeyboard = [];
+    const inlineKeyboard = [...actionButtons];
     for (let i = 0; i < quickButtons.length; i += 2) {
       inlineKeyboard.push(quickButtons.slice(i, i + 2));
     }
