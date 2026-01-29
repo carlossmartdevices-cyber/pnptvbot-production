@@ -26,11 +26,15 @@ const integratePrivateCallsToMenu = (bot) => {
             callback_data: 'show_profile'
           },
           {
-            text: lang === 'es' ? '💬 Mensajes' : '💬 Messages',
-            callback_data: 'messages_menu'
+            text: lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby',
+            callback_data: 'menu:nearby'
           }
         ],
         [
+          {
+            text: lang === 'es' ? '💬 Mensajes' : '💬 Messages',
+            callback_data: 'messages_menu'
+          },
           {
             text: lang === 'es' ? '🎬 Videos' : '🎬 Videos',
             callback_data: 'videos_menu'
