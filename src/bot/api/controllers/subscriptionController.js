@@ -16,7 +16,7 @@ class SubscriptionController {
    */
   static async getPlans(req, res) {
     try {
-      const plans = await PlanModel.getAll();
+      const plans = await PlanModel.getPublicPlans();
 
       // Add currency conversion for each plan
       const plansWithPrices = await Promise.all(

@@ -43,7 +43,7 @@ const showSubscriptionPlans = async (ctx, options = {}) => {
     );
   }
 
-  const plans = await PlanModel.getAll();
+  const plans = await PlanModel.getPublicPlans();
 
   // Header with internationalization
   let message = `${t('subscriptionHeader', lang)}\n`;

@@ -3981,7 +3981,7 @@ let registerAdminHandlers = (bot) => {
         return;
       }
 
-      const plans = await PlanModel.getAll();
+      const plans = await PlanModel.getAdminPlans();
 
       const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
       let text = `💎 **Cambiar Plan de Usuario**\n\n`;
@@ -4162,7 +4162,7 @@ let registerAdminHandlers = (bot) => {
         );
       } else {
         // Show available plans
-        const plans = await PlanModel.getAll();
+        const plans = await PlanModel.getAdminPlans();
 
         let text = '💎 **Seleccionar Plan**\n\n';
         text += `👤 ${safeName}\n`;
