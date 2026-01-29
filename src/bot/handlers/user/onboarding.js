@@ -118,7 +118,7 @@ If you have any questions, use /support to contact us.`;
         return;
       }
 
-      if (startParam && user.onboardingComplete) {
+      if (startParam) {
         const lang = getLanguage(ctx);
 
         if (startParam === 'plans' || startParam === 'show_subscription_plans') {

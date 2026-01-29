@@ -1524,7 +1524,8 @@ let registerAdminHandlers = (bot) => {
   });
 
   // Broadcast - Toggle one of the optional buttons (add/remove)
-  bot.action(/^broadcast_toggle_(.+)$/, async (ctx) => {
+  // Note: exclude 'email' which has its own handler (broadcast_toggle_email)
+  bot.action(/^broadcast_toggle_(?!email$)(.+)$/, async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
@@ -1786,7 +1787,12 @@ let registerAdminHandlers = (bot) => {
         [Markup.button.callback('❌ Cancelar Broadcast', 'admin_cancel')],
       ]);
 
-      await ctx.answerCbQuery(sendEmail ? '✅ Email habilitado' : '📧 Email deshabilitado');
+      // Answer callback and update keyboard
+      try {
+        await ctx.answerCbQuery(sendEmail ? '✅ Email habilitado' : '📧 Email deshabilitado');
+      } catch (cbError) {
+        logger.warn('Could not answer callback for email toggle:', cbError.message);
+      }
 
       // Edit message to update the keyboard
       try {
