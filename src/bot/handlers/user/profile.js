@@ -1086,3 +1086,4 @@ const unblockUser = async (ctx, targetUserId) => {
 
 module.exports = registerProfileHandlers;
 module.exports.showProfile = showProfile;
+module.exports.showEditProfileMenu = showEditProfileMenu;
