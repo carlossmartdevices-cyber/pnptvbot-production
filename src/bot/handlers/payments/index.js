@@ -407,7 +407,10 @@ const registerPaymentHandlers = (bot) => {
 
       if (result.success) {
         // Get supported payment apps
-        const paymentApps = DaimoConfig.SUPPORTED_PAYMENT_APPS.join(', ');
+        const paymentApps = DaimoConfig.SUPPORTED_PAYMENT_APPS
+          .filter((app) => !['Coinbase', 'Binance', 'MiniPay'].includes(app))
+          .map((app) => (app === 'CashApp' ? 'Cash App' : app))
+          .join(', ');
 
         const message = lang === 'es'
           ? '🪙 *Paga en Crypto con Daimo Pay*\n\n'
@@ -417,7 +420,7 @@ const registerPaymentHandlers = (bot) => {
             + '💳 *Daimo Pay acepta USDC, y puedes pagar usando wallets populares como:*\n'
             + 'Binance • Coinbase Wallet • MetaMask • Trust Wallet • Kraken Wallet • OKX Wallet • Bybit Wallet, y más.\n\n'
             + '📱 *O paga usando las apps de pago más populares:*\n'
-            + 'Cash App, Venmo, Wise, Revolut y Zelle.\n\n'
+            + `${paymentApps}.\n\n`
             + 'Solo elige tu wallet o app, confirma la transacción, y listo.\n\n'
             + '✅ *Una vez confirmado tu pago, recibirás automáticamente:*\n'
             + '• Tu mensaje de acceso PRIME\n'
@@ -431,7 +434,7 @@ const registerPaymentHandlers = (bot) => {
             + '💳 *Daimo Pay accepts USDC, and you can pay using popular wallets such as:*\n'
             + 'Binance • Coinbase Wallet • MetaMask • Trust Wallet • Kraken Wallet • OKX Wallet • Bybit Wallet, and more.\n\n'
             + '📱 *Or pay using the most popular payment apps, including:*\n'
-            + 'Cash App, Venmo, Wise, Revolut, and Zelle.\n\n'
+            + `${paymentApps}.\n\n`
             + 'Just choose your wallet or app, confirm the transaction, and you\'re done.\n\n'
             + '✅ *Once your payment is confirmed, you\'ll automatically receive:*\n'
             + '• Your PRIME access message\n'
