@@ -87,9 +87,10 @@ const registerImprovedSharePostHandlers = (bot) => {
   };
 
   // Available destinations - dynamically configured from env
+  // NOTE: General topic (thread 1) doesn't work for this forum - removed
   const SHARE_DESTINATIONS = [
     { id: 'prime', chatId: process.env.PRIME_CHANNEL_ID, threadId: null, name: '💎 Prime Channel', type: 'channel' },
-    { id: 'general', chatId: process.env.GROUP_ID, threadId: 1, name: '💬 General', type: 'topic' },
+    { id: 'news', chatId: process.env.GROUP_ID, threadId: 5525, name: '📰 PNP Latino News', type: 'topic' },
     { id: 'walloffame', chatId: process.env.GROUP_ID, threadId: parseTopicId(process.env.WALL_OF_FAME_TOPIC_ID), name: '🏆 Wall Of Fame', type: 'topic' },
   ].filter(d => d && d.chatId);
 
@@ -808,31 +809,47 @@ const registerImprovedSharePostHandlers = (bot) => {
       await ctx.answerCbQuery();
 
       const postData = ctx.session.temp.sharePostData;
-      const caption = buildPostCaption(postData);
+      const text = postData.text || '';
+      const hasMedia = !!(postData.mediaFileId || postData.sourceMessageId);
+      const maxLen = hasMedia ? 1024 : 4096;
       const kb = buildInlineKeyboard(postData.buttons);
 
-      // Render a preview message (copy media to admin chat if present to support very large videos)
+      // Check caption length
+      let lengthWarning = '';
+      if (text.length > maxLen) {
+        lengthWarning = `\n\n⚠️ ADVERTENCIA: El texto tiene ${text.length} caracteres (máximo ${maxLen} para ${hasMedia ? 'posts con media' : 'posts sin media'}). Será truncado al enviar.`;
+      }
+
+      // Show text preview (truncated if too long)
+      const previewText = text.length > 500 ? text.substring(0, 500) + '...\n\n[Texto truncado para preview]' : text;
+
+      // Try to show media preview if available
       if (postData.sourceChatId && postData.sourceMessageId) {
         try {
+          // Use shorter caption for preview to avoid errors
+          const shortCaption = text.length > 800 ? text.substring(0, 800) + '...' : text;
           await ctx.telegram.copyMessage(ctx.chat.id, postData.sourceChatId, postData.sourceMessageId, {
-            caption,
-            parse_mode: 'Markdown',
+            caption: shortCaption,
             ...(kb ? { reply_markup: kb.reply_markup } : {}),
           });
         } catch (e) {
-          logger.warn('Preview copyMessage failed (continuing):', e.message);
+          logger.warn('Preview copyMessage failed:', e.message);
+          // Fallback: just show text
+          await ctx.reply('📷 [Media adjunta]\n\n' + previewText, {
+            ...(kb ? { reply_markup: kb.reply_markup } : {}),
+          });
         }
-      } else if (caption) {
-        await ctx.reply(caption, { parse_mode: 'Markdown', ...(kb ? { reply_markup: kb.reply_markup } : {}) });
+      } else if (text) {
+        await ctx.reply(previewText, { ...(kb ? { reply_markup: kb.reply_markup } : {}) });
       }
 
       await ctx.reply(
-        '👀 *Preview*\n\n¿Enviar ahora o programar para mas tarde?',
+        '👀 Preview' + lengthWarning + '\n\n¿Enviar ahora o programar para mas tarde?',
         {
-          parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('📤 Send Now', 'share_post_send_now')],
             [Markup.button.callback('📅 Schedule', 'share_post_schedule')],
+            [Markup.button.callback('✏️ Edit Text', 'share_post_edit_text')],
             [Markup.button.callback('🔘 Edit Buttons', 'share_post_back_to_buttons')],
             [Markup.button.callback('❌ Cancel', 'share_post_cancel')],
           ]),
@@ -841,6 +858,20 @@ const registerImprovedSharePostHandlers = (bot) => {
     } catch (error) {
       logger.error('Error in share_post_preview:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Edit text from preview
+  bot.action('share_post_edit_text', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery();
+      ctx.session.temp.sharePostStep = 'write_text';
+      await ctx.saveSession();
+      await showTextInputStep(ctx);
+    } catch (error) {
+      logger.error('Error in share_post_edit_text:', error);
     }
   });
 
