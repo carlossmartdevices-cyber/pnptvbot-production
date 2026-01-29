@@ -118,14 +118,16 @@ async function sendBroadcastPreview(ctx) {
   const buttons = summarizeBroadcastButtons(data.buttons);
   const buttonsText = buttons.length ? buttons.map((t) => `• ${t}`).join('\n') : '_Sin botones_';
   const mediaText = data.mediaType ? `📎 ${data.mediaType}` : '📝 Solo texto';
+  const safeTextEn = hasTextEn ? escapeMarkdown(data.textEn) : '';
+  const safeTextEs = hasTextEs ? escapeMarkdown(data.textEs) : '';
 
   const previewText =
     '🎯 *Paso 5/5: Botones y Envío*\n\n' +
     '📌 *Parte 2: Vista Previa y Envío*\n\n' +
     '👀 *Vista previa del Broadcast:*' +
     `\n\n${mediaText}\n\n` +
-    (hasTextEn ? `*EN:*\n${data.textEn}\n\n` : '') +
-    (hasTextEs ? `*ES:*\n${data.textEs}\n\n` : '') +
+    (hasTextEn ? `*EN:*\n${safeTextEn}\n\n` : '') +
+    (hasTextEs ? `*ES:*\n${safeTextEs}\n\n` : '') +
     `*Botones:*\n${buttonsText}\n\n` +
     '¿Listo para enviar?';
 
@@ -156,7 +158,7 @@ async function sendBroadcastPreview(ctx) {
     })();
 
     // Use English text if available, otherwise Spanish, otherwise empty string
-    const previewCaption = hasTextEn ? `📢 ${data.textEn}` : hasTextEs ? `📢 ${data.textEs}` : '📢';
+    const previewCaption = hasTextEn ? `📢 ${safeTextEn}` : hasTextEs ? `📢 ${safeTextEs}` : '📢';
 
     if (data.mediaType === 'photo') {
       await ctx.replyWithPhoto(data.mediaFileId, {
@@ -3034,6 +3036,7 @@ let registerAdminHandlers = (bot) => {
     if (ctx.session.temp?.broadcastStep === 'edit_ai_en') {
       try {
         const editedText = ctx.message.text;
+        const escapedText = escapeMarkdown(editedText);
         if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
         ctx.session.temp.broadcastData.textEn = editedText;
         ctx.session.temp.aiDraft = null;
@@ -3041,7 +3044,7 @@ let registerAdminHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(
-          `✅ *Texto editado guardado (EN)*\n\n${editedText}`,
+          `✅ *Texto editado guardado (EN)*\n\n${escapedText}`,
           { parse_mode: 'Markdown' },
         );
         await ctx.reply(
@@ -3066,6 +3069,7 @@ let registerAdminHandlers = (bot) => {
     if (ctx.session.temp?.broadcastStep === 'edit_ai_es') {
       try {
         const editedText = ctx.message.text;
+        const escapedText = escapeMarkdown(editedText);
         if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
         ctx.session.temp.broadcastData.textEs = editedText;
         ctx.session.temp.aiDraft = null;
@@ -3078,7 +3082,7 @@ let registerAdminHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(
-          `✅ *Texto editado guardado (ES)*\n\n${editedText}`,
+          `✅ *Texto editado guardado (ES)*\n\n${escapedText}`,
           { parse_mode: 'Markdown' },
         );
         await showBroadcastButtonsPicker(ctx);
