@@ -15,7 +15,7 @@ const {
   getMessage
 } = require('../../../config/menuConfig');
 const { detectLanguage } = require('../../../utils/languageDetector');
-const { showProfile } = require('../user/profile');
+const { showProfile, showEditProfileMenu } = require('../user/profile');
 const UserModel = require('../../../models/userModel');
 const { isPrimeUser } = require('../../utils/helpers');
 const UserService = require('../../services/userService');
@@ -401,6 +401,10 @@ async function handleDeepLinkStart(ctx) {
       case 'profile':
         // Show user profile
         await handleProfile(ctx, lang);
+        return;
+      case 'edit_profile':
+        // Show edit profile menu
+        await handleEditProfile(ctx, lang);
         return;
 
       case 'cristina':
@@ -1378,6 +1382,10 @@ async function handleHowToUse(ctx, lang) {
 async function handleProfile(ctx, lang) {
   // Call the actual profile feature handler
   await showProfile(ctx, ctx.from.id, true, true);
+}
+
+async function handleEditProfile(ctx, lang) {
+  await showEditProfileMenu(ctx, lang);
 }
 
 async function handleNotificationSettings(ctx, lang) {
