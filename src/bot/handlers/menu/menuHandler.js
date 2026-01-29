@@ -380,15 +380,20 @@ async function handleDeepLinkStart(ctx) {
     // These take users directly to specific bot features
     switch (startPayload) {
       case 'home':
+      case 'menu':
+      case 'from_group':
+      case 'onboarding':
       case '1': // Legacy support for ?start=1
         return handleMenuCommand(ctx);
 
       case 'plans':
+      case 'show_subscription_plans':
         // Show subscription plans screen (using reply since we're in /start context)
         await handleDeepLinkPlans(ctx, lang);
         return;
 
       case 'nearby':
+      case 'show_nearby':
         // Show nearby users screen (using reply since we're in /start context)
         await handleDeepLinkNearby(ctx, lang);
         return;
@@ -417,6 +422,18 @@ async function handleDeepLinkStart(ctx) {
       case 'show_live':
         // Show PNP Live screen (using reply since we're in /start context)
         await handleDeepLinkPNPLive(ctx, lang);
+        return;
+
+      case 'support':
+      case 'show_support':
+        // Show support screen
+        await handleDeepLinkSupport(ctx, lang);
+        return;
+
+      case 'radio':
+      case 'show_radio':
+        // Show radio screen
+        await handleDeepLinkRadio(ctx, lang);
         return;
     }
 
@@ -670,6 +687,75 @@ async function handleDeepLinkPNPLive(ctx, lang) {
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback(lang === 'es' ? '📺 Ver PNP Live' : '📺 Watch PNP Live', 'PNP_LIVE_START')],
+    [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')]
+  ]);
+
+  await ctx.reply(message, {
+    parse_mode: 'Markdown',
+    ...keyboard
+  });
+}
+
+/**
+ * Handle deep link to support (uses ctx.reply instead of editMessageText)
+ */
+async function handleDeepLinkSupport(ctx, lang) {
+  const supportText = lang === 'es'
+    ? '`🆘 Centro de Ayuda`\n\n' +
+      '¿Necesitas ayuda? ¡Te tenemos! 💜\n\n' +
+      '**Cristina** es nuestra asistente IA —\n' +
+      'puede responder preguntas sobre:\n' +
+      '• Funciones de la plataforma\n' +
+      '• Reducción de daños y uso seguro\n' +
+      '• Salud sexual y mental\n' +
+      '• Recursos comunitarios\n\n' +
+      '_O contacta a Santino directamente para\n' +
+      'problemas de cuenta y facturación._'
+    : '`🆘 Help Center`\n\n' +
+      'Need help? We got you! 💜\n\n' +
+      '**Cristina** is our AI assistant —\n' +
+      'she can answer questions about:\n' +
+      '• Platform features\n' +
+      '• Harm reduction & safer use\n' +
+      '• Sexual & mental health\n' +
+      '• Community resources\n\n' +
+      '_Or contact Santino directly for\n' +
+      'account issues & billing._';
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback(lang === 'es' ? '🤖 Hablar con Cristina' : '🤖 Chat with Cristina', 'support_ai_chat')],
+    [Markup.button.callback(lang === 'es' ? '👤 Contactar a Santino' : '👤 Contact Santino', 'support_contact_admin')],
+    [Markup.button.callback(lang === 'es' ? '🎁 Solicitar Activación' : '🎁 Request Activation', 'support_request_activation')],
+    [Markup.button.callback(lang === 'es' ? '❓ FAQ' : '❓ FAQ', 'support_faq')],
+    [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')],
+  ]);
+
+  await ctx.reply(supportText, {
+    parse_mode: 'Markdown',
+    ...keyboard
+  });
+}
+
+/**
+ * Handle deep link to radio (uses ctx.reply instead of editMessageText)
+ */
+async function handleDeepLinkRadio(ctx, lang) {
+  const message = lang === 'es'
+    ? '📻 *PNPtv Radio*\n\n' +
+      '¡Sintoniza nuestra estación de radio comunitaria!\n\n' +
+      '🎵 Música las 24 horas\n' +
+      '🎤 Programas en vivo\n' +
+      '💜 Contenido de la comunidad\n\n' +
+      '_Haz clic en el botón de abajo para escuchar._'
+    : '📻 *PNPtv Radio*\n\n' +
+      'Tune in to our community radio station!\n\n' +
+      '🎵 24/7 Music\n' +
+      '🎤 Live shows\n' +
+      '💜 Community content\n\n' +
+      '_Click the button below to listen._';
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback(lang === 'es' ? '📻 Escuchar Radio' : '📻 Listen to Radio', 'menu_radio')],
     [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')]
   ]);
 
