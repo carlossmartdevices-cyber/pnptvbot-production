@@ -1640,6 +1640,127 @@ let registerAdminHandlers = (bot) => {
     }
   });
 
+  // Use AI text as-is (English)
+  bot.action('broadcast_use_ai_en', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery('✅ Texto guardado');
+
+      const aiDraft = ctx.session.temp?.aiDraft;
+      if (!aiDraft) {
+        await ctx.reply('❌ No hay borrador AI. Intenta de nuevo.');
+        return;
+      }
+
+      if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
+      ctx.session.temp.broadcastData.textEn = aiDraft;
+      ctx.session.temp.aiDraft = null;
+      await updateBroadcastStep(ctx, 'text_es');
+      await ctx.saveSession();
+
+      await ctx.reply(
+        '🇪🇸 *Paso 3/5: Texto en Español*\n\n'
+        + 'Por favor escribe el mensaje en español que quieres enviar:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_es')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error in broadcast_use_ai_en:', error);
+    }
+  });
+
+  // Use AI text as-is (Spanish)
+  bot.action('broadcast_use_ai_es', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery('✅ Texto guardado');
+
+      const aiDraft = ctx.session.temp?.aiDraft;
+      if (!aiDraft) {
+        await ctx.reply('❌ No hay borrador AI. Intenta de nuevo.');
+        return;
+      }
+
+      if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
+      ctx.session.temp.broadcastData.textEs = aiDraft;
+      ctx.session.temp.aiDraft = null;
+      await updateBroadcastStep(ctx, 'buttons');
+
+      // Ensure buttons array is properly initialized
+      if (!ctx.session.temp.broadcastData.buttons || !Array.isArray(ctx.session.temp.broadcastData.buttons)) {
+        ctx.session.temp.broadcastData.buttons = buildDefaultBroadcastButtons(getLanguage(ctx));
+      }
+      await ctx.saveSession();
+
+      await showBroadcastButtonsPicker(ctx);
+    } catch (error) {
+      logger.error('Error in broadcast_use_ai_es:', error);
+    }
+  });
+
+  // Edit AI text manually (English)
+  bot.action('broadcast_edit_ai_en', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery();
+
+      await updateBroadcastStep(ctx, 'edit_ai_en');
+      await ctx.saveSession();
+
+      const aiDraft = ctx.session.temp?.aiDraft || '';
+      await ctx.reply(
+        '✏️ *Editar texto (EN)*\n\n' +
+        'Envía el texto editado que quieres usar:\n\n' +
+        `_Texto actual:_\n\`\`\`\n${aiDraft}\n\`\`\``,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('⬅️ Volver', 'broadcast_ai_en')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error in broadcast_edit_ai_en:', error);
+    }
+  });
+
+  // Edit AI text manually (Spanish)
+  bot.action('broadcast_edit_ai_es', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery();
+
+      await updateBroadcastStep(ctx, 'edit_ai_es');
+      await ctx.saveSession();
+
+      const aiDraft = ctx.session.temp?.aiDraft || '';
+      await ctx.reply(
+        '✏️ *Editar texto (ES)*\n\n' +
+        'Envía el texto editado que quieres usar:\n\n' +
+        `_Texto actual:_\n\`\`\`\n${aiDraft}\n\`\`\``,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('⬅️ Volver', 'broadcast_ai_es')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error in broadcast_edit_ai_es:', error);
+    }
+  });
+
   bot.action('broadcast_add_custom_link', async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
@@ -2803,38 +2924,26 @@ let registerAdminHandlers = (bot) => {
         });
 
         if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
-        if (isEn) {
-          ctx.session.temp.broadcastData.textEn = result;
-          await updateBroadcastStep(ctx, 'text_es');
-          await ctx.reply(
-            `✅ *AI draft saved (EN)*\n\n${result}`,
-            { parse_mode: 'Markdown' },
-          );
-          await ctx.reply(
-            '🇪🇸 *Paso 3/5: Texto en Español*\n\n'
-            + 'Por favor escribe el mensaje en español que quieres enviar:',
-            {
-              parse_mode: 'Markdown',
-              ...Markup.inlineKeyboard([
-                [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_es')],
-                [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
-              ]),
-            },
-          );
-        } else {
-          ctx.session.temp.broadcastData.textEs = result;
-          await updateBroadcastStep(ctx, 'buttons');
-          // Ensure buttons array is properly initialized
-          if (!ctx.session.temp.broadcastData.buttons || !Array.isArray(ctx.session.temp.broadcastData.buttons)) {
-            ctx.session.temp.broadcastData.buttons = buildDefaultBroadcastButtons(getLanguage(ctx));
-          }
-          await ctx.saveSession();
-          await ctx.reply(
-            `✅ *AI draft saved (ES)*\n\n${result}`,
-            { parse_mode: 'Markdown' },
-          );
-          await showBroadcastButtonsPicker(ctx);
-        }
+
+        // Store AI result temporarily for review/edit
+        ctx.session.temp.aiDraft = result;
+        ctx.session.temp.aiDraftLang = isEn ? 'en' : 'es';
+        await updateBroadcastStep(ctx, isEn ? 'review_ai_en' : 'review_ai_es');
+        await ctx.saveSession();
+
+        await ctx.reply(
+          `🤖 *AI Draft (${isEn ? 'EN' : 'ES'}):*\n\n${result}\n\n` +
+          `_Puedes usar este texto o editarlo manualmente._`,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('✅ Usar texto', isEn ? 'broadcast_use_ai_en' : 'broadcast_use_ai_es')],
+              [Markup.button.callback('✏️ Editar manualmente', isEn ? 'broadcast_edit_ai_en' : 'broadcast_edit_ai_es')],
+              [Markup.button.callback('🔄 Regenerar', isEn ? 'broadcast_ai_en' : 'broadcast_ai_es')],
+              [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            ]),
+          },
+        );
       } catch (error) {
         logger.error('[GROK] Error generating AI broadcast text:', {
           error: error.message,
@@ -2845,6 +2954,65 @@ let registerAdminHandlers = (bot) => {
         // Reset to previous step on error using fallback logic
         const fallbackStep = getFallbackStep(ctx.session.temp.broadcastStep);
         await updateBroadcastStep(ctx, fallbackStep);
+      }
+      return;
+    }
+
+    // Handle edited AI text (English)
+    if (ctx.session.temp?.broadcastStep === 'edit_ai_en') {
+      try {
+        const editedText = ctx.message.text;
+        if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
+        ctx.session.temp.broadcastData.textEn = editedText;
+        ctx.session.temp.aiDraft = null;
+        await updateBroadcastStep(ctx, 'text_es');
+        await ctx.saveSession();
+
+        await ctx.reply(
+          `✅ *Texto editado guardado (EN)*\n\n${editedText}`,
+          { parse_mode: 'Markdown' },
+        );
+        await ctx.reply(
+          '🇪🇸 *Paso 3/5: Texto en Español*\n\n'
+          + 'Por favor escribe el mensaje en español que quieres enviar:',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_es')],
+              [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            ]),
+          },
+        );
+      } catch (error) {
+        logger.error('Error saving edited AI text (EN):', error);
+        await ctx.reply('❌ Error al guardar. Intenta de nuevo.');
+      }
+      return;
+    }
+
+    // Handle edited AI text (Spanish)
+    if (ctx.session.temp?.broadcastStep === 'edit_ai_es') {
+      try {
+        const editedText = ctx.message.text;
+        if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
+        ctx.session.temp.broadcastData.textEs = editedText;
+        ctx.session.temp.aiDraft = null;
+        await updateBroadcastStep(ctx, 'buttons');
+
+        // Ensure buttons array is properly initialized
+        if (!ctx.session.temp.broadcastData.buttons || !Array.isArray(ctx.session.temp.broadcastData.buttons)) {
+          ctx.session.temp.broadcastData.buttons = buildDefaultBroadcastButtons(getLanguage(ctx));
+        }
+        await ctx.saveSession();
+
+        await ctx.reply(
+          `✅ *Texto editado guardado (ES)*\n\n${editedText}`,
+          { parse_mode: 'Markdown' },
+        );
+        await showBroadcastButtonsPicker(ctx);
+      } catch (error) {
+        logger.error('Error saving edited AI text (ES):', error);
+        await ctx.reply('❌ Error al guardar. Intenta de nuevo.');
       }
       return;
     }
