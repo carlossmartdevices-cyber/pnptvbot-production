@@ -1783,10 +1783,11 @@ let registerAdminHandlers = (bot) => {
       await ctx.saveSession();
 
       const aiDraft = ctx.session.temp?.aiDraft || '';
+      const safeDraft = sanitize.telegramMarkdown(aiDraft);
       await ctx.reply(
         '✏️ *Editar texto (EN)*\n\n' +
         'Envía el texto editado que quieres usar:\n\n' +
-        `_Texto actual:_\n\`\`\`\n${aiDraft}\n\`\`\``,
+        `_Texto actual:_\n\`\`\`\n${safeDraft}\n\`\`\``,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -1811,10 +1812,11 @@ let registerAdminHandlers = (bot) => {
       await ctx.saveSession();
 
       const aiDraft = ctx.session.temp?.aiDraft || '';
+      const safeDraft = sanitize.telegramMarkdown(aiDraft);
       await ctx.reply(
         '✏️ *Editar texto (ES)*\n\n' +
         'Envía el texto editado que quieres usar:\n\n' +
-        `_Texto actual:_\n\`\`\`\n${aiDraft}\n\`\`\``,
+        `_Texto actual:_\n\`\`\`\n${safeDraft}\n\`\`\``,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -3030,6 +3032,7 @@ let registerAdminHandlers = (bot) => {
     if (ctx.session.temp?.broadcastStep === 'edit_ai_en') {
       try {
         const editedText = ctx.message.text;
+        const safeEditedText = sanitize.telegramMarkdown(editedText);
         if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
         ctx.session.temp.broadcastData.textEn = editedText;
         ctx.session.temp.aiDraft = null;
@@ -3037,7 +3040,7 @@ let registerAdminHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(
-          `✅ *Texto editado guardado (EN)*\n\n${editedText}`,
+          `✅ *Texto editado guardado (EN)*\n\n${safeEditedText}`,
           { parse_mode: 'Markdown' },
         );
         await ctx.reply(
@@ -3062,6 +3065,7 @@ let registerAdminHandlers = (bot) => {
     if (ctx.session.temp?.broadcastStep === 'edit_ai_es') {
       try {
         const editedText = ctx.message.text;
+        const safeEditedText = sanitize.telegramMarkdown(editedText);
         if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
         ctx.session.temp.broadcastData.textEs = editedText;
         ctx.session.temp.aiDraft = null;
@@ -3074,7 +3078,7 @@ let registerAdminHandlers = (bot) => {
         await ctx.saveSession();
 
         await ctx.reply(
-          `✅ *Texto editado guardado (ES)*\n\n${editedText}`,
+          `✅ *Texto editado guardado (ES)*\n\n${safeEditedText}`,
           { parse_mode: 'Markdown' },
         );
         await showBroadcastButtonsPicker(ctx);
