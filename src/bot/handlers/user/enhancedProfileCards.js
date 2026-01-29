@@ -131,13 +131,13 @@ const registerEnhancedProfileCards = (bot) => {
     }
     
     // Line 4: Looking For - Tribe
-    if (user.lookingFor) {
-      text += `👀 ${isSpanish ? 'Buscando' : 'Looking for'}: ${user.lookingFor}`;
+    if (user.looking_for) {
+      text += `👀 ${isSpanish ? 'Buscando' : 'Looking for'}: ${user.looking_for}`;
     }
     
     // Add tribe if available
     if (user.tribe) {
-      if (user.lookingFor) text += ` | `;
+      if (user.looking_for) text += ` | `;
       text += `🏷️ ${user.tribe}`;
     }
     
