@@ -22,6 +22,7 @@ const SUPPORTED_PAYMENT_APPS = [
   'Zelle',
   'Wise',
   'Revolut',
+  'MercadoPago',
   // Crypto wallets/exchanges (specific options - cannot use AllWallets/AllExchanges)
   'Coinbase',
   'Binance',
@@ -163,16 +164,7 @@ const createDaimoPayment = async ({
       display: {
         intent: description || `PNPtv ${planId} Subscription`,
         // P2P payment apps + crypto (specific options only)
-        paymentOptions: [
-          'CashApp',
-          'Venmo',
-          'Zelle',
-          'Wise',
-          'Revolut',
-          'Coinbase',
-          'Binance',
-          'MiniPay',
-        ],
+        paymentOptions: config.supportedPaymentApps,
         preferredChains: [config.chainId],
       },
       destination: {
