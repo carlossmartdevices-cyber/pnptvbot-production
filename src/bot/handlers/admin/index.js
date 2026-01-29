@@ -440,6 +440,7 @@ async function renderBroadcastStep(ctx) {
   if (step === 'review_ai_en' || step === 'review_ai_es') {
     const isEn = step === 'review_ai_en';
     const aiDraft = ctx.session.temp?.aiDraft || '';
+    const safeDraft = sanitize.telegramMarkdown(aiDraft);
 
     if (!aiDraft) {
       await updateBroadcastStep(ctx, isEn ? 'text_en' : 'text_es');
@@ -448,7 +449,7 @@ async function renderBroadcastStep(ctx) {
     }
 
     await ctx.editMessageText(
-      `🤖 *AI Draft (${isEn ? 'EN' : 'ES'}):*\n\n${aiDraft}\n\n` +
+      `🤖 *AI Draft (${isEn ? 'EN' : 'ES'}):*\n\n${safeDraft}\n\n` +
       '_Puedes usar este texto o editarlo manualmente._',
       {
         parse_mode: 'Markdown',
@@ -466,11 +467,12 @@ async function renderBroadcastStep(ctx) {
   if (step === 'edit_ai_en' || step === 'edit_ai_es') {
     const isEn = step === 'edit_ai_en';
     const aiDraft = ctx.session.temp?.aiDraft || '';
+    const safeDraft = sanitize.telegramMarkdown(aiDraft);
 
     await ctx.editMessageText(
       `✏️ *Editar texto (${isEn ? 'EN' : 'ES'})*\n\n` +
       'Envía el texto editado que quieres usar:\n\n' +
-      (aiDraft ? `_Texto actual:_\n\`\`\`\n${aiDraft}\n\`\`\`` : '_Texto actual:_ (vacío)'),
+      (aiDraft ? `_Texto actual:_\n\`\`\`\n${safeDraft}\n\`\`\`` : '_Texto actual:_ (vacío)'),
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
@@ -2996,8 +2998,9 @@ let registerAdminHandlers = (bot) => {
         await updateBroadcastStep(ctx, isEn ? 'review_ai_en' : 'review_ai_es');
         await ctx.saveSession();
 
+        const safeResult = sanitize.telegramMarkdown(result);
         await ctx.reply(
-          `🤖 *AI Draft (${isEn ? 'EN' : 'ES'}):*\n\n${result}\n\n` +
+          `🤖 *AI Draft (${isEn ? 'EN' : 'ES'}):*\n\n${safeResult}\n\n` +
           `_Puedes usar este texto o editarlo manualmente._`,
           {
             parse_mode: 'Markdown',
