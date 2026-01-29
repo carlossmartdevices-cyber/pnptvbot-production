@@ -9,6 +9,50 @@ const { getLanguage } = require('../../utils/helpers');
  * Main nearby menu is in nearbyUnified.js
  * @param {Telegraf} bot - Bot instance
  */
+const PLACE_CATEGORY_GROUPS = [
+  {
+    key: 'nightlife',
+    emoji: '🌙',
+    nameEn: 'Nightlife & Adult',
+    nameEs: 'Vida Nocturna y +18',
+    slugs: ['bars_clubs', 'adult_entertainment', 'cruising', 'saunas'],
+  },
+  {
+    key: 'wellness',
+    emoji: '🧘',
+    nameEn: 'Wellness & Support',
+    nameEs: 'Bienestar y Apoyo',
+    slugs: ['wellness', 'help_centers'],
+  },
+  {
+    key: 'pnp',
+    emoji: '💨',
+    nameEn: 'PNP Friendly',
+    nameEs: 'PNP Amigable',
+    slugs: ['pnp_friendly'],
+  },
+];
+
+const getPlaceCategoryGroups = (categories, lang) => {
+  const categoryBySlug = new Map(categories.map(cat => [cat.slug, cat]));
+
+  return PLACE_CATEGORY_GROUPS.map(group => {
+    const groupCategories = group.slugs
+      .map(slug => categoryBySlug.get(slug))
+      .filter(Boolean);
+    const categoryIds = groupCategories.map(cat => cat.id);
+    const requiresAgeVerification = groupCategories.some(cat => cat.requiresAgeVerification);
+
+    return {
+      ...group,
+      name: lang === 'es' ? group.nameEs : group.nameEn,
+      categories: groupCategories,
+      categoryIds,
+      requiresAgeVerification,
+    };
+  }).filter(group => group.categoryIds.length > 0);
+};
+
 const registerNearbyPlacesHandlers = (bot) => {
 
   // ===========================================
@@ -21,11 +65,12 @@ const registerNearbyPlacesHandlers = (bot) => {
 
       // Filter out community_business as it has its own menu
       const placeCategories = categories.filter(c => c.slug !== 'community_business');
+      const groupedCategories = getPlaceCategoryGroups(placeCategories, lang);
 
-      const buttons = placeCategories.map(cat => [
+      const buttons = groupedCategories.map(group => [
         Markup.button.callback(
-          `${cat.emoji} ${cat.name}${cat.requiresAgeVerification ? ' 🔞' : ''}`,
-          `nearby_cat_${cat.id}`
+          `${group.emoji} ${group.name}${group.requiresAgeVerification ? ' 🔞' : ''}`,
+          `nearby_place_group_${group.key}`
         ),
       ]);
 
@@ -34,10 +79,10 @@ const registerNearbyPlacesHandlers = (bot) => {
       await ctx.editMessageText(
         lang === 'es'
           ? '📍 *Lugares de Interés*\n\n' +
-            'Selecciona una categoría:\n\n' +
+            'Selecciona un grupo:\n\n' +
             '_🔞 indica que requiere verificación de edad_'
           : '📍 *Places of Interest*\n\n' +
-            'Select a category:\n\n' +
+            'Select a group:\n\n' +
             '_🔞 indicates age verification required_',
         {
           parse_mode: 'Markdown',
@@ -52,6 +97,79 @@ const registerNearbyPlacesHandlers = (bot) => {
   // ===========================================
   // PLACES BY CATEGORY
   // ===========================================
+  bot.action(/^nearby_place_group_(\w+)$/, async (ctx) => {
+    try {
+      const groupKey = ctx.match[1];
+      const lang = getLanguage(ctx);
+      const userId = ctx.from.id.toString();
+      const categories = await NearbyPlaceService.getCategories(lang);
+      const placeCategories = categories.filter(c => c.slug !== 'community_business');
+      const groupedCategories = getPlaceCategoryGroups(placeCategories, lang);
+      const group = groupedCategories.find(item => item.key === groupKey);
+
+      if (!group) {
+        await ctx.answerCbQuery(lang === 'es' ? 'Grupo inválido' : 'Invalid group', {
+          show_alert: true,
+        });
+        return;
+      }
+
+      if (group.requiresAgeVerification) {
+        const user = await UserService.getOrCreateFromContext(ctx);
+        if (!user.ageVerified) {
+          await ctx.answerCbQuery(
+            lang === 'es' ? '🔞 Requiere verificación de edad' : '🔞 Age verification required',
+            { show_alert: true }
+          );
+          return;
+        }
+      }
+
+      await ctx.editMessageText(
+        lang === 'es' ? '🔍 _Buscando lugares..._' : '🔍 _Searching for places..._',
+        { parse_mode: 'Markdown' }
+      );
+
+      const result = await NearbyPlaceService.getNearbyPlacesOfInterest(
+        userId,
+        50,
+        group.categoryIds
+      );
+
+      if (!result.success && result.error === 'no_location') {
+        await showNoLocationMessage(ctx, lang, 'nearby_places_categories');
+        return;
+      }
+
+      if (result.places.length === 0) {
+        await ctx.editMessageText(
+          lang === 'es'
+            ? `${group.emoji} *${group.name}*\n\n` +
+              'No hay lugares en este grupo cerca de ti.\n\n' +
+              '¿Conoces alguno? ¡Propónlo!'
+            : `${group.emoji} *${group.name}*\n\n` +
+              'No places in this group near you.\n\n' +
+              'Know any? Suggest one!',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(
+                lang === 'es' ? '➕ Proponer Lugar' : '➕ Suggest Place',
+                `submit_place_group_${group.key}`
+              )],
+              [Markup.button.callback('🔙 Back', 'nearby_places_categories')],
+            ]),
+          }
+        );
+        return;
+      }
+
+      await showPlacesList(ctx, result.places, lang, 'place', null, group.key);
+    } catch (error) {
+      logger.error('Error showing places by group:', error);
+    }
+  });
+
   bot.action(/^nearby_cat_(\d+)$/, async (ctx) => {
     try {
       const categoryId = parseInt(ctx.match[1]);
@@ -203,6 +321,55 @@ const registerNearbyPlacesHandlers = (bot) => {
     }
   });
 
+  bot.action(/^submit_place_group_(\w+)$/, async (ctx) => {
+    try {
+      const groupKey = ctx.match[1];
+      const lang = getLanguage(ctx);
+      const categories = await NearbyPlaceService.getCategories(lang);
+      const placeCategories = categories.filter(c => c.slug !== 'community_business');
+      const groupedCategories = getPlaceCategoryGroups(placeCategories, lang);
+      const group = groupedCategories.find(item => item.key === groupKey);
+
+      if (!group) {
+        await ctx.answerCbQuery(lang === 'es' ? 'Grupo inválido' : 'Invalid group', {
+          show_alert: true,
+        });
+        return;
+      }
+
+      if (group.requiresAgeVerification) {
+        const user = await UserService.getOrCreateFromContext(ctx);
+        if (!user.ageVerified) {
+          await ctx.answerCbQuery(
+            lang === 'es' ? '🔞 Requiere verificación de edad' : '🔞 Age verification required',
+            { show_alert: true }
+          );
+          return;
+        }
+      }
+
+      const buttons = group.categories.map(cat => [
+        Markup.button.callback(
+          `${cat.emoji} ${cat.name}`,
+          `submit_select_cat_${cat.id}`
+        ),
+      ]);
+      buttons.push([Markup.button.callback('❌ Cancel', 'show_nearby')]);
+
+      await ctx.editMessageText(
+        lang === 'es'
+          ? '📂 *Selecciona la categoría:*'
+          : '📂 *Select the category:*',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard(buttons),
+        }
+      );
+    } catch (error) {
+      logger.error('Error selecting group category:', error);
+    }
+  });
+
   // Select type
   bot.action('submit_type_business', async (ctx) => {
     try {
@@ -257,19 +424,20 @@ const registerNearbyPlacesHandlers = (bot) => {
       // Show category selection
       const categories = await NearbyPlaceService.getCategories(lang);
       const placeCategories = categories.filter(c => c.slug !== 'community_business');
+      const groupedCategories = getPlaceCategoryGroups(placeCategories, lang);
 
-      const buttons = placeCategories.map(cat => [
+      const buttons = groupedCategories.map(group => [
         Markup.button.callback(
-          `${cat.emoji} ${cat.name}`,
-          `submit_select_cat_${cat.id}`
+          `${group.emoji} ${group.name}${group.requiresAgeVerification ? ' 🔞' : ''}`,
+          `submit_place_group_${group.key}`
         ),
       ]);
       buttons.push([Markup.button.callback('❌ Cancel', 'show_nearby')]);
 
       await ctx.editMessageText(
         lang === 'es'
-          ? '📂 *Selecciona la categoría:*'
-          : '📂 *Select the category:*',
+          ? '📂 *Selecciona el grupo:*'
+          : '📂 *Select the group:*',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard(buttons),
@@ -847,7 +1015,7 @@ const registerNearbyPlacesHandlers = (bot) => {
   // ===========================================
   // HELPER FUNCTIONS
   // ===========================================
-  async function showPlacesList(ctx, places, lang, type, categoryId) {
+  async function showPlacesList(ctx, places, lang, type, categoryId, categoryGroupKey = null) {
     try {
       let headerText = type === 'business'
         ? (lang === 'es' ? '🏪 *Negocios Comunitarios*' : '🏪 *Community Businesses*')
@@ -875,6 +1043,11 @@ const registerNearbyPlacesHandlers = (bot) => {
         buttons.push([Markup.button.callback(
           lang === 'es' ? '➕ Proponer Negocio' : '➕ Suggest Business',
           'submit_business_profile'
+        )]);
+      } else if (categoryGroupKey) {
+        buttons.push([Markup.button.callback(
+          lang === 'es' ? '➕ Proponer Lugar' : '➕ Suggest Place',
+          `submit_place_group_${categoryGroupKey}`
         )]);
       } else if (categoryId) {
         buttons.push([Markup.button.callback(

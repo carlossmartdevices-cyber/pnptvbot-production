@@ -50,7 +50,11 @@ class NearbyPlaceService {
    */
   static async getNearbyPlacesOfInterest(userId, radiusKm = 50, categoryId = null) {
     const filters = { placeType: 'place_of_interest' };
-    if (categoryId) filters.categoryId = categoryId;
+    if (Array.isArray(categoryId) && categoryId.length > 0) {
+      filters.categoryIds = categoryId;
+    } else if (categoryId) {
+      filters.categoryId = categoryId;
+    }
     return this.getNearbyPlaces(userId, radiusKm, filters);
   }
 
