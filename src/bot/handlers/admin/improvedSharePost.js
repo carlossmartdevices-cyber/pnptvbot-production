@@ -1061,8 +1061,8 @@ const registerImprovedSharePostHandlers = (bot) => {
       // Send to each destination directly
       for (const dest of destinations) {
         try {
+          // No parse_mode to avoid Markdown conflicts with AI-generated text
           const options = {
-            parse_mode: 'Markdown',
             reply_markup: kb.reply_markup,
           };
 
