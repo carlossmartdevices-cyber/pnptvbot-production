@@ -87,9 +87,9 @@ const registerImprovedSharePostHandlers = (bot) => {
   };
 
   // Available destinations - dynamically configured from env
-  // NOTE: General topic removed - thread ID 1 doesn't work for this forum group
   const SHARE_DESTINATIONS = [
     { id: 'prime', chatId: process.env.PRIME_CHANNEL_ID, threadId: null, name: '💎 Prime Channel', type: 'channel' },
+    { id: 'general', chatId: process.env.GROUP_ID, threadId: 1, name: '💬 General', type: 'topic' },
     { id: 'walloffame', chatId: process.env.GROUP_ID, threadId: parseTopicId(process.env.WALL_OF_FAME_TOPIC_ID), name: '🏆 Wall Of Fame', type: 'topic' },
   ].filter(d => d && d.chatId);
 
@@ -470,14 +470,14 @@ const registerImprovedSharePostHandlers = (bot) => {
       const hasMedia = !!ctx.session.temp.sharePostData?.mediaFileId;
       const maxLen = hasMedia ? 1024 : 4096;
 
+      // Send without parse_mode to avoid conflicts with AI-generated text
       await ctx.reply(
-        '✏️ *Editar Texto*\n\n' +
+        '✏️ Editar Texto\n\n' +
         'Texto actual generado por AI:\n\n' +
-        '```\n' + aiDraft + '\n```\n\n' +
+        '---\n' + aiDraft + '\n---\n\n' +
         '📝 Envia tu versión editada del texto.\n' +
-        '_(Máximo ' + maxLen + ' caracteres)_',
+        '(Máximo ' + maxLen + ' caracteres)',
         {
-          parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('⬅️ Volver', 'share_post_back_to_review')],
             [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
@@ -513,11 +513,11 @@ const registerImprovedSharePostHandlers = (bot) => {
       await ctx.saveSession();
 
       await ctx.answerCbQuery();
+      // No parse_mode to avoid conflicts with AI-generated text
       await ctx.editMessageText(
-        '🤖 *AI Draft (Bilingual):*\n\n' + aiDraft + '\n\n' +
-        '_Puedes usar este texto o editarlo manualmente._',
+        '🤖 AI Draft (Bilingual):\n\n' + aiDraft + '\n\n' +
+        'Puedes usar este texto o editarlo manualmente.',
         {
-          parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('✅ Usar texto', 'share_post_use_ai')],
             [Markup.button.callback('✏️ Editar manualmente', 'share_post_edit_ai')],
@@ -567,12 +567,11 @@ const registerImprovedSharePostHandlers = (bot) => {
           ctx.session.temp.sharePostStep = 'review_ai_share';
           await ctx.saveSession();
 
-          // Show preview with edit options
+          // Show preview with edit options (no parse_mode to avoid conflicts with AI-generated text)
           await ctx.reply(
-            '🤖 *AI Draft (Bilingual):*\n\n' + result.combined + '\n\n' +
-            '_Puedes usar este texto o editarlo manualmente._',
+            '🤖 AI Draft (Bilingual):\n\n' + result.combined + '\n\n' +
+            'Puedes usar este texto o editarlo manualmente.',
             {
-              parse_mode: 'Markdown',
               ...Markup.inlineKeyboard([
                 [Markup.button.callback('✅ Usar texto', 'share_post_use_ai')],
                 [Markup.button.callback('✏️ Editar manualmente', 'share_post_edit_ai')],
