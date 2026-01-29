@@ -15,6 +15,7 @@ const DaimoConfig = require('../../config/daimo');
 const VisaCybersourceService = require('./visaCybersourceService');
 const PaymentNotificationService = require('./paymentNotificationService');
 const MessageTemplates = require('./messageTemplates');
+const sanitize = require('../../utils/sanitizer');
 
 class PaymentService {
     /**
@@ -1121,14 +1122,17 @@ class PaymentService {
         : (language === 'es' ? 'Sin vencimiento (Lifetime)' : 'No expiration (Lifetime)');
 
       // Build message in user's language
+      const safePlanName = sanitize.telegramMarkdown(planName);
+      const safeExpiryDateStr = sanitize.telegramMarkdown(expiryDateStr);
+
       const messageEs = [
         '🎉 *¡Membresía Premium Activada!*',
         '',
         '✅ Tu suscripción ha sido activada exitosamente.',
         '',
         '📋 *Detalles:*',
-        `💎 Plan: ${planName}`,
-        `📅 Válido hasta: ${expiryDateStr}`,
+        `💎 Plan: ${safePlanName}`,
+        `📅 Válido hasta: ${safeExpiryDateStr}`,
         '',
         '🌟 *¡Bienvenido a PRIME!*',
         '',
@@ -1148,8 +1152,8 @@ class PaymentService {
         '✅ Your subscription has been activated successfully.',
         '',
         '📋 *Details:*',
-        `💎 Plan: ${planName}`,
-        `📅 Valid until: ${expiryDateStr}`,
+        `💎 Plan: ${safePlanName}`,
+        `📅 Valid until: ${safeExpiryDateStr}`,
         '',
         '🌟 *Welcome to PRIME!*',
         '',
