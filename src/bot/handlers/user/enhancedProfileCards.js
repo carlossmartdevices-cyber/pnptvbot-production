@@ -303,14 +303,15 @@ const registerEnhancedProfileCards = (bot) => {
       buttons.push(inlineMenuButtons);
     }
     
-    // Contact button (separate row)
+    // Contact button (separate row) - always show, use username or user ID deep link
     if (user.username) {
+      const cleanUsername = user.username.replace(/^@/, '');
       buttons.push([
-        Markup.button.url(`💬 ${isSpanish ? 'Mensaje' : 'Message'}`, `https://t.me/${user.username}`)
+        Markup.button.url(`💬 ${isSpanish ? 'Enviar DM' : 'Send DM'}`, `https://t.me/${cleanUsername}`)
       ]);
-    } else {
+    } else if (user.id) {
       buttons.push([
-        Markup.button.url(`💬 ${isSpanish ? 'Mensaje' : 'Message'}`, `tg://user?id=${userId}`)
+        Markup.button.url(`💬 ${isSpanish ? 'Enviar DM' : 'Send DM'}`, `tg://user?id=${user.id}`)
       ]);
     }
     

@@ -12,6 +12,33 @@ const { getLanguage } = require('../../utils/helpers');
  */
 const registerNearbyUnifiedHandlers = (bot) => {
 
+  // Helper function to safely edit message or send new if editing fails
+  // This handles cases where the original message is a photo or was deleted
+  const safeEditOrReply = async (ctx, text, options) => {
+    try {
+      // Check if the message is a photo message (has photo or media)
+      const message = ctx.callbackQuery?.message;
+      if (message && (message.photo || message.video || message.animation || message.document)) {
+        // Can't edit photo message text, delete and send new
+        await ctx.deleteMessage().catch(() => {});
+        return await ctx.reply(text, options);
+      }
+
+      return await ctx.editMessageText(text, options);
+    } catch (error) {
+      // If edit fails (message deleted, no text, etc.), try sending new message
+      if (error.message?.includes('there is no text') ||
+          error.message?.includes('message to edit not found') ||
+          error.message?.includes('message can\'t be edited')) {
+        try {
+          await ctx.deleteMessage().catch(() => {});
+        } catch (e) { /* ignore delete errors */ }
+        return await ctx.reply(text, options);
+      }
+      throw error;
+    }
+  };
+
   // Helper function for showing the main nearby menu
   const showNearbyMenu = async (ctx, isNewMessage = false) => {
     try {
@@ -53,7 +80,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
       if (isNewMessage) {
         await ctx.reply(headerText, { parse_mode: 'Markdown', ...keyboard });
       } else {
-        await ctx.editMessageText(headerText, { parse_mode: 'Markdown', ...keyboard });
+        await safeEditOrReply(ctx, headerText, { parse_mode: 'Markdown', ...keyboard });
       }
     } catch (error) {
       logger.error('Error showing nearby menu:', error);
@@ -93,15 +120,22 @@ const registerNearbyUnifiedHandlers = (bot) => {
       await ctx.answerCbQuery(message);
 
       // Update the button text
-      await ctx.editMessageReplyMarkup({
-        inline_keyboard: ctx.callbackQuery.message.reply_markup.inline_keyboard.map(row => {
-          if (row[0]?.callback_data === 'toggle_location_sharing') {
-            const newStatus = newSetting ? '🟢 ON' : '🔴 OFF';
-            return [Markup.button.callback(`📍 Location: ${newStatus}`, 'toggle_location_sharing')];
-          }
-          return row;
-        })
-      });
+      try {
+        await ctx.editMessageReplyMarkup({
+          inline_keyboard: ctx.callbackQuery.message.reply_markup.inline_keyboard.map(row => {
+            if (row[0]?.callback_data === 'toggle_location_sharing') {
+              const newStatus = newSetting ? '🟢 ON' : '🔴 OFF';
+              return [Markup.button.callback(`📍 Location: ${newStatus}`, 'toggle_location_sharing')];
+            }
+            return row;
+          })
+        });
+      } catch (editError) {
+        // Ignore "message is not modified" errors (can happen with rapid clicks)
+        if (!editError.message?.includes('message is not modified')) {
+          throw editError;
+        }
+      }
     } catch (error) {
       logger.error('Error toggling location sharing:', error);
       const lang = getLanguage(ctx);
@@ -127,7 +161,8 @@ const registerNearbyUnifiedHandlers = (bot) => {
               'You need to share your location first!\n\n' +
               '_Go to your Profile → Location to share your location._';
 
-        await ctx.editMessageText(
+        await safeEditOrReply(
+          ctx,
           noLocationText,
           {
             parse_mode: 'Markdown',
@@ -140,7 +175,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
         return;
       }
 
-      await ctx.editMessageText(lang === 'es' ? '🔍 _Buscando todo cerca de ti..._' : '🔍 _Searching everything near you..._', { parse_mode: 'Markdown' });
+      await safeEditOrReply(ctx, lang === 'es' ? '🔍 _Buscando todo cerca de ti..._' : '🔍 _Searching everything near you..._', { parse_mode: 'Markdown' });
 
       // Get all nearby items
       const [nearbyUsers, nearbyBusinesses, nearbyPlaces] = await Promise.all([
@@ -201,7 +236,8 @@ const registerNearbyUnifiedHandlers = (bot) => {
               'Nothing found near you 😔\n\n' +
               '_Try again later or suggest a place!_';
 
-        await ctx.editMessageText(
+        await safeEditOrReply(
+          ctx,
           noResultsText,
           {
             parse_mode: 'Markdown',
@@ -222,15 +258,15 @@ const registerNearbyUnifiedHandlers = (bot) => {
           `Found **${allItems.length}** items nearby 👀\n\n`;
 
       const buttons = [];
-      
+
       // Show top 15 items
       allItems.slice(0, 15).forEach((item, index) => {
         const displayEmoji = item.categoryEmoji || item.emoji;
         const distance = item.distance.toFixed(1);
         const displayName = item.name.length > 20 ? item.name.substring(0, 20) + '...' : item.name;
-        
+
         message += `${index + 1}. ${displayEmoji} **${displayName}** - _${distance} km_\n`;
-        
+
         // Create action based on type
         if (item.type === 'user') {
           const label = item.username ? `@${item.username}` : displayName;
@@ -248,7 +284,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
 
       buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
-      await ctx.editMessageText(message, {
+      await safeEditOrReply(ctx, message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard(buttons),
       });
@@ -277,7 +313,8 @@ const registerNearbyUnifiedHandlers = (bot) => {
               'You need to share your location first!\n\n' +
               '_Go to your Profile → Location to share your location._';
 
-        await ctx.editMessageText(
+        await safeEditOrReply(
+          ctx,
           noLocationText,
           {
             parse_mode: 'Markdown',
@@ -290,7 +327,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
         return;
       }
 
-      await ctx.editMessageText(lang === 'es' ? '🔍 _Buscando miembros cerca..._' : '🔍 _Searching for members..._', { parse_mode: 'Markdown' });
+      await safeEditOrReply(ctx, lang === 'es' ? '🔍 _Buscando miembros cerca..._' : '🔍 _Searching for members..._', { parse_mode: 'Markdown' });
 
       const nearbyUsers = await UserService.getNearbyUsers(userId, 10);
 
@@ -304,7 +341,8 @@ const registerNearbyUnifiedHandlers = (bot) => {
               'No members found nearby 😔\n\n' +
               '_Try a larger radius!_';
 
-        await ctx.editMessageText(
+        await safeEditOrReply(
+          ctx,
           noResultsText,
           {
             parse_mode: 'Markdown',
@@ -341,7 +379,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
 
       buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
-      await ctx.editMessageText(message, {
+      await safeEditOrReply(ctx, message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard(buttons),
       });
@@ -358,12 +396,13 @@ const registerNearbyUnifiedHandlers = (bot) => {
       const lang = getLanguage(ctx);
       const userId = ctx.from.id.toString();
 
-      await ctx.editMessageText(lang === 'es' ? '🔍 _Buscando negocios..._' : '🔍 _Searching for businesses..._', { parse_mode: 'Markdown' });
+      await safeEditOrReply(ctx, lang === 'es' ? '🔍 _Buscando negocios..._' : '🔍 _Searching for businesses..._', { parse_mode: 'Markdown' });
 
       const result = await NearbyPlaceService.getNearbyBusinesses(userId, 10);
 
       if (!result.success && result.error === 'no_location') {
-        await ctx.editMessageText(
+        await safeEditOrReply(
+          ctx,
           lang === 'es'
             ? '`📍 Ubicación Requerida`\n\n' +
               'Necesitas compartir tu ubicación primero.'
@@ -381,7 +420,8 @@ const registerNearbyUnifiedHandlers = (bot) => {
       }
 
       if (result.places.length === 0) {
-        await ctx.editMessageText(
+        await safeEditOrReply(
+          ctx,
           lang === 'es'
             ? '🏪 *Negocios Comunitarios*\n\n' +
               'No hay negocios cerca de ti aún.\n\n' +
@@ -420,7 +460,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
       buttons.push([Markup.button.callback(lang === 'es' ? '➕ Proponer Negocio' : '➕ Suggest Business', 'submit_place_business')]);
       buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
-      await ctx.editMessageText(headerText, {
+      await safeEditOrReply(ctx, headerText, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard(buttons),
       });
@@ -435,12 +475,13 @@ const registerNearbyUnifiedHandlers = (bot) => {
       const lang = getLanguage(ctx);
       const userId = ctx.from.id.toString();
 
-      await ctx.editMessageText(lang === 'es' ? '🔍 _Buscando lugares..._' : '🔍 _Searching for places..._', { parse_mode: 'Markdown' });
+      await safeEditOrReply(ctx, lang === 'es' ? '🔍 _Buscando lugares..._' : '🔍 _Searching for places..._', { parse_mode: 'Markdown' });
 
       const result = await NearbyPlaceService.getNearbyPlacesOfInterest(userId, 10);
 
       if (!result.success && result.error === 'no_location') {
-        await ctx.editMessageText(
+        await safeEditOrReply(
+          ctx,
           lang === 'es'
             ? '`📍 Ubicación Requerida`\n\n' +
               'Necesitas compartir tu ubicación primero.'
@@ -458,7 +499,8 @@ const registerNearbyUnifiedHandlers = (bot) => {
       }
 
       if (result.places.length === 0) {
-        await ctx.editMessageText(
+        await safeEditOrReply(
+          ctx,
           lang === 'es'
             ? '📍 *Lugares de Interés*\n\n' +
               'No hay lugares cerca de ti aún.\n\n' +
@@ -497,7 +539,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
       buttons.push([Markup.button.callback(lang === 'es' ? '➕ Proponer Lugar' : '➕ Suggest Place', 'submit_place_start')]);
       buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
-      await ctx.editMessageText(headerText, {
+      await safeEditOrReply(ctx, headerText, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard(buttons),
       });
@@ -558,16 +600,37 @@ const registerNearbyUnifiedHandlers = (bot) => {
       }
 
       try {
+        // Build the profile link - prefer username, fallback to user ID deep link
+        let profileLink;
         if (targetUser.username) {
-          const chatUrl = `https://t.me/${targetUser.username}`;
-          await ctx.answerCbQuery(t('openingChat', lang), {
-            url: chatUrl,
-          });
+          // Clean the username (remove @ if present)
+          const cleanUsername = targetUser.username.replace(/^@/, '');
+          profileLink = `https://t.me/${encodeURIComponent(cleanUsername)}`;
         } else {
-          await ctx.answerCbQuery(t('userNoUsername', lang), {
-            show_alert: true,
-          });
+          // Use Telegram deep link for users without username
+          profileLink = `tg://user?id=${targetUserId}`;
         }
+
+        // Show message with link - answerCbQuery url option only works for games/web apps
+        await ctx.answerCbQuery(
+          lang === 'es'
+            ? `💬 Haz click para chatear con ${targetUser.firstName || 'este usuario'}`
+            : `💬 Click to chat with ${targetUser.firstName || 'this user'}`,
+          { show_alert: false }
+        );
+
+        // Send a helpful message with the DM link button
+        const messageText = lang === 'es'
+          ? `💬 Para enviar un mensaje a **${targetUser.firstName || 'este usuario'}**, usa el botón abajo:`
+          : `💬 To send a message to **${targetUser.firstName || 'this user'}**, use the button below:`;
+
+        await ctx.reply(messageText, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.url(lang === 'es' ? '💬 Abrir Chat' : '💬 Open Chat', profileLink)],
+            [Markup.button.callback(lang === 'es' ? '🔙 Volver' : '🔙 Back', 'show_nearby')]
+          ])
+        });
       } catch (chatError) {
         logger.error('Error opening chat:', chatError);
         await ctx.answerCbQuery(t('errorOpeningChat', lang), {
@@ -655,13 +718,13 @@ const registerNearbyUnifiedHandlers = (bot) => {
           });
         } catch (photoError) {
           logger.error('Error sending photo:', photoError);
-          await ctx.editMessageText(detailsText, {
+          await safeEditOrReply(ctx, detailsText, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard(buttons),
           });
         }
       } else {
-        await ctx.editMessageText(detailsText, {
+        await safeEditOrReply(ctx, detailsText, {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard(buttons),
         });

@@ -75,8 +75,12 @@ const buildMemberProfileInlineKeyboard = (user, lang = 'en') => {
   const buttons = [];
   const isSpanish = lang === 'es';
 
+  // Always show DM button - use username if available, otherwise use tg://user deep link
   if (user.username) {
     buttons.push([Markup.button.url(isSpanish ? '💬 Enviar DM' : '💬 Send DM', `https://t.me/${user.username}`)]);
+  } else if (user.id) {
+    // Fallback for users without username - use Telegram deep link
+    buttons.push([Markup.button.url(isSpanish ? '💬 Enviar DM' : '💬 Send DM', `tg://user?id=${user.id}`)]);
   }
 
   if (user.twitter) {
