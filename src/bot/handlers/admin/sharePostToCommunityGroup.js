@@ -9,6 +9,7 @@ const communityPostService = require('../../services/communityPostService');
 const PermissionService = require('../../services/permissionService');
 const { getLanguage } = require('../../utils/helpers');
 const GrokService = require('../../services/grokService');
+const sanitize = require('../../../utils/sanitizer');
 const broadcastUtils = require('../../utils/broadcastUtils'); // Changed from ../../utils/ to ../../utils/ (no change needed - already correct)
 const performanceUtils = require('../../utils/performanceUtils');
 const uxUtils = require('../../utils/uxUtils');
@@ -691,7 +692,8 @@ const registerCommunityPostHandlers = (bot) => {
           ctx.session.temp.communityPostData.text = result;
           ctx.session.temp.communityPostStep = 'select_buttons';
           await ctx.saveSession();
-          await ctx.reply(`✅ *AI draft saved*\n\n${result}`, { parse_mode: 'Markdown' });
+          const safeResult = sanitize.telegramMarkdown(result);
+          await ctx.reply(`✅ *AI draft saved*\n\n${safeResult}`, { parse_mode: 'Markdown' });
           await showButtonSelectionStep(ctx);
         } catch (e) {
           logger.error('AI generation error:', e);

@@ -10,6 +10,21 @@ function getGrokConfig() {
   };
 }
 
+function getModeConfig(mode, hasMedia) {
+  const modeDefaults = {
+    broadcast: { temperature: 0.65, defaultTokens: 260, mediaTokens: 200 },
+    sharePost: { temperature: 0.65, defaultTokens: 300, mediaTokens: 240 },
+    post: { temperature: 0.7, defaultTokens: 320, mediaTokens: 260 },
+  };
+
+  const fallback = { temperature: 0.7, defaultTokens: 300, mediaTokens: 240 };
+  const selected = modeDefaults[mode] || fallback;
+  return {
+    temperature: selected.temperature,
+    maxTokens: hasMedia ? selected.mediaTokens : selected.defaultTokens,
+  };
+}
+
 function buildSystemPrompt({ mode, language }) {
   const langHint = language ? `Language: ${language}` : '';
   const pnptvContext = `PNPtv context:
@@ -31,7 +46,7 @@ function buildSystemPrompt({ mode, language }) {
   return `You write concise Telegram post copy for the PNPtv community.\n${langHint}\n${pnptvContext}\nOutput rules:\n- Return ONLY the final message text.\n- No quotes, no markdown headings.\n- CRITICAL: Keep text UNDER 450 characters total.\n- End with a clear CTA.`;
 }
 
-async function chat({ mode, language, prompt, maxTokens = 300 }) {
+async function chat({ mode, language, prompt, hasMedia = false, maxTokens }) {
   const cfg = getGrokConfig();
   if (!cfg.apiKey) {
     const err = new Error('GROK_API_KEY not configured');
@@ -39,11 +54,19 @@ async function chat({ mode, language, prompt, maxTokens = 300 }) {
     throw err;
   }
 
+  const modeConfig = getModeConfig(mode, hasMedia);
+  const resolvedMaxTokens = Number(maxTokens || modeConfig.maxTokens || 300);
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), cfg.timeoutMs);
 
   try {
-    logger.info('Calling Grok API', { model: cfg.model, maxTokens });
+    logger.info('Calling Grok API', {
+      model: cfg.model,
+      maxTokens: resolvedMaxTokens,
+      mode,
+      hasMedia
+    });
     
     const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -53,8 +76,8 @@ async function chat({ mode, language, prompt, maxTokens = 300 }) {
       },
       body: JSON.stringify({
         model: cfg.model,
-        temperature: 0.7,
-        max_tokens: maxTokens,
+        temperature: modeConfig.temperature,
+        max_tokens: resolvedMaxTokens,
         messages: [
           { role: 'system', content: buildSystemPrompt({ mode, language }) },
           { role: 'user', content: prompt },
