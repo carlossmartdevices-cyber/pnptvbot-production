@@ -103,6 +103,7 @@ class EmailService {
             html,
             text,
             from = this.from,
+            bcc,
             attachments = []
         } = options;
 
@@ -129,6 +130,7 @@ class EmailService {
             const mailOptions = {
                 from,
                 to,
+                ...(bcc ? { bcc } : {}),
                 subject,
                 html,
                 text: text || this.stripHtml(html),
@@ -212,7 +214,9 @@ class EmailService {
         return await this.send({
             to: email,
             subject: 'PNP Latino Update! Noticias de PNP Latino',
-            html
+            html,
+            from: 'noreply@pnptv.app',
+            bcc: 'hello@easybots.store'
         });
     }
 
