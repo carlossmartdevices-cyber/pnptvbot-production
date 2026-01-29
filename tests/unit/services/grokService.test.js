@@ -1,25 +1,15 @@
 const GrokService = require('../../../src/bot/services/grokService');
 
-// Mock the chat function to return predictable results for testing
-jest.mock('../../../src/bot/services/grokService', () => {
-  const originalModule = jest.requireActual('../../../src/bot/services/grokService');
-  
-  return {
-    ...originalModule,
-    chat: jest.fn().mockImplementation(({ language }) => {
-      if (language === 'Spanish') {
-        return Promise.resolve('Título sexy\n---\nDescripción del video con gancho\n---\n#categoría1#categoría2\n---\nArtista1, Artista2');
-      } else {
-        return Promise.resolve('Sexy title\n---\nVideo description with hook\n---\n#category1#category2\n---\nArtist1, Artist2');
-      }
-    }),
-  };
-});
-
 describe('GrokService - generateSharePost', () => {
   beforeEach(() => {
     // Clear all mocks before each test
     jest.clearAllMocks();
+    GrokService.chat = jest.fn().mockImplementation(({ language }) => {
+      if (language === 'Spanish') {
+        return Promise.resolve('[Título sexy] [Descripción del video con gancho] #categoría1#categoría2');
+      }
+      return Promise.resolve('[Sexy title] [Video description with hook] #category1#category2');
+    });
   });
 
   test('should generate share post in single line format', async () => {
