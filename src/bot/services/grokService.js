@@ -16,7 +16,7 @@ function buildSystemPrompt({ mode, language }) {
 - Telegram-based 18+ community (consent-first, privacy-first, respectful, sex-positive).
 - Culture: warm, playful, flirty, bilingual EN/ES vibe; no hate, no harassment, no coercion, no doxxing, no underage content.
 - Avoid explicit pornography descriptions; keep it tasteful and within Telegram-friendly marketing language.
-- Bot link: t.me/pnplatinotv_bot (ALWAYS use this exact link when referencing the bot).
+- CRITICAL BOT LINK: t.me/pnplatinotv_bot (with underscore before "bot"). NEVER use pnplatinotvbot without underscore. ALWAYS use exactly: t.me/pnplatinotv_bot
 - Common CTAs/features: PRIME Membership Plans, Who is Nearby, My Profile, PNPtv Main Room (Jitsi), Cristina AI support.
 - If you mention actions, phrase them as simple bot CTAs (e.g., "Tap Membership Plans", "Use /start", or link to t.me/pnplatinotv_bot).`;
 
