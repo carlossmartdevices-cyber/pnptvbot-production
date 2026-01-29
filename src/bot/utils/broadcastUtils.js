@@ -30,25 +30,25 @@ function getStandardButtonOptions(language = 'en') {
   const translations = {
     en: {
       home: '🏠 Back to home menu',
-      plans: '💎 Membership Plans',
+      plans: '💎 Subscribe to PRIME',
       main_room: '🎥 PNPtv Main Room',
       hangouts: '🎭 PNPtv Hangouts',
       videorama: '🎬 PNPtv Videorama',
       pnp_live: '📺 PNP Television Live',
-      nearby: '📍 Who is Nearby?',
-      profile: '👤 My Profile',
+      nearby: '📍 Check Who is Nearby',
+      profile: '📝 Edit My Profile',
       cristina: '🤖 Cristina AI',
       all_features: '✨ All Features',
     },
     es: {
       home: '🏠 Volver al menú principal',
-      plans: '💎 Planes de Membresía',
+      plans: '💎 Suscribirse a PRIME',
       main_room: '🎥 Sala Principal PNPtv',
       hangouts: '🎭 PNPtv Hangouts',
       videorama: '🎬 PNPtv Videorama',
       pnp_live: '📺 PNP Television Live',
-      nearby: '📍 ¿Quién está cerca?',
-      profile: '👤 Mi Perfil',
+      nearby: '📍 Ver quién está cerca',
+      profile: '📝 Editar mi perfil',
       cristina: '🤖 Cristina AI',
       all_features: '✨ Todas las Funciones',
     }
@@ -64,7 +64,7 @@ function getStandardButtonOptions(language = 'en') {
     { key: 'videorama', text: t.videorama, type: 'url', target: videoramaUrl },
     { key: 'pnp_live', text: t.pnp_live, type: 'url', target: `https://t.me/${botUsername}?start=pnp_live` },
     { key: 'nearby', text: t.nearby, type: 'url', target: `https://t.me/${botUsername}?start=nearby` },
-    { key: 'profile', text: t.profile, type: 'url', target: `https://t.me/${botUsername}?start=profile` },
+    { key: 'profile', text: t.profile, type: 'url', target: `https://t.me/${botUsername}?start=edit_profile` },
     { key: 'cristina', text: t.cristina, type: 'url', target: `https://t.me/${botUsername}?start=cristina` },
     { key: 'all_features', text: t.all_features, type: 'url', target: `https://t.me/${botUsername}?start=home` },
   ];
@@ -209,11 +209,12 @@ function sanitizeInput(text, maxLength = 4096) {
 function buildDefaultBroadcastButtons(lang = 'en') {
   const options = getStandardButtonOptions();
 
-  // Return only home and profile buttons by default
-  const homeButton = options.find(opt => opt.key === 'home');
+  // Return broadcast ads buttons by default
+  const plansButton = options.find(opt => opt.key === 'plans');
   const profileButton = options.find(opt => opt.key === 'profile');
+  const nearbyButton = options.find(opt => opt.key === 'nearby');
 
-  return [homeButton, profileButton].filter(Boolean);
+  return [plansButton, profileButton, nearbyButton].filter(Boolean);
 }
 
 /**

@@ -8,6 +8,77 @@ const { getLanguage, safeReplyOrEdit } = require('../../utils/helpers');
 const DaimoConfig = require('../../../config/daimo');
 const registerActivationHandlers = require('./activation');
 
+const showSubscriptionPlans = async (ctx, options = {}) => {
+  const { forceReply = false, respectAdminViewMode = false } = options;
+  const lang = getLanguage(ctx);
+
+  const isAdminViewingAsFree = respectAdminViewMode && ctx.session?.adminViewMode === 'free';
+  const hasActiveSubscription = !isAdminViewingAsFree
+    && await UserService.hasActiveSubscription(ctx.from.id);
+
+  const sendMessage = async (message, extraOptions) => {
+    if (forceReply || !ctx.callbackQuery) {
+      return ctx.reply(message, extraOptions);
+    }
+    return safeReplyOrEdit(ctx, message, extraOptions);
+  };
+
+  if (hasActiveSubscription) {
+    const warningMsg = lang === 'es'
+      ? '⚠️ **Ya tienes una suscripción activa**\n\n'
+        + 'No puedes comprar una nueva suscripción mientras tengas una activa.\n\n'
+        + 'Para evitar pagos duplicados, por favor espera a que tu suscripción actual expire o contacta soporte para cambiar tu plan.'
+      : '⚠️ **You already have an active subscription**\n\n'
+        + 'You cannot purchase a new subscription while you have an active one.\n\n'
+        + 'To avoid double payments, please wait until your current subscription expires or contact support to change your plan.';
+
+    return sendMessage(
+      warningMsg,
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(t('back', lang), 'back_to_main')]
+        ])
+      }
+    );
+  }
+
+  const plans = await PlanModel.getAll();
+
+  // Header with internationalization
+  let message = `${t('subscriptionHeader', lang)}\n`;
+  message += `${t('subscriptionDivider', lang)}\n\n`;
+  message += `${t('subscriptionDescription', lang)}\n\n\n`;
+
+  const buttons = [];
+  plans.forEach((plan) => {
+    const planName = plan.display_name || plan.name;
+    const durationText = plan.duration_days || plan.duration;
+    const price = parseFloat(plan.price);
+
+    // Format buttons with i18n
+    let buttonText;
+    if (plan.is_lifetime) {
+      // Lifetime Pass without duration
+      buttonText = `${planName} | $${price.toFixed(2)}`;
+    } else {
+      // Regular plans with duration
+      buttonText = `${planName} | ${durationText} ${t('days', lang)} | $${price.toFixed(2)}`;
+    }
+
+    buttons.push([
+      Markup.button.callback(buttonText, `select_plan_${plan.id}`),
+    ]);
+  });
+
+  buttons.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
+
+  return sendMessage(message, {
+    parse_mode: 'Markdown',
+    ...Markup.inlineKeyboard(buttons)
+  });
+};
+
 /**
  * Payment handlers
  * @param {Telegraf} bot - Bot instance
@@ -19,67 +90,7 @@ const registerPaymentHandlers = (bot) => {
   // /subscribe command - shows subscription plans directly
   bot.command('subscribe', async (ctx) => {
     try {
-      const lang = getLanguage(ctx);
-
-      // Check if user already has an active subscription
-      const hasActiveSubscription = await UserService.hasActiveSubscription(ctx.from.id);
-
-      if (hasActiveSubscription) {
-        const warningMsg = lang === 'es'
-          ? '⚠️ **Ya tienes una suscripción activa**\n\n'
-            + 'No puedes comprar una nueva suscripción mientras tengas una activa.\n\n'
-            + 'Para evitar pagos duplicados, por favor espera a que tu suscripción actual expire o contacta soporte para cambiar tu plan.'
-          : '⚠️ **You already have an active subscription**\n\n'
-            + 'You cannot purchase a new subscription while you have an active one.\n\n'
-            + 'To avoid double payments, please wait until your current subscription expires or contact support to change your plan.';
-
-        await ctx.reply(
-          warningMsg,
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(t('back', lang), 'back_to_main')]
-            ])
-          }
-        );
-        return;
-      }
-
-      const plans = await PlanModel.getAll();
-
-      // Header with internationalization
-      let message = `${t('subscriptionHeader', lang)}\n`;
-      message += `${t('subscriptionDivider', lang)}\n\n`;
-      message += `${t('subscriptionDescription', lang)}\n\n\n`;
-
-      const buttons = [];
-      plans.forEach((plan) => {
-        const planName = plan.display_name || plan.name;
-        const durationText = plan.duration_days || plan.duration;
-        const price = parseFloat(plan.price);
-
-        // Format buttons with i18n
-        let buttonText;
-        if (plan.is_lifetime) {
-          // Lifetime Pass without duration
-          buttonText = `${planName} | $${price.toFixed(2)}`;
-        } else {
-          // Regular plans with duration
-          buttonText = `${planName} | ${durationText} ${t('days', lang)} | $${price.toFixed(2)}`;
-        }
-
-        buttons.push([
-          Markup.button.callback(buttonText, `select_plan_${plan.id}`),
-        ]);
-      });
-
-      buttons.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
-
-      await ctx.reply(message, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(buttons)
-      });
-
+      await showSubscriptionPlans(ctx, { forceReply: true });
       logger.info('User viewed subscription plans via /subscribe', { userId: ctx.from.id });
     } catch (error) {
       logger.error('Error in /subscribe command:', error);
@@ -91,62 +102,7 @@ const registerPaymentHandlers = (bot) => {
   bot.action('show_subscription_plans', async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const lang = getLanguage(ctx);
-
-      // Check if user already has an active subscription
-      // Skip this check if admin is in "View as Free" mode
-      const isAdminViewingAsFree = ctx.session?.adminViewMode === 'free';
-      const hasActiveSubscription = !isAdminViewingAsFree && await UserService.hasActiveSubscription(ctx.from.id);
-
-      if (hasActiveSubscription) {
-        const warningMsg = lang === 'es'
-          ? '⚠️ **Ya tienes una suscripción activa**\n\n'
-            + 'No puedes comprar una nueva suscripción mientras tengas una activa.\n\n'
-            + 'Para evitar pagos duplicados, por favor espera a que tu suscripción actual expire o contacta soporte para cambiar tu plan.'
-          : '⚠️ **You already have an active subscription**\n\n'
-            + 'You cannot purchase a new subscription while you have an active one.\n\n'
-            + 'To avoid double payments, please wait until your current subscription expires or contact support to change your plan.';
-
-        await safeReplyOrEdit(ctx, warningMsg, {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'back_to_main')]
-          ])
-        });
-        return;
-      }
-      
-      const plans = await PlanModel.getAll();
-
-      // Header with internationalization
-      let message = `${t('subscriptionHeader', lang)}\n`;
-      message += `${t('subscriptionDivider', lang)}\n\n`;
-      message += `${t('subscriptionDescription', lang)}\n\n\n`;
-
-      const buttons = [];
-      plans.forEach((plan) => {
-        const planName = plan.display_name || plan.name;
-        const durationText = plan.duration_days || plan.duration;
-        const price = parseFloat(plan.price);
-
-        // Format buttons with i18n
-        let buttonText;
-        if (plan.is_lifetime) {
-          // Lifetime Pass without duration
-          buttonText = `${planName} | $${price.toFixed(2)}`;
-        } else {
-          // Regular plans with duration
-          buttonText = `${planName} | ${durationText} ${t('days', lang)} | $${price.toFixed(2)}`;
-        }
-
-        buttons.push([
-          Markup.button.callback(buttonText, `select_plan_${plan.id}`),
-        ]);
-      });
-
-      buttons.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
-
-      const sentMessage = await safeReplyOrEdit(ctx, message, Markup.inlineKeyboard(buttons));
+      const sentMessage = await showSubscriptionPlans(ctx, { respectAdminViewMode: true });
 
       // Auto-delete after 30 seconds of inactivity (for group chats)
       if (sentMessage && (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup')) {
@@ -522,3 +478,4 @@ const registerPaymentHandlers = (bot) => {
 };
 
 module.exports = registerPaymentHandlers;
+module.exports.showSubscriptionPlans = showSubscriptionPlans;

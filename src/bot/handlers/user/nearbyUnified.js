@@ -5,88 +5,88 @@ const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 
+// Helper function to safely edit message or send new if editing fails
+// This handles cases where the original message is a photo or was deleted
+const safeEditOrReply = async (ctx, text, options) => {
+  try {
+    // Check if the message is a photo message (has photo or media)
+    const message = ctx.callbackQuery?.message;
+    if (message && (message.photo || message.video || message.animation || message.document)) {
+      // Can't edit photo message text, delete and send new
+      await ctx.deleteMessage().catch(() => {});
+      return await ctx.reply(text, options);
+    }
+
+    return await ctx.editMessageText(text, options);
+  } catch (error) {
+    // If edit fails (message deleted, no text, etc.), try sending new message
+    if (error.message?.includes('there is no text') ||
+        error.message?.includes('message to edit not found') ||
+        error.message?.includes('message can\'t be edited')) {
+      try {
+        await ctx.deleteMessage().catch(() => {});
+      } catch (e) { /* ignore delete errors */ }
+      return await ctx.reply(text, options);
+    }
+    throw error;
+  }
+};
+
+const showNearbyMenu = async (ctx, options = {}) => {
+  const { isNewMessage = false } = options;
+
+  try {
+    const lang = getLanguage(ctx);
+    const user = await UserService.getOrCreateFromContext(ctx);
+    const locationStatus = user.locationSharingEnabled ? '🟢 ON' : '🔴 OFF';
+
+    const headerText = lang === 'es'
+      ? '`🔥 PNP Nearby`\n\n' +
+        'Explora todo lo que está cerca de ti:\n' +
+        '👥 Miembros\n' +
+        '🏪 Negocios\n' +
+        '📍 Lugares de interés\n\n' +
+        '_Selecciona una categoría o ve todo:_'
+      : '`🔥 PNP Nearby`\n\n' +
+        'Explore everything near you:\n' +
+        '👥 Members\n' +
+        '🏪 Businesses\n' +
+        '📍 Places of interest\n\n' +
+        '_Select a category or see all:_';
+
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback(lang === 'es' ? '🌐 Todo' : '🌐 All', 'nearby_all'),
+        Markup.button.callback(lang === 'es' ? '👥 Miembros' : '👥 Members', 'nearby_users'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '🏪 Negocios' : '🏪 Businesses', 'nearby_businesses'),
+        Markup.button.callback(lang === 'es' ? '📍 Lugares' : '📍 Places', 'nearby_places_categories'),
+      ],
+      [Markup.button.callback(`📍 Location: ${locationStatus}`, 'toggle_location_sharing')],
+      [
+        Markup.button.callback(lang === 'es' ? '➕ Proponer' : '➕ Suggest', 'submit_place_start'),
+        Markup.button.callback(lang === 'es' ? '📋 Mis Propuestas' : '📋 My Submissions', 'my_place_submissions'),
+      ],
+      [Markup.button.callback('🔙 Back', 'back_to_main')],
+    ]);
+
+    if (isNewMessage || !ctx.callbackQuery) {
+      await ctx.reply(headerText, { parse_mode: 'Markdown', ...keyboard });
+    } else {
+      await safeEditOrReply(ctx, headerText, { parse_mode: 'Markdown', ...keyboard });
+    }
+  } catch (error) {
+    logger.error('Error showing nearby menu:', error);
+  }
+};
+
 /**
  * Unified Nearby handlers - MAIN nearby handler file
  * All nearby functionality is consolidated here to avoid duplicate callbacks
  * @param {Telegraf} bot - Bot instance
  */
 const registerNearbyUnifiedHandlers = (bot) => {
-
-  // Helper function to safely edit message or send new if editing fails
-  // This handles cases where the original message is a photo or was deleted
-  const safeEditOrReply = async (ctx, text, options) => {
-    try {
-      // Check if the message is a photo message (has photo or media)
-      const message = ctx.callbackQuery?.message;
-      if (message && (message.photo || message.video || message.animation || message.document)) {
-        // Can't edit photo message text, delete and send new
-        await ctx.deleteMessage().catch(() => {});
-        return await ctx.reply(text, options);
-      }
-
-      return await ctx.editMessageText(text, options);
-    } catch (error) {
-      // If edit fails (message deleted, no text, etc.), try sending new message
-      if (error.message?.includes('there is no text') ||
-          error.message?.includes('message to edit not found') ||
-          error.message?.includes('message can\'t be edited')) {
-        try {
-          await ctx.deleteMessage().catch(() => {});
-        } catch (e) { /* ignore delete errors */ }
-        return await ctx.reply(text, options);
-      }
-      throw error;
-    }
-  };
-
-  // Helper function for showing the main nearby menu
-  const showNearbyMenu = async (ctx, isNewMessage = false) => {
-    try {
-      const lang = getLanguage(ctx);
-      const user = await UserService.getOrCreateFromContext(ctx);
-      const locationStatus = user.locationSharingEnabled ? '🟢 ON' : '🔴 OFF';
-
-      const headerText = lang === 'es'
-        ? '`🔥 PNP Nearby`\n\n' +
-          'Explora todo lo que está cerca de ti:\n' +
-          '👥 Miembros\n' +
-          '🏪 Negocios\n' +
-          '📍 Lugares de interés\n\n' +
-          '_Selecciona una categoría o ve todo:_'
-        : '`🔥 PNP Nearby`\n\n' +
-          'Explore everything near you:\n' +
-          '👥 Members\n' +
-          '🏪 Businesses\n' +
-          '📍 Places of interest\n\n' +
-          '_Select a category or see all:_';
-
-      const keyboard = Markup.inlineKeyboard([
-        [
-          Markup.button.callback(lang === 'es' ? '🌐 Todo' : '🌐 All', 'nearby_all'),
-          Markup.button.callback(lang === 'es' ? '👥 Miembros' : '👥 Members', 'nearby_users'),
-        ],
-        [
-          Markup.button.callback(lang === 'es' ? '🏪 Negocios' : '🏪 Businesses', 'nearby_businesses'),
-          Markup.button.callback(lang === 'es' ? '📍 Lugares' : '📍 Places', 'nearby_places_categories'),
-        ],
-        [Markup.button.callback(`📍 Location: ${locationStatus}`, 'toggle_location_sharing')],
-        [
-          Markup.button.callback(lang === 'es' ? '➕ Proponer' : '➕ Suggest', 'submit_place_start'),
-          Markup.button.callback(lang === 'es' ? '📋 Mis Propuestas' : '📋 My Submissions', 'my_place_submissions'),
-        ],
-        [Markup.button.callback('🔙 Back', 'back_to_main')],
-      ]);
-
-      if (isNewMessage) {
-        await ctx.reply(headerText, { parse_mode: 'Markdown', ...keyboard });
-      } else {
-        await safeEditOrReply(ctx, headerText, { parse_mode: 'Markdown', ...keyboard });
-      }
-    } catch (error) {
-      logger.error('Error showing nearby menu:', error);
-    }
-  };
-
   // Main unified nearby menu - handles all entry point action names for compatibility
   bot.action(['show_nearby_unified', 'show_nearby', 'show_nearby_menu'], async (ctx) => {
     await showNearbyMenu(ctx);
@@ -790,3 +790,4 @@ const registerNearbyUnifiedHandlers = (bot) => {
 };
 
 module.exports = registerNearbyUnifiedHandlers;
+module.exports.showNearbyMenu = showNearbyMenu;

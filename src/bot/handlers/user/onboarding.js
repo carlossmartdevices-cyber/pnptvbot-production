@@ -5,6 +5,9 @@ const { isValidEmail } = require('../../../utils/validation');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const { showMainMenu } = require('./menu');
+const { showEditProfileMenu } = require('./profile');
+const paymentHandlers = require('../payments');
+const { showNearbyMenu } = require('./nearbyUnified');
 const supportRoutingService = require('../../services/supportRoutingService');
 
 /**
@@ -113,6 +116,25 @@ If you have any questions, use /support to contact us.`;
         }
 
         return;
+      }
+
+      if (startParam && user.onboardingComplete) {
+        const lang = getLanguage(ctx);
+
+        if (startParam === 'plans' || startParam === 'show_subscription_plans') {
+          await paymentHandlers.showSubscriptionPlans(ctx, { forceReply: true });
+          return;
+        }
+
+        if (startParam === 'nearby' || startParam === 'show_nearby' || startParam === 'show_nearby_unified') {
+          await showNearbyMenu(ctx, { isNewMessage: true });
+          return;
+        }
+
+        if (startParam === 'edit_profile') {
+          await showEditProfileMenu(ctx, lang);
+          return;
+        }
       }
 
       if (startParam && startParam.startsWith('viewprofile_')) {
