@@ -112,7 +112,10 @@ class NearbyPlaceModel {
       // Round for cache key
       const roundedLat = Math.round(lat * 100) / 100;
       const roundedLng = Math.round(lng * 100) / 100;
-      const cacheKey = `nearby_places:${roundedLat},${roundedLng}:${radiusKm}:${filters.categoryId || 'all'}:${filters.placeType || 'all'}`;
+      const categoryKey = Array.isArray(filters.categoryIds)
+        ? filters.categoryIds.slice().sort((a, b) => a - b).join(',')
+        : (filters.categoryId || 'all');
+      const cacheKey = `nearby_places:${roundedLat},${roundedLng}:${radiusKm}:${categoryKey}:${filters.placeType || 'all'}`;
 
       const fetchNearby = async () => {
         // Calculate bounding box for SQL pre-filtering
@@ -144,7 +147,10 @@ class NearbyPlaceModel {
         let paramIndex = 5;
 
         // Apply filters
-        if (filters.categoryId) {
+        if (Array.isArray(filters.categoryIds) && filters.categoryIds.length > 0) {
+          sql += ` AND p.category_id = ANY($${paramIndex++})`;
+          params.push(filters.categoryIds);
+        } else if (filters.categoryId) {
           sql += ` AND p.category_id = $${paramIndex++}`;
           params.push(filters.categoryId);
         }
