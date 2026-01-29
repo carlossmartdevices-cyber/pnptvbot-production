@@ -225,7 +225,7 @@ async function handleSetupRecurring(ctx) {
     const isSpanish = user?.language?.startsWith('es');
 
     // Get monthly plan
-    const plans = await PlanModel.getAll();
+    const plans = await PlanModel.getPublicPlans();
     const monthlyPlan = plans.find(p => p.duration === 30 || p.id?.includes('monthly'));
 
     if (!monthlyPlan) {
