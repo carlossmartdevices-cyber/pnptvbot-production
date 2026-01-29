@@ -101,81 +101,59 @@ const registerEnhancedProfileCards = (bot) => {
   function buildEnhancedMemberProfileCard(user, lang) {
     const isSpanish = lang === 'es';
     
-    // Calculate profile completion percentage
-    const completion = calculateProfileCompletion(user);
-    const completionBar = getCompletionBar(completion);
-    
-    // Determine user tier and badge
-    const tierInfo = getUserTierInfo(user);
-    
-    // Build the profile card
+    // Build the profile card - only include user-submitted information
     let text = '';
     
-    // Header with tier badge
-    text += '`👤 ' + (isSpanish ? 'PERFIL DE MIEMBRO' : 'MEMBER PROFILE') + '`\n\n';
-    text += `${tierInfo.badge} *${escapeMarkdown(getDisplayName(user))}* ${tierInfo.badge}\n`;
+    // Simple header with just the user's name
+    text += '`👤 ' + (isSpanish ? 'PERFIL' : 'PROFILE') + '`\n\n';
+    text += `*${escapeMarkdown(getDisplayName(user))}*\n`;
     
-    // Username and ID
+    // Username only (no Telegram ID)
     if (user.username) {
-      text += `@${user.username} `;
-    }
-    text += `🆔${user.id}\n\n`;
-    
-    // Profile completion
-    text += `📊 *${isSpanish ? 'Completitud' : 'Profile Completion'}: ${completion}%*\n`;
-    text += `${completionBar}\n\n`;
-    
-    // Tier information
-    if (user.subscriptionStatus && user.subscriptionStatus !== 'basic') {
-      text += `🎖️ *${isSpanish ? 'Nivel' : 'Tier'}: ${tierInfo.name}*\n`;
-      text += `💎 *${isSpanish ? 'Beneficios' : 'Benefits'}: ${tierInfo.benefits}*\n\n`;
+      text += `@${user.username}\n\n`;
+    } else {
+      text += '\n';
     }
     
-    // Bio section
+    // Bio section - only if user provided one
     if (user.bio) {
-      text += `📝 *${isSpanish ? 'Bio' : 'About Me'}:\n*\n`;
+      text += `📝 *${isSpanish ? 'Bio' : 'About Me'}:*\n`;
       text += `"${escapeMarkdown(user.bio)}"\n\n`;
     }
     
-    // Interests
+    // Interests - only if user provided any
     if (user.interests && user.interests.length > 0) {
-      text += `🎯 *${isSpanish ? 'Intereses' : 'Interests'}:\n*\n`;
+      text += `🎯 *${isSpanish ? 'Intereses' : 'Interests'}:*\n`;
       text += user.interests.map(interest => `• ${escapeMarkdown(interest)}`).join('\n') + '\n\n';
     }
     
-    // Location information
-    if (user.location) {
-      text += `📍 *${isSpanish ? 'Ubicación' : 'Location'}:\n*\n`;
+    // Location information - only if user provided it
+    if (user.location && (user.city || user.country)) {
+      text += `📍 *${isSpanish ? 'Ubicación' : 'Location'}:*\n`;
       if (user.city) text += `🏙️ ${escapeMarkdown(user.city)}\n`;
       if (user.country) text += `🌍 ${escapeMarkdown(user.country)}\n`;
-      text += `📡 ${isSpanish ? 'Compartiendo ubicación' : 'Sharing location'}: ${user.locationSharingEnabled ? '🟢 Sí' : '🔴 No'}\n\n`;
+      text += '\n';
     }
     
-    // Social media links
+    // Social media links - only if user provided any
     const socialLinks = getSocialMediaLinks(user);
     if (socialLinks.length > 0) {
-      text += `🔗 *${isSpanish ? 'Redes Sociales' : 'Social Media'}:\n*\n`;
+      text += `🔗 *${isSpanish ? 'Redes Sociales' : 'Social Media'}:*\n`;
       text += socialLinks.join('\n') + '\n\n';
     }
     
-    // Additional profile information
+    // Additional personal info - only if user provided any
     if (user.age || user.gender || user.lookingFor) {
-      text += `💞 *${isSpanish ? 'Información Personal' : 'Personal Info'}:\n*\n`;
+      text += `💞 *${isSpanish ? 'Información Personal' : 'Personal Info'}:*\n`;
       if (user.age) text += `🎂 ${isSpanish ? 'Edad' : 'Age'}: ${user.age}\n`;
       if (user.gender) text += `👤 ${isSpanish ? 'Género' : 'Gender'}: ${user.gender}\n`;
       if (user.lookingFor) text += `👀 ${isSpanish ? 'Buscando' : 'Looking For'}: ${user.lookingFor}\n\n`;
     }
     
-    // Account information
-    text += `📅 *${isSpanish ? 'Información de Cuenta' : 'Account Info'}:\n*\n`;
-    text += `📆 ${isSpanish ? 'Miembro desde' : 'Member since'}: ${formatDate(user.createdAt)}\n`;
-    text += `⏳ ${isSpanish ? 'Última actividad' : 'Last active'}: ${formatDate(user.lastActive)}\n`;
-    text += `👥 ${isSpanish ? 'Estado' : 'Status'}: ${user.isActive ? '🟢 Activo' : '🔴 Inactivo'}\n\n`;
+    // Simple footer
+    text += `💬 *${isSpanish ? 'Enviar mensaje' : 'Send message'}:* [👉 ${isSpanish ? 'Haz clic aquí' : 'Click here'}]`;
     
-    // Call to action
-    text += getProfileCTA(user, lang);
-    
-    return { text, completion };
+    return { text };
   }
 
   /**
