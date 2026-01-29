@@ -95,15 +95,13 @@ const registerNearbyHandlers = (bot) => {
         const emoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
         message += `${emoji} **${name}** - _${distance} km away_\n`;
 
-        buttons.push([
-          Markup.button.callback(`👁️ View`, `view_user_${user.id}`),
-          Markup.button.callback(`💬 DM ${name}`, `dm_user_${user.id}`),
-        ]);
+        const label = user.username ? `@${user.username}` : name;
+        buttons.push([Markup.button.callback(`View ${label}`, `view_user_${user.id}`)]);
       });
 
       message += lang === 'es'
-        ? '\n_Toca para ver perfil o enviar DM_ 😏'
-        : '\n_Tap to view profile or slide into their DMs_ 😏';
+        ? '\n_Toca para ver el perfil_ 😏'
+        : '\n_Tap to view the profile_ 😏';
 
       buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 

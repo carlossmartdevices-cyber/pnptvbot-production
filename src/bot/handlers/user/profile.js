@@ -5,6 +5,7 @@ const UserModel = require('../../../models/userModel');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput, safeReplyOrEdit } = require('../../utils/helpers');
+const { buildMemberProfileCard, buildMemberProfileInlineKeyboard } = require('../../utils/memberProfileCard');
 
 const GROUP_ID = process.env.GROUP_ID;
 
@@ -832,70 +833,13 @@ const shareProfile = async (ctx) => {
 
     await ctx.answerCbQuery();
 
-    // Build profile card in the same format as nearby members
-    let profileText = '`👤 PROFILE CARD`\n\n';
-
-    const displayName = user.firstName || 'Anonymous';
-    profileText += `**${displayName}**`;
-    if (user.lastName) profileText += ` ${user.lastName}`;
-    profileText += '\n';
-    
-    if (user.username) {
-      profileText += `@${user.username}\n`;
-    }
-
-    profileText += '\n';
-
-    if (user.bio) {
-      profileText += `💭 _"${user.bio}"_\n\n`;
-    }
-
-    // Add tribe and looking_for like in nearby display
-    if (user.tribe) {
-      profileText += `🏳️‍🌈 **Tribe:** ${user.tribe}\n`;
-    }
-    if (user.looking_for) {
-      profileText += `🔎 **Looking For:** ${user.looking_for}\n`;
-    }
-
-    if (user.interests && user.interests.length > 0) {
-      profileText += `🎯 **Into:** ${user.interests.join(', ')}\n\n`;
-    }
-
-    // Location
-    let locationStr = '';
-    if (user.city && user.country) {
-      locationStr = `📍 ${user.city}, ${user.country}`;
-    } else if (user.city) {
-      locationStr = `📍 ${user.city}`;
-    } else if (user.country) {
-      locationStr = `📍 ${user.country}`;
-    }
-    if (locationStr) {
-      profileText += `${locationStr}\n\n`;
-    }
-
-    // Social media
-    const socials = [];
-    if (user.twitter) socials.push(`𝕏 ${user.twitter}`);
-    if (user.instagram) socials.push(`IG ${user.instagram}`);
-    if (user.tiktok) socials.push(`TT ${user.tiktok}`);
-    
-    if (socials.length > 0) {
-      profileText += `🔗 ${socials.join(' • ')}\n\n`;
-    }
-
-    profileText += '_Don\'t be shy... DM! 💬_';
+    const profileText = buildMemberProfileCard(user);
 
     // Keyboard with share options
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.callback(
         lang === 'es' ? '📤 Compartir en Grupo' : '📤 Share to Group',
         'share_to_group'
-      )],
-      [Markup.button.switchToChat(
-        lang === 'es' ? '📨 Enviar a Chat' : '📨 Send to Chat',
-        profileText
       )],
       [Markup.button.callback(t('back', lang), 'show_profile')],
     ]);
@@ -932,84 +876,21 @@ const shareToGroup = async (ctx) => {
       return;
     }
 
-    // Build card with same format as nearby members
-    let profileText = '`👤 PROFILE CARD`\n\n';
+    const profileText = buildMemberProfileCard(user);
 
-    const displayName = user.firstName || 'Anonymous';
-    profileText += `**${displayName}**`;
-    if (user.lastName) profileText += ` ${user.lastName}`;
-    profileText += '\n';
-    
-    if (user.username) {
-      profileText += `@${user.username}\n`;
-    }
-
-    profileText += '\n';
-
-    if (user.bio) {
-      profileText += `💭 _"${user.bio}"_\n\n`;
-    }
-
-    // Add tribe and looking_for
-    if (user.tribe) {
-      profileText += `🏳️‍🌈 **Tribe:** ${user.tribe}\n`;
-    }
-    if (user.looking_for) {
-      profileText += `🔎 **Looking For:** ${user.looking_for}\n`;
-    }
-
-    if (user.interests && user.interests.length > 0) {
-      profileText += `🎯 **Into:** ${user.interests.join(', ')}\n\n`;
-    }
-
-    // Location
-    let locationStr = '';
-    if (user.city && user.country) {
-      locationStr = `📍 ${user.city}, ${user.country}`;
-    } else if (user.city) {
-      locationStr = `📍 ${user.city}`;
-    } else if (user.country) {
-      locationStr = `📍 ${user.country}`;
-    }
-    if (locationStr) {
-      profileText += `${locationStr}\n\n`;
-    }
-
-    profileText += '_Don\'t be shy... DM! 💬_';
-
-    // Build inline keyboard with social media and interests
-    const buttons = [];
-    
-    // Social media buttons
-    if (user.twitter) {
-      buttons.push([Markup.button.url('𝕏 Twitter', `https://twitter.com/${user.twitter}`)]);
-    }
-    if (user.instagram) {
-      buttons.push([Markup.button.url('IG Instagram', `https://instagram.com/${user.instagram}`)]);
-    }
-    if (user.tiktok) {
-      buttons.push([Markup.button.url('TT TikTok', `https://tiktok.com/@${user.tiktok}`)]);
-    }
-    
-    // Add DM button if username available
-    if (user.username) {
-      buttons.push([Markup.button.url('💬 DM', `https://t.me/${user.username}`)]);
-    }
-
-    const keyboard = buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined;
+    const buttons = buildMemberProfileInlineKeyboard(user, lang);
+    const keyboard = buttons.length > 0 ? Markup.inlineKeyboard(buttons) : null;
 
     try {
+      const baseOptions = { parse_mode: 'Markdown' };
+      const sendOptions = keyboard ? { ...baseOptions, ...keyboard } : baseOptions;
       if (user.photoFileId) {
         await ctx.telegram.sendPhoto(GROUP_ID, user.photoFileId, {
           caption: profileText,
-          parse_mode: 'Markdown',
-          ...keyboard
+          ...sendOptions
         });
       } else {
-        await ctx.telegram.sendMessage(GROUP_ID, profileText, {
-          parse_mode: 'Markdown',
-          ...keyboard
-        });
+        await ctx.telegram.sendMessage(GROUP_ID, profileText, sendOptions);
       }
       await ctx.answerCbQuery(lang === 'es' ? '✅ Tarjeta compartida en el grupo!' : '✅ Card shared to group!', { show_alert: true });
     } catch (error) {
