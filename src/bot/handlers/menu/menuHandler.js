@@ -367,7 +367,9 @@ async function handleMenuCommand(ctx) {
  */
 async function handleDeepLinkStart(ctx) {
   try {
-    const startPayload = ctx.startPayload;
+    const rawText = ctx.message?.text || '';
+    const parsedPayload = rawText.split(' ')[1];
+    const startPayload = ctx.startPayload || parsedPayload;
 
     if (!startPayload) {
       // No deep link, show regular menu
