@@ -390,22 +390,6 @@ Choose your plan and get instant access to all premium features:
       roomNotActive: 'This room is not currently active.',
       roomNotFound: 'Room not found.',
     },
-    // Video Rooms
-    zoomTitle: '`🎥 Video Rooms`',
-    createRoom: '➕ Create Room',
-    joinRoom: '▶️ Join Room',
-    myRooms: '📋 My Rooms',
-    enterRoomName: 'Enter room name:',
-    roomPrivacy: 'Room privacy:',
-    publicRoom: '🌐 Public',
-    privateRoom: '🔒 Private',
-    roomDuration: 'Select duration:',
-    duration30: '30 minutes',
-    duration60: '60 minutes',
-    duration120: '2 hours',
-    roomCreated: '🎥 Your call room is ready!\n\n🔗 Join URL: {url}\n\n💡 Share this link with participants.',
-    noActiveRooms: 'No active rooms available.',
-
     // Support
     supportTitle: '`🆘 Help Center`',
     chatWithCristina: '💬 Chat with Cristina (AI)',
@@ -921,23 +905,6 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
       roomNotActive: 'Esta sala no está activa actualmente.',
       roomNotFound: 'Sala no encontrada.',
     },
-    // Video Rooms
-    zoomTitle: '`🎥 Video Rooms`',
-    createRoom: '➕ Crear Sala',
-    joinRoom: '▶️ Unirse a Sala',
-    myRooms: '📋 Mis Salas',
-    enterRoomName: 'Ingresa el nombre de la sala:',
-    roomPrivacy: 'Privacidad de la sala:',
-    publicRoom: '🌐 Pública',
-    privateRoom: '🔒 Privada',
-    roomDuration: 'Selecciona duración:',
-    duration30: '30 minutos',
-    duration60: '60 minutos',
-    duration120: '2 horas',
-    roomCreated: '🎥 ¡Tu sala de video está lista!\n\n🔗 URL de Ingreso: {url}\n\n'
-      + '💡 Comparte este enlace con los participantes.',
-    noActiveRooms: 'No hay salas activas disponibles.',
-
     // Support
     supportTitle: '`🆘 Centro de Ayuda`',
     chatWithCristina: '💬 Chat con Cristina (IA)',

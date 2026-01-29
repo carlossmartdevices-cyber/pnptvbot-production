@@ -20,7 +20,6 @@
     "check:subscriptions": "node scripts/check-user-subscriptions.js",
     "seed": "node scripts/seed.js",
     "validate:env": "node -e \"require('./src/utils/envValidator').validateEnv()\"",
-    "validate:indexes": "node scripts/validate-indexes.js",
     "prestart": ""
   },
   "keywords": [
@@ -37,7 +36,6 @@
     "@aws-sdk/s3-request-presigner": "^3.967.0",
     "@daimo/pay": "^1.19.0",
     "@daimo/pay-common": "^1.19.0",
-    "@google-cloud/firestore": "^7.1.0",
     "@mistralai/mistralai": "^1.10.0",
     "@noble/hashes": "^2.0.1",
     "@sentry/node": "^7.99.0",
@@ -87,8 +85,7 @@
     "validator": "^13.11.0",
     "viem": "^2.22.0",
     "winston": "^3.19.0",
-    "winston-daily-rotate-file": "^4.7.1",
-    "zoomus": "^0.1.5"
+    "winston-daily-rotate-file": "^4.7.1"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.28.5",

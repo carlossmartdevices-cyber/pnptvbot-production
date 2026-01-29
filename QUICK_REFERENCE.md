@@ -20,7 +20,6 @@
 
 - **Media Handlers**: `/home/user/pnptvbot-production/src/bot/handlers/media/index.js`
   - Radio: `media/radio.js`
-  - Zoom: `media/zoom.js`
   - Live: `media/live.js`
   - Support: `media/support.js` (224 lines - includes AI chat)
 
@@ -196,4 +195,3 @@ src/bot/handlers/admin/index.js (add moderation panel)
 src/bot/core/bot.js (register new handlers)
 src/utils/i18n.js (add moderation translations)
 ```
-

@@ -63,7 +63,6 @@ const Collections = {
   BROADCASTS: 'broadcasts',
   ADMIN_LOGS: 'admin_logs',
   LIVE_STREAMS: 'live_streams',
-  ZOOM_ROOMS: 'zoom_rooms',
   SUPPORT_TICKETS: 'support_tickets',
   PAYMENTS: 'payments',
 };

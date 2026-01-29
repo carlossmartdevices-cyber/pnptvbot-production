@@ -11,9 +11,6 @@ const logger = require('./logger');
 const REQUIRED_ENV_VARS = [
   'BOT_TOKEN',
   'BOT_USERNAME',
-  'FIREBASE_PROJECT_ID',
-  'FIREBASE_CLIENT_EMAIL',
-  'FIREBASE_PRIVATE_KEY',
   'REDIS_HOST',
   'REDIS_PORT',
 ];
@@ -34,8 +31,6 @@ const OPTIONAL_ENV_VARS = [
   'DAIMO_API_KEY',
   'DAIMO_WEBHOOK_SECRET',
   'SENTRY_DSN',
-  'ZOOM_API_KEY',
-  'ZOOM_API_SECRET',
   'OPENAI_API_KEY',
 ];
 
@@ -43,7 +38,6 @@ const ENV_VAR_GROUPS = {
   payment_epayco: ['EPAYCO_PUBLIC_KEY', 'EPAYCO_PRIVATE_KEY'],
   payment_daimo: ['DAIMO_API_KEY', 'DAIMO_WEBHOOK_SECRET'],
   monitoring: ['SENTRY_DSN'],
-  zoom: ['ZOOM_API_KEY', 'ZOOM_API_SECRET'],
   ai: ['OPENAI_API_KEY'],
 };
 
@@ -126,7 +120,7 @@ function getEnv(key, defaultValue = null, required = false) {
 
 /**
  * Check if a feature is enabled based on environment variables
- * @param {string} feature - Feature name (epayco, daimo, sentry, zoom, openai)
+ * @param {string} feature - Feature name (epayco, daimo, sentry, openai)
  * @returns {boolean} True if feature is configured
  */
 function isFeatureEnabled(feature) {
@@ -134,7 +128,6 @@ function isFeatureEnabled(feature) {
     epayco: ENV_VAR_GROUPS.payment_epayco,
     daimo: ENV_VAR_GROUPS.payment_daimo,
     sentry: ENV_VAR_GROUPS.monitoring,
-    zoom: ENV_VAR_GROUPS.zoom,
     openai: ENV_VAR_GROUPS.ai,
   };
 
@@ -160,7 +153,6 @@ function printEnvSummary() {
   console.log(`  - ePayco Payments: ${isFeatureEnabled('epayco') ? '✓' : '✗'}`);
   console.log(`  - Daimo Payments: ${isFeatureEnabled('daimo') ? '✓' : '✗'}`);
   console.log(`  - Sentry Monitoring: ${isFeatureEnabled('sentry') ? '✓' : '✗'}`);
-  console.log(`  - Zoom Integration: ${isFeatureEnabled('zoom') ? '✓' : '✗'}`);
   console.log(`  - OpenAI Integration: ${isFeatureEnabled('openai') ? '✓' : '✗'}`);
   console.log('================================\n');
 }

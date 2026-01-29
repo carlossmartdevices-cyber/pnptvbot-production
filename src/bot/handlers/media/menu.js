@@ -332,31 +332,6 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, Ne
   });
 
   /**
-   * Zoom Rooms - Redirect to show_zoom action
-   */
-  bot.action('menu_zoom', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      await ctx.answerCbQuery();
-
-      // Redirect to the existing zoom handler
-      const zoomText = lang === 'es'
-        ? '🎥 *Salas Zoom* 🎥\n\nRedirigiendo a las salas Zoom...'
-        : '🎥 *Zoom Rooms* 🎥\n\nRedirecting to Zoom rooms...';
-
-      await ctx.editMessageText(zoomText, {
-        parse_mode: 'Markdown'
-      });
-
-      // Trigger the show_zoom action
-      ctx.callbackQuery.data = 'show_zoom';
-      await bot.handleUpdate(ctx.update);
-    } catch (error) {
-      logger.error('Error handling menu_zoom:', error);
-    }
-  });
-
-  /**
    * Support - Redirect to show_support action
    */
   bot.action('menu_support', async (ctx) => {

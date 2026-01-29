@@ -208,18 +208,6 @@ describe('Validation Utilities', () => {
       expect(result.value).toBeDefined();
     });
 
-    it('should validate zoom room schema', () => {
-      const validData = {
-        roomName: 'Test Room',
-        privacy: 'public',
-        duration: 60,
-      };
-
-      const result = validateSchema(validData, schemas.zoomRoom);
-      expect(result.error).toBeNull();
-      expect(result.value).toBeDefined();
-    });
-
     it('should strip unknown fields', () => {
       const dataWithExtra = {
         userId: 123456789,
