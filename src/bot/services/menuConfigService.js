@@ -42,6 +42,10 @@ class MenuConfigService {
         return await MenuConfigModel.getAll();
       }
 
+      if (!user?.onboardingComplete) {
+        return [];
+      }
+
       return await MenuConfigModel.getAvailableMenusForTier(userPlanId);
     } catch (error) {
       logger.error('Error getting available menus for user:', error);
@@ -66,6 +70,10 @@ class MenuConfigService {
       
       if (isAdmin) {
         return true;
+      }
+
+      if (!user?.onboardingComplete) {
+        return false;
       }
 
       return await MenuConfigModel.isMenuAvailable(menuId, userPlanId);

@@ -62,6 +62,32 @@ const buildMembershipHeader = (user, isPremium, lang) => {
   }
 };
 
+const buildOnboardingPrompt = (lang, botUsername) => {
+  const message = lang === 'es'
+    ? '📝 Necesitas completar el onboarding para acceder al menú.\n\nUsa /start para continuar.'
+    : '📝 You need to complete onboarding to access the menu.\n\nUse /start to continue.';
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.url(
+      lang === 'es' ? '🚀 Completar Onboarding' : '🚀 Complete Onboarding',
+      `https://t.me/${botUsername}?start=onboarding`
+    )]
+  ]);
+
+  return { message, keyboard };
+};
+
+const fetchUserForMenu = async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId) return ctx.session?.user || null;
+
+  try {
+    return await UserModel.getById(userId);
+  } catch (error) {
+    logger.warn('Error fetching user for menu:', error.message);
+    return ctx.session?.user || null;
+  }
+};
+
 /**
  * Envía mensaje de bienvenida y link de ingreso al canal PRIME
  * @param {Telegraf} bot - Bot instance
@@ -426,11 +452,19 @@ const getEffectiveViewMode = async (ctx) => {
 const showMainMenu = async (ctx) => {
   const lang = ctx.session?.language || 'en';
   const chatType = ctx.chat?.type;
-  const user = ctx.session?.user || {};
+  const userRecord = await fetchUserForMenu(ctx);
+  const user = userRecord || ctx.session?.user || {};
   const username = ctx.from?.username || ctx.from?.first_name || 'Member';
 
   if (chatType === 'group' || chatType === 'supergroup') {
     await showGroupMenu(ctx);
+    return;
+  }
+
+  if (!user?.onboardingComplete) {
+    const botUsername = ctx.botInfo?.username || 'PNPtvbot';
+    const { message, keyboard } = buildOnboardingPrompt(lang, botUsername);
+    await ctx.reply(message, { ...keyboard });
     return;
   }
 
@@ -589,8 +623,16 @@ const showGroupMenu = async (ctx) => {
  */
 const showMainMenuEdit = async (ctx) => {
   const lang = ctx.session?.language || 'en';
-  const user = ctx.session?.user || {};
+  const userRecord = await fetchUserForMenu(ctx);
+  const user = userRecord || ctx.session?.user || {};
   const username = ctx.from?.username || ctx.from?.first_name || 'Member';
+
+  if (!user?.onboardingComplete) {
+    const botUsername = ctx.botInfo?.username || 'PNPtvbot';
+    const { message, keyboard } = buildOnboardingPrompt(lang, botUsername);
+    await safeReplyOrEdit(ctx, message, { ...keyboard });
+    return;
+  }
 
   // Get effective view mode (handles admin preview)
   const viewState = await getEffectiveViewMode(ctx);

@@ -153,12 +153,7 @@ ${categoryEmoji} *Categoría:* ${category}
 🌍 *Idioma:* ${language}
 📅 *Creado:* ${new Date().toLocaleString('es-ES')}
 
-⚡ *Comandos Rápidos:*
-\`/activate_${userId}_30\` - Activar 30 días
-\`/activate_${userId}_lifetime\` - Activar lifetime
-\`/user_${userId}\` - Ver info usuario
-\`/solved_${userId}\` - Marcar resuelto
-\`/r2\` - Pedir comprobante
+⚡ *Acciones rápidas:* Usa los botones abajo.
 
 ⚡ *Acciones rápidas:* Usa los botones abajo.
 

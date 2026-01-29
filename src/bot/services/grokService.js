@@ -99,15 +99,16 @@ async function chat({ mode, language, prompt, maxTokens = 300 }) {
  * @param {Object} options - Generation options
  * @param {string} options.prompt - User prompt describing what to generate
  * @param {boolean} options.hasMedia - Whether the post has media attached
- * @returns {Promise<{combined: string, en: string, es: string}>}
+ * @returns {Promise<{combined: string, en: string, es: string, english: string, spanish: string}>}
  */
 async function generateSharePost({ prompt, hasMedia = false }) {
   const maxChars = hasMedia ? 900 : 3000;
+  const chatFn = module.exports.chat || chat;
 
   // Generate English version
   const enPrompt = `Create a share post for: ${prompt}\n\nRequirements:\n- Language: English\n- Max ${maxChars} characters\n- Engaging, community-focused tone\n- Include relevant emojis\n- End with a call to action`;
 
-  const enContent = await chat({
+  const enContent = await chatFn({
     mode: 'sharePost',
     language: 'English',
     prompt: enPrompt,
@@ -117,7 +118,7 @@ async function generateSharePost({ prompt, hasMedia = false }) {
   // Generate Spanish version
   const esPrompt = `Create a share post for: ${prompt}\n\nRequirements:\n- Language: Spanish\n- Max ${maxChars} characters\n- Engaging, community-focused tone\n- Include relevant emojis\n- End with a call to action`;
 
-  const esContent = await chat({
+  const esContent = await chatFn({
     mode: 'sharePost',
     language: 'Spanish',
     prompt: esPrompt,
@@ -125,12 +126,14 @@ async function generateSharePost({ prompt, hasMedia = false }) {
   });
 
   // Combine both versions
-  const combined = `🇺🇸 English:\n${enContent}\n\n🇪🇸 Español:\n${esContent}`;
+  const combined = `🇬🇧 ENGLISH:\n${enContent}\n\n🇪🇸 ESPAÑOL:\n${esContent}`;
 
   return {
     combined,
     en: enContent,
     es: esContent,
+    english: enContent,
+    spanish: esContent,
   };
 }
 

@@ -286,7 +286,7 @@ class UserModel {
 
   /**
    * Update user subscription
-   * Unified logic: prime/active = membership active, churned/free = membership not active
+   * Unified logic: prime/active = membership active, churned/expired/free = membership not active
    */
   static async updateSubscription(userId, subscription) {
     try {
@@ -294,13 +294,15 @@ class UserModel {
 
       // Determine tier based on status
       // prime/active = PRIME tier (membership active)
-      // churned/free/empty = Free tier (membership not active)
+      // churned/expired/free/empty = Free tier (membership not active)
       const isActive = status === 'active' || status === 'prime';
       const tier = isActive ? 'Prime' : 'Free';
 
-      // Normalize status: churned should remain as 'churned' for tracking,
+      // Normalize status: churned/expired should remain as 'churned' for tracking,
       // but tier will be 'Free' for access control
-      const normalizedStatus = isActive ? 'active' : (status === 'churned' ? 'churned' : 'free');
+      const normalizedStatus = isActive
+        ? 'active'
+        : (status === 'churned' || status === 'expired' ? 'churned' : 'free');
 
       await query(
         `UPDATE ${TABLE} SET subscription_status = $2, plan_id = $3, plan_expiry = $4, tier = $5, updated_at = NOW() WHERE id = $1`,
