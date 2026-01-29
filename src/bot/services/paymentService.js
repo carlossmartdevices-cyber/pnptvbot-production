@@ -6,6 +6,7 @@ const UserModel = require('../../models/userModel');
 const SubscriberModel = require('../../models/subscriberModel');
 const ModelService = require('./modelService');
 const MeetGreetService = require('./meetGreetService');
+const PNPLiveService = require('./pnpLiveService');
 const { cache } = require('../../config/redis');
 const logger = require('../../utils/logger');
 const crypto = require('crypto');
@@ -490,6 +491,102 @@ class PaymentService {
   }
 
   /**
+   * Process PNP Live ePayco webhook confirmation
+   * @param {Object} params - Webhook data for PNP Live
+   * @returns {Object} { success: boolean, error?: string }
+   */
+  static async processPNPLiveEpaycoWebhook({
+    x_ref_payco,
+    x_transaction_id,
+    x_transaction_state,
+    x_approval_code,
+    x_amount,
+    userId,
+    bookingId,
+    x_customer_email,
+    x_customer_name,
+  }) {
+    try {
+      logger.info('Processing PNP Live ePayco webhook', {
+        x_ref_payco,
+        x_transaction_state,
+        userId,
+        bookingId,
+      });
+
+      const booking = await PNPLiveService.getBookingById(bookingId);
+      if (!booking) {
+        logger.error('PNP Live booking not found', { bookingId });
+        return { success: false, error: 'Booking not found' };
+      }
+
+      if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
+        await PNPLiveService.updateBookingStatus(bookingId, 'confirmed');
+        await PNPLiveService.updatePaymentStatus(bookingId, 'paid', x_transaction_id);
+
+        logger.info('PNP Live booking confirmed via ePayco webhook', {
+          bookingId,
+          userId,
+          transactionId: x_transaction_id,
+          amount: x_amount,
+        });
+
+        try {
+          const bot = new Telegraf(process.env.BOT_TOKEN);
+          const user = await UserModel.getById(userId);
+          const userLanguage = user?.language || 'es';
+          const model = await ModelService.getModelById(booking.model_id);
+
+          const message = userLanguage === 'es'
+            ? `🎉 ¡Tu Show Privado ha sido confirmado!\n\n` +
+              `📅 Fecha: ${new Date(booking.booking_time).toLocaleString('es-ES')}\n` +
+              `🕒 Duración: ${booking.duration_minutes} minutos\n` +
+              `💃 Modelo: ${model?.name || 'Desconocido'}\n` +
+              `💰 Total: $${booking.price_usd} USD\n\n` +
+              `📹 Tu sala privada está lista. ¡Nos vemos pronto!`
+            : `🎉 Your Private Show has been confirmed!\n\n` +
+              `📅 Date: ${new Date(booking.booking_time).toLocaleString('en-US')}\n` +
+              `🕒 Duration: ${booking.duration_minutes} minutes\n` +
+              `💃 Model: ${model?.name || 'Unknown'}\n` +
+              `💰 Total: $${booking.price_usd} USD\n\n` +
+              `📹 Your private room is ready. See you soon!`;
+
+          await bot.telegram.sendMessage(userId, message, { parse_mode: 'Markdown' });
+        } catch (notificationError) {
+          logger.error('Error sending PNP Live confirmation notification (non-critical):', {
+            error: notificationError.message,
+            userId,
+            bookingId,
+          });
+        }
+
+        return { success: true };
+      } else if (x_transaction_state === 'Fallida' || x_transaction_state === 'Rechazada') {
+        await PNPLiveService.cancelBooking(bookingId, 'Payment failed');
+
+        logger.warn('PNP Live payment failed, booking cancelled', {
+          bookingId,
+          userId,
+          transactionId: x_transaction_id,
+        });
+
+        return { success: true, error: 'Payment failed, booking cancelled' };
+      }
+
+      logger.info('PNP Live ePayco webhook received (no action taken)', {
+        x_ref_payco,
+        x_transaction_state,
+        bookingId,
+      });
+
+      return { success: true };
+    } catch (error) {
+      logger.error('Error processing PNP Live ePayco webhook:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Process ePayco webhook confirmation
    * @param {Object} webhookData - ePayco webhook data
    * @returns {Object} { success: boolean, error?: string }
@@ -528,10 +625,25 @@ class PaymentService {
 
       // Check if this is a Meet & Greet payment
       const isMeetGreet = paymentIdOrType === 'meet_greet';
+      const isPNPLive = paymentIdOrType === 'pnp_live';
 
       if (isMeetGreet) {
         // Handle Meet & Greet payment
         return await this.processMeetGreetEpaycoWebhook({
+          x_ref_payco,
+          x_transaction_id,
+          x_transaction_state,
+          x_approval_code,
+          x_amount,
+          userId,
+          bookingId: planIdOrBookingId,
+          x_customer_email,
+          x_customer_name,
+        });
+      }
+
+      if (isPNPLive) {
+        return await this.processPNPLiveEpaycoWebhook({
           x_ref_payco,
           x_transaction_id,
           x_transaction_state,

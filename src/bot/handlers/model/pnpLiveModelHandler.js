@@ -6,6 +6,9 @@
 const { Markup } = require('telegraf');
 const PNPLiveAvailabilityService = require('../../services/pnpLiveAvailabilityService');
 const PNPLiveService = require('../../services/pnpLiveService');
+const userService = require('../../services/userService');
+const broadcastUtils = require('../../utils/broadcastUtils');
+const { escapeMarkdown } = require('../../utils/memberProfileCard');
 const { query } = require('../../../config/postgres');
 const logger = require('../../../utils/logger');
 
@@ -43,7 +46,7 @@ const registerPNPLiveModelHandlers = (bot) => {
 
       if (!model) {
         return ctx.reply(
-          '❌ No estás registrada como modelo en PNP Television Live.\n\n' +
+          '❌ No estás registrada como modelo en PNP Live.\n\n' +
           'Contacta al administrador para registrarte.'
         );
       }
@@ -81,7 +84,7 @@ const registerPNPLiveModelHandlers = (bot) => {
     );
 
     const message =
-      `💃 *Panel de Modelo - PNP Television Live*\n\n` +
+      `💃 *Panel de Modelo - PNP Live*\n\n` +
       `👤 *${model.name}*\n` +
       `${statusEmoji} Estado: *${statusText}*\n` +
       `${model.status_message ? `💬 "${model.status_message}"\n` : ''}` +
@@ -134,6 +137,7 @@ const registerPNPLiveModelHandlers = (bot) => {
         return ctx.answerCbQuery('❌ No autorizado');
       }
 
+      const wasOnline = model.is_online;
       await PNPLiveAvailabilityService.setModelOnlineStatus(
         model.id,
         true,
@@ -145,6 +149,9 @@ const registerPNPLiveModelHandlers = (bot) => {
 
       // Refresh dashboard
       const updatedModel = await getModelByTelegramId(ctx.from.id);
+      if (!wasOnline && updatedModel?.is_online) {
+        await sendModelOnlineBroadcast(bot, updatedModel);
+      }
       await showModelDashboard(ctx, updatedModel);
     } catch (error) {
       logger.error('Error going online:', error);
@@ -477,7 +484,7 @@ const registerPNPLiveModelHandlers = (bot) => {
 
       const startDate = new Date();
       const endDate = new Date();
-      endDate.setDate(endDate.getDate() + 14); // 2 weeks
+      endDate.setDate(endDate.getDate() + 3); // 3 days max
 
       const count = await PNPLiveAvailabilityService.generateRecurringAvailability(
         model.id,
@@ -506,7 +513,7 @@ const registerPNPLiveModelHandlers = (bot) => {
         scheduleText += '\n';
       }
 
-      scheduleText += `\n✅ *${count} slots* generados para las próximas 2 semanas`;
+      scheduleText += `\n✅ *${count} slots* generados para los próximos 3 días`;
 
       const keyboard = Markup.inlineKeyboard([
         [Markup.button.callback('➕ Agregar Horario', 'model_add_schedule')],
@@ -803,6 +810,83 @@ const registerPNPLiveModelHandlers = (bot) => {
       await ctx.reply('❌ Error al guardar mensaje');
     }
   });
+
+  const buildOnlineBroadcastMessage = (model, language) => {
+    const isSpanish = language === 'es';
+    const name = escapeMarkdown(model.name || 'PNP Live');
+    const username = model.username ? `@${escapeMarkdown(model.username)}` : '';
+    const bio = model.bio ? escapeMarkdown(model.bio) : '';
+    const status = model.status_message ? escapeMarkdown(model.status_message) : '';
+    const rating = model.avg_rating ? Number(model.avg_rating).toFixed(1) : '0.0';
+
+    if (isSpanish) {
+      return [
+        `🟢 *${name}* está online en *PNP Live*`,
+        username ? `👤 ${username}` : null,
+        bio ? `💬 ${bio}` : null,
+        status ? `✨ ${status}` : null,
+        `⭐ Rating: ${rating}/5`,
+        '',
+        '📺 Entra ahora para ver el show en vivo.'
+      ].filter(Boolean).join('\n');
+    }
+
+    return [
+      `🟢 *${name}* is online on *PNP Live*`,
+      username ? `👤 ${username}` : null,
+      bio ? `💬 ${bio}` : null,
+      status ? `✨ ${status}` : null,
+      `⭐ Rating: ${rating}/5`,
+      '',
+      '📺 Tap below to watch live now.'
+    ].filter(Boolean).join('\n');
+  };
+
+  const sendModelOnlineBroadcast = async (botInstance, model) => {
+    try {
+      const allUsers = await userService.getAllUsers();
+      const botUsername = process.env.BOT_USERNAME || 'pnplatinotv_bot';
+      const targetUrl = `https://t.me/${botUsername}?start=pnp_live`;
+      const users = allUsers.filter(user => user && user.id && user.is_bot !== true);
+
+      for (const user of users) {
+        const language = user.language || 'en';
+        const message = buildOnlineBroadcastMessage(model, language);
+        const keyboard = broadcastUtils.buildInlineKeyboard([
+          {
+            text: language === 'es' ? '📺 Ver PNP Live' : '📺 Watch PNP Live',
+            type: 'url',
+            target: targetUrl
+          }
+        ]);
+
+        try {
+          if (model.profile_image_url) {
+            await botInstance.telegram.sendPhoto(user.id, model.profile_image_url, {
+              caption: message,
+              parse_mode: 'Markdown',
+              ...(keyboard ? { reply_markup: keyboard.reply_markup } : {})
+            });
+          } else {
+            await botInstance.telegram.sendMessage(user.id, message, {
+              parse_mode: 'Markdown',
+              ...(keyboard ? { reply_markup: keyboard.reply_markup } : {})
+            });
+          }
+        } catch (sendError) {
+          logger.warn('Failed to send model online broadcast', {
+            userId: user.id,
+            modelId: model.id,
+            error: sendError.message
+          });
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    } catch (error) {
+      logger.error('Error sending model online broadcast:', error);
+    }
+  };
 
   logger.info('PNP Live Model handlers registered');
 };

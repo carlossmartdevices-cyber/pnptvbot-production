@@ -1,4 +1,4 @@
-const { query } = require('../../config/postgres');
+const { query, getClient } = require('../../config/postgres');
 const { cache } = require('../../config/redis');
 const ModelService = require('./modelService');
 const AvailabilityService = require('./availabilityService');
@@ -170,10 +170,28 @@ class PNPLiveService {
    * @returns {Promise<Object>} Created booking with video room details
    */
   static async createBooking(userId, modelId, durationMinutes, bookingTime, paymentMethod) {
+    let client;
     try {
       // Validate duration
       if (![30, 60, 90].includes(durationMinutes)) {
         throw new Error('Invalid duration. Must be 30, 60, or 90 minutes.');
+      }
+
+      if (!(bookingTime instanceof Date) || Number.isNaN(bookingTime.getTime())) {
+        throw new Error('Invalid booking time.');
+      }
+
+      const bookingTimeUtc = new Date(bookingTime);
+      if (bookingTimeUtc.getTime() <= Date.now()) {
+        throw new Error('Booking time must be in the future.');
+      }
+
+      if (!PNPLiveTimeSlotService.isDayInWindow(bookingTimeUtc)) {
+        throw new Error('Booking day must be Thursday through Monday.');
+      }
+
+      if (!PNPLiveTimeSlotService.isWithinOperatingHours(bookingTimeUtc)) {
+        throw new Error('Booking time must be between 10 AM and 10 PM.');
       }
 
       // Get model-specific pricing
@@ -187,26 +205,45 @@ class PNPLiveService {
         throw new Error('Model not found');
       }
 
+      client = await getClient();
+      await client.query('BEGIN');
+
       // Check if user already has a booking at this time
-      const existingBooking = await query(
+      const existingBooking = await client.query(
         `SELECT * FROM pnp_bookings
          WHERE user_id = $1
          AND booking_time = $2
          AND status != 'cancelled'`,
-        [userId, bookingTime]
+        [userId, bookingTimeUtc]
       );
 
       if (existingBooking.rows && existingBooking.rows.length > 0) {
         throw new Error('You already have a booking at this time');
       }
 
+      const bookingEndTime = new Date(bookingTimeUtc.getTime() + durationMinutes * 60000);
+      const overlappingBooking = await client.query(
+        `SELECT 1
+         FROM pnp_bookings
+         WHERE model_id = $1
+           AND status != 'cancelled'
+           AND booking_time < $3
+           AND booking_time + (duration_minutes * INTERVAL '1 minute') > $2
+         LIMIT 1`,
+        [modelId, bookingTimeUtc, bookingEndTime]
+      );
+
+      if (overlappingBooking.rows?.length) {
+        throw new Error('Model already has a booking during this time');
+      }
+
       // Create booking with earnings split
-      const booking = await query(
+      const booking = await client.query(
         `INSERT INTO pnp_bookings
          (user_id, model_id, duration_minutes, price_usd, booking_time, payment_method, model_earnings, platform_fee)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
-        [userId, modelId, durationMinutes, price, bookingTime, paymentMethod, modelEarnings, platformFee]
+        [userId, modelId, durationMinutes, price, bookingTimeUtc, paymentMethod, modelEarnings, platformFee]
       );
 
       const newBooking = booking.rows && booking.rows[0];
@@ -220,12 +257,14 @@ class PNPLiveService {
       );
 
       // Update booking with video room details
-      await query(
+      await client.query(
         `UPDATE pnp_bookings
          SET video_room_name = $1, video_room_url = $2, video_room_token = $3
          WHERE id = $4`,
-        [roomName, jaasRoom.clientUrl, jaasRoom.tokens.client]
+        [roomName, jaasRoom.clientUrl, jaasRoom.tokens.client, newBooking.id]
       );
+
+      await client.query('COMMIT');
 
       logger.info('PNP Live booking created successfully', {
         bookingId: newBooking?.id,
@@ -245,8 +284,19 @@ class PNPLiveService {
         }
       };
     } catch (error) {
+      if (client) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          logger.warn('Failed to rollback PNP Live booking transaction:', rollbackError);
+        }
+      }
       logger.error('Error creating PNP Live booking:', error);
       throw new Error('Failed to create booking: ' + error.message);
+    } finally {
+      if (client) {
+        client.release();
+      }
     }
   }
 
