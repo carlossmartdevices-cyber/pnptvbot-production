@@ -21,14 +21,14 @@ function buildSystemPrompt({ mode, language }) {
 - If you mention actions, phrase them as simple bot CTAs (e.g., "Tap Membership Plans", "Use /start", or link to t.me/pnplatinotv_bot).`;
 
   if (mode === 'broadcast') {
-    return `You write concise, high-converting Telegram broadcast copy for the PNPtv community.\n${langHint}\n${pnptvContext}\nOutput format:\n- HOOK: 1 attention-grabbing line (bold and engaging)\n- BODY: 2-3 sentences describing the offer/benefit\n- CALL TO ACTION: 1 clear line telling users what to do\n\nRules:\n- Return ONLY the final formatted text (no labels like "HOOK:", just the content)\n- No quotes, no markdown headings\n- Keep within Telegram limits (prefer <= 900 chars if media caption)\n- Separate sections with line breaks`;
+    return `You write concise, high-converting Telegram broadcast copy for the PNPtv community.\n${langHint}\n${pnptvContext}\nOutput format:\n- HOOK: 1 attention-grabbing line (bold and engaging)\n- BODY: 2-3 sentences describing the offer/benefit\n- CALL TO ACTION: 1 clear line telling users what to do\n\nRules:\n- Return ONLY the final formatted text (no labels like "HOOK:", just the content)\n- No quotes, no markdown headings\n- CRITICAL: Keep text UNDER 450 characters total\n- Separate sections with line breaks`;
   }
-  
+
   if (mode === 'sharePost') {
-    return `You write concise Telegram share post copy for the PNPtv community.\n${langHint}\n${pnptvContext}\nOutput format:\n- TITLE: 1 short, engaging line\n- DESCRIPTION: 2-3 sentences describing the content\n- CATEGORIES: 3-5 relevant hashtags\n\nRules:\n- Return ONLY the final formatted text (no labels like "TITLE:", just the content)\n- No quotes, no markdown headings\n- Keep within Telegram limits (prefer <= 600 chars)\n- Separate sections with line breaks\n- Hashtags should start with # and be space-separated`;
+    return `You write concise Telegram share post copy for the PNPtv community.\n${langHint}\n${pnptvContext}\nOutput format:\n- TITLE: 1 short, engaging line\n- DESCRIPTION: 1-2 sentences max describing the content\n- CATEGORIES: 2-3 relevant hashtags\n\nRules:\n- Return ONLY the final formatted text (no labels like "TITLE:", just the content)\n- No quotes, no markdown headings\n- CRITICAL: Keep text UNDER 450 characters total - be very concise\n- Separate sections with line breaks\n- Hashtags should start with # and be space-separated`;
   }
-  
-  return `You write concise Telegram post copy for the PNPtv community.\n${langHint}\n${pnptvContext}\nOutput rules:\n- Return ONLY the final message text.\n- No quotes, no markdown headings.\n- Keep within Telegram limits (prefer <= 900 chars if media caption).\n- End with a clear CTA.`;
+
+  return `You write concise Telegram post copy for the PNPtv community.\n${langHint}\n${pnptvContext}\nOutput rules:\n- Return ONLY the final message text.\n- No quotes, no markdown headings.\n- CRITICAL: Keep text UNDER 450 characters total.\n- End with a clear CTA.`;
 }
 
 async function chat({ mode, language, prompt, maxTokens = 300 }) {
@@ -103,31 +103,48 @@ async function chat({ mode, language, prompt, maxTokens = 300 }) {
  * @returns {Promise<{combined: string, en: string, es: string, english: string, spanish: string}>}
  */
 async function generateSharePost({ prompt, hasMedia = false }) {
-  const maxChars = hasMedia ? 900 : 3000;
+  // Each language max 450 chars so combined stays under 1000
+  const maxCharsPerLang = 450;
   const chatFn = module.exports.chat || chat;
 
   // Generate English version
-  const enPrompt = `Create a share post for: ${prompt}\n\nRequirements:\n- Language: English\n- Max ${maxChars} characters\n- Engaging, community-focused tone\n- Include relevant emojis\n- End with a call to action`;
+  const enPrompt = `Create a share post for: ${prompt}\n\nRequirements:\n- Language: English\n- MAXIMUM ${maxCharsPerLang} characters - be very concise\n- Engaging, community-focused tone\n- Include 2-3 relevant emojis\n- End with a short call to action`;
 
-  const enContent = await chatFn({
+  let enContent = await chatFn({
     mode: 'sharePost',
     language: 'English',
     prompt: enPrompt,
-    maxTokens: 400,
+    maxTokens: 200,
   });
 
-  // Generate Spanish version
-  const esPrompt = `Create a share post for: ${prompt}\n\nRequirements:\n- Language: Spanish\n- Max ${maxChars} characters\n- Engaging, community-focused tone\n- Include relevant emojis\n- End with a call to action`;
+  // Truncate if still too long
+  if (enContent.length > maxCharsPerLang) {
+    enContent = enContent.substring(0, maxCharsPerLang - 3) + '...';
+  }
 
-  const esContent = await chatFn({
+  // Generate Spanish version
+  const esPrompt = `Create a share post for: ${prompt}\n\nRequirements:\n- Language: Spanish\n- MAXIMUM ${maxCharsPerLang} characters - be very concise\n- Engaging, community-focused tone\n- Include 2-3 relevant emojis\n- End with a short call to action`;
+
+  let esContent = await chatFn({
     mode: 'sharePost',
     language: 'Spanish',
     prompt: esPrompt,
-    maxTokens: 400,
+    maxTokens: 200,
   });
+
+  // Truncate if still too long
+  if (esContent.length > maxCharsPerLang) {
+    esContent = esContent.substring(0, maxCharsPerLang - 3) + '...';
+  }
 
   // Combine both versions
   const combined = `🇬🇧 ENGLISH:\n${enContent}\n\n🇪🇸 ESPAÑOL:\n${esContent}`;
+
+  logger.info('Generated share post', {
+    enLength: enContent.length,
+    esLength: esContent.length,
+    combinedLength: combined.length
+  });
 
   return {
     combined,
