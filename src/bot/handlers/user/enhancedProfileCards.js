@@ -34,6 +34,12 @@ const registerEnhancedProfileCards = (bot) => {
 
       const profileText = buildMemberProfileCard(user);
       const buttons = buildMemberProfileInlineKeyboard(user, lang);
+      buttons.push([
+        Markup.button.callback(
+          lang === 'es' ? '🔙 Volver a resultados' : '🔙 Back to results',
+          'nearby_all'
+        ),
+      ]);
       const keyboard = buttons.length > 0 ? Markup.inlineKeyboard(buttons) : null;
 
       const baseOptions = { parse_mode: 'Markdown' };

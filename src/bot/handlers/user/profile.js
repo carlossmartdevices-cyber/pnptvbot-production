@@ -835,25 +835,28 @@ const shareProfile = async (ctx) => {
 
     const profileText = buildMemberProfileCard(user);
 
-    // Keyboard with share options
-    const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback(
+    const buttons = buildMemberProfileInlineKeyboard(user, lang);
+    buttons.push([
+      Markup.button.callback(
         lang === 'es' ? '📤 Compartir en Grupo' : '📤 Share to Group',
         'share_to_group'
-      )],
-      [Markup.button.callback(t('back', lang), 'show_profile')],
+      ),
     ]);
+    buttons.push([Markup.button.callback(t('back', lang), 'show_profile')]);
+    const keyboard = buttons.length > 0 ? Markup.inlineKeyboard(buttons) : null;
 
     if (user.photoFileId) {
+      const baseOptions = { parse_mode: 'Markdown' };
+      const sendOptions = keyboard ? { ...baseOptions, ...keyboard } : baseOptions;
       await ctx.replyWithPhoto(user.photoFileId, {
         caption: profileText,
-        parse_mode: 'Markdown',
-        ...keyboard
+        ...sendOptions
       });
     } else {
+      const baseOptions = { parse_mode: 'Markdown' };
+      const sendOptions = keyboard ? { ...baseOptions, ...keyboard } : baseOptions;
       await ctx.reply(profileText, {
-        parse_mode: 'Markdown',
-        ...keyboard
+        ...sendOptions
       });
     }
   } catch (error) {
