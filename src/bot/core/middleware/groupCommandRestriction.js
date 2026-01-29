@@ -121,8 +121,20 @@ function buildGroupMenuWithDeepLinks(ctx) {
 const groupCommandRestrictionMiddleware = () => {
   return async (ctx, next) => {
     try {
+      // Debug: Log chat type for /start command
+      if (ctx.message?.text === '/start') {
+        logger.info(`[GROUP_CMD_RESTRICT] /start command received in chat type: ${ctx.chat?.type}`, {
+          chatId: ctx.chat?.id,
+          userId: ctx.from?.id
+        });
+      }
+
       // Only apply in groups (not private chats)
       if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        // Debug: Log when middleware is skipped for private chats
+        if (ctx.message?.text === '/start') {
+          logger.info(`[GROUP_CMD_RESTRICT] Skipping middleware for private chat /start command`);
+        }
         return next();
       }
 
@@ -206,7 +218,11 @@ const groupCommandRestrictionMiddleware = () => {
 
           // USER COMMANDS - Cristina redirect response
           if (command && command !== 'menu') {
-            logger.info(`Cristina redirecting command /${command} in group ${ctx.chat.id} from user ${ctx.from.id}`);
+            if (command === 'start') {
+              logger.info(`[GROUP_CMD_RESTRICT] Intercepting /start command in group ${ctx.chat.id} from user ${ctx.from.id}`);
+            } else {
+              logger.info(`[GROUP_CMD_RESTRICT] Intercepting /${command} command in group ${ctx.chat.id} from user ${ctx.from.id}`);
+            }
 
             // Determine deep link destination
             const deepLink = COMMAND_DEEP_LINKS[command] || 'home';

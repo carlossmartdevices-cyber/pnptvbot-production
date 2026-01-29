@@ -44,18 +44,22 @@ const registerOnboardingHandlers = (bot) => {
       // Validate context has required data
       if (!ctx.from?.id) {
         logger.error('/start command called without user context');
-        await ctx.reply('An error occurred. Please try again.');
+        await ctx.reply('❌ Error: User context missing. Please try again.');
         return;
       }
+
+      logger.info(`[START] User ${ctx.from.id} triggered /start command in ${ctx.chat?.type} chat`);
 
       const user = await UserService.getOrCreateFromContext(ctx);
 
       // Validate user was created/fetched successfully
       if (!user) {
-        logger.error('/start command: Failed to get or create user', { userId: ctx.from.id });
-        await ctx.reply('An error occurred. Please try again in a few moments.');
+        logger.error('[START] Failed to get or create user - database may be unavailable', { userId: ctx.from.id });
+        await ctx.reply('⚠️ We are experiencing technical difficulties. Please try again in a few moments.');
         return;
       }
+
+      logger.info(`[START] User ${ctx.from.id} retrieved successfully, onboardingComplete: ${user.onboardingComplete}`);
 
       // Check for deep link parameters
       const startParam = ctx.message?.text?.split(' ')[1];
@@ -134,11 +138,26 @@ If you have any questions, use /support to contact us.`;
       // Start onboarding - language selection
       await showLanguageSelection(ctx);
     } catch (error) {
-      logger.error('Error in /start command:', error);
+      logger.error('[START] Error in /start command:', error);
       
+      // Handle database connection errors
+      if (error.message && (error.message.includes('connection refused') || error.message.includes('ECONNREFUSED') || error.message.includes('timeout') || error.message.includes('network'))) {
+        logger.error('[START] Database connection error in /start command', {
+          error: error.message,
+          userId: ctx.from?.id,
+          chatId: ctx.chat?.id
+        });
+        try {
+          await ctx.reply('⚠️ We are experiencing database connectivity issues. Please try again in a few minutes.');
+        } catch (dbError) {
+          logger.error('[START] Failed to send database error message:', dbError.message);
+        }
+        return;
+      }
+
       // Handle Telegram API errors gracefully
       if (error.message && error.message.includes('chat not found')) {
-        logger.warn('Chat not found in /start command - user may have blocked bot or deleted chat', {
+        logger.warn('[START] Chat not found in /start command - user may have blocked bot or deleted chat', {
           userId: ctx.from?.id,
           chatId: ctx.chat?.id
         });
@@ -147,7 +166,7 @@ If you have any questions, use /support to contact us.`;
 
       // Handle other Telegram API errors (Bad Request, Forbidden, etc.)
       if (error.message && (error.message.includes('Bad Request') || error.message.includes('Forbidden') || error.message.includes('message is not modified'))) {
-        logger.warn('Telegram API error in /start command', {
+        logger.warn('[START] Telegram API error in /start command', {
           error: error.message,
           userId: ctx.from?.id,
           chatId: ctx.chat?.id
@@ -155,16 +174,17 @@ If you have any questions, use /support to contact us.`;
         return; // Don't try to send message if Telegram API is having issues
       }
 
+      // Generic error handling
       try {
-        await ctx.reply('An error occurred. Please try again.');
+        await ctx.reply('❌ An error occurred. Please try /start again.');
       } catch (replyError) {
         if (replyError.message && replyError.message.includes('chat not found')) {
-          logger.warn('Cannot send error message - chat not found', {
+          logger.warn('[START] Cannot send error message - chat not found', {
             userId: ctx.from?.id,
             chatId: ctx.chat?.id
           });
         } else {
-          logger.error('Failed to send error message in /start:', replyError);
+          logger.error('[START] Failed to send error message in /start:', replyError);
         }
       }
     }
