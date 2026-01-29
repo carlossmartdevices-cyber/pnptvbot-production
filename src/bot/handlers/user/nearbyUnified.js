@@ -158,6 +158,7 @@ const registerNearbyUnifiedHandlers = (bot) => {
           type: 'user',
           id: user.id,
           name: user.firstName || 'Anonymous',
+          username: user.username,
           distance: user.distance,
           emoji: '👥'
         });
@@ -232,10 +233,8 @@ const registerNearbyUnifiedHandlers = (bot) => {
         
         // Create action based on type
         if (item.type === 'user') {
-          buttons.push([
-            Markup.button.callback(`👁️ ${displayName}`, `view_user_${item.id}`),
-            Markup.button.callback(`💬 DM`, `dm_user_${item.id}`),
-          ]);
+          const label = item.username ? `@${item.username}` : displayName;
+          buttons.push([Markup.button.callback(`View ${label}`, `view_user_${item.id}`)]);
         } else if (item.type === 'business' || item.type === 'place') {
           buttons.push([
             Markup.button.callback(`📍 ${displayName}`, `view_place_${item.id}`),
@@ -243,7 +242,9 @@ const registerNearbyUnifiedHandlers = (bot) => {
         }
       });
 
-      message += '\n_Toca para ver detalles o contactar_ 😏';
+      message += lang === 'es'
+        ? '\n_Toca para ver detalles_ 😏'
+        : '\n_Tap to view details_ 😏';
 
       buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
@@ -330,13 +331,13 @@ const registerNearbyUnifiedHandlers = (bot) => {
         const emoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👥';
         message += `${emoji} **${name}** - _${distance} km away_\n`;
 
-        buttons.push([
-          Markup.button.callback(`👁️ View`, `view_user_${user.id}`),
-          Markup.button.callback(`💬 DM`, `dm_user_${user.id}`),
-        ]);
+        const label = user.username ? `@${user.username}` : name;
+        buttons.push([Markup.button.callback(`View ${label}`, `view_user_${user.id}`)]);
       });
 
-      message += '\n_Tap to view profile or slide into their DMs_ 😏';
+      message += lang === 'es'
+        ? '\n_Toca para ver el perfil_ 😏'
+        : '\n_Tap to view the profile_ 😏';
 
       buttons.push([Markup.button.callback('🔙 Back', 'show_nearby')]);
 
