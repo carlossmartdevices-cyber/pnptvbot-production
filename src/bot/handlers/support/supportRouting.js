@@ -2,7 +2,6 @@ const logger = require('../../../utils/logger');
 const supportRoutingService = require('../../services/supportRoutingService');
 const SupportTopicModel = require('../../../models/supportTopicModel');
 const UserModel = require('../../../models/userModel');
-const Plan = require('../../../models/planModel');
 const { getLanguage } = require('../../utils/helpers');
 
 /**
@@ -19,6 +18,332 @@ const registerSupportRoutingHandlers = (bot) => {
   }
 
   logger.info('[DEBUG] Support routing registering with SUPPORT_GROUP_ID:', { SUPPORT_GROUP_ID });
+
+  const getThreadIdFromContext = (ctx) => (
+    ctx.message?.message_thread_id || ctx.update?.callback_query?.message?.message_thread_id
+  );
+
+  const sendQuickAnswer = async ({
+    ctx,
+    answerId,
+    langOption,
+    threadId,
+    userId,
+  }) => {
+    if (!threadId) {
+      await ctx.reply('❌ Este comando solo puede usarse dentro de un topic de soporte.');
+      return;
+    }
+
+    const supportTopic = await SupportTopicModel.getByThreadId(threadId)
+      || (userId ? await SupportTopicModel.getByUserId(userId) : null);
+
+    if (!supportTopic) {
+      await ctx.reply('❌ No se encontró el ticket de soporte para este topic.', {
+        message_thread_id: threadId,
+      });
+      return;
+    }
+
+    const answer = QUICK_ANSWERS[answerId];
+    if (!answer) {
+      await ctx.reply('❌ Respuesta rápida no encontrada.', {
+        message_thread_id: threadId,
+      });
+      return;
+    }
+
+    const targetUserId = supportTopic.user_id;
+    const adminName = ctx.from.first_name || 'Soporte';
+
+    let messageToSend = '';
+
+    if (langOption === 'en') {
+      messageToSend = answer.en;
+    } else if (langOption === 'es') {
+      messageToSend = answer.es;
+    } else if (langOption === 'both') {
+      messageToSend = `🇪🇸 *Español:*\n${answer.es}\n\n---\n\n🇺🇸 *English:*\n${answer.en}`;
+    } else {
+      messageToSend = supportTopic.language === 'en' ? answer.en : answer.es;
+    }
+
+    await ctx.telegram.sendMessage(
+      targetUserId,
+      `💬 *${adminName} (Soporte):*\n\n${messageToSend}`,
+      { parse_mode: 'Markdown' }
+    );
+
+    try {
+      await ctx.react('✅');
+    } catch (reactError) {
+      logger.debug('Could not add reaction:', reactError.message);
+    }
+
+    await SupportTopicModel.updateLastAgentMessage(targetUserId);
+
+    if (!supportTopic.first_response_at) {
+      await SupportTopicModel.updateFirstResponse(targetUserId);
+    }
+
+    logger.info('Quick answer sent', {
+      answerId,
+      lang: langOption || 'auto',
+      userId: targetUserId,
+      adminId: ctx.from.id,
+    });
+  };
+
+  const activateMembershipForUser = async (ctx, targetUserId, planOrDays, threadId) => {
+    try {
+      const user = await UserModel.getById(targetUserId);
+
+      if (!user) {
+        await ctx.reply(`❌ Usuario ${targetUserId} no encontrado en la base de datos.`, {
+          message_thread_id: threadId,
+        });
+        return;
+      }
+
+      let durationDays = 30;
+      let planId = 'monthly_pass';
+      let planName = 'Monthly Pass (30 días)';
+      let isLifetime = false;
+
+      if (planOrDays) {
+        const input = planOrDays.toLowerCase();
+        const planMappings = {
+          lifetime: { planId: 'lifetime_pass', planName: 'Lifetime Pass', days: 36500, isLifetime: true },
+          lifetime_pass: { planId: 'lifetime_pass', planName: 'Lifetime Pass', days: 36500, isLifetime: true },
+          forever: { planId: 'lifetime_pass', planName: 'Lifetime Pass', days: 36500, isLifetime: true },
+          week: { planId: 'week_pass', planName: 'Week Pass (7 días)', days: 7 },
+          week_pass: { planId: 'week_pass', planName: 'Week Pass (7 días)', days: 7 },
+          weekly: { planId: 'week_pass', planName: 'Week Pass (7 días)', days: 7 },
+          semanal: { planId: 'week_pass', planName: 'Week Pass (7 días)', days: 7 },
+          month: { planId: 'monthly_pass', planName: 'Monthly Pass (30 días)', days: 30 },
+          monthly: { planId: 'monthly_pass', planName: 'Monthly Pass (30 días)', days: 30 },
+          monthly_pass: { planId: 'monthly_pass', planName: 'Monthly Pass (30 días)', days: 30 },
+          mensual: { planId: 'monthly_pass', planName: 'Monthly Pass (30 días)', days: 30 },
+          crystal: { planId: 'crystal_pass', planName: 'Crystal Pass (120 días)', days: 120 },
+          crystal_pass: { planId: 'crystal_pass', planName: 'Crystal Pass (120 días)', days: 120 },
+          year: { planId: 'yearly_pass', planName: 'Yearly Pass (365 días)', days: 365 },
+          yearly: { planId: 'yearly_pass', planName: 'Yearly Pass (365 días)', days: 365 },
+          yearly_pass: { planId: 'yearly_pass', planName: 'Yearly Pass (365 días)', days: 365 },
+          anual: { planId: 'yearly_pass', planName: 'Yearly Pass (365 días)', days: 365 },
+        };
+
+        if (/^\d+$/.test(input)) {
+          durationDays = parseInt(input);
+          if (durationDays === 7) {
+            planId = 'week_pass';
+            planName = 'Week Pass (7 días)';
+          } else if (durationDays === 30) {
+            planId = 'monthly_pass';
+            planName = 'Monthly Pass (30 días)';
+          } else if (durationDays === 120) {
+            planId = 'crystal_pass';
+            planName = 'Crystal Pass (120 días)';
+          } else if (durationDays === 365) {
+            planId = 'yearly_pass';
+            planName = 'Yearly Pass (365 días)';
+          } else if (durationDays >= 36500) {
+            planId = 'lifetime_pass';
+            planName = 'Lifetime Pass';
+            isLifetime = true;
+          } else {
+            planId = 'custom';
+            planName = `Custom (${durationDays} días)`;
+          }
+        } else if (planMappings[input]) {
+          const plan = planMappings[input];
+          planId = plan.planId;
+          planName = plan.planName;
+          durationDays = plan.days;
+          isLifetime = plan.isLifetime || false;
+        }
+      }
+
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + durationDays);
+
+      await UserModel.updateSubscription(targetUserId, {
+        status: 'active',
+        planId: planId,
+        expiry: isLifetime ? null : expiryDate.toISOString(),
+      });
+
+      const adminName = ctx.from.first_name || 'Soporte';
+      const userLang = user.language || 'es';
+
+      const notificationMessage = userLang === 'en'
+        ? `🎉 *Membership Activated!*\n\n✅ Your *${planName}* membership has been activated by ${adminName}.\n\n${isLifetime ? '♾️ This is a lifetime membership - enjoy forever!' : `📅 Expires: ${expiryDate.toLocaleDateString()}`}\n\nYou now have full access to:\n🔥 Videorama\n📍 Nearby\n🎥 Hangouts\n📺 PNP Live\n\nEnjoy! 🎊`
+        : `🎉 *¡Membresía Activada!*\n\n✅ Tu membresía *${planName}* ha sido activada por ${adminName}.\n\n${isLifetime ? '♾️ Esta es una membresía de por vida - ¡disfruta para siempre!' : `📅 Expira: ${expiryDate.toLocaleDateString()}`}\n\nAhora tienes acceso completo a:\n🔥 Videorama\n📍 Nearby (Quién está cerca)\n🎥 Hangouts\n📺 PNP Live\n\n¡Disfruta! 🎊`;
+
+      try {
+        await ctx.telegram.sendMessage(targetUserId, notificationMessage, { parse_mode: 'Markdown' });
+      } catch (notifyError) {
+        logger.warn('Could not notify user about membership activation:', notifyError.message);
+      }
+
+      const userName = user.firstName || user.username || targetUserId;
+      await ctx.reply(`✅ *Membresía Activada*
+
+👤 *Usuario:* ${userName} (\`${targetUserId}\`)
+📋 *Plan:* ${planName}
+📅 *Expira:* ${isLifetime ? 'Nunca (Lifetime)' : expiryDate.toLocaleDateString()}
+👨‍💼 *Activado por:* ${adminName}
+
+_El usuario ha sido notificado._`, {
+        parse_mode: 'Markdown',
+        message_thread_id: threadId,
+      });
+
+      logger.info('Membership activated via support', {
+        userId: targetUserId,
+        planId,
+        durationDays,
+        activatedBy: ctx.from.id,
+      });
+    } catch (error) {
+      logger.error('Error activating membership:', error);
+      await ctx.reply('❌ Error al activar membresía: ' + error.message, {
+        message_thread_id: threadId,
+      });
+    }
+  };
+
+  const resolveSupportTicket = async (ctx, userId, threadId, resolutionNote) => {
+    const supportTopic = await SupportTopicModel.getByUserId(userId);
+
+    if (!supportTopic) {
+      await ctx.reply('❌ No se encontró el ticket de soporte para este usuario.', {
+        message_thread_id: threadId,
+      });
+      return;
+    }
+
+    try {
+      await SupportTopicModel.updateStatus(userId, 'resolved');
+      await SupportTopicModel.updateResolutionTime(userId);
+
+      if (supportTopic.thread_id) {
+        try {
+          await ctx.telegram.closeForumTopic(SUPPORT_GROUP_ID, supportTopic.thread_id);
+        } catch (closeError) {
+          logger.debug('Could not close forum topic:', closeError.message);
+        }
+      }
+
+      const user = await UserModel.getById(userId);
+      const userName = user?.firstName || user?.username || userId;
+      const adminName = ctx.from.first_name || 'Soporte';
+      const userLang = user?.language || 'es';
+      const resolvedMessage = userLang === 'en'
+        ? `✅ *Case Resolved*\n\nYour support ticket has been marked as resolved by ${adminName}.\n\n${resolutionNote ? `📝 *Note:* ${resolutionNote}\n\n` : ''}If you need anything else in the future, don't hesitate to reach out.\n\n⭐ _We'd love to hear about your experience! Please rate us 1-5._\n\nThanks for being part of PNP! 💜`
+        : `✅ *Caso Resuelto*\n\nTu ticket de soporte ha sido marcado como resuelto por ${adminName}.\n\n${resolutionNote ? `📝 *Nota:* ${resolutionNote}\n\n` : ''}Si necesitas algo más en el futuro, no dudes en contactarnos.\n\n⭐ _¡Nos encantaría saber tu experiencia! Por favor califícanos del 1 al 5._\n\n¡Gracias por ser parte de PNP! 💜`;
+
+      try {
+        await ctx.telegram.sendMessage(userId, resolvedMessage, { parse_mode: 'Markdown' });
+      } catch (notifyError) {
+        logger.warn('Could not notify user about resolution:', notifyError.message);
+      }
+
+      let resolutionTime = 'N/A';
+      if (supportTopic.created_at) {
+        const createdAt = new Date(supportTopic.created_at);
+        const now = new Date();
+        const diffMs = now - createdAt;
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        resolutionTime = diffHours > 0 ? `${diffHours}h ${diffMins}m` : `${diffMins}m`;
+      }
+
+      await ctx.reply(`✅ *Caso Resuelto*
+
+👤 *Usuario:* ${userName} (\`${userId}\`)
+⏱️ *Tiempo de resolución:* ${resolutionTime}
+👨‍💼 *Resuelto por:* ${adminName}
+${resolutionNote ? `📝 *Nota:* ${resolutionNote}` : ''}
+
+_El usuario ha sido notificado y se le pidió calificación._
+_El topic ha sido cerrado._`, {
+        parse_mode: 'Markdown',
+        message_thread_id: threadId || supportTopic.thread_id,
+      });
+
+      logger.info('Support ticket resolved', {
+        userId,
+        resolvedBy: ctx.from.id,
+        resolutionTime,
+        note: resolutionNote,
+      });
+    } catch (error) {
+      logger.error('Error resolving support ticket:', error);
+      await ctx.reply('❌ Error al resolver el ticket: ' + error.message, {
+        message_thread_id: threadId,
+      });
+    }
+  };
+
+  const sendUserInfo = async (ctx, targetUserId, threadId) => {
+    try {
+      const user = await UserModel.getById(targetUserId);
+
+      if (!user) {
+        await ctx.reply(`❌ Usuario ${targetUserId} no encontrado.`, {
+          message_thread_id: threadId,
+        });
+        return;
+      }
+
+      const subscriptionEmoji = user.subscriptionStatus === 'active' ? '✅' : '❌';
+      const tierEmoji = {
+        Free: '🆓',
+        Prime: '👑',
+        Silver: '⭐',
+        Golden: '👑',
+      }[user.tier] || '❓';
+
+      let expiryText = 'N/A';
+      if (user.planExpiry) {
+        const expiry = new Date(user.planExpiry);
+        const now = new Date();
+        const daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+        expiryText = daysLeft > 0
+          ? `${expiry.toLocaleDateString()} (${daysLeft} días restantes)`
+          : `${expiry.toLocaleDateString()} (EXPIRADO)`;
+      } else if (user.subscriptionStatus === 'active' && user.planId?.includes('lifetime')) {
+        expiryText = '♾️ Lifetime (Nunca expira)';
+      }
+
+      const message = `👤 *Información del Usuario*
+
+🆔 *ID:* \`${user.id}\`
+👤 *Nombre:* ${user.firstName || 'N/A'} ${user.lastName || ''}
+📧 *Username:* @${user.username || 'N/A'}
+📩 *Email:* ${user.email || 'N/A'}
+
+${tierEmoji} *Tier:* ${user.tier || 'Free'}
+${subscriptionEmoji} *Estado:* ${user.subscriptionStatus || 'free'}
+📋 *Plan:* ${user.planId || 'Ninguno'}
+📅 *Expira:* ${expiryText}
+
+🌐 *Idioma:* ${user.language || 'es'}
+📝 *Onboarding:* ${user.onboardingComplete ? '✅ Completo' : '⏳ Pendiente'}
+📆 *Registro:* ${user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+🕐 *Última actividad:* ${user.lastActive ? new Date(user.lastActive).toLocaleDateString() : 'N/A'}`;
+
+      await ctx.reply(message, {
+        parse_mode: 'Markdown',
+        message_thread_id: threadId,
+      });
+    } catch (error) {
+      logger.error('Error getting user info:', error);
+      await ctx.reply('❌ Error al obtener información del usuario: ' + error.message, {
+        message_thread_id: threadId,
+      });
+    }
+  };
 
   /**
    * Extract user ID from message text
@@ -987,37 +1312,54 @@ const registerSupportRoutingHandlers = (bot) => {
       return;
     }
 
-    let message = `📋 *Respuestas Rápidas / Quick Answers*
+    const threadId = ctx.message?.message_thread_id;
+    if (!threadId) {
+      await ctx.reply('❌ Este comando solo puede usarse dentro de un topic de soporte.');
+      return;
+    }
 
-*Comunicación:*
-\`/r1\` - ${QUICK_ANSWERS[1].title}
-\`/r9\` - ${QUICK_ANSWERS[9].title}
+    const supportTopic = await SupportTopicModel.getByThreadId(threadId);
+    if (!supportTopic) {
+      await ctx.reply('❌ No se encontró el ticket de soporte para este topic.', {
+        message_thread_id: threadId,
+      });
+      return;
+    }
 
-*Pagos y Verificación:*
-\`/r2\` - ${QUICK_ANSWERS[2].title}
-\`/r7\` - ${QUICK_ANSWERS[7].title}
-\`/r8\` - ${QUICK_ANSWERS[8].title}
+    const message = `📋 *Respuestas Rápidas / Quick Answers*
 
-*Membresías:*
-\`/r3\` - ${QUICK_ANSWERS[3].title}
+Usa los botones para enviar una respuesta rápida al usuario del topic actual.
+También puedes ejecutar acciones del ticket con los botones superiores.`;
 
-*Reembolsos:*
-\`/r4\` - ${QUICK_ANSWERS[4].title}
-\`/r5\` - ${QUICK_ANSWERS[5].title}
+    const actionButtons = [
+      [
+        { text: '✅ Activar 30 días', callback_data: `support_cmd:activate:${supportTopic.user_id}:30` },
+        { text: '♾️ Activar lifetime', callback_data: `support_cmd:activate:${supportTopic.user_id}:lifetime` },
+      ],
+      [
+        { text: '👤 Ver usuario', callback_data: `support_cmd:user:${supportTopic.user_id}` },
+        { text: '✅ Marcar resuelto', callback_data: `support_cmd:solved:${supportTopic.user_id}` },
+      ],
+    ];
 
-*Cierre:*
-\`/r6\` - ${QUICK_ANSWERS[6].title}
+    const quickButtons = Object.keys(QUICK_ANSWERS).map((key) => {
+      const answerId = Number(key);
+      const answer = QUICK_ANSWERS[answerId];
+      return {
+        text: `${answerId}. ${answer.title}`,
+        callback_data: `support_cmd:quick:${supportTopic.user_id}:${answerId}`,
+      };
+    });
 
-*Opciones de idioma:*
-\`/r1\` = Español (default)
-\`/r1_en\` = English
-\`/r1_both\` = Ambos idiomas
-
-💡 _Respuestas se envían al usuario del topic actual._`;
+    const inlineKeyboard = [...actionButtons];
+    for (let i = 0; i < quickButtons.length; i += 2) {
+      inlineKeyboard.push(quickButtons.slice(i, i + 2));
+    }
 
     await ctx.reply(message, {
       parse_mode: 'Markdown',
-      message_thread_id: ctx.message?.message_thread_id
+      message_thread_id: threadId,
+      reply_markup: { inline_keyboard: inlineKeyboard },
     });
   });
 
@@ -1044,65 +1386,13 @@ const registerSupportRoutingHandlers = (bot) => {
       else if (commandText.includes('_es')) langOption = 'es';
       else if (commandText.includes('_both')) langOption = 'both';
 
-      if (!threadId) {
-        await ctx.reply('❌ Este comando solo puede usarse dentro de un topic de soporte.');
-        return;
-      }
-
       try {
-        const supportTopic = await SupportTopicModel.getByThreadId(threadId);
-
-        if (!supportTopic) {
-          await ctx.reply('❌ No se encontró el ticket de soporte para este topic.');
-          return;
-        }
-
-        const answer = QUICK_ANSWERS[i];
-        if (!answer) {
-          await ctx.reply('❌ Respuesta rápida no encontrada.');
-          return;
-        }
-
-        const userId = supportTopic.user_id;
-        const adminName = ctx.from.first_name || 'Soporte';
-
-        let messageToSend = '';
-
-        if (langOption === 'en') {
-          messageToSend = answer.en;
-        } else if (langOption === 'es') {
-          messageToSend = answer.es;
-        } else if (langOption === 'both') {
-          messageToSend = `🇪🇸 *Español:*\n${answer.es}\n\n---\n\n🇺🇸 *English:*\n${answer.en}`;
-        } else {
-          // Default: use topic language or Spanish
-          messageToSend = supportTopic.language === 'en' ? answer.en : answer.es;
-        }
-
-        // Send to user
-        await ctx.telegram.sendMessage(
-          userId,
-          `💬 *${adminName} (Soporte):*\n\n${messageToSend}`,
-          { parse_mode: 'Markdown' }
-        );
-
-        // React with checkmark
-        try {
-          await ctx.react('✅');
-        } catch (reactError) {
-          logger.debug('Could not add reaction:', reactError.message);
-        }
-
-        // Update last agent message
-        await SupportTopicModel.updateLastAgentMessage(userId);
-
-        // If first response, update that too
-        if (!supportTopic.first_response_at) {
-          await SupportTopicModel.updateFirstResponse(userId);
-        }
-
-        logger.info('Quick answer sent', { answerId: i, lang: langOption || 'auto', userId, adminId: ctx.from.id });
-
+        await sendQuickAnswer({
+          ctx,
+          answerId: i,
+          langOption,
+          threadId,
+        });
       } catch (error) {
         logger.error('Error sending quick answer:', error);
 
@@ -1118,6 +1408,68 @@ const registerSupportRoutingHandlers = (bot) => {
       }
     });
   }
+
+  bot.action(/^support_cmd:(\w+):(\d+)(?::([\w-]+))?$/i, async (ctx) => {
+    const chatId = ctx.chat?.id || ctx.update?.callback_query?.message?.chat?.id;
+
+    if (String(chatId) !== String(SUPPORT_GROUP_ID)) {
+      try {
+        await ctx.answerCbQuery('Solo disponible en el grupo de soporte.');
+      } catch (error) {
+        logger.debug('Could not answer callback query:', error.message);
+      }
+      return;
+    }
+
+    const threadId = getThreadIdFromContext(ctx);
+    const action = ctx.match[1];
+    const userId = ctx.match[2];
+    const option = ctx.match[3];
+
+    try {
+      await ctx.answerCbQuery();
+    } catch (error) {
+      logger.debug('Could not answer callback query:', error.message);
+    }
+
+    try {
+      if (action === 'activate') {
+        await activateMembershipForUser(ctx, userId, option, threadId);
+        return;
+      }
+
+      if (action === 'user') {
+        await sendUserInfo(ctx, userId, threadId);
+        return;
+      }
+
+      if (action === 'solved') {
+        await resolveSupportTicket(ctx, userId, threadId, '');
+        return;
+      }
+
+      if (action === 'quick') {
+        const answerId = Number(option);
+        await sendQuickAnswer({
+          ctx,
+          answerId,
+          langOption: null,
+          threadId,
+          userId,
+        });
+        return;
+      }
+
+      await ctx.reply('❌ Acción no reconocida.', {
+        message_thread_id: threadId,
+      });
+    } catch (error) {
+      logger.error('Error handling quick action:', error);
+      await ctx.reply('❌ Error al ejecutar la acción: ' + error.message, {
+        message_thread_id: threadId,
+      });
+    }
+  });
 
   // ============================================
   // MEMBERSHIP ACTIVATION FROM SUPPORT
@@ -1204,138 +1556,7 @@ const registerSupportRoutingHandlers = (bot) => {
       return;
     }
 
-    try {
-      // Get user to verify they exist
-      const user = await UserModel.getById(targetUserId);
-
-      if (!user) {
-        await ctx.reply(`❌ Usuario ${targetUserId} no encontrado en la base de datos.`, {
-          message_thread_id: threadId,
-        });
-        return;
-      }
-
-      // Determine duration and plan
-      let durationDays = 30; // Default to 30 days
-      let planId = 'monthly_pass';
-      let planName = 'Monthly Pass (30 días)';
-      let isLifetime = false;
-
-      if (planOrDays) {
-        const input = planOrDays.toLowerCase();
-
-        // Plan name mappings (multiple aliases)
-        const planMappings = {
-          // Lifetime
-          'lifetime': { planId: 'lifetime_pass', planName: 'Lifetime Pass', days: 36500, isLifetime: true },
-          'lifetime_pass': { planId: 'lifetime_pass', planName: 'Lifetime Pass', days: 36500, isLifetime: true },
-          'forever': { planId: 'lifetime_pass', planName: 'Lifetime Pass', days: 36500, isLifetime: true },
-          // Weekly
-          'week': { planId: 'week_pass', planName: 'Week Pass (7 días)', days: 7 },
-          'week_pass': { planId: 'week_pass', planName: 'Week Pass (7 días)', days: 7 },
-          'weekly': { planId: 'week_pass', planName: 'Week Pass (7 días)', days: 7 },
-          'semanal': { planId: 'week_pass', planName: 'Week Pass (7 días)', days: 7 },
-          // Monthly
-          'month': { planId: 'monthly_pass', planName: 'Monthly Pass (30 días)', days: 30 },
-          'monthly': { planId: 'monthly_pass', planName: 'Monthly Pass (30 días)', days: 30 },
-          'monthly_pass': { planId: 'monthly_pass', planName: 'Monthly Pass (30 días)', days: 30 },
-          'mensual': { planId: 'monthly_pass', planName: 'Monthly Pass (30 días)', days: 30 },
-          // Crystal (120 days)
-          'crystal': { planId: 'crystal_pass', planName: 'Crystal Pass (120 días)', days: 120 },
-          'crystal_pass': { planId: 'crystal_pass', planName: 'Crystal Pass (120 días)', days: 120 },
-          // Yearly
-          'year': { planId: 'yearly_pass', planName: 'Yearly Pass (365 días)', days: 365 },
-          'yearly': { planId: 'yearly_pass', planName: 'Yearly Pass (365 días)', days: 365 },
-          'yearly_pass': { planId: 'yearly_pass', planName: 'Yearly Pass (365 días)', days: 365 },
-          'anual': { planId: 'yearly_pass', planName: 'Yearly Pass (365 días)', days: 365 },
-        };
-
-        // Check if it's a number (days)
-        if (/^\d+$/.test(input)) {
-          durationDays = parseInt(input);
-          if (durationDays === 7) {
-            planId = 'week_pass';
-            planName = 'Week Pass (7 días)';
-          } else if (durationDays === 30) {
-            planId = 'monthly_pass';
-            planName = 'Monthly Pass (30 días)';
-          } else if (durationDays === 120) {
-            planId = 'crystal_pass';
-            planName = 'Crystal Pass (120 días)';
-          } else if (durationDays === 365) {
-            planId = 'yearly_pass';
-            planName = 'Yearly Pass (365 días)';
-          } else if (durationDays >= 36500) {
-            planId = 'lifetime_pass';
-            planName = 'Lifetime Pass';
-            isLifetime = true;
-          } else {
-            planId = 'custom';
-            planName = `Custom (${durationDays} días)`;
-          }
-        }
-        // Check if it's a plan name alias
-        else if (planMappings[input]) {
-          const plan = planMappings[input];
-          planId = plan.planId;
-          planName = plan.planName;
-          durationDays = plan.days;
-          isLifetime = plan.isLifetime || false;
-        }
-      }
-
-      // Calculate expiry date
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + durationDays);
-
-      // Update user subscription
-      await UserModel.updateSubscription(targetUserId, {
-        status: 'active',
-        planId: planId,
-        expiry: isLifetime ? null : expiryDate.toISOString(),
-      });
-
-      // Notify user
-      const adminName = ctx.from.first_name || 'Soporte';
-      const userLang = user.language || 'es';
-
-      const notificationMessage = userLang === 'en'
-        ? `🎉 *Membership Activated!*\n\n✅ Your *${planName}* membership has been activated by ${adminName}.\n\n${isLifetime ? '♾️ This is a lifetime membership - enjoy forever!' : `📅 Expires: ${expiryDate.toLocaleDateString()}`}\n\nYou now have full access to:\n🔥 Videorama\n📍 Nearby\n🎥 Hangouts\n📺 PNP Live\n\nEnjoy! 🎊`
-        : `🎉 *¡Membresía Activada!*\n\n✅ Tu membresía *${planName}* ha sido activada por ${adminName}.\n\n${isLifetime ? '♾️ Esta es una membresía de por vida - ¡disfruta para siempre!' : `📅 Expira: ${expiryDate.toLocaleDateString()}`}\n\nAhora tienes acceso completo a:\n🔥 Videorama\n📍 Nearby (Quién está cerca)\n🎥 Hangouts\n📺 PNP Live\n\n¡Disfruta! 🎊`;
-
-      try {
-        await ctx.telegram.sendMessage(targetUserId, notificationMessage, { parse_mode: 'Markdown' });
-      } catch (notifyError) {
-        logger.warn('Could not notify user about membership activation:', notifyError.message);
-      }
-
-      // Confirmation in support group
-      const userName = user.firstName || user.username || targetUserId;
-      await ctx.reply(`✅ *Membresía Activada*
-
-👤 *Usuario:* ${userName} (\`${targetUserId}\`)
-📋 *Plan:* ${planName}
-📅 *Expira:* ${isLifetime ? 'Nunca (Lifetime)' : expiryDate.toLocaleDateString()}
-👨‍💼 *Activado por:* ${adminName}
-
-_El usuario ha sido notificado._`, {
-        parse_mode: 'Markdown',
-        message_thread_id: threadId,
-      });
-
-      logger.info('Membership activated via support', {
-        userId: targetUserId,
-        planId,
-        durationDays,
-        activatedBy: ctx.from.id,
-      });
-
-    } catch (error) {
-      logger.error('Error activating membership:', error);
-      await ctx.reply('❌ Error al activar membresía: ' + error.message, {
-        message_thread_id: threadId,
-      });
-    }
+    await activateMembershipForUser(ctx, targetUserId, planOrDays, threadId);
   });
 
   // ============================================
@@ -1406,67 +1627,7 @@ _El usuario ha sido notificado._`, {
         return;
       }
 
-      // Update status to resolved
-      await SupportTopicModel.updateStatus(userId, 'resolved');
-      await SupportTopicModel.updateResolutionTime(userId);
-
-      // Try to close the forum topic visually (mark as closed)
-      if (supportTopic.thread_id) {
-        try {
-          await ctx.telegram.closeForumTopic(SUPPORT_GROUP_ID, supportTopic.thread_id);
-        } catch (closeError) {
-          logger.debug('Could not close forum topic:', closeError.message);
-        }
-      }
-
-      // Get user info for the confirmation
-      const user = await UserModel.getById(userId);
-      const userName = user?.firstName || user?.username || userId;
-      const adminName = ctx.from.first_name || 'Soporte';
-
-      // Send resolved notification to user with satisfaction request
-      const userLang = user?.language || 'es';
-      const resolvedMessage = userLang === 'en'
-        ? `✅ *Case Resolved*\n\nYour support ticket has been marked as resolved by ${adminName}.\n\n${resolutionNote ? `📝 *Note:* ${resolutionNote}\n\n` : ''}If you need anything else in the future, don't hesitate to reach out.\n\n⭐ _We'd love to hear about your experience! Please rate us 1-5._\n\nThanks for being part of PNP! 💜`
-        : `✅ *Caso Resuelto*\n\nTu ticket de soporte ha sido marcado como resuelto por ${adminName}.\n\n${resolutionNote ? `📝 *Nota:* ${resolutionNote}\n\n` : ''}Si necesitas algo más en el futuro, no dudes en contactarnos.\n\n⭐ _¡Nos encantaría saber tu experiencia! Por favor califícanos del 1 al 5._\n\n¡Gracias por ser parte de PNP! 💜`;
-
-      try {
-        await ctx.telegram.sendMessage(userId, resolvedMessage, { parse_mode: 'Markdown' });
-      } catch (notifyError) {
-        logger.warn('Could not notify user about resolution:', notifyError.message);
-      }
-
-      // Calculate resolution time
-      let resolutionTime = 'N/A';
-      if (supportTopic.created_at) {
-        const createdAt = new Date(supportTopic.created_at);
-        const now = new Date();
-        const diffMs = now - createdAt;
-        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-        const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        resolutionTime = diffHours > 0 ? `${diffHours}h ${diffMins}m` : `${diffMins}m`;
-      }
-
-      // Confirmation in support group
-      await ctx.reply(`✅ *Caso Resuelto*
-
-👤 *Usuario:* ${userName} (\`${userId}\`)
-⏱️ *Tiempo de resolución:* ${resolutionTime}
-👨‍💼 *Resuelto por:* ${adminName}
-${resolutionNote ? `📝 *Nota:* ${resolutionNote}` : ''}
-
-_El usuario ha sido notificado y se le pidió calificación._
-_El topic ha sido cerrado._`, {
-        parse_mode: 'Markdown',
-        message_thread_id: threadId || supportTopic.thread_id,
-      });
-
-      logger.info('Support ticket resolved', {
-        userId,
-        resolvedBy: ctx.from.id,
-        resolutionTime,
-        note: resolutionNote,
-      });
+      await resolveSupportTicket(ctx, userId, threadId, resolutionNote);
 
     } catch (error) {
       logger.error('Error resolving support ticket:', error);
@@ -1507,66 +1668,7 @@ _El topic ha sido cerrado._`, {
       return;
     }
 
-    try {
-      const user = await UserModel.getById(targetUserId);
-
-      if (!user) {
-        await ctx.reply(`❌ Usuario ${targetUserId} no encontrado.`, {
-          message_thread_id: threadId,
-        });
-        return;
-      }
-
-      // Get subscription status
-      const subscriptionEmoji = user.subscriptionStatus === 'active' ? '✅' : '❌';
-      const tierEmoji = {
-        'Free': '🆓',
-        'Prime': '👑',
-        'Silver': '⭐',
-        'Golden': '👑',
-      }[user.tier] || '❓';
-
-      // Format expiry
-      let expiryText = 'N/A';
-      if (user.planExpiry) {
-        const expiry = new Date(user.planExpiry);
-        const now = new Date();
-        const daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
-        expiryText = daysLeft > 0
-          ? `${expiry.toLocaleDateString()} (${daysLeft} días restantes)`
-          : `${expiry.toLocaleDateString()} (EXPIRADO)`;
-      } else if (user.subscriptionStatus === 'active' && user.planId?.includes('lifetime')) {
-        expiryText = '♾️ Lifetime (Nunca expira)';
-      }
-
-      const message = `👤 *Información del Usuario*
-
-🆔 *ID:* \`${user.id}\`
-👤 *Nombre:* ${user.firstName || 'N/A'} ${user.lastName || ''}
-📧 *Username:* @${user.username || 'N/A'}
-📩 *Email:* ${user.email || 'N/A'}
-
-${tierEmoji} *Tier:* ${user.tier || 'Free'}
-${subscriptionEmoji} *Estado:* ${user.subscriptionStatus || 'free'}
-📋 *Plan:* ${user.planId || 'Ninguno'}
-📅 *Expira:* ${expiryText}
-
-🌐 *Idioma:* ${user.language || 'es'}
-📝 *Onboarding:* ${user.onboardingComplete ? '✅ Completo' : '⏳ Pendiente'}
-📆 *Registro:* ${user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
-🕐 *Última actividad:* ${user.lastActive ? new Date(user.lastActive).toLocaleDateString() : 'N/A'}`;
-
-      await ctx.reply(message, {
-        parse_mode: 'Markdown',
-        message_thread_id: threadId,
-      });
-
-    } catch (error) {
-      logger.error('Error getting user info:', error);
-      await ctx.reply('❌ Error al obtener info del usuario: ' + error.message, {
-        message_thread_id: threadId,
-      });
-    }
+    await sendUserInfo(ctx, targetUserId, threadId);
   });
 
   /**
