@@ -2,6 +2,7 @@ const { Markup } = require('telegraf');
 const UserService = require('../../services/userService');
 const NearbyPlaceService = require('../../services/nearbyPlaceService');
 const { getLanguage } = require('../../utils/helpers');
+const { buildMemberProfileCard, buildMemberProfileInlineKeyboard } = require('../../utils/memberProfileCard');
 const logger = require('../../../utils/logger');
 
 /**
@@ -31,14 +32,34 @@ const registerEnhancedProfileCards = (bot) => {
         return;
       }
 
-      // Build enhanced profile card with comprehensive information
-      const profileCard = buildEnhancedMemberProfileCard(user, lang);
-      const buttons = createMemberProfileButtons(user, targetUserId, lang);
+      const profileText = buildMemberProfileCard(user);
+      const buttons = buildMemberProfileInlineKeyboard(user, lang);
+      buttons.push([
+        Markup.button.callback(
+          lang === 'es' ? '🔙 Volver a resultados' : '🔙 Back to results',
+          'nearby_all'
+        ),
+      ]);
+      const keyboard = buttons.length > 0 ? Markup.inlineKeyboard(buttons) : null;
 
-      // Send the enhanced profile
-      await ctx.editMessageText(profileCard.text, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(buttons),
+      const baseOptions = { parse_mode: 'Markdown' };
+      const sendOptions = keyboard ? { ...baseOptions, ...keyboard } : baseOptions;
+
+      if (user.photoFileId) {
+        try {
+          await ctx.deleteMessage().catch(() => {});
+          await ctx.replyWithPhoto(user.photoFileId, {
+            caption: profileText,
+            ...sendOptions,
+          });
+          return;
+        } catch (photoError) {
+          logger.error('Error sending member photo:', photoError);
+        }
+      }
+
+      await ctx.editMessageText(profileText, {
+        ...sendOptions,
       });
     } catch (error) {
       logger.error('Error viewing enhanced user profile:', error);
