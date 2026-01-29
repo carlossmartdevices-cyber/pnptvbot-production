@@ -55,7 +55,7 @@ class SupportRoutingService {
           await this.telegram.reopenForumTopic(this.supportGroupId, supportTopic.thread_id);
           logger.info('Forum topic reopened', { userId, threadId: supportTopic.thread_id });
 
-          // Send reopen notification with quick commands
+          // Send reopen notification with quick actions
           const reopenMessage = `🔄 *TICKET REABIERTO*
 
 👤 *Usuario:* ${firstName} ${username}
@@ -66,11 +66,31 @@ class SupportRoutingService {
 \`/activate_${userId}_30\` - Activar 30 días
 \`/activate_${userId}_lifetime\` - Lifetime
 \`/user_${userId}\` - Ver info
-\`/solved_${userId}\` - Resolver`;
+\`/solved_${userId}\` - Resolver
+\`/r2\` - Pedir comprobante
+
+⚡ *Acciones rápidas:* Usa los botones abajo.`;
+
+          const quickActionsKeyboard = {
+            inline_keyboard: [
+              [
+                { text: '✅ Activar 30 días', callback_data: `support_cmd:activate:${userId}:30` },
+                { text: '♾️ Activar lifetime', callback_data: `support_cmd:activate:${userId}:lifetime` },
+              ],
+              [
+                { text: '👤 Ver usuario', callback_data: `support_cmd:user:${userId}` },
+                { text: '✅ Marcar resuelto', callback_data: `support_cmd:solved:${userId}` },
+              ],
+              [
+                { text: '📄 Pedir comprobante', callback_data: `support_cmd:quick:${userId}:2` },
+              ],
+            ],
+          };
 
           await this.telegram.sendMessage(this.supportGroupId, reopenMessage, {
             message_thread_id: supportTopic.thread_id,
             parse_mode: 'Markdown',
+            reply_markup: quickActionsKeyboard,
           });
         } catch (reopenError) {
           logger.warn('Could not reopen forum topic:', reopenError.message);
@@ -140,11 +160,30 @@ ${categoryEmoji} *Categoría:* ${category}
 \`/solved_${userId}\` - Marcar resuelto
 \`/r2\` - Pedir comprobante
 
+⚡ *Acciones rápidas:* Usa los botones abajo.
+
 _Responde en este topic para enviar mensajes al usuario._`;
+
+      const quickActionsKeyboard = {
+        inline_keyboard: [
+          [
+            { text: '✅ Activar 30 días', callback_data: `support_cmd:activate:${userId}:30` },
+            { text: '♾️ Activar lifetime', callback_data: `support_cmd:activate:${userId}:lifetime` },
+          ],
+          [
+            { text: '👤 Ver usuario', callback_data: `support_cmd:user:${userId}` },
+            { text: '✅ Marcar resuelto', callback_data: `support_cmd:solved:${userId}` },
+          ],
+          [
+            { text: '📄 Pedir comprobante', callback_data: `support_cmd:quick:${userId}:2` },
+          ],
+        ],
+      };
 
       await this.telegram.sendMessage(this.supportGroupId, infoMessage, {
         message_thread_id: threadId,
         parse_mode: 'Markdown',
+        reply_markup: quickActionsKeyboard,
       });
 
       logger.info('Created new support topic', { userId, threadId, topicName, priority, category });
