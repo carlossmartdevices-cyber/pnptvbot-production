@@ -340,6 +340,15 @@ app.get('/pnp/meet-greet/daimo-checkout/:bookingId', pageLimiter, (req, res) => 
   res.sendFile(path.join(__dirname, '../../../public', 'meet-greet-daimo-checkout.html'));
 });
 
+// PNP Live Checkout pages
+app.get('/pnp/live/checkout/:bookingId', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'pnp-live-checkout.html'));
+});
+
+app.get('/pnp/live/daimo-checkout/:bookingId', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public', 'pnp-live-daimo-checkout.html'));
+});
+
 // Payment checkout page with language support
 app.get('/payment/:paymentId', (req, res) => {
   // Get language from query parameter (e.g., ?lang=en)
@@ -510,6 +519,7 @@ app.get('/api/confirm-payment/:token', asyncHandler(paymentController.confirmPay
 
 // Meet & Greet API routes
 const MeetGreetService = require('../services/meetGreetService');
+const PNPLiveService = require('../services/pnpLiveService');
 const ModelService = require('../services/modelService');
 const AvailabilityService = require('../services/availabilityService');
 
@@ -552,6 +562,49 @@ app.post('/api/meet-greet/booking/:bookingId/confirm', asyncHandler(async (req, 
   // Update booking status
   await MeetGreetService.updateBookingStatus(bookingId, 'confirmed');
   await MeetGreetService.updatePaymentStatus(bookingId, 'paid', transactionId);
+
+  res.json({ success: true, message: 'Booking confirmed' });
+}));
+
+// PNP Live API routes
+app.get('/api/pnp-live/booking/:bookingId', asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+
+  const booking = await PNPLiveService.getBookingById(bookingId);
+  if (!booking) {
+    return res.status(404).json({ success: false, error: 'Booking not found' });
+  }
+
+  const model = await ModelService.getModelById(booking.model_id);
+
+  res.json({
+    success: true,
+    booking: {
+      id: booking.id,
+      userId: booking.user_id,
+      modelId: booking.model_id,
+      modelName: model?.name || 'Unknown',
+      durationMinutes: booking.duration_minutes,
+      priceUsd: booking.price_usd,
+      bookingTime: booking.booking_time,
+      status: booking.status,
+      paymentStatus: booking.payment_status,
+      paymentMethod: booking.payment_method
+    }
+  });
+}));
+
+app.post('/api/pnp-live/booking/:bookingId/confirm', asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  const { transactionId } = req.body;
+
+  const booking = await PNPLiveService.getBookingById(bookingId);
+  if (!booking) {
+    return res.status(404).json({ success: false, error: 'Booking not found' });
+  }
+
+  await PNPLiveService.updateBookingStatus(bookingId, 'confirmed');
+  await PNPLiveService.updatePaymentStatus(bookingId, 'paid', transactionId);
 
   res.json({ success: true, message: 'Booking confirmed' });
 }));
