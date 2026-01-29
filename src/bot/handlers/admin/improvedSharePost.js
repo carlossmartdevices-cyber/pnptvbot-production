@@ -410,6 +410,114 @@ const registerImprovedSharePostHandlers = (bot) => {
     }
   });
 
+  // Use AI-generated text as-is
+  bot.action('share_post_use_ai', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      const aiDraft = ctx.session.temp?.aiDraft;
+      if (!aiDraft) {
+        await ctx.answerCbQuery('❌ No hay texto AI guardado');
+        return;
+      }
+
+      ctx.session.temp.sharePostData.text = aiDraft;
+      ctx.session.temp.sharePostStep = 'select_buttons';
+      ctx.session.temp.aiDraft = null;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('✅ Texto guardado');
+      await showButtonSelectionStep(ctx);
+    } catch (error) {
+      logger.error('Error in share_post_use_ai:', error);
+      try { await ctx.answerCbQuery('❌ Error'); } catch (e) { /* ignore */ }
+    }
+  });
+
+  // Edit AI-generated text manually
+  bot.action('share_post_edit_ai', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      ctx.session.temp.sharePostStep = 'edit_ai_share';
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery();
+
+      const aiDraft = ctx.session.temp?.aiDraft || '';
+      const hasMedia = !!ctx.session.temp.sharePostData?.mediaFileId;
+      const maxLen = hasMedia ? 1024 : 4096;
+
+      await ctx.reply(
+        '✏️ *Editar Texto*\n\n' +
+        'Texto actual generado por AI:\n\n' +
+        '```\n' + aiDraft + '\n```\n\n' +
+        '📝 Envia tu versión editada del texto.\n' +
+        '_(Máximo ' + maxLen + ' caracteres)_',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('⬅️ Volver', 'share_post_back_to_review')],
+            [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error in share_post_edit_ai:', error);
+      try { await ctx.answerCbQuery('❌ Error'); } catch (e) { /* ignore */ }
+    }
+  });
+
+  // Back to AI review from edit mode
+  bot.action('share_post_back_to_review', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      const aiDraft = ctx.session.temp?.aiDraft;
+      if (!aiDraft) {
+        // No draft, go back to text input
+        ctx.session.temp.sharePostStep = 'write_text';
+        await ctx.saveSession();
+        await ctx.answerCbQuery();
+        await showTextInputStep(ctx);
+        return;
+      }
+
+      ctx.session.temp.sharePostStep = 'review_ai_share';
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery();
+      await ctx.editMessageText(
+        '🤖 *AI Draft (Bilingual):*\n\n' + aiDraft + '\n\n' +
+        '_Puedes usar este texto o editarlo manualmente._',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('✅ Usar texto', 'share_post_use_ai')],
+            [Markup.button.callback('✏️ Editar manualmente', 'share_post_edit_ai')],
+            [Markup.button.callback('🔄 Regenerar', 'share_post_ai_text')],
+            [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error in share_post_back_to_review:', error);
+      try { await ctx.answerCbQuery('❌ Error'); } catch (e) { /* ignore */ }
+    }
+  });
+
   // Text input handling
   bot.on('text', async (ctx, next) => {
     try {
@@ -432,22 +540,56 @@ const registerImprovedSharePostHandlers = (bot) => {
         try {
           const hasMedia = !!ctx.session.temp.sharePostData.mediaFileId;
 
+          await ctx.reply('⏳ Generando texto con AI...');
+
           // Use optimized parallel bilingual generation
           const result = await GrokService.generateSharePost({
             prompt,
             hasMedia,
           });
 
-          ctx.session.temp.sharePostData.text = result.combined;
-
-          ctx.session.temp.sharePostStep = 'select_buttons';
+          // Store AI draft temporarily for review/edit
+          ctx.session.temp.aiDraft = result.combined;
+          ctx.session.temp.sharePostStep = 'review_ai_share';
           await ctx.saveSession();
-          await ctx.reply('✅ *AI draft saved (bilingual)*\n\n' + result.combined, { parse_mode: 'Markdown' });
-          await showButtonSelectionStep(ctx);
+
+          // Show preview with edit options
+          await ctx.reply(
+            '🤖 *AI Draft (Bilingual):*\n\n' + result.combined + '\n\n' +
+            '_Puedes usar este texto o editarlo manualmente._',
+            {
+              parse_mode: 'Markdown',
+              ...Markup.inlineKeyboard([
+                [Markup.button.callback('✅ Usar texto', 'share_post_use_ai')],
+                [Markup.button.callback('✏️ Editar manualmente', 'share_post_edit_ai')],
+                [Markup.button.callback('🔄 Regenerar', 'share_post_ai_text')],
+                [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
+              ]),
+            },
+          );
         } catch (e) {
           logger.error('AI generation error:', e);
           await ctx.reply('❌ AI error: ' + e.message);
         }
+        return;
+      }
+
+      // Handle manual text edit for AI-generated content
+      if (step === 'edit_ai_share') {
+        const hasMedia = !!ctx.session.temp.sharePostData.mediaFileId;
+        const maxLen = hasMedia ? 1024 : 4096;
+        if (text.length > maxLen) {
+          await ctx.reply('❌ El texto es demasiado largo (maximo ' + maxLen + ' caracteres)');
+          return;
+        }
+
+        ctx.session.temp.sharePostData.text = text;
+        ctx.session.temp.sharePostStep = 'select_buttons';
+        ctx.session.temp.aiDraft = null;
+        await ctx.saveSession();
+
+        await ctx.reply('✅ Texto guardado');
+        await showButtonSelectionStep(ctx);
         return;
       }
 
