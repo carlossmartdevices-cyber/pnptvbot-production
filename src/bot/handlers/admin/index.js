@@ -33,10 +33,14 @@ function getBroadcastStepLabel(step, lang) {
     // Paso 3/5: Texto en inglés (opcional)
     text_en: 'Paso 3/5: Texto en Inglés (Opcional)',
     ai_prompt_en: 'Paso 3/5: AI (Inglés)',
+    review_ai_en: 'Paso 3/5: Revisión AI (Inglés)',
+    edit_ai_en: 'Paso 3/5: Edición AI (Inglés)',
 
     // Paso 4/5: Texto en español (opcional)
     text_es: 'Paso 4/5: Texto en Español (Opcional)',
     ai_prompt_es: 'Paso 4/5: AI (Español)',
+    review_ai_es: 'Paso 4/5: Revisión AI (Español)',
+    edit_ai_es: 'Paso 4/5: Edición AI (Español)',
 
     // Paso 5/5: Botones y envío (unificado)
     buttons: 'Paso 5/5: Botones y Envío',
@@ -48,6 +52,10 @@ function getBroadcastStepLabel(step, lang) {
     sending: 'Enviando…',
   };
   return labels[step] || step || 'Desconocido';
+}
+
+function escapeMarkdown(text = '') {
+  return String(text).replace(/([_*`[\]])/g, '\\$1');
 }
 
 // Use shared utilities for button management
@@ -294,7 +302,23 @@ async function showBroadcastResumePrompt(ctx) {
  * @param {string} newStep - New step to transition to
  */
 async function updateBroadcastStep(ctx, newStep) {
-  const validSteps = ['media', 'text_en', 'text_es', 'ai_prompt_en', 'ai_prompt_es', 'buttons', 'preview', 'sending', 'schedule_count', 'custom_link', 'custom_buttons'];
+  const validSteps = [
+    'media',
+    'text_en',
+    'text_es',
+    'ai_prompt_en',
+    'ai_prompt_es',
+    'review_ai_en',
+    'review_ai_es',
+    'edit_ai_en',
+    'edit_ai_es',
+    'buttons',
+    'preview',
+    'sending',
+    'schedule_count',
+    'custom_link',
+    'custom_buttons',
+  ];
 
   if (!validSteps.includes(newStep)) {
     logger.error(`Invalid broadcast step transition attempted: ${newStep}`);
@@ -410,6 +434,53 @@ async function renderBroadcastStep(ctx) {
         ...Markup.inlineKeyboard([
           [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_es')],
           [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_es')],
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+        ]),
+      },
+    );
+    return;
+  }
+
+  if (step === 'review_ai_en' || step === 'review_ai_es') {
+    const isEn = step === 'review_ai_en';
+    const aiDraft = ctx.session.temp?.aiDraft || '';
+    const escapedDraft = escapeMarkdown(aiDraft);
+
+    if (!aiDraft) {
+      await updateBroadcastStep(ctx, isEn ? 'text_en' : 'text_es');
+      await renderBroadcastStep(ctx);
+      return;
+    }
+
+    await ctx.editMessageText(
+      `🤖 *AI Draft (${isEn ? 'EN' : 'ES'}):*\n\n${escapedDraft}\n\n` +
+      '_Puedes usar este texto o editarlo manualmente._',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('✅ Usar texto', isEn ? 'broadcast_use_ai_en' : 'broadcast_use_ai_es')],
+          [Markup.button.callback('✏️ Editar manualmente', isEn ? 'broadcast_edit_ai_en' : 'broadcast_edit_ai_es')],
+          [Markup.button.callback('🔄 Regenerar', isEn ? 'broadcast_ai_en' : 'broadcast_ai_es')],
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+        ]),
+      },
+    );
+    return;
+  }
+
+  if (step === 'edit_ai_en' || step === 'edit_ai_es') {
+    const isEn = step === 'edit_ai_en';
+    const aiDraft = ctx.session.temp?.aiDraft || '';
+    const escapedDraft = escapeMarkdown(aiDraft);
+
+    await ctx.editMessageText(
+      `✏️ *Editar texto (${isEn ? 'EN' : 'ES'})*\n\n` +
+      'Envía el texto editado que quieres usar:\n\n' +
+      (aiDraft ? `_Texto actual:_\n${escapedDraft}` : '_Texto actual:_ (vacío)'),
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('⬅️ Volver', isEn ? 'broadcast_ai_en' : 'broadcast_ai_es')],
           [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
         ]),
       },
@@ -2931,8 +3002,9 @@ let registerAdminHandlers = (bot) => {
         await updateBroadcastStep(ctx, isEn ? 'review_ai_en' : 'review_ai_es');
         await ctx.saveSession();
 
+        const escapedResult = escapeMarkdown(result);
         await ctx.reply(
-          `🤖 *AI Draft (${isEn ? 'EN' : 'ES'}):*\n\n${result}\n\n` +
+          `🤖 *AI Draft (${isEn ? 'EN' : 'ES'}):*\n\n${escapedResult}\n\n` +
           `_Puedes usar este texto o editarlo manualmente._`,
           {
             parse_mode: 'Markdown',
