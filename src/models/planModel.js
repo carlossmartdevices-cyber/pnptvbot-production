@@ -1,5 +1,6 @@
 const { query } = require('../config/postgres');
 const { cache } = require('../config/redis');
+const promotionalPlans = require('../config/promotionalPlans');
 const logger = require('../utils/logger');
 
 /**
@@ -37,6 +38,25 @@ class Plan {
   }
 
   /**
+   * Get public plans (exclude promo/hidden plans)
+   * @returns {Promise<Array>} Public subscription plans
+   */
+  static async getPublicPlans() {
+    const plans = await this.getAll();
+    const hiddenIds = new Set(this.getPromotionalPlans().map((plan) => plan.id));
+    return plans.filter((plan) => !hiddenIds.has(plan.id));
+  }
+
+  /**
+   * Get plans for admin management (includes promotional plans)
+   * @returns {Promise<Array>} All plans available to admins
+   */
+  static async getAdminPlans() {
+    const plans = await this.getAll();
+    return this.mergePlans(plans, this.getPromotionalPlans());
+  }
+
+  /**
    * Get plan by ID (with caching)
    * @param {string} planId - Plan ID
    * @returns {Promise<Object|null>} Plan data
@@ -54,6 +74,11 @@ class Plan {
           );
 
           if (result.rows.length === 0) {
+            const promoPlan = this.getPromotionalPlanById(planId);
+            if (promoPlan) {
+              logger.info(`Fetched promotional plan: ${planId}`);
+              return promoPlan;
+            }
             logger.warn(`Plan not found: ${planId}`);
             return null;
           }
@@ -87,6 +112,7 @@ class Plan {
       featuresEs: this.normalizeFeatures(row.features_es),
       active: row.active,
       isLifetime: row.is_lifetime || false,
+      isPromo: row.is_promo || false,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -113,6 +139,45 @@ class Plan {
     }
 
     return [];
+  }
+
+  /**
+   * Get promotional plans from config
+   * @returns {Array} Promotional plans list
+   */
+  static getPromotionalPlans() {
+    return promotionalPlans.map((plan) => ({
+      ...plan,
+      active: plan.active !== undefined ? plan.active : true,
+      duration: plan.duration || 30,
+      currency: plan.currency || 'USD',
+      isPromo: true,
+    }));
+  }
+
+  /**
+   * Get a promotional plan by ID
+   * @param {string} planId - Plan ID
+   * @returns {Object|null} Promotional plan
+   */
+  static getPromotionalPlanById(planId) {
+    return this.getPromotionalPlans().find((plan) => plan.id === planId) || null;
+  }
+
+  /**
+   * Merge plans by ID, prioritizing database plans.
+   * @param {Array} plans - Base plans
+   * @param {Array} extraPlans - Additional plans
+   * @returns {Array} Merged plans
+   */
+  static mergePlans(plans, extraPlans) {
+    const merged = new Map(plans.map((plan) => [plan.id, plan]));
+    extraPlans.forEach((plan) => {
+      if (!merged.has(plan.id)) {
+        merged.set(plan.id, plan);
+      }
+    });
+    return Array.from(merged.values()).sort((a, b) => (a.price || 0) - (b.price || 0));
   }
 
   /**

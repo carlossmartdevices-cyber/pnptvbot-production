@@ -1,4 +1,5 @@
 const logger = require('../../utils/logger');
+const sanitize = require('../../utils/sanitizer');
 
 /**
  * Message Templates Service
@@ -52,6 +53,10 @@ class MessageTemplates {
 
       // Get provider display name
       const providerDisplayName = this.getProviderDisplayName(provider, language);
+      const safePlanName = sanitize.telegramMarkdown(planName);
+      const safeExpiryStr = sanitize.telegramMarkdown(expiryStr);
+      const safeTransactionId = sanitize.telegramMarkdown(transactionId);
+      const safeProviderDisplayName = sanitize.telegramMarkdown(providerDisplayName);
 
       // Build enhanced message based on language
       if (language === 'es') {
@@ -67,12 +72,12 @@ class MessageTemplates {
           '• PNP Television Live – Transmisiones en vivo y grabaciones exclusivas',
           '',
           '📋 *Detalles de tu compra:*',
-          `• Plan: ${planName}`,
+          `• Plan: ${safePlanName}`,
           amountLine.trim(),
-          `• Proveedor: ${providerDisplayName}`,
+          `• Proveedor: ${safeProviderDisplayName}`,
           `• Fecha de compra: ${new Date().toLocaleDateString('es-ES')}`,
-          `• Válido hasta: ${expiryStr}`,
-          `• ID de Transacción: ${transactionId}`,
+          `• Válido hasta: ${safeExpiryStr}`,
+          `• ID de Transacción: ${safeTransactionId}`,
           '',
           '📢 *Aviso importante*',
           '',
@@ -113,12 +118,12 @@ class MessageTemplates {
           '• PNP Television Live – Live streams and exclusive recordings',
           '',
           '📋 *Purchase Details:*',
-          `• Plan: ${planName}`,
+          `• Plan: ${safePlanName}`,
           amountLine.trim(),
-          `• Provider: ${providerDisplayName}`,
+          `• Provider: ${safeProviderDisplayName}`,
           `• Purchase Date: ${new Date().toLocaleDateString('en-US')}`,
-          `• Valid until: ${expiryStr}`,
-          `• Transaction ID: ${transactionId}`,
+          `• Valid until: ${safeExpiryStr}`,
+          `• Transaction ID: ${safeTransactionId}`,
           '',
           '📢 *Important notice*',
           '',
