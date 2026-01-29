@@ -112,7 +112,10 @@ const registerEnhancedProfileCards = (bot) => {
     text += `👑 *${displayName}*`;
     
     // Add badges if available
-    if (user.subscriptionStatus && user.subscriptionStatus !== 'basic') {
+    if (user.badges && user.badges.length > 0) {
+      // Show first badge
+      text += ` ${user.badges[0]}`;
+    } else if (user.subscriptionStatus && user.subscriptionStatus !== 'basic') {
       const tierInfo = getUserTierInfo(user);
       text += ` ${tierInfo.badge}`;
     }
@@ -145,6 +148,14 @@ const registerEnhancedProfileCards = (bot) => {
       text += '\n\n';
     } else {
       text += '\n';
+    }
+    
+    // Line 5: Location (if available)
+    if (user.location && (user.city || user.country)) {
+      text += `📍 ${isSpanish ? 'Ubicación' : 'Location'}:`;
+      if (user.city) text += ` 🏙️ ${escapeMarkdown(user.city)}`;
+      if (user.country) text += ` 🌍 ${escapeMarkdown(user.country)}`;
+      text += '\n\n';
     }
     
     return { text };
