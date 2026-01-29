@@ -11,6 +11,10 @@ const { getLanguage } = require('../../utils/helpers');
 const registerSupportRoutingHandlers = (bot) => {
   const SUPPORT_GROUP_ID = process.env.SUPPORT_GROUP_ID;
   const ADMIN_USER_IDS = process.env.ADMIN_USER_IDS?.split(',').map(id => id.trim()) || [];
+  const escapeMarkdown = (text) => {
+    if (!text) return '';
+    return text.replace(/([_*\[\]`])/g, '\\$1');
+  };
 
   if (!SUPPORT_GROUP_ID) {
     logger.warn('SUPPORT_GROUP_ID not configured. Support routing handlers will not work.');
@@ -316,22 +320,38 @@ _El topic ha sido cerrado._`, {
         expiryText = '♾️ Lifetime (Nunca expira)';
       }
 
+      const firstName = escapeMarkdown(user.firstName || 'N/A');
+      const lastName = escapeMarkdown(user.lastName || '');
+      const username = escapeMarkdown(user.username || 'N/A');
+      const email = escapeMarkdown(user.email || 'N/A');
+      const tier = escapeMarkdown(user.tier || 'Free');
+      const subscriptionStatus = escapeMarkdown(user.subscriptionStatus || 'free');
+      const planId = escapeMarkdown(user.planId || 'Ninguno');
+      const safeExpiryText = escapeMarkdown(expiryText);
+      const language = escapeMarkdown(user.language || 'es');
+      const createdAt = escapeMarkdown(
+        user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'
+      );
+      const lastActive = escapeMarkdown(
+        user.lastActive ? new Date(user.lastActive).toLocaleDateString() : 'N/A'
+      );
+
       const message = `👤 *Información del Usuario*
 
-🆔 *ID:* \`${user.id}\`
-👤 *Nombre:* ${user.firstName || 'N/A'} ${user.lastName || ''}
-📧 *Username:* @${user.username || 'N/A'}
-📩 *Email:* ${user.email || 'N/A'}
+🆔 *ID:* \`${escapeMarkdown(String(user.id || 'N/A'))}\`
+👤 *Nombre:* ${firstName} ${lastName}
+📧 *Username:* @${username}
+📩 *Email:* ${email}
 
-${tierEmoji} *Tier:* ${user.tier || 'Free'}
-${subscriptionEmoji} *Estado:* ${user.subscriptionStatus || 'free'}
-📋 *Plan:* ${user.planId || 'Ninguno'}
-📅 *Expira:* ${expiryText}
+${tierEmoji} *Tier:* ${tier}
+${subscriptionEmoji} *Estado:* ${subscriptionStatus}
+📋 *Plan:* ${planId}
+📅 *Expira:* ${safeExpiryText}
 
-🌐 *Idioma:* ${user.language || 'es'}
+🌐 *Idioma:* ${language}
 📝 *Onboarding:* ${user.onboardingComplete ? '✅ Completo' : '⏳ Pendiente'}
-📆 *Registro:* ${user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
-🕐 *Última actividad:* ${user.lastActive ? new Date(user.lastActive).toLocaleDateString() : 'N/A'}`;
+📆 *Registro:* ${createdAt}
+🕐 *Última actividad:* ${lastActive}`;
 
       await ctx.reply(message, {
         parse_mode: 'Markdown',
