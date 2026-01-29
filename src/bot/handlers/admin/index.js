@@ -4401,7 +4401,7 @@ async function sendBroadcastWithButtons(ctx, bot) {
     // Get target users
     let users = [];
     if (broadcastTarget === 'all') {
-      const result = await UserModel.getAll(1000);
+      const result = await UserModel.getAll(10000);
       users = result.users;
     } else if (broadcastTarget === 'premium') {
       users = await UserModel.getBySubscriptionStatus('active');

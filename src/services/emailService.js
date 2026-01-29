@@ -9,7 +9,22 @@ const sanitizeHtml = require('sanitize-html');
 class EmailService {
     constructor() {
         this.transporter = null;
-        this.from = process.env.EMAIL_FROM || 'noreply@pnptv.app';
+        this.initialized = false;
+    }
+
+    /**
+     * Get the from address (lazy loaded to ensure env is ready)
+     */
+    get from() {
+        return process.env.EMAIL_FROM || 'noreply@pnptv.app';
+    }
+
+    /**
+     * Ensure transporter is initialized (lazy initialization)
+     */
+    ensureInitialized() {
+        if (this.initialized) return;
+        this.initialized = true;
         this.initializeTransporter();
     }
 
@@ -92,6 +107,9 @@ class EmailService {
         } = options;
 
         try {
+            // Ensure transporter is initialized (lazy init for env loading)
+            this.ensureInitialized();
+
             // Validate email address to prevent misrouting attacks
             if (!this.isEmailSafe(to)) {
                 logger.error('Invalid or potentially malicious email address rejected:', { to });
@@ -1059,6 +1077,7 @@ class EmailService {
      * @returns {Promise<boolean>} Connection status
      */
     async verifyConnection() {
+        this.ensureInitialized();
         if (!this.transporter) {
             return false;
         }
