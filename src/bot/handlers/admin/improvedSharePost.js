@@ -83,9 +83,10 @@ const registerImprovedSharePostHandlers = (bot) => {
   // Available destinations - dynamically configured from env
   const SHARE_DESTINATIONS = [
     { id: 'prime', chatId: process.env.PRIME_CHANNEL_ID, threadId: null, name: '💎 Prime Channel', type: 'channel' },
-    { id: 'general', chatId: process.env.GROUP_ID, threadId: parseInt(process.env.GENERAL_TOPIC_ID) || 1, name: '💬 General', type: 'topic' },
+    // Only include General topic if GENERAL_TOPIC_ID is explicitly set
+    process.env.GENERAL_TOPIC_ID ? { id: 'general', chatId: process.env.GROUP_ID, threadId: parseInt(process.env.GENERAL_TOPIC_ID), name: '💬 General', type: 'topic' } : null,
     { id: 'walloffame', chatId: process.env.GROUP_ID, threadId: parseTopicId(process.env.WALL_OF_FAME_TOPIC_ID) || 2, name: '🏆 Wall Of Fame', type: 'topic' },
-  ].filter(d => d.chatId); // Only include destinations with valid chatId
+  ].filter(d => d && d.chatId); // Only include destinations with valid chatId
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DESTINATION SELECTION HANDLERS
