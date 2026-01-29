@@ -9,7 +9,7 @@ const { getLanguage, safeEditMessage } = require('../../utils/helpers');
 const logger = require('../../../utils/logger');
 
 /**
- * PNP Television Live Handler - Main handler for PNP Television Live system
+ * PNP Live Handler - Main handler for PNP Live system
  * Replaces Meet & Greet with enhanced private shows
  */
 const registerPNPLiveHandlers = (bot) => {
@@ -70,10 +70,10 @@ const registerPNPLiveHandlers = (bot) => {
         const branding = PNPLiveMediaService.getBrandingAssets();
         
         let message = lang === 'es'
-          ? `📹 *${branding.icon} PNP Television Live - Modelos Disponibles*\n\n` +
+          ? `📹 *${branding.icon} PNP Live - Modelos Disponibles*\n\n` +
             `🟢 *Online Ahora* | ⚪ *Disponibles*\n\n` +
             `💃 *Selecciona un modelo para tu Show Privado:*`
-          : `📹 *${branding.icon} PNP Television Live - Available Models*\n\n` +
+          : `📹 *${branding.icon} PNP Live - Available Models*\n\n` +
             `🟢 *Online Now* | ⚪ *Available*\n\n` +
             `💃 *Select a model for your Private Show:*`;
         
@@ -184,12 +184,12 @@ No models are available at this time. Please try again later.`;
       ]);
 
       const message = lang === 'es'
-        ? `📹 *PNP Television Live - Selecciona un Modelo*
+        ? `📹 *PNP Live - Selecciona un Modelo*
 
 🟢 Online ahora | ⚪ Disponible | ⭐ Rating
 
 Elige un modelo para tu Show Privado:`
-        : `📹 *PNP Television Live - Select a Model*
+        : `📹 *PNP Live - Select a Model*
 
 🟢 Online now | ⚪ Available | ⭐ Rating
 
@@ -642,7 +642,7 @@ Choose a model for your Private Show:`;
       ];
 
       const message = lang === 'es'
-        ? `📹 *PNP Television Live - ${model.name}*
+        ? `📹 *PNP Live - ${model.name}*
 
 💃 *Opciones de Show Privado:*
 
@@ -666,8 +666,8 @@ Choose a model for your Private Show:`;
 🎁 El paquete más exclusivo
 
 ` +
-          `💰 *Selecciona la duración para tu experiencia PNP Television Live:*`
-        : `📹 *PNP Television Live - ${model.name}*
+          `💰 *Selecciona la duración para tu experiencia PNP Live:*`
+        : `📹 *PNP Live - ${model.name}*
 
 💃 *Private Show Options:*
 
@@ -691,7 +691,7 @@ Choose a model for your Private Show:`;
 🎁 The most exclusive package
 
 ` +
-          `💰 *Select duration for your PNP Television Live experience:*`;
+          `💰 *Select duration for your PNP Live experience:*`;
 
       await safeEditMessage(ctx, message, {
         parse_mode: 'Markdown',
@@ -767,7 +767,7 @@ Choose a model for your Private Show:`;
         : `${selectedDuration} minutes`;
 
       const message = lang === 'es'
-        ? `📅 *PNP Television Live - Selecciona una Fecha*
+        ? `📅 *PNP Live - Selecciona una Fecha*
 
 💃 Modelo: ${model.name}
 ⏱️ Duración: ${durationText}
@@ -776,7 +776,7 @@ Choose a model for your Private Show:`;
 📅 *Disponible solo Jueves a Lunes*
 
 Elige una fecha disponible:`
-        : `📅 *PNP Television Live - Select a Date*
+        : `📅 *PNP Live - Select a Date*
 
 💃 Model: ${model.name}
 ⏱️ Duration: ${durationText}
@@ -882,7 +882,7 @@ No time slots are available for this date. Please choose another date.`;
         : `${selectedDuration} minutes`;
 
       const message = lang === 'es'
-        ? `⏰ *PNP Television Live - Selecciona un Horario*
+        ? `⏰ *PNP Live - Selecciona un Horario*
 
 💃 Modelo: ${model.name}
 📅 Fecha: ${dateStr}
@@ -892,7 +892,7 @@ No time slots are available for this date. Please choose another date.`;
 🕒 *Horarios disponibles (10 AM - 10 PM):*
 
 Elige un horario para tu Show Privado:`
-        : `⏰ *PNP Television Live - Select a Time Slot*
+        : `⏰ *PNP Live - Select a Time Slot*
 
 💃 Model: ${model.name}
 📅 Date: ${dateStr}
@@ -1028,7 +1028,7 @@ Choose a time slot for your Private Show:`;
       }
 
       const message = lang === 'es'
-        ? `💰 *PNP Television Live - Método de Pago*
+        ? `💰 *PNP Live - Método de Pago*
 
 📹 *Show Privado con ${model.name}*
 📅 Fecha: ${selectedDate}
@@ -1042,7 +1042,7 @@ ${holdWarning}
 ✅ Soporte 24/7
 
 Selecciona tu método de pago:`
-        : `💰 *PNP Television Live - Payment Method*
+        : `💰 *PNP Live - Payment Method*
 
 📹 *Private Show with ${model.name}*
 📅 Date: ${selectedDate}
@@ -1133,7 +1133,7 @@ Select your payment method:`;
       const checkoutUrl = `${webhookDomain}/pnp/live/checkout/${booking.id}`;
 
       const message = lang === 'es'
-        ? `💳 *PNP Television Live - Pago con Tarjeta*
+        ? `💳 *PNP Live - Pago con Tarjeta*
 
 📹 *Show Privado con ${model.name}*
 💰 Total: $${price} USD
@@ -1146,7 +1146,7 @@ Select your payment method:`;
 ✅ Reembolso garantizado
 
 *Tu sala privada será creada inmediatamente después del pago.*`
-        : `💳 *PNP Television Live - Credit Card Payment*
+        : `💳 *PNP Live - Credit Card Payment*
 
 📹 *Private Show with ${model.name}*
 💰 Total: $${price} USD
@@ -1239,7 +1239,7 @@ Select your payment method:`;
       const checkoutUrl = `${webhookDomain}/pnp/live/daimo-checkout/${booking.id}`;
 
       const message = lang === 'es'
-        ? `₿ *PNP Television Live - Pago con Crypto*
+        ? `₿ *PNP Live - Pago con Crypto*
 
 📹 *Show Privado con ${model.name}*
 💰 Total: $${price} USDC
@@ -1252,7 +1252,7 @@ Select your payment method:`;
 ✅ Confirmación instantánea
 
 *Tu sala privada será creada inmediatamente después del pago.*`
-        : `₿ *PNP Television Live - Crypto Payment*
+        : `₿ *PNP Live - Crypto Payment*
 
 📹 *Private Show with ${model.name}*
 💰 Total: $${price} USDC
@@ -1291,10 +1291,10 @@ Select your payment method:`;
       
       if (bookings.length === 0) {
         const message = lang === 'es'
-          ? `📹 *No tienes reservas de PNP Television Live*
+          ? `📹 *No tienes reservas de PNP Live*
 
 Aún no has reservado ningún Show Privado.`
-          : `📹 *No PNP Television Live Bookings*
+          : `📹 *No PNP Live Bookings*
 
 You haven't booked any Private Shows yet.`;
         
@@ -1342,10 +1342,10 @@ You haven't booked any Private Shows yet.`;
 
       // Create message
       let message = lang === 'es'
-        ? `📹 *Mis Reservas de PNP Television Live*
+        ? `📹 *Mis Reservas de PNP Live*
 
 `
-        : `📹 *My PNP Television Live Bookings*
+        : `📹 *My PNP Live Bookings*
 
 `;
 
@@ -1445,13 +1445,13 @@ You haven't booked any Private Shows yet.`;
       ];
 
       const message = lang === 'es'
-        ? `🌟 *Califica tu Experiencia PNP Television Live*
+        ? `🌟 *Califica tu Experiencia PNP Live*
 
 📹 Show con ${model?.name || 'modelo'}
 📅 ${new Date(booking.booking_time).toLocaleDateString()}
 
 ¿Cómo calificarías tu experiencia? (1-5 estrellas)`
-        : `🌟 *Rate Your PNP Television Live Experience*
+        : `🌟 *Rate Your PNP Live Experience*
 
 📹 Show with ${model?.name || 'model'}
 📅 ${new Date(booking.booking_time).toLocaleDateString()}
@@ -1565,13 +1565,13 @@ Send a message with your comments or type "/skip" to skip.`;
 🌟 Calificación: ${'⭐'.repeat(rating)}
 💬 Comentarios: ${comments || 'Ninguno'}
 
-Tu feedback ayuda a mejorar PNP Television Live.`
+Tu feedback ayuda a mejorar PNP Live.`
           : `✅ *Thank You for Your Feedback!*
 
 🌟 Rating: ${'⭐'.repeat(rating)}
 💬 Comments: ${comments || 'None'}
 
-Your feedback helps improve PNP Television Live.`;
+Your feedback helps improve PNP Live.`;
         
         await ctx.reply(message, {
           parse_mode: 'Markdown',
@@ -1630,7 +1630,7 @@ Your feedback helps improve PNP Television Live.`;
       ];
 
       const message = lang === 'es'
-        ? `💸 *Solicitar Reembolso - PNP Television Live*
+        ? `💸 *Solicitar Reembolso - PNP Live*
 
 📹 Show con ${model?.name || 'modelo'}
 📅 ${new Date(booking.booking_time).toLocaleString()}
@@ -1638,7 +1638,7 @@ Your feedback helps improve PNP Television Live.`;
 *Selecciona el motivo del reembolso:*
 
 📝 *Nota:* Los reembolsos solo están disponibles dentro de los primeros 15 minutos después de la hora de inicio del show.`
-        : `💸 *Request Refund - PNP Television Live*
+        : `💸 *Request Refund - PNP Live*
 
 📹 Show with ${model?.name || 'model'}
 📅 ${new Date(booking.booking_time).toLocaleString()}
