@@ -101,57 +101,51 @@ const registerEnhancedProfileCards = (bot) => {
   function buildEnhancedMemberProfileCard(user, lang) {
     const isSpanish = lang === 'es';
     
-    // Build the profile card - only include user-submitted information
+    // Build the profile card in the requested format
     let text = '';
     
-    // Simple header with just the user's name
+    // Header: User Name - Badges - Bio - Looking For - Tribe
     text += '`👤 ' + (isSpanish ? 'PERFIL' : 'PROFILE') + '`\n\n';
-    text += `*${escapeMarkdown(getDisplayName(user))}*\n`;
     
-    // Username only (no Telegram ID)
+    // Line 1: User Name - Badges
+    const displayName = escapeMarkdown(getDisplayName(user));
+    text += `👑 *${displayName}*`;
+    
+    // Add badges if available
+    if (user.subscriptionStatus && user.subscriptionStatus !== 'basic') {
+      const tierInfo = getUserTierInfo(user);
+      text += ` ${tierInfo.badge}`;
+    }
+    text += '\n';
+    
+    // Line 2: Username
     if (user.username) {
-      text += `@${user.username}\n\n`;
+      text += `@${user.username}\n`;
+    }
+    
+    // Line 3: Bio (single line)
+    if (user.bio) {
+      // Show first line of bio only
+      const bioFirstLine = user.bio.split('\n')[0];
+      text += `📝 "${escapeMarkdown(bioFirstLine)}"\n`;
+    }
+    
+    // Line 4: Looking For - Tribe
+    if (user.lookingFor) {
+      text += `👀 ${isSpanish ? 'Buscando' : 'Looking for'}: ${user.lookingFor}`;
+    }
+    
+    // Add tribe if available
+    if (user.tribe) {
+      if (user.lookingFor) text += ` | `;
+      text += `🏷️ ${user.tribe}`;
+    }
+    
+    if (user.lookingFor || user.tribe) {
+      text += '\n\n';
     } else {
       text += '\n';
     }
-    
-    // Bio section - only if user provided one
-    if (user.bio) {
-      text += `📝 *${isSpanish ? 'Bio' : 'About Me'}:*\n`;
-      text += `"${escapeMarkdown(user.bio)}"\n\n`;
-    }
-    
-    // Interests - only if user provided any
-    if (user.interests && user.interests.length > 0) {
-      text += `🎯 *${isSpanish ? 'Intereses' : 'Interests'}:*\n`;
-      text += user.interests.map(interest => `• ${escapeMarkdown(interest)}`).join('\n') + '\n\n';
-    }
-    
-    // Location information - only if user provided it
-    if (user.location && (user.city || user.country)) {
-      text += `📍 *${isSpanish ? 'Ubicación' : 'Location'}:*\n`;
-      if (user.city) text += `🏙️ ${escapeMarkdown(user.city)}\n`;
-      if (user.country) text += `🌍 ${escapeMarkdown(user.country)}\n`;
-      text += '\n';
-    }
-    
-    // Social media links - only if user provided any
-    const socialLinks = getSocialMediaLinks(user);
-    if (socialLinks.length > 0) {
-      text += `🔗 *${isSpanish ? 'Redes Sociales' : 'Social Media'}:*\n`;
-      text += socialLinks.join('\n') + '\n\n';
-    }
-    
-    // Additional personal info - only if user provided any
-    if (user.age || user.gender || user.lookingFor) {
-      text += `💞 *${isSpanish ? 'Información Personal' : 'Personal Info'}:*\n`;
-      if (user.age) text += `🎂 ${isSpanish ? 'Edad' : 'Age'}: ${user.age}\n`;
-      if (user.gender) text += `👤 ${isSpanish ? 'Género' : 'Gender'}: ${user.gender}\n`;
-      if (user.lookingFor) text += `👀 ${isSpanish ? 'Buscando' : 'Looking For'}: ${user.lookingFor}\n\n`;
-    }
-    
-    // Simple footer
-    text += `💬 *${isSpanish ? 'Enviar mensaje' : 'Send message'}:* [👉 ${isSpanish ? 'Haz clic aquí' : 'Click here'}]`;
     
     return { text };
   }
@@ -247,12 +241,37 @@ const registerEnhancedProfileCards = (bot) => {
 
   /**
    * Create member profile buttons
+   * Inline menu format: [Interests] [X] [FB] [IG]
    */
   function createMemberProfileButtons(user, userId, lang) {
     const isSpanish = lang === 'es';
     const buttons = [];
     
-    // Contact button
+    // Inline menu row: [Interests] [X] [FB] [IG]
+    const inlineMenuButtons = [];
+    
+    // Interests button (if user has interests)
+    if (user.interests && user.interests.length > 0) {
+      inlineMenuButtons.push(Markup.button.callback('🎯', 'show_interests'));
+    }
+    
+    // Social media buttons
+    if (user.twitter) {
+      inlineMenuButtons.push(Markup.button.url('𝕏', `https://twitter.com/${user.twitter}`));
+    }
+    if (user.facebook) {
+      inlineMenuButtons.push(Markup.button.url('📘', `https://facebook.com/${user.facebook}`));
+    }
+    if (user.instagram) {
+      inlineMenuButtons.push(Markup.button.url('📸', `https://instagram.com/${user.instagram}`));
+    }
+    
+    // Add inline menu row if we have any buttons
+    if (inlineMenuButtons.length > 0) {
+      buttons.push(inlineMenuButtons);
+    }
+    
+    // Contact button (separate row)
     if (user.username) {
       buttons.push([
         Markup.button.url(`💬 ${isSpanish ? 'Mensaje' : 'Message'}`, `https://t.me/${user.username}`)
@@ -261,24 +280,6 @@ const registerEnhancedProfileCards = (bot) => {
       buttons.push([
         Markup.button.url(`💬 ${isSpanish ? 'Mensaje' : 'Message'}`, `tg://user?id=${userId}`)
       ]);
-    }
-    
-    // Additional actions
-    const actionButtons = [];
-    
-    // Add social buttons if available
-    if (user.instagram) {
-      actionButtons.push(Markup.button.url('📸 Instagram', `https://instagram.com/${user.instagram}`));
-    }
-    if (user.twitter) {
-      actionButtons.push(Markup.button.url('𝕏 Twitter', `https://twitter.com/${user.twitter}`));
-    }
-    if (user.tiktok) {
-      actionButtons.push(Markup.button.url('🎵 TikTok', `https://tiktok.com/@${user.tiktok}`));
-    }
-    
-    if (actionButtons.length > 0) {
-      buttons.push(actionButtons);
     }
     
     // Back button
