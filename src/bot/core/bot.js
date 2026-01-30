@@ -55,7 +55,6 @@ const registerRoleManagementHandlers = require('../handlers/admin/roleManagement
 const registerGamificationHandlers = require('../handlers/admin/gamification');
 const registerLiveStreamManagementHandlers = require('../handlers/admin/liveStreamManagement');
 const registerRadioManagementHandlers = require('../handlers/admin/radioManagement');
-const registerPNPLiveManagementHandlers = require('../handlers/admin/pnpLiveManagement');
 const registerPNPLiveModelHandlers = require('../handlers/model/pnpLiveModelHandler');
 const { registerWallOfFameHandlers } = require('../handlers/group/wallOfFame');
 const registerPrivateCallHandlers = require('../handlers/user/privateCalls');
@@ -264,7 +263,6 @@ const startBot = async () => {
     // Register handlers
     registerUserHandlers(bot);
     registerAdminHandlers(bot); // This registers gamification, radio, live streams, community premium, and community posts handlers
-    registerPNPLiveManagementHandlers(bot); // Register PNP Television Live management handlers
     registerPNPLiveModelHandlers(bot); // Register PNP Live model self-service handlers
     registerPaymentHandlers(bot);
     registerMediaHandlers(bot);
@@ -576,7 +574,7 @@ const startBot = async () => {
     apiApp.use(expressErrorHandler);
     logger.info('✓ Error handlers registered');
     // Start API server
-    const PORT = process.env.PORT || 3000;
+    const PORT = process.env.PORT || 3001;
     const server = apiApp.listen(PORT, '0.0.0.0', () => {
       logger.info(`✓ API server running on port ${PORT}`);
     });
@@ -592,7 +590,7 @@ const startBot = async () => {
     logger.warn('⚠️  Bot encountered a critical error but will attempt to keep process alive');
     logger.warn('⚠️  Some features may not work properly. Check logs above for details.');
     try {
-      const PORT = process.env.PORT || 3000;
+      const PORT = process.env.PORT || 3001;
       apiApp.listen(PORT, '0.0.0.0', () => {
         logger.info(`⚠️  Emergency API server running on port ${PORT} (degraded mode)`);
         logger.info('Bot is NOT fully functional. Fix configuration and restart.');

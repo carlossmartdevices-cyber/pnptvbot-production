@@ -262,6 +262,25 @@ class EmailService {
     }
 
     /**
+     * Send reactivation email
+     * @param {Object} data - Reactivation email data
+     * @returns {Promise<Object>} Send result
+     */
+    async sendReactivationEmail(data) {
+        const { email, userName = 'PNP Latino Member', lifetimeDealLink, telegramLink, userLanguage = 'es' } = data;
+
+        const subject = userLanguage === 'es' ? '🔥 PNP Latino TV Está de Vuelta 🔥' : '🔥 PNP Latino TV IS BACK 🔥';
+        const html = this.getReactivationEmailTemplate({ lifetimeDealLink, telegramLink, language: userLanguage });
+
+        return await this.send({
+            to: email,
+            subject: subject,
+            html,
+            from: 'noreply@pnptv.app'
+        });
+    }
+
+    /**
      * Send recording ready notification
      * @param {Object} data - Recording data
      * @returns {Promise<Object>} Send result
@@ -280,8 +299,8 @@ class EmailService {
             roomTitle,
             recordingUrl,
             downloadUrl,
-            duration,
-            fileSize
+            fileSize,
+            duration
         });
 
         return await this.send({
@@ -459,10 +478,10 @@ class EmailService {
         const isSpanish = language === 'es';
 
         const welcomeTitle = isSpanish ? '¡Bienvenido a PNP TV Bot!' : 'Welcome to PNP TV Bot!';
-        const greeting = isSpanish ? `Estimado ${userName},` : `Dear ${userName},`;
+        const greeting = isSpanish ? `¡Hola ${userName},` : `Hello ${userName},`;
         const welcomeMessage = isSpanish 
-            ? '¡Estamos encantados de darle la bienvenida a la comunidad de PNP TV! Nuestro bot y canal de Telegram están diseñados para brindarle una experiencia emocionante y atractiva.'
-            : 'We\'re thrilled to welcome you to the PNP TV community! Our Telegram bot and channel are designed to provide you with an exciting and engaging experience.';
+            ? '¡Estamos encantados de darte la bienvenida a la comunidad de PNP TV! Prepárate para una experiencia emocionante y atractiva con nuestro bot y canal de Telegram.'
+            : 'We\'re thrilled to welcome you to the PNP TV community! Get ready for an exciting and engaging experience with our Telegram bot and channel.';
         
         const whatIsPNP = isSpanish ? '¿Qué es PNP TV?' : 'What is PNP TV?';
         const communityDesc = isSpanish 
@@ -498,7 +517,7 @@ class EmailService {
         ];
         
         const getStarted = isSpanish 
-            ? 'Para comenzar y obtener más información sobre lo que ofrecemos, visite nuestra página de inicio:'
+            ? 'Para comenzar y obtener más información sobre lo que ofrecemos, visita nuestra página de inicio:'
             : 'To get started and learn more about what we offer, visit our landing page:';
         
         const buttonText = isSpanish ? 'Visitar Página de Inicio de PNP TV' : 'Visit PNP TV Landing Page';
@@ -511,7 +530,7 @@ class EmailService {
         const teamName = isSpanish ? 'El Equipo de PNP TV' : 'The PNP TV Team';
         
         const footerText = isSpanish 
-            ? 'Si tiene alguna pregunta, no dude en ponerse en contacto con nuestro equipo de soporte.'
+            ? 'Si tienes alguna pregunta, no dudes en ponerte en contacto con nuestro equipo de soporte.'
             : 'If you have any questions, please don\'t hesitate to contact our support team.';
 
         return `
@@ -522,41 +541,79 @@ class EmailService {
     <title>${welcomeTitle}</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #ffffff;
+            background-color: #0b0b0f; /* Dark background */
+        }
+        .container {
+            background-color: #1a1a2e; /* Slightly lighter dark background for content */
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 229, 255, 0.2); /* Neon blue shadow */
             padding: 20px;
+            margin: 20px auto; /* Center on page */
+            max-width: 600px;
+            border: 1px solid #ff00cc; /* Fuchsia border */
         }
         .header {
-            background-color: #4a148c;
-            color: white;
-            padding: 20px;
             text-align: center;
-            border-radius: 5px 5px 0 0;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #00e5ff; /* Neon blue divider */
+            margin-bottom: 20px;
         }
-        .content {
-            padding: 20px;
-            background-color: #f9f9f9;
-            border-radius: 0 0 5px 5px;
+        h1 {
+            color: #ff00cc; /* Fuchsia */
+            font-size: 32px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 10px rgba(255, 0, 204, 0.7); /* Neon glow */
         }
-        .button {
+        h2 {
+            color: #00e5ff; /* Neon Blue */
+            font-size: 24px;
+            margin-top: 0;
+            text-shadow: 0 0 8px rgba(0, 229, 255, 0.7); /* Neon glow */
+        }
+        p {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #dddddd;
+            margin-bottom: 15px;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 15px;
+        }
+        li {
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+            color: #dddddd;
+        }
+        li::before {
+            content: '✨'; /* Sparkle bullet */
+            position: absolute;
+            left: 0;
+            color: #00e5ff;
+        }
+        .button-primary {
             display: inline-block;
-            background-color: #4a148c;
-            color: white;
-            padding: 10px 20px;
+            background-color: #ff00cc; /* Fuchsia */
+            color: #ffffff !important;
+            padding: 15px 30px;
             text-decoration: none;
-            border-radius: 5px;
-            margin: 20px 0;
+            border-radius: 50px; /* Pill shape */
+            font-weight: bold;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 0, 204, 0.4);
+            border: none;
         }
-        .attachment-note {
-            background-color: #e8f5e9;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-            text-align: center;
-            font-style: italic;
+        .button-primary:hover {
+            background-color: #e600b8; /* Darker fuchsia on hover */
+            box-shadow: 0 6px 20px rgba(255, 0, 204, 0.6);
+            transform: translateY(-2px);
         }
         .hot-content-banner {
             background: linear-gradient(45deg, #ff1744, #f50057);
@@ -575,66 +632,97 @@ class EmailService {
             font-style: italic;
             margin-top: 8px;
         }
+        .attachment-note {
+            background-color: #16213e; /* Dark blue for note */
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+            font-style: italic;
+            color: #00e5ff;
+            border: 1px solid #00e5ff;
+        }
         .footer {
-            margin-top: 20px;
+            margin-top: 30px;
             font-size: 12px;
             color: #777;
             text-align: center;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding-top: 15px;
+        }
+        .highlight {
+            color: #00e5ff; /* Highlight words with neon blue */
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>${welcomeTitle}</h1>
-    </div>
-    <div class="content">
-        <p>${greeting}</p>
-        <p>${welcomeMessage}</p>
-        
-        <div class="hot-content-banner">
-            🔥 HOT PNP ADULT CONTENT 🔥
-            <div class="hot-content-text">
-                ${isSpanish 
-                    ? '¡El corazón de nuestra comunidad es el contenido adulto PNP caliente creado por Santino y Lex!' 
-                    : 'The core of our community is the HOT PNP adult content created by Santino and Lex!'}
-            </div>
-            <div style="margin-top: 8px; font-size: 14px;">
-                🎬 Clouds & Slamming - 100% REAL 🎬
-            </div>
-        </div>
-        
-        <h2>${whatIsPNP}</h2>
-        <p>${communityDesc}</p>
-        <ul>
-            ${communityBenefits.map(benefit => `<li>${benefit}</li>`).join('')}
-        </ul>
-        
-        <p>${botFeaturesDesc}</p>
-        <ul>
-            ${botFeatures.map(feature => `<li>${feature}</li>`).join('')}
-        </ul>
-        
-        <div class="attachment-note">
-            ${isSpanish 
-                ? '📎 ¡Hemos incluido algunos documentos útiles como archivos adjuntos para ayudarle a comenzar!' 
-                : '📎 We\'ve included some helpful documents as attachments to get you started!'}
-        </div>
-        
-        <p>${getStarted}</p>
-        
-        <div style="text-align: center;">
-            <a href="https://pnptv.app/landing.html" class="button">${buttonText}</a>
-        </div>
-        
-        <p>${excitedMessage}</p>
-        
-        <p>${regards}<br>
-        ${teamName}</p>
-    </div>
-    <div class="footer">
-        <p>© ${new Date().getFullYear()} PNP TV. All rights reserved.</p>
-        <p>${footerText}</p>
-    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0b0b0f;">
+        <tr>
+            <td align="center">
+                <table class="container" width="600" cellpadding="20" cellspacing="0">
+                    <tr>
+                        <td class="header">
+                            <h1>${welcomeTitle}</h1>
+                            <h2>${isSpanish ? '¡Tu comunidad te espera!' : 'Your Community Awaits!'}</h2>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <p>${greeting}</p>
+                            <p>${welcomeMessage}</p>
+                            
+                            <div class="hot-content-banner">
+                                🔥 HOT PNP ADULT CONTENT 🔥
+                                <div class="hot-content-text">
+                                    ${isSpanish 
+                                        ? '¡El corazón de nuestra comunidad es el contenido adulto PNP caliente creado por Santino y Lex!' 
+                                        : 'The core of our community is the HOT PNP adult content created by Santino and Lex!'}
+                                </div>
+                                <div style="margin-top: 8px; font-size: 14px;">
+                                    🎬 Clouds & Slamming - 100% REAL 🎬
+                                </div>
+                            </div>
+                            
+                            <h2>${whatIsPNP}</h2>
+                            <p>${communityDesc}</p>
+                            <ul>
+                                ${communityBenefits.map(benefit => `<li>${benefit}</li>`).join('')}
+                            </ul>
+                            
+                            <h2>${botFeaturesDesc}</h2>
+                            <ul>
+                                ${botFeatures.map(feature => `<li>${feature}</li>`).join('')}
+                            </ul>
+                            
+                            <div class="attachment-note">
+                                ${isSpanish 
+                                    ? '📎 ¡Hemos incluido algunos documentos útiles como archivos adjuntos para ayudarte a comenzar!' 
+                                    : '📎 We\'ve included some helpful documents as attachments to help you get started!'}
+                            </div>
+                            
+                            <p>${getStarted}</p>
+                            
+                            <div style="text-align: center; margin-top: 20px;">
+                                <a href="https://pnptv.app/landing.html" class="button-primary">${buttonText}</a>
+                            </div>
+                            
+                            <p style="text-align: center; margin-top: 30px;">${excitedMessage}</p>
+                            
+                            <p>${regards}<br>
+                            ${teamName}</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="footer">
+                            <p>© ${new Date().getFullYear()} PNP TV. All rights reserved.</p>
+                            <p>${footerText}</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
         `;
@@ -716,6 +804,565 @@ class EmailService {
     }
 
     /**
+     * Send invoice email to user
+     * @param {Object} data - Invoice email data
+     * @returns {Promise<Object>} Send result
+     */
+    async sendInvoiceEmail(data) {
+        const {
+            email,
+            userName = 'Customer',
+            invoiceNumber,
+            orderDate,
+            items = [], // Array of { description, quantity, unitPrice, total }
+            subtotal,
+            tax = 0,
+            total,
+            currency = 'USD',
+            paymentMethod,
+            storeName = 'Easy Bots Store',
+            storeAddress = 'Bucaramanga, Colombia',
+            contactEmail = 'support@easybots.store'
+        } = data;
+
+        const html = this._getInvoiceEmailTemplate({
+            userName,
+            invoiceNumber,
+            orderDate,
+            items,
+            subtotal,
+            tax,
+            total,
+            currency,
+            paymentMethod,
+            storeName,
+            storeAddress,
+            contactEmail
+        });
+
+        return await this.send({
+            to: email,
+            subject: `Invoice #${invoiceNumber} from ${storeName}`,
+            html,
+            from: 'noreply@pnptv.app' // Explicitly setting the 'from' address
+        });
+    }
+
+    /**
+     * Get invoice email template
+     * @param {Object} data - Template data
+     * @returns {string} HTML template
+     */
+    _getInvoiceEmailTemplate(data) {
+        const {
+            userName,
+            invoiceNumber,
+            orderDate,
+            items,
+            subtotal,
+            tax,
+            total,
+            currency,
+            paymentMethod,
+            storeName,
+            storeAddress,
+            contactEmail
+        } = data;
+
+        const formatDate = (dateString) => {
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            return new Date(dateString).toLocaleDateString('en-US', options);
+        };
+
+        const formatCurrency = (amount, currencyCode = 'USD') => {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: currencyCode,
+            }).format(amount);
+        };
+
+        const itemsHtml = items.map(item => `
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #3a3a4a; color: #dddddd;">${item.description}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #3a3a4a; text-align: right; color: #dddddd;">${item.quantity}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #3a3a4a; text-align: right; color: #dddddd;">${formatCurrency(item.unitPrice, currency)}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #3a3a4a; text-align: right; color: #dddddd;">${formatCurrency(item.total, currency)}</td>
+            </tr>
+        `).join('');
+
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice #${invoiceNumber} from ${storeName}</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #ffffff;
+            background-color: #0b0b0f; /* Dark background */
+        }
+        .container {
+            background-color: #1a1a2e; /* Slightly lighter dark background for content */
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 229, 255, 0.2); /* Neon blue shadow */
+            padding: 30px;
+            margin: 20px auto; /* Center on page */
+            max-width: 600px;
+            border: 1px solid #ff00cc; /* Fuchsia border */
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #00e5ff; /* Neon blue divider */
+            margin-bottom: 30px;
+        }
+        h1 {
+            color: #ff00cc; /* Fuchsia */
+            font-size: 32px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 10px rgba(255, 0, 204, 0.7); /* Neon glow */
+        }
+        h2 {
+            color: #00e5ff; /* Neon Blue */
+            font-size: 24px;
+            margin-top: 0;
+            text-shadow: 0 0 8px rgba(0, 229, 255, 0.7); /* Neon glow */
+        }
+        p {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #dddddd;
+            margin-bottom: 10px;
+        }
+        .invoice-details, .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .invoice-details th, .invoice-details td, .summary-table th, .summary-table td {
+            padding: 10px;
+            border: 1px solid #3a3a4a;
+            text-align: left;
+            color: #dddddd;
+        }
+        .invoice-details th, .summary-table th {
+            background-color: #0d0d12;
+            color: #00e5ff;
+        }
+        .summary-table td {
+            text-align: right;
+        }
+        .total-row {
+            background-color: #ff00cc; /* Fuchsia for total */
+            color: #ffffff;
+            font-weight: bold;
+        }
+        .total-row td {
+            color: #ffffff !important;
+            border-top: 2px solid #00e5ff;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            color: #888;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0b0b0f;">
+        <tr>
+            <td align="center">
+                <table class="container" width="600" cellpadding="20" cellspacing="0">
+                    <tr>
+                        <td class="header">
+                            <h1>Invoice from ${storeName}</h1>
+                            <h2>#${invoiceNumber}</h2>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <p>Dear ${userName},</p>
+                            <p>Thank you for your recent purchase from ${storeName}. Here are the details of your order:</p>
+
+                            <table class="invoice-details">
+                                <tr>
+                                    <th>Invoice Number:</th>
+                                    <td>${invoiceNumber}</td>
+                                </tr>
+                                <tr>
+                                    <th>Order Date:</th>
+                                    <td>${formatDate(orderDate)}</td>
+                                </tr>
+                                <tr>
+                                    <th>Payment Method:</th>
+                                    <td>${paymentMethod}</td>
+                                </tr>
+                            </table>
+
+                            <table class="summary-table">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align: left;">Description</th>
+                                        <th style="text-align: right;">Qty</th>
+                                        <th style="text-align: right;">Unit Price</th>
+                                        <th style="text-align: right;">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${itemsHtml}
+                                    <tr>
+                                        <td colspan="3" style="padding: 8px; border-bottom: 1px solid #3a3a4a; text-align: right; color: #dddddd;">Subtotal</td>
+                                        <td style="padding: 8px; border-bottom: 1px solid #3a3a4a; text-align: right; color: #dddddd;">${formatCurrency(subtotal, currency)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3" style="padding: 8px; border-bottom: 1px solid #3a3a4a; text-align: right; color: #dddddd;">Tax</td>
+                                        <td style="padding: 8px; border-bottom: 1px solid #3a3a4a; text-align: right; color: #dddddd;">${formatCurrency(tax, currency)}</td>
+                                    </tr>
+                                    <tr class="total-row">
+                                        <td colspan="3" style="padding: 8px; text-align: right;">Total Due</td>
+                                        <td style="padding: 8px; text-align: right;">${formatCurrency(total, currency)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <p style="text-align: center; margin-top: 30px;">
+                                If you have any questions about this invoice, please contact us at <a href="mailto:${contactEmail}" style="color: #00e5ff; text-decoration: none;">${contactEmail}</a>.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="footer">
+                            <p>${storeName} | ${storeAddress}</p>
+                            <p>© ${new Date().getFullYear()} ${storeName}. All rights reserved.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+        `;
+    }
+
+    /**
+     * Get reactivation email template
+     * @param {Object} data - Template data
+     * @returns {string} HTML template
+     */
+    getReactivationEmailTemplate(data) {
+        const { lifetimeDealLink = "https://pnptv.app/lifetime100", telegramLink = "https://t.me/pnplatinotv_bot", language = 'es' } = data;
+
+        const spanishTemplate = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>PNP Latino TV Está de Vuelta</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #ffffff;
+      background-color: #0b0b0f; /* Dark background */
+    }
+    .container {
+      background-color: #1a1a2e; /* Slightly lighter dark background for content */
+      border-radius: 15px;
+      box-shadow: 0 8px 25px rgba(0, 229, 255, 0.2); /* Neon blue shadow */
+      padding: 20px;
+      margin: 20px auto; /* Center on page */
+      max-width: 600px;
+      border: 1px solid #00e5ff; /* Neon blue border */
+    }
+    .header {
+      text-align: center;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #ff00cc; /* Fuchsia divider */
+      margin-bottom: 20px;
+    }
+    h1 {
+      color: #ff00cc; /* Fuchsia */
+      font-size: 32px;
+      margin-bottom: 5px;
+      text-shadow: 0 0 10px rgba(255, 0, 204, 0.7); /* Neon glow */
+    }
+    h2 {
+      color: #00e5ff; /* Neon Blue */
+      font-size: 24px;
+      margin-top: 0;
+      text-shadow: 0 0 8px rgba(0, 229, 255, 0.7); /* Neon glow */
+    }
+    p {
+      font-size: 16px;
+      line-height: 1.6;
+      color: #dddddd;
+      margin-bottom: 15px;
+    }
+    .button-primary {
+      display: inline-block;
+      background-color: #ff00cc; /* Fuchsia */
+      color: #ffffff !important;
+      padding: 15px 30px;
+      text-decoration: none;
+      border-radius: 50px; /* Pill shape */
+      font-weight: bold;
+      font-size: 18px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(255, 0, 204, 0.4);
+      border: none;
+    }
+    .button-primary:hover {
+      background-color: #e600b8; /* Darker fuchsia on hover */
+      box-shadow: 0 6px 20px rgba(255, 0, 204, 0.6);
+      transform: translateY(-2px);
+    }
+    .button-secondary {
+      color: #00e5ff !important; /* Neon Blue */
+      font-size: 16px;
+      text-decoration: none;
+      font-weight: bold;
+      transition: color 0.3s ease;
+    }
+    .button-secondary:hover {
+      color: #00b8cc !important; /* Darker neon blue on hover */
+    }
+    .footer-text {
+      font-size: 13px;
+      color: #666666;
+      margin-top: 20px;
+    }
+    .highlight {
+      color: #00e5ff; /* Highlight words with neon blue */
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0b0b0f;">
+    <tr>
+      <td align="center">
+        <table class="container" width="600" cellpadding="20" cellspacing="0">
+          
+          <tr>
+            <td class="header">
+              <h1>🔥 PNP LATINO TV ESTÁ DE VUELTA 🔥</h1>
+              <h2>Más Caliente Que Nunca</h2>
+            </td>
+          </tr>
+
+          <tr>
+            <td>
+              <p>
+                <span class="highlight">PNP Latino TV</span> está de vuelta — <span class="highlight">más 🔥 que nunca</span>.
+              </p>
+              <p>
+                Después de cada intento de cierre, nos levantamos más fuertes, trayéndote el contenido que amas y un bot de nueva generación construido para mantener a nuestra comunidad más unida que nunca.
+              </p>
+              <p>
+                Disfruta de tus videos favoritos, explora nuevas experiencias como Nearby, Hangouts, Videorama y PNP Live, y reconecta con un espacio donde la <span class="highlight">libertad, la conexión y el placer</span> se encuentran.
+              </p>
+              <p style="text-align: center; font-style: italic; font-size: 18px; color: #ff00cc;">
+                Tu espacio. Tu gente. Tu momento.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding-top: 0;">
+              <a href="${lifetimeDealLink}" class="button-primary">
+                🔥 Lifetime Hot Deal
+              </a>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center">
+              <p style="margin-bottom: 0;">Suscríbete ahora y vuelve a encender el 🔥.</p>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding-top: 10px;">
+              <a href="${telegramLink}" class="button-secondary">
+                Suscríbete al canal y únete a la comunidad
+              </a>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" class="footer-text">
+              PNP Latino TV — Comunidad • Conexión • Placer
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+        const englishTemplate = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>PNP Latino TV Is Back</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #ffffff;
+      background-color: #0b0b0f; /* Dark background */
+    }
+    .container {
+      background-color: #1a1a2e; /* Slightly lighter dark background for content */
+      border-radius: 15px;
+      box-shadow: 0 8px 25px rgba(0, 229, 255, 0.2); /* Neon blue shadow */
+      padding: 20px;
+      margin: 20px auto; /* Center on page */
+      max-width: 600px;
+      border: 1px solid #00e5ff; /* Neon blue border */
+    }
+    .header {
+      text-align: center;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #ff00cc; /* Fuchsia divider */
+      margin-bottom: 20px;
+    }
+    h1 {
+      color: #ff00cc; /* Fuchsia */
+      font-size: 32px;
+      margin-bottom: 5px;
+      text-shadow: 0 0 10px rgba(255, 0, 204, 0.7); /* Neon glow */
+    }
+    h2 {
+      color: #00e5ff; /* Neon Blue */
+      font-size: 24px;
+      margin-top: 0;
+      text-shadow: 0 0 8px rgba(0, 229, 255, 0.7); /* Neon glow */
+    }
+    p {
+      font-size: 16px;
+      line-height: 1.6;
+      color: #dddddd;
+      margin-bottom: 15px;
+    }
+    .button-primary {
+      display: inline-block;
+      background-color: #ff00cc; /* Fuchsia */
+      color: #ffffff !important;
+      padding: 15px 30px;
+      text-decoration: none;
+      border-radius: 50px; /* Pill shape */
+      font-weight: bold;
+      font-size: 18px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(255, 0, 204, 0.4);
+      border: none;
+    }
+    .button-primary:hover {
+      background-color: #e600b8; /* Darker fuchsia on hover */
+      box-shadow: 0 6px 20px rgba(255, 0, 204, 0.6);
+      transform: translateY(-2px);
+    }
+    .button-secondary {
+      color: #00e5ff !important; /* Neon Blue */
+      font-size: 16px;
+      text-decoration: none;
+      font-weight: bold;
+      transition: color 0.3s ease;
+    }
+    .button-secondary:hover {
+      color: #00b8cc !important; /* Darker neon blue on hover */
+    }
+    .footer-text {
+      font-size: 13px;
+      color: #666666;
+      margin-top: 20px;
+    }
+    .highlight {
+      color: #00e5ff; /* Highlight words with neon blue */
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0b0b0f;">
+    <tr>
+      <td align="center">
+        <table class="container" width="600" cellpadding="20" cellspacing="0">
+          
+          <tr>
+            <td class="header">
+              <h1>🔥 PNP Latino TV IS BACK 🔥</h1>
+              <h2>Hotter Than Ever</h2>
+            </td>
+          </tr>
+
+          <tr>
+            <td>
+              <p>
+                <span class="highlight">PNP Latino TV</span> is back — <span class="highlight">hotter than ever</span>.
+              </p>
+              <p>
+                After every shutdown attempt, we rise stronger, bringing you the content you love and a new generation bot built to keep our community closer than ever.
+              </p>
+              <p>
+                Enjoy your favorite videos, explore new experiences like Nearby, Hangouts, Videorama, and PNP Live, and reconnect with a space where <span class="highlight">freedom, connection, and pleasure</span> meet.
+              </p>
+              <p style="text-align: center; font-style: italic; font-size: 18px; color: #ff00cc;">
+                Your space. Your people. Your moment.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding-top: 0;">
+              <a href="${lifetimeDealLink}" class="button-primary">
+                🔥 Lifetime Hot Deal
+              </a>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center">
+              <p style="margin-bottom: 0;">Subscribe now and turn the heat back on. 🔥</p>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding-top: 10px;">
+              <a href="${telegramLink}" class="button-secondary">
+                Join the community & subscribe to our channel
+              </a>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" class="footer-text">
+              PNP Latino TV — Community • Connection • Pleasure
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+        return language === 'es' ? spanishTemplate : englishTemplate;
+    }
+
+    /**
      * Strip HTML tags from string
      * @param {string} html - HTML string
      * @returns {string} Plain text
@@ -745,5 +1392,6 @@ class EmailService {
         }
     }
 }
+
 
 module.exports = new EmailService();

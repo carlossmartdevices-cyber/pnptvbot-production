@@ -3,6 +3,7 @@ const { t } = require('../../utils/i18n');
 const { isValidEmail } = require('../../utils/validation');
 const logger = require('../../utils/logger');
 const UserModel = require('../../models/userModel');
+const sanitize = require('../../utils/sanitizer');
 
 /**
  * Handle language selection
@@ -466,24 +467,30 @@ async function completeOnboarding(ctx) {
 async function showMainMenu(ctx) {
   const lang = ctx.session.language || 'en';
 
+  // Sanitize the intro text
+  const introText = sanitize.telegramMarkdown(t('mainMenuIntro', lang));
+
   await ctx.reply(
-    t('mainMenuIntro', lang),
+    introText,
     Markup.inlineKeyboard([
       [
-        Markup.button.callback(t('subscribe', lang), 'show_subscription_plans'),
+        // Sanitize button texts
+        Markup.button.callback(sanitize.telegramMarkdown(t('subscribe', lang)), 'show_subscription_plans'),
       ],
       [
-        Markup.button.callback(t('myProfile', lang), 'show_profile'),
-        Markup.button.callback(t('nearbyUsers', lang), 'show_nearby_unified'),
+        Markup.button.callback(sanitize.telegramMarkdown(t('myProfile', lang)), 'show_profile'),
+        Markup.button.callback(sanitize.telegramMarkdown(t('nearbyUsers', lang)), 'show_nearby_unified'),
       ],
       [
-        Markup.button.callback(t('liveStreams', lang), 'show_live'),
+        Markup.button.callback(sanitize.telegramMarkdown(t('liveStreams', lang)), 'show_live'),
       ],
       [
-        Markup.button.callback(t('support', lang), 'show_support'),
-        Markup.button.callback(t('settings', lang), 'show_settings'),
+        Markup.button.callback(sanitize.telegramMarkdown(t('support', lang)), 'show_support'),
+        Markup.button.callback(sanitize.telegramMarkdown(t('settings', lang)), 'show_settings'),
       ],
-    ])
+    ]),
+    // Explicitly set parse_mode
+    { parse_mode: 'MarkdownV2' }
   );
 }
 
