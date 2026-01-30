@@ -18,6 +18,7 @@ const broadcastUtils = require('../../utils/broadcastUtils');
 const performanceUtils = require('../../utils/performanceUtils');
 const uxUtils = require('../../utils/uxUtils');
 const BroadcastButtonModel = require('../../../models/broadcastButtonModel');
+const supportRoutingService = require('../../services/supportRoutingService');
 
 // Use shared utilities
 const { sanitizeInput } = broadcastUtils;
@@ -280,13 +281,13 @@ async function showBroadcastResumePrompt(ctx) {
   const step = ctx.session?.temp?.broadcastStep;
   const label = getBroadcastStepLabel(step, lang);
   await ctx.editMessageText(
-    `⚠️ Tienes un broadcast en progreso.\n\n*Estado:* ${label}\n\n¿Deseas reanudar o reiniciar?`,
+    t('broadcastResumePrompt', lang, { stepLabel: label }),
     {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
-        [Markup.button.callback('▶️ Reanudar', 'broadcast_resume')],
-        [Markup.button.callback('🔁 Reiniciar', 'broadcast_restart')],
-        [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+        [Markup.button.callback(t('broadcastResume', lang), 'broadcast_resume')],
+        [Markup.button.callback(t('broadcastRestart', lang), 'broadcast_restart')],
+        [Markup.button.callback(t('back', lang), 'admin_cancel')],
       ]),
     },
   );
@@ -378,14 +379,12 @@ async function renderBroadcastStep(ctx) {
 
   if (step === 'media') {
     const message = await ctx.editMessageText(
-      '📎 *Paso 2/5: Subir Media (Opcional)*\n\n'
-      + 'Envía una imagen, video o archivo para adjuntar al broadcast.\n\n'
-      + '💡 También puedes saltar este paso si solo quieres enviar texto.',
+      t('broadcastStepMedia', lang),
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback('⏭️ Saltar (Solo Texto)', 'broadcast_skip_media')],
-          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          [Markup.button.callback(t('broadcastSkipMedia', lang), 'broadcast_skip_media')],
+          [Markup.button.callback(t('cancel', lang), 'admin_cancel')],
         ]),
       },
     );
@@ -559,6 +558,7 @@ async function showAdminPanel(ctx, edit = false) {
       buttons.push([
         Markup.button.callback('📦 Cola', 'admin_queue_status'),
         Markup.button.callback('👁️ Vista Previa', 'admin_view_mode'),
+        Markup.button.callback('🎫 Tickets de Soporte', 'admin_support_tickets'),
       ]);
     }
 
@@ -1111,15 +1111,14 @@ let registerAdminHandlers = (bot) => {
       // Broadcast flow must run in private chat, otherwise session state splits across chats/topics
       if (ctx.chat?.type !== 'private') {
         const botUsername = process.env.BOT_USERNAME || 'pnplatinotv_bot';
-        await ctx.editMessageText(
-          '⚠️ Para enviar un broadcast, abre el bot en privado.\n\nEsto evita que el proceso se quede atascado entre topics/chats.',
-          Markup.inlineKeyboard([
-            [Markup.button.url('🔗 Abrir bot', `https://t.me/${botUsername}`)],
-            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
-          ]),
-        );
-        return;
-      }
+              await ctx.editMessageText(
+                t('broadcastPrivateChatRequired', lang, { botUsername }),
+                Markup.inlineKeyboard([
+                    [Markup.button.url(t('broadcastOpenBotPrivate', lang), `https://t.me/${botUsername}`)],
+                    [Markup.button.callback(t('cancel', lang), 'admin_cancel')],
+                ]),
+              );
+              return;      }
 
       // If there's an in-progress broadcast, offer resume/restart instead of resetting silently
       const existingStep = ctx.session?.temp?.broadcastStep;
@@ -1133,15 +1132,15 @@ let registerAdminHandlers = (bot) => {
       await ctx.saveSession();
 
       await ctx.editMessageText(
-        '📢 *Asistente de Difusión*\n\n🎯 *Paso 1/5: Seleccionar Audiencia*\n\nElige a quién enviar este broadcast:',
+        t('broadcastWizardIntro', lang),
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('👥 Todos los Usuarios', 'broadcast_all')],
-            [Markup.button.callback('💎 Solo Premium', 'broadcast_premium')],
-            [Markup.button.callback('🆓 Solo Gratis', 'broadcast_free')],
-            [Markup.button.callback('↩️ Churned (Ex-Premium)', 'broadcast_churned')],
-            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            [Markup.button.callback(t('broadcastAudienceAll', lang), 'broadcast_all')],
+            [Markup.button.callback(t('broadcastAudiencePremium', lang), 'broadcast_premium')],
+            [Markup.button.callback(t('broadcastAudienceFree', lang), 'broadcast_free')],
+            [Markup.button.callback(t('broadcastAudienceChurned', lang), 'broadcast_churned')],
+            [Markup.button.callback(t('cancel', lang), 'admin_cancel')],
           ]),
         },
       );
@@ -5123,7 +5122,287 @@ async function handleSendPrimeLinks(ctx, lang, telegram) {
 }
 
 // After registerAdminHandlers is defined, wrap it to add additional handlers
-const wrappedRegisterAdminHandlers = registerAdminHandlers;
+const wrappedRegisterAdminHandlers = (bot) => {
+  registerAdminHandlers(bot);
+
+  bot.action('admin_support_tickets', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const openTickets = await SupportTopicModel.getOpenTopics();
+
+      const message = `🎫 *Support Ticket System*\n\nOpen tickets: ${openTickets.length}`;
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(`Open Tickets (${openTickets.length})`, 'admin_support_tickets_open')],
+          [Markup.button.callback('My Tickets', 'admin_support_tickets_my')],
+          [Markup.button.callback('Ticket Stats', 'admin_support_tickets_stats')],
+          [Markup.button.callback('◀️ Back', 'admin_home')],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in admin_support_tickets:', error);
+    }
+  });
+
+  bot.action('admin_support_tickets_open', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const openTickets = await SupportTopicModel.getOpenTopics();
+
+      if (openTickets.length === 0) {
+        await ctx.editMessageText('No open tickets.', {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Back', 'admin_support_tickets')],
+          ]),
+        });
+        return;
+      }
+
+      const buttons = openTickets.map(ticket => {
+        return [Markup.button.callback(ticket.thread_name, `admin_support_ticket_view_${ticket.user_id}`)];
+      });
+
+      await ctx.editMessageText('Open Tickets:', {
+        ...Markup.inlineKeyboard([
+          ...buttons,
+          [Markup.button.callback('◀️ Back', 'admin_support_tickets')],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in admin_support_tickets_open:', error);
+    }
+  });
+
+  bot.action('admin_support_tickets_my', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const adminId = ctx.from.id;
+      const myTickets = await SupportTopicModel.getAssignedTopics(adminId);
+
+      if (myTickets.length === 0) {
+        await ctx.editMessageText('No tickets assigned to you.', {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Back', 'admin_support_tickets')],
+          ]),
+        });
+        return;
+      }
+
+      const buttons = myTickets.map(ticket => {
+        return [Markup.button.callback(ticket.thread_name, `admin_support_ticket_view_${ticket.user_id}`)];
+      });
+
+      await ctx.editMessageText('My Tickets:', {
+        ...Markup.inlineKeyboard([
+          ...buttons,
+          [Markup.button.callback('◀️ Back', 'admin_support_tickets')],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in admin_support_tickets_my:', error);
+    }
+  });
+
+  bot.action('admin_support_tickets_stats', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const stats = await SupportTopicModel.getStatistics();
+      const allAdmins = await PermissionService.getAllAdmins();
+
+      let message = `*Ticket Statistics*\n\n` +
+        `Total tickets: ${stats.total_topics}\n` +
+        `Open tickets: ${stats.open_topics}\n` +
+        `Resolved tickets: ${stats.resolved_topics}\n` +
+        `Closed tickets: ${stats.closed_topics}\n` +
+        `\n` +
+        `High priority: ${stats.high_priority}\n` +
+        `Critical priority: ${stats.critical_priority}\n` +
+        `SLA breaches: ${stats.sla_breaches}\n` +
+        `\n` +
+        `Total messages: ${stats.total_messages}\n` +
+        `Avg messages per topic: ${stats.avg_messages_per_topic.toFixed(2)}\n\n`;
+
+      message += `*Agent Performance:*\n`;
+      const agentPerformanceDetails = [];
+
+      for (const roleGroup of Object.values(allAdmins)) {
+        for (const admin of roleGroup) {
+          const agentStats = await SupportTopicModel.getAgentPerformance(admin.id);
+          if (agentStats && (agentStats.total_tickets > 0 || agentStats.sla_breaches > 0)) {
+            agentPerformanceDetails.push(
+              `👤 ${admin.firstName || 'N/A'} (ID: ${admin.id})\n` +
+              `  Tickets: ${agentStats.total_tickets || 0} (Closed: ${agentStats.closed_tickets || 0})\n` +
+              `  Avg First Response: ${agentStats.avg_first_response_hours ? agentStats.avg_first_response_hours.toFixed(2) + 'h' : 'N/A'}\n` +
+              `  Avg Resolution: ${agentStats.avg_resolution_hours ? agentStats.avg_resolution_hours.toFixed(2) + 'h' : 'N/A'}\n` +
+              `  SLA Breaches: ${agentStats.sla_breaches || 0}\n` +
+              `  Satisfied Customers: ${agentStats.satisfied_customers || 0}`
+            );
+          }
+        }
+      }
+
+      if (agentPerformanceDetails.length > 0) {
+        message += agentPerformanceDetails.join('\n\n');
+      } else {
+        message += 'No agent performance data available.\n';
+      }
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('◀️ Back', 'admin_support_tickets')],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in admin_support_tickets_stats:', error);
+    }
+  });
+
+  bot.action(/^admin_support_ticket_view_(\d+)$/, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.match[1];
+      const ticket = await SupportTopicModel.getByUserId(userId);
+      const user = await UserModel.findById(userId);
+
+      if (!ticket || !user) {
+        await ctx.editMessageText('Ticket or user not found.', {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Back', 'admin_support_tickets_open')],
+          ]),
+        });
+        return;
+      }
+
+      const message = `*Ticket Details*\n\n` +
+        `*User:* ${user.firstName} (@${user.username}) - ${user.id}\n` +
+        `*Status:* ${ticket.status}\n` +
+        `*Priority:* ${ticket.priority}\n` +
+        `*Category:* ${ticket.category}\n` +
+        `*Created:* ${ticket.created_at}\n` +
+        `*Last Message:* ${ticket.last_message_at}\n` +
+        `*Link:* https://t.me/c/${process.env.SUPPORT_GROUP_ID.substring(4)}/${ticket.thread_id}`;
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('Change Status', `admin_support_ticket_status_${userId}`)],
+          [Markup.button.callback('Assign', `admin_support_ticket_assign_${userId}`)],
+          [Markup.button.callback('◀️ Back', 'admin_support_tickets_open')],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in admin_support_ticket_view:', error);
+    }
+  });
+
+  bot.action(/^admin_support_ticket_status_(\d+)$/, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.match[1];
+
+      await ctx.editMessageText('Select a new status:', {
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('Open', `admin_support_ticket_set_status_${userId}_open`)],
+          [Markup.button.callback('In Progress', `admin_support_ticket_set_status_${userId}_in progress`)],
+          [Markup.button.callback('Resolved', `admin_support_ticket_set_status_${userId}_resolved`)],
+          [Markup.button.callback('Closed', `admin_support_ticket_set_status_${userId}_closed`)],
+          [Markup.button.callback('◀️ Back', `admin_support_ticket_view_${userId}`)],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in admin_support_ticket_status:', error);
+    }
+  });
+
+  bot.action(/^admin_support_ticket_set_status_(\d+)_([\w\s]+)$/, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.match[1];
+      const status = ctx.match[2];
+
+      await SupportTopicModel.updateStatus(userId, status);
+
+      await ctx.editMessageText(`Ticket status updated to ${status}`, {
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('◀️ Back', `admin_support_ticket_view_${userId}`)],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in admin_support_ticket_set_status:', error);
+    }
+  });
+
+  bot.action(/^admin_support_ticket_assign_(\d+)$/, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.match[1];
+      const admins = await PermissionService.getAllAdmins();
+      const allAdmins = [...admins.superadmins, ...admins.admins, ...admins.moderators];
+
+      const buttons = allAdmins.map(admin => {
+        return [Markup.button.callback(admin.firstName, `admin_support_ticket_set_assignee_${userId}_${admin.id}`)];
+      });
+
+      await ctx.editMessageText('Select an admin to assign:', {
+        ...Markup.inlineKeyboard([
+          ...buttons,
+          [Markup.button.callback('◀️ Back', `admin_support_ticket_view_${userId}`)],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in admin_support_ticket_assign:', error);
+    }
+  });
+
+  bot.action(/^admin_support_ticket_set_assignee_(\d+)_(\d+)$/, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.match[1];
+      const assigneeId = ctx.match[2];
+
+      const ticket = await SupportTopicModel.assignTo(userId, assigneeId);
+      await supportRoutingService.notifyAssignment(ticket, assigneeId);
+
+      await ctx.editMessageText(`Ticket assigned to admin ${assigneeId}`, {
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('◀️ Back', `admin_support_ticket_view_${userId}`)],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in admin_support_ticket_set_assignee:', error);
+    }
+  });
+};
 
 // Add broadcast button action handlers
 const addBroadcastButtonHandlers = (bot) => {

@@ -39,21 +39,7 @@ const registerPNPLiveHandlers = (bot) => {
   bot.action('PNP_LIVE_START', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
-      const userId = ctx.from?.id;
-      
-      // Check if user is admin for testing access
-      const PermissionService = require('../../services/permissionService');
-      const isAdmin = await PermissionService.isAdmin(userId);
-      
-      if (isAdmin) {
-        // Allow admin to access the feature for testing
-        await showFeaturedModelsCarousel(ctx, lang);
-      } else {
-        await ctx.answerCbQuery(
-          lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
-          { show_alert: true }
-        );
-      }
+      await showFeaturedModelsCarousel(ctx, lang);
     } catch (error) {
       logger.error('Error starting PNP Live:', error);
       await ctx.answerCbQuery('❌ Error starting PNP Live');

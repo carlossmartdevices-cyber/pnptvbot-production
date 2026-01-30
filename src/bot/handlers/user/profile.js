@@ -92,14 +92,6 @@ const registerProfileHandlers = (bot) => {
   // View user profile
   // NOTE: This handler has been removed to avoid conflict with enhancedProfileCards.js
   // The enhanced profile cards provide more comprehensive profile viewing functionality
-  // bot.action(/^view_user_(\d+)$/, async (ctx) => {
-  //   try {
-  //     const targetUserId = ctx.match[1];
-  //     await showProfile(ctx, targetUserId, true, false);
-  //   } catch (error) {
-  //     logger.error('Error viewing user profile:', error);
-  //   }
-  // });
 
   // Add/Remove favorites
   bot.action(/^add_favorite_(\d+)$/, async (ctx) => {
@@ -687,7 +679,6 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
   try {
     const lang = getLanguage(ctx);
     const viewerId = ctx.from.id;
-    const botUsername = ctx.botInfo?.username || 'PNPLatinoTV_bot';
 
     const targetUser = await UserModel.getById(targetUserId);
     if (!targetUser) { await ctx.reply(t('userNotFound', lang)); return; }
@@ -874,6 +865,7 @@ const shareToGroup = async (ctx) => {
     const user = await UserModel.getById(ctx.from.id);
     if (!user) { await ctx.reply(t('error', lang)); return; }
 
+    // GROUP_ID is the ID of the main community group, configured in .env
     if (!GROUP_ID) {
       await ctx.answerCbQuery(lang === 'es' ? 'Grupo no configurado' : 'Group not configured', { show_alert: true });
       return;
@@ -1038,7 +1030,18 @@ const addToFavorites = async (ctx, targetUserId) => {
     const lang = getLanguage(ctx);
     await UserModel.addToFavorites(ctx.from.id, targetUserId);
     await ctx.answerCbQuery(t('addedToFavorites', lang));
-    await showProfile(ctx, targetUserId, true, false);
+
+    // Update the button in the existing message
+    const keyboard = ctx.callbackQuery.message.reply_markup.inline_keyboard;
+    const newKeyboard = keyboard.map(row => {
+      return row.map(button => {
+        if (button.callback_data === `add_favorite_${targetUserId}`) {
+          return Markup.button.callback(t('removeFromFavorites', lang), `remove_favorite_${targetUserId}`);
+        }
+        return button;
+      });
+    });
+    await ctx.editMessageReplyMarkup({ inline_keyboard: newKeyboard });
   } catch (error) {
     logger.error('Error adding to favorites:', error);
   }
@@ -1049,10 +1052,21 @@ const removeFromFavorites = async (ctx, targetUserId) => {
     const lang = getLanguage(ctx);
     await UserModel.removeFromFavorites(ctx.from.id, targetUserId);
     await ctx.answerCbQuery(t('removedFromFavorites', lang));
+
     if (ctx.callbackQuery?.message?.text?.includes('Favorites')) {
       await showFavorites(ctx);
     } else {
-      await showProfile(ctx, targetUserId, true, false);
+      // Update the button in the existing message
+      const keyboard = ctx.callbackQuery.message.reply_markup.inline_keyboard;
+      const newKeyboard = keyboard.map(row => {
+        return row.map(button => {
+          if (button.callback_data === `remove_favorite_${targetUserId}`) {
+            return Markup.button.callback(t('addToFavorites', lang), `add_favorite_${targetUserId}`);
+          }
+          return button;
+        });
+      });
+      await ctx.editMessageReplyMarkup({ inline_keyboard: newKeyboard });
     }
   } catch (error) {
     logger.error('Error removing from favorites:', error);
@@ -1063,6 +1077,7 @@ const blockUser = async (ctx, targetUserId) => {
   try {
     const lang = getLanguage(ctx);
     await UserModel.blockUser(ctx.from.id, targetUserId);
+    await UserModel.removeFromFavorites(ctx.from.id, targetUserId);
     await ctx.answerCbQuery(t('userBlocked', lang));
     await ctx.editMessageText(
       t('userBlocked', lang),

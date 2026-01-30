@@ -15,31 +15,31 @@ class UserModel {
   static mapRowToUser(row) {
     if (!row) return null;
     return {
-      id: row.id,
-      userId: row.id,
-      username: row.username,
-      firstName: row.first_name,
-      lastName: row.last_name,
-      email: row.email,
-      emailVerified: row.email_verified,
-      bio: row.bio,
-      photoFileId: row.photo_file_id,
-      photoUpdatedAt: row.photo_updated_at,
-      interests: row.interests || [],
+      id: row.id, // Telegram user ID
+      userId: row.id, // Telegram user ID
+      username: row.username, // Telegram username
+      firstName: row.first_name, // User's first name
+      lastName: row.last_name, // User's last name
+      email: row.email, // User's email address
+      emailVerified: row.email_verified, // Whether the email has been verified
+      bio: row.bio, // User's biography
+      photoFileId: row.photo_file_id, // Telegram file ID for the user's photo
+      photoUpdatedAt: row.photo_updated_at, // When the photo was last updated
+      interests: row.interests || [], // Array of user's interests
       location: row.location_lat && row.location_lng ? {
         lat: parseFloat(row.location_lat),
         lng: parseFloat(row.location_lng),
         name: row.location_name,
         geohash: row.location_geohash,
-      } : null,
-      locationUpdatedAt: row.location_updated_at,
+      } : null, // User's location
+      locationUpdatedAt: row.location_updated_at, // When the location was last updated
       locationSharingEnabled: row.location_sharing_enabled === null || row.location_sharing_enabled === undefined
         ? true
-        : row.location_sharing_enabled,
-      subscriptionStatus: row.subscription_status,
-      planId: row.plan_id,
-      planExpiry: row.plan_expiry,
-      tier: row.tier,
+        : row.location_sharing_enabled, // Whether the user is sharing their location
+      subscriptionStatus: row.subscription_status, // 'active', 'free', 'churned'
+      planId: row.plan_id, // ID of the user's subscription plan
+      planExpiry: row.plan_expiry, // When the subscription expires
+      tier: row.tier, // 'Free' or 'Prime'
       // Subscription object for access control compatibility
       subscription: {
         isPrime: row.subscription_status === 'active',
@@ -47,36 +47,36 @@ class UserModel {
         planId: row.plan_id,
         expiry: row.plan_expiry
       },
-      role: row.role,
-      assignedBy: row.assigned_by,
-      roleAssignedAt: row.role_assigned_at,
-      privacy: typeof row.privacy === 'string' ? JSON.parse(row.privacy) : (row.privacy || { showLocation: true, showInterests: true, showBio: true, allowMessages: true, showOnline: true }),
-      profileViews: row.profile_views || 0,
-      xp: row.xp || 0,
-      favorites: row.favorites || [],
-      blocked: row.blocked || [],
-      badges: row.badges || [],
-      onboardingComplete: row.onboarding_complete,
-      ageVerified: row.age_verified,
-      ageVerifiedAt: row.age_verified_at,
-      ageVerificationExpiresAt: row.age_verification_expires_at,
-      ageVerificationIntervalHours: row.age_verification_interval_hours,
-      termsAccepted: row.terms_accepted,
-      privacyAccepted: row.privacy_accepted,
-      lastActive: row.last_active,
-      lastActivityInGroup: row.last_activity_in_group,
-      groupActivityLog: row.group_activity_log,
-      timezone: row.timezone,
-      timezoneDetected: row.timezone_detected,
-      timezoneUpdatedAt: row.timezone_updated_at,
-      language: row.language,
+      role: row.role, // 'user', 'moderator', 'admin', 'superadmin'
+      assignedBy: row.assigned_by, // Who assigned the role
+      roleAssignedAt: row.role_assigned_at, // When the role was assigned
+      privacy: typeof row.privacy === 'string' ? JSON.parse(row.privacy) : (row.privacy || { showLocation: true, showInterests: true, showBio: true, allowMessages: true, showOnline: true }), // User's privacy settings
+      profileViews: row.profile_views || 0, // Number of times the profile has been viewed
+      xp: row.xp || 0, // Experience points for gamification
+      favorites: row.favorites || [], // Array of user IDs that this user has favorited
+      blocked: row.blocked || [], // Array of user IDs that this user has blocked
+      badges: row.badges || [], // Array of badges the user has earned
+      onboardingComplete: row.onboarding_complete, // Whether the user has completed the onboarding process
+      ageVerified: row.age_verified, // Whether the user's age has been verified
+      ageVerifiedAt: row.age_verified_at, // When the age was verified
+      ageVerificationExpiresAt: row.age_verification_expires_at, // When the age verification expires
+      ageVerificationIntervalHours: row.age_verification_interval_hours, // How often to re-verify the age
+      termsAccepted: row.terms_accepted, // Whether the user has accepted the terms of service
+      privacyAccepted: row.privacy_accepted, // Whether the user has accepted the privacy policy
+      lastActive: row.last_active, // When the user was last active
+      lastActivityInGroup: row.last_activity_in_group, // When the user was last active in the group
+      groupActivityLog: row.group_activity_log, // Log of the user's activity in the group
+      timezone: row.timezone, // User's timezone
+      timezoneDetected: row.timezone_detected, // Whether the timezone was detected automatically
+      timezoneUpdatedAt: row.timezone_updated_at, // When the timezone was last updated
+      language: row.language, // User's language
       isActive: row.is_active === null || row.is_active === undefined
         ? true
-        : row.is_active,
-      deactivatedAt: row.deactivated_at,
-      deactivationReason: row.deactivation_reason,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+        : row.is_active, // Whether the user's account is active
+      deactivatedAt: row.deactivated_at, // When the account was deactivated
+      deactivationReason: row.deactivation_reason, // Why the account was deactivated
+      createdAt: row.created_at, // When the account was created
+      updatedAt: row.updated_at, // When the account was last updated
       // Social media fields
       instagram: row.instagram || null,
       twitter: row.twitter || null,
@@ -84,20 +84,20 @@ class UserModel {
       tiktok: row.tiktok || null,
       youtube: row.youtube || null,
       telegram: row.telegram || null,
-      looking_for: row.looking_for || null,
-      tribe: row.tribe || null,
-      city: row.city || null,
-      country: row.country || null,
+      looking_for: row.looking_for || null, // What the user is looking for
+      tribe: row.tribe || null, // User's tribe (e.g., 'bear', 'twink')
+      city: row.city || null, // User's city
+      country: row.country || null, // User's country
       // Recurring subscription fields
-      cardToken: row.card_token || null,
-      cardTokenMask: row.card_token_mask || null,
-      cardFranchise: row.card_franchise || null,
-      autoRenew: row.auto_renew || false,
-      subscriptionType: row.subscription_type || 'one_time',
-      recurringPlanId: row.recurring_plan_id || null,
-      nextBillingDate: row.next_billing_date || null,
-      billingFailures: row.billing_failures || 0,
-      lastBillingAttempt: row.last_billing_attempt || null,
+      cardToken: row.card_token || null, // Token for the user's credit card
+      cardTokenMask: row.card_token_mask || null, // Masked card number
+      cardFranchise: row.card_franchise || null, // Card brand (e.g., 'Visa', 'Mastercard')
+      autoRenew: row.auto_renew || false, // Whether the subscription should auto-renew
+      subscriptionType: row.subscription_type || 'one_time', // 'one_time' or 'recurring'
+      recurringPlanId: row.recurring_plan_id || null, // ID of the recurring plan
+      nextBillingDate: row.next_billing_date || null, // When the next billing will occur
+      billingFailures: row.billing_failures || 0, // Number of failed billing attempts
+      lastBillingAttempt: row.last_billing_attempt || null, // When the last billing attempt was made
     };
   }
 

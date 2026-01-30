@@ -8,6 +8,7 @@ const MembershipCleanupService = require('../src/bot/services/membershipCleanupS
 const TutorialReminderService = require('../src/bot/services/tutorialReminderService');
 const VisaCybersourceService = require('../src/bot/services/visaCybersourceService');
 const logger = require('../src/utils/logger');
+const supportRoutingService = require('../src/bot/services/supportRoutingService');
 
 /**
  * Initialize and start cron jobs
@@ -24,7 +25,20 @@ const startCronJobs = async (bot = null) => {
     if (bot) {
       MembershipCleanupService.initialize(bot);
       TutorialReminderService.initialize(bot);
+      supportRoutingService.initialize(bot.telegram);
     }
+
+    // Check for SLA breaches every hour
+    cron.schedule(process.env.SLA_CHECK_CRON || '0 * * * *', async () => {
+      try {
+        logger.info('Running SLA breach check...');
+        await supportRoutingService.checkSlaBreaches();
+        logger.info('SLA breach check completed');
+      } catch (error) {
+        logger.error('Error in SLA breach check cron:', error);
+      }
+    });
+
 
     // Full membership cleanup daily at midnight
     // Updates statuses (active/churned/free) and kicks expired users from PRIME channel
