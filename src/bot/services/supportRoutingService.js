@@ -1,8 +1,5 @@
 const logger = require('../../utils/logger');
 const SupportTopicModel = require('../../models/supportTopicModel');
-const PermissionService = require('./permissionService');
-const UserModel = require('../../models/userModel');
-const { Markup } = require('telegraf');
 
 /**
  * Support Routing Service
@@ -185,23 +182,6 @@ _Responde en este topic para enviar mensajes al usuario._`;
       });
 
       logger.info('Created new support topic', { userId, threadId, topicName, priority, category });
-
-      // Notify admins
-      const admins = await PermissionService.getAllAdmins();
-      const allAdmins = [...admins.superadmins, ...admins.admins, ...admins.moderators];
-      for (const admin of allAdmins) {
-        try {
-          const message = `New support ticket created by ${firstName} (@${username}).`;
-          await this.telegram.sendMessage(admin.id, message, {
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback('View Ticket', `admin_support_ticket_view_${userId}`)]
-            ])
-          });
-        } catch (error) {
-          logger.warn(`Failed to send new ticket notification to admin ${admin.id}`, error);
-        }
-      }
-
       return supportTopic;
 
     } catch (error) {
@@ -1105,25 +1085,6 @@ ${categoryEmoji} *Ticket:* ${topic.user_id}
       }
       
       throw error;
-    }
-  }
-
-  async notifyAssignment(ticket, assigneeId) {
-    if (!this.telegram) {
-      logger.warn('Support routing not initialized');
-      return;
-    }
-
-    try {
-      const user = await UserModel.findById(ticket.user_id);
-      const message = `A new ticket from ${user.firstName} (@${user.username}) has been assigned to you.`;
-      await this.telegram.sendMessage(assigneeId, message, {
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback('View Ticket', `admin_support_ticket_view_${ticket.user_id}`)]
-        ])
-      });
-    } catch (error) {
-      logger.error(`Failed to send assignment notification to admin ${assigneeId}`, error);
     }
   }
 }

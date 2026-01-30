@@ -642,10 +642,10 @@ class PNPLiveService {
    * @returns {number} Price in USD
    */
   static calculatePrice(durationMinutes) {
-    if (!this.DEFAULT_PRICING[durationMinutes]) {
+    if (!this.PRICING[durationMinutes]) {
       throw new Error('Invalid duration. Must be 30, 60, or 90 minutes.');
     }
-    return this.DEFAULT_PRICING[durationMinutes];
+    return this.PRICING[durationMinutes];
   }
 
   /**

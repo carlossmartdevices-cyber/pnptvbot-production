@@ -26,22 +26,25 @@ COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
 # Copy source code from builder
-COPY --from=builder /app/src ./src
+COPY --from=builder --chown=node:node /app/src ./src
 
 # Copy scripts directory for cron jobs
-COPY --from=builder /app/scripts ./scripts
+COPY --from=builder --chown=node:node /app/scripts ./scripts
 
 # Copy public directory for landing pages
 COPY --from=builder /app/public ./public
 
 # Copy .env.example for dotenv-safe validation
-COPY --from=builder /app/.env.example ./.env.example
+COPY --from=builder --chown=node:node /app/.env.example ./.env.example
 
-# Copy config directory
-COPY --from=builder /app/config ./config
+# Create logs and uploads directories with proper permissions
+RUN mkdir -p logs uploads \
+    && chown -R node:node /app \
+    && chmod -R 755 /app/public \
+    && find /app/public -type f -exec chmod 644 {} \;
 
-# Create logs and uploads directories
-RUN mkdir -p logs uploads
+# Switch to non-root user for security
+USER node
 
 # Expose port
 EXPOSE 3000

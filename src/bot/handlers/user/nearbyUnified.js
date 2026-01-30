@@ -178,27 +178,11 @@ const registerNearbyUnifiedHandlers = (bot) => {
       await safeEditOrReply(ctx, lang === 'es' ? '🔍 _Buscando todo cerca de ti..._' : '🔍 _Searching everything near you..._', { parse_mode: 'Markdown' });
 
       // Get all nearby items
-      let nearbyUsers = [];
-      let nearbyBusinesses = { places: [] };
-      let nearbyPlaces = { places: [] };
-
-      try {
-        nearbyUsers = await UserService.getNearbyUsers(userId, 10);
-      } catch (error) {
-        logger.error('Error getting nearby users:', error);
-      }
-
-      try {
-        nearbyBusinesses = await NearbyPlaceService.getNearbyBusinesses(userId, 10);
-      } catch (error) {
-        logger.error('Error getting nearby businesses:', error);
-      }
-
-      try {
-        nearbyPlaces = await NearbyPlaceService.getNearbyPlacesOfInterest(userId, 10);
-      } catch (error) {
-        logger.error('Error getting nearby places:', error);
-      }
+      const [nearbyUsers, nearbyBusinesses, nearbyPlaces] = await Promise.all([
+        UserService.getNearbyUsers(userId, 10),
+        NearbyPlaceService.getNearbyBusinesses(userId, 10),
+        NearbyPlaceService.getNearbyPlacesOfInterest(userId, 10)
+      ]);
 
       // Combine all results
       const allItems = [];
@@ -568,6 +552,34 @@ const registerNearbyUnifiedHandlers = (bot) => {
   // View user profile (imported from original nearby.js)
   // NOTE: This handler has been removed to avoid conflict with enhancedProfileCards.js
   // The enhanced profile cards provide more comprehensive profile viewing functionality
+  // bot.action(/^view_user_(.+)$/, async (ctx) => {
+  //   try {
+  //     if (!ctx.match || !ctx.match[1]) {
+  //       logger.error('Invalid view user action format');
+  //       return;
+  //     }
+  //
+  //     const targetUserId = ctx.match[1];
+  //     const lang = getLanguage(ctx);
+  //
+  //     const user = await UserService.getById(targetUserId);
+  //
+  //     if (!user) {
+  //       await ctx.answerCbQuery(t('userNotFound', lang));
+  //       return;
+  //     }
+  //
+  //     let profileText = '`👤 PROFILE CARD`\n\n';
+  //
+  //     const displayName = user.firstName || 'Anonymous';
+  //     profileText += `**${displayName}**`;
+  //     if (user.lastName) profileText += ` ${user.lastName}`;
+  //     profileText += '\n';
+  //     
+  //     if (user.username) {
+  //       profileText += `@${user.username}\n`;
+  //     }
+  //
 
   // Handle DM button clicks (imported from original nearby.js)
   bot.action(/^dm_user_(.+)$/, async (ctx) => {
