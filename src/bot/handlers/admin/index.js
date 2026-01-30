@@ -1917,9 +1917,12 @@ let registerAdminHandlers = (bot) => {
       await ctx.saveSession();
 
       // Process broadcast sending with buttons (async/non-blocking)
-      sendBroadcastWithButtons(ctx, bot).catch(error => {
+      try {
+        await sendBroadcastWithButtons(ctx, bot);
+      } catch (error) {
         logger.error('Error in background broadcast send:', error);
-      });
+        await ctx.reply('❌ Error al enviar broadcast en segundo plano. Revisa los logs.').catch(() => {});
+      }
 
       // Immediately show "processing" message to user
       await ctx.editMessageText(
@@ -4625,6 +4628,7 @@ let registerAdminHandlers = (bot) => {
  * Send broadcast with buttons
  */
 async function sendBroadcastWithButtons(ctx, bot) {
+  logger.info('Starting sendBroadcastWithButtons', { adminId: ctx.from.id });
   try {
     const { broadcastTarget, broadcastData } = ctx.session.temp;
     const { getLanguage } = require('../../utils/helpers');
@@ -4776,6 +4780,11 @@ async function sendBroadcastWithButtons(ctx, bot) {
       try {
         // Filter users with valid emails
         const usersWithEmail = users.filter(u => u.email && emailService.isEmailSafe(u.email));
+        logger.info('Email broadcast stats', {
+          totalUsers: users.length,
+          usersWithEmail: usersWithEmail.length,
+          usersWithoutEmail: users.length - usersWithEmail.length,
+        });
 
         logger.info('Starting email broadcast', {
           totalUsers: usersWithEmail.length,
