@@ -23,14 +23,90 @@ const registerVideoramaHandlers = (bot) => {
   bot.action('menu_videorama', async (ctx) => {
     try {
       const lang = ctx.session?.language || 'en';
-      await ctx.answerCbQuery(
-        lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
-        { show_alert: true }
-      );
+      const userId = ctx.from?.id;
+
+      // Check if admin for pre-launch testing
+      const PermissionService = require('../../services/permissionService');
+      const isAdmin = PermissionService.isEnvSuperAdmin(userId) || PermissionService.isEnvAdmin(userId);
+
+      if (isAdmin) {
+        // Show full videorama menu for admin testing
+        await showVideoramaMenu(ctx);
+      } else {
+        // Coming soon for regular users
+        await ctx.answerCbQuery(
+          lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
+          { show_alert: true }
+        );
+      }
     } catch (error) {
       logger.error('Error in menu_videorama:', error);
     }
   });
+
+  /**
+   * Show the full videorama menu
+   * @param {Context} ctx - Telegraf context
+   */
+  async function showVideoramaMenu(ctx) {
+    try {
+      await ctx.answerCbQuery();
+      const lang = ctx.session?.language || 'en';
+
+      // Get media stats
+      const stats = await getMediaStats();
+
+      // Get radio status
+      const radioStatus = await getRadioStatus();
+
+      let radioInfo = '';
+      if (radioStatus.isPlaying && radioStatus.track) {
+        radioInfo = lang === 'es'
+          ? `\n📻 *Radio en vivo:* ${radioStatus.track.title || 'Reproduciendo...'}`
+          : `\n📻 *Radio live:* ${radioStatus.track.title || 'Now playing...'}`;
+      }
+
+      const message = lang === 'es'
+        ? `🎶 *PNP Videorama*\n\n` +
+          `Tu centro multimedia con videos, música y podcasts.\n\n` +
+          `📹 *Videos:* ${stats.videos}\n` +
+          `🎵 *Música:* ${stats.music}\n` +
+          `🎙️ *Podcasts:* ${stats.podcasts}\n` +
+          radioInfo + `\n\nElige una categoría:`
+        : `🎶 *PNP Videorama*\n\n` +
+          `Your media center with videos, music and podcasts.\n\n` +
+          `📹 *Videos:* ${stats.videos}\n` +
+          `🎵 *Music:* ${stats.music}\n` +
+          `🎙️ *Podcasts:* ${stats.podcasts}\n` +
+          radioInfo + `\n\nChoose a category:`;
+
+      await safeReplyOrEdit(ctx, message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback(`📹 ${lang === 'es' ? 'Videos' : 'Videos'}`, 'videorama_videos'),
+            Markup.button.callback(`🎵 ${lang === 'es' ? 'Música' : 'Music'}`, 'videorama_music'),
+          ],
+          [
+            Markup.button.callback(`🎙️ Podcasts`, 'videorama_podcasts'),
+            Markup.button.callback(`📻 Radio`, 'menu_radio'),
+          ],
+          [Markup.button.webApp(
+            lang === 'es' ? '🎬 Abrir Videorama' : '🎬 Open Videorama',
+            VIDEORAMA_WEB_APP_URL
+          )],
+          [Markup.button.callback(lang === 'es' ? '⬅️ Menú Principal' : '⬅️ Main Menu', 'back_to_main')],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error showing videorama menu:', error);
+      const lang = ctx.session?.language || 'en';
+      await ctx.answerCbQuery(
+        lang === 'es' ? '❌ Error cargando menú' : '❌ Error loading menu',
+        { show_alert: true }
+      );
+    }
+  }
 
 
 

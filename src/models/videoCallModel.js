@@ -175,6 +175,12 @@ class VideoCallModel {
         [callId, String(userId), userName, isGuest, false]
       );
 
+      // Increment participant counter
+      await client.query(
+        `UPDATE video_calls SET current_participants = current_participants + 1 WHERE id = $1`,
+        [callId]
+      );
+
       await client.query('COMMIT');
 
       // Generate tokens
@@ -217,6 +223,11 @@ class VideoCallModel {
       );
 
       if (result.rows.length > 0) {
+        // Decrement participant counter (ensure it doesn't go below 0)
+        await query(
+          `UPDATE video_calls SET current_participants = GREATEST(current_participants - 1, 0) WHERE id = $1`,
+          [callId]
+        );
         logger.info('User left call', { callId, userId });
       }
     } catch (error) {
@@ -262,12 +273,13 @@ class VideoCallModel {
         (Date.now() - new Date(call.created_at).getTime()) / 1000
       );
 
-      // Update call
+      // Update call (reset participant counter)
       await client.query(
         `UPDATE video_calls
          SET is_active = false,
              ended_at = NOW(),
-             duration_seconds = $2
+             duration_seconds = $2,
+             current_participants = 0
          WHERE id = $1`,
         [callId, duration]
       );
@@ -393,14 +405,23 @@ class VideoCallModel {
       }
 
       // Mark as kicked
-      await query(
+      const result = await query(
         `UPDATE call_participants
          SET left_at = NOW(),
              was_kicked = true,
              total_duration_seconds = EXTRACT(EPOCH FROM (NOW() - joined_at))::INTEGER
-         WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL`,
+         WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL
+         RETURNING id`,
         [callId, String(participantUserId)]
       );
+
+      if (result.rows.length > 0) {
+        // Decrement participant counter
+        await query(
+          `UPDATE video_calls SET current_participants = GREATEST(current_participants - 1, 0) WHERE id = $1`,
+          [callId]
+        );
+      }
 
       logger.info('Participant kicked', { callId, participantUserId, hostUserId });
     } catch (error) {

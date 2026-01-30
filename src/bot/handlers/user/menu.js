@@ -204,65 +204,11 @@ const registerMenuHandlers = (bot) => {
     return next();
   });
 
-  bot.action('hangouts_menu', async (ctx) => {
-    try {
-      const lang = ctx.session?.language || 'en';
-      const userId = ctx.from?.id;
-      
-      // Check if user is admin for testing access
-      const isAdmin = await PermissionService.isAdmin(userId);
-      
-      if (isAdmin) {
-        // Allow admin to access the feature for testing
-        const HangoutsHandler = require('../hangoutsHandler');
-        if (HangoutsHandler.handleHangoutsMenu) {
-          await HangoutsHandler.handleHangoutsMenu(ctx);
-        } else {
-          await ctx.answerCbQuery(
-            lang === 'es' ? '👷 MODALIDAD DE PRUEBA (ADMIN)' : '👷 TEST MODE (ADMIN)',
-            { show_alert: true }
-          );
-        }
-      } else {
-        await ctx.answerCbQuery(
-          lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
-          { show_alert: true }
-        );
-      }
-    } catch (error) {
-      logger.error('Error handling hangouts_menu:', error);
-    }
-  });
+  // Note: hangouts_menu action is handled by hangoutsHandler.js
+  // It checks for admin access and shows full menu for testing
 
-  bot.action('menu_videorama', async (ctx) => {
-    try {
-      const lang = ctx.session?.language || 'en';
-      const userId = ctx.from?.id;
-      
-      // Check if user is admin for testing access
-      const isAdmin = await PermissionService.isAdmin(userId);
-      
-      if (isAdmin) {
-        // Allow admin to access the feature for testing
-        const VideoramaHandler = require('./videoramaHandler');
-        if (VideoramaHandler.handleVideoramaMenu) {
-          await VideoramaHandler.handleVideoramaMenu(ctx);
-        } else {
-          await ctx.answerCbQuery(
-            lang === 'es' ? '👷 MODALIDAD DE PRUEBA (ADMIN)' : '👷 TEST MODE (ADMIN)',
-            { show_alert: true }
-          );
-        }
-      } else {
-        await ctx.answerCbQuery(
-          lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
-          { show_alert: true }
-        );
-      }
-    } catch (error) {
-      logger.error('Error handling menu_videorama:', error);
-    }
-  });
+  // Note: menu_videorama action is handled by videoramaHandler.js
+  // It checks for admin access and shows full menu for testing
     // Locked feature handler for free users
     bot.action('locked_feature', async (ctx) => {
       const lang = ctx.session?.language || 'en';

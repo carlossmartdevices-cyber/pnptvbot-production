@@ -137,6 +137,12 @@ class MainRoomModel {
         [roomId, String(userId), userName, asPublisher]
       );
 
+      // Increment participant counter
+      await client.query(
+        `UPDATE main_rooms SET current_participants = current_participants + 1 WHERE id = $1`,
+        [roomId]
+      );
+
       // Log event
       await this.logRoomEvent(
         roomId,
@@ -187,6 +193,11 @@ class MainRoomModel {
       );
 
       if (result.rows.length > 0) {
+        // Decrement participant counter (ensure it doesn't go below 0)
+        await query(
+          `UPDATE main_rooms SET current_participants = GREATEST(current_participants - 1, 0) WHERE id = $1`,
+          [roomId]
+        );
         // Log event
         await this.logRoomEvent(roomId, 'USER_LEFT', null, userId);
         logger.info('User left room', { roomId, userId });
@@ -243,13 +254,22 @@ class MainRoomModel {
       // In production, verify moderatorUserId has permissions
       // For now, bot users and admins can kick
 
-      await query(
+      const result = await query(
         `UPDATE room_participants
          SET left_at = NOW(),
              total_duration_seconds = EXTRACT(EPOCH FROM (NOW() - joined_at))::INTEGER
-         WHERE room_id = $1 AND user_id = $2 AND left_at IS NULL`,
+         WHERE room_id = $1 AND user_id = $2 AND left_at IS NULL
+         RETURNING id`,
         [roomId, String(participantUserId)]
       );
+
+      if (result.rows.length > 0) {
+        // Decrement participant counter
+        await query(
+          `UPDATE main_rooms SET current_participants = GREATEST(current_participants - 1, 0) WHERE id = $1`,
+          [roomId]
+        );
+      }
 
       // Log event
       await this.logRoomEvent(roomId, 'USER_KICKED', moderatorUserId, participantUserId);

@@ -64,6 +64,13 @@ const RATE_LIMITS = {
     blockDuration: 300, // block for 5 minutes
   },
 
+  // Video call creation (restrictive to prevent abuse)
+  videocall: {
+    points: 5, // 5 calls
+    duration: 3600, // per hour
+    blockDuration: 1800, // block for 30 minutes
+  },
+
   // Message sending (moderate, anti-spam)
   message: {
     points: 40, // 40 messages
