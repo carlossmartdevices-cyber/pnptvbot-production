@@ -49,8 +49,8 @@ const ENHANCED_LINK_PATTERNS = [
   /(?:www\.)[a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*/gi,
   // Short URLs
   /(?:bit\.ly|t\.me|tinyurl\.com|goo\.gl|ow\.ly|buff\.ly|is\.gd|v\.gd)\/[^\s]+/gi,
-  // Telegram links (non-official)
-  /(?:@[a-zA-Z0-9_]{5,}|t\.me\/[a-zA-Z0-9_]+)(?<!pnplatinotv_bot|pnptv_bot|PNPtvBot|PNPtvOfficialBot)/gi,
+  // Telegram invite links (t.me links only - @usernames are allowed for mentions)
+  /t\.me\/[a-zA-Z0-9_]+/gi,
   // IP addresses
   /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g,
   // Email addresses
