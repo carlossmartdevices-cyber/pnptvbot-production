@@ -23,6 +23,14 @@ const normalizeTitle = (title) => {
   return trimmed.slice(0, 80);
 };
 
+const normalizeSubscriptionStatus = (status) => {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'active' || normalized === 'prime' || normalized === 'trial') {
+    return 'active';
+  }
+  return 'inactive';
+};
+
 const fetchUserRecord = async (userId) => {
   const result = await query(
     `SELECT id, subscription_status, tier, role, accepted_terms, is_active
@@ -34,9 +42,7 @@ const fetchUserRecord = async (userId) => {
 
 const isPrimeUserRecord = (user) => {
   if (!user) return false;
-  const status = String(user.subscription_status || '').toLowerCase();
-  const tier = String(user.tier || '').toLowerCase();
-  return status === 'active' || status === 'prime' || tier === 'prime';
+  return normalizeSubscriptionStatus(user.subscription_status) === 'active';
 };
 
 const isAdminRecord = (user) => {
