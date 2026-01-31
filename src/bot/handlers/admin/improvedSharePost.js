@@ -13,6 +13,8 @@ const GrokService = require('../../services/grokService');
 const broadcastUtils = require('../../utils/broadcastUtils');
 const performanceUtils = require('../../utils/performanceUtils');
 const uxUtils = require('../../utils/uxUtils');
+const XPostService = require('../../services/xPostService');
+const XOAuthService = require('../../services/xOAuthService');
 
 // Use shared utilities
 const { 
@@ -55,7 +57,11 @@ const registerImprovedSharePostHandlers = (bot) => {
         text: '',
         buttons: [getSharePostButtonOptions()[0]], // default: home button only
         scheduledAt: null,
-        isScheduled: false
+        isScheduled: false,
+        postToX: false,
+        xAccountId: null,
+        xAccountHandle: null,
+        xAccountDisplayName: null
       };
       await ctx.saveSession();
 
@@ -161,6 +167,149 @@ const registerImprovedSharePostHandlers = (bot) => {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // X (Twitter) ACCOUNT SELECTION
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async function showXAccountSelection(ctx) {
+    try {
+      const accounts = await XPostService.listActiveAccounts();
+      const currentAccountId = ctx.session.temp?.sharePostData?.xAccountId;
+
+      const buttons = accounts.map((account) => {
+        const selected = currentAccountId === account.account_id;
+        const label = `${selected ? '✅' : '⬜'} @${account.handle}`;
+        return [Markup.button.callback(label, `share_post_x_account_${account.account_id}`)];
+      });
+
+      buttons.push([Markup.button.callback('➕ Conectar cuenta X', 'share_post_x_connect')]);
+      buttons.push([Markup.button.callback('🚫 No publicar en X', 'share_post_x_disable')]);
+      buttons.push([Markup.button.callback('⬅️ Volver', 'share_post_preview')]);
+
+      if (!accounts.length) {
+        await ctx.reply(
+          '🐦 *Publicar en X*\n\n'
+          + 'No hay cuentas activas configuradas.\n\n'
+          + 'Puedes conectar una nueva cuenta ahora mismo.',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard(buttons),
+          }
+        );
+        return;
+      }
+
+      await ctx.reply(
+        '🐦 *Publicar en X*\n\nSelecciona la cuenta desde la cual se publicará:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard(buttons),
+        }
+      );
+    } catch (error) {
+      logger.error('Error showing X account selection:', error);
+      await ctx.reply('❌ Error al cargar cuentas de X').catch(() => {});
+    }
+  }
+
+  bot.action('share_post_configure_x', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      await ctx.answerCbQuery();
+      await showXAccountSelection(ctx);
+    } catch (error) {
+      logger.error('Error configuring X account:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  bot.action('share_post_x_connect', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      const authUrl = await XOAuthService.createAuthUrl({
+        adminId: ctx.from.id,
+        adminUsername: ctx.from.username || null,
+      });
+
+      await ctx.answerCbQuery();
+      await ctx.reply(
+        '🔗 *Conectar cuenta de X*\n\n'
+        + '1) Abre este enlace.\n'
+        + '2) Autoriza la cuenta.\n'
+        + '3) Regresa al bot y selecciona la cuenta.\n\n'
+        + authUrl,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (error) {
+      logger.error('Error starting X OAuth flow:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+      await ctx.reply('❌ No se pudo iniciar la conexion con X').catch(() => {});
+    }
+  });
+
+  bot.action(/^share_post_x_account_(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      const accountId = ctx.match[1];
+      const accounts = await XPostService.listActiveAccounts();
+      const selected = accounts.find((account) => account.account_id === accountId);
+
+      if (!selected) {
+        await ctx.answerCbQuery('❌ Cuenta no válida');
+        return;
+      }
+
+      ctx.session.temp.sharePostData.postToX = true;
+      ctx.session.temp.sharePostData.xAccountId = selected.account_id;
+      ctx.session.temp.sharePostData.xAccountHandle = selected.handle;
+      ctx.session.temp.sharePostData.xAccountDisplayName = selected.display_name;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery(`✅ Usando @${selected.handle}`);
+      await showXAccountSelection(ctx);
+    } catch (error) {
+      logger.error('Error selecting X account:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  bot.action('share_post_x_disable', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      ctx.session.temp.sharePostData.postToX = false;
+      ctx.session.temp.sharePostData.xAccountId = null;
+      ctx.session.temp.sharePostData.xAccountHandle = null;
+      ctx.session.temp.sharePostData.xAccountDisplayName = null;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('🚫 X desactivado');
+      await showXAccountSelection(ctx);
+    } catch (error) {
+      logger.error('Error disabling X posting:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
   // Clear all destinations
   bot.action('share_post_clear_selection', async (ctx) => {
     try {
@@ -244,8 +393,8 @@ const registerImprovedSharePostHandlers = (bot) => {
 
       const destinations = ctx.session.temp?.sharePostData?.destinations || [];
 
-      if (destinations.length === 0) {
-        await ctx.answerCbQuery('❌ Debes seleccionar al menos un destino');
+      if (destinations.length === 0 && !postData.postToX) {
+        await ctx.answerCbQuery('❌ Debes seleccionar al menos un destino o habilitar X');
         return;
       }
 
@@ -816,8 +965,20 @@ const registerImprovedSharePostHandlers = (bot) => {
 
       // Check caption length
       let lengthWarning = '';
+      let xWarning = '';
       if (text.length > maxLen) {
         lengthWarning = `\n\n⚠️ ADVERTENCIA: El texto tiene ${text.length} caracteres (máximo ${maxLen} para ${hasMedia ? 'posts con media' : 'posts sin media'}). Será truncado al enviar.`;
+      }
+
+      const xStatus = postData.postToX
+        ? `🐦 X: @${postData.xAccountHandle || 'cuenta seleccionada'}`
+        : '🐦 X: No se publicará';
+
+      if (postData.postToX) {
+        const { truncated } = XPostService.normalizeXText(text);
+        if (truncated) {
+          xWarning = '\n\n⚠️ ADVERTENCIA: El texto supera 280 caracteres para X y será truncado.';
+        }
       }
 
       // Show text preview (truncated if too long)
@@ -844,13 +1005,14 @@ const registerImprovedSharePostHandlers = (bot) => {
       }
 
       await ctx.reply(
-        '👀 Preview' + lengthWarning + '\n\n¿Enviar ahora o programar para mas tarde?',
+        '👀 Preview\n\n' + xStatus + lengthWarning + xWarning + '\n\n¿Enviar ahora o programar para mas tarde?',
         {
           ...Markup.inlineKeyboard([
             [Markup.button.callback('📤 Send Now', 'share_post_send_now')],
             [Markup.button.callback('📅 Schedule', 'share_post_schedule')],
             [Markup.button.callback('✏️ Edit Text', 'share_post_edit_text')],
             [Markup.button.callback('🔘 Edit Buttons', 'share_post_back_to_buttons')],
+            [Markup.button.callback('🐦 Configurar X', 'share_post_configure_x')],
             [Markup.button.callback('❌ Cancel', 'share_post_cancel')],
           ]),
         }
@@ -1041,8 +1203,8 @@ const registerImprovedSharePostHandlers = (bot) => {
       const destinations = postData.destinations || [];
 
       // Validate all required fields
-      if (destinations.length === 0) {
-        await ctx.answerCbQuery('❌ Debes seleccionar al menos un destino');
+      if (destinations.length === 0 && !postData.postToX) {
+        await ctx.answerCbQuery('❌ Debes seleccionar al menos un destino o habilitar X');
         return;
       }
 
@@ -1057,6 +1219,7 @@ const registerImprovedSharePostHandlers = (bot) => {
 
       let sent = 0;
       let failed = 0;
+      let xResult = null;
 
       // Send to each destination directly
       for (const dest of destinations) {
@@ -1098,14 +1261,32 @@ const registerImprovedSharePostHandlers = (bot) => {
         }
       }
 
+      if (postData.postToX && postData.xAccountId) {
+        try {
+          xResult = await XPostService.sendPostNow({
+            accountId: postData.xAccountId,
+            adminId: ctx.from.id,
+            adminUsername: ctx.from.username || 'unknown',
+            text: postData.text,
+          });
+        } catch (xError) {
+          xResult = { error: xError.message || 'Error desconocido' };
+        }
+      }
+
       // Clear session
       ctx.session.temp = {};
       await ctx.saveSession();
 
+      const xSummary = postData.postToX
+        ? `\n🐦 X: ${xResult?.response?.data?.id ? 'Publicado' : 'Error'}`
+        : '';
+
       const message = '✅ *Publicación Enviada*\n\n'
         + '📊 Destinos: ' + destinations.length + '\n'
         + '✓ Enviados: ' + sent + '\n'
-        + '✗ Fallidos: ' + failed;
+        + '✗ Fallidos: ' + failed
+        + xSummary;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -1143,8 +1324,8 @@ const registerImprovedSharePostHandlers = (bot) => {
       const destinations = postData.destinations || [];
 
       // Validate all required fields
-      if (destinations.length === 0) {
-        await ctx.answerCbQuery('❌ Debes seleccionar al menos un destino');
+      if (destinations.length === 0 && !postData.postToX) {
+        await ctx.answerCbQuery('❌ Debes seleccionar al menos un destino o habilitar X');
         return;
       }
 
@@ -1187,14 +1368,32 @@ const registerImprovedSharePostHandlers = (bot) => {
         status: 'scheduled',
       });
 
+      let xPostId = null;
+      if (postData.postToX && postData.xAccountId) {
+        const normalized = XPostService.normalizeXText(postData.text);
+        xPostId = await XPostService.createPostJob({
+          accountId: postData.xAccountId,
+          adminId: ctx.from.id,
+          adminUsername: ctx.from.username || 'unknown',
+          text: normalized.text,
+          scheduledAt: postData.scheduledAt,
+          status: 'scheduled',
+        });
+      }
+
       // Clear session
       ctx.session.temp = {};
       await ctx.saveSession();
 
+      const xInfo = postData.postToX
+        ? `\n🐦 X: ${xPostId ? 'Programado' : 'Error'}`
+        : '';
+
       const message = '✅ *Publicación Programada*\n\n'
         + '🗓️ Fecha: ' + postData.scheduledAt.toISOString().replace('T', ' ').substring(0, 16) + ' UTC\n'
         + '📢 Destinos: ' + destinations.length + '\n'
-        + '📝 ID: ' + postId;
+        + '📝 ID: ' + postId
+        + xInfo;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
