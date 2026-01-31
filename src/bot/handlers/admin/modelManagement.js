@@ -88,9 +88,9 @@ const registerModelManagementHandlers = (bot) => {
   /**
    * Handle text input for model creation
    */
-  bot.on('text', async (ctx) => {
+  bot.on('text', async (ctx, next) => {
     try {
-      if (!ctx.session.addModelStep) return;
+      if (!ctx.session.addModelStep) return next();
 
       const step = ctx.session.addModelStep;
       const text = ctx.message.text.trim();
@@ -167,9 +167,9 @@ const registerModelManagementHandlers = (bot) => {
   /**
    * Handle photo upload
    */
-  bot.on('photo', async (ctx) => {
+  bot.on('photo', async (ctx, next) => {
     try {
-      if (ctx.session.addModelStep !== 'photo') return;
+      if (ctx.session.addModelStep !== 'photo') return next();
 
       const file_id = ctx.message.photo[ctx.message.photo.length - 1].file_id;
       const file_path = await ctx.telegram.getFile(file_id);

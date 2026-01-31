@@ -56,14 +56,14 @@ class RoleService {
    * @param {string} userId - User ID
    * @param {string} role - Role name (USER, CONTRIBUTOR, PERFORMER, ADMIN)
    * @param {string} grantedBy - Admin who granted the role
-   * @returns {Promise<boolean>} Success status
+   * @returns {Promise<{success: boolean, message: string}>} Result object
    */
   static async setUserRole(userId, role, grantedBy) {
     try {
       // Validate role
       if (!ACCESS_CONTROL_CONFIG.ROLES[role]) {
         logger.error('Invalid role:', role);
-        return false;
+        return { success: false, message: 'Rol inválido' };
       }
 
       // Upsert role
@@ -76,10 +76,10 @@ class RoleService {
       );
 
       logger.info('User role updated', { userId, role, grantedBy });
-      return true;
+      return { success: true, message: `Rol ${role} asignado correctamente` };
     } catch (error) {
       logger.error('Error setting user role:', error);
-      return false;
+      return { success: false, message: error.message };
     }
   }
 
@@ -171,7 +171,7 @@ class RoleService {
   /**
    * Remove role from user (reset to USER)
    * @param {string} userId - User ID
-   * @returns {Promise<boolean>} Success status
+   * @returns {Promise<{success: boolean, message: string}>} Result object
    */
   static async removeRole(userId) {
     try {
@@ -181,10 +181,10 @@ class RoleService {
       );
 
       logger.info('User role removed', { userId });
-      return true;
+      return { success: true, message: 'Rol removido correctamente' };
     } catch (error) {
       logger.error('Error removing user role:', error);
-      return false;
+      return { success: false, message: error.message };
     }
   }
 

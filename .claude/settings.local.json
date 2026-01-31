@@ -227,7 +227,16 @@
       "Bash(__NEW_LINE_bedf0833f6cd6c69__ echo \"\")",
       "Bash(git show:*)",
       "Bash(timeout 2 cat:*)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(sudo systemctl start:*)",
+      "Bash(sudo journalctl:*)",
+      "Bash(sudo lsof:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker inspect:*)",
+      "Bash(ip route:*)",
+      "Bash(PGPASSWORD=\"$POSTGRES_PASSWORD\" psql:*)",
+      "Bash(PGPASSWORD='Apelo801050#' psql -h localhost -U pnptvbot -d pnptvbot -c \"\\\\d users\")"
     ],
     "deny": [],
     "ask": []

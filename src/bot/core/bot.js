@@ -55,6 +55,7 @@ const registerAccessControlHandlers = require('../handlers/moderation/accessCont
 const registerJitsiModeratorHandlers = require('../handlers/moderation/jitsiModerator');
 const registerCallManagementHandlers = require('../handlers/admin/callManagement');
 const registerRoleManagementHandlers = require('../handlers/admin/roleManagement');
+const registerPerformerManagementHandlers = require('../handlers/admin/performerManagement');
 const registerGamificationHandlers = require('../handlers/admin/gamification');
 const registerLiveStreamManagementHandlers = require('../handlers/admin/liveStreamManagement');
 const registerRadioManagementHandlers = require('../handlers/admin/radioManagement');
@@ -374,6 +375,7 @@ const startBot = async () => {
     registerJitsiModeratorHandlers(bot);
     registerCallManagementHandlers(bot);
     registerRoleManagementHandlers(bot);
+    registerPerformerManagementHandlers(bot);
     registerWallOfFameHandlers(bot);
     registerPrivateCallHandlers(bot);
     registerPrivateCallsProntoHandlers(bot);

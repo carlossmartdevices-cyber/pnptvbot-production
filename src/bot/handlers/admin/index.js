@@ -544,9 +544,9 @@ async function showAdminPanel(ctx, edit = false) {
         Markup.button.callback('📤 Compartir', 'admin_improved_share_post'),
       ]);
 
-      // ═══ EN VIVO E INTERACTIVO ═══
+      // ═══ PNP LIVE / PERFORMERS ═══
       buttons.push([
-        Markup.button.callback('📹 PNP Live', 'admin_pnp_live'),
+        Markup.button.callback('🎭 Performers', 'admin_performers'),
       ]);
 
       // ═══ LUGARES Y NEGOCIOS ═══

@@ -135,6 +135,42 @@ If you have any questions, use /support to contact us.`;
           await showEditProfileMenu(ctx, lang);
           return;
         }
+
+        // Deep link for PNP Live booking
+        if (startParam === 'pnp_live') {
+          // Trigger the PNP Live start action
+          const fakeCtx = {
+            ...ctx,
+            callbackQuery: { data: 'PNP_LIVE_START' },
+            answerCbQuery: async () => {},
+            editMessageText: async (text, opts) => ctx.reply(text, opts),
+          };
+          // Import and trigger PNP Live handler
+          try {
+            const { Markup } = require('telegraf');
+            const message = lang === 'es'
+              ? `📹 *PNP Live - Shows Privados*\n\n` +
+                `🔥 Conecta con nuestros performers para shows privados exclusivos.\n\n` +
+                `🟢 *Online Ahora* | ⚪ *Disponibles*\n\n` +
+                `Selecciona una opción para continuar:`
+              : `📹 *PNP Live - Private Shows*\n\n` +
+                `🔥 Connect with our performers for exclusive private shows.\n\n` +
+                `🟢 *Online Now* | ⚪ *Available*\n\n` +
+                `Select an option to continue:`;
+
+            await ctx.reply(message, {
+              parse_mode: 'Markdown',
+              ...Markup.inlineKeyboard([
+                [Markup.button.callback(lang === 'es' ? '🎭 Ver Performers' : '🎭 View Performers', 'PNP_LIVE_START')],
+                [Markup.button.callback(lang === 'es' ? '💰 Ver Precios' : '💰 View Pricing', 'pnp_show_pricing')],
+                [Markup.button.callback(lang === 'es' ? '🔙 Menú Principal' : '🔙 Main Menu', 'back_to_main')],
+              ]),
+            });
+          } catch (err) {
+            logger.error('Error showing PNP Live from deep link:', err);
+          }
+          return;
+        }
       }
 
       if (startParam && startParam.startsWith('viewprofile_')) {

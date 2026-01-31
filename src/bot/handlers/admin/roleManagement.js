@@ -110,13 +110,17 @@ const registerRoleManagementHandlers = (bot) => {
   // Main role management menu
   bot.action('admin_roles', async (ctx) => {
     try {
+      logger.info('[ROLE-HANDLER] admin_roles called', { userId: ctx.from.id });
+      await ctx.answerCbQuery();
       const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
+      logger.info('[ROLE-HANDLER] isSuperAdmin check result', { userId: ctx.from.id, isSuperAdmin });
       if (!isSuperAdmin) {
-        await ctx.answerCbQuery('❌ Solo Super Administradores pueden acceder');
+        logger.info('[ROLE-HANDLER] User is not superadmin, rejecting');
         return;
       }
-
+      logger.info('[ROLE-HANDLER] Calling showRoleManagement');
       await showRoleManagement(ctx, true);
+      logger.info('[ROLE-HANDLER] showRoleManagement completed');
     } catch (error) {
       logger.error('Error in admin roles:', error);
     }
