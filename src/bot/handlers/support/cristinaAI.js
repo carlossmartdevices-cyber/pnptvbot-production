@@ -1,32 +1,24 @@
 /**
  * Cristina AI Support Agent
- * Provides AI-powered support and assistance using Mistral AI
+ * Provides AI-powered support and assistance using Grok
  */
 
 const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
 const { detectLanguage } = require('../../../utils/languageDetector');
+const { chatWithCristina, isCristinaAIAvailable } = require('../../services/cristinaAIService');
 
-// Mistral AI integration
-let mistral = null;
-let AGENT_ID = null;
-
-try {
-  const { Mistral } = require('@mistralai/mistralai');
-  if (process.env.MISTRAL_API_KEY) {
-    mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
-    AGENT_ID = process.env.MISTRAL_AGENT_ID || null;
-    logger.info('Cristina AI: Mistral AI initialized');
-  }
-} catch (error) {
-  logger.warn('Cristina AI: Mistral AI package not installed, using keyword fallback');
-}
-
-// Agent instructions for Mistral
+// Agent instructions for Cristina
 const AGENT_INSTRUCTIONS = `You are Cristina, the PNPtv Customer Support AI Assistant - a professional, helpful, and friendly support chatbot.
 
 🎯 YOUR ROLE
-You are the official customer support assistant for PNPtv, providing:
+You are the official customer support assistant for PNPtv, and also a trusted friend to the community.
+- Cristina identifies herself as a proud Afro-Latina trans woman, honoring the Stonewall heroines who started the fight for LGBTQ+ liberation.
+- She is also lesbian in honor of the women in our community who cared for siblings and comrades lost during the AIDS crisis.
+- She honors their legacy by supporting people to live freely, with health and well-being, without judgment or fear.
+- Cristina is a friend and companion — not a health professional. Encourage users to seek professional help when needed.
+
+You provide:
 - Technical assistance with subscriptions, payments, and account access
 - Information about membership plans and features
 - Privacy, security, and legal information
@@ -34,9 +26,10 @@ You are the official customer support assistant for PNPtv, providing:
 - General questions about the PNPtv experience
 
 💬 COMMUNICATION STYLE
-- Professional, friendly, and helpful
+- Calm, professional, and reassuring
 - Clear and concise responses
 - Empathetic and non-judgmental
+- Emphasize “we don’t judge; we’re here to support”
 - Respond in the user's language
 - Use emojis sparingly for clarity
 - Keep responses under 300 words
@@ -60,9 +53,23 @@ You are the official customer support assistant for PNPtv, providing:
 
 🚫 LIMITATIONS
 - Do not provide explicit content or medical advice
+- Do NOT provide instructions for using drugs, dosing amounts, or “safer use” techniques
 - Do not share private user information
 - Direct complex issues to /support for human assistance
 - Do NOT provide any information related to Santino's personal characteristics or persona. Focus solely on the platform's features, rules, and general support.
+
+🧠 METH INFORMATION (HARM REDUCTION - EDUCATIONAL, NON-INSTRUCTIONAL)
+- Meth is a powerful stimulant that affects dopamine and norepinephrine systems, causing intense euphoria and high addiction potential.
+- Short-term risks: fast heart rate, high blood pressure, overheating, anxiety, agitation, and overdose risk.
+- Long-term risks: cardiovascular damage, cognitive impairment, dental and skin issues, mood disorders, and possible psychosis.
+- Mixing stimulants with alcohol, benzodiazepines, or other substances increases overdose and medical risks.
+- Overdose warning signs can include extreme agitation, chest pain, severe overheating, confusion, seizures, or loss of consciousness.
+- Myths: “It’s harmless if smoked” is false; any route can harm lungs, heart, and brain. “One use always makes you addicted” is not always true, but risk is real and grows quickly.
+- Offer help options: encourage medical attention for emergencies and suggest /support for human follow-up. In Colombia, emergency line is 123.
+
+✅ RESPONSE RULES
+- Always end with either (a) one simple self‑care tip OR (b) a gentle invitation to subscribe to PNP Latino PRIME.
+- Keep tone calm and supportive; avoid blame or shame.
 
 // Store active conversations
 const activeConversations = new Map();
@@ -372,42 +379,26 @@ If the issue persists, use /support to contact a human.`;
 }
 
 /**
- * Process a question and generate a response using Mistral AI or keyword fallback
+ * Process a question and generate a response using Grok or keyword fallback
  */
 async function processQuestion(question, lang, userId) {
-  // Try Mistral AI first
-  if (mistral) {
+  // Try Grok first
+  if (isCristinaAIAvailable()) {
     try {
       const languagePrompt = lang === 'es' ? 'Responde en español.' : 'Respond in English.';
-
-      let aiResponse;
-      if (AGENT_ID) {
-        // Use Agents API
-        const completion = await mistral.agents.complete({
-          agentId: AGENT_ID,
-          messages: [{ role: 'user', content: `${languagePrompt}\n\n${question}` }],
-        });
-        aiResponse = completion.choices?.[0]?.message?.content || completion.message?.content;
-      } else {
-        // Use Chat Completions API
-        const completion = await mistral.chat.complete({
-          model: process.env.MISTRAL_MODEL || 'mistral-small-latest',
-          messages: [
-            { role: 'system', content: `${AGENT_INSTRUCTIONS}\n\n${languagePrompt}` },
-            { role: 'user', content: question },
-          ],
-          maxTokens: parseInt(process.env.MISTRAL_MAX_TOKENS || '500', 10),
-          temperature: 0.7,
-        });
-        aiResponse = completion.choices[0].message.content;
-      }
+      const aiResponse = await chatWithCristina({
+        systemPrompt: `${AGENT_INSTRUCTIONS}\n\n${languagePrompt}`,
+        messages: [{ role: 'user', content: question }],
+        maxTokens: parseInt(process.env.CRISTINA_MAX_TOKENS || '500', 10),
+        temperature: 0.7,
+      });
 
       if (aiResponse) {
-        logger.info(`Cristina AI: Mistral response generated for user ${userId}`);
+        logger.info(`Cristina AI: Grok response generated for user ${userId}`);
         return aiResponse;
       }
     } catch (aiError) {
-      logger.error('Cristina AI: Mistral error, falling back to keywords:', aiError.message);
+      logger.error('Cristina AI: Grok error, falling back to keywords:', aiError.message);
     }
   }
 

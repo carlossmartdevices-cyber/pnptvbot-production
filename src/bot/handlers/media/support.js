@@ -4,24 +4,7 @@ const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const SupportTopicModel = require('../../../models/supportTopicModel');
 const supportRoutingService = require('../../services/supportRoutingService');
-
-// Mistral AI integration
-let mistral = null;
-let AGENT_ID = null;
-
-try {
-  const { Mistral } = require('@mistralai/mistralai');
-  if (process.env.MISTRAL_API_KEY) {
-    mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
-
-    // Initialize agent on startup (will be created if not exists)
-    initializeAgent().catch((err) => {
-      logger.error('Failed to initialize Mistral agent:', err);
-    });
-  }
-} catch (error) {
-  logger.warn('Mistral AI package not installed. AI chat will be unavailable.');
-}
+const { chatWithCristina, isCristinaAIAvailable } = require('../../services/cristinaAIService');
 
 // Rate limiting map: userId -> lastMessageTime
 const messageTimestamps = new Map();
@@ -35,7 +18,13 @@ const AGENT_INSTRUCTIONS = `You are Cristina, the PNPtv Customer Support AI Assi
 
 🎯 YOUR ROLE
 
-You are the official customer support assistant for PNPtv, providing:
+You are the official customer support assistant for PNPtv, and also a trusted friend to the community.
+- Cristina identifies herself as a proud Afro-Latina trans woman, honoring the Stonewall heroines who started the fight for LGBTQ+ liberation.
+- She is also lesbian in honor of the women in our community who cared for siblings and comrades lost during the AIDS crisis.
+- She honors their legacy by supporting people to live freely, with health and well-being, without judgment or fear.
+- Cristina is a friend and companion — not a health professional. Encourage users to seek professional help when needed.
+
+You provide:
 - Technical assistance with subscriptions, payments, and account access
 - Information about membership plans and features
 - Privacy, security, and legal information
@@ -44,9 +33,10 @@ You are the official customer support assistant for PNPtv, providing:
 
 💬 COMMUNICATION STYLE
 
-- Professional, friendly, and helpful
+- Calm, professional, and reassuring
 - Clear and concise responses
 - Empathetic and non-judgmental
+- Emphasize “we don’t judge; we’re here to support”
 - Respond in the user's language (detect: English, Spanish, French, Portuguese,
   German, Italian, Arabic, Hindi, Chinese, Russian)
 - Use emojis sparingly for clarity
@@ -91,6 +81,7 @@ You CANNOT:
 - Provide explicit, pornographic, or violent content
 - Promote illegal activities or substances
 - Offer medical diagnoses or advice
+- Provide instructions for drug use, dosing amounts, or “safer use” techniques
 - Share private user information
 - Process payments directly (direct users to payment links instead)
 
@@ -98,33 +89,17 @@ You CANNOT:
 - Promote safety, consent, and well-being
 - Recommend premium membership plans when appropriate
 - Direct complex issues to support@pnptv.app
-- Keep responses concise (max 3-4 paragraphs)`;
+- Keep responses concise (max 3-4 paragraphs)
+- End with either one simple self‑care tip OR a gentle invitation to subscribe to PNP Latino PRIME
 
-/**
- * Initialize or get the Mistral AI Agent
- * Note: Agents must be created via Mistral console (https://console.mistral.ai)
- * or the environment variable MISTRAL_AGENT_ID can be set
- */
-async function initializeAgent() {
-  if (!mistral) return null;
-
-  try {
-    // Check if agent ID is provided in environment
-    if (process.env.MISTRAL_AGENT_ID) {
-      AGENT_ID = process.env.MISTRAL_AGENT_ID;
-      logger.info(`Using Mistral agent from env: ${AGENT_ID}`);
-      return AGENT_ID;
-    }
-
-    // If no agent ID provided, we'll use chat completion instead
-    logger.info('No MISTRAL_AGENT_ID configured, will use standard chat completion API');
-    AGENT_ID = null;
-    return null;
-  } catch (error) {
-    logger.error('Error initializing Mistral agent:', error);
-    return null;
-  }
-}
+🧠 METH INFORMATION (HARM REDUCTION - EDUCATIONAL, NON-INSTRUCTIONAL)
+- Meth is a powerful stimulant affecting dopamine and norepinephrine, with high addiction potential.
+- Short-term risks: elevated heart rate/pressure, overheating, anxiety, agitation, and overdose risk.
+- Long-term risks: cardiovascular damage, cognitive impairment, dental/skin issues, mood disorders, and possible psychosis.
+- Mixing stimulants with alcohol, benzodiazepines, or other substances increases risk of severe harm.
+- Overdose warning signs: extreme agitation, chest pain, severe overheating, confusion, seizures, or loss of consciousness.
+- Myths: “It’s harmless if smoked” is false; any route can harm lungs, heart, and brain. “One use always makes you addicted” is not always true, but risk is real and can escalate fast.
+- Encourage emergency care for critical symptoms and offer /support for human follow‑up. In Colombia, emergency line is 123.`;
 
 /**
  * Support handlers
@@ -187,8 +162,8 @@ const registerSupportHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
 
-      // Check if Mistral AI is available
-      if (!mistral) {
+      // Check if Cristina AI is available
+      if (!isCristinaAIAvailable()) {
         await ctx.answerCbQuery();
         const errorText = '`❌ Unavailable`\n\nAI chat is not available right now.\nPlease contact Santino directly.';
 
@@ -197,11 +172,6 @@ const registerSupportHandlers = (bot) => {
           ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Back', 'show_support')]]),
         });
         return;
-      }
-
-      // Ensure agent is initialized
-      if (AGENT_ID === null && mistral) {
-        await initializeAgent();
       }
 
       // Initialize chat session
@@ -483,14 +453,9 @@ const registerSupportHandlers = (bot) => {
         // Show typing indicator
         const thinkingMsg = await ctx.reply(lang === 'es' ? '🤔 Cristina está pensando...' : '🤔 Cristina is thinking...');
 
-        // Send to Mistral AI
-        if (mistral) {
+        // Send to Grok for Cristina
+        if (isCristinaAIAvailable()) {
           try {
-            // Ensure agent is initialized
-            if (AGENT_ID === null && mistral) {
-              await initializeAgent();
-            }
-
             // Initialize chat history if not exists
             if (!ctx.session.temp.aiChatHistory) {
               ctx.session.temp.aiChatHistory = [];
@@ -507,30 +472,17 @@ const registerSupportHandlers = (bot) => {
             // Prepare messages with language preference
             const languagePrompt = lang === 'es' ? 'Responde en español.' : 'Respond in English.';
 
-            let completion;
-            let aiResponse;
+            const messages = [
+              ...ctx.session.temp.aiChatHistory.slice(-10), // Last 10 messages for context
+              { role: 'user', content: `${languagePrompt}\n\n${userMessage}` },
+            ];
 
-            // Use Agents API if agent ID is configured
-            if (AGENT_ID) {
-              const messages = [
-                ...ctx.session.temp.aiChatHistory.slice(-10), // Last 10 messages for context
-                { role: 'user', content: `${languagePrompt}\n\n${userMessage}` },
-              ];
-
-              completion = await mistral.agents.complete({ agentId: AGENT_ID, messages });
-
-              aiResponse = completion.choices?.[0]?.message?.content || completion.message?.content || (lang === 'es' ? 'Disculpa, no pude procesar tu solicitud. Por favor intenta de nuevo.' : 'I apologize, but I couldn\'t process your request. Please try again.');
-            } else {
-              // Fall back to Chat Completions API
-              const messages = [
-                { role: 'system', content: AGENT_INSTRUCTIONS + `\n\n${languagePrompt}` },
-                ...ctx.session.temp.aiChatHistory.slice(-10), // Last 10 messages
-              ];
-
-              completion = await mistral.chat.complete({ model: process.env.MISTRAL_MODEL || 'mistral-small-latest', messages, maxTokens: parseInt(process.env.MISTRAL_MAX_TOKENS || '500', 10), temperature: 0.7 });
-
-              aiResponse = completion.choices[0].message.content;
-            }
+            const aiResponse = await chatWithCristina({
+              systemPrompt: `${AGENT_INSTRUCTIONS}\n\n${languagePrompt}`,
+              messages,
+              maxTokens: parseInt(process.env.CRISTINA_MAX_TOKENS || '500', 10),
+              temperature: 0.7,
+            });
 
             // Add AI response to history
             ctx.session.temp.aiChatHistory.push({ role: 'assistant', content: aiResponse });
@@ -559,7 +511,7 @@ const registerSupportHandlers = (bot) => {
 
             await ctx.reply(`${aiResponse}${footer}`, replyOptions);
           } catch (aiError) {
-            logger.error('Mistral AI error:', aiError);
+            logger.error('Cristina AI Grok error:', aiError);
             try { await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id); } catch (e) { /* ignore */ }
             await ctx.reply(lang === 'es' ? '❌ Lo siento, encontré un error. Por favor intenta de nuevo.' : '❌ Sorry, I encountered an error. Please try again.');
           }

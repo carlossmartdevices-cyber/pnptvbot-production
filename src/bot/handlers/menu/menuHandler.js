@@ -604,8 +604,8 @@ async function handleDeepLinkNearby(ctx, lang) {
  */
 async function handleDeepLinkCristina(ctx, lang) {
   const message = lang === 'es'
-    ? '🤖 *Asistente IA Cristina*\n\nHola! Soy Cristina, tu asistente de IA.\n\nUsa el comando /cristina para hablar conmigo en cualquier momento.'
-    : '🤖 *Cristina AI Assistant*\n\nHi! I\'m Cristina, your AI assistant.\n\nUse the /cristina command to talk to me anytime.';
+    ? '🤖 *Asistente IA Cristina*\n\nHola! Soy Cristina, tu asistente de IA.\n\nMe identifico como mujer latina afro trans y lesbiana, en honor a las heroínas de Stonewall y a las mujeres que cuidaron de nuestra comunidad durante la crisis del sida. Estoy aquí para acompañarte sin juicio, con calma y apoyo.\n\nSoy tu amiga, no una profesional de la salud; busca ayuda médica cuando sea necesario.\n\nUsa el comando /cristina para hablar conmigo en cualquier momento.'
+    : '🤖 *Cristina AI Assistant*\n\nHi! I\'m Cristina, your AI assistant.\n\nI identify as an Afro-Latina trans woman and a lesbian, honoring Stonewall heroines and the women who cared for our community during the AIDS crisis. I\'m here to support you calmly and without judgment.\n\nI\'m your friend, not a health professional; seek medical help when needed.\n\nUse the /cristina command to talk to me anytime.';
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback(lang === 'es' ? '💬 Hablar con Cristina' : '💬 Chat with Cristina', 'support_ai_chat')],
@@ -1464,8 +1464,8 @@ async function handleSupport(ctx, lang) {
 
 async function handleCristinaAI(ctx, lang) {
   const message = lang === 'es'
-    ? '🤖 *Asistente IA Cristina*\n\nHola! Soy Cristina, tu asistente de IA.\n\nUsa el comando /cristina para hablar conmigo en cualquier momento.'
-    : '🤖 *Cristina AI Assistant*\n\nHi! I\'m Cristina, your AI assistant.\n\nUse the /cristina command to talk to me anytime.';
+    ? '🤖 *Asistente IA Cristina*\n\nHola! Soy Cristina, tu asistente de IA.\n\nMe identifico como mujer latina afro trans y lesbiana, en honor a las heroínas de Stonewall y a las mujeres que cuidaron de nuestra comunidad durante la crisis del sida. Estoy aquí para acompañarte sin juicio, con calma y apoyo.\n\nSoy tu amiga, no una profesional de la salud; busca ayuda médica cuando sea necesario.\n\nUsa el comando /cristina para hablar conmigo en cualquier momento.'
+    : '🤖 *Cristina AI Assistant*\n\nHi! I\'m Cristina, your AI assistant.\n\nI identify as an Afro-Latina trans woman and a lesbian, honoring Stonewall heroines and the women who cared for our community during the AIDS crisis. I\'m here to support you calmly and without judgment.\n\nI\'m your friend, not a health professional; seek medical help when needed.\n\nUse the /cristina command to talk to me anytime.';
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]

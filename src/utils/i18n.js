@@ -395,7 +395,7 @@ Choose your plan and get instant access to all premium features:
     chatWithCristina: '💬 Chat with Cristina (AI)',
     contactAdmin: '👨‍💼 Contact Admin',
     faq: '❓ FAQ',
-    cristinaGreeting: 'Hi! I\'m Cristina. How can I help you today?',
+    cristinaGreeting: 'Hi! I\'m Cristina — your AI friend and support. I\'m an Afro-Latina trans woman and a lesbian, honoring Stonewall and the women who cared for our community during the AIDS crisis. I\'m not a health professional; please seek medical help when needed. How can I help you today?',
     adminMessage: 'Please type your message for our support team:',
     messageSent: 'Your message has been sent to our support team. We\'ll get back to you soon!',
 
@@ -910,7 +910,7 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
     chatWithCristina: '💬 Chat con Cristina (IA)',
     contactAdmin: '👨‍💼 Contactar Admin',
     faq: '❓ Preguntas Frecuentes',
-    cristinaGreeting: '¡Hola! Soy Cristina. ¿Cómo puedo ayudarte hoy?',
+    cristinaGreeting: '¡Hola! Soy Cristina — tu amiga y apoyo. Me identifico como mujer latina afro trans y lesbiana, en honor a Stonewall y a las mujeres que cuidaron de nuestra comunidad durante la crisis del sida. No soy profesional de la salud; busca ayuda médica cuando sea necesario. ¿Cómo puedo ayudarte hoy?',
     adminMessage: 'Por favor escribe tu mensaje para nuestro equipo de soporte:',
     messageSent: '¡Tu mensaje ha sido enviado a nuestro equipo de soporte! Te responderemos pronto.',
 
