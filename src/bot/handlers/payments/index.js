@@ -224,7 +224,7 @@ const registerPaymentHandlers = (bot) => {
         planHeader += manualPaymentMsg;
       }
 
-      paymentButtons.push([Markup.button.callback(t('back', lang), 'show_subscription_plans')]);
+      paymentButtons.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
 
       await ctx.editMessageText(
         planHeader,
@@ -303,14 +303,14 @@ const registerPaymentHandlers = (bot) => {
           t('paymentInstructions', lang, { paymentUrl: result.paymentUrl }),
           Markup.inlineKeyboard([
             [Markup.button.url('💳 Pay Now', result.paymentUrl)],
-            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
+            [Markup.button.callback(t('back', lang), `select_plan_${planId}`)],
           ]),
         );
       } else {
         await ctx.editMessageText(
           `${t('error', lang)}\n\n${result.error}`,
           Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
+            [Markup.button.callback(t('back', lang), `select_plan_${planId}`)],
           ]),
         );
       }
@@ -325,7 +325,7 @@ const registerPaymentHandlers = (bot) => {
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
+            [Markup.button.callback(t('back', lang), `select_plan_${planId}`)],
           ]),
         },
       ).catch(() => {});
@@ -448,7 +448,7 @@ const registerPaymentHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.url('💰 Pay Now', result.paymentUrl)],
-              [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
+              [Markup.button.callback(t('back', lang), `select_plan_${planId}`)],
             ]),
           },
         );
@@ -456,7 +456,7 @@ const registerPaymentHandlers = (bot) => {
         await ctx.editMessageText(
           `${t('error', lang)}\n\n${result.error}`,
           Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
+            [Markup.button.callback(t('back', lang), `select_plan_${planId}`)],
           ]),
         );
       }
@@ -472,7 +472,7 @@ const registerPaymentHandlers = (bot) => {
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), 'show_subscription_plans')],
+            [Markup.button.callback(t('back', lang), `select_plan_${planId}`)],
           ]),
         },
       ).catch(() => {});

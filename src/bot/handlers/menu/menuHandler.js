@@ -24,6 +24,7 @@ const UserService = require('../../services/userService');
 const { buildHangoutsWebAppUrl } = require('../../utils/hangoutsWebApp');
 
 const HANGOUTS_WEB_APP_URL = process.env.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts';
+const PRIME_TV_LINK = 'https://t.me/+GDD0AAVbvGM3MGEx';
 
 /**
  * Store the last menu message ID per user per chat
@@ -65,35 +66,27 @@ async function getUserLanguage(ctx) {
  */
 function buildPrimeMenuKeyboard(lang = 'en') {
   const labels = lang === 'es' ? {
+    latinoTv: 'PNP Latino TV | Ver ahora',
+    pnpLive: 'PNP Live | Hombres Latinos en Webcam',
+    pnpApp: 'PNP tv App | Área PRIME',
     profile: '👤 Mi Perfil',
-    membership: '💎 Mi Membresía PRIME',
-    nearby: '📍 PNP Nearby',
-    hangouts: '🎥 PNP Hangouts',
-    videorama: '🎶 PNP Videorama',
-    pnpLive: '📺 PNP Television Live',
-    radio: '📻 Radio',
-    support: '💬 Soporte',
-    settings: '⚙️ Configuración',
+    support: '🆘 Ayuda y soporte',
   } : {
+    latinoTv: 'PNP Latino TV | Watch now',
+    pnpLive: 'PNP Live | Latino Men on Webcam',
+    pnpApp: 'PNP tv App | PRIME area',
     profile: '👤 My Profile',
-    membership: '💎 My PRIME Membership',
-    nearby: '📍 PNP Nearby',
-    hangouts: '🎥 PNP Hangouts',
-    videorama: '🎶 PNP Videorama',
-    pnpLive: '📺 PNP Television Live',
-    radio: '📻 Radio',
-    support: '💬 Support',
-    settings: '⚙️ Settings',
+    support: '🆘 Help and support',
   };
 
   return Markup.inlineKeyboard([
-    [Markup.button.callback(labels.profile, 'menu:profile')],
-    [Markup.button.callback(labels.membership, 'menu:subscription_status')],
-    [Markup.button.callback(labels.nearby, 'menu:nearby')],
-    [Markup.button.callback(labels.hangouts, 'menu_hangouts'), Markup.button.callback(labels.videorama, 'menu_videorama')],
+    [Markup.button.url(labels.latinoTv, PRIME_TV_LINK)],
     [Markup.button.callback(labels.pnpLive, 'PNP_LIVE_START')],
-    [Markup.button.callback(labels.support, 'menu:support')],
-    [Markup.button.callback(labels.settings, 'menu:settings')],
+    [Markup.button.callback(labels.pnpApp, 'menu_pnp_tv_app')],
+    [
+      Markup.button.callback(labels.profile, 'menu:profile'),
+      Markup.button.callback(labels.support, 'menu:support'),
+    ],
   ]);
 }
 
@@ -107,7 +100,7 @@ function buildFreeMenuKeyboard(lang = 'en') {
     nearby: '📍 PNP Nearby',
     hangouts: '🎥 PNP Hangouts',
     videorama: '🎶 PNP Videorama',
-    support: '💬 Soporte',
+    support: '🆘 Ayuda y soporte',
     settings: '⚙️ Configuración',
   } : {
     profile: '👤 My Profile',
@@ -115,7 +108,7 @@ function buildFreeMenuKeyboard(lang = 'en') {
     nearby: '📍 PNP Nearby',
     hangouts: '🎥 PNP Hangouts',
     videorama: '🎶 PNP Videorama',
-    support: '💬 Support',
+    support: '🆘 Help and support',
     settings: '⚙️ Settings',
   };
 
@@ -123,8 +116,10 @@ function buildFreeMenuKeyboard(lang = 'en') {
     [Markup.button.callback(labels.subscribe, 'menu:subscribe')],
     [Markup.button.callback(labels.nearby, 'menu:nearby')],
     [Markup.button.callback(labels.hangouts, 'menu_hangouts'), Markup.button.callback(labels.videorama, 'menu_videorama')],
-    [Markup.button.callback(labels.profile, 'menu:profile')],
-    [Markup.button.callback(labels.support, 'menu:support')],
+    [
+      Markup.button.callback(labels.profile, 'menu:profile'),
+      Markup.button.callback(labels.support, 'menu:support'),
+    ],
     [Markup.button.callback(labels.settings, 'menu:settings')],
   ]);
 }

@@ -11,6 +11,20 @@ const { showMainMenu: showUserMainMenu } = require('../user/menu');
  */
 const lastMenuMessages = {};
 
+const getEffectiveSubscriptionStatus = async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId) return false;
+
+  const isAdmin = await PermissionService.isAdmin(userId);
+  const adminViewMode = ctx.session?.adminViewMode;
+
+  if (isAdmin && adminViewMode) {
+    return adminViewMode === 'prime';
+  }
+
+  return await UserService.hasActiveSubscription(userId);
+};
+
 /**
  * Helper function to delete previous menu message
  */
@@ -105,7 +119,7 @@ const registerMenuHandlers = (bot) => {
       }
 
       // Check subscription status
-      const hasSubscription = userId ? await UserService.hasActiveSubscription(userId) : false;
+      const hasSubscription = await getEffectiveSubscriptionStatus(ctx);
       const username = ctx.from?.username || ctx.from?.first_name || 'Member';
 
       let menuText;
@@ -143,30 +157,28 @@ Tap the buttons below and enjoy everything we've prepared for you — videos, Ne
         const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
 
         buttons = [
-          [Markup.button.callback(
-            lang === 'es' ? '📸 Mi Perfil' : '📸 My Profile',
-            'show_profile'
-          )],
-          [Markup.button.callback(
-            lang === 'es' ? '📍 ¿Quién está cerca?' : '📍 Who is Nearby?',
-            'menu_nearby'
-          )],
-          [Markup.button.callback(
-            lang === 'es' ? '🎬 Contenido Exclusivo' : '🎬 Exclusive Content',
-            'menu_content'
-          )],
-          [Markup.button.callback(
-            lang === 'es' ? '💎 Mi Membresía' : '💎 My Membership',
-            'menu_membership'
-          )],
-          [Markup.button.callback(
-            lang === 'es' ? '🆘 Ayuda' : '🆘 Help',
-            'menu_help'
-          )],
-          [Markup.button.callback(
-            lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings',
-            'show_settings'
-          )],
+          [
+            Markup.button.url(
+              lang === 'es' ? 'PNP Latino TV | Ver ahora' : 'PNP Latino TV | Watch now',
+              'https://t.me/+GDD0AAVbvGM3MGEx'
+            ),
+          ],
+          [
+            Markup.button.callback(
+              lang === 'es' ? 'PNP Live | Hombres Latinos en Webcam' : 'PNP Live | Latino Men on Webcam',
+              'PNP_LIVE_START'
+            ),
+          ],
+          [
+            Markup.button.callback(
+              lang === 'es' ? 'PNP tv App | Área PRIME' : 'PNP tv App | PRIME area',
+              'menu_pnp_tv_app'
+            ),
+          ],
+        [
+          Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
+          Markup.button.callback(lang === 'es' ? '🆘 Ayuda y soporte' : '🆘 Help and support', 'show_support'),
+        ],
         ];
       } else {
         // FREE MEMBER VIEW
@@ -208,7 +220,7 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, Ne
             'menu_content'
           )],
           [Markup.button.callback(
-            lang === 'es' ? '🆘 Ayuda' : '🆘 Help',
+            lang === 'es' ? '🆘 Ayuda y soporte' : '🆘 Help and support',
             'menu_help'
           )],
           [Markup.button.callback(
@@ -509,9 +521,7 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, Ne
       const lang = getLanguage(ctx);
       await ctx.answerCbQuery();
 
-      const userId = ctx.from?.id;
-      const user = userId ? await UserService.getUser(userId) : null;
-      const isPrime = user ? await UserService.hasActiveSubscription(userId) : false;
+      const isPrime = await getEffectiveSubscriptionStatus(ctx);
 
       let privateCallsText;
       let buttons;
@@ -617,7 +627,7 @@ Hit *Unlock PRIME* to get even more cloudy fun — full-length videos, lives, Ne
     try {
       const lang = getLanguage(ctx);
       const userId = ctx.from?.id;
-      const hasSubscription = userId ? await UserService.hasActiveSubscription(userId) : false;
+      const hasSubscription = await getEffectiveSubscriptionStatus(ctx);
       
       await ctx.answerCbQuery();
 

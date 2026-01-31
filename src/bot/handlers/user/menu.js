@@ -6,6 +6,7 @@ const PermissionService = require('../../services/permissionService');
 const { isPrimeUser, hasFullAccess, safeReplyOrEdit } = require('../../utils/helpers');
 const config = require('../../../config/config');
 const UserModel = require('../../../models/userModel');
+const PlanModel = require('../../../models/planModel');
 
 /**
  * Sanitize text for Telegram Markdown to prevent parsing errors
@@ -61,6 +62,68 @@ const buildMembershipHeader = (user, isPremium, lang) => {
     return `${emoji} *${memberLabel}: ${memberType}*\n\n`;
   }
 };
+
+const formatPlanButtonText = (plan, lang) => {
+  const displayName = lang === 'es' ? (plan.nameEs || plan.name) : plan.name;
+  const duration = plan.duration || plan.duration_days || plan.durationDays || 0;
+  const isLifetimePlan = plan.isLifetime || duration >= 36500;
+  const periodText = isLifetimePlan
+    ? (lang === 'es' ? 'De por vida' : 'Lifetime')
+    : `${duration} ${t('days', lang)}`;
+  const priceText = plan.price ? `$${plan.price.toFixed(2)}` : '';
+  const textSegments = [displayName];
+  if (periodText) textSegments.push(periodText);
+  if (priceText) textSegments.push(priceText);
+  return textSegments.join(' | ');
+};
+
+const buildPlanButtons = async (lang) => {
+  try {
+    const plans = await PlanModel.getPublicPlans();
+    if (!plans || plans.length === 0) {
+      throw new Error('No plans available');
+    }
+
+    const visiblePlans = plans.filter((plan) => plan.active);
+    if (visiblePlans.length === 0) {
+      throw new Error('No active plans available');
+    }
+
+    return visiblePlans.map((plan) => ([
+      Markup.button.callback(formatPlanButtonText(plan, lang), `select_plan_${plan.id}`),
+    ]));
+  } catch (error) {
+    logger.warn('Unable to build plan buttons:', error.message);
+    return [
+      [Markup.button.callback(lang === 'es' ? '💎 Suscríbete a PRIME' : '💎 Subscribe to PRIME', 'menu_subscribe')],
+    ];
+  }
+};
+
+const buildPrimeMenuButtons = (lang) => ([
+  [
+    Markup.button.url(
+      lang === 'es' ? 'PNP Latino TV | Ver ahora' : 'PNP Latino TV | Watch now',
+      'https://t.me/+GDD0AAVbvGM3MGEx'
+    ),
+  ],
+  [
+    Markup.button.callback(
+      lang === 'es' ? 'PNP Live | Hombres Latinos en Webcam' : 'PNP Live | Latino Men on Webcam',
+      'PNP_LIVE_START'
+    ),
+  ],
+  [
+    Markup.button.callback(
+      lang === 'es' ? 'PNP tv App | Área PRIME' : 'PNP tv App | PRIME area',
+      'menu_pnp_tv_app'
+    ),
+  ],
+  [
+    Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
+    Markup.button.callback(lang === 'es' ? '🆘 Ayuda y soporte' : '🆘 Help and support', 'show_support'),
+  ],
+]);
 
 const buildOnboardingPrompt = (lang, botUsername) => {
   const message = lang === 'es'
@@ -218,6 +281,28 @@ const registerMenuHandlers = (bot) => {
           : '🔒 Feature for premium users only. Subscribe to unlock.',
         { show_alert: true }
       );
+    });
+
+    // PNP tv App (PRIME area) - regroup Hangouts + Videorama
+    bot.action('menu_pnp_tv_app', async (ctx) => {
+      try {
+        const lang = ctx.session?.language || 'en';
+        const message = lang === 'es'
+          ? '📱 *PNP tv App*\n\nSelecciona una opción del área PRIME:'
+          : '📱 *PNP tv App*\n\nChoose an option from the PRIME area:';
+
+        const keyboard = Markup.inlineKeyboard([
+          [
+            Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'hangouts_menu'),
+            Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
+          ],
+          [Markup.button.callback(lang === 'es' ? '🔙 Volver' : '🔙 Back', 'back_to_main')],
+        ]);
+
+        await ctx.editMessageText(message, { parse_mode: 'Markdown', ...keyboard });
+      } catch (error) {
+        logger.error('Error handling menu_pnp_tv_app:', error);
+      }
     });
 
     // Radio button handler - coming soon
@@ -440,34 +525,7 @@ const showMainMenu = async (ctx) => {
   if (isPremium) {
     // PRIME MEMBER VERSION - BENEFITS FOCUSED
     menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoPrimeMenu' : 'pnpLatinoPrimeMenu', lang);
-
-    // Get user's display name for Jitsi
-    const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
-    const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
-    const tg = ctx.from?.username ? `@${ctx.from.username}` : '';
-
-
-    buttons = [
-      [
-        Markup.button.url(lang === 'es' ? '💎 PNP Latino TV PRIME' : '💎 PNP Latino TV PRIME', 'https://t.me/+GDD0AAVbvGM3MGEx'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
-        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'hangouts_menu'),
-        Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '📻 PNP Radio' : '📻 PNP Radio', 'menu_radio'),
-        Markup.button.callback(lang === 'es' ? '📺 PNP Television Live' : '📺 PNP Television Live', 'PNP_LIVE_START'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? 'ℹ️ Ayuda' : 'ℹ️ Help', 'show_support'),
-        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙ Settings', 'show_settings'),
-      ],
-    ];
+    buttons = buildPrimeMenuButtons(lang);
   } else {
     // FREE MEMBER VERSION - SALES FOCUSED
     menuText = previewBanner + membershipHeader + (lang === 'es'
@@ -492,28 +550,12 @@ const showMainMenu = async (ctx) => {
         '**Go PRIME now and enjoy everything!**\n\n' +
         '`Passes starting at just $14.99 USD`');
 
+    const planButtons = await buildPlanButtons(lang);
     buttons = [
-      [
-        Markup.button.callback(lang === 'es' ? 'Week Pass | 7 días | $14,99' : 'Week Pass | 7 days | $14,99', 'select_plan_week_pass'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? 'Monthly Pass | 30 días | $24,99' : 'Monthly Pass | 30 days | $24,99', 'select_plan_monthly_pass'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '3 Months Pass | 90 días | $49,99' : '3 Months Pass | 90 days | $49,99', 'select_plan_3_months_pass'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '6 Months Pass | 180 días | $74,99' : '6 Months Pass | 180 days | $74,99', 'select_plan_6_months_pass'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? 'Diamond Pass | 1 año | $99,99' : 'Diamond Pass | 1 year | $99,99', 'select_plan_diamond_pass'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? 'Lifetime Pass | PNP 4 ever | $249,99' : 'Lifetime Pass | PNP 4 ever | $249,99', 'select_plan_lifetime_pass'),
-      ],
+      ...planButtons,
       [
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
-        Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Support', 'show_support'),
+        Markup.button.callback(lang === 'es' ? '🆘 Ayuda y soporte' : '🆘 Help and support', 'show_support'),
       ],
     ];
   }
@@ -612,32 +654,7 @@ const showMainMenuEdit = async (ctx) => {
   if (isPremium) {
     // PRIME MEMBER VERSION - BENEFITS FOCUSED
     menuText = previewBanner + membershipHeader + t(lang === 'es' ? 'pnpLatinoPrimeMenu' : 'pnpLatinoPrimeMenu', lang);
-
-    // Get user's display name for Jitsi
-    const displayName = ctx.from?.first_name || ctx.from?.username || 'User';
-    const jitsiUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
-
-    buttons = [
-      [
-        Markup.button.url(lang === 'es' ? '💎 PNP Latino TV PRIME' : '💎 PNP Latino TV PRIME', 'https://t.me/+GDD0AAVbvGM3MGEx'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
-        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '🎥 PNP Hangouts' : '🎥 PNP Hangouts', 'hangouts_menu'),
-        Markup.button.callback(lang === 'es' ? '🎶 PNP Videorama' : '🎶 PNP Videorama', 'menu_videorama'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '📻 PNP Radio' : '📻 PNP Radio', 'menu_radio'),
-        Markup.button.callback(lang === 'es' ? '📺 PNP Television Live' : '📺 PNP Television Live', 'PNP_LIVE_START'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? 'ℹ️ Ayuda' : 'ℹ️ Help', 'show_support'),
-        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙ Settings', 'show_settings'),
-      ],
-    ];
+    buttons = buildPrimeMenuButtons(lang);
   } else {
     // FREE MEMBER VERSION - SALES FOCUSED
     menuText = previewBanner + membershipHeader + (lang === 'es'
@@ -662,28 +679,12 @@ const showMainMenuEdit = async (ctx) => {
         '**Go PRIME now and enjoy everything!**\n\n' +
         '`Passes starting at just $14.99 USD`');
 
+    const planButtons = await buildPlanButtons(lang);
     buttons = [
-      [
-        Markup.button.callback(lang === 'es' ? 'Week Pass | 7 días | $14,99' : 'Week Pass | 7 days | $14,99', 'select_plan_week_pass'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? 'Monthly Pass | 30 días | $24,99' : 'Monthly Pass | 30 days | $24,99', 'select_plan_monthly_pass'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '3 Months Pass | 90 días | $49,99' : '3 Months Pass | 90 days | $49,99', 'select_plan_3_months_pass'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '6 Months Pass | 180 días | $74,99' : '6 Months Pass | 180 days | $74,99', 'select_plan_6_months_pass'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? 'Diamond Pass | 1 año | $99,99' : 'Diamond Pass | 1 year | $99,99', 'select_plan_diamond_pass'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? 'Lifetime Pass | PNP 4 ever | $249,99' : 'Lifetime Pass | PNP 4 ever | $249,99', 'select_plan_lifetime_pass'),
-      ],
+      ...planButtons,
       [
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
-        Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Support', 'show_support'),
+        Markup.button.callback(lang === 'es' ? '🆘 Ayuda y soporte' : '🆘 Help and support', 'show_support'),
       ],
     ];
   }

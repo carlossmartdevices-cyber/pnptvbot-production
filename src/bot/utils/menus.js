@@ -2,6 +2,8 @@
  * Inline keyboard menu templates
  */
 
+const PNP_TV_LINK = 'https://t.me/+GDD0AAVbvGM3MGEx';
+
 /**
  * Main menu for users
  * @param {string} [language='en'] - Language code ('en' or 'es')
@@ -13,67 +15,72 @@ const getMainMenu = (language = 'en', isPrime = false) => {
     en: {
       profile: '👤 My Profile',
       subscribe: '💎 Subscribe to PRIME',
-      membership: '💎 My PRIME Membership',
       nearby: '📍 Nearby Users',
       hangouts: '🎥 Hangouts',
-      videorama: '📹 Videorama',
-      privateCalls: '📞 Private Calls',
-      streams: '🎥 Live Streams',
-      radio: '📻 Radio',
-      support: '💬 Support',
+      videorama: '🎶 Videorama',
+      support: '🆘 Help and support',
       settings: '⚙️ Settings',
+      latinoTv: 'PNP Latino TV | Watch now',
+      pnpLive: 'PNP Live | Latino Men on Webcam',
+      pnpApp: 'PNP tv App | PRIME area',
     },
     es: {
       profile: '👤 Mi Perfil',
       subscribe: '💎 Suscribirse a PRIME',
-      membership: '💎 Mi Membresía PRIME',
       nearby: '📍 Usuarios Cercanos',
       hangouts: '🎥 Hangouts',
-      videorama: '📹 Videorama',
-      privateCalls: '📞 Video Llamada VIP',
-      streams: '🎥 Transmisiones en Vivo',
-      radio: '📻 Radio',
-      support: '💬 Soporte',
+      videorama: '🎶 Videorama',
+      support: '🆘 Ayuda y soporte',
       settings: '⚙️ Configuración',
+      latinoTv: 'PNP Latino TV | Ver ahora',
+      pnpLive: 'PNP Live | Hombres Latinos en Webcam',
+      pnpApp: 'PNP tv App | Área PRIME',
     },
   };
 
   const l = labels[language] || labels.en;
 
-  // Build menu based on subscription status
-  const buttons = [
-    [{ text: l.profile, callback_data: 'menu_profile' }],
+  const primeButtons = [
+    [
+      {
+        text: l.latinoTv,
+        url: PNP_TV_LINK,
+      },
+    ],
+    [
+      {
+        text: l.pnpLive,
+        callback_data: 'PNP_LIVE_START',
+      },
+    ],
+    [
+      {
+        text: l.pnpApp,
+        callback_data: 'menu_pnp_tv_app',
+      },
+    ],
+    [
+      { text: l.profile, callback_data: 'menu_profile' },
+      { text: l.support, callback_data: 'menu_support' },
+    ],
   ];
 
-  if (isPrime) {
-    // PRIME user menu - show features instead of subscribe button
-    buttons.push([{ text: l.membership, callback_data: 'menu_membership' }]);
-    buttons.push([{ text: l.nearby, callback_data: 'menu_nearby' }]);
-    buttons.push([
+  const freeButtons = [
+    [{ text: l.subscribe, callback_data: 'menu_subscribe' }],
+    [{ text: l.nearby, callback_data: 'menu_nearby' }],
+    [
       { text: l.hangouts, callback_data: 'menu_hangouts' },
       { text: l.videorama, callback_data: 'menu_videorama' },
-    ]);
-    buttons.push([{ text: l.privateCalls, callback_data: 'PRIVATECALL_START' }]);
-    buttons.push([{ text: l.streams, callback_data: 'menu_streams' }]);
-    buttons.push([{ text: l.radio, callback_data: 'menu_radio' }]);
-  } else {
-    // FREE user menu - show subscribe button prominently
-    buttons.push([{ text: l.subscribe, callback_data: 'menu_subscribe' }]);
-    buttons.push([{ text: l.nearby, callback_data: 'menu_nearby' }]);
-    buttons.push([
-      { text: l.hangouts, callback_data: 'menu_hangouts' },
-      { text: l.videorama, callback_data: 'menu_videorama' },
-    ]);
-    buttons.push([{ text: l.privateCalls, callback_data: 'PRIVATECALL_START' }]);
-    buttons.push([{ text: l.streams, callback_data: 'menu_streams' }]);
-    buttons.push([{ text: l.radio, callback_data: 'menu_radio' }]);
-  }
-
-  buttons.push([{ text: l.support, callback_data: 'menu_support' }]);
-  buttons.push([{ text: l.settings, callback_data: 'menu_settings' }]);
+    ],
+    [
+      { text: l.profile, callback_data: 'menu_profile' },
+      { text: l.support, callback_data: 'menu_support' },
+    ],
+    [{ text: l.settings, callback_data: 'menu_settings' }],
+  ];
 
   return {
-    inline_keyboard: buttons,
+    inline_keyboard: isPrime ? primeButtons : freeButtons,
   };
 };
 
