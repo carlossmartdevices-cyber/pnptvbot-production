@@ -515,7 +515,7 @@ class VideoCallModel {
         `INSERT INTO agora_channels (
           channel_name, channel_type, feature_name, created_by,
           max_participants, is_active, metadata
-        ) VALUES ($1, 'call', 'video', $2, $3, true, $4)`,
+        ) VALUES ($1, 'call', 'hangouts', $2, $3, true, $4)`,
         [channelName, callId, maxParticipants, JSON.stringify({ callId })]
       );
     } catch (error) {

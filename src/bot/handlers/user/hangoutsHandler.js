@@ -2,9 +2,9 @@ const { Markup } = require('telegraf');
 const VideoCallModel = require('../../../models/videoCallModel');
 const MainRoomModel = require('../../../models/mainRoomModel');
 const logger = require('../../../utils/logger');
-const { isPrimeUser, hasFullAccess, safeReplyOrEdit } = require('../../utils/helpers');
-const config = require('../../../config/config');
+const { hasFullAccess, safeReplyOrEdit } = require('../../utils/helpers');
 const { consumeRateLimit, getRateLimitInfo } = require('../../core/middleware/rateLimitGranular');
+const { buildHangoutsWebAppUrl } = require('../../utils/hangoutsWebApp');
 
 /**
  * Hangouts handlers for video calls and main rooms
@@ -171,7 +171,17 @@ const registerHangoutsHandlers = (bot) => {
         maxParticipants: 10,
       });
 
-      const webAppUrl = `${HANGOUTS_WEB_APP_URL}/call/${call.channelName}?token=${call.rtcToken}&uid=${ctx.from.id}`;
+      const displayName = ctx.from.first_name || ctx.from.username || 'User';
+      const webAppUrl = buildHangoutsWebAppUrl({
+        baseUrl: HANGOUTS_WEB_APP_URL,
+        room: call.channelName,
+        token: call.rtcToken,
+        uid: ctx.from.id,
+        username: displayName,
+        type: call.isPublic ? 'public' : 'private',
+        appId: call.appId,
+        callId: call.id,
+      });
       const joinLink = `https://t.me/${ctx.botInfo.username}?start=call_${call.id}`;
 
       const message = lang === 'es'
@@ -324,27 +334,37 @@ const registerHangoutsHandlers = (bot) => {
     try {
       const callId = ctx.match[1];
       const lang = ctx.session?.language || 'en';
+      await ctx.answerCbQuery();
+      const displayName = ctx.from.first_name || ctx.from.username || 'User';
 
-      const call = await VideoCallModel.getById(callId);
+      const joinResult = await VideoCallModel.joinCall(
+        callId,
+        ctx.from.id,
+        displayName,
+        false
+      );
 
-      if (!call) {
-        await ctx.answerCbQuery(
-          lang === 'es' ? '❌ Llamada no encontrada' : '❌ Call not found',
-          { show_alert: true }
-        );
-        return;
-      }
-
-      const webAppUrl = `${HANGOUTS_WEB_APP_URL}/call/${call.channelName}?token=${call.rtcToken}&uid=${ctx.from.id}`;
+      const call = joinResult.call;
+      const participantCount = call.currentParticipants + (joinResult.alreadyJoined ? 0 : 1);
+      const webAppUrl = buildHangoutsWebAppUrl({
+        baseUrl: HANGOUTS_WEB_APP_URL,
+        room: call.channelName,
+        token: joinResult.rtcToken,
+        uid: ctx.from.id,
+        username: displayName,
+        type: call.isPublic ? 'public' : 'private',
+        appId: joinResult.appId,
+        callId: call.id,
+      });
       const joinLink = `https://t.me/${ctx.botInfo.username}?start=call_${call.id}`;
 
       const message = lang === 'es'
         ? `📞 *Detalles de Llamada*\n\n` +
-          `👥 Participantes: ${call.currentParticipants}/${call.maxParticipants}\n` +
+          `👥 Participantes: ${participantCount}/${call.maxParticipants}\n` +
           `📅 Creada: ${new Date(call.createdAt).toLocaleString()}\n` +
           `🔗 Compartir: \`${joinLink}\``
         : `📞 *Call Details*\n\n` +
-          `👥 Participants: ${call.currentParticipants}/${call.maxParticipants}\n` +
+          `👥 Participants: ${participantCount}/${call.maxParticipants}\n` +
           `📅 Created: ${new Date(call.createdAt).toLocaleString()}\n` +
           `🔗 Share: \`${joinLink}\``;
 
@@ -359,20 +379,29 @@ const registerHangoutsHandlers = (bot) => {
       });
     } catch (error) {
       logger.error('Error viewing call:', error);
+      const lang = ctx.session?.language || 'en';
+      await ctx.answerCbQuery(
+        error.message.includes('full')
+          ? (lang === 'es' ? '❌ La llamada está llena' : '❌ Call is full')
+          : (lang === 'es' ? '❌ Error cargando llamada' : '❌ Error loading call'),
+        { show_alert: true }
+      );
     }
   });
 
   // ==========================================
-  // MAIN ROOMS (AVAILABLE TO ALL)
+  // MAIN ROOMS (PRIME ONLY)
   // ==========================================
 
   /**
    * Join a main room
    */
-  bot.action(/^join_main_room_(\d)$/, async (ctx) => {
+  const joinMainRoom = async (ctx, roomId) => {
     try {
-      await ctx.answerCbQuery();
-      const roomId = parseInt(ctx.match[1]);
+      const resolvedRoomId = Number(roomId);
+      if (!Number.isFinite(resolvedRoomId)) {
+        return;
+      }
       const lang = ctx.session?.language || 'en';
       const user = ctx.session?.user || {};
       const userId = ctx.from?.id;
@@ -393,29 +422,39 @@ const registerHangoutsHandlers = (bot) => {
         return;
       }
 
-      const room = await MainRoomModel.getById(roomId);
+      const room = await MainRoomModel.getById(resolvedRoomId);
 
       if (!room) {
-        await ctx.answerCbQuery(
-          lang === 'es' ? '❌ Sala no encontrada' : '❌ Room not found',
-          { show_alert: true }
-        );
+        try {
+          await ctx.answerCbQuery(
+            lang === 'es' ? '❌ Sala no encontrada' : '❌ Room not found',
+            { show_alert: true }
+          );
+        } catch {}
         return;
       }
 
       // Join the room (as viewer by default)
-      const { rtcToken, rtmToken } = await MainRoomModel.joinRoom(
-        roomId,
+      const { rtcToken, appId } = await MainRoomModel.joinRoom(
+        resolvedRoomId,
         ctx.from.id,
         ctx.from.first_name || ctx.from.username || 'User',
         false // Start as viewer
       );
 
-      const webAppUrl = `${HANGOUTS_WEB_APP_URL}/room/${roomId}?rtc=${rtcToken}&rtm=${rtmToken}&uid=${ctx.from.id}`;
+      const displayName = ctx.from.first_name || ctx.from.username || 'User';
+      const webAppUrl = buildHangoutsWebAppUrl({
+        baseUrl: HANGOUTS_WEB_APP_URL,
+        room: room.channelName,
+        token: rtcToken,
+        uid: ctx.from.id,
+        username: displayName,
+        type: 'main',
+        appId,
+      });
 
       // Also provide Jitsi fallback
-      const displayName = ctx.from.first_name || ctx.from.username || 'User';
-      const jitsiUrl = `https://meet.jit.si/pnptv-main-room-${roomId}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+      const jitsiUrl = `https://meet.jit.si/pnptv-main-room-${resolvedRoomId}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
 
       const message = lang === 'es'
         ? `🏠 *${room.name}*\n\n` +
@@ -442,84 +481,34 @@ const registerHangoutsHandlers = (bot) => {
       const lang = ctx.session?.language || 'en';
 
       if (error.message.includes('full')) {
-        await ctx.answerCbQuery(
-          lang === 'es' ? '❌ La sala está llena' : '❌ Room is full',
-          { show_alert: true }
-        );
-      } else {
-        await ctx.answerCbQuery(
-          lang === 'es' ? '❌ Error al entrar' : '❌ Error joining',
-          { show_alert: true }
-        );
-      }
-    }
-  });
-
-  // ==========================================
-  // DEEPLINK HANDLERS
-  // ==========================================
-
-  /**
-   * Handle /start call_<id> deeplink for joining calls
-   */
-  bot.start(async (ctx, next) => {
-    const payload = ctx.startPayload;
-
-    if (payload && payload.startsWith('call_')) {
-      const callId = payload.replace('call_', '');
-      const lang = ctx.session?.language || 'en';
-
-      try {
-        const call = await VideoCallModel.getById(callId);
-
-        if (!call || !call.isActive) {
-          await ctx.reply(
-            lang === 'es' ? '❌ Esta llamada ya no está disponible.' : '❌ This call is no longer available.'
+        try {
+          await ctx.answerCbQuery(
+            lang === 'es' ? '❌ La sala está llena' : '❌ Room is full',
+            { show_alert: true }
           );
-          return;
-        }
-
-        // Join the call
-        const { rtcToken, rtmToken } = await VideoCallModel.joinCall(
-          callId,
-          ctx.from.id,
-          ctx.from.first_name || ctx.from.username || 'User',
-          false // Not a guest
-        );
-
-        const webAppUrl = `${HANGOUTS_WEB_APP_URL}/call/${call.channelName}?token=${rtcToken}&uid=${ctx.from.id}`;
-
-        const message = lang === 'es'
-          ? `📞 *Unirse a Videollamada*\n\n` +
-            `Creada por: ${call.creatorName}\n` +
-            `👥 ${call.currentParticipants}/${call.maxParticipants} participantes\n\n` +
-            `Presiona el botón para entrar:`
-          : `📞 *Join Video Call*\n\n` +
-            `Created by: ${call.creatorName}\n` +
-            `👥 ${call.currentParticipants}/${call.maxParticipants} participants\n\n` +
-            `Tap the button to join:`;
-
-        await ctx.reply(message, {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.webApp(lang === 'es' ? '🚀 Entrar a Llamada' : '🚀 Join Call', webAppUrl)],
-          ]),
-        });
-
-        logger.info('User joining call via deeplink', { callId, userId: ctx.from.id });
-        return;
-      } catch (error) {
-        logger.error('Error joining call via deeplink:', error);
-        await ctx.reply(
-          lang === 'es' ? '❌ Error al unirse a la llamada.' : '❌ Error joining the call.'
-        );
-        return;
+        } catch {}
+      } else {
+        try {
+          await ctx.answerCbQuery(
+            lang === 'es' ? '❌ Error al entrar' : '❌ Error joining',
+            { show_alert: true }
+          );
+        } catch {}
       }
     }
+  };
 
-    // Continue to next handler if not a call deeplink
-    return next();
+  bot.action(/^join_main_room_(\d+)$/, async (ctx) => {
+    await ctx.answerCbQuery();
+    const roomId = parseInt(ctx.match[1], 10);
+    return joinMainRoom(ctx, roomId);
   });
+
+  bot.action('hangouts_join_main', async (ctx) => {
+    await ctx.answerCbQuery();
+    return joinMainRoom(ctx, 1);
+  });
+
 };
 
 module.exports = registerHangoutsHandlers;

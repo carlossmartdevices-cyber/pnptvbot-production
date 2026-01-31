@@ -1,6 +1,9 @@
 // Force IPv4 for DNS resolution BEFORE any network requests
 // This must be at the very top to fix IPv6 timeout issues with Telegram API
 const dns = require('dns');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 dns.setDefaultResultOrder('ipv4first');
 
 require('dotenv').config({ allowEmptyValues: true });
@@ -97,6 +100,102 @@ const BroadcastButtonModel = require('../../models/broadcastButtonModel');
 let botStarted = false;
 let botInstance = null;
 let isWebhookMode = false;
+let apiServer = null;
+
+const LOCK_PATH = process.env.BOT_LOCK_PATH || path.join(os.tmpdir(), 'pnptvbot.lock');
+const LOCK_ENABLED = process.env.BOT_LOCK_ENABLED !== 'false';
+let hasProcessLock = false;
+
+const acquireProcessLock = () => {
+  if (!LOCK_ENABLED) return true;
+  try {
+    const fd = fs.openSync(LOCK_PATH, 'wx');
+    fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+    fs.closeSync(fd);
+    hasProcessLock = true;
+    logger.info(`✓ Process lock acquired: ${LOCK_PATH}`);
+    return true;
+  } catch (error) {
+    if (error.code !== 'EEXIST') {
+      logger.warn(`Failed to create process lock (${LOCK_PATH}); continuing without lock: ${error.message}`);
+      return true;
+    }
+  }
+
+  try {
+    const raw = fs.readFileSync(LOCK_PATH, 'utf8').trim();
+    let lockedPid = null;
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        lockedPid = Number(parsed.pid);
+      } catch (_) {
+        lockedPid = Number(raw);
+      }
+    }
+
+    if (lockedPid) {
+      try {
+        process.kill(lockedPid, 0);
+        logger.error(`Another bot instance is already running (pid ${lockedPid}).`);
+        logger.error('If this is unexpected, stop the other process or remove the lock file.');
+        return false;
+      } catch (err) {
+        if (err.code !== 'ESRCH') {
+          logger.error(`Unable to verify existing lock pid ${lockedPid}: ${err.message}`);
+          return false;
+        }
+      }
+    }
+
+    fs.unlinkSync(LOCK_PATH);
+    return acquireProcessLock();
+  } catch (error) {
+    logger.warn(`Failed to validate existing lock; continuing without lock: ${error.message}`);
+    return true;
+  }
+};
+
+const releaseProcessLock = () => {
+  if (!LOCK_ENABLED || !hasProcessLock) return;
+  try {
+    fs.unlinkSync(LOCK_PATH);
+    hasProcessLock = false;
+    logger.info(`✓ Process lock released: ${LOCK_PATH}`);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      logger.warn(`Failed to remove process lock (${LOCK_PATH}): ${error.message}`);
+    }
+  }
+};
+
+const startApiServer = (modeLabel) => {
+  if (apiServer) {
+    logger.warn('API server already started; skipping additional listen.');
+    return apiServer;
+  }
+
+  const PORT = process.env.PORT || 3001;
+  const server = apiApp.listen(PORT, '0.0.0.0', () => {
+    const prefix = modeLabel ? `${modeLabel} ` : '';
+    logger.info(`✓ ${prefix}API server running on port ${PORT}`);
+  });
+
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      logger.error(`API port ${PORT} is already in use. Another instance may be running.`);
+      releaseProcessLock();
+      process.exit(1);
+    }
+    logger.error('API server error:', error);
+  });
+
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 66000;
+  server.timeout = 120000;
+  apiServer = server;
+  return server;
+};
 
 /**
  * Validate critical environment variables
@@ -119,6 +218,9 @@ const startBot = async () => {
   try {
     performanceMonitor.start('bot_startup');
     logger.info('Starting PNPtv Telegram Bot...');
+    if (!acquireProcessLock()) {
+      process.exit(1);
+    }
     // Validate critical environment variables
     try {
       validateCriticalEnvVars();
@@ -574,13 +676,7 @@ const startBot = async () => {
     apiApp.use(expressErrorHandler);
     logger.info('✓ Error handlers registered');
     // Start API server
-    const PORT = process.env.PORT || 3001;
-    const server = apiApp.listen(PORT, '0.0.0.0', () => {
-      logger.info(`✓ API server running on port ${PORT}`);
-    });
-    server.keepAliveTimeout = 65000;
-    server.headersTimeout = 66000;
-    server.timeout = 120000;
+    startApiServer();
     logger.info('🚀 PNPtv Telegram Bot is running!');
     performanceMonitor.end('bot_startup', { mode: isWebhookMode ? 'webhook' : 'polling' });
     performanceMonitor.logSummary();
@@ -590,11 +686,8 @@ const startBot = async () => {
     logger.warn('⚠️  Bot encountered a critical error but will attempt to keep process alive');
     logger.warn('⚠️  Some features may not work properly. Check logs above for details.');
     try {
-      const PORT = process.env.PORT || 3001;
-      apiApp.listen(PORT, '0.0.0.0', () => {
-        logger.info(`⚠️  Emergency API server running on port ${PORT} (degraded mode)`);
-        logger.info('Bot is NOT fully functional. Fix configuration and restart.');
-      });
+      startApiServer('Emergency');
+      logger.info('Bot is NOT fully functional. Fix configuration and restart.');
     } catch (apiError) {
       logger.error('Failed to start emergency API server:', apiError);
       logger.warn('Process will stay alive but non-functional. Manual intervention required.');
@@ -618,6 +711,7 @@ process.once('SIGINT', async () => {
   } else {
     logger.warn('SIGINT received but bot was not started, skipping stop()');
   }
+  releaseProcessLock();
   process.exit(0);
 });
 
@@ -636,6 +730,7 @@ process.once('SIGTERM', async () => {
   } else {
     logger.warn('SIGTERM received but bot was not started, skipping stop()');
   }
+  releaseProcessLock();
   process.exit(0);
 });
 
@@ -650,6 +745,10 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error('❌ UNHANDLED PROMISE REJECTION:', reason);
   logger.error('Promise:', promise);
   logger.warn('Process will continue despite unhandled rejection');
+});
+
+process.once('exit', () => {
+  releaseProcessLock();
 });
 
 // Start the bot

@@ -19,6 +19,7 @@ const invitationController = require('./controllers/invitationController');
 const playlistController = require('./controllers/playlistController');
 const podcastController = require('./controllers/podcastController');
 const healthController = require('./controllers/healthController');
+const hangoutsController = require('./controllers/hangoutsController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -786,6 +787,13 @@ app.delete('/api/audio/:filename', asyncHandler(async (req, res) => {
     });
   }
 }));
+
+// ==========================================
+// Hangouts API
+// ==========================================
+app.get('/api/hangouts/public', asyncHandler(hangoutsController.listPublic));
+app.post('/api/hangouts/create', asyncHandler(hangoutsController.create));
+app.post('/api/hangouts/join/:callId', asyncHandler(hangoutsController.join));
 
 // ==========================================
 // Media Library API (for Videorama)

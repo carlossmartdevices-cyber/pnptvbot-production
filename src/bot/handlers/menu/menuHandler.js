@@ -17,8 +17,13 @@ const {
 const { detectLanguage } = require('../../../utils/languageDetector');
 const { showProfile, showEditProfileMenu } = require('../user/profile');
 const UserModel = require('../../../models/userModel');
-const { isPrimeUser } = require('../../utils/helpers');
+const VideoCallModel = require('../../../models/videoCallModel');
+const MainRoomModel = require('../../../models/mainRoomModel');
+const { isPrimeUser, hasFullAccess } = require('../../utils/helpers');
 const UserService = require('../../services/userService');
+const { buildHangoutsWebAppUrl } = require('../../utils/hangoutsWebApp');
+
+const HANGOUTS_WEB_APP_URL = process.env.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts';
 
 /**
  * Store the last menu message ID per user per chat
@@ -378,6 +383,19 @@ async function handleDeepLinkStart(ctx) {
 
     const lang = await getUserLanguage(ctx);
 
+    // Handle call deeplinks (room invites)
+    if (startPayload.startsWith('call_')) {
+      const callId = startPayload.replace('call_', '');
+      await handleDeepLinkCallJoin(ctx, lang, callId);
+      return;
+    }
+
+    // Handle main room deeplink
+    if (startPayload === 'hangouts_join_main') {
+      await handleDeepLinkMainRoom(ctx, lang);
+      return;
+    }
+
     // Handle specific broadcast/share post deep links
     // These take users directly to specific bot features
     switch (startPayload) {
@@ -640,14 +658,13 @@ async function handleDeepLinkContent(ctx, lang) {
  * Handle deep link to hangouts/video rooms (uses ctx.reply instead of editMessageText)
  */
 async function handleDeepLinkHangouts(ctx, lang) {
-  const displayName = ctx.from.first_name || 'Guest';
-  const mainRoomUrl = `https://meet.jit.si/pnptv-main-room-1#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
+  const lobbyUrl = buildHangoutsWebAppUrl({ baseUrl: HANGOUTS_WEB_APP_URL });
 
   const message = lang === 'es'
     ? '🎥 *PNPtv Video Hangouts*\n\n' +
       '¡Conecta cara a cara con la comunidad!\n\n' +
       '✨ Salas seguras y privadas\n' +
-      '🔐 Auto-alojadas (self-hosted)\n' +
+      '🔐 Infraestructura dedicada\n' +
       '📹 Grabación de pantalla deshabilitada\n' +
       '✅ Usuarios verificados por edad\n' +
       '👥 Videollamadas de grupo en vivo\n\n' +
@@ -655,14 +672,14 @@ async function handleDeepLinkHangouts(ctx, lang) {
     : '🎥 *PNPtv Video Hangouts*\n\n' +
       'Connect face-to-face with the community!\n\n' +
       '✨ Safe and private rooms\n' +
-      '🔐 Self-hosted infrastructure\n' +
+      '🔐 Dedicated infrastructure\n' +
       '📹 Screen recording disabled\n' +
       '✅ Age-verified users\n' +
       '👥 Live group video calls\n\n' +
       '💡 You can join with camera off';
 
   const keyboard = Markup.inlineKeyboard([
-    [Markup.button.url(lang === 'es' ? '🎥 Entrar a Main Room' : '🎥 Join Main Room', mainRoomUrl)],
+    [Markup.button.url(lang === 'es' ? '🎥 Abrir Hangouts' : '🎥 Open Hangouts', lobbyUrl)],
     [Markup.button.callback(lang === 'es' ? '🎥 Ver Todas las Salas' : '🎥 View All Rooms', 'menu_hangouts')],
     [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')]
   ]);
@@ -671,6 +688,126 @@ async function handleDeepLinkHangouts(ctx, lang) {
     parse_mode: 'Markdown',
     ...keyboard
   });
+}
+
+/**
+ * Handle deep link to join a video call via /start call_<id>
+ */
+async function handleDeepLinkCallJoin(ctx, lang, callId) {
+  const displayName = ctx.from.first_name || ctx.from.username || 'User';
+
+  try {
+    const joinResult = await VideoCallModel.joinCall(
+      callId,
+      ctx.from.id,
+      displayName,
+      false
+    );
+
+    const call = joinResult.call;
+    const participantCount = call.currentParticipants + (joinResult.alreadyJoined ? 0 : 1);
+    const webAppUrl = buildHangoutsWebAppUrl({
+      baseUrl: HANGOUTS_WEB_APP_URL,
+      room: call.channelName,
+      token: joinResult.rtcToken,
+      uid: ctx.from.id,
+      username: displayName,
+      type: call.isPublic ? 'public' : 'private',
+      appId: joinResult.appId,
+      callId: call.id,
+    });
+
+    const message = lang === 'es'
+      ? `📞 *Unirse a Videollamada*\n\n` +
+        `Creada por: ${call.creatorName}\n` +
+        `👥 ${participantCount}/${call.maxParticipants} participantes\n\n` +
+        `Presiona el botón para entrar:`
+      : `📞 *Join Video Call*\n\n` +
+        `Created by: ${call.creatorName}\n` +
+        `👥 ${participantCount}/${call.maxParticipants} participants\n\n` +
+        `Tap the button to join:`;
+
+    await ctx.reply(message, {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.webApp(lang === 'es' ? '🚀 Entrar a Llamada' : '🚀 Join Call', webAppUrl)],
+      ]),
+    });
+  } catch (error) {
+    logger.error('Error joining call via deeplink:', error);
+    await ctx.reply(
+      lang === 'es' ? '❌ Error al unirse a la llamada.' : '❌ Error joining the call.'
+    );
+  }
+}
+
+/**
+ * Handle deep link to join main room 1
+ */
+async function handleDeepLinkMainRoom(ctx, lang) {
+  try {
+    const user = await UserModel.getById(ctx.from.id);
+    if (!hasFullAccess(user, ctx.from.id)) {
+      const message = lang === 'es'
+        ? '🔒 *Función PRIME*\n\nLas salas comunitarias requieren membresía PRIME.'
+        : '🔒 *PRIME Feature*\n\nCommunity rooms require PRIME membership.';
+
+      await ctx.reply(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(lang === 'es' ? '💎 Ver Planes' : '💎 View Plans', 'show_subscription_plans')],
+          [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')],
+        ]),
+      });
+      return;
+    }
+
+    const room = await MainRoomModel.getById(1);
+    if (!room) {
+      await ctx.reply(lang === 'es' ? '❌ Sala no encontrada' : '❌ Room not found');
+      return;
+    }
+
+    const displayName = ctx.from.first_name || ctx.from.username || 'User';
+    const { rtcToken, appId } = await MainRoomModel.joinRoom(
+      1,
+      ctx.from.id,
+      displayName,
+      false
+    );
+
+    const webAppUrl = buildHangoutsWebAppUrl({
+      baseUrl: HANGOUTS_WEB_APP_URL,
+      room: room.channelName,
+      token: rtcToken,
+      uid: ctx.from.id,
+      username: displayName,
+      type: 'main',
+      appId,
+    });
+
+    const message = lang === 'es'
+      ? `🏠 *${room.name}*\n\n` +
+        `${room.description}\n\n` +
+        `👥 ${room.currentParticipants}/50 participantes\n\n` +
+        `Presiona el botón para entrar:`
+      : `🏠 *${room.name}*\n\n` +
+        `${room.description}\n\n` +
+        `👥 ${room.currentParticipants}/50 participants\n\n` +
+        `Tap the button to join:`;
+
+    await ctx.reply(message, {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.webApp(lang === 'es' ? '🚀 Entrar a Sala' : '🚀 Join Room', webAppUrl)],
+      ]),
+    });
+  } catch (error) {
+    logger.error('Error joining main room via deeplink:', error);
+    await ctx.reply(
+      lang === 'es' ? '❌ Error al entrar a la sala.' : '❌ Error joining room.'
+    );
+  }
 }
 
 /**

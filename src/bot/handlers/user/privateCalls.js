@@ -49,44 +49,40 @@ const registerPrivateCallHandlers = (bot) => {
         : '🔴 *Currently Unavailable*';
 
       const message = lang === 'es'
-        ? '📞 *PNP Live*\n\n'
-          + `${availabilityIndicator}\n\n`
-          + '💎 *¿Qué incluye?*\n'
-          + '• 45 minutos de consulta personalizada\n'
-          + '• Videollamada directa (calidad HD)\n'
-          + '• Consejos expertos y orientación\n'
-          + '• Horario flexible\n\n'
-          + '💰 *Precio:* $100 USD (USDC en Optimism)\n\n'
-          + '📱 *Puedes pagar con:*\n'
-          + '• Zelle\n'
-          + '• CashApp\n'
-          + '• Venmo\n'
-          + '• Revolut\n'
-          + `• Wise\n\n${`
-`}
-            onlinePerformers.length > 0
-              ? '👥 *Elige con quién quieres la llamada:*'
-              : '⏰ No disponible en este momento. Te notificaremos cuando haya disponibilidad.'}`
-        : '📞 *PNP Live*\n\n'
-          + `${availabilityIndicator}\n\n`
-          + '💎 *What\'s included:*
-' 
-          + '• 45 minutes of personalized consultation\n'
-          + '• Direct video call (HD quality)\n'
-          + '• Expert advice and guidance\n'
-          + '• Flexible scheduling\n\n'
-          + '💰 *Price:* $100 USD (USDC on Optimism)\n\n'
-          + '📱 *You can pay using:*
-'
-          + '• Zelle\n'
-          + '• CashApp\n'
-          + '• Venmo\n'
-          + '• Revolut\n'
-          + `• Wise\n\n${`
-`}
-            onlinePerformers.length > 0
-              ? '👥 *Choose who you want to talk to:*'
-              : '⏰ Not available right now. We\'ll notify you when available.'}`;
+        ? `📞 *PNP Live*\n\n` +
+          `${availabilityIndicator}\n\n` +
+          `💎 *¿Qué incluye?*\n` +
+          `• 45 minutos de consulta personalizada\n` +
+          `• Videollamada directa (calidad HD)\n` +
+          `• Consejos expertos y orientación\n` +
+          `• Horario flexible\n\n` +
+          `💰 *Precio:* $100 USD (USDC en Optimism)\n\n` +
+          `📱 *Puedes pagar con:*\n` +
+          `• Zelle\n` +
+          `• CashApp\n` +
+          `• Venmo\n` +
+          `• Revolut\n` +
+          `• Wise\n\n` +
+          (onlinePerformers.length > 0
+            ? '👥 *Elige con quién quieres la llamada:*'
+            : '⏰ No disponible en este momento. Te notificaremos cuando haya disponibilidad.')
+        : `📞 *PNP Live*\n\n` +
+          `${availabilityIndicator}\n\n` +
+          `💎 *What's included:*\n` +
+          `• 45 minutes of personalized consultation\n` +
+          `• Direct video call (HD quality)\n` +
+          `• Expert advice and guidance\n` +
+          `• Flexible scheduling\n\n` +
+          `💰 *Price:* $100 USD (USDC on Optimism)\n\n` +
+          `📱 *You can pay using:*\n` +
+          `• Zelle\n` +
+          `• CashApp\n` +
+          `• Venmo\n` +
+          `• Revolut\n` +
+          `• Wise\n\n` +
+          (onlinePerformers.length > 0
+            ? '👥 *Choose who you want to talk to:*'
+            : '⏰ Not available right now. We\'ll notify you when available.');
 
       const buttons = onlinePerformers.length > 0
         ? onlinePerformers.map(p => [
@@ -224,38 +220,34 @@ async function promptForPayment(ctx) {
       await ctx.saveSession();
 
       const paymentMessage = lang === 'es'
-        ? '💳 *Pago de PNP Live*\n\n'
-          + `Precio: ${booking.priceCents / 100} USDC\n\n`
-          + '📱 *Puedes pagar usando:*
-'
-          + '• Zelle\n'
-          + '• CashApp\n'
-          + '• Venmo\n'
-          + '• Revolut\n'
-          + '• Wise\n\n'
-          + '💡 *Cómo funciona:*
-'
-          + '1. Haz clic en "Pagar Ahora"\n'
-          + '2. Elige tu app de pago preferida\n'
-          + '3. El pago se convierte automáticamente a USDC\n'
-          + '4. Agenda tu llamada inmediatamente después\n\n'
-          + '🔒 Seguro y rápido en la red Optimism'
-        : '💳 *PNP Live Payment*\n\n'
-          + `Price: ${booking.priceCents / 100} USDC\n\n`
-          + '📱 *You can pay using:*
-'
-          + '• Zelle\n'
-          + '• CashApp\n'
-          + '• Venmo\n'
-          + '• Revolut\n'
-          + '• Wise\n\n'
-          + '💡 *How it works:*
-'
-          + '1. Click "Pay Now"\n'
-          + '2. Choose your preferred payment app\n'
-          + '3. Payment is automatically converted to USDC\n'
-          + '4. Schedule your call immediately after\n\n'
-          + '🔒 Secure and fast on Optimism network';
+        ? `💳 *Pago de PNP Live*\n\n` +
+          `Precio: ${booking.priceCents / 100} USDC\n\n` +
+          `📱 *Puedes pagar usando:*\n` +
+          `• Zelle\n` +
+          `• CashApp\n` +
+          `• Venmo\n` +
+          `• Revolut\n` +
+          `• Wise\n\n` +
+          `💡 *Cómo funciona:*\n` +
+          `1. Haz clic en "Pagar Ahora"\n` +
+          `2. Elige tu app de pago preferida\n` +
+          `3. El pago se convierte automáticamente a USDC\n` +
+          `4. Agenda tu llamada inmediatamente después\n\n` +
+          `🔒 Seguro y rápido en la red Optimism`
+        : `💳 *PNP Live Payment*\n\n` +
+          `Price: ${booking.priceCents / 100} USDC\n\n` +
+          `📱 *You can pay using:*\n` +
+          `• Zelle\n` +
+          `• CashApp\n` +
+          `• Venmo\n` +
+          `• Revolut\n` +
+          `• Wise\n\n` +
+          `💡 *How it works:*\n` +
+          `1. Click "Pay Now"\n` +
+          `2. Choose your preferred payment app\n` +
+          `3. Payment is automatically converted to USDC\n` +
+          `4. Schedule your call immediately after\n\n` +
+          `🔒 Secure and fast on Optimism network`;
 
       await ctx.editMessageText(paymentMessage, {
         parse_mode: 'Markdown',
@@ -352,28 +344,26 @@ async function promptForPayment(ctx) {
       
       const lang = getLanguage(ctx);
       const message = lang === 'es'
-          ? '✅ *¡Llamada Reservada!*\n\n'
-            + `🎭 Con: ${performer.firstName}\n`
-            + `📅 Fecha: Ahora\n`
-            + `⏰ Hora: Ahora\n`
-            + `⏱ Duración: ${booking.durationMinutes} minutos\n\n`
-            + '🔗 *Link de la llamada:*
-'
-            + `${meetingUrl}\n\n`
-            + '⚡ *Tu llamada comienza ahora!*\n'
-            + 'Prepárate y únete usando el link de arriba.\n\n'
-            + '¡Nos vemos pronto! 👋'
-          : '✅ *Call Booked!*\n\n'
-            + `🎭 With: ${performer.firstName}\n`
-            + `📅 Date: Now\n`
-            + `⏰ Time: Now\n`
-            + `⏱ Duration: ${booking.durationMinutes} minutes\n\n`
-            + '🔗 *Join Link:*
-'
-            + `${meetingUrl}\n\n`
-            + '⚡ *Your call starts now!*\n'
-            + 'Get ready and join using the link above.\n\n'
-            + 'See you soon! 👋';
+          ? `✅ *¡Llamada Reservada!*\n\n` +
+            `🎭 Con: ${performer.firstName}\n` +
+            `📅 Fecha: Ahora\n` +
+            `⏰ Hora: Ahora\n` +
+            `⏱ Duración: ${booking.durationMinutes} minutos\n\n` +
+            `🔗 *Link de la llamada:*\n` +
+            `${meetingUrl}\n\n` +
+            `⚡ *Tu llamada comienza ahora!*\n` +
+            `Prepárate y únete usando el link de arriba.\n\n` +
+            `¡Nos vemos pronto! 👋`
+          : `✅ *Call Booked!*\n\n` +
+            `🎭 With: ${performer.firstName}\n` +
+            `📅 Date: Now\n` +
+            `⏰ Time: Now\n` +
+            `⏱ Duration: ${booking.durationMinutes} minutes\n\n` +
+            `🔗 *Join Link:*\n` +
+            `${meetingUrl}\n\n` +
+            `⚡ *Your call starts now!*\n` +
+            `Get ready and join using the link above.\n\n` +
+            `See you soon! 👋`;
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -467,26 +457,24 @@ async function promptForPayment(ctx) {
 
         const lang = getLanguage(ctx);
         const message = lang === 'es'
-            ? '✅ *¡Llamada Reservada!*\n\n'
-            + `🎭 Con: ${performer.firstName}\n`
-            + `📅 Fecha: ${scheduledDate}\n`
-            + `⏰ Hora: ${scheduledTime}\n`
-            + `⏱ Duración: ${booking.durationMinutes} minutos\n\n`
-            + '🔗 *Link de la llamada:*
-'
-            + `${meetingUrl}\n\n`
-            + '📧 Recibirás un recordatorio 15 minutos antes de la llamada.\n\n'
-            + '¡Nos vemos pronto! 👋'
-            : '✅ *Call Booked Successfully!*\n\n'
-            + `🎭 With: ${performer.firstName}\n`
-            + `📅 Date: ${scheduledDate}\n`
-            + `⏰ Time: ${scheduledTime}\n`
-            + `⏱ Duration: ${booking.durationMinutes} minutes\n\n`
-            + '🔗 *Join Link:*
-'
-            + `${meetingUrl}\n\n`
-            + '📧 You\'ll receive a reminder 15 minutes before the call.\n\n'
-            + 'See you soon! 👋';
+            ? `✅ *¡Llamada Reservada!*\n\n` +
+              `🎭 Con: ${performer.firstName}\n` +
+              `📅 Fecha: ${scheduledDate}\n` +
+              `⏰ Hora: ${scheduledTime}\n` +
+              `⏱ Duración: ${booking.durationMinutes} minutos\n\n` +
+              `🔗 *Link de la llamada:*\n` +
+              `${meetingUrl}\n\n` +
+              `📧 Recibirás un recordatorio 15 minutos antes de la llamada.\n\n` +
+              `¡Nos vemos pronto! 👋`
+            : `✅ *Call Booked Successfully!*\n\n` +
+              `🎭 With: ${performer.firstName}\n` +
+              `📅 Date: ${scheduledDate}\n` +
+              `⏰ Time: ${scheduledTime}\n` +
+              `⏱ Duration: ${booking.durationMinutes} minutes\n\n` +
+              `🔗 *Join Link:*\n` +
+              `${meetingUrl}\n\n` +
+              `📧 You\'ll receive a reminder 15 minutes before the call.\n\n` +
+              `See you soon! 👋`;
 
         await ctx.reply(message, {
             parse_mode: 'Markdown',
