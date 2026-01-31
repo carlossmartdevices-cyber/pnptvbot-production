@@ -41,6 +41,17 @@ class RoleService {
   }
 
   /**
+   * Get user's role display name
+   * @param {string} userId - User ID
+   * @param {string} lang - Language
+   * @returns {Promise<string>} Role display name
+   */
+  static async getUserRoleDisplay(userId, lang) {
+    const roleLevel = await this.getUserRoleLevel(userId);
+    return ACCESS_CONTROL_CONFIG.ROLE_NAMES[roleLevel] || 'User';
+  }
+
+  /**
    * Set user's role
    * @param {string} userId - User ID
    * @param {string} role - Role name (USER, CONTRIBUTOR, PERFORMER, ADMIN)
@@ -132,12 +143,29 @@ class RoleService {
   }
 
   /**
+   * Get all performers
+   * @returns {Promise<Array>} Array of performer user IDs
+   */
+  static async getPerformers() {
+    return await this.getUsersByRole('PERFORMER');
+  }
+
+  /**
    * Check if user is admin
    * @param {string} userId - User ID
    * @returns {Promise<boolean>} Is admin
    */
   static async isAdmin(userId) {
     return await this.hasRole(userId, 'ADMIN');
+  }
+
+  /**
+   * Check if user is superadmin
+   * @param {string} userId - User ID
+   * @returns {Promise<boolean>} Is superadmin
+   */
+  static async isSuperAdmin(userId) {
+    return await this.hasRole(userId, 'SUPERADMIN');
   }
 
   /**

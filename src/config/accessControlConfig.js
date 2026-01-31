@@ -16,6 +16,7 @@ const ACCESS_CONTROL_CONFIG = {
     CONTRIBUTOR: 10,   // Can post in approval topic
     PERFORMER: 20,     // Can post in approval topic + additional permissions
     ADMIN: 100,        // Full access
+    SUPERADMIN: 200,   // God mode
   },
 
   // Role names for display

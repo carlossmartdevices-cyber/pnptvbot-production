@@ -1,6 +1,10 @@
 const { Markup } = require('telegraf');
-const CallService = require('../../services/callService');
-const CallModel = require('../../../models/callModel');
+const BookingAvailabilityIntegration = require('../../services/bookingAvailabilityIntegration');
+const BookingModel = require('../../../models/bookingModel');
+const PerformerProfileModel = require('../../../models/performerProfileModel');
+const VideoCallService = require('../../services/videoCallService');
+const RoleService = require('../../services/roleService');
+const UserModel = require('../../../models/userModel');
 const PaymentService = require('../../services/paymentService');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
@@ -12,17 +16,40 @@ const { t } = require('../../../utils/i18n');
  */
 const registerPrivateCallHandlers = (bot) => {
   // Show private call booking - First select performer
-  bot.action('book_private_call', async (ctx) => {
+  bot.action(/^book_private_call(?::(\d+))?$/, async (ctx) => {
     try {
-      const lang = getLanguage(ctx);
-      const availability = await CallService.getAvailability();
+      const performerId = ctx.match[1];
 
-      const availabilityIndicator = availability.available
+      if (performerId) {
+        const performer = await UserModel.getById(performerId);
+        if (performer) {
+          ctx.session.temp = ctx.session.temp || {};
+          ctx.session.temp.selectedPerformer = performer;
+          await ctx.saveSession();
+          return promptForPayment(ctx);
+        }
+      }
+
+      const lang = getLanguage(ctx);
+      
+      const performers = await RoleService.getUsersByRole('PERFORMER');
+      const onlinePerformers = [];
+      for (const performerId of performers) {
+          const performer = await UserModel.getById(performerId);
+          if (performer && performer.status === 'online') {
+              const availability = await BookingAvailabilityIntegration.checkInstantAvailability(performer.id, 45);
+              if (availability.available) {
+                onlinePerformers.push(performer);
+              }
+          }
+      }
+
+      const availabilityIndicator = onlinePerformers.length > 0
         ? '🟢 *Available Now*'
         : '🔴 *Currently Unavailable*';
 
       const message = lang === 'es'
-        ? '📞 *Llamada Privada 1:1*\n\n'
+        ? '📞 *PNP Live*\n\n'
           + `${availabilityIndicator}\n\n`
           + '💎 *¿Qué incluye?*\n'
           + '• 45 minutos de consulta personalizada\n'
@@ -35,38 +62,44 @@ const registerPrivateCallHandlers = (bot) => {
           + '• CashApp\n'
           + '• Venmo\n'
           + '• Revolut\n'
-          + `• Wise\n\n${
-            availability.available
+          + `• Wise\n\n${`
+`}
+            onlinePerformers.length > 0
               ? '👥 *Elige con quién quieres la llamada:*'
               : '⏰ No disponible en este momento. Te notificaremos cuando haya disponibilidad.'}`
-        : '📞 *Private 1:1 Call*\n\n'
+        : '📞 *PNP Live*\n\n'
           + `${availabilityIndicator}\n\n`
-          + '💎 *What\'s included:*\n'
+          + '💎 *What\'s included:*
+' 
           + '• 45 minutes of personalized consultation\n'
           + '• Direct video call (HD quality)\n'
           + '• Expert advice and guidance\n'
           + '• Flexible scheduling\n\n'
           + '💰 *Price:* $100 USD (USDC on Optimism)\n\n'
-          + '📱 *You can pay using:*\n'
+          + '📱 *You can pay using:*
+'
           + '• Zelle\n'
           + '• CashApp\n'
           + '• Venmo\n'
           + '• Revolut\n'
-          + `• Wise\n\n${
-            availability.available
+          + `• Wise\n\n${`
+`}
+            onlinePerformers.length > 0
               ? '👥 *Choose who you want to talk to:*'
               : '⏰ Not available right now. We\'ll notify you when available.'}`;
 
-      const buttons = availability.available
-        ? [
-          [Markup.button.callback('🎭 Santino', 'select_performer_santino')],
-          [Markup.button.callback('🎤 Lex Boy', 'select_performer_lexboy')],
-          [Markup.button.callback(t('back', lang), 'back_to_main')],
-        ]
+      const buttons = onlinePerformers.length > 0
+        ? onlinePerformers.map(p => [
+            Markup.button.callback(`Book ${p.firstName}`, `select_performer_${p.id}`),
+            Markup.button.callback(`View Profile`, `view_performer_profile_${p.id}`),
+          ])
         : [
           [Markup.button.callback('🔔 Notify Me', 'notify_call_availability')],
-          [Markup.button.callback(t('back', lang), 'back_to_main')],
         ];
+        
+      if(buttons.length > 0) {
+        buttons.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
+      }
 
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
@@ -77,21 +110,76 @@ const registerPrivateCallHandlers = (bot) => {
     }
   });
 
-  // Select performer Santino
-  bot.action('select_performer_santino', async (ctx) => {
+  bot.action(/^view_performer_profile_(\d+)$/, async (ctx) => {
     try {
+      const performerId = ctx.match[1];
+      const performer = await UserModel.getById(performerId);
+      if (!performer) {
+        return ctx.answerCbQuery('Performer not found.');
+      }
+
+      const profile = await PerformerProfileModel.getByUserId(performerId);
+      if (!profile) {
+        return ctx.answerCbQuery('Profile not found.');
+      }
+
+      const message = `
+*${performer.firstName}*
+
+*Bio:*
+${profile.bio || '_Not set_'}
+
+*Rates:*
+${profile.rates ? JSON.stringify(profile.rates) : '_Not set_'}
+
+*Tags:*
+${profile.tags ? profile.tags.join(', ') : '_Not set_'}
+      `;
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(`Book ${performer.firstName}`, `select_performer_${performer.id}`)],
+          [Markup.button.callback('⬅️ Back', 'book_private_call')],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error viewing performer profile:', error);
+    }
+  });
+
+  bot.action(/^select_performer_(\d+)$/, async (ctx) => {
+    try {
+      const performerId = ctx.match[1];
+      const performer = await UserModel.getById(performerId);
+      if (!performer) {
+        return ctx.answerCbQuery('Performer not found.');
+      }
+
+      const bookingData = {
+        userId: ctx.from.id,
+        modelId: performer.id,
+        durationMinutes: 45,
+        preferredStartTime: new Date(),
+        searchStartTime: new Date(),
+        searchEndTime: new Date(new Date().getTime() + 2 * 60 * 60 * 1000), // 2 hours from now
+      };
+
+      const { booking } = await BookingAvailabilityIntegration.createSmartBooking(bookingData);
+
       ctx.session.temp = ctx.session.temp || {};
-      ctx.session.temp.selectedPerformer = 'Santino';
+      ctx.session.temp.bookingId = booking.id;
+      ctx.session.temp.selectedPerformer = performer;
       await ctx.saveSession();
 
       const lang = getLanguage(ctx);
       const message = lang === 'es'
-        ? '🎭 *Llamada con Santino*\n\n'
-          + 'Has seleccionado una llamada privada de 45 minutos con Santino.\n\n'
+        ? `🎭 *Llamada con ${performer.firstName}*\n\n`
+          + `Has seleccionado una llamada privada de 45 minutos con ${performer.firstName}.\n\n`
           + '💰 Precio: $100 USD\n\n'
           + 'Procede al pago para reservar tu llamada.'
-        : '🎭 *Call with Santino*\n\n'
-          + 'You\'ve selected a 45-minute private call with Santino.\n\n'
+        : `🎭 *Call with ${performer.firstName}*\n\n`
+          + `You\'ve selected a 45-minute private call with ${performer.firstName}.\n\n`
           + '💰 Price: $100 USD\n\n'
           + 'Proceed to payment to book your call.';
 
@@ -103,144 +191,114 @@ const registerPrivateCallHandlers = (bot) => {
         ]),
       });
     } catch (error) {
-      logger.error('Error selecting Santino:', error);
+      logger.error('Error selecting performer:', error);
     }
   });
 
-  // Select performer Lex Boy
-  bot.action('select_performer_lexboy', async (ctx) => {
-    try {
+async function promptForPayment(ctx) {
+  try {
+    const lang = getLanguage(ctx);
+    const userId = ctx.from.id;
+    const chatId = ctx.chat?.id;
+    const bookingId = ctx.session.temp.bookingId;
+
+    const booking = await BookingModel.getById(bookingId);
+    if (!booking) {
+      return ctx.reply('Booking not found.');
+    }
+
+    // Create payment for private call (as a special plan)
+    const result = await PaymentService.createPayment({
+      userId,
+      planId: 'private_call_45min', // This should be dynamic based on the booking
+      provider: 'daimo',
+      chatId,
+      bookingId: booking.id,
+      amount: booking.priceCents / 100,
+    });
+
+    if (result.success) {
+      // Store temp data for booking after payment
       ctx.session.temp = ctx.session.temp || {};
-      ctx.session.temp.selectedPerformer = 'Lex Boy';
+      ctx.session.temp.pendingCallPayment = result.paymentId;
       await ctx.saveSession();
 
-      const lang = getLanguage(ctx);
-      const message = lang === 'es'
-        ? '🎤 *Llamada con Lex Boy*\n\n'
-          + 'Has seleccionado una llamada privada de 45 minutos con Lex Boy.\n\n'
-          + '💰 Precio: $100 USD\n\n'
-          + 'Procede al pago para reservar tu llamada.'
-        : '🎤 *Call with Lex Boy*\n\n'
-          + 'You\'ve selected a 45-minute private call with Lex Boy.\n\n'
-          + '💰 Price: $100 USD\n\n'
-          + 'Proceed to payment to book your call.';
+      const paymentMessage = lang === 'es'
+        ? '💳 *Pago de PNP Live*\n\n'
+          + `Precio: ${booking.priceCents / 100} USDC\n\n`
+          + '📱 *Puedes pagar usando:*
+'
+          + '• Zelle\n'
+          + '• CashApp\n'
+          + '• Venmo\n'
+          + '• Revolut\n'
+          + '• Wise\n\n'
+          + '💡 *Cómo funciona:*
+'
+          + '1. Haz clic en "Pagar Ahora"\n'
+          + '2. Elige tu app de pago preferida\n'
+          + '3. El pago se convierte automáticamente a USDC\n'
+          + '4. Agenda tu llamada inmediatamente después\n\n'
+          + '🔒 Seguro y rápido en la red Optimism'
+        : '💳 *PNP Live Payment*\n\n'
+          + `Price: ${booking.priceCents / 100} USDC\n\n`
+          + '📱 *You can pay using:*
+'
+          + '• Zelle\n'
+          + '• CashApp\n'
+          + '• Venmo\n'
+          + '• Revolut\n'
+          + '• Wise\n\n'
+          + '💡 *How it works:*
+'
+          + '1. Click "Pay Now"\n'
+          + '2. Choose your preferred payment app\n'
+          + '3. Payment is automatically converted to USDC\n'
+          + '4. Schedule your call immediately after\n\n'
+          + '🔒 Secure and fast on Optimism network';
 
-      await ctx.editMessageText(message, {
+      await ctx.editMessageText(paymentMessage, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback('💳 Pay & Book', 'pay_for_private_call')],
+          [Markup.button.url('💰 Pay Now', result.paymentUrl)],
           [Markup.button.callback(t('back', lang), 'book_private_call')],
         ]),
       });
-    } catch (error) {
-      logger.error('Error selecting Lex Boy:', error);
-    }
-  });
-
-  // Pay for private call
-  bot.action('pay_for_private_call', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      const userId = ctx.from.id;
-      const chatId = ctx.chat?.id;
-
-      // Check availability again
-      const availability = await CallService.getAvailability();
-      if (!availability.available) {
-        await ctx.answerCbQuery('⚠️ No longer available');
-        await ctx.editMessageText(
-          '⚠️ Sorry, availability has expired. Please try again later.',
-          {
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback('🔙 Back', 'book_private_call')],
-            ]),
-          },
-        );
-        return;
-      }
-
-      await ctx.editMessageText(t('loading', lang));
-
-      // Create payment for private call (as a special plan)
-      const result = await PaymentService.createPayment({
-        userId,
-        planId: 'private_call_45min', // Special plan ID
-        provider: 'daimo',
-        chatId,
-      });
-
-      if (result.success) {
-        // Store temp data for booking after payment
-        ctx.session.temp = ctx.session.temp || {};
-        ctx.session.temp.pendingCallPayment = result.paymentId;
-        await ctx.saveSession();
-
-        const paymentMessage = lang === 'es'
-          ? '💳 *Pago de Llamada Privada*\n\n'
-            + 'Precio: $100 USDC\n\n'
-            + '📱 *Puedes pagar usando:*\n'
-            + '• Zelle\n'
-            + '• CashApp\n'
-            + '• Venmo\n'
-            + '• Revolut\n'
-            + '• Wise\n\n'
-            + '💡 *Cómo funciona:*\n'
-            + '1. Haz clic en "Pagar Ahora"\n'
-            + '2. Elige tu app de pago preferida\n'
-            + '3. El pago se convierte automáticamente a USDC\n'
-            + '4. Agenda tu llamada inmediatamente después\n\n'
-            + '🔒 Seguro y rápido en la red Optimism'
-          : '💳 *Private Call Payment*\n\n'
-            + 'Price: $100 USDC\n\n'
-            + '📱 *You can pay using:*\n'
-            + '• Zelle\n'
-            + '• CashApp\n'
-            + '• Venmo\n'
-            + '• Revolut\n'
-            + '• Wise\n\n'
-            + '💡 *How it works:*\n'
-            + '1. Click "Pay Now"\n'
-            + '2. Choose your preferred payment app\n'
-            + '3. Payment is automatically converted to USDC\n'
-            + '4. Schedule your call immediately after\n\n'
-            + '🔒 Secure and fast on Optimism network';
-
-        await ctx.editMessageText(paymentMessage, {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.url('💰 Pay Now', result.paymentUrl)],
-            [Markup.button.callback(t('back', lang), 'book_private_call')],
-          ]),
-        });
-      } else {
-        await ctx.editMessageText(
-          `${t('error', lang)}\n\n${result.error}`,
-          {
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(t('back', lang), 'book_private_call')],
-            ]),
-          },
-        );
-      }
-    } catch (error) {
-      logger.error('Error processing call payment:', error);
-      const lang = getLanguage(ctx);
+    } else {
       await ctx.editMessageText(
-        t('error', lang),
+        `${t('error', lang)}\n\n${result.error}`,
         {
           ...Markup.inlineKeyboard([
             [Markup.button.callback(t('back', lang), 'book_private_call')],
           ]),
         },
-      ).catch(() => {});
+      );
     }
+  } catch (error) {
+    logger.error('Error processing call payment:', error);
+    const lang = getLanguage(ctx);
+    await ctx.editMessageText(
+      t('error', lang),
+      {
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(t('back', lang), 'book_private_call')],
+        ]),
+      },
+    ).catch(() => {});
+  }
+}
+
+  // Pay for private call
+  bot.action('pay_for_private_call', async (ctx) => {
+    await promptForPayment(ctx);
   });
 
   // After payment: schedule the call
   bot.action('schedule_private_call', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
-      const availability = await CallService.getAvailability();
+      const bookingId = ctx.session.temp.bookingId;
+      const booking = await BookingModel.getById(bookingId);
 
       const message = lang === 'es'
         ? '📅 *Agenda tu Llamada*\n\n'
@@ -252,21 +310,18 @@ const registerPrivateCallHandlers = (bot) => {
 
       const buttons = [];
 
-      // Add quick schedule button if available
-      if (availability.available) {
-        buttons.push([
-          Markup.button.callback(
-            lang === 'es' ? '⚡ Ahora (en 15 min)' : '⚡ Now (in 15 min)',
-            'schedule_call_quick',
-          ),
-        ]);
-      }
+      buttons.push([
+        Markup.button.callback(
+          lang === 'es' ? '⚡ Ahora' : '⚡ Now',
+          `schedule_call_now:${booking.id}`,
+        ),
+      ]);
 
       // Add custom schedule button
       buttons.push([
         Markup.button.callback(
           lang === 'es' ? '📆 Elegir fecha/hora' : '📆 Choose date/time',
-          'schedule_call_custom',
+          `schedule_call_custom:${booking.id}`,
         ),
       ]);
 
@@ -279,81 +334,57 @@ const registerPrivateCallHandlers = (bot) => {
     }
   });
 
-  // Quick schedule (15 minutes from now)
-  bot.action('schedule_call_quick', async (ctx) => {
+  // Quick schedule (now)
+  bot.action(/^schedule_call_now:(\S+)$/, async (ctx) => {
     try {
+      const bookingId = ctx.match[1];
+      const booking = await BookingModel.getById(bookingId);
+      const performer = await UserModel.getById(booking.performerId);
+      const user = await UserModel.getById(booking.userId);
+
+      const meetingUrl = await VideoCallService.createMeetingRoom({
+        callId: booking.id,
+        userName: user.firstName,
+        scheduledDate: new Date(),
+      });
+
+      await BookingModel.update(bookingId, { meetingUrl });
+      
       const lang = getLanguage(ctx);
-      const userId = ctx.from.id;
-      const userName = ctx.from.first_name + (ctx.from.last_name ? ` ${ctx.from.last_name}` : '');
-      const userUsername = ctx.from.username;
-      const paymentId = ctx.session.temp.pendingCallPayment;
-      const performer = ctx.session.temp.selectedPerformer || 'Santino';
-
-      // Calculate time in 15 minutes
-      const now = new Date();
-      const scheduledTime = new Date(now.getTime() + 15 * 60000);
-      const scheduledDateStr = scheduledTime.toLocaleDateString('en-GB'); // DD/MM/YYYY
-      const scheduledTimeStr = scheduledTime.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZoneName: 'short',
-      });
-
-      await ctx.editMessageText(t('loading', lang));
-
-      // Book the call
-      const booking = await CallService.bookCall({
-        userId,
-        userName,
-        userUsername,
-        paymentId,
-        scheduledDate: scheduledDateStr,
-        scheduledTime: scheduledTimeStr,
-        performer,
-      });
-
-      if (booking.success) {
-        // Clear session state
-        delete ctx.session.temp.awaitingCallSchedule;
-        delete ctx.session.temp.pendingCallPayment;
-        delete ctx.session.temp.selectedPerformer;
-        await ctx.saveSession();
-
-        const message = lang === 'es'
+      const message = lang === 'es'
           ? '✅ *¡Llamada Reservada!*\n\n'
-            + `🎭 Con: ${performer}\n`
-            + `📅 Fecha: ${scheduledDateStr}\n`
-            + `⏰ Hora: ${scheduledTimeStr}\n`
-            + '⏱ Duración: 45 minutos\n\n'
-            + '🔗 *Link de la llamada:*\n'
-            + `${booking.call.meetingUrl}\n\n`
-            + '⚡ *Tu llamada comienza en 15 minutos!*\n'
+            + `🎭 Con: ${performer.firstName}\n`
+            + `📅 Fecha: Ahora\n`
+            + `⏰ Hora: Ahora\n`
+            + `⏱ Duración: ${booking.durationMinutes} minutos\n\n`
+            + '🔗 *Link de la llamada:*
+'
+            + `${meetingUrl}\n\n`
+            + '⚡ *Tu llamada comienza ahora!*\n'
             + 'Prepárate y únete usando el link de arriba.\n\n'
             + '¡Nos vemos pronto! 👋'
           : '✅ *Call Booked!*\n\n'
-            + `🎭 With: ${performer}\n`
-            + `📅 Date: ${scheduledDateStr}\n`
-            + `⏰ Time: ${scheduledTimeStr}\n`
-            + '⏱ Duration: 45 minutes\n\n'
-            + '🔗 *Join Link:*\n'
-            + `${booking.call.meetingUrl}\n\n`
-            + '⚡ *Your call starts in 15 minutes!*\n'
+            + `🎭 With: ${performer.firstName}\n`
+            + `📅 Date: Now\n`
+            + `⏰ Time: Now\n`
+            + `⏱ Duration: ${booking.durationMinutes} minutes\n\n`
+            + '🔗 *Join Link:*
+'
+            + `${meetingUrl}\n\n`
+            + '⚡ *Your call starts now!*\n'
             + 'Get ready and join using the link above.\n\n'
             + 'See you soon! 👋';
 
-        await ctx.editMessageText(message, {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.url('🎥 Join Call', booking.call.meetingUrl)],
-          ]),
-        });
-      } else {
-        await ctx.editMessageText(
-          lang === 'es'
-            ? '❌ Error al reservar la llamada. Por favor contacta a soporte.'
-            : '❌ Error booking call. Please contact support.',
-        );
-      }
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.url('🎥 Join Call', meetingUrl)],
+        ]),
+      });
+      
+      // Notify performer
+      await bot.telegram.sendMessage(performer.id, `¡Tienes una nueva llamada de PNP Live con ${user.firstName}! Link: ${meetingUrl}`);
+
     } catch (error) {
       logger.error('Error in quick schedule:', error);
       const lang = getLanguage(ctx);
@@ -364,8 +395,9 @@ const registerPrivateCallHandlers = (bot) => {
   });
 
   // Custom schedule
-  bot.action('schedule_call_custom', async (ctx) => {
+  bot.action(/^schedule_call_custom:(\S+)$/, async (ctx) => {
     try {
+      const bookingId = ctx.match[1];
       const lang = getLanguage(ctx);
 
       const message = lang === 'es'
@@ -386,7 +418,7 @@ const registerPrivateCallHandlers = (bot) => {
 
       // Set user state to expect scheduling input
       ctx.session.temp = ctx.session.temp || {};
-      ctx.session.temp.awaitingCallSchedule = true;
+      ctx.session.temp.awaitingCallSchedule = bookingId;
       await ctx.saveSession();
 
       await ctx.editMessageText(message, {
@@ -401,13 +433,9 @@ const registerPrivateCallHandlers = (bot) => {
   bot.on('text', async (ctx, next) => {
     try {
       if (ctx.session?.temp?.awaitingCallSchedule) {
+        const bookingId = ctx.session.temp.awaitingCallSchedule;
         const { text } = ctx.message;
-        const userId = ctx.from.id;
-        const userName = ctx.from.first_name + (ctx.from.last_name ? ` ${ctx.from.last_name}` : '');
-        const userUsername = ctx.from.username;
-        const paymentId = ctx.session.temp.pendingCallPayment;
-
-        // Simple parsing (you may want to improve this with a proper date parser)
+        
         const lines = text.split('\n');
         const scheduledDate = lines[0]?.trim();
         const scheduledTime = lines[1]?.trim();
@@ -422,58 +450,55 @@ const registerPrivateCallHandlers = (bot) => {
           return;
         }
 
-        const performer = ctx.session.temp.selectedPerformer || 'Santino';
+        const booking = await BookingModel.getById(bookingId);
+        const performer = await UserModel.getById(booking.performerId);
+        const user = await UserModel.getById(booking.userId);
 
-        // Book the call
-        const booking = await CallService.bookCall({
-          userId,
-          userName,
-          userUsername,
-          paymentId,
-          scheduledDate,
-          scheduledTime,
-          performer,
+        const meetingUrl = await VideoCallService.createMeetingRoom({
+            callId: booking.id,
+            userName: user.firstName,
+            scheduledDate: new Date(`${scheduledDate} ${scheduledTime}`),
         });
 
-        if (booking.success) {
-          // Clear session state
-          delete ctx.session.temp.awaitingCallSchedule;
-          delete ctx.session.temp.pendingCallPayment;
-          delete ctx.session.temp.selectedPerformer;
-          await ctx.saveSession();
+        await BookingModel.update(bookingId, { meetingUrl, startTimeUtc: new Date(`${scheduledDate} ${scheduledTime}`) });
+        
+        delete ctx.session.temp.awaitingCallSchedule;
+        await ctx.saveSession();
 
-          const lang = getLanguage(ctx);
-          const message = lang === 'es'
+        const lang = getLanguage(ctx);
+        const message = lang === 'es'
             ? '✅ *¡Llamada Reservada!*\n\n'
-              + `🎭 Con: ${performer}\n`
-              + `📅 Fecha: ${scheduledDate}\n`
-              + `⏰ Hora: ${scheduledTime}\n`
-              + '⏱ Duración: 45 minutos\n\n'
-              + '🔗 *Link de la llamada:*\n'
-              + `${booking.call.meetingUrl}\n\n`
-              + '📧 Recibirás un recordatorio 15 minutos antes de la llamada.\n\n'
-              + '¡Nos vemos pronto! 👋'
+            + `🎭 Con: ${performer.firstName}\n`
+            + `📅 Fecha: ${scheduledDate}\n`
+            + `⏰ Hora: ${scheduledTime}\n`
+            + `⏱ Duración: ${booking.durationMinutes} minutos\n\n`
+            + '🔗 *Link de la llamada:*
+'
+            + `${meetingUrl}\n\n`
+            + '📧 Recibirás un recordatorio 15 minutos antes de la llamada.\n\n'
+            + '¡Nos vemos pronto! 👋'
             : '✅ *Call Booked Successfully!*\n\n'
-              + `🎭 With: ${performer}\n`
-              + `📅 Date: ${scheduledDate}\n`
-              + `⏰ Time: ${scheduledTime}\n`
-              + '⏱ Duration: 45 minutes\n\n'
-              + '🔗 *Join Link:*\n'
-              + `${booking.call.meetingUrl}\n\n`
-              + '📧 You\'ll receive a reminder 15 minutes before the call.\n\n'
-              + 'See you soon! 👋';
+            + `🎭 With: ${performer.firstName}\n`
+            + `📅 Date: ${scheduledDate}\n`
+            + `⏰ Time: ${scheduledTime}\n`
+            + `⏱ Duration: ${booking.durationMinutes} minutes\n\n`
+            + '🔗 *Join Link:*
+'
+            + `${meetingUrl}\n\n`
+            + '📧 You\'ll receive a reminder 15 minutes before the call.\n\n'
+            + 'See you soon! 👋';
 
-          await ctx.reply(message, {
+        await ctx.reply(message, {
             parse_mode: 'Markdown',
             reply_markup: {
-              inline_keyboard: [
-                [{ text: '📅 Add to Calendar', url: booking.call.meetingUrl }],
-              ],
+                inline_keyboard: [
+                [{ text: '📅 Add to Calendar', url: meetingUrl }],
+                ],
             },
-          });
-        } else {
-          await ctx.reply('❌ Error booking call. Please contact support.');
-        }
+        });
+        
+        // Notify performer
+        await bot.telegram.sendMessage(performer.id, `¡Tienes una nueva llamada de PNP Live con ${user.firstName}! Link: ${meetingUrl}`);
 
         return;
       }
@@ -513,7 +538,7 @@ const registerPrivateCallHandlers = (bot) => {
     try {
       const userId = ctx.from.id;
       const lang = getLanguage(ctx);
-      const calls = await CallModel.getByUser(userId);
+      const calls = await BookingModel.getByUser(userId);
 
       if (calls.length === 0) {
         await ctx.editMessageText(
@@ -542,8 +567,9 @@ const registerPrivateCallHandlers = (bot) => {
 
         message
           += `${index + 1}. ${statusEmoji} ${call.status.toUpperCase()}\n`
-          + `   📅 ${call.scheduledDate} at ${call.scheduledTime}\n`
-          + '   ⏱ 45 minutes\n';
+          + `   With: ${call.performerName}\n`
+          + `   📅 ${new Date(call.startTimeUtc).toLocaleString()}\n`
+          + `   ⏱ ${call.durationMinutes} minutes\n`;
 
         if (call.meetingUrl && (call.status === 'confirmed' || call.status === 'pending')) {
           message += `   🔗 ${call.meetingUrl}\n`;

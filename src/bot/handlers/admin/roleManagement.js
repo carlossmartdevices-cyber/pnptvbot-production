@@ -1,5 +1,5 @@
 const { Markup } = require('telegraf');
-const PermissionService = require('../../services/permissionService');
+const RoleService = require('../../services/roleService');
 const UserModel = require('../../../models/userModel');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
@@ -15,14 +15,24 @@ async function showRoleManagement(ctx, edit = false) {
     ctx.session.temp = {};
     await ctx.saveSession();
 
-    const admins = await PermissionService.getAllAdmins();
+    const [adminIds, moderatorIds, performerIds] = await Promise.all([
+      RoleService.getUsersByRole('ADMIN'),
+      RoleService.getUsersByRole('MODERATOR'),
+      RoleService.getUsersByRole('PERFORMER'),
+    ]);
+
+    const allAdmins = await Promise.all(adminIds.map(id => UserModel.getById(id)));
+    const superadmins = allAdmins.filter(admin => admin && admin.role === 'SUPERADMIN');
+    const admins = allAdmins.filter(admin => admin && admin.role === 'ADMIN');
+    const moderators = await Promise.all(moderatorIds.map(id => UserModel.getById(id)));
+    const performers = await Promise.all(performerIds.map(id => UserModel.getById(id)));
 
     let message = '👑 *Gestión de Roles*\n\n';
 
     // Super Admins
-    message += `🔴 *Super Admins* (${admins.superadmins.length}):\n`;
-    if (admins.superadmins.length > 0) {
-      for (const admin of admins.superadmins) {
+    message += `🔴 *Super Admins* (${superadmins.length}):\n`;
+    if (superadmins.length > 0) {
+      for (const admin of superadmins) {
         message += `  • @${admin.username || admin.id} (${admin.id})\n`;
       }
     } else {
@@ -31,9 +41,9 @@ async function showRoleManagement(ctx, edit = false) {
     message += '\n';
 
     // Admins
-    message += `🟡 *Administradores* (${admins.admins.length}):\n`;
-    if (admins.admins.length > 0) {
-      for (const admin of admins.admins) {
+    message += `🟡 *Administradores* (${admins.length}):\n`;
+    if (admins.length > 0) {
+      for (const admin of admins) {
         message += `  • @${admin.username || admin.id} (${admin.id})\n`;
       }
     } else {
@@ -42,10 +52,20 @@ async function showRoleManagement(ctx, edit = false) {
     message += '\n';
 
     // Moderators
-    message += `🟢 *Moderadores* (${admins.moderators.length}):\n`;
-    if (admins.moderators.length > 0) {
-      for (const mod of admins.moderators) {
+    message += `🟢 *Moderadores* (${moderators.length}):\n`;
+    if (moderators.length > 0) {
+      for (const mod of moderators) {
         message += `  • @${mod.username || mod.id} (${mod.id})\n`;
+      }
+    } else {
+      message += '  _Ninguno_\n';
+    }
+
+    // Performers
+    message += `\n🎭 *Performers* (${performers.length}):\n`;
+    if (performers.length > 0) {
+      for (const performer of performers) {
+        message += `  • @${performer.username || performer.id} (${performer.id})\n`;
       }
     } else {
       message += '  _Ninguno_\n';
@@ -57,9 +77,10 @@ async function showRoleManagement(ctx, edit = false) {
     // Add buttons
     keyboard.push([Markup.button.callback('➕ Agregar Admin', 'role_add_admin')]);
     keyboard.push([Markup.button.callback('➕ Agregar Moderador', 'role_add_moderator')]);
+    keyboard.push([Markup.button.callback('➕ Agregar Performer', 'role_add_performer')]);
 
     // Show manage buttons if there are admins/moderators
-    if (admins.admins.length > 0 || admins.moderators.length > 0) {
+    if (admins.length > 0 || moderators.length > 0 || performers.length > 0) {
       keyboard.push([Markup.button.callback('⚙️ Gestionar Roles', 'role_manage_list')]);
     }
 
@@ -89,7 +110,7 @@ const registerRoleManagementHandlers = (bot) => {
   // Main role management menu
   bot.action('admin_roles', async (ctx) => {
     try {
-      const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
       if (!isSuperAdmin) {
         await ctx.answerCbQuery('❌ Solo Super Administradores pueden acceder');
         return;
@@ -104,7 +125,7 @@ const registerRoleManagementHandlers = (bot) => {
   // Add admin
   bot.action('role_add_admin', async (ctx) => {
     try {
-      const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
       if (!isSuperAdmin) return;
 
       const lang = getLanguage(ctx);
@@ -126,7 +147,7 @@ const registerRoleManagementHandlers = (bot) => {
   // Add moderator
   bot.action('role_add_moderator', async (ctx) => {
     try {
-      const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
       if (!isSuperAdmin) return;
 
       const lang = getLanguage(ctx);
@@ -145,14 +166,36 @@ const registerRoleManagementHandlers = (bot) => {
     }
   });
 
+  // Add performer
+  bot.action('role_add_performer', async (ctx) => {
+    try {
+      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
+      if (!isSuperAdmin) return;
+
+      const lang = getLanguage(ctx);
+      ctx.session.temp.addingRole = 'performer';
+      ctx.session.temp.waitingForUserId = true;
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        '👤 Agregar Performer\n\nEnvía el ID de Telegram del usuario que quieres promover a Performer:',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('❌ Cancelar', 'admin_roles')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error adding performer:', error);
+    }
+  });
+
   // Remove role (demote to user)
   bot.action(/^role_remove_(.+)$/, async (ctx) => {
     try {
-      const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
       if (!isSuperAdmin) return;
 
       const targetUserId = ctx.match[1];
-      const result = await PermissionService.removeRole(targetUserId, ctx.from.id);
+      const result = await RoleService.removeRole(targetUserId, ctx.from.id);
 
       if (result.success) {
         await ctx.answerCbQuery(`✅ ${result.message}`);
@@ -168,11 +211,11 @@ const registerRoleManagementHandlers = (bot) => {
   // Promote moderator to admin
   bot.action(/^role_promote_(.+)$/, async (ctx) => {
     try {
-      const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
       if (!isSuperAdmin) return;
 
       const targetUserId = ctx.match[1];
-      const result = await PermissionService.assignRole(targetUserId, 'admin', ctx.from.id);
+      const result = await RoleService.setUserRole(targetUserId, 'admin', ctx.from.id);
 
       if (result.success) {
         await ctx.answerCbQuery(`✅ ${result.message}`);
@@ -188,11 +231,11 @@ const registerRoleManagementHandlers = (bot) => {
   // Demote admin to moderator
   bot.action(/^role_demote_(.+)$/, async (ctx) => {
     try {
-      const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
       if (!isSuperAdmin) return;
 
       const targetUserId = ctx.match[1];
-      const result = await PermissionService.assignRole(targetUserId, 'moderator', ctx.from.id);
+      const result = await RoleService.setUserRole(targetUserId, 'moderator', ctx.from.id);
 
       if (result.success) {
         await ctx.answerCbQuery(`✅ ${result.message}`);
@@ -208,16 +251,27 @@ const registerRoleManagementHandlers = (bot) => {
   // Manage individual roles - show list
   bot.action('role_manage_list', async (ctx) => {
     try {
-      const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
       if (!isSuperAdmin) return;
 
-      const admins = await PermissionService.getAllAdmins();
+      const [adminIds, moderatorIds, performerIds] = await Promise.all([
+        RoleService.getUsersByRole('admin'),
+        RoleService.getUsersByRole('moderator'),
+        RoleService.getUsersByRole('performer'),
+      ]);
+
+      const [admins, moderators, performers] = await Promise.all([
+        Promise.all(adminIds.map(id => UserModel.getById(id))),
+        Promise.all(moderatorIds.map(id => UserModel.getById(id))),
+        Promise.all(performerIds.map(id => UserModel.getById(id))),
+      ]);
+
       const keyboard = [];
 
       // List admins with actions
-      if (admins.admins.length > 0) {
+      if (admins.length > 0) {
         keyboard.push([{ text: '🟡 ADMINISTRADORES', callback_data: 'noop' }]);
-        for (const admin of admins.admins) {
+        for (const admin of admins) {
           keyboard.push([
             Markup.button.callback(
               `@${admin.username || admin.id}`,
@@ -240,6 +294,21 @@ const registerRoleManagementHandlers = (bot) => {
         }
       }
 
+      // List performers with actions
+      if (performers.length > 0) {
+        keyboard.push([{ text: '🎭 PERFORMERS', callback_data: 'noop' }]);
+        for (const performer of performers) {
+          keyboard.push([
+            Markup.button.callback(
+              `@${performer.username || performer.id}`,
+              `role_manage_detail_${performer.id}`,
+            ),
+          ]);
+        }
+      }
+
+
+
       keyboard.push([Markup.button.callback('⬅️ Volver', 'admin_roles')]);
 
       await ctx.editMessageText(
@@ -257,7 +326,7 @@ const registerRoleManagementHandlers = (bot) => {
   // Show details for specific user
   bot.action(/^role_manage_detail_(.+)$/, async (ctx) => {
     try {
-      const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
       if (!isSuperAdmin) return;
 
       const userId = ctx.match[1];
@@ -269,7 +338,7 @@ const registerRoleManagementHandlers = (bot) => {
       }
 
       const role = user.role || 'user';
-      const roleDisplay = await PermissionService.getUserRoleDisplay(userId, 'es');
+      const roleDisplay = await RoleService.getUserRoleDisplay(userId, 'es');
 
       let message = '👤 *Gestionar Usuario*\n\n';
       message += `Nombre: ${user.firstName || 'N/A'}\n`;
@@ -285,6 +354,8 @@ const registerRoleManagementHandlers = (bot) => {
         keyboard.push([Markup.button.callback('❌ Remover Rol (a Usuario)', `role_remove_${userId}`)]);
       } else if (role === 'moderator') {
         keyboard.push([Markup.button.callback('⬆️ Promover a Admin', `role_promote_${userId}`)]);
+        keyboard.push([Markup.button.callback('❌ Remover Rol (a Usuario)', `role_remove_${userId}`)]);
+      } else if (role === 'performer') {
         keyboard.push([Markup.button.callback('❌ Remover Rol (a Usuario)', `role_remove_${userId}`)]);
       }
 
@@ -306,7 +377,7 @@ const registerRoleManagementHandlers = (bot) => {
     }
 
     try {
-      const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
       if (!isSuperAdmin) return next();
 
       const userId = ctx.message.text.trim();
@@ -326,7 +397,7 @@ const registerRoleManagementHandlers = (bot) => {
       }
 
       // Assign role
-      const result = await PermissionService.assignRole(userId, role, ctx.from.id);
+      const result = await RoleService.setUserRole(userId, role, ctx.from.id);
 
       ctx.session.temp.waitingForUserId = false;
       ctx.session.temp.addingRole = null;
@@ -336,13 +407,23 @@ const registerRoleManagementHandlers = (bot) => {
         const roleEmoji = role === 'admin' ? '🟡' : '🟢';
         const roleName = role === 'admin' ? 'Admin' : 'Moderador';
 
-        await ctx.reply(
-          `✅ ${roleEmoji} ${user.firstName || 'Usuario'} (@${user.username || userId}) asignado como ${roleName}`,
-          Markup.inlineKeyboard([
-            [Markup.button.callback('⬅️ Volver a Roles', 'admin_roles')],
-            [Markup.button.callback('⬅️ Volver al Panel', 'admin_cancel')],
-          ]),
-        );
+        if (role === 'performer') {
+            await ctx.reply(
+                `✅ 🎭 ${user.firstName || 'Usuario'} (@${user.username || userId}) asignado como Performer`,
+                Markup.inlineKeyboard([
+                    [Markup.button.callback('⬅️ Volver a Roles', 'admin_roles')],
+                    [Markup.button.callback('⬅️ Volver al Panel', 'admin_cancel')],
+                ]),
+            );
+        } else {
+            await ctx.reply(
+              `✅ ${roleEmoji} ${user.firstName || 'Usuario'} (@${user.username || userId}) asignado como ${roleName}`,
+              Markup.inlineKeyboard([
+                [Markup.button.callback('⬅️ Volver a Roles', 'admin_roles')],
+                [Markup.button.callback('⬅️ Volver al Panel', 'admin_cancel')],
+              ]),
+            );
+        }
 
         logger.info(`Role assigned: ${userId} -> ${role} by ${ctx.from.id}`);
       } else {

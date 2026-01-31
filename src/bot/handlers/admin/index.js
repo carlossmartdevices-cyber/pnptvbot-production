@@ -546,7 +546,7 @@ async function showAdminPanel(ctx, edit = false) {
 
       // ═══ EN VIVO E INTERACTIVO ═══
       buttons.push([
-        Markup.button.callback('📹 PNP Television En Vivo', 'admin_pnp_live'),
+        Markup.button.callback('📹 PNP Live', 'admin_pnp_live'),
       ]);
 
       // ═══ LUGARES Y NEGOCIOS ═══

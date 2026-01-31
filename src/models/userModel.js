@@ -48,6 +48,7 @@ class UserModel {
         expiry: row.plan_expiry
       },
       role: row.role,
+      status: row.status,
       assignedBy: row.assigned_by,
       roleAssignedAt: row.role_assigned_at,
       privacy: typeof row.privacy === 'string' ? JSON.parse(row.privacy) : (row.privacy || { showLocation: true, showInterests: true, showBio: true, allowMessages: true, showOnline: true }),
@@ -111,18 +112,19 @@ class UserModel {
         INSERT INTO ${TABLE} (
           id, username, first_name, last_name, email, bio, photo_file_id,
           interests, location_lat, location_lng, location_name, location_geohash,
-          subscription_status, plan_id, plan_expiry, tier, role, privacy,
+          subscription_status, plan_id, plan_expiry, tier, role, status, privacy,
           profile_views, xp, favorites, blocked, badges, onboarding_complete,
           age_verified, terms_accepted, privacy_accepted, language, is_active,
           created_at, updated_at
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-          $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, NOW(), NOW()
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+          $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, NOW(), NOW()
         )
         ON CONFLICT (id) DO UPDATE SET
           username = COALESCE(EXCLUDED.username, ${TABLE}.username),
           first_name = COALESCE(EXCLUDED.first_name, ${TABLE}.first_name),
           last_name = COALESCE(EXCLUDED.last_name, ${TABLE}.last_name),
+          status = COALESCE(EXCLUDED.status, ${TABLE}.status),
           updated_at = NOW()
         RETURNING *
       `;
@@ -148,6 +150,7 @@ class UserModel {
         userData.planExpiry || null,
         userData.tier || 'free',
         userData.role || 'user',
+        userData.status || 'offline',
         JSON.stringify(privacy),
         userData.profileViews || 0,
         userData.xp || 0,

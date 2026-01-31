@@ -900,9 +900,23 @@ class PaymentService {
       const userId = metadata?.userId;
       const planId = metadata?.planId;
       const paymentId = metadata?.paymentId;
+      const bookingId = metadata?.bookingId;
 
-      if (!paymentId || !userId || !planId) {
+      if (!paymentId || !userId) {
         return { success: false, error: 'Missing required fields' };
+      }
+
+      if (bookingId) {
+        // This is a booking payment
+        if (status === 'payment_completed') {
+          await BookingAvailabilityIntegration.completeBooking(bookingId, null, userId);
+          logger.info('Booking completed via Daimo webhook', { bookingId, userId });
+        }
+        return { success: true };
+      }
+      
+      if (!planId) {
+        return { success: false, error: 'Missing planId for subscription' };
       }
 
       // Idempotency lock
