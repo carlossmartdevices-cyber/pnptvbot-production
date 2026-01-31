@@ -990,14 +990,6 @@ async function handleMenuCallback(ctx) {
         await handleJoinGroup(ctx, lang);
         break;
 
-      case 'badges':
-        await handleBadges(ctx, lang);
-        break;
-
-      case 'leaderboard':
-        await handleLeaderboard(ctx, lang);
-        break;
-
       case 'events':
         await handleEvents(ctx, lang);
         break;
@@ -1368,36 +1360,6 @@ async function handleJoinGroup(ctx, lang) {
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.url(lang === 'es' ? '🚀 Unirse Ahora' : '🚀 Join Now', groupLink)],
-    [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
-  ]);
-
-  await ctx.editMessageText(message, {
-    parse_mode: 'Markdown',
-    ...keyboard
-  });
-}
-
-async function handleBadges(ctx, lang) {
-  const message = lang === 'es'
-    ? '🏆 *Tus Insignias*\n\nAquí puedes ver tus insignias ganadas.\n\n_Esta función estará disponible pronto._'
-    : '🏆 *Your Badges*\n\nHere you can view your earned badges.\n\n_This feature is coming soon._';
-
-  const keyboard = Markup.inlineKeyboard([
-    [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
-  ]);
-
-  await ctx.editMessageText(message, {
-    parse_mode: 'Markdown',
-    ...keyboard
-  });
-}
-
-async function handleLeaderboard(ctx, lang) {
-  const message = lang === 'es'
-    ? '📊 *Tabla de Clasificación*\n\nAquí puedes ver la tabla de clasificación de la comunidad.\n\n_Esta función estará disponible pronto._'
-    : '📊 *Leaderboard*\n\nHere you can view the community leaderboard.\n\n_This feature is coming soon._';
-
-  const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')]
   ]);
 

@@ -15,7 +15,6 @@ const sessionMiddleware = require('./middleware/session');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
 const moderationFilter = require('./middleware/moderationFilter');
-const activityTrackerMiddleware = require('./middleware/activityTracker');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
 const errorHandler = require('./middleware/errorHandler');
 // Topic middleware
@@ -55,7 +54,6 @@ const registerAccessControlHandlers = require('../handlers/moderation/accessCont
 const registerJitsiModeratorHandlers = require('../handlers/moderation/jitsiModerator');
 const registerCallManagementHandlers = require('../handlers/admin/callManagement');
 const registerRoleManagementHandlers = require('../handlers/admin/roleManagement');
-const registerGamificationHandlers = require('../handlers/admin/gamification');
 const registerLiveStreamManagementHandlers = require('../handlers/admin/liveStreamManagement');
 const registerRadioManagementHandlers = require('../handlers/admin/radioManagement');
 const registerPNPLiveModelHandlers = require('../handlers/model/pnpLiveModelHandler');
@@ -338,7 +336,6 @@ const startBot = async () => {
     bot.use(botAdditionPreventionMiddleware()); // Prevent unauthorized bot additions
     bot.use(autoModerationMiddleware()); // Auto-moderation for links, spam, flooding
     bot.use(moderationFilter());
-    bot.use(activityTrackerMiddleware());
 
     // Group behavior rules (OVERRIDE all previous rules)
     bot.use(primeChannelSilentRedirectMiddleware()); // PRIME channel: silent redirect to private (no messages in channel)
@@ -364,7 +361,7 @@ const startBot = async () => {
 
     // Register handlers
     registerUserHandlers(bot);
-    registerAdminHandlers(bot); // This registers gamification, radio, live streams, community premium, and community posts handlers
+    registerAdminHandlers(bot); // This registers radio, live streams, community premium, and community posts handlers
     registerPNPLiveModelHandlers(bot); // Register PNP Live model self-service handlers
     registerPaymentHandlers(bot);
     registerMediaHandlers(bot);

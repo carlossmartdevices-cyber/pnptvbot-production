@@ -112,18 +112,6 @@ const MENU_CONFIG = {
           deepLink: 'join_group'
         },
         {
-          id: 'badges',
-          title: { en: '🏆 Your Badges', es: '🏆 Tus Insignias' },
-          callback: 'menu:badges',
-          deepLink: 'badges'
-        },
-        {
-          id: 'leaderboard',
-          title: { en: '📊 Leaderboard', es: '📊 Tabla de Clasificación' },
-          callback: 'menu:leaderboard',
-          deepLink: 'leaderboard'
-        },
-        {
           id: 'events',
           title: { en: '🎉 Events', es: '🎉 Eventos' },
           callback: 'menu:events',

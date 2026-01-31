@@ -831,6 +831,23 @@ class UserModel {
   }
 
   /**
+   * Remove badge from all users
+   */
+  static async removeBadgeFromAll(badge) {
+    try {
+      await query(
+        `UPDATE ${TABLE} SET badges = array_remove(badges, $1), updated_at = NOW() WHERE $1 = ANY(badges)`,
+        [badge]
+      );
+      logger.info('Badge removed from all users', { badge });
+      return true;
+    } catch (error) {
+      logger.error('Error removing badge from all users:', error);
+      return false;
+    }
+  }
+
+  /**
    * Get churned users
    */
   static async getChurnedUsers() {

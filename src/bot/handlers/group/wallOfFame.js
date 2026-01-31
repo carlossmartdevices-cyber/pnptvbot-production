@@ -1,17 +1,24 @@
 const { Markup } = require('telegraf');
 const UserModel = require('../../../models/userModel');
+const WallOfFameModel = require('../../../models/wallOfFameModel');
+const CultEventModel = require('../../../models/cultEventModel');
+const CultEventService = require('../../services/cultEventService');
+const { cache } = require('../../../config/redis');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const SubscriptionService = require('../../services/subscriptionService');
 
-// Track daily legend selection
-let lastLegendSelectionDate = null;
-let todayLegendUserId = null;
+const BADGE_HIGH_LEGEND = 'High Legend of the Cult';
+const BADGE_TRIBUTE = 'Tribute of the Cult';
+const BADGE_LOYAL = 'The Loyal Disciple';
+const CULT_BADGES = [BADGE_HIGH_LEGEND, BADGE_TRIBUTE, BADGE_LOYAL];
+const { EVENT_TYPES } = CultEventService;
+let lastProcessedDateKey = null;
 
 /**
- * Wall of Fame Handler - "PNPtv Legend of the Day"
+ * Wall of Fame Handler - Cult Titles
  * Automatically posts photos/videos to Wall of Fame TOPIC with member info
- * Selects one daily "Legend" to feature and rewards them with 1 day PRIME access
+ * Tracks daily cult titles based on interactions and activity
  * Deletes the original message from the group to avoid duplicates
  *
  * IMPORTANT RULES:
@@ -20,7 +27,7 @@ let todayLegendUserId = null;
  * - Original user messages in general group are deleted (to avoid duplicates)
  * - Wall of Fame messages are excluded from /cleanupcommunity command
  * - Only bot messages in main GROUP are deleted, not Wall of Fame topic
- * - One "Legend of the Day" is selected daily and rewarded with 1 day PRIME
+ * - Daily titles are calculated from reactions and activity
  */
 
 // Wall of Fame Topic ID in the group
@@ -36,71 +43,201 @@ const GROUP_ID = process.env.GROUP_ID || '-1003291737499';
  */
 const wallOfFameMessageIds = new Map();
 
-/**
- * Check if user should be today's Legend of the Day and select if so
- * @param {string} userId - User ID
- * @returns {Object} { isLegend: boolean, isFirstSelection: boolean }
- */
-async function checkAndSelectLegendOfTheDay(userId) {
+const getDateKey = (date = new Date()) => date.toISOString().split('T')[0];
+const getMonthKey = (date = new Date()) => date.toISOString().slice(0, 7);
+
+const getPreviousDateKey = (dateKey) => {
+  const date = new Date(`${dateKey}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() - 1);
+  return getDateKey(date);
+};
+
+const getSecondsUntilNextMonth = (date = new Date()) => {
+  const nextMonth = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1));
+  return Math.max(3600, Math.floor((nextMonth.getTime() - date.getTime()) / 1000));
+};
+
+async function maybeResetMonthlyBadges(currentDate) {
+  if (currentDate.getUTCDate() !== 1) {
+    return;
+  }
+
+  const monthKey = getMonthKey(currentDate);
+  const lockKey = `wall_of_fame:monthly_reset:${monthKey}`;
+  const lockTtl = getSecondsUntilNextMonth(currentDate);
+  const acquired = await cache.setNX(lockKey, { processedAt: new Date().toISOString() }, lockTtl);
+  if (!acquired) {
+    return;
+  }
+
+  for (const badge of CULT_BADGES) {
+    await UserModel.removeBadgeFromAll(badge);
+  }
+}
+
+async function processDailyWinners(dateKey, telegram) {
+  const existing = await WallOfFameModel.getDailyWinners(dateKey);
+  if (existing) {
+    return;
+  }
+
+  const winners = await WallOfFameModel.calculateDailyWinners(dateKey);
+  await WallOfFameModel.setDailyWinners(dateKey, winners);
+
+  if (!winners.legendUserId && !winners.activeUserId && !winners.newMemberUserId) {
+    return;
+  }
+
+  await Promise.all([
+    notifyLegendWinner(telegram, winners.legendUserId, dateKey),
+    notifyNewMemberWinner(telegram, winners.newMemberUserId, dateKey),
+    notifyActiveWinner(telegram, winners.activeUserId, dateKey),
+  ]);
+}
+
+async function ensureDailyProcessing(currentDate, telegram) {
+  await maybeResetMonthlyBadges(currentDate);
+
+  const currentDateKey = getDateKey(currentDate);
+  if (!lastProcessedDateKey) {
+    lastProcessedDateKey = currentDateKey;
+    await processDailyWinners(getPreviousDateKey(currentDateKey), telegram);
+    return;
+  }
+
+  if (currentDateKey === lastProcessedDateKey) {
+    return;
+  }
+
+  await processDailyWinners(getPreviousDateKey(currentDateKey), telegram);
+  lastProcessedDateKey = currentDateKey;
+}
+
+async function notifyLegendWinner(telegram, userId, dateKey) {
+  if (!userId) return;
+
   try {
-    const today = new Date();
-    const todayKey = today.toISOString().split('T')[0]; // YYYY-MM-DD
-
-    // Reset legend selection if it's a new day
-    if (lastLegendSelectionDate !== todayKey) {
-      lastLegendSelectionDate = todayKey;
-      todayLegendUserId = null;
-    }
-
-    // If we already have a legend for today and it's a DIFFERENT user, they can't be legend
-    if (todayLegendUserId && todayLegendUserId !== userId) {
-      return { isLegend: false, isFirstSelection: false };
-    }
-
-    // If this user is ALREADY today's legend, return true but don't reward again
-    if (todayLegendUserId === userId) {
-      logger.debug('User is already today\'s legend, skipping reward', { userId });
-      return { isLegend: true, isFirstSelection: false };
-    }
-
-    // Select this user as today's legend (FIRST TIME)
-    todayLegendUserId = userId;
-
-    // Reward the user with 1 day of PRIME access (only on first selection)
-    try {
-      const result = await SubscriptionService.addFreeTrial(userId, 1, 'legend_of_the_day');
-      if (result.success) {
-        logger.info('PNPtv Legend of the Day rewarded with 1 day PRIME', {
-          userId,
-          trialDays: 1,
-          reason: 'legend_of_the_day'
-        });
-      }
-    } catch (rewardError) {
-      logger.error('Error rewarding PNPtv Legend of the Day:', {
-        userId,
-        error: rewardError.message
-      });
-    }
-
-    // Add PNPtv Legend badge to user profile (only on first selection)
-    try {
-      await UserModel.addBadge(userId, 'pnptv_legend');
-      logger.info('PNPtv Legend badge added to user profile', {
-        userId,
-        badge: 'pnptv_legend'
-      });
-    } catch (badgeError) {
-      logger.error('Error adding PNPtv Legend badge:', {
-        userId,
-        error: badgeError.message
-      });
-    }
-
-    return { isLegend: true, isFirstSelection: true };
+    await UserModel.addBadge(userId, BADGE_HIGH_LEGEND);
+    await sendWinnerMessage(telegram, userId, BADGE_HIGH_LEGEND, dateKey, {
+      es: 'Has ganado 3 días PRIME por ser quien recibió más interacciones.',
+      en: 'You earned 3 PRIME days for getting the most interactions.',
+    }, EVENT_TYPES.PRIME);
+    await announceWinner(telegram, userId, BADGE_HIGH_LEGEND, {
+      es: 'Premio: 3 días PRIME gratis.',
+      en: 'Prize: 3 FREE PRIME days.',
+    });
   } catch (error) {
-    logger.error('Error in checkAndSelectLegendOfTheDay:', error);
-    return { isLegend: false, isFirstSelection: false };
+    logger.error('Error rewarding High Legend winner:', error);
+  }
+}
+
+async function notifyNewMemberWinner(telegram, userId, dateKey) {
+  if (!userId) return;
+
+  try {
+    await UserModel.addBadge(userId, BADGE_TRIBUTE);
+    await sendWinnerMessage(telegram, userId, BADGE_TRIBUTE, dateKey, {
+      es: 'Fuiste el Nuevo Miembro Destacado. Estás invitado al próximo hangout privado con Santino.',
+      en: 'You were the Featured New Member. You are invited to the next private hangout with Santino.',
+    }, EVENT_TYPES.SANTINO);
+    await announceWinner(telegram, userId, BADGE_TRIBUTE, {
+      es: 'Premio: invitación al próximo hangout privado con Santino.',
+      en: 'Prize: invitation to the next private hangout with Santino.',
+    });
+  } catch (error) {
+    logger.error('Error rewarding Tribute of the Cult winner:', error);
+  }
+}
+
+async function notifyActiveWinner(telegram, userId, dateKey) {
+  if (!userId) return;
+
+  try {
+    await UserModel.addBadge(userId, BADGE_LOYAL);
+    await sendWinnerMessage(telegram, userId, BADGE_LOYAL, dateKey, {
+      es: 'Fuiste el Miembro Activo Destacado. Estás invitado al próximo hangout privado con Lex.',
+      en: 'You were the Featured Active Member. You are invited to the next private hangout with Lex.',
+    }, EVENT_TYPES.LEX);
+    await announceWinner(telegram, userId, BADGE_LOYAL, {
+      es: 'Premio: invitación al próximo hangout privado con Lex.',
+      en: 'Prize: invitation to the next private hangout with Lex.',
+    });
+  } catch (error) {
+    logger.error('Error rewarding Loyal Disciple winner:', error);
+  }
+}
+
+async function sendWinnerMessage(telegram, userId, badge, dateKey, extra, primaryEvent) {
+  try {
+    const user = await UserModel.getById(userId);
+    const lang = user?.language || 'en';
+    const monthKey = getMonthKey(new Date(`${dateKey}T00:00:00.000Z`));
+    const keyboard = buildWinnerKeyboard(primaryEvent, monthKey, lang);
+    const message = lang === 'es'
+      ? `🏆 ¡Ganaste el título ${badge}!\n\n${extra.es}\n\n✅ Tu título se mantiene hasta el último día del mes.\n\n📅 Horarios oficiales (UTC):\n• Hangout con Lex: segundo sábado 20:00–22:00\n• Hangout con Santino: segundo sábado 22:00–00:00\n• The Meth Gala: último sábado desde las 20:00\n\n⚠️ Términos y condiciones:\n• Debes reclamar tu premio desde los botones abajo.\n• Si no se canjea antes de fin de mes, el premio expira.\n• Los premios son personales e intransferibles.\n• PNPtv no se responsabiliza por premios no reclamados.\n\n🎉 Con cualquier badge del culto tienes invitación a la Meth Gala.\n\nRevisa los botones para reclamar o registrarte.`
+      : `🏆 You won the ${badge} title!\n\n${extra.en}\n\n✅ Your title remains active until the last day of this month.\n\n📅 Official times (UTC):\n• Lex hangout: 2nd Saturday 20:00–22:00\n• Santino hangout: 2nd Saturday 22:00–00:00\n• The Meth Gala: last Saturday from 20:00 onward\n\n⚠️ Terms & conditions:\n• Claim your prize using the buttons below.\n• Unclaimed prizes expire at month end.\n• Prizes are personal and non-transferable.\n• PNPtv is not responsible for unclaimed prizes.\n\n🎉 Any cult-title badge grants a Meth Gala invite.\n\nUse the buttons to claim or register.`;
+
+    await telegram.sendMessage(userId, message, {
+      ...keyboard,
+    });
+  } catch (error) {
+    logger.debug('Could not send winner DM', { userId, error: error.message });
+  }
+}
+
+function buildWinnerKeyboard(primaryEvent, monthKey, lang) {
+  const buttons = [];
+
+  if (primaryEvent === EVENT_TYPES.PRIME) {
+    buttons.push([
+      Markup.button.callback(
+        lang === 'es' ? '✅ Activar PRIME 3 días' : '✅ Activate 3-Day PRIME',
+        `cult_claim_prime_${monthKey}`
+      ),
+    ]);
+  }
+
+  if (primaryEvent === EVENT_TYPES.SANTINO) {
+    buttons.push([
+      Markup.button.callback(
+        lang === 'es' ? '🗓️ Register for Santino\'s Hangout' : "🗓️ Register for Santino's Hangout",
+        `cult_register_santino_${monthKey}`
+      ),
+    ]);
+  }
+
+  if (primaryEvent === EVENT_TYPES.LEX) {
+    buttons.push([
+      Markup.button.callback(
+        lang === 'es' ? '🗓️ Register for Lex\'s Hangout' : "🗓️ Register for Lex's Hangout",
+        `cult_register_lex_${monthKey}`
+      ),
+    ]);
+  }
+
+  buttons.push([
+    Markup.button.callback(
+      lang === 'es' ? '🎉 Register for The Meth Gala' : '🎉 Register for The Meth Gala',
+      `cult_register_gala_${monthKey}`
+    ),
+  ]);
+
+  return Markup.inlineKeyboard(buttons);
+}
+
+async function announceWinner(telegram, userId, badge, reward) {
+  try {
+    const user = await UserModel.getById(userId);
+    const username = user?.username ? `@${user.username}` : (user?.firstName || 'Miembro');
+    const message = `🏆 Usuario destacado: ${username}\nDesde ahora será conocido como **${badge}**.\n\n🏆 Featured member: ${username}\nFrom now on he shall be known as **${badge}**.\n\n${reward.es}\n${reward.en}\n\n⏳ Ostentará el título hasta el último día del mes.\n📩 Revisa el bot: se envió un mensaje con detalles para reclamar el premio.\n📌 Anuncio publicado en el Wall of Fame.`;
+
+    await telegram.sendMessage(GROUP_ID, message, { parse_mode: 'Markdown' });
+    await telegram.sendMessage(GROUP_ID, message, {
+      parse_mode: 'Markdown',
+      message_thread_id: WALL_OF_FAME_TOPIC_ID,
+    });
+  } catch (error) {
+    logger.error('Error announcing cult winner:', error);
   }
 }
 
@@ -136,6 +273,7 @@ const registerWallOfFameHandlers = (bot) => {
 
       const userId = ctx.from.id;
       const lang = getLanguage(ctx);
+      const now = new Date();
 
       // Get user info
       const user = await UserModel.getById(userId);
@@ -144,13 +282,15 @@ const registerWallOfFameHandlers = (bot) => {
         return;
       }
 
-      // Check if this user should be today's Legend of the Day
-      const legendResult = await checkAndSelectLegendOfTheDay(userId);
-      const isLegendOfTheDay = legendResult.isLegend;
-      const isFirstLegendSelection = legendResult.isFirstSelection;
+      await ensureDailyProcessing(now, ctx.telegram);
 
-      // Build member info caption (show legend badge if they are the legend)
-      const caption = buildMemberInfoCaption(user, lang, isLegendOfTheDay);
+      const joinData = await cache.get(`group_joined_at:${userId}`);
+      const joinedAt = joinData?.joinedAt ? new Date(joinData.joinedAt) : null;
+      const isNewMember = joinedAt ? (now.getTime() - joinedAt.getTime()) <= 3 * 60 * 60 * 1000 : false;
+      const groupIdValue = Number(GROUP_ID);
+
+      // Build member info caption
+      const caption = buildMemberInfoCaption(user, lang);
       const inlineKeyboard = buildMemberInlineKeyboard(user, userId, lang);
 
       // Prepare to forward to Wall of Fame
@@ -178,6 +318,14 @@ const registerWallOfFameHandlers = (bot) => {
 
           // Track this Wall of Fame message so it's NEVER deleted
           trackWallOfFameMessage(WALL_OF_FAME_TOPIC_ID, sentMessage.message_id);
+          await WallOfFameModel.recordPost({
+            groupId: groupIdValue,
+            messageId: sentMessage.message_id,
+            userId,
+            dateKey: getDateKey(now),
+            isNewMember,
+            createdAt: now,
+          });
 
           logger.info('Photo posted to Wall of Fame TOPIC (PERMANENT)', {
             userId,
@@ -206,6 +354,14 @@ const registerWallOfFameHandlers = (bot) => {
 
           // Track this Wall of Fame message so it's NEVER deleted
           trackWallOfFameMessage(WALL_OF_FAME_TOPIC_ID, sentMessage.message_id);
+          await WallOfFameModel.recordPost({
+            groupId: groupIdValue,
+            messageId: sentMessage.message_id,
+            userId,
+            dateKey: getDateKey(now),
+            isNewMember,
+            createdAt: now,
+          });
 
           logger.info('Video posted to Wall of Fame TOPIC (PERMANENT)', {
             userId,
@@ -234,43 +390,9 @@ const registerWallOfFameHandlers = (bot) => {
 
         // Send confirmation to user in private chat
         try {
-          let confirmMsg;
-          if (isFirstLegendSelection) {
-            // First time selected as Legend of the Day - full congratulations with reward info
-            confirmMsg = lang === 'es'
-              ? `🎉 ¡FELICIDADES! ¡ERES LA LEYENDA PNPtv DEL DÍA! 🎉
-
-🏆 Tu foto/video ha sido seleccionado como el MEJOR del día
-💎 Has ganado 1 DÍA GRATIS de acceso PRIME
-👑 Has recibido la insignia exclusiva PNPtv LEGEND
-🔥 Disfruta de todos los beneficios exclusivos
-
-👑 ${user.name || user.username}
-
-📢 Tu logro ha sido anunciado en el Muro de la Fama
-💫 ¡Revisa tu perfil para ver tu nueva insignia!`
-              : `🎉 CONGRATULATIONS! YOU ARE THE PNPtv LEGEND OF THE DAY! 🎉
-
-🏆 Your photo/video has been selected as the BEST of the day
-💎 You have earned 1 FREE DAY of PRIME access
-👑 You have received the exclusive PNPtv LEGEND badge
-🔥 Enjoy all exclusive benefits
-
-👑 ${user.name || user.username}
-
-📢 Your achievement has been announced on the Wall of Fame
-💫 Check your profile to see your new badge!`;
-          } else if (isLegendOfTheDay) {
-            // Already today's legend, posting again - simpler message
-            confirmMsg = lang === 'es'
-              ? `✨ Tu foto/video ha sido publicado en el Muro de la Fama!\n\n🏆 ${user.name || user.username} - LEYENDA DEL DÍA\n\n💫 ¡Sigue compartiendo contenido increíble!`
-              : `✨ Your photo/video has been posted to the Wall of Fame!\n\n🏆 ${user.name || user.username} - LEGEND OF THE DAY\n\n💫 Keep sharing amazing content!`;
-          } else {
-            // Not the legend - encourage them
-            confirmMsg = lang === 'es'
-              ? `✨ Tu foto/video ha sido publicado en el Muro de la Fama!\n\n👑 ${user.name || user.username}\n\n💡 ¿Quieres ser la próxima LEYENDA PNPtv DEL DÍA? ¡Sube más contenido de calidad!`
-              : `✨ Your photo/video has been posted to the Wall of Fame!\n\n👑 ${user.name || user.username}\n\n💡 Want to be the next PNPtv LEGEND OF THE DAY? Upload more quality content!`;
-          }
+          const confirmMsg = lang === 'es'
+            ? `✨ Tu foto/video ha sido publicado en el Muro de la Fama.\n\n🏆 Los títulos diarios se definen por interacciones y actividad.\n\n💫 ¡Sigue compartiendo contenido increíble!`
+            : `✨ Your photo/video has been posted to the Wall of Fame.\n\n🏆 Daily titles are decided by interactions and activity.\n\n💫 Keep sharing amazing content!`;
 
           await ctx.telegram.sendMessage(userId, confirmMsg);
         } catch (dmError) {
@@ -296,19 +418,136 @@ const registerWallOfFameHandlers = (bot) => {
       logger.error('Error in wallOfFame handler:', error);
     }
   });
+
+  bot.on('message_reaction', async (ctx) => {
+    try {
+      const messageReaction = ctx.messageReaction;
+      if (!messageReaction?.message) {
+        return;
+      }
+
+      const chatIdStr = messageReaction.message.chat?.id?.toString();
+      if (chatIdStr !== GROUP_ID) {
+        return;
+      }
+
+      await ensureDailyProcessing(new Date(), ctx.telegram);
+
+      const newReactions = messageReaction.new_reaction || [];
+      const oldReactions = messageReaction.old_reaction || [];
+      const delta = newReactions.length - oldReactions.length;
+      if (delta === 0) {
+        return;
+      }
+
+      await WallOfFameModel.incrementReactions({
+        groupId: Number(GROUP_ID),
+        messageId: messageReaction.message.message_id,
+        delta,
+      });
+    } catch (error) {
+      logger.error('Error tracking Wall of Fame reactions:', error);
+    }
+  });
+
+  bot.action(/^cult_claim_prime_(\d{4}-\d{2})$/, async (ctx) => {
+    try {
+      const monthKey = ctx.match[1];
+      const userId = ctx.from.id.toString();
+      const currentMonthKey = getMonthKey(new Date());
+      const user = await UserModel.getById(userId);
+      const lang = user?.language || 'en';
+      if (monthKey !== currentMonthKey) {
+        await ctx.answerCbQuery(lang === 'es' ? 'Este premio ya expiró.' : 'This reward has expired.');
+        return;
+      }
+      const existing = await CultEventModel.getRegistration({
+        userId,
+        eventType: EVENT_TYPES.PRIME,
+        monthKey,
+      });
+
+      if (existing?.status === 'claimed') {
+        await ctx.answerCbQuery(lang === 'es' ? 'PRIME ya fue activado.' : 'PRIME already activated.');
+        return;
+      }
+
+      if (!existing) {
+        await CultEventService.register({
+          userId,
+          eventType: EVENT_TYPES.PRIME,
+          monthKey,
+          eventAt: new Date(),
+        });
+      }
+
+      const result = await SubscriptionService.addFreeTrial(userId, 3, 'cult_high_legend');
+      if (result.success) {
+        await CultEventModel.markClaimed({ userId, eventType: EVENT_TYPES.PRIME, monthKey });
+        await ctx.answerCbQuery(lang === 'es' ? '¡PRIME activado! 🎉' : 'PRIME activated! 🎉');
+      } else {
+        await ctx.answerCbQuery(lang === 'es' ? 'Fallo al activar. Intenta de nuevo.' : 'Activation failed. Try again.');
+      }
+    } catch (error) {
+      logger.error('Error activating PRIME claim:', error);
+      await ctx.answerCbQuery('Error activating PRIME.');
+    }
+  });
+
+  bot.action(/^cult_register_(santino|lex|gala)_(\d{4}-\d{2})$/, async (ctx) => {
+    try {
+      const eventKey = ctx.match[1];
+      const monthKey = ctx.match[2];
+      const userId = ctx.from.id.toString();
+      const currentMonthKey = getMonthKey(new Date());
+      const eventType = eventKey === 'santino'
+        ? EVENT_TYPES.SANTINO
+        : eventKey === 'lex'
+          ? EVENT_TYPES.LEX
+          : EVENT_TYPES.GALA;
+
+      const user = await UserModel.getById(userId);
+      const lang = user?.language || 'en';
+      if (monthKey !== currentMonthKey) {
+        await ctx.answerCbQuery(lang === 'es' ? 'Registro fuera de fecha.' : 'Registration period ended.');
+        return;
+      }
+
+      const registration = await CultEventService.register({
+        userId,
+        eventType,
+        monthKey,
+      });
+
+      if (!registration) {
+        await ctx.answerCbQuery(lang === 'es' ? 'Registro fallido.' : 'Registration failed.');
+        return;
+      }
+
+      const eventAt = new Date(registration.event_at);
+      const dateStr = eventAt.toISOString().split('T')[0];
+      const timeStr = `${eventAt.getUTCHours().toString().padStart(2, '0')}:00 UTC`;
+      await ctx.answerCbQuery(lang === 'es' ? '¡Registrado!' : 'Registered!');
+      await ctx.reply(
+        lang === 'es'
+          ? `✅ Registro confirmado\n\n📅 Fecha: ${dateStr}\n🕗 Hora: ${timeStr}\n\nTe enviaremos recordatorios 1 semana antes, 3 días antes y el día del evento.`
+          : `✅ Registration confirmed\n\n📅 Date: ${dateStr}\n🕗 Time: ${timeStr}\n\nWe will send reminders 1 week before, 3 days before, and on the day.`,
+      );
+    } catch (error) {
+      logger.error('Error registering cult event:', error);
+      await ctx.answerCbQuery('Error registering.');
+    }
+  });
 };
 
 /**
  * Build member information caption for Wall of Fame
  * @param {Object} user - User object
  * @param {string} lang - Language code
- * @param {boolean} isLegendOfTheDay - Whether this user is today's legend
  * @returns {string} HTML formatted caption
  */
-function buildMemberInfoCaption(user, lang, isLegendOfTheDay = false) {
-  const label = isLegendOfTheDay
-    ? (lang === 'es' ? '🏆 LEYENDA PNPtv DEL DÍA 🏆' : '🏆 PNPtv LEGEND OF THE DAY 🏆')
-    : (lang === 'es' ? '👑 Miembro Destacado' : '👑 Featured Member');
+function buildMemberInfoCaption(user, lang) {
+  const label = lang === 'es' ? '👑 Miembro Destacado' : '👑 Featured Member';
   const nameLabel = lang === 'es' ? 'Nombre:' : 'Name:';
   const usernameLabel = lang === 'es' ? 'Usuario:' : 'Username:';
   const bioLabel = lang === 'es' ? 'Bio:' : 'Bio:';
@@ -374,23 +613,6 @@ function buildMemberInfoCaption(user, lang, isLegendOfTheDay = false) {
   }
 
   caption += `\n✨ <i>${lang === 'es' ? 'Destacado en el Muro de la Fama' : 'Featured on Wall of Fame'}</i>`;
-
-  // Add Legend of the Day reward info
-  if (isLegendOfTheDay) {
-    const rewardText = lang === 'es'
-      ? '\n\n🎁 ¡FELICIDADES! Eres la LEYENDA PNPtv DEL DÍA' +
-        '\n💎 Has ganado 1 DÍA GRATIS de acceso PRIME' +
-        '\n👑 Has recibido la insignia exclusiva PNPtv LEGEND' +
-        '\n🔥 Tu membresía ha sido actualizada automáticamente' +
-        '\n📅 Disfruta de todos los beneficios PRIME por 24 horas'
-      : '\n\n🎁 CONGRATULATIONS! You are the PNPtv LEGEND OF THE DAY' +
-        '\n💎 You have earned 1 FREE DAY of PRIME access' +
-        '\n👑 You have received the exclusive PNPtv LEGEND badge' +
-        '\n🔥 Your membership has been automatically upgraded' +
-        '\n📅 Enjoy all PRIME benefits for 24 hours';
-    
-    caption += rewardText;
-  }
 
   return caption;
 }
