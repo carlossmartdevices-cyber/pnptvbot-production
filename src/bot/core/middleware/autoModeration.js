@@ -1,6 +1,7 @@
 const WarningService = require('../../../services/warningService');
 const logger = require('../../../utils/logger');
 const MODERATION_CONFIG = require('../../../config/moderationConfig');
+const { autoModerationReasons } = require('../../../config/groupMessages');
 
 // Store recent messages for spam/flood detection
 const userMessageHistory = new Map();
@@ -232,7 +233,7 @@ const autoModerationMiddleware = () => async (ctx, next) => {
     // Check if user is muted
     const muteStatus = await WarningService.getMuteStatus(ctx.from.id, ctx.chat.id);
     if (muteStatus?.isMuted) {
-      await deleteAndNotify(ctx, 'You are currently muted');
+      await deleteAndNotify(ctx, autoModerationReasons.muted);
       return; // Don't proceed
     }
 
@@ -243,7 +244,7 @@ const autoModerationMiddleware = () => async (ctx, next) => {
 
     // ENHANCED: Check for forwarded messages - BLOCK ALL
     if (isForwardedMessage(message)) {
-      await deleteAndNotify(ctx, 'Forwarded messages are not allowed in this group');
+      await deleteAndNotify(ctx, autoModerationReasons.forwarded);
 
       // Issue auto-warning
       await WarningService.addWarning({
@@ -262,7 +263,7 @@ const autoModerationMiddleware = () => async (ctx, next) => {
 
       // Check for spam
       if (checkSpam(userId, messageText)) {
-        await deleteAndNotify(ctx, 'Spam detected (duplicate messages)');
+        await deleteAndNotify(ctx, autoModerationReasons.spam);
 
         // Issue auto-warning
         await WarningService.addWarning({
@@ -278,7 +279,7 @@ const autoModerationMiddleware = () => async (ctx, next) => {
 
     // Check for flooding (all message types)
     if (checkFlood(userId)) {
-      await deleteAndNotify(ctx, 'Too many messages too quickly');
+      await deleteAndNotify(ctx, autoModerationReasons.flood);
 
       // Mute for 5 minutes
       const muteDuration = 5 * 60 * 1000;
@@ -304,7 +305,7 @@ const autoModerationMiddleware = () => async (ctx, next) => {
     // ENHANCED: Check for ANY links - COMPLETE BLOCK
     // Check both text patterns and URL entities
     if (messageText && (detectAnyLink(messageText) || hasUrlEntities(message))) {
-      await deleteAndNotify(ctx, 'Links are not allowed in this group');
+      await deleteAndNotify(ctx, autoModerationReasons.links);
 
       // Issue auto-warning
       await WarningService.addWarning({
@@ -319,7 +320,7 @@ const autoModerationMiddleware = () => async (ctx, next) => {
 
     // Check for profanity (only if has text)
     if (messageText && checkProfanity(messageText)) {
-      await deleteAndNotify(ctx, 'Inappropriate language detected');
+      await deleteAndNotify(ctx, autoModerationReasons.profanity);
 
       // Issue auto-warning
       await WarningService.addWarning({
