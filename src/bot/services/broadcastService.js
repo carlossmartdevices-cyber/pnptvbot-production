@@ -235,11 +235,11 @@ class BroadcastService {
     const query = `
       SELECT
         bs.*,
-        b.message as message_en, b.message as message_es, b.target_tier as target_type,
-        b.media_type, b.media_url, NULL as media_file_id, NULL as s3_key, NULL as s3_bucket,
-        b.created_by as admin_id, NULL as admin_username, b.title, NULL as include_filters, NULL as exclude_user_ids
+        b.message_en, b.message_es, b.target_type,
+        b.media_type, b.media_url, b.media_file_id, b.s3_key, b.s3_bucket,
+        b.admin_id, b.admin_username, b.title, b.include_filters, b.exclude_user_ids
       FROM broadcast_schedules bs
-      JOIN broadcasts b ON bs.broadcast_id = b.id
+      JOIN broadcasts b ON bs.broadcast_id = b.broadcast_id
       WHERE bs.status = 'scheduled'
         AND bs.next_execution_at <= CURRENT_TIMESTAMP
       ORDER BY bs.next_execution_at ASC
@@ -368,7 +368,7 @@ class BroadcastService {
         bs.max_occurrences,
         bs.status as schedule_status
       FROM broadcasts b
-      LEFT JOIN broadcast_schedules bs ON b.id = bs.broadcast_id
+      LEFT JOIN broadcast_schedules bs ON b.broadcast_id = bs.broadcast_id
       WHERE b.status IN ('scheduled', 'pending')
       ORDER BY COALESCE(bs.next_execution_at, b.scheduled_at) ASC
       LIMIT $1 OFFSET $2
@@ -473,18 +473,18 @@ class BroadcastService {
    */
   async getTargetUsers(targetType, excludeUserIds = []) {
     try {
-      let query = 'SELECT id, language, subscription_tier FROM users WHERE 1=1';
+      let query = 'SELECT id, language, subscription_status FROM users WHERE 1=1';
       const params = [];
 
       // Filter by target type
       if (targetType === 'premium') {
-        query += ' AND subscription_tier = $1';
-        params.push('premium');
+        query += ' AND LOWER(COALESCE(subscription_status, \'\')) IN ($1, $2, $3)';
+        params.push('active', 'prime', 'trial');
       } else if (targetType === 'free') {
-        query += ' AND (subscription_tier IS NULL OR subscription_tier = $1)';
+        query += ' AND (subscription_status IS NULL OR LOWER(subscription_status) = $1)';
         params.push('free');
       } else if (targetType === 'churned') {
-        query += ' AND subscription_tier = $1';
+        query += ' AND LOWER(subscription_status) = $1';
         params.push('churned');
       }
 
@@ -623,7 +623,7 @@ class BroadcastService {
           await this.recordRecipient(broadcastId, user.id, 'sent', {
             messageId,
             language: user.language,
-            subscriptionTier: user.subscription_tier,
+            subscriptionTier: user.subscription_status,
           });
 
           stats.sent++;
@@ -643,7 +643,7 @@ class BroadcastService {
             errorCode: error.code,
             errorMessage: classification.description || error.message,
             language: user.language,
-            subscriptionTier: user.subscription_tier,
+            subscriptionTier: user.subscription_status,
           });
 
           logger.warn(`Failed to send to user ${user.id}: ${classification.description || error.message}`);
@@ -811,9 +811,9 @@ class BroadcastService {
         COUNT(CASE WHEN br.status = 'failed' THEN 1 END) as recipients_failed,
         COUNT(CASE WHEN br.status = 'blocked' THEN 1 END) as recipients_blocked
       FROM broadcasts b
-      LEFT JOIN broadcast_recipients br ON b.id = br.broadcast_id
-      WHERE b.id = $1
-      GROUP BY b.id
+      LEFT JOIN broadcast_recipients br ON b.broadcast_id = br.broadcast_id
+      WHERE b.broadcast_id = $1
+      GROUP BY b.broadcast_id
     `;
 
     try {
@@ -961,7 +961,7 @@ class BroadcastService {
             messageId = await this._sendMediaBroadcast(bot, userId, broadcast, sendOptions);
           } else {
             // Text-only broadcast
-            const text = broadcast.text_en || broadcast.text;
+            const text = broadcast.message_en || broadcast.message_es;
             const sentMessage = await bot.telegram.sendMessage(userId, text, sendOptions);
             messageId = sentMessage.message_id;
           }

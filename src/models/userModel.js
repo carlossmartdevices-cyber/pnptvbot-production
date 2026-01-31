@@ -5,6 +5,14 @@ const performanceMonitor = require('../utils/performanceMonitor');
 
 const TABLE = 'users';
 
+const normalizeSubscriptionStatus = (status) => {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'active' || normalized === 'prime' || normalized === 'trial') {
+    return 'active';
+  }
+  return 'inactive';
+};
+
 /**
  * User Model - Handles all user data operations with PostgreSQL
  */
@@ -42,7 +50,7 @@ class UserModel {
       tier: row.tier,
       // Subscription object for access control compatibility
       subscription: {
-        isPrime: row.subscription_status === 'active',
+        isPrime: normalizeSubscriptionStatus(row.subscription_status) === 'active',
         status: row.subscription_status,
         planId: row.plan_id,
         expiry: row.plan_expiry
