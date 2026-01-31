@@ -23,7 +23,6 @@ module.exports = {
     registerModelManagement: require('./admin/modelManagement'),
     registerCallManagement: require('./admin/callManagement'),
     registerRoleManagement: require('./admin/roleManagement'),
-    registerGamification: require('./admin/gamification'),
     registerLiveStreamManagement: require('./admin/liveStreamManagement'),
     registerRadioManagement: require('./admin/radioManagement'),
     registerPaymentAnalytics: require('./admin/paymentAnalytics')

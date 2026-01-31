@@ -329,7 +329,7 @@ const registerEnhancedBusinessAdminHandlers = (bot) => {
           '*Next Steps:*\n' +
           '✅ Business is now live in the directory\n' +
           '✅ Submitter has been notified\n' +
-          '✅ Reputation points awarded to submitter\n\n' +
+          '✅ Submitter gains community recognition\n\n' +
           '*Quick Actions:*',
           {
             parse_mode: 'Markdown',

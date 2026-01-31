@@ -6,6 +6,7 @@ const { initializePostgres } = require('../src/config/postgres');
 const UserService = require('../src/bot/services/userService');
 const MembershipCleanupService = require('../src/bot/services/membershipCleanupService');
 const TutorialReminderService = require('../src/bot/services/tutorialReminderService');
+const CultEventService = require('../src/bot/services/cultEventService');
 const VisaCybersourceService = require('../src/bot/services/visaCybersourceService');
 const logger = require('../src/utils/logger');
 
@@ -72,6 +73,18 @@ const startCronJobs = async (bot = null) => {
     // NOTE: Tutorial reminders are handled by TutorialReminderService.startScheduling() in bot.js
     // Do NOT duplicate them here to avoid exceeding the 6 messages/day rate limit
     // The service alternates between health tips and PRIME feature tutorials every 4 hours
+
+    // Cult event reminders (daily)
+    if (bot) {
+      cron.schedule(process.env.CULT_EVENT_REMINDERS_CRON || '0 15 * * *', async () => {
+        try {
+          logger.info('Running cult event reminders...');
+          await CultEventService.processReminders(bot);
+        } catch (error) {
+          logger.error('Error in cult event reminders cron:', error);
+        }
+      });
+    }
 
     // Process recurring payments - runs daily at 8 AM UTC
     // Charges cards for subscriptions that are due for renewal

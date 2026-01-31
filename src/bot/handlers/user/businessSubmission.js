@@ -63,16 +63,14 @@ const registerBusinessSubmissionHandlers = (bot) => {
           '¡Gracias por ayudar a crecer nuestra comunidad! 🙌\n\n' +
           '*Beneficios de proponer negocios:*\n' +
           '✅ Apoyas a negocios locales\n' +
-          '✅ Ganar puntos de reputación\n' +
-          '✅ Visibilidad en la comunidad\n' +
+          '✅ Reconocimiento en la comunidad\n' +
           '✅ Acceso a promociones especiales\n\n' +
           '_El proceso toma solo 2-3 minutos._'
         : '`🏪 Submit Community Business`\n\n' +
           'Thank you for helping grow our community! 🙌\n\n' +
           '*Benefits of submitting businesses:*\n' +
           '✅ Support local businesses\n' +
-          '✅ Earn reputation points\n' +
-          '✅ Community visibility\n' +
+          '✅ Community recognition\n' +
           '✅ Access to special promotions\n\n' +
           '_The process takes only 2-3 minutes._';
 
@@ -400,9 +398,8 @@ const registerBusinessSubmissionHandlers = (bot) => {
             '*Tiempo estimado:* 24-48 horas\n\n' +
             '_Recibirás una notificación cuando sea aprobada._\n\n' +
             '*Beneficios desbloqueados:*\n' +
-            '✅ +50 puntos de reputación\n' +
             '✅ Acceso a canal VIP\n' +
-            '✅ Insignia "Contribuidor"\n\n' +
+            '✅ Reconocimiento en la comunidad\n\n' +
             '_¿Quieres proponer otro negocio?_'
           : '`✅ Submission Successful!`\n\n' +
             '🎉 *Thank you for your contribution!*\n\n' +
@@ -411,9 +408,8 @@ const registerBusinessSubmissionHandlers = (bot) => {
             '*Estimated time:* 24-48 hours\n\n' +
             '_You will receive a notification when approved._\n\n' +
             '*Unlocked benefits:*\n' +
-            '✅ +50 reputation points\n' +
             '✅ VIP channel access\n' +
-            '✅ "Contributor" badge\n\n' +
+            '✅ Community recognition\n\n' +
             '_Want to submit another business?_';
 
         await ctx.editMessageText(confirmationText, {
