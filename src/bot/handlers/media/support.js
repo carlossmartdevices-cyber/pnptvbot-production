@@ -4,24 +4,7 @@ const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const SupportTopicModel = require('../../../models/supportTopicModel');
 const supportRoutingService = require('../../services/supportRoutingService');
-
-// Mistral AI integration
-let mistral = null;
-let AGENT_ID = null;
-
-try {
-  const { Mistral } = require('@mistralai/mistralai');
-  if (process.env.MISTRAL_API_KEY) {
-    mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
-
-    // Initialize agent on startup (will be created if not exists)
-    initializeAgent().catch((err) => {
-      logger.error('Failed to initialize Mistral agent:', err);
-    });
-  }
-} catch (error) {
-  logger.warn('Mistral AI package not installed. AI chat will be unavailable.');
-}
+const { chatWithCristina, isCristinaAIAvailable } = require('../../services/cristinaAIService');
 
 // Rate limiting map: userId -> lastMessageTime
 const messageTimestamps = new Map();
@@ -101,32 +84,6 @@ You CANNOT:
 - Keep responses concise (max 3-4 paragraphs)`;
 
 /**
- * Initialize or get the Mistral AI Agent
- * Note: Agents must be created via Mistral console (https://console.mistral.ai)
- * or the environment variable MISTRAL_AGENT_ID can be set
- */
-async function initializeAgent() {
-  if (!mistral) return null;
-
-  try {
-    // Check if agent ID is provided in environment
-    if (process.env.MISTRAL_AGENT_ID) {
-      AGENT_ID = process.env.MISTRAL_AGENT_ID;
-      logger.info(`Using Mistral agent from env: ${AGENT_ID}`);
-      return AGENT_ID;
-    }
-
-    // If no agent ID provided, we'll use chat completion instead
-    logger.info('No MISTRAL_AGENT_ID configured, will use standard chat completion API');
-    AGENT_ID = null;
-    return null;
-  } catch (error) {
-    logger.error('Error initializing Mistral agent:', error);
-    return null;
-  }
-}
-
-/**
  * Support handlers
  * @param {Telegraf} bot - Bot instance
  */
@@ -187,8 +144,8 @@ const registerSupportHandlers = (bot) => {
     try {
       const lang = getLanguage(ctx);
 
-      // Check if Mistral AI is available
-      if (!mistral) {
+      // Check if Cristina AI is available
+      if (!isCristinaAIAvailable()) {
         await ctx.answerCbQuery();
         const errorText = '`❌ Unavailable`\n\nAI chat is not available right now.\nPlease contact Santino directly.';
 
@@ -197,11 +154,6 @@ const registerSupportHandlers = (bot) => {
           ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Back', 'show_support')]]),
         });
         return;
-      }
-
-      // Ensure agent is initialized
-      if (AGENT_ID === null && mistral) {
-        await initializeAgent();
       }
 
       // Initialize chat session
@@ -483,14 +435,9 @@ const registerSupportHandlers = (bot) => {
         // Show typing indicator
         const thinkingMsg = await ctx.reply(lang === 'es' ? '🤔 Cristina está pensando...' : '🤔 Cristina is thinking...');
 
-        // Send to Mistral AI
-        if (mistral) {
+        // Send to Grok for Cristina
+        if (isCristinaAIAvailable()) {
           try {
-            // Ensure agent is initialized
-            if (AGENT_ID === null && mistral) {
-              await initializeAgent();
-            }
-
             // Initialize chat history if not exists
             if (!ctx.session.temp.aiChatHistory) {
               ctx.session.temp.aiChatHistory = [];
@@ -507,30 +454,17 @@ const registerSupportHandlers = (bot) => {
             // Prepare messages with language preference
             const languagePrompt = lang === 'es' ? 'Responde en español.' : 'Respond in English.';
 
-            let completion;
-            let aiResponse;
+            const messages = [
+              ...ctx.session.temp.aiChatHistory.slice(-10), // Last 10 messages for context
+              { role: 'user', content: `${languagePrompt}\n\n${userMessage}` },
+            ];
 
-            // Use Agents API if agent ID is configured
-            if (AGENT_ID) {
-              const messages = [
-                ...ctx.session.temp.aiChatHistory.slice(-10), // Last 10 messages for context
-                { role: 'user', content: `${languagePrompt}\n\n${userMessage}` },
-              ];
-
-              completion = await mistral.agents.complete({ agentId: AGENT_ID, messages });
-
-              aiResponse = completion.choices?.[0]?.message?.content || completion.message?.content || (lang === 'es' ? 'Disculpa, no pude procesar tu solicitud. Por favor intenta de nuevo.' : 'I apologize, but I couldn\'t process your request. Please try again.');
-            } else {
-              // Fall back to Chat Completions API
-              const messages = [
-                { role: 'system', content: AGENT_INSTRUCTIONS + `\n\n${languagePrompt}` },
-                ...ctx.session.temp.aiChatHistory.slice(-10), // Last 10 messages
-              ];
-
-              completion = await mistral.chat.complete({ model: process.env.MISTRAL_MODEL || 'mistral-small-latest', messages, maxTokens: parseInt(process.env.MISTRAL_MAX_TOKENS || '500', 10), temperature: 0.7 });
-
-              aiResponse = completion.choices[0].message.content;
-            }
+            const aiResponse = await chatWithCristina({
+              systemPrompt: `${AGENT_INSTRUCTIONS}\n\n${languagePrompt}`,
+              messages,
+              maxTokens: parseInt(process.env.CRISTINA_MAX_TOKENS || '500', 10),
+              temperature: 0.7,
+            });
 
             // Add AI response to history
             ctx.session.temp.aiChatHistory.push({ role: 'assistant', content: aiResponse });
@@ -559,7 +493,7 @@ const registerSupportHandlers = (bot) => {
 
             await ctx.reply(`${aiResponse}${footer}`, replyOptions);
           } catch (aiError) {
-            logger.error('Mistral AI error:', aiError);
+            logger.error('Cristina AI Grok error:', aiError);
             try { await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id); } catch (e) { /* ignore */ }
             await ctx.reply(lang === 'es' ? '❌ Lo siento, encontré un error. Por favor intenta de nuevo.' : '❌ Sorry, I encountered an error. Please try again.');
           }

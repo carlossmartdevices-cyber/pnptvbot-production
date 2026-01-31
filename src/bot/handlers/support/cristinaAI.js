@@ -1,28 +1,14 @@
 /**
  * Cristina AI Support Agent
- * Provides AI-powered support and assistance using Mistral AI
+ * Provides AI-powered support and assistance using Grok
  */
 
 const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
 const { detectLanguage } = require('../../../utils/languageDetector');
+const { chatWithCristina, isCristinaAIAvailable } = require('../../services/cristinaAIService');
 
-// Mistral AI integration
-let mistral = null;
-let AGENT_ID = null;
-
-try {
-  const { Mistral } = require('@mistralai/mistralai');
-  if (process.env.MISTRAL_API_KEY) {
-    mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
-    AGENT_ID = process.env.MISTRAL_AGENT_ID || null;
-    logger.info('Cristina AI: Mistral AI initialized');
-  }
-} catch (error) {
-  logger.warn('Cristina AI: Mistral AI package not installed, using keyword fallback');
-}
-
-// Agent instructions for Mistral
+// Agent instructions for Cristina
 const AGENT_INSTRUCTIONS = `You are Cristina, the PNPtv Customer Support AI Assistant - a professional, helpful, and friendly support chatbot.
 
 🎯 YOUR ROLE
@@ -372,42 +358,26 @@ If the issue persists, use /support to contact a human.`;
 }
 
 /**
- * Process a question and generate a response using Mistral AI or keyword fallback
+ * Process a question and generate a response using Grok or keyword fallback
  */
 async function processQuestion(question, lang, userId) {
-  // Try Mistral AI first
-  if (mistral) {
+  // Try Grok first
+  if (isCristinaAIAvailable()) {
     try {
       const languagePrompt = lang === 'es' ? 'Responde en español.' : 'Respond in English.';
-
-      let aiResponse;
-      if (AGENT_ID) {
-        // Use Agents API
-        const completion = await mistral.agents.complete({
-          agentId: AGENT_ID,
-          messages: [{ role: 'user', content: `${languagePrompt}\n\n${question}` }],
-        });
-        aiResponse = completion.choices?.[0]?.message?.content || completion.message?.content;
-      } else {
-        // Use Chat Completions API
-        const completion = await mistral.chat.complete({
-          model: process.env.MISTRAL_MODEL || 'mistral-small-latest',
-          messages: [
-            { role: 'system', content: `${AGENT_INSTRUCTIONS}\n\n${languagePrompt}` },
-            { role: 'user', content: question },
-          ],
-          maxTokens: parseInt(process.env.MISTRAL_MAX_TOKENS || '500', 10),
-          temperature: 0.7,
-        });
-        aiResponse = completion.choices[0].message.content;
-      }
+      const aiResponse = await chatWithCristina({
+        systemPrompt: `${AGENT_INSTRUCTIONS}\n\n${languagePrompt}`,
+        messages: [{ role: 'user', content: question }],
+        maxTokens: parseInt(process.env.CRISTINA_MAX_TOKENS || '500', 10),
+        temperature: 0.7,
+      });
 
       if (aiResponse) {
-        logger.info(`Cristina AI: Mistral response generated for user ${userId}`);
+        logger.info(`Cristina AI: Grok response generated for user ${userId}`);
         return aiResponse;
       }
     } catch (aiError) {
-      logger.error('Cristina AI: Mistral error, falling back to keywords:', aiError.message);
+      logger.error('Cristina AI: Grok error, falling back to keywords:', aiError.message);
     }
   }
 
