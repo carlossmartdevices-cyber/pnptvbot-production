@@ -79,6 +79,7 @@ const TutorialReminderService = require('../services/tutorialReminderService');
 const MessageRateLimiter = require('../services/messageRateLimiter');
 const radioStreamManager = require('../../services/radio/radioStreamManager');
 const CommunityPostScheduler = require('./schedulers/communityPostScheduler');
+const XPostScheduler = require('./schedulers/xPostScheduler');
 const { initializeWorker: initializePrivateCallsWorker } = require('../../workers/privateCallsWorker');
 const PNPLiveWorker = require('../../workers/pnpLiveWorker');
 const { startCronJobs } = require('../../../scripts/cron');
@@ -490,6 +491,16 @@ const startBot = async () => {
       logger.info('✓ Community post scheduler initialized and started');
     } catch (error) {
       logger.warn('Community post scheduler initialization failed, continuing without community posts:', error.message);
+    }
+
+    // Initialize X post scheduler
+    try {
+      const xPostScheduler = new XPostScheduler();
+      xPostScheduler.start();
+      global.xPostScheduler = xPostScheduler;
+      logger.info('✓ X post scheduler initialized and started');
+    } catch (error) {
+      logger.warn('X post scheduler initialization failed, continuing without X posts:', error.message);
     }
 
     // Initialize proactive reminder service
