@@ -6,6 +6,7 @@
 const ComprehensiveAvailabilityService = require('./comprehensiveAvailabilityService');
 const BookingModel = require('../models/bookingModel');
 const logger = require('../utils/logger');
+const { getClient } = require('../config/postgres');
 
 class BookingAvailabilityIntegration {
   /**
@@ -103,7 +104,10 @@ class BookingAvailabilityIntegration {
       );
 
       // Update booking status
-      const updatedBooking = await BookingModel.updateStatus(bookingId, 'confirmed');
+      const updatedResult = await BookingModel.updateStatus(bookingId, 'confirmed');
+      if (!updatedResult.success) {
+        throw new Error(updatedResult.error || 'Failed to update booking status');
+      }
 
       logger.info('Booking completed and availability slot booked', {
         bookingId,
@@ -112,7 +116,7 @@ class BookingAvailabilityIntegration {
       });
 
       return {
-        booking: updatedBooking,
+        booking: updatedResult.booking,
         availabilitySlot: bookedSlot
       };
     } catch (error) {
@@ -132,7 +136,10 @@ class BookingAvailabilityIntegration {
   static async cancelBooking(bookingId, availabilityId, userId, reason) {
     try {
       // Cancel the booking
-      const cancelledBooking = await BookingModel.cancel(bookingId, userId, reason);
+      const cancelledResult = await BookingModel.cancel(bookingId, reason, userId);
+      if (!cancelledResult.success) {
+        throw new Error(cancelledResult.error || 'Failed to cancel booking');
+      }
 
       // Release the held slot
       const releasedSlot = await ComprehensiveAvailabilityService.releaseHeldSlot(availabilityId);
@@ -145,7 +152,7 @@ class BookingAvailabilityIntegration {
       });
 
       return {
-        booking: cancelledBooking,
+        booking: cancelledResult.booking,
         availabilitySlot: releasedSlot
       };
     } catch (error) {
@@ -392,11 +399,7 @@ class BookingAvailabilityIntegration {
         const proposedStart = new Date(startTime);
         const proposedEnd = new Date(endTime);
 
-        return (
-          (bookingStart < proposedEnd && bookingEnd > proposedStart) ||
-          (bookingStart < proposedEnd && bookingEnd > proposedStart) ||
-          (bookingStart >= proposedStart && bookingEnd <= proposedEnd)
-        );
+        return bookingStart < proposedEnd && bookingEnd > proposedStart;
       });
 
       return {
@@ -485,11 +488,14 @@ class BookingAvailabilityIntegration {
         }
 
         // Update booking
-        const updatedBooking = await BookingModel.update(bookingId, {
+        const updatedResult = await BookingModel.update(bookingId, {
           startTimeUtc: newStartTime,
           durationMinutes: newDurationMinutes,
           availabilityId: newAvailabilitySlot.id
         });
+        if (!updatedResult.success) {
+          throw new Error(updatedResult.error || 'Failed to update booking');
+        }
 
         await client.query('COMMIT');
 
@@ -504,7 +510,7 @@ class BookingAvailabilityIntegration {
         return {
           success: true,
           oldBooking: currentBooking,
-          newBooking: updatedBooking,
+          newBooking: updatedResult.booking,
           newAvailabilitySlot
         };
       } catch (error) {
@@ -583,7 +589,12 @@ class BookingAvailabilityIntegration {
   static _calculateConfirmedRevenue(bookings) {
     return bookings.reduce((total, booking) => {
       if (booking.status === 'confirmed' || booking.status === 'completed') {
-        return total + (booking.price_usd * 100); // Convert to cents
+        if (booking.priceCents !== undefined) {
+          return total + Number(booking.priceCents || 0);
+        }
+        if (booking.price_usd !== undefined) {
+          return total + Number(booking.price_usd || 0) * 100;
+        }
       }
       return total;
     }, 0);

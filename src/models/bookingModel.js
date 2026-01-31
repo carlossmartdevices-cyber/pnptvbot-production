@@ -228,6 +228,111 @@ class BookingModel {
   // =====================================================
 
   /**
+   * Update booking fields (partial update)
+   */
+  static async update(bookingId, updates = {}) {
+    try {
+      const current = await this.getById(bookingId);
+      if (!current) {
+        return { success: false, error: 'booking_not_found' };
+      }
+
+      const fields = [];
+      const values = [];
+      let paramIndex = 1;
+
+      const setField = (field, value) => {
+        fields.push(`${field} = $${paramIndex++}`);
+        values.push(value);
+      };
+
+      if (updates.callType) {
+        setField('call_type', updates.callType);
+      }
+
+      if (updates.durationMinutes) {
+        setField('duration_minutes', updates.durationMinutes);
+      }
+
+      if (updates.priceCents !== undefined) {
+        setField('price_cents', updates.priceCents);
+      }
+
+      if (updates.currency) {
+        setField('currency', updates.currency);
+      }
+
+      if (updates.slotId) {
+        setField('slot_id', updates.slotId);
+      }
+
+      if (updates.status) {
+        setField('status', updates.status);
+      }
+
+      if (updates.startTimeUtc) {
+        setField('start_time_utc', updates.startTimeUtc);
+      }
+
+      if (updates.durationMinutes || updates.startTimeUtc) {
+        const startTime = updates.startTimeUtc || current.startTimeUtc;
+        const durationMinutes = updates.durationMinutes || current.durationMinutes;
+        const endTime = new Date(new Date(startTime).getTime() + durationMinutes * 60 * 1000);
+        setField('end_time_utc', endTime.toISOString());
+      }
+
+      if (fields.length === 0) {
+        return { success: true, booking: current };
+      }
+
+      const sql = `
+        UPDATE ${BOOKINGS_TABLE}
+        SET ${fields.join(', ')}, updated_at = NOW()
+        WHERE id = $${paramIndex}
+        RETURNING *
+      `;
+      values.push(bookingId);
+
+      const result = await query(sql, values);
+
+      if (result.rows.length === 0) {
+        return { success: false, error: 'booking_not_found' };
+      }
+
+      return { success: true, booking: this.mapRowToBooking(result.rows[0]) };
+    } catch (error) {
+      logger.error('Error updating booking:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Update booking status
+   */
+  static async updateStatus(bookingId, status) {
+    try {
+      const sql = `
+        UPDATE ${BOOKINGS_TABLE}
+        SET status = $2,
+            hold_expires_at = CASE WHEN $2 IN ('confirmed', 'cancelled', 'completed', 'expired', 'no_show') THEN NULL ELSE hold_expires_at END,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+      `;
+      const result = await query(sql, [bookingId, status]);
+
+      if (result.rows.length === 0) {
+        return { success: false, error: 'booking_not_found' };
+      }
+
+      return { success: true, booking: this.mapRowToBooking(result.rows[0]) };
+    } catch (error) {
+      logger.error('Error updating booking status:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Hold a booking slot for X minutes
    */
   static async hold(bookingId, holdMinutes = 10) {
