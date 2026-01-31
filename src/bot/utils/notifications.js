@@ -1,4 +1,8 @@
 const logger = require('../../utils/logger');
+const {
+  getGroupRedirectNotification,
+  getRequirePrivateChatPrompt,
+} = require('../../config/groupMessages');
 
 /**
  * Send notification to group chat that user was redirected to private chat
@@ -6,7 +10,7 @@ const logger = require('../../utils/logger');
 async function notifyGroupRedirect(ctx, commandName) {
   try {
     const username = ctx.from.username ? `@${ctx.from.username}` : ctx.from.first_name;
-    const message = `${username}, I sent you a private message about ${commandName}!`;
+    const message = getGroupRedirectNotification({ username, commandName });
 
     await ctx.reply(message, {
       reply_to_message_id: ctx.message?.message_id,
@@ -49,9 +53,12 @@ async function requirePrivateChat(ctx, commandName, privateMessage, options = {}
       return false; // Indicates command was redirected
     } catch (error) {
       // User might not have started the bot
+      const userDisplay = ctx.from.username ? '@' + ctx.from.username : ctx.from.first_name;
       await ctx.reply(
-        `${ctx.from.username ? '@' + ctx.from.username : ctx.from.first_name}, ` +
-        `please start a private chat with me first by clicking here: https://t.me/${ctx.botInfo.username}`,
+        getRequirePrivateChatPrompt({
+          username: userDisplay,
+          botUsername: ctx.botInfo?.username,
+        }),
         { reply_to_message_id: ctx.message?.message_id }
       );
       return false;

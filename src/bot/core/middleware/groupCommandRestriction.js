@@ -13,6 +13,10 @@ const { Markup } = require('telegraf');
 const ChatCleanupService = require('../../services/chatCleanupService');
 const PermissionService = require('../../services/permissionService');
 const { getLanguage } = require('../../utils/helpers');
+const {
+  getCristinaRedirectMessage,
+  getGroupMenuTitle,
+} = require('../../../config/groupMessages');
 
 const GROUP_ID = process.env.GROUP_ID;
 const WALL_OF_FAME_TOPIC_ID = parseInt(process.env.WALL_OF_FAME_TOPIC_ID || '3132', 10);
@@ -61,36 +65,13 @@ const COMMAND_DEEP_LINKS = {
 };
 
 /**
- * Get Cristina's redirect message based on language
- * Cristina messages are NOT auto-deleted - they stay visible
- */
-function getCristinaRedirectMessage(username, lang, botUsername, deepLink = 'home') {
-  const pmLink = `https://t.me/${botUsername}?start=${deepLink}`;
-  const CRISTINA_EMOJI = '🧜‍♀️';
-
-  if (lang === 'es') {
-    return {
-      text: `${CRISTINA_EMOJI} @${username} gracias por usar nuestro bot. Por favor revisa @${botUsername} para mas informacion.\n\nRecuerda enviar "Ey Cristina" si tienes alguna pregunta.`,
-      button: Markup.button.url('Abrir Bot', pmLink),
-    };
-  }
-
-  return {
-    text: `${CRISTINA_EMOJI} @${username} thank you for using our bot. Please check @${botUsername} for more info.\n\nRemember to send "Hey Cristina" if you have a question.`,
-    button: Markup.button.url('Open Bot', pmLink),
-  };
-}
-
-/**
  * Build group menu with deep links (no callbacks)
  */
 function buildGroupMenuWithDeepLinks(ctx) {
   const lang = getLanguage(ctx);
   const botUsername = ctx.botInfo?.username || BOT_USERNAME;
 
-  const text = lang === 'es'
-    ? `PNPtv - Selecciona una opcion:`
-    : `PNPtv - Choose an option:`;
+  const text = getGroupMenuTitle(lang);
 
   const buttons = [
     [
@@ -228,17 +209,26 @@ const groupCommandRestrictionMiddleware = () => {
             const deepLink = COMMAND_DEEP_LINKS[command] || 'home';
 
             try {
-              const cristina = getCristinaRedirectMessage(username, lang, botUsername, deepLink);
+              const cristina = getCristinaRedirectMessage({
+                username,
+                lang,
+                botUsername,
+                deepLink,
+              });
               let replyMsg;
               try {
                 replyMsg = await ctx.reply(cristina.text, {
                   reply_to_message_id: ctx.message.message_id,
-                  ...Markup.inlineKeyboard([[cristina.button]]),
+                  ...Markup.inlineKeyboard([
+                    [Markup.button.url(cristina.buttonText, cristina.buttonUrl)],
+                  ]),
                 });
               } catch (replyError) {
                 // If reply fails (message deleted), send without reply
                 replyMsg = await ctx.reply(cristina.text, {
-                  ...Markup.inlineKeyboard([[cristina.button]]),
+                  ...Markup.inlineKeyboard([
+                    [Markup.button.url(cristina.buttonText, cristina.buttonUrl)],
+                  ]),
                 });
               }
 

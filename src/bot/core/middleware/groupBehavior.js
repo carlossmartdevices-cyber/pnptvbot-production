@@ -1,6 +1,10 @@
 const logger = require('../../../utils/logger');
 const ChatCleanupService = require('../../services/chatCleanupService');
 const PermissionService = require('../../services/permissionService');
+const {
+  getPersonalInfoRedirect,
+  getCallbackRedirectText,
+} = require('../../../config/groupMessages');
 
 const GROUP_ID = process.env.GROUP_ID;
 const PRIME_CHANNEL_ID = process.env.PRIME_CHANNEL_ID;
@@ -331,12 +335,7 @@ function cristinaGroupFilterMiddleware() {
 
     if (containsPersonalInfo) {
       const userLang = ctx.from?.language_code || 'en';
-      const isSpanish = userLang.startsWith('es');
-      const CRISTINA_EMOJI = '🧜‍♀️';
-
-      const redirectMessage = isSpanish
-        ? `${CRISTINA_EMOJI} Esta pregunta contiene información personal. Por favor, contáctame en privado para proteger tu privacidad.`
-        : `${CRISTINA_EMOJI} This question contains personal information. Please contact me privately to protect your privacy.`;
+      const redirectMessage = getPersonalInfoRedirect(userLang);
 
       // Delete original message
       try {
@@ -394,7 +393,6 @@ function groupCallbackRedirectMiddleware() {
 
     const callbackData = ctx.callbackQuery.data || '';
     const userLang = ctx.from?.language_code || 'en';
-    const isSpanish = userLang.startsWith('es');
     const botUsername = ctx.botInfo?.username || 'PNPLatinoTV_bot';
 
     // Map callback actions to deep links
@@ -422,9 +420,7 @@ function groupCallbackRedirectMiddleware() {
       const pmLink = `https://t.me/${botUsername}?start=${deepLink}`;
 
       // Answer callback with redirect message
-      const redirectText = isSpanish
-        ? `Por favor usa el bot en privado para esta funcion`
-        : `Please use the bot in private for this feature`;
+      const redirectText = getCallbackRedirectText(userLang);
 
       try {
         await ctx.answerCbQuery(redirectText, { show_alert: false, url: pmLink });

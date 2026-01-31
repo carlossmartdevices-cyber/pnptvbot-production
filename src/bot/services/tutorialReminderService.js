@@ -132,7 +132,11 @@ class TutorialReminderService {
 💰 $14.99/semana
 🔥 HOT PNP LIFETIME: $100 → pnptv.app/lifetime100
 
-📸 ¡Comparte fotos y sé la LEYENDA PNPtv DEL DÍA! Gana 1 día PRIME gratis.`;
+📸 Comparte fotos para competir por títulos del culto diarios:
+• High Legend of the Cult (más interacciones) = 3 días PRIME
+• Tribute of the Cult (nuevo miembro en 3 horas)
+• The Loyal Disciple (más fotos del día)
+🎉 Con un badge del culto quedas invitado a la Meth Gala de fin de mes.`;
 
     try {
       // Atomic check and record to prevent race conditions

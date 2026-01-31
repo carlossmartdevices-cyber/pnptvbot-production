@@ -20,6 +20,7 @@ const playlistController = require('./controllers/playlistController');
 const podcastController = require('./controllers/podcastController');
 const healthController = require('./controllers/healthController');
 const hangoutsController = require('./controllers/hangoutsController');
+const xOAuthRoutes = require('./xOAuthRoutes');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -960,6 +961,7 @@ app.get('/api/radio/playlist', asyncHandler(async (req, res) => {
 // Broadcast Queue API Routes
 const broadcastQueueRoutes = require('./broadcastQueueRoutes');
 app.use('/api/admin/queue', broadcastQueueRoutes);
+app.use('/api/admin/x/oauth', xOAuthRoutes);
 
 // Health Check and Monitoring Endpoints
 // Health check endpoints should be accessible but with reasonable rate limits

@@ -1,6 +1,7 @@
 const { Markup } = require('telegraf');
 const UserModel = require('../../../models/userModel');
 const ChatCleanupService = require('../../services/chatCleanupService');
+const { cache } = require('../../../config/redis');
 const logger = require('../../../utils/logger');
 
 // Authorized group ID from environment
@@ -144,6 +145,8 @@ async function processNewMember(ctx, member) {
     const lang = user.language || 'en';
     const username = member.first_name || 'Friend';
 
+    await cache.set(`group_joined_at:${userId}`, { joinedAt: new Date().toISOString() }, 3 * 60 * 60);
+
     // Send welcome message
     await sendWelcomeMessage(ctx, username, user, lang);
 
@@ -218,7 +221,10 @@ Aquí la vuelta es simple: gente real, buena vibra, cero filtro.
 💰 $14.99/semana
 🔥 HOT PNP LIFETIME: $100 → pnptv.app/lifetime100
 
-📸 ¡Comparte fotos y sé la LEYENDA PNPtv DEL DÍA! Gana 1 día PRIME gratis.
+📸 Comparte fotos para competir por títulos del culto diarios:
+• High Legend of the Cult (más interacciones) = 3 días PRIME
+• Tribute of the Cult (nuevo miembro rápido)
+• The Loyal Disciple (más fotos)
 👉 /subscribe`
       : `👋 Hey ${username}, welcome to PNPtv!
 
@@ -240,7 +246,10 @@ This place is simple: real people, real vibes, no filters.
 💰 $14.99/week
 🔥 HOT PNP LIFETIME: $100 → pnptv.app/lifetime100
 
-📸 Share pics and be the PNPtv LEGEND OF THE DAY! Win 1 day FREE PRIME.
+📸 Share pics to compete for daily cult titles:
+• High Legend of the Cult (most interactions) = 3 days PRIME
+• Tribute of the Cult (fast new member)
+• The Loyal Disciple (most photos)
 👉 /subscribe`;
 
     const sentMessage = await ctx.reply(message, { parse_mode: 'Markdown' });
@@ -312,30 +321,34 @@ async function sendPhotoSharingInvitation(ctx, username, lang) {
     const message = lang === 'es'
       ? `📸 ¡COMPARTE TU ESTILO Y GANA! 📸
 
-💡 ¿Sabías que puedes ser la próxima LEYENDA PNPtv DEL DÍA?
+🏆 Títulos diarios del culto:
+• High Legend of the Cult = más interacciones (3 días PRIME)
+• Tribute of the Cult = nuevo miembro en 3 horas
+• The Loyal Disciple = más fotos del día
 
-🏆 Cada día seleccionamos UN miembro para ser destacado
-🎁 El ganador recibe 1 DÍA GRATIS de acceso PRIME
-📢 Tu foto/video será publicada en el Muro de la Fama
+📢 Tu foto/video se publica en el Muro de la Fama
+🎉 Con un badge del culto quedas invitado a la Meth Gala de fin de mes
 
-👉 Simplemente sube fotos/videos de calidad en el grupo
+👉 Sube fotos/videos de calidad en el grupo
 👉 Usa tu mejor energía y estilo
 👉 ¡Sé auténtico y destaca!
 
-💎 ¿Listo para ser el próximo? ¡Sube tu mejor contenido ahora!`
+💎 ¿Listo para competir? ¡Sube tu mejor contenido ahora!`
       : `📸 SHARE YOUR STYLE AND WIN! 📸
 
-💡 Did you know you can be the next PNPtv LEGEND OF THE DAY?
+🏆 Daily cult titles:
+• High Legend of the Cult = most interactions (3 days PRIME)
+• Tribute of the Cult = new member within 3 hours
+• The Loyal Disciple = most photos of the day
 
-🏆 We select ONE member daily to be featured
-🎁 The winner gets 1 FREE DAY of PRIME access
-📢 Your photo/video will be posted on the Wall of Fame
+📢 Your photo/video is posted on the Wall of Fame
+🎉 Any cult-title badge invites you to the Meth Gala at month end
 
-👉 Just upload quality photos/videos in the group
+👉 Upload quality photos/videos in the group
 👉 Show your best energy and style
 👉 Be authentic and stand out!
 
-💎 Ready to be next? Upload your best content now!`;
+💎 Ready to compete? Upload your best content now!`;
 
     const sentMessage = await ctx.reply(message);
     ChatCleanupService.scheduleMenuMessage(ctx.telegram, sentMessage);

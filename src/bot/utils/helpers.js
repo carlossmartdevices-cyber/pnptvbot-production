@@ -27,32 +27,29 @@ const isAdminUser = (userId) => {
 const getLanguage = (ctx) => ctx.session?.language || 'en';
 
 /**
+ * Normalize subscription status into access state
+ * PRIME access is based solely on active status.
+ * @param {string} status - Raw subscription status
+ * @returns {'active'|'inactive'} Normalized access state
+ */
+const normalizeSubscriptionStatus = (status) => {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'active' || normalized === 'prime' || normalized === 'trial') {
+    return 'active';
+  }
+  return 'inactive';
+};
+
+/**
  * Check if user has PRIME/active membership
- * Unified logic: prime = active, churned = free = not active
- * Checks both tier and subscriptionStatus for consistency
- * @param {Object} user - User object with subscriptionStatus and/or tier
+ * Unified logic: active = PRIME access, everything else is inactive.
+ * @param {Object} user - User object with subscriptionStatus
  * @returns {boolean} True if user has active PRIME membership
  */
 const isPrimeUser = (user) => {
   if (!user) return false;
-
-  // Check subscription status (primary indicator)
-  const status = (user.subscriptionStatus || user.subscription_status || '').toLowerCase();
-
-  // Check tier (secondary indicator)
-  const tier = (user.tier || '').toLowerCase();
-
-  // User is PRIME if:
-  // - subscription_status is 'active' or 'prime'
-  // - OR tier is 'prime'
-  // User is NOT PRIME if:
-  // - subscription_status is 'free', 'churned', or empty
-  // - AND tier is 'free' or empty
-
-  const isActiveStatus = status === 'active' || status === 'prime';
-  const isPrimeTier = tier === 'prime';
-
-  return isActiveStatus || isPrimeTier;
+  const status = user.subscriptionStatus || user.subscription_status;
+  return normalizeSubscriptionStatus(status) === 'active';
 };
 
 /**
@@ -285,6 +282,7 @@ const safeAnswerCbQuery = async (ctx, text = '', showAlert = false) => {
 
 module.exports = {
   getLanguage,
+  normalizeSubscriptionStatus,
   isPrimeUser,
   isAdminUser,
   hasFullAccess,

@@ -263,6 +263,56 @@ CREATE INDEX IF NOT EXISTS idx_live_streams_host_id ON live_streams(host_id);
 CREATE INDEX IF NOT EXISTS idx_live_streams_status ON live_streams(status);
 CREATE INDEX IF NOT EXISTS idx_live_streams_scheduled_at ON live_streams(scheduled_at);
 
+-- X (Twitter) accounts and scheduled posts
+CREATE TABLE IF NOT EXISTS x_accounts (
+  account_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  x_user_id VARCHAR(40),
+  handle VARCHAR(50) NOT NULL,
+  display_name VARCHAR(120),
+  encrypted_access_token TEXT NOT NULL,
+  encrypted_refresh_token TEXT,
+  token_expires_at TIMESTAMP,
+  created_by BIGINT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_x_accounts_handle ON x_accounts(handle);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_x_accounts_user_id ON x_accounts(x_user_id);
+CREATE INDEX IF NOT EXISTS idx_x_accounts_active ON x_accounts(is_active);
+
+CREATE TABLE IF NOT EXISTS x_oauth_states (
+  state VARCHAR(64) PRIMARY KEY,
+  code_verifier TEXT NOT NULL,
+  admin_id BIGINT,
+  admin_username VARCHAR(100),
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_x_oauth_states_expires_at ON x_oauth_states(expires_at);
+
+CREATE TABLE IF NOT EXISTS x_post_jobs (
+  post_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  account_id UUID NOT NULL REFERENCES x_accounts(account_id) ON DELETE CASCADE,
+  admin_id BIGINT,
+  admin_username VARCHAR(100),
+  text TEXT NOT NULL,
+  media_url TEXT,
+  scheduled_at TIMESTAMP,
+  status VARCHAR(20) DEFAULT 'scheduled',
+  response_json JSONB,
+  error_message TEXT,
+  sent_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_x_post_jobs_status ON x_post_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_x_post_jobs_scheduled_at ON x_post_jobs(scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_x_post_jobs_account_id ON x_post_jobs(account_id);
+
 -- Radio stations table
 CREATE TABLE IF NOT EXISTS radio_stations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -325,38 +375,58 @@ CREATE TABLE IF NOT EXISTS promo_codes (
 CREATE INDEX IF NOT EXISTS idx_promo_codes_code ON promo_codes(code);
 CREATE INDEX IF NOT EXISTS idx_promo_codes_active ON promo_codes(active);
 
--- Gamification table
-CREATE TABLE IF NOT EXISTS gamification (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+-- Wall of Fame tracking
+CREATE TABLE IF NOT EXISTS wall_of_fame_posts (
+  id SERIAL PRIMARY KEY,
+  group_id BIGINT NOT NULL,
+  message_id BIGINT NOT NULL,
   user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-
-  -- Points & Levels
-  points INTEGER DEFAULT 0,
-  level INTEGER DEFAULT 1,
-
-  -- Achievements
-  achievements JSONB DEFAULT '[]'::jsonb,
-
-  -- Streaks
-  login_streak INTEGER DEFAULT 0,
-  last_login_date DATE,
-
-  -- Activity stats
-  total_calls INTEGER DEFAULT 0,
-  total_messages INTEGER DEFAULT 0,
-  referrals_count INTEGER DEFAULT 0,
-
-  -- Metadata
+  date_key DATE NOT NULL,
+  reactions_count INTEGER DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-  UNIQUE(user_id)
+  UNIQUE(group_id, message_id)
 );
 
--- Indexes for gamification
-CREATE INDEX IF NOT EXISTS idx_gamification_user_id ON gamification(user_id);
-CREATE INDEX IF NOT EXISTS idx_gamification_points ON gamification(points);
-CREATE INDEX IF NOT EXISTS idx_gamification_level ON gamification(level);
+CREATE TABLE IF NOT EXISTS wall_of_fame_daily_stats (
+  date_key DATE NOT NULL,
+  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  photos_shared INTEGER DEFAULT 0,
+  reactions_received INTEGER DEFAULT 0,
+  is_new_member BOOLEAN DEFAULT FALSE,
+  first_post_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (date_key, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS wall_of_fame_daily_winners (
+  date_key DATE PRIMARY KEY,
+  legend_user_id VARCHAR(255) REFERENCES users(id) ON DELETE SET NULL,
+  new_member_user_id VARCHAR(255) REFERENCES users(id) ON DELETE SET NULL,
+  active_user_id VARCHAR(255) REFERENCES users(id) ON DELETE SET NULL,
+  processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_wall_of_fame_posts_group ON wall_of_fame_posts(group_id);
+CREATE INDEX IF NOT EXISTS idx_wall_of_fame_posts_date ON wall_of_fame_posts(date_key);
+CREATE INDEX IF NOT EXISTS idx_wall_of_fame_stats_reactions ON wall_of_fame_daily_stats(reactions_received);
+
+CREATE TABLE IF NOT EXISTS cult_event_registrations (
+  id SERIAL PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  event_type VARCHAR(50) NOT NULL,
+  month_key VARCHAR(7) NOT NULL,
+  event_at TIMESTAMP NOT NULL,
+  status VARCHAR(20) DEFAULT 'registered',
+  claimed_at TIMESTAMP,
+  reminder_7d_sent BOOLEAN DEFAULT FALSE,
+  reminder_3d_sent BOOLEAN DEFAULT FALSE,
+  reminder_day_sent BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, event_type, month_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cult_event_registrations_event ON cult_event_registrations(event_type, event_at);
 
 -- Moderation table
 CREATE TABLE IF NOT EXISTS moderation (
@@ -487,4 +557,3 @@ CREATE TRIGGER update_call_packages_updated_at BEFORE UPDATE ON call_packages FO
 CREATE TRIGGER update_live_streams_updated_at BEFORE UPDATE ON live_streams FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_radio_stations_updated_at BEFORE UPDATE ON radio_stations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_promo_codes_updated_at BEFORE UPDATE ON promo_codes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_gamification_updated_at BEFORE UPDATE ON gamification FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
