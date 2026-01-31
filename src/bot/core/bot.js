@@ -54,7 +54,6 @@ const registerAccessControlHandlers = require('../handlers/moderation/accessCont
 const registerJitsiModeratorHandlers = require('../handlers/moderation/jitsiModerator');
 const registerCallManagementHandlers = require('../handlers/admin/callManagement');
 const registerRoleManagementHandlers = require('../handlers/admin/roleManagement');
-<<<<<<< HEAD
 const registerPerformerManagementHandlers = require('../handlers/admin/performerManagement');
 const registerLiveStreamManagementHandlers = require('../handlers/admin/liveStreamManagement');
 const registerRadioManagementHandlers = require('../handlers/admin/radioManagement');
