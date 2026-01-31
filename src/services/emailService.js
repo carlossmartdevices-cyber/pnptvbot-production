@@ -267,7 +267,7 @@ class EmailService {
      * @returns {Promise<Object>} Send result
      */
     async sendReactivationEmail(data) {
-        const { email, userName = 'PNP Latino Member', lifetimeDealLink, telegramLink, userLanguage = 'es' } = data;
+        const { email, userName = 'PNP Latino Member', lifetimeDealLink, telegramLink, userLanguage = 'en' } = data;
 
         const subject = userLanguage === 'es' ? '🔥 PNP Latino TV Está de Vuelta 🔥' : '🔥 PNP Latino TV IS BACK 🔥';
         const html = this.getReactivationEmailTemplate({ lifetimeDealLink, telegramLink, language: userLanguage });
