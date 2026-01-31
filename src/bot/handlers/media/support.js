@@ -171,6 +171,9 @@ const registerSupportHandlers = (bot) => {
           [Markup.button.callback('👤 Contact Santino', 'support_contact_admin')],
           [Markup.button.callback('🎁 Request Activation', 'support_request_activation')],
           [Markup.button.callback('❓ FAQ', 'support_faq')],
+          [
+            Markup.button.callback(lang === 'es' ? '🔄 Migrar Lifetime del viejo PNPtv' : '🔄 Migrate Lifetime from old PNPtv', 'migrate_lifetime_start'),
+          ],
           [Markup.button.callback('🔙 Back', 'back_to_main')],
         ]),
       });

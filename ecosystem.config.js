@@ -13,11 +13,13 @@ module.exports = {
       NODE_ENV: 'production',
       PORT: '3001',
       NODE_OPTIONS: '--dns-result-order=ipv4first',
+      BOT_LOCK_ENABLED: 'false',
     },
     env_production: {
       NODE_ENV: 'production',
       PORT: '3001',
       NODE_OPTIONS: '--dns-result-order=ipv4first',
+      BOT_LOCK_ENABLED: 'false',
     },
     env_development: {
       NODE_ENV: 'development',

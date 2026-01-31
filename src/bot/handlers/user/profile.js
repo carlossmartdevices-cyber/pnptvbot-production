@@ -38,14 +38,27 @@ const registerProfileHandlers = (bot) => {
     }
   });
 
-  // Edit Profile (consolidated menu)
-  bot.action(['edit_profile', 'edit_profile_info'], async (ctx) => {
+  // Edit Profile (consolidated overview)
+  bot.action('show_edit_profile_overview', async (ctx) => {
     try {
       await ctx.answerCbQuery();
       const lang = getLanguage(ctx);
-      await showEditProfileMenu(ctx, lang);
+      await showEditProfileOverview(ctx, lang);
     } catch (error) {
-      logger.error('Error showing edit profile menu:', error);
+      logger.error('Error showing edit profile overview menu:', error);
+    }
+  });
+
+
+
+  // Show settings overview
+  bot.action('show_settings_overview', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const lang = getLanguage(ctx);
+      await showSettingsOverview(ctx, lang);
+    } catch (error) {
+      logger.error('Error showing settings overview:', error);
     }
   });
 
@@ -136,6 +149,15 @@ const registerProfileHandlers = (bot) => {
       await unblockUser(ctx, targetUserId);
     } catch (error) {
       logger.error('Error unblocking user:', error);
+    }
+  });
+
+  // Share Profile Directly
+  bot.action('share_profile_direct', async (ctx) => {
+    try {
+      await shareProfileDirect(ctx);
+    } catch (error) {
+      logger.error('Error sharing profile directly:', error);
     }
   });
 
@@ -418,7 +440,7 @@ const registerProfileHandlers = (bot) => {
       ctx.session.temp.waitingForBio = false;
       await ctx.saveSession();
       await ctx.reply(t('bioUpdated', lang));
-      await showEditProfileMenu(ctx, lang);
+      await showEditProfileOverview(ctx, lang);
       return;
     }
 
@@ -432,7 +454,7 @@ const registerProfileHandlers = (bot) => {
       ctx.session.temp.waitingForInterests = false;
       await ctx.saveSession();
       await ctx.reply(t('interestsUpdated', lang));
-      await showEditProfileMenu(ctx, lang);
+      await showEditProfileOverview(ctx, lang);
       return;
     }
 
@@ -450,7 +472,7 @@ const registerProfileHandlers = (bot) => {
       }
       ctx.session.temp.waitingForTribe = false;
       await ctx.saveSession();
-      await showEditProfileMenu(ctx, lang);
+      await showEditProfileOverview(ctx, lang);
       return;
     }
 
@@ -468,7 +490,7 @@ const registerProfileHandlers = (bot) => {
       }
       ctx.session.temp.waitingForLookingFor = false;
       await ctx.saveSession();
-      await showEditProfileMenu(ctx, lang);
+      await showEditProfileOverview(ctx, lang);
       return;
     }
 
@@ -486,7 +508,7 @@ const registerProfileHandlers = (bot) => {
       }
       ctx.session.temp.waitingForCity = false;
       await ctx.saveSession();
-      await showEditProfileMenu(ctx, lang);
+      await showEditProfileOverview(ctx, lang);
       return;
     }
 
@@ -504,7 +526,7 @@ const registerProfileHandlers = (bot) => {
       }
       ctx.session.temp.waitingForCountry = false;
       await ctx.saveSession();
-      await showEditProfileMenu(ctx, lang);
+      await showEditProfileOverview(ctx, lang);
       return;
     }
 
@@ -541,9 +563,9 @@ const registerProfileHandlers = (bot) => {
 };
 
 /**
- * Show consolidated edit profile menu
+ * Show consolidated edit profile overview menu
  */
-const showEditProfileMenu = async (ctx, lang) => {
+const showEditProfileOverview = async (ctx, lang) => {
   try {
     const user = await UserModel.getById(ctx.from.id);
     if (!user) { await ctx.reply(t('error', lang)); return; }
@@ -624,7 +646,7 @@ const showEditProfileMenu = async (ctx, lang) => {
       await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
     }
   } catch (error) {
-    logger.error('Error showing edit profile menu:', error);
+    logger.error('Error showing edit profile overview menu:', error);
   }
 };
 
@@ -671,7 +693,7 @@ const showSocialMediaMenu = async (ctx, lang) => {
         Markup.button.callback('📘 Facebook', 'edit_facebook'),
         Markup.button.callback('📷 Instagram', 'edit_instagram'),
       ],
-      [Markup.button.callback(t('back', lang), 'edit_profile')],
+      [Markup.button.callback(t('back', lang), 'show_edit_profile_overview')],
     ]);
 
     await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
@@ -679,6 +701,37 @@ const showSocialMediaMenu = async (ctx, lang) => {
     logger.error('Error showing social media menu:', error);
   }
 };
+
+/**
+ * Show consolidated settings overview menu
+ */
+const showSettingsOverview = async (ctx, lang) => {
+  try {
+    const text = lang === 'es'
+      ? '`⚙️ Ajustes`\n\n_Gestiona tus preferencias de perfil y privacidad._'
+      : '`⚙️ Settings`\n\n_Manage your profile and privacy preferences._';
+
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback(lang === 'es' ? '🔒 Privacidad' : '🔒 Privacy', 'privacy_settings'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '⭐ Mis Favoritos' : '⭐ My Favorites', 'show_favorites'),
+        Markup.button.callback(lang === 'es' ? '🚫 Usuarios Bloqueados' : '🚫 Blocked Users', 'show_blocked'),
+      ],
+      [Markup.button.callback(t('back', lang), 'show_profile')],
+    ]);
+
+    try {
+      await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
+    } catch (e) {
+      await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
+    }
+  } catch (error) {
+    logger.error('Error showing settings overview menu:', error);
+  }
+};
+
 
 /**
  * Show user profile - Clean design
@@ -766,18 +819,12 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
     if (isOwnProfile) {
       // Own profile actions
       keyboard.push([
-        Markup.button.callback(`📝 ${lang === 'es' ? 'Editar' : 'Edit'}`, 'edit_profile'),
-        Markup.button.callback(`📸 ${lang === 'es' ? 'Foto' : 'Photo'}`, 'edit_photo'),
+        Markup.button.callback(t('editProfile', lang), 'show_edit_profile_overview'),
+        Markup.button.callback(t('settings', lang), 'show_settings_overview'),
       ]);
       keyboard.push([
-        Markup.button.callback(`🖨️ ${lang === 'es' ? 'Imprimir Tarjeta' : 'Print Card'}`, 'share_profile'),
-      ]);
-      keyboard.push([
-        Markup.button.callback(`⚙️ ${lang === 'es' ? 'Privacidad' : 'Privacy'}`, 'privacy_settings'),
-      ]);
-      keyboard.push([
-        Markup.button.callback(t('myFavorites', lang), 'show_favorites'),
-        Markup.button.callback(t('blockedUsers', lang), 'show_blocked'),
+        Markup.button.callback(lang === 'es' ? '📍 PNP Cercanos' : '📍 PNP Nearby', 'show_nearby_unified'),
+        Markup.button.callback(t('shareProfile', lang), 'share_profile_direct'),
       ]);
       keyboard.push([Markup.button.callback(t('back', lang), 'back_to_main')]);
     } else {
@@ -823,9 +870,9 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
 };
 
 /**
- * Share/Print profile card - Clean design with group share option
+ * Share profile card directly to user's private chat, with option to share to group
  */
-const shareProfile = async (ctx) => {
+const shareProfileDirect = async (ctx) => {
   try {
     const lang = getLanguage(ctx);
     const user = await UserModel.getById(ctx.from.id);
@@ -860,7 +907,7 @@ const shareProfile = async (ctx) => {
       });
     }
   } catch (error) {
-    logger.error('Error sharing profile:', error);
+    logger.error('Error sharing profile directly:', error);
     await ctx.reply(t('error', lang));
   }
 };
@@ -1086,4 +1133,6 @@ const unblockUser = async (ctx, targetUserId) => {
 
 module.exports = registerProfileHandlers;
 module.exports.showProfile = showProfile;
-module.exports.showEditProfileMenu = showEditProfileMenu;
+module.exports.showEditProfileOverview = showEditProfileOverview;
+module.exports.showSettingsOverview = showSettingsOverview;
+module.exports.shareProfileDirect = shareProfileDirect;

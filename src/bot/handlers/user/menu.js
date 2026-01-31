@@ -480,7 +480,7 @@ const showMainMenu = async (ctx) => {
         '📻 Radio y contenido sin restricciones\n' +
         '💬 Chat y soporte prioritario\n\n' +
         '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
-        '`Desde solo $14.99 USD/semana 💎`'
+        '`Pases desde solo $14.99 USD`'
       : '`🔒 UNLOCK ALL CONTENT`\n\n' +
         `Hey ${username}, you're on the FREE version.\n\n` +
         '**With PRIME you get unlimited access to:**\n\n' +
@@ -490,22 +490,30 @@ const showMainMenu = async (ctx) => {
         '📻 Radio & unrestricted content\n' +
         '💬 Priority chat & support\n\n' +
         '**Go PRIME now and enjoy everything!**\n\n' +
-        '`Starting at just $14.99 USD/week 💎`');
+        '`Passes starting at just $14.99 USD`');
 
     buttons = [
       [
-        Markup.button.callback(lang === 'es' ? '💎 VER PLANES PRIME' : '💎 VIEW PRIME PLANS', 'show_subscription_plans'),
+        Markup.button.callback(lang === 'es' ? 'Week Pass | 7 días | $14,99' : 'Week Pass | 7 days | $14,99', 'select_plan_week_pass'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '🔄 Migrar Lifetime del viejo PNPtv' : '🔄 Migrate Lifetime from old PNPtv', 'migrate_lifetime_start'),
+        Markup.button.callback(lang === 'es' ? 'Monthly Pass | 30 días | $24,99' : 'Monthly Pass | 30 days | $24,99', 'select_plan_monthly_pass'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '3 Months Pass | 90 días | $49,99' : '3 Months Pass | 90 days | $49,99', 'select_plan_3_months_pass'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '6 Months Pass | 180 días | $74,99' : '6 Months Pass | 180 days | $74,99', 'select_plan_6_months_pass'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? 'Diamond Pass | 1 año | $99,99' : 'Diamond Pass | 1 year | $99,99', 'select_plan_diamond_pass'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? 'Lifetime Pass | PNP 4 ever | $249,99' : 'Lifetime Pass | PNP 4 ever | $249,99', 'select_plan_lifetime_pass'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
-        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
-        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings', 'show_settings'),
+        Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Support', 'show_support'),
       ],
     ];
   }
@@ -642,7 +650,7 @@ const showMainMenuEdit = async (ctx) => {
         '📻 Radio y contenido sin restricciones\n' +
         '💬 Chat y soporte prioritario\n\n' +
         '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
-        '`Desde solo $14.99 USD/semana 💎`'
+        '`Pases desde solo $14.99 USD`'
       : '`🔒 UNLOCK ALL CONTENT`\n\n' +
         `Hey ${username}, you're on the FREE version.\n\n` +
         '**With PRIME you get unlimited access to:**\n\n' +
@@ -652,22 +660,30 @@ const showMainMenuEdit = async (ctx) => {
         '📻 Radio & unrestricted content\n' +
         '💬 Priority chat & support\n\n' +
         '**Go PRIME now and enjoy everything!**\n\n' +
-        '`Starting at just $14.99 USD/week 💎`');
+        '`Passes starting at just $14.99 USD`');
 
     buttons = [
       [
-        Markup.button.callback(lang === 'es' ? '💎 VER PLANES PRIME' : '💎 VIEW PRIME PLANS', 'show_subscription_plans'),
+        Markup.button.callback(lang === 'es' ? 'Week Pass | 7 días | $14,99' : 'Week Pass | 7 days | $14,99', 'select_plan_week_pass'),
       ],
       [
-        Markup.button.callback(lang === 'es' ? '🔄 Migrar Lifetime del viejo PNPtv' : '🔄 Migrate Lifetime from old PNPtv', 'migrate_lifetime_start'),
+        Markup.button.callback(lang === 'es' ? 'Monthly Pass | 30 días | $24,99' : 'Monthly Pass | 30 days | $24,99', 'select_plan_monthly_pass'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '3 Months Pass | 90 días | $49,99' : '3 Months Pass | 90 days | $49,99', 'select_plan_3_months_pass'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? '6 Months Pass | 180 días | $74,99' : '6 Months Pass | 180 days | $74,99', 'select_plan_6_months_pass'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? 'Diamond Pass | 1 año | $99,99' : 'Diamond Pass | 1 year | $99,99', 'select_plan_diamond_pass'),
+      ],
+      [
+        Markup.button.callback(lang === 'es' ? 'Lifetime Pass | PNP 4 ever | $249,99' : 'Lifetime Pass | PNP 4 ever | $249,99', 'select_plan_lifetime_pass'),
       ],
       [
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
-        Markup.button.callback(lang === 'es' ? '📍 PNP Nearby' : '📍 PNP Nearby', 'show_nearby'),
-      ],
-      [
-        Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Help', 'show_support'),
-        Markup.button.callback(lang === 'es' ? '⚙️ Ajustes' : '⚙️ Settings', 'show_settings'),
+        Markup.button.callback(lang === 'es' ? '🆘 Ayuda' : '🆘 Support', 'show_support'),
       ],
     ];
   }
