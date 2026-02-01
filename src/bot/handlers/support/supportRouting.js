@@ -3,6 +3,7 @@ const supportRoutingService = require('../../services/supportRoutingService');
 const SupportTopicModel = require('../../../models/supportTopicModel');
 const UserModel = require('../../../models/userModel');
 const { getLanguage } = require('../../utils/helpers');
+const { addReaction } = require('../../utils/telegramReactions');
 
 /**
  * Support Routing Handlers
@@ -79,7 +80,7 @@ const registerSupportRoutingHandlers = (bot) => {
     );
 
     try {
-      await ctx.react('✅');
+      await addReaction(ctx, '✅');
     } catch (reactError) {
       logger.debug('Could not add reaction:', reactError.message);
     }
@@ -96,6 +97,7 @@ const registerSupportRoutingHandlers = (bot) => {
       userId: targetUserId,
       adminId: ctx.from.id,
     });
+    await supportRoutingService.indicateQuickAnswerDelivery(ctx);
   };
 
   const activateMembershipForUser = async (ctx, targetUserId, planOrDays, threadId) => {
@@ -420,15 +422,7 @@ ${subscriptionEmoji} *Estado:* ${subscriptionStatus}
 
         if (supportTopic) {
           // Send the admin's reply to the user
-          const sent = await supportRoutingService.sendReplyToUser(threadId, ctx);
-
-          if (sent) {
-            try {
-              await ctx.react('👍');
-            } catch (reactError) {
-              logger.debug('Could not add reaction:', reactError.message);
-            }
-          }
+          await supportRoutingService.sendReplyToUser(threadId, ctx);
           return;
         }
       }
@@ -512,7 +506,7 @@ ${subscriptionEmoji} *Estado:* ${subscriptionStatus}
 
             // React with checkmark
             try {
-              await ctx.react('👍');
+            await addReaction(ctx, '👍');
             } catch (reactError) {
               logger.debug('Could not add reaction:', reactError.message);
             }

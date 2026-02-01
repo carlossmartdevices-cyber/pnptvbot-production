@@ -61,7 +61,9 @@ const registerImprovedSharePostHandlers = (bot) => {
         postToX: false,
         xAccountId: null,
         xAccountHandle: null,
-        xAccountDisplayName: null
+        xAccountDisplayName: null,
+        includeLex: false,
+        includeSantino: false
       };
       await ctx.saveSession();
 
@@ -527,6 +529,10 @@ const registerImprovedSharePostHandlers = (bot) => {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('🤖 AI Write (Grok)', 'share_post_ai_text')],
+            [
+              Markup.button.callback('👤 Incluir Lex', 'share_post_toggle_lex'),
+              Markup.button.callback('😈 Incluir Santino', 'share_post_toggle_santino'),
+            ],
             [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
           ]),
         }
@@ -544,6 +550,10 @@ const registerImprovedSharePostHandlers = (bot) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.callback('🤖 AI Write (Grok)', 'share_post_ai_text')],
+              [
+                Markup.button.callback('👤 Incluir Lex', 'share_post_toggle_lex'),
+                Markup.button.callback('😈 Incluir Santino', 'share_post_toggle_santino'),
+              ],
               [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
             ]),
           }
@@ -556,6 +566,40 @@ const registerImprovedSharePostHandlers = (bot) => {
     ctx.session.temp.waitingForText = true;
     await ctx.saveSession();
   }
+
+  // Toggle Lex inclusion
+  bot.action('share_post_toggle_lex', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      
+      let includeLex = ctx.session.temp.sharePostData.includeLex || false;
+      ctx.session.temp.sharePostData.includeLex = !includeLex;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery(ctx.session.temp.sharePostData.includeLex ? '✅ Incluido Lex' : '⬜ Excluido Lex');
+      await showTextInputStep(ctx);
+    } catch (error) {
+      logger.error('Error toggling Lex inclusion:', error);
+    }
+  });
+
+  // Toggle Santino inclusion
+  bot.action('share_post_toggle_santino', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      
+      let includeSantino = ctx.session.temp.sharePostData.includeSantino || false;
+      ctx.session.temp.sharePostData.includeSantino = !includeSantino;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery(ctx.session.temp.sharePostData.includeSantino ? '✅ Incluido Santino' : '⬜ Excluido Santino');
+      await showTextInputStep(ctx);
+    } catch (error) {
+      logger.error('Error toggling Santino inclusion:', error);
+    }
+  });
 
   // AI text generation
   bot.action('share_post_ai_text', async (ctx) => {
@@ -706,10 +750,15 @@ const registerImprovedSharePostHandlers = (bot) => {
 
           await ctx.reply('⏳ Generando texto con AI...');
 
+          const includeLex = ctx.session.temp.sharePostData.includeLex;
+          const includeSantino = ctx.session.temp.sharePostData.includeSantino;
+
           // Use optimized parallel bilingual generation
           const result = await GrokService.generateSharePost({
             prompt,
             hasMedia,
+            includeLex,
+            includeSantino,
           });
 
           // Store AI draft temporarily for review/edit

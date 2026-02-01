@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PNPtv Login</title>
+  <style>
+    body {
+      background: #04010a;
+      color: #fff;
+      font-family: 'Inter', system-ui, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0 16px;
+    }
+    .card {
+      max-width: 420px;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+      padding: 32px;
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 12px;
+      font-size: 1.7rem;
+    }
+    p {
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 24px;
+    }
+    .status {
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.7);
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>PNPtv Login</h1>
+    <p>Authenticate with Telegram so the bot can send you hangout, videorama, and live notifications.</p>
+    <div id="tg-login"></div>
+    <p class="status" id="login-status">Waiting for confirmation...</p>
+  </div>
+  <script>
+    const status = document.getElementById('login-status');
+    window.onTelegramAuth = async (user) => {
+      if (!user) return;
+      status.textContent = 'Authenticating...';
+      try {
+        const res = await fetch('/api/telegram-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegramUser: user }),
+          credentials: 'include'
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          throw new Error(json.error || 'Login failed');
+        }
+        status.textContent = 'Login successful! Redirecting...';
+        window.location.href = '/pnplive';
+      } catch (err) {
+        status.textContent = err.message;
+      }
+    };
+    const script = document.createElement('script');
+    script.src = 'https://telegram.org/js/telegram-widget.js?22';
+    script.async = true;
+    script.setAttribute('data-telegram-login', 'pnplatinotv_bot');
+    script.setAttribute('data-size', 'large');
+    script.setAttribute('data-userpic', 'false');
+    script.setAttribute('data-request-access', 'write');
+    script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+    document.getElementById('tg-login').appendChild(script);
+  </script>
+</body>
+</html>

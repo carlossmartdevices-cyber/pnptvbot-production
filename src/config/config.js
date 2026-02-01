@@ -107,12 +107,7 @@ module.exports = {
   AGORA_APP_ID: process.env.AGORA_APP_ID,
   AGORA_APP_CERTIFICATE: process.env.AGORA_APP_CERTIFICATE,
 
-  // ==================== RADIO STREAMING ====================
-  RADIO_STREAM_URL: process.env.RADIO_STREAM_URL,
-  RADIO_API_URL: process.env.RADIO_API_URL,
-  RADIO_WEB_APP_URL: process.env.RADIO_WEB_APP_URL,
-  RADIO_CHANNEL_NAME: process.env.RADIO_CHANNEL_NAME || 'PNPtv Radio',
-  RADIO_CONTENT_DIR: process.env.RADIO_CONTENT_DIR || '/var/radio/content',
+
 
   // ==================== SECURITY ====================
   JWT_SECRET: process.env.JWT_SECRET,

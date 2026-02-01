@@ -753,3 +753,77 @@ body {
     margin: 0 auto;
   }
 }
+.collections-section {
+  margin: 40px 20px 20px;
+}
+
+.collections-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+
+.collections-header h2 {
+  font-size: 18px;
+}
+
+.create-link {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.collection-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.collection-card {
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow);
+}
+
+.collection-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.collection-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.collection-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
+.collection-meta button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.collection-meta button:hover {
+  opacity: 0.9;
+}
+
+.error-text {
+  color: #f87171;
+  font-size: 14px;
+  margin-top: 12px;
+}

@@ -13,7 +13,7 @@ const formatElapsed = (ms) => {
   return `${Math.floor(minutes / 60)}h`;
 };
 
-function Lobby({ telegramUser }) {
+function Lobby({ telegramUser, role }) {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -25,6 +25,8 @@ function Lobby({ telegramUser }) {
   const [toast, setToast] = useState('');
 
   const isTelegram = isTelegramWebApp() && telegramUser?.initData;
+  const normalizedRole = role?.toUpperCase() || '';
+  const canCreate = normalizedRole === 'PRIME' || normalizedRole === 'ADMIN';
 
   useEffect(() => {
     let active = true;
@@ -71,8 +73,15 @@ function Lobby({ telegramUser }) {
   };
 
   const handleCreate = async () => {
+    if (!canCreate) {
+      setToast('Only PRIME/ADMIN users can create rooms.');
+      setCreating(false);
+      return;
+    }
+
     if (isPublic && !isTelegram) {
       setToast('Open from Telegram to create public rooms.');
+      setCreating(false);
       return;
     }
     try {
@@ -159,12 +168,17 @@ function Lobby({ telegramUser }) {
               <>Open from Telegram for instant join and creator credit.</>
             )}
           </div>
-          {!isTelegram && (
-            <div className="notice info">
-              This feature requires Telegram authentication. Open this link inside Telegram to join or
-              create public rooms.
-            </div>
-          )}
+            {!isTelegram && (
+              <div className="notice info">
+                This feature requires Telegram authentication. Open this link inside Telegram to join or
+                create public rooms.
+              </div>
+            )}
+            {!canCreate && (
+              <div className="notice warning">
+                Room creation is restricted to PRIME/ADMIN members in the full webapp.
+              </div>
+            )}
         </section>
 
         <section className="card glass">

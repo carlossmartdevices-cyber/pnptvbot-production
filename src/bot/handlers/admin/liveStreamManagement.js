@@ -1030,19 +1030,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
                 }
               );
 
-              // Notify Live & Radio topic about scheduled stream
-              try {
-                const { notifyLiveRadioTopic } = require('../../handlers/user/menu');
-                const botUsername = ctx.botInfo?.username || 'PNPtvbot';
-                await notifyLiveRadioTopic(ctx.telegram, 'live_stream', {
-                  title: `📅 SCHEDULED: ${newStream.title}`,
-                  host: newStream.hostName,
-                  description: `Coming ${scheduledDate.toLocaleString()}`,
-                  link: `https://t.me/${botUsername}?start=show_live`
-                });
-              } catch (notifyTopicError) {
-                logger.debug('Could not notify Live/Radio topic:', notifyTopicError.message);
-              }
+
 
               logger.info('Scheduled stream created by admin', {
                 adminId: ctx.from.id,
@@ -1336,19 +1324,7 @@ const registerLiveStreamManagementHandlers = (bot) => {
           logger.warn('Failed to notify stream host:', { hostId: newStream.hostId });
         }
 
-        // Notify Live & Radio topic about new stream
-        try {
-          const { notifyLiveRadioTopic } = require('../../handlers/user/menu');
-          const botUsername = ctx.botInfo?.username || 'PNPtvbot';
-          await notifyLiveRadioTopic(ctx.telegram, 'live_stream', {
-            title: newStream.title,
-            host: newStream.hostName,
-            description: `📂 ${categories[newStream.category] || newStream.category}${newStream.isPaid ? ` • 💰 $${newStream.price}` : ' • FREE'}`,
-            link: `https://t.me/${botUsername}?start=show_live`
-          });
-        } catch (notifyTopicError) {
-          logger.debug('Could not notify Live/Radio topic:', notifyTopicError.message);
-        }
+
 
         logger.info('Stream created by admin', {
           adminId: ctx.from.id,

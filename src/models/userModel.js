@@ -61,7 +61,7 @@ class UserModel {
       roleAssignedAt: row.role_assigned_at,
       privacy: typeof row.privacy === 'string' ? JSON.parse(row.privacy) : (row.privacy || { showLocation: true, showInterests: true, showBio: true, allowMessages: true, showOnline: true }),
       profileViews: row.profile_views || 0,
-      xp: row.xp || 0,
+
       favorites: row.favorites || [],
       blocked: row.blocked || [],
       badges: row.badges || [],
@@ -121,21 +121,26 @@ class UserModel {
           id, username, first_name, last_name, email, bio, photo_file_id,
           interests, location_lat, location_lng, location_name, location_geohash,
           subscription_status, plan_id, plan_expiry, tier, role, status, privacy,
-          profile_views, xp, favorites, blocked, badges, onboarding_complete,
+          profile_views, favorites, blocked, badges, onboarding_complete,
           age_verified, terms_accepted, privacy_accepted, language, is_active,
           created_at, updated_at
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
           $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, NOW(), NOW()
         )
-        ON CONFLICT (id) DO UPDATE SET
-          username = COALESCE(EXCLUDED.username, ${TABLE}.username),
-          first_name = COALESCE(EXCLUDED.first_name, ${TABLE}.first_name),
-          last_name = COALESCE(EXCLUDED.last_name, ${TABLE}.last_name),
-          status = COALESCE(EXCLUDED.status, ${TABLE}.status),
-          updated_at = NOW()
-        RETURNING *
-      `;
+      ON CONFLICT (id) DO UPDATE SET
+        username = COALESCE(EXCLUDED.username, ${TABLE}.username),
+        first_name = COALESCE(EXCLUDED.first_name, ${TABLE}.first_name),
+        last_name = COALESCE(EXCLUDED.last_name, ${TABLE}.last_name),
+        status = COALESCE(EXCLUDED.status, ${TABLE}.status),
+        onboarding_complete = COALESCE(EXCLUDED.onboarding_complete, ${TABLE}.onboarding_complete),
+        age_verified = COALESCE(EXCLUDED.age_verified, ${TABLE}.age_verified),
+        terms_accepted = COALESCE(EXCLUDED.terms_accepted, ${TABLE}.terms_accepted),
+        privacy_accepted = COALESCE(EXCLUDED.privacy_accepted, ${TABLE}.privacy_accepted),
+        language = COALESCE(EXCLUDED.language, ${TABLE}.language),
+        updated_at = NOW()
+      RETURNING *
+    `;
 
       const location = userData.location || {};
       const privacy = userData.privacy || { showLocation: true, showInterests: true, showBio: true, allowMessages: true, showOnline: true };
@@ -161,7 +166,6 @@ class UserModel {
         userData.status || 'offline',
         JSON.stringify(privacy),
         userData.profileViews || 0,
-        userData.xp || 0,
         userData.favorites || [],
         userData.blocked || [],
         userData.badges || [],
@@ -256,11 +260,12 @@ class UserModel {
         telegram: 'telegram',
         locationSharingEnabled: 'location_sharing_enabled',
         onboardingComplete: 'onboarding_complete',
-        hasSeenTutorial: 'has_seen_tutorial',
-        ageVerified: 'age_verified',
-        termsAccepted: 'terms_accepted',
-        privacyAccepted: 'privacy_accepted',
-        language: 'language',
+      hasSeenTutorial: 'has_seen_tutorial',
+      ageVerified: 'age_verified',
+      termsAccepted: 'terms_accepted',
+      privacyAccepted: 'privacy_accepted',
+      lastActive: 'last_active',
+      language: 'language',
       };
 
       for (const [key, col] of Object.entries(fieldMap)) {
@@ -291,6 +296,42 @@ class UserModel {
       return true;
     } catch (error) {
       logger.error('Error updating user profile:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Update the age verification flags on a user record
+   * @param {string|number} userId - Telegram user ID
+   * @param {Object} options - Verification options
+   */
+  static async updateAgeVerification(userId, { verified = true, method = 'ai_photo', expiresHours = 168 } = {}) {
+    try {
+      const now = new Date();
+      const expiresAt = verified ? new Date(now.getTime() + expiresHours * 60 * 60 * 1000) : null;
+
+      const result = await query(
+        `UPDATE ${TABLE} SET
+          age_verified = $2,
+          age_verified_at = $3,
+          age_verification_expires_at = $4,
+          age_verification_method = $5,
+          updated_at = NOW()
+        WHERE id = $1
+        RETURNING id`,
+        [userId.toString(), verified, verified ? now : null, expiresAt, method]
+      );
+
+      if (result.rowCount === 0) {
+        logger.warn('User not found when updating age verification', { userId });
+        return false;
+      }
+
+      await cache.del(`user:${userId}`);
+      logger.info('Age verification status updated', { userId, verified, method });
+      return true;
+    } catch (error) {
+      logger.error('Error updating age verification:', error);
       return false;
     }
   }

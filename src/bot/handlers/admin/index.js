@@ -544,6 +544,11 @@ async function showAdminPanel(ctx, edit = false) {
         Markup.button.callback('📤 Compartir', 'admin_improved_share_post'),
       ]);
 
+      // ═══ PROMOS Y MARKETING ═══
+      buttons.push([
+        Markup.button.callback('🎁 Promos', 'promo_admin_menu'),
+      ]);
+
       // ═══ PNP LIVE / PERFORMERS ═══
       buttons.push([
         Markup.button.callback('🎭 Performers', 'admin_performers'),
@@ -599,11 +604,13 @@ async function showAdminPanel(ctx, edit = false) {
  */
 // Import handlers
 const registerImprovedSharePostHandlers = require('./improvedSharePost');
+const { registerPromoAdminHandlers } = require('./promoAdmin');
 
 let registerAdminHandlers = (bot) => {
   logger.info('[DEBUG-INIT] registerAdminHandlers called - registering admin command handlers');
   // Register handlers
   registerImprovedSharePostHandlers(bot);
+  registerPromoAdminHandlers(bot);
 
   bot.action('admin_home', async (ctx) => {
     try {

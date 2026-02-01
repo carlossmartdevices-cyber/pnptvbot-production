@@ -295,7 +295,7 @@ class EmailService {
       <p style="margin-top: 30px;"><strong>¿Qué puedes hacer con PNPtv?</strong></p>
       <ul>
         <li>📺 Ver contenido exclusivo en streaming</li>
-        <li>🎵 Escuchar radio en vivo</li>
+
         <li>💬 Participar en la comunidad</li>
         <li>📱 Acceso 24/7 desde cualquier dispositivo</li>
       </ul>
@@ -380,7 +380,7 @@ class EmailService {
       <p style="margin-top: 30px;"><strong>What can you do with PNPtv?</strong></p>
       <ul>
         <li>📺 Watch exclusive streaming content</li>
-        <li>🎵 Listen to live radio</li>
+
         <li>💬 Join the community</li>
         <li>📱 24/7 access from any device</li>
       </ul>

@@ -50,6 +50,18 @@ export async function fetchCategories() {
   }
 }
 
+export async function fetchCollections() {
+  try {
+    const response = await fetch(`${API_BASE}/videorama/collections`);
+    if (!response.ok) throw new Error('Failed to fetch collections');
+    const data = await response.json();
+    return data.collections || []
+  } catch (error) {
+    console.error('Error fetching videorama collections:', error);
+    return [];
+  }
+}
+
 export function getUrlParams() {
   const params = new URLSearchParams(window.location.search);
   return {

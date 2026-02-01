@@ -207,8 +207,7 @@ const registerMenuHandlers = (bot) => {
       }
     });
 
-  // Special topic IDs for Live & Radio updates
-  const LIVE_RADIO_TOPIC_ID = 3809;
+
   const PRIME_CHAT_ID = -1003291737499;
 
   // /menu command is now handled by media/menu.js - removed from here to avoid conflicts
@@ -218,7 +217,7 @@ const registerMenuHandlers = (bot) => {
     'show_subscription_plans',
     'show_profile',
     'show_nearby',
-    'show_radio',
+    'show_support',
     'show_support',
     'show_settings',
     'admin_panel'
@@ -305,36 +304,7 @@ const registerMenuHandlers = (bot) => {
       }
     });
 
-    // Radio button handler - coming soon
-    bot.action('menu_radio', async (ctx) => {
-      try {
-        const lang = ctx.session?.language || 'en';
-        const userId = ctx.from?.id;
-        
-        // Check if user is admin for testing access
-        const isAdmin = await PermissionService.isAdmin(userId);
-        
-        if (isAdmin) {
-          // Allow admin to access the feature for testing
-          const RadioHandler = require('../radioHandler');
-          if (RadioHandler.handleRadioMenu) {
-            await RadioHandler.handleRadioMenu(ctx);
-          } else {
-            await ctx.answerCbQuery(
-              lang === 'es' ? '👷 MODALIDAD DE PRUEBA (ADMIN)' : '👷 TEST MODE (ADMIN)',
-              { show_alert: true }
-            );
-          }
-        } else {
-          await ctx.answerCbQuery(
-            lang === 'es' ? '🚧 ESTRENO EL FIN DE SEMANA' : '🚧 COMING OUT THIS WEEKEND',
-            { show_alert: true }
-          );
-        }
-      } catch (error) {
-        logger.error('Error handling menu_radio:', error);
-      }
-    });
+
 
     // Already PRIME handler
     bot.action('already_prime', async (ctx) => {
@@ -535,7 +505,7 @@ const showMainMenu = async (ctx) => {
         '🎬 Videos completos y shows exclusivos\n' +
         '📍 Encuentra papis cerca de ti (Nearby)\n' +
         '🎥 Salas de video en vivo 24/7\n' +
-        '📻 Radio y contenido sin restricciones\n' +
+
         '💬 Chat y soporte prioritario\n\n' +
         '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
         '`Pases desde solo $14.99 USD`'
@@ -545,7 +515,7 @@ const showMainMenu = async (ctx) => {
         '🎬 Full videos & exclusive shows\n' +
         '📍 Find papis near you (Nearby)\n' +
         '🎥 Live video rooms 24/7\n' +
-        '📻 Radio & unrestricted content\n' +
+
         '💬 Priority chat & support\n\n' +
         '**Go PRIME now and enjoy everything!**\n\n' +
         '`Passes starting at just $14.99 USD`');
@@ -664,7 +634,7 @@ const showMainMenuEdit = async (ctx) => {
         '🎬 Videos completos y shows exclusivos\n' +
         '📍 Encuentra papis cerca de ti (Nearby)\n' +
         '🎥 Salas de video en vivo 24/7\n' +
-        '📻 Radio y contenido sin restricciones\n' +
+
         '💬 Chat y soporte prioritario\n\n' +
         '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
         '`Pases desde solo $14.99 USD`'
@@ -674,7 +644,7 @@ const showMainMenuEdit = async (ctx) => {
         '🎬 Full videos & exclusive shows\n' +
         '📍 Find papis near you (Nearby)\n' +
         '🎥 Live video rooms 24/7\n' +
-        '📻 Radio & unrestricted content\n' +
+
         '💬 Priority chat & support\n\n' +
         '**Go PRIME now and enjoy everything!**\n\n' +
         '`Passes starting at just $14.99 USD`');
@@ -714,142 +684,11 @@ const showMainMenuEdit = async (ctx) => {
   }
 };
 
-/**
- * Show special menu for Live & Radio topic
- * Shows subscription invite for free users or quick links for PRIME members
- */
-const showLiveRadioTopicMenu = async (ctx) => {
-  const user = ctx.session?.user || {};
-  const userId = ctx.from?.id;
-  const hasAccess = hasFullAccess(user, userId);
-  const firstName = ctx.from?.first_name || 'friend';
-  const botUsername = ctx.botInfo?.username || 'PNPtvbot';
 
-  let menuText;
-  let keyboard;
 
-  if (hasAccess) {
-    // PRIME member - show quick links
-    menuText = 
-      '`📻 LIVE & RADIO HUB 🎙️`\n\n' +
-      `Hey ${firstName}! 🔥\n\n` +
-      'This is where all the action happens! Shows, calls, radio updates — right here.\n\n' +
-      '**Quick Access:**\n' +
-      '• 📻 Radio — 24/7 cloudy beats\n' +
-      '• 🎥 Salas 24/7 — Community video rooms\n' +
-      '• 🎬 Live Shows — Performers streaming\n\n' +
-      '`Stay tuned papi! 🎧`';
 
-    keyboard = Markup.inlineKeyboard([
-      [
-        Markup.button.url('📻 Radio', `https://t.me/${botUsername}?start=show_radio`),
-      ],
-      [
-        Markup.button.url('🎬 Live Shows', `https://t.me/${botUsername}?start=show_live`),
-        Markup.button.url('📍 Nearby', `https://t.me/${botUsername}?start=show_nearby`),
-      ],
-      [
-        Markup.button.url('💬 Full Menu', `https://t.me/${botUsername}?start=menu`),
-      ],
-    ]);
-  } else {
-    // FREE user - show subscription invite
-    menuText = 
-      '`🔒 PRIME MEMBERS ONLY`\n\n' +
-      `Hey ${firstName}! 👋\n\n` +
-      'This topic is for **PRIME members** to get live updates on shows, calls & radio!\n\n' +
-      '**With PRIME you get:**\n' +
-      '• 📻 24/7 Radio access\n' +
-      '• 🎬 Watch live performer shows\n' +
-      '• 📍 Find nearby cloudy papis\n' +
-      '• 📹 Full-length videos\n\n' +
-      '`Unlock the fun! 🔓`';
-
-    keyboard = Markup.inlineKeyboard([
-      [
-        Markup.button.url('💎 Unlock PRIME', `https://t.me/${botUsername}?start=show_subscription_plans`),
-      ],
-      [
-        Markup.button.url('❓ Learn More', `https://t.me/${botUsername}?start=show_support`),
-      ],
-    ]);
-  }
-
-  await ctx.reply(menuText, {
-    parse_mode: 'Markdown',
-    ...keyboard
-  });
-};
-
-/**
- * Send notification to Live & Radio topic about new events
- * @param {Telegram} telegram - Telegram instance
- * @param {string} eventType - Type of event: 'radio_show', 'hangout', 'live_stream'
- * @param {object} eventData - Event details { title, host, description, link }
- */
-const notifyLiveRadioTopic = async (telegram, eventType, eventData) => {
-  const LIVE_RADIO_TOPIC_ID = 3809;
-  const PRIME_CHAT_ID = -1003291737499;
-
-  let emoji, eventTitle;
-  switch (eventType) {
-    case 'radio_show':
-      emoji = '📻';
-      eventTitle = 'RADIO SHOW';
-      break;
-    case 'hangout':
-      emoji = '🎥';
-      eventTitle = 'VIDEO HANGOUT';
-      break;
-    case 'live_stream':
-      emoji = '🎬';
-      eventTitle = 'LIVE SHOW';
-      break;
-    default:
-      emoji = '🔔';
-      eventTitle = 'NEW EVENT';
-  }
-
-  const message = 
-    '```\n' +
-    '──────────────────────────────┐\n' +
-    `  ${emoji} ${eventTitle} NOW! ${emoji}  \n` +
-    '──────────────────────────────┘\n' +
-    '```\n\n' +
-    `🔥 **${eventData.title || 'Something hot is happening!'}**\n\n` +
-    (eventData.host ? `👤 Host: ${eventData.host}\n\n` : '') +
-    (eventData.description ? `${eventData.description}\n\n` : '') +
-    '```\n' +
-    '┌─────────────────────────┐\n' +
-    '│   Join now papi! 🔥    │\n' +
-    '└─────────────────────────┘\n' +
-    '```';
-
-  let keyboard;
-  if (eventData.link) {
-    keyboard = Markup.inlineKeyboard([
-      [Markup.button.url('🚀 Join Now', eventData.link)]
-    ]);
-  }
-
-  try {
-    await telegram.sendMessage(PRIME_CHAT_ID, message, {
-      message_thread_id: LIVE_RADIO_TOPIC_ID,
-      parse_mode: 'Markdown',
-      ...keyboard
-    });
-    logger.info('Live/Radio topic notification sent', { eventType, title: eventData.title });
-  } catch (error) {
-    logger.error('Error sending Live/Radio topic notification:', error);
-  }
-};
 
 // Export as default function for consistency with other handlers
 module.exports = registerMenuHandlers;
 
-// Also export named functions for direct imports
-module.exports.showMainMenu = showMainMenu;
-module.exports.showMainMenuEdit = showMainMenuEdit;
-module.exports.sendPrimeWelcome = sendPrimeWelcome;
-module.exports.showLiveRadioTopicMenu = showLiveRadioTopicMenu;
-module.exports.notifyLiveRadioTopic = notifyLiveRadioTopic;
+

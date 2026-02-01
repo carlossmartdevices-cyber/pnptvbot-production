@@ -3,6 +3,7 @@ const InvoiceService = require('../../bot/services/invoiceservice');
 const EmailService = require('../../bot/services/emailservice');
 const PlanModel = require('../../models/planModel');
 const UserModel = require('../../models/userModel');
+const PromoService = require('./promoService');
 const SubscriberModel = require('../../models/subscriberModel');
 const ModelService = require('./modelService');
 const MeetGreetService = require('./meetGreetService');
@@ -711,6 +712,26 @@ class PaymentService {
                 userId,
               });
             }
+
+            // Complete promo redemption if this was a promo payment
+            if (payment && payment.metadata?.redemptionId) {
+              try {
+                await PromoService.completePromoRedemption(
+                  payment.metadata.redemptionId,
+                  payment.id
+                );
+                logger.info('Promo redemption completed', {
+                  redemptionId: payment.metadata.redemptionId,
+                  paymentId: payment.id,
+                  promoCode: payment.metadata.promoCode,
+                });
+              } catch (promoError) {
+                logger.error('Error completing promo redemption (non-critical):', {
+                  error: promoError.message,
+                  redemptionId: payment.metadata.redemptionId,
+                });
+              }
+            }
           }
         }
 
@@ -722,10 +743,14 @@ class PaymentService {
 
             if (plan) {
               const bot = new Telegraf(process.env.BOT_TOKEN);
+              // Check if this was a promo purchase
+              const promoInfo = payment?.metadata?.promoCode
+                ? ` (Promo: ${payment.metadata.promoCode})`
+                : '';
               await PaymentNotificationService.sendAdminPaymentNotification({
                 bot,
                 userId,
-                planName: plan.display_name || plan.name,
+                planName: (plan.display_name || plan.name) + promoInfo,
                 amount: parseFloat(x_amount),
                 provider: 'ePayco',
                 transactionId: x_ref_payco,
@@ -990,6 +1015,26 @@ class PaymentService {
               });
             }
 
+            // Complete promo redemption if this was a promo payment
+            if (payment && payment.metadata?.redemptionId) {
+              try {
+                await PromoService.completePromoRedemption(
+                  payment.metadata.redemptionId,
+                  payment.id
+                );
+                logger.info('Promo redemption completed via Daimo', {
+                  redemptionId: payment.metadata.redemptionId,
+                  paymentId: payment.id,
+                  promoCode: payment.metadata.promoCode,
+                });
+              } catch (promoError) {
+                logger.error('Error completing promo redemption (non-critical):', {
+                  error: promoError.message,
+                  redemptionId: payment.metadata.redemptionId,
+                });
+              }
+            }
+
             // Get customer email from user record or subscriber record
             let customerEmail = user?.email;
             if (!customerEmail) {
@@ -1006,10 +1051,14 @@ class PaymentService {
             try {
               const bot = new Telegraf(process.env.BOT_TOKEN);
               const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
+              // Check if this was a promo purchase
+              const promoInfo = payment?.metadata?.promoCode
+                ? ` (Promo: ${payment.metadata.promoCode})`
+                : '';
               await PaymentNotificationService.sendAdminPaymentNotification({
                 bot,
                 userId,
-                planName: plan.display_name || plan.name,
+                planName: (plan.display_name || plan.name) + promoInfo,
                 amount: amountUSD,
                 provider: 'Daimo Pay',
                 transactionId: source?.txHash || id,

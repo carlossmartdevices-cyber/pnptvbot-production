@@ -16,11 +16,11 @@ const translations = {
     next: '➡️ Next',
     confirm: '✅ Confirm',
     error: '❌ An error occurred. Please try again.',
-    openingChat: 'Opening chat...',
+    openingChat: 'Opening chat...', 
     userNoUsername: 'This user doesn\'t have a username. You can search for them manually.',
     errorOpeningChat: 'Could not open chat. Please try manually.',
     success: '✅ Success!',
-    loading: '⏳ Loading...',
+    loading: '⏳ Loading...', 
     days: 'days',
 
     // Onboarding
@@ -43,7 +43,6 @@ const translations = {
     myProfile: '👤 My Profile',
     nearbyUsers: '🌍 Nearby Users',
     liveStreams: '🎤 Live Streams',
-    radioMenu: '📻 Radio',
     playerMenu: '🎵 Media Player',
     callRooms: '🎥 Call Rooms',
     support: '🤖 Support',
@@ -63,7 +62,7 @@ Choose your plan and get instant access to all premium features:
 🔥 Profile Card with photo, badges & bio
 🔥 Instant support through the bot
 
-\`Tap a plan below to activate your membership instantly. 💜\``,
+`Tap a plan below to activate your membership instantly. 💜` `,
     subscriptionPlans: '💎 Choose Your PRIME Plan:',
       planCrystal: '💎 Crystal Pass - $49.99/180 days',
       planCrystalDesc: 'Half a year of complete access to the PNPtv! community. Includes:\n\n• Unlimited access to all PNPtv! channels and groups\n• Full videography of Santino plus Latino chem sessions\n• Long-duration videos with weekly new releases\n• Invites to Call rooms and Live Stream PNP shows\n• Unlimited Nearby access\n• Access to community events and private sessions\n• Early access to upcoming features',
@@ -74,35 +73,35 @@ Choose your plan and get instant access to all premium features:
     planMonthly: '🗓️ Monthly Pass - $24.99/30 days',
     planMonthlyDesc: 'Our most popular plan with full access and no limits. Includes:\n\n• Unlimited access to all PNPtv! channels and group\n• Full videography of Santino plus sexy Latinos smoking and slamming\n• Long-session videos with weekly new releases\n• Invites to Call rooms and Live Stream PNP shows\n• Unlimited Nearby access\n• Profile card with photo, badges and bio',
     planTrial: '⭐ Trial Week',
-    planTrialDesc: '7 days of pure PNP bliss.\nUnlimited access to videos, weekly drops, Nearby, profile tools, radio, hangouts, lives, and video rooms.\n💜 Perfect for first-timers — try EVERYTHING before committing.',
+
     planDetails: 'Plan Details:',
     selectPlan: 'Select Plan',
     paymentMethod: 'Choose payment method:',
     payWithEpayco: '💳 Pay with Debit/Credit Card',
     payWithDaimo: '🪙 Pay with Crypto and Payment Apps',
     paymentFooter: '\n\n🔒 *No recurring payments* • 🕶️ *Discreet billing* • ✅ *100% guaranteed membership*',
-    paymentInstructions: '💳 *Payment Instructions*\n\n'
-      + 'Please tap the button below to go to the checkout page.\n'
-      + 'There you\'ll be able to review the price, plan details, and all benefits included before confirming your purchase.\n\n'
-      + 'After confirming, you will be redirected to ePayco\'s secure payment gateway, where you can pay using:\n\n'
-      + '• Debit card\n'
-      + '• Credit card\n\n'
-      + '*Please remember:*\n\n'
-      + '• The charge will appear on your bank statement as Easy Bots\n'
-      + '• You can review our Terms, Conditions, and Refund Policy at:\n'
-      + 'www.pnptv.app/terms\n\n'
+    paymentInstructions: '💳 *Payment Instructions*\n\n' 
+      + 'Please tap the button below to go to the checkout page.\n' 
+      + 'There you\'ll be able to review the price, plan details, and all benefits included before confirming your purchase.\n\n' 
+      + 'After confirming, you will be redirected to ePayco\'s secure payment gateway, where you can pay using:\n\n' 
+      + '• Debit card\n' 
+      + '• Credit card\n\n' 
+      + '*Please remember:*\n\n' 
+      + '• The charge will appear on your bank statement as Easy Bots\n' 
+      + '• You can review our Terms, Conditions, and Refund Policy at:\n' 
+      + 'www.pnptv.app/terms\n\n' 
       + 'If you need help, Cristina — our AI assistant — is here to guide you.',
-    payment_confirmation: '✅ **Order Summary**\n\n'
-      + '📦 Plan: {planName}\n'
-      + '💰 Price: ${price}/month\n'
-      + '⏱️ Duration: {duration} day(s)\n\n'
-      + '⚠️ **Important Notes:**\n'
-      + '• This is a ONE-TIME payment\n'
-      + '• ❌ Recurring payments are OFF\n'
-      + '• We will NOT charge your card next month\n'
-      + '• You\'ll receive a reminder before renewal\n\n'
+    payment_confirmation: '✅ **Order Summary**\n\n' 
+      + '📦 Plan: {planName}\n' 
+      + '💰 Price: ${price}/month\n' 
+      + '⏱️ Duration: {duration} day(s)\n\n' 
+      + '⚠️ **Important Notes:**\n' 
+      + '• This is a ONE-TIME payment\n' 
+      + '• ❌ Recurring payments are OFF\n' 
+      + '• We will NOT charge your card next month\n' 
+      + '• You\'ll receive a reminder before renewal\n\n' 
       + 'Click "Pay Now" to complete your purchase.',
-    paymentSuccess: '✅ Payment successful! Your PRIME subscription is now active. '
+    paymentSuccess: '✅ Payment successful! Your PRIME subscription is now active. ' 
       + 'Enjoy premium features!',
     paymentFailed: '❌ Payment failed. Please try again or contact support.',
     subscriptionActive: 'Your subscription is active until {expiry}',
@@ -234,13 +233,13 @@ Choose your plan and get instant access to all premium features:
     emotesUsed: 'Emotes used',
     myEmotes: 'My Custom Emotes',
     noCustomEmotes: 'You have no custom emotes yet. Create one to get started!',
-    enterEmoteCode: 'Enter a code for your emote (3-20 alphanumeric characters):\n\n'
+    enterEmoteCode: 'Enter a code for your emote (3-20 alphanumeric characters):\n\n' 
       + 'Example: MyEmote, PogChamp, LUL',
-    enterEmoteImage: 'Send the URL of your emote image:\n\n'
-      + 'Example: https://example.com/emote.png\n\n'
+    enterEmoteImage: 'Send the URL of your emote image:\n\n' 
+      + 'Example: https://example.com/emote.png\n\n' 
       + 'Supported formats: PNG, JPG, GIF, WEBP',
     invalidEmoteCode: '❌ Invalid emote code. Use 3-20 alphanumeric characters only.',
-    invalidImageUrl: '❌ Invalid image URL. '
+    invalidImageUrl: '❌ Invalid image URL. ' 
       + 'Please provide a valid URL ending in .png, .jpg, .jpeg, .gif, or .webp',
     emoteCreated: 'Custom emote created!',
     emoteAwaitingApproval: 'Your emote is pending admin approval',
@@ -257,74 +256,7 @@ Choose your plan and get instant access to all premium features:
     totalUsage: 'Total Usage',
     yourEmotes: 'Your Emotes',
 
-    // Radio
-    radioTitle: '`📻 PNPtv Radio 24/7`',
-    listenNow: '🎧 Listen Now',
-    requestSong: '🎵 Request Song',
-    nowPlaying: '🎵 Now Playing',
-    radioSchedule: '📅 Schedule',
-    streamUrl: 'Listen here: {url}',
-    songRequested: 'Song request received! We\'ll play it soon.',
-    enterSongName: 'Enter song name to request:',
-    radio: {
-      description: 'Stream beats, chill vibes, and cloudy tunes all day long! 🎵☁️',
-      onAir: 'On Air',
-      liveNow: 'Live Now',
-      tip: 'Tap the button below to open the stream in your favorite player',
-      openStream: '🎧 Open Stream',
-      artist: 'Artist',
-      duration: 'Duration',
-      startedAt: 'Started at',
-      noSongPlaying: 'No song information available right now.',
-      history: '📜 History',
-      recentlyPlayed: 'Recently Played',
-      noHistory: 'No history available yet.',
-      noSchedule: 'No schedule set yet.',
-      requestLimitReached: 'You have reached the daily request limit (5 songs).',
-      listeners: 'Listeners',
-      likes: 'Likes',
-      queuePosition: 'Queue Position',
-      requestsToday: 'Requests Today',
-      songsInQueue: 'songs in queue',
-      yourRequest: 'Your Request',
-      requestReceived: 'Song Request Received!',
-      notifyWhenPlays: 'You\'ll be notified when your song plays!',
-      skip: 'Skip',
-      like: 'Like',
-      settings: 'Settings',
-      notifications: 'Notifications',
-      notifyToggle: 'Toggle Notifications',
-      trackAdded: 'Track Added Successfully!',
-      noTracks: 'No tracks in playlist',
-      addTrackHelp: 'Add tracks using /radio_add',
-      admin: {
-        title: 'Radio Management',
-        stats: 'Statistics',
-        totalRequests: 'Total Requests',
-        songsPlayed: 'Songs Played',
-        pendingRequests: 'Pending Requests',
-        setNowPlaying: '🎵 Set Now Playing',
-        viewRequests: '📋 View Song Requests',
-        manageSchedule: '📅 Manage Schedule',
-        statistics: '📊 Statistics',
-        enterSongTitle: 'Enter the song title:',
-        enterArtist: 'Enter the artist name:',
-        enterDuration: 'Enter the duration (e.g., 3:45):',
-        nowPlayingSet: 'Now playing updated successfully!',
-        noRequests: 'No pending song requests.',
-        requestApproved: 'Request approved!',
-        requestRejected: 'Request rejected!',
-        scheduleManagement: 'Schedule Management',
-        addToSchedule: '➕ Add to Schedule',
-        selectDay: 'Select a day:',
-        enterTimeSlot: 'Enter time slot (e.g., 14:00-16:00):',
-        enterProgramName: 'Enter program name:',
-        enterDescription: 'Enter program description (optional):',
-        scheduleCreated: 'Schedule entry created successfully!',
-        scheduleDeleted: 'Schedule entry deleted!',
-        noScheduleEntries: 'No schedule entries yet.',
-      },
-    },
+
 
     // Media Player
     player: {
@@ -489,18 +421,18 @@ Your FREE access includes:
           `@${username} Te envié un mensaje privado sobre tu solicitud. Por favor revísalo. Esto es por privacidad y para cumplir con la política anti-spam del grupo.\n\n[Abrir en chat privado con tu solicitud](https://t.me/${botUsername}?start=${command})`,
     // General
     welcome: '👋 ¡Bienvenido a PNPtv!',
-    welcomeScreen: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv! Premium\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel de control.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas de Video, iniciar transmisiones en vivo, ver videos completos,\nexplorar Cercanos sin límites y unirte a eventos privados.',
-    welcomeScreenFree: `PNPtv!\n------------\n\nBienvenido a PNPtv!  \nDisfruta la experiencia completa desde aquí.\n\nDesbloquea todas las funciones premium:\n• Videos completos  \n• Transmisiones en vivo  \n• Nearby ilimitado  \n• Salas de Video  \n• Eventos privados de la comunidad\n\nToca "Suscríbete a PRIME" para obtener acceso inmediato.`,
+    welcomeScreen: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv! Premium\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel de control.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas de Video, iniciar transmisiones en vivo, ver videos completos,\nexplore Nearby sin límites y unirte a eventos privados.',
+    welcomeScreenFree: `PNPtv!\n------------\n\nBienvenido a PNPtv!  \nDisfruta la experiencia completa desde aquí.\n\nDesbloquea todas las funciones premium:\n• Videos completos  \n• Transmisiones en vivo  \n• Unlimited Nearby  \n• Salas de Video  \n• Eventos privados de la comunidad\n\nTap "Suscríbete a PRIME" para obtener acceso inmediato.`,
     back: '🔙 Atrás',
     cancel: '❌ Cancelar',
     next: '➡️ Siguiente',
     confirm: '✅ Confirmar',
     error: '❌ Ocurrió un error. Por favor intenta de nuevo.',
-    openingChat: 'Abriendo chat...',
+    openingChat: 'Abriendo chat...', 
     userNoUsername: 'Este usuario no tiene nombre de usuario. Puedes buscarlo manualmente.',
     errorOpeningChat: 'No se pudo abrir el chat. Por favor intenta manualmente.',
     success: '✅ ¡Éxito!',
-    loading: '⏳ Cargando...',
+    loading: '⏳ Cargando...', 
     days: 'días',
 
     // Onboarding
@@ -523,7 +455,7 @@ Your FREE access includes:
     myProfile: '👤 Mi Perfil',
     nearbyUsers: '🌍 Usuarios Cercanos',
     liveStreams: '🎤 Transmisiones en Vivo',
-    radioMenu: '📻 Radio',
+
     playerMenu: '🎵 Reproductor',
     callRooms: '🎥 Salas de Video',
     support: '🤖 Soporte',
@@ -543,7 +475,7 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
 🔥 Tarjeta de perfil con foto, badges y bio
 🔥 Soporte instantáneo desde el bot
 
-\`Toca un plan para activar tu membresía al instante. 💜\``,
+`Toca un plan para activar tu membresía al instante. 💜` `,
     subscriptionPlans: '💎 Elige tu Plan PRIME:',
       planCrystal: '💎 Pase Crystal - $49.99/180 días',
       planCrystalDesc: 'Medio año de acceso total a la comunidad PNPtv!. Incluye:\n\n• Acceso ilimitado a todos los canales y grupos de PNPtv!\n• Videografía completa de Santino y sesiones químicas latinas\n• Videos de larga duración con estrenos semanales\n• Invitaciones a salas de video y shows en vivo de PNP\n• Acceso ilimitado a Cercanos\n• Acceso a eventos comunitarios y sesiones privadas\n• Acceso anticipado a nuevas funciones',
@@ -554,35 +486,35 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
     planMonthly: '🗓️ Pase Mensual - $24.99/30 días',
     planMonthlyDesc: 'Nuestro plan más popular con acceso total y sin límites. Incluye:\n\n• Acceso ilimitado a todos los canales y grupo de PNPtv!\n• Videografía completa de Santino y latinos sexys fumando y slameando\n• Videos largos con estrenos semanales\n• Invitaciones a salas de video y shows en vivo de PNP\n• Acceso ilimitado a Cercanos\n• Tarjeta de perfil con foto, badges y bio',
     planTrial: '⭐ Semana de Prueba',
-    planTrialDesc: '7 días de puro placer PNP.\nAcceso ilimitado a videos, estrenos semanales, Cercanos, herramientas de perfil, radio, hangouts, lives y salas de video.\n💜 Perfecto para nuevos — prueba TODO antes de comprometerte.',
+
     planDetails: 'Detalles del Plan:',
     selectPlan: 'Seleccionar Plan',
     paymentMethod: 'Elige método de pago:',
     payWithEpayco: '💳 Pagar con Tarjeta Débito/Crédito',
     payWithDaimo: '🪙 Pagar con Crypto y Apps de Pago',
     paymentFooter: '\n\n🔒 *Sin pagos recurrentes* • 🕶️ *Cobro discreto* • ✅ *Membresía 100% garantizada*',
-    paymentInstructions: '💳 *Instrucciones de Pago*\n\n'
-      + 'Por favor toca el botón de abajo para ir a la página de checkout.\n'
-      + 'Ahí podrás revisar el precio, los detalles del plan y todos los beneficios incluidos antes de confirmar tu compra.\n\n'
-      + 'Después de confirmar, serás redirigido a la pasarela de pago segura de ePayco, donde puedes pagar usando:\n\n'
-      + '• Tarjeta de débito\n'
-      + '• Tarjeta de crédito\n\n'
-      + '*Por favor recuerda:*\n\n'
-      + '• El cargo aparecerá en tu estado de cuenta bancario como Easy Bots\n'
-      + '• Puedes revisar nuestros Términos, Condiciones y Política de Reembolso en:\n'
-      + 'www.pnptv.app/terms\n\n'
+    paymentInstructions: '💳 *Instrucciones de Pago*\n\n' 
+      + 'Por favor toca el botón de abajo para ir a la página de checkout.\n' 
+      + 'Ahí podrás revisar el precio, los detalles del plan y todos los beneficios incluidos antes de confirmar tu compra.\n\n' 
+      + 'Después de confirmar, serás redirigido a la pasarela de pago segura de ePayco, donde puedes pagar usando:\n\n' 
+      + '• Tarjeta de débito\n' 
+      + '• Tarjeta de crédito\n\n' 
+      + '*Por favor recuerda:*\n\n' 
+      + '• El cargo aparecerá en tu estado de cuenta bancario como Easy Bots\n' 
+      + '• Puedes revisar nuestros Términos, Condiciones y Política de Reembolso en:\n' 
+      + 'www.pnptv.app/terms\n\n' 
       + 'Si necesitas ayuda, Cristina — nuestra asistente AI — está aquí para guiarte.',
-    payment_confirmation: '✅ **Resumen de Pedido**\n\n'
-      + '📦 Plan: {planName}\n'
-      + '💰 Precio: ${price}/mes\n'
-      + '⏱️ Duración: {duration} día(s)\n\n'
-      + '⚠️ **Notas Importantes:**\n'
-      + '• Este es un pago ÚNICO\n'
-      + '• ❌ Los pagos recurrentes están APAGADOS\n'
-      + '• NO cobraremos tu tarjeta el próximo mes\n'
-      + '• Recibirás un recordatorio antes de renovar\n\n'
+    payment_confirmation: '✅ **Resumen de Pedido**\n\n' 
+      + '📦 Plan: {planName}\n' 
+      + '💰 Precio: ${price}/mes\n' 
+      + '⏱️ Duración: {duration} día(s)\n\n' 
+      + '⚠️ **Notas Importantes:**\n' 
+      + '• Este es un pago ÚNICO\n' 
+      + '• ❌ Los pagos recurrentes están APAGADOS\n' 
+      + '• NO cobraremos tu tarjeta el próximo mes\n' 
+      + '• Recibirás un recordatorio antes de renovar\n\n' 
       + 'Haz clic en "Pagar Ahora" para completar tu compra.',
-    paymentSuccess: '✅ ¡Pago exitoso! Tu suscripción PRIME está activa. '
+    paymentSuccess: '✅ ¡Pago exitoso! Tu suscripción PRIME está activa. ' 
       + '¡Disfruta las funciones premium!',
     paymentFailed: '❌ Pago fallido. Por favor intenta de nuevo o contacta soporte.',
     subscriptionActive: 'Tu suscripción está activa hasta {expiry}',
@@ -617,7 +549,7 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
     myFavorites: '⭐ Mis Favoritos',
     noFavorites: 'Aún no tienes favoritos.',
     blockedUsers: '🚫 Usuarios Bloqueados',
-    welcomeScreenPrime: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv PRIME!\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel PRIME.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas de Video, iniciar transmisiones en vivo, ver videos completos,\nexplorar Cercanos sin límites y unirte a eventos privados.`,
+    welcomeScreenPrime: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n          ¡Bienvenido a PNPtv PRIME!\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEste es tu panel PRIME.\nDesde aquí puedes acceder a todas tus funciones premium:\nabrir Salas de Video, iniciar transmisiones en vivo, ver videos completos,\nexplore Nearby sin límites y unirte a eventos privados.`,
     noBlockedUsers: 'No tienes usuarios bloqueados.',
     shareProfile: '📤 Compartir Perfil',
     profileShared: '¡Tarjeta de perfil creada! Toca para compartirla.',
@@ -674,7 +606,7 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
     streamLiked: '❤️ ¡Me gusta!',
     manageStream: 'Gestionar Transmisión',
     liveNow: 'En Vivo Ahora',
-    streamHostInstructions: 'Haz clic en "Iniciar Transmisión" para salir en vivo. '
+    streamHostInstructions: 'Haz clic en "Iniciar Transmisión" para salir en vivo. ' 
       + '¡Comparte tu enlace con los espectadores!',
     streamInstructions: 'Haz clic en "Ver Transmisión" para comenzar a ver. ¡Disfruta!',
     paidStreamNotice: '💰 Esta es una transmisión de pago',
@@ -710,20 +642,20 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
     availableEmotes: 'Emotes Disponibles',
     defaultEmotes: 'Emotes Predeterminados',
     customEmotes: 'Emotes Personalizados',
-    useEmotesInComment: '¡Puedes usar emotes en tu comentario! '
+    useEmotesInComment: '¡Puedes usar emotes en tu comentario! ' 
       + 'Haz clic en "Mostrar Emotes" para ver los emotes disponibles.',
     emoteUsageInstructions: '¡Escribe códigos de emotes como :smile: o :fire: en tu mensaje!',
     emotesUsed: 'Emotes usados',
     myEmotes: 'Mis Emotes Personalizados',
     noCustomEmotes: '¡Aún no tienes emotes personalizados. Crea uno para comenzar!',
-    enterEmoteCode: 'Ingresa un código para tu emote (3-20 caracteres alfanuméricos):\n\n'
+    enterEmoteCode: 'Ingresa un código para tu emote (3-20 caracteres alfanuméricos):\n\n' 
       + 'Ejemplo: MiEmote, PogChamp, LUL',
-    enterEmoteImage: 'Envía la URL de la imagen de tu emote:\n\n'
-      + 'Ejemplo: https://ejemplo.com/emote.png\n\n'
+    enterEmoteImage: 'Envía la URL de la imagen de tu emote:\n\n' 
+      + 'Ejemplo: https://ejemplo.com/emote.png\n\n' 
       + 'Formatos soportados: PNG, JPG, GIF, WEBP',
-    invalidEmoteCode: '❌ Código de emote inválido. '
+    invalidEmoteCode: '❌ Código de emote inválido. ' 
       + 'Usa solo 3-20 caracteres alfanuméricos.',
-    invalidImageUrl: '❌ URL de imagen inválida. '
+    invalidImageUrl: '❌ URL de imagen inválida. ' 
       + 'Proporciona una URL válida que termine en .png, .jpg, .jpeg, .gif, o .webp',
     emoteCreated: '¡Emote personalizado creado!',
     emoteAwaitingApproval: 'Tu emote está pendiente de aprobación del administrador',
@@ -740,75 +672,7 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
     totalUsage: 'Uso Total',
     yourEmotes: 'Tus Emotes',
 
-    // Radio
-    radioTitle: '`📻 Radio PNPtv 24/7`',
-    listenNow: '🎧 Escuchar Ahora',
-    requestSong: '🎵 Pedir Canción',
-    nowPlaying: '🎵 Sonando Ahora',
-    radioSchedule: '📅 Programación',
-    streamUrl: 'Escuchar aquí: {url}',
-    songRequested: '¡Solicitud de canción recibida! La reproduciremos pronto.',
-    enterSongName: 'Ingresa el nombre de la canción:',
-    radio: {
-      description: '¡Música, vibes relajantes y tonos cloudys todo el día! 🎵☁️',
-      onAir: 'Al Aire',
-      liveNow: 'En Vivo Ahora',
-      tip: 'Toca el botón de abajo para abrir el stream en tu '
-        + 'reproductor favorito',
-      openStream: '🎧 Abrir Stream',
-      artist: 'Artista',
-      duration: 'Duración',
-      startedAt: 'Comenzó a las',
-      noSongPlaying: 'No hay información de canción disponible en este momento.',
-      history: '📜 Historial',
-      recentlyPlayed: 'Reproducidas Recientemente',
-      noHistory: 'Aún no hay historial disponible.',
-      noSchedule: 'Aún no hay programación.',
-      requestLimitReached: 'Has alcanzado el límite diario de solicitudes (5 canciones).',
-      listeners: 'Oyentes',
-      likes: 'Me gusta',
-      queuePosition: 'Posición en Cola',
-      requestsToday: 'Solicitudes Hoy',
-      songsInQueue: 'canciones en cola',
-      yourRequest: 'Tu Solicitud',
-      requestReceived: '¡Solicitud de Canción Recibida!',
-      notifyWhenPlays: '¡Te notificaremos cuando suene tu canción!',
-      skip: 'Saltar',
-      like: 'Me Gusta',
-      settings: 'Configuración',
-      notifications: 'Notificaciones',
-      notifyToggle: 'Activar/Desactivar Notificaciones',
-      trackAdded: '¡Track Agregado Exitosamente!',
-      noTracks: 'No hay tracks en la lista',
-      addTrackHelp: 'Agrega tracks usando /radio_add',
-      admin: {
-        title: 'Gestión de Radio',
-        stats: 'Estadísticas',
-        totalRequests: 'Solicitudes Totales',
-        songsPlayed: 'Canciones Reproducidas',
-        pendingRequests: 'Solicitudes Pendientes',
-        setNowPlaying: '🎵 Establecer Sonando Ahora',
-        viewRequests: '📋 Ver Solicitudes de Canciones',
-        manageSchedule: '📅 Gestionar Programación',
-        statistics: '📊 Estadísticas',
-        enterSongTitle: 'Ingresa el título de la canción:',
-        enterArtist: 'Ingresa el nombre del artista:',
-        enterDuration: 'Ingresa la duración (ej: 3:45):',
-        nowPlayingSet: '¡Sonando ahora actualizado exitosamente!',
-        noRequests: 'No hay solicitudes de canciones pendientes.',
-        requestApproved: '¡Solicitud aprobada!',
-        requestRejected: '¡Solicitud rechazada!',
-        scheduleManagement: 'Gestión de Programación',
-        addToSchedule: '➕ Agregar a la Programación',
-        selectDay: 'Selecciona un día:',
-        enterTimeSlot: 'Ingresa el horario (ej: 14:00-16:00):',
-        enterProgramName: 'Ingresa el nombre del programa:',
-        enterDescription: 'Ingresa la descripción del programa (opcional):',
-        scheduleCreated: '¡Entrada de programación creada exitosamente!',
-        scheduleDeleted: '¡Entrada de programación eliminada!',
-        noScheduleEntries: 'Aún no hay entradas de programación.',
-      },
-    },
+
 
     // Media Player
     player: {
@@ -940,18 +804,18 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
     pnpLatinoPrimeMenu: `💎 PNP LATINO PRIME
 
 Disfruta del contenido más hot con Santino, Lex y otros latinos:
-videos reales, sesiones intensas y vibes PNP sin censura, solo aquí en Telegram.
+real videos, sesiones intensas y vibes PNP sin censura, solo aquí en Telegram.
 
-Tu acceso PRIME incluye:
+Your PRIME access includes:
 
-📍 Nearby — Grinder PNP de la comunidad
-🎥 Hangouts — Salas de video privadas y públicas
-🔴 PNP Television Live — Shows y eventos en vivo
-🎶 Videorama — Playlists y podcasts PNP
+📍 Nearby — Community PNP Grindr
+🎥 Hangouts — Private and public video rooms
+🔴 PNP Television Live — Live shows and events
+🎶 Videorama — PNP playlists and podcasts
 
-🤖 Cristina IA — Soporte 24/7
+🤖 Cristina AI — Soporte 24/7
 
-💎 Contenido, conexión y experiencia PRIME.`,
+💎 Content, connection and PRIME experience.`,
     pnpLatinoFreeMenu: `🆓 PNP LATINO FREE
 
 Únete a la comunidad PNP más grande con Santino, Lex y otros latinos.
@@ -959,11 +823,11 @@ Accede a contenido básico y conecta con la comunidad.
 
 Tu acceso FREE incluye:
 
-📍 Nearby — Grinder PNP de la comunidad (básico)
+📍 Nearby — Community PNP Grindr (basic)
 🎥 Hangouts — Salas de video públicas
-🎶 Videorama — Playlists y podcasts PNP (selección limitada)
+🎶 Videorama — Playlists y podcasts PNP (limited selection)
 
-🤖 Cristina IA — Soporte 24/7
+🤖 Cristina AI — Soporte 24/7
 
 💎 ¿Quieres más? Sube a PRIME para contenido exclusivo.`,
     pnpLatinoPrimeOnboardingComplete: `🎉 ¡Bienvenido a PNP LATINO PRIME!

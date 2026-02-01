@@ -1,4 +1,4 @@
-const radioHandlers = require('./radio');
+
 const jitsiHandlers = require('./jitsi');
 const liveHandlers = require('./live');
 const supportHandlers = require('./support');
@@ -12,7 +12,7 @@ const menuHandlers = require('./menu');
  */
 const registerMediaHandlers = (bot) => {
   console.log('>>> MEDIA HANDLERS: Starting registration');
-  radioHandlers(bot);
+
   jitsiHandlers(bot);
   liveHandlers(bot);
   supportHandlers(bot);

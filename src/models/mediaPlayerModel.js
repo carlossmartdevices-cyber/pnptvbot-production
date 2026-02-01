@@ -686,13 +686,13 @@ class MediaPlayerModel {
           const result = await getPool().query(query);
           const categories = result.rows.map(r => r.category);
           logger.info(`Retrieved ${categories.length} categories`);
-          return categories.length > 0 ? categories : ['general', 'music', 'podcasts', 'radio'];
+          return categories.length > 0 ? categories : ['general', 'music', 'podcasts'];
         },
         600, // Cache for 10 minutes
       );
     } catch (error) {
       logger.error('Error getting categories:', error);
-      return ['general', 'music', 'podcasts', 'radio'];
+      return ['general', 'music', 'podcasts'];
     }
   }
 

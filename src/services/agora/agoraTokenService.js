@@ -203,27 +203,10 @@ class AgoraTokenService {
     };
   }
 
-  /**
-   * Generate tokens for radio (audio-only)
-   */
-  generateRadioTokens(channelName, userId) {
-    const rtcToken = this.generateRTCToken({
-      channelName,
-      userId,
-      role: 'subscriber', // Listeners are subscribers
-      expirationTimeInSeconds: 14400, // 4 hours
-    });
 
-    return {
-      rtcToken,
-      appId: this.appId,
-      channelName,
-      userId: String(userId),
-    };
-  }
 
   /**
-   * Generate bot tokens (for room hosts and radio)
+   * Generate bot tokens (for room hosts and )
    */
   generateBotTokens(channelName, botUserId) {
     const rtcToken = this.generateRTCToken({

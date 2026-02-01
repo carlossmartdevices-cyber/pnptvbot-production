@@ -48,6 +48,43 @@ const registerAgeVerificationHandlers = (bot) => {
     return next();
   });
 
+  // Handle Telegram WebApp payloads (age verification results + manual fallback)
+  bot.on('message', async (ctx, next) => {
+    const webAppPayload = ctx.message?.web_app_data?.data;
+    if (!webAppPayload) {
+      return next();
+    }
+
+    const lang = getLanguage(ctx);
+    const [command, payload] = webAppPayload.split(':', 2);
+
+    if (command === 'age_verified') {
+      const { updateAgeVerificationStatus } = require('../../middleware/ageVerificationRequired');
+      const { showTermsAndPrivacy } = require('./onboarding');
+
+      await updateAgeVerificationStatus(ctx, true, 'webapp_photo');
+      ctx.session.onboardingStep = 'terms';
+      await ctx.saveSession();
+
+      const parsedAge = payload ? Number(payload) : null;
+      const roundedAge = Number.isFinite(parsedAge) ? Math.round(parsedAge) : null;
+      const successMessage = lang === 'es'
+        ? `✅ Verificación completada${roundedAge ? ` (edad estimada: ${roundedAge})` : ''}. Gracias por completar la verificación.`
+        : `✅ Verification completed${roundedAge ? ` (estimated age: ${roundedAge})` : ''}. Thank you for completing the verification.`;
+
+      await ctx.reply(successMessage, { parse_mode: 'Markdown' });
+      await showTermsAndPrivacy(ctx);
+      return;
+    }
+
+    if (command === 'manual_verification') {
+      await showManualAgeConfirmation(ctx);
+      return;
+    }
+
+    return next();
+  });
+
   // Handle manual age confirmation - Yes
   bot.action('age_confirm_yes', async (ctx) => {
     try {
@@ -483,22 +520,45 @@ Please confirm that you are at least 18 years old.
 
 By clicking "Confirm", you declare under your responsibility that you are of legal age.`;
 
-  await ctx.editMessageText(
-    message,
-    {
-      parse_mode: 'Markdown',
-      ...Markup.inlineKeyboard([
-        [Markup.button.callback(
-          lang === 'es' ? '✅ Confirmar (Soy mayor de 18)' : '✅ Confirm (I am 18+)',
-          'age_confirm_yes'
-        )],
-        [Markup.button.callback(
-          lang === 'es' ? '❌ No soy mayor de edad' : '❌ I am not of legal age',
-          'age_confirm_no'
-        )],
-      ])
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback(
+      lang === 'es' ? '✅ Confirmar (Soy mayor de 18)' : '✅ Confirm (I am 18+)',
+      'age_confirm_yes'
+    )],
+    [Markup.button.callback(
+      lang === 'es' ? '❌ No soy mayor de edad' : '❌ I am not of legal age',
+      'age_confirm_no'
+    )],
+  ]);
+
+  let edited = false;
+  if (ctx.callbackQuery) {
+    try {
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...keyboard,
+      });
+      edited = true;
+    } catch (error) {
+      const alreadySame = error.description?.includes('message is not modified') ||
+        error.description?.includes('message to edit not found');
+      if (!alreadySame) {
+        logger.warn('Could not edit manual age confirmation message, falling back to reply', {
+          error: error.message,
+          userId: ctx.from?.id,
+        });
+      } else {
+        edited = true;
+      }
     }
-  );
+  }
+
+  if (!edited) {
+    await ctx.reply(message, {
+      parse_mode: 'Markdown',
+      ...keyboard,
+    });
+  }
 };
 
 module.exports = {

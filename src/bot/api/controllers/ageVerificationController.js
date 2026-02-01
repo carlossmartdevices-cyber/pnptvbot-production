@@ -1,5 +1,4 @@
 const ageVerificationService = require('../../services/ageVerificationService');
-const UserService = require('../../services/userService');
 const logger = require('../../../utils/logger');
 const path = require('path');
 
@@ -34,7 +33,10 @@ class AgeVerificationController {
       // Call age verification service with the photo
       const verificationResult = await ageVerificationService.verifyPhotoAge(
         req.file.buffer,
-        userId
+        userId,
+        {
+          fallbackPhotoId: `web_upload_${Date.now()}`,
+        }
       );
 
       if (!verificationResult) {
@@ -46,32 +48,16 @@ class AgeVerificationController {
         });
       }
 
-      // Update user's age verification status if verified
-      if (verificationResult.ageVerified) {
-        try {
-          await UserService.updateProfile(userId, {
-            ageVerified: true,
-            ageVerifiedAt: new Date(),
-          });
-
-          logger.info('User age verified successfully', {
-            userId,
-            estimatedAge: verificationResult.estimatedAge
-          });
-        } catch (updateError) {
-          logger.warn('Failed to update user profile', { userId, error: updateError.message });
-          // Continue anyway - age verification was successful
-        }
-      }
-
       return res.json({
-        success: true,
-        ageVerified: verificationResult.ageVerified,
-        estimatedAge: verificationResult.estimatedAge,
-        confidence: verificationResult.confidence,
-        message: verificationResult.ageVerified
-          ? 'Age verified successfully'
-          : 'Could not verify age - please try again or use manual verification'
+        success: Boolean(verificationResult.success),
+        ageVerified: Boolean(verificationResult.ageVerified),
+        estimatedAge: verificationResult.age || verificationResult.estimatedAge || null,
+        confidence: verificationResult.confidence || null,
+        message: verificationResult.message || (
+          verificationResult.ageVerified
+            ? 'Age verified successfully'
+            : 'Could not verify age - please try again or use manual verification'
+        ),
       });
 
     } catch (error) {

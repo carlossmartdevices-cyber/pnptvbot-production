@@ -7,6 +7,7 @@ const CallRoom = lazy(() => import('./components/CallRoom'));
 
 function App() {
   const params = useMemo(() => getQueryParams(), []);
+  const roleParam = (params.role || '').toUpperCase();
   const [telegramUser, setTelegramUser] = useState(null);
 
   useEffect(() => {
@@ -35,7 +36,7 @@ function App() {
     );
   }
 
-  return <Lobby telegramUser={telegramUser} />;
+  return <Lobby telegramUser={telegramUser} role={roleParam} />;
 }
 
 export default App;

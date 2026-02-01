@@ -1,8 +1,9 @@
 const { Markup } = require('telegraf');
-const { getFirestore } = require('../../config/firebase');
 const { t } = require('../../utils/i18n');
+const UserService = require('../services/userService');
 const logger = require('../../utils/logger');
 const { showAgeVerification, showMainMenu } = require('../helpers/onboardingHelpers');
+const { handlePromoDeepLink } = require('./promo/promoHandler');
 
 /**
  * Check if user is admin
@@ -44,17 +45,30 @@ async function handleStart(ctx) {
       return await handleGroupRedirect(ctx);
     }
 
-    // Check if user exists in Firestore
-    const db = getFirestore();
-    const userDoc = await db.collection('users').doc(userId).get();
+    // Check for promo deep link: /start promo_CODE
+    if (startPayload && startPayload.startsWith('promo_')) {
+      const promoCode = startPayload.replace('promo_', '');
+      logger.info(`[Start] User ${userId} accessing promo: ${promoCode}`);
+      return await handlePromoDeepLink(ctx, promoCode);
+    }
 
-    if (!userDoc.exists) {
-      // New user - start fresh onboarding
+    ctx.session = ctx.session || {};
+
+    if (startPayload === 'age_verified') {
+      ctx.session.ageVerified = true;
+      ctx.session.onboardingStep = 'terms';
+      await ctx.saveSession();
+      const confirmation = lang === 'es'
+        ? '✅ Verificamos tu edad. Continúa con los siguientes pasos (términos y privacidad).'
+        : '✅ Age verified! Continue with the following steps (terms & privacy).';
+      await ctx.reply(confirmation);
+    }
+
+    const userData = await UserService.getUser(userId);
+    if (!userData) {
       logger.info(`[Start] New user ${userId} - starting onboarding`);
       return await startFreshOnboarding(ctx);
     }
-
-    const userData = userDoc.data();
 
     // Optional: Force fresh onboarding for admins during testing
     if (isAdmin(ctx.from.id) && process.env.ADMIN_FRESH_ONBOARDING === 'true') {
@@ -70,30 +84,22 @@ async function handleStart(ctx) {
 
     // Check if onboarding is complete
     if (userData.onboardingComplete) {
-      // Returning user with valid age verification
       logger.info(`[Start] Returning user ${userId} - showing main menu`);
 
-      // Update last active
       try {
-        await db.collection('users').doc(userId).update({
-          lastActive: new Date(),
-        });
+        await UserService.updateUser(userId, { lastActive: new Date() });
       } catch (updateError) {
         logger.warn('Failed to update lastActive:', updateError);
       }
 
-      // Show personalized welcome message
       const greeting = lang === 'es'
         ? `¡Hola de nuevo, ${userData.firstName || 'Usuario'}! 👋`
         : `Welcome back, ${userData.firstName || 'User'}! 👋`;
 
       await ctx.reply(greeting);
-
-      // Show main menu
       return await showMainMenu(ctx);
     }
 
-    // User exists but onboarding incomplete - resume onboarding
     logger.info(`[Start] User ${userId} - resuming incomplete onboarding`);
     return await resumeOnboarding(ctx, userData);
   } catch (error) {

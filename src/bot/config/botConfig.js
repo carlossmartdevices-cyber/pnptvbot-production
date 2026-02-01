@@ -48,7 +48,7 @@ const config = {
   // Feature flags
   features: {
     liveStreams: true,
-    radio: true,
+
     nearbyUsers: true,
     payments: true,
   },

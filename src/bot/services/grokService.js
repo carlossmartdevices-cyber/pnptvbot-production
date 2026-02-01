@@ -151,13 +151,23 @@ async function chat({ mode, language, prompt, hasMedia = false, maxTokens }) {
  * @param {boolean} options.hasMedia - Whether the post has media attached
  * @returns {Promise<{combined: string, en: string, es: string, english: string, spanish: string}>}
  */
-async function generateSharePost({ prompt, hasMedia = false }) {
+async function generateSharePost({ prompt, hasMedia = false, includeLex = false, includeSantino = false }) {
   // Each language max 450 chars so combined stays under 1000
   const maxCharsPerLang = 450;
   const chatFn = module.exports.chat || chat;
 
+  let lexInstructionEn = '';
+  if (includeLex) {
+    lexInstructionEn = '- Include information and hashtags about Lex per (e.g., #LexPer #PNPtvLex).\n';
+  }
+
+  let santinoInstructionEn = '';
+  if (includeSantino) {
+    santinoInstructionEn = '- Include information and hashtags about Santino (e.g., #Santino #MethDaddy #CultoSantino #PNPLatinoTV).\n';
+  }
+
   // Generate English version
-  const enPrompt = `Create a share post for: ${prompt}\n\nRequirements:\n- Language: English\n- MAXIMUM ${maxCharsPerLang} characters - be very concise\n- Engaging, community-focused tone\n- Include 2-3 relevant emojis\n- End with a short call to action`;
+  const enPrompt = `Create a share post for: ${prompt}\n\nRequirements:\n- Language: English\n- MAXIMUM ${maxCharsPerLang} characters - be very concise\n- Engaging, community-focused tone\n${lexInstructionEn}${santinoInstructionEn}- End with a short call to action`;
 
   let enContent = await chatFn({
     mode: 'sharePost',
@@ -171,8 +181,18 @@ async function generateSharePost({ prompt, hasMedia = false }) {
     enContent = enContent.substring(0, maxCharsPerLang - 3) + '...';
   }
 
+  let lexInstructionEs = '';
+  if (includeLex) {
+    lexInstructionEs = '- Incluye información y hashtags sobre Lex per (ej. #LexPer #PNPtvLex).\n';
+  }
+
+  let santinoInstructionEs = '';
+  if (includeSantino) {
+    santinoInstructionEs = '- Incluye información y hashtags sobre Santino (ej. #Santino #MethDaddy #CultoSantino #PNPLatinoTV).\n';
+  }
+
   // Generate Spanish version
-  const esPrompt = `Create a share post for: ${prompt}\n\nRequirements:\n- Language: Spanish\n- MAXIMUM ${maxCharsPerLang} characters - be very concise\n- Engaging, community-focused tone\n- Include 2-3 relevant emojis\n- End with a short call to action`;
+  const esPrompt = `Create a share post for: ${prompt}\n\nRequirements:\n- Language: Spanish\n- MAXIMUM ${maxCharsPerLang} characters - be very concise\n- Engaging, community-focused tone\n${lexInstructionEs}${santinoInstructionEs}- End with a short call to action`;
 
   let esContent = await chatFn({
     mode: 'sharePost',

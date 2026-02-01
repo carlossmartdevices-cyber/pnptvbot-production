@@ -469,10 +469,10 @@ const showNowPlaying = async (ctx) => {
       if (media) {
         text += `🎼 ${media.title}\n`;
         if (media.artist) {
-          text += `🎤 ${t('radio.artist', lang)}: ${media.artist}\n`;
+          text += `🎤 ${media.artist}\n`;
         }
         if (media.duration) {
-          text += `⏱️ ${t('radio.duration', lang)}: ${media.duration}\n`;
+          text += `⏱️ ${media.duration}\n`;
         }
 
         text += `\n📊 ${media.plays} ${t('player.plays', lang)} | ❤️ ${media.likes} ${t('player.likes', lang)}\n\n`;
@@ -712,7 +712,6 @@ const playMedia = async (ctx, mediaId) => {
       // Send audio
       await ctx.replyWithAudio(media.url, {
         title: media.title,
-        performer: media.artist || 'PNP Radio',
         caption: text,
       });
     } else {

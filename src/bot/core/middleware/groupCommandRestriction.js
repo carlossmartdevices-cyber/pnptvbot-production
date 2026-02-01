@@ -49,7 +49,7 @@ const COMMAND_DEEP_LINKS = {
   'videos': 'content',
   'hangouts': 'hangouts',
   'calls': 'hangouts',
-  'radio': 'show_radio',
+
   'live': 'show_live',
   'pnplive': 'pnp_live',
   'cristina': 'cristina',

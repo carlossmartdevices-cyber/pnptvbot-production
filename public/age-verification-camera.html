@@ -518,7 +518,7 @@
             if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
                 Telegram.WebApp.close();
             } else {
-                window.location.href = 'tg://resolve?domain=PNPtv_bot';
+                window.location.href = 'tg://resolve?domain=pnplatinotv_bot';
             }
         });
 
@@ -584,7 +584,7 @@
             if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
                 Telegram.WebApp.sendData('manual_verification');
             } else {
-                window.location.href = `tg://resolve?domain=PNPtv_bot&start=age_manual`;
+                window.location.href = `tg://resolve?domain=pnplatinotv_bot&start=age_manual`;
             }
         });
 
@@ -599,13 +599,29 @@
                 const formData = new FormData();
                 formData.append('photo', photoBlob);
                 formData.append('user_id', USER_ID);
+                formData.append('lang', LANGUAGE);
 
                 const response = await fetch('/api/verify-age', {
                     method: 'POST',
                     body: formData
                 });
 
-                const result = await response.json();
+                let result = null;
+                try {
+                    result = await response.json();
+                } catch (parseError) {
+                    result = {
+                        success: false,
+                        message: 'Verification service error. Please try again in a moment.'
+                    };
+                }
+                if (!response.ok) {
+                    result = result || { success: false };
+                    result.success = false;
+                    if (!result.message) {
+                        result.message = 'We could not process your photo. Please try again or use manual verification.';
+                    }
+                }
                 verificationResult = result;
 
                 if (result.success && result.ageVerified) {
@@ -614,8 +630,9 @@
                     document.getElementById('controlButtons').classList.add('hidden');
                     document.getElementById('resultButtons').classList.remove('hidden');
                 } else {
+                    const failureMessage = result?.message || result?.error || 'We could not verify your age. Please try again or use manual verification.';
                     loader.classList.remove('active');
-                    showResult(false, '❌ Verification Failed', 'We could not verify your age. Please try again or use manual verification.');
+                    showResult(false, '❌ Verification Failed', failureMessage);
                     document.getElementById('controlButtons').classList.remove('hidden');
                     document.getElementById('resultButtons').classList.add('hidden');
                     captureBtn.disabled = false;
@@ -650,7 +667,7 @@
                 Telegram.WebApp.sendData('age_verified:' + verificationResult.estimatedAge);
             } else {
                 alert('Age verified! Redirecting...');
-                window.location.href = `tg://resolve?domain=PNPtv_bot&start=age_verified`;
+                window.location.href = `tg://resolve?domain=pnplatinotv_bot&start=age_verified`;
             }
         });
 

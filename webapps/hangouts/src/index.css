@@ -273,6 +273,12 @@ select {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.notice.warning {
+  border-color: rgba(255, 179, 71, 0.6);
+  background: rgba(255, 179, 71, 0.18);
+  color: var(--warning);
+}
+
 .notice.info {
   border-color: rgba(255, 255, 255, 0.2);
 }

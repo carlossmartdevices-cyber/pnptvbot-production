@@ -7,6 +7,8 @@ const MediaPopularityService = require('./mediaPopularityService');
 const logger = require('../../utils/logger');
 const { getPool } = require('../../config/postgres');
 
+const MAX_TIMEOUT = 0x7fffffff;
+
 class MediaPopularityScheduler {
   constructor(bot) {
     this.bot = bot;
@@ -172,18 +174,38 @@ class MediaPopularityScheduler {
       const nextFirst = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       nextFirst.setHours(20, 0, 0, 0);
 
-      const delay = Math.max(nextFirst - now, 60000); // Minimum 1 minute
+    const delay = Math.max(nextFirst - now, 60000); // Minimum 1 minute
 
-      // Schedule the announcement
-      this.scheduledJobs.monthly = setTimeout(async () => {
-        await this.runMonthlyAnnouncement();
-        this.scheduleMonthlyAnnouncement(); // Reschedule for next month
-      }, delay);
+    this.scheduleWithLimit('monthly', async () => {
+      await this.runMonthlyAnnouncement();
+      this.scheduleMonthlyAnnouncement();
+    }, delay);
 
-      logger.info(`Monthly top contributor announcement scheduled for ${nextFirst}`);
-    } catch (error) {
-      logger.error('Error scheduling monthly announcement:', error);
+    logger.info(`Monthly top contributor announcement scheduled for ${nextFirst}`);
+  } catch (error) {
+    logger.error('Error scheduling monthly announcement:', error);
+  }
+}
+
+  scheduleWithLimit(key, callback, delay) {
+    // Clear existing job first
+    if (this.scheduledJobs[key]) {
+      clearTimeout(this.scheduledJobs[key]);
     }
+
+    const scheduleChunk = (remaining) => {
+      const chunk = Math.min(remaining, MAX_TIMEOUT);
+      this.scheduledJobs[key] = setTimeout(() => {
+        const nextRemaining = remaining - chunk;
+        if (nextRemaining <= 0) {
+          callback();
+        } else {
+          scheduleChunk(nextRemaining);
+        }
+      }, chunk);
+    };
+
+    scheduleChunk(delay);
   }
 
   /**

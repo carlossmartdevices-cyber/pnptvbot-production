@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 const session = require('express-session');
 const RedisStore = require('connect-redis').default;
+const multer = require('multer');
 const { getRedis } = require('../../config/redis');
 const logger = require('../../utils/logger');
 
@@ -18,6 +19,7 @@ const paymentController = require('./controllers/paymentController');
 const invitationController = require('./controllers/invitationController');
 const playlistController = require('./controllers/playlistController');
 const podcastController = require('./controllers/podcastController');
+const ageVerificationController = require('./controllers/ageVerificationController');
 const healthController = require('./controllers/healthController');
 const hangoutsController = require('./controllers/hangoutsController');
 const xOAuthRoutes = require('./xOAuthRoutes');
@@ -419,6 +421,44 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
+const ageVerificationUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max photo size
+  fileFilter: (req, file, cb) => {
+    const isImage = /^image\/(jpeg|jpg|png|webp|heic|heif)$/i.test(file.mimetype || '');
+    if (isImage) {
+      return cb(null, true);
+    }
+    return cb(new Error('Only image uploads are allowed'));
+  }
+});
+
+const uploadAgeVerificationPhoto = (req, res, next) => {
+  ageVerificationUpload.single('photo')(req, res, (err) => {
+    if (!err) {
+      return next();
+    }
+
+    let message = 'Invalid upload. Please try again with a clear photo.';
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      message = 'Photo is too large. Maximum size is 5MB.';
+    } else if (err.message && err.message.toLowerCase().includes('image')) {
+      message = 'Only image files are allowed. Please upload a JPG or PNG.';
+    }
+
+    logger.warn('Age verification upload rejected', {
+      error: err.message,
+      code: err.code
+    });
+
+    return res.status(400).json({
+      success: false,
+      error: 'INVALID_UPLOAD',
+      message
+    });
+  });
+};
+
 // Stricter rate limiting for webhooks to prevent abuse
 const webhookLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
@@ -487,6 +527,13 @@ app.post('/api/logout', (req, res) => {
     res.json({ success: true });
   });
 });
+
+// Age verification (AI camera)
+app.post(
+  '/api/verify-age',
+  uploadAgeVerificationPhoto,
+  asyncHandler(ageVerificationController.verifyAge)
+);
 
 // Telegram webhook is handled in bot.js, not here
 // The webhook handler is registered via apiApp.post(webhookPath, ...) in bot.js
@@ -800,7 +847,7 @@ app.post('/api/hangouts/join/:callId', asyncHandler(hangoutsController.join));
 // Media Library API (for Videorama)
 // ==========================================
 const MediaPlayerModel = require('../../models/mediaPlayerModel');
-const radioStreamManager = require('../../services/radio/radioStreamManager');
+
 
 // Get media library
 app.get('/api/media/library', asyncHandler(async (req, res) => {
@@ -904,59 +951,7 @@ app.get('/api/media/playlists', asyncHandler(async (req, res) => {
   }
 }));
 
-// ==========================================
-// Radio API (for Videorama integration)
-// ==========================================
 
-// Get radio now playing
-app.get('/api/radio/now-playing', asyncHandler(async (req, res) => {
-  try {
-    const nowPlaying = await radioStreamManager.getNowPlaying();
-    const channelInfo = radioStreamManager.getChannelInfo();
-
-    res.json({
-      success: true,
-      track: nowPlaying?.track || null,
-      remaining: nowPlaying?.remaining || 0,
-      listenerCount: nowPlaying?.listenerCount || 0,
-      isPlaying: channelInfo?.isPlaying || false
-    });
-  } catch (error) {
-    logger.error('Error fetching radio now playing:', error);
-    res.json({
-      success: true,
-      track: null,
-      remaining: 0,
-      listenerCount: 0,
-      isPlaying: false
-    });
-  }
-}));
-
-// Get radio playlist
-app.get('/api/radio/playlist', asyncHandler(async (req, res) => {
-  try {
-    const { getPool } = require('../../config/postgres');
-    const result = await getPool().query(`
-      SELECT id, title, artist, type, duration_seconds, thumbnail_url
-      FROM radio_tracks
-      WHERE is_active = true
-      ORDER BY play_order ASC NULLS LAST, created_at DESC
-      LIMIT 20
-    `);
-
-    res.json({
-      success: true,
-      data: result.rows
-    });
-  } catch (error) {
-    logger.error('Error fetching radio playlist:', error);
-    res.json({
-      success: true,
-      data: []
-    });
-  }
-}));
 
 // Broadcast Queue API Routes
 const broadcastQueueRoutes = require('./broadcastQueueRoutes');

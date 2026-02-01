@@ -32,79 +32,100 @@ class AgeVerificationService {
     try {
       logger.info(`Starting AI age verification for user ${ctx.from.id} with provider: ${this.provider}`);
 
-      // Get photo file from Telegram
       const photoFile = await ctx.telegram.getFile(photoFileId);
       const photoUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${photoFile.file_path}`;
 
       logger.info(`Photo URL obtained: ${photoUrl}`);
 
-      // Download photo
       const photoBuffer = await this.downloadPhoto(photoUrl);
 
-      // Analyze photo based on provider
-      let analysisResult;
-      switch (this.provider) {
-        case 'azure':
-          analysisResult = await this.analyzeWithAzure(photoBuffer);
-          break;
-        case 'facepp':
-          analysisResult = await this.analyzeWithFacePP(photoBuffer);
-          break;
-        default:
-          throw new Error(`Unsupported provider: ${this.provider}`);
-      }
+      return this.verifyPhotoBuffer(photoBuffer, ctx.from.id, {
+        method: 'ai_photo',
+        fallbackPhotoId: photoFileId,
+      });
+    } catch (error) {
+      logger.error('Error in AI age verification:', error);
+      return {
+        success: false,
+        verified: false,
+        ageVerified: false,
+        error: 'VERIFICATION_ERROR',
+        message: error.message,
+      };
+    }
+  }
 
-      // Validate analysis result
+  async verifyPhotoAge(photoBuffer, userId, options = {}) {
+    return this.verifyPhotoBuffer(photoBuffer, userId, {
+      method: options.method || 'ai_photo',
+      fallbackPhotoId: options.fallbackPhotoId || `web_upload_${Date.now()}`,
+    });
+  }
+
+  async verifyPhotoBuffer(photoBuffer, userId, { method = 'ai_photo', fallbackPhotoId } = {}) {
+    try {
+      const analysisResult = await this.analyzePhoto(photoBuffer);
+
       if (!analysisResult.success) {
         return {
           success: false,
           verified: false,
+          ageVerified: false,
           error: analysisResult.error,
+          message: analysisResult.message || analysisResult.error,
         };
       }
 
       const { age, confidence, faceDetected } = analysisResult;
 
-      // Check if face was detected
       if (!faceDetected) {
         return {
           success: false,
           verified: false,
+          ageVerified: false,
           error: 'NO_FACE_DETECTED',
-          message: 'No se detectó un rostro en la imagen. Por favor, tome una foto clara de su rostro.',
+          message: 'No se detectó un rostro claro en la imagen.',
         };
       }
 
-      // Check if age meets requirement
       const isVerified = age >= this.minAge;
 
-      // Save verification attempt to database
-      await this.saveVerificationAttempt(ctx.from.id, {
-        photoFileId,
+      await this.saveVerificationAttempt(userId, {
+        photoFileId: fallbackPhotoId || `web_upload_${Date.now()}`,
         estimatedAge: age,
         confidence,
         verified: isVerified,
         provider: this.provider,
       });
 
-      // Update user if verified
       if (isVerified) {
-        await this.updateUserVerification(ctx.from.id);
+        const persistence = await UserModel.updateAgeVerification(userId, { verified: true, method });
+        if (!persistence) {
+          logger.warn('Age verification could not be persisted - user record missing', { userId });
+        }
       }
+
+      const message = isVerified
+        ? 'Age verified successfully'
+        : 'User does not meet the minimum age requirement';
 
       return {
         success: true,
         verified: isVerified,
+        ageVerified: isVerified,
         age,
+        estimatedAge: age,
         confidence,
         minAge: this.minAge,
         provider: this.provider,
+        message,
       };
     } catch (error) {
-      logger.error('Error in AI age verification:', error);
+      logger.error('Error in AI age verification buffer path:', error);
       return {
         success: false,
         verified: false,
+        ageVerified: false,
         error: 'VERIFICATION_ERROR',
         message: error.message,
       };
@@ -126,6 +147,22 @@ class AgeVerificationService {
     } catch (error) {
       logger.error('Error downloading photo:', error);
       throw new Error('Failed to download photo');
+    }
+  }
+
+  /**
+   * Analyze photo based on configured provider
+   * @param {Buffer} photoBuffer - Photo bytes
+   * @returns {Promise<Object>} Analysis result
+   */
+  async analyzePhoto(photoBuffer) {
+    switch (this.provider) {
+      case 'azure':
+        return this.analyzeWithAzure(photoBuffer);
+      case 'facepp':
+        return this.analyzeWithFacePP(photoBuffer);
+      default:
+        throw new Error(`Unsupported provider: ${this.provider}`);
     }
   }
 
@@ -268,9 +305,11 @@ class AgeVerificationService {
         ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
       `;
 
+      const photoRef = data.photoFileId || `web_upload_${Date.now()}`;
+
       await query(sql, [
         userId.toString(),
-        data.photoFileId,
+        photoRef,
         data.estimatedAge,
         data.confidence,
         data.verified,
@@ -285,36 +324,6 @@ class AgeVerificationService {
       } else {
         logger.error('Error saving verification attempt:', error);
       }
-    }
-  }
-
-  /**
-   * Update user verification status
-   * @param {string} userId - User ID
-   */
-  async updateUserVerification(userId) {
-    try {
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + (168 * 60 * 60 * 1000)); // 7 days
-
-      await query(
-        `UPDATE users SET
-          age_verified = true,
-          age_verified_at = $2,
-          age_verification_expires_at = $3,
-          age_verification_method = 'ai_photo',
-          updated_at = NOW()
-        WHERE id = $1`,
-        [userId.toString(), now, expiresAt]
-      );
-
-      // Clear cache
-      await UserModel.invalidateCache(userId);
-
-      logger.info(`User ${userId} age verified successfully via AI`);
-    } catch (error) {
-      logger.error('Error updating user verification:', error);
-      throw error;
     }
   }
 

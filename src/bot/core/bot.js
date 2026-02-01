@@ -56,7 +56,7 @@ const registerCallManagementHandlers = require('../handlers/admin/callManagement
 const registerRoleManagementHandlers = require('../handlers/admin/roleManagement');
 const registerPerformerManagementHandlers = require('../handlers/admin/performerManagement');
 const registerLiveStreamManagementHandlers = require('../handlers/admin/liveStreamManagement');
-const registerRadioManagementHandlers = require('../handlers/admin/radioManagement');
+
 const registerPNPLiveModelHandlers = require('../handlers/model/pnpLiveModelHandler');
 const { registerWallOfFameHandlers } = require('../handlers/group/wallOfFame');
 const registerPrivateCallHandlers = require('../handlers/user/privateCalls');
@@ -66,6 +66,7 @@ const registerPaymentAnalyticsHandlers = require('../handlers/admin/paymentAnaly
 const registerUserCallManagementHandlers = require('../handlers/user/callManagement');
 const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
+const { registerPromoHandlers } = require('../handlers/promo/promoHandler');
 // Middleware
 const { setupAgeVerificationMiddleware } = require('./middleware/ageVerificationRequired');
 // Services
@@ -76,7 +77,7 @@ const SubscriptionReminderService = require('../services/subscriptionReminderSer
 const MembershipCleanupService = require('../services/membershipCleanupService');
 const TutorialReminderService = require('../services/tutorialReminderService');
 const MessageRateLimiter = require('../services/messageRateLimiter');
-const radioStreamManager = require('../../services/radio/radioStreamManager');
+
 const CommunityPostScheduler = require('./schedulers/communityPostScheduler');
 const XPostScheduler = require('./schedulers/xPostScheduler');
 const { initializeWorker: initializePrivateCallsWorker } = require('../../workers/privateCallsWorker');
@@ -382,6 +383,8 @@ const startBot = async () => {
     registerUserCallManagementHandlers(bot);
     registerCallFeedbackHandlers(bot);
     registerCallPackageHandlers(bot);
+    // Register promo handlers (for promotional offers via deep links)
+    registerPromoHandlers(bot);
     // Register support routing handlers (for forum topic-based support)
     registerSupportRoutingHandlers(bot);
 
@@ -475,13 +478,7 @@ const startBot = async () => {
     } catch (error) {
       logger.warn('Async broadcast queue initialization failed, continuing without async processing:', error.message);
     }
-    // Initialize radio stream manager
-    try {
-      await radioStreamManager.initialize();
-      logger.info('✓ Radio stream manager initialized and started');
-    } catch (error) {
-      logger.warn('Radio stream manager initialization failed, continuing without radio:', error.message);
-    }
+
     // Initialize community post scheduler
     try {
       const communityPostScheduler = new CommunityPostScheduler(bot);

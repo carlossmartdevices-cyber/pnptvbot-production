@@ -449,11 +449,7 @@ async function handleDeepLinkStart(ctx) {
         await handleDeepLinkSupport(ctx, lang);
         return;
 
-      case 'radio':
-      case 'show_radio':
-        // Show radio screen
-        await handleDeepLinkRadio(ctx, lang);
-        return;
+
     }
 
     // Check if it's a menu deep link
@@ -874,34 +870,7 @@ async function handleDeepLinkSupport(ctx, lang) {
   });
 }
 
-/**
- * Handle deep link to radio (uses ctx.reply instead of editMessageText)
- */
-async function handleDeepLinkRadio(ctx, lang) {
-  const message = lang === 'es'
-    ? '📻 *PNPtv Radio*\n\n' +
-      '¡Sintoniza nuestra estación de radio comunitaria!\n\n' +
-      '🎵 Música las 24 horas\n' +
-      '🎤 Programas en vivo\n' +
-      '💜 Contenido de la comunidad\n\n' +
-      '_Haz clic en el botón de abajo para escuchar._'
-    : '📻 *PNPtv Radio*\n\n' +
-      'Tune in to our community radio station!\n\n' +
-      '🎵 24/7 Music\n' +
-      '🎤 Live shows\n' +
-      '💜 Community content\n\n' +
-      '_Click the button below to listen._';
 
-  const keyboard = Markup.inlineKeyboard([
-    [Markup.button.callback(lang === 'es' ? '📻 Escuchar Radio' : '📻 Listen to Radio', 'menu_radio')],
-    [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')]
-  ]);
-
-  await ctx.reply(message, {
-    parse_mode: 'Markdown',
-    ...keyboard
-  });
-}
 
 /**
  * Handle menu option callbacks

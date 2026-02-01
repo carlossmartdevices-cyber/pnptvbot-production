@@ -122,7 +122,7 @@ We're excited to have you join our community. Here's what you can do:
 
 📍 Connect with nearby users
 🎥 Watch live streams
-📻 Listen to our radio
+
 🎥 Join private Hangouts (video rooms)
 💎 Subscribe for premium features
 
@@ -133,7 +133,7 @@ Estamos emocionados de que te unas a nuestra comunidad. Esto es lo que puedes ha
 
 📍 Conecta con usuarios cercanos
 🎥 Ver transmisiones en vivo
-📻 Escuchar nuestra radio
+
 🎥 Unirse a Hangouts privados (video rooms)
 💎 Suscríbete para funciones premium
 

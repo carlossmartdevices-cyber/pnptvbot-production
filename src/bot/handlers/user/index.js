@@ -14,7 +14,7 @@ const { registerSubscriptionHandlers } = require('./subscriptionManagement');
 const registerPNPLiveHandlers = require('./pnpLiveHandler');
 const PNPLiveNotificationService = require('../../services/pnpLiveNotificationService');
 const registerHangoutsHandlers = require('./hangoutsHandler');
-const registerRadioHandlers = require('./radioHandler');
+
 const registerVideoramaHandlers = require('./videoramaHandler');
 
 /**
@@ -38,7 +38,7 @@ const registerUserHandlers = (bot) => {
   registerSubscriptionHandlers(bot);
   registerPNPLiveHandlers(bot);
   registerHangoutsHandlers(bot);
-  registerRadioHandlers(bot);
+
   registerVideoramaHandlers(bot);
 
   // Initialize PNP Live notification service with bot instance

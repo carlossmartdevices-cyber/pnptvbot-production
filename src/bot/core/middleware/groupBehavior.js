@@ -406,7 +406,7 @@ function groupCallbackRedirectMiddleware() {
       'show_hangouts': 'hangouts',
       'cristina': 'cristina',
       'menu_cristina': 'cristina',
-      'show_radio': 'show_radio',
+
       'show_live': 'show_live',
       'pnp_live': 'pnp_live',
       'show_leaderboard': 'leaderboard',

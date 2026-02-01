@@ -539,19 +539,7 @@ const registerJitsiHandlers = (bot) => {
             });
 
             // Notify Live & Radio topic if room is public
-            if (room.is_public) {
-                try {
-                    const { notifyLiveRadioTopic } = require('../../handlers/user/menu');
-                    await notifyLiveRadioTopic(ctx.telegram, 'hangout', {
-                        title: room.title,
-                        host: ctx.from.first_name || ctx.from.username || 'A member',
-                        description: `${tierInfo.icon} ${room.max_participants} max participants`,
-                        link: joinUrl
-                    });
-                } catch (notifyError) {
-                    logger.debug('Could not notify Live/Radio topic:', notifyError.message);
-                }
-            }
+
 
             // Clear session
             ctx.session.temp.creatingJitsiRoom = false;

@@ -132,7 +132,7 @@ function setupAgeVerificationMiddleware(bot) {
  * @param {Object} ctx - Telegraf context
  * @param {boolean} verified - Verification status
  */
-async function updateAgeVerificationStatus(ctx, verified = true) {
+async function updateAgeVerificationStatus(ctx, verified = true, method = 'ai_photo') {
   try {
     const userId = ctx.from?.id;
     if (!userId) return;
@@ -143,10 +143,10 @@ async function updateAgeVerificationStatus(ctx, verified = true) {
 
     // Update database via UserModel if method exists
     if (UserModel.updateAgeVerification) {
-      await UserModel.updateAgeVerification(userId, verified);
+      await UserModel.updateAgeVerification(userId, { verified, method });
     }
 
-    logger.info(`Age verification status updated for user ${userId}:`, { verified });
+    logger.info(`Age verification status updated for user ${userId}:`, { verified, method });
   } catch (error) {
     logger.error('Error updating age verification status:', error);
   }

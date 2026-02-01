@@ -57,8 +57,12 @@ class PaymentController {
         });
       }
 
-      // Calculate price in COP
-      const priceInCOP = plan.price_in_cop || (parseFloat(plan.price) * 4000);
+      // Use payment amount if available (for promos), otherwise use plan price
+      const paymentAmount = payment.amount || parseFloat(plan.price);
+      const isPromo = payment.metadata?.promoId ? true : false;
+
+      // Calculate price in COP using the actual payment amount
+      const priceInCOP = Math.round(paymentAmount * 4000);
       const amountCOPString = String(priceInCOP);
       const currencyCode = 'COP';
 
@@ -88,14 +92,20 @@ class PaymentController {
         planId,
         provider,
         status: payment.status,
-        amountUSD: parseFloat(plan.price),
+        amountUSD: paymentAmount,
         amountCOP: priceInCOP,
         currencyCode,
+        isPromo,
+        originalPrice: isPromo ? parseFloat(plan.price) : null,
+        discountAmount: isPromo ? (parseFloat(plan.price) - paymentAmount) : null,
+        promoCode: payment.metadata?.promoCode || null,
         plan: {
           id: plan.id,
           sku: plan.sku || 'EASYBOTS-PNP-030',
           name: plan.display_name || plan.name,
-          description: `Suscripción ${plan.display_name || plan.name} - PNPtv`,
+          description: isPromo
+            ? `Promo ${payment.metadata?.promoCode || ''} - ${plan.display_name || plan.name}`
+            : `Suscripción ${plan.display_name || plan.name} - PNPtv`,
           icon: plan.icon || '💎',
           duration: plan.duration || 30,
           features: plan.features || [],

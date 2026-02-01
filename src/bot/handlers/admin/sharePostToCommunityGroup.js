@@ -81,6 +81,8 @@ const registerCommunityPostHandlers = (bot) => {
         scheduledTimes: [],
         scheduledCount: 1,
         currentScheduleIndex: 0,
+        includeLex: false,
+        includeSantino: false,
       };
       await ctx.saveSession();
 
@@ -632,6 +634,10 @@ const registerCommunityPostHandlers = (bot) => {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('🤖 AI Write (Grok)', 'share_post_ai_text')],
+            [
+              Markup.button.callback('👤 Incluir Lex', 'share_post_toggle_lex'),
+              Markup.button.callback('😈 Incluir Santino', 'share_post_toggle_santino'),
+            ],
             [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
           ]),
         }
@@ -660,7 +666,39 @@ const registerCommunityPostHandlers = (bot) => {
 
     ctx.session.temp.waitingForText = true;
     await ctx.saveSession();
-  }
+  // Toggle Lex inclusion
+  bot.action('share_post_toggle_lex', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      
+      let includeLex = ctx.session.temp.communityPostData.includeLex || false;
+      ctx.session.temp.communityPostData.includeLex = !includeLex;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery(ctx.session.temp.communityPostData.includeLex ? '✅ Incluido Lex' : '⬜ Excluido Lex');
+      await showTextInputStep(ctx);
+    } catch (error) {
+      logger.error('Error toggling Lex inclusion:', error);
+    }
+  });
+
+  // Toggle Santino inclusion
+  bot.action('share_post_toggle_santino', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      
+      let includeSantino = ctx.session.temp.communityPostData.includeSantino || false;
+      ctx.session.temp.communityPostData.includeSantino = !includeSantino;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery(ctx.session.temp.communityPostData.includeSantino ? '✅ Incluido Santino' : '⬜ Excluido Santino');
+      await showTextInputStep(ctx);
+    } catch (error) {
+      logger.error('Error toggling Santino inclusion:', error);
+    }
+  });
 
   bot.on('text', async (ctx, next) => {
     try {
@@ -682,17 +720,20 @@ const registerCommunityPostHandlers = (bot) => {
         if (!prompt) return;
         try {
           const hasMedia = !!ctx.session.temp.communityPostData.mediaFileId;
-          // Use optimized chat with hasMedia parameter for automatic token calculation
-          const result = await GrokService.chat({
-            mode: 'post',
-            language: 'Spanish',
+          const includeLex = ctx.session.temp.communityPostData.includeLex;
+          const includeSantino = ctx.session.temp.communityPostData.includeSantino;
+
+          // Use optimized parallel bilingual generation
+          const result = await GrokService.generateSharePost({
             prompt,
             hasMedia,
+            includeLex,
+            includeSantino,
           });
-          ctx.session.temp.communityPostData.text = result;
+          ctx.session.temp.communityPostData.text = result.combined; // Use combined text
           ctx.session.temp.communityPostStep = 'select_buttons';
           await ctx.saveSession();
-          const safeResult = sanitize.telegramMarkdown(result);
+          const safeResult = sanitize.telegramMarkdown(result.combined);
           await ctx.reply(`✅ *AI draft saved*\n\n${safeResult}`, { parse_mode: 'Markdown' });
           await showButtonSelectionStep(ctx);
         } catch (e) {

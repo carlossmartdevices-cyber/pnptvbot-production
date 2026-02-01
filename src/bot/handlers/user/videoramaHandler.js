@@ -1,6 +1,6 @@
 const { Markup } = require('telegraf');
 const MediaPlayerModel = require('../../../models/mediaPlayerModel');
-const radioStreamManager = require('../../../services/radio/radioStreamManager');
+
 const { query } = require('../../../config/postgres');
 const logger = require('../../../utils/logger');
 const { safeReplyOrEdit } = require('../../utils/helpers');
@@ -11,7 +11,7 @@ const { safeReplyOrEdit } = require('../../utils/helpers');
  */
 const registerVideoramaHandlers = (bot) => {
   const VIDEORAMA_WEB_APP_URL = process.env.VIDEORAMA_WEB_APP_URL || 'https://pnptv.app/videorama-app';
-  const RADIO_WEB_APP_URL = process.env.RADIO_WEB_APP_URL || 'https://pnptv.app/radio';
+
 
   // ==========================================
   // VIDEORAMA MENU
@@ -56,15 +56,7 @@ const registerVideoramaHandlers = (bot) => {
       // Get media stats
       const stats = await getMediaStats();
 
-      // Get radio status
-      const radioStatus = await getRadioStatus();
 
-      let radioInfo = '';
-      if (radioStatus.isPlaying && radioStatus.track) {
-        radioInfo = lang === 'es'
-          ? `\n📻 *Radio en vivo:* ${radioStatus.track.title || 'Reproduciendo...'}`
-          : `\n📻 *Radio live:* ${radioStatus.track.title || 'Now playing...'}`;
-      }
 
       const message = lang === 'es'
         ? `🎶 *PNP Videorama*\n\n` +
@@ -72,13 +64,13 @@ const registerVideoramaHandlers = (bot) => {
           `📹 *Videos:* ${stats.videos}\n` +
           `🎵 *Música:* ${stats.music}\n` +
           `🎙️ *Podcasts:* ${stats.podcasts}\n` +
-          radioInfo + `\n\nElige una categoría:`
+
         : `🎶 *PNP Videorama*\n\n` +
           `Your media center with videos, music and podcasts.\n\n` +
           `📹 *Videos:* ${stats.videos}\n` +
           `🎵 *Music:* ${stats.music}\n` +
           `🎙️ *Podcasts:* ${stats.podcasts}\n` +
-          radioInfo + `\n\nChoose a category:`;
+
 
       await safeReplyOrEdit(ctx, message, {
         parse_mode: 'Markdown',
@@ -89,7 +81,7 @@ const registerVideoramaHandlers = (bot) => {
           ],
           [
             Markup.button.callback(`🎙️ Podcasts`, 'videorama_podcasts'),
-            Markup.button.callback(`📻 Radio`, 'menu_radio'),
+
           ],
           [Markup.button.webApp(
             lang === 'es' ? '🎬 Abrir Videorama' : '🎬 Open Videorama',
@@ -219,24 +211,7 @@ const registerVideoramaHandlers = (bot) => {
     }
   }
 
-  /**
-   * Get radio status for integration
-   */
-  async function getRadioStatus() {
-    try {
-      const nowPlaying = await radioStreamManager.getNowPlaying();
-      const channelInfo = radioStreamManager.getChannelInfo();
-
-      return {
-        isPlaying: channelInfo?.isPlaying || false,
-        track: nowPlaying?.track || null,
-        listenerCount: nowPlaying?.listenerCount || 0,
-      };
-    } catch (error) {
-      logger.error('Error getting radio status:', error);
-      return { isPlaying: false, track: null, listenerCount: 0 };
-    }
-  }
+  
 
   /**
    * Format duration in seconds to MM:SS or HH:MM:SS

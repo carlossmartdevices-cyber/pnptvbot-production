@@ -25,10 +25,11 @@ class PaymentModel {
         updatedAt: new Date(),
       };
 
-      // Insert with plan_id and provider
+      // Insert with plan_id, provider, and optional metadata
+      const metadata = paymentData.metadata ? JSON.stringify(paymentData.metadata) : '{}';
       await query(
-        `INSERT INTO payments (id, reference, user_id, plan_id, provider, amount, currency, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        `INSERT INTO payments (id, reference, user_id, plan_id, provider, amount, currency, status, metadata, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11)`,
         [
           paymentId,
           data.reference,
@@ -38,6 +39,7 @@ class PaymentModel {
           data.amount,
           data.currency,
           data.status,
+          metadata,
           data.createdAt,
           data.updatedAt
         ]
@@ -83,6 +85,7 @@ class PaymentModel {
       expiresAt: row.expires_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      metadata: row.metadata || {},
     };
   }
 

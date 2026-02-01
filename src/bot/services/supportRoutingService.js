@@ -1,5 +1,6 @@
 const logger = require('../../utils/logger');
 const SupportTopicModel = require('../../models/supportTopicModel');
+const { addReaction } = require('../utils/telegramReactions');
 
 /**
  * Support Routing Service
@@ -441,6 +442,7 @@ _Responde en este topic para enviar mensajes al usuario._`;
         await this.telegram.sendMessage(userId, replyInstructions.trim(), { parse_mode: 'Markdown' });
       }
 
+      await this.addDeliveryReaction(ctx);
       logger.info('Admin reply sent to user', { userId, threadId, adminId: ctx.from.id });
       return true;
 
@@ -1085,6 +1087,30 @@ ${categoryEmoji} *Ticket:* ${topic.user_id}
       }
       
       throw error;
+    }
+  }
+
+  /**
+   * Try to react with the delivered indicator on the topic message
+   * @param {Object} ctx - Telegraf context for the incoming support group reply
+   */
+  async addDeliveryReaction(ctx) {
+    try {
+      await addReaction(ctx, '👍');
+    } catch (reactError) {
+      logger.debug('Could not add delivery reaction:', reactError.message);
+    }
+  }
+
+  async indicateQuickAnswerDelivery(ctx) {
+    try {
+      await addReaction(ctx, '🤝');
+      logger.info('Quick answer delivery indicator added', {
+        adminId: ctx.from?.id,
+        messageId: ctx.message?.message_id,
+      });
+    } catch (reactError) {
+      logger.debug('Could not add quick answer reaction:', reactError.message);
     }
   }
 }

@@ -4,7 +4,12 @@ import MediaGrid from './components/MediaGrid'
 import VideoPlayer from './components/VideoPlayer'
 import MiniRadioPlayer from './components/MiniRadioPlayer'
 import CategoryNav from './components/CategoryNav'
-import { getUrlParams, fetchMediaLibrary, fetchRadioNowPlaying } from './utils/api'
+import {
+  getUrlParams,
+  fetchMediaLibrary,
+  fetchRadioNowPlaying,
+  fetchCollections,
+} from './utils/api'
 
 // Demo data for when API is not available
 const DEMO_MEDIA = [
@@ -79,6 +84,9 @@ function App() {
   const [radioNowPlaying, setRadioNowPlaying] = useState(null)
   const [isRadioExpanded, setIsRadioExpanded] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [collections, setCollections] = useState([])
+  const [collectionsLoading, setCollectionsLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     const urlParams = getUrlParams()
@@ -87,6 +95,7 @@ function App() {
 
     loadMedia()
     loadRadioStatus()
+    loadCollections()
 
     // Refresh radio status periodically
     const radioInterval = setInterval(loadRadioStatus, 30000)
@@ -103,6 +112,21 @@ function App() {
       setMediaLibrary(DEMO_MEDIA)
     }
     setLoading(false)
+  }
+
+  async function loadCollections() {
+    setCollectionsLoading(true)
+    try {
+      const data = await fetchCollections()
+      setCollections(data)
+      setError(null)
+    } catch (error) {
+      console.error('Failed to load collections:', error)
+      setError('Could not load collections at the moment.')
+      setCollections([])
+    } finally {
+      setCollectionsLoading(false)
+    }
   }
 
   async function loadRadioStatus() {
@@ -125,6 +149,23 @@ function App() {
     }
   }
 
+  function handleCollectionSelect(collection) {
+    if (collection.items && collection.items.length > 0) {
+      setSelectedMedia({
+        id: collection.items[0].id || collection.id,
+        title: collection.items[0].title || collection.title,
+        artist: collection.items[0].artist || 'PNPtv',
+        type: 'video',
+        duration: collection.items[0].duration || 0,
+        cover_url: collection.items[0].cover_url || collection.cover_url || 'https://picsum.photos/seed/pnp-collection/400/225',
+        url: collection.items[0].url || collection.items[0].path,
+      })
+      setCurrentView('player')
+    } else {
+      window.open(`https://pnptv.app/videorama/${collection.id}`, '_blank')
+    }
+  }
+
   function handleMediaSelect(media) {
     setSelectedMedia(media)
     setCurrentView('player')
@@ -138,6 +179,9 @@ function App() {
   const filteredMedia = selectedCategory === 'all'
     ? mediaLibrary
     : mediaLibrary.filter(m => m.category === selectedCategory || m.type === selectedCategory)
+
+  const roleParam = (params?.role || '').toUpperCase()
+  const canManageCollections = roleParam === 'PRIME' || roleParam === 'ADMIN'
 
   if (currentView === 'player' && selectedMedia) {
     return (
@@ -182,6 +226,47 @@ function App() {
           media={filteredMedia}
           onSelect={handleMediaSelect}
         />
+      )}
+
+      {collections.length > 0 && (
+        <section className="collections-section">
+          <div className="collections-header">
+            <div>
+              <h2>Collections</h2>
+              <p>Curated playlists and podcasts powered by Videorama.</p>
+            </div>
+            {canManageCollections && (
+              <a href="https://pnptv.app/videorama/create" target="_blank" rel="noreferrer" className="create-link">
+                + Create collection
+              </a>
+            )}
+          </div>
+          {collectionsLoading ? (
+            <p>Loading collections...</p>
+          ) : (
+            <>
+              {collections.length > 0 ? (
+                <div className="collection-grid">
+                  {collections.map((collection) => (
+                    <article key={collection.id} className="collection-card">
+                      <div className="collection-title">{collection.title}</div>
+                      <p className="collection-desc">{collection.description}</p>
+                      <div className="collection-meta">
+                        <span>{collection.visibility} collection</span>
+                        <button type="button" onClick={() => handleCollectionSelect(collection)}>
+                          View details
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p>No collections are available right now.</p>
+              )}
+            </>
+          )}
+          {error && <p className="error-text">{error}</p>}
+        </section>
       )}
 
       {radioNowPlaying && (
