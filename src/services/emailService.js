@@ -215,8 +215,7 @@ class EmailService {
             to: email,
             subject: 'PNP Latino Update! Noticias de PNP Latino',
             html,
-            from: 'noreply@pnptv.app',
-            bcc: 'hello@easybots.store'
+            from: 'noreply@pnptv.app'
         });
     }
 

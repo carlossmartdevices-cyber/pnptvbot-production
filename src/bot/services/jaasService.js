@@ -280,8 +280,8 @@ class JaaSService {
             url,
             role: 'moderator',
             features: {
-                livestreaming: true,
-                recording: true,
+                livestreaming: false,
+                recording: false,
                 chat: true,
                 raiseHand: true,
                 reactions: true
