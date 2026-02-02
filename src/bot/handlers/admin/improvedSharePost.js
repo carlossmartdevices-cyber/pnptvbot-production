@@ -838,12 +838,25 @@ const registerImprovedSharePostHandlers = (bot) => {
   async function showButtonSelectionStep(ctx) {
     try {
       const options = getSharePostButtonOptions();
-      const selected = new Set((normalizeButtons(ctx.session.temp.sharePostData.buttons) || []).map((b) => (typeof b === 'string' ? JSON.parse(b).key : b.key)));
+      const currentButtons = normalizeButtons(ctx.session.temp.sharePostData.buttons) || [];
+      const selected = new Set(currentButtons.map((b) => (typeof b === 'string' ? JSON.parse(b).key : b.key)));
 
       const buttons = options.map((opt) => {
         const on = selected.has(opt.key);
         return [Markup.button.callback((on ? '✅' : '➕') + ' ' + opt.text, 'share_post_toggle_' + opt.key)];
       });
+
+      // Show any custom buttons that have been added (not in preset options)
+      const presetKeys = new Set(options.map(opt => opt.key));
+      const customButtons = currentButtons.filter(b => {
+        const btn = typeof b === 'string' ? JSON.parse(b) : b;
+        return !presetKeys.has(btn.key) || btn.key === 'custom';
+      });
+
+      for (let i = 0; i < customButtons.length; i++) {
+        const btn = typeof customButtons[i] === 'string' ? JSON.parse(customButtons[i]) : customButtons[i];
+        buttons.push([Markup.button.callback(`✅ ${btn.text} 🔗`, `share_post_remove_custom_${i}`)]);
+      }
 
       buttons.push([Markup.button.callback('➕ Custom Link', 'share_post_add_custom_link')]);
       buttons.push([Markup.button.callback('👀 Preview', 'share_post_preview')]);
@@ -913,6 +926,42 @@ const registerImprovedSharePostHandlers = (bot) => {
       await showButtonSelectionStep(ctx);
     } catch (error) {
       logger.error('Error toggling share post button:', error);
+    }
+  });
+
+  // Remove custom link
+  bot.action(/^share_post_remove_custom_(\d+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      if (!ctx.session.temp?.sharePostData?.buttons) return;
+
+      const index = parseInt(ctx.match[1]);
+      const options = getSharePostButtonOptions();
+      const presetKeys = new Set(options.map(opt => opt.key));
+
+      // Find and remove the custom button at the given index
+      const buttons = normalizeButtons(ctx.session.temp.sharePostData.buttons);
+      let customIndex = 0;
+      for (let i = 0; i < buttons.length; i++) {
+        const btn = typeof buttons[i] === 'string' ? JSON.parse(buttons[i]) : buttons[i];
+        if (!presetKeys.has(btn.key) || btn.key === 'custom') {
+          if (customIndex === index) {
+            buttons.splice(i, 1);
+            break;
+          }
+          customIndex++;
+        }
+      }
+
+      ctx.session.temp.sharePostData.buttons = buttons;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('Removed');
+      await showButtonSelectionStep(ctx);
+    } catch (error) {
+      logger.error('Error removing custom button:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
 

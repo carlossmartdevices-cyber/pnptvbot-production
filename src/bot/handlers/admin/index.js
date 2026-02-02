@@ -249,8 +249,9 @@ async function showBroadcastButtonsPicker(ctx) {
     buttonCount: ctx.session.temp.broadcastData.buttons.length
   });
 
+  const currentButtons = ctx.session.temp.broadcastData.buttons || [];
   const selectedKeys = new Set(
-    (ctx.session.temp.broadcastData.buttons || [])
+    currentButtons
       .map((b) => (typeof b === 'string' ? JSON.parse(b).key : b.key))
       .filter(Boolean),
   );
@@ -260,6 +261,18 @@ async function showBroadcastButtonsPicker(ctx) {
     const label = on ? `✅ ${opt.text}` : `➕ ${opt.text}`;
     return [Markup.button.callback(label, `broadcast_toggle_${opt.key}`)];
   });
+
+  // Show any custom buttons that have been added (not in preset options)
+  const presetKeys = new Set(options.map(opt => opt.key));
+  const customButtons = currentButtons.filter(b => {
+    const btn = typeof b === 'string' ? JSON.parse(b) : b;
+    return !presetKeys.has(btn.key) || btn.key === 'custom';
+  });
+
+  for (let i = 0; i < customButtons.length; i++) {
+    const btn = typeof customButtons[i] === 'string' ? JSON.parse(customButtons[i]) : customButtons[i];
+    rows.push([Markup.button.callback(`✅ ${btn.text} 🔗`, `broadcast_remove_custom_${i}`)]);
+  }
 
   rows.push([Markup.button.callback('➕ Link Personalizado', 'broadcast_add_custom_link')]);
   rows.push([Markup.button.callback('✅ Continuar a Vista Previa', 'broadcast_continue_with_buttons')]);
@@ -1867,6 +1880,42 @@ let registerAdminHandlers = (bot) => {
     }
   });
 
+  // Broadcast - Remove custom link
+  bot.action(/^broadcast_remove_custom_(\d+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      if (!ctx.session.temp?.broadcastData?.buttons) return;
+
+      const index = parseInt(ctx.match[1]);
+      const options = getBroadcastButtonOptions(getLanguage(ctx));
+      const presetKeys = new Set(options.map(opt => opt.key));
+
+      // Find and remove the custom button at the given index
+      const buttons = normalizeButtons(ctx.session.temp.broadcastData.buttons);
+      let customIndex = 0;
+      for (let i = 0; i < buttons.length; i++) {
+        const btn = typeof buttons[i] === 'string' ? JSON.parse(buttons[i]) : buttons[i];
+        if (!presetKeys.has(btn.key) || btn.key === 'custom') {
+          if (customIndex === index) {
+            buttons.splice(i, 1);
+            break;
+          }
+          customIndex++;
+        }
+      }
+
+      ctx.session.temp.broadcastData.buttons = buttons;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('Removed');
+      await showBroadcastButtonsPicker(ctx);
+    } catch (error) {
+      logger.error('Error removing custom button:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
   // Broadcast - Custom buttons option
   bot.action('broadcast_custom_buttons', async (ctx) => {
     try {
@@ -2936,23 +2985,12 @@ let registerAdminHandlers = (bot) => {
         if (!Array.isArray(ctx.session.temp.broadcastData.buttons)) {
           ctx.session.temp.broadcastData.buttons = buildDefaultBroadcastButtons(getLanguage(ctx));
         }
-        ctx.session.temp.broadcastData.buttons.push({ text, type: 'url', target: url });
-        ctx.session.temp.broadcastStep = 'schedule_options';
+        ctx.session.temp.broadcastData.buttons.push({ key: 'custom', text, type: 'url', target: url });
+        ctx.session.temp.broadcastStep = 'buttons';
         await ctx.saveSession();
 
         await ctx.reply('✅ Custom link agregado.');
-        await ctx.reply(
-          '⏰ *Paso 5/5: Envío*\n\n'
-          + '¿Cuándo quieres enviar este broadcast?',
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback('📤 Enviar Ahora', 'broadcast_send_now_with_buttons')],
-              [Markup.button.callback('📅 Programar Envío', 'broadcast_schedule_with_buttons')],
-              [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
-            ]),
-          }
-        );
+        await showBroadcastButtonsPicker(ctx);
       } catch (error) {
         logger.error('Error handling custom link input:', error);
       }
