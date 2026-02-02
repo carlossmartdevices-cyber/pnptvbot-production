@@ -391,6 +391,13 @@ async function handleDeepLinkStart(ctx) {
       return;
     }
 
+    // Handle promo deep links
+    if (startPayload.startsWith('promo_')) {
+      const { handlePromoDeepLink } = require('../promo/promoHandler');
+      const promoCode = startPayload.replace('promo_', '');
+      return await handlePromoDeepLink(ctx, promoCode);
+    }
+
     // Handle specific broadcast/share post deep links
     // These take users directly to specific bot features
     switch (startPayload) {
