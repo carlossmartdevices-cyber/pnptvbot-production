@@ -363,6 +363,12 @@ const startBot = async () => {
     logger.info('✓ Group security handlers registered');
 
     // Register handlers
+const { getLanguage } = require('../utils/helpers');
+const { buildOnboardingPrompt } = require('../handlers/user/menu');
+const UserService = require('../services/userService');
+
+// ... (rest of the file)
+
     // Generic message handler for private chats to route to support
     bot.on('message', async (ctx, next) => {
       // Only process messages from private chats
@@ -373,6 +379,16 @@ const startBot = async () => {
       // Skip commands as they are handled elsewhere
       if (ctx.message?.text?.startsWith('/')) {
         return next();
+      }
+
+      // Check if user has completed onboarding
+      const user = await UserService.getOrCreateFromContext(ctx);
+      if (!user?.onboardingComplete) {
+        const lang = getLanguage(ctx);
+        const botUsername = ctx.botInfo?.username || 'PNPtvbot';
+        const { message, keyboard } = buildOnboardingPrompt(lang, botUsername);
+        await ctx.reply(message, { ...keyboard });
+        return;
       }
 
       // Check if the message is media or text
@@ -400,6 +416,7 @@ const startBot = async () => {
       }
       // Do not call next() as this message has been handled by the support system
     });
+
 
     registerUserHandlers(bot);
     registerAdminHandlers(bot); // This registers radio, live streams, community premium, and community posts handlers
