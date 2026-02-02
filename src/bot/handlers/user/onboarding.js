@@ -397,12 +397,50 @@ If you have any questions, use /support to contact us.`;
       }
 
       if (isValidEmail(rawEmail)) {
-        ctx.session.temp.email = rawEmail;
-        ctx.session.temp.waitingForEmail = false;
-        await ctx.saveSession();
+        const existingUser = await UserService.getByEmail(rawEmail);
 
-        await ctx.reply(t('emailReceived', lang));
-        await showLocationSharingPrompt(ctx);
+        if (existingUser) {
+          if (String(existingUser.id) === String(ctx.from.id)) {
+            // Same user, fuse and complete
+            await UserService.updateProfile(ctx.from.id, {
+              email: rawEmail,
+              onboardingComplete: true,
+            });
+            ctx.session.temp.waitingForEmail = false;
+            await ctx.saveSession();
+            await ctx.reply(t('emailReceived', lang));
+            await completeOnboarding(ctx);
+          } else {
+            // Different user, notify admin and continue onboarding
+            const adminNotification = `⚠️ *Alerta de Email Duplicado*\n\n` +
+              `Un usuario se ha registrado con un email que ya existe en la base de datos.\n\n` +
+              `📧 **Email:** \`${rawEmail}\`\n` +
+              `👤 **ID de Telegram Existente:** \`${existingUser.id}\`\n` +
+              `🆕 **ID de Telegram Nuevo:** \`${ctx.from.id}\`\n\n` +
+              `Ambos usuarios podrán completar el onboarding. Por favor, revisa manualmente la situación para decidir si es necesario tomar alguna acción.`;
+
+            await supportRoutingService.sendToSupportGroup(adminNotification, 'escalation', {
+              id: 'SYSTEM',
+              first_name: 'System Alert',
+              username: 'system'
+            });
+
+            ctx.session.temp.email = rawEmail;
+            ctx.session.temp.waitingForEmail = false;
+            await ctx.saveSession();
+
+            await ctx.reply(t('emailReceived', lang));
+            await showLocationSharingPrompt(ctx);
+          }
+        } else {
+          // New email, proceed normally
+          ctx.session.temp.email = rawEmail;
+          ctx.session.temp.waitingForEmail = false;
+          await ctx.saveSession();
+
+          await ctx.reply(t('emailReceived', lang));
+          await showLocationSharingPrompt(ctx);
+        }
       } else {
         await ctx.reply(`${t('invalidInput', lang)}\nPlease send a valid email address (e.g., user@example.com).`);
       }

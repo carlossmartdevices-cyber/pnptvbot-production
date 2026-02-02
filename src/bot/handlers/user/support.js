@@ -2,6 +2,7 @@ const { requirePrivateChat } = require('../../utils/notifications');
 const userService = require('../../services/userService');
 const i18n = require('../../utils/i18n');
 const logger = require('../../../utils/logger');
+const supportRoutingService = require('../../services/supportRoutingService');
 
 /**
  * Handle support command
@@ -24,20 +25,17 @@ async function handleSupport(ctx) {
     }
 
     const supportMessage = language === 'es'
-      ? `💬 **Soporte**\n\n¿Cómo podemos ayudarte hoy?\n\nPor favor describe tu problema o pregunta:`
-      : `💬 **Support**\n\nHow can we help you today?\n\nPlease describe your issue or question:`;
+      ? `💬 *Crear Ticket de Soporte*\n\nPor favor, describe tu problema o pregunta. Un agente de soporte te responderá lo antes posible.`
+      : `💬 *Create Support Ticket*\n\nPlease describe your issue or question. A support agent will reply as soon as possible.`;
 
     await ctx.reply(supportMessage, {
       parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: language === 'es' ? '📧 Email Soporte' : '📧 Email Support', url: 'mailto:support@pnptv.com' }],
-          [{ text: language === 'es' ? '🔙 Menú Principal' : '🔙 Main Menu', callback_data: 'back_main' }],
-        ],
-      },
     });
 
-    logger.info(`User ${userId} accessed support`);
+    // Set a flag in the session to indicate the user is providing support details
+    ctx.session.awaitingSupportMessage = true;
+
+    logger.info(`User ${userId} initiated support ticket creation`);
   } catch (error) {
     logger.error('Error in support command:', error);
     await ctx.reply(i18n.t('error_occurred', 'en'));

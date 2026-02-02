@@ -359,6 +359,29 @@ class SupportTopicModel {
   }
 
   /**
+   * Update user satisfaction rating
+   * @param {string} userId - Telegram user ID
+   * @param {number} rating - Satisfaction rating (1-4)
+   * @returns {Promise<Object>} Updated topic data
+   */
+  static async updateRating(userId, rating) {
+    const query = `
+      INSERT INTO ticket_ratings (ticket_user_id, user_id, rating)
+      VALUES ($1, $1, $2)
+      RETURNING *
+    `;
+
+    try {
+      const result = await getPool().query(query, [userId, rating]);
+      logger.info('User rating updated', { userId, rating });
+      return result.rows[0] || null;
+    } catch (error) {
+      logger.error('Error updating rating:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Mark SLA as breached
    * @param {string} userId - Telegram user ID
    * @param {boolean} breached - SLA breach status

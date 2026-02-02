@@ -363,6 +363,44 @@ const startBot = async () => {
     logger.info('✓ Group security handlers registered');
 
     // Register handlers
+    // Generic message handler for private chats to route to support
+    bot.on('message', async (ctx, next) => {
+      // Only process messages from private chats
+      if (ctx.chat.type !== 'private') {
+        return next();
+      }
+
+      // Skip commands as they are handled elsewhere
+      if (ctx.message?.text?.startsWith('/')) {
+        return next();
+      }
+
+      // Check if the message is media or text
+      let messageType = 'text';
+      if (ctx.message.photo) messageType = 'photo';
+      else if (ctx.message.document) messageType = 'document';
+      else if (ctx.message.video) messageType = 'video';
+      else if (ctx.message.voice) messageType = 'voice';
+      else if (ctx.message.audio) messageType = 'audio';
+      else if (ctx.message.sticker) messageType = 'sticker';
+      else if (ctx.message.animation) messageType = 'animation';
+      
+      // Forward the message to the support routing service
+      try {
+        await supportRoutingService.forwardUserMessage(ctx, messageType, 'support');
+        // Add a reaction to indicate the message was received
+        try {
+          await ctx.react('👍');
+        } catch (reactError) {
+          logger.debug('Could not add reaction to user message:', reactError.message);
+        }
+      } catch (error) {
+        logger.error('Error forwarding user message to support:', error);
+        await ctx.reply('❌ Hubo un error al enviar tu mensaje al soporte. Por favor, inténtalo de nuevo más tarde.');
+      }
+      // Do not call next() as this message has been handled by the support system
+    });
+
     registerUserHandlers(bot);
     registerAdminHandlers(bot); // This registers radio, live streams, community premium, and community posts handlers
     registerPNPLiveModelHandlers(bot); // Register PNP Live model self-service handlers

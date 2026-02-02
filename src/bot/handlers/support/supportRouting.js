@@ -4,6 +4,7 @@ const SupportTopicModel = require('../../../models/supportTopicModel');
 const UserModel = require('../../../models/userModel');
 const { getLanguage } = require('../../utils/helpers');
 const { addReaction } = require('../../utils/telegramReactions');
+const { createChatInviteLink } = require('../../utils/telegramAdmin');
 
 /**
  * Support Routing Handlers
@@ -181,9 +182,12 @@ const registerSupportRoutingHandlers = (bot) => {
       const adminName = ctx.from.first_name || 'Soporte';
       const userLang = user.language || 'es';
 
+      const primeChannelLink = await createChatInviteLink(ctx, process.env.PRIME_CHANNEL_ID, `support_activation_${targetUserId}`, 1);
+
       const notificationMessage = userLang === 'en'
-        ? `🎉 *Membership Activated!*\n\n✅ Your *${planName}* membership has been activated by ${adminName}.\n\n${isLifetime ? '♾️ This is a lifetime membership - enjoy forever!' : `📅 Expires: ${expiryDate.toLocaleDateString()}`}\n\nYou now have full access to:\n🔥 Videorama\n📍 Nearby\n🎥 Hangouts\n📺 PNP Live\n\nEnjoy! 🎊`
-        : `🎉 *¡Membresía Activada!*\n\n✅ Tu membresía *${planName}* ha sido activada por ${adminName}.\n\n${isLifetime ? '♾️ Esta es una membresía de por vida - ¡disfruta para siempre!' : `📅 Expira: ${expiryDate.toLocaleDateString()}`}\n\nAhora tienes acceso completo a:\n🔥 Videorama\n📍 Nearby (Quién está cerca)\n🎥 Hangouts\n📺 PNP Live\n\n¡Disfruta! 🎊`;
+      ? `🎉 *Membership Activated!*\n\n✅ Your *${planName}* membership has been activated by ${adminName}.\n\n${isLifetime ? '♾️ This is a lifetime membership - enjoy forever!' : `📅 Expires: ${expiryDate.toLocaleDateString()}`}\n\nYou now have full access to:\n🔥 Videorama\n📍 Nearby\n🎥 Hangouts\n📺 PNP Live\n\n- PNP Latino TV PRIME content: ${primeChannelLink}\n- PNP Live: Latinos streaming on webcam.\n- PNP Hangouts: video call rooms.\n- PNP Videorama: Podcasts and Music Playlist in the PNP Latino style you love.\n\nEnjoy! 🎊`
+      : `🎉 *¡Membresía Activada!*\n\n✅ Tu membresía *${planName}* ha sido activada por ${adminName}.\n\n${isLifetime ? '♾️ Esta es una membresía de por vida - ¡disfruta para siempre!' : `📅 Expira: ${expiryDate.toLocaleDateString()}`}\n\nAhora tienes acceso completo a:\n🔥 Videorama\n📍 Nearby (Quién está cerca)\n🎥 Hangouts\n📺 PNP Live\n\n- Contenido PRIME de PNP Latino TV: ${primeChannelLink}\n- PNP Live: Latinos transmitiendo en vivo por webcam.\n- PNP Hangouts: salas de videollamadas.\n- PNP Videorama: Podcasts y listas de reproducción de música al estilo que te encanta de PNP Latino.\n\n¡Disfruta! 🎊`;
+
 
       try {
         await ctx.telegram.sendMessage(targetUserId, notificationMessage, { parse_mode: 'Markdown' });
@@ -210,6 +214,7 @@ _El usuario ha sido notificado._`, {
         durationDays,
         activatedBy: ctx.from.id,
       });
+      await resolveSupportTicket(ctx, targetUserId, threadId, 'Membership activated.');
     } catch (error) {
       logger.error('Error activating membership:', error);
       await ctx.reply('❌ Error al activar membresía: ' + error.message, {
@@ -245,14 +250,27 @@ _El usuario ha sido notificado._`, {
       const adminName = ctx.from.first_name || 'Soporte';
       const userLang = user?.language || 'es';
       const resolvedMessage = userLang === 'en'
-        ? `✅ *Case Resolved*\n\nYour support ticket has been marked as resolved by ${adminName}.\n\n${resolutionNote ? `📝 *Note:* ${resolutionNote}\n\n` : ''}If you need anything else in the future, don't hesitate to reach out.\n\n⭐ _We'd love to hear about your experience! Please rate us 1-5._\n\nThanks for being part of PNP! 💜`
-        : `✅ *Caso Resuelto*\n\nTu ticket de soporte ha sido marcado como resuelto por ${adminName}.\n\n${resolutionNote ? `📝 *Nota:* ${resolutionNote}\n\n` : ''}Si necesitas algo más en el futuro, no dudes en contactarnos.\n\n⭐ _¡Nos encantaría saber tu experiencia! Por favor califícanos del 1 al 5._\n\n¡Gracias por ser parte de PNP! 💜`;
+      ? `✅ *Case Resolved*\n\nYour support ticket has been marked as resolved by ${adminName}.\n\n${resolutionNote ? `📝 *Note:* ${resolutionNote}\n\n` : ''}If you need anything else in the future, don't hesitate to reach out.\n\n⭐ _We'd love to hear about your experience! Please rate us 1-4._\n\nThanks for being part of PNP! 💜`
+      : `✅ *Caso Resuelto*\n\nTu ticket de soporte ha sido marcado como resuelto por ${adminName}.\n\n${resolutionNote ? `📝 *Nota:* ${resolutionNote}\n\n` : ''}Si necesitas algo más en el futuro, no dudes en contactarnos.\n\n⭐ _¡Nos encantaría saber tu experiencia! Por favor califícanos del 1 al 4._\n\n¡Gracias por ser parte de PNP! 💜`;
 
-      try {
-        await ctx.telegram.sendMessage(userId, resolvedMessage, { parse_mode: 'Markdown' });
-      } catch (notifyError) {
-        logger.warn('Could not notify user about resolution:', notifyError.message);
-      }
+    const ratingButtons = [
+      { text: '⭐️', callback_data: `rate_ticket:${userId}:1` },
+      { text: '⭐️⭐️', callback_data: `rate_ticket:${userId}:2` },
+      { text: '⭐️⭐️⭐️', callback_data: `rate_ticket:${userId}:3` },
+      { text: '⭐️⭐️⭐️⭐️', callback_data: `rate_ticket:${userId}:4` },
+    ];
+    const reopenButton = { text: 'Re-open Ticket', callback_data: `reopen_ticket:${userId}` };
+
+    try {
+      await ctx.telegram.sendMessage(userId, resolvedMessage, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [ratingButtons, [reopenButton]],
+        },
+      });
+    } catch (notifyError) {
+      logger.warn('Could not notify user about resolution:', notifyError.message);
+    }
 
       let resolutionTime = 'N/A';
       if (supportTopic.created_at) {
@@ -1347,12 +1365,18 @@ También puedes ejecutar acciones del ticket con los botones superiores.`;
 
     const actionButtons = [
       [
-        { text: '✅ Activar 30 días', callback_data: `support_cmd:activate:${supportTopic.user_id}:30` },
-        { text: '♾️ Activar lifetime', callback_data: `support_cmd:activate:${supportTopic.user_id}:lifetime` },
+        { text: '✅ Activar Semana', callback_data: `support_cmd:activate:${supportTopic.user_id}:week` },
+        { text: '✅ Activar Mes', callback_data: `support_cmd:activate:${supportTopic.user_id}:month` },
+        { text: '✅ Activar Crystal', callback_data: `support_cmd:activate:${supportTopic.user_id}:crystal` },
+      ],
+      [
+        { text: '✅ Activar Año', callback_data: `support_cmd:activate:${supportTopic.user_id}:year` },
+        { text: '♾️ Activar Lifetime', callback_data: `support_cmd:activate:${supportTopic.user_id}:lifetime` },
       ],
       [
         { text: '👤 Ver usuario', callback_data: `support_cmd:user:${supportTopic.user_id}` },
         { text: '✅ Marcar resuelto', callback_data: `support_cmd:solved:${supportTopic.user_id}` },
+        { text: '❌ Cerrar Ticket', callback_data: `support_cmd:close:${supportTopic.user_id}` },
       ],
     ];
 
@@ -1471,6 +1495,11 @@ También puedes ejecutar acciones del ticket con los botones superiores.`;
           threadId,
           userId,
         });
+        return;
+      }
+
+      if (action === 'close') {
+        await closeSupportTicket(ctx, userId, threadId);
         return;
       }
 
@@ -1626,8 +1655,8 @@ También puedes ejecutar acciones del ticket con los botones superiores.`;
         await ctx.reply(`❌ *Marcar como Resuelto / Mark as Solved*
 
 *Formato con guión bajo:*
-\`/solved_USER_ID\`
-\`/resuelto_USER_ID\`
+\`/solved_USERID\`
+\`/resuelto_USERID\`
 
 *En un topic (sin USER_ID):*
 \`/solved\` o \`/resuelto\`
@@ -1743,6 +1772,161 @@ También puedes ejecutar acciones del ticket con los botones superiores.`;
       parse_mode: 'Markdown',
       message_thread_id: ctx.message?.message_thread_id,
     });
+  });
+
+  bot.action(/^rate_ticket:(\d+):([1-4])$/i, async (ctx) => {
+    const userId = ctx.match[1];
+    const rating = parseInt(ctx.match[2]);
+
+    try {
+      await SupportTopicModel.updateRating(userId, rating);
+      await ctx.answerCbQuery('Gracias por tu calificación!');
+      await ctx.editMessageText('Gracias por tu calificación!', {
+        reply_markup: { inline_keyboard: [] },
+      });
+    } catch (error) {
+      logger.error('Error saving rating:', error);
+      await ctx.answerCbQuery('Error al guardar la calificación.');
+    }
+  });
+
+  bot.action(/^reopen_ticket:(\d+)$/i, async (ctx) => {
+    const userId = ctx.match[1];
+
+    try {
+      await SupportTopicModel.updateStatus(userId, 'open');
+      await ctx.answerCbQuery('Ticket reabierto.');
+      await ctx.editMessageText('El ticket ha sido reabierto.', {
+        reply_markup: { inline_keyboard: [] },
+      });
+      // Notify support group
+      const supportTopic = await SupportTopicModel.getByUserId(userId);
+      if (supportTopic) {
+        await bot.telegram.sendMessage(SUPPORT_GROUP_ID, `Ticket reabierto por el usuario ${userId}`, {
+          message_thread_id: supportTopic.thread_id,
+        });
+      }
+    } catch (error) {
+      logger.error('Error reopening ticket:', error);
+      await ctx.answerCbQuery('Error al reabrir el ticket.');
+    }
+  });
+  
+  const closeSupportTicket = async (ctx, userId, threadId) => {
+    const supportTopic = await SupportTopicModel.getByUserId(userId);
+
+    if (!supportTopic) {
+      await ctx.reply('❌ No se encontró el ticket de soporte para este usuario.', {
+        message_thread_id: threadId,
+      });
+      return;
+    }
+
+    try {
+      await SupportTopicModel.updateStatus(userId, 'closed');
+
+      if (supportTopic.thread_id) {
+        try {
+          await ctx.telegram.closeForumTopic(SUPPORT_GROUP_ID, supportTopic.thread_id);
+        } catch (closeError) {
+          logger.debug('Could not close forum topic:', closeError.message);
+        }
+      }
+
+      const user = await UserModel.getById(userId);
+      const adminName = ctx.from.first_name || 'Soporte';
+      const userLang = user?.language || 'es';
+      const closedMessage = userLang === 'en'
+        ? `✅ *Case Closed*\n\nWe haven't heard back from you, so we've closed this ticket. If you need more help, please open a new ticket. Thanks for contacting PNP! 💜`
+        : `✅ *Caso Cerrado*\n\nNo hemos recibido respuesta de tu parte, por lo que hemos cerrado este ticket. Si necesitas más ayuda, por favor abre un nuevo ticket. ¡Gracias por contactar a PNP! 💜`;
+
+      try {
+        await ctx.telegram.sendMessage(userId, closedMessage, { parse_mode: 'Markdown' });
+      } catch (notifyError) {
+        logger.warn('Could not notify user about closure:', notifyError.message);
+      }
+
+      await ctx.reply(`✅ *Caso Cerrado*
+
+👤 *Usuario:* ${user?.firstName || user?.username || userId} (\`${userId}\`)
+👨‍💼 *Cerrado por:* ${adminName}
+
+_El usuario ha sido notificado._
+_El topic ha sido cerrado._`, {
+        parse_mode: 'Markdown',
+        message_thread_id: threadId || supportTopic.thread_id,
+      });
+
+      logger.info('Support ticket closed', {
+        userId,
+        closedBy: ctx.from.id,
+      });
+    } catch (error) {
+      logger.error('Error closing support ticket:', error);
+      await ctx.reply('❌ Error al cerrar el ticket: ' + error.message, {
+        message_thread_id: threadId,
+      });
+    }
+  };
+
+  bot.command('kpis', async (ctx) => {
+    // Only in support group or from admins
+    const isInSupportGroup = String(ctx.chat?.id) === String(SUPPORT_GROUP_ID);
+    const isAdmin = ADMIN_USER_IDS.includes(String(ctx.from?.id));
+
+    if (!isInSupportGroup && !isAdmin) {
+      return;
+    }
+
+    try {
+      const stats = await SupportTopicModel.getStatistics();
+      const ratings = await getPool().query('SELECT AVG(rating) as avg_rating FROM ticket_ratings');
+      const avgRating = ratings.rows[0].avg_rating || 'N/A';
+
+      const message = `📊 *Estadísticas de Soporte*
+
+📋 Total de tickets: ${stats.total_topics || 0}
+🟢 Abiertos: ${stats.open_topics || 0}
+✅ Resueltos: ${stats.resolved_topics || 0}
+🔒 Cerrados: ${stats.closed_topics || 0}
+
+⏱️ Tiempo promedio de resolución: ${stats.avg_resolution_hours ? `${stats.avg_resolution_hours.toFixed(2)} hours` : 'N/A'}
+⭐ Calificación promedio: ${avgRating.toFixed(2)}
+      `;
+
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+
+    } catch (error) {
+      logger.error('Error getting support stats:', error);
+      await ctx.reply('❌ Error al obtener estadísticas: ' + error.message);
+    }
+  });
+
+  bot.command('close', async (ctx) => {
+    // Only in support group
+    if (String(ctx.chat?.id) !== String(SUPPORT_GROUP_ID)) {
+      return;
+    }
+
+    const threadId = ctx.message?.message_thread_id;
+    const args = ctx.message?.text?.split(' ').slice(1) || [];
+    let userId = args[0];
+
+    if (!userId && threadId) {
+      const supportTopic = await SupportTopicModel.getByThreadId(threadId);
+      if (supportTopic) {
+        userId = supportTopic.user_id;
+      }
+    }
+
+    if (!userId) {
+      await ctx.reply('❌ Uso: /close USER_ID o usar dentro de un topic de soporte', {
+        message_thread_id: threadId,
+      });
+      return;
+    }
+
+    await closeSupportTicket(ctx, userId, threadId);
   });
 
   logger.info('✓ Support routing handlers registered');
