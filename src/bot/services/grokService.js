@@ -15,6 +15,8 @@ function getModeConfig(mode, hasMedia) {
     broadcast: { temperature: 0.65, defaultTokens: 260, mediaTokens: 200 },
     sharePost: { temperature: 0.65, defaultTokens: 300, mediaTokens: 240 },
     post: { temperature: 0.7, defaultTokens: 320, mediaTokens: 260 },
+    videoDescription: { temperature: 0.7, defaultTokens: 350, mediaTokens: 300 },
+    salesPost: { temperature: 0.7, defaultTokens: 400, mediaTokens: 350 },
   };
 
   const fallback = { temperature: 0.7, defaultTokens: 300, mediaTokens: 240 };
@@ -72,6 +74,14 @@ Respond ONLY in this style. Direct, dominant, PnP fire. Nothing out of character
 
   if (mode === 'sharePost') {
     return `${methDaddyPersona}\n\n${langHint}\n\nOUTPUT FORMAT FOR SHARE POST:\n- TITLE: 1 short, dominant engaging line\n- DESCRIPTION: 1-2 sentences max with PnP vibe\n- HASHTAGS: 2-4 relevant hashtags\n\nRules:\n- Return ONLY the final formatted text (no labels)\n- No quotes, no markdown headings\n- CRITICAL: Keep text UNDER 450 characters total\n- Separate sections with line breaks\n- Hashtags: #PNPLatinoTV #MethDaddy #CultoSantino etc`;
+  }
+
+  if (mode === 'videoDescription') {
+    return `${methDaddyPersona}\n\n${langHint}\n\nOUTPUT FORMAT FOR VIDEO DESCRIPTION:\n- TITLE: ALL CAPS, bold style, attention-grabbing (1 line)\n- DESCRIPTION: Narrative, descriptive text inviting people to watch the video. Maximum 6 lines. Paint a picture of what they'll see, tease the content, make them curious and horny to watch.\n- HASHTAGS: 3-5 relevant hashtags\n\nRules:\n- Return ONLY the final formatted text (no labels like "TITLE:" or "DESCRIPTION:")\n- Title must be in ALL CAPS\n- Description should be seductive, inviting, narrative style\n- Maximum 6 lines for description (not counting title and hashtags)\n- CRITICAL: Keep text UNDER 500 characters total\n- Separate title from description with blank line\n- End with hashtags`;
+  }
+
+  if (mode === 'salesPost') {
+    return `${methDaddyPersona}\n\n${langHint}\n\nOUTPUT FORMAT FOR SALES POST:\n- HOOK: ALL CAPS, bold, attention-grabbing opening line that stops the scroll\n- BODY: Develop the sales pitch including:\n  * The offer/product being promoted\n  * Price (if provided in prompt)\n  * Benefits or discount/extra service\n  * Urgency or exclusivity\n- CTA: Clear call to action\n\nRules:\n- Return ONLY the final formatted text (no labels)\n- Hook must be in ALL CAPS\n- Include price and benefits clearly\n- ONLY use approved URLs: pnptv.app or t.me/pnplatinotv_bot (with deep links like ?start=plans)\n- If no specific link requested, use: t.me/pnplatinotv_bot?start=plans\n- CRITICAL: Keep text UNDER 500 characters total\n- End with 2-3 hashtags`;
   }
 
   return `${methDaddyPersona}\n\n${langHint}\n\nOutput rules:\n- Return ONLY the final message text in Meth Daddy style\n- No quotes, no markdown headings\n- CRITICAL: Keep text UNDER 450 characters total\n- End with hashtags`;
@@ -229,7 +239,119 @@ async function generateSharePost({ prompt, hasMedia = false, includeLex = false,
   };
 }
 
+/**
+ * Generate bilingual video description content
+ * @param {Object} options - Generation options
+ * @param {string} options.prompt - Description of the video
+ * @param {boolean} options.hasMedia - Whether post has media
+ * @param {boolean} options.includeLex - Include Lex persona
+ * @param {boolean} options.includeSantino - Include Santino persona
+ * @returns {Promise<{combined: string, en: string, es: string}>}
+ */
+async function generateVideoDescription({ prompt, hasMedia = false, includeLex = false, includeSantino = false }) {
+  const maxCharsPerLang = 500;
+  const chatFn = module.exports.chat || chat;
+
+  let lexInstruction = includeLex ? '- Include Lex hashtags (#LexPer #PNPtvLex)\n' : '';
+  let santinoInstruction = includeSantino ? '- Include Santino hashtags (#Santino #MethDaddy #CultoSantino)\n' : '';
+
+  // Generate English version
+  const enPrompt = `Create a video description for: ${prompt}\n\nRequirements:\n- Language: English\n- TITLE in ALL CAPS (attention-grabbing)\n- Description: narrative, seductive, max 6 lines inviting to watch\n${lexInstruction}${santinoInstruction}- End with hashtags`;
+
+  let enContent = await chatFn({
+    mode: 'videoDescription',
+    language: 'English',
+    prompt: enPrompt,
+    maxTokens: 250,
+  });
+
+  if (enContent.length > maxCharsPerLang) {
+    enContent = enContent.substring(0, maxCharsPerLang - 3) + '...';
+  }
+
+  // Generate Spanish version
+  const esPrompt = `Create a video description for: ${prompt}\n\nRequirements:\n- Language: Spanish\n- TITLE in ALL CAPS (attention-grabbing)\n- Description: narrative, seductive, max 6 lines inviting to watch\n${lexInstruction}${santinoInstruction}- End with hashtags`;
+
+  let esContent = await chatFn({
+    mode: 'videoDescription',
+    language: 'Spanish',
+    prompt: esPrompt,
+    maxTokens: 250,
+  });
+
+  if (esContent.length > maxCharsPerLang) {
+    esContent = esContent.substring(0, maxCharsPerLang - 3) + '...';
+  }
+
+  const combined = `🇬🇧 ENGLISH:\n${enContent}\n\n🇪🇸 ESPAÑOL:\n${esContent}`;
+
+  logger.info('Generated video description', {
+    enLength: enContent.length,
+    esLength: esContent.length,
+    combinedLength: combined.length
+  });
+
+  return { combined, en: enContent, es: esContent, english: enContent, spanish: esContent };
+}
+
+/**
+ * Generate bilingual sales post content
+ * @param {Object} options - Generation options
+ * @param {string} options.prompt - Sales pitch details (product, price, benefits, etc.)
+ * @param {boolean} options.hasMedia - Whether post has media
+ * @param {boolean} options.includeLex - Include Lex persona
+ * @param {boolean} options.includeSantino - Include Santino persona
+ * @returns {Promise<{combined: string, en: string, es: string}>}
+ */
+async function generateSalesPost({ prompt, hasMedia = false, includeLex = false, includeSantino = false }) {
+  const maxCharsPerLang = 500;
+  const chatFn = module.exports.chat || chat;
+
+  let lexInstruction = includeLex ? '- Include Lex hashtags (#LexPer #PNPtvLex)\n' : '';
+  let santinoInstruction = includeSantino ? '- Include Santino hashtags (#Santino #MethDaddy #CultoSantino)\n' : '';
+
+  // Generate English version
+  const enPrompt = `Create a sales post for: ${prompt}\n\nRequirements:\n- Language: English\n- HOOK in ALL CAPS (scroll-stopping)\n- Include price and benefits clearly\n- CTA with approved link (t.me/pnplatinotv_bot?start=plans or pnptv.app)\n${lexInstruction}${santinoInstruction}- End with hashtags`;
+
+  let enContent = await chatFn({
+    mode: 'salesPost',
+    language: 'English',
+    prompt: enPrompt,
+    maxTokens: 280,
+  });
+
+  if (enContent.length > maxCharsPerLang) {
+    enContent = enContent.substring(0, maxCharsPerLang - 3) + '...';
+  }
+
+  // Generate Spanish version
+  const esPrompt = `Create a sales post for: ${prompt}\n\nRequirements:\n- Language: Spanish\n- HOOK in ALL CAPS (scroll-stopping)\n- Include price and benefits clearly\n- CTA with approved link (t.me/pnplatinotv_bot?start=plans or pnptv.app)\n${lexInstruction}${santinoInstruction}- End with hashtags`;
+
+  let esContent = await chatFn({
+    mode: 'salesPost',
+    language: 'Spanish',
+    prompt: esPrompt,
+    maxTokens: 280,
+  });
+
+  if (esContent.length > maxCharsPerLang) {
+    esContent = esContent.substring(0, maxCharsPerLang - 3) + '...';
+  }
+
+  const combined = `🇬🇧 ENGLISH:\n${enContent}\n\n🇪🇸 ESPAÑOL:\n${esContent}`;
+
+  logger.info('Generated sales post', {
+    enLength: enContent.length,
+    esLength: esContent.length,
+    combinedLength: combined.length
+  });
+
+  return { combined, en: enContent, es: esContent, english: enContent, spanish: esContent };
+}
+
 module.exports = {
   chat,
   generateSharePost,
+  generateVideoDescription,
+  generateSalesPost,
 };

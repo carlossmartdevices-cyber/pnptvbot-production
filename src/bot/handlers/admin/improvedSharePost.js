@@ -17,15 +17,46 @@ const XPostService = require('../../services/xPostService');
 const XOAuthService = require('../../services/xOAuthService');
 
 // Use shared utilities
-const { 
-  getStandardButtonOptions, 
-  normalizeButtons, 
-  buildInlineKeyboard, 
-  buildPostCaption 
+const {
+  getStandardButtonOptions,
+  normalizeButtons,
+  buildInlineKeyboard,
+  buildPostCaption
 } = broadcastUtils;
 
 function getSharePostButtonOptions() {
   return getStandardButtonOptions();
+}
+
+/**
+ * Build X post text with deep links from buttons
+ * @param {string} text - Original post text
+ * @param {Array} buttons - Button configurations
+ * @returns {string} Text with deep links appended
+ */
+function buildXTextWithDeepLinks(text, buttons) {
+  const normalized = normalizeButtons(buttons);
+  if (!normalized.length) return text;
+
+  // Filter buttons that have deep links (t.me URLs)
+  const deepLinkButtons = normalized.filter(btn => {
+    const b = typeof btn === 'string' ? JSON.parse(btn) : btn;
+    return b.type === 'url' && b.target && b.target.includes('t.me/');
+  });
+
+  if (!deepLinkButtons.length) return text;
+
+  // Build the links section
+  const links = deepLinkButtons.map(btn => {
+    const b = typeof btn === 'string' ? JSON.parse(btn) : btn;
+    // Clean the button text (remove emojis for cleaner X post)
+    const cleanText = b.text.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
+    return `${cleanText}: ${b.target}`;
+  });
+
+  // Append links to text (X has 280 char limit, so be concise)
+  const linkSection = '\n\n🔗 ' + links.join('\n🔗 ');
+  return text + linkSection;
 }
 
 /**
@@ -518,23 +549,29 @@ const registerImprovedSharePostHandlers = (bot) => {
     ctx.session.temp.sharePostStep = 'write_text';
     await ctx.saveSession();
 
+    const aiButtons = [
+      [Markup.button.callback('🤖 AI Write (General)', 'share_post_ai_text')],
+      [Markup.button.callback('🎬 Create Video Description', 'share_post_ai_video_desc')],
+      [Markup.button.callback('💰 Create Sales Post', 'share_post_ai_sales')],
+      [
+        Markup.button.callback('👤 Incluir Lex', 'share_post_toggle_lex'),
+        Markup.button.callback('😈 Incluir Santino', 'share_post_toggle_santino'),
+      ],
+      [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
+    ];
+
     try {
       await ctx.editMessageText(
         '📤 *Compartir Publicacion*\n\n'
         + '*Paso 3/6: Escribir Texto*\n\n'
-        + '✍️ Envia el texto de tu publicacion.\n\n'
-        + '💡 *Tip:* Puedes usar *negrita* y _cursiva_.\n\n'
+        + '✍️ Envia el texto de tu publicacion o usa AI:\n\n'
+        + '🤖 *AI Write* - General share post\n'
+        + '🎬 *Video Description* - TITLE + narrative description\n'
+        + '💰 *Sales Post* - HOOK + price/benefits/CTA\n\n'
         + '📝 *Limites:* 1024 si hay media / 4096 si es solo texto',
         {
           parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('🤖 AI Write (Grok)', 'share_post_ai_text')],
-            [
-              Markup.button.callback('👤 Incluir Lex', 'share_post_toggle_lex'),
-              Markup.button.callback('😈 Incluir Santino', 'share_post_toggle_santino'),
-            ],
-            [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
-          ]),
+          ...Markup.inlineKeyboard(aiButtons),
         }
       );
     } catch (editError) {
@@ -543,19 +580,14 @@ const registerImprovedSharePostHandlers = (bot) => {
         await ctx.reply(
           '📤 *Compartir Publicacion*\n\n'
           + '*Paso 3/6: Escribir Texto*\n\n'
-          + '✍️ Envia el texto de tu publicacion.\n\n'
-          + '💡 *Tip:* Puedes usar *negrita* y _cursiva_.\n\n'
+          + '✍️ Envia el texto de tu publicacion o usa AI:\n\n'
+          + '🤖 *AI Write* - General share post\n'
+          + '🎬 *Video Description* - TITLE + narrative description\n'
+          + '💰 *Sales Post* - HOOK + price/benefits/CTA\n\n'
           + '📝 *Limites:* 1024 si hay media / 4096 si es solo texto',
           {
             parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback('🤖 AI Write (Grok)', 'share_post_ai_text')],
-              [
-                Markup.button.callback('👤 Incluir Lex', 'share_post_toggle_lex'),
-                Markup.button.callback('😈 Incluir Santino', 'share_post_toggle_santino'),
-              ],
-              [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
-            ]),
+            ...Markup.inlineKeyboard(aiButtons),
           }
         );
       } else {
@@ -601,13 +633,14 @@ const registerImprovedSharePostHandlers = (bot) => {
     }
   });
 
-  // AI text generation
+  // AI text generation - General
   bot.action('share_post_ai_text', async (ctx) => {
     try {
       await ctx.answerCbQuery();
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
       ctx.session.temp.sharePostStep = 'ai_prompt';
+      ctx.session.temp.aiMode = 'sharePost';
       await ctx.saveSession();
       await ctx.reply(
         '🤖 *AI Write (Grok)*\n\nDescribe el post que quieres publicar.\nEjemplo:\n`Anuncia un evento hoy, tono sexy, incluye CTA a membership`',
@@ -615,6 +648,56 @@ const registerImprovedSharePostHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error in share_post_ai_text:', error);
+    }
+  });
+
+  // AI video description generation
+  bot.action('share_post_ai_video_desc', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp.sharePostStep = 'ai_prompt';
+      ctx.session.temp.aiMode = 'videoDescription';
+      await ctx.saveSession();
+      await ctx.reply(
+        '🎬 *Create Video Description*\n\n'
+        + 'Describe el video que quieres promocionar.\n\n'
+        + '*Formato de salida:*\n'
+        + '• TÍTULO EN MAYÚSCULAS (bold)\n'
+        + '• Descripción narrativa (max 6 líneas)\n'
+        + '• Hashtags\n\n'
+        + '*Ejemplo:*\n'
+        + '`Video de Santino en la ducha, mucho vapor y nubes`',
+        { parse_mode: 'Markdown' },
+      );
+    } catch (error) {
+      logger.error('Error in share_post_ai_video_desc:', error);
+    }
+  });
+
+  // AI sales post generation
+  bot.action('share_post_ai_sales', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp.sharePostStep = 'ai_prompt';
+      ctx.session.temp.aiMode = 'salesPost';
+      await ctx.saveSession();
+      await ctx.reply(
+        '💰 *Create Sales Post*\n\n'
+        + 'Describe la oferta o producto a vender.\n\n'
+        + '*Formato de salida:*\n'
+        + '• HOOK EN MAYÚSCULAS (bold)\n'
+        + '• Precio y beneficios\n'
+        + '• CTA con link aprobado\n\n'
+        + '*Ejemplo:*\n'
+        + '`Membresía PRIME a $9.99, acceso ilimitado, descuento 50% esta semana`',
+        { parse_mode: 'Markdown' },
+      );
+    } catch (error) {
+      logger.error('Error in share_post_ai_sales:', error);
     }
   });
 
@@ -747,34 +830,63 @@ const registerImprovedSharePostHandlers = (bot) => {
         if (!prompt) return;
         try {
           const hasMedia = !!ctx.session.temp.sharePostData.mediaFileId;
+          const aiMode = ctx.session.temp.aiMode || 'sharePost';
 
           await ctx.reply('⏳ Generando texto con AI...');
 
           const includeLex = ctx.session.temp.sharePostData.includeLex;
           const includeSantino = ctx.session.temp.sharePostData.includeSantino;
 
-          // Use optimized parallel bilingual generation
-          const result = await GrokService.generateSharePost({
-            prompt,
-            hasMedia,
-            includeLex,
-            includeSantino,
-          });
+          let result;
+          let modeLabel;
+
+          // Use the appropriate generation function based on mode
+          if (aiMode === 'videoDescription') {
+            result = await GrokService.generateVideoDescription({
+              prompt,
+              hasMedia,
+              includeLex,
+              includeSantino,
+            });
+            modeLabel = '🎬 Video Description';
+          } else if (aiMode === 'salesPost') {
+            result = await GrokService.generateSalesPost({
+              prompt,
+              hasMedia,
+              includeLex,
+              includeSantino,
+            });
+            modeLabel = '💰 Sales Post';
+          } else {
+            // Default: sharePost
+            result = await GrokService.generateSharePost({
+              prompt,
+              hasMedia,
+              includeLex,
+              includeSantino,
+            });
+            modeLabel = '🤖 Share Post';
+          }
 
           // Store AI draft temporarily for review/edit
           ctx.session.temp.aiDraft = result.combined;
           ctx.session.temp.sharePostStep = 'review_ai_share';
           await ctx.saveSession();
 
+          // Determine regenerate button based on mode
+          const regenerateAction = aiMode === 'videoDescription' ? 'share_post_ai_video_desc'
+            : aiMode === 'salesPost' ? 'share_post_ai_sales'
+            : 'share_post_ai_text';
+
           // Show preview with edit options (no parse_mode to avoid conflicts with AI-generated text)
           await ctx.reply(
-            '🤖 AI Draft (Bilingual):\n\n' + result.combined + '\n\n' +
+            `${modeLabel} AI Draft (Bilingual):\n\n` + result.combined + '\n\n' +
             'Puedes usar este texto o editarlo manualmente.',
             {
               ...Markup.inlineKeyboard([
                 [Markup.button.callback('✅ Usar texto', 'share_post_use_ai')],
                 [Markup.button.callback('✏️ Editar manualmente', 'share_post_edit_ai')],
-                [Markup.button.callback('🔄 Regenerar', 'share_post_ai_text')],
+                [Markup.button.callback('🔄 Regenerar', regenerateAction)],
                 [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
               ]),
             },
@@ -1361,11 +1473,13 @@ const registerImprovedSharePostHandlers = (bot) => {
 
       if (postData.postToX && postData.xAccountId) {
         try {
+          // Build X text with deep links from buttons
+          const xText = buildXTextWithDeepLinks(postData.text, postData.buttons);
           xResult = await XPostService.sendPostNow({
             accountId: postData.xAccountId,
             adminId: ctx.from.id,
             adminUsername: ctx.from.username || 'unknown',
-            text: postData.text,
+            text: xText,
           });
         } catch (xError) {
           xResult = { error: xError.message || 'Error desconocido' };
@@ -1468,7 +1582,9 @@ const registerImprovedSharePostHandlers = (bot) => {
 
       let xPostId = null;
       if (postData.postToX && postData.xAccountId) {
-        const normalized = XPostService.normalizeXText(postData.text);
+        // Build X text with deep links from buttons
+        const xText = buildXTextWithDeepLinks(postData.text, postData.buttons);
+        const normalized = XPostService.normalizeXText(xText);
         xPostId = await XPostService.createPostJob({
           accountId: postData.xAccountId,
           adminId: ctx.from.id,
