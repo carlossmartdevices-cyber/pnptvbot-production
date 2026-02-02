@@ -59,17 +59,8 @@ const registerVideoramaHandlers = (bot) => {
 
 
       const message = lang === 'es'
-        ? `🎶 *PNP Videorama*\n\n` +
-          `Tu centro multimedia con videos, música y podcasts.\n\n` +
-          `📹 *Videos:* ${stats.videos}\n` +
-          `🎵 *Música:* ${stats.music}\n` +
-          `🎙️ *Podcasts:* ${stats.podcasts}\n` +
-
-        : `🎶 *PNP Videorama*\n\n` +
-          `Your media center with videos, music and podcasts.\n\n` +
-          `📹 *Videos:* ${stats.videos}\n` +
-          `🎵 *Music:* ${stats.music}\n` +
-          `🎙️ *Podcasts:* ${stats.podcasts}\n` +
+        ? `🎶 *PNP Videorama*\n\nTu centro multimedia con videos, música y podcasts.\n\n📹 *Videos:* ${stats.videos}\n🎵 *Música:* ${stats.music}\n🎙️ *Podcasts:* ${stats.podcasts}\n`
+        : `🎶 *PNP Videorama*\n\nYour media center with videos, music and podcasts.\n\n📹 *Videos:* ${stats.videos}\n🎵 *Music:* ${stats.music}\n🎙️ *Podcasts:* ${stats.podcasts}\n`;
 
 
       await safeReplyOrEdit(ctx, message, {

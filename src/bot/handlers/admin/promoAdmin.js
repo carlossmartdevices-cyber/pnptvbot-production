@@ -1062,6 +1062,81 @@ function registerPromoAdminHandlers(bot) {
     await finalConfiguration(ctx, ctx.session.temp.promoCreate.targetAudience);
   });
 
+  // Create flow - set custom code
+  bot.action('promo_create_set_code', async (ctx) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin) return;
+    await ctx.answerCbQuery();
+
+    const lang = getLanguage(ctx);
+    ctx.session.temp.promoCreate.step = 'custom_code';
+    await ctx.saveSession();
+
+    await ctx.editMessageText(
+      `*${lang === 'es' ? 'CAMBIAR CODIGO' : 'CHANGE CODE'}*\n\n` +
+      (lang === 'es'
+        ? 'Escribe el nuevo codigo de la promo (solo letras y numeros, sin espacios):'
+        : 'Enter the new promo code (letters and numbers only, no spaces):'),
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(lang === 'es' ? '◀️ Cancelar' : '◀️ Cancel', 'promo_create_back_final')],
+        ]),
+      }
+    );
+  });
+
+  // Handle custom code text input
+  bot.on('text', async (ctx, next) => {
+    if (!ctx.session.temp?.promoCreate?.step || ctx.session.temp.promoCreate.step !== 'custom_code') {
+      return next();
+    }
+
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin) return next();
+
+    const lang = getLanguage(ctx);
+    const code = (ctx.message.text || '').trim().toUpperCase();
+
+    // Validate code format
+    if (!/^[A-Z0-9]+$/.test(code)) {
+      await ctx.reply(
+        lang === 'es'
+          ? '❌ Codigo invalido. Solo letras y numeros, sin espacios.'
+          : '❌ Invalid code. Letters and numbers only, no spaces.'
+      );
+      return;
+    }
+
+    if (code.length < 3 || code.length > 20) {
+      await ctx.reply(
+        lang === 'es'
+          ? '❌ El codigo debe tener entre 3 y 20 caracteres.'
+          : '❌ Code must be between 3 and 20 characters.'
+      );
+      return;
+    }
+
+    // Check if code already exists
+    const existingPromo = await PromoModel.getByCode(code);
+    if (existingPromo) {
+      await ctx.reply(
+        lang === 'es'
+          ? '❌ Este codigo ya existe. Elige otro.'
+          : '❌ This code already exists. Choose another.'
+      );
+      return;
+    }
+
+    ctx.session.temp.promoCreate.code = code;
+    ctx.session.temp.promoCreate.name = `${code} Promo`;
+    ctx.session.temp.promoCreate.step = 'final';
+    await ctx.saveSession();
+
+    await ctx.reply(lang === 'es' ? `✅ Codigo cambiado a: *${code}*` : `✅ Code changed to: *${code}*`, { parse_mode: 'Markdown' });
+    await finalConfiguration(ctx, ctx.session.temp.promoCreate.targetAudience);
+  });
+
   // Create flow - back to final
   bot.action('promo_create_back_final', async (ctx) => {
     const isAdmin = await PermissionService.isAdmin(ctx.from.id);

@@ -15,7 +15,6 @@ const BOT_USERNAME = process.env.BOT_USERNAME || 'pnplatinotv_bot';
 class TutorialReminderService {
   static bot = null;
   static GROUP_ID = config.GROUP_ID;
-  static GENERAL_TOPIC_ID = config.GENERAL_TOPIC_ID || 1;
 
   /**
    * Initialize the service with bot instance
@@ -112,8 +111,7 @@ class TutorialReminderService {
       }
 
       await this.bot.telegram.sendMessage(this.GROUP_ID, tip, {
-        parse_mode: 'Markdown',
-        message_thread_id: this.GENERAL_TOPIC_ID,
+        parse_mode: 'Markdown'
       });
 
     } catch (error) {
@@ -149,8 +147,7 @@ class TutorialReminderService {
       }
 
       await this.bot.telegram.sendMessage(this.GROUP_ID, message, {
-        parse_mode: 'Markdown',
-        message_thread_id: this.GENERAL_TOPIC_ID,
+        parse_mode: 'Markdown'
       });
 
     } catch (error) {
@@ -495,7 +492,6 @@ Toca *"Contenido Exclusivo"* en el menú para explorar toda la biblioteca.
 
       await this.bot.telegram.sendMessage(this.GROUP_ID, tutorial.message, {
         parse_mode: 'Markdown',
-        message_thread_id: this.GENERAL_TOPIC_ID,
         ...(keyboard ? keyboard : {})
       });
 

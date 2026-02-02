@@ -235,11 +235,10 @@ class BroadcastService {
     const query = `
       SELECT
         bs.*,
-        b.message_en, b.message_es, b.target_type,
-        b.media_type, b.media_url, b.media_file_id, b.s3_key, b.s3_bucket,
-        b.admin_id, b.admin_username, b.title, b.include_filters, b.exclude_user_ids
+        b.message, b.title, b.media_type, b.media_url,
+        b.target_tier, b.created_by as admin_id
       FROM broadcast_schedules bs
-      JOIN broadcasts b ON bs.broadcast_id = b.broadcast_id
+      JOIN broadcasts b ON bs.broadcast_id = b.id
       WHERE bs.status = 'scheduled'
         AND bs.next_execution_at <= CURRENT_TIMESTAMP
       ORDER BY bs.next_execution_at ASC

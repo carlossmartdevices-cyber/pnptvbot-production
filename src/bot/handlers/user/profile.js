@@ -8,7 +8,6 @@ const { getLanguage, validateUserInput, safeReplyOrEdit } = require('../../utils
 const { buildMemberProfileCard, buildMemberProfileInlineKeyboard } = require('../../utils/memberProfileCard');
 
 const GROUP_ID = process.env.GROUP_ID;
-const GENERAL_TOPIC_ID = process.env.GENERAL_TOPIC_ID ? parseInt(process.env.GENERAL_TOPIC_ID) : 1;
 
 /**
  * Profile handlers
@@ -933,7 +932,7 @@ const shareToGroup = async (ctx) => {
     const keyboard = buttons.length > 0 ? Markup.inlineKeyboard(buttons) : null;
 
     try {
-      const baseOptions = { parse_mode: 'Markdown', message_thread_id: GENERAL_TOPIC_ID };
+      const baseOptions = { parse_mode: 'Markdown' };
       const sendOptions = keyboard ? { ...baseOptions, ...keyboard } : baseOptions;
       if (user.photoFileId) {
         await ctx.telegram.sendPhoto(GROUP_ID, user.photoFileId, {

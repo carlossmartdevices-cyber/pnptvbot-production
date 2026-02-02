@@ -60,9 +60,8 @@ Choose your plan and get instant access to all premium features:
 🔥 Nearby feature (unlimited)
 🔥 Live Streams & Video Rooms
 🔥 Profile Card with photo, badges & bio
-🔥 Instant support through the bot
 
-`Tap a plan below to activate your membership instantly. 💜` `,
+Tap a plan below to activate your membership instantly. 💜`,
     subscriptionPlans: '💎 Choose Your PRIME Plan:',
       planCrystal: '💎 Crystal Pass - $49.99/180 days',
       planCrystalDesc: 'Half a year of complete access to the PNPtv! community. Includes:\n\n• Unlimited access to all PNPtv! channels and groups\n• Full videography of Santino plus Latino chem sessions\n• Long-duration videos with weekly new releases\n• Invites to Call rooms and Live Stream PNP shows\n• Unlimited Nearby access\n• Access to community events and private sessions\n• Early access to upcoming features',
@@ -473,9 +472,8 @@ Elige tu plan y obtén acceso inmediato a todas las funciones premium:
 🔥 Nearby ilimitado
 🔥 Transmisiones en vivo y Video Rooms
 🔥 Tarjeta de perfil con foto, badges y bio
-🔥 Soporte instantáneo desde el bot
 
-`Toca un plan para activar tu membresía al instante. 💜` `,
+Toca un plan para activar tu membresía al instante. 💜`,
     subscriptionPlans: '💎 Elige tu Plan PRIME:',
       planCrystal: '💎 Pase Crystal - $49.99/180 días',
       planCrystalDesc: 'Medio año de acceso total a la comunidad PNPtv!. Incluye:\n\n• Acceso ilimitado a todos los canales y grupos de PNPtv!\n• Videografía completa de Santino y sesiones químicas latinas\n• Videos de larga duración con estrenos semanales\n• Invitaciones a salas de video y shows en vivo de PNP\n• Acceso ilimitado a Cercanos\n• Acceso a eventos comunitarios y sesiones privadas\n• Acceso anticipado a nuevas funciones',

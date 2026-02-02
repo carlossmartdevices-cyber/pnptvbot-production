@@ -122,7 +122,12 @@
       "WebSearch",
       "WebFetch(domain:docs.daimo.com)",
       "WebFetch(domain:github.com)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: Clean up Claude Code settings permissions\n\nConsolidate 244 cluttered permission entries down to 122 clean wildcard\npatterns. Removed broken shell fragments, embedded commit messages, and\noverly specific one-off commands. Organized by category: file ops, node/npm,\npm2, git, network, database, docker, system, and utilities.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: Clean up Claude Code settings permissions\n\nConsolidate 244 cluttered permission entries down to 122 clean wildcard\npatterns. Removed broken shell fragments, embedded commit messages, and\noverly specific one-off commands. Organized by category: file ops, node/npm,\npm2, git, network, database, docker, system, and utilities.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Add approved URLs to Grok configuration\n\nOnly allow pnptv.app and t.me/pnplatinotv_bot URLs in generated text.\nPrevents Grok from using random or incorrect URLs in broadcasts/posts.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)",
+      "Bash(git -C /root/pnptvbot-production status)",
+      "Bash(git -C /root/pnptvbot-production diff src/bot/services/jaasService.js src/services/emailService.js)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Disable recording features and remove broadcast email BCC\n\n- Set livestreaming and recording to false in JaaS moderator config\n- Remove BCC to hello@easybots.store from broadcast emails\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ],
     "deny": [],
     "ask": []

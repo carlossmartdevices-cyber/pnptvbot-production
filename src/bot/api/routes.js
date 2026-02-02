@@ -104,7 +104,7 @@ app.get('/auth/telegram-login-complete', (req, res) => {
   if (host.includes('easybots.store') || host.includes('easybots')) {
     return res.status(404).send('Page not found.');
   }
-  res.sendFile(path.join(__dirname, '../../../public/auth/telegram-login-complete.html'));
+  res.redirect(302, '/auth/telegram-login-complete.html');
 });
 
 app.get('/auth/telegram-login', (req, res) => {
@@ -112,7 +112,7 @@ app.get('/auth/telegram-login', (req, res) => {
   if (host.includes('easybots.store') || host.includes('easybots')) {
     return res.status(404).send('Page not found.');
   }
-  res.sendFile(path.join(__dirname, '../../../public/auth/telegram-login.html'));
+  res.redirect(302, '/auth/telegram-login.html');
 });
 
 app.get('/auth/terms', (req, res) => {
@@ -120,7 +120,7 @@ app.get('/auth/terms', (req, res) => {
   if (host.includes('easybots.store') || host.includes('easybots')) {
     return res.status(404).send('Page not found.');
   }
-  res.sendFile(path.join(__dirname, '../../../public/auth/terms.html'));
+  res.redirect(302, '/auth/terms.html');
 });
 
 app.get('/auth/not-registered', (req, res) => {
@@ -128,7 +128,7 @@ app.get('/auth/not-registered', (req, res) => {
   if (host.includes('easybots.store') || host.includes('easybots')) {
     return res.status(404).send('Page not found.');
   }
-  res.sendFile(path.join(__dirname, '../../../public/auth/not-registered.html'));
+  res.redirect(302, '/auth/not-registered.html');
 });
 
 // Add cache control headers for static assets to prevent browser caching issues
@@ -232,8 +232,8 @@ app.get('/', (req, res) => {
     `);
     return;
   }
-  // Route all traffic to pnptv.app - easybots.store references removed
-  res.sendFile(path.join(__dirname, '../../../public/index.html'));
+  // Redirect to Nginx-served index.html
+  res.redirect(302, '/index.html');
 });
 
 // PNPtv Haus page
@@ -242,7 +242,7 @@ app.get('/community-room', (req, res) => {
   if (host.includes('easybots.store') || host.includes('easybots')) {
     return res.status(404).send('Not found');
   }
-  res.sendFile(path.join(__dirname, '../../../public/community-room.html'));
+  res.redirect(302, '/community-room.html');
 });
 
 // PNPtv Haus alias
@@ -251,7 +251,7 @@ app.get('/pnptv-haus', (req, res) => {
   if (host.includes('easybots.store') || host.includes('easybots')) {
     return res.status(404).send('Not found');
   }
-  res.sendFile(path.join(__dirname, '../../../public/community-room.html'));
+  res.redirect(302, '/community-room.html');
 });
 
 // Community Features page
@@ -260,7 +260,7 @@ app.get('/community-features', (req, res) => {
   if (host.includes('easybots.store') || host.includes('easybots')) {
     return res.status(404).send('Not found');
   }
-  res.sendFile(path.join(__dirname, '../../../public/community-features.html'));
+  res.redirect(302, '/community-features.html');
 });
 
 // How to Use page (Bilingual) - routes to pnptv.app
@@ -269,7 +269,7 @@ app.get('/how-to-use', (req, res) => {
   if (host.includes('easybots.store') || host.includes('easybots')) {
     return res.status(404).send('Not found');
   }
-  res.sendFile(path.join(__dirname, '../../../public/how-to-use.html'));
+  res.redirect(302, '/how-to-use.html');
 });
 
 
@@ -280,7 +280,7 @@ app.get('/lifetime-pass', (req, res) => {
   if (host.includes('easybots.store') || host.includes('easybots')) {
     return res.status(404).send('Not found');
   }
-  res.sendFile(path.join(__dirname, '../../../public/lifetime-pass.html'));
+  res.redirect(302, '/lifetime-pass.html');
 });
 
 // Lifetime Pass landing page ($100)
@@ -289,7 +289,7 @@ app.get('/lifetime100', pageLimiter, (req, res) => {
   if (host.includes('easybots.store') || host.includes('easybots')) {
     return res.status(404).send('Not found');
   }
-  res.sendFile(path.join(__dirname, '../../../public', 'lifetime-pass.html'));
+  res.redirect(302, '/lifetime-pass.html');
 });
 
 // Terms and Conditions / Privacy Policy
@@ -300,7 +300,7 @@ app.get('/terms', pageLimiter, (req, res) => {
   }
   const lang = req.query.lang || 'en';
   const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
-  res.sendFile(path.join(__dirname, '../../../public', fileName));
+  res.redirect(302, `/${fileName}`);
 });
 
 app.get('/privacy', pageLimiter, (req, res) => {
@@ -310,7 +310,7 @@ app.get('/privacy', pageLimiter, (req, res) => {
   }
   const lang = req.query.lang || 'en';
   const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
-  res.sendFile(path.join(__dirname, '../../../public', fileName));
+  res.redirect(302, `/${fileName}`);
 });
 
 app.get('/policies', pageLimiter, (req, res) => {
@@ -320,37 +320,37 @@ app.get('/policies', pageLimiter, (req, res) => {
   }
   const lang = req.query.lang || 'en';
   const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
-  res.sendFile(path.join(__dirname, '../../../public', fileName));
+  res.redirect(302, `/${fileName}`);
 });
 
 
 
 // ePayco Checkout page - serves payment-checkout.html for /checkout/:paymentId
 app.get('/checkout/:paymentId', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public', 'payment-checkout.html'));
+  res.redirect(302, '/payment-checkout.html');
 });
 
 // Daimo Checkout page - serves daimo-checkout.html for /daimo-checkout/:paymentId
 app.get('/daimo-checkout/:paymentId', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public', 'daimo-checkout.html'));
+  res.redirect(302, '/daimo-checkout.html');
 });
 
 // Meet & Greet Checkout pages
 app.get('/pnp/meet-greet/checkout/:bookingId', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public', 'meet-greet-checkout.html'));
+  res.redirect(302, '/meet-greet-checkout.html');
 });
 
 app.get('/pnp/meet-greet/daimo-checkout/:bookingId', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public', 'meet-greet-daimo-checkout.html'));
+  res.redirect(302, '/meet-greet-daimo-checkout.html');
 });
 
 // PNP Live Checkout pages
 app.get('/pnp/live/checkout/:bookingId', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public', 'pnp-live-checkout.html'));
+  res.redirect(302, '/pnp-live-checkout.html');
 });
 
 app.get('/pnp/live/daimo-checkout/:bookingId', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public', 'pnp-live-daimo-checkout.html'));
+  res.redirect(302, '/pnp-live-daimo-checkout.html');
 });
 
 // Payment checkout page with language support
@@ -364,8 +364,7 @@ app.get('/payment/:paymentId', (req, res) => {
   } else {
     fileName = 'payment-checkout-es.html';
   }
-
-  res.sendFile(path.join(__dirname, '../../../public', fileName));
+  res.redirect(302, `/${fileName}`);
 });
 
 // Function to conditionally apply middleware (skip for Telegram webhook)
@@ -673,7 +672,7 @@ app.post(
 
 // Recurring Checkout page - serves recurring-checkout.html for /recurring-checkout/:userId/:planId
 app.get('/recurring-checkout/:userId/:planId', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public', 'recurring-checkout.html'));
+  res.redirect(302, '/recurring-checkout.html');
 });
 
 // Recurring Subscription API routes
