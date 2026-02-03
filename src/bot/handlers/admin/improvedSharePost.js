@@ -14,7 +14,7 @@ const broadcastUtils = require('../../utils/broadcastUtils');
 const performanceUtils = require('../../utils/performanceUtils');
 const uxUtils = require('../../utils/uxUtils');
 const XPostService = require('../../services/xPostService');
-const XOAuthService = require('../../services/xOAuthService');
+const { registerXAccountHandlers } = require('./xAccountWizard');
 
 // Use shared utilities
 const {
@@ -64,6 +64,11 @@ function buildXTextWithDeepLinks(text, buttons) {
  * @param {Telegraf} bot - Bot instance
  */
 const registerImprovedSharePostHandlers = (bot) => {
+  registerXAccountHandlers(bot, {
+    sessionKey: 'sharePostData',
+    actionPrefix: 'share_post',
+    backAction: 'share_post_preview',
+  });
   
   // ═══════════════════════════════════════════════════════════════════════════
   // STEP 1: Main entry point - Show channel/group selection
@@ -200,149 +205,6 @@ const registerImprovedSharePostHandlers = (bot) => {
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // X (Twitter) ACCOUNT SELECTION
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  async function showXAccountSelection(ctx) {
-    try {
-      const accounts = await XPostService.listActiveAccounts();
-      const currentAccountId = ctx.session.temp?.sharePostData?.xAccountId;
-
-      const buttons = accounts.map((account) => {
-        const selected = currentAccountId === account.account_id;
-        const label = `${selected ? '✅' : '⬜'} @${account.handle}`;
-        return [Markup.button.callback(label, `share_post_x_account_${account.account_id}`)];
-      });
-
-      buttons.push([Markup.button.callback('➕ Conectar cuenta X', 'share_post_x_connect')]);
-      buttons.push([Markup.button.callback('🚫 No publicar en X', 'share_post_x_disable')]);
-      buttons.push([Markup.button.callback('⬅️ Volver', 'share_post_preview')]);
-
-      if (!accounts.length) {
-        await ctx.reply(
-          '🐦 *Publicar en X*\n\n'
-          + 'No hay cuentas activas configuradas.\n\n'
-          + 'Puedes conectar una nueva cuenta ahora mismo.',
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard(buttons),
-          }
-        );
-        return;
-      }
-
-      await ctx.reply(
-        '🐦 *Publicar en X*\n\nSelecciona la cuenta desde la cual se publicará:',
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard(buttons),
-        }
-      );
-    } catch (error) {
-      logger.error('Error showing X account selection:', error);
-      await ctx.reply('❌ Error al cargar cuentas de X').catch(() => {});
-    }
-  }
-
-  bot.action('share_post_configure_x', async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) {
-        await ctx.answerCbQuery('❌ No autorizado');
-        return;
-      }
-
-      await ctx.answerCbQuery();
-      await showXAccountSelection(ctx);
-    } catch (error) {
-      logger.error('Error configuring X account:', error);
-      await ctx.answerCbQuery('❌ Error').catch(() => {});
-    }
-  });
-
-  bot.action('share_post_x_connect', async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) {
-        await ctx.answerCbQuery('❌ No autorizado');
-        return;
-      }
-
-      const authUrl = await XOAuthService.createAuthUrl({
-        adminId: ctx.from.id,
-        adminUsername: ctx.from.username || null,
-      });
-
-      await ctx.answerCbQuery();
-      await ctx.reply(
-        '🔗 *Conectar cuenta de X*\n\n'
-        + '1) Abre este enlace.\n'
-        + '2) Autoriza la cuenta.\n'
-        + '3) Regresa al bot y selecciona la cuenta.\n\n'
-        + authUrl,
-        { parse_mode: 'Markdown' }
-      );
-    } catch (error) {
-      logger.error('Error starting X OAuth flow:', error);
-      await ctx.answerCbQuery('❌ Error').catch(() => {});
-      await ctx.reply('❌ No se pudo iniciar la conexion con X').catch(() => {});
-    }
-  });
-
-  bot.action(/^share_post_x_account_(.+)$/, async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) {
-        await ctx.answerCbQuery('❌ No autorizado');
-        return;
-      }
-
-      const accountId = ctx.match[1];
-      const accounts = await XPostService.listActiveAccounts();
-      const selected = accounts.find((account) => account.account_id === accountId);
-
-      if (!selected) {
-        await ctx.answerCbQuery('❌ Cuenta no válida');
-        return;
-      }
-
-      ctx.session.temp.sharePostData.postToX = true;
-      ctx.session.temp.sharePostData.xAccountId = selected.account_id;
-      ctx.session.temp.sharePostData.xAccountHandle = selected.handle;
-      ctx.session.temp.sharePostData.xAccountDisplayName = selected.display_name;
-      await ctx.saveSession();
-
-      await ctx.answerCbQuery(`✅ Usando @${selected.handle}`);
-      await showXAccountSelection(ctx);
-    } catch (error) {
-      logger.error('Error selecting X account:', error);
-      await ctx.answerCbQuery('❌ Error').catch(() => {});
-    }
-  });
-
-  bot.action('share_post_x_disable', async (ctx) => {
-    try {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) {
-        await ctx.answerCbQuery('❌ No autorizado');
-        return;
-      }
-
-      ctx.session.temp.sharePostData.postToX = false;
-      ctx.session.temp.sharePostData.xAccountId = null;
-      ctx.session.temp.sharePostData.xAccountHandle = null;
-      ctx.session.temp.sharePostData.xAccountDisplayName = null;
-      await ctx.saveSession();
-
-      await ctx.answerCbQuery('🚫 X desactivado');
-      await showXAccountSelection(ctx);
-    } catch (error) {
-      logger.error('Error disabling X posting:', error);
-      await ctx.answerCbQuery('❌ Error').catch(() => {});
-    }
-  });
-
   // Clear all destinations
   bot.action('share_post_clear_selection', async (ctx) => {
     try {
@@ -424,7 +286,8 @@ const registerImprovedSharePostHandlers = (bot) => {
         return;
       }
 
-      const destinations = ctx.session.temp?.sharePostData?.destinations || [];
+      const postData = ctx.session.temp?.sharePostData || {};
+      const destinations = postData.destinations || [];
 
       if (destinations.length === 0 && !postData.postToX) {
         await ctx.answerCbQuery('❌ Debes seleccionar al menos un destino o habilitar X');

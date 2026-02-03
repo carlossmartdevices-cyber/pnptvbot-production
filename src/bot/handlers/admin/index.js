@@ -18,6 +18,7 @@ const broadcastUtils = require('../../utils/broadcastUtils');
 const performanceUtils = require('../../utils/performanceUtils');
 const uxUtils = require('../../utils/uxUtils');
 const BroadcastButtonModel = require('../../../models/broadcastButtonModel');
+const { registerXAccountHandlers } = require('./xAccountWizard');
 
 // Use shared utilities
 const { sanitizeInput } = broadcastUtils;
@@ -579,6 +580,10 @@ async function showAdminPanel(ctx, edit = false) {
         Markup.button.callback('📤 Compartir', 'admin_improved_share_post'),
       ]);
 
+      buttons.push([
+        Markup.button.callback('🐦 X Accounts', 'admin_x_accounts_configure'),
+      ]);
+
       // ═══ PROMOS Y MARKETING ═══
       buttons.push([
         Markup.button.callback('🎁 Promos', 'promo_admin_menu'),
@@ -646,6 +651,19 @@ let registerAdminHandlers = (bot) => {
   // Register handlers
   registerImprovedSharePostHandlers(bot);
   registerPromoAdminHandlers(bot);
+  registerXAccountHandlers(bot, {
+    sessionKey: 'adminXAccountWizard',
+    actionPrefix: 'admin_x_accounts',
+    backAction: 'admin_home',
+    title: '🐦 X Accounts',
+    emptyTitle: '🐦 X Accounts',
+    emptyBody: 'No hay cuentas activas configuradas.\nPuedes conectar una nueva cuenta ahora mismo.',
+    prompt: 'Selecciona la cuenta desde la cual se publicará:',
+    connectLabel: '➕ Conectar cuenta X',
+    disableLabel: '🚫 No publicar en X',
+    backLabel: '⬅️ Volver al panel',
+    notifyOnEmpty: true,
+  });
 
   bot.action('admin_home', async (ctx) => {
     try {
