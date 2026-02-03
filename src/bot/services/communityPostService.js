@@ -286,6 +286,312 @@ class CommunityPostService {
   }
 
   /**
+   * Get all scheduled posts with optional filters
+   * @param {Object} filters - Optional filters (e.g., status, adminId, startDate, endDate, limit, offset)
+   * @returns {Promise<Object>} Object with posts and total count
+   */
+  async getAllScheduledPosts(filters = {}) {
+    try {
+      const {
+        status,
+        adminId,
+        startDate,
+        endDate,
+        limit = 20,
+        offset = 0,
+        sortBy = 'scheduled_at',
+        sortOrder = 'DESC',
+      } = filters;
+
+      let whereClauses = [];
+      let queryParams = [];
+      let paramIndex = 1;
+
+      if (status) {
+        whereClauses.push(`p.status = $${paramIndex++}`);
+        queryParams.push(status);
+      }
+      if (adminId) {
+        whereClauses.push(`p.admin_id = $${paramIndex++}`);
+        queryParams.push(adminId);
+      }
+      if (startDate) {
+        whereClauses.push(`p.scheduled_at >= $${paramIndex++}`);
+        queryParams.push(startDate);
+      }
+      if (endDate) {
+        whereClauses.push(`p.scheduled_at <= $${paramIndex++}`);
+        queryParams.push(endDate);
+      }
+
+      const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+      const postsQuery = `
+        SELECT
+          p.*,
+          array_agg(jsonb_build_object(
+            'schedule_id', s.schedule_id,
+            'scheduled_for', s.scheduled_for,
+            'status', s.status,
+            'is_recurring', s.is_recurring,
+            'recurrence_pattern', s.recurrence_pattern,
+            'cron_expression', s.cron_expression,
+            'execution_count', s.execution_count,
+            'last_executed_at', s.last_executed_at,
+            'next_execution_at', s.next_execution_at,
+            'error_message', s.error_message
+          )) as schedules,
+          array_agg(jsonb_build_object(
+            'button_id', b.button_id,
+            'button_label', b.button_label,
+            'button_type', b.button_type,
+            'target_url', b.target_url,
+            'icon_emoji', b.icon_emoji,
+            'button_order', b.button_order
+          )) FILTER (WHERE b.button_id IS NOT NULL) as buttons
+        FROM community_posts p
+        LEFT JOIN community_post_schedules s ON p.post_id = s.post_id
+        LEFT JOIN community_post_buttons b ON p.post_id = b.post_id
+        ${whereClause}
+        GROUP BY p.post_id
+        ORDER BY p.${sortBy} ${sortOrder}
+        LIMIT $${paramIndex++} OFFSET $${paramIndex++};
+      `;
+
+      const countQuery = `
+        SELECT COUNT(DISTINCT p.post_id)
+        FROM community_posts p
+        LEFT JOIN community_post_schedules s ON p.post_id = s.post_id
+        ${whereClause};
+      `;
+
+      const postsResult = await db.query(postsQuery, [...queryParams, limit, offset]);
+      const countResult = await db.query(countQuery, queryParams);
+
+      return {
+        posts: postsResult.rows.map(row => ({
+          ...row,
+          // Ensure buttons and schedules are arrays even if no joins found
+          buttons: row.buttons[0] === null ? [] : row.buttons,
+          schedules: row.schedules[0] === null ? [] : row.schedules,
+        })),
+        totalCount: parseInt(countResult.rows[0].count, 10),
+      };
+    } catch (error) {
+      logger.error('Error fetching all scheduled posts:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update an existing community post
+   * @param {string} postId - ID of the post to update
+   * @param {Object} updateData - Data to update the post with
+   * @returns {Promise<Object>} Updated post object
+   */
+  async updateCommunityPostDetails(postId, updateData) {
+    try {
+      const settableFields = [
+        'title', 'message_en', 'message_es', 'media_type', 'media_url', 's3_key', 's3_bucket',
+        'telegram_file_id', 'target_group_ids', 'target_channel_ids', 'target_all_groups',
+        'post_to_prime_channel', 'formatted_template_type', 'button_layout', 'scheduled_at',
+        'timezone', 'is_recurring', 'recurrence_pattern', 'cron_expression', 'recurrence_end_date',
+        'max_occurrences', 'status', 'video_file_size_mb', 'video_duration_seconds', 'uses_streaming',
+      ];
+
+      let updateClauses = [];
+      let queryParams = [];
+      let paramIndex = 1;
+
+      for (const field of settableFields) {
+        if (updateData[field] !== undefined) {
+          updateClauses.push(`${field} = $${paramIndex++}`);
+          queryParams.push(updateData[field]);
+        }
+      }
+
+      if (updateClauses.length === 0) {
+        logger.warn('No valid fields to update for post', { postId, updateData });
+        return this.getPostWithDetails(postId); // Return current state if no updates
+      }
+
+      queryParams.push(postId); // Add postId as the last parameter
+
+      const query = `
+        UPDATE community_posts
+        SET ${updateClauses.join(', ')}, updated_at = NOW()
+        WHERE post_id = $${paramIndex}
+        RETURNING *;
+      `;
+
+      const result = await db.query(query, queryParams);
+
+      if (result.rows.length === 0) {
+        throw new Error('Post not found or no changes made');
+      }
+
+      logger.info('Community post updated', { postId });
+
+      // If schedules or buttons are part of update, they need separate handling
+      // For schedules, we would typically delete existing and re-create if structure changes significantly
+      // For buttons, update/delete existing and add new ones as necessary
+
+      return result.rows[0];
+    } catch (error) {
+      logger.error('Error updating community post details:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a community post and all its associated data (schedules, buttons, deliveries).
+   * @param {string} postId - ID of the post to delete
+   * @returns {Promise<void>}
+   */
+  async deleteCommunityPost(postId) {
+    try {
+      // Delete associated deliveries
+      await db.query(`DELETE FROM community_post_deliveries WHERE post_id = $1;`, [postId]);
+      await db.query(`DELETE FROM community_post_channel_deliveries WHERE post_id = $1;`, [postId]);
+
+      // Delete associated schedules
+      await db.query(`DELETE FROM community_post_schedules WHERE post_id = $1;`, [postId]);
+
+      // Delete associated buttons
+      await db.query(`DELETE FROM community_post_buttons WHERE post_id = $1;`, [postId]);
+
+      // Delete the post itself
+      await db.query(`DELETE FROM community_posts WHERE post_id = $1;`, [postId]);
+
+      logger.info('Community post and all associated data deleted', { postId });
+    } catch (error) {
+      logger.error('Error deleting community post:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get details of a specific post schedule.
+   * @param {string} scheduleId - ID of the schedule to retrieve
+   * @returns {Promise<Object|null>} Schedule object or null if not found
+   */
+  async getPostScheduleDetails(scheduleId) {
+    try {
+      const query = `
+        SELECT * FROM community_post_schedules
+        WHERE schedule_id = $1;
+      `;
+      const result = await db.query(query, [scheduleId]);
+      return result.rows[0] || null;
+    } catch (error) {
+      logger.error('Error fetching post schedule details:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update details of a specific post schedule.
+   * @param {string} scheduleId - ID of the schedule to update
+   * @param {Object} updateData - Data to update the schedule with
+   * @returns {Promise<Object>} Updated schedule object
+   */
+  async updatePostSchedule(scheduleId, updateData) {
+    try {
+      const settableFields = [
+        'scheduled_for', 'timezone', 'status', 'is_recurring', 'recurrence_pattern',
+        'cron_expression', 'recurrence_end_date', 'max_occurrences', 'execution_count',
+        'last_executed_at', 'next_execution_at', 'error_message',
+      ];
+
+      let updateClauses = [];
+      let queryParams = [];
+      let paramIndex = 1;
+
+      for (const field of settableFields) {
+        if (updateData[field] !== undefined) {
+          updateClauses.push(`${field} = $${paramIndex++}`);
+          queryParams.push(updateData[field]);
+        }
+      }
+
+      if (updateClauses.length === 0) {
+        logger.warn('No valid fields to update for schedule', { scheduleId, updateData });
+        return this.getPostScheduleDetails(scheduleId); // Return current state if no updates
+      }
+
+      queryParams.push(scheduleId); // Add scheduleId as the last parameter
+
+      const query = `
+        UPDATE community_post_schedules
+        SET ${updateClauses.join(', ')}, updated_at = NOW()
+        WHERE schedule_id = $${paramIndex}
+        RETURNING *;
+      `;
+
+      const result = await db.query(query, queryParams);
+
+      if (result.rows.length === 0) {
+        throw new Error('Schedule not found or no changes made');
+      }
+
+      logger.info('Community post schedule updated', { scheduleId });
+      return result.rows[0];
+    } catch (error) {
+      logger.error('Error updating post schedule:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Manually triggers a post to be sent immediately.
+   * This sets the post and its primary schedule to 'executing' and 'scheduled for now' respectively,
+   * allowing the scheduler to pick it up in its next cycle.
+   * @param {string} postId - The ID of the post to trigger.
+   * @returns {Promise<Object>} The updated post object.
+   */
+  async triggerPostImmediately(postId) {
+    try {
+      // First, update the post status to 'sending' to indicate it's being processed
+      await db.query(
+        `UPDATE community_posts SET status = 'sending', updated_at = NOW() WHERE post_id = $1;`,
+        [postId]
+      );
+
+      // Then, find the primary scheduled entry for this post and set its scheduled_for to NOW()
+      // and status to 'scheduled' so the scheduler picks it up immediately.
+      // Assuming a post can have multiple schedules, we'll pick one that is 'scheduled' or 'pending'.
+      // If none, we might create a new one, but for now, we'll modify an existing one.
+      const updateScheduleQuery = `
+        UPDATE community_post_schedules
+        SET scheduled_for = NOW(), status = 'scheduled', updated_at = NOW()
+        WHERE post_id = $1 AND status IN ('scheduled', 'pending', 'paused')
+        ORDER BY scheduled_for ASC
+        LIMIT 1
+        RETURNING *;
+      `;
+
+      const result = await db.query(updateScheduleQuery, [postId]);
+
+      if (result.rows.length === 0) {
+        // If no existing schedule was found to update, it might be a post that was already sent/failed
+        // or has no schedules. For an immediate trigger, we might need to create a new schedule.
+        // For simplicity, we'll log a warning for now and let the admin handle.
+        logger.warn('No active schedule found to trigger immediately for post', { postId });
+        throw new Error('No active schedule found for immediate triggering.');
+      }
+
+      logger.info('Post marked for immediate triggering', { postId, scheduleId: result.rows[0].schedule_id });
+      return this.getPostWithDetails(postId);
+    } catch (error) {
+      logger.error('Error triggering post immediately:', error);
+      throw error;
+    }
+  }
+
+
+
+
+  /**
    * Get a post with all details
    * @param {string} postId - Post UUID
    * @returns {Promise<Object>} Post object with buttons and schedules

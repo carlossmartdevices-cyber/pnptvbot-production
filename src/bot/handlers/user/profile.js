@@ -622,19 +622,22 @@ const showEditProfileOverview = async (ctx, lang) => {
 
     const keyboard = Markup.inlineKeyboard([
       [
+        Markup.button.callback('📸 ' + (lang === 'es' ? 'Foto' : 'Photo'), 'edit_photo'),
         Markup.button.callback('📝 Bio', 'edit_bio'),
+      ],
+      [
         Markup.button.callback('🎯 ' + (lang === 'es' ? 'Intereses' : 'Interests'), 'edit_interests'),
-      ],
-      [
         Markup.button.callback('🏳️‍🌈 ' + (lang === 'es' ? 'Tribu' : 'Tribe'), 'edit_tribe'),
+      ],
+      [
         Markup.button.callback('🔎 ' + (lang === 'es' ? 'Buscando' : 'Looking For'), 'edit_looking_for'),
-      ],
-      [
         Markup.button.callback('🏙️ ' + (lang === 'es' ? 'Ciudad' : 'City'), 'edit_city'),
-        Markup.button.callback('🌍 ' + (lang === 'es' ? 'País' : 'Country'), 'edit_country'),
       ],
       [
+        Markup.button.callback('🌍 ' + (lang === 'es' ? 'País' : 'Country'), 'edit_country'),
         Markup.button.callback('📍 ' + (lang === 'es' ? 'GPS' : 'GPS Location'), 'edit_location'),
+      ],
+      [
         Markup.button.callback('🔗 ' + (lang === 'es' ? 'Redes' : 'Social'), 'edit_social'),
       ],
       [Markup.button.callback(t('back', lang), 'show_profile')],
