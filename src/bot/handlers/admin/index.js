@@ -22,6 +22,28 @@ const BroadcastButtonModel = require('../../../models/broadcastButtonModel');
 // Use shared utilities
 const { sanitizeInput } = broadcastUtils;
 
+const safeAnswerCbQuery = async (ctx, text, options = {}) => {
+  if (!ctx?.answerCbQuery) return;
+  try {
+    if (typeof text === 'string') {
+      await ctx.answerCbQuery(text, options);
+    } else {
+      await ctx.answerCbQuery();
+    }
+  } catch (error) {
+    const description = error?.response?.description || error?.message || '';
+    if (
+      description.includes('query is too old') ||
+      description.includes('query ID is invalid') ||
+      description.includes('response timeout')
+    ) {
+      logger.debug('Callback query expired', { error: description });
+      return;
+    }
+    logger.warn('Failed to answer callback query', { error: description });
+  }
+};
+
 function getBroadcastStepLabel(step, lang) {
   const labels = {
     // Paso 1/5: Selección de audiencia
@@ -1967,32 +1989,40 @@ let registerAdminHandlers = (bot) => {
       }
 
       // Answer callback query immediately to prevent timeout
-      await ctx.answerCbQuery('📤 Enviando broadcast...');
+      await safeAnswerCbQuery(ctx, '📤 Enviando broadcast...');
 
       ctx.session.temp.broadcastStep = 'sending';
       await ctx.saveSession();
 
       // Process broadcast sending with buttons (async/non-blocking)
-      try {
-        await sendBroadcastWithButtons(ctx, bot);
-      } catch (error) {
+      void sendBroadcastWithButtons(ctx, bot).catch((error) => {
         logger.error('Error in background broadcast send:', error);
-        await ctx.reply('❌ Error al enviar broadcast en segundo plano. Revisa los logs.').catch(() => {});
-      }
+        ctx.reply('❌ Error al enviar broadcast en segundo plano. Revisa los logs.').catch(() => {});
+      });
 
       // Immediately show "processing" message to user
-      await ctx.editMessageText(
-        '📤 *Broadcast en Cola*\n\n'
-        + 'Tu broadcast se está enviando en segundo plano.\n\n'
-        + 'Recibirás una notificación cuando se complete.\n\n'
-        + '⏳ Esto puede tomar unos minutos dependiendo del número de usuarios...',
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('◀️ Volver al Panel Admin', 'admin_cancel')],
-          ]),
-        }
-      );
+      try {
+        await ctx.editMessageText(
+          '📤 *Broadcast en Cola*\n\n'
+          + 'Tu broadcast se está enviando en segundo plano.\n\n'
+          + 'Recibirás una notificación cuando se complete.\n\n'
+          + '⏳ Esto puede tomar unos minutos dependiendo del número de usuarios...',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('◀️ Volver al Panel Admin', 'admin_cancel')],
+            ]),
+          }
+        );
+      } catch (editError) {
+        logger.warn('Failed to update broadcast queue message:', editError.message);
+        await ctx.reply(
+          '📤 *Broadcast en Cola*\n\n'
+          + 'Tu broadcast se está enviando en segundo plano.\n\n'
+          + 'Recibirás una notificación cuando se complete.',
+          { parse_mode: 'Markdown' }
+        ).catch(() => {});
+      }
     } catch (error) {
       logger.error('Error in broadcast send now with buttons:', error);
       await ctx.reply('❌ Error al enviar broadcast').catch(() => {});
@@ -2144,7 +2174,7 @@ let registerAdminHandlers = (bot) => {
   // Admin cancel / back to main panel
   bot.action('admin_cancel', async (ctx) => {
     try {
-      await ctx.answerCbQuery(); // Answer immediately
+      await safeAnswerCbQuery(ctx); // Answer immediately
 
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
@@ -2172,7 +2202,7 @@ let registerAdminHandlers = (bot) => {
   // Back to admin panel (alternative back button)
   bot.action('back_admin', async (ctx) => {
     try {
-      await ctx.answerCbQuery(); // Answer immediately
+      await safeAnswerCbQuery(ctx); // Answer immediately
 
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
