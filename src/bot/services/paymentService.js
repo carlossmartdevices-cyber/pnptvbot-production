@@ -153,41 +153,14 @@ class PaymentService {
 
       let paymentUrl;
       const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
+      const checkoutDomain = process.env.CHECKOUT_DOMAIN || webhookDomain || 'https://easybots.store';
 
       if (provider === 'epayco') {
-        const epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;
-        const epaycoTestMode = process.env.EPAYCO_TEST_MODE === 'true';
-        const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN;
-
         // Create payment reference
         const paymentRef = `PAY-${payment.id.substring(0, 8).toUpperCase()}`;
 
-        // Generate ePayco Checkout URL with parameters
-        const planName = plan.display_name || plan.name;
-        const description = `Suscripción ${planName} - PNPtv`;
-
-        const baseUrl = 'https://checkout.epayco.co/checkout.html';
-
-        const params = new URLSearchParams({
-          key: epaycoPublicKey,
-          external: 'true',
-          name: description,
-          description: description,
-          invoice: paymentRef,
-          currency: 'cop',
-          amount: plan.price.toString(),
-          tax_base: '0',
-          tax: '0',
-          country: 'co',
-          lang: 'es',
-          external_reference: payment.id,
-          confirmation: `${webhookDomain}/api/webhooks/epayco`,
-          response: `${webhookDomain}/payment/response`,
-          test: epaycoTestMode ? 'true' : 'false',
-          autoclick: 'true'
-        });
-
-        paymentUrl = `${baseUrl}?${params.toString()}`;
+        // Use landing page before ePayco checkout
+        paymentUrl = `${checkoutDomain}/checkout/${payment.id}`;
         
         await PaymentModel.updateStatus(payment.id, 'pending', {
           paymentUrl,
@@ -196,7 +169,7 @@ class PaymentService {
           fallback: false, 
         });
         
-        logger.info('ePayco direct checkout URL created', {
+        logger.info('ePayco landing checkout URL created', {
           paymentId: payment.id,
           paymentUrl,
         });

@@ -327,12 +327,12 @@ app.get('/policies', pageLimiter, (req, res) => {
 
 // ePayco Checkout page - serves payment-checkout.html for /checkout/:paymentId
 app.get('/checkout/:paymentId', pageLimiter, (req, res) => {
-  res.redirect(302, '/payment-checkout.html');
+  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
 });
 
 // Daimo Checkout page - serves daimo-checkout.html for /daimo-checkout/:paymentId
 app.get('/daimo-checkout/:paymentId', pageLimiter, (req, res) => {
-  res.redirect(302, '/daimo-checkout.html');
+  res.sendFile(path.join(__dirname, '../../../public/daimo-checkout.html'));
 });
 
 // Meet & Greet Checkout pages
