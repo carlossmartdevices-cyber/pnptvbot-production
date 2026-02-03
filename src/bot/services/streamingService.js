@@ -2,7 +2,6 @@ const jaasService = require('./jaasService');
 const LiveStreamModel = require('../../models/liveStreamModel');
 const User = require('../../models/userModel');
 const logger = require('../../utils/logger');
-const { query } = require('../../config/postgres');
 const PermissionService = require('./permissionService');
 
 /**
@@ -67,12 +66,8 @@ class StreamingService {
                 language: 'en'
             });
 
-            // Save JaaS room name to the stream record
-            // Store it in the channel_name field so it persists and can be retrieved
-            await query(
-                'UPDATE live_streams SET channel_name = $1 WHERE id = $2',
-                [roomName, stream.streamId]
-            );
+            // Save JaaS room name to the stream record for later joins
+            await LiveStreamModel.updateChannelName(stream.streamId, roomName);
 
             logger.info('Live stream created with JaaS', {
                 streamId: stream.streamId,

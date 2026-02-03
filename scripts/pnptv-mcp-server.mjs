@@ -45,7 +45,7 @@ server.tool(
     ];
     
     if (withPayment) {
-      imports.push("const StripeService = require('../../services/stripeService');");
+      imports.push("const PaymentService = require('../../services/paymentService');");
     }
     if (withDatabase) {
       imports.push("const { query } = require('../../config/postgres');");
@@ -68,7 +68,7 @@ module.exports = (bot) => {
       // TODO: Implement handler logic
       ${withPayment ? `
       // Payment integration example
-      // const paymentIntent = await StripeService.createPaymentIntent(amount, userId);
+      // const paymentIntent = await PaymentService.createPaymentIntent(amount, userId);
       ` : ''}
       ${withDatabase ? `
       // Database query example

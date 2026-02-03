@@ -28,7 +28,6 @@
    └─ ⏱️ Select duration (15-120 min)
    ↓
 5. Confirm & Pay
-   ├─ 💳 Stripe
    ├─ 💳 ePayco
    └─ 💎 Crypto (Daimo)
    ↓

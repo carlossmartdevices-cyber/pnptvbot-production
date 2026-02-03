@@ -1,6 +1,5 @@
 require('dotenv-safe').config({ allowEmptyValues: true });
 const cron = require('node-cron');
-const { initializeFirebase } = require('../src/config/firebase');
 const { initializeRedis } = require('../src/config/redis');
 const { initializePostgres } = require('../src/config/postgres');
 const UserService = require('../src/bot/services/userService');

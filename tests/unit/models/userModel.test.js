@@ -1,5 +1,4 @@
 // Mock dependencies
-jest.mock('../../../src/config/firebase');
 jest.mock('../../../src/config/redis');
 jest.mock('../../../src/config/postgres', () => ({
   query: jest.fn(),

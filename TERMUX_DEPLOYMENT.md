@@ -256,12 +256,6 @@ ENCRYPTION_KEY=$(openssl rand -base64 32)
 #### Optional Configuration (Configure as needed)
 
 ```env
-# Firebase (if using Firebase/Firestore)
-FIREBASE_PROJECT_ID=your_project_id
-FIREBASE_PRIVATE_KEY=your_private_key
-FIREBASE_CLIENT_EMAIL=your_client_email
-FIREBASE_DATABASE_URL=your_database_url
-
 # Payment Providers
 EPAYCO_PUBLIC_KEY=your_epayco_public_key
 EPAYCO_PRIVATE_KEY=your_epayco_private_key

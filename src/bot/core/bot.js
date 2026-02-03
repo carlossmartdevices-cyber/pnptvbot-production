@@ -8,6 +8,11 @@ dns.setDefaultResultOrder('ipv4first');
 
 require('dotenv').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
+const ADMIN_USER_IDS = [
+  ...(process.env.ADMIN_USER_IDS || '').split(','),
+  ...(process.env.ADMIN_IDS || '').split(','),
+  ...(process.env.ADMIN_ID ? [process.env.ADMIN_ID] : []),
+].map((id) => id.trim()).filter(Boolean);
 const { initializePostgres, testConnection } = require('../../config/postgres');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
@@ -55,7 +60,6 @@ const registerJitsiModeratorHandlers = require('../handlers/moderation/jitsiMode
 const registerCallManagementHandlers = require('../handlers/admin/callManagement');
 const registerRoleManagementHandlers = require('../handlers/admin/roleManagement');
 const registerPerformerManagementHandlers = require('../handlers/admin/performerManagement');
-const registerLiveStreamManagementHandlers = require('../handlers/admin/liveStreamManagement');
 
 const registerPNPLiveModelHandlers = require('../handlers/model/pnpLiveModelHandler');
 const { registerWallOfFameHandlers } = require('../handlers/group/wallOfFame');
@@ -67,6 +71,9 @@ const registerUserCallManagementHandlers = require('../handlers/user/callManagem
 const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
 const { registerPromoHandlers } = require('../handlers/promo/promoHandler');
+const { getLanguage } = require('../utils/helpers');
+const { buildOnboardingPrompt } = require('../handlers/user/menu');
+const UserService = require('../services/userService');
 // Middleware
 const { setupAgeVerificationMiddleware } = require('./middleware/ageVerificationRequired');
 // Services
@@ -84,7 +91,6 @@ const { initializeWorker: initializePrivateCallsWorker } = require('../../worker
 const PNPLiveWorker = require('../../workers/pnpLiveWorker');
 const { startCronJobs } = require('../../../scripts/cron');
 // Models for cache prewarming
-const PlanModel = require('../../models/planModel');
 // Support model for ticket tracking
 const SupportTopicModel = require('../../models/supportTopicModel');
 // Support routing service and handlers
@@ -264,13 +270,6 @@ const startBot = async () => {
     try {
       initializeRedis();
       logger.info('✓ Redis initialized');
-      // Prewarm cache with critical data
-      try {
-        await PlanModel.prewarmCache();
-        logger.info('✓ Cache prewarmed successfully');
-      } catch (cacheError) {
-        logger.warn('Cache prewarming failed, continuing:', cacheError.message);
-      }
     } catch (error) {
       logger.warn('Redis initialization failed, continuing without cache:', error.message);
       logger.warn('⚠️  Performance may be degraded without caching');
@@ -363,11 +362,6 @@ const startBot = async () => {
     logger.info('✓ Group security handlers registered');
 
     // Register handlers
-const { getLanguage } = require('../utils/helpers');
-const { buildOnboardingPrompt } = require('../handlers/user/menu');
-const UserService = require('../services/userService');
-
-// ... (rest of the file)
 
     // Generic message handler for private chats to route to support
     bot.on('message', async (ctx, next) => {
@@ -381,14 +375,75 @@ const UserService = require('../services/userService');
         return next();
       }
 
-      // Check if user has completed onboarding
-      const user = await UserService.getOrCreateFromContext(ctx);
-      if (!user?.onboardingComplete) {
-        const lang = getLanguage(ctx);
-        const botUsername = ctx.botInfo?.username || 'PNPtvbot';
-        const { message, keyboard } = buildOnboardingPrompt(lang, botUsername);
-        await ctx.reply(message, { ...keyboard });
-        return;
+      const isAwaitingSupportMessage = Boolean(ctx.session?.awaitingSupportMessage);
+      const isContactingAdmin = Boolean(ctx.session?.temp?.contactingAdmin);
+      const isRequestingActivation = Boolean(ctx.session?.temp?.requestingActivation);
+      const isWaitingForEmail = Boolean(ctx.session?.temp?.waitingForEmail);
+      const adminSessionFlags = Boolean(
+        ctx.session?.temp?.broadcastStep ||
+        ctx.session?.temp?.broadcastTarget ||
+        ctx.session?.temp?.broadcastData ||
+        ctx.session?.temp?.customButtons ||
+        ctx.session?.temp?.adminSearchingUser ||
+        ctx.session?.temp?.activatingMembership ||
+        ctx.session?.temp?.activationStep ||
+        ctx.session?.temp?.awaitingMessageInput ||
+        ctx.session?.temp?.adminMode ||
+        ctx.session?.temp?.adminAction
+      );
+      let isAdminUser = ADMIN_USER_IDS.includes(String(ctx.from?.id));
+      if (!isAdminUser && adminSessionFlags) {
+        try {
+          const PermissionService = require('../services/permissionService');
+          isAdminUser = await PermissionService.isAdmin(ctx.from?.id);
+        } catch (adminCheckError) {
+          logger.warn('Admin permission check failed during support routing guard:', adminCheckError.message);
+        }
+      }
+      const isAdminFlow = isAdminUser && adminSessionFlags;
+
+      const replyToMessage = ctx.message?.reply_to_message;
+      const isReplyToSupport = Boolean(replyToMessage && (
+        replyToMessage.text?.includes('(Soporte):') ||
+        replyToMessage.caption?.includes('(Soporte):') ||
+        replyToMessage.text?.includes('Para responder:') ||
+        replyToMessage.text?.includes('To reply:')
+      ));
+
+      if (isWaitingForEmail) {
+        return next();
+      }
+
+      if (isAdminFlow) {
+        if (isAwaitingSupportMessage || isContactingAdmin || isRequestingActivation) {
+          ctx.session.awaitingSupportMessage = false;
+          if (ctx.session?.temp) {
+            ctx.session.temp.contactingAdmin = false;
+            ctx.session.temp.requestingActivation = false;
+          }
+          await ctx.saveSession();
+        }
+        return next();
+      }
+
+      const isSupportIntent = isAwaitingSupportMessage || isContactingAdmin || isRequestingActivation || isReplyToSupport;
+
+      if (!isSupportIntent) {
+        // Only prompt onboarding when the user isn't mid-onboarding input
+        const user = await UserService.getOrCreateFromContext(ctx);
+        if (!user?.onboardingComplete && !isWaitingForEmail) {
+          const lang = getLanguage(ctx);
+          const botUsername = ctx.botInfo?.username || 'PNPtvbot';
+          const { message, keyboard } = buildOnboardingPrompt(lang, botUsername);
+          await ctx.reply(message, { ...keyboard });
+          return;
+        }
+        return next();
+      }
+
+      // Let specialized support handlers process text flows
+      if (ctx.message?.text && (isContactingAdmin || isRequestingActivation || isReplyToSupport)) {
+        return next();
       }
 
       // Check if the message is media or text
@@ -403,7 +458,12 @@ const UserService = require('../services/userService');
       
       // Forward the message to the support routing service
       try {
-        await supportRoutingService.forwardUserMessage(ctx, messageType, 'support');
+        const requestType = isRequestingActivation ? 'activation' : 'support';
+        await supportRoutingService.forwardUserMessage(ctx, messageType, requestType);
+        if (isAwaitingSupportMessage) {
+          ctx.session.awaitingSupportMessage = false;
+          await ctx.saveSession();
+        }
         // Add a reaction to indicate the message was received
         try {
           await ctx.react('👍');

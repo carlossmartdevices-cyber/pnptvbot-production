@@ -75,7 +75,6 @@ docker-compose logs bot | tail -30
 
 # Look for:
 # ✓ Redis initialized
-# ✓ Firebase initialized  
 # ✓ Cache prewarmed successfully
 # 🚀 PNPtv Telegram Bot is running!
 

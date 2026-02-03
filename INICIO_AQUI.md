@@ -29,7 +29,7 @@ He creado **5 archivos de documentación completa** (155 KB total) para que pued
 - Estructura de proyecto (60+ archivos)
 - FASE 1-4:
   - Setup inicial
-  - Configuración Firebase y Redis
+  - Configuración PostgreSQL y Redis
   - Logger, i18n
   - Modelos (User, Plan, Payment)
   - Bot principal
@@ -109,7 +109,7 @@ Crea TODOS los archivos con el código EXACTO proporcionado."
 
 ### Arquitectura
 - ✅ Node.js 18+ / Telegraf 4.15
-- ✅ Firebase Firestore (base de datos)
+- ✅ PostgreSQL (base de datos)
 - ✅ Redis 7 (cache y sesiones)
 - ✅ Express 4.18 (API server)
 - ✅ Docker multi-stage optimizado
@@ -131,9 +131,6 @@ Crea TODOS los archivos con el código EXACTO proporcionado."
 ### 1. Credenciales Mínimas
 ```bash
 BOT_TOKEN=              # @BotFather en Telegram
-FIREBASE_PROJECT_ID=    # Firebase Console
-FIREBASE_PRIVATE_KEY=   # Firebase Console
-FIREBASE_CLIENT_EMAIL=  # Firebase Console
 ADMIN_USER_IDS=         # @userinfobot en Telegram
 JWT_SECRET=             # Generar 32+ caracteres
 ENCRYPTION_KEY=         # Generar 32+ caracteres

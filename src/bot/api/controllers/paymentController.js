@@ -1,3 +1,4 @@
+const DaimoConfig = require('../../../config/daimo');
 const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
 const ConfirmationTokenService = require('../../services/confirmationTokenService');
@@ -124,19 +125,29 @@ class PaymentController {
           currencyCode,
         });
       } else if (provider === 'daimo') {
-        // For Daimo, generate the payment link using DaimoService
-        const DaimoService = require('../../services/daimoService');
         try {
-          const daimoPaymentLink = DaimoService.generatePaymentLink({
-            userId,
-            chatId: '',
-            planId,
+          const daimoResult = await DaimoConfig.createDaimoPayment({
             amount: plan.price,
-            paymentId: payment.id
+            userId,
+            planId,
+            chatId: '',
+            paymentId: payment.id,
+            description: `${plan.display_name || plan.name} Subscription`,
           });
-          basePaymentData.daimoPaymentLink = daimoPaymentLink;
+
+          if (daimoResult.success) {
+            basePaymentData.daimoPaymentLink = daimoResult.paymentUrl;
+            // Optionally, save the daimo_payment_id to the payment record
+            if (daimoResult.daimoPaymentId) {
+              await PaymentModel.updateStatus(payment.id, 'pending', {
+                daimo_payment_id: daimoResult.daimoPaymentId,
+              });
+            }
+          } else {
+            throw new Error(daimoResult.error || 'Daimo payment creation failed');
+          }
         } catch (error) {
-          logger.error('Error generating Daimo payment link:', error);
+          logger.error('Error creating Daimo payment link:', error);
           basePaymentData.daimoPaymentLink = null;
         }
       }

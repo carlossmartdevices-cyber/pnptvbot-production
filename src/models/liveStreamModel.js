@@ -1,22 +1,8 @@
-/**
- * Live Stream Model
- * Handles live streaming with Agora integration
- */
-
-const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
-const { getFirestore } = require('../config/firebase');
+const { v4: uuidv4 } = require('uuid');
+const { query } = require('../config/postgres');
 const logger = require('../utils/logger');
-const redisClient = require('../config/redis');
-const AIModerationService = require('../services/aiModerationService');
+const agoraTokenService = require('../services/agora/agoraTokenService');
 
-const COLLECTION = 'live_streams';
-const VIEWERS_COLLECTION = 'stream_viewers';
-const COMMENTS_COLLECTION = 'stream_comments';
-const NOTIFICATIONS_COLLECTION = 'stream_notifications';
-const BANNED_USERS_COLLECTION = 'stream_banned_users';
-const CACHE_TTL = 30; // 30 seconds for active streams
-
-// Stream categories
 const CATEGORIES = {
   MUSIC: 'music',
   GAMING: 'gaming',
@@ -29,1312 +15,1087 @@ const CATEGORIES = {
 };
 
 class LiveStreamModel {
-  /**
-   * Create a new live stream
-   * @param {Object} streamData - Stream data
-   * @returns {Promise<Object>} Created stream
-   */
-  static async create(streamData) {
+  static _tableInfoCache = new Map();
+
+  static async _getTableInfo(tableName) {
+    if (this._tableInfoCache.has(tableName)) {
+      return this._tableInfoCache.get(tableName);
+    }
+
     try {
-      const db = getFirestore();
-      const {
-        hostId,
-        hostName,
-        title,
-        description = '',
-        isPaid = false,
-        price = 0,
-        maxViewers = 1000,
-        scheduledFor = null,
-        category = CATEGORIES.OTHER,
-        tags = [],
-        thumbnailUrl = null,
-        allowComments = true,
-        recordStream = false,
-        language = 'en',
-      } = streamData;
+      const result = await query(
+        `SELECT column_name, data_type, udt_name
+         FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = $1`,
+        [tableName],
+        { cache: false }
+      );
 
-      // Validate required fields
-      if (!hostId || !hostName || !title) {
-        throw new Error('Missing required fields: hostId, hostName, or title');
-      }
+      const columns = new Set();
+      const types = new Map();
 
-      // Validate category
-      const validCategories = Object.values(CATEGORIES);
-      if (!validCategories.includes(category)) {
-        throw new Error(`Invalid category. Must be one of: ${validCategories.join(', ')}`);
-      }
+      result.rows.forEach((row) => {
+        columns.add(row.column_name);
+        types.set(row.column_name, row.udt_name || row.data_type);
+      });
 
-      // Generate unique stream ID
-      const streamId = `stream_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      // Generate Agora channel name (alphanumeric only)
-      const channelName = `live_${streamId.replace(/[^a-zA-Z0-9]/g, '')}`;
-
-      // Generate Agora tokens
-      const tokens = this.generateAgoraTokens(channelName, hostId);
-
-      const stream = {
-        streamId,
-        channelName,
-        hostId: String(hostId),
-        hostName,
-        title,
-        description,
-        category,
-        tags: Array.isArray(tags) ? tags.slice(0, 5) : [], // Max 5 tags
-        language,
-        isPaid,
-        price: isPaid ? parseFloat(price) : 0,
-        maxViewers,
-        currentViewers: 0,
-        totalViews: 0,
-        peakViewers: 0,
-        status: scheduledFor ? 'scheduled' : 'active',
-        scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
-        startedAt: scheduledFor ? null : new Date(),
-        endedAt: null,
-        duration: 0, // Will be calculated when stream ends
-        thumbnailUrl,
-        viewers: [],
-        likes: 0,
-        totalComments: 0,
-        allowComments,
-        recordStream,
-        recordingUrl: null, // Will be set after stream ends if recordStream is true
-        moderators: [String(hostId)], // Host is default moderator
-        bannedUsers: [],
-        chatSettings: {
-          slowMode: false, // Limit comments frequency
-          slowModeDelay: 5, // Seconds between comments
-          subscribersOnly: false,
-          emotesOnly: false,
-        },
-        analytics: {
-          avgWatchTime: 0,
-          totalWatchTime: 0,
-          engagementRate: 0,
-          shareCount: 0,
-        },
-        createdAt: new Date(),
-        updatedAt: new Date(),
+      const info = {
+        exists: columns.size > 0,
+        columns,
+        types,
       };
 
-      await db.collection(COLLECTION).doc(streamId).set(stream);
+      this._tableInfoCache.set(tableName, info);
+      return info;
+    } catch (error) {
+      logger.error('Error loading table info', { tableName, error: error.message });
+      const info = { exists: false, columns: new Set(), types: new Map() };
+      this._tableInfoCache.set(tableName, info);
+      return info;
+    }
+  }
 
-      logger.info('Live stream created', { streamId, hostId, title, category });
+  static async _tableExists(tableName) {
+    const info = await this._getTableInfo(tableName);
+    return info.exists;
+  }
+
+  static _normalizeStatus(status) {
+    if (!status) return 'scheduled';
+    const normalized = String(status).toLowerCase();
+    if (normalized === 'live') return 'active';
+    return normalized;
+  }
+
+  static _statusToDb(status) {
+    if (!status) return 'scheduled';
+    const normalized = String(status).toLowerCase();
+    if (normalized === 'active') return 'live';
+    return normalized;
+  }
+
+  static _toArray(value) {
+    if (Array.isArray(value)) return value;
+    if (value === undefined || value === null) return [];
+    return [value];
+  }
+
+  static _resolveTelegramId(userId, telegramId) {
+    if (telegramId !== undefined && telegramId !== null) return Number(telegramId);
+    const numeric = Number(userId);
+    return Number.isFinite(numeric) ? numeric : 0;
+  }
+
+  static _safeNumber(value, fallback = 0) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+  }
+
+  static _coalesce(...values) {
+    for (const value of values) {
+      if (value !== undefined && value !== null) return value;
+    }
+    return undefined;
+  }
+
+  static async _getStreamIdColumn() {
+    const info = await this._getTableInfo('live_streams');
+    if (info.columns.has('stream_id')) return 'stream_id';
+    if (info.columns.has('id')) return 'id';
+    return 'stream_id';
+  }
+
+  static async _getStreamRefForTable(stream, tableName) {
+    const info = await this._getTableInfo(tableName);
+    if (!info.exists) return stream.streamId;
+
+    const type = info.types.get('stream_id');
+    if (!type) return stream.streamId;
+
+    const normalized = String(type).toLowerCase();
+    if (normalized.includes('uuid') || normalized.startsWith('int')) {
+      return stream.dbId || stream.streamId;
+    }
+
+    return stream.streamId;
+  }
+
+  static _mapRowToStream(row) {
+    if (!row) return null;
+
+    const streamId = row.stream_id || row.id;
+    const hostId = row.host_user_id || row.host_id;
+    const maxViewers = this._coalesce(row.max_viewers, row.maxViewers, row.max_viewers_count);
+
+    const durationSeconds = this._coalesce(row.duration_seconds, row.duration);
+    const durationMinutes = durationSeconds !== undefined && durationSeconds !== null
+      ? Math.round(this._safeNumber(durationSeconds) / 60)
+      : null;
+
+    return {
+      dbId: row.id,
+      streamId: streamId ? String(streamId) : null,
+      channelName: row.channel_name || row.jaas_room_name || row.room_name || row.stream_url || (streamId ? String(streamId) : null),
+      hostId: hostId ? String(hostId) : null,
+      hostTelegramId: row.host_telegram_id ? Number(row.host_telegram_id) : null,
+      hostName: row.host_name || row.streamer_name || (hostId ? String(hostId) : 'Host'),
+      title: row.title,
+      description: row.description || '',
+      category: row.category || (Array.isArray(row.tags) && row.tags.length > 0 ? row.tags[0] : CATEGORIES.OTHER),
+      tags: row.tags || [],
+      thumbnailUrl: row.thumbnail_url || null,
+      streamUrl: row.stream_url || null,
+      status: this._normalizeStatus(row.status),
+      scheduledFor: row.scheduled_for || row.scheduled_start_time || row.scheduled_at || null,
+      startedAt: row.actual_start_time || row.started_at || null,
+      endedAt: row.end_time || row.ended_at || null,
+      duration: durationMinutes !== null ? durationMinutes : (row.duration || row.duration_seconds || null),
+      isPublic: row.is_public !== undefined && row.is_public !== null ? row.is_public : true,
+      isSubscribersOnly: row.is_subscribers_only || false,
+      allowedPlanTiers: row.allowed_plan_tiers || [],
+      currentViewers: this._safeNumber(this._coalesce(row.current_viewers, row.viewers_count, row.viewers_count_old), 0),
+      peakViewers: this._safeNumber(row.peak_viewers, 0),
+      totalViews: this._safeNumber(this._coalesce(row.total_views, row.viewers_count), 0),
+      totalComments: this._safeNumber(this._coalesce(row.total_comments, row.total_messages), 0),
+      likes: this._safeNumber(row.likes, 0),
+      isPaid: row.is_paid || false,
+      price: this._safeNumber(row.price, 0),
+      maxViewers: this._safeNumber(maxViewers, 0),
+      allowComments: row.allow_comments !== undefined && row.allow_comments !== null ? row.allow_comments : true,
+      recordStream: row.record_stream || row.recording_enabled || false,
+      recordingUrl: row.recording_url || null,
+      language: row.language || 'en',
+      createdAt: row.created_at || null,
+      updatedAt: row.updated_at || null,
+      analytics: row.analytics || null,
+    };
+  }
+
+  static async create(streamData) {
+    try {
+      const info = await this._getTableInfo('live_streams');
+      if (!info.exists) {
+        throw new Error('live_streams table not found');
+      }
+
+      const streamId = streamData.streamId || uuidv4();
+      const channelName = streamData.channelName || streamData.roomName || streamId;
+      const status = this._statusToDb(streamData.status || (streamData.scheduledFor ? 'scheduled' : 'live'));
+      const now = new Date();
+
+      const hostId = String(streamData.hostId);
+      const hostName = streamData.hostName || 'Host';
+      const hostTelegramId = this._resolveTelegramId(hostId, streamData.hostTelegramId);
+
+      const columns = info.columns;
+      const fields = [];
+      const values = [];
+      const placeholders = [];
+      let paramIndex = 1;
+
+      const addField = (column, value) => {
+        if (!columns.has(column)) return;
+        if (value === undefined) return;
+        fields.push(column);
+        values.push(value);
+        placeholders.push(`$${paramIndex++}`);
+      };
+
+      addField('stream_id', streamId);
+      addField('room_name', channelName);
+      addField('jaas_room_name', streamData.jaasRoomName);
+      addField('channel_name', channelName);
+      addField('host_user_id', hostId);
+      addField('host_id', hostId);
+      addField('host_telegram_id', hostTelegramId);
+      addField('host_name', hostName);
+      addField('title', streamData.title);
+      addField('description', streamData.description || '');
+      addField('thumbnail_url', streamData.thumbnailUrl || null);
+      addField('status', status);
+
+      if (status === 'live') {
+        addField('actual_start_time', now);
+        addField('started_at', now);
+      }
+
+      addField('scheduled_start_time', streamData.scheduledFor || null);
+      addField('scheduled_for', streamData.scheduledFor || null);
+      addField('scheduled_at', streamData.scheduledFor || null);
+
+      addField('is_public', streamData.isPublic !== undefined ? streamData.isPublic : true);
+      addField('is_subscribers_only', streamData.isSubscribersOnly || false);
+      addField('allowed_plan_tiers', this._toArray(streamData.allowedPlanTiers));
+
+      addField('current_viewers', 0);
+      addField('total_views', 0);
+      addField('peak_viewers', 0);
+      addField('total_messages', 0);
+      addField('total_comments', 0);
+      addField('likes', 0);
+
+      addField('recording_enabled', streamData.recordStream || false);
+      addField('record_stream', streamData.recordStream || false);
+      addField('recording_url', streamData.recordingUrl || null);
+
+      addField('is_paid', streamData.isPaid || false);
+      addField('price', streamData.price || 0);
+
+      addField('tags', this._toArray(streamData.tags));
+      addField('allow_comments', streamData.allowComments !== false);
+      addField('language', streamData.language || 'en');
+      addField('category', streamData.category);
+      addField('max_viewers', streamData.maxViewers || null);
+      addField('stream_url', streamData.streamUrl || null);
+
+      if (fields.length === 0) {
+        throw new Error('No columns available for live_streams insert');
+      }
+
+      const result = await query(
+        `INSERT INTO live_streams (${fields.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING *`,
+        values
+      );
+
+      const stream = this._mapRowToStream(result.rows[0]);
+      const hostToken = agoraTokenService.generateHostToken(channelName, hostId);
 
       return {
         ...stream,
-        hostToken: tokens.hostToken,
-        viewerToken: tokens.viewerToken,
+        hostToken,
+        channelName,
       };
     } catch (error) {
-      logger.error('Error creating live stream:', error);
+      logger.error('Error creating live stream', { error: error.message });
       throw error;
     }
   }
 
-  /**
-   * Generate Agora tokens for host and viewers
-   * @param {string} channelName - Agora channel name
-   * @param {string} _userId - User ID
-   * @returns {Object} Tokens for host and viewer
-   */
-  static generateAgoraTokens(channelName, _userId) {
+  static async updateChannelName(streamId, channelName) {
     try {
-      const appId = process.env.AGORA_APP_ID;
-      const appCertificate = process.env.AGORA_APP_CERTIFICATE;
+      const info = await this._getTableInfo('live_streams');
+      if (!info.exists) return false;
 
-      if (!appId || !appCertificate) {
-        logger.warn('Agora credentials not configured, using mock tokens');
-        return {
-          hostToken: `mock_host_token_${Date.now()}`,
-          viewerToken: `mock_viewer_token_${Date.now()}`,
-        };
-      }
+      const updates = [];
+      const values = [];
+      let paramIndex = 1;
 
-      const uid = 0; // 0 means any user can join
-      const _role = RtcRole.PUBLISHER; // Reserved for future use
-      const expirationTimeInSeconds = 3600; // 1 hour
-      const currentTimestamp = Math.floor(Date.now() / 1000);
-      const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
-
-      // Host token (can publish and subscribe)
-      const hostToken = RtcTokenBuilder.buildTokenWithUid(
-        appId,
-        appCertificate,
-        channelName,
-        uid,
-        RtcRole.PUBLISHER,
-        privilegeExpiredTs,
-      );
-
-      // Viewer token (can only subscribe)
-      const viewerToken = RtcTokenBuilder.buildTokenWithUid(
-        appId,
-        appCertificate,
-        channelName,
-        uid,
-        RtcRole.SUBSCRIBER,
-        privilegeExpiredTs,
-      );
-
-      return { hostToken, viewerToken };
-    } catch (error) {
-      logger.error('Error generating Agora tokens:', error);
-      // Return mock tokens as fallback
-      return {
-        hostToken: `mock_host_token_${Date.now()}`,
-        viewerToken: `mock_viewer_token_${Date.now()}`,
+      const addUpdate = (column, value) => {
+        if (!info.columns.has(column)) return;
+        updates.push(`${column} = $${paramIndex++}`);
+        values.push(value);
       };
+
+      addUpdate('channel_name', channelName);
+      addUpdate('jaas_room_name', channelName);
+      addUpdate('room_name', channelName);
+
+      if (updates.length === 0) return false;
+
+      const streamIdColumn = await this._getStreamIdColumn();
+      values.push(streamId);
+
+      const whereClause = streamIdColumn === 'id'
+        ? 'id::text = $' + paramIndex
+        : `${streamIdColumn} = $${paramIndex}`;
+
+      await query(
+        `UPDATE live_streams SET ${updates.join(', ')}, updated_at = NOW() WHERE ${whereClause}`,
+        values
+      );
+
+      return true;
+    } catch (error) {
+      logger.error('Error updating channel name', { error: error.message, streamId });
+      return false;
     }
   }
 
-  /**
-   * Get stream by ID
-   * @param {string} streamId - Stream ID
-   * @returns {Promise<Object|null>} Stream data or null
-   */
   static async getById(streamId) {
     try {
-      const db = getFirestore();
-      const doc = await db.collection(COLLECTION).doc(streamId).get();
+      const streamIdColumn = await this._getStreamIdColumn();
+      const whereClause = streamIdColumn === 'id'
+        ? 'id::text = $1'
+        : `${streamIdColumn} = $1`;
 
-      if (!doc.exists) {
-        return null;
-      }
+      const result = await query(
+        `SELECT * FROM live_streams WHERE ${whereClause} LIMIT 1`,
+        [streamId]
+      );
 
-      const stream = doc.data();
-
-      // Convert Firestore timestamps
-      if (stream.startedAt?.toDate) stream.startedAt = stream.startedAt.toDate();
-      if (stream.endedAt?.toDate) stream.endedAt = stream.endedAt.toDate();
-      if (stream.scheduledFor?.toDate) stream.scheduledFor = stream.scheduledFor.toDate();
-      if (stream.createdAt?.toDate) stream.createdAt = stream.createdAt.toDate();
-      if (stream.updatedAt?.toDate) stream.updatedAt = stream.updatedAt.toDate();
-
-      return stream;
+      return this._mapRowToStream(result.rows[0]);
     } catch (error) {
-      logger.error('Error getting stream:', error);
-      throw error;
+      logger.error('Error getting live stream', { streamId, error: error.message });
+      return null;
     }
   }
 
-  /**
-   * Get all active streams
-   * @param {number} limit - Maximum number of streams to return
-   * @returns {Promise<Array>} Active streams
-   */
-  static async getActiveStreams(limit = 50) {
+  static async getActiveStreams(limit = 20) {
     try {
-      // Check cache first
-      const cacheKey = `active_streams:${limit}`;
-      const cached = await redisClient.get(cacheKey);
+      const info = await this._getTableInfo('live_streams');
+      if (!info.exists) return [];
 
-      if (cached) {
-        return JSON.parse(cached);
+      const conditions = [];
+      const values = [];
+      let paramIndex = 1;
+
+      if (info.columns.has('status')) {
+        conditions.push(`status IN ($${paramIndex++}, $${paramIndex++})`);
+        values.push('live', 'active');
       }
 
-      const db = getFirestore();
-      const snapshot = await db
-        .collection(COLLECTION)
-        .where('status', '==', 'active')
-        .orderBy('startedAt', 'desc')
-        .limit(limit)
-        .get();
+      let sql = 'SELECT * FROM live_streams';
+      if (conditions.length > 0) {
+        sql += ` WHERE ${conditions.join(' AND ')}`;
+      }
 
-      const streams = [];
-      snapshot.forEach((doc) => {
-        const stream = doc.data();
+      const orderColumn = info.columns.has('actual_start_time')
+        ? 'actual_start_time'
+        : info.columns.has('started_at')
+          ? 'started_at'
+          : 'created_at';
 
-        // Convert timestamps
-        if (stream.startedAt?.toDate) stream.startedAt = stream.startedAt.toDate();
-        if (stream.createdAt?.toDate) stream.createdAt = stream.createdAt.toDate();
-        if (stream.updatedAt?.toDate) stream.updatedAt = stream.updatedAt.toDate();
+      sql += ` ORDER BY ${orderColumn} DESC LIMIT $${paramIndex}`;
+      values.push(limit);
 
-        streams.push(stream);
-      });
-
-      // Cache for 30 seconds
-      await redisClient.setex(cacheKey, CACHE_TTL, JSON.stringify(streams));
-
-      return streams;
+      const result = await query(sql, values);
+      return result.rows.map((row) => this._mapRowToStream(row));
     } catch (error) {
-      logger.error('Error getting active streams:', error);
-      throw error;
+      logger.error('Error getting active streams', { error: error.message });
+      return [];
     }
   }
 
-  /**
-   * Get streams by host ID
-   * @param {string} hostId - Host user ID
-   * @param {number} limit - Maximum number of streams
-   * @returns {Promise<Array>} User's streams
-   */
   static async getByHostId(hostId, limit = 20) {
     try {
-      const db = getFirestore();
-      const snapshot = await db
-        .collection(COLLECTION)
-        .where('hostId', '==', String(hostId))
-        .orderBy('createdAt', 'desc')
-        .limit(limit)
-        .get();
+      const info = await this._getTableInfo('live_streams');
+      if (!info.exists) return [];
 
-      const streams = [];
-      snapshot.forEach((doc) => {
-        const stream = doc.data();
+      const hostColumns = [];
+      if (info.columns.has('host_user_id')) hostColumns.push('host_user_id');
+      if (info.columns.has('host_id')) hostColumns.push('host_id');
 
-        // Convert timestamps
-        if (stream.startedAt?.toDate) stream.startedAt = stream.startedAt.toDate();
-        if (stream.endedAt?.toDate) stream.endedAt = stream.endedAt.toDate();
-        if (stream.scheduledFor?.toDate) stream.scheduledFor = stream.scheduledFor.toDate();
-        if (stream.createdAt?.toDate) stream.createdAt = stream.createdAt.toDate();
-        if (stream.updatedAt?.toDate) stream.updatedAt = stream.updatedAt.toDate();
+      if (hostColumns.length === 0) return [];
 
-        streams.push(stream);
-      });
+      const conditions = hostColumns.map((column, index) => `${column} = $${index + 1}`);
+      const values = hostColumns.map(() => String(hostId));
 
-      return streams;
+      const orderColumn = info.columns.has('created_at') ? 'created_at' : 'updated_at';
+
+      const result = await query(
+        `SELECT * FROM live_streams WHERE ${conditions.join(' OR ')} ORDER BY ${orderColumn} DESC LIMIT $${values.length + 1}`,
+        [...values, limit]
+      );
+
+      return result.rows.map((row) => this._mapRowToStream(row));
     } catch (error) {
-      logger.error('Error getting streams by host:', error);
-      throw error;
+      logger.error('Error getting host streams', { hostId, error: error.message });
+      return [];
     }
   }
 
-  /**
-   * Join a stream as viewer
-   * @param {string} streamId - Stream ID
-   * @param {string} viewerId - Viewer user ID
-   * @param {string} viewerName - Viewer name
-   * @returns {Promise<Object>} Viewer token and stream info
-   */
-  static async joinStream(streamId, viewerId, viewerName) {
+  static async getByCategory(category, limit = 20) {
     try {
-      const db = getFirestore();
-      const streamRef = db.collection(COLLECTION).doc(streamId);
-      const stream = await this.getById(streamId);
+      const info = await this._getTableInfo('live_streams');
+      if (!info.exists) return [];
 
+      const values = [];
+      let paramIndex = 1;
+
+      const conditions = [];
+
+      if (info.columns.has('category')) {
+        conditions.push(`category = $${paramIndex++}`);
+        values.push(category);
+      }
+
+      if (info.columns.has('status')) {
+        conditions.push(`status IN ($${paramIndex++}, $${paramIndex++})`);
+        values.push('live', 'active');
+      }
+
+      let sql = 'SELECT * FROM live_streams';
+      if (conditions.length > 0) {
+        sql += ` WHERE ${conditions.join(' AND ')}`;
+      }
+
+      sql += ` ORDER BY created_at DESC LIMIT $${paramIndex}`;
+      values.push(limit);
+
+      const result = await query(sql, values);
+      return result.rows.map((row) => this._mapRowToStream(row));
+    } catch (error) {
+      logger.error('Error getting streams by category', { category, error: error.message });
+      return [];
+    }
+  }
+
+  static async joinStream(streamId, userId, userName) {
+    try {
+      const stream = await this.getById(streamId);
       if (!stream) {
         throw new Error('Stream not found');
       }
 
-      if (stream.status !== 'active') {
+      if (!['active', 'live'].includes(stream.status)) {
         throw new Error('Stream is not active');
       }
 
-      // Check if stream has reached max viewers
-      if (stream.maxViewers && stream.currentViewers >= stream.maxViewers) {
+      const info = await this._getTableInfo('live_streams');
+      const maxViewers = info.columns.has('max_viewers') ? this._safeNumber(stream.maxViewers || 0) : 0;
+      if (maxViewers > 0 && stream.currentViewers >= maxViewers) {
         throw new Error('Stream has reached maximum viewers');
       }
 
-      // Check if viewer is already in stream
-      const isAlreadyViewing = stream.viewers.some((v) => v.viewerId === String(viewerId));
-
-      if (!isAlreadyViewing) {
-        const newViewerCount = stream.currentViewers + 1;
-
-        // Add viewer and update peak viewers if necessary
-        await streamRef.update({
-          currentViewers: newViewerCount,
-          totalViews: stream.totalViews + 1,
-          peakViewers: Math.max(stream.peakViewers || 0, newViewerCount),
-          viewers: [
-            ...stream.viewers,
-            {
-              viewerId: String(viewerId),
-              viewerName,
-              joinedAt: new Date(),
-            },
-          ],
-          updatedAt: new Date(),
-        });
-
-        // Track viewer in separate collection for analytics
-        await db.collection(VIEWERS_COLLECTION).add({
-          streamId,
-          viewerId: String(viewerId),
-          viewerName,
-          joinedAt: new Date(),
-          leftAt: null,
-        });
+      if (await this._tableExists('stream_viewers')) {
+        await this._trackViewerJoin(stream, userId, userName);
       }
 
-      // Generate viewer token
-      const tokens = this.generateAgoraTokens(stream.channelName, viewerId);
-
-      logger.info('User joined stream', { streamId, viewerId });
-
-      // Invalidate cache
-      await redisClient.del('active_streams:*');
+      const updatedStream = await this._incrementViewerCounts(streamId, 1);
+      const viewerToken = agoraTokenService.generateViewerToken(stream.channelName || stream.streamId, userId);
 
       return {
-        stream,
-        viewerToken: tokens.viewerToken,
+        stream: updatedStream || stream,
+        viewerToken,
       };
     } catch (error) {
-      logger.error('Error joining stream:', error);
+      logger.error('Error joining stream', { streamId, userId, error: error.message });
       throw error;
     }
   }
 
-  /**
-   * Leave a stream
-   * @param {string} streamId - Stream ID
-   * @param {string} viewerId - Viewer user ID
-   * @returns {Promise<void>}
-   */
-  static async leaveStream(streamId, viewerId) {
+  static async leaveStream(streamId, userId) {
     try {
-      const db = getFirestore();
       const stream = await this.getById(streamId);
+      if (!stream) return false;
 
-      if (!stream) {
-        return;
+      if (await this._tableExists('stream_viewers')) {
+        await this._trackViewerLeave(stream, userId);
       }
 
-      // Remove viewer from active viewers list
-      const updatedViewers = stream.viewers.filter((v) => v.viewerId !== String(viewerId));
-      const viewerLeft = stream.viewers.length > updatedViewers.length;
-
-      if (viewerLeft) {
-        await db.collection(COLLECTION).doc(streamId).update({
-          currentViewers: Math.max(0, stream.currentViewers - 1),
-          viewers: updatedViewers,
-          updatedAt: new Date(),
-        });
-
-        // Update viewer record
-        const viewerSnapshot = await db
-          .collection(VIEWERS_COLLECTION)
-          .where('streamId', '==', streamId)
-          .where('viewerId', '==', String(viewerId))
-          .where('leftAt', '==', null)
-          .limit(1)
-          .get();
-
-        if (!viewerSnapshot.empty) {
-          await viewerSnapshot.docs[0].ref.update({
-            leftAt: new Date(),
-          });
-        }
-
-        logger.info('User left stream', { streamId, viewerId });
-
-        // Invalidate cache
-        await redisClient.del('active_streams:*');
-      }
+      await this._incrementViewerCounts(streamId, -1);
+      return true;
     } catch (error) {
-      logger.error('Error leaving stream:', error);
-      throw error;
+      logger.error('Error leaving stream', { streamId, userId, error: error.message });
+      return false;
     }
   }
 
-  /**
-   * End a stream
-   * @param {string} streamId - Stream ID
-   * @param {string} hostId - Host user ID (for verification)
-   * @returns {Promise<void>}
-   */
-  static async endStream(streamId, hostId) {
-    try {
-      const db = getFirestore();
-      const stream = await this.getById(streamId);
+  static async _trackViewerJoin(stream, userId, userName) {
+    const viewerInfo = await this._getTableInfo('stream_viewers');
+    if (!viewerInfo.exists) return;
 
-      if (!stream) {
-        throw new Error('Stream not found');
-      }
+    const streamRef = await this._getStreamRefForTable(stream, 'stream_viewers');
 
-      if (stream.hostId !== String(hostId)) {
-        throw new Error('Only the host can end the stream');
-      }
+    const columns = viewerInfo.columns;
+    const fields = [];
+    const values = [];
+    const placeholders = [];
+    let paramIndex = 1;
 
-      if (stream.status === 'ended') {
-        throw new Error('Stream already ended');
-      }
+    const addField = (column, value) => {
+      if (!columns.has(column)) return;
+      if (value === undefined) return;
+      fields.push(column);
+      values.push(value);
+      placeholders.push(`$${paramIndex++}`);
+    };
 
-      // Calculate stream duration in minutes
-      const endTime = new Date();
-      const startTime = stream.startedAt;
-      const durationMinutes = Math.floor((endTime - startTime) / (1000 * 60));
+    const userIdString = String(userId);
 
-      await db.collection(COLLECTION).doc(streamId).update({
-        status: 'ended',
-        endedAt: endTime,
-        duration: durationMinutes,
-        updatedAt: endTime,
-      });
+    addField('stream_id', streamRef);
+    addField('user_id', userIdString);
+    addField('viewer_id', userIdString);
+    addField('telegram_id', this._resolveTelegramId(userId, null));
+    addField('username', userName);
+    addField('display_name', userName);
+    addField('viewer_name', userName);
+    addField('joined_at', new Date());
 
-      // Update all active viewers
-      const activeViewersSnapshot = await db
-        .collection(VIEWERS_COLLECTION)
-        .where('streamId', '==', streamId)
-        .where('leftAt', '==', null)
-        .get();
+    if (fields.length === 0) return;
 
-      const batch = db.batch();
-      activeViewersSnapshot.forEach((doc) => {
-        batch.update(doc.ref, { leftAt: new Date() });
-      });
-      await batch.commit();
-
-      logger.info('Stream ended', { streamId, hostId });
-
-      // Invalidate cache
-      await redisClient.del('active_streams:*');
-    } catch (error) {
-      logger.error('Error ending stream:', error);
-      throw error;
-    }
+    await query(
+      `INSERT INTO stream_viewers (${fields.join(', ')}) VALUES (${placeholders.join(', ')})`,
+      values
+    );
   }
 
-  /**
-   * Like a stream
-   * @param {string} streamId - Stream ID
-   * @returns {Promise<void>}
-   */
-  static async likeStream(streamId) {
-    try {
-      const db = getFirestore();
-      const streamRef = db.collection(COLLECTION).doc(streamId);
+  static async _trackViewerLeave(stream, userId) {
+    const viewerInfo = await this._getTableInfo('stream_viewers');
+    if (!viewerInfo.exists) return;
 
-      await streamRef.update({
-        likes: require('firebase-admin').firestore.FieldValue.increment(1),
-        updatedAt: new Date(),
-      });
+    const streamRef = await this._getStreamRefForTable(stream, 'stream_viewers');
+    const columns = viewerInfo.columns;
+    const userIdString = String(userId);
 
-      logger.info('Stream liked', { streamId });
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
 
-      // Invalidate cache
-      await redisClient.del('active_streams:*');
-    } catch (error) {
-      logger.error('Error liking stream:', error);
-      throw error;
+    const addUpdate = (column, expression) => {
+      if (!columns.has(column)) return;
+      updates.push(`${column} = ${expression}`);
+    };
+
+    addUpdate('left_at', 'NOW()');
+    addUpdate('updated_at', 'NOW()');
+
+    if (columns.has('watch_duration_seconds')) {
+      updates.push('watch_duration_seconds = EXTRACT(EPOCH FROM (NOW() - joined_at))::int');
     }
+
+    if (updates.length === 0) return;
+
+    const userColumn = columns.has('user_id') ? 'user_id' : 'viewer_id';
+
+    values.push(streamRef, userIdString);
+
+    const sql = `
+      UPDATE stream_viewers
+      SET ${updates.join(', ')}
+      WHERE stream_id = $1 AND ${userColumn} = $2 AND left_at IS NULL
+    `;
+
+    await query(sql, values);
   }
 
-  /**
-   * Add comment to stream (improved with moderation)
-   * @param {string} streamId - Stream ID
-   * @param {string} userId - User ID
-   * @param {string} userName - User name
-   * @param {string} text - Comment text
-   * @returns {Promise<Object>} Created comment
-   */
+  static async _incrementViewerCounts(streamId, delta) {
+    const info = await this._getTableInfo('live_streams');
+    if (!info.exists) return null;
+
+    const updates = [];
+    if (info.columns.has('current_viewers')) {
+      updates.push(`current_viewers = GREATEST(COALESCE(current_viewers, 0) + ${delta}, 0)`);
+    }
+    if (info.columns.has('viewers_count')) {
+      updates.push(`viewers_count = GREATEST(COALESCE(viewers_count, 0) + ${delta}, 0)`);
+    }
+    if (delta > 0 && info.columns.has('total_views')) {
+      updates.push('total_views = COALESCE(total_views, 0) + 1');
+    }
+    if (delta > 0 && info.columns.has('peak_viewers')) {
+      if (info.columns.has('current_viewers')) {
+        updates.push('peak_viewers = GREATEST(COALESCE(peak_viewers, 0), COALESCE(current_viewers, 0) + 1)');
+      } else if (info.columns.has('viewers_count')) {
+        updates.push('peak_viewers = GREATEST(COALESCE(peak_viewers, 0), COALESCE(viewers_count, 0) + 1)');
+      }
+    }
+
+    if (updates.length === 0) return null;
+
+    const streamIdColumn = await this._getStreamIdColumn();
+    const whereClause = streamIdColumn === 'id'
+      ? 'id::text = $1'
+      : `${streamIdColumn} = $1`;
+
+    const result = await query(
+      `UPDATE live_streams SET ${updates.join(', ')}, updated_at = NOW() WHERE ${whereClause} RETURNING *`,
+      [streamId]
+    );
+
+    return this._mapRowToStream(result.rows[0]);
+  }
+
   static async addComment(streamId, userId, userName, text) {
     try {
-      const db = getFirestore();
       const stream = await this.getById(streamId);
-
       if (!stream) {
         throw new Error('Stream not found');
       }
 
-      // Check if comments are allowed
       if (!stream.allowComments) {
-        throw new Error('Comments are disabled for this stream');
+        throw new Error('Comments are disabled');
       }
 
-      // Check if user is banned
-      if (stream.bannedUsers && stream.bannedUsers.includes(String(userId))) {
-        throw new Error('You are banned from commenting on this stream');
+      const commentsTable = await this._getCommentsTable();
+      if (!commentsTable) {
+        throw new Error('Comments are disabled');
       }
 
-      // Check slow mode
-      if (stream.chatSettings?.slowMode) {
-        const recentComment = await db
-          .collection(COMMENTS_COLLECTION)
-          .where('streamId', '==', streamId)
-          .where('userId', '==', String(userId))
-          .orderBy('timestamp', 'desc')
-          .limit(1)
-          .get();
-
-        if (!recentComment.empty) {
-          const lastComment = recentComment.docs[0].data();
-          const timeSinceLastComment = (Date.now() - lastComment.timestamp.toDate().getTime()) / 1000;
-
-          if (timeSinceLastComment < stream.chatSettings.slowModeDelay) {
-            throw new Error(`Please wait ${Math.ceil(stream.chatSettings.slowModeDelay - timeSinceLastComment)} seconds before commenting again`);
-          }
-        }
-      }
-
-      // AI Content Moderation
-      const moderationEnabled = stream.ai_moderation_enabled || false;
-      if (moderationEnabled) {
-        const moderationResult = await AIModerationService.moderateChatMessage(
-          streamId, 
-          userId, 
-          text
+      if (await this._tableExists('stream_banned_users')) {
+        const bannedStreamRef = await this._getStreamRefForTable(stream, 'stream_banned_users');
+        const bannedResult = await query(
+          'SELECT 1 FROM stream_banned_users WHERE stream_id = $1 AND user_id = $2 LIMIT 1',
+          [bannedStreamRef, String(userId)]
         );
-
-        if (!moderationResult.allowed) {
-          // Record violation
-          await AIModerationService.recordViolation(streamId, userId, {
-            violations: moderationResult.analysis.violations,
-            messageText: text,
-            action: moderationResult.action
-          });
-
-          // Take appropriate action
-          if (moderationResult.action.type === 'BAN') {
-            await this.banUser(streamId, userId, 'system');
-          } else if (moderationResult.action.type === 'MUTE') {
-            // In a real implementation, you would implement mute functionality
-            logger.info('User should be muted', { streamId, userId });
-          }
-
-          // Throw error with user-friendly message
-          throw new Error(moderationResult.message);
+        if (bannedResult.rows.length > 0) {
+          throw new Error('User is banned from commenting on this stream');
         }
       }
 
-      // Create comment document
-      const commentId = `comment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const comment = {
-        commentId,
-        streamId,
-        userId: String(userId),
-        userName,
-        text,
-        timestamp: new Date(),
-        likes: 0,
-        isPinned: false,
-        isDeleted: false,
+      const commentId = uuidv4();
+      const commentData = await this._insertComment(commentsTable, stream, commentId, userId, userName, text);
+      await this._incrementCommentCount(streamId);
+
+      return commentData;
+    } catch (error) {
+      logger.error('Error adding comment', { streamId, userId, error: error.message });
+      throw error;
+    }
+  }
+
+  static async _getCommentsTable() {
+    if (await this._tableExists('stream_comments')) {
+      return 'stream_comments';
+    }
+    if (await this._tableExists('stream_chat_messages')) {
+      return 'stream_chat_messages';
+    }
+    return null;
+  }
+
+  static async _insertComment(tableName, stream, commentId, userId, userName, text) {
+    const info = await this._getTableInfo(tableName);
+    const columns = info.columns;
+    const streamRef = await this._getStreamRefForTable(stream, tableName);
+
+    const fields = [];
+    const values = [];
+    const placeholders = [];
+    let paramIndex = 1;
+
+    const addField = (column, value) => {
+      if (!columns.has(column)) return;
+      if (value === undefined) return;
+      fields.push(column);
+      values.push(value);
+      placeholders.push(`$${paramIndex++}`);
+    };
+
+    const userIdString = String(userId);
+
+    if (tableName === 'stream_comments') {
+      addField('id', commentId);
+      addField('stream_id', streamRef);
+      addField('user_id', userIdString);
+      addField('user_name', userName);
+      addField('text', text);
+      addField('timestamp', new Date());
+    } else {
+      addField('message_id', commentId);
+      addField('stream_id', streamRef);
+      addField('user_id', userIdString);
+      addField('telegram_id', this._resolveTelegramId(userId, null));
+      addField('username', userName);
+      addField('display_name', userName);
+      addField('message_text', text);
+      addField('message_type', 'text');
+      addField('sent_at', new Date());
+    }
+
+    if (fields.length === 0) {
+      throw new Error('Comments are disabled');
+    }
+
+    await query(
+      `INSERT INTO ${tableName} (${fields.join(', ')}) VALUES (${placeholders.join(', ')})`,
+      values
+    );
+
+    return {
+      commentId,
+      userId: userIdString,
+      userName,
+      text,
+      timestamp: new Date(),
+      likes: 0,
+    };
+  }
+
+  static async _incrementCommentCount(streamId) {
+    const info = await this._getTableInfo('live_streams');
+    if (!info.exists) return;
+
+    const updates = [];
+    if (info.columns.has('total_comments')) {
+      updates.push('total_comments = COALESCE(total_comments, 0) + 1');
+    }
+    if (info.columns.has('total_messages')) {
+      updates.push('total_messages = COALESCE(total_messages, 0) + 1');
+    }
+
+    if (updates.length === 0) return;
+
+    const streamIdColumn = await this._getStreamIdColumn();
+    const whereClause = streamIdColumn === 'id'
+      ? 'id::text = $1'
+      : `${streamIdColumn} = $1`;
+
+    await query(
+      `UPDATE live_streams SET ${updates.join(', ')}, updated_at = NOW() WHERE ${whereClause}`,
+      [streamId]
+    );
+  }
+
+  static async getComments(streamId, limit = 50, before = null) {
+    try {
+      const tableName = await this._getCommentsTable();
+      if (!tableName) return [];
+
+      const info = await this._getTableInfo(tableName);
+      const stream = await this.getById(streamId);
+      if (!stream) return [];
+
+      const streamRef = await this._getStreamRefForTable(stream, tableName);
+      const columns = info.columns;
+      const values = [streamRef];
+      let paramIndex = 2;
+
+      const conditions = ['stream_id = $1'];
+
+      if (columns.has('is_deleted')) {
+        conditions.push('is_deleted = false');
+      }
+
+      const timeColumn = tableName === 'stream_comments' ? 'timestamp' : 'sent_at';
+      if (before) {
+        conditions.push(`${timeColumn} < $${paramIndex++}`);
+        values.push(before);
+      }
+
+      const sql = `
+        SELECT * FROM ${tableName}
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY ${timeColumn} DESC
+        LIMIT $${paramIndex}
+      `;
+
+      values.push(limit);
+
+      const result = await query(sql, values);
+      return result.rows.map((row) => {
+        if (tableName === 'stream_comments') {
+          return {
+            commentId: row.id,
+            userId: row.user_id,
+            userName: row.user_name,
+            text: row.text,
+            timestamp: row.timestamp,
+            likes: row.likes || 0,
+          };
+        }
+        return {
+          commentId: row.message_id,
+          userId: row.user_id,
+          userName: row.display_name || row.username,
+          text: row.message_text,
+          timestamp: row.sent_at,
+          likes: 0,
+        };
+      });
+    } catch (error) {
+      logger.error('Error getting comments', { streamId, error: error.message });
+      return [];
+    }
+  }
+
+  static async likeStream(streamId) {
+    try {
+      const info = await this._getTableInfo('live_streams');
+      if (!info.exists || !info.columns.has('likes')) return null;
+
+      const streamIdColumn = await this._getStreamIdColumn();
+      const whereClause = streamIdColumn === 'id'
+        ? 'id::text = $1'
+        : `${streamIdColumn} = $1`;
+
+      const result = await query(
+        `UPDATE live_streams
+         SET likes = COALESCE(likes, 0) + 1, updated_at = NOW()
+         WHERE ${whereClause}
+         RETURNING *`,
+        [streamId]
+      );
+
+      return this._mapRowToStream(result.rows[0]);
+    } catch (error) {
+      logger.error('Error liking stream', { streamId, error: error.message });
+      return null;
+    }
+  }
+
+  static async endStream(streamId, hostId = null) {
+    try {
+      const stream = await this.getById(streamId);
+      if (!stream) return false;
+
+      if (hostId && stream.hostId && String(stream.hostId) !== String(hostId)) {
+        throw new Error('Unauthorized');
+      }
+
+      const info = await this._getTableInfo('live_streams');
+      const updates = [];
+      const values = [];
+      let paramIndex = 1;
+
+      const addUpdate = (column, value) => {
+        if (!info.columns.has(column)) return;
+        updates.push(`${column} = $${paramIndex++}`);
+        values.push(value);
       };
 
-      await db.collection(COMMENTS_COLLECTION).doc(commentId).set(comment);
+      const now = new Date();
+      const startTime = stream.startedAt || stream.createdAt || now;
+      const durationSeconds = Math.max(0, Math.round((now - new Date(startTime)) / 1000));
 
-      // Update stream comment count
-      await db.collection(COLLECTION).doc(streamId).update({
-        totalComments: require('firebase-admin').firestore.FieldValue.increment(1),
-        updatedAt: new Date(),
-      });
+      addUpdate('status', this._statusToDb('ended'));
+      addUpdate('end_time', now);
+      addUpdate('ended_at', now);
+      addUpdate('duration_seconds', durationSeconds);
+      addUpdate('duration', durationSeconds);
+      addUpdate('current_viewers', 0);
+      addUpdate('viewers_count', 0);
 
-      logger.info('Comment added to stream', { streamId, userId, commentId });
+      if (updates.length === 0) return false;
 
-      return comment;
+      const streamIdColumn = await this._getStreamIdColumn();
+      values.push(streamId);
+
+      const whereClause = streamIdColumn === 'id'
+        ? 'id::text = $' + paramIndex
+        : `${streamIdColumn} = $${paramIndex}`;
+
+      await query(
+        `UPDATE live_streams SET ${updates.join(', ')}, updated_at = NOW() WHERE ${whereClause}`,
+        values
+      );
+
+      return true;
     } catch (error) {
-      logger.error('Error adding comment:', error);
+      logger.error('Error ending stream', { streamId, error: error.message });
       throw error;
     }
   }
 
-  /**
-   * Get stream comments (paginated)
-   * @param {string} streamId - Stream ID
-   * @param {number} limit - Number of comments to fetch
-   * @param {Date} beforeTimestamp - Fetch comments before this timestamp (for pagination)
-   * @returns {Promise<Array>} Comments
-   */
-  static async getComments(streamId, limit = 50, beforeTimestamp = null) {
+  static async startStream(streamId, hostId = null) {
     try {
-      const db = getFirestore();
-      let query = db
-        .collection(COMMENTS_COLLECTION)
-        .where('streamId', '==', streamId)
-        .where('isDeleted', '==', false)
-        .orderBy('timestamp', 'desc')
-        .limit(limit);
-
-      if (beforeTimestamp) {
-        query = query.where('timestamp', '<', beforeTimestamp);
-      }
-
-      const snapshot = await query.get();
-      const comments = [];
-
-      snapshot.forEach((doc) => {
-        const comment = doc.data();
-        if (comment.timestamp?.toDate) {
-          comment.timestamp = comment.timestamp.toDate();
-        }
-        comments.push(comment);
-      });
-
-      return comments.reverse(); // Return in chronological order
-    } catch (error) {
-      logger.error('Error getting comments:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Delete comment
-   * @param {string} commentId - Comment ID
-   * @param {string} requesterId - User requesting deletion (must be host or moderator)
-   * @returns {Promise<void>}
-   */
-  static async deleteComment(commentId, requesterId) {
-    try {
-      const db = getFirestore();
-      const commentDoc = await db.collection(COMMENTS_COLLECTION).doc(commentId).get();
-
-      if (!commentDoc.exists) {
-        throw new Error('Comment not found');
-      }
-
-      const comment = commentDoc.data();
-      const stream = await this.getById(comment.streamId);
-
-      // Check if requester is comment owner, host, or moderator
-      const isOwner = comment.userId === String(requesterId);
-      const isModerator = stream.moderators && stream.moderators.includes(String(requesterId));
-
-      if (!isOwner && !isModerator) {
-        throw new Error('Unauthorized to delete this comment');
-      }
-
-      // Soft delete
-      await commentDoc.ref.update({
-        isDeleted: true,
-        deletedAt: new Date(),
-        deletedBy: String(requesterId),
-      });
-
-      logger.info('Comment deleted', { commentId, streamId: comment.streamId, deletedBy: requesterId });
-    } catch (error) {
-      logger.error('Error deleting comment:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Ban user from stream
-   * @param {string} streamId - Stream ID
-   * @param {string} userId - User ID to ban
-   * @param {string} moderatorId - Moderator performing the ban
-   * @returns {Promise<void>}
-   */
-  static async banUser(streamId, userId, moderatorId) {
-    try {
-      const db = getFirestore();
       const stream = await this.getById(streamId);
+      if (!stream) return false;
 
-      if (!stream) {
-        throw new Error('Stream not found');
+      if (hostId && stream.hostId && String(stream.hostId) !== String(hostId)) {
+        throw new Error('Unauthorized');
       }
 
-      // Check if requester is host or moderator
-      const isModerator = stream.moderators && stream.moderators.includes(String(moderatorId));
-      if (!isModerator) {
-        throw new Error('Unauthorized to ban users');
-      }
+      const info = await this._getTableInfo('live_streams');
+      const updates = [];
+      const values = [];
+      let paramIndex = 1;
 
-      // Add to banned users
-      await db.collection(COLLECTION).doc(streamId).update({
-        bannedUsers: require('firebase-admin').firestore.FieldValue.arrayUnion(String(userId)),
-        updatedAt: new Date(),
-      });
+      const addUpdate = (column, value) => {
+        if (!info.columns.has(column)) return;
+        updates.push(`${column} = $${paramIndex++}`);
+        values.push(value);
+      };
 
-      // Record the ban
-      await db.collection(BANNED_USERS_COLLECTION).add({
-        streamId,
-        userId: String(userId),
-        bannedBy: String(moderatorId),
-        bannedAt: new Date(),
-      });
+      const now = new Date();
+      addUpdate('status', this._statusToDb('live'));
+      addUpdate('actual_start_time', now);
+      addUpdate('started_at', now);
 
-      // Remove user from stream if currently viewing
-      await this.leaveStream(streamId, userId);
+      if (updates.length === 0) return false;
 
-      logger.info('User banned from stream', { streamId, userId, bannedBy: moderatorId });
+      const streamIdColumn = await this._getStreamIdColumn();
+      values.push(streamId);
+
+      const whereClause = streamIdColumn === 'id'
+        ? 'id::text = $' + paramIndex
+        : `${streamIdColumn} = $${paramIndex}`;
+
+      await query(
+        `UPDATE live_streams SET ${updates.join(', ')}, updated_at = NOW() WHERE ${whereClause}`,
+        values
+      );
+
+      return true;
     } catch (error) {
-      logger.error('Error banning user:', error);
+      logger.error('Error starting stream', { streamId, error: error.message });
       throw error;
     }
   }
 
-  /**
-   * Unban user from stream
-   * @param {string} streamId - Stream ID
-   * @param {string} userId - User ID to unban
-   * @param {string} moderatorId - Moderator performing the unban
-   * @returns {Promise<void>}
-   */
-  static async unbanUser(streamId, userId, moderatorId) {
+  static async getVODs(filters = {}, limit = 20) {
     try {
-      const db = getFirestore();
-      const stream = await this.getById(streamId);
+      const info = await this._getTableInfo('live_streams');
+      if (!info.exists) return [];
 
-      if (!stream) {
-        throw new Error('Stream not found');
+      const conditions = [];
+      const values = [];
+      let paramIndex = 1;
+
+      if (info.columns.has('status')) {
+        conditions.push(`status = $${paramIndex++}`);
+        values.push('ended');
       }
 
-      // Check if requester is host or moderator
-      const isModerator = stream.moderators && stream.moderators.includes(String(moderatorId));
-      if (!isModerator) {
-        throw new Error('Unauthorized to unban users');
+      if (info.columns.has('recording_url')) {
+        conditions.push('recording_url IS NOT NULL');
       }
 
-      // Remove from banned users
-      await db.collection(COLLECTION).doc(streamId).update({
-        bannedUsers: require('firebase-admin').firestore.FieldValue.arrayRemove(String(userId)),
-        updatedAt: new Date(),
-      });
-
-      logger.info('User unbanned from stream', { streamId, userId, unbannedBy: moderatorId });
-    } catch (error) {
-      logger.error('Error unbanning user:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get streams by category
-   * @param {string} category - Category to filter by
-   * @param {number} limit - Maximum number of streams
-   * @returns {Promise<Array>} Streams in category
-   */
-  static async getByCategory(category, limit = 20) {
-    try {
-      const db = getFirestore();
-      const snapshot = await db
-        .collection(COLLECTION)
-        .where('status', '==', 'active')
-        .where('category', '==', category)
-        .orderBy('currentViewers', 'desc')
-        .limit(limit)
-        .get();
-
-      const streams = [];
-      snapshot.forEach((doc) => {
-        const stream = doc.data();
-        if (stream.startedAt?.toDate) stream.startedAt = stream.startedAt.toDate();
-        streams.push(stream);
-      });
-
-      return streams;
-    } catch (error) {
-      logger.error('Error getting streams by category:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Search streams by title or tags
-   * @param {string} query - Search query
-   * @param {number} limit - Maximum number of results
-   * @returns {Promise<Array>} Matching streams
-   */
-  static async searchStreams(query, limit = 20) {
-    try {
-      const db = getFirestore();
-      const searchQuery = query.toLowerCase();
-
-      // Get all active streams (Firestore doesn't support full-text search natively)
-      const snapshot = await db
-        .collection(COLLECTION)
-        .where('status', '==', 'active')
-        .limit(100)
-        .get();
-
-      const streams = [];
-      snapshot.forEach((doc) => {
-        const stream = doc.data();
-        const titleMatch = stream.title.toLowerCase().includes(searchQuery);
-        const tagMatch = stream.tags && stream.tags.some(tag => tag.toLowerCase().includes(searchQuery));
-        const descMatch = stream.description && stream.description.toLowerCase().includes(searchQuery);
-
-        if (titleMatch || tagMatch || descMatch) {
-          if (stream.startedAt?.toDate) stream.startedAt = stream.startedAt.toDate();
-          streams.push(stream);
+      if (filters.hostId) {
+        if (info.columns.has('host_user_id')) {
+          conditions.push(`host_user_id = $${paramIndex++}`);
+          values.push(String(filters.hostId));
+        } else if (info.columns.has('host_id')) {
+          conditions.push(`host_id = $${paramIndex++}`);
+          values.push(String(filters.hostId));
         }
-      });
+      }
 
-      // Sort by relevance (viewers count) and limit
-      return streams
-        .sort((a, b) => b.currentViewers - a.currentViewers)
-        .slice(0, limit);
+      let sql = 'SELECT * FROM live_streams';
+      if (conditions.length > 0) {
+        sql += ` WHERE ${conditions.join(' AND ')}`;
+      }
+
+      const orderColumn = info.columns.has('end_time')
+        ? 'end_time'
+        : info.columns.has('ended_at')
+          ? 'ended_at'
+          : 'created_at';
+
+      sql += ` ORDER BY ${orderColumn} DESC LIMIT $${paramIndex}`;
+      values.push(limit);
+
+      const result = await query(sql, values);
+      return result.rows.map((row) => this._mapRowToStream(row));
     } catch (error) {
-      logger.error('Error searching streams:', error);
-      throw error;
+      logger.error('Error getting VODs', { error: error.message });
+      return [];
     }
   }
 
-  /**
-   * Subscribe to stream notifications
-   * @param {string} userId - User ID subscribing
-   * @param {string} streamerId - Streamer to follow
-   * @returns {Promise<void>}
-   */
-  static async subscribeToStreamer(userId, streamerId) {
-    try {
-      const db = getFirestore();
-
-      await db.collection(NOTIFICATIONS_COLLECTION).add({
-        userId: String(userId),
-        streamerId: String(streamerId),
-        subscribedAt: new Date(),
-        notificationsEnabled: true,
-      });
-
-      logger.info('User subscribed to streamer', { userId, streamerId });
-    } catch (error) {
-      logger.error('Error subscribing to streamer:', error);
-      throw error;
-    }
+  static generateShareLink(streamId, botUsername) {
+    const base = botUsername ? `https://t.me/${botUsername}` : 'https://t.me';
+    return `${base}?start=live_${streamId}`;
   }
 
-  /**
-   * Get subscribers of a streamer
-   * @param {string} streamerId - Streamer ID
-   * @returns {Promise<Array>} Subscriber user IDs
-   */
-  static async getStreamSubscribers(streamerId) {
-    try {
-      const db = getFirestore();
-      const snapshot = await db
-        .collection(NOTIFICATIONS_COLLECTION)
-        .where('streamerId', '==', String(streamerId))
-        .where('notificationsEnabled', '==', true)
-        .get();
-
-      const subscribers = [];
-      snapshot.forEach((doc) => {
-        subscribers.push(doc.data().userId);
-      });
-
-      return subscribers;
-    } catch (error) {
-      logger.error('Error getting stream subscribers:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Update stream analytics
-   * @param {string} streamId - Stream ID
-   * @param {Object} analytics - Analytics data to update
-   * @returns {Promise<void>}
-   */
-  static async updateAnalytics(streamId, analytics) {
-    try {
-      const db = getFirestore();
-      const updateData = {};
-
-      if (analytics.shareCount !== undefined) {
-        updateData['analytics.shareCount'] = require('firebase-admin').firestore.FieldValue.increment(analytics.shareCount);
-      }
-
-      if (analytics.avgWatchTime !== undefined) {
-        updateData['analytics.avgWatchTime'] = analytics.avgWatchTime;
-      }
-
-      if (analytics.totalWatchTime !== undefined) {
-        updateData['analytics.totalWatchTime'] = analytics.totalWatchTime;
-      }
-
-      if (analytics.engagementRate !== undefined) {
-        updateData['analytics.engagementRate'] = analytics.engagementRate;
-      }
-
-      updateData.updatedAt = new Date();
-
-      await db.collection(COLLECTION).doc(streamId).update(updateData);
-
-      logger.info('Stream analytics updated', { streamId, analytics });
-    } catch (error) {
-      logger.error('Error updating stream analytics:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Toggle chat settings
-   * @param {string} streamId - Stream ID
-   * @param {string} hostId - Host user ID (for authorization)
-   * @param {Object} settings - Chat settings to update
-   * @returns {Promise<void>}
-   */
-  static async updateChatSettings(streamId, hostId, settings) {
-    try {
-      const db = getFirestore();
-      const stream = await this.getById(streamId);
-
-      if (!stream) {
-        throw new Error('Stream not found');
-      }
-
-      if (stream.hostId !== String(hostId)) {
-        throw new Error('Only the host can update chat settings');
-      }
-
-      const updateData = { updatedAt: new Date() };
-
-      if (settings.slowMode !== undefined) {
-        updateData['chatSettings.slowMode'] = settings.slowMode;
-      }
-
-      if (settings.slowModeDelay !== undefined) {
-        updateData['chatSettings.slowModeDelay'] = settings.slowModeDelay;
-      }
-
-      if (settings.subscribersOnly !== undefined) {
-        updateData['chatSettings.subscribersOnly'] = settings.subscribersOnly;
-      }
-
-      if (settings.allowComments !== undefined) {
-        updateData.allowComments = settings.allowComments;
-      }
-
-      await db.collection(COLLECTION).doc(streamId).update(updateData);
-
-      logger.info('Chat settings updated', { streamId, settings });
-    } catch (error) {
-      logger.error('Error updating chat settings:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Set recording URL for VOD (Video on Demand)
-   * @param {string} streamId - Stream ID
-   * @param {string} recordingUrl - URL of the recorded stream
-   * @returns {Promise<void>}
-   */
-  static async setRecordingUrl(streamId, recordingUrl) {
-    try {
-      const db = getFirestore();
-
-      await db.collection(COLLECTION).doc(streamId).update({
-        recordingUrl,
-        updatedAt: new Date(),
-      });
-
-      logger.info('Recording URL set for stream', { streamId, recordingUrl });
-    } catch (error) {
-      logger.error('Error setting recording URL:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get available VODs (recorded streams)
-   * @param {Object} filters - Filter options
-   * @param {number} limit - Maximum number of VODs
-   * @returns {Promise<Array>} VOD streams
-   */
-  static async getVODs(filters = {}, limit = 50) {
-    try {
-      const db = getFirestore();
-      const { category, hostId, minDuration = 0 } = filters;
-
-      let query = db
-        .collection(COLLECTION)
-        .where('status', '==', 'ended')
-        .where('recordStream', '==', true)
-        .orderBy('endedAt', 'desc')
-        .limit(limit);
-
-      if (category) {
-        query = query.where('category', '==', category);
-      }
-
-      if (hostId) {
-        query = query.where('hostId', '==', String(hostId));
-      }
-
-      const snapshot = await query.get();
-      const vods = [];
-
-      snapshot.forEach((doc) => {
-        const stream = doc.data();
-
-        // Filter by minimum duration if specified
-        if (minDuration && stream.duration < minDuration) {
-          return;
-        }
-
-        // Only include streams with recording URL
-        if (stream.recordingUrl) {
-          if (stream.startedAt?.toDate) stream.startedAt = stream.startedAt.toDate();
-          if (stream.endedAt?.toDate) stream.endedAt = stream.endedAt.toDate();
-          vods.push(stream);
-        }
-      });
-
-      return vods;
-    } catch (error) {
-      logger.error('Error getting VODs:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Set thumbnail for stream
-   * @param {string} streamId - Stream ID
-   * @param {string} thumbnailUrl - Thumbnail URL
-   * @returns {Promise<void>}
-   */
-  static async setThumbnail(streamId, thumbnailUrl) {
-    try {
-      const db = getFirestore();
-
-      await db.collection(COLLECTION).doc(streamId).update({
-        thumbnailUrl,
-        updatedAt: new Date(),
-      });
-
-      logger.info('Thumbnail set for stream', { streamId, thumbnailUrl });
-    } catch (error) {
-      logger.error('Error setting thumbnail:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Increment share count
-   * @param {string} streamId - Stream ID
-   * @returns {Promise<void>}
-   */
   static async incrementShareCount(streamId) {
     try {
-      await this.updateAnalytics(streamId, { shareCount: 1 });
-      logger.info('Share count incremented', { streamId });
+      const info = await this._getTableInfo('live_streams');
+      if (!info.exists || !info.columns.has('analytics')) return false;
+
+      const streamIdColumn = await this._getStreamIdColumn();
+      const whereClause = streamIdColumn === 'id'
+        ? 'id::text = $1'
+        : `${streamIdColumn} = $1`;
+
+      await query(
+        `UPDATE live_streams
+         SET analytics = jsonb_set(
+           COALESCE(analytics, '{}'::jsonb),
+           '{share_count}',
+           to_jsonb(COALESCE((analytics->>'share_count')::int, 0) + 1),
+           true
+         ),
+         updated_at = NOW()
+         WHERE ${whereClause}`,
+        [streamId]
+      );
+
+      return true;
     } catch (error) {
-      logger.error('Error incrementing share count:', error);
-      throw error;
+      logger.error('Error incrementing share count', { streamId, error: error.message });
+      return false;
     }
   }
 
-  /**
-   * Generate shareable link
-   * @param {string} streamId - Stream ID
-   * @param {string} botUsername - Bot username
-   * @returns {string} Shareable deep link
-   */
-  static generateShareLink(streamId, botUsername) {
-    return `https://t.me/${botUsername}?start=stream_${streamId}`;
-  }
-
-  /**
-   * Notify followers when stream starts
-   * @param {string} streamerId - Streamer user ID
-   * @param {Object} streamInfo - Stream information
-   * @param {Function} sendNotification - Function to send Telegram message
-   * @returns {Promise<number>} Number of notifications sent
-   */
-  static async notifyFollowers(streamerId, streamInfo, sendNotification) {
+  static async subscribeToStreamer(userId, streamerId) {
     try {
-      const subscribers = await this.getStreamSubscribers(streamerId);
+      if (!await this._tableExists('stream_notifications')) return false;
 
-      let notificationsSent = 0;
+      await query(
+        `INSERT INTO stream_notifications (user_id, streamer_id, notifications_enabled)
+         VALUES ($1, $2, true)
+         ON CONFLICT (user_id, streamer_id)
+         DO UPDATE SET notifications_enabled = true, subscribed_at = NOW()`,
+        [String(userId), String(streamerId)]
+      );
 
-      for (const subscriberId of subscribers) {
-        try {
-          await sendNotification(
-            subscriberId,
-            `🔴 ${streamInfo.hostName} is now live!\n\n` +
-            `🎤 ${streamInfo.title}\n` +
-            `${this.getCategoryEmoji(streamInfo.category)} ${streamInfo.category}\n\n` +
-            `Tap below to join the stream!`,
-            streamInfo.streamId
-          );
-          notificationsSent++;
-        } catch (notifyError) {
-          logger.warn('Failed to notify subscriber', { subscriberId, error: notifyError.message });
-        }
-      }
-
-      logger.info('Followers notified', { streamerId, notificationsSent });
-      return notificationsSent;
+      return true;
     } catch (error) {
-      logger.error('Error notifying followers:', error);
-      throw error;
+      logger.error('Error subscribing to streamer', { userId, streamerId, error: error.message });
+      return false;
     }
   }
 
-  /**
-   * Get category emoji
-   * @param {string} category - Category name
-   * @returns {string} Category emoji
-   */
-  static getCategoryEmoji(category) {
-    const emojiMap = {
-      music: '🎵',
-      gaming: '🎮',
-      talk_show: '🎙',
-      education: '📚',
-      entertainment: '🎭',
-      sports: '⚽',
-      news: '📰',
-      other: '📁',
-    };
-    return emojiMap[category] || '📁';
-  }
-
-  /**
-   * Check if user is subscribed to streamer
-   * @param {string} userId - User ID
-   * @param {string} streamerId - Streamer ID
-   * @returns {Promise<boolean>} True if subscribed
-   */
-  static async isSubscribedToStreamer(userId, streamerId) {
-    try {
-      const db = getFirestore();
-      const snapshot = await db
-        .collection(NOTIFICATIONS_COLLECTION)
-        .where('userId', '==', String(userId))
-        .where('streamerId', '==', String(streamerId))
-        .where('notificationsEnabled', '==', true)
-        .limit(1)
-        .get();
-
-      return !snapshot.empty;
-    } catch (error) {
-      logger.error('Error checking subscription:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Unsubscribe from streamer
-   * @param {string} userId - User ID
-   * @param {string} streamerId - Streamer ID
-   * @returns {Promise<void>}
-   */
   static async unsubscribeFromStreamer(userId, streamerId) {
     try {
-      const db = getFirestore();
+      if (!await this._tableExists('stream_notifications')) return false;
 
-      const snapshot = await db
-        .collection(NOTIFICATIONS_COLLECTION)
-        .where('userId', '==', String(userId))
-        .where('streamerId', '==', String(streamerId))
-        .get();
+      await query(
+        `UPDATE stream_notifications
+         SET notifications_enabled = false
+         WHERE user_id = $1 AND streamer_id = $2`,
+        [String(userId), String(streamerId)]
+      );
 
-      const batch = db.batch();
-      snapshot.forEach((doc) => {
-        batch.update(doc.ref, { notificationsEnabled: false });
-      });
-      await batch.commit();
-
-      logger.info('User unsubscribed from streamer', { userId, streamerId });
+      return true;
     } catch (error) {
-      logger.error('Error unsubscribing from streamer:', error);
-      throw error;
+      logger.error('Error unsubscribing from streamer', { userId, streamerId, error: error.message });
+      return false;
     }
   }
 
-  /**
-   * Get stream statistics
-   * @returns {Promise<Object>} Statistics
-   */
-  static async getStatistics() {
+  static async isSubscribedToStreamer(userId, streamerId) {
     try {
-      const db = getFirestore();
+      if (!await this._tableExists('stream_notifications')) return false;
 
-      // Get all streams
-      const snapshot = await db.collection(COLLECTION).get();
+      const result = await query(
+        `SELECT 1 FROM stream_notifications
+         WHERE user_id = $1 AND streamer_id = $2 AND notifications_enabled = true
+         LIMIT 1`,
+        [String(userId), String(streamerId)]
+      );
 
-      const stats = {
-        total: snapshot.size,
-        active: 0,
-        scheduled: 0,
-        ended: 0,
-        totalViewers: 0,
-        totalLikes: 0,
-      };
-
-      snapshot.forEach((doc) => {
-        const stream = doc.data();
-
-        if (stream.status === 'active') stats.active++;
-        else if (stream.status === 'scheduled') stats.scheduled++;
-        else if (stream.status === 'ended') stats.ended++;
-
-        stats.totalViewers += stream.totalViews || 0;
-        stats.totalLikes += stream.likes || 0;
-      });
-
-      return stats;
+      return result.rows.length > 0;
     } catch (error) {
-      logger.error('Error getting stream statistics:', error);
-      throw error;
+      logger.error('Error checking streamer subscription', { userId, streamerId, error: error.message });
+      return false;
     }
   }
 
-  /**
-   * Get AI moderation settings for a stream
-   * @param {string} streamId - Stream ID
-   * @returns {Promise<Object>} Moderation settings
-   */
-  static async getAIModerationSettings(streamId) {
+  static async notifyFollowers(streamerId, streamData, sendFn) {
     try {
-      return await AIModerationService.getStreamModerationSettings(streamId);
+      if (!await this._tableExists('stream_notifications')) return;
+
+      const result = await query(
+        `SELECT user_id FROM stream_notifications
+         WHERE streamer_id = $1 AND notifications_enabled = true`,
+        [String(streamerId)]
+      );
+
+      if (!result.rows.length) return;
+
+      const message = `🔴 ${streamData.hostName} is live!\n🎤 ${streamData.title}`;
+
+      for (const row of result.rows) {
+        await sendFn(row.user_id, message, streamData.streamId);
+      }
     } catch (error) {
-      logger.error('Error getting AI moderation settings:', error);
-      throw error;
+      logger.error('Error notifying followers', { streamerId, error: error.message });
     }
   }
 
-  /**
-   * Update AI moderation settings for a stream
-   * @param {string} streamId - Stream ID
-   * @param {Object} settings - Moderation settings
-   * @returns {Promise<boolean>} Success
-   */
-  static async updateAIModerationSettings(streamId, settings) {
-    try {
-      return await AIModerationService.updateStreamModerationSettings(streamId, settings);
-    } catch (error) {
-      logger.error('Error updating AI moderation settings:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get moderation statistics for a stream
-   * @param {string} streamId - Stream ID
-   * @returns {Promise<Object>} Moderation statistics
-   */
-  static async getModerationStats(streamId) {
-    try {
-      return await AIModerationService.getModerationStats(streamId);
-    } catch (error) {
-      logger.error('Error getting moderation stats:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Delete stream
-   * @param {string} streamId - Stream ID
-   * @returns {Promise<void>}
-   */
-  static async delete(streamId) {
-    try {
-      const db = getFirestore();
-
-      // Delete stream
-      await db.collection(COLLECTION).doc(streamId).delete();
-
-      // Delete viewer records
-      const viewersSnapshot = await db
-        .collection(VIEWERS_COLLECTION)
-        .where('streamId', '==', streamId)
-        .get();
-
-      const batch = db.batch();
-      viewersSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
-      await batch.commit();
-
-      logger.info('Stream deleted', { streamId });
-
-      // Invalidate cache
-      await redisClient.del('active_streams:*');
-    } catch (error) {
-      logger.error('Error deleting stream:', error);
-      throw error;
+  static getCategoryEmoji(category) {
+    switch (category) {
+      case CATEGORIES.MUSIC:
+        return '🎵';
+      case CATEGORIES.GAMING:
+        return '🎮';
+      case CATEGORIES.TALK_SHOW:
+        return '🎙';
+      case CATEGORIES.EDUCATION:
+        return '📚';
+      case CATEGORIES.ENTERTAINMENT:
+        return '🎭';
+      case CATEGORIES.SPORTS:
+        return '⚽';
+      case CATEGORIES.NEWS:
+        return '📰';
+      default:
+        return '📺';
     }
   }
 }
 
-// Export model and constants
 module.exports = LiveStreamModel;
 module.exports.CATEGORIES = CATEGORIES;

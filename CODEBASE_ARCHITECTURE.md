@@ -24,11 +24,11 @@
 The bot initialization follows this sequence:
 
 1. **Environment Validation** (Lines 27-36)
-   - Checks for critical variables: BOT_TOKEN, FIREBASE_PROJECT_ID, FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL
+   - Checks for critical variables: BOT_TOKEN
    - Exits with error if any are missing
 
 2. **Service Initialization** (Lines 41-76)
-   - Firebase Admin SDK initialization
+   - PostgreSQL connection
    - Redis connection (with graceful fallback)
    - Cache prewarming with critical data
    - Sentry error tracking setup
@@ -54,7 +54,7 @@ The bot initialization follows this sequence:
 | Component | Technology | Version |
 |-----------|-----------|---------|
 | Framework | Telegraf.js | 4.15.0 |
-| Database | Firebase Firestore | 7.1.0 |
+| Database | PostgreSQL | 14.x |
 | Cache/Session | Redis/IORedis | 5.3.2 |
 | API Server | Express.js | 4.18.2 |
 | Language | Node.js | 18.x+ |
@@ -317,66 +317,71 @@ static async hasActiveSubscription(userId) {
 
 ## 4. DATABASE/STORAGE SYSTEM
 
-### Primary Database: Firebase Firestore (NoSQL)
+### Primary Database: PostgreSQL (Relational)
 
-#### Collections Schema
+#### Schema Overview
 
-```
-firestore/
-├── users/
-│   └── {userId}
-│       ├── userId (number) - Telegram user ID
-│       ├── username (string) - @username
-│       ├── firstName (string)
-│       ├── lastName (string)
-│       ├── email (string, optional)
-│       ├── language (string) - 'en' or 'es'
-│       ├── subscriptionStatus (string) - 'free'|'active'|'expired'|'deactivated'
-│       ├── planId (string) - Reference to plan
-│       ├── planExpiry (timestamp)
-│       ├── location (object)
-│       │   ├── lat (number)
-│       │   ├── lng (number)
-│       │   └── address (string, optional)
-│       ├── interests (array) - User interests/hobbies
-│       ├── bio (string) - User description
-│       ├── photoUrl (string) - Profile picture URL
-│       ├── createdAt (timestamp)
-│       └── updatedAt (timestamp)
-│
-├── plans/
-│   └── {planId}
-│       ├── id (string)
-│       ├── name (string)
-│       ├── nameEs (string)
-│       ├── price (number)
-│       ├── features (array)
-│       ├── featuresEs (array)
-│       ├── active (boolean)
-│       └── createdAt (timestamp)
-│
-├── payments/
-│   └── {paymentId}
-│       ├── userId (string)
-│       ├── planId (string)
-│       ├── provider (string) - 'epayco'|'daimo'
-│       ├── status (string) - 'pending'|'completed'|'failed'
-│       ├── amount (number)
-│       ├── currency (string)
-│       ├── paymentUrl (string)
-│       ├── transactionId (string)
-│       ├── createdAt (timestamp)
-│       └── updatedAt (timestamp)
-│
-└── liveStreams/
-    └── {streamId}
-        ├── userId (string)
-        ├── title (string)
-        ├── description (string)
-        ├── streamUrl (string)
-        ├── status (string) - 'active'|'ended'
-        ├── createdAt (timestamp)
-        └── updatedAt (timestamp)
+The system uses a PostgreSQL relational database. Key tables include:
+
+```sql
+-- users table
+CREATE TABLE users (
+    id BIGINT PRIMARY KEY,
+    username VARCHAR(255),
+    first_name VARCHAR(255),
+    last_name VARCHAR(255),
+    email VARCHAR(255),
+    language VARCHAR(10) DEFAULT 'en',
+    subscription_status VARCHAR(50) DEFAULT 'free', -- 'free'|'active'|'expired'|'deactivated'
+    plan_id VARCHAR(255),
+    plan_expiry TIMESTAMP WITH TIME ZONE,
+    location JSONB, -- { lat: number, lng: number, address: string }
+    interests TEXT[], -- Array of text
+    bio TEXT,
+    photo_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- plans table
+CREATE TABLE plans (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255),
+    name_es VARCHAR(255),
+    price NUMERIC(10, 2),
+    features TEXT[],
+    features_es TEXT[],
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- payments table
+CREATE TABLE payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id BIGINT REFERENCES users(id),
+    plan_id VARCHAR(255) REFERENCES plans(id),
+    provider VARCHAR(50), -- 'epayco'|'daimo'
+    status VARCHAR(50) DEFAULT 'pending', -- 'pending'|'completed'|'failed'
+    amount NUMERIC(10, 2),
+    currency VARCHAR(10),
+    payment_url TEXT,
+    transaction_id VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- live_streams table
+CREATE TABLE live_streams (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id BIGINT REFERENCES users(id),
+    title VARCHAR(255),
+    description TEXT,
+    stream_url TEXT,
+    status VARCHAR(50) DEFAULT 'active', -- 'active'|'ended'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 ```
 
 ### Cache Layer: Redis
@@ -397,35 +402,30 @@ firestore/
 | `stats:*` | 1 minute | Statistics (updates frequently) |
 | `plan:*` | 1 hour | Subscription plan data |
 
-### Database Indexes (Firestore)
+### Database Indexes (PostgreSQL)
 
 Required for efficient queries:
 
-```
-Index 1: users collection
-  Fields: subscriptionStatus (ASC), planExpiry (ASC)
-  Use: Expired subscription detection
+```sql
+-- Index for user subscriptions
+CREATE INDEX idx_users_subscription_status_plan_expiry ON users (subscription_status, plan_expiry);
 
-Index 2: users collection
-  Fields: location.lat (ASC), location.lng (ASC)
-  Use: Nearby user searches
+-- Index for geolocation (if using PostGIS, otherwise this is a simplified example)
+CREATE INDEX idx_users_location_lat_lng ON users ((location->>'lat'), (location->>'lng'));
 
-Index 3: users collection
-  Fields: interests (ARRAY_CONTAINS), subscriptionStatus (ASC)
-  Use: User discovery by interests
+-- Index for user interests (GIN index for array types)
+CREATE INDEX idx_users_interests ON users USING GIN (interests);
 
-Index 4: payments collection
-  Fields: userId (ASC), createdAt (DESC)
-  Use: User payment history
+-- Index for user payment history
+CREATE INDEX idx_payments_user_id_created_at ON payments (user_id, created_at DESC);
 
-Index 5: liveStreams collection
-  Fields: status (ASC), createdAt (DESC)
-  Use: Active streams listing
+-- Index for live streams status and creation date
+CREATE INDEX idx_live_streams_status_created_at ON live_streams (status, created_at DESC);
 ```
 
 **Deploy Indexes**:
 ```bash
-npm run validate:indexes
+npm run migrate:latest
 ```
 
 ---
@@ -618,60 +618,64 @@ const webhookLimiter = rateLimit({
 
 **Create**: `src/models/moderationModel.js`
 
-**New Firestore Collections**:
+**New PostgreSQL Tables**:
 
-```
-moderation/
-├── blocked_users/
-│   └── {relationshipId}
-│       ├── blockerId (string)
-│       ├── blockedUserId (string)
-│       ├── reason (string)
-│       ├── createdAt (timestamp)
-│       └── expiresAt (timestamp, optional)
-│
-├── reports/
-│   └── {reportId}
-│       ├── reporterId (string)
-│       ├── reportedUserId (string)
-│       ├── type (string) - 'spam'|'harassment'|'fraud'|'content'
-│       ├── reason (string)
-│       ├── evidence (array) - messageIds or screenshots
-│       ├── status (string) - 'new'|'reviewing'|'resolved'|'dismissed'
-│       ├── resolution (string, optional)
-│       ├── createdAt (timestamp)
-│       └── resolvedAt (timestamp, optional)
-│
-├── moderation_logs/
-│   └── {logId}
-│       ├── action (string) - 'warn'|'ban'|'unban'|'filter'
-│       ├── targetUserId (string)
-│       ├── moderatorId (string)
-│       ├── reason (string)
-│       ├── duration (number, optional - minutes)
-│       ├── previousStatus (string)
-│       ├── newStatus (string)
-│       ├── createdAt (timestamp)
-│       └── metadata (object)
-│
-├── filter_rules/
-│   └── {ruleId}
-│       ├── type (string) - 'keyword'|'pattern'|'url'
-│       ├── pattern (string/regex)
-│       ├── action (string) - 'warn'|'delete'|'block'
-│       ├── severity (string) - 'low'|'medium'|'high'
-│       ├── active (boolean)
-│       ├── description (string)
-│       └── createdAt (timestamp)
-│
-└── user_status/
-    └── {userId}
-        ├── warnings (number)
-        ├── status (string) - 'active'|'muted'|'banned'
-        ├── muteUntil (timestamp, optional)
-        ├── banReason (string, optional)
-        ├── lastWarning (timestamp, optional)
-        └── updatedAt (timestamp)
+```sql
+CREATE TABLE blocked_users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    blocker_id BIGINT NOT NULL,
+    blocked_user_id BIGINT NOT NULL,
+    reason TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE TABLE reports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    reporter_id BIGINT NOT NULL,
+    reported_user_id BIGINT NOT NULL,
+    type VARCHAR(50), -- 'spam'|'harassment'|'fraud'|'content'
+    reason TEXT,
+    evidence TEXT[], -- Array of messageIds or screenshots
+    status VARCHAR(50) DEFAULT 'new', -- 'new'|'reviewing'|'resolved'|'dismissed'
+    resolution TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    resolved_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE TABLE moderation_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    action VARCHAR(50), -- 'warn'|'ban'|'unban'|'filter'
+    target_user_id BIGINT NOT NULL,
+    moderator_id BIGINT NOT NULL,
+    reason TEXT,
+    duration_minutes INTEGER,
+    previous_status VARCHAR(50),
+    new_status VARCHAR(50),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    metadata JSONB
+);
+
+CREATE TABLE filter_rules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type VARCHAR(50), -- 'keyword'|'pattern'|'url'
+    pattern TEXT,
+    action VARCHAR(50), -- 'warn'|'delete'|'block'
+    severity VARCHAR(50), -- 'low'|'medium'|'high'
+    active BOOLEAN DEFAULT TRUE,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE user_status (
+    user_id BIGINT PRIMARY KEY,
+    warnings INTEGER DEFAULT 0,
+    status VARCHAR(50) DEFAULT 'active', -- 'active'|'muted'|'banned'
+    mute_until TIMESTAMP WITH TIME ZONE,
+    ban_reason TEXT,
+    last_warning TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 ```
 
 #### Phase 2: Moderation Service
@@ -846,7 +850,6 @@ Phase 6: Testing & Docs
 - `src/bot/core/middleware/errorHandler.js` - Error handling
 
 ### Configuration
-- `src/config/firebase.js` - Firebase setup
 - `src/config/redis.js` - Redis setup
 - `.env.example` - Environment variables
 
@@ -865,11 +868,6 @@ Phase 6: Testing & Docs
 BOT_TOKEN=xxxxx
 BOT_WEBHOOK_DOMAIN=https://yourdomain.com
 NODE_ENV=production
-
-# Database
-FIREBASE_PROJECT_ID=xxxxx
-FIREBASE_PRIVATE_KEY=xxxxx
-FIREBASE_CLIENT_EMAIL=xxxxx
 
 # Cache
 REDIS_HOST=localhost

@@ -29,7 +29,7 @@ const callHandler = async (handler, payload, headers = {}) => {
   return res;
 };
 
-describe.skip('Webhook Controller Integration Tests', () => {
+describe('Webhook Controller Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -275,6 +275,33 @@ describe.skip('Webhook Controller Integration Tests', () => {
         expect(response.statusCode).toBe(200);
         expect(response.body).toEqual({ success: true });
         expect(PaymentService.processDaimoWebhook).toHaveBeenCalledWith(validPayload);
+      });
+
+      it('should return 200 for duplicate Daimo webhook indicating already processed', async () => {
+        PaymentService.processDaimoWebhook.mockResolvedValue({
+          success: true,
+          alreadyProcessed: true,
+        });
+
+        const duplicatePayload = {
+          transaction_id: 'test-123',
+          status: 'completed',
+          signature: 'test-signature',
+          metadata: {
+            paymentId: 'payment-123',
+            userId: 'user-456',
+            planId: 'plan-789',
+          },
+        };
+
+        const response = await callHandler(
+          webhookController.handleDaimoWebhook,
+          duplicatePayload,
+        );
+
+        expect(response.statusCode).toBe(200);
+        expect(response.body).toEqual({ success: true, alreadyProcessed: true });
+        expect(PaymentService.processDaimoWebhook).toHaveBeenCalledWith(duplicatePayload);
       });
     });
 

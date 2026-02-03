@@ -24,8 +24,6 @@ El código tiene problemas de seguridad, confiabilidad y calidad que requieren a
 **Ubicación**: `/home/user/pnptvbot-production/.env.example` (líneas 1-170)
 **Severidad**: CRÍTICA
 **Descripción**: El archivo contiene credenciales REALES de producción:
-- Firebase Private Key (línea 25)
-- Firebase Client Email (línea 27)
 - Sentry DSN (línea 69)
 - ePayco API Keys (línea 77-79)
 - Daimo API Key y Webhook Secret (línea 89-90)
@@ -34,7 +32,7 @@ El código tiene problemas de seguridad, confiabilidad y calidad que requieren a
 - Encryption Key (línea 140)
 
 **Impacto Potencial**: 
-- Acceso no autorizado a Firebase y bases de datos
+- Acceso no autorizado a bases de datos
 - Fraude con pagos ePayco
 - Abuso de webhook de Daimo
 - Acceso completo al bot de Telegram
@@ -42,7 +40,7 @@ El código tiene problemas de seguridad, confiabilidad y calidad que requieren a
 
 **Solución**: 
 1. Revocar TODAS las credenciales inmediatamente
-2. Usar valores placeholder en .env.example (ej: `your_firebase_key_here`)
+2. Usar valores placeholder en .env.example (ej: `your_key_here`)
 3. NO incluir datos reales en ejemplos
 
 ---
@@ -108,13 +106,13 @@ try {
 ```
 
 **Problema**: 
-- Las variables críticas (BOT_TOKEN, FIREBASE_*) son ESENCIALES
+- Las variables críticas (BOT_TOKEN) son ESENCIALES
 - Continuando sin ellas causará fallos silenciosos después
 - El bot fallará de forma impredecible
 
 **Impacto Potencial**: 
 - Comportamiento impredecible en producción
-- Fallos en cascada cuando se intente usar Telegram o Firebase
+- Fallos en cascada cuando se intente usar Telegram
 
 **Solución**: 
 Hacer throw en lugar de continuar para variables CRÍTICAS:

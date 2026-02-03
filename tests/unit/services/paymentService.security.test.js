@@ -37,8 +37,7 @@ describe('PaymentService Security Tests', () => {
       expect(result).toBe(false);
     });
 
-    it('should throw ConfigurationError in production when private key is missing', () => {
-      process.env.NODE_ENV = 'production';
+    it('should throw ConfigurationError when private key is missing', () => {
       delete process.env.EPAYCO_PRIVATE_KEY;
       delete process.env.EPAYCO_P_KEY;
 
@@ -49,22 +48,7 @@ describe('PaymentService Security Tests', () => {
 
       expect(() => {
         PaymentService.verifyEpaycoSignature(webhookData);
-      }).toThrow('EPAYCO_P_KEY or EPAYCO_PRIVATE_KEY must be configured in production');
-    });
-
-    it('should allow bypass in development when private key is missing', () => {
-      process.env.NODE_ENV = 'development';
-      delete process.env.EPAYCO_PRIVATE_KEY;
-      delete process.env.EPAYCO_P_KEY;
-
-      const webhookData = {
-        x_ref_payco: 'ref123',
-        x_signature: 'test-signature',
-      };
-
-      const result = PaymentService.verifyEpaycoSignature(webhookData);
-
-      expect(result).toBe(true);
+      }).toThrow('EPAYCO_P_KEY or EPAYCO_PRIVATE_KEY must be configured');
     });
 
     it('should verify valid ePayco signature correctly', () => {
@@ -149,8 +133,7 @@ describe('PaymentService Security Tests', () => {
       expect(result).toBe(false);
     });
 
-    it('should throw ConfigurationError in production when secret is missing', () => {
-      process.env.NODE_ENV = 'production';
+    it('should throw ConfigurationError when secret is missing', () => {
       delete process.env.DAIMO_WEBHOOK_SECRET;
 
       const webhookData = {
@@ -160,21 +143,7 @@ describe('PaymentService Security Tests', () => {
 
       expect(() => {
         PaymentService.verifyDaimoSignature(webhookData);
-      }).toThrow('DAIMO_WEBHOOK_SECRET must be configured in production');
-    });
-
-    it('should allow bypass in development when secret is missing', () => {
-      process.env.NODE_ENV = 'development';
-      delete process.env.DAIMO_WEBHOOK_SECRET;
-
-      const webhookData = {
-        transaction_id: 'txn123',
-        signature: 'test-signature',
-      };
-
-      const result = PaymentService.verifyDaimoSignature(webhookData);
-
-      expect(result).toBe(true);
+      }).toThrow('DAIMO_WEBHOOK_SECRET must be configured');
     });
 
     it('should verify valid Daimo signature correctly', () => {

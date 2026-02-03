@@ -69,12 +69,6 @@ module.exports = {
   DAIMO_REFUND_ADDRESS: process.env.DAIMO_REFUND_ADDRESS,
   DAIMO_WEBHOOK_SECRET: process.env.DAIMO_WEBHOOK_SECRET,
 
-  // ==================== MISTRAL AI ====================
-  MISTRAL_API_KEY: process.env.MISTRAL_API_KEY,
-  MISTRAL_AGENT_ID: process.env.MISTRAL_AGENT_ID,
-  MISTRAL_MODEL: process.env.MISTRAL_MODEL || 'mistral-small-latest',
-  MISTRAL_MAX_TOKENS: parseInt(process.env.MISTRAL_MAX_TOKENS) || 500,
-
   // ==================== EMAIL CONFIGURATION ====================
   // SendGrid
   SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
@@ -145,17 +139,6 @@ module.exports = {
   MAX_CALL_PARTICIPANTS: parseInt(process.env.MAX_CALL_PARTICIPANTS) || 50,
   MAX_ROOM_PARTICIPANTS: parseInt(process.env.MAX_ROOM_PARTICIPANTS) || 100,
   WEBINAR_MAX_ATTENDEES: parseInt(process.env.WEBINAR_MAX_ATTENDEES) || 500,
-
-  // ==================== AWS S3 ====================
-  AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
-  AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
-  AWS_REGION: process.env.AWS_REGION || 'us-east-1',
-  AWS_S3_BUCKET: process.env.AWS_S3_BUCKET,
-  AWS_S3_RECORDINGS_FOLDER: process.env.AWS_S3_RECORDINGS_FOLDER || 'recordings',
-  AWS_S3_RADIO_FOLDER: process.env.AWS_S3_RADIO_FOLDER || 'radio',
-  AWS_S3_BROADCASTS_FOLDER: process.env.AWS_S3_BROADCASTS_FOLDER || 'broadcasts',
-  AWS_S3_ACCESS_POINT_ARN: process.env.AWS_S3_ACCESS_POINT_ARN,
-  AWS_S3_ACCESS_POINT_ALIAS: process.env.AWS_S3_ACCESS_POINT_ALIAS,
 
   // ==================== FEATURE FLAGS ====================
   ENABLE_MODERATION: process.env.ENABLE_MODERATION !== 'false',

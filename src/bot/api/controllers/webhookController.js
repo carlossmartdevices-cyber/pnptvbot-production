@@ -1,50 +1,53 @@
+const { schemas } = require('../../../validation/schemas/payment.schema');
 const PaymentService = require('../../services/paymentService');
 const logger = require('../../../utils/logger');
 const DaimoConfig = require('../../../config/daimo');
 
+const { cache } = require('../../../config/redis');
+
 // In-memory cache for webhook idempotency (prevents duplicate processing within 5 minutes)
 // In production, use Redis for this
-const webhookCache = new Map();
-const IDEMPOTENCY_TTL = 5 * 60 * 1000; // 5 minutes
+// const webhookCache = new Map();
+// const IDEMPOTENCY_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Cleanup interval to prevent memory leaks - runs every 10 minutes
-if (process.env.NODE_ENV !== 'test') {
-  const cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [key, timestamp] of webhookCache.entries()) {
-      if (now - timestamp >= IDEMPOTENCY_TTL) {
-        webhookCache.delete(key);
-      }
-    }
-    logger.debug(`Webhook cache cleanup: ${webhookCache.size} entries remaining`);
-  }, 10 * 60 * 1000); // Run every 10 minutes
-  cleanupInterval.unref();
-}
+// if (process.env.NODE_ENV !== 'test') {
+//   const cleanupInterval = setInterval(() => {
+//     const now = Date.now();
+//     for (const [key, timestamp] of webhookCache.entries()) {
+//       if (now - timestamp >= IDEMPOTENCY_TTL) {
+//         webhookCache.delete(key);
+//       }
+//     }
+//     logger.debug(`Webhook cache cleanup: ${webhookCache.size} entries remaining`);
+//   }, 10 * 60 * 1000); // Run every 10 minutes
+//   cleanupInterval.unref();
+// }
 
 /**
  * Check if webhook was already processed using idempotency key
  * @param {string} idempotencyKey - Unique key for this webhook
  * @returns {boolean} True if already processed
  */
-const isWebhookProcessed = (idempotencyKey) => {
-  if (webhookCache.has(idempotencyKey)) {
-    const timestamp = webhookCache.get(idempotencyKey);
-    if (Date.now() - timestamp < IDEMPOTENCY_TTL) {
-      return true;
-    }
-    // Expired, remove from cache
-    webhookCache.delete(idempotencyKey);
-  }
-  return false;
-};
+// const isWebhookProcessed = (idempotencyKey) => {
+//   if (webhookCache.has(idempotencyKey)) {
+//     const timestamp = webhookCache.get(idempotencyKey);
+//     if (Date.now() - timestamp < IDEMPOTENCY_TTL) {
+//       return true;
+//     }
+//     // Expired, remove from cache
+//     webhookCache.delete(idempotencyKey);
+//   }
+//   return false;
+// };
 
 /**
  * Mark webhook as processed
  * @param {string} idempotencyKey - Unique key for this webhook
  */
-const markWebhookProcessed = (idempotencyKey) => {
-  webhookCache.set(idempotencyKey, Date.now());
-};
+// const markWebhookProcessed = (idempotencyKey) => {
+//   webhookCache.set(idempotencyKey, Date.now());
+// };
 
 /**
  * Send a normalized error response
@@ -76,16 +79,13 @@ const sanitizeBotUsername = (username) => {
  * @returns {Object} { valid: boolean, error?: string }
  */
 const validateEpaycoPayload = (payload) => {
-  const requiredFields = ['x_ref_payco', 'x_transaction_state', 'x_extra1', 'x_extra2', 'x_extra3'];
-  const missingFields = requiredFields.filter((field) => !payload[field]);
-
-  if (missingFields.length > 0) {
+  const { error } = schemas.epaycoWebhook.validate(payload);
+  if (error) {
     return {
       valid: false,
-      error: `Missing required fields: ${missingFields.join(', ')}`,
+      error: error.details.map((d) => d.message).join(', '),
     };
   }
-
   return { valid: true };
 };
 
@@ -174,15 +174,8 @@ const handleEpaycoWebhook = async (req, res) => {
     const stateCode = req.body.x_cod_transaction_state || req.body.x_transaction_state || 'unknown';
     const idempotencyKey = `epayco_${req.body.x_ref_payco}_${stateCode}`;
 
-    // Verify webhook signature before any processing
-    const signatureCheck = verifyEpaycoSignature(req);
-    if (!signatureCheck.valid) {
-      const status = signatureCheck.reason === 'missing_signature' ? 400 : 401;
-      return sendError(res, status, 'INVALID_SIGNATURE', signatureCheck.error);
-    }
-
-    // Check if this webhook was already processed
-    if (isWebhookProcessed(idempotencyKey)) {
+    const acquired = await cache.acquireLock(idempotencyKey, 60);
+    if (!acquired) {
       logger.info('Duplicate ePayco webhook detected (already processed)', {
         refPayco: req.body.x_ref_payco,
         state: req.body.x_transaction_state,
@@ -194,37 +187,47 @@ const handleEpaycoWebhook = async (req, res) => {
       return res.status(200).json({ success: true, duplicate: true });
     }
 
-    logger.info('ePayco webhook received', {
-      transactionId: req.body.x_ref_payco,
-      state: req.body.x_transaction_state,
-      idempotencyKey,
-      provider: 'epayco',
-      signaturePresent: Boolean(req.body.x_signature),
-    });
+    try {
+      // Verify webhook signature before any processing
+      const signatureCheck = verifyEpaycoSignature(req);
+      if (!signatureCheck.valid) {
+        const status = signatureCheck.reason === 'missing_signature' ? 400 : 401;
+        return sendError(res, status, 'INVALID_SIGNATURE', signatureCheck.error);
+      }
 
-    // Validate payload structure
-    const validation = validateEpaycoPayload(req.body);
-    if (!validation || !validation.valid) {
-      const errorMsg = validation?.error || 'Invalid webhook payload';
-      logger.warn('Invalid ePayco webhook payload', { error: errorMsg });
-      return sendError(res, 400, 'INVALID_PAYLOAD', errorMsg);
+      logger.info('ePayco webhook received', {
+        transactionId: req.body.x_ref_payco,
+        state: req.body.x_transaction_state,
+        idempotencyKey,
+        provider: 'epayco',
+        signaturePresent: Boolean(req.body.x_signature),
+      });
+
+      // Validate payload structure
+      const validation = validateEpaycoPayload(req.body);
+      if (!validation || !validation.valid) {
+        const errorMsg = validation?.error || 'Invalid webhook payload';
+        logger.warn('Invalid ePayco webhook payload', { error: errorMsg });
+        return sendError(res, 400, 'INVALID_PAYLOAD', errorMsg);
+      }
+
+      const result = await PaymentService.processEpaycoWebhook(req.body);
+
+      if (result.success) {
+        return res.status(200).json({ success: true });
+      }
+
+      logger.warn('ePayco webhook rejected during processing', {
+        transactionId: req.body.x_ref_payco,
+        error: result.error,
+        idempotencyKey,
+        provider: 'epayco',
+        signaturePresent: Boolean(req.body.x_signature),
+      });
+      return sendError(res, 400, 'EPAYCO_REJECTED', result.error || 'Webhook processing failed');
+    } finally {
+      await cache.releaseLock(idempotencyKey);
     }
-
-    const result = await PaymentService.processEpaycoWebhook(req.body);
-
-    if (result.success) {
-      markWebhookProcessed(idempotencyKey);
-      return res.status(200).json({ success: true });
-    }
-
-    logger.warn('ePayco webhook rejected during processing', {
-      transactionId: req.body.x_ref_payco,
-      error: result.error,
-      idempotencyKey,
-      provider: 'epayco',
-      signaturePresent: Boolean(req.body.x_signature),
-    });
-    return sendError(res, 400, 'EPAYCO_REJECTED', result.error || 'Webhook processing failed');
   } catch (error) {
     logger.error('Error handling ePayco webhook:', error);
     return sendError(res, 500, 'INTERNAL_ERROR', 'Internal server error');
@@ -280,8 +283,8 @@ const handleDaimoWebhook = async (req, res) => {
     // Use event ID as idempotency key
     const idempotencyKey = `daimo_${id}`;
 
-    // Check if this webhook was already processed
-    if (isWebhookProcessed(idempotencyKey)) {
+    const acquired = await cache.acquireLock(idempotencyKey, 60);
+    if (!acquired) {
       logger.info('Duplicate Daimo webhook detected (already processed)', {
         eventId: id,
         status,
@@ -289,65 +292,67 @@ const handleDaimoWebhook = async (req, res) => {
       return res.status(200).json({ success: true, duplicate: true });
     }
 
-    logger.info('Daimo Pay webhook received', {
-      eventId: id,
-      status,
-      txHash: source?.txHash,
-      userId: metadata?.userId,
-      planId: metadata?.planId,
-      chain: 'Optimism',
-      token: source?.tokenSymbol || 'USDC',
-    });
-
-    // Verify webhook authorization
-    // Daimo uses Authorization: Basic <token> header for webhook verification
-    const authHeader = req.headers['authorization'] || req.headers['x-daimo-signature'];
-    const isValidSignature = DaimoService.verifyWebhookSignature(req.body, authHeader);
-
-    if (!isValidSignature) {
-      logger.error('Invalid Daimo webhook authorization', {
-        eventId: id,
-        hasAuthHeader: !!authHeader,
-      });
-      return res.status(401).json({ success: false, error: 'Invalid signature' });
-    }
-
-    // Validate payload structure
-    const validation = validateDaimoPayload(req.body);
-    if (!validation || !validation.valid) {
-        const errorMsg = validation?.error || 'Invalid metadata structure';
-        logger.warn('Invalid Daimo webhook payload', {
-          error: errorMsg,
-          receivedFields: Object.keys(req.body),
-        });
-        return res.status(400).json({ success: false, error: 'Invalid metadata structure' });
-    }
-
-    // Handle test events - acknowledge without processing
-    if (validation.isTestEvent) {
-      markWebhookProcessed(idempotencyKey);
-      logger.info('Daimo test event acknowledged', { eventId: id });
-      return res.status(200).json({ success: true, testEvent: true });
-    }
-
-    // Process webhook with auth header
-    const result = await PaymentService.processDaimoWebhook(req.body, authHeader);
-
-    if (result.success) {
-      markWebhookProcessed(idempotencyKey);
-      logger.info('Daimo webhook processed successfully', {
+    try {
+      logger.info('Daimo Pay webhook received', {
         eventId: id,
         status,
-        alreadyProcessed: result.alreadyProcessed || false,
+        txHash: source?.txHash,
+        userId: metadata?.userId,
+        planId: metadata?.planId,
+        chain: 'Optimism',
+        token: source?.tokenSymbol || 'USDC',
       });
-      return res.status(200).json({ success: true });
-    }
 
-    logger.warn('Daimo webhook processing failed', {
-      eventId: id,
-      error: result.error,
-    });
-    return res.status(400).json({ success: false, error: result.error });
+      // Verify webhook authorization
+      // Daimo uses Authorization: Basic <token> header for webhook verification
+      const authHeader = req.headers['authorization'] || req.headers['x-daimo-signature'];
+      const isValidSignature = DaimoService.verifyWebhookSignature(req.body, authHeader);
+
+      if (!isValidSignature) {
+        logger.error('Invalid Daimo webhook authorization', {
+          eventId: id,
+          hasAuthHeader: !!authHeader,
+        });
+        return res.status(401).json({ success: false, error: 'Invalid signature' });
+      }
+
+      // Validate payload structure
+      const validation = validateDaimoPayload(req.body);
+      if (!validation || !validation.valid) {
+          const errorMsg = validation?.error || 'Invalid metadata structure';
+          logger.warn('Invalid Daimo webhook payload', {
+            error: errorMsg,
+            receivedFields: Object.keys(req.body),
+          });
+          return res.status(400).json({ success: false, error: 'Invalid metadata structure' });
+      }
+
+      // Handle test events - acknowledge without processing
+      if (validation.isTestEvent) {
+        logger.info('Daimo test event acknowledged', { eventId: id });
+        return res.status(200).json({ success: true, testEvent: true });
+      }
+
+      // Process webhook with auth header
+      const result = await PaymentService.processDaimoWebhook(req.body, authHeader);
+
+      if (result.success) {
+        logger.info('Daimo webhook processed successfully', {
+          eventId: id,
+          status,
+          alreadyProcessed: result.alreadyProcessed || false,
+        });
+        return res.status(200).json({ success: true });
+      }
+
+      logger.warn('Daimo webhook processing failed', {
+        eventId: id,
+        error: result.error,
+      });
+      return res.status(400).json({ success: false, error: result.error });
+    } finally {
+      await cache.releaseLock(idempotencyKey);
+    }
   } catch (error) {
     logger.error('Error handling Daimo webhook:', {
       error: error.message,

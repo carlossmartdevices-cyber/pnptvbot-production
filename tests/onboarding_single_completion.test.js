@@ -128,11 +128,11 @@ describe('Onboarding Single Completion', function() {
     it('should retrieve incomplete onboarding users', async function() {
       // Mock database query
       const mockRows = [
-        { id: 'user1', onboarding_complete: false },
-        { id: 'user2', onboarding_complete: false }
+        { id: 'user1', onboardingComplete: false },
+        { id: 'user2', onboardingComplete: false }
       ];
 
-      sandbox.stub(UserModel, 'query').resolves({ rows: mockRows });
+      sandbox.stub(UserModel, 'getIncompleteOnboarding').resolves(mockRows);
 
       const incompleteUsers = await UserModel.getIncompleteOnboarding();
       
@@ -143,7 +143,7 @@ describe('Onboarding Single Completion', function() {
 
     it('should handle empty result for incomplete onboarding', async function() {
       // Mock empty database query
-      sandbox.stub(UserModel, 'query').resolves({ rows: [] });
+      sandbox.stub(UserModel, 'getIncompleteOnboarding').resolves([]);
 
       const incompleteUsers = await UserModel.getIncompleteOnboarding();
       

@@ -57,7 +57,7 @@ Este archivo contiene ejemplos concretos de cómo usar el `MASTER_BOT_PROMPT_TEM
 {{paso_especifico_2}} = "Preguntar sobre alergias alimentarias"
 {{paso_especifico_3}} = "Configurar preferencias de notificaciones de pedidos"
 
-{{lista_providers}} = "ePayco, Daimo, Stripe"
+{{lista_providers}} = "ePayco, Daimo"
 
 {{idiomas}} = "['en', 'es']"
 
@@ -163,40 +163,9 @@ Este archivo contiene ejemplos concretos de cómo usar el `MASTER_BOT_PROMPT_TEM
 {{paso_especifico_2}} = "Solicitar destinos preferidos"
 {{paso_especifico_3}} = "Configurar notificaciones de disponibilidad"
 
-{{lista_providers}} = "Stripe, PayPal, Daimo"
-
-{{idiomas}} = "['en', 'es', 'pt']"
-
-{{seccion_especifica_1}} = "🏘️ Gestión de Propiedades"
-{{seccion_especifica_2}} = "📅 Gestión de Reservas"
-{{seccion_especifica_3}} = "💰 Finanzas y Comisiones"
-
-{{metrica_especifica_1}} = "Reservas confirmadas hoy"
-{{metrica_especifica_2}} = "Tasa de ocupación promedio"
-{{metrica_especifica_3}} = "Revenue total (comisiones)"
-
-{{segmento_custom}} = "Super Hosts (rating > 4.8)"
-
-{{Gestión_Entidad_Principal}} = "Gestión de Reservas"
-{{entidades}} = "reservas"
-{{entidad}} = "reserva"
-{{entidades_criticas}} = "reservas confirmadas y pagadas"
-{{accion_especifica}} = "Enviar código de check-in"
-
-{{feature_exclusivo}} = "Early check-in/late check-out sin cargo"
-
-{{Flujo_Especifico_1}} = "Flujo de Búsqueda y Reserva"
-
-{{entity}} = "booking"
-{{collection}} = "bookings"
-{{related_pattern}} = "property"
-
-{{entityId}} = "bookingId"
-
-{{PROVIDER1_API_KEY}} = "STRIPE_PUBLIC_KEY"
-{{PROVIDER1_SECRET}} = "STRIPE_SECRET_KEY"
-{{PROVIDER2_API_KEY}} = "PAYPAL_CLIENT_ID"
-{{PROVIDER2_SECRET}} = "PAYPAL_CLIENT_SECRET"
+{{lista_providers}} = "PayPal, Daimo"
+{{PROVIDER1_API_KEY}} = "PAYPAL_CLIENT_ID"
+{{PROVIDER1_SECRET}} = "PAYPAL_CLIENT_SECRET"
 
 {{CONFIG_CUSTOM_1}} = "CANCELLATION_HOURS=24"
 {{CONFIG_CUSTOM_2}} = "AUTO_CHECKIN_TIME=15:00"

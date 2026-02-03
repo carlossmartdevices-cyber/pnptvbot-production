@@ -322,7 +322,7 @@ class PrivateCallBookingService {
   /**
    * Create payment link for booking
    */
-  static async createPaymentLink(bookingId, provider = 'stripe', expiresMinutes = 10) {
+  static async createPaymentLink(bookingId, provider = 'epayco', expiresMinutes = 10) {
     try {
       const booking = await BookingModel.getById(bookingId);
       if (!booking) {
@@ -354,10 +354,7 @@ class PrivateCallBookingService {
       const paymentId = payment.id;
 
       switch (provider) {
-        case 'stripe':
-          // Integration with existing payment service would go here
-          paymentLink = `${process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app'}/checkout/${paymentId}`;
-          break;
+
         case 'daimo':
           paymentLink = `${process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app'}/daimo-checkout/${paymentId}`;
           break;

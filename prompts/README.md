@@ -18,7 +18,7 @@ Esta carpeta contiene el **sistema completo** para generar bots de Telegram prof
 
 ---
 
-### 2. **MASTER_BOT_PROMPT_TEMPLATE.md**
+- **MASTER_BOT_PROMPT_TEMPLATE.md**
 - **Qué es:** Template maestro con ~15,000 palabras
 - **Cuándo usar:** Para generar cualquier tipo de bot desde cero
 - **Contenido:**
@@ -26,7 +26,7 @@ Esta carpeta contiene el **sistema completo** para generar bots de Telegram prof
   - Sistema de roles (user, admin, super_admin)
   - Modelos de datos parametrizables
   - Patrones de diseño obligatorios
-  - Configuración de servicios (Firebase, Redis, Pagos)
+  - Configuración de servicios (PostgreSQL, Redis, Pagos)
   - i18n multi-idioma
   - API REST y webhooks idempotentes
   - Deployment ready
@@ -122,7 +122,7 @@ Todos los bots incluyen:
 
 ✅ **Arquitectura profesional** con separación de responsabilidades
 ✅ **Sistema de roles** (user, admin, super_admin)
-✅ **Pagos integrados** (ePayco, Daimo, Stripe)
+✅ **Pagos integrados** (ePayco, Daimo)
 ✅ **Multi-idioma** (i18n con soporte en/es extensible)
 ✅ **Cache con Redis** (con fallback in-memory)
 ✅ **Webhooks idempotentes** con distributed locking
@@ -148,7 +148,7 @@ Día 1: Generación
 
 Día 2: Setup
 ├─ 15 min: Setup local (npm install, .env)
-├─ 20 min: Configurar Firebase + Redis
+├─ 20 min: Configurar PostgreSQL + Redis
 ├─ 10 min: Obtener token de Telegram
 └─ 15 min: Testing local
 

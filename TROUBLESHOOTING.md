@@ -50,7 +50,6 @@ The Node.js application server was not running on port 3000, causing nginx to fa
 ### Dependencies
 - **Redis** (optional): Used for caching. Server will run in degraded mode without it.
 - **PostgreSQL** (optional): Used for persistent storage. Server will run in degraded mode without it.
-- **Firestore**: Required for core functionality (configured via Firebase credentials in .env)
 
 ### Nginx Configuration
 The nginx configuration in `/etc/nginx/sites-available/pnptv-app.conf` proxies `/video-rooms` to `http://localhost:3000/video-rooms`. Ensure:

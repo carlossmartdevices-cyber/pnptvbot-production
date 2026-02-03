@@ -58,9 +58,6 @@
   - Sends user-friendly error messages
 
 ## CONFIGURATION
-- **Firebase**: `/home/user/pnptvbot-production/src/config/firebase.js` (113 lines)
-  - Functions: initializeFirebase, getFirestore, getAdmin, createIndexes
-  
 - **Redis**: `/home/user/pnptvbot-production/src/config/redis.js`
 
 ## UTILITIES
@@ -84,7 +81,6 @@
 
 **Critical Variables**:
 - `BOT_TOKEN` - Telegram bot token
-- `FIREBASE_PROJECT_ID`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL`
 - `ADMIN_USER_IDS` - Comma-separated admin user IDs (e.g., "123456789,987654321")
 
 **Rate Limiting**:
@@ -114,34 +110,34 @@ const hasSubscription = await UserService.hasActiveSubscription(userId);
 
 ## DATABASE SCHEMA
 
-### Users Collection Fields
-```javascript
-{
-  userId: number,
-  username: string,
-  firstName: string,
-  lastName: string,
-  email: string (optional),
-  language: 'en' | 'es',
-  subscriptionStatus: 'free' | 'active' | 'expired' | 'deactivated',
-  planId: string,
-  planExpiry: timestamp,
-  location: { lat: number, lng: number, address: string },
-  interests: string[],
-  bio: string,
-  photoUrl: string,
-  createdAt: timestamp,
-  updatedAt: timestamp
-}
+### Users Table Fields
+```sql
+CREATE TABLE users (
+  id BIGINT PRIMARY KEY,
+  username VARCHAR(255),
+  first_name VARCHAR(255),
+  last_name VARCHAR(255),
+  email VARCHAR(255),
+  language VARCHAR(10),
+  subscription_status VARCHAR(50),
+  plan_id VARCHAR(255),
+  plan_expiry TIMESTAMP WITH TIME ZONE,
+  location JSONB, -- { lat: number, lng: number, address: string }
+  interests TEXT[],
+  bio TEXT,
+  photo_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE,
+  updated_at TIMESTAMP WITH TIME ZONE
+);
 ```
 
-### Firestore Indexes
-Location: `src/config/firebase.js` lines 65-102
-- Index 1: users(subscriptionStatus, planExpiry)
+### PostgreSQL Indexes
+Location: `database/migrations/`
+- Index 1: users(subscription_status, plan_expiry)
 - Index 2: users(location.lat, location.lng)
-- Index 3: users(interests, subscriptionStatus)
-- Index 4: payments(userId, createdAt)
-- Index 5: liveStreams(status, createdAt)
+- Index 3: users(interests)
+- Index 4: payments(user_id, created_at)
+- Index 5: live_streams(status, created_at)
 
 ## API ENDPOINTS
 - **Health Check**: `GET /health`

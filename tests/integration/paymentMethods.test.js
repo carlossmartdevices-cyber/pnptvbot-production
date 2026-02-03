@@ -24,7 +24,7 @@ describe('Payment Methods Integration Tests', () => {
   });
 
   describe('ePayco Payment Method', () => {
-    it('should create ePayco payment with fallback checkout page', async () => {
+    it('should create ePayco payment with direct checkout page', async () => {
       // Mock PlanModel.getById
       PlanModel.getById.mockResolvedValue({
         id: 'plan_123',
@@ -55,12 +55,11 @@ describe('Payment Methods Integration Tests', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.paymentUrl).toContain('checkout/pay_123');
+      expect(result.paymentUrl).toContain('https://checkout.epayco.co');
       expect(result.paymentId).toBe('pay_123');
       expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_123', 'pending', expect.objectContaining({
-        paymentUrl: expect.stringContaining('checkout/pay_123'),
+        paymentUrl: expect.stringContaining('https://checkout.epayco.co'),
         provider: 'epayco',
-        fallback: true,
       }));
     });
 

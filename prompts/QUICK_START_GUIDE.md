@@ -157,7 +157,9 @@ mkdir -p src/bot/{core,handlers,services,utils,api}
 mkdir -p src/{models,config,utils}
 
 # Instala dependencias (el LLM te dará la lista)
-npm install telegraf firebase-admin ioredis express helmet cors ...
+npm install telegraf@^4.15.0 dotenv@^16.3.1 \
+  ioredis@^5.3.2 \
+  express@^4.18.2 winston@^3.11.0
 
 # Configura variables de entorno
 cp .env.example .env
@@ -166,7 +168,7 @@ cp .env.example .env
 
 ### 5. Configuración de Servicios (20 minutos)
 
-- [ ] Crea proyecto en Firebase
+- [ ] Crea proyecto en PostgreSQL
 - [ ] Configura Redis (local o cloud)
 - [ ] Obtén token de Telegram Bot (via @BotFather)
 - [ ] Configura proveedores de pago
@@ -320,7 +322,7 @@ echo $REDIS_URL
 ### Documentación Oficial
 - [Telegram Bot API](https://core.telegram.org/bots/api)
 - [Telegraf Framework](https://telegraf.js.org/)
-- [Firebase/Firestore](https://firebase.google.com/docs/firestore)
+- [PostgreSQL](https://www.postgresql.org/docs/)
 - [Redis](https://redis.io/docs/)
 
 ### Tutoriales Recomendados

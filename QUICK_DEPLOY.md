@@ -52,11 +52,6 @@ ADMIN_USER_IDS=your_telegram_user_id
 
 Optional services (add if needed):
 ```env
-# Firebase
-FIREBASE_PROJECT_ID=your_project_id
-FIREBASE_PRIVATE_KEY=your_private_key
-FIREBASE_CLIENT_EMAIL=your_client_email
-
 # Payment Providers
 EPAYCO_PUBLIC_KEY=your_key
 DAIMO_API_KEY=your_key

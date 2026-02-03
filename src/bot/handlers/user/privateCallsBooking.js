@@ -362,10 +362,6 @@ ${statusEmoji}
 
       const keyboard = [
         [{
-          text: '💳 Pay with Stripe',
-          callback_data: 'pay_stripe'
-        }],
-        [{
           text: '💳 Pay with ePayco',
           callback_data: 'pay_epayco'
         }],
@@ -405,7 +401,7 @@ ${statusEmoji}
   /**
    * Process payment
    */
-  bot.action(/^pay_(stripe|epayco|daimo)$/, async (ctx) => {
+  bot.action(/^pay_(epayco|daimo)$/, async (ctx) => {
     try {
       const method = ctx.match[1];
       const userId = ctx.from.id;
@@ -427,14 +423,7 @@ ${statusEmoji}
 
       // Generate payment link based on method
       let paymentUrl;
-      if (method === 'stripe') {
-        paymentUrl = await PaymentService.createStripeSession({
-          userId,
-          bookingId: booking.id,
-          amount: ctx.session.totalPrice,
-          description: `Private call with ${ctx.session.selectedModelId}`
-        });
-      } else if (method === 'epayco') {
+      if (method === 'epayco') {
         paymentUrl = await PaymentService.createEPaycoCheckout({
           userId,
           bookingId: booking.id,

@@ -469,6 +469,11 @@ async function selectTargetAudience(ctx, discountValue) {
   try {
     await ctx.answerCbQuery();
 
+    if (!ctx.session.temp?.promoCreate) {
+      await showPromoAdminMenu(ctx, true);
+      return;
+    }
+
     ctx.session.temp.promoCreate.discountValue = discountValue;
     ctx.session.temp.promoCreate.step = 'audience';
 
@@ -491,6 +496,9 @@ async function selectTargetAudience(ctx, discountValue) {
       ? 'Quien puede acceder a esta promo?'
       : 'Who can access this promo?';
 
+    // Back button should go to the correct discount type
+    const backCallback = `promo_create_type_${discountType}`;
+
     const buttons = [
       [Markup.button.callback(
         lang === 'es' ? '👥 Todos los usuarios' : '👥 All users',
@@ -508,7 +516,7 @@ async function selectTargetAudience(ctx, discountValue) {
         lang === 'es' ? '🆕 Nuevos usuarios (ultimos 7 dias)' : '🆕 New users (last 7 days)',
         'promo_create_audience_new_users'
       )],
-      [Markup.button.callback(lang === 'es' ? '◀️ Atras' : '◀️ Back', 'promo_create_type_percentage')],
+      [Markup.button.callback(lang === 'es' ? '◀️ Atras' : '◀️ Back', backCallback)],
     ];
 
     await ctx.editMessageText(message, {

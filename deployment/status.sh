@@ -11,25 +11,6 @@ echo "📊 PNPtv Bot Status Check"
 echo "=========================="
 echo ""
 
-# Firebase/Firestore
-echo -e "${BLUE}🔥 Firebase/Firestore:${NC}"
-echo "   Cloud-based database - monitored via Google Cloud Console"
-echo "   Check: https://console.firebase.google.com/"
-echo ""
-
-# Redis
-echo -e "${BLUE}📦 Redis:${NC}"
-if redis-cli ping > /dev/null 2>&1; then
-    echo -e "   ${GREEN}✅ Running${NC}"
-
-    # Get stats
-    KEYS=$(redis-cli DBSIZE 2>/dev/null | awk '{print $2}')
-    echo -e "   ${GREEN}✅ Cached keys: $KEYS${NC}"
-else
-    echo -e "   ${RED}❌ Not running${NC}"
-fi
-echo ""
-
 # Bot Process
 echo -e "${BLUE}🤖 Bot Status:${NC}"
 
@@ -98,5 +79,4 @@ echo ""
 echo "Start bot:         npm start"
 echo "PM2 status:        pm2 status"
 echo "View logs:         pm2 logs pnptv-bot"
-echo "Firebase console:  https://console.firebase.google.com/"
 echo ""

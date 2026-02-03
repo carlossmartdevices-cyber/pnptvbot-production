@@ -38,66 +38,7 @@ class DaimoService {
     });
   }
 
-  /**
-   * Generate payment link for Daimo Pay
-   * @param {Object} options - Payment options
-   * @param {string} options.userId - Telegram user ID
-   * @param {string} options.chatId - Telegram chat ID
-   * @param {string} options.planId - Plan ID
-   * @param {number} options.amount - Amount in USD (will be converted to USDC)
-   * @param {string} options.paymentId - Payment record ID
-   * @returns {string} Payment link
-   */
-  generatePaymentLink({ userId, chatId, planId, amount, paymentId }) {
-    try {
-      if (!this.treasuryAddress || !this.refundAddress) {
-        logger.error('Daimo addresses not configured');
-        throw new Error('Daimo payment system not configured');
-      }
 
-      // Convert amount to USDC units (6 decimals for USDC)
-      const amountInUSDC = (parseFloat(amount) * 1000000).toString(); // e.g., 10.00 USD = 10000000 USDC units
-
-      // Create payment intent
-      const paymentIntent = {
-        toAddress: this.treasuryAddress,
-        toChain: this.chain.id,
-        toToken: this.chain.token,
-        toUnits: amountInUSDC,
-        intent: 'Pay PNPtv Subscription',
-        refundAddress: this.refundAddress,
-        metadata: {
-          userId,
-          chatId,
-          planId,
-          paymentId,
-          timestamp: Date.now(),
-        },
-        paymentOptions: this.supportedPaymentApps,
-      };
-
-      // Generate payment URL
-      const encodedIntent = encodeURIComponent(JSON.stringify(paymentIntent));
-      const paymentUrl = `https://pay.daimo.com/pay?intent=${encodedIntent}`;
-
-      logger.info('Daimo payment link generated', {
-        paymentId,
-        userId,
-        amount,
-        amountInUSDC,
-        chain: this.chain.name,
-      });
-
-      return paymentUrl;
-    } catch (error) {
-      logger.error('Error generating Daimo payment link:', {
-        error: error.message,
-        userId,
-        amount,
-      });
-      throw error;
-    }
-  }
 
   /**
    * Verify webhook authorization from Daimo

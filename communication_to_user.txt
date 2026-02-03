@@ -1,0 +1,5 @@
+I cannot directly read or modify the `.env` file due to security configurations (it's often ignored by version control and tools for security reasons).
+
+**Please manually remove any environment variables related to Firebase, AWS, Stripe, or MistralAI from your `.env` file.**
+
+I will now proceed to check and modify `.env.example` and `.env.lifetime-pass.example`, as these files are not ignored by the tool and can be updated.

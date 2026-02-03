@@ -10,7 +10,7 @@ Before deploying, ensure you have:
 
 - ✅ Access to the server where PNPtv Bot is hosted
 - ✅ Database credentials with migration permissions
-- ✅ Payment provider API keys (Stripe, Daimo, Wompi)
+- ✅ Payment provider API keys (Daimo)
 - ✅ Admin user IDs for alert notifications
 - ✅ Backup of current production database
 
@@ -41,9 +41,7 @@ Add these to your `.env` file:
 DAILY_API_KEY=your_daily_co_api_key
 
 # Payment Provider Keys
-STRIPE_API_KEY=your_stripe_key
 DAIMO_API_KEY=your_daimo_key
-WOMPI_API_KEY=your_wompi_key
 
 # Admin Alerts (comma-separated Telegram user IDs)
 ADMIN_USER_IDS=admin1_id,admin2_id,admin3_id
@@ -151,7 +149,6 @@ Set up webhooks for payment providers:
 
 - **Stripe**: `https://your-bot-domain.com/api/webhooks/stripe`
 - **Daimo**: `https://your-bot-domain.com/api/webhooks/daimo`
-- **Wompi**: `https://your-bot-domain.com/api/webhooks/wompi`
 
 ### 4. 📈 Monitor Performance
 

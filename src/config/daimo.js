@@ -126,20 +126,7 @@ const createPaymentIntent = ({
   };
 };
 
-/**
- * Generate Daimo Pay link (DEPRECATED - use createDaimoPayment instead)
- * @param {Object} paymentIntent - Payment intent object
- * @returns {string} Payment URL
- * @deprecated Use createDaimoPayment for the official API
- */
-const generatePaymentLink = (paymentIntent) => {
-  const baseUrl = 'https://pay.daimo.com/pay';
-  const params = new URLSearchParams({
-    intent: JSON.stringify(paymentIntent),
-  });
 
-  return `${baseUrl}?${params.toString()}`;
-};
 
 /**
  * Create a payment using Daimo Pay API (Official method)
@@ -308,7 +295,6 @@ const formatAmountFromUnits = (units) => parseFloat(units) / 1e6;
 module.exports = {
   getDaimoConfig,
   createPaymentIntent,
-  generatePaymentLink,
   createDaimoPayment,
   validateWebhookPayload,
   mapDaimoStatus,

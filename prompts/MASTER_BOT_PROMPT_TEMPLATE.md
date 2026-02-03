@@ -85,7 +85,7 @@ Debes seguir esta arquitectura **exactamente**:
 │   │   ├── planModel.js                  # Planes de suscripción (si aplica)
 │   │   └── paymentModel.js               # Registros de pagos
 │   ├── config/
-│   │   ├── firebase.js                   # Singleton Firestore
+│   │   ├── postgres.js                   # Configuración PostgreSQL
 │   │   └── redis.js                      # Cache con helpers
 │   └── utils/
 │       ├── logger.js                     # Winston con rotación
@@ -512,8 +512,9 @@ static async getById(id) {
   return await cache.getOrSet(
     cacheKey,
     async () => {
-      const doc = await db.collection('{{collection}}').doc(id).get();
-      return doc.exists ? { id: doc.id, ...doc.data() } : null;
+      // Assuming 'db' is a PostgreSQL client or ORM instance
+      const result = await db('{{collection}}').where({ id }).first();
+      return result || null;
     },
     600 // TTL en segundos
   );
@@ -682,31 +683,6 @@ Características:
 
 ## 9️⃣ CONFIGURACIÓN Y SERVICIOS EXTERNOS
 
-### 🔥 Firebase/Firestore
-
-```javascript
-// src/config/firebase.js
-
-Requerimientos:
-- Singleton pattern (única instancia)
-- Service account authentication
-- Variables de entorno:
-  - FIREBASE_PROJECT_ID
-  - FIREBASE_PRIVATE_KEY
-  - FIREBASE_CLIENT_EMAIL
-
-Colecciones requeridas:
-- users
-- {{coleccion_principal}}
-- payments
-- {{otras_colecciones}}
-
-Índices requeridos:
-- userId + createdAt (descendente)
-- status + createdAt (descendente)
-- {{indices_especificos}}
-```
-
 ### 🗄️ Redis
 
 ```javascript
@@ -735,7 +711,7 @@ Configuración:
 ```javascript
 // src/bot/services/paymentService.js
 
-Providers requeridos: {{lista_providers}}  // Ej: ePayco, Daimo, Stripe
+Providers requeridos: epayco, daimo
 
 Para cada provider implementar:
 
@@ -892,7 +868,7 @@ Sanitización:
 1. ✅ Rate limiting (30 req/min por usuario)
 2. ✅ Webhook signature verification
 3. ✅ Input sanitization
-4. ✅ SQL injection prevention (usar Firestore queries correctamente)
+5. ✅ SQL injection prevention (usar parameterized queries en PostgreSQL)
 5. ✅ XSS prevention (sanitizar inputs antes de guardar)
 6. ✅ CSRF protection (tokens en webhooks)
 7. ✅ Environment variables para secretos
@@ -942,7 +918,7 @@ Response:
   uptime: 3600,
   services: {
     redis: { status: 'ok', latency: 5 },
-    firestore: { status: 'ok', latency: 50 },
+    postgresql: { status: 'ok', latency: 50 },
     telegram: { status: 'ok' }
   }
 }
@@ -992,11 +968,6 @@ NODE_ENV=development
 # Admin Configuration
 SUPER_ADMIN_USER_IDS=123456,789012        # Comma-separated
 ADMIN_USER_IDS=345678,901234
-
-# Firebase
-FIREBASE_PROJECT_ID=your_project_id
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk@project.iam.gserviceaccount.com
 
 # Redis
 REDIS_URL=redis://localhost:6379
@@ -1148,7 +1119,7 @@ Para considerar el bot **completo y funcional**, debe cumplir:
 ### ✅ Performance
 - [ ] Cache implementado correctamente
 - [ ] Queries optimizadas
-- [ ] Índices de Firestore configurados
+- [ ] Índices de PostgreSQL configurados
 - [ ] Respuestas < 2 segundos en promedio
 
 ### ✅ UX
@@ -1195,11 +1166,11 @@ Al finalizar, debes proveer:
 
 ---
 
-## 🎓 RECURSOS DE REFERENCIA
+### 🎓 RECURSOS DE REFERENCIA
 
 **Documentación oficial:**
 - Telegraf: https://telegraf.js.org/
-- Firebase/Firestore: https://firebase.google.com/docs/firestore
+- PostgreSQL: https://www.postgresql.org/docs/
 - Redis: https://redis.io/docs/
 - Express: https://expressjs.com/
 
@@ -1226,7 +1197,7 @@ Al finalizar, debes proveer:
 
 Con este prompt, desarrolla el bot paso a paso:
 1. Setup inicial (package.json, .env, estructura de carpetas)
-2. Configuración (Firebase, Redis)
+2. Configuración (PostgreSQL, Redis)
 3. Modelos de datos
 4. Middleware
 5. Handlers básicos (onboarding, menú)

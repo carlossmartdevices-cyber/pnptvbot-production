@@ -180,7 +180,6 @@ const sendPrimeWelcome = async (bot, userId) => {
   }
 };
 
-module.exports.sendPrimeWelcome = sendPrimeWelcome;
 
 /**
  * Main menu handlers
@@ -691,5 +690,6 @@ const showMainMenuEdit = async (ctx) => {
 // Export as default function for consistency with other handlers
 module.exports = registerMenuHandlers;
 module.exports.showMainMenu = showMainMenu;
-
+module.exports.buildOnboardingPrompt = buildOnboardingPrompt;
+module.exports.sendPrimeWelcome = sendPrimeWelcome;
 

@@ -55,7 +55,6 @@ class MessageTemplates {
       const providerDisplayName = this.getProviderDisplayName(provider, language);
       const safePlanName = sanitize.telegramMarkdown(planName);
       const safeExpiryStr = sanitize.telegramMarkdown(expiryStr);
-      const safeTransactionId = sanitize.telegramMarkdown(transactionId);
       const safeProviderDisplayName = sanitize.telegramMarkdown(providerDisplayName);
 
       // Build enhanced message based on language
@@ -77,7 +76,7 @@ class MessageTemplates {
           `• Proveedor: ${safeProviderDisplayName}`,
           `• Fecha de compra: ${new Date().toLocaleDateString('es-ES')}`,
           `• Válido hasta: ${safeExpiryStr}`,
-          `• ID de Transacción: ${safeTransactionId}`,
+          `• ID de Transacción: ${transactionId}`,
           '',
           '📢 *Aviso importante*',
           '',
@@ -123,7 +122,7 @@ class MessageTemplates {
           `• Provider: ${safeProviderDisplayName}`,
           `• Purchase Date: ${new Date().toLocaleDateString('en-US')}`,
           `• Valid until: ${safeExpiryStr}`,
-          `• Transaction ID: ${safeTransactionId}`,
+          `• Transaction ID: ${transactionId}`,
           '',
           '📢 *Important notice*',
           '',

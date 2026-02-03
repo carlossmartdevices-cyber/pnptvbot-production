@@ -96,26 +96,14 @@ class PrivateCallService {
    */
   static getPaymentProvider(method) {
     const providers = {
-      card: 'stripe',
+      card: 'manual',
       crypto: 'daimo',
       bank: 'wompi',
     };
     return providers[method] || 'manual';
   }
   
-  /**
-   * Generate card payment URL (Stripe)
-   */
-  static async generateCardPaymentUrl(paymentId, paymentData) {
-    try {
-      // In a real implementation, this would call Stripe API
-      // For now, return a placeholder URL
-      return `https://checkout.stripe.com/pay/${paymentId}`;
-    } catch (error) {
-      logger.error('Error generating card payment URL:', error);
-      throw error;
-    }
-  }
+
   
   /**
    * Generate crypto payment URL (Daimo)

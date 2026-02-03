@@ -55,9 +55,6 @@ fi
 
 required_vars=(
     "BOT_TOKEN"
-    "FIREBASE_PROJECT_ID"
-    "FIREBASE_PRIVATE_KEY"
-    "FIREBASE_CLIENT_EMAIL"
 )
 
 for var in "${required_vars[@]}"; do
@@ -70,18 +67,7 @@ done
 echo -e "${GREEN}✅ Configuration verified${NC}"
 echo ""
 
-# Step 5: Verify Firestore connectivity
-echo -e "${BLUE}🔥 Testing Firebase/Firestore connectivity...${NC}"
-if npm run validate:env >/dev/null 2>&1; then
-    echo -e "${GREEN}✅ Firebase credentials verified${NC}"
-else
-    echo -e "${RED}❌ Firebase credential verification failed${NC}"
-    echo "   Please check your Firebase credentials in .env"
-    exit 1
-fi
-echo ""
-
-# Step 6: Final checks
+# Step 5: Final checks
 echo -e "${BLUE}✅ Pre-deployment checks completed${NC}"
 echo ""
 
@@ -94,7 +80,7 @@ echo "To start the bot, run:"
 echo "  npm start       (or use PM2: pm2 start src/bot/core/bot.js --name pnptv-bot)"
 echo ""
 
-echo "Database: Firebase Firestore (Cloud-based, no local setup needed)"
+echo "Database: PostgreSQL (Cloud-based or local instance)"
 echo "Cache: Redis (local or cloud instance)"
 echo ""
 

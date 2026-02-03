@@ -4,7 +4,6 @@ const UserService = require('../../services/userService');
 const LiveStreamModel = require('../../../models/liveStreamModel');
 const { CATEGORIES } = require('../../../models/liveStreamModel');
 const UserModel = require('../../../models/userModel');
-const EmoteModel = require('../../../models/emoteModel');
 const logger = require('../../../utils/logger');
 const { getLanguage, validateUserInput } = require('../../utils/helpers');
 
@@ -331,38 +330,18 @@ const registerLiveHandlers = (bot) => {
         }
 
         try {
-          // Get stream to find host for emote parsing
-          const stream = await LiveStreamModel.getById(streamId);
-
-          // Parse emotes in comment
-          const parsedComment = stream
-            ? await EmoteModel.parseEmotes(commentText, stream.hostId)
-            : { text: commentText, emotes: [] };
-
           await LiveStreamModel.addComment(
             streamId,
             userId,
             user.firstName || user.username || 'Anonymous',
-            parsedComment.text
+            commentText
           );
 
           // Clear commenting state
           ctx.session.temp.commentingOnStream = null;
           await ctx.saveSession();
 
-          let responseMessage = `${t('commentAdded', lang)} ✅`;
-
-          // Show which emotes were used
-          if (parsedComment.emotes.length > 0) {
-            responseMessage += `\n\n${t('emotesUsed', lang)}: `;
-            parsedComment.emotes.forEach((emote) => {
-              if (emote.type === 'default') {
-                responseMessage += `${emote.emoji} `;
-              } else {
-                responseMessage += `:${emote.code}: `;
-              }
-            });
-          }
+          const responseMessage = `${t('commentAdded', lang)} ✅`;
 
           await ctx.reply(
             responseMessage,
@@ -372,7 +351,7 @@ const registerLiveHandlers = (bot) => {
             ]),
           );
 
-          logger.info('Comment added', { userId, streamId, emotesUsed: parsedComment.emotes.length });
+          logger.info('Comment added', { userId, streamId });
         } catch (commentError) {
           if (commentError.message.includes('banned')) {
             await ctx.reply(t('bannedFromCommenting', lang));
@@ -442,84 +421,6 @@ const registerLiveHandlers = (bot) => {
         // Price is now selected via buttons, no text input needed
       } catch (error) {
         logger.error('Error in live stream creation:', error);
-      }
-      return;
-    }
-
-    // Handle emote creation text input
-    if (ctx.session.temp?.creatingEmote) {
-      try {
-        const lang = getLanguage(ctx);
-        const step = ctx.session.temp.emoteStep;
-        const userId = ctx.from.id;
-
-        if (step === 'code') {
-          const code = validateUserInput(ctx.message.text, 20);
-
-          if (!code || !/^[a-zA-Z0-9]{3,20}$/.test(code)) {
-            await ctx.reply(t('invalidEmoteCode', lang));
-            return;
-          }
-
-          ctx.session.temp.emoteCode = code;
-          ctx.session.temp.emoteStep = 'image';
-          await ctx.saveSession();
-
-          await ctx.reply(
-            t('enterEmoteImage', lang),
-            Markup.inlineKeyboard([
-              [Markup.button.callback(t('cancel', lang), 'live_my_emotes')],
-            ]),
-          );
-          return;
-        }
-
-        if (step === 'image') {
-          const imageUrl = validateUserInput(ctx.message.text, 500);
-
-          if (!imageUrl || !imageUrl.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i)) {
-            await ctx.reply(t('invalidImageUrl', lang));
-            return;
-          }
-
-          const user = await UserModel.getById(userId);
-          const code = ctx.session.temp.emoteCode;
-
-          try {
-            const emote = await EmoteModel.createCustomEmote(
-              userId,
-              user.firstName || user.username || 'Anonymous',
-              code,
-              imageUrl,
-              true // Requires admin approval
-            );
-
-            // Clear session
-            ctx.session.temp.creatingEmote = false;
-            ctx.session.temp.emoteCode = null;
-            ctx.session.temp.emoteStep = null;
-            await ctx.saveSession();
-
-            await ctx.reply(
-              `✅ ${t('emoteCreated', lang)}\n\n` +
-                `🎭 Code: :${emote.code}:\n` +
-                `⏳ ${t('emoteAwaitingApproval', lang)}`,
-              Markup.inlineKeyboard([
-                [Markup.button.callback(t('back', lang), 'live_my_emotes')],
-              ]),
-            );
-
-            logger.info('Emote created', { userId, code });
-          } catch (emoteError) {
-            await ctx.reply(emoteError.message || t('error', lang));
-            ctx.session.temp.creatingEmote = false;
-            await ctx.saveSession();
-          }
-          return;
-        }
-      } catch (error) {
-        logger.error('Error in emote creation:', error);
-        await ctx.reply(t('error', getLanguage(ctx)));
       }
       return;
     }
@@ -793,7 +694,7 @@ const registerLiveHandlers = (bot) => {
       const streamId = ctx.match[1];
       const lang = getLanguage(ctx);
 
-      // Get stream to find host for custom emotes
+      // Validate stream exists
       const stream = await LiveStreamModel.getById(streamId);
       if (!stream) {
         await ctx.answerCbQuery(t('streamNotFound', lang));
@@ -804,78 +705,16 @@ const registerLiveHandlers = (bot) => {
       ctx.session.temp.commentingOnStream = streamId;
       await ctx.saveSession();
 
-      // Show emote picker
       const buttons = [
-        [Markup.button.callback('😊 Show Emotes', `live_show_emotes_${streamId}`)],
         [Markup.button.callback(t('cancel', lang), `live_comments_${streamId}`)],
       ];
 
       await ctx.editMessageText(
-        t('enterComment', lang) + '\n\n' +
-        t('useEmotesInComment', lang),
+        t('enterComment', lang),
         Markup.inlineKeyboard(buttons),
       );
     } catch (error) {
       logger.error('Error initiating comment:', error);
-    }
-  });
-
-  // Show available emotes
-  bot.action(/^live_show_emotes_(.+)$/, async (ctx) => {
-    try {
-      if (!ctx.match || !ctx.match[1]) {
-        logger.error('Invalid show emotes action format');
-        return;
-      }
-
-      const streamId = ctx.match[1];
-      const lang = getLanguage(ctx);
-
-      // Get stream to find host
-      const stream = await LiveStreamModel.getById(streamId);
-      if (!stream) {
-        await ctx.answerCbQuery(t('streamNotFound', lang));
-        return;
-      }
-
-      // Get available emotes
-      const emotes = await EmoteModel.getAvailableEmotes(stream.hostId);
-
-      let message = `🎭 ${t('availableEmotes', lang)}\n\n`;
-
-      // Show default emotes (first 15)
-      message += `*${t('defaultEmotes', lang)}:*\n`;
-      const defaultEmotes = emotes.default.slice(0, 15);
-      defaultEmotes.forEach((emote) => {
-        message += `${emote.emoji} \`:${emote.code}:\`  `;
-      });
-      message += '\n';
-
-      if (emotes.default.length > 15) {
-        message += `_...and ${emotes.default.length - 15} more default emotes_\n`;
-      }
-
-      // Show custom emotes
-      if (emotes.custom.length > 0) {
-        message += `\n*${t('customEmotes', lang)}:*\n`;
-        emotes.custom.slice(0, 10).forEach((emote) => {
-          message += `🎨 \`:${emote.code}:\`\n`;
-        });
-      }
-
-      message += `\n${t('emoteUsageInstructions', lang)}`;
-
-      await ctx.editMessageText(
-        message,
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), `live_add_comment_${streamId}`)],
-          ]),
-        },
-      );
-    } catch (error) {
-      logger.error('Error showing emotes:', error);
     }
   });
 
@@ -961,7 +800,6 @@ const registerLiveHandlers = (bot) => {
           + `❤️ ${stream.likes} likes`,
         Markup.inlineKeyboard([
           [Markup.button.callback('🛑 End Stream', `live_end_${streamId}`)],
-          [Markup.button.callback('🎭 My Emotes', 'live_my_emotes')],
           [Markup.button.callback(t('back', lang), 'live_my_streams')],
         ]),
       );
@@ -1181,256 +1019,6 @@ const registerLiveHandlers = (bot) => {
     }
   });
 
-  // My Emotes - View and manage custom emotes
-  bot.action('live_my_emotes', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      const userId = ctx.from.id;
-
-      // Get user's custom emotes
-      const emotes = await EmoteModel.getStreamerEmotes(userId, false);
-      const stats = await EmoteModel.getStreamerEmoteStats(userId);
-
-      let message = `🎭 ${t('myEmotes', lang)}\n\n`;
-
-      if (stats) {
-        message +=
-          `*${t('stats', lang)}:*\n` +
-          `✅ ${t('approved', lang)}: ${stats.approved}\n` +
-          `⏳ ${t('pending', lang)}: ${stats.pending}\n` +
-          `❌ ${t('rejected', lang)}: ${stats.rejected}\n` +
-          `📊 ${t('totalUsage', lang)}: ${stats.totalUsage}\n\n`;
-      }
-
-      if (emotes.length > 0) {
-        message += `*${t('yourEmotes', lang)}:*\n`;
-        emotes.slice(0, 10).forEach((emote) => {
-          const statusEmoji =
-            emote.status === 'approved' ? '✅' :
-            emote.status === 'pending' ? '⏳' : '❌';
-          const activeEmoji = emote.isActive ? '🟢' : '🔴';
-          message += `${statusEmoji}${activeEmoji} \`:${emote.code}:\` - ${emote.usageCount || 0} uses\n`;
-        });
-
-        if (emotes.length > 10) {
-          message += `\n_...and ${emotes.length - 10} more_`;
-        }
-      } else {
-        message += t('noCustomEmotes', lang);
-      }
-
-      await ctx.editMessageText(
-        message,
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('➕ Create Emote', 'live_create_emote')],
-            [Markup.button.callback('📋 Manage Emotes', 'live_manage_emotes')],
-            [Markup.button.callback(t('back', lang), 'show_live')],
-          ]),
-        },
-      );
-    } catch (error) {
-      logger.error('Error showing my emotes:', error);
-      await ctx.reply(t('error', getLanguage(ctx)));
-    }
-  });
-
-  // Create emote
-  bot.action('live_create_emote', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-
-      ctx.session.temp = ctx.session.temp || {};
-      ctx.session.temp.creatingEmote = true;
-      ctx.session.temp.emoteStep = 'code';
-      await ctx.saveSession();
-
-      await ctx.editMessageText(
-        t('enterEmoteCode', lang),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('cancel', lang), 'live_my_emotes')],
-        ]),
-      );
-    } catch (error) {
-      logger.error('Error starting emote creation:', error);
-    }
-  });
-
-  // Manage emotes list
-  bot.action('live_manage_emotes', async (ctx) => {
-    try {
-      const lang = getLanguage(ctx);
-      const userId = ctx.from.id;
-
-      const emotes = await EmoteModel.getStreamerEmotes(userId, false);
-
-      if (emotes.length === 0) {
-        await ctx.editMessageText(
-          t('noCustomEmotes', lang),
-          Markup.inlineKeyboard([
-            [Markup.button.callback('➕ Create Emote', 'live_create_emote')],
-            [Markup.button.callback(t('back', lang), 'live_my_emotes')],
-          ]),
-        );
-        return;
-      }
-
-      const buttons = [];
-      emotes.slice(0, 15).forEach((emote) => {
-        const statusEmoji =
-          emote.status === 'approved' ? '✅' :
-          emote.status === 'pending' ? '⏳' : '❌';
-        buttons.push([
-          Markup.button.callback(
-            `${statusEmoji} :${emote.code}:`,
-            `live_edit_emote_${emote.emoteId}`
-          ),
-        ]);
-      });
-
-      buttons.push([Markup.button.callback(t('back', lang), 'live_my_emotes')]);
-
-      await ctx.editMessageText(
-        `${t('manageEmotes', lang)}\n\n${t('selectEmoteToEdit', lang)}`,
-        Markup.inlineKeyboard(buttons),
-      );
-    } catch (error) {
-      logger.error('Error showing manage emotes:', error);
-      await ctx.reply(t('error', getLanguage(ctx)));
-    }
-  });
-
-  // Edit specific emote
-  bot.action(/^live_edit_emote_(.+)$/, async (ctx) => {
-    try {
-      if (!ctx.match || !ctx.match[1]) {
-        logger.error('Invalid edit emote action format');
-        return;
-      }
-
-      const emoteId = ctx.match[1];
-      const lang = getLanguage(ctx);
-      const userId = ctx.from.id;
-
-      // Get emote
-      const emotes = await EmoteModel.getStreamerEmotes(userId, false);
-      const emote = emotes.find((e) => e.emoteId === emoteId);
-
-      if (!emote) {
-        await ctx.answerCbQuery(t('emoteNotFound', lang));
-        return;
-      }
-
-      const statusEmoji =
-        emote.status === 'approved' ? '✅ Approved' :
-        emote.status === 'pending' ? '⏳ Pending Approval' : '❌ Rejected';
-
-      let message =
-        `🎭 *Emote: :${emote.code}:*\n\n` +
-        `Status: ${statusEmoji}\n` +
-        `Active: ${emote.isActive ? '🟢 Yes' : '🔴 No'}\n` +
-        `Usage: ${emote.usageCount || 0} times\n`;
-
-      if (emote.rejectionReason) {
-        message += `\n❌ Rejection reason: ${emote.rejectionReason}`;
-      }
-
-      const buttons = [];
-
-      // Toggle active/inactive
-      if (emote.status === 'approved') {
-        buttons.push([
-          Markup.button.callback(
-            emote.isActive ? '🔴 Deactivate' : '🟢 Activate',
-            `live_toggle_emote_${emoteId}`
-          ),
-        ]);
-      }
-
-      buttons.push([Markup.button.callback('🗑 Delete', `live_delete_emote_${emoteId}`)]);
-      buttons.push([Markup.button.callback(t('back', lang), 'live_manage_emotes')]);
-
-      await ctx.editMessageText(message, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(buttons),
-      });
-    } catch (error) {
-      logger.error('Error editing emote:', error);
-      await ctx.reply(t('error', getLanguage(ctx)));
-    }
-  });
-
-  // Toggle emote active/inactive
-  bot.action(/^live_toggle_emote_(.+)$/, async (ctx) => {
-    try {
-      if (!ctx.match || !ctx.match[1]) {
-        logger.error('Invalid toggle emote action format');
-        return;
-      }
-
-      const emoteId = ctx.match[1];
-      const lang = getLanguage(ctx);
-      const userId = ctx.from.id;
-
-      // Get current state
-      const emotes = await EmoteModel.getStreamerEmotes(userId, false);
-      const emote = emotes.find((e) => e.emoteId === emoteId);
-
-      if (!emote) {
-        await ctx.answerCbQuery(t('emoteNotFound', lang));
-        return;
-      }
-
-      // Toggle
-      await EmoteModel.updateEmote(emoteId, userId, { isActive: !emote.isActive });
-
-      await ctx.answerCbQuery(
-        emote.isActive ? t('emoteDeactivated', lang) : t('emoteActivated', lang)
-      );
-
-      // Refresh the edit screen
-      ctx.match[1] = emoteId;
-      await bot.handleUpdate({
-        ...ctx.update,
-        callback_query: {
-          ...ctx.callbackQuery,
-          data: `live_edit_emote_${emoteId}`,
-        },
-      });
-    } catch (error) {
-      logger.error('Error toggling emote:', error);
-      await ctx.answerCbQuery('Error');
-    }
-  });
-
-  // Delete emote
-  bot.action(/^live_delete_emote_(.+)$/, async (ctx) => {
-    try {
-      if (!ctx.match || !ctx.match[1]) {
-        logger.error('Invalid delete emote action format');
-        return;
-      }
-
-      const emoteId = ctx.match[1];
-      const lang = getLanguage(ctx);
-      const userId = ctx.from.id;
-
-      await EmoteModel.deleteEmote(emoteId, userId);
-
-      await ctx.editMessageText(
-        `✅ ${t('emoteDeleted', lang)}`,
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('back', lang), 'live_manage_emotes')],
-        ]),
-      );
-
-      logger.info('Emote deleted by user', { userId, emoteId });
-    } catch (error) {
-      logger.error('Error deleting emote:', error);
-      await ctx.reply(t('error', getLanguage(ctx)));
-    }
-  });
 };
 
 /**

@@ -5,7 +5,6 @@
 
 const { getPool } = require('../../config/postgres');
 const logger = require('../../utils/logger');
-const s3Service = require('../../utils/s3Service');
 const userService = require('./userService');
 const { v4: uuidv4 } = require('uuid');
 
@@ -55,8 +54,6 @@ class BroadcastService {
       mediaType = null,
       mediaUrl = null,
       mediaFileId = null,
-      s3Key = null,
-      s3Bucket = null,
       scheduledAt = null,
       timezone = 'UTC',
       includeFilters = {},
@@ -67,11 +64,11 @@ class BroadcastService {
       INSERT INTO broadcasts (
         broadcast_id, admin_id, admin_username, title,
         message_en, message_es, target_type,
-        media_type, media_url, media_file_id, s3_key, s3_bucket,
+        media_type, media_url, media_file_id,
         scheduled_at, timezone, include_filters, exclude_user_ids,
         status
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
       ) RETURNING *
     `;
 
@@ -90,8 +87,6 @@ class BroadcastService {
         mediaType,
         mediaUrl,
         mediaFileId,
-        s3Key,
-        s3Bucket,
         scheduledAt,
         timezone,
         JSON.stringify(includeFilters),
@@ -123,8 +118,6 @@ class BroadcastService {
       mediaType = null,
       mediaUrl = null,
       mediaFileId = null,
-      s3Key = null,
-      s3Bucket = null,
       scheduledAt,
       timezone = 'UTC',
       isRecurring = true,
@@ -150,11 +143,11 @@ class BroadcastService {
           INSERT INTO broadcasts (
             broadcast_id, admin_id, admin_username, title,
             message_en, message_es, target_type,
-            media_type, media_url, media_file_id, s3_key, s3_bucket,
+            media_type, media_url, media_file_id,
             scheduled_at, timezone, include_filters, exclude_user_ids,
             status
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
           ) RETURNING *
         `;
 
@@ -169,8 +162,6 @@ class BroadcastService {
           mediaType,
           mediaUrl,
           mediaFileId,
-          s3Key,
-          s3Bucket,
           scheduledAt,
           timezone,
           JSON.stringify(includeFilters),
@@ -409,60 +400,7 @@ class BroadcastService {
     }
   }
 
-  /**
-   * Upload media to S3 and create broadcast media record
-   * @param {Object} bot - Telegram bot instance
-   * @param {string} fileId - Telegram file ID
-   * @param {string} mediaType - Media type
-   * @param {string} broadcastId - Associated broadcast ID
-   * @returns {Promise<Object>} Media upload result
-   */
-  async uploadBroadcastMedia(bot, fileId, mediaType, broadcastId = null) {
-    try {
-      // Upload to S3
-      const uploadResult = await s3Service.uploadTelegramFileToS3(bot, fileId, mediaType, {
-        folder: 'broadcasts',
-        metadata: {
-          broadcast_id: broadcastId || 'pending',
-        },
-      });
 
-      // Save media metadata to database
-      const query = `
-        INSERT INTO broadcast_media (
-          media_id, broadcast_id, original_filename, media_type,
-          file_size, s3_bucket, s3_key, s3_url, s3_region,
-          telegram_file_id, processing_status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING *
-      `;
-
-      const mediaId = uuidv4();
-      const result = await getPool().query(query, [
-        mediaId,
-        broadcastId,
-        uploadResult.originalFilename,
-        mediaType,
-        uploadResult.fileSize,
-        uploadResult.s3Bucket,
-        uploadResult.s3Key,
-        uploadResult.s3Url,
-        uploadResult.s3Region,
-        fileId,
-        'uploaded',
-      ]);
-
-      logger.info(`Broadcast media uploaded: ${mediaId}`);
-
-      return {
-        ...result.rows[0],
-        uploadResult,
-      };
-    } catch (error) {
-      logger.error('Error uploading broadcast media:', error);
-      throw error;
-    }
-  }
 
   /**
    * Get target users for broadcast based on target type and filters
@@ -700,23 +638,8 @@ class BroadcastService {
       ...sendOptions
     };
 
-    // If we have an S3 key and the URL is an S3 URL, generate a presigned URL
-    // Telegram cannot access private S3 URLs directly
-    let urlToSend = mediaUrl;
-    if (s3Key && (mediaUrl.includes('s3.amazonaws.com') || mediaUrl.includes('s3://'))) {
-      try {
-        // Generate presigned URL valid for 1 hour
-        urlToSend = await s3Service.getPresignedUrl(s3Key, {
-          expiresIn: 3600, // 1 hour
-        });
-        logger.info(`Generated presigned URL for broadcast media: ${s3Key}`);
-      } catch (error) {
-        logger.warn(`Failed to generate presigned URL for ${s3Key}, falling back to direct URL: ${error.message}`);
-        // Fall back to mediaUrl (might be Telegram file_id)
-      }
-    }
-
     let result;
+    let urlToSend = mediaUrl;
     switch (mediaType) {
       case 'photo':
         result = await bot.telegram.sendPhoto(userId, urlToSend, options);
