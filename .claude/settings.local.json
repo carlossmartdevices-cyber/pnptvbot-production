@@ -127,7 +127,10 @@
       "Bash(git push)",
       "Bash(git -C /root/pnptvbot-production status)",
       "Bash(git -C /root/pnptvbot-production diff src/bot/services/jaasService.js src/services/emailService.js)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Disable recording features and remove broadcast email BCC\n\n- Set livestreaming and recording to false in JaaS moderator config\n- Remove BCC to hello@easybots.store from broadcast emails\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Disable recording features and remove broadcast email BCC\n\n- Set livestreaming and recording to false in JaaS moderator config\n- Remove BCC to hello@easybots.store from broadcast emails\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(sudo find:*)",
+      "Bash(dmesg:*)",
+      "Bash(PGPASSWORD='Apelo801050#' psql:*)"
     ],
     "deny": [],
     "ask": []
