@@ -336,6 +336,7 @@
                 promoBadge.textContent = `PROMO: ${paymentData.promoCode}`;
                 promoBadge.style.display = 'inline-block';
                 if (paymentData.discountAmount !== null) {
+                    const lang = document.documentElement.lang || 'es';
                     const savingsText = lang === 'es'
                         ? `Ahorras $${paymentData.discountAmount.toFixed(2)} USD`
                         : `You save $${paymentData.discountAmount.toFixed(2)} USD`;
