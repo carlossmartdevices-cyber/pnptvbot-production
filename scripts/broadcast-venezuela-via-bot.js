@@ -5,7 +5,7 @@
  * Triggers broadcast through the bot's built-in broadcast service
  */
 
-require('dotenv-safe').config({ allowEmptyValues: true });
+require('dotenv').config({ allowEmptyValues: true });
 
 const { Telegraf } = require('telegraf');
 const { initializeFirebase } = require('../src/config/firebase');

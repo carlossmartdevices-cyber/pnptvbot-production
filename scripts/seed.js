@@ -1,4 +1,4 @@
-require('dotenv-safe').config();
+require('dotenv').config();
 const { initializeFirebase } = require('../src/config/firebase');
 const PlanModel = require('../src/models/planModel');
 const logger = require('../src/utils/logger');

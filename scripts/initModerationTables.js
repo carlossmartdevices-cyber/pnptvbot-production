@@ -5,7 +5,7 @@
  * Run this script once to set up the moderation system
  */
 
-require('dotenv-safe').config({ allowEmptyValues: true });
+require('dotenv').config({ allowEmptyValues: true });
 const WarningService = require('../src/services/warningService');
 const logger = require('../src/utils/logger');
 

@@ -5,7 +5,7 @@
  * Run this script as a scheduled task or manually
  */
 
-require('dotenv-safe').config({ allowEmptyValues: true });
+require('dotenv').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
 const OnboardingReminderService = require('../src/bot/services/onboardingReminderService');
 const logger = require('../src/utils/logger');

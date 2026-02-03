@@ -5,7 +5,7 @@
  * Run this script once to set up the access control system
  */
 
-require('dotenv-safe').config({ allowEmptyValues: true });
+require('dotenv').config({ allowEmptyValues: true });
 const RoleService = require('../src/services/roleService');
 const ApprovalService = require('../src/services/approvalService');
 const logger = require('../src/utils/logger');

@@ -1,4 +1,4 @@
-require('dotenv-safe').config({ allowEmptyValues: true });
+require('dotenv').config({ allowEmptyValues: true });
 const cron = require('node-cron');
 const { initializeRedis } = require('../src/config/redis');
 const { initializePostgres } = require('../src/config/postgres');

@@ -10,7 +10,7 @@
  *   --no-kick   Only update statuses, don't kick users from channels
  */
 
-require('dotenv-safe').config({ allowEmptyValues: true });
+require('dotenv').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
 const { initializePostgres } = require('../src/config/postgres');
 const MembershipCleanupService = require('../src/bot/services/membershipCleanupService');

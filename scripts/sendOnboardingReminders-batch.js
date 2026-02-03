@@ -7,7 +7,7 @@
  * Example: node sendOnboardingReminders-batch.js 100 3
  */
 
-require('dotenv-safe').config({ allowEmptyValues: true });
+require('dotenv').config({ allowEmptyValues: true });
 const { Telegraf } = require('telegraf');
 const UserModel = require('../src/models/userModel');
 const OnboardingReminderService = require('../src/bot/services/onboardingReminderService');
