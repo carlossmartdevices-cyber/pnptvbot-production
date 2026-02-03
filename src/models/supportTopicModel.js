@@ -364,16 +364,16 @@ class SupportTopicModel {
    * @param {number} rating - Satisfaction rating (1-4)
    * @returns {Promise<Object>} Updated topic data
    */
-  static async updateRating(userId, rating) {
+  static async updateRating(ticketUserId, ratingUserId, rating) {
     const query = `
       INSERT INTO ticket_ratings (ticket_user_id, user_id, rating)
-      VALUES ($1, $1, $2)
+      VALUES ($1::varchar, $2::bigint, $3)
       RETURNING *
     `;
 
     try {
-      const result = await getPool().query(query, [userId, rating]);
-      logger.info('User rating updated', { userId, rating });
+      const result = await getPool().query(query, [ticketUserId, ratingUserId, rating]);
+      logger.info('User rating updated', { ticketUserId, ratingUserId, rating });
       return result.rows[0] || null;
     } catch (error) {
       logger.error('Error updating rating:', error);

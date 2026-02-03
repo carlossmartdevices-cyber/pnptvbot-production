@@ -873,8 +873,9 @@ const showProfile = async (ctx, targetUserId, edit = true, isOwnProfile = false)
  * Share profile card directly to user's private chat, with option to share to group
  */
 const shareProfileDirect = async (ctx) => {
+  let lang = 'en';
   try {
-    const lang = getLanguage(ctx);
+    lang = getLanguage(ctx);
     const user = await UserModel.getById(ctx.from.id);
     if (!user) { await ctx.reply(t('error', lang)); return; }
 
@@ -892,16 +893,25 @@ const shareProfileDirect = async (ctx) => {
     buttons.push([Markup.button.callback(t('back', lang), 'show_profile')]);
     const keyboard = buttons.length > 0 ? Markup.inlineKeyboard(buttons) : null;
 
+    const baseOptions = { parse_mode: 'Markdown' };
+    const sendOptions = keyboard ? { ...baseOptions, ...keyboard } : baseOptions;
     if (user.photoFileId) {
-      const baseOptions = { parse_mode: 'Markdown' };
-      const sendOptions = keyboard ? { ...baseOptions, ...keyboard } : baseOptions;
-      await ctx.replyWithPhoto(user.photoFileId, {
-        caption: profileText,
-        ...sendOptions
-      });
+      try {
+        await ctx.replyWithPhoto(user.photoFileId, {
+          caption: profileText,
+          ...sendOptions
+        });
+      } catch (photoError) {
+        const description = photoError?.response?.description || photoError?.description || photoError?.message || '';
+        if (String(description).toLowerCase().includes('wrong file identifier')) {
+          await ctx.reply(profileText, {
+            ...sendOptions
+          });
+          return;
+        }
+        throw photoError;
+      }
     } else {
-      const baseOptions = { parse_mode: 'Markdown' };
-      const sendOptions = keyboard ? { ...baseOptions, ...keyboard } : baseOptions;
       await ctx.reply(profileText, {
         ...sendOptions
       });
@@ -916,8 +926,9 @@ const shareProfileDirect = async (ctx) => {
  * Share profile card to group
  */
 const shareToGroup = async (ctx) => {
+  let lang = 'en';
   try {
-    const lang = getLanguage(ctx);
+    lang = getLanguage(ctx);
     const user = await UserModel.getById(ctx.from.id);
     if (!user) { await ctx.reply(t('error', lang)); return; }
 
@@ -935,10 +946,19 @@ const shareToGroup = async (ctx) => {
       const baseOptions = { parse_mode: 'Markdown' };
       const sendOptions = keyboard ? { ...baseOptions, ...keyboard } : baseOptions;
       if (user.photoFileId) {
-        await ctx.telegram.sendPhoto(GROUP_ID, user.photoFileId, {
-          caption: profileText,
-          ...sendOptions
-        });
+        try {
+          await ctx.telegram.sendPhoto(GROUP_ID, user.photoFileId, {
+            caption: profileText,
+            ...sendOptions
+          });
+        } catch (photoError) {
+          const description = photoError?.response?.description || photoError?.description || photoError?.message || '';
+          if (String(description).toLowerCase().includes('wrong file identifier')) {
+            await ctx.telegram.sendMessage(GROUP_ID, profileText, sendOptions);
+          } else {
+            throw photoError;
+          }
+        }
       } else {
         await ctx.telegram.sendMessage(GROUP_ID, profileText, sendOptions);
       }

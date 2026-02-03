@@ -1779,7 +1779,7 @@ También puedes ejecutar acciones del ticket con los botones superiores.`;
     const rating = parseInt(ctx.match[2]);
 
     try {
-      await SupportTopicModel.updateRating(userId, rating);
+      await SupportTopicModel.updateRating(userId, ctx.from?.id, rating);
       await ctx.answerCbQuery('Gracias por tu calificación!');
       await ctx.editMessageText('Gracias por tu calificación!', {
         reply_markup: { inline_keyboard: [] },
