@@ -9,6 +9,7 @@ const { showEditProfileMenu } = require('./profile');
 const paymentHandlers = require('../payments');
 const { showNearbyMenu } = require('./nearbyUnified');
 const supportRoutingService = require('../../services/supportRoutingService');
+const { handlePromoDeepLink } = require('../promo/promoHandler');
 
 /**
  * Onboarding handlers
@@ -120,6 +121,11 @@ If you have any questions, use /support to contact us.`;
 
       if (startParam) {
         const lang = getLanguage(ctx);
+
+        if (startParam.startsWith('promo_')) {
+          const promoCode = startParam.replace('promo_', '');
+          return await handlePromoDeepLink(ctx, promoCode);
+        }
 
         if (startParam === 'plans' || startParam === 'show_subscription_plans') {
           await paymentHandlers.showSubscriptionPlans(ctx, { forceReply: true });
