@@ -417,13 +417,13 @@ If you have any questions, use /support to contact us.`;
             await ctx.reply(t('emailReceived', lang));
             await completeOnboarding(ctx);
           } else {
-            // Different user, notify admin and continue onboarding
+            // Different user, notify admin and inform user to provide a different email
             const adminNotification = `⚠️ *Alerta de Email Duplicado*\n\n` +
               `Un usuario se ha registrado con un email que ya existe en la base de datos.\n\n` +
               `📧 **Email:** \`${rawEmail}\`\n` +
               `👤 **ID de Telegram Existente:** \`${existingUser.id}\`\n` +
               `🆕 **ID de Telegram Nuevo:** \`${ctx.from.id}\`\n\n` +
-              `Ambos usuarios podrán completar el onboarding. Por favor, revisa manualmente la situación para decidir si es necesario tomar alguna acción.`;
+              `El nuevo usuario no podrá proceder con este email. Por favor, revisa manualmente la situación.`;
 
             await supportRoutingService.sendToSupportGroup(adminNotification, 'escalation', {
               id: 'SYSTEM',
@@ -431,12 +431,19 @@ If you have any questions, use /support to contact us.`;
               username: 'system'
             });
 
-            ctx.session.temp.email = rawEmail;
-            ctx.session.temp.waitingForEmail = false;
-            await ctx.saveSession();
+            logger.warn('Duplicate email detected during onboarding for different user', {
+              newUserId: ctx.from.id,
+              existingUserId: existingUser.id,
+              email: rawEmail
+            });
 
-            await ctx.reply(t('emailReceived', lang));
-            await showLocationSharingPrompt(ctx);
+            await ctx.reply(
+              lang === 'es'
+                ? `❌ Este email ya está en uso por otra cuenta. Por favor, proporciona un email diferente o contacta a soporte para asistencia.`
+                : `❌ This email is already in use by another account. Please provide a different email or contact support for assistance.`
+            );
+            // Keep waitingForEmail true so user can retry
+            // Do not store email in session or proceed to next step
           }
         } else {
           // New email, proceed normally
