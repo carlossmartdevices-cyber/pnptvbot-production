@@ -124,7 +124,7 @@ const showXPostMenu = async (ctx, edit = false) => {
     [Markup.button.callback('✍️ Crear Nuevo Post', 'xpost_new')],
     [Markup.button.callback('🕐 Ver Programados', 'xpost_view_scheduled')],
     [Markup.button.callback('📜 Historial', 'xpost_view_history')],
-    [Markup.button.callback('⚙️ Gestionar Cuentas', 'admin_x_accounts_configure')],
+    [Markup.button.callback('⚙️ Gestionar Cuentas', 'admin_x_accounts_configure_x')],
     [Markup.button.callback('◀️ Volver al Panel', 'admin_cancel')],
   ];
 

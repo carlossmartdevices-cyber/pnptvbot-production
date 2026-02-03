@@ -584,7 +584,7 @@ async function showAdminPanel(ctx, edit = false) {
 
       buttons.push([
         Markup.button.callback('🐦 Publicar en X', 'xpost_menu'),
-        Markup.button.callback('⚙️ X Cuentas', 'admin_x_accounts_configure'),
+        Markup.button.callback('⚙️ X Cuentas', 'admin_x_accounts_configure_x'),
       ]);
 
       // ═══ PROMOS Y MARKETING ═══
