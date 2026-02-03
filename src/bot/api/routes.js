@@ -957,6 +957,7 @@ app.get('/api/media/playlists', asyncHandler(async (req, res) => {
 const broadcastQueueRoutes = require('./broadcastQueueRoutes');
 app.use('/api/admin/queue', broadcastQueueRoutes);
 app.use('/api/admin/x/oauth', xOAuthRoutes);
+app.use('/api/auth/x', xOAuthRoutes); // Alias for X Developer Portal redirect URI
 
 // Health Check and Monitoring Endpoints
 // Health check endpoints should be accessible but with reasonable rate limits
