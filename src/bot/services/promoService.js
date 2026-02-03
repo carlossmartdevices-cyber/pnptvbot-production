@@ -103,7 +103,7 @@ class PromoService {
       }
 
       // Create payment with promo pricing
-      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
+      const checkoutDomain = process.env.CHECKOUT_DOMAIN || process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
 
       const payment = await PaymentModel.create({
         userId: userId.toString(),
@@ -126,7 +126,7 @@ class PromoService {
 
       if (provider === 'epayco') {
         // Use checkout page with promo metadata
-        paymentUrl = `${webhookDomain}/checkout/${payment.id}?promo=${promo.code}`;
+        paymentUrl = `${checkoutDomain}/checkout/${payment.id}?promo=${promo.code}`;
         await PaymentModel.updateStatus(payment.id, 'pending', {
           paymentUrl,
           provider,
@@ -159,7 +159,7 @@ class PromoService {
             error: daimoError.message,
             paymentId: payment.id,
           });
-          paymentUrl = `${webhookDomain}/daimo-checkout/${payment.id}?promo=${promo.code}`;
+          paymentUrl = `${checkoutDomain}/daimo-checkout/${payment.id}?promo=${promo.code}`;
           await PaymentModel.updateStatus(payment.id, 'pending', {
             paymentUrl,
             provider,
@@ -167,7 +167,7 @@ class PromoService {
           });
         }
       } else {
-        paymentUrl = `${webhookDomain}/checkout/${payment.id}?promo=${promo.code}`;
+        paymentUrl = `${checkoutDomain}/checkout/${payment.id}?promo=${promo.code}`;
       }
 
       logger.info('Promo payment initiated', {
