@@ -10,6 +10,7 @@ const GROUP_ID = process.env.GROUP_ID;
 const PRIME_CHANNEL_ID = process.env.PRIME_CHANNEL_ID;
 const NOTIFICATIONS_TOPIC_ID = parseInt(process.env.NOTIFICATIONS_TOPIC_ID || '10682', 10);
 const AUTO_DELETE_DELAY = 3 * 60 * 1000; // 3 minutes
+const CRISTINA_INVOCATION_REGEX = /\b(?:ey|hey)\s*[,.:;!?-]?\s*cristina\b/i;
 
 // Cache valid topic IDs per chat to avoid repeated failed attempts
 const validTopicsPerChat = {};
@@ -142,6 +143,11 @@ function groupBehaviorMiddleware() {
 
     // Only apply to configured group
     if (!isGroup || (GROUP_ID && chatIdStr !== GROUP_ID)) {
+      return next();
+    }
+
+    const messageText = ctx.message?.text || '';
+    if (CRISTINA_INVOCATION_REGEX.test(messageText)) {
       return next();
     }
 

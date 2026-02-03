@@ -9,6 +9,7 @@ const { chatWithCristina, isCristinaAIAvailable } = require('../../services/cris
 // Rate limiting map: userId -> lastMessageTime
 const messageTimestamps = new Map();
 const RATE_LIMIT_MS = 3000; // 3 seconds between messages
+const CRISTINA_INVOCATION_REGEX = /\b(?:ey|hey)\s*[,.:;!?-]?\s*cristina\b/i;
 
 /**
  * Agent instructions - Cristina Customer Support AI
@@ -292,12 +293,12 @@ const registerSupportHandlers = (bot) => {
 
     // IN GROUPS: Only respond when invoked with "Ey Cristina" (case insensitive)
     if (isGroup) {
-      const invokesCristina = /\b(e(y|y)?|hey)\s+cristina\b/i.test(rawUserMessage);
+      const invokesCristina = CRISTINA_INVOCATION_REGEX.test(rawUserMessage);
       if (!invokesCristina) {
         return next(); // Don't respond in groups unless explicitly invoked
       }
       // Remove the invocation phrase before processing
-      const cleanedMessage = rawUserMessage.replace(/\b(e(y|y)?|hey)\s+cristina\b/i, '').replace(/^[:,.-]\s*/, '').trim();
+      const cleanedMessage = rawUserMessage.replace(CRISTINA_INVOCATION_REGEX, '').replace(/^[:,.-]\s*/, '').trim();
       if (!cleanedMessage) {
         // Just invoked Cristina with no question
         const lang = getLanguage(ctx);
