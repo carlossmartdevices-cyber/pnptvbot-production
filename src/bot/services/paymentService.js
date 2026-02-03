@@ -153,7 +153,7 @@ class PaymentService {
 
       let paymentUrl;
       const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
-      const checkoutDomain = process.env.CHECKOUT_DOMAIN || webhookDomain || 'https://easybots.store';
+      const checkoutDomain = process.env.CHECKOUT_DOMAIN || process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
 
       if (provider === 'epayco') {
         // Create payment reference
