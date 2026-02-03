@@ -364,7 +364,7 @@ app.get('/payment/:paymentId', (req, res) => {
   } else {
     fileName = 'payment-checkout-es.html';
   }
-  res.redirect(302, `/${fileName}`);
+  res.sendFile(path.join(__dirname, `../../../public/${fileName}`));
 });
 
 // Function to conditionally apply middleware (skip for Telegram webhook)
@@ -396,7 +396,8 @@ app.use((req, res, next) => {
       '/pnp/webhook/telegram',
       '/webhook/telegram',
       '/checkout/',
-      '/daimo-checkout/'
+      '/daimo-checkout/',
+      '/payment/'
     ];
     
     const isAllowed = allowedPaths.some(path => 
