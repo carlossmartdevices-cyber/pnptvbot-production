@@ -33,6 +33,7 @@
   "author": "PNPtv Team",
   "license": "MIT",
   "dependencies": {
+    "@daimo/pay": "^1.19.0",
     "@daimo/pay-common": "^1.19.0",
     "@noble/hashes": "^2.0.1",
     "@sentry/node": "^7.99.0",
@@ -53,9 +54,7 @@
     "express-rate-limit": "^7.1.5",
     "express-session": "^1.18.2",
     "form-data": "^4.0.0",
-    "@daimo/pay": "^1.19.0",
     "geolib": "^3.3.4",
-    "git": "^0.1.5",
     "helmet": "^7.1.0",
     "i18next": "^23.7.16",
     "ioredis": "^5.3.2",
@@ -96,7 +95,6 @@
     "globals": "^16.5.0",
     "jest": "^29.7.0",
     "nodemon": "^3.1.11",
-    "pm2": "^6.0.14",
     "sinon": "^21.0.1",
     "supertest": "^6.3.4"
   },
