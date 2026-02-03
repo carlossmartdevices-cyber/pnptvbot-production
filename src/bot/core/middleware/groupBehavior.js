@@ -131,7 +131,8 @@ function primeChannelSilentRedirectMiddleware() {
 
 /**
  * Group Behavior Middleware
- * Routes messages to valid topics only. Falls back to main chat if topic doesn't exist.
+ * Redirects ALL bot responses to private chat instead of the group.
+ * Keeps the community group clean - no bot spam.
  */
 function groupBehaviorMiddleware() {
   return async (ctx, next) => {
@@ -144,8 +145,7 @@ function groupBehaviorMiddleware() {
       return next();
     }
 
-    // Store original reply and sendMessage functions
-    const originalReply = ctx.reply.bind(ctx);
+    // Store original sendMessage function for private messages
     const originalSendMessage = ctx.telegram.sendMessage.bind(ctx.telegram);
 
     // Check if user is admin (admins' messages not redirected)
@@ -155,149 +155,111 @@ function groupBehaviorMiddleware() {
       PermissionService.isEnvAdmin(userId)
     );
 
-    // Determine if we should use a topic ID
-    const shouldUseTopic = !isAdmin && NOTIFICATIONS_TOPIC_ID &&
-      (validTopicsPerChat[chatId] === undefined || validTopicsPerChat[chatId] === true);
+    // Admins can use bot normally in group
+    if (isAdmin) {
+      return next();
+    }
 
     const incomingText = (ctx.message?.text || '').toLowerCase();
-    const isMenuCommand = incomingText.startsWith('/menu');
+    const isCommand = incomingText.startsWith('/');
+    const botUsername = ctx.botInfo?.username || 'PNPLatinoTV_bot';
 
-    // Override ctx.reply to route to notifications topic
+    // Override ctx.reply to send to private chat instead
     ctx.reply = async (text, extra = {}) => {
-      // /menu should be visible in the same place it was invoked (main chat or current topic)
-      if (isMenuCommand) {
-        if (ctx.message?.message_thread_id && !extra.message_thread_id) {
-          extra.message_thread_id = ctx.message.message_thread_id;
-        }
-      }
-      // Only add topic ID if we haven't determined it doesn't exist
-      if (!isMenuCommand && shouldUseTopic && !extra.message_thread_id) {
-        extra.message_thread_id = NOTIFICATIONS_TOPIC_ID;
-      }
-
       try {
-        const message = await originalReply(text, extra);
+        // Remove message_thread_id as we're sending to private chat
+        const privateExtra = { ...extra };
+        delete privateExtra.message_thread_id;
+        delete privateExtra.reply_to_message_id;
 
-        // Mark topic as valid for this chat
-        if (shouldUseTopic && validTopicsPerChat[chatId] === undefined) {
-          validTopicsPerChat[chatId] = true;
-        }
+        const message = await originalSendMessage(userId, text, privateExtra);
 
-        // Schedule deletion after 3 minutes (keep /menu longer)
-        if (message) {
-          ChatCleanupService.scheduleDelete(
-            ctx.telegram,
-            chatId,
-            message.message_id,
-            'group-bot-behavior',
-            isMenuCommand ? 15 * 60 * 1000 : AUTO_DELETE_DELAY
-          );
-
-          logger.debug('Bot message sent and scheduled for deletion', {
-            chatId,
-            messageId: message.message_id,
-            topicId: extra.message_thread_id || 'main',
-            deleteIn: isMenuCommand ? '15 minutes' : '3 minutes',
-          });
-        }
+        logger.debug('Bot response redirected to private chat', {
+          userId,
+          groupChatId: chatId,
+        });
 
         return message;
       } catch (error) {
-        // If topic not found, mark it as invalid and retry without topic
-        if (error.description && error.description.includes('message thread not found')) {
-          logger.info('Topic does not exist, marking as invalid and using main chat', {
-            chatId,
-            topicId: NOTIFICATIONS_TOPIC_ID,
-          });
-
-          validTopicsPerChat[chatId] = false;
-          extra.message_thread_id = undefined;
-
-          const message = await originalReply(text, extra);
-
-          if (message) {
-            ChatCleanupService.scheduleDelete(
-              ctx.telegram,
-              chatId,
-              message.message_id,
-              'group-bot-behavior',
-              AUTO_DELETE_DELAY
-            );
-          }
-
-          return message;
+        // User might have blocked the bot or never started it
+        if (error.description && error.description.includes('bot was blocked')) {
+          logger.info('User has blocked bot, cannot send private message', { userId });
+        } else if (error.description && error.description.includes("bot can't initiate")) {
+          logger.info('User has not started bot, cannot send private message', { userId });
+        } else {
+          logger.error('Failed to send private message:', error.message);
         }
-        throw error;
+        return null;
       }
     };
 
-    // Override ctx.telegram.sendMessage for groups
-    ctx.telegram.sendMessage = async (chatId, text, extra = {}) => {
-      const chatIdStr = chatId.toString();
-      const isTargetGroup = GROUP_ID ? chatIdStr === GROUP_ID : chatIdStr.startsWith('-');
-      const shouldUseTopic = isTargetGroup && !isAdmin && NOTIFICATIONS_TOPIC_ID &&
-        (validTopicsPerChat[chatId] === undefined || validTopicsPerChat[chatId] === true);
+    // Override all reply variants
+    ctx.replyWithMarkdown = ctx.reply;
+    ctx.replyWithHTML = ctx.reply;
 
-      // Only add topic ID if we haven't determined it doesn't exist
-      if (shouldUseTopic && !extra.message_thread_id) {
-        extra.message_thread_id = NOTIFICATIONS_TOPIC_ID;
+    // Override ctx.telegram.sendMessage for group targets
+    ctx.telegram.sendMessage = async (targetChatId, text, extra = {}) => {
+      const targetChatIdStr = targetChatId?.toString();
+      const isTargetGroup = GROUP_ID ? targetChatIdStr === GROUP_ID : targetChatIdStr?.startsWith('-');
+
+      // If targeting the group, redirect to user's private chat instead
+      if (isTargetGroup && userId) {
+        const privateExtra = { ...extra };
+        delete privateExtra.message_thread_id;
+        delete privateExtra.reply_to_message_id;
+
+        try {
+          return await originalSendMessage(userId, text, privateExtra);
+        } catch (error) {
+          logger.debug('Could not redirect group message to private:', error.message);
+          return null;
+        }
       }
 
+      // For other targets (including private chats), send normally
+      return originalSendMessage(targetChatId, text, extra);
+    };
+
+    // Delete user's command in group after processing
+    if (isCommand && ctx.message?.message_id) {
+      // Schedule deletion of user command after a short delay
+      ChatCleanupService.scheduleDelete(
+        ctx.telegram,
+        chatId,
+        ctx.message.message_id,
+        'group-user-command',
+        5000 // Delete after 5 seconds
+      );
+    }
+
+    // Send a brief notification in group that redirects to private chat
+    if (isCommand) {
+      const userLang = ctx.session?.language || ctx.from?.language_code || 'en';
+      const isSpanish = userLang.startsWith('es');
+
+      const redirectNotice = isSpanish
+        ? `💬 @${ctx.from?.username || ctx.from?.first_name}, revisa tu chat privado con @${botUsername}`
+        : `💬 @${ctx.from?.username || ctx.from?.first_name}, check your private chat with @${botUsername}`;
+
       try {
-        const message = await originalSendMessage(chatId, text, extra);
+        // Send brief notice in group using ORIGINAL sendMessage (not overridden)
+        const notice = await originalSendMessage(chatId, redirectNotice, {
+          message_thread_id: ctx.message?.message_thread_id || NOTIFICATIONS_TOPIC_ID,
+        });
 
-        // Mark topic as valid for this chat
-        if (shouldUseTopic && validTopicsPerChat[chatId] === undefined) {
-          validTopicsPerChat[chatId] = true;
-        }
-
-        // Schedule deletion after 3 minutes
-        if (isTargetGroup && message) {
+        if (notice) {
           ChatCleanupService.scheduleDelete(
             ctx.telegram,
             chatId,
-            message.message_id,
-            'group-bot-behavior',
-            AUTO_DELETE_DELAY
+            notice.message_id,
+            'group-redirect-notice',
+            10000 // Delete notice after 10 seconds
           );
-
-          logger.debug('Bot message sent and scheduled for deletion', {
-            chatId,
-            messageId: message.message_id,
-            topicId: extra.message_thread_id || 'main',
-            deleteIn: '3 minutes',
-          });
         }
-
-        return message;
       } catch (error) {
-        // If topic not found, mark it as invalid and retry without topic
-        if (error.description && error.description.includes('message thread not found')) {
-          logger.info('Topic does not exist, marking as invalid and using main chat', {
-            chatId,
-            topicId: NOTIFICATIONS_TOPIC_ID,
-          });
-
-          validTopicsPerChat[chatId] = false;
-          extra.message_thread_id = undefined;
-
-          const message = await originalSendMessage(chatId, text, extra);
-
-          if (isTargetGroup && message) {
-            ChatCleanupService.scheduleDelete(
-              ctx.telegram,
-              chatId,
-              message.message_id,
-              'group-bot-behavior',
-              AUTO_DELETE_DELAY
-            );
-          }
-
-          return message;
-        }
-        throw error;
+        logger.debug('Could not send redirect notice:', error.message);
       }
-    };
+    }
 
     return next();
   };
@@ -361,7 +323,7 @@ function cristinaGroupFilterMiddleware() {
 
 /**
  * Group Callback Redirect Middleware
- * Redirects inline button clicks to deep links instead of processing in group
+ * Redirects ALL inline button clicks to private chat
  */
 function groupCallbackRedirectMiddleware() {
   return async (ctx, next) => {
@@ -395,7 +357,7 @@ function groupCallbackRedirectMiddleware() {
     const userLang = ctx.from?.language_code || 'en';
     const botUsername = ctx.botInfo?.username || 'PNPLatinoTV_bot';
 
-    // Map callback actions to deep links
+    // Map callback actions to deep links for direct navigation
     const CALLBACK_DEEP_LINKS = {
       'show_subscription_plans': 'plans',
       'menu_nearby': 'nearby',
@@ -406,34 +368,27 @@ function groupCallbackRedirectMiddleware() {
       'show_hangouts': 'hangouts',
       'cristina': 'cristina',
       'menu_cristina': 'cristina',
-
       'show_live': 'show_live',
       'pnp_live': 'pnp_live',
       'show_leaderboard': 'leaderboard',
       'menu_leaderboard': 'leaderboard',
     };
 
-    // Check if this callback should be redirected
-    const deepLink = CALLBACK_DEEP_LINKS[callbackData];
+    // Get specific deep link or use generic menu link
+    const deepLink = CALLBACK_DEEP_LINKS[callbackData] || 'menu';
+    const pmLink = `https://t.me/${botUsername}?start=${deepLink}`;
 
-    if (deepLink) {
-      const pmLink = `https://t.me/${botUsername}?start=${deepLink}`;
+    // Answer callback with redirect message
+    const redirectText = getCallbackRedirectText(userLang);
 
-      // Answer callback with redirect message
-      const redirectText = getCallbackRedirectText(userLang);
-
-      try {
-        await ctx.answerCbQuery(redirectText, { show_alert: false, url: pmLink });
-        logger.info('Callback redirected to deep link', { callbackData, deepLink, userId });
-      } catch (error) {
-        logger.debug('Could not answer callback with redirect:', error.message);
-      }
-
-      return; // Don't proceed with callback handler
+    try {
+      await ctx.answerCbQuery(redirectText, { show_alert: false, url: pmLink });
+      logger.info('Callback redirected to private chat', { callbackData, deepLink, userId });
+    } catch (error) {
+      logger.debug('Could not answer callback with redirect:', error.message);
     }
 
-    // Allow other callbacks to proceed
-    return next();
+    return; // Don't proceed with callback handler - ALL callbacks redirect to private
   };
 }
 
@@ -448,7 +403,7 @@ function groupMenuRedirectMiddleware() {
 }
 
 /**
- * Delete user commands in group after 3 minutes
+ * Delete user commands in group quickly to keep group clean
  */
 function groupCommandDeleteMiddleware() {
   return async (ctx, next) => {
@@ -462,20 +417,20 @@ function groupCommandDeleteMiddleware() {
     const isCommand = messageText.startsWith('/');
 
     if (isCommand && ctx.message?.message_id) {
-      // Schedule deletion of user command after 3 minutes
+      // Schedule deletion of user command after 5 seconds (keep group clean)
       ChatCleanupService.scheduleDelete(
         ctx.telegram,
         ctx.chat.id,
         ctx.message.message_id,
         'group-user-command',
-        AUTO_DELETE_DELAY
+        5000 // 5 seconds
       );
 
       logger.debug('User command scheduled for deletion', {
         chatId: ctx.chat.id,
         messageId: ctx.message.message_id,
         command: messageText.split(' ')[0],
-        deleteIn: '3 minutes',
+        deleteIn: '5 seconds',
       });
     }
 
