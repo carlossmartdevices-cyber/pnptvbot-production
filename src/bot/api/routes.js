@@ -299,8 +299,8 @@ app.get('/terms', pageLimiter, (req, res) => {
     return res.status(404).send('Not found');
   }
   const lang = req.query.lang || 'en';
-  const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
-  res.redirect(302, `/${fileName}`);
+  const fileName = lang === 'es' ? 'policies_es.html' : 'terms.html';
+  res.sendFile(path.join(__dirname, `../../../public/${fileName}`));
 });
 
 app.get('/privacy', pageLimiter, (req, res) => {
@@ -309,8 +309,8 @@ app.get('/privacy', pageLimiter, (req, res) => {
     return res.status(404).send('Not found');
   }
   const lang = req.query.lang || 'en';
-  const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
-  res.redirect(302, `/${fileName}`);
+  const fileName = lang === 'es' ? 'policies_es.html' : 'privacy.html';
+  res.sendFile(path.join(__dirname, `../../../public/${fileName}`));
 });
 
 app.get('/policies', pageLimiter, (req, res) => {
@@ -319,8 +319,17 @@ app.get('/policies', pageLimiter, (req, res) => {
     return res.status(404).send('Not found');
   }
   const lang = req.query.lang || 'en';
-  const fileName = lang === 'es' ? 'policies_es.html' : 'policies_en.html';
-  res.redirect(302, `/${fileName}`);
+  const fileName = lang === 'es' ? 'policies_es.html' : 'terms.html';
+  res.sendFile(path.join(__dirname, `../../../public/${fileName}`));
+});
+
+// Age Verification page
+app.get('/age-verification', pageLimiter, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
+  res.sendFile(path.join(__dirname, '../../../public/age-verification.html'));
 });
 
 

@@ -27,6 +27,13 @@ function Lobby({ telegramUser, role }) {
   const isTelegram = isTelegramWebApp() && telegramUser?.initData;
   const normalizedRole = role?.toUpperCase() || '';
   const canCreate = normalizedRole === 'PRIME' || normalizedRole === 'ADMIN';
+  const roomCount = loading ? '—' : rooms.length;
+  const participantCount = loading
+    ? '—'
+    : rooms.reduce((sum, room) => sum + (room.currentParticipants || 0), 0);
+  const capacityCount = loading
+    ? '—'
+    : rooms.reduce((sum, room) => sum + (room.maxParticipants || 0), 0);
 
   useEffect(() => {
     let active = true;
@@ -168,17 +175,40 @@ function Lobby({ telegramUser, role }) {
               <>Open from Telegram for instant join and creator credit.</>
             )}
           </div>
-            {!isTelegram && (
-              <div className="notice info">
-                This feature requires Telegram authentication. Open this link inside Telegram to join or
-                create public rooms.
-              </div>
-            )}
-            {!canCreate && (
-              <div className="notice warning">
-                Room creation is restricted to PRIME/ADMIN members in the full webapp.
-              </div>
-            )}
+          <div className="chipRow">
+            <span className={`chip ${isTelegram ? 'chipSuccess' : 'chipMuted'}`}>
+              {isTelegram ? 'Telegram linked' : 'Telegram required'}
+            </span>
+            <span className={`chip ${canCreate ? 'chipSuccess' : 'chipWarn'}`}>
+              {canCreate ? 'Creator access' : 'Viewer access'}
+            </span>
+            <span className="chip chipMuted">Instant join links</span>
+          </div>
+          <div className="statRow">
+            <div className="statCard">
+              <div className="statValue">{roomCount}</div>
+              <div className="statLabel">Public rooms</div>
+            </div>
+            <div className="statCard">
+              <div className="statValue">{participantCount}</div>
+              <div className="statLabel">Guests online</div>
+            </div>
+            <div className="statCard">
+              <div className="statValue">{capacityCount}</div>
+              <div className="statLabel">Total capacity</div>
+            </div>
+          </div>
+          {!isTelegram && (
+            <div className="notice info">
+              This feature requires Telegram authentication. Open this link inside Telegram to join or
+              create public rooms.
+            </div>
+          )}
+          {!canCreate && (
+            <div className="notice warning">
+              Room creation is restricted to PRIME/ADMIN members in the full webapp.
+            </div>
+          )}
         </section>
 
         <section className="card glass">

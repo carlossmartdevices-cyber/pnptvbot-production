@@ -232,6 +232,26 @@ class UserModel {
   }
 
   /**
+   * Get user by email
+   * @param {string} email - Email address
+   * @returns {Promise<Object|null>} User object or null
+   */
+  static async getByEmail(email) {
+    try {
+      if (!email) return null;
+      const result = await query(
+        `SELECT * FROM ${TABLE} WHERE LOWER(email) = LOWER($1) AND NOT id LIKE 'legacy_%' LIMIT 1`,
+        [email.trim()]
+      );
+      if (result.rows.length === 0) return null;
+      return this.mapRowToUser(result.rows[0]);
+    } catch (error) {
+      logger.error('Error getting user by email:', error);
+      return null;
+    }
+  }
+
+  /**
    * Update user profile
    */
   static async updateProfile(userId, updates) {

@@ -123,6 +123,64 @@ body {
   line-height: 1.6;
 }
 
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chip {
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+}
+
+.chipSuccess {
+  border-color: rgba(61, 220, 151, 0.6);
+  color: var(--success);
+  background: rgba(61, 220, 151, 0.15);
+}
+
+.chipWarn {
+  border-color: rgba(255, 179, 71, 0.6);
+  color: var(--warning);
+  background: rgba(255, 179, 71, 0.16);
+}
+
+.chipMuted {
+  color: var(--muted);
+}
+
+.statRow {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin-top: 16px;
+}
+
+.statCard {
+  border-radius: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+}
+
+.statValue {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.statLabel {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
 .heroActions {
   display: flex;
   flex-wrap: wrap;
@@ -383,6 +441,33 @@ select {
   border: 1px solid var(--stroke);
   box-shadow: var(--shadow);
   z-index: 10;
+}
+
+.main > * {
+  animation: fadeUp 0.6s ease both;
+}
+
+.main > *:nth-child(2) {
+  animation-delay: 0.06s;
+}
+
+.main > *:nth-child(3) {
+  animation-delay: 0.12s;
+}
+
+.main > *:nth-child(4) {
+  animation-delay: 0.18s;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .centerCard {

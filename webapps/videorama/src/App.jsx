@@ -182,10 +182,11 @@ function App() {
 
   const roleParam = (params?.role || '').toUpperCase()
   const canManageCollections = roleParam === 'PRIME' || roleParam === 'ADMIN'
+  const isPlayerView = currentView === 'player' && selectedMedia
 
-  if (currentView === 'player' && selectedMedia) {
+  if (isPlayerView) {
     return (
-      <div className="app">
+      <div className="app player">
         <VideoPlayer
           media={selectedMedia}
           onClose={handleClosePlayer}
@@ -204,11 +205,42 @@ function App() {
   }
 
   return (
-    <div className="app">
+    <div className="app home">
       <Header
         title="PNPtv Videorama"
         subtitle="Your Media Center"
       />
+
+      <section className="hero-banner">
+        <div className="hero-copy">
+          <p className="hero-eyebrow">Curated media feed</p>
+          <h2>Video drops, podcasts, and radio — all in one place.</h2>
+          <p>
+            Browse categories or jump into a collection. New uploads and PRIME content are synced
+            to your membership automatically.
+          </p>
+          <div className="hero-badges">
+            <span className="hero-badge">Fresh drops</span>
+            <span className="hero-badge">Community picks</span>
+            <span className="hero-badge">Live radio</span>
+          </div>
+        </div>
+        <div className="hero-panel">
+          <p className="hero-panel-title">Radio status</p>
+          <div className="hero-panel-row">
+            <span>{radioNowPlaying ? 'Live now' : 'Offline'}</span>
+            <span className={`status-dot ${radioNowPlaying ? 'live' : ''}`}></span>
+          </div>
+          <p className="hero-panel-track">
+            {radioNowPlaying?.title || 'Check back soon for the live mix.'}
+          </p>
+          {radioNowPlaying && (
+            <button type="button" className="hero-panel-btn" onClick={() => setIsRadioExpanded(true)}>
+              Open radio
+            </button>
+          )}
+        </div>
+      </section>
 
       <CategoryNav
         selected={selectedCategory}

@@ -32,6 +32,20 @@ class UserService {
   }
 
   /**
+   * Get user by email
+   * @param {string} email - Email address
+   * @returns {Promise<Object|null>} User object or null
+   */
+  static async getByEmail(email) {
+    try {
+      return await UserModel.getByEmail(email);
+    } catch (error) {
+      logger.error('Error getting user by email:', error);
+      return null;
+    }
+  }
+
+  /**
    * Update user profile
    * @param {string|number} userId - Telegram user ID
    * @param {Object.<string, *>} updates - Fields to update
