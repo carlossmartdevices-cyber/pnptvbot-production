@@ -876,7 +876,7 @@ async function activatePromo(ctx, promoId) {
   try {
     await ctx.answerCbQuery();
 
-    const promo = await PromoModel.update(promoId, { active: true });
+    const promo = await PromoModel.update(promoId, { active: true, currentSpotsUsed: 0 });
 
     if (promo) {
       await ctx.editMessageText(

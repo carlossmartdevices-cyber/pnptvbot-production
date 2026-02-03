@@ -433,6 +433,7 @@ class PromoModel {
         featuresEs: 'features_es',
         active: 'active',
         hidden: 'hidden',
+        currentSpotsUsed: 'current_spots_used',
       };
 
       for (const [key, column] of Object.entries(fieldMap)) {
