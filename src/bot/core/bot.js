@@ -608,10 +608,10 @@ const startBot = async () => {
 
     // Initialize X post scheduler
     try {
-      const xPostScheduler = new XPostScheduler();
+      const xPostScheduler = new XPostScheduler(bot);
       xPostScheduler.start();
       global.xPostScheduler = xPostScheduler;
-      logger.info('✓ X post scheduler initialized and started');
+      logger.info('✓ X post scheduler initialized and started (with admin notifications)');
     } catch (error) {
       logger.warn('X post scheduler initialization failed, continuing without X posts:', error.message);
     }

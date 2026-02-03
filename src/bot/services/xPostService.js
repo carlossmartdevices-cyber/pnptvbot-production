@@ -224,6 +224,96 @@ class XPostService {
     const result = await db.query(query);
     return result.rows;
   }
+
+  static async getScheduledPosts() {
+    const query = `
+      SELECT j.post_id, j.account_id, j.text, j.media_url, j.scheduled_at,
+             j.admin_id, j.admin_username, j.created_at,
+             a.handle, a.display_name
+      FROM x_post_jobs j
+      LEFT JOIN x_accounts a ON j.account_id = a.account_id
+      WHERE j.status = 'scheduled'
+      ORDER BY j.scheduled_at ASC
+    `;
+    const result = await db.query(query);
+    return result.rows;
+  }
+
+  static async getRecentPosts(limit = 5) {
+    const query = `
+      SELECT j.post_id, j.account_id, j.text, j.status, j.scheduled_at,
+             j.sent_at, j.error_message, j.created_at,
+             a.handle, a.display_name
+      FROM x_post_jobs j
+      LEFT JOIN x_accounts a ON j.account_id = a.account_id
+      ORDER BY COALESCE(j.sent_at, j.scheduled_at, j.created_at) DESC
+      LIMIT $1
+    `;
+    const result = await db.query(query, [limit]);
+    return result.rows;
+  }
+
+  static async getPostHistory(limit = 20) {
+    const query = `
+      SELECT j.post_id, j.account_id, j.text, j.status, j.scheduled_at,
+             j.sent_at, j.error_message, j.response_json, j.created_at,
+             a.handle, a.display_name
+      FROM x_post_jobs j
+      LEFT JOIN x_accounts a ON j.account_id = a.account_id
+      WHERE j.status IN ('sent', 'failed')
+      ORDER BY COALESCE(j.sent_at, j.created_at) DESC
+      LIMIT $1
+    `;
+    const result = await db.query(query, [limit]);
+    return result.rows;
+  }
+
+  static async cancelScheduledPost(postId) {
+    const query = `
+      DELETE FROM x_post_jobs
+      WHERE post_id = $1 AND status = 'scheduled'
+      RETURNING post_id
+    `;
+    const result = await db.query(query, [postId]);
+    if (result.rowCount === 0) {
+      throw new Error('Post not found or already processed');
+    }
+    return result.rows[0];
+  }
+
+  static async getPostById(postId) {
+    const query = `
+      SELECT j.*, a.handle, a.display_name
+      FROM x_post_jobs j
+      LEFT JOIN x_accounts a ON j.account_id = a.account_id
+      WHERE j.post_id = $1
+    `;
+    const result = await db.query(query, [postId]);
+    return result.rows[0] || null;
+  }
+
+  static async incrementRetryCount(postId) {
+    const query = `
+      UPDATE x_post_jobs
+      SET retry_count = COALESCE(retry_count, 0) + 1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE post_id = $1
+      RETURNING retry_count
+    `;
+    const result = await db.query(query, [postId]);
+    return result.rows[0]?.retry_count || 0;
+  }
+
+  static async reschedulePost(postId, delayMinutes) {
+    const query = `
+      UPDATE x_post_jobs
+      SET scheduled_at = NOW() + INTERVAL '${delayMinutes} minutes',
+          status = 'scheduled',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE post_id = $1
+    `;
+    await db.query(query, [postId]);
+  }
 }
 
 module.exports = XPostService;

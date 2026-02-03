@@ -304,6 +304,7 @@ CREATE TABLE IF NOT EXISTS x_post_jobs (
   status VARCHAR(20) DEFAULT 'scheduled',
   response_json JSONB,
   error_message TEXT,
+  retry_count INTEGER DEFAULT 0,
   sent_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

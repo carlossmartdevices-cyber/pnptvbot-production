@@ -20,6 +20,7 @@ const performanceUtils = require('../../utils/performanceUtils');
 const uxUtils = require('../../utils/uxUtils');
 const BroadcastButtonModel = require('../../../models/broadcastButtonModel');
 const { registerXAccountHandlers } = require('./xAccountWizard');
+const { registerXPostWizardHandlers, handleTextInput: handleXPostTextInput, getSession: getXPostSession, STEPS: XPOST_STEPS } = require('./xPostWizard');
 
 // Use shared utilities
 const { sanitizeInput } = broadcastUtils;
@@ -582,7 +583,8 @@ async function showAdminPanel(ctx, edit = false) {
       ]);
 
       buttons.push([
-        Markup.button.callback('🐦 X Accounts', 'admin_x_accounts_configure'),
+        Markup.button.callback('🐦 Publicar en X', 'xpost_menu'),
+        Markup.button.callback('⚙️ X Cuentas', 'admin_x_accounts_configure'),
       ]);
 
       // ═══ PROMOS Y MARKETING ═══
@@ -665,6 +667,9 @@ let registerAdminHandlers = (bot) => {
     backLabel: '⬅️ Volver al panel',
     notifyOnEmpty: true,
   });
+
+  // Register X Post Wizard handlers
+  registerXPostWizardHandlers(bot);
 
   bot.action('admin_home', async (ctx) => {
     try {
@@ -2610,6 +2615,13 @@ let registerAdminHandlers = (bot) => {
     if (!isAdmin) {
       logger.info('[TEXT-HANDLER] User is not admin, passing to next handler', { userId: ctx.from.id });
       return next();
+    }
+
+    // X Post Wizard text input (compose step or schedule custom)
+    const xPostSession = getXPostSession(ctx);
+    if (xPostSession.step === XPOST_STEPS.COMPOSE_TEXT || xPostSession.step === 'schedule_custom') {
+      logger.info('[TEXT-HANDLER] Processing X post wizard text input', { userId: ctx.from.id, step: xPostSession.step });
+      return handleXPostTextInput(ctx, next);
     }
 
     // User search
