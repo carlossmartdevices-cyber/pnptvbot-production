@@ -43,6 +43,11 @@ class XPostScheduler {
             postId: post.post_id,
             error: error.message,
           });
+
+          await XPostService.updatePostJob(post.post_id, {
+            status: 'failed',
+            errorMessage: error.message || 'Unknown error',
+          });
         }
       }
     } catch (error) {
