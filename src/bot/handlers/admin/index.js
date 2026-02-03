@@ -5,6 +5,7 @@ const { PERMISSIONS } = require('../../../models/permissionModel');
 const UserModel = require('../../../models/userModel');
 const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
+const ModerationModel = require('../../../models/moderationModel');
 const PaymentService = require('../../services/paymentService');
 const adminService = require('../../services/adminService');
 const { getBroadcastQueueIntegration } = require('../../services/broadcastQueueIntegration');
@@ -2632,19 +2633,33 @@ let registerAdminHandlers = (bot) => {
         ctx.session.temp.selectedUserId = user.id;
         await ctx.saveSession();
 
+        // Check if user is banned globally
+        const isBanned = await ModerationModel.isUserBanned(user.id, 'global');
+
+        const buttons = [
+          [Markup.button.callback('📅 Extender Suscripción', 'admin_extend_sub')],
+          [Markup.button.callback('💎 Cambiar Plan', 'admin_change_plan')],
+          [Markup.button.callback('🚫 Desactivar Usuario', 'admin_deactivate')],
+          [isBanned
+            ? Markup.button.callback('✅ Desbanear Usuario', 'admin_unban_user')
+            : Markup.button.callback('⛔ Banear Usuario', 'admin_ban_user')],
+          [Markup.button.callback('🔞 Forzar Verificación Edad', 'admin_force_age_verify')],
+          [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+        ];
+
         await ctx.reply(
           `${t('userFound', lang)}\n\n`
           + `👤 ${user.firstName || ''} ${user.lastName || ''}\n`
           + `🆔 ${user.id}\n`
           + `📧 ${user.email || 'N/A'}\n`
           + `💎 Status: ${user.subscriptionStatus}\n`
-          + `📦 Plan: ${user.planId || 'N/A'}`,
-          Markup.inlineKeyboard([
-            [Markup.button.callback('📅 Extender Suscripción', 'admin_extend_sub')],
-            [Markup.button.callback('💎 Cambiar Plan', 'admin_change_plan')],
-            [Markup.button.callback('🚫 Desactivar Usuario', 'admin_deactivate')],
-            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
-          ]),
+          + `📦 Plan: ${user.planId || 'N/A'}\n`
+          + `🔞 Edad: ${user.ageVerified ? '✅ Verificado' : '❌ No verificado'}`
+          + (isBanned ? '\n\n⛔ **USUARIO BANEADO**' : ''),
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard(buttons),
+          },
         );
       } catch (error) {
         logger.error('Error searching user:', error);
@@ -4071,6 +4086,233 @@ let registerAdminHandlers = (bot) => {
       logger.info('User deactivated by admin', { adminId: ctx.from.id, userId });
     } catch (error) {
       logger.error('Error deactivating user:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Ban user - Show confirmation
+  bot.action('admin_ban_user', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.session.temp.selectedUserId;
+      const user = await UserModel.getById(userId);
+
+      if (!user) {
+        await ctx.answerCbQuery('Usuario no encontrado');
+        return;
+      }
+
+      const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
+
+      await ctx.editMessageText(
+        `⛔ **Confirmar Baneo**\n\n`
+        + `👤 ${safeName}\n`
+        + `🆔 ${userId}\n\n`
+        + `⚠️ Esta acción impedirá que el usuario use el bot.\n\n`
+        + `¿Estás seguro de que deseas banear a este usuario?`,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('✅ Sí, Banear', 'admin_ban_user_confirm')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error showing ban confirmation:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Ban user - Confirm
+  bot.action('admin_ban_user_confirm', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.session.temp.selectedUserId;
+      const user = await UserModel.getById(userId);
+
+      if (!user) {
+        await ctx.answerCbQuery('Usuario no encontrado');
+        return;
+      }
+
+      // Ban user globally
+      await ModerationModel.banUser(userId, 'global', 'Banned by admin', ctx.from.id);
+
+      // Log the action
+      await ModerationModel.addLog({
+        groupId: 'global',
+        action: 'ban',
+        userId: userId,
+        moderatorId: ctx.from.id.toString(),
+        targetUserId: userId,
+        reason: 'Banned by admin',
+        details: { bannedBy: ctx.from.id },
+      });
+
+      const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
+
+      await ctx.editMessageText(
+        `✅ **Usuario Baneado**\n\n`
+        + `👤 ${safeName}\n`
+        + `🆔 ${userId}\n\n`
+        + `⛔ El usuario ya no puede usar el bot.`,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Volver al Panel', 'admin_cancel')],
+          ]),
+        },
+      );
+
+      logger.info('User banned by admin', { adminId: ctx.from.id, userId });
+    } catch (error) {
+      logger.error('Error banning user:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Unban user
+  bot.action('admin_unban_user', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.session.temp.selectedUserId;
+      const user = await UserModel.getById(userId);
+
+      if (!user) {
+        await ctx.answerCbQuery('Usuario no encontrado');
+        return;
+      }
+
+      // Unban user globally
+      await ModerationModel.unbanUser(userId, 'global');
+
+      // Log the action
+      await ModerationModel.addLog({
+        groupId: 'global',
+        action: 'unban',
+        userId: userId,
+        moderatorId: ctx.from.id.toString(),
+        targetUserId: userId,
+        reason: 'Unbanned by admin',
+        details: { unbannedBy: ctx.from.id },
+      });
+
+      const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
+
+      await ctx.editMessageText(
+        `✅ **Usuario Desbaneado**\n\n`
+        + `👤 ${safeName}\n`
+        + `🆔 ${userId}\n\n`
+        + `El usuario puede volver a usar el bot.`,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Volver al Panel', 'admin_cancel')],
+          ]),
+        },
+      );
+
+      logger.info('User unbanned by admin', { adminId: ctx.from.id, userId });
+    } catch (error) {
+      logger.error('Error unbanning user:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Force age verification - Reset age verification to require re-verification
+  bot.action('admin_force_age_verify', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.session.temp.selectedUserId;
+      const user = await UserModel.getById(userId);
+
+      if (!user) {
+        await ctx.answerCbQuery('Usuario no encontrado');
+        return;
+      }
+
+      const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
+
+      await ctx.editMessageText(
+        `🔞 **Forzar Verificación de Edad**\n\n`
+        + `👤 ${safeName}\n`
+        + `🆔 ${userId}\n\n`
+        + `⚠️ Esta acción resetea la verificación de edad del usuario.\n`
+        + `El usuario deberá volver a verificar su edad con IA la próxima vez que intente acceder a contenido restringido.\n\n`
+        + `Estado actual: ${user.ageVerified ? '✅ Verificado' : '❌ No verificado'}\n\n`
+        + `¿Confirmar el reset de verificación?`,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('✅ Sí, Resetear', 'admin_force_age_verify_confirm')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error showing force age verify confirmation:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Force age verification - Confirm
+  bot.action('admin_force_age_verify_confirm', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const userId = ctx.session.temp.selectedUserId;
+      const user = await UserModel.getById(userId);
+
+      if (!user) {
+        await ctx.answerCbQuery('Usuario no encontrado');
+        return;
+      }
+
+      // Reset age verification - set to false with expired timestamp
+      await UserModel.updateAgeVerification(userId, {
+        verified: false,
+        method: 'admin_reset',
+        expiresHours: 0,
+      });
+
+      const safeName = sanitize.telegramMarkdown(user.firstName) + ' ' + sanitize.telegramMarkdown(user.lastName || '');
+
+      await ctx.editMessageText(
+        `✅ **Verificación de Edad Reseteada**\n\n`
+        + `👤 ${safeName}\n`
+        + `🆔 ${userId}\n\n`
+        + `🔞 El usuario deberá volver a verificar su edad con IA para acceder a contenido restringido.`,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Volver al Panel', 'admin_cancel')],
+          ]),
+        },
+      );
+
+      logger.info('Age verification reset by admin', { adminId: ctx.from.id, userId });
+    } catch (error) {
+      logger.error('Error resetting age verification:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });

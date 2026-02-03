@@ -17,6 +17,7 @@ const { initializePostgres, testConnection } = require('../../config/postgres');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
+const globalBanCheck = require('./middleware/globalBanCheck');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
 const moderationFilter = require('./middleware/moderationFilter');
@@ -327,6 +328,7 @@ const startBot = async () => {
 
     // Register middleware
     bot.use(sessionMiddleware());
+    bot.use(globalBanCheck()); // Block globally banned users
     bot.use(rateLimitMiddleware());
 
     // CRITICAL: Group security enforcement - MUST be early in the chain
