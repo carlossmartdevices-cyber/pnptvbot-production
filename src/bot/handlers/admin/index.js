@@ -2702,6 +2702,12 @@ let registerAdminHandlers = (bot) => {
     // Check if we have a max completed step to prevent regression
     const maxCompletedStep = ctx.session.temp?.maxCompletedStep;
     const currentStep = ctx.session.temp?.broadcastStep;
+    const stepAliasMap = {
+      custom_link: 'buttons',
+      custom_buttons: 'buttons',
+      schedule_options: 'buttons',
+    };
+    const normalizedStep = stepAliasMap[currentStep] || currentStep;
     
     logger.info('[TEXT-HANDLER] Checking step regression guard', {
       userId: ctx.from.id,
@@ -2711,17 +2717,17 @@ let registerAdminHandlers = (bot) => {
     
     if (maxCompletedStep && currentStep) {
       const stepOrder = ['media', 'text_en', 'ai_prompt_en', 'text_es', 'ai_prompt_es', 'buttons', 'preview', 'sending'];
-      const currentStepIndex = stepOrder.indexOf(currentStep);
+      const currentStepIndex = stepOrder.indexOf(normalizedStep);
       const maxStepIndex = stepOrder.indexOf(maxCompletedStep);
       
       // If current step is before max completed step, prevent regression
       // EXCEPT: Allow normal step progression (text_en -> ai_prompt_en -> text_es -> ai_prompt_es -> buttons)
       const isNormalProgression = 
-        (currentStep === 'text_en' && maxCompletedStep === 'ai_prompt_en') ||
-        (currentStep === 'ai_prompt_en' && maxCompletedStep === 'text_es') ||
-        (currentStep === 'text_es' && maxCompletedStep === 'ai_prompt_es') ||
-        (currentStep === 'ai_prompt_es' && maxCompletedStep === 'buttons') ||
-        (currentStep === 'text_es' && maxCompletedStep === 'buttons');
+        (normalizedStep === 'text_en' && maxCompletedStep === 'ai_prompt_en') ||
+        (normalizedStep === 'ai_prompt_en' && maxCompletedStep === 'text_es') ||
+        (normalizedStep === 'text_es' && maxCompletedStep === 'ai_prompt_es') ||
+        (normalizedStep === 'ai_prompt_es' && maxCompletedStep === 'buttons') ||
+        (normalizedStep === 'text_es' && maxCompletedStep === 'buttons');
       
       if (currentStepIndex < maxStepIndex && !isNormalProgression) {
         logger.warn('Step regression detected in text processing - preventing', {
