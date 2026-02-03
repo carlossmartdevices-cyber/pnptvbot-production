@@ -171,11 +171,8 @@ const registerXAccountHandlers = (bot, options = {}) => {
   const disableAction = `${actionPrefix}_x_disable`;
   const selectPattern = new RegExp(`^${actionPrefix}_x_account_(.+)$`);
 
-  console.log(`[X-ACCOUNTS] Registering handlers with prefix: ${actionPrefix}, configureAction: ${configureAction}`);
-  logger.info(`[X-ACCOUNTS] Registering handlers with prefix: ${actionPrefix}, configureAction: ${configureAction}`);
 
   bot.action(configureAction, async (ctx) => {
-    logger.info(`[X-ACCOUNTS] Configure action triggered: ${configureAction}`);
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) {

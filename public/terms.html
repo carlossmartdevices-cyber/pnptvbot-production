@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service - PNPtv</title>
+  <meta name="description" content="Terms of Service for PNPtv Digital Community - Adult content platform terms, membership, and community rules.">
+  <link rel="stylesheet" href="/unified-design.css">
+  <style>
+    body {
+      background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+      min-height: 100vh;
+    }
+
+    .header {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 30px 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+
+    .header-content {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .brand h1 {
+      font-size: 1.8rem;
+      margin: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .badge {
+      background: rgba(102, 126, 234, 0.2);
+      border: 1px solid rgba(102, 126, 234, 0.4);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      color: var(--primary-light);
+      font-weight: 600;
+    }
+
+    .header-links {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .header-links a {
+      color: var(--text-muted);
+      font-size: 14px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .header-links a:hover, .header-links a.active {
+      background: rgba(102, 126, 234, 0.2);
+      color: var(--primary-light);
+      text-decoration: none;
+    }
+
+    .lang-switch {
+      display: flex;
+      gap: 5px;
+    }
+
+    .lang-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.3s ease;
+    }
+
+    .lang-btn:hover, .lang-btn.active {
+      background: rgba(102, 126, 234, 0.2);
+      color: var(--primary-light);
+    }
+
+    .main-content {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    .page-title {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .page-title h2 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+
+    .page-title .updated {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .toc {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 25px;
+      margin-bottom: 40px;
+    }
+
+    .toc h3 {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 15px;
+    }
+
+    .toc ol {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 10px;
+      padding-left: 20px;
+      margin: 0;
+    }
+
+    .toc ol li a {
+      color: var(--primary-light);
+      font-size: 14px;
+    }
+
+    .section {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 30px;
+      margin-bottom: 25px;
+      transition: all 0.3s ease;
+    }
+
+    .section:hover {
+      border-color: rgba(102, 126, 234, 0.3);
+    }
+
+    .section h3 {
+      font-size: 1.4rem;
+      margin-bottom: 20px;
+      color: var(--primary-light);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section h3 .number {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .section h4 {
+      font-size: 1.1rem;
+      margin: 20px 0 12px;
+      color: var(--text-light);
+    }
+
+    .section p {
+      color: var(--text-muted);
+      line-height: 1.8;
+      margin-bottom: 15px;
+    }
+
+    .section ul, .section ol {
+      color: var(--text-muted);
+      padding-left: 25px;
+      margin-bottom: 15px;
+    }
+
+    .section li {
+      margin-bottom: 8px;
+      line-height: 1.7;
+    }
+
+    .highlight-box {
+      background: rgba(102, 126, 234, 0.1);
+      border-left: 4px solid var(--primary-light);
+      padding: 15px 20px;
+      border-radius: 0 10px 10px 0;
+      margin: 20px 0;
+    }
+
+    .highlight-box p {
+      margin: 0;
+      color: var(--text-light);
+    }
+
+    .warning-box {
+      background: rgba(255, 68, 68, 0.1);
+      border-left: 4px solid #ff6b6b;
+      padding: 15px 20px;
+      border-radius: 0 10px 10px 0;
+      margin: 20px 0;
+    }
+
+    .warning-box p {
+      margin: 0;
+      color: #ffaaaa;
+    }
+
+    .prohibited-list {
+      background: rgba(255, 68, 68, 0.05);
+      border: 1px solid rgba(255, 68, 68, 0.2);
+      border-radius: 10px;
+      padding: 20px;
+      margin: 15px 0;
+    }
+
+    .prohibited-list li {
+      color: #ff8888;
+    }
+
+    .footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 30px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .footer a {
+      color: var(--primary-light);
+    }
+
+    .back-to-top {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      transition: all 0.3s ease;
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .back-to-top.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .back-to-top:hover {
+      transform: translateY(-3px);
+    }
+
+    @media (max-width: 768px) {
+      .header-content {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .page-title h2 {
+        font-size: 1.8rem;
+      }
+
+      .section {
+        padding: 20px;
+      }
+
+      .toc ol {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <div class="brand">
+        <h1>PNPtv!</h1>
+        <span class="badge">Legal</span>
+      </div>
+      <div class="header-links">
+        <a href="/terms" class="active">Terms</a>
+        <a href="/privacy">Privacy</a>
+        <div class="lang-switch">
+          <button class="lang-btn active" onclick="window.location.href='/terms'">EN</button>
+          <button class="lang-btn" onclick="window.location.href='/policies_es.html'">ES</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <div class="page-title">
+      <h2>Terms of Service</h2>
+      <p class="updated">Last updated: January 2025 | Contact: <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>
+    </div>
+
+    <nav class="toc">
+      <h3>Table of Contents</h3>
+      <ol>
+        <li><a href="#intro">Introduction</a></li>
+        <li><a href="#eligibility">Eligibility & Age Requirements</a></li>
+        <li><a href="#services">Service Description</a></li>
+        <li><a href="#membership">Membership & Access</a></li>
+        <li><a href="#conduct">Community Conduct</a></li>
+        <li><a href="#payments">Payments & Refunds</a></li>
+        <li><a href="#intellectual">Intellectual Property</a></li>
+        <li><a href="#termination">Termination</a></li>
+        <li><a href="#disclaimer">Disclaimers & Liability</a></li>
+        <li><a href="#jurisdiction">Jurisdiction & Disputes</a></li>
+      </ol>
+    </nav>
+
+    <section class="section" id="intro">
+      <h3><span class="number">1</span> Introduction</h3>
+      <p>Welcome to PNPtv! Digital Community. By accessing or using our platform, you agree to be bound by these Terms of Service. PNPtv! is an international adult-only membership platform operated from Colombia with global reach, providing subscription-based content, community features, and interactive experiences via Telegram and web interfaces.</p>
+      <div class="highlight-box">
+        <p><strong>Important:</strong> These terms are designed to comply with U.S., EU, and Colombian regulations for digital services, data protection, and adult content.</p>
+      </div>
+    </section>
+
+    <section class="section" id="eligibility">
+      <h3><span class="number">2</span> Eligibility & Age Requirements</h3>
+      <div class="warning-box">
+        <p><strong>18+ Only:</strong> Access is strictly limited to individuals aged 18 years or older.</p>
+      </div>
+      <ul>
+        <li>You must be at least 18 years old to access any part of PNPtv!</li>
+        <li>You must ensure that viewing adult content is legal in your jurisdiction</li>
+        <li>We may request age or identity verification at any time</li>
+        <li>All performers in our content are verified to be 18+ at the time of recording</li>
+        <li>Misrepresenting your age is a violation of these terms and may result in immediate termination</li>
+      </ul>
+    </section>
+
+    <section class="section" id="services">
+      <h3><span class="number">3</span> Service Description</h3>
+      <p>PNPtv! provides the following services:</p>
+      <ul>
+        <li><strong>Private Adult Channel:</strong> Exclusive subscription-based adult content</li>
+        <li><strong>Community Platform:</strong> Interactive Telegram community with moderated discussions</li>
+        <li><strong>Geolocation Feature:</strong> Optional feature to discover nearby members (without sharing exact location)</li>
+        <li><strong>Live Events:</strong> Live streams, challenges, mini-games, and digital entertainment</li>
+        <li><strong>Video Calls:</strong> Private and group video call features (Hangouts)</li>
+      </ul>
+      <p>Our purpose is to provide a safe, private, consent-driven experience for adults built on respect and personal freedom.</p>
+    </section>
+
+    <section class="section" id="membership">
+      <h3><span class="number">4</span> Membership & Access</h3>
+
+      <h4>4.1 License Grant</h4>
+      <p>Your subscription grants you a <strong>personal, limited, non-transferable, revocable license</strong> to access PNPtv! content. No ownership of content or the platform is transferred to you.</p>
+
+      <h4>4.2 Account Responsibility</h4>
+      <ul>
+        <li>You are responsible for maintaining the security of your account</li>
+        <li>Sharing, reposting, recording, distributing, or selling content is strictly prohibited</li>
+        <li>One account per person - sharing accounts is not permitted</li>
+        <li>You are responsible for all activity under your account</li>
+      </ul>
+
+      <h4>4.3 Subscription Management</h4>
+      <ul>
+        <li>Subscriptions are billed according to the plan you select</li>
+        <li>You can cancel your subscription at any time through the bot or by contacting support</li>
+        <li>Cancellation takes effect at the end of your current billing period</li>
+      </ul>
+    </section>
+
+    <section class="section" id="conduct">
+      <h3><span class="number">5</span> Community Conduct</h3>
+
+      <h4>5.1 Respect & Consent</h4>
+      <ul>
+        <li>All interactions must be consensual and respectful</li>
+        <li>No abusive, intimidating, or discriminatory behavior</li>
+        <li>No sharing of another member's private information without consent</li>
+        <li>Harassment of any kind will not be tolerated</li>
+      </ul>
+
+      <h4>5.2 Prohibited Content</h4>
+      <div class="prohibited-list">
+        <p><strong>The following content is strictly prohibited and will result in immediate removal:</strong></p>
+        <ul>
+          <li>Content involving minors (pedophilia) - Zero tolerance</li>
+          <li>Content involving animals (zoophilia)</li>
+          <li>Sexual violence or non-consensual acts</li>
+          <li>Incest, human trafficking, or exploitation</li>
+          <li>Hate speech, racism, or extreme violence</li>
+          <li>Any illegal content under applicable law</li>
+        </ul>
+      </div>
+      <p>Violations will be reported to appropriate authorities when required by law.</p>
+
+      <h4>5.3 Geolocation Feature Rules</h4>
+      <ul>
+        <li>Use of geolocation is entirely optional</li>
+        <li>No harassment or excessive messaging to nearby members</li>
+        <li>Respect others' privacy and boundaries</li>
+      </ul>
+    </section>
+
+    <section class="section" id="payments">
+      <h3><span class="number">6</span> Payments & Refunds</h3>
+
+      <h4>6.1 Payment Processing</h4>
+      <p>Payments are processed through secure third-party providers (ePayco, Daimo). We do not store your complete payment information on our servers.</p>
+
+      <h4>6.2 Refund Policy</h4>
+      <div class="warning-box">
+        <p><strong>Digital access is immediate. All sales are final and non-refundable</strong>, except where required by law or in case of verified technical errors attributable to the platform.</p>
+      </div>
+
+      <p><strong>Refunds are NOT available for:</strong></p>
+      <ul>
+        <li>Change of mind</li>
+        <li>Voluntary non-use of services</li>
+        <li>Removal due to community guideline violations</li>
+        <li>User device or connection issues</li>
+      </ul>
+
+      <p><strong>Exceptions:</strong> In case of duplicate payment or technical error, contact <a href="mailto:support@pnptv.app">support@pnptv.app</a> within 7 days with proof of the issue.</p>
+    </section>
+
+    <section class="section" id="intellectual">
+      <h3><span class="number">7</span> Intellectual Property</h3>
+      <ul>
+        <li>All content on PNPtv! is protected by copyright and other intellectual property rights</li>
+        <li>You may not copy, distribute, modify, or create derivative works from our content</li>
+        <li>Recording, screenshotting, or redistributing content is strictly prohibited</li>
+        <li>The PNPtv! name, logo, and branding are our trademarks</li>
+      </ul>
+    </section>
+
+    <section class="section" id="termination">
+      <h3><span class="number">8</span> Termination</h3>
+      <ul>
+        <li>We may suspend or terminate your account for violations of these terms</li>
+        <li>Termination for breach does not entitle you to any refund</li>
+        <li>You may delete your account at any time by contacting support</li>
+        <li>Upon termination, your right to access content ends immediately</li>
+      </ul>
+    </section>
+
+    <section class="section" id="disclaimer">
+      <h3><span class="number">9</span> Disclaimers & Liability</h3>
+      <ul>
+        <li>Content is for entertainment purposes only and is not professional advice</li>
+        <li>We are not responsible for personal decisions or member interactions on or off the platform</li>
+        <li>We are not liable for third-party service outages or force majeure events</li>
+        <li>Any substances or items depicted in content are fictional props for entertainment</li>
+        <li>Users facing mental health challenges should seek professional help</li>
+      </ul>
+      <div class="highlight-box">
+        <p>PNPtv! services are provided "as is" without warranties of any kind, express or implied.</p>
+      </div>
+    </section>
+
+    <section class="section" id="jurisdiction">
+      <h3><span class="number">10</span> Jurisdiction & Disputes</h3>
+      <ul>
+        <li>This agreement is governed by the laws of the Republic of Colombia</li>
+        <li>Disputes should first be addressed amicably via <a href="mailto:support@pnptv.app">support@pnptv.app</a></li>
+        <li>Failing resolution, competent courts in Bogotá, Colombia have jurisdiction</li>
+        <li><strong>Class Action Waiver:</strong> Claims must be brought individually; you waive the right to participate in class actions against PNPtv!</li>
+      </ul>
+    </section>
+
+    <div class="highlight-box" style="text-align: center; margin-top: 40px;">
+      <p>By using PNPtv!, you acknowledge that you have read, understood, and agree to these Terms of Service.</p>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>&copy; 2025 PNPtv! Digital Community | <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>
+    <p><a href="/terms">Terms</a> | <a href="/privacy">Privacy</a> | <a href="/">Home</a></p>
+  </footer>
+
+  <div class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">↑</div>
+
+  <script>
+    // Show/hide back to top button
+    window.addEventListener('scroll', () => {
+      const btn = document.querySelector('.back-to-top');
+      if (window.scrollY > 300) {
+        btn.classList.add('visible');
+      } else {
+        btn.classList.remove('visible');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -35,6 +35,22 @@ app.use('/auth', express.static(__dirname + '/../../public/auth'));
 // Serve monitoring dashboard
 app.use('/monitoring', express.static(__dirname + '/../../public/monitoring'));
 
+// Serve public static files (HTML pages, CSS, etc.)
+app.use(express.static(__dirname + '/../../public'));
+
+// Clean URL routes for legal pages (without .html extension)
+app.get('/terms', (req, res) => {
+  res.sendFile('terms.html', { root: __dirname + '/../../public' });
+});
+
+app.get('/privacy', (req, res) => {
+  res.sendFile('privacy.html', { root: __dirname + '/../../public' });
+});
+
+app.get('/age-verification', (req, res) => {
+  res.sendFile('age-verification.html', { root: __dirname + '/../../public' });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -111,6 +127,34 @@ app.use((error, req, res, _next) => {
 app.post('/api/telegram-auth', handleTelegramAuth);
 app.post('/api/accept-terms', handleAcceptTerms);
 app.get('/api/auth-status', checkAuthStatus);
+
+// Manual age verification endpoint (for web page)
+app.post('/api/verify-age-manual', async (req, res) => {
+  try {
+    const { user_id, method, lang } = req.body;
+
+    logger.info(`Manual age verification: user ${user_id}, method: ${method}, lang: ${lang}`);
+
+    // If we have a user_id, update their verification status in the database
+    if (user_id) {
+      const User = require('../models/userModel');
+      const user = await User.findOne({ where: { telegram_id: user_id } });
+
+      if (user) {
+        user.age_verified = true;
+        user.age_verification_method = method || 'manual_web';
+        user.age_verification_date = new Date();
+        await user.save();
+        logger.info(`Age verification updated for user ${user_id}`);
+      }
+    }
+
+    res.json({ success: true, message: 'Age verification recorded' });
+  } catch (error) {
+    logger.error('Error processing manual age verification:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
 
 // Monitoring and Health Check endpoints
 app.get('/api/health', healthCheck);
