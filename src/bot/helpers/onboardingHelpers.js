@@ -301,8 +301,9 @@ async function handleEmailSubmission(ctx) {
   try {
     const lang = ctx.session.language || 'en';
     const email = ctx.message.text.trim().toLowerCase();
+    const userId = ctx.from.id.toString();
 
-    console.log(`[Onboarding] User ${ctx.from.id} submitted email: ${email}`);
+    console.log(`[Onboarding] User ${userId} submitted email: ${email}`);
 
     // Validate email
     if (!isValidEmail(email)) {
@@ -314,10 +315,34 @@ async function handleEmailSubmission(ctx) {
     ctx.session.email = email;
     ctx.session.awaitingEmail = false;
 
-    await UserModel.updateProfile(ctx.from.id.toString(), {
-      email,
-      emailVerified: false,
-    });
+    const existingUser = await UserModel.getByEmail(email);
+    const isDuplicate = existingUser && existingUser.id !== userId;
+    ctx.session.emailDuplicate = isDuplicate;
+
+    if (isDuplicate) {
+      logger.warn('Email already exists during onboarding', {
+        email,
+        currentUserId: userId,
+        existingUserId: existingUser.id,
+      });
+
+      // Mark existing record as onboarded to avoid loops on that account
+      await UserModel.updateProfile(existingUser.id, {
+        onboardingComplete: true,
+        lastActive: new Date(),
+      });
+
+      // Update current user without setting email to avoid unique constraint
+      await UserModel.updateProfile(userId, {
+        onboardingComplete: true,
+        lastActive: new Date(),
+      });
+    } else {
+      await UserModel.updateProfile(userId, {
+        email,
+        emailVerified: false,
+      });
+    }
 
     await ctx.reply(t('emailConfirmed', lang));
 
@@ -415,13 +440,14 @@ async function completeOnboarding(ctx) {
     console.log(`[Onboarding] Completing onboarding for user ${userId}`);
 
     const now = new Date();
+    const useEmail = ctx.session.emailDuplicate ? null : (ctx.session.email || null);
     const userData = {
       userId,
       username: ctx.from.username || null,
       firstName: ctx.from.first_name || null,
       lastName: ctx.from.last_name || null,
       language: ctx.session.language,
-      email: ctx.session.email || null,
+      email: useEmail,
       emailVerified: false,
 
       onboardingComplete: true,
@@ -431,7 +457,25 @@ async function completeOnboarding(ctx) {
       termsAccepted: ctx.session.termsAccepted || false,
       privacyAccepted: ctx.session.privacyAccepted || false,
     };
-    await UserModel.createOrUpdate(userData);
+    try {
+      await UserModel.createOrUpdate(userData);
+    } catch (error) {
+      const isDuplicateEmail =
+        error?.code === '23505' ||
+        (error?.message || '').toLowerCase().includes('duplicate key') ||
+        (error?.message || '').toLowerCase().includes('idx_users_email');
+      if (!isDuplicateEmail) {
+        throw error;
+      }
+
+      logger.warn('Duplicate email during onboarding, retrying without email', {
+        userId,
+        email: ctx.session.email,
+      });
+      ctx.session.emailDuplicate = true;
+      userData.email = null;
+      await UserModel.createOrUpdate(userData);
+    }
     console.log(`[Onboarding] User record created in PostgreSQL for user ${userId}`);
 
     // Auto-activate free membership if enabled
@@ -448,6 +492,7 @@ async function completeOnboarding(ctx) {
     ctx.session.onboardingStep = null;
     ctx.session.awaitingEmail = false;
     ctx.session.onboardingComplete = true;
+    ctx.session.emailDuplicate = false;
 
     // Send completion message
     await ctx.reply(t('profileCreated', lang));
