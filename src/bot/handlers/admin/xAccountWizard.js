@@ -151,10 +151,10 @@ const connectXAccount = async (ctx) => {
       '🔗 *Conectar cuenta de X*\n\n'
       + '1) Abre este enlace.\n'
       + '2) Autoriza la cuenta.\n'
-      + '3) Regresa al bot y selecciona la cuenta.\n\n'
-      + authUrl,
+      + '3) Regresa al bot y selecciona la cuenta.',
       { parse_mode: 'Markdown' }
     );
+    await ctx.reply(authUrl, { disable_web_page_preview: true });
   } catch (error) {
     logger.error('Error starting X OAuth flow:', error);
     await ctx.answerCbQuery('❌ Error').catch(() => {});

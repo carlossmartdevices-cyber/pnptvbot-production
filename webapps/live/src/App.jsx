@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { Radio, Sparkles, Users, Video } from 'lucide-react'
-import LiveStream from './components/LiveStream'
 import { getUrlParams } from './utils/url'
 
 const TELEGRAM_BOT = 'pnplatinotv_bot'
+const LiveStream = lazy(() => import('./components/LiveStream'))
 
 function App() {
   const params = useMemo(() => getUrlParams(), [])
@@ -71,7 +71,16 @@ function App() {
   if (params.stream && params.token && params.uid) {
     return (
       <div className="app live-view">
-        <LiveStream {...params} />
+        <Suspense
+          fallback={
+            <div className="loading">
+              <div className="spinner" />
+              <p>Loading stream...</p>
+            </div>
+          }
+        >
+          <LiveStream {...params} />
+        </Suspense>
       </div>
     )
   }

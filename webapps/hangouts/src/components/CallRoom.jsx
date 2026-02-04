@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import AgoraRTC from 'agora-rtc-sdk-ng';
 import {
   Camera,
   LogOut,
@@ -42,11 +41,13 @@ function CallRoom({ params, telegramUser }) {
   const [status, setStatus] = useState('');
   const [remoteUsers, setRemoteUsers] = useState([]);
   const [callStartedAt, setCallStartedAt] = useState(null);
+  const [agoraReady, setAgoraReady] = useState(false);
 
   const prejoinVideoRef = useRef(null);
   const localVideoRef = useRef(null);
   const clientRef = useRef(null);
   const localTracksRef = useRef({ audio: null, video: null });
+  const agoraRef = useRef(null);
 
   const isMainRoom = params.type === 'main';
   const mode = isMainRoom ? 'live' : 'rtc';
@@ -58,6 +59,33 @@ function CallRoom({ params, telegramUser }) {
   }, []);
 
   useEffect(() => {
+    let active = true;
+
+    const loadAgora = async () => {
+      setStatus('Loading video engine...');
+      try {
+        const module = await import('agora-rtc-sdk-ng');
+        if (!active) return;
+        agoraRef.current = module.default || module;
+        setAgoraReady(true);
+        setStatus('');
+      } catch (error) {
+        if (active) {
+          setStatus('Failed to load video engine.');
+        }
+      }
+    };
+
+    loadAgora();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!agoraReady || !agoraRef.current) return;
+    const AgoraRTC = agoraRef.current;
     const client = AgoraRTC.createClient({ mode, codec: 'vp8' });
     clientRef.current = client;
 
@@ -98,9 +126,11 @@ function CallRoom({ params, telegramUser }) {
     return () => {
       client.removeAllListeners();
     };
-  }, [mode]);
+  }, [mode, agoraReady]);
 
   const ensureLocalTracks = async () => {
+    const AgoraRTC = agoraRef.current;
+    if (!AgoraRTC) throw new Error('Video engine not ready.');
     const tracks = localTracksRef.current;
 
     if (micOn && !tracks.audio) {
@@ -129,6 +159,8 @@ function CallRoom({ params, telegramUser }) {
   };
 
   const updateLiveTracks = async () => {
+    const AgoraRTC = agoraRef.current;
+    if (!AgoraRTC) return;
     if (!callStartedAt) return;
     const client = clientRef.current;
     if (!client) return;
@@ -179,6 +211,9 @@ function CallRoom({ params, telegramUser }) {
     setJoining(true);
     setStatus('');
     try {
+      if (!agoraReady || !agoraRef.current) {
+        throw new Error('Video engine is still loading. Please try again.');
+      }
       const client = clientRef.current;
       if (!client) throw new Error('Video client not ready');
       if (!resolvedAppId) throw new Error('Missing Agora App ID');

@@ -31,6 +31,20 @@ class UserService {
   }
 
   /**
+   * Get user by email
+   * @param {string} email - Email address
+   * @returns {Promise<Object|null>} User data or null
+   */
+  static async getByEmail(email) {
+    try {
+      return await UserModel.getByEmail(email);
+    } catch (error) {
+      logger.error('Error getting user by email:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get or create user by ID and data
    * @param {number|string} userId - User ID
    * @param {Object} userData - User data (username, firstName, lastName, email)
