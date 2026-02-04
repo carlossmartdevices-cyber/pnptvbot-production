@@ -1,5 +1,7 @@
 const { Markup } = require('telegraf');
 const MediaPlayerModel = require('../../../models/mediaPlayerModel');
+const UserModel = require('../../../models/userModel');
+const RoleService = require('../../services/roleService');
 
 const { query } = require('../../../config/postgres');
 const logger = require('../../../utils/logger');
@@ -11,6 +13,44 @@ const { safeReplyOrEdit } = require('../../utils/helpers');
  */
 const registerVideoramaHandlers = (bot) => {
   const VIDEORAMA_WEB_APP_URL = process.env.VIDEORAMA_WEB_APP_URL || 'https://pnptv.app/videorama-app';
+
+  /**
+   * Build webapp URL with user role and subscription info
+   * @param {string} userId - User's Telegram ID
+   * @param {Object} options - Additional URL options (view, etc.)
+   * @returns {Promise<string>} Full webapp URL with params
+   */
+  async function buildVideoramaUrl(userId, options = {}) {
+    try {
+      const params = new URLSearchParams();
+
+      // Add any custom view option
+      if (options.view) {
+        params.set('view', options.view);
+      }
+
+      // Get user role
+      const role = await RoleService.getUserRole(userId.toString());
+      if (role && role !== 'USER') {
+        params.set('role', role);
+      }
+
+      // Check if user has PRIME subscription
+      const user = await UserModel.getById(userId.toString());
+      if (user && (user.subscription_type === 'prime' || user.is_prime === true)) {
+        params.set('prime', 'true');
+      }
+
+      // Add user ID for tracking
+      params.set('uid', userId.toString());
+
+      const queryString = params.toString();
+      return queryString ? `${VIDEORAMA_WEB_APP_URL}?${queryString}` : VIDEORAMA_WEB_APP_URL;
+    } catch (error) {
+      logger.error('Error building Videorama URL:', error);
+      return VIDEORAMA_WEB_APP_URL;
+    }
+  }
 
 
   // ==========================================
@@ -52,16 +92,17 @@ const registerVideoramaHandlers = (bot) => {
     try {
       await ctx.answerCbQuery();
       const lang = ctx.session?.language || 'en';
+      const userId = ctx.from?.id;
 
       // Get media stats
       const stats = await getMediaStats();
 
-
+      // Build URL with user role info
+      const webappUrl = await buildVideoramaUrl(userId);
 
       const message = lang === 'es'
         ? `🎶 *PNP Videorama*\n\nTu centro multimedia con videos, música y podcasts.\n\n📹 *Videos:* ${stats.videos}\n🎵 *Música:* ${stats.music}\n🎙️ *Podcasts:* ${stats.podcasts}\n`
         : `🎶 *PNP Videorama*\n\nYour media center with videos, music and podcasts.\n\n📹 *Videos:* ${stats.videos}\n🎵 *Music:* ${stats.music}\n🎙️ *Podcasts:* ${stats.podcasts}\n`;
-
 
       await safeReplyOrEdit(ctx, message, {
         parse_mode: 'Markdown',
@@ -72,11 +113,10 @@ const registerVideoramaHandlers = (bot) => {
           ],
           [
             Markup.button.callback(`🎙️ Podcasts`, 'videorama_podcasts'),
-
           ],
           [Markup.button.webApp(
             lang === 'es' ? '🎬 Abrir Videorama' : '🎬 Open Videorama',
-            VIDEORAMA_WEB_APP_URL
+            webappUrl
           )],
           [Markup.button.callback(lang === 'es' ? '⬅️ Menú Principal' : '⬅️ Main Menu', 'back_to_main')],
         ]),
@@ -125,6 +165,7 @@ const registerVideoramaHandlers = (bot) => {
     try {
       await ctx.answerCbQuery();
       const lang = ctx.session?.language || 'en';
+      const userId = ctx.from?.id;
 
       const media = await MediaPlayerModel.getMediaLibrary(type, 10);
 
@@ -155,12 +196,15 @@ const registerVideoramaHandlers = (bot) => {
         ? `${emoji} *${typeName}*\n\n${mediaList}\n\n_Abre Videorama para ver más_`
         : `${emoji} *${typeName}*\n\n${mediaList}\n\n_Open Videorama to see more_`;
 
+      // Build URL with view and user role info
+      const webappUrl = await buildVideoramaUrl(userId, { view: type });
+
       await safeReplyOrEdit(ctx, message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.webApp(
             lang === 'es' ? '🎬 Abrir Videorama' : '🎬 Open Videorama',
-            `${VIDEORAMA_WEB_APP_URL}?view=${type}`
+            webappUrl
           )],
           [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu_videorama')],
         ]),

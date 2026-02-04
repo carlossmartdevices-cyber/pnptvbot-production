@@ -69,5 +69,7 @@ export function getUrlParams() {
     uid: params.get('uid'),
     view: params.get('view') || 'home',
     mediaId: params.get('id'),
+    role: params.get('role') || '',
+    isPrime: params.get('prime') === 'true' || params.get('isPrime') === 'true',
   };
 }

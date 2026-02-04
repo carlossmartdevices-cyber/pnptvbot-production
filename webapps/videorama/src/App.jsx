@@ -181,7 +181,9 @@ function App() {
     : mediaLibrary.filter(m => m.category === selectedCategory || m.type === selectedCategory)
 
   const roleParam = (params?.role || '').toUpperCase()
-  const canManageCollections = roleParam === 'PRIME' || roleParam === 'ADMIN'
+  const isPrime = params?.isPrime === true
+  // Allow collection management for ADMIN, SUPERADMIN, PERFORMER, or PRIME subscribers
+  const canManageCollections = ['ADMIN', 'SUPERADMIN', 'PERFORMER'].includes(roleParam) || isPrime
   const isPlayerView = currentView === 'player' && selectedMedia
 
   if (isPlayerView) {

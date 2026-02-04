@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const { Markup } = require('telegraf');
 const logger = require('../../utils/logger');
 const VideoMediaService = require('./videoMediaService');
-const MediaPlayerModel = require('../models/mediaPlayerModel');
+const MediaPlayerModel = require('../../models/mediaPlayerModel');
 const InvidiousService = require('./invidiousService'); // Assuming this service can handle YouTube/Vimeo links
 const config = require('../../config/config');
 
@@ -33,12 +33,12 @@ class VideoramaAdminService {
     await ctx.reply(
       '🎬 Welcome to Videorama Media Upload! Please select the type of content you want to upload:',
       Markup.inlineKeyboard([
-        Markup.button.callback('📹 Video (File)', 'upload_videorama_type:video_file'),
-        Markup.button.callback('🎵 Music (File)', 'upload_videorama_type:music_file'),
-        Markup.button.callback('🔗 Video/Music (Link)', 'upload_videorama_type:link'),
-        Markup.button.callback('🎙️ Podcast (File)', 'upload_videorama_type:podcast_file'),
-        Markup.button.callback('❌ Cancel', 'upload_videorama_cancel'),
-      ]).extra()
+        [Markup.button.callback('📹 Video (File)', 'upload_videorama_type:video_file')],
+        [Markup.button.callback('🎵 Music (File)', 'upload_videorama_type:music_file')],
+        [Markup.button.callback('🔗 Video/Music (Link)', 'upload_videorama_type:link')],
+        [Markup.button.callback('🎙️ Podcast (File)', 'upload_videorama_type:podcast_file')],
+        [Markup.button.callback('❌ Cancel', 'upload_videorama_cancel')],
+      ])
     );
   }
 
@@ -77,7 +77,7 @@ class VideoramaAdminService {
     } catch (error) {
       logger.error('Error in Videorama upload session:', error);
       await ctx.reply('An error occurred during the upload process. Please try again or cancel.',
-        Markup.inlineKeyboard([Markup.button.callback('❌ Cancel', 'upload_videorama_cancel')]).extra()
+        Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel', 'upload_videorama_cancel')]])
       );
       this.uploadSessions.delete(userId);
       return true;
@@ -105,7 +105,7 @@ class VideoramaAdminService {
         case 'upload_videorama_type':
           return this.handleTypeSelection(ctx, session, value);
         case 'upload_videorama_category':
-          return this.handleCategoryConfirmation(ctx, session, value);
+          return this.handleCategorySelection(ctx, session, value);
         case 'upload_videorama_is_explicit':
           return this.handleIsExplicitConfirmation(ctx, session, value === 'yes');
         case 'upload_videorama_cancel':
@@ -118,7 +118,7 @@ class VideoramaAdminService {
     } catch (error) {
       logger.error('Error handling Videorama upload callback query:', error);
       await ctx.reply('An error occurred. Please try again or cancel.',
-        Markup.inlineKeyboard([Markup.button.callback('❌ Cancel', 'upload_videorama_cancel')]).extra()
+        Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel', 'upload_videorama_cancel')]])
       );
       this.uploadSessions.delete(userId);
       return true;
@@ -257,11 +257,21 @@ class VideoramaAdminService {
     // Suggest categories
     const categories = await MediaPlayerModel.getCategories();
     session.step = 'waiting_category_selection';
+
+    // Create rows of 2 buttons each for better layout
+    const rows = [];
+    for (let i = 0; i < categories.length; i += 2) {
+      const row = [Markup.button.callback(categories[i], `upload_videorama_category:${categories[i]}`)];
+      if (categories[i + 1]) {
+        row.push(Markup.button.callback(categories[i + 1], `upload_videorama_category:${categories[i + 1]}`));
+      }
+      rows.push(row);
+    }
+    rows.push([Markup.button.callback('❌ Cancel', 'upload_videorama_cancel')]);
+
     await ctx.reply(
       'Choose a category for this media:',
-      Markup.inlineKeyboard(
-        categories.map(cat => Markup.button.callback(cat, `upload_videorama_category:${cat}`))
-      ).extra()
+      Markup.inlineKeyboard(rows)
     );
     return true;
   }
@@ -272,9 +282,11 @@ class VideoramaAdminService {
     await ctx.reply(
       `Is this media explicit content?`,
       Markup.inlineKeyboard([
-        Markup.button.callback('✅ Yes', 'upload_videorama_is_explicit:yes'),
-        Markup.button.callback('❌ No', 'upload_videorama_is_explicit:no'),
-      ]).extra()
+        [
+          Markup.button.callback('✅ Yes', 'upload_videorama_is_explicit:yes'),
+          Markup.button.callback('❌ No', 'upload_videorama_is_explicit:no'),
+        ]
+      ])
     );
     return true;
   }

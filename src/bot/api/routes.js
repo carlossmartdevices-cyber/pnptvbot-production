@@ -10,6 +10,7 @@ const session = require('express-session');
 const RedisStore = require('connect-redis').default;
 const multer = require('multer');
 const { getRedis } = require('../../config/redis');
+const { getPool } = require('../../config/postgres');
 const logger = require('../../utils/logger');
 
 // Controllers
@@ -1048,6 +1049,202 @@ app.get('/api/media/playlists', asyncHandler(async (req, res) => {
 }));
 
 
+
+// ==========================================
+// RADIO API ROUTES
+// ==========================================
+
+// Get radio now playing
+app.get('/api/radio/now-playing', asyncHandler(async (req, res) => {
+  try {
+    const result = await getPool().query(
+      'SELECT * FROM radio_now_playing WHERE id = 1'
+    );
+
+    const nowPlaying = result.rows[0];
+
+    if (!nowPlaying) {
+      return res.json({
+        track: {
+          title: 'PNPtv Radio',
+          artist: 'Starting Soon',
+          thumbnailUrl: null,
+        },
+        listenerCount: 0,
+      });
+    }
+
+    res.json({
+      track: {
+        title: nowPlaying.title,
+        artist: nowPlaying.artist,
+        thumbnailUrl: nowPlaying.cover_url,
+        duration: nowPlaying.duration,
+        startedAt: nowPlaying.started_at,
+      },
+      listenerCount: Math.floor(Math.random() * 50) + 10, // Simulated listener count
+    });
+  } catch (error) {
+    logger.error('Error fetching radio now playing:', error);
+    res.json({
+      track: {
+        title: 'PNPtv Radio',
+        artist: 'Starting Soon',
+        thumbnailUrl: null,
+      },
+      listenerCount: 0,
+    });
+  }
+}));
+
+// Get radio history
+app.get('/api/radio/history', asyncHandler(async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const result = await getPool().query(
+      'SELECT * FROM radio_history ORDER BY played_at DESC LIMIT $1',
+      [limit]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    logger.error('Error fetching radio history:', error);
+    res.json({ success: true, data: [] });
+  }
+}));
+
+// Get radio schedule
+app.get('/api/radio/schedule', asyncHandler(async (req, res) => {
+  try {
+    const result = await getPool().query(
+      'SELECT * FROM radio_schedule ORDER BY day_of_week, time_slot'
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    logger.error('Error fetching radio schedule:', error);
+    res.json({ success: true, data: [] });
+  }
+}));
+
+// Submit song request
+app.post('/api/radio/request', asyncHandler(async (req, res) => {
+  try {
+    const { userId, songName, artist } = req.body;
+
+    if (!userId || !songName) {
+      return res.status(400).json({ error: 'User ID and song name are required' });
+    }
+
+    const result = await getPool().query(
+      `INSERT INTO radio_requests (user_id, song_name, artist, status)
+       VALUES ($1, $2, $3, 'pending')
+       RETURNING id`,
+      [userId, songName, artist || null]
+    );
+
+    res.json({ success: true, requestId: result.rows[0].id });
+  } catch (error) {
+    logger.error('Error submitting song request:', error);
+    res.status(500).json({ error: 'Failed to submit request' });
+  }
+}));
+
+// ==========================================
+// VIDEORAMA COLLECTIONS API
+// ==========================================
+
+// Get Videorama collections (curated playlists/featured content)
+app.get('/api/videorama/collections', asyncHandler(async (req, res) => {
+  try {
+    // Get featured playlists as collections
+    const playlistsResult = await getPool().query(`
+      SELECT
+        mp.id,
+        mp.name as title,
+        mp.description,
+        mp.cover_url as thumbnail,
+        mp.is_public,
+        COUNT(pi.id) as item_count,
+        'playlist' as type
+      FROM media_playlists mp
+      LEFT JOIN playlist_items pi ON mp.id = pi.playlist_id
+      WHERE mp.is_public = true
+      GROUP BY mp.id
+      ORDER BY mp.total_likes DESC, mp.created_at DESC
+      LIMIT 10
+    `);
+
+    // Get category-based collections
+    const categoriesResult = await getPool().query(`
+      SELECT
+        category as id,
+        category as title,
+        COUNT(*) as item_count,
+        'category' as type
+      FROM media_library
+      WHERE is_public = true AND category IS NOT NULL
+      GROUP BY category
+      ORDER BY COUNT(*) DESC
+    `);
+
+    const collections = [
+      ...playlistsResult.rows.map(p => ({
+        id: p.id,
+        title: p.title,
+        description: p.description,
+        thumbnail: p.thumbnail,
+        itemCount: parseInt(p.item_count) || 0,
+        type: 'playlist',
+      })),
+      ...categoriesResult.rows.map(c => ({
+        id: c.id,
+        title: c.title.charAt(0).toUpperCase() + c.title.slice(1),
+        description: `${c.item_count} items`,
+        thumbnail: null,
+        itemCount: parseInt(c.item_count) || 0,
+        type: 'category',
+      })),
+    ];
+
+    res.json({ success: true, collections });
+  } catch (error) {
+    logger.error('Error fetching videorama collections:', error);
+    res.json({ success: true, collections: [] });
+  }
+}));
+
+// Get collection items
+app.get('/api/videorama/collections/:collectionId', asyncHandler(async (req, res) => {
+  const { collectionId } = req.params;
+  const { type } = req.query;
+
+  try {
+    let items = [];
+
+    if (type === 'playlist') {
+      const result = await getPool().query(`
+        SELECT m.*
+        FROM playlist_items pi
+        JOIN media_library m ON pi.media_id = m.id
+        WHERE pi.playlist_id = $1
+        ORDER BY pi.position ASC
+      `, [collectionId]);
+      items = result.rows;
+    } else if (type === 'category') {
+      const result = await getPool().query(`
+        SELECT * FROM media_library
+        WHERE category = $1 AND is_public = true
+        ORDER BY plays DESC, created_at DESC
+        LIMIT 50
+      `, [collectionId]);
+      items = result.rows;
+    }
+
+    res.json({ success: true, items });
+  } catch (error) {
+    logger.error('Error fetching collection items:', error);
+    res.json({ success: true, items: [] });
+  }
+}));
 
 // Broadcast Queue API Routes
 const broadcastQueueRoutes = require('./broadcastQueueRoutes');
