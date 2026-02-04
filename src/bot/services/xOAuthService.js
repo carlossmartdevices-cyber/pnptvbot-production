@@ -193,6 +193,11 @@ class XOAuthService {
       throw new Error('Perfil de X no disponible');
     }
 
+    const handle = String(profile.username).replace(/^@/, '').trim();
+    if (!handle) {
+      throw new Error('Handle de X invalido');
+    }
+
     const tokenExpiresAt = expiresIn ? new Date(Date.now() + expiresIn * 1000) : null;
     const encryptedAccess = PaymentSecurityService.encryptSensitiveData({
       accessToken,
@@ -210,50 +215,56 @@ class XOAuthService {
       throw new Error('No se pudo cifrar el refresh token de X');
     }
 
-    const existing = await db.query(
-      'SELECT account_id FROM x_accounts WHERE x_user_id = $1 OR handle = $2 LIMIT 1',
-      [profile.id, profile.username]
+    const updateByUserId = await db.query(
+      `
+        UPDATE x_accounts
+        SET handle = $1,
+            display_name = $2,
+            encrypted_access_token = $3,
+            encrypted_refresh_token = $4,
+            token_expires_at = $5,
+            is_active = TRUE,
+            updated_at = CURRENT_TIMESTAMP,
+            created_by = COALESCE($6, created_by)
+        WHERE x_user_id = $7
+        RETURNING account_id
+      `,
+      [
+        handle,
+        profile.name || null,
+        encryptedAccess,
+        encryptedRefresh,
+        tokenExpiresAt,
+        adminId,
+        profile.id,
+      ]
     );
 
-    if (existing.rows.length) {
-      await db.query(
-        `
-          UPDATE x_accounts
-          SET handle = $1,
-              display_name = $2,
-              encrypted_access_token = $3,
-              encrypted_refresh_token = $4,
-              token_expires_at = $5,
-              is_active = TRUE,
-              updated_at = CURRENT_TIMESTAMP,
-              x_user_id = $6
-          WHERE account_id = $7
-        `,
-        [
-          profile.username,
-          profile.name || null,
-          encryptedAccess,
-          encryptedRefresh,
-          tokenExpiresAt,
-          profile.id,
-          existing.rows[0].account_id,
-        ]
-      );
-
-      return { accountId: existing.rows[0].account_id, handle: profile.username };
+    if (updateByUserId.rows.length) {
+      return { accountId: updateByUserId.rows[0].account_id, handle };
     }
 
-    const insert = await db.query(
+    const upsert = await db.query(
       `
         INSERT INTO x_accounts (
           handle, display_name, encrypted_access_token, encrypted_refresh_token,
           token_expires_at, created_by, x_user_id
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (handle)
+        DO UPDATE SET
+          display_name = EXCLUDED.display_name,
+          encrypted_access_token = EXCLUDED.encrypted_access_token,
+          encrypted_refresh_token = EXCLUDED.encrypted_refresh_token,
+          token_expires_at = EXCLUDED.token_expires_at,
+          created_by = COALESCE(EXCLUDED.created_by, x_accounts.created_by),
+          is_active = TRUE,
+          updated_at = CURRENT_TIMESTAMP,
+          x_user_id = EXCLUDED.x_user_id
         RETURNING account_id
       `,
       [
-        profile.username,
+        handle,
         profile.name || null,
         encryptedAccess,
         encryptedRefresh,
@@ -264,13 +275,13 @@ class XOAuthService {
     );
 
     logger.info('X account connected', {
-      accountId: insert.rows[0].account_id,
-      handle: profile.username,
+      accountId: upsert.rows[0].account_id,
+      handle,
       adminId,
       adminUsername,
     });
 
-    return { accountId: insert.rows[0].account_id, handle: profile.username };
+    return { accountId: upsert.rows[0].account_id, handle };
   }
 
   static async refreshAccountTokens(account) {

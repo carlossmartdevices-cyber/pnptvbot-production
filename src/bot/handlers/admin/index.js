@@ -20,7 +20,7 @@ const performanceUtils = require('../../utils/performanceUtils');
 const uxUtils = require('../../utils/uxUtils');
 const BroadcastButtonModel = require('../../../models/broadcastButtonModel');
 const { registerXAccountHandlers } = require('./xAccountWizard');
-const { registerXPostWizardHandlers, handleTextInput: handleXPostTextInput, getSession: getXPostSession, STEPS: XPOST_STEPS } = require('./xPostWizard');
+const { registerXPostWizardHandlers, handleTextInput: handleXPostTextInput, handleMediaInput: handleXPostMediaInput, getSession: getXPostSession, STEPS: XPOST_STEPS } = require('./xPostWizard');
 
 // Use shared utilities
 const { sanitizeInput } = broadcastUtils;
@@ -2256,6 +2256,16 @@ let registerAdminHandlers = (bot) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
 
+      // Handle X post media upload
+      if (isAdmin) {
+        const xPostSession = getXPostSession(ctx);
+        if (xPostSession.step === XPOST_STEPS.ADD_MEDIA) {
+          const photo = ctx.message.photo?.[ctx.message.photo.length - 1];
+          const handled = await handleXPostMediaInput(ctx, { file_id: photo?.file_id, type: 'photo' });
+          if (handled) return;
+        }
+      }
+
       // Check if this is for broadcast
       if (!isAdmin || !ctx.session.temp || ctx.session.temp.broadcastStep !== 'media') {
         return next();
@@ -2324,6 +2334,16 @@ let registerAdminHandlers = (bot) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
 
+      // Handle X post media upload
+      if (isAdmin) {
+        const xPostSession = getXPostSession(ctx);
+        if (xPostSession.step === XPOST_STEPS.ADD_MEDIA) {
+          const video = ctx.message.video;
+          const handled = await handleXPostMediaInput(ctx, { file_id: video?.file_id, type: 'video' });
+          if (handled) return;
+        }
+      }
+
       // Check if this is for broadcast
       if (!isAdmin || !ctx.session.temp || ctx.session.temp.broadcastStep !== 'media') {
         return next();
@@ -2388,9 +2408,65 @@ let registerAdminHandlers = (bot) => {
     }
   });
 
+  bot.on('animation', async (ctx, next) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      // Handle X post media upload (animations/gifs)
+      if (isAdmin) {
+        const xPostSession = getXPostSession(ctx);
+        if (xPostSession.step === XPOST_STEPS.ADD_MEDIA) {
+          const animation = ctx.message.animation;
+          const handled = await handleXPostMediaInput(ctx, { file_id: animation?.file_id, type: 'video' });
+          if (handled) return;
+        }
+      }
+
+      return next();
+    } catch (error) {
+      logger.error('Error handling animation for X post:', error);
+      return next();
+    }
+  });
+
+  bot.on('video_note', async (ctx, next) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      // Handle X post media upload (video notes)
+      if (isAdmin) {
+        const xPostSession = getXPostSession(ctx);
+        if (xPostSession.step === XPOST_STEPS.ADD_MEDIA) {
+          const note = ctx.message.video_note;
+          const handled = await handleXPostMediaInput(ctx, { file_id: note?.file_id, type: 'video' });
+          if (handled) return;
+        }
+      }
+
+      return next();
+    } catch (error) {
+      logger.error('Error handling video_note for X post:', error);
+      return next();
+    }
+  });
+
   bot.on('document', async (ctx, next) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+
+      // Handle X post media upload (documents that are images/videos)
+      if (isAdmin) {
+        const xPostSession = getXPostSession(ctx);
+        if (xPostSession.step === XPOST_STEPS.ADD_MEDIA) {
+          const document = ctx.message.document;
+          const mime = document?.mime_type || '';
+          if (mime.startsWith('video/') || mime.startsWith('image/')) {
+            const type = mime.startsWith('video/') ? 'video' : 'photo';
+            const handled = await handleXPostMediaInput(ctx, { file_id: document?.file_id, type });
+            if (handled) return;
+          }
+        }
+      }
 
       // Check if this is for broadcast
       if (!isAdmin || !ctx.session.temp || ctx.session.temp.broadcastStep !== 'media') {
@@ -2617,9 +2693,14 @@ let registerAdminHandlers = (bot) => {
       return next();
     }
 
-    // X Post Wizard text input (compose step or schedule custom)
+    // X Post Wizard text input (compose, AI prompt, or schedule custom)
     const xPostSession = getXPostSession(ctx);
-    if (xPostSession.step === XPOST_STEPS.COMPOSE_TEXT || xPostSession.step === 'schedule_custom') {
+    if (
+      xPostSession.step === XPOST_STEPS.COMPOSE_TEXT
+      || xPostSession.step === XPOST_STEPS.AI_PROMPT_EN
+      || xPostSession.step === XPOST_STEPS.AI_PROMPT_ES
+      || xPostSession.step === 'schedule_custom'
+    ) {
       logger.info('[TEXT-HANDLER] Processing X post wizard text input', { userId: ctx.from.id, step: xPostSession.step });
       return handleXPostTextInput(ctx, next);
     }

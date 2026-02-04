@@ -2,6 +2,7 @@ const { Markup } = require('telegraf');
 const PermissionService = require('../../services/permissionService');
 const XPostService = require('../../services/xPostService');
 const XOAuthService = require('../../services/xOAuthService');
+const GrokService = require('../../services/grokService');
 const logger = require('../../../utils/logger');
 const sanitize = require('../../../utils/sanitizer');
 
@@ -13,6 +14,8 @@ const STEPS = {
   MENU: 'menu',
   SELECT_ACCOUNT: 'select_account',
   COMPOSE_TEXT: 'compose_text',
+  AI_PROMPT_EN: 'ai_prompt_en',
+  AI_PROMPT_ES: 'ai_prompt_es',
   ADD_MEDIA: 'add_media',
   PREVIEW: 'preview',
   SCHEDULE: 'schedule',
@@ -30,6 +33,7 @@ const getSession = (ctx) => {
       accountHandle: null,
       text: null,
       mediaUrl: null,
+      mediaFileId: null,
       mediaType: null,
       scheduledAt: null,
     };
@@ -214,6 +218,11 @@ const showComposeText = async (ctx, edit = false) => {
 
   const buttons = [];
 
+  buttons.push([
+    Markup.button.callback('🤖 AI (EN)', 'xpost_ai_en'),
+    Markup.button.callback('🤖 AI (ES)', 'xpost_ai_es'),
+  ]);
+
   if (session.text) {
     buttons.push([Markup.button.callback('▶️ Continuar', 'xpost_add_media')]);
     buttons.push([Markup.button.callback('🗑️ Borrar texto', 'xpost_clear_text')]);
@@ -241,9 +250,10 @@ const showAddMedia = async (ctx, edit = false) => {
 
   if (session.mediaUrl) {
     message += `✅ Media agregada: ${session.mediaType || 'imagen'}\n\n`;
-    message += '📤 Envía otra imagen para reemplazar o continúa.\n';
+    message += '📤 Envía otra media para reemplazar o continúa.\n';
+    message += 'ℹ️ La media se subirá a X al publicar.\n';
   } else {
-    message += '📤 Envía una imagen para agregar al post.\n';
+    message += '📤 Envía una imagen o video para agregar al post.\n';
     message += 'O presiona "Continuar sin media" para omitir.\n';
   }
 
@@ -685,6 +695,38 @@ const handleTextInput = async (ctx, next) => {
   }
 
   // Only handle text in compose step
+  if (session.step === STEPS.AI_PROMPT_EN || session.step === STEPS.AI_PROMPT_ES) {
+    const prompt = ctx.message?.text?.trim();
+    if (!prompt) return next();
+
+    const language = session.step === STEPS.AI_PROMPT_EN ? 'English' : 'Spanish';
+    try {
+      await ctx.reply('⏳ Generando texto con Grok...');
+
+      const aiText = await GrokService.chat({
+        mode: 'xPost',
+        language,
+        prompt: `Solicitud del usuario: ${prompt}`,
+        maxTokens: 180,
+      });
+
+      const normalized = XPostService.normalizeXText(aiText);
+      session.text = normalized.text;
+      session.step = STEPS.COMPOSE_TEXT;
+      await ctx.saveSession?.();
+
+      const notice = normalized.truncated
+        ? '✅ Texto generado con Grok. ⚠️ Se truncó a 280 caracteres.'
+        : '✅ Texto generado con Grok.';
+      await ctx.reply(notice);
+      return showComposeText(ctx);
+    } catch (error) {
+      logger.error('Error generating X post with Grok:', error);
+      await ctx.reply(`❌ Error generando texto con Grok: ${error.message || 'desconocido'}`);
+      return;
+    }
+  }
+
   if (session.step === STEPS.COMPOSE_TEXT) {
     const text = ctx.message?.text;
     if (!text) return next();
@@ -733,6 +775,49 @@ const handleTextInput = async (ctx, next) => {
   }
 
   return next();
+};
+
+const handleMediaInput = async (ctx, media) => {
+  const session = getSession(ctx);
+
+  if (session.step !== STEPS.ADD_MEDIA) {
+    return false;
+  }
+
+  const fileId = media?.file_id;
+  if (!fileId) {
+    await ctx.reply('❌ Media inválida. Intenta de nuevo.');
+    return true;
+  }
+
+  try {
+    let downloadUrl = null;
+    if (process.env.BOT_TOKEN) {
+      const filePath = await ctx.telegram.getFile(fileId);
+      if (filePath?.file_path) {
+        downloadUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${filePath.file_path}`;
+      }
+    }
+
+    session.mediaType = media.type || 'media';
+    session.mediaFileId = fileId;
+    session.mediaUrl = downloadUrl || fileId;
+    await ctx.saveSession?.();
+
+    logger.info('X post media saved', {
+      userId: ctx.from?.id,
+      type: session.mediaType,
+      hasUrl: !!downloadUrl,
+    });
+
+    await ctx.reply('✅ Media guardada correctamente');
+    await showAddMedia(ctx);
+    return true;
+  } catch (error) {
+    logger.error('Error handling X post media:', error);
+    await ctx.reply('❌ Error al procesar la media. Intenta de nuevo.');
+    return true;
+  }
 };
 
 // ==================== REGISTER HANDLERS ====================
@@ -796,13 +881,13 @@ const registerXPostWizardHandlers = (bot) => {
       });
       await safeAnswer(ctx);
       await ctx.reply(
-        '🔗 **Conectar cuenta de X**\n\n'
+        '🔗 *Conectar cuenta de X*\n\n'
         + '1) Abre el enlace de abajo.\n'
         + '2) Autoriza la cuenta.\n'
-        + '3) Regresa y selecciona la cuenta.\n\n'
-        + authUrl,
+        + '3) Regresa y selecciona la cuenta.',
         { parse_mode: 'Markdown' },
       );
+      await ctx.reply(authUrl, { disable_web_page_preview: true });
     } catch (error) {
       logger.error('Error starting X OAuth from wizard:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
@@ -815,6 +900,48 @@ const registerXPostWizardHandlers = (bot) => {
     if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
     await safeAnswer(ctx);
     await showComposeText(ctx, true);
+  });
+
+  bot.action('xpost_ai_en', async (ctx) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
+    const session = getSession(ctx);
+    session.step = STEPS.AI_PROMPT_EN;
+    await ctx.saveSession?.();
+    await safeAnswer(ctx);
+    await ctx.reply(
+      '🤖 *AI Write (Grok) - English*\n\n'
+      + 'Describe el post que quieres generar.\n'
+      + 'Ejemplo:\n`Announce a new live show tonight, bold tone, include CTA to pnptv.app`',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('◀️ Volver', 'xpost_compose')],
+          [Markup.button.callback('❌ Cancelar', 'xpost_menu')],
+        ]),
+      },
+    );
+  });
+
+  bot.action('xpost_ai_es', async (ctx) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
+    const session = getSession(ctx);
+    session.step = STEPS.AI_PROMPT_ES;
+    await ctx.saveSession?.();
+    await safeAnswer(ctx);
+    await ctx.reply(
+      '🤖 *AI Write (Grok) - Español*\n\n'
+      + 'Describe el post que quieres generar.\n'
+      + 'Ejemplo:\n`Anuncia un show en vivo esta noche, tono intenso, incluye CTA a pnptv.app`',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('◀️ Volver', 'xpost_compose')],
+          [Markup.button.callback('❌ Cancelar', 'xpost_menu')],
+        ]),
+      },
+    );
   });
 
   bot.action('xpost_clear_text', async (ctx) => {
@@ -962,6 +1089,7 @@ module.exports = {
   registerXPostWizardHandlers,
   showXPostMenu,
   handleTextInput,
+  handleMediaInput,
   getSession,
   STEPS,
 };
