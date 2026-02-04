@@ -21,9 +21,2021 @@ const uxUtils = require('../../utils/uxUtils');
 const BroadcastButtonModel = require('../../../models/broadcastButtonModel');
 const { registerXAccountHandlers } = require('./xAccountWizard');
 const { registerXPostWizardHandlers, handleTextInput: handleXPostTextInput, handleMediaInput: handleXPostMediaInput, getSession: getXPostSession, STEPS: XPOST_STEPS } = require('./xPostWizard');
+const VideoramaAdminService = require('../../services/VideoramaAdminService'); // Import new service
+const config = require('../../config/config');
 
 // Use shared utilities
 const { sanitizeInput } = broadcastUtils;
+
+const safeAnswerCbQuery = async (ctx, text, options = {}) => {
+  if (!ctx?.answerCbQuery) return;
+  try {
+    if (typeof text === 'string') {
+      await ctx.answerCbQuery(text, options);
+    } catch (error) {
+      const description = error?.response?.description || error?.message || '';
+      if (
+        description.includes('query is too old') ||
+        description.includes('query ID is invalid') ||
+        description.includes('response timeout')
+      ) {
+        logger.debug('Callback query expired', { error: description });
+        return;
+      }
+      logger.warn('Failed to answer callback query', { error: description });
+    }
+  } catch (error) {
+    logger.error('Error in safeAnswerCbQuery:', error);
+  }
+};
+
+function getBroadcastStepLabel(step, lang) {
+  const labels = {
+    // Paso 1/5: Selección de audiencia
+    audience: 'Paso 1/5: Seleccionar Audiencia',
+
+    // Paso 2/5: Media (opcional)
+    media: 'Paso 2/5: Media (Opcional)',
+
+    // Paso 3/5: Texto en inglés (opcional)
+    text_en: 'Paso 3/5: Texto en Inglés (Opcional)',
+    ai_prompt_en: 'Paso 3/5: AI (Inglés)',
+    review_ai_en: 'Paso 3/5: Revisión AI (Inglés)',
+    edit_ai_en: 'Paso 3/5: Edición AI (Inglés)',
+
+    // Paso 4/5: Texto en español (opcional)
+    text_es: 'Paso 4/5: Texto en Español (Opcional)',
+    ai_prompt_es: 'Paso 4/5: AI (Español)',
+    review_ai_es: 'Paso 4/5: Revisión AI (Español)',
+    edit_ai_es: 'Paso 4/5: Edición AI (Español)',
+
+    // Paso 5/5: Botones y envío (unificado)
+    buttons: 'Paso 5/5: Botones y Envío',
+    custom_buttons: 'Paso 5/5: Botones Personalizados',
+    preview: 'Paso 5/5: Vista Previa y Envío',
+    schedule_options: 'Paso 5/5: Programación',
+    schedule_datetime: 'Programación (Fecha/Hora)',
+    schedule_count: 'Programación (Cantidad)',
+    sending: 'Enviando…',
+  };
+  return labels[step] || step || 'Desconocido';
+}
+
+// Use shared utilities for button management
+const {
+  getStandardButtonOptions,
+  normalizeButtons,
+  buildInlineKeyboard,
+  buildDefaultBroadcastButtons
+} = broadcastUtils;
+
+function getBroadcastButtonOptions(lang) {
+  const options = getStandardButtonOptions();
+
+  // Return options as-is (button text is already in English)
+  // Language preference doesn't affect button labels in this implementation
+  return options;
+}
+
+function summarizeBroadcastButtons(buttons) {
+  const normalized = normalizeButtons(buttons);
+  return normalized.map((b) => {
+    const obj = typeof b === 'string' ? JSON.parse(b) : b;
+    return obj.text;
+  });
+}
+
+async function sendBroadcastPreview(ctx) {
+  const lang = getLanguage(ctx);
+  const data = ctx.session?.temp?.broadcastData;
+
+  // Validate session exists
+  if (!ctx.session?.temp?.broadcastTarget) {
+    await ctx.reply('❌ Sesión expirada. Inicia de nuevo.');
+    return;
+  }
+
+  // Validate that we have at least SOME content (text or media)
+  const hasTextEn = data?.textEn && data.textEn.trim().length > 0;
+  const hasTextEs = data?.textEs && data.textEs.trim().length > 0;
+  const hasMedia = data?.mediaFileId;
+
+  if (!hasTextEn && !hasTextEs && !hasMedia) {
+    await ctx.reply(
+      '❌ Debes proporcionar al menos uno de los siguientes:\n• Texto en inglés\n• Texto en español\n• Media (imagen/video/archivo)'
+    );
+    return;
+  }
+
+  // Log warning if only one language provided
+  if (!hasTextEn || !hasTextEs) {
+    const missingLang = !hasTextEn ? 'inglés' : 'español';
+    logger.warn(`Broadcasting without ${missingLang} text`, {
+      userId: ctx.from.id,
+      hasTextEn,
+      hasTextEs,
+      hasMedia
+    });
+  }
+
+  const buttons = summarizeBroadcastButtons(data.buttons);
+  const buttonsText = buttons.length ? buttons.map((t) => `• ${t}`).join('\n') : '_Sin botones_';
+  const mediaText = data.mediaType ? `📎 ${data.mediaType}` : '📝 Solo texto';
+
+  const previewText =
+    '🎯 *Paso 5/5: Botones y Envío*\n\n' +
+    '📌 *Parte 2: Vista Previa y Envío*\n\n' +
+    '👀 *Vista previa del Broadcast:*' +
+    `\n\n${mediaText}\n\n` +
+    (hasTextEn ? `*EN:*\n${data.textEn}\n\n` : '') +
+    (hasTextEs ? `*ES:*\n${data.textEs}\n\n` : '') +
+    `*Botones:*\n${buttonsText}\n\n` +
+    '¿Listo para enviar?';
+
+  // Check if email sending is enabled
+  const sendEmail = ctx.session.temp?.broadcastData?.sendEmail || false;
+  const emailToggleText = sendEmail
+    ? '✅ También enviar por Email'
+    : '📧 También enviar por Email';
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback(emailToggleText, 'broadcast_toggle_email')],
+    [Markup.button.callback('📤 Enviar Ahora', 'broadcast_send_now_with_buttons')],
+    [Markup.button.callback('📅 Programar Envío', 'broadcast_schedule_with_buttons')],
+    [Markup.button.callback('◀️ Volver a Botones', 'broadcast_resume_buttons')],
+    [Markup.button.callback('❌ Cancelar Broadcast', 'admin_cancel')],
+  ]);
+
+  // Also send a "rendered" preview with buttons for one language (EN) so admin sees layout.
+  try {
+    const buttonMarkup = (() => {
+      const rows = [];
+      for (const btn of normalizeButtons(data.buttons)) {
+        const b = typeof btn === 'string' ? JSON.parse(btn) : btn;
+        if (b.type === 'url') rows.push([Markup.button.url(b.text, b.target)]);
+        else if (b.type === 'callback') rows.push([Markup.button.callback(b.text, b.data)]);
+      }
+      return rows.length ? Markup.inlineKeyboard(rows) : undefined;
+    })();
+
+    // Use English text if available, otherwise Spanish, otherwise empty string
+    const previewCaption = hasTextEn ? `📢 ${data.textEn}` : hasTextEs ? `📢 ${data.textEs}` : '📢';
+
+    if (data.mediaType === 'photo') {
+      await ctx.replyWithPhoto(data.mediaFileId, {
+        caption: previewCaption,
+        parse_mode: 'Markdown',
+        ...(buttonMarkup ? { reply_markup: buttonMarkup.reply_markup } : {}),
+      });
+    } else if (data.mediaType === 'video') {
+      await ctx.replyWithVideo(data.mediaFileId, {
+        caption: previewCaption,
+        parse_mode: 'Markdown',
+        ...(buttonMarkup ? { reply_markup: buttonMarkup.reply_markup } : {}),
+      });
+    } else if (data.mediaType === 'document') {
+      await ctx.replyWithDocument(data.mediaFileId, {
+        caption: previewCaption,
+        parse_mode: 'Markdown',
+        ...(buttonMarkup ? { reply_markup: buttonMarkup.reply_markup } : {}),
+      });
+    } else if (hasTextEn || hasTextEs) {
+      // Only send text preview if we have text
+      await ctx.reply(previewCaption, {
+        parse_mode: 'Markdown',
+        ...(buttonMarkup ? { reply_markup: buttonMarkup.reply_markup } : {}),
+      });
+    }
+  } catch (error) {
+    logger.warn('Failed to send rendered preview (continuing):', error.message);
+  }
+
+  await ctx.reply(previewText, { parse_mode: 'Markdown', ...keyboard });
+}
+
+async function showBroadcastButtonsPicker(ctx) {
+  const lang = getLanguage(ctx);
+  const options = getBroadcastButtonOptions(lang);
+
+  if (!ctx.session.temp?.broadcastData) ctx.session.temp.broadcastData = {};
+
+  // Normalize and ensure buttons array
+  ctx.session.temp.broadcastData.buttons = normalizeButtons(ctx.session.temp.broadcastData.buttons);
+
+  // DEFENSIVE FIX: Step progression guard in button picker
+  // Check if we have a max completed step to prevent regression
+  const currentStep = ctx.session.temp.broadcastStep;
+  const maxCompletedStep = ctx.session.temp.maxCompletedStep;
+  
+  // Define step order for progression validation
+  const stepOrder = ['media', 'text_en', 'ai_prompt_en', 'text_es', 'ai_prompt_es', 'buttons', 'preview', 'sending'];
+  
+  if (maxCompletedStep) {
+    const currentStepIndex = stepOrder.indexOf(currentStep);
+    const maxStepIndex = stepOrder.indexOf(maxCompletedStep);
+    
+    // If current step is before max completed step, prevent regression
+    // EXCEPT: Allow button picker to run when called from text_es step (normal progression)
+    if (currentStepIndex < maxStepIndex && currentStep !== 'text_es') {
+      logger.warn('Step regression detected in button picker - preventing', {
+        userId: ctx.from.id,
+        attemptedStep: currentStep,
+        maxCompletedStep: maxCompletedStep,
+        currentStepIndex,
+        maxStepIndex
+      });
+      
+      // Force back to the correct step
+      ctx.session.temp.broadcastStep = maxCompletedStep;
+      await ctx.saveSession();
+      
+      logger.info('Step regression prevented in button picker - restored to max completed step', {
+        userId: ctx.from.id,
+        restoredStep: ctx.session.temp.broadcastStep
+      });
+      
+      return; // Exit to prevent further processing with wrong step
+    }
+  }
+  
+  // Ensure we're in the buttons step with additional safeguards
+  if (currentStep !== 'buttons') {
+    logger.info('Broadcast step correction in button picker', {
+      userId: ctx.from.id,
+      fromStep: currentStep,
+      toStep: 'buttons'
+    });
+    ctx.session.temp.broadcastStep = 'buttons';
+    await ctx.saveSession();
+  }
+
+  // Log button picker display
+  logger.info('Displaying button picker', {
+    userId: ctx.from.id,
+    broadcastStep: ctx.session.temp.broadcastStep,
+    buttonCount: ctx.session.temp.broadcastData.buttons.length
+  });
+
+  const currentButtons = ctx.session.temp.broadcastData.buttons || [];
+  const selectedKeys = new Set(
+    currentButtons
+      .map((b) => (typeof b === 'string' ? JSON.parse(b).key : b.key))
+      .filter(Boolean),
+  );
+
+  const rows = options.map((opt) => {
+    const on = selectedKeys.has(opt.key);
+    const label = on ? `✅ ${opt.text}` : `➕ ${opt.text}`;
+    return [Markup.button.callback(label, `broadcast_toggle_${opt.key}`)];
+  });
+
+  // Show any custom buttons that have been added (not in preset options)
+  const presetKeys = new Set(options.map(opt => opt.key));
+  const customButtons = currentButtons.filter(b => {
+    const btn = typeof b === 'string' ? JSON.parse(b) : b;
+    return !presetKeys.has(btn.key) || btn.key === 'custom';
+  });
+
+  for (let i = 0; i < customButtons.length; i++) {
+    const btn = typeof customButtons[i] === 'string' ? JSON.parse(customButtons[i]) : customButtons[i];
+    rows.push([Markup.button.callback(`✅ ${btn.text} 🔗`, `broadcast_remove_custom_${i}`)]);
+  }
+
+  rows.push([Markup.button.callback('➕ Link Personalizado', 'broadcast_add_custom_link')]);
+  rows.push([Markup.button.callback('✅ Continuar a Vista Previa', 'broadcast_continue_with_buttons')]);
+  rows.push([Markup.button.callback('⏭️ Sin Botones', 'broadcast_no_buttons')]);
+  rows.push([Markup.button.callback('❌ Cancelar', 'admin_cancel')]);
+
+  await ctx.reply(
+    '🎯 *Paso 5/5: Botones y Envío*\n\n' +
+    '📌 *Parte 1: Seleccionar Botones*\n\n' +
+    'Selecciona 1 o varios botones para incluir en el broadcast, o elige "Sin Botones" para continuar.\n\n' +
+    'Cuando estés listo, presiona "✅ Continuar" para ver la vista previa y enviar.',
+    { parse_mode: 'Markdown', ...Markup.inlineKeyboard(rows) },
+  );
+}
+
+async function showBroadcastResumePrompt(ctx) {
+  const lang = getLanguage(ctx);
+  const step = ctx.session?.temp?.broadcastStep;
+  const label = getBroadcastStepLabel(step, lang);
+  await ctx.editMessageText(
+    `⚠️ Tienes un broadcast en progreso.\n\n*Estado:* ${label}\n\n¿Deseas reanudar o reiniciar?`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('▶️ Reanudar', 'broadcast_resume')],
+        [Markup.button.callback('🔁 Reiniciar', 'broadcast_restart')],
+        [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+      ]),
+    },
+  );
+}
+
+/**
+ * Update broadcast step with validation and atomic save
+ * @param {Object} ctx - Telegraf context
+ * @param {string} newStep - New step to transition to
+ */
+async function updateBroadcastStep(ctx, newStep) {
+  const validSteps = [
+    'media',
+    'text_en',
+    'text_es',
+    'ai_prompt_en',
+    'ai_prompt_es',
+    'review_ai_en',
+    'review_ai_es',
+    'edit_ai_en',
+    'edit_ai_es',
+    'buttons',
+    'preview',
+    'sending',
+    'schedule_count',
+    'custom_link',
+    'custom_buttons',
+  ];
+
+  if (!validSteps.includes(newStep)) {
+    logger.error(`Invalid broadcast step transition attempted: ${newStep}`);
+    throw new Error(`Invalid broadcast step: ${newStep}`);
+  }
+
+  const previousStep = ctx.session.temp?.broadcastStep;
+  ctx.session.temp.broadcastStep = newStep;
+
+  try {
+    await ctx.saveSession();
+    logger.info(`Broadcast step updated: ${previousStep} → ${newStep}`, {
+      userId: ctx.from.id,
+      previousStep,
+      newStep
+    });
+  } catch (error) {
+    logger.error('Failed to save broadcast step:', {
+      error: error.message,
+      previousStep,
+      attemptedStep: newStep
+    });
+    throw error;
+  }
+}
+
+/**
+ * Get appropriate fallback step on error
+ * @param {string} currentStep - Current step
+ * @returns {string} Safe fallback step
+ */
+function getFallbackStep(currentStep) {
+  const fallbackMap = {
+    'ai_prompt_en': 'text_en',
+    'ai_prompt_es': 'text_es',
+    'custom_link': 'buttons',
+    'custom_buttons': 'buttons'
+  };
+
+  return fallbackMap[currentStep] || currentStep;
+}
+
+async function renderBroadcastStep(ctx) {
+  const lang = getLanguage(ctx);
+  const step = ctx.session?.temp?.broadcastStep;
+  
+  logger.info('Rendering broadcast step', {
+    userId: ctx.from.id,
+    broadcastTarget: ctx.session?.temp?.broadcastTarget,
+    broadcastStep: step
+  });
+
+  if (!ctx.session?.temp?.broadcastTarget) {
+    logger.warn('No broadcast target found in session', { userId: ctx.from.id });
+    await ctx.editMessageText(
+      '❌ Sesión expirada. Inicia de nuevo desde /admin.',
+      Markup.inlineKeyboard([[Markup.button.callback('◀️ Volver', 'admin_cancel')]]),
+    );
+    return;
+  }
+
+  if (step === 'media') {
+    const message = await ctx.editMessageText(
+      '📎 *Paso 2/5: Subir Media (Opcional)*\n\n'
+      + 'Envía una imagen, video o archivo para adjuntar al broadcast.\n\n'
+      + '💡 También puedes saltar este paso si solo quieres enviar texto.',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('⏭️ Saltar (Solo Texto)', 'broadcast_skip_media')],
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+        ]),
+      },
+    );
+
+    // Store message ID to delete later when media is uploaded
+    // For editMessageText, the message ID is from the callback query message
+    if (ctx.callbackQuery && ctx.callbackQuery.message) {
+      ctx.session.temp.mediaPromptMessageId = ctx.callbackQuery.message.message_id;
+      await ctx.saveSession();
+      logger.info('Stored media prompt message ID for deletion', {
+        messageId: ctx.callbackQuery.message.message_id
+      });
+    }
+
+    return;
+  }
+
+  if (step === 'text_en') {
+    await ctx.editMessageText(
+      '🇺🇸 *Paso 3/5: Texto en Inglés (Opcional)*\n\n'
+      + 'Escribe el mensaje en inglés que quieres enviar.\n\n'
+      + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en inglés.',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_en')],
+          [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_en')],
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+        ]),
+      },
+    );
+    return;
+  }
+
+  if (step === 'text_es') {
+    await ctx.editMessageText(
+      '🇪🇸 *Paso 4/5: Texto en Español (Opcional)*\n\n'
+      + 'Escribe el mensaje en español que quieres enviar.\n\n'
+      + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en español.',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_es')],
+          [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_es')],
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+        ]),
+      },
+    );
+    return;
+  }
+
+  if (step === 'review_ai_en' || step === 'review_ai_es') {
+    const isEn = step === 'review_ai_en';
+    const aiDraft = ctx.session.temp?.aiDraft || '';
+    const safeDraft = sanitize.telegramMarkdown(aiDraft);
+
+    if (!aiDraft) {
+      await updateBroadcastStep(ctx, isEn ? 'text_en' : 'text_es');
+      await renderBroadcastStep(ctx);
+      return;
+    }
+
+    await ctx.editMessageText(
+      `🤖 *AI Draft (${isEn ? 'EN' : 'ES'}):*\n\n${safeDraft}\n\n` +
+      '_Puedes usar este texto o editarlo manualmente._',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('✅ Usar texto', isEn ? 'broadcast_use_ai_en' : 'broadcast_use_ai_es')],
+          [Markup.button.callback('✏️ Editar manualmente', isEn ? 'broadcast_edit_ai_en' : 'broadcast_edit_ai_es')],
+          [Markup.button.callback('🔄 Regenerar', isEn ? 'broadcast_ai_en' : 'broadcast_ai_es')],
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+        ]),
+      },
+    );
+    return;
+  }
+
+  if (step === 'edit_ai_en' || step === 'edit_ai_es') {
+    const isEn = step === 'edit_ai_en';
+    const aiDraft = ctx.session.temp?.aiDraft || '';
+    const safeDraft = sanitize.telegramMarkdown(aiDraft);
+
+    await ctx.editMessageText(
+      `✏️ *Editar texto (${isEn ? 'EN' : 'ES'})*\n\n` +
+      'Envía el texto editado que quieres usar:\n\n' +
+      (aiDraft ? `_Texto actual:_\n\`\`\`\n${safeDraft}\n\`\`\`` : '_Texto actual:_ (vacío)'),
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('⬅️ Volver', isEn ? 'broadcast_ai_en' : 'broadcast_ai_es')],
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+        ]),
+      },
+    );
+    return;
+  }
+
+  if (step === 'buttons' || step === 'custom_buttons') {
+    await showBroadcastButtonsPicker(ctx);
+    return;
+  }
+
+  await ctx.editMessageText(
+    `ℹ️ Broadcast en progreso (${getBroadcastStepLabel(step, lang)}).\n\nUsa Reiniciar si no avanza.`,
+    Markup.inlineKeyboard([
+      [Markup.button.callback('🔁 Reiniciar', 'broadcast_restart')],
+      [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+    ]),
+  );
+}
+
+/**
+ * Show admin panel based on user role
+ * @param {Context} ctx - Telegraf context
+ * @param {boolean} edit - Whether to edit message or send new
+ */
+async function showAdminPanel(ctx, edit = false) {
+  try {
+    const lang = getLanguage(ctx);
+    const userId = ctx.from.id;
+    const userRole = await PermissionService.getUserRole(userId);
+    const roleDisplay = await PermissionService.getUserRoleDisplay(userId, lang);
+
+    // Optional stats (Firestore may be disabled in some deployments)
+    let statsText = '';
+    try {
+      if (userRole === 'superadmin' || userRole === 'admin') {
+        const stats = await adminService.getDashboardStats();
+        statsText = broadcastUtils.formatDashboardStats(stats, lang);
+      }
+    } catch (error) {
+      logger.warn(`Admin stats unavailable (continuing without stats): ${error.message}`);
+    }
+
+    // Build menu based on role with organized sections
+    const buttons = [];
+
+    // ═══ CONTROLES PRINCIPALES ═══
+    buttons.push([
+      Markup.button.callback('🔄 Actualizar', 'admin_refresh'),
+      Markup.button.callback('🧪 Prueba', 'test_callback'),
+    ]);
+
+    // ═══ GESTIÓN DE USUARIOS ═══
+    buttons.push([
+      Markup.button.callback('👥 Usuarios', 'admin_users'),
+      Markup.button.callback('🎁 Membresía', 'admin_activate_membership'),
+    ]);
+
+    // Funciones de Admin y SuperAdmin
+    if (userRole === 'superadmin' || userRole === 'admin') {
+      // ═══ CONTENIDO Y COMUNICACIÓN ═══
+      buttons.push([
+        Markup.button.callback('📢 Difusión', 'admin_broadcast'),
+        Markup.button.callback('📤 Compartir', 'admin_improved_share_post'),
+      ]);
+
+      buttons.push([
+        Markup.button.callback('🐦 Publicar en X', 'xpost_menu'),
+        Markup.button.callback('⚙️ X Cuentas', 'admin_x_accounts_configure_x'),
+      ]);
+      
+      // ═══ VIDEORAMA ═══
+      buttons.push([
+        Markup.button.callback('🎬 Videorama Upload', 'upload_videorama'),
+      ]);
+
+      // ═══ PROMOS Y MARKETING ═══
+      buttons.push([
+        Markup.button.callback('🎁 Promos', 'promo_admin_menu'),
+      ]);
+
+      // ═══ PNP LIVE / PERFORMERS ═══
+      buttons.push([
+        Markup.button.callback('🎭 Performers', 'admin_performers'),
+      ]);
+
+      // ═══ LUGARES Y NEGOCIOS ═══
+      buttons.push([
+        Markup.button.callback('🏪 Business Admin', 'admin_business_dashboard'),
+        Markup.button.callback('📍 Nearby Places', 'admin_nearby_places'),
+      ]);
+
+      // ═══ SISTEMA Y HERRAMIENTAS ═══
+      buttons.push([
+        Markup.button.callback('📦 Cola', 'admin_queue_status'),
+        Markup.button.callback('👁️ Vista Previa', 'admin_view_mode'),
+      ]);
+    }
+
+    // Funciones solo para SuperAdmin
+    if (userRole === 'superadmin') {
+      // ═══ ADMINISTRACIÓN ═══
+      buttons.push([
+        Markup.button.callback('👑 Roles', 'admin_roles'),
+        Markup.button.callback('📜 Registros', 'admin_logs'),
+      ]);
+    }
+
+    // Construir mensaje con estilo
+    const header = '`⚙️ Panel de Administración`';
+    const divider = '━━━━━━━━━━━━━━━━━━━━';
+    const footer = '`Selecciona una opción 💜`';
+
+    const message = `${header}\n${divider}\n\n${roleDisplay}\n\n${statsText}${footer}`;
+
+    const options = {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard(buttons),
+    };
+
+    if (edit) {
+      await ctx.editMessageText(message, options);
+    } else {
+      await ctx.reply(message, options);
+    }
+  } catch (error) {
+    logger.error('Error showing admin panel:', error);
+  }
+}
+
+/**
+ * Admin handlers
+ * @param {Telegraf} bot - Bot instance
+ */
+// Import handlers
+const registerImprovedSharePostHandlers = require('./improvedSharePost');
+const { registerPromoAdminHandlers } = require('./promoAdmin');
+
+let registerAdminHandlers = (bot) => {
+  logger.info('[DEBUG-INIT] registerAdminHandlers called - registering admin command handlers');
+  // Register handlers
+  registerImprovedSharePostHandlers(bot);
+  registerPromoAdminHandlers(bot);
+  registerXAccountHandlers(bot, {
+    sessionKey: 'adminXAccountWizard',
+    actionPrefix: 'admin_x_accounts',
+    backAction: 'admin_home',
+    title: '🐦 X Accounts',
+    emptyTitle: '🐦 X Accounts',
+    emptyBody: 'No hay cuentas activas configuradas.\nPuedes conectar una nueva cuenta ahora mismo.',
+    prompt: 'Selecciona la cuenta desde la cual se publicará:',
+    connectLabel: '➕ Conectar cuenta X',
+    disableLabel: '🚫 No publicar en X',
+    backLabel: '⬅️ Volver al panel',
+    notifyOnEmpty: true,
+  });
+
+  // Register X Post Wizard handlers
+  registerXPostWizardHandlers(bot);
+
+  // Initialize Videorama Admin Service
+  const videoramaAdminService = new VideoramaAdminService(bot);
+
+  // === Videorama Upload Handlers ===
+  bot.command('uploadvideorama', async (ctx) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin) {
+      return ctx.reply('❌ Unauthorized. Admin access required.');
+    }
+    await videoramaAdminService.startUpload(ctx);
+  });
+
+  bot.on(['photo', 'video', 'audio', 'document', 'text'], async (ctx, next) => {
+    if (ctx.chat.id.toString() === config.VIDEORAMA_ADMIN_UPLOAD_CHANNEL_ID) {
+      const handled = await videoramaAdminService.handleMessage(ctx);
+      if (handled) return; // If the Videorama service handled the message, stop propagation
+    }
+    return next(); // Otherwise, continue to the next middleware/handler
+  });
+
+  bot.action(/^upload_videorama_(.+)$/, async (ctx) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin) {
+      return ctx.answerCbQuery('❌ Unauthorized. Admin access required.');
+    }
+    const handled = await videoramaAdminService.handleCallbackQuery(ctx);
+    if (handled) return;
+  });
+
+  // ================================
+
+  bot.action('admin_home', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await showAdminPanel(ctx, true);
+    } catch (error) {
+      logger.error('Error in admin_home:', error);
+    }
+  });
+
+  bot.action('admin_refresh', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await showAdminPanel(ctx, true);
+    } catch (error) {
+      logger.error('Error in admin_refresh:', error);
+    }
+  });
+
+  bot.action('admin_queue_status', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const lang = getLanguage(ctx);
+      const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+      const queueIntegration = getBroadcastQueueIntegration();
+      const status = await queueIntegration.getStatus();
+
+      if (status?.error) {
+        await ctx.editMessageText(
+          '❌ Error al cargar el estado de la cola:\n\n' + sanitizeInput(status.error),
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 Actualizar', 'admin_queue_status')],
+            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+          ])
+        );
+        return;
+      }
+
+      const running = status.running ? '✅ Activa' : '⏸️ Pausada';
+      const activeJobs = status.activeJobs ?? 0;
+      const totalFailed = status.statistics?.totalFailed ?? '-';
+      const totalCompleted = status.statistics?.totalCompleted ?? '-';
+      const totalPending = status.statistics?.totalPending ?? '-';
+
+      const msg =
+        '`📦 Estado de Cola`' +
+        '\n━━━━━━━━━━━━━━━━━━━━\n\n' +
+        `• Estado: ${running}\n` +
+        `• Trabajos activos: ${activeJobs}\n` +
+        `• Pendientes: ${totalPending}\n` +
+        `• Completados: ${totalCompleted}\n` +
+        `• Fallidos: ${totalFailed}\n`;
+
+      const controlsRow = [];
+      if (isSuperAdmin) {
+        if (status.running) {
+          controlsRow.push(Markup.button.callback('⏸️ Pausar', 'admin_queue_pause_confirm'));
+        } else {
+          controlsRow.push(
+            Markup.button.callback('▶️ Reanudar x1', 'admin_queue_resume_1'),
+            Markup.button.callback('▶️ Reanudar x2', 'admin_queue_resume_2'),
+          );
+        }
+      }
+
+      const controlsRow2 = [];
+      if (isSuperAdmin && !status.running) {
+        controlsRow2.push(
+          Markup.button.callback('▶️ Reanudar x3', 'admin_queue_resume_3'),
+          Markup.button.callback('▶️ Reanudar x5', 'admin_queue_resume_5'),
+        );
+      }
+
+      await ctx.editMessageText(
+        msg,
+        Object.assign(
+          { parse_mode: 'Markdown' },
+          Markup.inlineKeyboard([
+            [
+              Markup.button.callback('🧯 Ver fallidos', 'admin_queue_failed'),
+              Markup.button.callback('🔄 Actualizar', 'admin_queue_status'),
+            ],
+            ...(controlsRow.length ? [controlsRow] : []),
+            ...(controlsRow2.length ? [controlsRow2] : []),
+            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+          ])
+        )
+      );
+    } catch (error) {
+      logger.error('Error in admin_queue_status:', error);
+    }
+  });
+
+  bot.action('admin_queue_pause_confirm', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+      if (!isSuperAdmin) return;
+
+      await ctx.editMessageText(
+        '⏸️ ¿Pausar la cola de broadcasts?\n\nEsto detiene el procesador y el scheduler de retries/cleanup.',
+        Markup.inlineKeyboard([
+          [
+            Markup.button.callback('✅ Sí, pausar', 'admin_queue_pause'),
+            Markup.button.callback('❌ Cancelar', 'admin_queue_status'),
+          ],
+        ])
+      );
+    } catch (error) {
+      logger.error('Error in admin_queue_pause_confirm:', error);
+    }
+  });
+
+  bot.action('admin_queue_pause', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+      if (!isSuperAdmin) return;
+
+      const queueIntegration = getBroadcastQueueIntegration();
+      await queueIntegration.stop();
+      await showAdminPanel(ctx, true);
+    } catch (error) {
+      logger.error('Error in admin_queue_pause:', error);
+    }
+  });
+
+  bot.action(/^admin_queue_resume_(\\d+)$/, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
+      if (!isSuperAdmin) return;
+
+      const requested = Number(ctx.match[1]);
+      const concurrency = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 10) : 2;
+      const queueIntegration = getBroadcastQueueIntegration();
+      await queueIntegration.start(concurrency);
+      await showAdminPanel(ctx, true);
+    } catch (error) {
+      logger.error('Error in admin_queue_resume:', error);
+    }
+  });
+
+  bot.action('admin_queue_failed', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const lang = getLanguage(ctx);
+      const queueIntegration = getBroadcastQueueIntegration();
+      const failed = await queueIntegration.getFailedBroadcasts(10);
+
+      if (!failed?.length) {
+        await ctx.editMessageText(
+          '✅ No hay broadcasts fallidos.',
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 Actualizar', 'admin_queue_failed')],
+            [Markup.button.callback('◀️ Volver', 'admin_queue_status')],
+          ])
+        );
+        return;
+      }
+
+      const lines = failed.map((job, idx) => {
+        const id = job.job_id || job.id || '-';
+        const attempts = job.attempts ?? '-';
+        const lastError = sanitizeInput(job.last_error || job.error || '').slice(0, 80);
+        return `${idx + 1}) \`${sanitizeInput(id)}\` (attempts: ${attempts})${lastError ? `\n   ${lastError}` : ''}`;
+      });
+
+      const keyboard = failed
+        .map((job) => {
+          const id = job.job_id || job.id;
+          if (!id) return null;
+          return [Markup.button.callback('Reintentar ' + String(id).slice(0, 8), `admin_queue_retry_${id}`)];
+        })
+        .filter(Boolean);
+
+      keyboard.push([
+        Markup.button.callback('🔄 Actualizar', 'admin_queue_failed'),
+        Markup.button.callback('◀️ Volver', 'admin_queue_status'),
+      ]);
+
+      await ctx.editMessageText(
+        '`🧯 Broadcasts fallidos`' +
+          '\n━━━━━━━━━━━━━━━━━━━━\n\n' +
+          lines.join('\n\n'),
+        Object.assign({ parse_mode: 'Markdown' }, Markup.inlineKeyboard(keyboard))
+      );
+    } catch (error) {
+      logger.error('Error in admin_queue_failed:', error);
+    }
+  });
+
+  bot.action(/^admin_queue_retry_(.+)$/, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const jobId = ctx.match[1];
+      const queueIntegration = getBroadcastQueueIntegration();
+      await queueIntegration.retryFailedBroadcast(jobId);
+
+      await ctx.reply(`✅ Reintento programado: ${jobId}`);
+    } catch (error) {
+      logger.error('Error in admin_queue_retry:', error);
+    }
+  });
+
+  // NOTE: /admin command is now registered early in bot.js to ensure proper handler execution
+  // The showAdminPanel function is called directly from there
+
+  // Quick view mode command: /viewas free | /viewas prime | /viewas normal
+  bot.command('viewas', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.reply(t('unauthorized', getLanguage(ctx)));
+        return;
+      }
+
+      const args = ctx.message.text.split(' ');
+      const mode = args[1]?.toLowerCase();
+
+      if (!mode || !['free', 'prime', 'normal'].includes(mode)) {
+        const helpMsg = '👁️ **Comando de Vista Previa**\n\n' +
+            'Uso: `/viewas <modo>`\n\n' +
+            'Modos disponibles:\n' +
+            '• `free` - Ver como usuario FREE\n' +
+            '• `prime` - Ver como usuario PRIME\n' +
+            '• `normal` - Vista normal (admin)\n\n' +
+            'Ejemplo: `/viewas free`';
+        await ctx.reply(helpMsg, { parse_mode: 'Markdown' });
+        return;
+      }
+
+      if (mode === 'normal') {
+        delete ctx.session.adminViewMode;
+      } else {
+        ctx.session.adminViewMode = mode;
+      }
+      await ctx.saveSession();
+
+      const modeText = mode === 'free'
+        ? '🆓 FREE'
+        : mode === 'prime'
+        ? '💎 PRIME'
+        : '🔙 Normal';
+
+      await ctx.reply(
+        `👁️ Vista activada: ${modeText}\n\nUsa /menu para ver el menú.`,
+        { parse_mode: 'Markdown' }
+      );
+
+      logger.info('Admin view mode changed via command', { userId: ctx.from.id, mode });
+    } catch (error) {
+      logger.error('Error in /viewas command:', error);
+    }
+  });
+
+  // Quick stats command
+  bot.command('stats', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.reply(t('unauthorized', getLanguage(ctx)));
+        return;
+      }
+
+      const lang = getLanguage(ctx);
+
+      // Get comprehensive statistics
+      const userStats = await UserService.getStatistics();
+
+      // Revenue stats for different periods
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      const [todayRevenue, monthRevenue, last30Revenue] = await Promise.all([
+        PaymentModel.getRevenue(today, now),
+        PaymentModel.getRevenue(thisMonth, now),
+        PaymentModel.getRevenue(last30Days, now),
+      ]);
+
+      // Build comprehensive stats message
+      const statsMessage = '📊 *Estadísticas en Tiempo Real*\n\n'
+        + '*Métricas de Usuarios:*\n'
+        + `👥 Total Usuarios: ${userStats.total}\n`
+        + `💎 Usuarios Premium: ${userStats.active}\n`
+        + `🆓 Usuarios Free: ${userStats.free}\n`
+        + `📈 Tasa de Conversión: ${userStats.conversionRate.toFixed(2)}%\n\n`
+        + '*Ingresos - Hoy:*\n'
+        + `💰 Total: $${todayRevenue.total.toFixed(2)}\n`
+        + `📦 Pagos: ${todayRevenue.count}\n`
+        + `📊 Promedio: $${todayRevenue.average.toFixed(2)}\n\n`
+        + '*Ingresos - Este Mes:*\n'
+        + `💰 Total: $${monthRevenue.total.toFixed(2)}\n`
+        + `📦 Pagos: ${monthRevenue.count}\n`
+        + `📊 Promedio: $${monthRevenue.average.toFixed(2)}\n\n`
+        + '*Ingresos - Últimos 30 Días:*\n'
+        + `💰 Total: $${last30Revenue.total.toFixed(2)}\n`
+        + `📦 Pagos: ${last30Revenue.count}\n`
+        + `📊 Promedio: $${last30Revenue.average.toFixed(2)}\n\n`
+        + '*Desglose por Plan (Últimos 30 Días):*\n'
+        + `${Object.entries(last30Revenue.byPlan)
+          .map(([plan, count]) => `  ${plan}: ${count}`)
+          .join('\n') || '  Sin datos'}\n\n`
+        + '*Desglose por Proveedor:*\n'
+        + `${Object.entries(last30Revenue.byProvider)
+          .map(([provider, count]) => `  ${provider}: ${count}`)
+          .join('\n') || '  Sin datos'}\n\n`
+        + `_Actualizado: ${now.toLocaleString()}_`;
+
+      await ctx.reply(statsMessage, { parse_mode: 'Markdown' });
+
+      logger.info('Stats command executed', { adminId: ctx.from.id });
+    } catch (error) {
+      logger.error('Error in /stats command:', error);
+      await ctx.reply('Error al obtener estadísticas. Por favor intenta de nuevo.');
+    }
+  });
+
+  // User management
+  bot.action('admin_users', async (ctx) => {
+    try {
+      await ctx.answerCbQuery(); // Answer immediately
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const lang = getLanguage(ctx);
+
+      // Clear any ongoing admin tasks
+      ctx.session.temp = {
+        adminSearchingUser: true,
+      };
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        t('searchUser', lang),
+        Markup.inlineKeyboard([
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error in admin users:', error);
+    }
+  });
+
+  // View Mode - Show options to preview as Free or Prime
+  bot.action('admin_view_mode', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const currentMode = ctx.session?.adminViewMode;
+
+      let statusText = '';
+      if (currentMode === 'free') {
+        statusText = '\n\n_Actualmente: Vista FREE_';
+      } else if (currentMode === 'prime') {
+        statusText = '\n\n_Actualmente: Vista PRIME_';
+      } else {
+        statusText = '\n\n_Actualmente: Vista Normal (Admin)_';
+      }
+
+      const message = '👁️ **Vista Previa de Menú**\n\nSelecciona cómo quieres ver el menú para probar la experiencia del usuario:' + statusText;
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback('🆓 Ver como FREE', 'admin_view_as_free'),
+            Markup.button.callback('💎 Ver como PRIME', 'admin_view_as_prime'),
+          ],
+          [
+            Markup.button.callback('🔙 Vista Normal', 'admin_view_as_normal'),
+          ],
+          [
+            Markup.button.callback('↩️ Volver', 'admin_cancel'),
+          ],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in admin view mode:', error);
+    }
+  });
+
+  // Set view mode to FREE
+  bot.action('admin_view_as_free', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      ctx.session.adminViewMode = 'free';
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('👁️ Vista FREE activada');
+
+      // Show menu with new view mode
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error setting free view mode:', error);
+    }
+  });
+
+  // Set view mode to PRIME
+  bot.action('admin_view_as_prime', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      ctx.session.adminViewMode = 'prime';
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('👁️ Vista PRIME activada');
+
+      // Show menu with new view mode
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error setting prime view mode:', error);
+    }
+  });
+
+  // Set view mode back to Normal (admin)
+  bot.action('admin_view_as_normal', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      delete ctx.session.adminViewMode;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('🔙 Vista Normal activada');
+
+      // Show menu with normal view
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error setting normal view mode:', error);
+    }
+  });
+
+  // Exit preview mode (from menu button)
+  bot.action('admin_exit_preview', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      delete ctx.session.adminViewMode;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('🔙 Vista Normal');
+
+      // Show menu with normal view
+      const { showMainMenu } = require('../user/menu');
+      await ctx.deleteMessage().catch(() => {});
+      await showMainMenu(ctx);
+    } catch (error) {
+      logger.error('Error exiting preview mode:', error);
+    }
+  });
+
+  // Broadcast
+  bot.action('admin_broadcast', async (ctx) => {
+    try {
+      await ctx.answerCbQuery(); // Answer immediately to prevent timeout
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        logger.warn('Non-admin tried to access broadcast:', { userId: ctx.from.id });
+        return;
+      }
+
+      // Broadcast flow must run in private chat, otherwise session state splits across chats/topics
+      if (ctx.chat?.type !== 'private') {
+        const botUsername = process.env.BOT_USERNAME || 'pnplatinotv_bot';
+        await ctx.editMessageText(
+          '⚠️ Para enviar un broadcast, abre el bot en privado.\n\nEsto evita que el proceso se quede atascado entre topics/chats.',
+          Markup.inlineKeyboard([
+            [Markup.button.url('🔗 Abrir bot', `https://t.me/${botUsername}`)],
+            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+          ]),
+        );
+        return;
+      }
+
+      // If there's an in-progress broadcast, offer resume/restart instead of resetting silently
+      const existingStep = ctx.session?.temp?.broadcastStep;
+      if (existingStep && existingStep !== 'sending') {
+        await showBroadcastResumePrompt(ctx);
+        return;
+      }
+
+      // Clear any ongoing admin tasks
+      ctx.session.temp = {};
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        '📢 *Asistente de Difusión*\n\n🎯 *Paso 1/5: Seleccionar Audiencia*\n\nElige a quién enviar este broadcast:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('👥 Todos los Usuarios', 'broadcast_all')],
+            [Markup.button.callback('💎 Solo Premium', 'broadcast_premium')],
+            [Markup.button.callback('🆓 Solo Gratis', 'broadcast_free')],
+            [Markup.button.callback('↩️ Churned (Ex-Premium)', 'broadcast_churned')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error in admin broadcast:', error);
+      try {
+        await ctx.answerCbQuery('Error al iniciar broadcast');
+        await ctx.reply('❌ Error al cargar el menú de broadcast. Por favor intenta de nuevo.').catch(() => {});
+      } catch (e) {
+        logger.error('❌ Failed to send error message:', e);
+      }
+    }
+  });
+
+  bot.action('broadcast_all', async (ctx) => {
+    try {
+      logger.info('🎯 HANDLER TRIGGERED: broadcast_all', {
+        userId: ctx.from.id,
+        chatType: ctx.chat?.type,
+        callbackData: ctx.callbackQuery?.data
+      });
+      
+      // Answer callback immediately
+      await ctx.answerCbQuery('✅ Processing...');
+      logger.info('✅ Callback query answered');
+      
+      // Check admin permissions
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      logger.info('🔐 Permission check result:', { userId: ctx.from.id, isAdmin });
+      
+      if (!isAdmin) {
+        logger.warn('Non-admin tried to select broadcast audience (all):', { userId: ctx.from.id });
+        await ctx.answerCbQuery('❌ Not authorized');
+        return;
+      }
+      
+      logger.info('👥 Broadcast audience selected: all', { userId: ctx.from.id });
+      
+      // Initialize session data with debugging
+      logger.info('📊 Session before initialization:', ctx.session);
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.broadcastTarget = 'all';
+      ctx.session.temp.broadcastData = {};
+      logger.info('📊 Session after initialization:', ctx.session);
+      
+      // Update broadcast step
+      logger.info('🔄 Updating broadcast step to media...');
+      await updateBroadcastStep(ctx, 'media');
+      logger.info('✅ Broadcast step updated');
+      
+      // Save session
+      logger.info('💾 Saving session...');
+      await ctx.saveSession();
+      logger.info('✅ Session saved successfully');
+      
+      // Log final session state
+      logger.info('📋 Final session state:', {
+        userId: ctx.from.id,
+        broadcastTarget: ctx.session.temp.broadcastTarget,
+        broadcastStep: ctx.session.temp.broadcastStep,
+        broadcastData: ctx.session.temp.broadcastData
+      });
+      
+      // Render next step
+      logger.info('🎨 Rendering broadcast step...');
+      await renderBroadcastStep(ctx);
+      logger.info('✅ Broadcast step rendered');
+      
+    } catch (error) {
+      logger.error('❌ CRITICAL ERROR in broadcast_all handler:', {
+        error: error.message,
+        stack: error.stack,
+        userId: ctx.from.id
+      });
+      try {
+        await ctx.reply('❌ Error selecting audience. Please check logs and try again.').catch(() => {});
+      } catch (replyError) {
+        logger.error('❌ Failed to send error message:', replyError.message);
+      }
+    }
+  });
+
+  bot.action('broadcast_premium', async (ctx) => {
+    try {
+      logger.info('🎯 HANDLER TRIGGERED: broadcast_premium', {
+        userId: ctx.from.id,
+        chatType: ctx.chat?.type,
+        callbackData: ctx.callbackQuery?.data
+      });
+      
+      await ctx.answerCbQuery('✅ Processing...');
+      logger.info('✅ Callback query answered');
+      
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      logger.info('🔐 Permission check result:', { userId: ctx.from.id, isAdmin });
+      
+      if (!isAdmin) {
+        logger.warn('Non-admin tried to select broadcast audience (premium):', { userId: ctx.from.id });
+        await ctx.answerCbQuery('❌ Not authorized');
+        return;
+      }
+      
+      logger.info('💎 Broadcast audience selected: premium', { userId: ctx.from.id });
+      
+      logger.info('📊 Session before initialization:', ctx.session);
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.broadcastTarget = 'premium';
+      ctx.session.temp.broadcastData = {};
+      logger.info('📊 Session after initialization:', ctx.session);
+      
+      logger.info('🔄 Updating broadcast step to media...');
+      await updateBroadcastStep(ctx, 'media');
+      logger.info('✅ Broadcast step updated');
+      
+      logger.info('💾 Saving session...');
+      await ctx.saveSession();
+      logger.info('✅ Session saved successfully');
+      
+      logger.info('📋 Final session state:', {
+        userId: ctx.from.id,
+        broadcastTarget: ctx.session.temp.broadcastTarget,
+        broadcastStep: ctx.session.temp.broadcastStep
+      });
+      
+      logger.info('🎨 Rendering broadcast step...');
+      await renderBroadcastStep(ctx);
+      logger.info('✅ Broadcast step rendered');
+      
+    } catch (error) {
+      logger.error('❌ CRITICAL ERROR in broadcast_premium handler:', {
+        error: error.message,
+        stack: error.stack,
+        userId: ctx.from.id
+      });
+      try {
+        await ctx.reply('❌ Error selecting audience. Please check logs and try again.').catch(() => {});
+      } catch (replyError) {
+        logger.error('❌ Failed to send error message:', replyError.message);
+      }
+    }
+  });
+
+  bot.action('broadcast_free', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp.broadcastTarget = 'free';
+      ctx.session.temp.broadcastData = {};
+      await updateBroadcastStep(ctx, 'media');
+      await ctx.saveSession();
+      await renderBroadcastStep(ctx);
+    } catch (error) {
+      logger.error('Error selecting broadcast audience (free):', error);
+    }
+  });
+
+  bot.action('broadcast_churned', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp.broadcastTarget = 'churned';
+      ctx.session.temp.broadcastData = {};
+      await updateBroadcastStep(ctx, 'media');
+      await ctx.saveSession();
+      await renderBroadcastStep(ctx);
+    } catch (error) {
+      logger.error('Error selecting broadcast audience (churned):', error);
+    }
+  });
+
+  bot.action('broadcast_resume', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await renderBroadcastStep(ctx);
+    } catch (error) {
+      logger.error('Error in broadcast_resume:', error);
+    }
+  });
+
+  bot.action('broadcast_restart', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp = {};
+      await ctx.saveSession();
+      await ctx.editMessageText(
+        t('broadcastTarget', getLanguage(ctx)),
+        Markup.inlineKeyboard([
+          [Markup.button.callback('👥 Todos los Usuarios', 'broadcast_all')],
+          [Markup.button.callback('💎 Solo Premium', 'broadcast_premium')],
+          [Markup.button.callback('🆓 Solo Gratis', 'broadcast_free')],
+          [Markup.button.callback('↩️ Churned (Ex-Premium)', 'broadcast_churned')],
+          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+        ]),
+      );
+    } catch (error) {
+      logger.error('Error in broadcast_restart:', error);
+    }
+  });
+
+  // Broadcast target selection
+  // 🧪 TEST HANDLER: Simple callback test to verify callback queries work
+  bot.action('test_callback', async (ctx) => {
+    try {
+      logger.info('🧪 TEST CALLBACK TRIGGERED', {
+        userId: ctx.from.id,
+        callbackData: ctx.callbackQuery?.data
+      });
+      
+      await ctx.answerCbQuery('✅ Test callback received!');
+      await ctx.reply('🎉 Test callback works! Callback queries are functioning properly.').catch(() => {});
+      
+      logger.info('✅ Test callback completed successfully');
+    } catch (error) {
+      logger.error('❌ Test callback failed:', {
+        error: error.message,
+        userId: ctx.from.id
+      });
+      try {
+        await ctx.answerCbQuery('❌ Test failed');
+        await ctx.reply('❌ Test callback failed. Check logs for details.').catch(() => {});
+      } catch (replyError) {
+        logger.error('❌ Failed to send test error message:', replyError.message);
+      }
+    }
+  });
+
+  // DISABLED: Regex handler conflicts with specific audience selection handlers
+  // bot.action(/^broadcast_(.+)$/, async (ctx) => {
+  //   try {
+  //     logger.info('🎯 Regex handler: broadcast_* triggered', { 
+  //       userId: ctx.from.id, 
+  //       action: ctx.callbackQuery?.data 
+  //     });
+  //     const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+  //     if (!isAdmin) {
+  //       await ctx.answerCbQuery('❌ No autorizado');
+  //       return;
+  //     }
+
+  //     // Validate match result exists
+  //     if (!ctx.match || !ctx.match[1]) {
+  //       logger.error('Invalid broadcast target action format');
+  //       await ctx.answerCbQuery('❌ Error en formato de acción');
+  //       return;
+  //     }
+
+  //     const target = ctx.match[1];
+  //     const lang = getLanguage(ctx);
+
+  //     // Initialize session temp if needed
+  //     if (!ctx.session.temp) {
+  //       ctx.session.temp = {};
+  //     }
+
+  //     ctx.session.temp.broadcastTarget = target;
+  //     await updateBroadcastStep(ctx, 'media');
+  //     ctx.session.temp.broadcastData = {};
+  //     await ctx.saveSession();
+
+  //     logger.info('Broadcast target selected via regex handler', { target, userId: ctx.from.id });
+
+  //     await ctx.answerCbQuery(`✓ Audiencia: ${target}`);
+
+  //     await ctx.editMessageText(
+  //       '📎 *Paso 1/5: Subir Media*\n\n'
+  //       + 'Por favor envía una imagen, video o archivo para adjuntar al broadcast.\n\n'
+  //       + '💡 También puedes saltar este paso si solo quieres enviar texto.',
+  //       {
+  //         parse_mode: 'Markdown',
+  //         ...Markup.inlineKeyboard([
+  //           [Markup.button.callback('⏭️ Saltar (Solo Texto)', 'broadcast_skip_media')],
+  //           [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+  //         ]),
+  //       },
+  //     );
+  //   } catch (error) {
+  //     logger.error('Error in broadcast target:', error);
+  //     await ctx.answerCbQuery('❌ Error al seleccionar audiencia').catch(() => {});
+  //   }
+  // });
+
+  // Skip media upload
+  bot.action('broadcast_skip_media', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      // Validate session state
+      if (!ctx.session.temp || !ctx.session.temp.broadcastTarget) {
+        await ctx.answerCbQuery('❌ Sesión expirada. Por favor inicia de nuevo.');
+        logger.warn('Broadcast session expired or missing', { userId: ctx.from.id });
+        return;
+      }
+
+      ctx.session.temp.broadcastStep = 'text_en';
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('⏭️ Saltando media');
+
+      await ctx.editMessageText(
+        '🇺🇸 *Paso 3/5: Texto en Inglés (Opcional)*\n\n'
+        + 'Escribe el mensaje en inglés que quieres enviar.\n\n'
+        + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en inglés.',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_en')],
+            [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_en')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+
+      logger.info('Broadcast media skipped', { userId: ctx.from.id });
+    } catch (error) {
+      logger.error('Error skipping media:', error);
+      await ctx.answerCbQuery('❌ Error al saltar media').catch(() => {});
+    }
+  });
+
+  // Skip English text
+  bot.action('broadcast_skip_text_en', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      // Validate session state
+      if (!ctx.session.temp || !ctx.session.temp.broadcastTarget) {
+        await ctx.answerCbQuery('❌ Sesión expirada. Por favor inicia de nuevo.');
+        logger.warn('Broadcast session expired or missing', { userId: ctx.from.id });
+        return;
+      }
+
+      // Set empty English text
+      if (!ctx.session.temp.broadcastData) {
+        ctx.session.temp.broadcastData = {};
+      }
+      ctx.session.temp.broadcastData.textEn = '';
+
+      ctx.session.temp.broadcastStep = 'text_es';
+      ctx.session.temp.maxCompletedStep = 'text_es';
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('⏭️ Texto en inglés omitido');
+
+      await ctx.editMessageText(
+        '🇪🇸 *Paso 4/5: Texto en Español (Opcional)*\n\n'
+        + 'Escribe el mensaje en español que quieres enviar.\n\n'
+        + '💡 Puedes usar Grok AI para generar el texto, o saltar si no necesitas texto en español.',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_es')],
+            [Markup.button.callback('⏭️ Saltar', 'broadcast_skip_text_es')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+
+      logger.info('Broadcast English text skipped', { userId: ctx.from.id });
+    } catch (error) {
+      logger.error('Error skipping English text:', error);
+      await ctx.answerCbQuery('❌ Error al saltar texto').catch(() => {});
+    }
+  });
+
+  // Skip Spanish text
+  bot.action('broadcast_skip_text_es', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      // Validate session state
+      if (!ctx.session.temp || !ctx.session.temp.broadcastTarget) {
+        await ctx.answerCbQuery('❌ Sesión expirada. Por favor inicia de nuevo.');
+        logger.warn('Broadcast session expired or missing', { userId: ctx.from.id });
+        return;
+      }
+
+      // Set empty Spanish text
+      if (!ctx.session.temp.broadcastData) {
+        ctx.session.temp.broadcastData = {};
+      }
+      ctx.session.temp.broadcastData.textEs = '';
+
+      ctx.session.temp.broadcastStep = 'buttons';
+      ctx.session.temp.maxCompletedStep = 'buttons';
+
+      // Initialize buttons array with default buttons
+      const lang = getLanguage(ctx);
+      if (!ctx.session.temp.broadcastData.buttons || !Array.isArray(ctx.session.temp.broadcastData.buttons)) {
+        ctx.session.temp.broadcastData.buttons = buildDefaultBroadcastButtons(lang);
+      }
+
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('⏭️ Texto en español omitido');
+      await showBroadcastButtonsPicker(ctx);
+
+      logger.info('Broadcast Spanish text skipped', { userId: ctx.from.id });
+    } catch (error) {
+      logger.error('Error skipping Spanish text:', error);
+      await ctx.answerCbQuery('❌ Error al saltar texto').catch(() => {});
+    }
+  });
+
+  // NOTE: Old preset-based broadcast buttons removed in favor of a flexible toggle picker.
+
+  // Broadcast - No buttons option
+  bot.action('broadcast_no_buttons', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      // Save no buttons selection
+      if (!ctx.session.temp.broadcastData) {
+        ctx.session.temp.broadcastData = {};
+      }
+      ctx.session.temp.broadcastData.buttons = [];
+      ctx.session.temp.broadcastStep = 'preview';
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('⏭️ Sin botones');
+      await sendBroadcastPreview(ctx);
+    } catch (error) {
+      logger.error('Error selecting no buttons:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Broadcast - Toggle one of the optional buttons (add/remove)
+  // Note: exclude 'email' which has its own handler (broadcast_toggle_email)
+  bot.action(/^broadcast_toggle_(?!email$)(.+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      if (!ctx.session.temp?.broadcastData) return;
+
+      const key = ctx.match?.[1];
+      if (!key) return;
+
+      const lang = getLanguage(ctx);
+      const options = getBroadcastButtonOptions(lang);
+      const opt = options.find((o) => o.key === key);
+      if (!opt) {
+        await ctx.answerCbQuery('Unknown');
+        return;
+      }
+
+      const buttons = normalizeButtons(ctx.session.temp.broadcastData.buttons);
+      const idx = buttons.findIndex((b) => (typeof b === 'string' ? JSON.parse(b).key : b.key) === key);
+      if (idx >= 0) {
+        buttons.splice(idx, 1);
+        await ctx.answerCbQuery('Removed');
+      } else {
+        buttons.push(opt);
+        await ctx.answerCbQuery('Added');
+      }
+      ctx.session.temp.broadcastData.buttons = buttons;
+      ctx.session.temp.broadcastStep = 'buttons'; // Ensure we stay in buttons step
+      await ctx.saveSession();
+      await showBroadcastButtonsPicker(ctx);
+    } catch (error) {
+      logger.error('Error toggling broadcast button:', error);
+      // Reset to buttons step on error to prevent getting stuck
+      if (ctx.session.temp) {
+        ctx.session.temp.broadcastStep = 'buttons';
+        await ctx.saveSession();
+      }
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  bot.action('broadcast_continue_with_buttons', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      if (!ctx.session.temp?.broadcastTarget || !ctx.session.temp?.broadcastData) {
+        await ctx.answerCbQuery('❌ Sesión expirada');
+        return;
+      }
+      await ctx.answerCbQuery();
+      ctx.session.temp.broadcastStep = 'preview';
+      await ctx.saveSession();
+      await sendBroadcastPreview(ctx);
+    } catch (error) {
+      logger.error('Error in broadcast_continue_with_buttons:', error);
+    }
+  });
+
+  bot.action('broadcast_resume_buttons', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp.broadcastStep = 'buttons';
+      await ctx.saveSession();
+      await showBroadcastButtonsPicker(ctx);
+    } catch (error) {
+      logger.error('Error in broadcast_resume_buttons:', error);
+    }
+  });
+
+  bot.action('broadcast_ai_en', async (ctx) => {
+    try {
+      logger.info('[GROK-BUTTON] broadcast_ai_en clicked', { userId: ctx.from.id });
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        logger.warn('[GROK-BUTTON] User not admin, ignoring broadcast_ai_en');
+        return;
+      }
+      if (!ctx.session.temp?.broadcastData) ctx.session.temp.broadcastData = {};
+      ctx.session.temp.broadcastStep = 'ai_prompt_en';
+      await ctx.saveSession();
+      logger.info('[GROK-BUTTON] Set broadcastStep to ai_prompt_en', { userId: ctx.from.id });
+      await ctx.reply(
+        '🤖 *AI Write (EN)*\n\nDescribe what you want to announce.\nExample:\n`Promote Lifetime Pass with urgency + link pnptv.app/lifetime100`',
+        { parse_mode: 'Markdown' },
+      );
+    } catch (error) {
+      logger.error('[GROK-BUTTON] Error in broadcast_ai_en:', { error: error.message, stack: error.stack });
+    }
+  });
+
+  bot.action('broadcast_ai_es', async (ctx) => {
+    try {
+      logger.info('[GROK-BUTTON] broadcast_ai_es clicked', { userId: ctx.from.id });
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        logger.warn('[GROK-BUTTON] User not admin, ignoring broadcast_ai_es');
+        return;
+      }
+      if (!ctx.session.temp?.broadcastData) ctx.session.temp.broadcastData = {};
+      ctx.session.temp.broadcastStep = 'ai_prompt_es';
+      await ctx.saveSession();
+      logger.info('[GROK-BUTTON] Set broadcastStep to ai_prompt_es', { userId: ctx.from.id });
+      await ctx.reply(
+        '🤖 *AI Write (ES)*\n\nDescribe lo que quieres anunciar.\nEjemplo:\n`Promociona Lifetime Pass con urgencia + link pnptv.app/lifetime100`',
+        { parse_mode: 'Markdown' },
+      );
+    } catch (error) {
+      logger.error('[GROK-BUTTON] Error in broadcast_ai_es:', { error: error.message, stack: error.stack });
+    }
+  });
+
+  // Use AI text as-is (English)
+  bot.action('broadcast_use_ai_en', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery('✅ Texto guardado');
+
+      const aiDraft = ctx.session.temp?.aiDraft;
+      if (!aiDraft) {
+        await ctx.reply('❌ No hay borrador AI. Intenta de nuevo.');
+        return;
+      }
+
+      if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
+      ctx.session.temp.broadcastData.textEn = aiDraft;
+      ctx.session.temp.aiDraft = null;
+      await updateBroadcastStep(ctx, 'text_es');
+      await ctx.saveSession();
+
+      await ctx.reply(
+        '🇪🇸 *Paso 3/5: Texto en Español*\n\n'
+        + 'Por favor escribe el mensaje en español que quieres enviar:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🤖 AI Write (Grok)', 'broadcast_ai_es')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error in broadcast_use_ai_en:', error);
+    }
+  });
+
+  // Use AI text as-is (Spanish)
+  bot.action('broadcast_use_ai_es', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery('✅ Texto guardado');
+
+      const aiDraft = ctx.session.temp?.aiDraft;
+      if (!aiDraft) {
+        await ctx.reply('❌ No hay borrador AI. Intenta de nuevo.');
+        return;
+      }
+
+      if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
+      ctx.session.temp.broadcastData.textEs = aiDraft;
+      ctx.session.temp.aiDraft = null;
+      await updateBroadcastStep(ctx, 'buttons');
+
+      // Ensure buttons array is properly initialized
+      if (!ctx.session.temp.broadcastData.buttons || !Array.isArray(ctx.session.temp.broadcastData.buttons)) {
+        ctx.session.temp.broadcastData.buttons = buildDefaultBroadcastButtons(getLanguage(ctx));
+      }
+      await ctx.saveSession();
+
+      await showBroadcastButtonsPicker(ctx);
+    } catch (error) {
+      logger.error('Error in broadcast_use_ai_es:', error);
+    }
+  });
+
+  // Edit AI text manually (English)
+  bot.action('broadcast_edit_ai_en', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery();
+
+      await updateBroadcastStep(ctx, 'edit_ai_en');
+      await ctx.saveSession();
+
+      const aiDraft = ctx.session.temp?.aiDraft || '';
+      const safeDraft = sanitize.telegramMarkdown(aiDraft);
+      await ctx.reply(
+        '✏️ *Editar texto (EN)*\n\n' +
+        'Envía el texto editado que quieres usar:\n\n' +
+        `_Texto actual:_\n\`\`\`\n${safeDraft}\n\`\`\``,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('⬅️ Volver', 'broadcast_ai_en')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error in broadcast_edit_ai_en:', error);
+    }
+  });
+
+  // Edit AI text manually (Spanish)
+  bot.action('broadcast_edit_ai_es', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery();
+
+      await updateBroadcastStep(ctx, 'edit_ai_es');
+      await ctx.saveSession();
+
+      const aiDraft = ctx.session.temp?.aiDraft || '';
+      const safeDraft = sanitize.telegramMarkdown(aiDraft);
+      await ctx.reply(
+        '✏️ *Editar texto (ES)*\n\n' +
+        'Envía el texto editado que quieres usar:\n\n' +
+        `_Texto actual:_\n\`\`\`\n${safeDraft}\n\`\`\``,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('⬅️ Volver', 'broadcast_ai_es')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        },
+      );
+    } catch (error) {
+      logger.error('Error in broadcast_edit_ai_es:', error);
+    }
+  });
+
+  bot.action('broadcast_add_custom_link', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      if (!ctx.session.temp?.broadcastTarget || !ctx.session.temp?.broadcastData) {
+        await ctx.answerCbQuery('❌ Sesión expirada');
+        return;
+      }
+      await ctx.answerCbQuery();
+      ctx.session.temp.broadcastStep = 'custom_link';
+      await ctx.saveSession();
+      await ctx.editMessageText(
+        '🔗 *Custom Link*\n\n'
+        + 'Envía el enlace en este formato:\n\n'
+        + '`Texto del Botón|https://tu-link.com`\n\n'
+        + 'Ejemplo:\n'
+        + '`🔥 Promo|https://pnptv.app`',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('⏭️ Saltar', 'broadcast_continue_with_buttons')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error in broadcast_add_custom_link:', error);
+    }
+  });
+
+  // Broadcast - Remove custom link
+  bot.action(/^broadcast_remove_custom_(\d+)$/, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      if (!ctx.session.temp?.broadcastData?.buttons) return;
+
+      const index = parseInt(ctx.match[1]);
+      const options = getBroadcastButtonOptions(getLanguage(ctx));
+      const presetKeys = new Set(options.map(opt => opt.key));
+
+      // Find and remove the custom button at the given index
+      const buttons = normalizeButtons(ctx.session.temp.broadcastData.buttons);
+      let customIndex = 0;
+      for (let i = 0; i < buttons.length; i++) {
+        const btn = typeof buttons[i] === 'string' ? JSON.parse(buttons[i]) : buttons[i];
+        if (!presetKeys.has(btn.key) || btn.key === 'custom') {
+          if (customIndex === index) {
+            buttons.splice(i, 1);
+            break;
+          }
+          customIndex++;
+        }
+      }
+
+      ctx.session.temp.broadcastData.buttons = buttons;
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('Removed');
+      await showBroadcastButtonsPicker(ctx);
+    } catch (error) {
+      logger.error('Error removing custom button:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // Broadcast - Custom buttons option
+  bot.action('broadcast_custom_buttons', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      ctx.session.temp.broadcastStep = 'custom_buttons';
+      ctx.session.temp.customButtons = [];
+      await ctx.saveSession();
+
+      await ctx.answerCbQuery('➕ Botones Personalizados');
+      await ctx.editMessageText(
+        '➕ *Agregar Botones Personalizados*\n\n'
+        + 'Envía cada botón en este formato:\n\n'
+        + '`Texto del Botón|tipo|destino`\n\n'
+        + '**Tipos disponibles:**\n'
+        + '• `url` - Enlace externo (ej: https://...)\n'
+        + '• `plan` - Plan específico (ej: premium, gold)\n'
+        + '• `command` - Comando bot (ej: /plans, /support)\n'
+        + '• `feature` - Característica (ej: features, nearby)\n\n'
+        + '**Ejemplos:**\n'
+        + '`💎 Ver Planes|command|/plans`\n'
+        + '`⭐ Premium Now|plan|premium`\n'
+        + '`🔗 Website|url|https://pnptv.app`\n\n'
+        + 'Escribe cada botón en un mensaje. Cuando termines, di \"listo\".',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        }
+      );
+    } catch (error) {
 
 const safeAnswerCbQuery = async (ctx, text, options = {}) => {
   if (!ctx?.answerCbQuery) return;
