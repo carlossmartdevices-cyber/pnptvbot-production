@@ -15,6 +15,7 @@ const ACCESS_CONTROL_CONFIG = {
     USER: 0,           // Default user
     CONTRIBUTOR: 10,   // Can post in approval topic
     PERFORMER: 20,     // Can post in approval topic + additional permissions
+    MODERATOR: 50,     // Can moderate content, limited admin access
     ADMIN: 100,        // Full access
     SUPERADMIN: 200,   // God mode
   },
@@ -24,7 +25,9 @@ const ACCESS_CONTROL_CONFIG = {
     0: 'User',
     10: 'Contributor',
     20: 'Performer',
+    50: 'Moderator',
     100: 'Admin',
+    200: 'Super Admin',
   },
 
   // Topic permissions

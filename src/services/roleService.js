@@ -60,23 +60,32 @@ class RoleService {
    */
   static async setUserRole(userId, role, grantedBy) {
     try {
+      // Normalize role to uppercase for consistency
+      const normalizedRole = role.toUpperCase();
+
       // Validate role
-      if (!ACCESS_CONTROL_CONFIG.ROLES[role]) {
+      if (!ACCESS_CONTROL_CONFIG.ROLES[normalizedRole]) {
         logger.error('Invalid role:', role);
         return { success: false, message: 'Rol inválido' };
       }
 
-      // Upsert role
+      // Upsert role in user_roles table
       await query(
         `INSERT INTO user_roles (user_id, role, granted_by, granted_at)
          VALUES ($1, $2, $3, NOW())
          ON CONFLICT (user_id)
          DO UPDATE SET role = $2, granted_by = $3, granted_at = NOW()`,
-        [userId.toString(), role, grantedBy.toString()]
+        [userId.toString(), normalizedRole, grantedBy.toString()]
       );
 
-      logger.info('User role updated', { userId, role, grantedBy });
-      return { success: true, message: `Rol ${role} asignado correctamente` };
+      // Also update the users table for consistency
+      await query(
+        `UPDATE users SET role = $1, assigned_by = $2, role_assigned_at = NOW() WHERE id = $3`,
+        [normalizedRole.toLowerCase(), grantedBy.toString(), userId.toString()]
+      );
+
+      logger.info('User role updated', { userId, role: normalizedRole, grantedBy });
+      return { success: true, message: `Rol ${normalizedRole} asignado correctamente` };
     } catch (error) {
       logger.error('Error setting user role:', error);
       return { success: false, message: error.message };
@@ -122,9 +131,11 @@ class RoleService {
    */
   static async getUsersByRole(role) {
     try {
+      // Normalize role to uppercase for query
+      const normalizedRole = role.toUpperCase();
       const result = await query(
-        'SELECT user_id FROM user_roles WHERE role = $1',
-        [role]
+        'SELECT user_id FROM user_roles WHERE UPPER(role) = $1',
+        [normalizedRole]
       );
 
       return result.rows.map(row => row.user_id);
@@ -171,16 +182,24 @@ class RoleService {
   /**
    * Remove role from user (reset to USER)
    * @param {string} userId - User ID
+   * @param {string} removedBy - Admin who removed the role (optional)
    * @returns {Promise<{success: boolean, message: string}>} Result object
    */
-  static async removeRole(userId) {
+  static async removeRole(userId, removedBy = null) {
     try {
+      // Remove from user_roles table
       await query(
         'DELETE FROM user_roles WHERE user_id = $1',
         [userId.toString()]
       );
 
-      logger.info('User role removed', { userId });
+      // Also update the users table for consistency
+      await query(
+        `UPDATE users SET role = 'user', assigned_by = $1, role_assigned_at = NOW() WHERE id = $2`,
+        [removedBy ? removedBy.toString() : null, userId.toString()]
+      );
+
+      logger.info('User role removed', { userId, removedBy });
       return { success: true, message: 'Rol removido correctamente' };
     } catch (error) {
       logger.error('Error removing user role:', error);
@@ -195,18 +214,22 @@ class RoleService {
   static async getRoleStats() {
     try {
       const result = await query(
-        'SELECT role, COUNT(*) as count FROM user_roles GROUP BY role'
+        'SELECT UPPER(role) as role, COUNT(*) as count FROM user_roles GROUP BY UPPER(role)'
       );
 
       const stats = {
         USER: 0,
         CONTRIBUTOR: 0,
         PERFORMER: 0,
+        MODERATOR: 0,
         ADMIN: 0,
+        SUPERADMIN: 0,
       };
 
       result.rows.forEach(row => {
-        stats[row.role] = parseInt(row.count);
+        if (stats.hasOwnProperty(row.role)) {
+          stats[row.role] = parseInt(row.count);
+        }
       });
 
       return stats;

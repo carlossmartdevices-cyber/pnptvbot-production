@@ -276,6 +276,7 @@ const registerRoleManagementHandlers = (bot) => {
       if (admins.length > 0) {
         keyboard.push([{ text: '🟡 ADMINISTRADORES', callback_data: 'noop' }]);
         for (const admin of admins) {
+          if (!admin) continue;
           keyboard.push([
             Markup.button.callback(
               `@${admin.username || admin.id}`,
@@ -286,9 +287,10 @@ const registerRoleManagementHandlers = (bot) => {
       }
 
       // List moderators with actions
-      if (admins.moderators.length > 0) {
+      if (moderators.length > 0) {
         keyboard.push([{ text: '🟢 MODERADORES', callback_data: 'noop' }]);
-        for (const mod of admins.moderators) {
+        for (const mod of moderators) {
+          if (!mod) continue;
           keyboard.push([
             Markup.button.callback(
               `@${mod.username || mod.id}`,
@@ -302,6 +304,7 @@ const registerRoleManagementHandlers = (bot) => {
       if (performers.length > 0) {
         keyboard.push([{ text: '🎭 PERFORMERS', callback_data: 'noop' }]);
         for (const performer of performers) {
+          if (!performer) continue;
           keyboard.push([
             Markup.button.callback(
               `@${performer.username || performer.id}`,
