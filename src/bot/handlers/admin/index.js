@@ -613,10 +613,15 @@ async function showAdminPanel(ctx, edit = false) {
     }
 
     // Funciones solo para SuperAdmin
+    if (userRole === 'superadmin' || userRole === 'admin') {
+      buttons.push([
+        Markup.button.callback('👑 Roles', 'admin_roles'),
+      ]);
+    }
+
     if (userRole === 'superadmin') {
       // ═══ ADMINISTRACIÓN ═══
       buttons.push([
-        Markup.button.callback('👑 Roles', 'admin_roles'),
         Markup.button.callback('📜 Registros', 'admin_logs'),
       ]);
     }
@@ -666,6 +671,8 @@ let registerAdminHandlers = (bot) => {
     prompt: 'Selecciona la cuenta desde la cual se publicará:',
     connectLabel: '➕ Conectar cuenta X',
     disableLabel: '🚫 No publicar en X',
+    allowDisconnect: true,
+    disconnectLabel: '🧹 Desconectar',
     backLabel: '⬅️ Volver al panel',
     notifyOnEmpty: true,
   });

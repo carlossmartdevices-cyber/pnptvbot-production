@@ -16,6 +16,9 @@ const DEFAULT_OPTIONS = {
   prompt: 'Selecciona la cuenta desde la cual se publicará:',
   connectLabel: '➕ Conectar cuenta X',
   disableLabel: '🚫 No publicar en X',
+  allowDisconnect: false,
+  disconnectLabel: '🧹 Desconectar',
+  accountActionPrefix: null,
   backLabel: '⬅️ Volver',
   notifyOnEmpty: true,
 };
@@ -56,20 +59,65 @@ const safeAnswer = async (ctx, text, options = {}) => {
   }
 };
 
+const safeEditOrReply = async (ctx, text, options = {}) => {
+  if (ctx?.editMessageText && ctx?.callbackQuery?.message) {
+    try {
+      await ctx.editMessageText(text, options);
+      return;
+    } catch (error) {
+      const description = error?.response?.description || error?.message || '';
+      if (description.includes('message is not modified')) {
+        return;
+      }
+      logger.warn('Failed to edit X accounts message', { description });
+    }
+  }
+
+  try {
+    await ctx.reply(text, options);
+  } catch (error) {
+    const description = error?.response?.description || error?.message || '';
+    logger.warn('Failed to send X accounts message', { description });
+  }
+};
+
 const buildButtons = (accounts, config, currentAccountId) => {
-  const { actionPrefix, backAction, connectLabel, disableLabel, backLabel } = config;
+  const {
+    actionPrefix,
+    backAction,
+    connectLabel,
+    disableLabel,
+    backLabel,
+    allowDisconnect,
+    disconnectLabel,
+    accountActionPrefix,
+  } = config;
+
+  const accountPrefix = accountActionPrefix || actionPrefix;
 
   const buttons = accounts.map((account) => {
     const selected = currentAccountId === account.account_id;
     const label = `${selected ? '✅' : '⬜'} @${account.handle}`;
-    return [Markup.button.callback(label, `${actionPrefix}_x_account_${account.account_id}`)];
+    const rows = [
+      [Markup.button.callback(label, `${accountPrefix}_a_${account.account_id}`)],
+    ];
+    if (allowDisconnect) {
+      rows.push([
+        Markup.button.callback(
+          `${disconnectLabel} @${account.handle}`,
+          `${accountPrefix}_d_${account.account_id}`
+        ),
+      ]);
+    }
+    return rows;
   });
 
-  buttons.push([Markup.button.callback(connectLabel, `${actionPrefix}_x_connect`)]);
-  buttons.push([Markup.button.callback(disableLabel, `${actionPrefix}_x_disable`)]);
-  buttons.push([Markup.button.callback(backLabel, backAction)]);
+  const flattened = buttons.flat();
+  flattened.push([Markup.button.callback(connectLabel, `${actionPrefix}_x_connect`)]);
+  flattened.push([Markup.button.callback(disableLabel, `${actionPrefix}_x_disable`)]);
+  flattened.push([Markup.button.callback(backLabel, backAction)]);
 
-  return buttons;
+  return flattened;
 };
 
 const showXAccountSelection = async (ctx, options = {}) => {
@@ -90,11 +138,11 @@ const showXAccountSelection = async (ctx, options = {}) => {
   };
 
   if (accounts.length === 0 && config.notifyOnEmpty) {
-    await ctx.reply(`${config.emptyTitle}\n\n${body}`, replyOptions);
+    await safeEditOrReply(ctx, `${config.emptyTitle}\n\n${body}`, replyOptions);
     return;
   }
 
-  await ctx.reply(`${header}\n\n${body}`, replyOptions);
+  await safeEditOrReply(ctx, `${header}\n\n${body}`, replyOptions);
 };
 
 const selectXAccount = async (ctx, accountId, options = {}) => {
@@ -147,14 +195,14 @@ const connectXAccount = async (ctx) => {
       adminUsername: ctx.from.username || null,
     });
     await safeAnswer(ctx);
-    await ctx.reply(
-      '🔗 *Conectar cuenta de X*\n\n'
+    const message = '🔗 Conectar cuenta de X\n\n'
       + '1) Abre este enlace.\n'
       + '2) Autoriza la cuenta.\n'
-      + '3) Regresa al bot y selecciona la cuenta.',
-      { parse_mode: 'Markdown' }
+      + '3) Regresa al bot y selecciona la cuenta.';
+    await ctx.reply(
+      message,
+      Markup.inlineKeyboard([Markup.button.url('Abrir enlace', authUrl)])
     );
-    await ctx.reply(authUrl, { disable_web_page_preview: true });
   } catch (error) {
     logger.error('Error starting X OAuth flow:', error);
     await ctx.answerCbQuery('❌ Error').catch(() => {});
@@ -165,11 +213,15 @@ const connectXAccount = async (ctx) => {
 const registerXAccountHandlers = (bot, options = {}) => {
   const config = { ...DEFAULT_OPTIONS, ...options };
   const actionPrefix = config.actionPrefix;
+  const accountPrefix = config.accountActionPrefix || actionPrefix;
 
   const configureAction = `${actionPrefix}_configure_x`;
   const connectAction = `${actionPrefix}_x_connect`;
   const disableAction = `${actionPrefix}_x_disable`;
-  const selectPattern = new RegExp(`^${actionPrefix}_x_account_(.+)$`);
+  const selectPattern = new RegExp(`^${accountPrefix}_a_(.+)$`);
+  const disconnectPattern = new RegExp(`^${accountPrefix}_d_(.+)$`);
+  const legacySelectPattern = new RegExp(`^${actionPrefix}_x_account_(.+)$`);
+  const legacyDisconnectPattern = new RegExp(`^${actionPrefix}_x_disconnect_(.+)$`);
 
 
   bot.action(configureAction, async (ctx) => {
@@ -208,6 +260,71 @@ const registerXAccountHandlers = (bot, options = {}) => {
   bot.action(selectPattern, async (ctx) => {
     const accountId = ctx.match[1];
     await selectXAccount(ctx, accountId, config);
+  });
+
+  bot.action(legacySelectPattern, async (ctx) => {
+    const accountId = ctx.match[1];
+    await selectXAccount(ctx, accountId, config);
+  });
+
+  bot.action(disconnectPattern, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      await safeAnswer(ctx, '🧹 Desconectando...');
+      const accountId = ctx.match[1];
+      const session = getSessionData(ctx, config.sessionKey);
+      const deactivated = await XPostService.deactivateAccount(accountId);
+
+      if (session.xAccountId === accountId) {
+        session.postToX = false;
+        session.xAccountId = null;
+        session.xAccountHandle = null;
+        session.xAccountDisplayName = null;
+        if (ctx.session && typeof ctx.saveSession === 'function') {
+          await ctx.saveSession();
+        }
+      }
+
+      await showXAccountSelection(ctx, config);
+    } catch (error) {
+      logger.error('Error disconnecting X account:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  bot.action(legacyDisconnectPattern, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      await safeAnswer(ctx, '🧹 Desconectando...');
+      const accountId = ctx.match[1];
+      const session = getSessionData(ctx, config.sessionKey);
+      const deactivated = await XPostService.deactivateAccount(accountId);
+
+      if (session.xAccountId === accountId) {
+        session.postToX = false;
+        session.xAccountId = null;
+        session.xAccountHandle = null;
+        session.xAccountDisplayName = null;
+        if (ctx.session && typeof ctx.saveSession === 'function') {
+          await ctx.saveSession();
+        }
+      }
+
+      await showXAccountSelection(ctx, config);
+    } catch (error) {
+      logger.error('Error disconnecting X account (legacy):', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
   });
 };
 

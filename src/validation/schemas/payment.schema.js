@@ -126,7 +126,7 @@ const schemas = {
     x_currency_code: Joi.string().valid('COP', 'USD', 'cop', 'usd').required(),
     x_transaction_state: Joi.string().valid('Aceptada', 'Aprobada', 'Rechazada', 'Pendiente', 'Fallida').required(),
     x_signature: Joi.string().required(),
-  }),
+  }).unknown(true),
 
   /**
    * Payment query filters validation

@@ -4,70 +4,59 @@ const XPostService = require('../../services/xPostService');
 const XOAuthService = require('../../services/xOAuthService');
 const GrokService = require('../../services/grokService');
 const logger = require('../../../utils/logger');
-const sanitize = require('../../../utils/sanitizer');
 
 const SESSION_KEY = 'xPostWizard';
 const X_MAX_TEXT_LENGTH = 280;
 const X_REQUIRED_LINKS = ['t.me/pnplatinotv_bot', 'pnptv.app/lifetime100'];
 
+const SERVER_TIMEZONE = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch (error) {
+    return 'UTC';
+  }
+})();
+
+const escapeMarkdown = (text) => {
+  if (!text) return '';
+  return String(text).replace(/[_*\\[\]()~`>#+=|{}.!-]/g, '\\$&');
+};
+
+const safeCodeBlock = (text) => {
+  if (!text) return '';
+  return String(text).replace(/```/g, '``\\`');
+};
+
+const getMissingRequiredLinks = (text) => {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return X_REQUIRED_LINKS.slice();
+  return X_REQUIRED_LINKS.filter((link) => {
+    const escaped = link.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return !new RegExp(escaped, 'i').test(trimmed);
+  });
+};
+
+const formatMissingLinks = (missing) => {
+  if (!missing || missing.length === 0) return '✅ Links requeridos: OK';
+  const list = missing.map((link) => `\`${link}\``).join(', ');
+  return `⚠️ Links requeridos faltantes: ${list}`;
+};
+
+const updateSessionText = (session, newText, oldText) => {
+  session.text = newText;
+};
+
 // Wizard steps
 const STEPS = {
   MENU: 'menu',
   SELECT_ACCOUNT: 'select_account',
-  POST_TYPE: 'post_type',
-  AI_OPTIONS: 'ai_options',
-  TEMPLATES: 'templates',
   COMPOSE_TEXT: 'compose_text',
   AI_PROMPT: 'ai_prompt',
-  AI_PROMPT_EN: 'ai_prompt_en',
-  AI_PROMPT_ES: 'ai_prompt_es',
   ADD_MEDIA: 'add_media',
   PREVIEW: 'preview',
   SCHEDULE: 'schedule',
   VIEW_SCHEDULED: 'view_scheduled',
   VIEW_HISTORY: 'view_history',
-};
-
-// Post types
-const POST_TYPES = {
-  REGULAR: 'regular',
-  SALES: 'sales',
-  VIDEO: 'video',
-};
-
-// AI Language options
-const AI_LANGUAGES = {
-  EN: 'en',
-  ES: 'es',
-  BOTH: 'both',
-};
-
-// Post templates
-const POST_TEMPLATES = {
-  LIVE_SHOW: {
-    id: 'live_show',
-    label: '🔴 Live Show',
-    promptEn: 'Announce a live show happening now on PNP Latino TV. Intense energy, invite viewers to join.',
-    promptEs: 'Anuncia un show en vivo ahora en PNP Latino TV. Energía intensa, invita a los viewers a unirse.',
-  },
-  LIFETIME_PROMO: {
-    id: 'lifetime_promo',
-    label: '💎 Lifetime Promo',
-    promptEn: 'Promote the lifetime membership at $100. Emphasize unlimited access, exclusive content, and urgency.',
-    promptEs: 'Promociona la membresía lifetime a $100. Enfatiza acceso ilimitado, contenido exclusivo y urgencia.',
-  },
-  COMMUNITY_UPDATE: {
-    id: 'community_update',
-    label: '📢 Community Update',
-    promptEn: 'Share an exciting community update. New features, upcoming events, or milestones.',
-    promptEs: 'Comparte una actualización emocionante de la comunidad. Nuevas funciones, eventos o logros.',
-  },
-  NEW_CONTENT: {
-    id: 'new_content',
-    label: '🎬 New Content',
-    promptEn: 'Announce new exclusive content just uploaded. Tease what viewers will see, create curiosity.',
-    promptEs: 'Anuncia nuevo contenido exclusivo recién subido. Adelanta lo que verán, crea curiosidad.',
-  },
 };
 
 const getSession = (ctx) => {
@@ -79,19 +68,11 @@ const getSession = (ctx) => {
       accountId: null,
       accountHandle: null,
       text: null,
-      textEn: null,
-      textEs: null,
       mediaUrl: null,
       mediaFileId: null,
       mediaType: null,
       scheduledAt: null,
-      // New properties
-      postType: POST_TYPES.REGULAR,
-      aiLanguage: AI_LANGUAGES.BOTH,
-      includeLex: false,
-      includeSantino: true,
       lastAiPrompt: null,
-      selectedTemplate: null,
     };
   }
   return ctx.session.temp[SESSION_KEY];
@@ -120,16 +101,35 @@ const safeAnswer = async (ctx, text, options = {}) => {
   }
 };
 
+const safeEditOrReply = async (ctx, text, options = {}) => {
+  if (ctx?.callbackQuery) {
+    try {
+      await ctx.editMessageText(text, options);
+      return;
+    } catch (error) {
+      logger.warn('Edit message failed, falling back to reply', {
+        error: error?.message,
+      });
+    }
+  }
+  await ctx.reply(text, options);
+};
+
 const formatDate = (date) => {
   if (!date) return 'N/A';
   const d = new Date(date);
-  return d.toLocaleString('es-ES', {
+  const options = {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  });
+  };
+  try {
+    return d.toLocaleString('es-ES', { ...options, timeZone: SERVER_TIMEZONE });
+  } catch (error) {
+    return d.toLocaleString('es-ES', options);
+  }
 };
 
 const getStatusEmoji = (status) => {
@@ -161,7 +161,7 @@ const showXPostMenu = async (ctx, edit = false) => {
   } else {
     message += `📊 **Cuentas activas:** ${accounts.length}\n`;
     accounts.forEach(acc => {
-      message += `  • @${acc.handle}\n`;
+      message += `  • @${escapeMarkdown(acc.handle)}\n`;
     });
     message += '\n';
   }
@@ -176,7 +176,7 @@ const showXPostMenu = async (ctx, edit = false) => {
       const status = getStatusEmoji(post.status);
       const date = formatDate(post.sent_at || post.scheduled_at);
       const textPreview = (post.text || '').substring(0, 30) + (post.text?.length > 30 ? '...' : '');
-      message += `  ${status} ${date} - ${textPreview}\n`;
+      message += `  ${status} ${escapeMarkdown(date)} - ${escapeMarkdown(textPreview)}\n`;
     });
   }
 
@@ -190,6 +190,7 @@ const showXPostMenu = async (ctx, edit = false) => {
 
   const options = {
     parse_mode: 'Markdown',
+    disable_web_page_preview: true,
     ...Markup.inlineKeyboard(buttons),
   };
 
@@ -219,7 +220,7 @@ const showAccountSelection = async (ctx, edit = false) => {
       [Markup.button.callback('◀️ Volver', 'xpost_menu')],
     ];
 
-    const options = { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) };
+  const options = { parse_mode: 'Markdown', disable_web_page_preview: true, ...Markup.inlineKeyboard(buttons) };
     if (edit && ctx.callbackQuery) {
       await ctx.editMessageText(message, options).catch(() => ctx.reply(message, options));
     } else {
@@ -240,122 +241,7 @@ const showAccountSelection = async (ctx, edit = false) => {
   buttons.push([Markup.button.callback('➕ Conectar nueva cuenta', 'xpost_connect_account')]);
   buttons.push([Markup.button.callback('◀️ Volver', 'xpost_menu')]);
 
-  const options = { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) };
-  if (edit && ctx.callbackQuery) {
-    await ctx.editMessageText(message, options).catch(() => ctx.reply(message, options));
-  } else {
-    await ctx.reply(message, options);
-  }
-};
-
-// ==================== POST TYPE SELECTION ====================
-
-const showPostTypeSelection = async (ctx, edit = false) => {
-  const session = getSession(ctx);
-  session.step = STEPS.POST_TYPE;
-  await ctx.saveSession?.();
-
-  let message = '📝 **Tipo de Post**\n\n';
-  message += `📤 Publicando como: @${session.accountHandle || 'No seleccionada'}\n\n`;
-  message += 'Selecciona el tipo de contenido que deseas crear:\n';
-
-  const getTypeIcon = (type) => {
-    if (session.postType === type) return '✅';
-    return '⬜';
-  };
-
-  const buttons = [
-    [Markup.button.callback(`${getTypeIcon(POST_TYPES.REGULAR)} 🐦 Post Regular`, 'xpost_type_regular')],
-    [Markup.button.callback(`${getTypeIcon(POST_TYPES.SALES)} 💰 Post de Ventas`, 'xpost_type_sales')],
-    [Markup.button.callback(`${getTypeIcon(POST_TYPES.VIDEO)} 🎬 Descripción de Video`, 'xpost_type_video')],
-    [Markup.button.callback('▶️ Continuar', 'xpost_ai_options')],
-    [Markup.button.callback('◀️ Volver', 'xpost_select_account')],
-    [Markup.button.callback('❌ Cancelar', 'xpost_menu')],
-  ];
-
-  const options = { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) };
-  if (edit && ctx.callbackQuery) {
-    await ctx.editMessageText(message, options).catch(() => ctx.reply(message, options));
-  } else {
-    await ctx.reply(message, options);
-  }
-};
-
-// ==================== AI OPTIONS ====================
-
-const showAIOptions = async (ctx, edit = false) => {
-  const session = getSession(ctx);
-  session.step = STEPS.AI_OPTIONS;
-  await ctx.saveSession?.();
-
-  const postTypeLabel = {
-    [POST_TYPES.REGULAR]: '🐦 Post Regular',
-    [POST_TYPES.SALES]: '💰 Post de Ventas',
-    [POST_TYPES.VIDEO]: '🎬 Descripción de Video',
-  }[session.postType] || '🐦 Post';
-
-  let message = '🤖 **Opciones de AI**\n\n';
-  message += `📤 Cuenta: @${session.accountHandle || 'No seleccionada'}\n`;
-  message += `📝 Tipo: ${postTypeLabel}\n\n`;
-  message += '**Idioma del contenido:**\n';
-
-  const getLangIcon = (lang) => session.aiLanguage === lang ? '✅' : '⬜';
-  const getPersonaIcon = (enabled) => enabled ? '✅' : '⬜';
-
-  message += '\n**Personas a incluir:**\n';
-  message += `${getPersonaIcon(session.includeLex)} Lex - Leather master dominante\n`;
-  message += `${getPersonaIcon(session.includeSantino)} Santino - Meth Daddy satánico\n`;
-
-  const buttons = [
-    // Language selection
-    [
-      Markup.button.callback(`${getLangIcon(AI_LANGUAGES.EN)} 🇬🇧 EN`, 'xpost_lang_en'),
-      Markup.button.callback(`${getLangIcon(AI_LANGUAGES.ES)} 🇪🇸 ES`, 'xpost_lang_es'),
-      Markup.button.callback(`${getLangIcon(AI_LANGUAGES.BOTH)} 🌎 Ambos`, 'xpost_lang_both'),
-    ],
-    // Persona toggles
-    [
-      Markup.button.callback(`${getPersonaIcon(session.includeLex)} Lex`, 'xpost_toggle_lex'),
-      Markup.button.callback(`${getPersonaIcon(session.includeSantino)} Santino`, 'xpost_toggle_santino'),
-    ],
-    // Templates
-    [Markup.button.callback('📋 Usar Plantilla', 'xpost_templates')],
-    // Continue to compose
-    [Markup.button.callback('✍️ Escribir Prompt', 'xpost_compose')],
-    [Markup.button.callback('◀️ Volver', 'xpost_post_type')],
-    [Markup.button.callback('❌ Cancelar', 'xpost_menu')],
-  ];
-
-  const options = { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) };
-  if (edit && ctx.callbackQuery) {
-    await ctx.editMessageText(message, options).catch(() => ctx.reply(message, options));
-  } else {
-    await ctx.reply(message, options);
-  }
-};
-
-// ==================== TEMPLATES ====================
-
-const showTemplates = async (ctx, edit = false) => {
-  const session = getSession(ctx);
-  session.step = STEPS.TEMPLATES;
-  await ctx.saveSession?.();
-
-  let message = '📋 **Plantillas Rápidas**\n\n';
-  message += 'Selecciona una plantilla para generar contenido automáticamente:\n\n';
-
-  Object.values(POST_TEMPLATES).forEach(tpl => {
-    message += `${tpl.label}\n`;
-  });
-
-  const buttons = Object.values(POST_TEMPLATES).map(tpl => [
-    Markup.button.callback(tpl.label, `xpost_template_${tpl.id}`),
-  ]);
-
-  buttons.push([Markup.button.callback('◀️ Volver', 'xpost_ai_options')]);
-  buttons.push([Markup.button.callback('❌ Cancelar', 'xpost_menu')]);
-
-  const options = { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) };
+  const options = { parse_mode: 'Markdown', disable_web_page_preview: true, ...Markup.inlineKeyboard(buttons) };
   if (edit && ctx.callbackQuery) {
     await ctx.editMessageText(message, options).catch(() => ctx.reply(message, options));
   } else {
@@ -370,53 +256,16 @@ const showComposeText = async (ctx, edit = false) => {
   session.step = STEPS.COMPOSE_TEXT;
   await ctx.saveSession?.();
 
-  const postTypeLabel = {
-    [POST_TYPES.REGULAR]: '🐦 Post Regular',
-    [POST_TYPES.SALES]: '💰 Post de Ventas',
-    [POST_TYPES.VIDEO]: '🎬 Descripción de Video',
-  }[session.postType] || '🐦 Post';
-
   let message = '✍️ **Redactar Post**\n\n';
-  message += `📤 Cuenta: @${session.accountHandle || 'No seleccionada'}\n`;
-  message += `📝 Tipo: ${postTypeLabel}\n`;
+  const safeHandle = session.accountHandle ? escapeMarkdown(session.accountHandle) : 'No seleccionada';
+  message += `📤 Cuenta: @${safeHandle}\n\n`;
 
-  // Show AI config if set
-  const langLabel = {
-    [AI_LANGUAGES.EN]: '🇬🇧 Inglés',
-    [AI_LANGUAGES.ES]: '🇪🇸 Español',
-    [AI_LANGUAGES.BOTH]: '🌎 Ambos',
-  }[session.aiLanguage] || '🌎 Ambos';
-  message += `🌐 Idioma AI: ${langLabel}\n`;
-
-  const personas = [];
-  if (session.includeLex) personas.push('Lex');
-  if (session.includeSantino) personas.push('Santino');
-  if (personas.length > 0) {
-    message += `👤 Personas: ${personas.join(', ')}\n`;
-  }
-
-  message += '\n';
-
-  // Show bilingual text if both languages
-  if (session.aiLanguage === AI_LANGUAGES.BOTH && (session.textEn || session.textEs)) {
-    if (session.textEn) {
-      const charCountEn = session.textEn.length;
-      const charStatusEn = charCountEn <= X_MAX_TEXT_LENGTH ? '✅' : '⚠️';
-      message += `🇬🇧 **English** (${charCountEn}/${X_MAX_TEXT_LENGTH} ${charStatusEn}):\n`;
-      message += `\`\`\`\n${session.textEn}\n\`\`\`\n\n`;
-    }
-    if (session.textEs) {
-      const charCountEs = session.textEs.length;
-      const charStatusEs = charCountEs <= X_MAX_TEXT_LENGTH ? '✅' : '⚠️';
-      message += `🇪🇸 **Español** (${charCountEs}/${X_MAX_TEXT_LENGTH} ${charStatusEs}):\n`;
-      message += `\`\`\`\n${session.textEs}\n\`\`\`\n\n`;
-    }
-    message += '💡 Selecciona qué versión publicar o edita manualmente.\n';
-  } else if (session.text) {
+  if (session.text) {
     const charCount = session.text.length;
     const charStatus = charCount <= X_MAX_TEXT_LENGTH ? '✅' : '⚠️';
     message += `📝 **Texto actual** (${charCount}/${X_MAX_TEXT_LENGTH} ${charStatus}):\n`;
-    message += `\`\`\`\n${session.text}\n\`\`\`\n\n`;
+    message += `\`\`\`\n${safeCodeBlock(session.text)}\n\`\`\`\n\n`;
+    message += `${formatMissingLinks(getMissingRequiredLinks(session.text))}\n\n`;
     if (charCount > X_MAX_TEXT_LENGTH) {
       message += `🚨 **¡ATENCIÓN!** El texto excede el límite de ${X_MAX_TEXT_LENGTH} caracteres por ${charCount - X_MAX_TEXT_LENGTH} chars.\n`;
       message += 'Será truncado al publicar.\n\n';
@@ -429,37 +278,28 @@ const showComposeText = async (ctx, edit = false) => {
 
   const buttons = [];
 
-  // AI generation button
-  buttons.push([Markup.button.callback('🤖 Generar con AI', 'xpost_ai_generate')]);
+  buttons.push([Markup.button.callback('🤖 Generar con Grok', 'xpost_ai_generate')]);
 
-  // If we have AI-generated text, show regenerate option
   if (session.lastAiPrompt) {
-    buttons.push([Markup.button.callback('🔄 Regenerar AI', 'xpost_ai_regenerate')]);
+    buttons.push([Markup.button.callback('🔄 Regenerar Grok', 'xpost_ai_regenerate')]);
   }
-
-  // If bilingual, show language selection buttons
-  if (session.aiLanguage === AI_LANGUAGES.BOTH && (session.textEn || session.textEs)) {
-    buttons.push([
-      Markup.button.callback('🇬🇧 Usar EN', 'xpost_use_en'),
-      Markup.button.callback('🇪🇸 Usar ES', 'xpost_use_es'),
-    ]);
-  }
-
-  // Legacy single language AI buttons
-  buttons.push([
-    Markup.button.callback('🤖 AI (EN)', 'xpost_ai_en'),
-    Markup.button.callback('🤖 AI (ES)', 'xpost_ai_es'),
-  ]);
 
   if (session.text) {
+    const missingLinks = getMissingRequiredLinks(session.text);
+    if (missingLinks.length > 0) {
+      buttons.push([Markup.button.callback('🔗 Agregar links requeridos', 'xpost_append_links')]);
+    }
+    if (session.text.length > X_MAX_TEXT_LENGTH) {
+      buttons.push([Markup.button.callback('✂️ Recortar a 280', 'xpost_trim_text')]);
+    }
     buttons.push([Markup.button.callback('▶️ Continuar a Media', 'xpost_add_media')]);
     buttons.push([Markup.button.callback('🗑️ Borrar texto', 'xpost_clear_text')]);
   }
 
-  buttons.push([Markup.button.callback('◀️ Volver', 'xpost_ai_options')]);
+  buttons.push([Markup.button.callback('◀️ Volver', 'xpost_select_account')]);
   buttons.push([Markup.button.callback('❌ Cancelar', 'xpost_menu')]);
 
-  const options = { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) };
+  const options = { parse_mode: 'Markdown', disable_web_page_preview: true, ...Markup.inlineKeyboard(buttons) };
   if (edit && ctx.callbackQuery) {
     await ctx.editMessageText(message, options).catch(() => ctx.reply(message, options));
   } else {
@@ -506,7 +346,7 @@ const showAddMedia = async (ctx, edit = false) => {
   buttons.push([Markup.button.callback('◀️ Volver', 'xpost_compose')]);
   buttons.push([Markup.button.callback('❌ Cancelar', 'xpost_menu')]);
 
-  const options = { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) };
+  const options = { parse_mode: 'Markdown', disable_web_page_preview: true, ...Markup.inlineKeyboard(buttons) };
   if (edit && ctx.callbackQuery) {
     await ctx.editMessageText(message, options).catch(() => ctx.reply(message, options));
   } else {
@@ -521,20 +361,19 @@ const showPreview = async (ctx, edit = false) => {
   session.step = STEPS.PREVIEW;
   await ctx.saveSession?.();
 
+  if (!session.text) {
+    return showComposeText(ctx, edit);
+  }
+
   const charCount = (session.text || '').length;
   const charStatus = charCount <= X_MAX_TEXT_LENGTH ? '✅' : '🚨';
   const willTruncate = charCount > X_MAX_TEXT_LENGTH;
   const excessChars = charCount - X_MAX_TEXT_LENGTH;
-
-  const postTypeLabel = {
-    [POST_TYPES.REGULAR]: '🐦 Post Regular',
-    [POST_TYPES.SALES]: '💰 Post de Ventas',
-    [POST_TYPES.VIDEO]: '🎬 Descripción de Video',
-  }[session.postType] || '🐦 Post';
+  const missingLinks = getMissingRequiredLinks(session.text);
 
   let message = '👁️ **Vista Previa del Post**\n\n';
-  message += `📤 Cuenta: @${session.accountHandle || 'No seleccionada'}\n`;
-  message += `📝 Tipo: ${postTypeLabel}\n`;
+  const safeHandle = session.accountHandle ? escapeMarkdown(session.accountHandle) : 'No seleccionada';
+  message += `📤 Cuenta: @${safeHandle}\n`;
 
   // Character count with warning
   if (willTruncate) {
@@ -550,6 +389,8 @@ const showPreview = async (ctx, edit = false) => {
     message += '\n';
   }
 
+  message += `${formatMissingLinks(missingLinks)}\n`;
+
   // Media indicator with more detail
   if (session.mediaUrl) {
     const mediaTypeEmoji = {
@@ -564,18 +405,27 @@ const showPreview = async (ctx, edit = false) => {
   }
 
   message += '\n━━━━━━━━━━━━━━━━━━━━\n';
-  message += session.text || '(Sin texto)';
+  message += escapeMarkdown(session.text || '(Sin texto)');
   message += '\n━━━━━━━━━━━━━━━━━━━━\n\n';
 
   if (willTruncate) {
     message += '⚠️ **Texto truncado se verá así:**\n';
     const truncatedPreview = (session.text || '').slice(0, X_MAX_TEXT_LENGTH - 1) + '…';
-    message += `\`${truncatedPreview}\`\n\n`;
+    message += `\`\`\`\n${safeCodeBlock(truncatedPreview)}\n\`\`\`\n\n`;
   }
 
   message += '¿Qué deseas hacer?';
 
-  const buttons = [
+  const buttons = [];
+
+  if (missingLinks.length > 0) {
+    buttons.push([Markup.button.callback('🔗 Agregar links requeridos', 'xpost_append_links')]);
+  }
+  if (willTruncate) {
+    buttons.push([Markup.button.callback('✂️ Recortar a 280', 'xpost_trim_text')]);
+  }
+
+  buttons.push(
     [
       Markup.button.callback('📤 Publicar Ahora', 'xpost_send_now'),
       Markup.button.callback('🕐 Programar', 'xpost_schedule'),
@@ -584,9 +434,9 @@ const showPreview = async (ctx, edit = false) => {
     [Markup.button.callback('🖼️ Editar Media', 'xpost_add_media')],
     [Markup.button.callback('◀️ Volver', 'xpost_add_media')],
     [Markup.button.callback('❌ Cancelar', 'xpost_menu')],
-  ];
+  );
 
-  const options = { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) };
+  const options = { parse_mode: 'Markdown', disable_web_page_preview: true, ...Markup.inlineKeyboard(buttons) };
   if (edit && ctx.callbackQuery) {
     await ctx.editMessageText(message, options).catch(() => ctx.reply(message, options));
   } else {
@@ -603,6 +453,7 @@ const showSchedule = async (ctx, edit = false) => {
 
   let message = '🕐 **Programar Publicación**\n\n';
   message += 'Selecciona cuándo deseas publicar:\n\n';
+  message += `🌍 Zona horaria: \`${SERVER_TIMEZONE}\`\n\n`;
 
   // Quick schedule options
   const buttons = [
@@ -623,7 +474,7 @@ const showSchedule = async (ctx, edit = false) => {
     [Markup.button.callback('❌ Cancelar', 'xpost_menu')],
   ];
 
-  const options = { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) };
+  const options = { parse_mode: 'Markdown', disable_web_page_preview: true, ...Markup.inlineKeyboard(buttons) };
   if (edit && ctx.callbackQuery) {
     await ctx.editMessageText(message, options).catch(() => ctx.reply(message, options));
   } else {
@@ -636,11 +487,12 @@ const showCustomSchedule = async (ctx) => {
   session.step = 'schedule_custom';
   await ctx.saveSession?.();
 
+  const exampleYear = new Date().getFullYear();
   const message = '🗓️ **Programar Fecha Personalizada**\n\n'
     + 'Envía la fecha y hora en formato:\n'
     + '`DD/MM/YYYY HH:MM`\n\n'
-    + 'Ejemplo: `25/12/2024 15:30`\n\n'
-    + '⚠️ La hora debe ser en formato 24h (UTC-5).';
+    + `Ejemplo: \`25/12/${exampleYear} 15:30\`\n\n`
+    + `⚠️ La hora debe ser en formato 24h (\`${SERVER_TIMEZONE}\`).`;
 
   const buttons = [
     [Markup.button.callback('◀️ Volver', 'xpost_schedule')],
@@ -666,6 +518,7 @@ const showScheduledPosts = async (ctx, edit = false, page = 0) => {
   const pagePosts = posts.slice(page * pageSize, (page + 1) * pageSize);
 
   let message = '🕐 **Posts Programados**\n\n';
+  message += `🌍 Zona horaria: \`${SERVER_TIMEZONE}\`\n\n`;
 
   if (posts.length === 0) {
     message += '📭 No hay posts programados.\n';
@@ -675,12 +528,12 @@ const showScheduledPosts = async (ctx, edit = false, page = 0) => {
     pagePosts.forEach((post, idx) => {
       const num = page * pageSize + idx + 1;
       const date = formatDate(post.scheduled_at);
-      const handle = post.handle || 'desconocido';
+      const handle = escapeMarkdown(post.handle || 'desconocido');
       const textPreview = (post.text || '').substring(0, 40) + (post.text?.length > 40 ? '...' : '');
 
       message += `**${num}.** @${handle}\n`;
-      message += `   📅 ${date}\n`;
-      message += `   📝 ${textPreview}\n\n`;
+      message += `   📅 ${escapeMarkdown(date)}\n`;
+      message += `   📝 ${escapeMarkdown(textPreview)}\n\n`;
     });
 
     if (totalPages > 1) {
@@ -717,7 +570,7 @@ const showScheduledPosts = async (ctx, edit = false, page = 0) => {
   buttons.push([Markup.button.callback('🔄 Actualizar', 'xpost_view_scheduled')]);
   buttons.push([Markup.button.callback('◀️ Volver', 'xpost_menu')]);
 
-  const options = { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) };
+  const options = { parse_mode: 'Markdown', disable_web_page_preview: true, ...Markup.inlineKeyboard(buttons) };
   if (edit && ctx.callbackQuery) {
     await ctx.editMessageText(message, options).catch(() => ctx.reply(message, options));
   } else {
@@ -738,6 +591,7 @@ const showHistory = async (ctx, edit = false, page = 0) => {
   const pagePosts = posts.slice(page * pageSize, (page + 1) * pageSize);
 
   let message = '📜 **Historial de Posts**\n\n';
+  message += `🌍 Zona horaria: \`${SERVER_TIMEZONE}\`\n\n`;
 
   if (posts.length === 0) {
     message += '📭 No hay posts en el historial.\n';
@@ -748,16 +602,16 @@ const showHistory = async (ctx, edit = false, page = 0) => {
       const num = page * pageSize + idx + 1;
       const status = getStatusEmoji(post.status);
       const date = formatDate(post.sent_at || post.scheduled_at || post.created_at);
-      const handle = post.handle || 'desconocido';
+      const handle = escapeMarkdown(post.handle || 'desconocido');
       const textPreview = (post.text || '').substring(0, 40) + (post.text?.length > 40 ? '...' : '');
 
       message += `**${num}.** ${status} @${handle}\n`;
-      message += `   📅 ${date}\n`;
-      message += `   📝 ${textPreview}\n`;
+      message += `   📅 ${escapeMarkdown(date)}\n`;
+      message += `   📝 ${escapeMarkdown(textPreview)}\n`;
 
       if (post.status === 'failed' && post.error_message) {
         const errorPreview = post.error_message.substring(0, 50);
-        message += `   ❌ ${errorPreview}\n`;
+        message += `   ❌ ${escapeMarkdown(errorPreview)}\n`;
       }
 
       message += '\n';
@@ -805,7 +659,7 @@ const showHistory = async (ctx, edit = false, page = 0) => {
   buttons.push([Markup.button.callback('🔄 Actualizar', 'xpost_view_history')]);
   buttons.push([Markup.button.callback('◀️ Volver', 'xpost_menu')]);
 
-  const options = { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) };
+  const options = { parse_mode: 'Markdown', disable_web_page_preview: true, ...Markup.inlineKeyboard(buttons) };
   if (edit && ctx.callbackQuery) {
     await ctx.editMessageText(message, options).catch(() => ctx.reply(message, options));
   } else {
@@ -838,7 +692,8 @@ const sendNow = async (ctx) => {
     const tweetUrl = tweetId ? `https://x.com/i/status/${tweetId}` : null;
 
     let message = '✅ **Post Publicado Exitosamente**\n\n';
-    message += `📤 Cuenta: @${session.accountHandle}\n`;
+    const safeHandle = session.accountHandle ? escapeMarkdown(session.accountHandle) : 'desconocida';
+    message += `📤 Cuenta: @${safeHandle}\n`;
 
     if (result.truncated) {
       message += '⚠️ El texto fue truncado a 280 caracteres.\n';
@@ -850,7 +705,7 @@ const sendNow = async (ctx) => {
 
     clearSession(ctx);
 
-    await ctx.editMessageText(message, {
+    await safeEditOrReply(ctx, message, {
       parse_mode: 'Markdown',
       disable_web_page_preview: true,
       ...Markup.inlineKeyboard([
@@ -868,12 +723,15 @@ const sendNow = async (ctx) => {
     logger.error('Error sending X post via wizard:', error);
 
     let errorMsg = '❌ **Error al Publicar**\n\n';
-    errorMsg += `Cuenta: @${session.accountHandle}\n`;
-    errorMsg += `Error: ${error.message || 'Error desconocido'}\n\n`;
+    const safeHandle = session.accountHandle ? escapeMarkdown(session.accountHandle) : 'desconocida';
+    const safeError = escapeMarkdown(error.message || 'Error desconocido');
+    errorMsg += `Cuenta: @${safeHandle}\n`;
+    errorMsg += `Error: ${safeError}\n\n`;
     errorMsg += 'Por favor, intenta de nuevo más tarde.';
 
-    await ctx.editMessageText(errorMsg, {
+    await safeEditOrReply(ctx, errorMsg, {
       parse_mode: 'Markdown',
+      disable_web_page_preview: true,
       ...Markup.inlineKeyboard([
         [Markup.button.callback('🔄 Reintentar', 'xpost_send_now')],
         [Markup.button.callback('◀️ Volver', 'xpost_preview')],
@@ -906,15 +764,17 @@ const schedulePost = async (ctx, minutes) => {
     });
 
     let message = '✅ **Post Programado Exitosamente**\n\n';
-    message += `📤 Cuenta: @${session.accountHandle}\n`;
-    message += `📅 Fecha: ${formatDate(scheduledAt)}\n`;
+    const safeHandle = session.accountHandle ? escapeMarkdown(session.accountHandle) : 'desconocida';
+    message += `📤 Cuenta: @${safeHandle}\n`;
+    message += `📅 Fecha: ${escapeMarkdown(formatDate(scheduledAt))} (\`${SERVER_TIMEZONE}\`)\n`;
     message += `🆔 ID: ${postId.substring(0, 8)}...\n\n`;
     message += 'El post se publicará automáticamente en la fecha indicada.';
 
     clearSession(ctx);
 
-    await ctx.editMessageText(message, {
+    await safeEditOrReply(ctx, message, {
       parse_mode: 'Markdown',
+      disable_web_page_preview: true,
       ...Markup.inlineKeyboard([
         [Markup.button.callback('🕐 Ver programados', 'xpost_view_scheduled')],
         [Markup.button.callback('✍️ Crear otro post', 'xpost_new')],
@@ -931,10 +791,12 @@ const schedulePost = async (ctx, minutes) => {
   } catch (error) {
     logger.error('Error scheduling X post via wizard:', error);
 
-    await ctx.editMessageText(
-      `❌ **Error al Programar**\n\n${error.message || 'Error desconocido'}`,
+    await safeEditOrReply(
+      ctx,
+      `❌ **Error al Programar**\n\n${escapeMarkdown(error.message || 'Error desconocido')}`,
       {
         parse_mode: 'Markdown',
+        disable_web_page_preview: true,
         ...Markup.inlineKeyboard([
           [Markup.button.callback('🔄 Reintentar', 'xpost_schedule')],
           [Markup.button.callback('◀️ Volver', 'xpost_preview')],
@@ -959,10 +821,12 @@ const cancelScheduledPost = async (ctx, postId) => {
   try {
     await XPostService.cancelScheduledPost(postId);
 
-    await ctx.editMessageText(
+    await safeEditOrReply(
+      ctx,
       '✅ **Post Cancelado**\n\nEl post programado ha sido eliminado.',
       {
         parse_mode: 'Markdown',
+        disable_web_page_preview: true,
         ...Markup.inlineKeyboard([
           [Markup.button.callback('◀️ Volver', 'xpost_view_scheduled')],
         ]),
@@ -984,115 +848,31 @@ const generateAIContent = async (ctx, prompt, isRegenerate = false) => {
   session.lastAiPrompt = prompt;
   await ctx.saveSession?.();
 
-  await ctx.reply('⏳ Generando contenido con Grok AI...');
+  await ctx.reply('⏳ Generando post con Grok...');
 
   try {
-    const postType = session.postType || POST_TYPES.REGULAR;
-    const aiLanguage = session.aiLanguage || AI_LANGUAGES.BOTH;
-    const includeLex = session.includeLex || false;
-    const includeSantino = session.includeSantino !== false; // default true
+    const aiText = await GrokService.chat({
+      mode: 'xPost',
+      language: 'Spanish',
+      prompt: `Solicitud del usuario: ${prompt}`,
+      maxTokens: 180,
+    });
 
-    // Determine which generation function to use based on post type
-    if (postType === POST_TYPES.SALES) {
-      const result = await GrokService.generateSalesPost({
-        prompt,
-        includeLex,
-        includeSantino,
-      });
-
-      if (aiLanguage === AI_LANGUAGES.BOTH) {
-        session.textEn = result.en;
-        session.textEs = result.es;
-        session.text = result.en; // Default to English
-      } else if (aiLanguage === AI_LANGUAGES.EN) {
-        session.text = result.en;
-        session.textEn = result.en;
-        session.textEs = null;
-      } else {
-        session.text = result.es;
-        session.textEs = result.es;
-        session.textEn = null;
-      }
-    } else if (postType === POST_TYPES.VIDEO) {
-      const result = await GrokService.generateVideoDescription({
-        prompt,
-        includeLex,
-        includeSantino,
-      });
-
-      if (aiLanguage === AI_LANGUAGES.BOTH) {
-        session.textEn = result.en;
-        session.textEs = result.es;
-        session.text = result.en;
-      } else if (aiLanguage === AI_LANGUAGES.EN) {
-        session.text = result.en;
-        session.textEn = result.en;
-        session.textEs = null;
-      } else {
-        session.text = result.es;
-        session.textEs = result.es;
-        session.textEn = null;
-      }
-    } else {
-      // Regular X post - use xPost mode with ensureRequiredLinks
-      if (aiLanguage === AI_LANGUAGES.BOTH) {
-        // Generate both languages
-        const [enResult, esResult] = await Promise.all([
-          GrokService.chat({
-            mode: 'xPost',
-            language: 'English',
-            prompt: `User request: ${prompt}`,
-            maxTokens: 180,
-          }),
-          GrokService.chat({
-            mode: 'xPost',
-            language: 'Spanish',
-            prompt: `Solicitud del usuario: ${prompt}`,
-            maxTokens: 180,
-          }),
-        ]);
-
-        const enNormalized = XPostService.ensureRequiredLinks(enResult, X_REQUIRED_LINKS, X_MAX_TEXT_LENGTH);
-        const esNormalized = XPostService.ensureRequiredLinks(esResult, X_REQUIRED_LINKS, X_MAX_TEXT_LENGTH);
-
-        session.textEn = enNormalized.text;
-        session.textEs = esNormalized.text;
-        session.text = enNormalized.text; // Default to English
-      } else {
-        const language = aiLanguage === AI_LANGUAGES.EN ? 'English' : 'Spanish';
-        const promptText = aiLanguage === AI_LANGUAGES.EN
-          ? `User request: ${prompt}`
-          : `Solicitud del usuario: ${prompt}`;
-
-        const aiText = await GrokService.chat({
-          mode: 'xPost',
-          language,
-          prompt: promptText,
-          maxTokens: 180,
-        });
-
-        const normalized = XPostService.ensureRequiredLinks(aiText, X_REQUIRED_LINKS, X_MAX_TEXT_LENGTH);
-        session.text = normalized.text;
-
-        if (aiLanguage === AI_LANGUAGES.EN) {
-          session.textEn = normalized.text;
-          session.textEs = null;
-        } else {
-          session.textEs = normalized.text;
-          session.textEn = null;
-        }
-      }
-    }
+    const normalized = XPostService.ensureRequiredLinks(
+      aiText,
+      X_REQUIRED_LINKS,
+      X_MAX_TEXT_LENGTH,
+    );
+    session.text = normalized.text;
 
     session.step = STEPS.COMPOSE_TEXT;
     await ctx.saveSession?.();
 
     const genLabel = isRegenerate ? 'regenerado' : 'generado';
-    if (aiLanguage === AI_LANGUAGES.BOTH) {
-      await ctx.reply(`✅ Contenido ${genLabel} en ambos idiomas. Selecciona cuál usar.`);
-    } else {
-      await ctx.reply(`✅ Contenido ${genLabel} exitosamente.`);
-    }
+    const notice = normalized.truncated
+      ? `✅ Post ${genLabel} (texto recortado para incluir links).`
+      : `✅ Post ${genLabel} exitosamente.`;
+    await ctx.reply(notice);
 
     return showComposeText(ctx);
   } catch (error) {
@@ -1118,52 +898,11 @@ const handleTextInput = async (ctx, next) => {
     return generateAIContent(ctx, prompt);
   }
 
-  // Legacy: handle single language AI prompts
-  if (session.step === STEPS.AI_PROMPT_EN || session.step === STEPS.AI_PROMPT_ES) {
-    const prompt = ctx.message?.text?.trim();
-    if (!prompt) return next();
-
-    const language = session.step === STEPS.AI_PROMPT_EN ? 'English' : 'Spanish';
-    try {
-      await ctx.reply('⏳ Generando texto con Grok...');
-
-      const aiText = await GrokService.chat({
-        mode: 'xPost',
-        language,
-        prompt: `Solicitud del usuario: ${prompt}`,
-        maxTokens: 180,
-      });
-
-      const normalized = XPostService.ensureRequiredLinks(
-        aiText,
-        X_REQUIRED_LINKS,
-        X_MAX_TEXT_LENGTH,
-      );
-      session.text = normalized.text;
-      session.lastAiPrompt = prompt;
-      session.step = STEPS.COMPOSE_TEXT;
-      await ctx.saveSession?.();
-
-      const notice = normalized.truncated
-        ? '✅ Texto generado con Grok. ⚠️ Se truncó a 280 caracteres para incluir links.'
-        : '✅ Texto generado con Grok (links incluidos).';
-      await ctx.reply(notice);
-      return showComposeText(ctx);
-    } catch (error) {
-      logger.error('Error generating X post with Grok:', error);
-      await ctx.reply(`❌ Error generando texto con Grok: ${error.message || 'desconocido'}`);
-      return;
-    }
-  }
-
   if (session.step === STEPS.COMPOSE_TEXT) {
     const text = ctx.message?.text;
     if (!text) return next();
 
     session.text = text;
-    // Clear bilingual texts if user manually inputs text
-    session.textEn = null;
-    session.textEs = null;
     await ctx.saveSession?.();
 
     const charCount = text.length;
@@ -1187,8 +926,12 @@ const handleTextInput = async (ctx, next) => {
     // Parse DD/MM/YYYY HH:MM
     const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/);
     if (!match) {
+      const exampleYear = new Date().getFullYear();
       await ctx.reply(
-        '❌ Formato inválido.\n\nUsa: `DD/MM/YYYY HH:MM`\nEjemplo: `25/12/2024 15:30`',
+        '❌ Formato inválido.\n\n'
+        + 'Usa: `DD/MM/YYYY HH:MM`\n'
+        + `Ejemplo: \`25/12/${exampleYear} 15:30\`\n`
+        + `Zona horaria: \`${SERVER_TIMEZONE}\``,
         { parse_mode: 'Markdown' },
       );
       return;
@@ -1302,132 +1045,7 @@ const registerXPostWizardHandlers = (bot) => {
     await ctx.saveSession?.();
 
     await safeAnswer(ctx, `✅ @${account.handle}`);
-    await showPostTypeSelection(ctx, true);
-  });
-
-  // Post type selection
-  bot.action('xpost_post_type', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    await safeAnswer(ctx);
-    await showPostTypeSelection(ctx, true);
-  });
-
-  bot.action('xpost_type_regular', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    const session = getSession(ctx);
-    session.postType = POST_TYPES.REGULAR;
-    await ctx.saveSession?.();
-    await safeAnswer(ctx, '✅ Post Regular');
-    await showPostTypeSelection(ctx, true);
-  });
-
-  bot.action('xpost_type_sales', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    const session = getSession(ctx);
-    session.postType = POST_TYPES.SALES;
-    await ctx.saveSession?.();
-    await safeAnswer(ctx, '✅ Post de Ventas');
-    await showPostTypeSelection(ctx, true);
-  });
-
-  bot.action('xpost_type_video', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    const session = getSession(ctx);
-    session.postType = POST_TYPES.VIDEO;
-    await ctx.saveSession?.();
-    await safeAnswer(ctx, '✅ Descripción de Video');
-    await showPostTypeSelection(ctx, true);
-  });
-
-  // AI Options
-  bot.action('xpost_ai_options', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    await safeAnswer(ctx);
-    await showAIOptions(ctx, true);
-  });
-
-  bot.action('xpost_lang_en', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    const session = getSession(ctx);
-    session.aiLanguage = AI_LANGUAGES.EN;
-    await ctx.saveSession?.();
-    await safeAnswer(ctx, '✅ Inglés');
-    await showAIOptions(ctx, true);
-  });
-
-  bot.action('xpost_lang_es', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    const session = getSession(ctx);
-    session.aiLanguage = AI_LANGUAGES.ES;
-    await ctx.saveSession?.();
-    await safeAnswer(ctx, '✅ Español');
-    await showAIOptions(ctx, true);
-  });
-
-  bot.action('xpost_lang_both', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    const session = getSession(ctx);
-    session.aiLanguage = AI_LANGUAGES.BOTH;
-    await ctx.saveSession?.();
-    await safeAnswer(ctx, '✅ Ambos idiomas');
-    await showAIOptions(ctx, true);
-  });
-
-  bot.action('xpost_toggle_lex', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    const session = getSession(ctx);
-    session.includeLex = !session.includeLex;
-    await ctx.saveSession?.();
-    await safeAnswer(ctx, session.includeLex ? '✅ Lex incluido' : '❌ Lex removido');
-    await showAIOptions(ctx, true);
-  });
-
-  bot.action('xpost_toggle_santino', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    const session = getSession(ctx);
-    session.includeSantino = !session.includeSantino;
-    await ctx.saveSession?.();
-    await safeAnswer(ctx, session.includeSantino ? '✅ Santino incluido' : '❌ Santino removido');
-    await showAIOptions(ctx, true);
-  });
-
-  // Templates
-  bot.action('xpost_templates', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    await safeAnswer(ctx);
-    await showTemplates(ctx, true);
-  });
-
-  // Handle template selection
-  Object.values(POST_TEMPLATES).forEach(template => {
-    bot.action(`xpost_template_${template.id}`, async (ctx) => {
-      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-      if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-
-      const session = getSession(ctx);
-      session.selectedTemplate = template.id;
-      await ctx.saveSession?.();
-
-      await safeAnswer(ctx, `✅ ${template.label}`);
-
-      // Use the appropriate prompt based on language setting
-      const prompt = session.aiLanguage === AI_LANGUAGES.ES
-        ? template.promptEs
-        : template.promptEn;
-
-      await generateAIContent(ctx, prompt);
-    });
+    await showComposeText(ctx, true);
   });
 
   // AI Generate button
@@ -1439,16 +1057,10 @@ const registerXPostWizardHandlers = (bot) => {
     session.step = STEPS.AI_PROMPT;
     await ctx.saveSession?.();
 
-    const postTypeLabel = {
-      [POST_TYPES.REGULAR]: 'Post Regular',
-      [POST_TYPES.SALES]: 'Post de Ventas',
-      [POST_TYPES.VIDEO]: 'Descripción de Video',
-    }[session.postType] || 'Post';
-
     await safeAnswer(ctx);
     await ctx.reply(
-      `🤖 *Generar ${postTypeLabel} con AI*\n\n`
-      + 'Describe el contenido que quieres generar.\n\n'
+      '🤖 *Generar post con Grok*\n\n'
+      + 'Describe en una frase lo que quieres publicar.\n\n'
       + '*Ejemplos:*\n'
       + '• `Anuncia show en vivo esta noche`\n'
       + '• `Promo lifetime con urgencia`\n'
@@ -1456,7 +1068,6 @@ const registerXPostWizardHandlers = (bot) => {
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback('📋 Usar Plantilla', 'xpost_templates')],
           [Markup.button.callback('◀️ Volver', 'xpost_compose')],
           [Markup.button.callback('❌ Cancelar', 'xpost_menu')],
         ]),
@@ -1477,37 +1088,6 @@ const registerXPostWizardHandlers = (bot) => {
 
     await safeAnswer(ctx, '🔄 Regenerando...');
     await generateAIContent(ctx, session.lastAiPrompt, true);
-  });
-
-  // Use EN/ES version
-  bot.action('xpost_use_en', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-
-    const session = getSession(ctx);
-    if (session.textEn) {
-      session.text = session.textEn;
-      await ctx.saveSession?.();
-      await safeAnswer(ctx, '✅ Usando versión en inglés');
-      await showComposeText(ctx, true);
-    } else {
-      await ctx.answerCbQuery('❌ No hay versión en inglés');
-    }
-  });
-
-  bot.action('xpost_use_es', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-
-    const session = getSession(ctx);
-    if (session.textEs) {
-      session.text = session.textEs;
-      await ctx.saveSession?.();
-      await safeAnswer(ctx, '✅ Usando versión en español');
-      await showComposeText(ctx, true);
-    } else {
-      await ctx.answerCbQuery('❌ No hay versión en español');
-    }
   });
 
   bot.action('xpost_connect_account', async (ctx) => {
@@ -1542,60 +1122,61 @@ const registerXPostWizardHandlers = (bot) => {
     await showComposeText(ctx, true);
   });
 
-  bot.action('xpost_ai_en', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    const session = getSession(ctx);
-    session.step = STEPS.AI_PROMPT_EN;
-    await ctx.saveSession?.();
-    await safeAnswer(ctx);
-    await ctx.reply(
-      '🤖 *AI Write (Grok) - English*\n\n'
-      + 'Describe el post que quieres generar.\n'
-      + 'Ejemplo:\n`Announce a new live show tonight, bold tone, include CTA to pnptv.app`',
-      {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback('◀️ Volver', 'xpost_compose')],
-          [Markup.button.callback('❌ Cancelar', 'xpost_menu')],
-        ]),
-      },
-    );
-  });
-
-  bot.action('xpost_ai_es', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    const session = getSession(ctx);
-    session.step = STEPS.AI_PROMPT_ES;
-    await ctx.saveSession?.();
-    await safeAnswer(ctx);
-    await ctx.reply(
-      '🤖 *AI Write (Grok) - Español*\n\n'
-      + 'Describe el post que quieres generar.\n'
-      + 'Ejemplo:\n`Anuncia un show en vivo esta noche, tono intenso, incluye CTA a pnptv.app`',
-      {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback('◀️ Volver', 'xpost_compose')],
-          [Markup.button.callback('❌ Cancelar', 'xpost_menu')],
-        ]),
-      },
-    );
-  });
-
   bot.action('xpost_clear_text', async (ctx) => {
     const isAdmin = await PermissionService.isAdmin(ctx.from.id);
     if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
 
     const session = getSession(ctx);
     session.text = null;
-    session.textEn = null;
-    session.textEs = null;
     session.lastAiPrompt = null;
     await ctx.saveSession?.();
 
     await safeAnswer(ctx, '🗑️ Texto eliminado');
+    await showComposeText(ctx, true);
+  });
+
+  bot.action('xpost_append_links', async (ctx) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
+
+    const session = getSession(ctx);
+    if (!session.text) {
+      await safeAnswer(ctx, '❌ No hay texto');
+      return showComposeText(ctx, true);
+    }
+
+    const oldText = session.text;
+    const normalized = XPostService.ensureRequiredLinks(oldText, X_REQUIRED_LINKS, X_MAX_TEXT_LENGTH);
+    updateSessionText(session, normalized.text, oldText);
+    await ctx.saveSession?.();
+
+    const notice = normalized.truncated
+      ? '✅ Links agregados (texto recortado)'
+      : '✅ Links agregados';
+    await safeAnswer(ctx, notice);
+    await showComposeText(ctx, true);
+  });
+
+  bot.action('xpost_trim_text', async (ctx) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
+
+    const session = getSession(ctx);
+    if (!session.text) {
+      await safeAnswer(ctx, '❌ No hay texto');
+      return showComposeText(ctx, true);
+    }
+
+    const oldText = session.text;
+    const normalized = XPostService.normalizeXText(oldText);
+    if (!normalized.truncated) {
+      await safeAnswer(ctx, '✅ Ya está dentro de 280');
+      return showComposeText(ctx, true);
+    }
+
+    updateSessionText(session, normalized.text, oldText);
+    await ctx.saveSession?.();
+    await safeAnswer(ctx, '✂️ Texto recortado a 280');
     await showComposeText(ctx, true);
   });
 
@@ -1765,7 +1346,7 @@ const registerXPostWizardHandlers = (bot) => {
       const tweetUrl = tweetId ? `https://x.com/i/status/${tweetId}` : null;
 
       let message = '✅ **Post Reenviado Exitosamente**\n\n';
-      message += `📤 Cuenta: @${account.handle}\n`;
+      message += `📤 Cuenta: @${escapeMarkdown(account.handle || 'desconocida')}\n`;
       if (tweetUrl) {
         message += `\n🔗 [Ver en X](${tweetUrl})`;
       }
@@ -1824,13 +1405,13 @@ const registerXPostWizardHandlers = (bot) => {
       await ctx.reply(
         '📋 **Post Copiado**\n\n'
         + 'El texto ha sido copiado. Puedes editarlo antes de publicar.\n\n'
-        + `📝 Texto: ${(post.text || '').substring(0, 50)}...`,
+        + `📝 Texto: ${escapeMarkdown((post.text || '').substring(0, 50))}...`,
         { parse_mode: 'Markdown' },
       );
 
       // Go to account selection if not pre-selected, otherwise to compose
       if (session.accountId) {
-        await showPostTypeSelection(ctx);
+        await showComposeText(ctx);
       } else {
         await showAccountSelection(ctx);
       }
@@ -1855,7 +1436,4 @@ module.exports = {
   handleMediaInput,
   getSession,
   STEPS,
-  POST_TYPES,
-  AI_LANGUAGES,
-  POST_TEMPLATES,
 };

@@ -394,7 +394,8 @@ const startBot = async () => {
         ctx.session?.temp?.adminAction
       );
       let isAdminUser = ADMIN_USER_IDS.includes(String(ctx.from?.id));
-      if (!isAdminUser && adminSessionFlags) {
+      const needsAdminCheck = adminSessionFlags || isAwaitingSupportMessage || isContactingAdmin || isRequestingActivation;
+      if (!isAdminUser && needsAdminCheck) {
         try {
           const PermissionService = require('../services/permissionService');
           isAdminUser = await PermissionService.isAdmin(ctx.from?.id);
@@ -416,7 +417,7 @@ const startBot = async () => {
         return next();
       }
 
-      if (isAdminFlow) {
+      if (isAdminUser) {
         if (isAwaitingSupportMessage || isContactingAdmin || isRequestingActivation) {
           ctx.session.awaitingSupportMessage = false;
           if (ctx.session?.temp) {
@@ -425,6 +426,10 @@ const startBot = async () => {
           }
           await ctx.saveSession();
         }
+        if (isAdminFlow) {
+          return next();
+        }
+        // Avoid routing admin messages to support even if stale support flags exist
         return next();
       }
 

@@ -22,7 +22,7 @@ const registerAgeVerificationHandlers = (bot) => {
     } catch (error) {
       logger.error('Error starting photo verification:', error);
       const lang = getLanguage(ctx);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', lang)).catch(() => {});
     }
   });
 
@@ -34,7 +34,7 @@ const registerAgeVerificationHandlers = (bot) => {
     } catch (error) {
       logger.error('Error in manual age verification:', error);
       const lang = getLanguage(ctx);
-      await ctx.reply(t('error', lang));
+      await ctx.reply(t('error', lang)).catch(() => {});
     }
   });
 

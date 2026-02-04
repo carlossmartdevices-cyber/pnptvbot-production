@@ -9,7 +9,7 @@ const logger = require('../../utils/logger');
 const PaymentSecurityService = require('./paymentSecurityService');
 
 const X_API_BASE = 'https://api.twitter.com/2';
-const X_MEDIA_UPLOAD_URL = 'https://api.x.com/2/media/upload';
+const X_MEDIA_UPLOAD_URL = 'https://upload.twitter.com/1.1/media/upload.json';
 const X_MAX_TEXT_LENGTH = 280;
 const X_TOKEN_EXPIRY_BUFFER_MS = 2 * 60 * 1000;
 const XOAuthService = require('./xOAuthService');
@@ -64,7 +64,7 @@ class XPostService {
       WHERE is_active = TRUE
       ORDER BY display_name NULLS LAST, handle ASC
     `;
-    const result = await db.query(query);
+    const result = await db.query(query, [], { cache: false });
     return result.rows;
   }
 
@@ -74,8 +74,23 @@ class XPostService {
       FROM x_accounts
       WHERE account_id = $1
     `;
-    const result = await db.query(query, [accountId]);
+    const result = await db.query(query, [accountId], { cache: false });
     return result.rows[0] || null;
+  }
+
+  static async deactivateAccount(accountId) {
+    const query = `
+      UPDATE x_accounts
+      SET is_active = FALSE,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE account_id = $1
+      RETURNING account_id, handle
+    `;
+    const result = await db.query(query, [accountId], { cache: false });
+    if (!result.rows[0]) {
+      throw new Error('Cuenta de X no encontrada');
+    }
+    return result.rows[0];
   }
 
   static async createPostJob({
@@ -209,10 +224,18 @@ class XPostService {
         accountId: account.account_id,
         handle: account.handle,
       });
-      const mediaId = await this.uploadMediaToX({
-        accessToken,
-        mediaUrl,
-      });
+      let mediaId = null;
+      try {
+        mediaId = await this.uploadMediaToX({
+          accessToken,
+          mediaUrl,
+        });
+      } catch (error) {
+        if (error?.response?.status === 403) {
+          throw new Error('X API 403 al subir media. Revisa permisos (media.write) o reconecta la cuenta.');
+        }
+        throw error;
+      }
       if (mediaId) {
         payload.media = { media_ids: [String(mediaId)] };
       }

@@ -5,6 +5,24 @@ const path = require('path');
 const logDir = process.env.LOG_DIR || './logs';
 const logLevel = process.env.LOG_LEVEL || 'info';
 
+const safeStringify = (value) => {
+  const seen = new WeakSet();
+  return JSON.stringify(value, (key, val) => {
+    if (typeof val === 'bigint') return val.toString();
+    if (val instanceof Error) {
+      return { name: val.name, message: val.message, stack: val.stack };
+    }
+    if (typeof val === 'object' && val !== null) {
+      if (seen.has(val)) return '[Circular]';
+      seen.add(val);
+    }
+    if (typeof val === 'function') {
+      return `[Function${val.name ? `: ${val.name}` : ''}]`;
+    }
+    return val;
+  });
+};
+
 // Define log format
 const logFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
@@ -22,7 +40,7 @@ const consoleFormat = winston.format.combine(
   }) => {
     let msg = `${timestamp} [${level}]: ${message}`;
     if (Object.keys(meta).length > 0) {
-      msg += ` ${JSON.stringify(meta)}`;
+      msg += ` ${safeStringify(meta)}`;
     }
     return msg;
   }),

@@ -318,15 +318,15 @@ const registerMenuHandlers = (bot) => {
       await ctx.answerCbQuery('🎬 Videos section coming soon!', { show_alert: true });
     });
 
-    // Admin panel handler: only superadmins can access role management
+    // Admin panel handler: admins and superadmins can access role management
     bot.action('admin_panel', async (ctx) => {
       try {
         // PermissionService is required from roleManagement.js
         const PermissionService = require('../admin/../../services/permissionService');
         const showRoleManagement = require('../admin/roleManagement.js').showRoleManagement;
-        const isSuperAdmin = await PermissionService.isSuperAdmin(ctx.from.id);
-        if (!isSuperAdmin) {
-          await ctx.answerCbQuery('❌ Solo Super Administradores pueden acceder');
+        const role = await PermissionService.getUserRole(ctx.from.id);
+        if (!(role === 'superadmin' || role === 'admin')) {
+          await ctx.answerCbQuery('❌ No autorizado');
           return;
         }
         await showRoleManagement(ctx);
@@ -692,4 +692,3 @@ module.exports = registerMenuHandlers;
 module.exports.showMainMenu = showMainMenu;
 module.exports.buildOnboardingPrompt = buildOnboardingPrompt;
 module.exports.sendPrimeWelcome = sendPrimeWelcome;
-

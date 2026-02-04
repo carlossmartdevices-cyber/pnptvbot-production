@@ -529,8 +529,8 @@ class UserModel {
   static async updateRole(userId, role, assignedBy) {
     try {
       await query(
-        `UPDATE ${TABLE} SET role = $2, assigned_by = $3, role_assigned_at = NOW(), updated_at = NOW() WHERE id = $1`,
-        [userId.toString(), role, assignedBy ? assignedBy.toString() : null]
+        `UPDATE ${TABLE} SET role = $2, updated_at = NOW() WHERE id = $1`,
+        [userId.toString(), role]
       );
       await cache.del(`user:${userId}`);
       logger.info('User role updated', { userId, role, assignedBy });

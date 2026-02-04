@@ -79,9 +79,10 @@ class RoleService {
       );
 
       // Also update the users table for consistency
+      // Keep schema-compatible updates (assigned_by/role_assigned_at may not exist)
       await query(
-        `UPDATE users SET role = $1, assigned_by = $2, role_assigned_at = NOW() WHERE id = $3`,
-        [normalizedRole.toLowerCase(), grantedBy.toString(), userId.toString()]
+        `UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2`,
+        [normalizedRole.toLowerCase(), userId.toString()]
       );
 
       logger.info('User role updated', { userId, role: normalizedRole, grantedBy });
@@ -194,9 +195,10 @@ class RoleService {
       );
 
       // Also update the users table for consistency
+      // Keep schema-compatible updates (assigned_by/role_assigned_at may not exist)
       await query(
-        `UPDATE users SET role = 'user', assigned_by = $1, role_assigned_at = NOW() WHERE id = $2`,
-        [removedBy ? removedBy.toString() : null, userId.toString()]
+        `UPDATE users SET role = 'user', updated_at = NOW() WHERE id = $1`,
+        [userId.toString()]
       );
 
       logger.info('User role removed', { userId, removedBy });

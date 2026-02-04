@@ -1,8 +1,14 @@
 const { Markup } = require('telegraf');
 const RoleService = require('../../services/roleService');
+const PermissionService = require('../../services/permissionService');
 const UserModel = require('../../../models/userModel');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
+
+const escapeMarkdown = (text) => {
+  if (!text) return '';
+  return String(text).replace(/[_*\\[\]()~`>#+=|{}.!-]/g, '\\$&');
+};
 
 /**
  * Show role management panel with current admins/moderators
@@ -12,20 +18,21 @@ const { getLanguage } = require('../../utils/helpers');
 async function showRoleManagement(ctx, edit = false) {
   try {
     // Clear any ongoing admin tasks
+    ctx.session = ctx.session || {};
     ctx.session.temp = {};
-    await ctx.saveSession();
+    await ctx.saveSession?.();
 
-    const [adminIds, moderatorIds, performerIds] = await Promise.all([
+    const [superAdminIds, adminIds, moderatorIds, performerIds] = await Promise.all([
+      RoleService.getUsersByRole('SUPERADMIN'),
       RoleService.getUsersByRole('ADMIN'),
       RoleService.getUsersByRole('MODERATOR'),
       RoleService.getUsersByRole('PERFORMER'),
     ]);
 
-    const allAdmins = await Promise.all(adminIds.map(id => UserModel.getById(id)));
-    const superadmins = allAdmins.filter(admin => admin && admin.role === 'SUPERADMIN');
-    const admins = allAdmins.filter(admin => admin && admin.role === 'ADMIN');
-    const moderators = await Promise.all(moderatorIds.map(id => UserModel.getById(id)));
-    const performers = await Promise.all(performerIds.map(id => UserModel.getById(id)));
+    const superadmins = (await Promise.all(superAdminIds.map(id => UserModel.getById(id)))).filter(Boolean);
+    const admins = (await Promise.all(adminIds.map(id => UserModel.getById(id)))).filter(Boolean);
+    const moderators = (await Promise.all(moderatorIds.map(id => UserModel.getById(id)))).filter(Boolean);
+    const performers = (await Promise.all(performerIds.map(id => UserModel.getById(id)))).filter(Boolean);
 
     let message = '👑 *Gestión de Roles*\n\n';
 
@@ -33,7 +40,7 @@ async function showRoleManagement(ctx, edit = false) {
     message += `🔴 *Super Admins* (${superadmins.length}):\n`;
     if (superadmins.length > 0) {
       for (const admin of superadmins) {
-        message += `  • @${admin.username || admin.id} (${admin.id})\n`;
+        message += `  • @${escapeMarkdown(admin.username || admin.id)} (${admin.id})\n`;
       }
     } else {
       message += '  _Ninguno_\n';
@@ -44,7 +51,7 @@ async function showRoleManagement(ctx, edit = false) {
     message += `🟡 *Administradores* (${admins.length}):\n`;
     if (admins.length > 0) {
       for (const admin of admins) {
-        message += `  • @${admin.username || admin.id} (${admin.id})\n`;
+        message += `  • @${escapeMarkdown(admin.username || admin.id)} (${admin.id})\n`;
       }
     } else {
       message += '  _Ninguno_\n';
@@ -55,7 +62,7 @@ async function showRoleManagement(ctx, edit = false) {
     message += `🟢 *Moderadores* (${moderators.length}):\n`;
     if (moderators.length > 0) {
       for (const mod of moderators) {
-        message += `  • @${mod.username || mod.id} (${mod.id})\n`;
+        message += `  • @${escapeMarkdown(mod.username || mod.id)} (${mod.id})\n`;
       }
     } else {
       message += '  _Ninguno_\n';
@@ -65,7 +72,7 @@ async function showRoleManagement(ctx, edit = false) {
     message += `\n🎭 *Performers* (${performers.length}):\n`;
     if (performers.length > 0) {
       for (const performer of performers) {
-        message += `  • @${performer.username || performer.id} (${performer.id})\n`;
+        message += `  • @${escapeMarkdown(performer.username || performer.id)} (${performer.id})\n`;
       }
     } else {
       message += '  _Ninguno_\n';
@@ -103,19 +110,25 @@ async function showRoleManagement(ctx, edit = false) {
 }
 
 /**
- * Role Management Handlers - SuperAdmin only
+ * Role Management Handlers - Admin/SuperAdmin
  * @param {Telegraf} bot - Bot instance
  */
 const registerRoleManagementHandlers = (bot) => {
+  const canManageRoles = async (ctx) => {
+    const role = await PermissionService.getUserRole(ctx.from.id);
+    return role === 'superadmin' || role === 'admin';
+  };
+
   // Main role management menu
   bot.action('admin_roles', async (ctx) => {
     try {
       logger.info('[ROLE-HANDLER] admin_roles called', { userId: ctx.from.id });
       await ctx.answerCbQuery();
-      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
-      logger.info('[ROLE-HANDLER] isSuperAdmin check result', { userId: ctx.from.id, isSuperAdmin });
-      if (!isSuperAdmin) {
-        logger.info('[ROLE-HANDLER] User is not superadmin, rejecting');
+      const allowed = await canManageRoles(ctx);
+      logger.info('[ROLE-HANDLER] canManageRoles check result', { userId: ctx.from.id, allowed });
+      if (!allowed) {
+        logger.info('[ROLE-HANDLER] User is not authorized, rejecting');
+        await ctx.reply('❌ No autorizado');
         return;
       }
       logger.info('[ROLE-HANDLER] Calling showRoleManagement');
@@ -129,8 +142,11 @@ const registerRoleManagementHandlers = (bot) => {
   // Add admin
   bot.action('role_add_admin', async (ctx) => {
     try {
-      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
-      if (!isSuperAdmin) return;
+      const allowed = await canManageRoles(ctx);
+      if (!allowed) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
 
       const lang = getLanguage(ctx);
       ctx.session.temp.addingRole = 'admin';
@@ -151,8 +167,11 @@ const registerRoleManagementHandlers = (bot) => {
   // Add moderator
   bot.action('role_add_moderator', async (ctx) => {
     try {
-      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
-      if (!isSuperAdmin) return;
+      const allowed = await canManageRoles(ctx);
+      if (!allowed) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
 
       const lang = getLanguage(ctx);
       ctx.session.temp.addingRole = 'moderator';
@@ -173,8 +192,11 @@ const registerRoleManagementHandlers = (bot) => {
   // Add performer
   bot.action('role_add_performer', async (ctx) => {
     try {
-      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
-      if (!isSuperAdmin) return;
+      const allowed = await canManageRoles(ctx);
+      if (!allowed) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
 
       const lang = getLanguage(ctx);
       ctx.session.temp.addingRole = 'performer';
@@ -195,8 +217,11 @@ const registerRoleManagementHandlers = (bot) => {
   // Remove role (demote to user)
   bot.action(/^role_remove_(.+)$/, async (ctx) => {
     try {
-      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
-      if (!isSuperAdmin) return;
+      const allowed = await canManageRoles(ctx);
+      if (!allowed) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
 
       const targetUserId = ctx.match[1];
       const result = await RoleService.removeRole(targetUserId, ctx.from.id);
@@ -215,8 +240,11 @@ const registerRoleManagementHandlers = (bot) => {
   // Promote moderator to admin
   bot.action(/^role_promote_(.+)$/, async (ctx) => {
     try {
-      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
-      if (!isSuperAdmin) return;
+      const allowed = await canManageRoles(ctx);
+      if (!allowed) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
 
       const targetUserId = ctx.match[1];
       const result = await RoleService.setUserRole(targetUserId, 'admin', ctx.from.id);
@@ -235,8 +263,11 @@ const registerRoleManagementHandlers = (bot) => {
   // Demote admin to moderator
   bot.action(/^role_demote_(.+)$/, async (ctx) => {
     try {
-      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
-      if (!isSuperAdmin) return;
+      const allowed = await canManageRoles(ctx);
+      if (!allowed) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
 
       const targetUserId = ctx.match[1];
       const result = await RoleService.setUserRole(targetUserId, 'moderator', ctx.from.id);
@@ -255,8 +286,11 @@ const registerRoleManagementHandlers = (bot) => {
   // Manage individual roles - show list
   bot.action('role_manage_list', async (ctx) => {
     try {
-      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
-      if (!isSuperAdmin) return;
+      const allowed = await canManageRoles(ctx);
+      if (!allowed) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
 
       const [adminIds, moderatorIds, performerIds] = await Promise.all([
         RoleService.getUsersByRole('admin'),
@@ -333,8 +367,11 @@ const registerRoleManagementHandlers = (bot) => {
   // Show details for specific user
   bot.action(/^role_manage_detail_(.+)$/, async (ctx) => {
     try {
-      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
-      if (!isSuperAdmin) return;
+      const allowed = await canManageRoles(ctx);
+      if (!allowed) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
 
       const userId = ctx.match[1];
       const user = await UserModel.getById(userId);
@@ -348,10 +385,10 @@ const registerRoleManagementHandlers = (bot) => {
       const roleDisplay = await RoleService.getUserRoleDisplay(userId, 'es');
 
       let message = '👤 *Gestionar Usuario*\n\n';
-      message += `Nombre: ${user.firstName || 'N/A'}\n`;
-      message += `Usuario: @${user.username || 'N/A'}\n`;
+      message += `Nombre: ${escapeMarkdown(user.firstName || 'N/A')}\n`;
+      message += `Usuario: @${escapeMarkdown(user.username || 'N/A')}\n`;
       message += `ID: \`${userId}\`\n`;
-      message += `Rol actual: ${roleDisplay}\n\n`;
+      message += `Rol actual: ${escapeMarkdown(roleDisplay)}\n\n`;
       message += '¿Qué deseas hacer?';
 
       const keyboard = [];
@@ -384,8 +421,8 @@ const registerRoleManagementHandlers = (bot) => {
     }
 
     try {
-      const isSuperAdmin = await RoleService.isSuperAdmin(ctx.from.id);
-      if (!isSuperAdmin) return next();
+      const allowed = await canManageRoles(ctx);
+      if (!allowed) return next();
 
       const userId = ctx.message.text.trim();
       const role = ctx.session.temp.addingRole;

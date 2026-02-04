@@ -1,11 +1,12 @@
 const { Markup } = require('telegraf');
 const UserService = require('../../services/userService');
+const UserModel = require('../../../models/userModel');
 const { t } = require('../../../utils/i18n');
 const { isValidEmail } = require('../../../utils/validation');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
 const { showMainMenu } = require('./menu');
-const { showEditProfileMenu } = require('./profile');
+const { showEditProfileOverview } = require('./profile');
 const paymentHandlers = require('../payments');
 const { showNearbyMenu } = require('./nearbyUnified');
 const supportRoutingService = require('../../services/supportRoutingService');
@@ -138,7 +139,7 @@ If you have any questions, use /support to contact us.`;
         }
 
         if (startParam === 'edit_profile') {
-          await showEditProfileMenu(ctx, lang);
+          await showEditProfileOverview(ctx, lang);
           return;
         }
 
@@ -403,7 +404,9 @@ If you have any questions, use /support to contact us.`;
       }
 
       if (isValidEmail(rawEmail)) {
-        const existingUser = await UserService.getByEmail(rawEmail);
+        const existingUser = typeof UserService.getByEmail === 'function'
+          ? await UserService.getByEmail(rawEmail)
+          : await UserModel.getByEmail(rawEmail);
 
         if (existingUser) {
           if (String(existingUser.id) === String(ctx.from.id)) {
