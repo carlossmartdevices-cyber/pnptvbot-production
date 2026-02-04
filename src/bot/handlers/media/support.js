@@ -144,7 +144,7 @@ const registerSupportHandlers = (bot) => {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.callback('🤖 Chat with Cristina', 'support_ai_chat')],
-          [Markup.button.callback('👤 Contact Santino', 'support_contact_admin')],
+          [Markup.button.callback('📞 Contact Customer Support', 'support_contact_admin')],
           [Markup.button.callback('🎁 Request Activation', 'support_request_activation')],
           [Markup.button.callback('❓ FAQ', 'support_faq')],
           [

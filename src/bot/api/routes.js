@@ -31,6 +31,26 @@ const { asyncHandler } = require('./middleware/errorHandler');
 const { telegramAuth, checkTermsAccepted } = require('../../api/middleware/telegramAuth');
 const { handleTelegramAuth, handleAcceptTerms, checkAuthStatus } = require('../../api/handlers/telegramAuthHandler');
 
+/**
+ * Page-level authentication middleware
+ * Redirects to login page if user is not authenticated
+ * Saves the original URL so user can be redirected back after login
+ */
+const requirePageAuth = (req, res, next) => {
+  const user = req.session?.user;
+
+  if (!user) {
+    // Save the original URL to redirect back after login
+    const returnUrl = encodeURIComponent(req.originalUrl);
+    logger.info(`Unauthenticated access to ${req.originalUrl}, redirecting to login`);
+    return res.redirect(`/login?return=${returnUrl}`);
+  }
+
+  // User is authenticated
+  req.user = user;
+  next();
+};
+
 // Simple page limiter middleware stub (used by landing page routes).
 // In production this may be replaced with a proper rate-limiter or cache-based limiter.
 const pageLimiter = (req, res, next) => {
@@ -64,10 +84,24 @@ app.use(morgan('combined', { stream: logger.stream }));
 
 
 
-// Custom static file middleware with easybots.store blocking
+// Protected paths that require authentication (don't serve static files directly)
+const PROTECTED_PATHS = ['/videorama', '/hangouts', '/live', '/pnplive'];
+
+// Custom static file middleware with easybots.store blocking and protected path exclusion
 const serveStaticWithBlocking = (staticPath) => {
   return (req, res, next) => {
     const host = req.get('host') || '';
+
+    // Skip static serving for protected paths (let auth routes handle them)
+    // But allow assets (/videorama/assets/, /hangouts/assets/, /live/assets/)
+    const isProtectedPath = PROTECTED_PATHS.some(p =>
+      req.path === p ||
+      req.path === p + '/' ||
+      (req.path.startsWith(p + '/') && !req.path.includes('/assets/'))
+    );
+    if (isProtectedPath) {
+      return next();
+    }
 
     // Block easybots.store from accessing PNPtv static files
     if (host.includes('easybots.store') || host.includes('easybots')) {
@@ -535,6 +569,59 @@ app.post('/api/logout', (req, res) => {
     logger.info('User logged out successfully');
     res.json({ success: true });
   });
+});
+
+// ==========================================
+// Protected Webapp Routes (require Telegram login)
+// ==========================================
+
+// Videorama - protected
+app.get('/videorama', requirePageAuth, (req, res) => {
+  logger.info(`User ${req.user.id} accessing Videorama`);
+  res.sendFile(path.join(__dirname, '../../../public/videorama-app/index.html'));
+});
+
+app.get('/videorama/*', requirePageAuth, (req, res) => {
+  // Serve static assets or fallback to index.html for SPA routing
+  const assetPath = path.join(__dirname, '../../../public/videorama-app', req.path.replace('/videorama', ''));
+  if (fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
+    return res.sendFile(assetPath);
+  }
+  res.sendFile(path.join(__dirname, '../../../public/videorama-app/index.html'));
+});
+
+// Hangouts - protected
+app.get('/hangouts', requirePageAuth, (req, res) => {
+  logger.info(`User ${req.user.id} accessing Hangouts`);
+  res.sendFile(path.join(__dirname, '../../../public/hangouts/index.html'));
+});
+
+app.get('/hangouts/*', requirePageAuth, (req, res) => {
+  const assetPath = path.join(__dirname, '../../../public/hangouts', req.path.replace('/hangouts', ''));
+  if (fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
+    return res.sendFile(assetPath);
+  }
+  res.sendFile(path.join(__dirname, '../../../public/hangouts/index.html'));
+});
+
+// Live - protected
+app.get('/live', requirePageAuth, (req, res) => {
+  logger.info(`User ${req.user.id} accessing Live`);
+  res.sendFile(path.join(__dirname, '../../../public/live/index.html'));
+});
+
+app.get('/live/*', requirePageAuth, (req, res) => {
+  const assetPath = path.join(__dirname, '../../../public/live', req.path.replace('/live', ''));
+  if (fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
+    return res.sendFile(assetPath);
+  }
+  res.sendFile(path.join(__dirname, '../../../public/live/index.html'));
+});
+
+// PNP Live portal - protected
+app.get('/pnplive', requirePageAuth, (req, res) => {
+  logger.info(`User ${req.user.id} accessing PNP Live portal`);
+  res.sendFile(path.join(__dirname, '../../../public/live/index.html'));
 });
 
 // Age verification (AI camera)

@@ -121,7 +121,7 @@ const buildPrimeMenuButtons = (lang) => ([
   ],
   [
     Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
-    Markup.button.callback(lang === 'es' ? '🆘 Crear Ticket de Soporte' : '🆘 Create a Support Ticket', 'show_support'),
+    Markup.button.callback(lang === 'es' ? '🆘 Ayuda y Soporte' : '🆘 Help & Support', 'show_support'),
   ],
 ]);
 
@@ -524,7 +524,7 @@ const showMainMenu = async (ctx) => {
       ...planButtons,
       [
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
-        Markup.button.callback(lang === 'es' ? '🆘 Crear Ticket de Soporte' : '🆘 Create a Support Ticket', 'show_support'),
+        Markup.button.callback(lang === 'es' ? '🆘 Ayuda y Soporte' : '🆘 Help & Support', 'show_support'),
       ],
     ];
   }
@@ -653,7 +653,7 @@ const showMainMenuEdit = async (ctx) => {
       ...planButtons,
       [
         Markup.button.callback(lang === 'es' ? '👤 Mi Perfil' : '👤 My Profile', 'show_profile'),
-        Markup.button.callback(lang === 'es' ? '🆘 Crear Ticket de Soporte' : '🆘 Create a Support Ticket', 'show_support'),
+        Markup.button.callback(lang === 'es' ? '🆘 Ayuda y Soporte' : '🆘 Help & Support', 'show_support'),
       ],
     ];
   }

@@ -3,6 +3,7 @@
  */
 
 const PNP_TV_LINK = 'https://t.me/+GDD0AAVbvGM3MGEx';
+const PNPTV_APP_BASE = 'https://pnptv.app';
 
 /**
  * Main menu for users
@@ -18,11 +19,13 @@ const getMainMenu = (language = 'en', isPrime = false) => {
       nearby: '📍 Nearby Users',
       hangouts: '🎥 Hangouts',
       videorama: '🎶 Videorama',
+      live: '📺 Live',
       support: '🆘 Help and support',
       settings: '⚙️ Settings',
       latinoTv: 'PNP Latino TV | Watch now',
       pnpLive: 'PNP Live | Latino Men on Webcam',
       pnpApp: 'PNP tv App | PRIME area',
+      login: '🔐 Login to PNPtv',
     },
     es: {
       profile: '👤 Mi Perfil',
@@ -30,11 +33,13 @@ const getMainMenu = (language = 'en', isPrime = false) => {
       nearby: '📍 Usuarios Cercanos',
       hangouts: '🎥 Hangouts',
       videorama: '🎶 Videorama',
+      live: '📺 En Vivo',
       support: '🆘 Ayuda y soporte',
       settings: '⚙️ Configuración',
       latinoTv: 'PNP Latino TV | Ver ahora',
       pnpLive: 'PNP Live | Hombres Latinos en Webcam',
       pnpApp: 'PNP tv App | Área PRIME',
+      login: '🔐 Iniciar sesión en PNPtv',
     },
   };
 
@@ -50,13 +55,23 @@ const getMainMenu = (language = 'en', isPrime = false) => {
     [
       {
         text: l.pnpLive,
-        callback_data: 'PNP_LIVE_START',
+        url: `${PNPTV_APP_BASE}/live`,
       },
     ],
     [
       {
         text: l.pnpApp,
-        callback_data: 'menu_pnp_tv_app',
+        url: `${PNPTV_APP_BASE}/login`,
+      },
+    ],
+    [
+      {
+        text: l.hangouts,
+        url: `${PNPTV_APP_BASE}/hangouts`,
+      },
+      {
+        text: l.videorama,
+        url: `${PNPTV_APP_BASE}/videorama`,
       },
     ],
     [
@@ -69,8 +84,12 @@ const getMainMenu = (language = 'en', isPrime = false) => {
     [{ text: l.subscribe, callback_data: 'menu_subscribe' }],
     [{ text: l.nearby, callback_data: 'menu_nearby' }],
     [
-      { text: l.hangouts, callback_data: 'menu_hangouts' },
-      { text: l.videorama, callback_data: 'menu_videorama' },
+      { text: l.hangouts, url: `${PNPTV_APP_BASE}/hangouts` },
+      { text: l.videorama, url: `${PNPTV_APP_BASE}/videorama` },
+    ],
+    [
+      { text: l.live, url: `${PNPTV_APP_BASE}/live` },
+      { text: l.login, url: `${PNPTV_APP_BASE}/login` },
     ],
     [
       { text: l.profile, callback_data: 'menu_profile' },

@@ -25,6 +25,7 @@ const { buildHangoutsWebAppUrl } = require('../../utils/hangoutsWebApp');
 
 const HANGOUTS_WEB_APP_URL = process.env.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts';
 const PRIME_TV_LINK = 'https://t.me/+GDD0AAVbvGM3MGEx';
+const PNPTV_APP_BASE = 'https://pnptv.app';
 
 /**
  * Store the last menu message ID per user per chat
@@ -69,20 +70,28 @@ function buildPrimeMenuKeyboard(lang = 'en') {
     latinoTv: 'PNP Latino TV | Ver ahora',
     pnpLive: 'PNP Live | Hombres Latinos en Webcam',
     pnpApp: 'PNP tv App | Área PRIME',
+    hangouts: '🎥 Hangouts',
+    videorama: '🎶 Videorama',
     profile: '👤 Mi Perfil',
     support: '🆘 Ayuda y soporte',
   } : {
     latinoTv: 'PNP Latino TV | Watch now',
     pnpLive: 'PNP Live | Latino Men on Webcam',
     pnpApp: 'PNP tv App | PRIME area',
+    hangouts: '🎥 Hangouts',
+    videorama: '🎶 Videorama',
     profile: '👤 My Profile',
     support: '🆘 Help and support',
   };
 
   return Markup.inlineKeyboard([
     [Markup.button.url(labels.latinoTv, PRIME_TV_LINK)],
-    [Markup.button.callback(labels.pnpLive, 'PNP_LIVE_START')],
-    [Markup.button.callback(labels.pnpApp, 'menu_pnp_tv_app')],
+    [Markup.button.url(labels.pnpLive, `${PNPTV_APP_BASE}/live`)],
+    [Markup.button.url(labels.pnpApp, `${PNPTV_APP_BASE}/login`)],
+    [
+      Markup.button.url(labels.hangouts, `${PNPTV_APP_BASE}/hangouts`),
+      Markup.button.url(labels.videorama, `${PNPTV_APP_BASE}/videorama`),
+    ],
     [
       Markup.button.callback(labels.profile, 'menu:profile'),
       Markup.button.callback(labels.support, 'menu:support'),
@@ -98,16 +107,20 @@ function buildFreeMenuKeyboard(lang = 'en') {
     profile: '👤 Mi Perfil',
     subscribe: '💎 Suscribirse a PRIME',
     nearby: '📍 PNP Nearby',
-    hangouts: '🎥 PNP Hangouts',
-    videorama: '🎶 PNP Videorama',
+    hangouts: '🎥 Hangouts',
+    videorama: '🎶 Videorama',
+    live: '📺 En Vivo',
+    login: '🔐 Iniciar sesión',
     support: '🆘 Ayuda y soporte',
     settings: '⚙️ Configuración',
   } : {
     profile: '👤 My Profile',
     subscribe: '💎 Subscribe to PRIME',
     nearby: '📍 PNP Nearby',
-    hangouts: '🎥 PNP Hangouts',
-    videorama: '🎶 PNP Videorama',
+    hangouts: '🎥 Hangouts',
+    videorama: '🎶 Videorama',
+    live: '📺 Live',
+    login: '🔐 Login',
     support: '🆘 Help and support',
     settings: '⚙️ Settings',
   };
@@ -115,7 +128,14 @@ function buildFreeMenuKeyboard(lang = 'en') {
   return Markup.inlineKeyboard([
     [Markup.button.callback(labels.subscribe, 'menu:subscribe')],
     [Markup.button.callback(labels.nearby, 'menu:nearby')],
-    [Markup.button.callback(labels.hangouts, 'menu_hangouts'), Markup.button.callback(labels.videorama, 'menu_videorama')],
+    [
+      Markup.button.url(labels.hangouts, `${PNPTV_APP_BASE}/hangouts`),
+      Markup.button.url(labels.videorama, `${PNPTV_APP_BASE}/videorama`),
+    ],
+    [
+      Markup.button.url(labels.live, `${PNPTV_APP_BASE}/live`),
+      Markup.button.url(labels.login, `${PNPTV_APP_BASE}/login`),
+    ],
     [
       Markup.button.callback(labels.profile, 'menu:profile'),
       Markup.button.callback(labels.support, 'menu:support'),
@@ -865,7 +885,7 @@ async function handleDeepLinkSupport(ctx, lang) {
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback(lang === 'es' ? '🤖 Hablar con Cristina' : '🤖 Chat with Cristina', 'support_ai_chat')],
-    [Markup.button.callback(lang === 'es' ? '👤 Contactar a Santino' : '👤 Contact Santino', 'support_contact_admin')],
+    [Markup.button.callback(lang === 'es' ? '📞 Contactar Soporte al Cliente' : '📞 Contact Customer Support', 'support_contact_admin')],
     [Markup.button.callback(lang === 'es' ? '🎁 Solicitar Activación' : '🎁 Request Activation', 'support_request_activation')],
     [Markup.button.callback(lang === 'es' ? '❓ FAQ' : '❓ FAQ', 'support_faq')],
     [Markup.button.callback(lang === 'es' ? '🏠 Menú Principal' : '🏠 Main Menu', 'menu:back')],
@@ -1392,7 +1412,7 @@ async function handleSupport(ctx, lang) {
     parse_mode: 'Markdown',
     ...Markup.inlineKeyboard([
       [Markup.button.callback('🤖 Chat with Cristina', 'support_ai_chat')],
-      [Markup.button.callback('👤 Contact Santino', 'support_contact_admin')],
+      [Markup.button.callback('📞 Contact Customer Support', 'support_contact_admin')],
       [Markup.button.callback('🎁 Request Activation', 'support_request_activation')],
       [Markup.button.callback('❓ FAQ', 'support_faq')],
       [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'menu:back')],
