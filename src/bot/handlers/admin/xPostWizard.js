@@ -477,20 +477,30 @@ const showAddMedia = async (ctx, edit = false) => {
   let message = '🖼️ **Agregar Media (Opcional)**\n\n';
 
   if (session.mediaUrl) {
-    message += `✅ Media agregada: ${session.mediaType || 'imagen'}\n\n`;
-    message += '📤 Envía otra media para reemplazar o continúa.\n';
-    message += 'ℹ️ La media se subirá a X al publicar.\n';
+    const mediaTypeLabel = {
+      'photo': '🖼️ Imagen',
+      'video': '🎥 Video',
+      'animation': '🎞️ GIF',
+      'image': '🖼️ Imagen',
+    }[session.mediaType] || '📎 Media';
+
+    message += `✅ **Media agregada:** ${mediaTypeLabel}\n\n`;
+    message += '👆 Presiona **"Continuar con Media"** para ir a la vista previa.\n';
+    message += '📤 O envía otra media para reemplazar la actual.\n';
   } else {
     message += '📤 Envía una imagen o video para agregar al post.\n';
-    message += 'O presiona "Continuar sin media" para omitir.\n';
+    message += 'O presiona **"Omitir Media"** para continuar sin ella.\n';
   }
 
   const buttons = [];
 
-  buttons.push([Markup.button.callback('▶️ Continuar sin media', 'xpost_preview')]);
-
   if (session.mediaUrl) {
+    // Media is attached - show continue with media button
+    buttons.push([Markup.button.callback('▶️ Continuar con Media', 'xpost_preview')]);
     buttons.push([Markup.button.callback('🗑️ Eliminar media', 'xpost_clear_media')]);
+  } else {
+    // No media - show skip option
+    buttons.push([Markup.button.callback('⏭️ Omitir Media', 'xpost_preview')]);
   }
 
   buttons.push([Markup.button.callback('◀️ Volver', 'xpost_compose')]);
