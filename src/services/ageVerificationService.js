@@ -10,7 +10,8 @@ const { query } = require('../config/postgres');
  */
 class AgeVerificationService {
   constructor() {
-    this.provider = process.env.AGE_VERIFICATION_PROVIDER || 'azure'; // 'azure' or 'facepp'
+    // Prefer explicit provider, otherwise choose based on available credentials
+    const configuredProvider = process.env.AGE_VERIFICATION_PROVIDER;
     this.minAge = parseInt(process.env.MIN_AGE_REQUIREMENT || '18', 10);
 
     // Azure Face API configuration
@@ -18,8 +19,18 @@ class AgeVerificationService {
     this.azureApiKey = process.env.AZURE_FACE_API_KEY;
 
     // Face++ API configuration
-    this.faceppApiKey = process.env.FACEPP_API_KEY;
-    this.faceppApiSecret = process.env.FACEPP_API_SECRET;
+    this.faceppApiKey = process.env.FACEPP_API_KEY || process.env.FACE_API_KEY;
+    this.faceppApiSecret = process.env.FACEPP_API_SECRET || process.env.FACE_API_SECRET;
+
+    if (configuredProvider) {
+      this.provider = configuredProvider;
+    } else if (this.azureEndpoint && this.azureApiKey) {
+      this.provider = 'azure';
+    } else if (this.faceppApiKey && this.faceppApiSecret) {
+      this.provider = 'facepp';
+    } else {
+      this.provider = 'azure';
+    }
   }
 
   /**
@@ -158,6 +169,16 @@ class AgeVerificationService {
   async analyzePhoto(photoBuffer) {
     switch (this.provider) {
       case 'azure':
+        if (!this.azureEndpoint || !this.azureApiKey) {
+          if (this.faceppApiKey && this.faceppApiSecret) {
+            logger.warn('Azure credentials missing, falling back to Face++');
+            return this.analyzeWithFacePP(photoBuffer);
+          }
+          return {
+            success: false,
+            error: 'Azure Face API credentials not configured',
+          };
+        }
         return this.analyzeWithAzure(photoBuffer);
       case 'facepp':
         return this.analyzeWithFacePP(photoBuffer);

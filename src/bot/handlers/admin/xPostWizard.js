@@ -8,6 +8,7 @@ const sanitize = require('../../../utils/sanitizer');
 
 const SESSION_KEY = 'xPostWizard';
 const X_MAX_TEXT_LENGTH = 280;
+const X_REQUIRED_LINKS = ['t.me/pnplatinotv_bot', 'pnptv.app/lifetime100'];
 
 // Wizard steps
 const STEPS = {
@@ -710,14 +711,18 @@ const handleTextInput = async (ctx, next) => {
         maxTokens: 180,
       });
 
-      const normalized = XPostService.normalizeXText(aiText);
+      const normalized = XPostService.ensureRequiredLinks(
+        aiText,
+        X_REQUIRED_LINKS,
+        X_MAX_TEXT_LENGTH,
+      );
       session.text = normalized.text;
       session.step = STEPS.COMPOSE_TEXT;
       await ctx.saveSession?.();
 
       const notice = normalized.truncated
-        ? '✅ Texto generado con Grok. ⚠️ Se truncó a 280 caracteres.'
-        : '✅ Texto generado con Grok.';
+        ? '✅ Texto generado con Grok. ⚠️ Se truncó a 280 caracteres para incluir links.'
+        : '✅ Texto generado con Grok (links incluidos).';
       await ctx.reply(notice);
       return showComposeText(ctx);
     } catch (error) {

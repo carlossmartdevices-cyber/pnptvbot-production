@@ -126,7 +126,7 @@ Respond ONLY in this style. Direct, dominant, PnP fire. Nothing out of character
   }
 
   if (mode === 'xPost') {
-    return `${xPostBasePrompt}\n\n${langHint}\n\nOUTPUT RULES:\n- Genera SOLO 1 post por respuesta, a menos que el usuario pida una tanda.\n- No agregues explicaciones ni texto extra, solo el post final.\n- Respeta el limite de 280 caracteres.`;
+    return `${xPostBasePrompt}\n\n${langHint}\n\nOUTPUT RULES:\n- Genera SOLO 1 post por respuesta, a menos que el usuario pida una tanda.\n- No agregues explicaciones ni texto extra, solo el post final.\n- Incluye SIEMPRE ambos links exactamente una vez cada uno y al final del post: t.me/pnplatinotv_bot y pnptv.app/lifetime100\n- Respeta el limite de 280 caracteres.`;
   }
 
   return `${methDaddyPersona}\n\n${langHint}\n\nOutput rules:\n- Return ONLY the final message text in Meth Daddy style\n- No quotes, no markdown headings\n- CRITICAL: Keep text UNDER 450 characters total\n- End with hashtags`;

@@ -26,6 +26,37 @@ class XPostService {
     return { text: `${truncatedText}…`, truncated: true };
   }
 
+  static ensureRequiredLinks(text, links = [], maxLength = X_MAX_TEXT_LENGTH) {
+    const trimmed = (text || '').trim();
+    const required = links.filter(Boolean);
+    const missing = required.filter((link) => {
+      const escaped = link.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return !new RegExp(escaped, 'i').test(trimmed);
+    });
+
+    if (missing.length === 0) {
+      return this.normalizeXText(trimmed);
+    }
+
+    const linksText = missing.join(' ');
+    const appendLength = (trimmed ? 1 : 0) + linksText.length; // newline + links
+    let base = trimmed;
+    let truncated = false;
+
+    if (base.length + appendLength > maxLength) {
+      const allowed = maxLength - appendLength;
+      if (allowed <= 0) {
+        base = '';
+      } else {
+        base = base.slice(0, allowed).trimEnd();
+      }
+      truncated = trimmed.length !== base.length;
+    }
+
+    const combined = base ? `${base}\n${linksText}` : linksText;
+    return { text: combined, truncated };
+  }
+
   static async listActiveAccounts() {
     const query = `
       SELECT account_id, handle, display_name, is_active

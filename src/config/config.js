@@ -27,6 +27,10 @@ module.exports = {
   GENERAL_TOPIC_ID: process.env.GENERAL_TOPIC_ID ? parseInt(process.env.GENERAL_TOPIC_ID) : 1,
   HANGOUTS_TOPIC_ID: process.env.HANGOUTS_TOPIC_ID ? parseInt(process.env.HANGOUTS_TOPIC_ID) : null,
 
+  // Videorama Configuration
+  VIDEORAMA_ADMIN_UPLOAD_CHANNEL_ID: process.env.VIDEORAMA_ADMIN_UPLOAD_CHANNEL_ID,
+
+
   // ==================== ENVIRONMENT ====================
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: parseInt(process.env.PORT) || 3001,
