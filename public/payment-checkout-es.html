@@ -236,6 +236,9 @@
                     <div style="color: var(--muted); font-size: 14px; margin-top: 5px;">
                         COP $<span id="plan-price-cop">0</span>
                     </div>
+                    <div id="plan-promo" class="promo-badge" style="display: none;"></div>
+                    <div id="plan-savings" class="promo-savings" style="display: none;"></div>
+                    <ul class="plan-features" id="plan-features" style="display: none;"></ul>
                 </div>
 
                 <button type="button" class="pay-button" id="pay-button">
@@ -253,6 +256,204 @@
         </main>
     </div>
 
-    </body>
+    <!-- ePayco Checkout Script -->
+    <script src="https://checkout.epayco.co/checkout.js"></script>
 
-    </html>
+    <script>
+        // Get payment ID from URL
+        const pathParts = window.location.pathname.split('/');
+        const paymentId = pathParts[pathParts.length - 1];
+
+        let paymentData = null;
+        let ePaycoHandler = null;
+
+        // Load payment information
+        async function loadPaymentInfo() {
+            try {
+                const response = await fetch(`/api/payment/${paymentId}`);
+
+                if (!response.ok) {
+                    throw new Error('No se pudo cargar la información del pago');
+                }
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Error al cargar el pago');
+                }
+
+                paymentData = data.payment;
+                displayPaymentInfo();
+                initializeEpayco();
+
+            } catch (error) {
+                console.error('Error loading payment:', error);
+                showError(error.message || 'Error al cargar la información del pago. Por favor, intenta nuevamente.');
+            }
+        }
+
+        // Display payment information
+        function displayPaymentInfo() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('checkout-form').style.display = 'block';
+
+            // Plan info
+            document.getElementById('plan-icon').textContent = paymentData.plan.icon || '💎';
+            document.getElementById('plan-name').textContent = paymentData.plan.name;
+            document.getElementById('plan-sku').textContent = paymentData.plan.sku || 'EASYBOTS-PNP-030';
+
+            // Duration text
+            const duration = paymentData.plan.duration;
+            let durationText;
+            if (duration >= 36500) {
+                durationText = 'Acceso de por vida';
+            } else if (duration === 7) {
+                durationText = '7 días';
+            } else if (duration === 30) {
+                durationText = '30 días';
+            } else {
+                durationText = duration + ' días';
+            }
+            document.getElementById('plan-duration').textContent = durationText;
+
+            // Prices
+            document.getElementById('plan-price-usd').textContent = paymentData.amountUSD.toFixed(2);
+            document.getElementById('plan-price-cop').textContent = formatNumber(paymentData.amountCOP);
+
+            const promoBadge = document.getElementById('plan-promo');
+            const promoSavings = document.getElementById('plan-savings');
+            if (paymentData.isPromo && paymentData.promoCode) {
+                promoBadge.textContent = `PROMO: ${paymentData.promoCode}`;
+                promoBadge.style.display = 'inline-block';
+                if (paymentData.discountAmount !== null) {
+                    const lang = document.documentElement.lang || 'es';
+                    const savingsText = lang === 'es'
+                        ? `Ahorras $${paymentData.discountAmount.toFixed(2)} USD`
+                        : `You save $${paymentData.discountAmount.toFixed(2)} USD`;
+                    promoSavings.textContent = savingsText;
+                    promoSavings.style.display = 'block';
+                }
+            } else {
+                promoBadge.style.display = 'none';
+                promoSavings.style.display = 'none';
+            }
+
+            const featuresList = document.getElementById('plan-features');
+            if (paymentData.plan.features && paymentData.plan.features.length > 0) {
+                featuresList.innerHTML = '';
+                paymentData.plan.features.forEach((feature) => {
+                    const li = document.createElement('li');
+                    li.textContent = feature;
+                    featuresList.appendChild(li);
+                });
+                featuresList.style.display = 'block';
+            } else {
+                featuresList.style.display = 'none';
+            }
+        }
+
+        // Initialize ePayco Checkout
+        function initializeEpayco() {
+            if (!paymentData.epaycoPublicKey || !paymentData.epaycoSignature) {
+                showError('Configuración de pago incompleta');
+                return;
+            }
+
+            ePaycoHandler = ePayco.checkout.configure({
+                key: paymentData.epaycoPublicKey,
+                test: paymentData.testMode
+            });
+        }
+
+        // Handle pay button click
+        document.getElementById('pay-button').addEventListener('click', function(e) {
+            e.preventDefault();
+
+            // Disable button
+            const payButton = document.getElementById('pay-button');
+            payButton.disabled = true;
+            payButton.textContent = 'Abriendo ePayco...';
+
+            // Prepare ePayco data
+            const epaycoData = {
+                // Plan info - use SKU only, not plan name
+                name: paymentData.plan.sku,
+                description: paymentData.plan.sku,
+                invoice: paymentData.paymentRef,
+                currency: paymentData.currencyCode || "COP",
+                amount: paymentData.amountCOP.toString(),
+                tax_base: "0",
+                tax: "0",
+                country: "co",
+                lang: "es",
+                signature: paymentData.epaycoSignature,
+
+                // Extra data for webhook (no customer data - ePayco will collect it)
+                extra1: paymentData.userId.toString(),
+                extra2: paymentData.planId,
+                extra3: paymentData.paymentId,
+
+                // URLs
+                confirmation: paymentData.confirmationUrl,
+                response: paymentData.responseUrl,
+
+                // Optional
+                methodsDisable: [],
+                autoclick: false
+            };
+
+            // Add event handlers for better UX
+            const checkoutOptions = {
+                ...epaycoData,
+                // Event handlers (optional but recommended for better UX)
+                onCreated: function() {
+                    console.log('ePayco checkout created successfully');
+                    // Re-enable button after popup opens
+                    setTimeout(() => {
+                        payButton.disabled = false;
+                        payButton.textContent = '💳 Pagar con ePayco';
+                    }, 1000);
+                },
+                onErrors: function(errors) {
+                    console.error('ePayco checkout errors:', errors);
+                    showError('Error al procesar el pago. Por favor, intenta nuevamente.');
+                    payButton.disabled = false;
+                    payButton.textContent = '💳 Pagar con ePayco';
+                },
+                onClosed: function() {
+                    console.log('ePayco checkout closed');
+                    // User closed the checkout without completing payment
+                    payButton.disabled = false;
+                    payButton.textContent = '💳 Pagar con ePayco';
+                }
+            };
+
+            try {
+                ePaycoHandler.open(checkoutOptions);
+            } catch (error) {
+                console.error('Error opening ePayco checkout:', error);
+                showError('Error al abrir el checkout. Por favor, intenta nuevamente.');
+                payButton.disabled = false;
+                payButton.textContent = '💳 Pagar con ePayco';
+            }
+        });
+
+        // Show error
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('checkout-form').style.display = 'none';
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Format number with thousands separator
+        function formatNumber(num) {
+            return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        }
+
+        // Load payment info on page load
+        loadPaymentInfo();
+    </script>
+</body>
+</html>
