@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Header from './components/Header'
 import RadioPlayer from './components/RadioPlayer'
+import LoginPage from './components/LoginPage' // Import LoginPage
 import {
   getUrlParams,
   fetchRadioNowPlaying,
@@ -14,45 +15,50 @@ function App() {
   const [radioNowPlaying, setRadioNowPlaying] = useState(null)
   const [error, setError] = useState(null)
   const [telegramUser, setTelegramUser] = useState(null)
-  const [authLoading, setAuthLoading] = useState(false)
+  const [authLoading, setAuthLoading] = useState(true) // Set to true initially
+  const [isAuthenticated, setIsAuthenticated] = useState(false) // New state
   const loginRef = useRef(null)
 
   useEffect(() => {
     const urlParams = getUrlParams()
     setParams(urlParams)
 
-    loadRadioStatus()
-
-    // Refresh radio status periodically
-    const radioInterval = setInterval(loadRadioStatus, 30000)
-
-    window.onTelegramAuth = (user) => {
-      handleTelegramAuth(user, setTelegramUser, setAuthLoading, setError);
-    };
-
+    // Initial Telegram auth check
     const initializeUser = async () => {
-      setAuthLoading(true);
+      setAuthLoading(true)
       try {
-        const currentUser = await fetchTelegramUser();
+        const currentUser = await fetchTelegramUser()
         if (currentUser) {
-          setTelegramUser(currentUser);
+          setTelegramUser(currentUser)
+          setIsAuthenticated(true)
+          loadRadioStatus()
         } else {
-          initTelegramLogin(loginRef);
+          setIsAuthenticated(false)
         }
       } catch (err) {
-        setError(err.message);
-        initTelegramLogin(loginRef);
+        setError(err.message)
+        setIsAuthenticated(false)
       } finally {
-        setAuthLoading(false);
+        setAuthLoading(false)
       }
+    }
+
+    initializeUser()
+
+    // Setup Telegram auth callback
+    window.onTelegramAuth = async (user) => {
+      await handleTelegramAuth(user, setTelegramUser, setAuthLoading, setError);
+      setIsAuthenticated(true); // Set authenticated on successful login
+      loadRadioStatus();
     };
 
-    initializeUser();
-    
+    // Refresh radio status periodically
+    const radioInterval = setInterval(loadRadioStatus, 30000);
+
     return () => {
       clearInterval(radioInterval)
     }
-  }, [])
+  }, [isAuthenticated]) // Re-run effect when authentication status changes
 
   async function loadRadioStatus() {
     try {
@@ -67,12 +73,25 @@ function App() {
     try {
       await fetch('/api/logout', { method: 'POST' });
       setTelegramUser(null);
-      initTelegramLogin(loginRef); // Re-initialize login widget after logout
+      setIsAuthenticated(false); // Reset authenticated on logout
     } catch (err) {
       console.error('Logout failed:', err);
       setError('Failed to log out.');
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <div className="spinner-lg"></div>
+        <p className="text-muted-foreground mt-4">Loading authentication...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage onAuthSuccess={() => setIsAuthenticated(true)} authLoading={authLoading} />;
+  }
 
   return (
     <>
@@ -81,14 +100,8 @@ function App() {
         subtitle="24/7 Live Music"
         telegramUser={telegramUser}
         onLogout={handleLogout}
-        loginRef={loginRef}
       />
-      {authLoading ? (
-        <div className="loading-state">
-          <div className="spinner-lg" />
-          <p className="text-muted-foreground mt-4">Authenticating...</p>
-        </div>
-      ) : error ? (
+      {error ? (
         <div className="error-state">
           <p className="text-red-500">{error}</p>
         </div>

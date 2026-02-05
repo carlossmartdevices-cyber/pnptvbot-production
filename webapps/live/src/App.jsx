@@ -4,6 +4,7 @@ import MediaGrid from './components/MediaGrid'
 import VideoPlayer from './components/VideoPlayer'
 import MiniRadioPlayer from './components/MiniRadioPlayer'
 import CategoryNav from './components/CategoryNav'
+import LoginPage from './components/LoginPage' // Import LoginPage
 import {
   getUrlParams,
   fetchMediaLibrary,
@@ -88,7 +89,8 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [telegramUser, setTelegramUser] = useState(null)
-  const [authLoading, setAuthLoading] = useState(false)
+  const [authLoading, setAuthLoading] = useState(true) // Set to true initially
+  const [isAuthenticated, setIsAuthenticated] = useState(false) // New state
   const loginRef = useRef(null)
 
   useEffect(() => {
@@ -96,39 +98,45 @@ function App() {
     setParams(urlParams)
     setCurrentView(urlParams.view || 'home')
 
-    loadMedia()
-    loadRadioStatus()
-
-    // Refresh radio status periodically
-    const radioInterval = setInterval(loadRadioStatus, 30000)
-
-    window.onTelegramAuth = (user) => {
-      handleTelegramAuth(user, setTelegramUser, setAuthLoading, setError);
-    };
-
+    // Initial Telegram auth check
     const initializeUser = async () => {
-      setAuthLoading(true);
+      setAuthLoading(true)
       try {
-        const currentUser = await fetchTelegramUser();
+        const currentUser = await fetchTelegramUser()
         if (currentUser) {
-          setTelegramUser(currentUser);
+          setTelegramUser(currentUser)
+          setIsAuthenticated(true)
+          // Only load media/radio/collections if authenticated
+          loadMedia()
+          loadRadioStatus()
         } else {
-          initTelegramLogin(loginRef);
+          setIsAuthenticated(false)
         }
       } catch (err) {
-        setError(err.message);
-        initTelegramLogin(loginRef);
+        setError(err.message)
+        setIsAuthenticated(false)
       } finally {
-        setAuthLoading(false);
+        setAuthLoading(false)
       }
+    }
+
+    initializeUser()
+
+    // Setup Telegram auth callback
+    window.onTelegramAuth = async (user) => {
+      await handleTelegramAuth(user, setTelegramUser, setAuthLoading, setError);
+      setIsAuthenticated(true); // Set authenticated on successful login
+      loadMedia(); // Load content after successful login
+      loadRadioStatus();
     };
 
-    initializeUser();
-    
+    // Refresh radio status periodically
+    const radioInterval = setInterval(loadRadioStatus, 30000);
+
     return () => {
       clearInterval(radioInterval)
     }
-  }, [])
+  }, [isAuthenticated]) // Re-run effect when authentication status changes
 
   async function loadMedia(category = null) {
     setLoading(true)
@@ -171,7 +179,7 @@ function App() {
     try {
       await fetch('/api/logout', { method: 'POST' });
       setTelegramUser(null);
-      initTelegramLogin(loginRef); // Re-initialize login widget after logout
+      setIsAuthenticated(false); // Reset authenticated on logout
     } catch (err) {
       console.error('Logout failed:', err);
       setError('Failed to log out.');
@@ -181,6 +189,19 @@ function App() {
   function handleClosePlayer() {
     setSelectedMedia(null);
     setCurrentView('home');
+  }
+
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <div className="spinner-lg"></div>
+        <p className="text-muted-foreground mt-4">Loading authentication...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage onAuthSuccess={() => setIsAuthenticated(true)} authLoading={authLoading} />;
   }
 
   const isPlayerView = currentView === 'player' && selectedMedia
@@ -212,7 +233,6 @@ function App() {
         subtitle="Your Media Center"
         telegramUser={telegramUser}
         onLogout={handleLogout}
-        loginRef={loginRef}
       />
 
       <main className="container">

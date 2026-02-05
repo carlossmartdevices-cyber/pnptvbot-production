@@ -1,8 +1,8 @@
 import { Suspense, lazy, useEffect, useMemo, useState, useRef } from 'react';
 import Header from './components/Header';
 import Lobby from './components/Lobby';
-import { getUrlParams } from './utils/api';
-// import { getTelegramUser, initTelegramWebApp } from './utils/telegram'; // Will adapt this
+import LoginPage from './components/LoginPage'; // Import LoginPage
+import { getUrlParams, fetchTelegramUser, initTelegramLogin, handleTelegramAuth } from './utils/api';
 
 const CallRoom = lazy(() => import('./components/CallRoom'));
 
@@ -10,59 +10,61 @@ function App() {
   const params = useMemo(() => getUrlParams(), []);
   const roleParam = (params.role || '').toUpperCase();
   const [telegramUser, setTelegramUser] = useState(null);
-  const [authMessage, setAuthMessage] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true); // Set to true initially
+  const [isAuthenticated, setIsAuthenticated] = useState(false); // New state
+  const [error, setError] = useState(null); // Add error state
   const loginRef = useRef(null);
 
   useEffect(() => {
-    const TELEGRAM_BOT = 'pnplatinotv_bot' // TODO: Make this configurable
-    window.onTelegramAuth = async (user) => {
-      if (!user) return
-      setAuthLoading(true)
-      setAuthMessage('Authenticating...')
+    // Initial Telegram auth check
+    const initializeUser = async () => {
+      setAuthLoading(true);
       try {
-        const response = await fetch('/api/telegram-auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramUser: user }),
-        })
-        const data = await response.json()
-        if (!response.ok) {
-          throw new Error(data.error || 'Telegram authentication failed')
+        const currentUser = await fetchTelegramUser();
+        if (currentUser) {
+          setTelegramUser(currentUser);
+          setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
         }
-        setTelegramUser({
-          id: user.id,
-          username: user.username,
-          first_name: user.first_name, // Use first_name for consistency
-          subscriptionStatus: data.user?.subscriptionStatus || 'free',
-        })
-        setAuthMessage('Welcome ' + (user.username || user.first_name || 'PNPtv user'))
       } catch (err) {
-        setAuthMessage(err.message)
+        setError(err.message); // Use setError here
+        setIsAuthenticated(false);
       } finally {
-        setAuthLoading(false)
+        setAuthLoading(false);
       }
-    }
+    };
 
-    if (!loginRef.current) return
-    const script = document.createElement('script')
-    script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.async = true
-    script.setAttribute('data-telegram-login', TELEGRAM_BOT)
-    script.setAttribute('data-size', 'large')
-    script.setAttribute('data-userpic', 'false')
-    script.setAttribute('data-request-access', 'write')
-    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
-    loginRef.current.appendChild(script)
-    
-    return () => {
-      script.remove()
-    }
+    initializeUser();
+
+    // Setup Telegram auth callback
+    window.onTelegramAuth = async (user) => {
+      await handleTelegramAuth(user, setTelegramUser, setAuthLoading, setError); // Use setError here
+      setIsAuthenticated(true); // Set authenticated on successful login
+    };
   }, []);
 
-  function handleLogout() {
-    setTelegramUser(null);
-    setAuthMessage('');
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+      setTelegramUser(null);
+      setIsAuthenticated(false); // Reset authenticated on logout
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <div className="spinner-lg"></div>
+        <p className="text-muted-foreground mt-4">Loading authentication...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage onAuthSuccess={() => setIsAuthenticated(true)} authLoading={authLoading} />;
   }
 
   const isCallMode = Boolean(params.room && params.token && params.uid);
@@ -75,7 +77,6 @@ function App() {
           subtitle="Video Calls" 
           telegramUser={telegramUser} 
           onLogout={handleLogout} 
-          loginRef={loginRef} 
         />
         <Suspense
           fallback={
@@ -98,7 +99,6 @@ function App() {
         subtitle="Video Calls" 
         telegramUser={telegramUser} 
         onLogout={handleLogout} 
-        loginRef={loginRef} 
       />
       <Lobby telegramUser={telegramUser} role={roleParam} />
     </>
