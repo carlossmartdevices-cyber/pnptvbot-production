@@ -356,8 +356,9 @@ class XPostService {
         }
       );
 
-      const mediaId = initRes.data?.data?.id;
+      const mediaId = initRes.data?.media_id_string || initRes.data?.media_id;
       if (!mediaId) {
+        logger.error('X media upload INIT failed - no media_id', { responseData: initRes.data });
         throw new Error('No se recibió media_id al inicializar upload');
       }
       logger.info('X media upload INIT ok', { mediaId });
@@ -421,12 +422,13 @@ class XPostService {
         }
       );
 
-      const processingInfo = finalizeRes.data?.data?.processing_info;
+      const processingInfo = finalizeRes.data?.processing_info;
       logger.info('X media upload FINALIZE ok', { mediaId, hasProcessing: !!processingInfo });
       if (processingInfo) {
         await this.waitForMediaProcessing(accessToken, mediaId, processingInfo);
       }
 
+      logger.info('X media upload completed successfully', { mediaId });
       return mediaId;
     } catch (error) {
       const status = error.response?.status;
@@ -451,6 +453,8 @@ class XPostService {
     let checkAfter = processingInfo?.check_after_secs || 5;
     let attempts = 0;
 
+    logger.info('Waiting for X media processing', { mediaId, initialState: state, checkAfter });
+
     while (state && state !== 'succeeded' && state !== 'failed' && attempts < 10) {
       await new Promise((resolve) => setTimeout(resolve, checkAfter * 1000));
       const statusRes = await axios.get(
@@ -462,15 +466,19 @@ class XPostService {
         }
       );
 
-      const info = statusRes.data?.data?.processing_info;
+      const info = statusRes.data?.processing_info;
       state = info?.state || state;
       checkAfter = info?.check_after_secs || checkAfter;
       attempts += 1;
+
+      logger.info('X media processing status check', { mediaId, state, attempts });
     }
 
     if (state && state !== 'succeeded') {
       throw new Error(`Media processing failed: ${state}`);
     }
+
+    logger.info('X media processing completed', { mediaId, finalState: state });
   }
 
   static async getValidAccessToken(account) {
