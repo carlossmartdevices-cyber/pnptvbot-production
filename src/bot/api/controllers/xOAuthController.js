@@ -56,7 +56,19 @@ const handleCallback = async (req, res) => {
     const botUsername = sanitizeBotUsername(process.env.BOT_USERNAME);
     const botLink = botUsername ? `https://t.me/${botUsername}` : null;
 
+    logger.info('X OAuth callback received', {
+      hasCode: !!code,
+      hasState: !!state,
+      hasError: !!error,
+      error: error || null,
+      errorDescription: errorDescription || null,
+    });
+
     if (error) {
+      logger.error('X OAuth authorization denied by user or Twitter', {
+        error,
+        errorDescription,
+      });
       return res.status(400).send(buildRedirectPage('Conexion rechazada', errorDescription || error, botLink));
     }
 

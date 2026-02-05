@@ -17,6 +17,7 @@ const { initializePostgres, testConnection } = require('../../config/postgres');
 const { initializeRedis } = require('../../config/redis');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
+const { userExistsMiddleware } = require('./middleware/userExistsMiddleware');
 const globalBanCheck = require('./middleware/globalBanCheck');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
@@ -328,6 +329,7 @@ const startBot = async () => {
 
     // Register middleware
     bot.use(sessionMiddleware());
+    bot.use(userExistsMiddleware()); // Check if user exists in DB, force onboarding if not
     bot.use(globalBanCheck()); // Block globally banned users
     bot.use(rateLimitMiddleware());
 

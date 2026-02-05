@@ -61,7 +61,16 @@ class XOAuthService {
       code_challenge_method: 'S256',
     });
 
-    return `${X_OAUTH_BASE}/authorize?${params.toString()}`;
+    const authUrl = `${X_OAUTH_BASE}/authorize?${params.toString()}`;
+
+    logger.info('Generated X OAuth URL', {
+      clientId: clientId.substring(0, 10) + '...',
+      redirectUri,
+      scopes,
+      state: state.substring(0, 8) + '...',
+    });
+
+    return authUrl;
   }
 
   static async handleOAuthCallback({ code, state }) {
