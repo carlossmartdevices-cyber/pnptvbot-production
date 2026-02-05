@@ -10,7 +10,170 @@
     /* Add any specific styles for privacy page here, if needed, that are not covered by static.css */
     .header .header-links a[href="/privacy"] {
       background: var(--accent);
-      color: #2d1d00;
+      color: var(--bg);
+    }
+
+    .privacy-summary {
+      background: var(--bg-2);
+      padding: 30px;
+      border-radius: 12px;
+      margin-bottom: 40px;
+      border: 1px solid var(--border);
+    }
+
+    .privacy-summary h3 {
+      text-align: center;
+      color: var(--accent);
+      font-size: 22px;
+      margin-bottom: 25px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+    }
+
+    .summary-item {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      background: var(--bg);
+      padding: 20px;
+      border-radius: 10px;
+      border-left: 4px solid var(--accent-2);
+      border: 1px solid var(--border);
+    }
+
+    .summary-item .icon {
+      font-size: 32px;
+      color: var(--accent-2);
+    }
+
+    .summary-item .text strong {
+      display: block;
+      font-size: 16px;
+      color: var(--text);
+      margin-bottom: 5px;
+    }
+
+    .summary-item .text {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .privacy-box {
+      background: rgba(255, 180, 84, 0.1);
+      border: 1px solid rgba(255, 180, 84, 0.3);
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      color: var(--accent);
+    }
+
+    .privacy-box strong {
+      color: var(--accent);
+    }
+
+    .data-box {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+      margin: 25px 0;
+    }
+
+    @media (min-width: 768px) {
+      .data-box {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .data-card {
+      background: var(--bg);
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .data-card h5 {
+      font-size: 18px;
+      margin-bottom: 15px;
+    }
+
+    .data-card ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .data-card li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .data-card li::before {
+      content: "•";
+      color: var(--accent);
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .data-card.collect h5 {
+      color: var(--accent);
+    }
+
+    .data-card.collect li::before {
+      color: var(--accent);
+    }
+
+    .data-card.no-collect h5 {
+      color: var(--accent-3);
+    }
+
+    .data-card.no-collect li::before {
+      content: "✕";
+      color: var(--accent-3);
+    }
+
+    .rights-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 20px;
+      margin: 25px 0;
+    }
+
+    .right-item {
+      background: var(--bg);
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+      border: 1px solid var(--border);
+      transition: transform 0.2s;
+    }
+
+    .right-item:hover {
+      transform: translateY(-5px);
+    }
+
+    .right-item .icon {
+      font-size: 38px;
+      color: var(--accent-2);
+      margin-bottom: 10px;
+    }
+
+    .right-item .title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 5px;
+    }
+
+    .right-item .desc {
+      font-size: 12px;
+      color: var(--muted);
     }
   </style>
 </head>

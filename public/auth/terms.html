@@ -7,9 +7,24 @@
   <link rel="stylesheet" href="/webapps/design-system/static.css">
   <style>
     /* Specific styles for auth terms page */
+    .button {
+        display: inline-block;
+        padding: 12px 24px;
+        background: linear-gradient(135deg, var(--accent), #ffd27a);
+        color: var(--bg);
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+
+    .button:hover {
+        transform: translateY(-2px);
+    }
   </style>
 </head>
-<body>
 <body>
     <header class="header">
         <div class="header-logo">
@@ -55,7 +70,7 @@
             <h3>3. Access Levels</h3>
             <ul>
                 <li><strong>FREE/Churned Users:</strong> Can join public hangouts and play public content</li>
-                <li><strong>PRIME Users:</strong> Can create private hangouts and private playlists</li>
+                <li><strong>PRIME Users:</b> Can create private hangouts and private playlists</li>
             </ul>
             
             <h3>4. Data Privacy</h3>

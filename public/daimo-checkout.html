@@ -125,7 +125,7 @@
             width: 100%;
             padding: 14px;
             background: linear-gradient(135deg, var(--accent), #ffd27a);
-            color: #2d1d00;
+            color: var(--bg);
             border: none;
             border-radius: 8px;
             font-size: 16px;
@@ -456,113 +456,5 @@
         loadPaymentInfo();
     </script>
 
-    <script>
-        // Get payment ID from URL
-        const pathParts = window.location.pathname.split('/');
-        const paymentId = pathParts[pathParts.length - 1];
-
-        let paymentData = null;
-
-        // Load payment information
-        async function loadPaymentInfo() {
-            try {
-                const response = await fetch(`/api/payment/${paymentId}`);
-
-                if (!response.ok) {
-                    throw new Error('No se pudo cargar la información del pago');
-                }
-
-                const data = await response.json();
-
-                if (!data.success) {
-                    throw new Error(data.error || 'Error al cargar el pago');
-                }
-
-                paymentData = data.payment;
-                displayPaymentInfo();
-
-            } catch (error) {
-                console.error('Error loading payment:', error);
-                showError(error.message || 'Error al cargar la información del pago. Por favor intenta de nuevo.');
-            }
-        }
-
-        // Display payment information
-        function displayPaymentInfo() {
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('checkout-form').style.display = 'block';
-
-            // Plan info
-            document.getElementById('plan-icon').textContent = paymentData.plan.icon || '💎';
-            document.getElementById('plan-name').textContent = paymentData.plan.name;
-            document.getElementById('plan-sku').textContent = paymentData.plan.sku;
-            document.getElementById('plan-duration').textContent = paymentData.plan.duration || 30;
-
-            // Prices
-            document.getElementById('plan-price-usd').textContent = paymentData.amountUSD.toFixed(2);
-            document.getElementById('plan-price-cop').textContent = formatNumber(paymentData.amountCOP);
-
-            // Add pay button handler
-            document.getElementById('pay-button').addEventListener('click', handlePayClick);
-        }
-
-        // Handle pay button click
-        function handlePayClick() {
-            const payButton = document.getElementById('pay-button');
-            payButton.disabled = true;
-            payButton.textContent = 'Abriendo Daimo...';
-
-            try {
-                // Get the Daimo payment link from payment data
-                const daimoLink = paymentData.daimoPaymentLink;
-
-                if (!daimoLink) {
-                    showError('No se pudo generar el enlace de pago. Por favor intenta desde el bot.');
-                    payButton.disabled = false;
-                    payButton.textContent = '💎 Pagar con Daimo';
-                    return;
-                }
-
-                // Open Daimo payment link in new tab
-                const daimoWindow = window.open(daimoLink, 'DaimoPayment', 'width=500,height=700');
-
-                if (!daimoWindow) {
-                    showError('No se pudo abrir la ventana de pago. Por favor comprueba tu bloqueador de ventanas emergentes.');
-                    payButton.disabled = false;
-                    payButton.textContent = '💎 Pagar con Daimo';
-                    return;
-                }
-
-                // Re-enable button after a delay
-                setTimeout(() => {
-                    payButton.disabled = false;
-                    payButton.textContent = '💎 Pagar con Daimo';
-                }, 2000);
-
-            } catch (error) {
-                console.error('Error opening Daimo payment:', error);
-                showError('Error al abrir el pago. Por favor intenta de nuevo.');
-                payButton.disabled = false;
-                payButton.textContent = '💎 Pagar con Daimo';
-            }
-        }
-
-        // Show error
-        function showError(message) {
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('checkout-form').style.display = 'none';
-            const errorDiv = document.getElementById('error');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-        }
-
-        // Format number with thousands separator
-        function formatNumber(num) {
-            return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-        }
-
-        // Load payment info on page load
-        loadPaymentInfo();
-    </script>
 </body>
 </html>

@@ -5,26 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Age Verification - PNPtv</title>
   <meta name="description" content="Age verification required to access PNPtv adult content platform.">
-  <link rel="stylesheet" href="/unified-design.css">
+  <link rel="stylesheet" href="/webapps/design-system/static.css">
   <style>
     body {
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       padding: 20px;
     }
 
     .verification-container {
       max-width: 500px;
       width: 100%;
-      background: rgba(0, 0, 0, 0.85);
+      background: var(--panel-strong);
       border-radius: 24px;
       padding: 40px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      box-shadow: var(--shadow);
       backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--border);
     }
 
     .logo {
@@ -34,7 +33,7 @@
 
     .logo h1 {
       font-size: 2.5rem;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, var(--accent), #ffd37c);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -42,13 +41,13 @@
     }
 
     .logo .tagline {
-      color: var(--text-muted);
+      color: var(--muted);
       font-size: 14px;
     }
 
     .warning-box {
-      background: rgba(255, 68, 68, 0.15);
-      border: 1px solid rgba(255, 68, 68, 0.4);
+      background: rgba(255, 107, 107, 0.1);
+      border: 1px solid rgba(255, 107, 107, 0.3);
       border-radius: 12px;
       padding: 20px;
       margin-bottom: 25px;
@@ -58,10 +57,11 @@
     .warning-box .icon {
       font-size: 48px;
       margin-bottom: 10px;
+      color: var(--accent-3);
     }
 
     .warning-box h2 {
-      color: #ff6b6b;
+      color: var(--accent-3);
       font-size: 1.3rem;
       margin-bottom: 10px;
     }
@@ -84,7 +84,7 @@
     }
 
     .age-question p {
-      color: var(--text-muted);
+      color: var(--muted);
       font-size: 14px;
     }
 
@@ -111,19 +111,19 @@
     }
 
     .verify-btn.primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.35);
+      background: linear-gradient(135deg, var(--accent), #ffd27a);
+      color: #2d1d00;
+      box-shadow: 0 8px 25px rgba(255, 180, 84, 0.35);
     }
 
     .verify-btn.primary:hover {
       transform: translateY(-3px);
-      box-shadow: 0 12px 35px rgba(102, 126, 234, 0.5);
+      box-shadow: 0 12px 35px rgba(255, 180, 84, 0.5);
     }
 
     .verify-btn.secondary {
       background: rgba(255, 255, 255, 0.1);
-      color: white;
+      color: var(--text);
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
@@ -132,13 +132,13 @@
     }
 
     .verify-btn.exit {
-      background: rgba(255, 68, 68, 0.2);
-      color: #ff6b6b;
-      border: 1px solid rgba(255, 68, 68, 0.3);
+      background: rgba(255, 107, 107, 0.2);
+      color: var(--accent-3);
+      border: 1px solid rgba(255, 107, 107, 0.3);
     }
 
     .verify-btn.exit:hover {
-      background: rgba(255, 68, 68, 0.3);
+      background: rgba(255, 107, 107, 0.3);
     }
 
     .verify-btn .icon {
@@ -146,15 +146,15 @@
     }
 
     .privacy-notice {
-      background: rgba(72, 187, 120, 0.1);
-      border: 1px solid rgba(72, 187, 120, 0.3);
+      background: rgba(44, 226, 201, 0.1);
+      border: 1px solid rgba(44, 226, 201, 0.3);
       border-radius: 10px;
       padding: 15px;
       margin-bottom: 20px;
     }
 
     .privacy-notice h4 {
-      color: #68d391;
+      color: var(--accent-2);
       font-size: 14px;
       margin-bottom: 8px;
       display: flex;
@@ -167,7 +167,7 @@
       padding: 0;
       margin: 0;
       font-size: 12px;
-      color: #a0d8b0;
+      color: var(--muted);
     }
 
     .privacy-notice ul li {
@@ -179,19 +179,19 @@
 
     .privacy-notice ul li::before {
       content: "\2713";
-      color: #68d391;
+      color: var(--accent-2);
       font-weight: bold;
     }
 
     .legal-links {
       text-align: center;
       font-size: 12px;
-      color: var(--text-muted);
+      color: var(--muted);
       margin-top: 20px;
     }
 
     .legal-links a {
-      color: var(--primary-light);
+      color: var(--text);
       text-decoration: none;
     }
 
@@ -234,15 +234,16 @@
     .confirmation-screen .success-icon {
       font-size: 64px;
       margin-bottom: 20px;
+      color: var(--accent-2);
     }
 
     .confirmation-screen h2 {
-      color: #68d391;
+      color: var(--text);
       margin-bottom: 15px;
     }
 
     .confirmation-screen p {
-      color: var(--text-muted);
+      color: var(--muted);
       margin-bottom: 25px;
     }
 
@@ -254,15 +255,16 @@
     .denied-screen .denied-icon {
       font-size: 64px;
       margin-bottom: 20px;
+      color: var(--accent-3);
     }
 
     .denied-screen h2 {
-      color: #ff6b6b;
+      color: var(--accent-3);
       margin-bottom: 15px;
     }
 
     .denied-screen p {
-      color: var(--text-muted);
+      color: var(--muted);
       margin-bottom: 25px;
     }
 
@@ -281,247 +283,3 @@
       }
     }
   </style>
-</head>
-<body>
-  <div class="language-switcher">
-    <button class="lang-btn active" onclick="setLanguage('en')">EN</button>
-    <button class="lang-btn" onclick="setLanguage('es')">ES</button>
-  </div>
-
-  <div class="verification-container">
-    <!-- Main verification screen -->
-    <div id="mainScreen">
-      <div class="logo">
-        <h1>PNPtv!</h1>
-        <p class="tagline" data-i18n="tagline">Digital Community</p>
-      </div>
-
-      <div class="warning-box">
-        <div class="icon">18+</div>
-        <h2 data-i18n="warning_title">Adult Content Warning</h2>
-        <p data-i18n="warning_text">This website contains age-restricted material including nudity and explicit content. By entering, you confirm that you are at least 18 years old and that viewing this content is legal in your jurisdiction.</p>
-      </div>
-
-      <div class="age-question">
-        <h3 data-i18n="question">Are you 18 years or older?</h3>
-        <p data-i18n="question_sub">You must verify your age to continue</p>
-      </div>
-
-      <div class="verification-options">
-        <button class="verify-btn primary" onclick="verifyAge('camera')">
-          <span class="icon">📷</span>
-          <span data-i18n="btn_camera">Verify with Camera (Recommended)</span>
-        </button>
-
-        <button class="verify-btn secondary" onclick="verifyAge('manual')">
-          <span class="icon">✓</span>
-          <span data-i18n="btn_manual">I confirm I am 18+</span>
-        </button>
-
-        <button class="verify-btn exit" onclick="exitSite()">
-          <span class="icon">✕</span>
-          <span data-i18n="btn_exit">I am under 18 - Exit</span>
-        </button>
-      </div>
-
-      <div class="privacy-notice">
-        <h4><span>🔒</span> <span data-i18n="privacy_title">Your Privacy is Protected</span></h4>
-        <ul>
-          <li data-i18n="privacy_1">Photos are analyzed instantly and deleted immediately</li>
-          <li data-i18n="privacy_2">We never store facial images on our servers</li>
-          <li data-i18n="privacy_3">Only verification status is saved, not biometric data</li>
-          <li data-i18n="privacy_4">You can delete your account anytime</li>
-        </ul>
-      </div>
-
-      <div class="legal-links">
-        <span data-i18n="legal_agree">By continuing, you agree to our</span>
-        <a href="/terms" data-i18n="terms_link">Terms of Service</a> &amp;
-        <a href="/privacy" data-i18n="privacy_link">Privacy Policy</a>
-      </div>
-    </div>
-
-    <!-- Confirmation screen -->
-    <div id="confirmationScreen" class="confirmation-screen hidden">
-      <div class="success-icon">✅</div>
-      <h2 data-i18n="confirm_title">Age Verified</h2>
-      <p data-i18n="confirm_text">Thank you for confirming your age. You can now access PNPtv content.</p>
-      <button class="verify-btn primary" onclick="continueToSite()">
-        <span data-i18n="btn_continue">Continue to PNPtv</span>
-      </button>
-    </div>
-
-    <!-- Denied screen -->
-    <div id="deniedScreen" class="denied-screen hidden">
-      <div class="denied-icon">🚫</div>
-      <h2 data-i18n="denied_title">Access Denied</h2>
-      <p data-i18n="denied_text">You must be at least 18 years old to access this content. Please come back when you are of legal age.</p>
-      <button class="verify-btn exit" onclick="exitSite()">
-        <span data-i18n="btn_leave">Leave Site</span>
-      </button>
-    </div>
-  </div>
-
-  <script>
-    // Translations
-    const translations = {
-      en: {
-        tagline: 'Digital Community',
-        warning_title: 'Adult Content Warning',
-        warning_text: 'This website contains age-restricted material including nudity and explicit content. By entering, you confirm that you are at least 18 years old and that viewing this content is legal in your jurisdiction.',
-        question: 'Are you 18 years or older?',
-        question_sub: 'You must verify your age to continue',
-        btn_camera: 'Verify with Camera (Recommended)',
-        btn_manual: 'I confirm I am 18+',
-        btn_exit: 'I am under 18 - Exit',
-        privacy_title: 'Your Privacy is Protected',
-        privacy_1: 'Photos are analyzed instantly and deleted immediately',
-        privacy_2: 'We never store facial images on our servers',
-        privacy_3: 'Only verification status is saved, not biometric data',
-        privacy_4: 'You can delete your account anytime',
-        legal_agree: 'By continuing, you agree to our',
-        terms_link: 'Terms of Service',
-        privacy_link: 'Privacy Policy',
-        confirm_title: 'Age Verified',
-        confirm_text: 'Thank you for confirming your age. You can now access PNPtv content.',
-        btn_continue: 'Continue to PNPtv',
-        denied_title: 'Access Denied',
-        denied_text: 'You must be at least 18 years old to access this content. Please come back when you are of legal age.',
-        btn_leave: 'Leave Site'
-      },
-      es: {
-        tagline: 'Comunidad Digital',
-        warning_title: 'Advertencia de Contenido Adulto',
-        warning_text: 'Este sitio web contiene material restringido por edad, incluyendo desnudez y contenido explícito. Al entrar, confirmas que tienes al menos 18 años y que ver este contenido es legal en tu jurisdicción.',
-        question: '¿Tienes 18 años o más?',
-        question_sub: 'Debes verificar tu edad para continuar',
-        btn_camera: 'Verificar con Cámara (Recomendado)',
-        btn_manual: 'Confirmo que tengo 18+',
-        btn_exit: 'Soy menor de 18 - Salir',
-        privacy_title: 'Tu Privacidad está Protegida',
-        privacy_1: 'Las fotos se analizan al instante y se eliminan inmediatamente',
-        privacy_2: 'Nunca almacenamos imágenes faciales en nuestros servidores',
-        privacy_3: 'Solo se guarda el estado de verificación, no datos biométricos',
-        privacy_4: 'Puedes eliminar tu cuenta en cualquier momento',
-        legal_agree: 'Al continuar, aceptas nuestros',
-        terms_link: 'Términos de Servicio',
-        privacy_link: 'Política de Privacidad',
-        confirm_title: 'Edad Verificada',
-        confirm_text: 'Gracias por confirmar tu edad. Ahora puedes acceder al contenido de PNPtv.',
-        btn_continue: 'Continuar a PNPtv',
-        denied_title: 'Acceso Denegado',
-        denied_text: 'Debes tener al menos 18 años para acceder a este contenido. Por favor regresa cuando tengas la edad legal.',
-        btn_leave: 'Salir del Sitio'
-      }
-    };
-
-    let currentLang = 'en';
-
-    // Get URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const userId = urlParams.get('user_id');
-    const token = urlParams.get('token');
-    const langParam = urlParams.get('lang');
-    const redirect = urlParams.get('redirect') || '/';
-
-    // Set initial language from URL param
-    if (langParam && translations[langParam]) {
-      currentLang = langParam;
-      updateLanguage();
-    }
-
-    function setLanguage(lang) {
-      currentLang = lang;
-      updateLanguage();
-
-      // Update active button
-      document.querySelectorAll('.lang-btn').forEach(btn => {
-        btn.classList.remove('active');
-      });
-      event.target.classList.add('active');
-    }
-
-    function updateLanguage() {
-      const t = translations[currentLang];
-      document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if (t[key]) {
-          el.textContent = t[key];
-        }
-      });
-    }
-
-    function verifyAge(method) {
-      if (method === 'camera') {
-        // Redirect to camera verification page
-        const cameraUrl = `/age-verification-camera.html?user_id=${userId || ''}&token=${token || ''}&lang=${currentLang}`;
-        window.location.href = cameraUrl;
-      } else if (method === 'manual') {
-        // Show confirmation screen
-        document.getElementById('mainScreen').classList.add('hidden');
-        document.getElementById('confirmationScreen').classList.remove('hidden');
-
-        // Store age verification in localStorage
-        localStorage.setItem('ageVerified', 'true');
-        localStorage.setItem('ageVerifiedMethod', 'manual');
-        localStorage.setItem('ageVerifiedDate', new Date().toISOString());
-
-        // If we have user ID and token, send to backend
-        if (userId) {
-          fetch('/api/verify-age-manual', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              user_id: userId,
-              method: 'manual',
-              lang: currentLang
-            })
-          }).catch(err => console.log('Manual verification logged'));
-        }
-      }
-    }
-
-    function exitSite() {
-      // Show denied screen briefly then redirect
-      document.getElementById('mainScreen').classList.add('hidden');
-      document.getElementById('confirmationScreen').classList.add('hidden');
-      document.getElementById('deniedScreen').classList.remove('hidden');
-
-      // Clear any verification
-      localStorage.removeItem('ageVerified');
-
-      // Redirect to safe site after 2 seconds
-      setTimeout(() => {
-        window.location.href = 'https://www.google.com';
-      }, 2000);
-    }
-
-    function continueToSite() {
-      // Redirect to the main site or specified redirect URL
-      if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-        Telegram.WebApp.sendData('age_verified:manual');
-      } else {
-        window.location.href = redirect;
-      }
-    }
-
-    // Check if already verified
-    window.addEventListener('DOMContentLoaded', () => {
-      const isVerified = localStorage.getItem('ageVerified');
-      if (isVerified === 'true') {
-        // Show continue button instead of full verification
-        document.getElementById('mainScreen').classList.add('hidden');
-        document.getElementById('confirmationScreen').classList.remove('hidden');
-      }
-
-      // Initialize Telegram WebApp if available
-      if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-        Telegram.WebApp.ready();
-        Telegram.WebApp.expand();
-      }
-    });
-  </script>
-</body>
-</html>

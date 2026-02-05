@@ -145,179 +145,161 @@ function Lobby({ telegramUser, role }) {
   };
 
   return (
-    <div className="app">
-      <div className="bg" />
-      <header className="header">
-        <div className="brand">
-          <div className="brandMark">
-            <Sparkles size={18} />
+    <main className="container">
+      <section className="hero-section">
+        <h2 className="hero-title">Find a room or start one.</h2>
+        <p className="hero-text">
+          {telegramUser ? (
+            <>
+              Connected as <span className="font-mono">{telegramUser.displayName}</span>. Public
+              rooms appear below.
+            </>
+          ) : (
+            <>Open from Telegram for instant join and creator credit.</>
+          )}
+        </p>
+        <div className="flex flex-wrap gap-2 mb-4">
+          <span className={`badge ${isTelegram ? 'badge-success' : 'badge-muted'}`}>
+            {isTelegram ? 'Telegram linked' : 'Telegram required'}
+          </span>
+          <span className={`badge ${canCreate ? 'badge-success' : 'badge-warning'}`}>
+            {canCreate ? 'Creator access' : 'Viewer access'}
+          </span>
+          <span className="badge badge-muted">Instant join links</span>
+        </div>
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="card text-center">
+            <div className="text-2xl font-bold">{roomCount}</div>
+            <div className="text-sm text-muted-foreground">Public rooms</div>
           </div>
-          <div className="brandText">
-            <div className="brandName">PNPtv Hangouts</div>
-            <div className="brandTag">Rooms | Live | Private-by-default | 18+</div>
+          <div className="card text-center">
+            <div className="text-2xl font-bold">{participantCount}</div>
+            <div className="text-sm text-muted-foreground">Guests online</div>
+          </div>
+          <div className="card text-center">
+            <div className="text-2xl font-bold">{capacityCount}</div>
+            <div className="text-sm text-muted-foreground">Total capacity</div>
           </div>
         </div>
-        <button className="iconBtn" onClick={handleRefresh} disabled={loading} title="Refresh rooms">
-          <RefreshCw size={18} />
-        </button>
-      </header>
-
-      <main className="main">
-        <section className="hero">
-          <div className="heroTitle">Find a room or start one.</div>
-          <div className="heroText">
-            {telegramUser ? (
-              <>
-                Connected as <span className="monoInline">{telegramUser.displayName}</span>. Public
-                rooms appear below.
-              </>
-            ) : (
-              <>Open from Telegram for instant join and creator credit.</>
-            )}
-          </div>
-          <div className="chipRow">
-            <span className={`chip ${isTelegram ? 'chipSuccess' : 'chipMuted'}`}>
-              {isTelegram ? 'Telegram linked' : 'Telegram required'}
-            </span>
-            <span className={`chip ${canCreate ? 'chipSuccess' : 'chipWarn'}`}>
-              {canCreate ? 'Creator access' : 'Viewer access'}
-            </span>
-            <span className="chip chipMuted">Instant join links</span>
-          </div>
-          <div className="statRow">
-            <div className="statCard">
-              <div className="statValue">{roomCount}</div>
-              <div className="statLabel">Public rooms</div>
-            </div>
-            <div className="statCard">
-              <div className="statValue">{participantCount}</div>
-              <div className="statLabel">Guests online</div>
-            </div>
-            <div className="statCard">
-              <div className="statValue">{capacityCount}</div>
-              <div className="statLabel">Total capacity</div>
-            </div>
-          </div>
-          {!isTelegram && (
-            <div className="notice info">
-              This feature requires Telegram authentication. Open this link inside Telegram to join or
-              create public rooms.
-            </div>
-          )}
-          {!canCreate && (
-            <div className="notice warning">
-              Room creation is restricted to PRIME/ADMIN members in the full webapp.
-            </div>
-          )}
-        </section>
-
-        <section className="card glass">
-          <div className="formGrid">
-            <label className="field">
-              <div className="label">Title</div>
-              <input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="e.g., Late-night vibez"
-              />
-            </label>
-
-            <label className="field">
-              <div className="label">Visibility</div>
-              <div className="segmented">
-                <button
-                  className={isPublic ? 'seg active' : 'seg'}
-                  onClick={() => setIsPublic(true)}
-                  type="button"
-                >
-                  <Globe2 size={16} /> Public
-                </button>
-                <button
-                  className={!isPublic ? 'seg active' : 'seg'}
-                  onClick={() => setIsPublic(false)}
-                  type="button"
-                >
-                  <Lock size={16} /> Private
-                </button>
-              </div>
-            </label>
-
-            <label className="field">
-              <div className="label">Max participants</div>
-              <input
-                type="number"
-                min={2}
-                max={50}
-                value={maxParticipants}
-                onChange={(event) => setMaxParticipants(Number(event.target.value))}
-              />
-            </label>
-          </div>
-
-          <div className="hint">
-            Public rooms send a community notification with a join link. Private rooms stay invite-only.
-          </div>
-
-          <div className="heroActions">
-            <button className="btn" onClick={handleCreate} disabled={creating}>
-              {creating ? 'Creating...' : 'Create room'}
-            </button>
-            <button className="btn btnGhost" onClick={handleRefresh} disabled={loading}>
-              Refresh
-            </button>
-          </div>
-        </section>
-
-        <div className="sectionTitle">Public rooms</div>
-
-        {error && <div className="notice error">{error}</div>}
-
-        {loading ? (
-          <div className="loading">
-            <div className="spinner" />
-            <div className="muted">Loading rooms...</div>
-          </div>
-        ) : rooms.length === 0 ? (
-          <div className="empty">
-            <div className="emptyTitle">No public rooms right now</div>
-            <div className="emptyText">Create one and it will appear here.</div>
-          </div>
-        ) : (
-          <div className="grid">
-            {rooms.map((room) => (
-              <div className="card" key={room.id}>
-                <div className="cardTop">
-                  <div className="pill">Public</div>
-                  <button
-                    className="btn btnSmall"
-                    onClick={() => handleJoin(room.id)}
-                    disabled={joining === room.id}
-                  >
-                    {joining === room.id ? 'Joining...' : 'Join'}
-                  </button>
-                </div>
-                <div className="cardTitle">{room.title || 'Untitled room'}</div>
-                <div className="cardDesc">
-                  Host: <span className="monoInline">{room.creatorName || 'Unknown'}</span>
-                </div>
-                <div className="cardMeta">
-                  <span className="pill subtle">
-                    {room.currentParticipants || 0}/{room.maxParticipants || 0}
-                  </span>
-                  {room.createdAt && (
-                    <span className="pill subtle">
-                      {formatElapsed(Date.now() - new Date(room.createdAt).getTime())} ago
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
+        {!isTelegram && (
+          <div className="alert alert-info">
+            This feature requires Telegram authentication. Open this link inside Telegram to join or
+            create public rooms.
           </div>
         )}
-      </main>
+        {!canCreate && (
+          <div className="alert alert-warning">
+            Room creation is restricted to PRIME/ADMIN members in the full webapp.
+          </div>
+        )}
+      </section>
 
-      {toast && <div className="toast">{toast}</div>}
-    </div>
+      <section className="card">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <label className="form-group">
+            <div className="form-label">Title</div>
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="e.g., Late-night vibez"
+            />
+          </label>
+
+          <label className="form-group">
+            <div className="form-label">Visibility</div>
+            <div className="segmented-control">
+              <button
+                className={isPublic ? 'segmented-control-button active' : 'segmented-control-button'}
+                onClick={() => setIsPublic(true)}
+                type="button"
+              >
+                <Globe2 size={16} /> Public
+              </button>
+              <button
+                className={!isPublic ? 'segmented-control-button active' : 'segmented-control-button'}
+                onClick={() => setIsPublic(false)}
+                type="button"
+              >
+                <Lock size={16} /> Private
+              </button>
+            </div>
+          </label>
+
+          <label className="form-group">
+            <div className="form-label">Max participants</div>
+            <input
+              type="number"
+              min={2}
+              max={50}
+              value={maxParticipants}
+              onChange={(event) => setMaxParticipants(Number(event.target.value))}
+            />
+          </label>
+        </div>
+
+        <div className="text-sm text-muted-foreground mt-2">
+          Public rooms send a community notification with a join link. Private rooms stay invite-only.
+        </div>
+
+        <div className="flex gap-4 mt-6">
+          <button className="btn" onClick={handleCreate} disabled={creating}>
+            {creating ? 'Creating...' : 'Create room'}
+          </button>
+          <button className="btn btn-secondary" onClick={handleRefresh} disabled={loading}>
+            Refresh
+          </button>
+        </div>
+      </section>
+
+      <h2 className="text-xl font-semibold mb-4">Public rooms</h2>
+
+      {error && <div className="alert alert-error">{error}</div>}
+
+      {loading ? (
+        <div className="flex flex-col items-center justify-center p-8">
+          <div className="spinner-lg" />
+          <div className="text-muted-foreground mt-4">Loading rooms...</div>
+        </div>
+      ) : rooms.length === 0 ? (
+        <div className="text-center p-8">
+          <div className="text-xl font-semibold mb-2">No public rooms right now</div>
+          <div className="text-muted-foreground">Create one and it will appear here.</div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {rooms.map((room) => (
+            <div className="card" key={room.id}>
+              <div className="flex justify-between items-center mb-2">
+                <div className="badge">Public</div>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => handleJoin(room.id)}
+                  disabled={joining === room.id}
+                >
+                  {joining === room.id ? 'Joining...' : 'Join'}
+                </button>
+              </div>
+              <div className="text-lg font-semibold">{room.title || 'Untitled room'}</div>
+              <div className="text-muted-foreground text-sm">
+                Host: <span className="font-mono">{room.creatorName || 'Unknown'}</span>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <span className="badge badge-subtle">
+                  {room.currentParticipants || 0}/{room.maxParticipants || 0}
+                </span>
+                {room.createdAt && (
+                  <span className="badge badge-subtle">
+                    {formatElapsed(Date.now() - new Date(room.createdAt).getTime())} ago
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {toast && <div className="toast-message">{toast}</div>}
+    </main>
   );
 }
 

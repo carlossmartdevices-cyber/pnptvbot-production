@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { apiClient } from '../auth/apiClient';
-import { Button } from '../../webapps/design-system/components'; // Import the shared Button component
+import '../../webapps/design-system/styles.css'; // Import global design system styles
+import '../styles.css'; // Import local styles including .spinner-sm
 
 const TermsPage: React.FC = () => {
   const { user, refreshUser } = useAuth();
@@ -98,7 +99,6 @@ const TermsPage: React.FC = () => {
                 href="https://pnptv.app/terms" 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="text-blue-600 hover:underline"
               >
                 https://pnptv.app/terms
               </a>
@@ -124,10 +124,10 @@ const TermsPage: React.FC = () => {
             </div>
           )}
 
-          <Button
+          <button
             onClick={handleAccept}
             disabled={isLoading}
-            className={isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+            className={`button ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {isLoading ? (
               <span className="flex items-center justify-center">
@@ -137,7 +137,7 @@ const TermsPage: React.FC = () => {
             ) : (
               'Aceptar y Continuar'
             )}
-          </Button>
+          </button>
         </section>
       </main>
 

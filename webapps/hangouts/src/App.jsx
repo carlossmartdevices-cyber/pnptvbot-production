@@ -7,7 +7,7 @@ import { getUrlParams } from './utils/api';
 const CallRoom = lazy(() => import('./components/CallRoom'));
 
 function App() {
-  const params = useMemo(() => getQueryParams(), []);
+  const params = useMemo(() => getUrlParams(), []);
   const roleParam = (params.role || '').toUpperCase();
   const [telegramUser, setTelegramUser] = useState(null);
   const [authMessage, setAuthMessage] = useState('');
@@ -33,7 +33,7 @@ function App() {
         setTelegramUser({
           id: user.id,
           username: user.username,
-          name: user.first_name,
+          first_name: user.first_name, // Use first_name for consistency
           subscriptionStatus: data.user?.subscriptionStatus || 'free',
         })
         setAuthMessage('Welcome ' + (user.username || user.first_name || 'PNPtv user'))
@@ -69,7 +69,7 @@ function App() {
 
   if (isCallMode) {
     return (
-      <div className="app">
+      <>
         <Header 
           title="PNPtv Hangouts" 
           subtitle="Video Calls" 
@@ -79,20 +79,20 @@ function App() {
         />
         <Suspense
           fallback={
-            <div className="loading">
-              <div className="spinner" />
-              <div className="muted">Loading call...</div>
+            <div className="loading-state">
+              <div className="spinner-lg" />
+              <div className="text-muted-foreground mt-4">Loading call...</div>
             </div>
           }
         >
           <CallRoom params={params} telegramUser={telegramUser} />
         </Suspense>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="app">
+    <>
       <Header 
         title="PNPtv Hangouts" 
         subtitle="Video Calls" 
@@ -101,7 +101,7 @@ function App() {
         loginRef={loginRef} 
       />
       <Lobby telegramUser={telegramUser} role={roleParam} />
-    </div>
+    </>
   );
 }
 

@@ -16,11 +16,17 @@ describe('Payment Methods Integration Tests', () => {
     jest.clearAllMocks();
 
     // Set environment variables for testing
-    process.env.BOT_WEBHOOK_DOMAIN = 'https://test.easybots.store';
+    process.env.BOT_WEBHOOK_DOMAIN = 'https://test.pnptv.app';
+    process.env.CHECKOUT_DOMAIN = 'https://test.easybots.store';
+    process.env.EPAYCO_WEBHOOK_DOMAIN = 'https://test.easybots.store';
     process.env.EPAYCO_PUBLIC_KEY = 'test_public_key';
     delete process.env.EPAYCO_P_CUST_ID;
     delete process.env.EPAYCO_P_KEY;
     process.env.DAIMO_API_KEY = 'test_daimo_key';
+    // Ensure NODE_ENV is set for the signature bypass to work in test environment
+    process.env.NODE_ENV = 'test';
+    // Mock PaymentService.sendPaymentConfirmationNotification to prevent timeouts
+    jest.spyOn(PaymentService, 'sendPaymentConfirmationNotification').mockResolvedValue(true);
   });
 
   describe('ePayco Payment Method', () => {
@@ -55,10 +61,10 @@ describe('Payment Methods Integration Tests', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.paymentUrl).toContain('https://checkout.epayco.co');
+      expect(result.paymentUrl).toContain(`${process.env.CHECKOUT_DOMAIN}/pay/pay_123`);
       expect(result.paymentId).toBe('pay_123');
       expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_123', 'pending', expect.objectContaining({
-        paymentUrl: expect.stringContaining('https://checkout.epayco.co'),
+        paymentUrl: expect.stringContaining(`${process.env.CHECKOUT_DOMAIN}/pay/pay_123`),
         provider: 'epayco',
       }));
     });
@@ -361,12 +367,12 @@ describe('Payment Methods Integration Tests', () => {
       expect(result).toBe(true);
     });
 
-    it('should allow ePayco signature bypass without private key in non-production', () => {
+    it('should throw error if ePayco private key is not configured', () => {
       delete process.env.EPAYCO_PRIVATE_KEY;
-      process.env.NODE_ENV = 'test';
+      delete process.env.EPAYCO_P_KEY; // Ensure both are undefined
+      process.env.NODE_ENV = 'test'; // Still non-production
 
-      const result = PaymentService.verifyEpaycoSignature({ x_signature: 'sig' });
-      expect(result).toBe(true);
+      expect(() => PaymentService.verifyEpaycoSignature({ x_signature: 'sig' })).toThrow('EPAYCO_P_KEY or EPAYCO_PRIVATE_KEY must be configured');
     });
 
     it('should verify Daimo signature correctly', () => {

@@ -62,7 +62,7 @@
       top: -10px;
       right: 15px;
       background: var(--accent);
-      color: #2d1d00;
+      color: var(--bg);
       padding: 4px 10px;
       border-radius: 15px;
       font-size: 11px;
@@ -147,7 +147,7 @@
       width: 100%;
       padding: 14px;
       background: linear-gradient(135deg, var(--accent), #ffd27a);
-      color: #2d1d00;
+      color: var(--bg);
       border: none;
       border-radius: 8px;
       font-size: 16px;
@@ -235,7 +235,8 @@
     </div>
 
     <div class="content">
-      <div id="loading-script" style="text-align: center; padding: 20px; display: none;">
+      <div id="loading-script" class="loading-script active">
+        <div class="spinner"></div>
         <p>Loading checkout system...</p>
       </div>
       <div id="error" class="error"></div>
@@ -359,23 +360,21 @@
       const container = document.getElementById('plans-container');
       container.innerHTML = '';
 
-      plansData.forEach((plan, index) => {
+      plansData.forEach((plan) => {
         const planCard = document.createElement('div');
         planCard.className = 'plan-card';
         planCard.onclick = () => selectPlan(plan);
 
-        const isPopular = plan.name.toLowerCase().includes('premium');
-
         planCard.innerHTML = `
-          ${isPopular ? '<div class="badge">POPULAR</div>' : ''}
+          ${plan.isPopular ? '<div class="badge">POPULAR</div>' : ''}
           <h3>${plan.name}</h3>
+          <p>${plan.description || ''}</p>
           <div class="plan-price">
             <span class="usd">$${plan.priceUSD || plan.price} USD</span>
-            <span class="cop">≈ $${(plan.priceCOP || plan.price).toLocaleString('es-CO')} COP</span>
+            <span class="cop">COP ${ (plan.priceCOP || plan.price).toLocaleString('es-CO') }</span>
           </div>
-          <p>${plan.description || ''}</p>
           <ul class="plan-features">
-            ${plan.features ? plan.features.map(f => `<li>${f}</li>`).join('') : ''}
+            ${plan.features.map(f => `<li>${f}</li>`).join('')}
           </ul>
         `;
 

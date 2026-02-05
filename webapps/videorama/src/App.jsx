@@ -9,6 +9,9 @@ import {
   fetchMediaLibrary,
   fetchRadioNowPlaying,
   fetchCollections,
+  fetchTelegramUser,
+  initTelegramLogin,
+  handleTelegramAuth,
 } from './utils/api'
 
 // Demo data for when API is not available
@@ -88,7 +91,6 @@ function App() {
   const [collectionsLoading, setCollectionsLoading] = useState(true)
   const [error, setError] = useState(null)
   const [telegramUser, setTelegramUser] = useState(null)
-  const [authMessage, setAuthMessage] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
   const loginRef = useRef(null)
 
@@ -104,49 +106,31 @@ function App() {
     // Refresh radio status periodically
     const radioInterval = setInterval(loadRadioStatus, 30000)
 
-    const TELEGRAM_BOT = 'pnplatinotv_bot'
-    window.onTelegramAuth = async (user) => {
-      if (!user) return
-      setAuthLoading(true)
-      setAuthMessage('Authenticating...')
-      try {
-        const response = await fetch('/api/telegram-auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramUser: user }),
-        })
-        const data = await response.json()
-        if (!response.ok) {
-          throw new Error(data.error || 'Telegram authentication failed')
-        }
-        setTelegramUser({
-          id: user.id,
-          username: user.username,
-          name: user.first_name,
-          subscriptionStatus: data.user?.subscriptionStatus || 'free',
-        })
-        setAuthMessage('Welcome ' + (user.username || user.first_name || 'PNPtv user'))
-      } catch (err) {
-        setAuthMessage(err.message)
-      } finally {
-        setAuthLoading(false)
-      }
-    }
+    window.onTelegramAuth = (user) => {
+      handleTelegramAuth(user, setTelegramUser, setAuthLoading, setError);
+    };
 
-    if (!loginRef.current) return
-    const script = document.createElement('script')
-    script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.async = true
-    script.setAttribute('data-telegram-login', TELEGRAM_BOT)
-    script.setAttribute('data-size', 'large')
-    script.setAttribute('data-userpic', 'false')
-    script.setAttribute('data-request-access', 'write')
-    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
-    loginRef.current.appendChild(script)
+    const initializeUser = async () => {
+      setAuthLoading(true);
+      try {
+        const currentUser = await fetchTelegramUser();
+        if (currentUser) {
+          setTelegramUser(currentUser);
+        } else {
+          initTelegramLogin(loginRef);
+        }
+      } catch (err) {
+        setError(err.message);
+        initTelegramLogin(loginRef);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    initializeUser();
     
     return () => {
       clearInterval(radioInterval)
-      script.remove()
     }
   }, [])
 
@@ -224,24 +208,25 @@ function App() {
     setCurrentView('home')
   }
 
-  function handleLogout() {
-    setTelegramUser(null)
-    setAuthMessage('')
-  }
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+      setTelegramUser(null);
+      initTelegramLogin(loginRef); // Re-initialize login widget after logout
+    } catch (err) {
+      console.error('Logout failed:', err);
+      setError('Failed to log out.');
+    }
+  };
 
-  const filteredMedia = selectedCategory === 'all'
-    ? mediaLibrary
-    : mediaLibrary.filter(m => m.category === selectedCategory || m.type === selectedCategory)
-
-  const roleParam = (params?.role || '').toUpperCase()
   const isPrime = params?.isPrime === true
   // Allow collection management for ADMIN, SUPERADMIN, PERFORMER, or PRIME subscribers
-  const canManageCollections = ['ADMIN', 'SUPERADMIN', 'PERFORMER'].includes(roleParam) || isPrime
+  const canManageCollections = ['ADMIN', 'SUPERADMIN', 'PERFORMER'].includes(telegramUser?.subscriptionStatus?.toUpperCase()) || isPrime
   const isPlayerView = currentView === 'player' && selectedMedia
 
   if (isPlayerView) {
     return (
-      <div className="app player">
+      <>
         <VideoPlayer
           media={selectedMedia}
           onClose={handleClosePlayer}
@@ -255,12 +240,12 @@ function App() {
             onToggle={() => setIsRadioExpanded(!isRadioExpanded)}
           />
         )}
-      </div>
+      </>
     )
   }
 
   return (
-    <div className="app home">
+    <>
       <Header
         title="PNPtv Videorama"
         subtitle="Your Media Center"
@@ -269,104 +254,106 @@ function App() {
         loginRef={loginRef}
       />
 
-      <section className="hero-banner">
-        <div className="hero-copy">
-          <p className="hero-eyebrow">Curated media feed</p>
-          <h2>Video drops, podcasts, and radio — all in one place.</h2>
-          <p>
-            Browse categories or jump into a collection. New uploads and PRIME content are synced
-            to your membership automatically.
-          </p>
-          <div className="hero-badges">
-            <span className="hero-badge">Fresh drops</span>
-            <span className="hero-badge">Community picks</span>
-            <span className="hero-badge">Live radio</span>
-          </div>
-        </div>
-        <div className="hero-panel">
-          <p className="hero-panel-title">Radio status</p>
-          <div className="hero-panel-row">
-            <span>{radioNowPlaying ? 'Live now' : 'Offline'}</span>
-            <span className={`status-dot ${radioNowPlaying ? 'live' : ''}`}></span>
-          </div>
-          <p className="hero-panel-track">
-            {radioNowPlaying?.title || 'Check back soon for the live mix.'}
-          </p>
-          {radioNowPlaying && (
-            <button type="button" className="hero-panel-btn" onClick={() => setIsRadioExpanded(true)}>
-              Open radio
-            </button>
-          )}
-        </div>
-      </section>
-
-      <CategoryNav
-        selected={selectedCategory}
-        onChange={handleCategoryChange}
-        radioActive={radioNowPlaying !== null}
-      />
-
-      {loading ? (
-        <div className="loading-container">
-          <div className="spinner"></div>
-          <p>Loading media...</p>
-        </div>
-      ) : (
-        <MediaGrid
-          media={filteredMedia}
-          onSelect={handleMediaSelect}
-        />
-      )}
-
-      {collections.length > 0 && (
-        <section className="collections-section">
-          <div className="collections-header">
-            <div>
-              <h2>Collections</h2>
-              <p>Curated playlists and podcasts powered by Videorama.</p>
+      <main className="container">
+        <section className="hero-section">
+          <div className="hero-copy">
+            <p className="hero-eyebrow">Curated media feed</p>
+            <h2>Video drops, podcasts, and radio — all in one place.</h2>
+            <p>
+              Browse categories or jump into a collection. New uploads and PRIME content are synced
+              to your membership automatically.
+            </p>
+            <div className="flex flex-wrap gap-2 mt-4">
+              <span className="badge">Fresh drops</span>
+              <span className="badge">Community picks</span>
+              <span className="badge">Live radio</span>
             </div>
-            {canManageCollections && (
-              <a href="https://pnptv.app/videorama/create" target="_blank" rel="noreferrer" className="create-link">
-                + Create collection
-              </a>
+          </div>
+          <div className="card p-4">
+            <p className="text-lg font-semibold">Radio status</p>
+            <div className="flex items-center gap-2 mt-2">
+              <span>{radioNowPlaying ? 'Live now' : 'Offline'}</span>
+              <span className={`w-3 h-3 rounded-full ${radioNowPlaying ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              {radioNowPlaying?.title || 'Check back soon for the live mix.'}
+            </p>
+            {radioNowPlaying && (
+              <button type="button" className="button mt-4" onClick={() => setIsRadioExpanded(true)}>
+                Open radio
+              </button>
             )}
           </div>
-          {collectionsLoading ? (
-            <p>Loading collections...</p>
-          ) : (
-            <>
-              {collections.length > 0 ? (
-                <div className="collection-grid">
-                  {collections.map((collection) => (
-                    <article key={collection.id} className="collection-card">
-                      <div className="collection-title">{collection.title}</div>
-                      <p className="collection-desc">{collection.description}</p>
-                      <div className="collection-meta">
-                        <span>{collection.visibility} collection</span>
-                        <button type="button" onClick={() => handleCollectionSelect(collection)}>
-                          View details
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p>No collections are available right now.</p>
-              )}
-            </>
-          )}
-          {error && <p className="error-text">{error}</p>}
         </section>
-      )}
 
-      {radioNowPlaying && (
-        <MiniRadioPlayer
-          nowPlaying={radioNowPlaying}
-          isExpanded={isRadioExpanded}
-          onToggle={() => setIsRadioExpanded(!isRadioExpanded)}
+        <CategoryNav
+          selected={selectedCategory}
+          onChange={handleCategoryChange}
+          radioActive={radioNowPlaying !== null}
         />
-      )}
-    </div>
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center p-8">
+            <div className="spinner-lg"></div>
+            <p className="text-muted-foreground mt-4">Loading media...</p>
+          </div>
+        ) : (
+          <MediaGrid
+            media={filteredMedia}
+            onSelect={handleMediaSelect}
+          />
+        )}
+
+        {collections.length > 0 && (
+          <section className="section">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2>Collections</h2>
+                <p>Curated playlists and podcasts powered by Videorama.</p>
+              </div>
+              {canManageCollections && (
+                <a href="https://pnptv.app/videorama/create" target="_blank" rel="noreferrer" className="button button-primary">
+                  + Create collection
+                </a>
+              )}
+            </div>
+            {collectionsLoading ? (
+              <p>Loading collections...</p>
+            ) : (
+              <>
+                {collections.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {collections.map((collection) => (
+                      <article key={collection.id} className="card">
+                        <div className="text-lg font-semibold">{collection.title}</div>
+                        <p className="text-muted-foreground text-sm">{collection.description}</p>
+                        <div className="flex justify-between items-center mt-4">
+                          <span>{collection.visibility} collection</span>
+                          <button type="button" className="button button-sm" onClick={() => handleCollectionSelect(collection)}>
+                            View details
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p>No collections are available right now.</p>
+                )}
+              </>
+            )}
+            {error && <p className="alert alert-error">{error}</p>}
+          </section>
+        )}
+
+        {radioNowPlaying && (
+          <MiniRadioPlayer
+            nowPlaying={radioNowPlaying}
+            isExpanded={isRadioExpanded}
+            onToggle={() => setIsRadioExpanded(!isRadioExpanded)}
+          />
+        )}
+      </main>
+    </>
   )
 }
 

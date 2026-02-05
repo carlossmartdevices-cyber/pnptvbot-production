@@ -312,43 +312,44 @@ function CallRoom({ params, telegramUser }) {
   if (!consent) {
     return (
       <div className="app">
-        <div className="bg" />
-        <div className="centerCard">
-          <div className="heroTitle">Confirm before entering</div>
-          <p className="heroText">Nothing starts until you confirm.</p>
-          <div className="checkList">
-            <label className="checkRow">
+        <div className="card max-w-lg mx-auto my-8 p-6">
+          <h2 className="hero-title text-center">Confirm before entering</h2>
+          <p className="hero-text text-center mt-2">Nothing starts until you confirm.</p>
+          <div className="form-group space-y-3 my-6">
+            <label className="flex items-center space-x-2">
               <input
                 type="checkbox"
                 checked={ageConfirmed}
                 onChange={(event) => setAgeConfirmed(event.target.checked)}
+                className="form-checkbox h-4 w-4 text-blue-600 rounded"
               />
               <span>I confirm I am 18+ (or legal age in my country).</span>
             </label>
-            <label className="checkRow">
+            <label className="flex items-center space-x-2">
               <input
                 type="checkbox"
                 checked={privacyConfirmed}
                 onChange={(event) => setPrivacyConfirmed(event.target.checked)}
+                className="form-checkbox h-4 w-4 text-blue-600 rounded"
               />
               <span>I understand this is private content and will not record.</span>
             </label>
           </div>
-          <div className="heroActions">
+          <div className="flex gap-4 mt-6">
             <button
-              className="btn"
+              className="button"
               onClick={handleConsent}
               disabled={!ageConfirmed || !privacyConfirmed}
             >
               Continue
             </button>
-            <button className="btn btnGhost" onClick={() => window.close()}>
+            <button className="button button-secondary" onClick={() => window.close()}>
               Exit
             </button>
           </div>
-          <div className="hint">
+          <p className="text-sm text-muted-foreground mt-4 text-center">
             Tip: open in a private window and keep your link secret.
-          </div>
+          </p>
         </div>
       </div>
     );
@@ -356,74 +357,72 @@ function CallRoom({ params, telegramUser }) {
 
   return (
     <div className="app">
-      <div className="bg" />
       <header className="header">
-        <div className="brand">
-          <div className="brandMark">
+        <div className="header-logo">
+          <div className="logo-icon">
             <ShieldCheck size={18} />
           </div>
-          <div className="brandText">
-            <div className="brandName">PNPtv Hangouts</div>
-            <div className="brandTag">
+          <div className="header-text">
+            <h1>PNPtv Hangouts</h1>
+            <p>
               {params.type} | {privacyMode ? 'Privacy On' : 'Privacy Off'} | 18+
-            </div>
+            </p>
           </div>
         </div>
-        <div className="headerActions">
+        <div className="header-actions">
           <button
-            className={`iconBtn ${privacyMode ? 'active' : ''}`}
+            className={`button-icon ${privacyMode ? 'active' : ''}`}
             onClick={() => setPrivacyMode((prev) => !prev)}
             aria-label="Toggle privacy mode"
             title="Toggle privacy mode"
           >
             <ShieldCheck size={18} />
           </button>
-          <button className="iconBtn danger" onClick={leaveCall} title="Exit">
+          <button className="button-icon button-danger" onClick={leaveCall} title="Exit">
             <LogOut size={18} />
           </button>
         </div>
       </header>
 
-      <main className="main callBody">
-        <section className="hero">
-          <div className="heroTitle">
+      <main className="container call-body">
+        <section className="hero-section text-center">
+          <h2 className="hero-title">
             {callStartedAt ? 'You are live' : 'Ready when you are'}
-          </div>
-          <div className="heroText">
+          </h2>
+          <p className="hero-text">
             {callStartedAt
               ? `Room is active. ${remoteUsers.length} online.`
               : 'Choose what to share before joining.'}
-          </div>
+          </p>
 
           {!callStartedAt && (
-            <div className="card glass">
-              <div className="prejoin-preview">
-                <div className={`prejoin-preview-box ${camOn ? 'on' : ''}`}>
-                  <div ref={prejoinVideoRef} className="prejoin-player" />
-                  {!camOn && <div className="prejoin-preview-overlay">Camera preview is off</div>}
+            <div className="card">
+              <div className="relative w-full h-48 bg-black rounded-lg overflow-hidden flex items-center justify-center">
+                <div ref={prejoinVideoRef} className="w-full h-full object-cover" />
+                {!camOn && <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center text-muted-foreground">Camera preview is off</div>}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="text-center">
+                  <div className="text-sm text-muted-foreground">Mic</div>
+                  <div className="text-lg font-semibold">{micOn ? 'On' : 'Off'}</div>
                 </div>
-                <div className="prejoin-stats">
-                  <div className="stat">
-                    <div className="stat-label">Mic</div>
-                    <div className="stat-value">{micOn ? 'On' : 'Off'}</div>
-                  </div>
-                  <div className="stat">
-                    <div className="stat-label">Mode</div>
-                    <div className="stat-value">{canPublish ? 'Speaker' : 'Audience'}</div>
-                  </div>
+                <div className="text-center">
+                  <div className="text-sm text-muted-foreground">Mode</div>
+                  <div className="text-lg font-semibold">{canPublish ? 'Speaker' : 'Audience'}</div>
                 </div>
               </div>
 
-              <div className="segmented prejoin-toggles">
+              <div className="segmented-control mt-4">
                 <button
-                  className={`seg ${micOn ? 'active' : ''}`}
+                  className={`segmented-control-button ${micOn ? 'active' : ''}`}
                   onClick={() => setMicOn((prev) => !prev)}
                   type="button"
                 >
                   {micOn ? <Mic size={16} /> : <MicOff size={16} />} Mic
                 </button>
                 <button
-                  className={`seg ${camOn ? 'active' : ''}`}
+                  className={`segmented-control-button ${camOn ? 'active' : ''}`}
                   onClick={() => setCamOn((prev) => !prev)}
                   type="button"
                 >
@@ -431,11 +430,11 @@ function CallRoom({ params, telegramUser }) {
                 </button>
               </div>
 
-              <div className="heroActions">
-                <button className="btn" onClick={joinCall} disabled={joining}>
+              <div className="flex gap-4 mt-6">
+                <button className="button" onClick={joinCall} disabled={joining}>
                   {joining ? 'Joining...' : 'Join now'}
                 </button>
-                <button className="btn btnGhost" onClick={leaveCall}>
+                <button className="button button-secondary" onClick={leaveCall}>
                   Exit
                 </button>
               </div>
@@ -443,50 +442,52 @@ function CallRoom({ params, telegramUser }) {
           )}
 
           {callStartedAt && (
-            <div className="callSummary">
-              <div className="pill">
+            <div className="flex flex-wrap justify-center gap-4 mt-6">
+              <span className="badge">
                 <Users size={14} /> {remoteUsers.length + 1} participants
-              </div>
-              <div className="pill subtle">
+              </span>
+              <span className="badge badge-subtle">
                 Live for {formatElapsed(Date.now() - callStartedAt)}
-              </div>
-              <button className="pill subtle linkBtn" onClick={copyLink}>
+              </span>
+              <button className="button-link" onClick={copyLink}>
                 <Link2 size={14} /> Copy link
               </button>
             </div>
           )}
         </section>
 
-        {status && <div className="notice info">{status}</div>}
+        {status && <div className="alert alert-info">{status}</div>}
 
         {callStartedAt && (
-          <section className="videoGrid">
-            <div className="videoCard">
-              <div className="videoFrame" ref={localVideoRef} />
-              <div className="videoLabel">
+          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
+            <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+              <div className="w-full h-full object-cover" ref={localVideoRef} />
+              <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
                 {privacyMode ? 'You' : telegramUser?.displayName || params.username}
               </div>
             </div>
             {remoteUsers.map((user) => (
-              <div className="videoCard" key={user.uid}>
-                <div className="videoFrame" id={`remote-${user.uid}`} />
-                <div className="videoLabel">{privacyMode ? 'Guest' : `User ${user.uid}`}</div>
+              <div className="relative bg-black rounded-lg overflow-hidden aspect-video" key={user.uid}>
+                <div className="w-full h-full object-cover" id={`remote-${user.uid}`} />
+                <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                  {privacyMode ? 'Guest' : `User ${user.uid}`}
+                </div>
               </div>
             ))}
           </section>
         )}
 
         {callStartedAt && (
-          <div className="controlBar">
-            <button className="controlBtn" onClick={() => setMicOn((prev) => !prev)}>
+          <div className="control-bar fixed bottom-0 left-0 right-0 p-4 bg-background border-t border-border flex justify-center gap-4">
+            <button className="button-icon button-lg" onClick={() => setMicOn((prev) => !prev)}>
               {micOn ? <Mic size={18} /> : <MicOff size={18} />}
               <span>{micOn ? 'Mute' : 'Unmute'}</span>
             </button>
-            <button className="controlBtn" onClick={() => setCamOn((prev) => !prev)}>
+            <button className="button-icon button-lg" onClick={() => setCamOn((prev) => !prev)}>
               {camOn ? <Video size={18} /> : <VideoOff size={18} />}
               <span>{camOn ? 'Camera' : 'Cam off'}</span>
             </button>
-            <button className="controlBtn danger" onClick={leaveCall}>
+            <button className="button-icon button-lg button-danger" onClick={leaveCall}>
               <LogOut size={18} />
               <span>Leave</span>
             </button>

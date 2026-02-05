@@ -2,6 +2,10 @@ const PaymentService = require('../../../src/bot/services/paymentService');
 const axios = require('axios');
 const DaimoConfig = require('../../../src/config/daimo');
 const crypto = require('crypto'); // Import crypto
+const PaymentModel = require('../../../src/models/paymentModel'); // Import PaymentModel
+const PlanModel = require('../../../src/models/planModel'); // Import PlanModel
+const UserModel = require('../../../src/models/userModel'); // Import UserModel
+const { cache } = require('../../../src/config/redis'); // Import cache for mocking purposes
 
 // Mock all external dependencies BEFORE importing PaymentService
 
@@ -83,10 +87,10 @@ describe('PaymentService Integration Tests', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.paymentUrl).toContain('checkout.epayco.co');
+      expect(result.paymentUrl).toContain(`${process.env.CHECKOUT_DOMAIN}/pay/pay_123`);
       expect(result.paymentId).toBe('pay_123');
       expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_123', 'pending', expect.objectContaining({
-        paymentUrl: expect.stringContaining('checkout.epayco.co'),
+        paymentUrl: expect.stringContaining(`${process.env.CHECKOUT_DOMAIN}/pay/pay_123`),
         provider: 'epayco',
       }));
     });
@@ -273,9 +277,11 @@ describe('PaymentService Integration Tests', () => {
         planId: 'plan_123',
         expiry: expect.any(Date),
       });
-      expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_123', 'success', {
-        transactionId: 'txn_123',
-        completedAt: expect.any(Date),
+      expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_123', 'completed', {
+        transaction_id: webhookData.source.txHash || webhookData.id,
+        daimo_event_id: webhookData.id,
+        payer_address: webhookData.source.payerAddress,
+        chain_id: webhookData.source.chainId,
       });
       expect(cache.releaseLock).toHaveBeenCalled();
     });
@@ -348,7 +354,7 @@ describe('PaymentService Integration Tests', () => {
       const result = await PaymentService.getPaymentHistory('user_123');
 
       expect(result).toEqual(mockPayments);
-      expect(PaymentModel.getByUserId).toHaveBeenCalledWith('user_123');
+      expect(PaymentModel.getByUserId).toHaveBeenCalledWith('user_123', 20);
     });
 
     it('should return empty array on error', async () => {

@@ -8,6 +8,9 @@ import {
   getUrlParams,
   fetchMediaLibrary,
   fetchRadioNowPlaying,
+  fetchTelegramUser,
+  initTelegramLogin,
+  handleTelegramAuth,
 } from './utils/api'
 
 // Demo data for when API is not available
@@ -85,7 +88,6 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [telegramUser, setTelegramUser] = useState(null)
-  const [authMessage, setAuthMessage] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
   const loginRef = useRef(null)
 
@@ -100,49 +102,31 @@ function App() {
     // Refresh radio status periodically
     const radioInterval = setInterval(loadRadioStatus, 30000)
 
-    const TELEGRAM_BOT = 'pnplatinotv_bot'
-    window.onTelegramAuth = async (user) => {
-      if (!user) return
-      setAuthLoading(true)
-      setAuthMessage('Authenticating...')
-      try {
-        const response = await fetch('/api/telegram-auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramUser: user }),
-        })
-        const data = await response.json()
-        if (!response.ok) {
-          throw new Error(data.error || 'Telegram authentication failed')
-        }
-        setTelegramUser({
-          id: user.id,
-          username: user.username,
-          name: user.first_name,
-          subscriptionStatus: data.user?.subscriptionStatus || 'free',
-        })
-        setAuthMessage('Welcome ' + (user.username || user.first_name || 'PNPtv user'))
-      } catch (err) {
-        setAuthMessage(err.message)
-      } finally {
-        setAuthLoading(false)
-      }
-    }
+    window.onTelegramAuth = (user) => {
+      handleTelegramAuth(user, setTelegramUser, setAuthLoading, setError);
+    };
 
-    if (!loginRef.current) return
-    const script = document.createElement('script')
-    script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.async = true
-    script.setAttribute('data-telegram-login', TELEGRAM_BOT)
-    script.setAttribute('data-size', 'large')
-    script.setAttribute('data-userpic', 'false')
-    script.setAttribute('data-request-access', 'write')
-    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
-    loginRef.current.appendChild(script)
+    const initializeUser = async () => {
+      setAuthLoading(true);
+      try {
+        const currentUser = await fetchTelegramUser();
+        if (currentUser) {
+          setTelegramUser(currentUser);
+        } else {
+          initTelegramLogin(loginRef);
+        }
+      } catch (err) {
+        setError(err.message);
+        initTelegramLogin(loginRef);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    initializeUser();
     
     return () => {
       clearInterval(radioInterval)
-      script.remove()
     }
   }, [])
 
@@ -183,22 +167,27 @@ function App() {
     setCurrentView('player')
   }
 
-    function handleLogout() {
-    setTelegramUser(null)
-    setAuthMessage('')
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+      setTelegramUser(null);
+      initTelegramLogin(loginRef); // Re-initialize login widget after logout
+    } catch (err) {
+      console.error('Logout failed:', err);
+      setError('Failed to log out.');
+    }
+  };
+
+  function handleClosePlayer() {
+    setSelectedMedia(null);
+    setCurrentView('home');
   }
 
-  const filteredMedia = selectedCategory === 'all'
-    ? mediaLibrary
-    : mediaLibrary.filter(m => m.category === selectedCategory || m.type === selectedCategory)
-
-  const roleParam = (params?.role || '').toUpperCase()
-  const isPrime = params?.isPrime === true
   const isPlayerView = currentView === 'player' && selectedMedia
 
   if (isPlayerView) {
     return (
-      <div className="app player">
+      <>
         <VideoPlayer
           media={selectedMedia}
           onClose={handleClosePlayer}
@@ -212,12 +201,12 @@ function App() {
             onToggle={() => setIsRadioExpanded(!isRadioExpanded)}
           />
         )}
-      </div>
+      </>
     )
   }
 
   return (
-    <div className="app home">
+    <>
       <Header
         title="PNPtv Live"
         subtitle="Your Media Center"
@@ -226,66 +215,66 @@ function App() {
         loginRef={loginRef}
       />
 
-      <section className="hero-banner">
-        <div className="hero-copy">
-          <p className="hero-eyebrow">Live Streaming Platform</p>
-          <h2>Experience live events, shows, and more.</h2>
-          <p>
-            Join live streams, interact with creators, and enjoy exclusive content. 
-            All powered by PNPtv.
-          </p>
-          <div className="hero-badges">
-            <span className="hero-badge">Live Events</span>
-            <span className="hero-badge">Creator Streams</span>
-            <span className="hero-badge">24/7 Radio</span>
+      <main className="container">
+        <section className="hero-section">
+          <div className="hero-copy">
+            <p className="hero-eyebrow">Live Streaming Platform</p>
+            <h2>Experience live events, shows, and more.</h2>
+            <p>
+              Join live streams, interact with creators, and enjoy exclusive content. 
+              All powered by PNPtv.
+            </p>
+            <div className="flex flex-wrap gap-2 mt-4">
+              <span className="badge">Live Events</span>
+              <span className="badge">Creator Streams</span>
+              <span className="badge">24/7 Radio</span>
+            </div>
           </div>
-        </div>
-        <div className="hero-panel">
-          
-          <p className="hero-panel-title">Radio status</p>
-          <div className="hero-panel-row">
-            <span>{radioNowPlaying ? 'Live now' : 'Offline'}</span>
-            <span className={`status-dot ${radioNowPlaying ? 'live' : ''}`}></span>
+          <div className="card p-4">
+            
+            <p className="text-lg font-semibold">Radio status</p>
+            <div className="flex items-center gap-2 mt-2">
+              <span>{radioNowPlaying ? 'Live now' : 'Offline'}</span>
+              <span className={`w-3 h-3 rounded-full ${radioNowPlaying ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              {radioNowPlaying?.title || 'Check back soon for the live mix.'}
+            </p>
+            {radioNowPlaying && (
+              <button type="button" className="button mt-4" onClick={() => setIsRadioExpanded(true)}>
+                Open radio
+              </button>
+            )}
           </div>
-          <p className="hero-panel-track">
-            {radioNowPlaying?.title || 'Check back soon for the live mix.'}
-          </p>
-          {radioNowPlaying && (
-            <button type="button" className="hero-panel-btn" onClick={() => setIsRadioExpanded(true)}>
-              Open radio
-            </button>
-          )}
-        </div>
-      </section>
+        </section>
 
-      <CategoryNav
-        selected={selectedCategory}
-        onChange={handleCategoryChange}
-        radioActive={radioNowPlaying !== null}
-      />
-
-      {loading ? (
-        <div className="loading-container">
-          <div className="spinner"></div>
-          <p>Loading media...</p>
-        </div>
-      ) : (
-        <MediaGrid
-          media={filteredMedia}
-          onSelect={handleMediaSelect}
+        <CategoryNav
+          selected={selectedCategory}
+          onChange={handleCategoryChange}
+          radioActive={radioNowPlaying !== null}
         />
-      )}
 
-      
+        {loading ? (
+          <div className="flex flex-col items-center justify-center p-8">
+            <div className="spinner-lg"></div>
+            <p className="text-muted-foreground mt-4">Loading media...</p>
+          </div>
+        ) : (
+          <MediaGrid
+            media={filteredMedia}
+            onSelect={handleMediaSelect}
+          />
+        )}
 
-      {radioNowPlaying && (
-        <MiniRadioPlayer
-          nowPlaying={radioNowPlaying}
-          isExpanded={isRadioExpanded}
-          onToggle={() => setIsRadioExpanded(!isRadioExpanded)}
-        />
-      )}
-    </div>
+        {radioNowPlaying && (
+          <MiniRadioPlayer
+            nowPlaying={radioNowPlaying}
+            isExpanded={isRadioExpanded}
+            onToggle={() => setIsRadioExpanded(!isRadioExpanded)}
+          />
+        )}
+      </main>
+    </>
   )
 }
 

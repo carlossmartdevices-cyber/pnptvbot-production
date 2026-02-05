@@ -4,6 +4,9 @@ import RadioPlayer from './components/RadioPlayer'
 import {
   getUrlParams,
   fetchRadioNowPlaying,
+  fetchTelegramUser,
+  initTelegramLogin,
+  handleTelegramAuth,
 } from './utils/api'
 
 function App() {
@@ -11,7 +14,6 @@ function App() {
   const [radioNowPlaying, setRadioNowPlaying] = useState(null)
   const [error, setError] = useState(null)
   const [telegramUser, setTelegramUser] = useState(null)
-  const [authMessage, setAuthMessage] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
   const loginRef = useRef(null)
 
@@ -24,49 +26,31 @@ function App() {
     // Refresh radio status periodically
     const radioInterval = setInterval(loadRadioStatus, 30000)
 
-    const TELEGRAM_BOT = 'pnplatinotv_bot'
-    window.onTelegramAuth = async (user) => {
-      if (!user) return
-      setAuthLoading(true)
-      setAuthMessage('Authenticating...')
-      try {
-        const response = await fetch('/api/telegram-auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramUser: user }),
-        })
-        const data = await response.json()
-        if (!response.ok) {
-          throw new Error(data.error || 'Telegram authentication failed')
-        }
-        setTelegramUser({
-          id: user.id,
-          username: user.username,
-          name: user.first_name,
-          subscriptionStatus: data.user?.subscriptionStatus || 'free',
-        })
-        setAuthMessage('Welcome ' + (user.username || user.first_name || 'PNPtv user'))
-      } catch (err) {
-        setAuthMessage(err.message)
-      } finally {
-        setAuthLoading(false)
-      }
-    }
+    window.onTelegramAuth = (user) => {
+      handleTelegramAuth(user, setTelegramUser, setAuthLoading, setError);
+    };
 
-    if (!loginRef.current) return
-    const script = document.createElement('script')
-    script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.async = true
-    script.setAttribute('data-telegram-login', TELEGRAM_BOT)
-    script.setAttribute('data-size', 'large')
-    script.setAttribute('data-userpic', 'false')
-    script.setAttribute('data-request-access', 'write')
-    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
-    loginRef.current.appendChild(script)
+    const initializeUser = async () => {
+      setAuthLoading(true);
+      try {
+        const currentUser = await fetchTelegramUser();
+        if (currentUser) {
+          setTelegramUser(currentUser);
+        } else {
+          initTelegramLogin(loginRef);
+        }
+      } catch (err) {
+        setError(err.message);
+        initTelegramLogin(loginRef);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    initializeUser();
     
     return () => {
       clearInterval(radioInterval)
-      script.remove()
     }
   }, [])
 
@@ -79,13 +63,19 @@ function App() {
     }
   }
 
-  function handleLogout() {
-    setTelegramUser(null)
-    setAuthMessage('')
-  }
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+      setTelegramUser(null);
+      initTelegramLogin(loginRef); // Re-initialize login widget after logout
+    } catch (err) {
+      console.error('Logout failed:', err);
+      setError('Failed to log out.');
+    }
+  };
 
   return (
-    <div className="app home">
+    <>
       <Header
         title="PNPtv Radio"
         subtitle="24/7 Live Music"
@@ -93,8 +83,19 @@ function App() {
         onLogout={handleLogout}
         loginRef={loginRef}
       />
-      <RadioPlayer nowPlaying={radioNowPlaying} />
-    </div>
+      {authLoading ? (
+        <div className="loading-state">
+          <div className="spinner-lg" />
+          <p className="text-muted-foreground mt-4">Authenticating...</p>
+        </div>
+      ) : error ? (
+        <div className="error-state">
+          <p className="text-red-500">{error}</p>
+        </div>
+      ) : (
+        <RadioPlayer nowPlaying={radioNowPlaying} />
+      )}
+    </>
   )
 }
 

@@ -10,12 +10,35 @@
     /* Add any specific styles for terms page here, if needed, that are not covered by static.css */
     .header .header-links a[href="/terms"] {
       background: var(--accent);
-      color: #2d1d00;
+      color: var(--bg);
+    }
+    .back-to-top {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--accent);
+      color: var(--bg);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      cursor: pointer;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .back-to-top.visible {
+      opacity: 1;
+      visibility: visible;
     }
   </style>
 </head>
 <body>
-  <body>
+
   <header class="header">
     <div class="header-logo">
       <div class="logo-icon">
