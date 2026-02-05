@@ -4,64 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Preview - Checkout PNPtv</title>
+    <link rel="stylesheet" href="/webapps/design-system/static.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 500px;
-            width: 100%;
-            overflow: hidden;
-        }
-
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
+            background: var(--panel-strong);
+            color: var(--text);
+            padding: 20px;
             text-align: center;
+            border-bottom: 1px solid var(--border);
         }
 
         .header h1 {
-            font-size: 28px;
-            margin-bottom: 10px;
+            font-size: 24px;
+            margin-bottom: 5px;
+            color: var(--accent);
         }
 
         .header p {
-            opacity: 0.9;
             font-size: 14px;
+            color: var(--muted);
         }
 
         .content {
-            padding: 30px;
+            padding: 20px;
         }
 
         .plan-info {
-            background: #f8f9fa;
+            background: var(--bg-2);
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 25px;
+            border: 1px solid var(--border);
         }
 
         .plan-name {
-            font-size: 24px;
-            font-weight: bold;
-            color: #333;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
             margin-bottom: 10px;
             display: flex;
             align-items: center;
@@ -69,46 +48,48 @@
         }
 
         .plan-price {
-            font-size: 32px;
-            font-weight: bold;
-            color: #667eea;
-            margin: 15px 0;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent);
+            margin: 10px 0;
         }
 
         .plan-price .currency {
-            font-size: 18px;
-            color: #666;
+            font-size: 14px;
+            color: var(--muted);
         }
 
         .plan-features {
             list-style: none;
             margin-top: 15px;
+            padding: 0;
         }
 
         .plan-features li {
             padding: 8px 0;
-            color: #555;
+            color: var(--muted);
             display: flex;
             align-items: center;
             gap: 10px;
+            font-size: 13px;
         }
 
         .plan-features li:before {
             content: "✓";
-            color: #667eea;
+            color: var(--accent-2);
             font-weight: bold;
-            font-size: 18px;
+            font-size: 16px;
         }
 
         .pay-button {
             width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--accent), #ffd27a);
+            color: #2d1d00;
             border: none;
             border-radius: 8px;
-            font-size: 18px;
-            font-weight: bold;
+            font-size: 16px;
+            font-weight: 700;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
             margin-top: 10px;
@@ -116,22 +97,27 @@
 
         .pay-button:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 20px rgba(255, 180, 84, 0.4);
         }
 
         .pay-button:disabled {
-            opacity: 0.6;
+            background: var(--bg-2);
+            color: var(--muted);
+            opacity: 0.8;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
         .security-note {
             text-align: center;
             margin-top: 20px;
-            padding: 15px;
-            background: #f0f7ff;
+            padding: 12px;
+            background: rgba(44, 226, 201, 0.1);
+            border: 1px solid rgba(44, 226, 201, 0.3);
             border-radius: 8px;
-            font-size: 13px;
-            color: #555;
+            font-size: 12px;
+            color: var(--accent-2);
         }
 
         .back-link {
@@ -140,7 +126,7 @@
         }
 
         .back-link a {
-            color: #667eea;
+            color: var(--text);
             text-decoration: none;
             font-size: 14px;
         }
@@ -149,36 +135,37 @@
             text-decoration: underline;
         }
 
+        .preview-note {
+            background: rgba(255, 180, 84, 0.1);
+            border: 1px solid rgba(255, 180, 84, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 20px;
+            color: var(--accent);
+            text-align: center;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
         @media (max-width: 600px) {
             .header h1 {
-                font-size: 24px;
+                font-size: 20px;
             }
 
             .plan-price {
                 font-size: 28px;
             }
         }
-
-        .preview-note {
-            background: #fff3cd;
-            border: 2px solid #ffc107;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
-            color: #856404;
-            text-align: center;
-            font-weight: 500;
-        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <header class="header">
             <h1>🎬 PNPtv</h1>
             <p>Completa tu suscripción</p>
-        </div>
+        </header>
 
-        <div class="content">
+        <main class="content">
             <div class="preview-note">
                 ⚠️ PREVIEW - Esta es una vista previa estática
             </div>
@@ -188,17 +175,17 @@
                     <span>💎</span>
                     <span>Plan Premium</span>
                 </div>
-                <div style="color: #888; font-size: 13px; margin: 8px 0;">
+                <div style="color: var(--muted); font-size: 13px; margin: 8px 0;">
                     SKU: EASYBOTS-PNP-030
                 </div>
-                <div style="color: #667eea; font-weight: 600; font-size: 15px; margin: 8px 0;">
+                <div style="color: var(--accent); font-weight: 600; font-size: 15px; margin: 8px 0;">
                     30 días - Acceso a PNPtv!
                 </div>
                 <div class="plan-price">
-                    USD $29.99
+                    USD $<span id="plan-price-usd">29.99</span>
                 </div>
-                <div style="color: #888; font-size: 14px; margin-top: 5px;">
-                    COP $119.960
+                <div style="color: var(--muted); font-size: 14px; margin-top: 5px;">
+                    COP $<span id="plan-price-cop">119.960</span>
                 </div>
             </div>
 
@@ -213,7 +200,7 @@
             <div class="back-link">
                 <a href="#" onclick="alert('Volver al bot'); return false;">← Volver al bot</a>
             </div>
-        </div>
+        </main>
     </div>
 </body>
 </html>

@@ -1,12 +1,88 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
-import { Radio, Sparkles, Users, Video } from 'lucide-react'
-import { getUrlParams } from './utils/url'
+import { useState, useEffect, useRef } from 'react'
+import Header from './components/Header'
+import MediaGrid from './components/MediaGrid'
+import VideoPlayer from './components/VideoPlayer'
+import MiniRadioPlayer from './components/MiniRadioPlayer'
+import CategoryNav from './components/CategoryNav'
+import {
+  getUrlParams,
+  fetchMediaLibrary,
+  fetchRadioNowPlaying,
+} from './utils/api'
 
-const TELEGRAM_BOT = 'pnplatinotv_bot'
-const LiveStream = lazy(() => import('./components/LiveStream'))
+// Demo data for when API is not available
+const DEMO_MEDIA = [
+  {
+    id: '1',
+    title: 'Welcome to PNPtv',
+    artist: 'PNPtv Team',
+    type: 'video',
+    category: 'featured',
+    duration: 180,
+    cover_url: 'https://picsum.photos/seed/pnp1/400/225',
+    url: 'https://www.w3schools.com/html/mov_bbb.mp4',
+  },
+  {
+    id: '2',
+    title: 'Community Highlights',
+    artist: 'PNPtv Community',
+    type: 'video',
+    category: 'featured',
+    duration: 240,
+    cover_url: 'https://picsum.photos/seed/pnp2/400/225',
+    url: 'https://www.w3schools.com/html/movie.mp4',
+  },
+  {
+    id: '3',
+    title: 'Latin Vibes Mix',
+    artist: 'DJ PNP',
+    type: 'audio',
+    category: 'music',
+    duration: 3600,
+    cover_url: 'https://picsum.photos/seed/pnp3/400/400',
+    url: '',
+  },
+  {
+    id: '4',
+    title: 'PNPtv Podcast Ep. 1',
+    artist: 'The PNP Crew',
+    type: 'audio',
+    category: 'podcast',
+    duration: 2400,
+    cover_url: 'https://picsum.photos/seed/pnp4/400/400',
+    url: '',
+  },
+  {
+    id: '5',
+    title: 'Best of the Week',
+    artist: 'Various Artists',
+    type: 'video',
+    category: 'videos',
+    duration: 600,
+    cover_url: 'https://picsum.photos/seed/pnp5/400/225',
+    url: 'https://www.w3schools.com/html/mov_bbb.mp4',
+  },
+  {
+    id: '6',
+    title: 'Dance Party Mix',
+    artist: 'DJ Latino',
+    type: 'audio',
+    category: 'music',
+    duration: 4200,
+    cover_url: 'https://picsum.photos/seed/pnp6/400/400',
+    url: '',
+  },
+]
 
 function App() {
-  const params = useMemo(() => getUrlParams(), [])
+  const [params, setParams] = useState(null)
+  const [currentView, setCurrentView] = useState('home')
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [mediaLibrary, setMediaLibrary] = useState([])
+  const [selectedMedia, setSelectedMedia] = useState(null)
+  const [radioNowPlaying, setRadioNowPlaying] = useState(null)
+  const [isRadioExpanded, setIsRadioExpanded] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [telegramUser, setTelegramUser] = useState(null)
   const [authMessage, setAuthMessage] = useState('')
@@ -14,6 +90,17 @@ function App() {
   const loginRef = useRef(null)
 
   useEffect(() => {
+    const urlParams = getUrlParams()
+    setParams(urlParams)
+    setCurrentView(urlParams.view || 'home')
+
+    loadMedia()
+    loadRadioStatus()
+
+    // Refresh radio status periodically
+    const radioInterval = setInterval(loadRadioStatus, 30000)
+
+    const TELEGRAM_BOT = 'pnplatinotv_bot'
     window.onTelegramAuth = async (user) => {
       if (!user) return
       setAuthLoading(true)
@@ -52,181 +139,152 @@ function App() {
     script.setAttribute('data-request-access', 'write')
     script.setAttribute('data-onauth', 'onTelegramAuth(user)')
     loginRef.current.appendChild(script)
+    
     return () => {
+      clearInterval(radioInterval)
       script.remove()
     }
   }, [])
 
-  if (error) {
+  async function loadMedia(category = null) {
+    setLoading(true)
+    try {
+      const media = await fetchMediaLibrary('all', category)
+      setMediaLibrary(media.length > 0 ? media : DEMO_MEDIA)
+    } catch (error) {
+      console.error('Failed to load media, using demo data:', error)
+      setMediaLibrary(DEMO_MEDIA)
+    }
+    setLoading(false)
+  }
+
+  async function loadRadioStatus() {
+    try {
+      const nowPlaying = await fetchRadioNowPlaying()
+      setRadioNowPlaying(nowPlaying)
+    } catch (error) {
+      console.error('Failed to load radio status:', error)
+    }
+  }
+
+  function handleCategoryChange(category) {
+    setSelectedCategory(category)
+    if (category === 'all') {
+      loadMedia()
+    } else if (category === 'radio') {
+      setIsRadioExpanded(true)
+    } else {
+      loadMedia(category)
+    }
+  }
+
+  function handleMediaSelect(media) {
+    setSelectedMedia(media)
+    setCurrentView('player')
+  }
+
+    function handleLogout() {
+    setTelegramUser(null)
+    setAuthMessage('')
+  }
+
+  const filteredMedia = selectedCategory === 'all'
+    ? mediaLibrary
+    : mediaLibrary.filter(m => m.category === selectedCategory || m.type === selectedCategory)
+
+  const roleParam = (params?.role || '').toUpperCase()
+  const isPrime = params?.isPrime === true
+  const isPlayerView = currentView === 'player' && selectedMedia
+
+  if (isPlayerView) {
     return (
-      <div className="app">
-        <section className="error-panel">
-          <h2>Error</h2>
-          <p>{error}</p>
-        </section>
+      <div className="app player">
+        <VideoPlayer
+          media={selectedMedia}
+          onClose={handleClosePlayer}
+          radioNowPlaying={radioNowPlaying}
+          onRadioToggle={() => setIsRadioExpanded(!isRadioExpanded)}
+        />
+        {radioNowPlaying && (
+          <MiniRadioPlayer
+            nowPlaying={radioNowPlaying}
+            isExpanded={isRadioExpanded}
+            onToggle={() => setIsRadioExpanded(!isRadioExpanded)}
+          />
+        )}
       </div>
     )
   }
-
-  if (params.stream && params.token && params.uid) {
-    return (
-      <div className="app live-view">
-        <Suspense
-          fallback={
-            <div className="loading">
-              <div className="spinner" />
-              <p>Loading stream...</p>
-            </div>
-          }
-        >
-          <LiveStream {...params} />
-        </Suspense>
-      </div>
-    )
-  }
-
-  const roleParam = telegramUser?.subscriptionStatus === 'active' ? 'PRIME' : 'FREE'
-  const displayName = telegramUser?.username || telegramUser?.name || 'PNPtv user'
-  const membershipLabel = telegramUser
-    ? telegramUser.subscriptionStatus === 'active'
-      ? 'PRIME Active'
-      : 'Free Access'
-    : 'Not linked'
-  const featureCards = [
-    {
-      title: 'Hangouts rooms',
-      description:
-        'Create or join group video rooms. Opens the Hangouts dashboard powered by Agora and protected via Telegram.',
-      link: `/hangouts${roleParam ? `?role=${roleParam}` : ''}`,
-      icon: Users,
-    },
-    {
-      title: 'Videorama library',
-      description:
-        'Browse curated playlists, podcasts, and gated PRIME content while the bot keeps your membership synced.',
-      link: '/videorama',
-      icon: Video,
-    },
-    {
-      title: 'PNP Live',
-      description:
-        'Launch premium live streams and get the join links/notifications sent through the Telegram bot.',
-      link: '/pnplive?mode=live',
-      icon: Radio,
-    },
-  ]
-  const steps = [
-    {
-      title: 'Connect Telegram',
-      description: 'Verify your account once so invites and member status stay synced.',
-    },
-    {
-      title: 'Pick your experience',
-      description: 'Open Hangouts, Videorama, or PNP Live from the cards below.',
-    },
-    {
-      title: 'Go live together',
-      description: 'Start a stream or room and share the instant join link.',
-    },
-  ]
 
   return (
-    <div className="app hub">
-      <div className="bg" />
-      <header className="hub-header">
+    <div className="app home">
+      <Header
+        title="PNPtv Live"
+        subtitle="Your Media Center"
+        telegramUser={telegramUser}
+        onLogout={handleLogout}
+        loginRef={loginRef}
+      />
+
+      <section className="hero-banner">
         <div className="hero-copy">
-          <p className="tag">PNPtv Unified Portal</p>
-          <h1>Hangouts, Videorama, and Live — synced by Telegram.</h1>
+          <p className="hero-eyebrow">Live Streaming Platform</p>
+          <h2>Experience live events, shows, and more.</h2>
           <p>
-            Login with Telegram to keep subscriptions, calls, and notifications synced with the
-            bot. All membership activations and live rooms produce Telegram notifications so you
-            never miss an invite.
+            Join live streams, interact with creators, and enjoy exclusive content. 
+            All powered by PNPtv.
           </p>
-          <div className="hero-actions">
-            <a className="btn btnPrimary" href={`/hangouts${roleParam ? `?role=${roleParam}` : ''}`}>
-              Open Hangouts
-            </a>
-            <a className="btn btnGhost" href="/videorama">
-              Browse Videorama
-            </a>
-          </div>
-          <div className="hero-chips">
-            <span className="chip chipAccent">
-              <Sparkles size={14} /> Telegram linked access
-            </span>
-            <span className="chip">Live invites</span>
-            <span className="chip">Member sync</span>
+          <div className="hero-badges">
+            <span className="hero-badge">Live Events</span>
+            <span className="hero-badge">Creator Streams</span>
+            <span className="hero-badge">24/7 Radio</span>
           </div>
         </div>
-        <div className="auth-card">
-          <p className="auth-title">Login with Telegram</p>
-          <div ref={loginRef} className="telegram-widget" />
-          <p className="auth-status">
-            {authLoading
-              ? 'Waiting for Telegram...'
-              : authMessage || 'Bot notifications will follow your Telegram account.'}
+        <div className="hero-panel">
+          
+          <p className="hero-panel-title">Radio status</p>
+          <div className="hero-panel-row">
+            <span>{radioNowPlaying ? 'Live now' : 'Offline'}</span>
+            <span className={`status-dot ${radioNowPlaying ? 'live' : ''}`}></span>
+          </div>
+          <p className="hero-panel-track">
+            {radioNowPlaying?.title || 'Check back soon for the live mix.'}
           </p>
-          <div className="auth-meta">
-            <div>
-              <span className="auth-label">Account</span>
-              <span className="auth-value">{telegramUser ? displayName : 'Not linked'}</span>
-            </div>
-            <div>
-              <span className="auth-label">Membership</span>
-              <span className="auth-value">{membershipLabel}</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <section className="feature-grid">
-        {featureCards.map((card) => {
-          const Icon = card.icon
-          return (
-          <article key={card.title} className="feature-card">
-            <div className="feature-icon">
-              <Icon size={22} />
-            </div>
-            <h3>{card.title}</h3>
-            <p>{card.description}</p>
-            <a href={card.link} className="feature-link">
-              Open {card.title}
-            </a>
-          </article>
-          )
-        })}
-      </section>
-
-      <section className="steps-section">
-        <h2>Launch in 3 steps</h2>
-        <div className="steps-grid">
-          {steps.map((step, index) => (
-            <div key={step.title} className="step-card">
-              <div className="step-index">0{index + 1}</div>
-              <div className="step-title">{step.title}</div>
-              <p>{step.description}</p>
-            </div>
-          ))}
+          {radioNowPlaying && (
+            <button type="button" className="hero-panel-btn" onClick={() => setIsRadioExpanded(true)}>
+              Open radio
+            </button>
+          )}
         </div>
       </section>
 
-      <section className="api-section">
-        <h2>API Endpoints</h2>
-        <ul>
-          <li>
-            <strong>Hangouts</strong> – `pnptv.app/api/hangouts` (list/create/join). Handles Auth via
-            Telegram init data and still delivers join notifications through the bot.
-          </li>
-          <li>
-            <strong>Videorama</strong> – `pnptv.app/api/videorama/collections` provides curated content
-            and respects PRIME access.
-          </li>
-          <li>
-            <strong>PNP Live</strong> – `pnptv.app/pnplive?mode=live` boots the Agora stream that emits
-            Telegram notifications for approved viewers and hosts.
-          </li>
-        </ul>
-      </section>
+      <CategoryNav
+        selected={selectedCategory}
+        onChange={handleCategoryChange}
+        radioActive={radioNowPlaying !== null}
+      />
+
+      {loading ? (
+        <div className="loading-container">
+          <div className="spinner"></div>
+          <p>Loading media...</p>
+        </div>
+      ) : (
+        <MediaGrid
+          media={filteredMedia}
+          onSelect={handleMediaSelect}
+        />
+      )}
+
+      
+
+      {radioNowPlaying && (
+        <MiniRadioPlayer
+          nowPlaying={radioNowPlaying}
+          isExpanded={isRadioExpanded}
+          onToggle={() => setIsRadioExpanded(!isRadioExpanded)}
+        />
+      )}
     </div>
   )
 }

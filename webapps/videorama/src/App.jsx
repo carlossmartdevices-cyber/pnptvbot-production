@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Header from './components/Header'
 import MediaGrid from './components/MediaGrid'
 import VideoPlayer from './components/VideoPlayer'
@@ -87,6 +87,10 @@ function App() {
   const [collections, setCollections] = useState([])
   const [collectionsLoading, setCollectionsLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [telegramUser, setTelegramUser] = useState(null)
+  const [authMessage, setAuthMessage] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+  const loginRef = useRef(null)
 
   useEffect(() => {
     const urlParams = getUrlParams()
@@ -99,7 +103,51 @@ function App() {
 
     // Refresh radio status periodically
     const radioInterval = setInterval(loadRadioStatus, 30000)
-    return () => clearInterval(radioInterval)
+
+    const TELEGRAM_BOT = 'pnplatinotv_bot'
+    window.onTelegramAuth = async (user) => {
+      if (!user) return
+      setAuthLoading(true)
+      setAuthMessage('Authenticating...')
+      try {
+        const response = await fetch('/api/telegram-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegramUser: user }),
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error || 'Telegram authentication failed')
+        }
+        setTelegramUser({
+          id: user.id,
+          username: user.username,
+          name: user.first_name,
+          subscriptionStatus: data.user?.subscriptionStatus || 'free',
+        })
+        setAuthMessage('Welcome ' + (user.username || user.first_name || 'PNPtv user'))
+      } catch (err) {
+        setAuthMessage(err.message)
+      } finally {
+        setAuthLoading(false)
+      }
+    }
+
+    if (!loginRef.current) return
+    const script = document.createElement('script')
+    script.src = 'https://telegram.org/js/telegram-widget.js?22'
+    script.async = true
+    script.setAttribute('data-telegram-login', TELEGRAM_BOT)
+    script.setAttribute('data-size', 'large')
+    script.setAttribute('data-userpic', 'false')
+    script.setAttribute('data-request-access', 'write')
+    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
+    loginRef.current.appendChild(script)
+    
+    return () => {
+      clearInterval(radioInterval)
+      script.remove()
+    }
   }, [])
 
   async function loadMedia(category = null) {
@@ -176,6 +224,11 @@ function App() {
     setCurrentView('home')
   }
 
+  function handleLogout() {
+    setTelegramUser(null)
+    setAuthMessage('')
+  }
+
   const filteredMedia = selectedCategory === 'all'
     ? mediaLibrary
     : mediaLibrary.filter(m => m.category === selectedCategory || m.type === selectedCategory)
@@ -211,6 +264,9 @@ function App() {
       <Header
         title="PNPtv Videorama"
         subtitle="Your Media Center"
+        telegramUser={telegramUser}
+        onLogout={handleLogout}
+        loginRef={loginRef}
       />
 
       <section className="hero-banner">

@@ -4,103 +4,75 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PNPtv - Subscription Checkout</title>
-  <script src="https://checkout.epayco.co/checkout.js"></script>
-  <link rel="stylesheet" href="/unified-design.css">
+  <link rel="stylesheet" href="/webapps/design-system/static.css">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    /* Apply BBH Bartle font to all headings */
-    h1, h2, h3, h4, h5, h6 {
-      font-family: var(--font-title);
-    }
-
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
-    }
-
-    .container {
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      max-width: 800px;
-      width: 100%;
-      overflow: hidden;
-    }
-
     .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 40px;
+      background: var(--panel-strong);
+      color: var(--text);
+      padding: 20px;
       text-align: center;
+      border-bottom: 1px solid var(--border);
     }
 
     .header h1 {
-      font-size: 32px;
-      margin-bottom: 10px;
+      font-size: 24px;
+      margin-bottom: 5px;
+      color: var(--accent);
     }
 
     .header p {
-      font-size: 16px;
-      opacity: 0.9;
+      font-size: 14px;
+      color: var(--muted);
     }
 
     .content {
-      padding: 40px;
+      padding: 20px;
     }
 
     .plans-container {
       display: grid;
-      gap: 20px;
-      margin-bottom: 30px;
+      gap: 15px;
+      margin-bottom: 20px;
     }
 
     .plan-card {
-      border: 2px solid #e0e0e0;
-      border-radius: 10px;
-      padding: 25px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
       cursor: pointer;
       transition: all 0.3s ease;
       position: relative;
+      background: var(--bg-2);
     }
 
     .plan-card:hover {
-      border-color: #667eea;
-      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+      border-color: var(--accent);
+      box-shadow: 0 5px 15px rgba(255, 180, 84, 0.2);
       transform: translateY(-2px);
     }
 
     .plan-card.selected {
-      border-color: #667eea;
-      background: #f8f9ff;
-      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+      border-color: var(--accent);
+      background: rgba(255, 180, 84, 0.1);
+      box-shadow: 0 5px 15px rgba(255, 180, 84, 0.3);
     }
 
     .plan-card .badge {
       position: absolute;
       top: -10px;
-      right: 20px;
-      background: #667eea;
-      color: white;
-      padding: 5px 15px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: bold;
+      right: 15px;
+      background: var(--accent);
+      color: #2d1d00;
+      padding: 4px 10px;
+      border-radius: 15px;
+      font-size: 11px;
+      font-weight: 600;
     }
 
     .plan-card h3 {
-      color: #333;
-      font-size: 24px;
-      margin-bottom: 10px;
+      color: var(--text);
+      font-size: 20px;
+      margin-bottom: 8px;
     }
 
     .plan-price {
@@ -111,88 +83,107 @@
     }
 
     .plan-price .usd {
-      font-size: 32px;
-      font-weight: bold;
-      color: #667eea;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent);
     }
 
     .plan-price .cop {
-      font-size: 18px;
-      color: #666;
+      font-size: 16px;
+      color: var(--muted);
     }
 
     .plan-features {
       list-style: none;
       margin-top: 15px;
+      padding: 0;
     }
 
     .plan-features li {
-      padding: 8px 0;
-      color: #555;
+      padding: 6px 0;
+      color: var(--muted);
       display: flex;
       align-items: center;
+      gap: 8px;
+      font-size: 13px;
     }
 
     .plan-features li:before {
       content: "✓";
-      color: #4CAF50;
+      color: var(--accent-2);
       font-weight: bold;
-      margin-right: 10px;
+      font-size: 16px;
     }
 
     .form-group {
-      margin-bottom: 20px;
+      margin-bottom: 15px;
     }
 
     .form-group label {
       display: block;
-      margin-bottom: 8px;
-      color: #333;
+      margin-bottom: 5px;
+      color: var(--text);
       font-weight: 500;
+      font-size: 13px;
     }
 
     .form-group input {
       width: 100%;
       padding: 12px;
-      border: 2px solid #e0e0e0;
+      border: 1px solid var(--border);
       border-radius: 8px;
-      font-size: 16px;
+      font-size: 15px;
+      background: var(--bg);
+      color: var(--text);
       transition: border-color 0.3s;
     }
 
     .form-group input:focus {
       outline: none;
-      border-color: #667eea;
+      border-color: var(--accent);
     }
 
     .checkout-btn {
       width: 100%;
-      padding: 15px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--accent), #ffd27a);
+      color: #2d1d00;
       border: none;
       border-radius: 8px;
-      font-size: 18px;
-      font-weight: bold;
+      font-size: 16px;
+      font-weight: 700;
       cursor: pointer;
-      transition: transform 0.3s, box-shadow 0.3s;
+      transition: transform 0.2s, box-shadow 0.2s;
     }
 
     .checkout-btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+      box-shadow: 0 5px 15px rgba(255, 180, 84, 0.4);
     }
 
     .checkout-btn:disabled {
-      background: #ccc;
+      background: var(--bg-2);
+      color: var(--muted);
       cursor: not-allowed;
       transform: none;
+    }
+
+    .loading-script {
+        text-align: center;
+        padding: 20px;
+        display: none;
+        color: var(--muted);
+    }
+
+    .loading-script.active {
+        display: block;
     }
 
     .loading {
       display: none;
       text-align: center;
       padding: 20px;
+      color: var(--muted);
     }
 
     .loading.active {
@@ -200,12 +191,14 @@
     }
 
     .error {
-      background: #ffebee;
-      color: #c62828;
-      padding: 15px;
+      background: rgba(255, 107, 107, 0.1);
+      color: var(--accent-3);
+      padding: 12px;
       border-radius: 8px;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
+      text-align: center;
       display: none;
+      border: 1px solid rgba(255, 107, 107, 0.3);
     }
 
     .error.active {
@@ -214,14 +207,14 @@
 
     .info-text {
       text-align: center;
-      color: #666;
-      font-size: 14px;
+      color: var(--muted);
+      font-size: 12px;
       margin-top: 20px;
     }
 
     @media (max-width: 600px) {
       .header h1 {
-        font-size: 24px;
+        font-size: 20px;
       }
 
       .plan-price .usd {

@@ -5,323 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Terms of Service - PNPtv</title>
   <meta name="description" content="Terms of Service for PNPtv Digital Community - Adult content platform terms, membership, and community rules.">
-  <link rel="stylesheet" href="/unified-design.css">
+  <link rel="stylesheet" href="/webapps/design-system/static.css">
   <style>
-    body {
-      background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
-      min-height: 100vh;
-    }
-
-    .header {
-      background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 30px 0;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      backdrop-filter: blur(10px);
-    }
-
-    .header-content {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 0 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 15px;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-    }
-
-    .brand h1 {
-      font-size: 1.8rem;
-      margin: 0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .badge {
-      background: rgba(102, 126, 234, 0.2);
-      border: 1px solid rgba(102, 126, 234, 0.4);
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 12px;
-      color: var(--primary-light);
-      font-weight: 600;
-    }
-
-    .header-links {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-    }
-
-    .header-links a {
-      color: var(--text-muted);
-      font-size: 14px;
-      padding: 8px 16px;
-      border-radius: 8px;
-      transition: all 0.3s ease;
-    }
-
-    .header-links a:hover, .header-links a.active {
-      background: rgba(102, 126, 234, 0.2);
-      color: var(--primary-light);
-      text-decoration: none;
-    }
-
-    .lang-switch {
-      display: flex;
-      gap: 5px;
-    }
-
-    .lang-btn {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: var(--text-muted);
-      padding: 6px 10px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 12px;
-      transition: all 0.3s ease;
-    }
-
-    .lang-btn:hover, .lang-btn.active {
-      background: rgba(102, 126, 234, 0.2);
-      color: var(--primary-light);
-    }
-
-    .main-content {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 40px 20px;
-    }
-
-    .page-title {
-      text-align: center;
-      margin-bottom: 40px;
-    }
-
-    .page-title h2 {
-      font-size: 2.5rem;
-      margin-bottom: 10px;
-    }
-
-    .page-title .updated {
-      color: var(--text-muted);
-      font-size: 14px;
-    }
-
-    .toc {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 16px;
-      padding: 25px;
-      margin-bottom: 40px;
-    }
-
-    .toc h3 {
-      font-size: 1.1rem;
-      color: var(--text-muted);
-      margin-bottom: 15px;
-    }
-
-    .toc ol {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 10px;
-      padding-left: 20px;
-      margin: 0;
-    }
-
-    .toc ol li a {
-      color: var(--primary-light);
-      font-size: 14px;
-    }
-
-    .section {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 30px;
-      margin-bottom: 25px;
-      transition: all 0.3s ease;
-    }
-
-    .section:hover {
-      border-color: rgba(102, 126, 234, 0.3);
-    }
-
-    .section h3 {
-      font-size: 1.4rem;
-      margin-bottom: 20px;
-      color: var(--primary-light);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .section h3 .number {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: bold;
-    }
-
-    .section h4 {
-      font-size: 1.1rem;
-      margin: 20px 0 12px;
-      color: var(--text-light);
-    }
-
-    .section p {
-      color: var(--text-muted);
-      line-height: 1.8;
-      margin-bottom: 15px;
-    }
-
-    .section ul, .section ol {
-      color: var(--text-muted);
-      padding-left: 25px;
-      margin-bottom: 15px;
-    }
-
-    .section li {
-      margin-bottom: 8px;
-      line-height: 1.7;
-    }
-
-    .highlight-box {
-      background: rgba(102, 126, 234, 0.1);
-      border-left: 4px solid var(--primary-light);
-      padding: 15px 20px;
-      border-radius: 0 10px 10px 0;
-      margin: 20px 0;
-    }
-
-    .highlight-box p {
-      margin: 0;
-      color: var(--text-light);
-    }
-
-    .warning-box {
-      background: rgba(255, 68, 68, 0.1);
-      border-left: 4px solid #ff6b6b;
-      padding: 15px 20px;
-      border-radius: 0 10px 10px 0;
-      margin: 20px 0;
-    }
-
-    .warning-box p {
-      margin: 0;
-      color: #ffaaaa;
-    }
-
-    .prohibited-list {
-      background: rgba(255, 68, 68, 0.05);
-      border: 1px solid rgba(255, 68, 68, 0.2);
-      border-radius: 10px;
-      padding: 20px;
-      margin: 15px 0;
-    }
-
-    .prohibited-list li {
-      color: #ff8888;
-    }
-
-    .footer {
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 30px 20px;
-      text-align: center;
-      color: var(--text-muted);
-      font-size: 14px;
-    }
-
-    .footer a {
-      color: var(--primary-light);
-    }
-
-    .back-to-top {
-      position: fixed;
-      bottom: 30px;
-      right: 30px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-      transition: all 0.3s ease;
-      opacity: 0;
-      visibility: hidden;
-    }
-
-    .back-to-top.visible {
-      opacity: 1;
-      visibility: visible;
-    }
-
-    .back-to-top:hover {
-      transform: translateY(-3px);
-    }
-
-    @media (max-width: 768px) {
-      .header-content {
-        flex-direction: column;
-        text-align: center;
-      }
-
-      .page-title h2 {
-        font-size: 1.8rem;
-      }
-
-      .section {
-        padding: 20px;
-      }
-
-      .toc ol {
-        grid-template-columns: 1fr;
-      }
+    /* Add any specific styles for terms page here, if needed, that are not covered by static.css */
+    .header .header-links a[href="/terms"] {
+      background: var(--accent);
+      color: #2d1d00;
     }
   </style>
 </head>
 <body>
+  <body>
   <header class="header">
-    <div class="header-content">
-      <div class="brand">
+    <div class="header-logo">
+      <div class="logo-icon">
+        <!-- You can replace this with an SVG icon or an image -->
+        <span>PNP</span>
+      </div>
+      <div class="header-text">
         <h1>PNPtv!</h1>
-        <span class="badge">Legal</span>
+        <p>Legal</p>
       </div>
-      <div class="header-links">
-        <a href="/terms" class="active">Terms</a>
-        <a href="/privacy">Privacy</a>
-        <div class="lang-switch">
-          <button class="lang-btn active" onclick="window.location.href='/terms'">EN</button>
-          <button class="lang-btn" onclick="window.location.href='/policies_es.html'">ES</button>
-        </div>
-      </div>
+    </div>
+    <div class="header-links">
+      <a href="/terms" class="active">Terms</a>
+      <a href="/privacy">Privacy</a>
     </div>
   </header>
 
-  <main class="main-content">
+  <main class="container">
     <div class="page-title">
       <h2>Terms of Service</h2>
       <p class="updated">Last updated: January 2025 | Contact: <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>

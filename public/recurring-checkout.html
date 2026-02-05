@@ -5,60 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <title>Suscripción Recurrente - PNPtv</title>
+    <link rel="stylesheet" href="/webapps/design-system/static.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 500px;
-            width: 100%;
-            overflow: hidden;
-        }
-
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
+            background: var(--panel-strong);
+            color: var(--text);
+            padding: 20px;
             text-align: center;
+            border-bottom: 1px solid var(--border);
         }
 
         .header h1 {
             font-size: 24px;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
+            color: var(--accent);
         }
 
         .header p {
-            opacity: 0.9;
             font-size: 14px;
+            color: var(--muted);
         }
 
         .recurring-badge {
             display: inline-block;
-            background: rgba(255,255,255,0.2);
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            margin-top: 10px;
+            background: rgba(44, 226, 201, 0.2);
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            color: var(--accent-2);
+            margin-top: 8px;
+            border: 1px solid rgba(44, 226, 201, 0.4);
         }
 
         .content {
-            padding: 30px;
+            padding: 20px;
         }
 
         .loading {
@@ -67,11 +47,11 @@
         }
 
         .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
+            border: 3px solid var(--border);
+            border-top: 3px solid var(--accent);
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 40px;
+            height: 40px;
             animation: spin 1s linear infinite;
             margin: 0 auto 20px;
         }
@@ -82,16 +62,17 @@
         }
 
         .plan-info {
-            background: #f8f9fa;
+            background: var(--bg-2);
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 25px;
+            border: 1px solid var(--border);
         }
 
         .plan-name {
-            font-size: 20px;
-            font-weight: bold;
-            color: #333;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
             margin-bottom: 10px;
             display: flex;
             align-items: center;
@@ -99,22 +80,22 @@
         }
 
         .plan-price {
-            font-size: 28px;
-            font-weight: bold;
-            color: #667eea;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent);
             margin: 10px 0;
         }
 
         .plan-price .period {
-            font-size: 14px;
-            color: #666;
+            font-size: 12px;
+            color: var(--muted);
             font-weight: normal;
         }
 
         .plan-features {
             margin-top: 15px;
             padding-top: 15px;
-            border-top: 1px solid #eee;
+            border-top: 1px solid var(--border);
         }
 
         .feature {
@@ -122,40 +103,42 @@
             align-items: center;
             gap: 8px;
             margin: 8px 0;
-            font-size: 14px;
-            color: #555;
+            font-size: 13px;
+            color: var(--muted);
         }
 
         .feature::before {
             content: "✓";
-            color: #28a745;
+            color: var(--accent-2);
             font-weight: bold;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .form-group label {
             display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #333;
-            font-size: 14px;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: var(--text);
+            font-size: 13px;
         }
 
         .form-group input {
             width: 100%;
-            padding: 14px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 16px;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 15px;
+            background: var(--bg);
+            color: var(--text);
             transition: border-color 0.3s;
         }
 
         .form-group input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--accent);
         }
 
         .form-row {
@@ -172,41 +155,44 @@
             gap: 10px;
             margin-bottom: 20px;
             justify-content: center;
+            opacity: 0.7;
         }
 
         .card-icon {
-            width: 50px;
-            height: 32px;
-            background: #f0f0f0;
+            width: 45px;
+            height: 28px;
+            background: var(--bg-2);
+            border: 1px solid var(--border);
             border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
+            font-size: 9px;
             font-weight: bold;
-            color: #666;
+            color: var(--muted);
         }
 
         .submit-btn {
             width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--accent), #ffd27a);
+            color: #2d1d00;
             border: none;
-            border-radius: 10px;
-            font-size: 18px;
-            font-weight: bold;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .submit-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 20px rgba(255, 180, 84, 0.4);
         }
 
         .submit-btn:disabled {
-            background: #ccc;
+            background: var(--bg-2);
+            color: var(--muted);
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
@@ -215,11 +201,12 @@
         .security-note {
             text-align: center;
             margin-top: 20px;
-            padding: 15px;
-            background: #f0fdf4;
-            border-radius: 10px;
-            font-size: 13px;
-            color: #166534;
+            padding: 12px;
+            background: rgba(44, 226, 201, 0.1);
+            border: 1px solid rgba(44, 226, 201, 0.3);
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--accent-2);
         }
 
         .security-note::before {
@@ -228,74 +215,83 @@
 
         .terms {
             margin-top: 15px;
-            font-size: 12px;
-            color: #666;
+            font-size: 11px;
+            color: var(--muted);
             text-align: center;
         }
 
         .terms a {
-            color: #667eea;
+            color: var(--accent-2);
             text-decoration: none;
         }
 
         .error-message {
-            background: #fef2f2;
-            color: #dc2626;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+            background: rgba(255, 107, 107, 0.1);
+            color: var(--accent-3);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
             text-align: center;
             display: none;
+            border: 1px solid rgba(255, 107, 107, 0.3);
         }
 
         .success-message {
             text-align: center;
             padding: 40px 20px;
+            background: var(--bg-2);
+            border-radius: 16px;
+            border: 1px solid var(--border);
         }
 
         .success-icon {
-            font-size: 60px;
-            margin-bottom: 20px;
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: var(--accent-2);
         }
 
         .success-message h2 {
-            color: #28a745;
-            margin-bottom: 15px;
+            color: var(--text);
+            margin-bottom: 10px;
+            font-size: 22px;
         }
 
         .success-message p {
-            color: #666;
+            color: var(--muted);
             margin-bottom: 20px;
+            font-size: 14px;
         }
 
         .telegram-btn {
             display: inline-block;
-            padding: 14px 30px;
-            background: #0088cc;
-            color: white;
+            padding: 12px 25px;
+            background: linear-gradient(135deg, var(--accent-2), #66f2d8);
+            color: #001318;
             text-decoration: none;
-            border-radius: 10px;
-            font-weight: bold;
-            transition: background 0.3s;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .telegram-btn:hover {
-            background: #006699;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(44, 226, 201, 0.4);
         }
 
         .cancel-info {
-            background: #fff7ed;
-            border: 1px solid #fed7aa;
-            border-radius: 10px;
-            padding: 15px;
+            background: rgba(255, 180, 84, 0.1);
+            border: 1px solid rgba(255, 180, 84, 0.3);
+            border-radius: 8px;
+            padding: 12px;
             margin-bottom: 20px;
-            font-size: 13px;
-            color: #9a3412;
+            font-size: 12px;
+            color: var(--accent);
         }
 
         .cancel-info strong {
             display: block;
             margin-bottom: 5px;
+            color: var(--accent);
         }
 
         @media (max-width: 480px) {
@@ -309,20 +305,20 @@
             }
 
             .plan-price {
-                font-size: 24px;
+                font-size: 20px;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <header class="header">
             <h1>💎 <span id="header-title">Suscripción PRIME</span></h1>
             <p id="header-subtitle">Renovación automática mensual</p>
             <div class="recurring-badge">🔄 Auto-renovación</div>
-        </div>
+        </header>
 
-        <div class="content">
+        <main class="content">
             <!-- Loading State -->
             <div id="loading" class="loading">
                 <div class="spinner"></div>
@@ -409,7 +405,7 @@
                 <p id="success-text">Tu membresía PRIME con renovación automática está activa. Revisa tu Telegram para el enlace de acceso.</p>
                 <a href="https://t.me/pnptv_bot" class="telegram-btn" id="telegram-link">Abrir Telegram</a>
             </div>
-        </div>
+        </main>
     </div>
 
     <script>

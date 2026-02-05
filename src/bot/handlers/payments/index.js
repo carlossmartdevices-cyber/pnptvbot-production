@@ -320,12 +320,13 @@ const registerPaymentHandlers = (bot) => {
         ? '❌ **Error al procesar el pago**\n\nOcurrió un error al crear tu pago con ePayco. Por favor intenta nuevamente o contacta soporte si el problema persiste.'
         : '❌ **Payment Processing Error**\n\nAn error occurred while creating your ePayco payment. Please try again or contact support if the problem persists.';
 
+      const errorPlanId = ctx.match?.[1] || 'unknown';
       await ctx.editMessageText(
         errorMsg,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), `select_plan_${planId}`)],
+            [Markup.button.callback(t('back', lang), `select_plan_${errorPlanId}`)],
           ]),
         },
       ).catch(() => {});
@@ -467,12 +468,13 @@ const registerPaymentHandlers = (bot) => {
         ? '❌ **Error al procesar el pago**\n\nOcurrió un error al crear tu pago con Daimo. Por favor intenta nuevamente o contacta soporte si el problema persiste.\n\n💡 *Sugerencia:* Puedes intentar con otro método de pago como ePayco.'
         : '❌ **Payment Processing Error**\n\nAn error occurred while creating your Daimo payment. Please try again or contact support if the problem persists.\n\n💡 *Tip:* You can try another payment method like ePayco.';
 
+      const errorPlanId = ctx.match?.[1] || 'unknown';
       await ctx.editMessageText(
         errorMsg,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback(t('back', lang), `select_plan_${planId}`)],
+            [Markup.button.callback(t('back', lang), `select_plan_${errorPlanId}`)],
           ]),
         },
       ).catch(() => {});

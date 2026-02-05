@@ -160,7 +160,7 @@ class PaymentService {
         const paymentRef = `PAY-${payment.id.substring(0, 8).toUpperCase()}`;
 
         // Use landing page before ePayco checkout
-        paymentUrl = `${checkoutDomain}/checkout/${payment.id}`;
+        paymentUrl = `${checkoutDomain}/pay/${payment.id}`;
         
         await PaymentModel.updateStatus(payment.id, 'pending', {
           paymentUrl,

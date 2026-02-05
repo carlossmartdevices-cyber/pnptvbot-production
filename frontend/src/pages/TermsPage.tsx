@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { apiClient } from '../auth/apiClient';
+import { Button } from '../../webapps/design-system/components'; // Import the shared Button component
 
 const TermsPage: React.FC = () => {
   const { user, refreshUser } = useAuth();
@@ -38,21 +39,34 @@ const TermsPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-md p-8 max-w-2xl w-full">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">
-          Términos y Condiciones - PNPtv
-        </h1>
+    <div className="app">
+      <header className="header">
+        <div className="header-logo">
+          <div className="logo-icon">
+            <span>PNP</span>
+          </div>
+          <div className="header-text">
+            <h1>PNPtv!</h1>
+            <p>Legal</p>
+          </div>
+        </div>
+        <div className="header-links">
+          <a href="/terms" className="active">Terms</a>
+          <a href="/privacy">Privacy</a>
+        </div>
+      </header>
 
-        <div className="prose max-w-none mb-8">
-          <h2 className="text-xl font-semibold text-gray-700 mb-4">
-            Reglas básicas de uso
-          </h2>
+      <main className="container">
+        <div className="page-title">
+          <h2>Terms of Service</h2>
+          <p className="updated">Last updated: January 2025 | Contact: <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>
+        </div>
 
-          <h3 className="text-lg font-medium text-gray-600 mb-3">
-            Hangouts (Video Calls):
-          </h3>
-          <ul className="list-disc pl-6 mb-4 text-gray-600">
+        <section className="section">
+          <h2>Reglas básicas de uso</h2>
+
+          <h3>Hangouts (Video Calls):</h3>
+          <ul>
             <li>Las salas son espacios sociales entre adultos verificados.</li>
             <li>No se permite grabar pantalla, audio ni redistribuir contenido.</li>
             <li>Cada usuario es responsable de su comportamiento y de lo que comparte.</li>
@@ -61,28 +75,24 @@ const TermsPage: React.FC = () => {
             <li>Abusos pueden resultar en expulsión o bloqueo de acceso.</li>
           </ul>
 
-          <h3 className="text-lg font-medium text-gray-600 mb-3">
-            Videorama (Playlists & Podcasts):
-          </h3>
-          <ul className="list-disc pl-6 mb-4 text-gray-600">
+          <h3>Videorama (Playlists & Podcasts):</h3>
+          <ul>
             <li>Listas/podcasts pueden ser creados por usuarios PRIME.</li>
             <li>Cada creador es responsable del contenido que publica.</li>
             <li>El contenido es solo para adultos.</li>
             <li>ADMIN puede editar o eliminar contenido cuando sea necesario.</li>
           </ul>
 
-          <h3 className="text-lg font-medium text-gray-600 mb-3">
-            Responsabilidad (Liability Release):
-          </h3>
-          <ul className="list-disc pl-6 mb-6 text-gray-600">
+          <h3>Responsabilidad (Liability Release):</h3>
+          <ul>
             <li>PNPtv y PNP Latino TV son plataformas tecnológicas.</li>
             <li>No somos responsables por acciones, palabras, contenido o conductas de los usuarios.</li>
             <li>Cada usuario participa bajo su propia responsabilidad.</li>
             <li>El uso de la plataforma implica aceptación total de estas condiciones.</li>
           </ul>
 
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-600">
+          <div className="highlight-box">
+            <p>
               Para ver los términos completos, visita: 
               <a 
                 href="https://pnptv.app/terms" 
@@ -109,41 +119,32 @@ const TermsPage: React.FC = () => {
           </div>
 
           {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-red-700">{error}</p>
-                </div>
-              </div>
+            <div className="warning-box">
+                <p>{error}</p>
             </div>
           )}
 
-          <button
+          <Button
             onClick={handleAccept}
             disabled={isLoading}
-            className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors ${
-              isLoading ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
+            className={isLoading ? 'opacity-50 cursor-not-allowed' : ''}
           >
             {isLoading ? (
               <span className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+                <div className="spinner-sm"></div>
                 Procesando...
               </span>
             ) : (
               'Aceptar y Continuar'
             )}
-          </button>
-        </div>
-      </div>
+          </Button>
+        </section>
+      </main>
+
+      <footer className="footer">
+        <p>&copy; 2025 PNPtv! Digital Community | <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>
+        <p><a href="/terms">Terms</a> | <a href="/privacy">Privacy</a> | <a href="/">Home</a></p>
+      </footer>
     </div>
   );
 };

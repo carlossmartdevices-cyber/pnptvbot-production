@@ -5,51 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <title>Checkout - PNPtv</title>
+    <link rel="stylesheet" href="/webapps/design-system/static.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 500px;
-            width: 100%;
-            overflow: hidden;
-        }
-
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
+            background: var(--panel-strong);
+            color: var(--text);
+            padding: 20px;
             text-align: center;
+            border-bottom: 1px solid var(--border);
         }
 
         .header h1 {
-            font-size: 28px;
-            margin-bottom: 10px;
+            font-size: 24px;
+            margin-bottom: 5px;
+            color: var(--accent);
         }
 
         .header p {
-            opacity: 0.9;
             font-size: 14px;
+            color: var(--muted);
         }
 
         .content {
-            padding: 30px;
+            padding: 20px;
         }
 
         .loading {
@@ -58,11 +36,11 @@
         }
 
         .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
+            border: 3px solid var(--border);
+            border-top: 3px solid var(--accent);
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 40px;
+            height: 40px;
             animation: spin 1s linear infinite;
             margin: 0 auto 20px;
         }
@@ -73,16 +51,17 @@
         }
 
         .plan-info {
-            background: #f8f9fa;
+            background: var(--bg-2);
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 25px;
+            border: 1px solid var(--border);
         }
 
         .plan-name {
-            font-size: 24px;
-            font-weight: bold;
-            color: #333;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
             margin-bottom: 10px;
             display: flex;
             align-items: center;
@@ -90,46 +69,67 @@
         }
 
         .plan-price {
-            font-size: 32px;
-            font-weight: bold;
-            color: #667eea;
-            margin: 15px 0;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent);
+            margin: 10px 0;
         }
 
         .plan-price .currency {
-            font-size: 18px;
-            color: #666;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .promo-badge {
+            margin-top: 6px;
+            padding: 4px 10px;
+            border-radius: 15px;
+            background: rgba(255, 180, 84, 0.2);
+            color: var(--accent);
+            font-size: 11px;
+            display: inline-block;
+            font-weight: 600;
+            border: 1px solid rgba(255, 180, 84, 0.4);
+        }
+
+        .promo-savings {
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--accent-2);
+            font-weight: 600;
         }
 
         .plan-features {
             list-style: none;
             margin-top: 15px;
+            padding: 0;
         }
 
         .plan-features li {
             padding: 8px 0;
-            color: #555;
+            color: var(--muted);
             display: flex;
             align-items: center;
             gap: 10px;
+            font-size: 13px;
         }
 
         .plan-features li:before {
             content: "✓";
-            color: #667eea;
+            color: var(--accent-2);
             font-weight: bold;
-            font-size: 18px;
+            font-size: 16px;
         }
 
         .pay-button {
             width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--accent), #ffd27a);
+            color: #2d1d00;
             border: none;
             border-radius: 8px;
-            font-size: 18px;
-            font-weight: bold;
+            font-size: 16px;
+            font-weight: 700;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
             margin-top: 10px;
@@ -137,36 +137,44 @@
 
         .pay-button:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 20px rgba(255, 180, 84, 0.4);
         }
 
         .pay-button:disabled {
-            opacity: 0.6;
+            background: var(--bg-2);
+            color: var(--muted);
+            opacity: 0.8;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
         .security-note {
             text-align: center;
             margin-top: 20px;
-            padding: 15px;
-            background: #f0f7ff;
+            padding: 12px;
+            background: rgba(44, 226, 201, 0.1);
+            border: 1px solid rgba(44, 226, 201, 0.3);
             border-radius: 8px;
-            font-size: 13px;
-            color: #555;
+            font-size: 12px;
+            color: var(--accent-2);
         }
 
         .security-note svg {
             vertical-align: middle;
             margin-right: 5px;
+            color: var(--accent-2);
         }
 
         .error {
-            background: #fee;
-            color: #c33;
-            padding: 15px;
+            background: rgba(255, 107, 107, 0.1);
+            color: var(--accent-3);
+            padding: 12px;
             border-radius: 8px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             text-align: center;
+            display: none;
+            border: 1px solid rgba(255, 107, 107, 0.3);
         }
 
         .back-link {
@@ -175,7 +183,7 @@
         }
 
         .back-link a {
-            color: #667eea;
+            color: var(--text);
             text-decoration: none;
             font-size: 14px;
         }
@@ -186,7 +194,7 @@
 
         @media (max-width: 600px) {
             .header h1 {
-                font-size: 24px;
+                font-size: 20px;
             }
 
             .plan-price {
@@ -197,12 +205,12 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <header class="header">
             <h1>🎬 PNPtv</h1>
             <p>Complete your subscription</p>
-        </div>
+        </header>
 
-        <div class="content">
+        <main class="content">
             <div id="loading" class="loading">
                 <div class="spinner"></div>
                 <p>Loading payment information...</p>
@@ -216,16 +224,16 @@
                         <span id="plan-icon">💎</span>
                         <span id="plan-name">Premium</span>
                     </div>
-                    <div style="color: #888; font-size: 13px; margin: 8px 0;">
+                    <div style="color: var(--muted); font-size: 13px; margin: 8px 0;">
                         SKU: <span id="plan-sku">EASYBOTS-PNP-030</span>
                     </div>
-                    <div style="color: #667eea; font-weight: 600; font-size: 15px; margin: 8px 0;">
+                    <div style="color: var(--accent); font-weight: 600; font-size: 15px; margin: 8px 0;">
                         <span id="plan-duration">30</span> days - PNPtv Access!
                     </div>
                     <div class="plan-price">
                         USD $<span id="plan-price-usd">0</span>
                     </div>
-                    <div style="color: #888; font-size: 14px; margin-top: 5px;">
+                    <div style="color: var(--muted); font-size: 14px; margin-top: 5px;">
                         COP $<span id="plan-price-cop">0</span>
                     </div>
                 </div>
@@ -242,8 +250,156 @@
                     <a href="#" onclick="window.close(); return false;">← Back to bot</a>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
+
+    <!-- ePayco Checkout Script -->
+    <script src="https://checkout.epayco.co/checkout.js"></script>
+
+    <script>
+        // Get payment ID from URL
+        const pathParts = window.location.pathname.split('/');
+        const paymentId = pathParts[pathParts.length - 1];
+
+        let paymentData = null;
+        let ePaycoHandler = null;
+
+        // Load payment information
+        async function loadPaymentInfo() {
+            try {
+                const response = await fetch(`/api/payment/${paymentId}`);
+
+                if (!response.ok) {
+                    throw new Error('Could not load payment information');
+                }
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Error loading payment');
+                }
+
+                paymentData = data.payment;
+                displayPaymentInfo();
+                initializeEpayco();
+
+            } catch (error) {
+                console.error('Error loading payment:', error);
+                showError(error.message || 'Error loading payment information. Please try again.');
+            }
+        }
+
+        // Display payment information
+        function displayPaymentInfo() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('checkout-form').style.display = 'block';
+
+            // Plan info
+            document.getElementById('plan-icon').textContent = paymentData.plan.icon || '💎';
+            document.getElementById('plan-name').textContent = paymentData.plan.name;
+            document.getElementById('plan-sku').textContent = paymentData.plan.sku || 'EASYBOTS-PNP-030';
+
+            // Duration text
+            const duration = paymentData.plan.duration;
+            let durationText;
+            if (duration >= 36500) {
+                durationText = 'Lifetime access';
+            } else if (duration === 7) {
+                durationText = '7 days';
+            } else if (duration === 30) {
+                durationText = '30 days';
+            } else {
+                durationText = duration + ' days';
+            }
+            document.getElementById('plan-duration').textContent = durationText;
+
+            // Prices
+            document.getElementById('plan-price-usd').textContent = paymentData.amountUSD.toFixed(2);
+            document.getElementById('plan-price-cop').textContent = formatNumber(paymentData.amountCOP);
+        }
+
+        // Initialize ePayco Checkout
+        function initializeEpayco() {
+            if (!paymentData.epaycoPublicKey || !paymentData.epaycoSignature) {
+                showError('Payment configuration incomplete');
+                return;
+            }
+
+            ePaycoHandler = ePayco.checkout.configure({
+                key: paymentData.epaycoPublicKey,
+                test: paymentData.testMode
+            });
+        }
+
+        // Handle pay button click
+        document.getElementById('pay-button').addEventListener('click', function(e) {
+            e.preventDefault();
+
+            // Disable button
+            const payButton = document.getElementById('pay-button');
+            payButton.disabled = true;
+            payButton.textContent = 'Opening ePayco...';
+
+            // Prepare ePayco data
+            const epaycoData = {
+                // Plan info - use SKU only, not plan name
+                name: paymentData.plan.sku,
+                description: paymentData.plan.sku,
+                invoice: paymentData.paymentRef,
+                currency: paymentData.currencyCode || "COP",
+                amount: paymentData.amountCOP.toString(),
+                tax_base: "0",
+                tax: "0",
+                country: "co",
+                lang: "en",
+                signature: paymentData.epaycoSignature,
+
+                // Extra data for webhook (no customer data - ePayco will collect it)
+                extra1: paymentData.userId.toString(),
+                extra2: paymentData.planId,
+                extra3: paymentData.paymentId,
+
+                // URLs
+                confirmation: paymentData.confirmationUrl,
+                response: paymentData.responseUrl,
+
+                // Optional
+                methodsDisable: [],
+                autoclick: false
+            };
+
+            try {
+                ePaycoHandler.open(epaycoData);
+                // Re-enable button after popup opens
+                setTimeout(() => {
+                    payButton.disabled = false;
+                    payButton.textContent = '💳 Pay with ePayco';
+                }, 1000);
+            } catch (error) {
+                console.error('Error opening ePayco checkout:', error);
+                showError('Error opening checkout. Please try again.');
+                payButton.disabled = false;
+                payButton.textContent = '💳 Pay with ePayco';
+            }
+        });
+
+        // Show error
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('checkout-form').style.display = 'none';
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Format number with thousands separator
+        function formatNumber(num) {
+            return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        }
+
+        // Load payment info on page load
+        loadPaymentInfo();
+    </script>
 
     <!-- ePayco Checkout Script -->
     <script src="https://checkout.epayco.co/checkout.js"></script>

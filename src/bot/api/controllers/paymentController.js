@@ -80,6 +80,7 @@ class PaymentController {
 
       // Prepare response data
       const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN;
+      const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || webhookDomain;
       const provider = payment.provider || 'epayco';
 
       // Handle both camelCase and snake_case from payment
@@ -117,8 +118,8 @@ class PaymentController {
       if (provider === 'epayco') {
         basePaymentData.epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;
         basePaymentData.testMode = process.env.EPAYCO_TEST_MODE === 'true';
-        basePaymentData.confirmationUrl = `${webhookDomain}/api/webhooks/epayco`;
-        basePaymentData.responseUrl = `${webhookDomain}/api/payment-response`;
+        basePaymentData.confirmationUrl = `${epaycoWebhookDomain}/api/webhooks/epayco`;
+        basePaymentData.responseUrl = `${epaycoWebhookDomain}/api/payment-response`;
         basePaymentData.epaycoSignature = PaymentService.generateEpaycoCheckoutSignature({
           invoice: paymentRef,
           amount: amountCOPString,

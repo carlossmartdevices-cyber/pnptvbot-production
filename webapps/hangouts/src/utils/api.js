@@ -1,67 +1,75 @@
-import { getTelegramUser } from './telegram';
+// API utilities for Videorama
+const API_BASE = window.location.hostname === 'localhost'
+  ? 'http://localhost:3000/api'
+  : '/api';
 
-const jsonHeaders = (initData) => {
-  const headers = { 'Content-Type': 'application/json' };
-  if (initData) headers['x-telegram-init-data'] = initData;
-  return headers;
-};
+export async function fetchMediaLibrary(type = 'all', category = null) {
+  try {
+    let url = `${API_BASE}/media/library?type=${type}`;
+    if (category) url += `&category=${category}`;
 
-export const fetchPublicRooms = async () => {
-  const response = await fetch('/api/hangouts/public', { method: 'GET' });
-  const data = await response.json();
-  if (!response.ok || !data.success) {
-    throw new Error(data.error || 'Failed to load rooms');
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch media');
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching media library:', error);
+    return [];
   }
-  return data.rooms || [];
-};
+}
 
-export const createRoom = async ({
-  title,
-  maxParticipants,
-  isPublic,
-  enforceCamera,
-  allowGuests,
-} = {}) => {
-  const telegramUser = getTelegramUser();
-  const payload = {
-    title,
-    maxParticipants,
-    isPublic,
-    enforceCamera,
-    allowGuests,
-    creatorId: telegramUser?.id,
-    creatorName: telegramUser?.displayName,
-    initData: telegramUser?.initData,
+export async function fetchPlaylists() {
+  try {
+    const response = await fetch(`${API_BASE}/media/playlists`);
+    if (!response.ok) throw new Error('Failed to fetch playlists');
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching playlists:', error);
+    return [];
+  }
+}
+
+export async function fetchRadioNowPlaying() {
+  try {
+    const response = await fetch(`${API_BASE}/radio/now-playing`);
+    if (!response.ok) throw new Error('Failed to fetch now playing');
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching radio now playing:', error);
+    return null;
+  }
+}
+
+export async function fetchCategories() {
+  try {
+    const response = await fetch(`${API_BASE}/media/categories`);
+    if (!response.ok) throw new Error('Failed to fetch categories');
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    return ['music', 'podcast', 'videos', 'live'];
+  }
+}
+
+export async function fetchCollections() {
+  try {
+    const response = await fetch(`${API_BASE}/videorama/collections`);
+    if (!response.ok) throw new Error('Failed to fetch collections');
+    const data = await response.json();
+    return data.collections || []
+  } catch (error) {
+    console.error('Error fetching videorama collections:', error);
+    return [];
+  }
+}
+
+export function getUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    token: params.get('token'),
+    uid: params.get('uid'),
+    view: params.get('view') || 'home',
+    mediaId: params.get('id'),
+    role: params.get('role') || '',
+    isPrime: params.get('prime') === 'true' || params.get('isPrime') === 'true',
   };
-
-  const response = await fetch('/api/hangouts/create', {
-    method: 'POST',
-    headers: jsonHeaders(telegramUser?.initData),
-    body: JSON.stringify(payload),
-  });
-
-  const data = await response.json();
-  if (!response.ok || !data.success) {
-    throw new Error(data.error || 'Failed to create room');
-  }
-  return data;
-};
-
-export const joinRoom = async (callId) => {
-  const telegramUser = getTelegramUser();
-  const response = await fetch(`/api/hangouts/join/${encodeURIComponent(callId)}`, {
-    method: 'POST',
-    headers: jsonHeaders(telegramUser?.initData),
-    body: JSON.stringify({
-      userId: telegramUser?.id,
-      userName: telegramUser?.displayName,
-      initData: telegramUser?.initData,
-    }),
-  });
-
-  const data = await response.json();
-  if (!response.ok || !data.success) {
-    throw new Error(data.error || 'Failed to join room');
-  }
-  return data;
-};
+}
