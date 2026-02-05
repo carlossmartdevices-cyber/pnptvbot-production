@@ -1025,8 +1025,9 @@ const registerCommunityPostHandlers = (bot) => {
     const currentIndex = scheduledTimes.length;
     if (currentIndex < totalCount) {
       const tz = ctx.session.temp.communityPostTimezone || DEFAULT_TZ;
+      const formattedDate = dateTimePicker.formatDate(scheduledDate, 'es', tz);
       const text = `✅ *Programación ${currentIndex}/${totalCount} Guardada*\n\n`
-        + `📅 ${scheduledDate.toISOString().replace('T', ' ').substring(0, 16)} ${tz}\n\n`
+        + `📅 ${formattedDate} ${tz}\n\n`
         + '¿Programar la siguiente fecha?';
       await ctx.editMessageText(text, {
         parse_mode: 'Markdown',
@@ -1048,7 +1049,8 @@ const registerCommunityPostHandlers = (bot) => {
     });
   };
 
-  for (let i = 0; i < 6; i++) {
+  const presetCount = dateTimePicker.getQuickPresetHours().length;
+  for (let i = 0; i < presetCount; i++) {
     bot.action(`${COMMUNITY_PREFIX}_preset_${i}`, async (ctx) => {
       try {
         const isAdmin = await PermissionService.isAdmin(ctx.from.id);
@@ -1126,12 +1128,15 @@ const registerCommunityPostHandlers = (bot) => {
       const parsed = dateTimePicker.parseTimeCallback(ctx.match[0]);
       if (!parsed) return;
       const { year, month, day, hour, minute } = parsed;
-      const scheduledDate = new Date(year, month, day, hour, minute);
+      const tz = ctx.session.temp.communityPostTimezone || DEFAULT_TZ;
+      const scheduledDate = dateTimePicker.buildDateInTimeZone(
+        { year, month, day, hour, minute },
+        tz
+      );
       if (scheduledDate <= new Date()) {
         await ctx.answerCbQuery('❌ La hora seleccionada ya pasó', { show_alert: true });
         return;
       }
-      const tz = ctx.session.temp.communityPostTimezone || DEFAULT_TZ;
       const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, tz, 'es', COMMUNITY_PREFIX);
       ctx.session.temp.communityPostTempDate = scheduledDate.toISOString();
       await ctx.saveSession();
@@ -1291,7 +1296,17 @@ const registerCommunityPostHandlers = (bot) => {
         await ctx.reply('❌ Sesión expirada. Selecciona la fecha de nuevo.');
         return;
       }
-      const scheduledDate = new Date(dateInfo.year, dateInfo.month, dateInfo.day, hour, minute);
+      const tz = ctx.session.temp.communityPostTimezone || DEFAULT_TZ;
+      const scheduledDate = dateTimePicker.buildDateInTimeZone(
+        {
+          year: dateInfo.year,
+          month: dateInfo.month,
+          day: dateInfo.day,
+          hour,
+          minute,
+        },
+        tz
+      );
       if (scheduledDate <= new Date()) {
         await ctx.reply('❌ La fecha debe estar en el futuro.');
         return;

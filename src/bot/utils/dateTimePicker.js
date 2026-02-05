@@ -21,6 +21,16 @@ const WEEKDAYS = {
   en: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
 };
 
+const QUICK_PRESET_HOURS = Array.from({ length: 24 }, (_, i) => (i + 1) * 2);
+
+/**
+ * Return quick preset hours.
+ * @returns {number[]} Array of hours
+ */
+function getQuickPresetHours() {
+  return QUICK_PRESET_HOURS.slice();
+}
+
 /**
  * Generate quick preset options for scheduling
  * @param {string} lang - Language code ('es' or 'en')
@@ -28,23 +38,14 @@ const WEEKDAYS = {
  * @returns {Array} Array of button rows
  */
 function getQuickPresets(lang = 'es', prefix = 'schedule') {
-  const now = new Date();
+  const hours = getQuickPresetHours();
 
-  const presets = lang === 'es' ? [
-    { label: '⚡ En 1 hora', hours: 1 },
-    { label: '⏰ En 3 horas', hours: 3 },
-    { label: '🌅 Mañana 9 AM', tomorrow: true, hour: 9 },
-    { label: '🌇 Mañana 6 PM', tomorrow: true, hour: 18 },
-    { label: '📅 Este fin de semana', weekend: true, hour: 12 },
-    { label: '📆 Próximo lunes 9 AM', nextWeekday: 1, hour: 9 },
-  ] : [
-    { label: '⚡ In 1 hour', hours: 1 },
-    { label: '⏰ In 3 hours', hours: 3 },
-    { label: '🌅 Tomorrow 9 AM', tomorrow: true, hour: 9 },
-    { label: '🌇 Tomorrow 6 PM', tomorrow: true, hour: 18 },
-    { label: '📅 This weekend', weekend: true, hour: 12 },
-    { label: '📆 Next Monday 9 AM', nextWeekday: 1, hour: 9 },
-  ];
+  const presets = hours.map((value) => {
+    const label = lang === 'es'
+      ? `⏰ En ${value} horas`
+      : `⏰ In ${value} hours`;
+    return { label, hours: value };
+  });
 
   const buttons = [];
 
@@ -68,16 +69,11 @@ function getQuickPresets(lang = 'es', prefix = 'schedule') {
  */
 function calculatePresetDate(index) {
   const now = new Date();
-  const presets = [
-    { hours: 1 },
-    { hours: 3 },
-    { tomorrow: true, hour: 9 },
-    { tomorrow: true, hour: 18 },
-    { weekend: true, hour: 12 },
-    { nextWeekday: 1, hour: 9 },
-  ];
+  const hours = getQuickPresetHours();
+  const presetHours = hours[index];
+  if (!presetHours) return null;
 
-  const preset = presets[index];
+  const preset = { hours: presetHours };
   if (!preset) return null;
 
   const result = new Date(now);
@@ -101,6 +97,79 @@ function calculatePresetDate(index) {
   }
 
   return result;
+}
+
+/**
+ * Get timezone offset in ms for a given date/timezone.
+ * @param {Date} date
+ * @param {string} timeZone
+ * @returns {number} Offset in milliseconds
+ */
+function getTimeZoneOffset(date, timeZone) {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const parts = dtf.formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const asUTC = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+    Number(values.hour),
+    Number(values.minute),
+    Number(values.second),
+  );
+  return asUTC - date.getTime();
+}
+
+/**
+ * Build a Date from timezone-local components.
+ * @param {Object} params
+ * @param {number} params.year
+ * @param {number} params.month
+ * @param {number} params.day
+ * @param {number} params.hour
+ * @param {number} params.minute
+ * @param {string} timeZone
+ * @returns {Date}
+ */
+function buildDateInTimeZone({ year, month, day, hour, minute }, timeZone) {
+  const utcDate = new Date(Date.UTC(year, month, day, hour, minute, 0));
+  const offset = getTimeZoneOffset(utcDate, timeZone);
+  return new Date(utcDate.getTime() - offset);
+}
+
+/**
+ * Format date/time in a specific timezone.
+ * @param {Date} date
+ * @param {string} timeZone
+ * @param {string} lang
+ * @returns {{formattedDate: string, formattedTime: string}}
+ */
+function formatDateTimeInTimeZone(date, timeZone, lang = 'es') {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = dtf.formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const monthIndex = Number(values.month) - 1;
+  const monthName = MONTHS_FULL[lang][monthIndex];
+  const formattedDate = `${Number(values.day)} ${monthName} ${values.year}`;
+  const formattedTime = `${values.hour}:${values.minute}`;
+  return { formattedDate, formattedTime };
 }
 
 /**
@@ -357,14 +426,9 @@ function getTimeSelectionView(year, month, day, lang = 'es', prefix = 'schedule'
  * @returns {Object} { text, keyboard }
  */
 function getConfirmationView(scheduledDate, timezone, lang = 'es', prefix = 'schedule') {
-  const monthName = MONTHS_FULL[lang][scheduledDate.getMonth()];
-  const day = scheduledDate.getDate();
-  const year = scheduledDate.getFullYear();
-  const hours = String(scheduledDate.getHours()).padStart(2, '0');
-  const minutes = String(scheduledDate.getMinutes()).padStart(2, '0');
-
-  const formattedDate = `${day} ${monthName} ${year}`;
-  const formattedTime = `${hours}:${minutes}`;
+  const { formattedDate, formattedTime } = timezone
+    ? formatDateTimeInTimeZone(scheduledDate, timezone, lang)
+    : formatDateTimeInTimeZone(scheduledDate, 'UTC', lang);
 
   const text = lang === 'es'
     ? `✅ *Confirmar Programación*\n\n` +
@@ -448,7 +512,11 @@ function parseMonthCallback(data) {
  * @param {string} lang - Language code
  * @returns {string} Formatted date string
  */
-function formatDate(date, lang = 'es') {
+function formatDate(date, lang = 'es', timeZone = null) {
+  if (timeZone) {
+    const { formattedDate, formattedTime } = formatDateTimeInTimeZone(date, timeZone, lang);
+    return `${formattedDate} ${formattedTime}`;
+  }
   const day = date.getDate();
   const month = MONTHS_FULL[lang][date.getMonth()];
   const year = date.getFullYear();
@@ -460,7 +528,9 @@ function formatDate(date, lang = 'es') {
 
 module.exports = {
   getQuickPresets,
+  getQuickPresetHours,
   calculatePresetDate,
+  buildDateInTimeZone,
   generateCalendar,
   generateTimeSlots,
   getSchedulingMenu,

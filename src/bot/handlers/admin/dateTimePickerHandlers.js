@@ -63,8 +63,9 @@ const registerDateTimePickerHandlers = (bot) => {
   // QUICK PRESETS
   // ==========================================
 
-  // Handle preset selection (0-5)
-  for (let i = 0; i < 6; i++) {
+  // Handle preset selection
+  const presetCount = dateTimePicker.getQuickPresetHours().length;
+  for (let i = 0; i < presetCount; i++) {
     bot.action(`${PREFIX}_preset_${i}`, async (ctx) => {
       try {
         const isAdmin = await PermissionService.isAdmin(ctx.from.id);
@@ -244,9 +245,13 @@ const registerDateTimePickerHandlers = (bot) => {
       if (!parsed) return;
 
       const { year, month, day, hour, minute } = parsed;
+      const tz = ensureTimezone(ctx);
 
-      // Create the scheduled date
-      const scheduledDate = new Date(year, month, day, hour, minute);
+      // Create the scheduled date in the selected timezone
+      const scheduledDate = dateTimePicker.buildDateInTimeZone(
+        { year, month, day, hour, minute },
+        tz
+      );
 
       // Validate it's in the future
       if (scheduledDate <= new Date()) {
@@ -261,7 +266,6 @@ const registerDateTimePickerHandlers = (bot) => {
       if (!ctx.session.temp) ctx.session.temp = {};
       ctx.session.temp.scheduledDate = scheduledDate.toISOString();
       ctx.session.temp.schedulingStep = 'selecting_timezone';
-      const tz = ensureTimezone(ctx);
       await ctx.saveSession();
 
       await showConfirmation(ctx, lang, tz);
@@ -462,7 +466,7 @@ const registerDateTimePickerHandlers = (bot) => {
       ctx.session.temp.schedulingStep = 'confirmed';
       await ctx.saveSession();
 
-      const formattedDate = dateTimePicker.formatDate(scheduledDate, lang);
+      const formattedDate = dateTimePicker.formatDate(scheduledDate, lang, timezone);
 
       if (schedulingContext === 'multi') {
         if (!ctx.session.temp.scheduledTimes) ctx.session.temp.scheduledTimes = [];

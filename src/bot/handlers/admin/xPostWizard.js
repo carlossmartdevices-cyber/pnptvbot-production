@@ -452,19 +452,22 @@ const showSchedule = async (ctx, edit = false) => {
   message += `🌍 Zona horaria: \`${session.scheduleTimezone}\`\n\n`;
 
   // Quick schedule options
+  const quickHours = dateTimePicker.getQuickPresetHours();
+  const quickButtons = [];
+  for (let i = 0; i < quickHours.length; i += 2) {
+    const first = quickHours[i];
+    const second = quickHours[i + 1];
+    const row = [
+      Markup.button.callback(`⏰ En ${first} horas`, `xpost_schedule_${first}h`),
+    ];
+    if (second) {
+      row.push(Markup.button.callback(`⏰ En ${second} horas`, `xpost_schedule_${second}h`));
+    }
+    quickButtons.push(row);
+  }
+
   const buttons = [
-    [
-      Markup.button.callback('⏰ En 30 min', 'xpost_schedule_30m'),
-      Markup.button.callback('⏰ En 1 hora', 'xpost_schedule_1h'),
-    ],
-    [
-      Markup.button.callback('⏰ En 2 horas', 'xpost_schedule_2h'),
-      Markup.button.callback('⏰ En 4 horas', 'xpost_schedule_4h'),
-    ],
-    [
-      Markup.button.callback('📅 Mañana 9:00', 'xpost_schedule_tomorrow_9'),
-      Markup.button.callback('📅 Mañana 18:00', 'xpost_schedule_tomorrow_18'),
-    ],
+    ...quickButtons,
     [Markup.button.callback('🗓️ Elegir fecha', 'xpost_schedule_custom')],
     [Markup.button.callback('◀️ Volver', 'xpost_preview')],
     [Markup.button.callback('❌ Cancelar', 'xpost_menu')],
@@ -931,7 +934,17 @@ const handleTextInput = async (ctx, next) => {
       return;
     }
 
-    const scheduledAt = new Date(dateInfo.year, dateInfo.month, dateInfo.day, hour, minute);
+    const tz = session.scheduleTimezone || SERVER_TIMEZONE;
+    const scheduledAt = dateTimePicker.buildDateInTimeZone(
+      {
+        year: dateInfo.year,
+        month: dateInfo.month,
+        day: dateInfo.day,
+        hour,
+        minute,
+      },
+      tz
+    );
     if (scheduledAt <= new Date()) {
       await ctx.reply('❌ La fecha debe ser en el futuro.');
       return;
@@ -1219,41 +1232,14 @@ const registerXPostWizardHandlers = (bot) => {
     await showSchedule(ctx, true);
   });
 
-  bot.action('xpost_schedule_30m', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    await schedulePost(ctx, 30);
-  });
-
-  bot.action('xpost_schedule_1h', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    await schedulePost(ctx, 60);
-  });
-
-  bot.action('xpost_schedule_2h', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    await schedulePost(ctx, 120);
-  });
-
-  bot.action('xpost_schedule_4h', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    await schedulePost(ctx, 240);
-  });
-
-  bot.action('xpost_schedule_tomorrow_9', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    await scheduleForTomorrow(ctx, 9);
-  });
-
-  bot.action('xpost_schedule_tomorrow_18', async (ctx) => {
-    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
-    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
-    await scheduleForTomorrow(ctx, 18);
-  });
+  const quickHours = dateTimePicker.getQuickPresetHours();
+  for (const hours of quickHours) {
+    bot.action(`xpost_schedule_${hours}h`, async (ctx) => {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
+      await schedulePost(ctx, hours * 60);
+    });
+  }
 
   bot.action('xpost_schedule_custom', async (ctx) => {
     const isAdmin = await PermissionService.isAdmin(ctx.from.id);
@@ -1265,7 +1251,8 @@ const registerXPostWizardHandlers = (bot) => {
   // Inline date/time picker for X scheduling
   const XPOST_PREFIX = 'xpost_sched';
 
-  for (let i = 0; i < 6; i++) {
+  const presetCount = dateTimePicker.getQuickPresetHours().length;
+  for (let i = 0; i < presetCount; i++) {
     bot.action(`${XPOST_PREFIX}_preset_${i}`, async (ctx) => {
       await safeAnswer(ctx);
       const session = getSession(ctx);
@@ -1314,14 +1301,17 @@ const registerXPostWizardHandlers = (bot) => {
     const parsed = dateTimePicker.parseTimeCallback(ctx.match[0]);
     if (!parsed) return;
     const { year, month, day, hour, minute } = parsed;
-    const scheduledDate = new Date(year, month, day, hour, minute);
+    const tz = session.scheduleTimezone || SERVER_TIMEZONE;
+    const scheduledDate = dateTimePicker.buildDateInTimeZone(
+      { year, month, day, hour, minute },
+      tz
+    );
     if (scheduledDate <= new Date()) {
       await ctx.answerCbQuery('❌ La hora seleccionada ya pasó', { show_alert: true }).catch(() => {});
       return;
     }
     session.scheduleTempDate = scheduledDate.toISOString();
     await ctx.saveSession?.();
-    const tz = session.scheduleTimezone || SERVER_TIMEZONE;
     const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, tz, 'es', XPOST_PREFIX);
     await safeEditOrReply(ctx, text, { parse_mode: 'Markdown', ...keyboard });
   });

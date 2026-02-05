@@ -1164,7 +1164,8 @@ const registerImprovedSharePostHandlers = (bot) => {
   // Inline picker handlers for scheduling
   const SCHED_PREFIX = 'share_post_sched';
   const DEFAULT_TZ = 'America/Bogota';
-  for (let i = 0; i < 6; i++) {
+  const presetCount = dateTimePicker.getQuickPresetHours().length;
+  for (let i = 0; i < presetCount; i++) {
     bot.action(`${SCHED_PREFIX}_preset_${i}`, async (ctx) => {
       try {
         const isAdmin = await PermissionService.isAdmin(ctx.from.id);
@@ -1242,12 +1243,15 @@ const registerImprovedSharePostHandlers = (bot) => {
       const parsed = dateTimePicker.parseTimeCallback(ctx.match[0]);
       if (!parsed) return;
       const { year, month, day, hour, minute } = parsed;
-      const scheduledDate = new Date(year, month, day, hour, minute);
+      const tz = ctx.session.temp.sharePostTimezone || DEFAULT_TZ;
+      const scheduledDate = dateTimePicker.buildDateInTimeZone(
+        { year, month, day, hour, minute },
+        tz
+      );
       if (scheduledDate <= new Date()) {
         await ctx.answerCbQuery('❌ La hora seleccionada ya pasó', { show_alert: true });
         return;
       }
-      const tz = ctx.session.temp.sharePostTimezone || DEFAULT_TZ;
       const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, tz, 'es', SCHED_PREFIX);
       ctx.session.temp.sharePostTempDate = scheduledDate.toISOString();
       await ctx.saveSession();
@@ -1391,7 +1395,17 @@ const registerImprovedSharePostHandlers = (bot) => {
         return;
       }
 
-      const scheduledDate = new Date(dateInfo.year, dateInfo.month, dateInfo.day, hour, minute);
+      const tz = ctx.session.temp.sharePostTimezone || DEFAULT_TZ;
+      const scheduledDate = dateTimePicker.buildDateInTimeZone(
+        {
+          year: dateInfo.year,
+          month: dateInfo.month,
+          day: dateInfo.day,
+          hour,
+          minute,
+        },
+        tz
+      );
       if (scheduledDate <= new Date()) {
         await ctx.reply('❌ La fecha debe estar en el futuro.');
         return;
@@ -1401,7 +1415,6 @@ const registerImprovedSharePostHandlers = (bot) => {
       ctx.session.temp.sharePostStep = 'schedule_datetime_picker';
       await ctx.saveSession();
 
-      const tz = ctx.session.temp.sharePostTimezone || DEFAULT_TZ;
       const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, tz, 'es', SCHED_PREFIX);
       await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
       return;
@@ -1419,9 +1432,11 @@ const registerImprovedSharePostHandlers = (bot) => {
       const scheduledAt = postData.scheduledAt;
       const destinations = postData.destinations || [];
 
+      const tz = ctx.session.temp.sharePostTimezone || DEFAULT_TZ;
+      const formattedDate = dateTimePicker.formatDate(scheduledAt, 'es', tz);
       await ctx.reply(
         '📅 *Publicación Programada*\n\n'
-        + '🗓️ Fecha: ' + scheduledAt.toISOString().replace('T', ' ').substring(0, 16) + ` ${ctx.session.temp.sharePostTimezone || DEFAULT_TZ}\n`
+        + `🗓️ Fecha: ${formattedDate} ${tz}\n`
         + '📢 Destinos: ' + destinations.length + '\n\n'
         + '✅ ¿Confirmar programación?',
         {

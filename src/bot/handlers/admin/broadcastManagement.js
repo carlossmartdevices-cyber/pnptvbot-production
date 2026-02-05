@@ -10,6 +10,7 @@ const broadcastService = new BroadcastService();
 const s3Service = require('../../../utils/s3Service');
 const PermissionService = require('../../services/permissionService');
 const { getLanguage } = require('../../utils/helpers');
+const { escapeMarkdown } = require('../../utils/memberProfileCard');
 
 /**
  * Register enhanced broadcast handlers
@@ -624,7 +625,7 @@ const registerBroadcastHandlers = (bot) => {
 
         // Format date for display
         const dateTimePicker = require('../../utils/dateTimePicker');
-        const formattedDate = dateTimePicker.formatDate(scheduledDate, lang);
+        const formattedDate = dateTimePicker.formatDate(scheduledDate, lang, timezone);
 
         // Clear session data
         ctx.session.temp.broadcastTarget = null;
@@ -663,10 +664,11 @@ const registerBroadcastHandlers = (bot) => {
         });
       } catch (createError) {
         logger.error('Error creating scheduled broadcast:', createError);
+        const safeErrorMessage = escapeMarkdown(createError?.message || 'Unknown error');
         await ctx.reply(
           lang === 'es'
-            ? `❌ *Error al crear broadcast*\n\nDetalles: ${createError.message}`
-            : `❌ *Error creating broadcast*\n\nDetails: ${createError.message}`,
+            ? `❌ *Error al crear broadcast*\n\nDetalles: ${safeErrorMessage}`
+            : `❌ *Error creating broadcast*\n\nDetails: ${safeErrorMessage}`,
           {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
