@@ -9,7 +9,8 @@ const logger = require('../../utils/logger');
 const PaymentSecurityService = require('./paymentSecurityService');
 
 const X_API_BASE = 'https://api.twitter.com/2';
-const X_MEDIA_UPLOAD_BASE = 'https://api.x.com/2/media/upload';
+const X_MEDIA_UPLOAD_V2_BASE = 'https://api.x.com/2/media/upload';
+const X_MEDIA_UPLOAD_V1_URL = 'https://upload.twitter.com/1.1/media/upload.json';
 const X_MAX_TEXT_LENGTH = 280;
 const X_TOKEN_EXPIRY_BUFFER_MS = 2 * 60 * 1000;
 const XOAuthService = require('./xOAuthService');
@@ -368,103 +369,21 @@ class XPostService {
     return 'tweet_image';
   }
 
+  static shouldUseV1Upload(mimeType) {
+    if (!mimeType) return true;
+    if (mimeType.startsWith('video/')) return true;
+    if (mimeType === 'image/gif') return true;
+    return false;
+  }
+
   static async uploadMediaToX({ accessToken, mediaUrl }) {
     const { filePath, mimeType, size } = await this.downloadMediaToFile(mediaUrl);
-    const authHeader = `Bearer ${accessToken}`;
 
     try {
-      const mediaCategory = this.getMediaCategory(mimeType);
-      logger.info('X media upload INIT (v2)', { mimeType, size, mediaCategory });
-
-      // INIT (v2)
-      const initRes = await axios.post(
-        `${X_MEDIA_UPLOAD_BASE}/initialize`,
-        {
-          media_type: mimeType,
-          total_bytes: size,
-          media_category: mediaCategory,
-        },
-        {
-          headers: {
-            Authorization: authHeader,
-            'Content-Type': 'application/json',
-          },
-          timeout: 30000,
-          maxBodyLength: Infinity,
-        }
-      );
-
-      // v2 returns 'id' in data, v1.1 returned 'media_id_string'
-      const mediaId = initRes.data?.data?.id || initRes.data?.id || initRes.data?.media_id_string || initRes.data?.media_id;
-      if (!mediaId) {
-        logger.error('X media upload INIT failed - no media_id', { responseData: initRes.data });
-        throw new Error('No se recibió media_id al inicializar upload');
+      if (this.shouldUseV1Upload(mimeType)) {
+        return await this.uploadMediaToXV1({ accessToken, filePath, mimeType, size });
       }
-      logger.info('X media upload INIT ok', { mediaId });
-
-      const appendUrl = `${X_MEDIA_UPLOAD_BASE}/${mediaId}/append`;
-
-      // APPEND chunks
-      const fileHandle = await fs.promises.open(filePath, 'r');
-      try {
-        const buffer = Buffer.alloc(X_MEDIA_CHUNK_SIZE);
-        let offset = 0;
-        let segmentIndex = 0;
-
-        while (true) {
-          const { bytesRead } = await fileHandle.read(buffer, 0, X_MEDIA_CHUNK_SIZE, offset);
-          if (!bytesRead) break;
-
-          const chunk = buffer.subarray(0, bytesRead);
-          const appendForm = new FormData();
-          appendForm.append('segment_index', String(segmentIndex));
-          appendForm.append('media', chunk, {
-            filename: `chunk_${segmentIndex}`,
-            contentType: mimeType,
-          });
-
-          await axios.post(
-            appendUrl,
-            appendForm,
-            {
-              headers: {
-                Authorization: authHeader,
-                ...appendForm.getHeaders(),
-              },
-              timeout: 60000,
-              maxBodyLength: Infinity,
-            }
-          );
-
-          offset += bytesRead;
-          segmentIndex += 1;
-        }
-      } finally {
-        await fileHandle.close();
-      }
-
-      // FINALIZE (v2)
-      const finalizeRes = await axios.post(
-        `${X_MEDIA_UPLOAD_BASE}/${mediaId}/finalize`,
-        {},
-        {
-          headers: {
-            Authorization: authHeader,
-            'Content-Type': 'application/json',
-          },
-          timeout: 30000,
-          maxBodyLength: Infinity,
-        }
-      );
-
-      const processingInfo = finalizeRes.data?.data?.processing_info || finalizeRes.data?.processing_info;
-      logger.info('X media upload FINALIZE ok', { mediaId, hasProcessing: !!processingInfo });
-      if (processingInfo) {
-        await this.waitForMediaProcessing(accessToken, mediaId, processingInfo);
-      }
-
-      logger.info('X media upload completed successfully', { mediaId });
-      return mediaId;
+      return await this.uploadMediaToXV2({ accessToken, filePath, mimeType, size });
     } catch (error) {
       const status = error.response?.status;
       const data = error.response?.data;
@@ -483,7 +402,205 @@ class XPostService {
     }
   }
 
-  static async waitForMediaProcessing(accessToken, mediaId, processingInfo) {
+  static async uploadMediaToXV2({ accessToken, filePath, mimeType, size }) {
+    const authHeader = `Bearer ${accessToken}`;
+    const mediaCategory = this.getMediaCategory(mimeType);
+    logger.info('X media upload INIT (v2)', { mimeType, size, mediaCategory });
+
+    // INIT (v2)
+    const initRes = await axios.post(
+      `${X_MEDIA_UPLOAD_V2_BASE}/initialize`,
+      {
+        media_type: mimeType,
+        total_bytes: size,
+        media_category: mediaCategory,
+      },
+      {
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        },
+        timeout: 30000,
+        maxBodyLength: Infinity,
+      }
+    );
+
+    // v2 returns 'id' in data, v1.1 returned 'media_id_string'
+    const mediaId = initRes.data?.data?.id || initRes.data?.id || initRes.data?.media_id_string || initRes.data?.media_id;
+    if (!mediaId) {
+      logger.error('X media upload INIT failed - no media_id', { responseData: initRes.data });
+      throw new Error('No se recibió media_id al inicializar upload');
+    }
+    logger.info('X media upload INIT ok', { mediaId });
+
+    const appendUrl = `${X_MEDIA_UPLOAD_V2_BASE}/${mediaId}/append`;
+
+    // APPEND chunks
+    const fileHandle = await fs.promises.open(filePath, 'r');
+    try {
+      const buffer = Buffer.alloc(X_MEDIA_CHUNK_SIZE);
+      let offset = 0;
+      let segmentIndex = 0;
+
+      while (true) {
+        const { bytesRead } = await fileHandle.read(buffer, 0, X_MEDIA_CHUNK_SIZE, offset);
+        if (!bytesRead) break;
+
+        const chunk = buffer.subarray(0, bytesRead);
+        const appendForm = new FormData();
+        appendForm.append('segment_index', String(segmentIndex));
+        appendForm.append('media', chunk, {
+          filename: `chunk_${segmentIndex}`,
+          contentType: mimeType,
+        });
+
+        await axios.post(
+          appendUrl,
+          appendForm,
+          {
+            headers: {
+              Authorization: authHeader,
+              ...appendForm.getHeaders(),
+            },
+            timeout: 60000,
+            maxBodyLength: Infinity,
+          }
+        );
+
+        offset += bytesRead;
+        segmentIndex += 1;
+      }
+    } finally {
+      await fileHandle.close();
+    }
+
+    // FINALIZE (v2)
+    const finalizeRes = await axios.post(
+      `${X_MEDIA_UPLOAD_V2_BASE}/${mediaId}/finalize`,
+      {},
+      {
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        },
+        timeout: 30000,
+        maxBodyLength: Infinity,
+      }
+    );
+
+    const processingInfo = finalizeRes.data?.data?.processing_info || finalizeRes.data?.processing_info;
+    logger.info('X media upload FINALIZE ok', { mediaId, hasProcessing: !!processingInfo });
+    if (processingInfo) {
+      await this.waitForMediaProcessingV2(accessToken, mediaId, processingInfo);
+    }
+
+    logger.info('X media upload completed successfully (v2)', { mediaId });
+    return mediaId;
+  }
+
+  static async uploadMediaToXV1({ accessToken, filePath, mimeType, size }) {
+    const authHeader = `Bearer ${accessToken}`;
+    const mediaCategory = this.getMediaCategory(mimeType);
+    logger.info('X media upload INIT (v1.1)', { mimeType, size, mediaCategory });
+
+    const initParams = new URLSearchParams({
+      command: 'INIT',
+      total_bytes: String(size),
+      media_type: mimeType,
+      media_category: mediaCategory,
+    });
+
+    const initRes = await axios.post(
+      X_MEDIA_UPLOAD_V1_URL,
+      initParams,
+      {
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        timeout: 30000,
+        maxBodyLength: Infinity,
+      }
+    );
+
+    const mediaId = initRes.data?.media_id_string || initRes.data?.media_id;
+    if (!mediaId) {
+      logger.error('X media upload INIT failed - no media_id (v1.1)', { responseData: initRes.data });
+      throw new Error('No se recibió media_id al inicializar upload');
+    }
+    logger.info('X media upload INIT ok (v1.1)', { mediaId });
+
+    // APPEND chunks
+    const fileHandle = await fs.promises.open(filePath, 'r');
+    try {
+      const buffer = Buffer.alloc(X_MEDIA_CHUNK_SIZE);
+      let offset = 0;
+      let segmentIndex = 0;
+
+      while (true) {
+        const { bytesRead } = await fileHandle.read(buffer, 0, X_MEDIA_CHUNK_SIZE, offset);
+        if (!bytesRead) break;
+
+        const chunk = buffer.subarray(0, bytesRead);
+        const appendForm = new FormData();
+        appendForm.append('command', 'APPEND');
+        appendForm.append('media_id', mediaId);
+        appendForm.append('segment_index', String(segmentIndex));
+        appendForm.append('media', chunk, {
+          filename: `chunk_${segmentIndex}`,
+          contentType: mimeType,
+        });
+
+        await axios.post(
+          X_MEDIA_UPLOAD_V1_URL,
+          appendForm,
+          {
+            headers: {
+              Authorization: authHeader,
+              ...appendForm.getHeaders(),
+            },
+            timeout: 60000,
+            maxBodyLength: Infinity,
+          }
+        );
+
+        offset += bytesRead;
+        segmentIndex += 1;
+      }
+    } finally {
+      await fileHandle.close();
+    }
+
+    // FINALIZE (v1.1)
+    const finalizeParams = new URLSearchParams({
+      command: 'FINALIZE',
+      media_id: mediaId,
+    });
+
+    const finalizeRes = await axios.post(
+      X_MEDIA_UPLOAD_V1_URL,
+      finalizeParams,
+      {
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        timeout: 30000,
+        maxBodyLength: Infinity,
+      }
+    );
+
+    const processingInfo = finalizeRes.data?.processing_info;
+    logger.info('X media upload FINALIZE ok (v1.1)', { mediaId, hasProcessing: !!processingInfo });
+    if (processingInfo) {
+      await this.waitForMediaProcessingV1(accessToken, mediaId, processingInfo);
+    }
+
+    logger.info('X media upload completed successfully (v1.1)', { mediaId });
+    return mediaId;
+  }
+
+  static async waitForMediaProcessingV2(accessToken, mediaId, processingInfo) {
     let state = processingInfo?.state;
     let checkAfter = processingInfo?.check_after_secs || 5;
     let attempts = 0;
@@ -493,7 +610,7 @@ class XPostService {
     while (state && state !== 'succeeded' && state !== 'failed' && attempts < 10) {
       await new Promise((resolve) => setTimeout(resolve, checkAfter * 1000));
       const statusRes = await axios.get(
-        `${X_MEDIA_UPLOAD_BASE}/${mediaId}`,
+        `${X_MEDIA_UPLOAD_V2_BASE}/${mediaId}`,
         {
           headers: { Authorization: `Bearer ${accessToken}` },
           timeout: 15000,
@@ -513,6 +630,39 @@ class XPostService {
     }
 
     logger.info('X media processing completed', { mediaId, finalState: state });
+  }
+
+  static async waitForMediaProcessingV1(accessToken, mediaId, processingInfo) {
+    let state = processingInfo?.state;
+    let checkAfter = processingInfo?.check_after_secs || 5;
+    let attempts = 0;
+
+    logger.info('Waiting for X media processing (v1.1)', { mediaId, initialState: state, checkAfter });
+
+    while (state && state !== 'succeeded' && state !== 'failed' && attempts < 10) {
+      await new Promise((resolve) => setTimeout(resolve, checkAfter * 1000));
+      const statusRes = await axios.get(
+        X_MEDIA_UPLOAD_V1_URL,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          params: { command: 'STATUS', media_id: mediaId },
+          timeout: 15000,
+        }
+      );
+
+      const info = statusRes.data?.processing_info;
+      state = info?.state || state;
+      checkAfter = info?.check_after_secs || checkAfter;
+      attempts += 1;
+
+      logger.info('X media processing status check (v1.1)', { mediaId, state, attempts });
+    }
+
+    if (state && state !== 'succeeded') {
+      throw new Error(`Media processing failed: ${state}`);
+    }
+
+    logger.info('X media processing completed (v1.1)', { mediaId, finalState: state });
   }
 
   static async getValidAccessToken(account) {
