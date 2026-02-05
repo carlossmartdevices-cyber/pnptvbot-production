@@ -46,11 +46,11 @@ async function initializeAsyncBroadcastQueue(bot, options = {}) {
 
     // Step 4: Log status
     const status = await queueIntegration.getStatus();
-    logger.info('Queue Status:', JSON.stringify({
+    logger.info('Queue Status:', {
       running: queue.isProcessorRunning(),
       queues: status.queues,
       activeJobs: status.activeJobs,
-    }, null, 2));
+    });
 
     logger.info('✓ Async Broadcast Queue initialized successfully');
 

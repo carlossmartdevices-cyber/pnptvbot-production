@@ -364,6 +364,7 @@ const registerNearbyPlacesAdminHandlers = (bot) => {
   // Handle custom rejection reason text
   bot.on('text', async (ctx, next) => {
     try {
+      if (ctx.chat?.type && ctx.chat.type !== 'private') return next();
       if (!ctx.session?.temp?.awaitingCustomRejection) {
         return next();
       }

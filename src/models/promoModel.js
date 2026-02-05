@@ -12,6 +12,7 @@ const logger = require('../utils/logger');
 class PromoModel {
   static TABLE = 'promos';
   static REDEMPTIONS_TABLE = 'promo_redemptions';
+  static ANY_PLAN_IDS = new Set(['any', 'all']);
 
   /**
    * Map database row to promo object
@@ -42,6 +43,16 @@ class PromoModel {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+  }
+
+  /**
+   * Check if promo applies to any plan
+   * @param {Object} promo
+   * @returns {boolean}
+   */
+  static isAnyPlanPromo(promo) {
+    const basePlanId = promo?.basePlanId || promo?.base_plan_id;
+    return this.ANY_PLAN_IDS.has(String(basePlanId || '').toLowerCase());
   }
 
   /**
@@ -171,6 +182,16 @@ class PromoModel {
    */
   static async calculatePrice(promo) {
     try {
+      if (this.isAnyPlanPromo(promo)) {
+        return {
+          originalPrice: null,
+          discountAmount: null,
+          finalPrice: null,
+          basePlan: null,
+          isAnyPlan: true,
+        };
+      }
+
       const basePlan = await PlanModel.getById(promo.basePlanId);
       if (!basePlan) {
         throw new Error('Base plan not found');
@@ -198,6 +219,37 @@ class PromoModel {
       logger.error('Error calculating promo price:', error);
       throw error;
     }
+  }
+
+  /**
+   * Calculate promo price for a specific plan
+   * @param {Object} promo
+   * @param {Object} plan
+   * @returns {Object}
+   */
+  static calculatePriceForPlan(promo, plan) {
+    if (!plan) {
+      throw new Error('Plan not found');
+    }
+
+    const originalPrice = parseFloat(plan.price);
+    let finalPrice;
+    let discountAmount;
+
+    if (promo.discountType === 'percentage') {
+      discountAmount = originalPrice * (promo.discountValue / 100);
+      finalPrice = originalPrice - discountAmount;
+    } else {
+      finalPrice = promo.discountValue;
+      discountAmount = originalPrice - finalPrice;
+    }
+
+    return {
+      originalPrice: parseFloat(originalPrice.toFixed(2)),
+      discountAmount: parseFloat(discountAmount.toFixed(2)),
+      finalPrice: parseFloat(Math.max(0, finalPrice).toFixed(2)),
+      basePlan: plan,
+    };
   }
 
   /**

@@ -1,6 +1,7 @@
 const { Markup } = require('telegraf');
 const { query } = require('../../../config/postgres');
 const RoleService = require('../../services/roleService');
+const PermissionService = require('../../services/permissionService');
 const UserModel = require('../../../models/userModel');
 const logger = require('../../../utils/logger');
 const { getLanguage, safeEditMessage } = require('../../utils/helpers');
@@ -202,7 +203,7 @@ const registerPerformerManagementHandlers = (bot) => {
     try {
       logger.info('[PERF-HANDLER] admin_performers called', { userId: ctx.from.id });
       await ctx.answerCbQuery();
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       logger.info('[PERF-HANDLER] isAdmin check result', { userId: ctx.from.id, isAdmin });
       if (!isAdmin) {
         logger.info('[PERF-HANDLER] User is not admin, rejecting');
@@ -220,7 +221,7 @@ const registerPerformerManagementHandlers = (bot) => {
   bot.action('perf_create_start', async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
       ctx.session.temp = ctx.session.temp || {};
@@ -248,7 +249,7 @@ const registerPerformerManagementHandlers = (bot) => {
   bot.action('perf_edit_list', async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
       const performers = await getAllPerformers();
@@ -282,7 +283,7 @@ const registerPerformerManagementHandlers = (bot) => {
   bot.action(/^perf_edit_(.+)$/, async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
       const performerId = ctx.match[1];
@@ -329,7 +330,7 @@ const registerPerformerManagementHandlers = (bot) => {
   // Toggle performer availability
   bot.action(/^perf_toggle_(.+)$/, async (ctx) => {
     try {
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
       const performerId = ctx.match[1];
@@ -366,7 +367,7 @@ const registerPerformerManagementHandlers = (bot) => {
   bot.action(/^perf_set_name_(.+)$/, async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
       const performerId = ctx.match[1];
@@ -392,7 +393,7 @@ const registerPerformerManagementHandlers = (bot) => {
   bot.action(/^perf_set_bio_(.+)$/, async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
       const performerId = ctx.match[1];
@@ -418,7 +419,7 @@ const registerPerformerManagementHandlers = (bot) => {
   bot.action(/^perf_set_price_(.+)$/, async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
       const performerId = ctx.match[1];
@@ -444,7 +445,7 @@ const registerPerformerManagementHandlers = (bot) => {
   bot.action('perf_delete_list', async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
       const performers = await getAllPerformers();
@@ -478,7 +479,7 @@ const registerPerformerManagementHandlers = (bot) => {
   bot.action(/^perf_delete_confirm_(.+)$/, async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
       const performerId = ctx.match[1];
@@ -514,7 +515,7 @@ const registerPerformerManagementHandlers = (bot) => {
   // Execute performer deletion
   bot.action(/^perf_delete_do_(.+)$/, async (ctx) => {
     try {
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
       const performerId = ctx.match[1];
@@ -535,6 +536,12 @@ const registerPerformerManagementHandlers = (bot) => {
 
   // Handle text input for performer creation/editing
   bot.on('text', async (ctx, next) => {
+    if (ctx.chat?.type && ctx.chat.type !== 'private') {
+      return next();
+    }
+    if (ctx.session?.temp?.promoCreate?.step === 'custom_code') {
+      return next();
+    }
     // Debug logging
     logger.info('[PERFORMER-TEXT-HANDLER] Received text', {
       userId: ctx.from.id,
@@ -547,7 +554,7 @@ const registerPerformerManagementHandlers = (bot) => {
 
     // Check if we're creating a performer
     if (ctx.session?.temp?.performerCreate) {
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return next();
 
       const createState = ctx.session.temp.performerCreate;
@@ -684,7 +691,7 @@ const registerPerformerManagementHandlers = (bot) => {
 
     // Check if we're editing a performer
     if (ctx.session?.temp?.editingPerformer) {
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return next();
 
       const { id, field } = ctx.session.temp.editingPerformer;
@@ -737,7 +744,7 @@ const registerPerformerManagementHandlers = (bot) => {
   bot.action('perf_create_default_price', async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const isAdmin = await RoleService.isAdmin(ctx.from.id);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
       const createState = ctx.session?.temp?.performerCreate;

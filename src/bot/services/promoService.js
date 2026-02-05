@@ -53,8 +53,10 @@ class PromoService {
         };
       }
 
-      // Calculate pricing
-      const pricing = await PromoModel.calculatePrice(promo);
+      // Calculate pricing (skip for any-plan promos)
+      const pricing = PromoModel.isAnyPlanPromo(promo)
+        ? null
+        : await PromoModel.calculatePrice(promo);
 
       // Calculate remaining spots
       const remainingSpots = promo.maxSpots !== null
@@ -66,7 +68,7 @@ class PromoService {
         promo,
         pricing,
         remainingSpots,
-        basePlan: pricing.basePlan,
+        basePlan: pricing?.basePlan || null,
       };
     } catch (error) {
       logger.error('Error getting promo for user:', error);
@@ -77,7 +79,7 @@ class PromoService {
   /**
    * Initiate promo payment flow
    */
-  static async initiatePromoPayment(promoCode, userId, provider, chatId = null) {
+  static async initiatePromoPayment(promoCode, userId, provider, chatId = null, planIdOverride = null) {
     try {
       // Get promo and validate
       const promoDetails = await this.getPromoForUser(promoCode, userId);
@@ -85,7 +87,20 @@ class PromoService {
         return promoDetails;
       }
 
-      const { promo, pricing, basePlan } = promoDetails;
+      const { promo } = promoDetails;
+      const isAnyPlan = PromoModel.isAnyPlanPromo(promo);
+      const planId = isAnyPlan ? planIdOverride : promo.basePlanId;
+
+      if (isAnyPlan && !planId) {
+        return { success: false, error: 'missing_plan', message: 'Plan is required for this promo' };
+      }
+
+      const basePlan = await PlanModel.getById(planId);
+      if (!basePlan || basePlan.active === false) {
+        return { success: false, error: 'plan_not_found', message: 'Plan not found' };
+      }
+
+      const pricing = PromoModel.calculatePriceForPlan(promo, basePlan);
 
       // Claim spot atomically
       const claimResult = await PromoModel.claimSpot(promo.id, userId, pricing);
@@ -107,7 +122,7 @@ class PromoService {
 
       const payment = await PaymentModel.create({
         userId: userId.toString(),
-        planId: promo.basePlanId,
+        planId,
         provider,
         sku: basePlan.sku,
         amount: pricing.finalPrice,
@@ -138,7 +153,7 @@ class PromoService {
           const daimoResult = await DaimoConfig.createDaimoPayment({
             amount: pricing.finalPrice,
             userId,
-            planId: promo.basePlanId,
+            planId,
             chatId,
             paymentId: payment.id,
             description: `${promo.name} - ${basePlan.name || basePlan.display_name}`,
@@ -235,10 +250,15 @@ class PromoService {
    * Create new promo (admin)
    */
   static async createPromo(promoData) {
-    // Validate base plan exists
-    const basePlan = await PlanModel.getById(promoData.basePlanId);
-    if (!basePlan) {
-      throw new Error('Base plan not found');
+    const isAnyPlan = PromoModel.isAnyPlanPromo(promoData);
+
+    // Validate base plan exists (unless any-plan promo)
+    let basePlan = null;
+    if (!isAnyPlan) {
+      basePlan = await PlanModel.getById(promoData.basePlanId);
+      if (!basePlan) {
+        throw new Error('Base plan not found');
+      }
     }
 
     // Validate discount
@@ -247,10 +267,13 @@ class PromoService {
         throw new Error('Percentage discount must be between 0 and 100');
       }
     } else if (promoData.discountType === 'fixed_price') {
+      if (isAnyPlan) {
+        throw new Error('Fixed price discounts are not supported for any-plan promos');
+      }
       if (promoData.discountValue < 0) {
         throw new Error('Fixed price must be positive');
       }
-      if (promoData.discountValue > basePlan.price) {
+      if (basePlan && promoData.discountValue > basePlan.price) {
         throw new Error('Fixed price cannot exceed base plan price');
       }
     }

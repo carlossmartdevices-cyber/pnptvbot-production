@@ -66,6 +66,27 @@ const registerOnboardingHandlers = (bot) => {
 
       logger.info(`[START] User ${ctx.from.id} retrieved successfully, onboardingComplete: ${user.onboardingComplete}`);
 
+      // If user is stuck with a duplicate email conflict, show resolution prompt
+      if (ctx.session?.temp?.emailConflict) {
+        const lang = getLanguage(ctx);
+        const conflictEmail = ctx.session.temp.emailConflict.email;
+        const conflictMessage = lang === 'es'
+          ? `⚠️ *Email ya vinculado*\n\nEl email \`${conflictEmail}\` ya está asociado a otra cuenta.\n\nPuedes intentar con otro email o contactar soporte.`
+          : `⚠️ *Email Already Linked*\n\nThe email \`${conflictEmail}\` is already linked to another account.\n\nYou can try another email or contact support.`;
+
+        await ctx.reply(
+          conflictMessage,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(lang === 'es' ? '✏️ Usar otro email' : '✏️ Use another email', 'onboarding_retry_email')],
+              [Markup.button.url(lang === 'es' ? '🆘 Soporte' : '🆘 Support', 'https://t.me/pnptv_support')],
+            ]),
+          }
+        );
+        return;
+      }
+
       // Check for deep link parameters
       const startParam = ctx.message?.text?.split(' ')[1];
 
@@ -365,6 +386,7 @@ If you have any questions, use /support to contact us.`;
         ctx.session.temp = {};
       }
       ctx.session.temp.waitingForEmail = true;
+      ctx.session.temp.emailConflict = null;
       await ctx.saveSession();
       logger.info('Email input mode activated', { userId: ctx.from?.id });
 
@@ -373,6 +395,19 @@ If you have any questions, use /support to contact us.`;
       );
     } catch (error) {
       logger.error('Error in provide email:', error);
+    }
+  });
+
+  bot.action('onboarding_retry_email', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      if (!ctx.session.temp) ctx.session.temp = {};
+      ctx.session.temp.emailConflict = null;
+      ctx.session.temp.waitingForEmail = true;
+      await ctx.saveSession();
+      await ctx.reply('📧 Please send your email address:');
+    } catch (error) {
+      logger.error('Error in onboarding_retry_email:', error);
     }
   });
 
@@ -440,13 +475,21 @@ If you have any questions, use /support to contact us.`;
               email: rawEmail
             });
 
+            ctx.session.temp.waitingForEmail = false;
+            ctx.session.temp.emailConflict = { email: rawEmail, existingUserId: existingUser.id };
+            await ctx.saveSession();
+
             await ctx.reply(
               lang === 'es'
-                ? `❌ Este email ya está en uso por otra cuenta. Por favor, proporciona un email diferente o contacta a soporte para asistencia.`
-                : `❌ This email is already in use by another account. Please provide a different email or contact support for assistance.`
+                ? `❌ Este email ya está en uso por otra cuenta.`
+                : `❌ This email is already in use by another account.`,
+              {
+                ...Markup.inlineKeyboard([
+                  [Markup.button.callback(lang === 'es' ? '✏️ Usar otro email' : '✏️ Use another email', 'onboarding_retry_email')],
+                  [Markup.button.url(lang === 'es' ? '🆘 Soporte' : '🆘 Support', 'https://t.me/pnptv_support')],
+                ]),
+              }
             );
-            // Keep waitingForEmail true so user can retry
-            // Do not store email in session or proceed to next step
           }
         } else {
           // New email, proceed normally

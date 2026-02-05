@@ -225,6 +225,7 @@ const safeReplyOrEdit = async (ctx, text, options = {}) => {
     // Fallback to reply if edit fails for any reason
     if (error.message?.includes('no text in the message to edit') ||
         error.message?.includes('message is not modified') ||
+        error.message?.includes("message can't be edited") ||
         error.message?.includes('message to edit not found')) {
       return ctx.reply(text, options);
     }

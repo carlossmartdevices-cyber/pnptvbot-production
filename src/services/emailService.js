@@ -199,21 +199,30 @@ class EmailService {
             messageEs,
             userLanguage = 'en',
             mediaUrl = null,
-            buttons = []
+            buttons = [],
+            subjectEn = null,
+            subjectEs = null,
+            preheaderEn = null,
+            preheaderEs = null
         } = data;
 
         const message = userLanguage === 'es' ? messageEs : messageEn;
+        const subject = userLanguage === 'es'
+            ? (subjectEs || 'PNP Latino Update! Noticias de PNP Latino')
+            : (subjectEn || 'PNP Latino Update! Noticias de PNP Latino');
+        const preheader = userLanguage === 'es' ? preheaderEs : preheaderEn;
         const html = this.getBroadcastEmailTemplate({
             userName,
             message,
             mediaUrl,
             buttons,
-            language: userLanguage
+            language: userLanguage,
+            preheader
         });
 
         return await this.send({
             to: email,
-            subject: 'PNP Latino Update! Noticias de PNP Latino',
+            subject,
             html,
             from: 'noreply@pnptv.app'
         });
@@ -226,7 +235,7 @@ class EmailService {
      * @returns {Promise<Object>} Results summary
      */
     async sendBroadcastEmails(users, broadcastData) {
-        const { messageEn, messageEs, mediaUrl, buttons } = broadcastData;
+        const { messageEn, messageEs, mediaUrl, buttons, subjectEn, subjectEs, preheaderEn, preheaderEs } = broadcastData;
 
         let sent = 0;
         let failed = 0;
@@ -245,7 +254,11 @@ class EmailService {
                     messageEs,
                     userLanguage: user.language || 'en',
                     mediaUrl,
-                    buttons
+                    buttons,
+                    subjectEn,
+                    subjectEs,
+                    preheaderEn,
+                    preheaderEs
                 });
                 sent++;
 
@@ -315,7 +328,7 @@ class EmailService {
      * @returns {string} HTML template
      */
     getBroadcastEmailTemplate(data) {
-        const { userName, message, mediaUrl, buttons, language } = data;
+        const { userName, message, mediaUrl, buttons, language, preheader } = data;
 
         const isSpanish = language === 'es';
         const greeting = isSpanish ? `¡Hola ${userName}!` : `Hey ${userName}!`;
@@ -352,6 +365,10 @@ class EmailService {
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/\n/g, '<br>');
+
+        const preheaderText = preheader
+            ? `<span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;max-height:0;max-width:0;overflow:hidden;">${preheader}</span>`
+            : '';
 
         return `
 <!DOCTYPE html>
@@ -434,6 +451,7 @@ class EmailService {
     </style>
 </head>
 <body>
+    ${preheaderText}
     <div class="container">
         <div class="header">
             <div class="logo">🔥 PNP Latino TV</div>

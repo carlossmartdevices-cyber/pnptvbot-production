@@ -416,6 +416,12 @@ const registerRoleManagementHandlers = (bot) => {
 
   // Handle user ID input for adding roles
   bot.on('text', async (ctx, next) => {
+    if (ctx.chat?.type && ctx.chat.type !== 'private') {
+      return next();
+    }
+    if (ctx.session?.temp?.promoCreate?.step === 'custom_code') {
+      return next();
+    }
     if (!ctx.session.temp?.waitingForUserId || !ctx.session.temp?.addingRole) {
       return next();
     }

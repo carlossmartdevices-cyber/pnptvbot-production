@@ -53,6 +53,7 @@ class XOAuthService {
 
     const params = new URLSearchParams({
       response_type: 'code',
+      response_mode: 'query',
       client_id: clientId,
       redirect_uri: redirectUri,
       scope: scopes,

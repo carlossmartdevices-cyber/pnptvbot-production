@@ -115,7 +115,11 @@ class UserModel {
    */
   static async createOrUpdate(userData) {
     try {
-      const userId = userData.userId.toString();
+      const rawUserId = userData.userId ?? userData.id ?? userData.user_id ?? userData.telegramId ?? userData.telegram_id;
+      if (rawUserId === undefined || rawUserId === null) {
+        throw new Error('User ID is required to create or update a user');
+      }
+      const userId = rawUserId.toString();
       const sql = `
         INSERT INTO ${TABLE} (
           id, username, first_name, last_name, email, bio, photo_file_id,
@@ -145,9 +149,9 @@ class UserModel {
       const location = userData.location || {};
       const privacy = userData.privacy || { showLocation: true, showInterests: true, showBio: true, allowMessages: true, showOnline: true };
 
-      const result = await query(sql, [
+      const executeInsert = async (usernameOverride) => query(sql, [
         userId,
-        userData.username || null,
+        usernameOverride,
         userData.firstName || userData.first_name || 'User',
         userData.lastName || userData.last_name || null,
         userData.email || null,
@@ -177,9 +181,34 @@ class UserModel {
         userData.isActive !== false,
       ]);
 
+      let result;
+      try {
+        result = await executeInsert(userData.username || null);
+      } catch (error) {
+        const isDuplicateUsername = error?.code === '23505'
+          && String(error?.constraint || '').includes('users_username_key');
+        if (isDuplicateUsername) {
+          logger.warn('Duplicate username on create/update, retrying without username', {
+            userId,
+            username: userData.username,
+          });
+          result = await executeInsert(null);
+        } else {
+          throw error;
+        }
+      }
+
       await cache.del(`user:${userId}`);
+      const mappedUser = this.mapRowToUser(result.rows[0]);
+      if (cache.set) {
+        try {
+          await cache.set(`user:${userId}`, mappedUser, 600);
+        } catch (cacheError) {
+          logger.warn('Failed to update user cache after create/update:', cacheError.message || cacheError);
+        }
+      }
       logger.info('User created/updated', { userId, role: userData.role || 'user' });
-      return this.mapRowToUser(result.rows[0]);
+      return mappedUser;
     } catch (error) {
       logger.error('Error creating/updating user:', error);
       throw error;
@@ -924,6 +953,44 @@ class UserModel {
       return churnedUsers;
     } catch (error) {
       logger.error('Error getting churned users:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get users whose latest payment attempt was not completed
+   * @param {Object} options
+   * @param {number|null} options.sinceDays - Optional filter to only consider payments within N days
+   */
+  static async getUsersWithIncompletePayments({ sinceDays = null } = {}) {
+    try {
+      const params = [];
+      let dateFilter = '';
+      if (sinceDays && Number.isFinite(Number(sinceDays))) {
+        params.push(Number(sinceDays));
+        dateFilter = `WHERE p.created_at >= NOW() - ($${params.length} || ' days')::interval`;
+      }
+
+      const sql = `
+        WITH latest_payments AS (
+          SELECT DISTINCT ON (p.user_id) p.user_id, p.status, p.created_at
+          FROM payments p
+          ${dateFilter}
+          ORDER BY p.user_id, p.created_at DESC
+        )
+        SELECT u.*, COALESCE(u.email, s.email) AS email
+        FROM ${TABLE} u
+        INNER JOIN latest_payments lp ON lp.user_id = u.id
+        LEFT JOIN subscribers s ON s.telegram_id = u.id
+        WHERE lp.status IN ('pending', 'processing', 'failed', 'cancelled', 'expired')
+      `;
+
+      const result = await query(sql, params);
+      const users = result.rows.map((row) => this.mapRowToUser(row));
+      logger.info(`Found ${users.length} users with incomplete payments`);
+      return users;
+    } catch (error) {
+      logger.error('Error getting users with incomplete payments:', error);
       return [];
     }
   }

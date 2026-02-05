@@ -675,7 +675,8 @@ class EnhancedBroadcastService extends BroadcastService {
       // Get target users
       const targetUsers = await this.getTargetUsers(
         broadcast.target_type,
-        broadcast.exclude_user_ids || []
+        broadcast.exclude_user_ids || [],
+        broadcast.include_filters || {}
       );
 
       const stats = {

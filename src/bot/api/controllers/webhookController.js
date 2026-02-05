@@ -2,8 +2,11 @@ const { schemas } = require('../../../validation/schemas/payment.schema');
 const PaymentService = require('../../services/paymentService');
 const logger = require('../../../utils/logger');
 const DaimoConfig = require('../../../config/daimo');
+const PaymentWebhookEventModel = require('../../../models/paymentWebhookEventModel');
 
 const { cache } = require('../../../config/redis');
+
+const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''));
 
 // In-memory cache for webhook idempotency (prevents duplicate processing within 5 minutes)
 // In production, use Redis for this
@@ -188,12 +191,31 @@ const handleEpaycoWebhook = async (req, res) => {
     }
 
     try {
+      const paymentId = isUuid(req.body.x_extra3) ? req.body.x_extra3 : null;
+      const eventMeta = {
+        provider: 'epayco',
+        eventId: req.body.x_ref_payco || req.body.x_transaction_id,
+        paymentId,
+        status: req.body.x_transaction_state,
+        stateCode: req.body.x_cod_transaction_state || req.body.x_transaction_state,
+        payload: req.body,
+      };
+
       // Verify webhook signature before any processing
       const signatureCheck = verifyEpaycoSignature(req);
       if (!signatureCheck.valid) {
+        await PaymentWebhookEventModel.logEvent({
+          ...eventMeta,
+          isValidSignature: false,
+        });
         const status = signatureCheck.reason === 'missing_signature' ? 400 : 401;
         return sendError(res, status, 'INVALID_SIGNATURE', signatureCheck.error);
       }
+
+      await PaymentWebhookEventModel.logEvent({
+        ...eventMeta,
+        isValidSignature: true,
+      });
 
       logger.info('ePayco webhook received', {
         transactionId: req.body.x_ref_payco,
@@ -293,6 +315,16 @@ const handleDaimoWebhook = async (req, res) => {
     }
 
     try {
+      const paymentId = isUuid(metadata?.paymentId) ? metadata.paymentId : null;
+      const eventMeta = {
+        provider: 'daimo',
+        eventId: id,
+        paymentId,
+        status,
+        stateCode: req.body?.event || req.body?.type || null,
+        payload: req.body,
+      };
+
       logger.info('Daimo Pay webhook received', {
         eventId: id,
         status,
@@ -309,12 +341,21 @@ const handleDaimoWebhook = async (req, res) => {
       const isValidSignature = DaimoService.verifyWebhookSignature(req.body, authHeader);
 
       if (!isValidSignature) {
+        await PaymentWebhookEventModel.logEvent({
+          ...eventMeta,
+          isValidSignature: false,
+        });
         logger.error('Invalid Daimo webhook authorization', {
           eventId: id,
           hasAuthHeader: !!authHeader,
         });
         return res.status(401).json({ success: false, error: 'Invalid signature' });
       }
+
+      await PaymentWebhookEventModel.logEvent({
+        ...eventMeta,
+        isValidSignature: true,
+      });
 
       // Validate payload structure
       const validation = validateDaimoPayload(req.body);

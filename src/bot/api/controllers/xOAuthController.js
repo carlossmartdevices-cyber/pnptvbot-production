@@ -38,6 +38,48 @@ const buildRedirectPage = (title, message, botLink) => `
 </html>
 `;
 
+const buildHashRecoveryPage = (title, message, botLink) => `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${title}</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 40px; }
+    .card { max-width: 520px; margin: 0 auto; border-radius: 12px; padding: 24px; background: #f6f8ff; }
+    h1 { color: #0f172a; }
+    p { color: #334155; }
+    .button { display: inline-block; margin-top: 16px; padding: 12px 18px; background: #1d4ed8; color: #fff; text-decoration: none; border-radius: 8px; }
+    .muted { color: #64748b; font-size: 12px; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>${title}</h1>
+    <p>${message}</p>
+    ${botLink ? `<a class="button" href="${botLink}">Abrir bot</a><p class="muted">${botLink}</p>` : ''}
+  </div>
+  <script>
+    (function() {
+      try {
+        var hash = window.location.hash || '';
+        if (hash.startsWith('#')) hash = hash.slice(1);
+        var params = new URLSearchParams(hash);
+        var code = params.get('code');
+        var state = params.get('state');
+        if (code && state) {
+          var qs = new URLSearchParams({ code: code, state: state }).toString();
+          var nextUrl = window.location.pathname + '?' + qs;
+          window.location.replace(nextUrl);
+        }
+      } catch (e) {}
+    })();
+  </script>
+</body>
+</html>
+`;
+
 const startOAuth = async (req, res) => {
   try {
     const adminId = req.query.admin_id ? Number(req.query.admin_id) : null;
@@ -62,6 +104,8 @@ const handleCallback = async (req, res) => {
       hasError: !!error,
       error: error || null,
       errorDescription: errorDescription || null,
+      originalUrl: req.originalUrl,
+      queryKeys: Object.keys(req.query || {}),
     });
 
     if (error) {
@@ -70,6 +114,18 @@ const handleCallback = async (req, res) => {
         errorDescription,
       });
       return res.status(400).send(buildRedirectPage('Conexion rechazada', errorDescription || error, botLink));
+    }
+
+    if (!code && !state) {
+      logger.warn('X OAuth callback missing code/state', {
+        originalUrl: req.originalUrl,
+        query: req.query || {},
+      });
+      return res.status(200).send(buildHashRecoveryPage(
+        'Procesando conexion',
+        'Si la autorizacion fue correcta, esta pagina se actualizara sola en segundos. Si no, vuelve al bot y genera un nuevo enlace.',
+        botLink
+      ));
     }
 
     const account = await XOAuthService.handleOAuthCallback({ code, state });

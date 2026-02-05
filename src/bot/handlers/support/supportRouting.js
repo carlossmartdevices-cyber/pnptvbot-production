@@ -246,12 +246,13 @@ _El usuario ha sido notificado._`, {
       }
 
       const user = await UserModel.getById(userId);
-      const userName = user?.firstName || user?.username || userId;
-      const adminName = ctx.from.first_name || 'Soporte';
+      const userName = escapeMarkdown(user?.firstName || user?.username || userId);
+      const adminName = escapeMarkdown(ctx.from.first_name || 'Soporte');
       const userLang = user?.language || 'es';
+      const safeResolutionNote = escapeMarkdown(resolutionNote || '');
       const resolvedMessage = userLang === 'en'
-      ? `✅ *Case Resolved*\n\nYour support ticket has been marked as resolved by ${adminName}.\n\n${resolutionNote ? `📝 *Note:* ${resolutionNote}\n\n` : ''}If you need anything else in the future, don't hesitate to reach out.\n\n⭐ _We'd love to hear about your experience! Please rate us 1-4._\n\nThanks for being part of PNP! 💜`
-      : `✅ *Caso Resuelto*\n\nTu ticket de soporte ha sido marcado como resuelto por ${adminName}.\n\n${resolutionNote ? `📝 *Nota:* ${resolutionNote}\n\n` : ''}Si necesitas algo más en el futuro, no dudes en contactarnos.\n\n⭐ _¡Nos encantaría saber tu experiencia! Por favor califícanos del 1 al 4._\n\n¡Gracias por ser parte de PNP! 💜`;
+      ? `✅ *Case Resolved*\n\nYour support ticket has been marked as resolved by ${adminName}.\n\n${safeResolutionNote ? `📝 *Note:* ${safeResolutionNote}\n\n` : ''}If you need anything else in the future, don't hesitate to reach out.\n\n⭐ _We'd love to hear about your experience! Please rate us 1-4._\n\nThanks for being part of PNP! 💜`
+      : `✅ *Caso Resuelto*\n\nTu ticket de soporte ha sido marcado como resuelto por ${adminName}.\n\n${safeResolutionNote ? `📝 *Nota:* ${safeResolutionNote}\n\n` : ''}Si necesitas algo más en el futuro, no dudes en contactarnos.\n\n⭐ _¡Nos encantaría saber tu experiencia! Por favor califícanos del 1 al 4._\n\n¡Gracias por ser parte de PNP! 💜`;
 
     const ratingButtons = [
       { text: '⭐️', callback_data: `rate_ticket:${userId}:1` },
@@ -284,10 +285,10 @@ _El usuario ha sido notificado._`, {
 
       await ctx.reply(`✅ *Caso Resuelto*
 
-👤 *Usuario:* ${userName} (\`${userId}\`)
+👤 *Usuario:* ${userName} (\`${escapeMarkdown(String(userId))}\`)
 ⏱️ *Tiempo de resolución:* ${resolutionTime}
 👨‍💼 *Resuelto por:* ${adminName}
-${resolutionNote ? `📝 *Nota:* ${resolutionNote}` : ''}
+${safeResolutionNote ? `📝 *Nota:* ${safeResolutionNote}` : ''}
 
 _El usuario ha sido notificado y se le pidió calificación._
 _El topic ha sido cerrado._`, {

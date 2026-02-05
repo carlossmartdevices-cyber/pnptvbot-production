@@ -90,6 +90,7 @@ const registerModelManagementHandlers = (bot) => {
    */
   bot.on('text', async (ctx, next) => {
     try {
+      if (ctx.chat?.type && ctx.chat.type !== 'private') return next();
       if (!ctx.session.addModelStep) return next();
 
       const step = ctx.session.addModelStep;

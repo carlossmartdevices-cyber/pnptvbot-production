@@ -5,6 +5,8 @@
 
 const { Markup } = require('telegraf');
 const PromoService = require('../../services/promoService');
+const PromoModel = require('../../../models/promoModel');
+const PlanModel = require('../../../models/planModel');
 const logger = require('../../../utils/logger');
 
 /**
@@ -12,6 +14,71 @@ const logger = require('../../../utils/logger');
  */
 function getLanguage(ctx) {
   return ctx.session?.language || ctx.from?.language_code || 'en';
+}
+
+async function sendAnyPlanSelection(ctx, promo, remainingSpots, lang) {
+  const plans = await PlanModel.getPublicPlans();
+  const availablePlans = plans && plans.length > 0 ? plans : await PlanModel.getAll();
+
+  let message = lang === 'es'
+    ? `*OFERTA ESPECIAL!*\n\n`
+    : `*SPECIAL OFFER!*\n\n`;
+
+  const promoName = lang === 'es' ? (promo.nameEs || promo.name) : promo.name;
+  const promoDesc = lang === 'es' ? (promo.descriptionEs || promo.description) : promo.description;
+
+  message += `*${promoName}*\n`;
+  if (promoDesc) {
+    message += `${promoDesc}\n`;
+  }
+  message += `━━━━━━━━━━━━━━━━━━\n\n`;
+  message += lang === 'es'
+    ? `*Descuento:* ${promo.discountValue}% en cualquier plan\n\n`
+    : `*Discount:* ${promo.discountValue}% off any plan\n\n`;
+
+  if (remainingSpots !== null && remainingSpots <= 20) {
+    message += lang === 'es'
+      ? `*Solo ${remainingSpots} cupo${remainingSpots !== 1 ? 's' : ''} disponible${remainingSpots !== 1 ? 's' : ''}!*\n`
+      : `*Only ${remainingSpots} spot${remainingSpots !== 1 ? 's' : ''} left!*\n`;
+  }
+
+  if (promo.validUntil) {
+    const expiryDate = new Date(promo.validUntil);
+    const expiryStr = expiryDate.toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    message += lang === 'es'
+      ? `Valido hasta: ${expiryStr}\n`
+      : `Valid until: ${expiryStr}\n`;
+  }
+
+  message += lang === 'es'
+    ? '\nSelecciona el plan que quieres comprar:'
+    : '\nSelect the plan you want to purchase:';
+
+  const buttons = availablePlans.map((plan) => {
+    const price = PromoModel.calculatePriceForPlan(promo, plan);
+    const planLabel = lang === 'es' && plan.nameEs ? plan.nameEs : plan.name;
+    const label = `${planLabel} - $${price.finalPrice}`;
+    return [Markup.button.callback(label, `promo_select_plan_${promo.code}|${plan.id}`)];
+  });
+
+  buttons.push([
+    Markup.button.callback(lang === 'es' ? 'Menu Principal' : 'Main Menu', 'menu:back'),
+  ]);
+
+  const options = {
+    parse_mode: 'Markdown',
+    ...Markup.inlineKeyboard(buttons),
+  };
+
+  if (ctx.callbackQuery?.message) {
+    await ctx.editMessageText(message, options);
+  } else {
+    await ctx.reply(message, options);
+  }
 }
 
 /**
@@ -79,6 +146,12 @@ async function handlePromoDeepLink(ctx, promoCode) {
 
     // Show promo offer
     const { promo, pricing, remainingSpots, basePlan } = result;
+
+    // Any-plan promo flow: let user choose plan
+    if (PromoModel.isAnyPlanPromo(promo)) {
+      await sendAnyPlanSelection(ctx, promo, remainingSpots, lang);
+      return;
+    }
 
     // Build message
     const promoName = lang === 'es' ? (promo.nameEs || promo.name) : promo.name;
@@ -192,13 +265,14 @@ async function handlePromoPayment(ctx, provider) {
       return;
     }
 
-    const promoCode = ctx.match[1];
+    const raw = ctx.match[1];
+    const [promoCode, planId] = raw.split('|');
     const userId = ctx.from.id.toString();
     const chatId = ctx.chat?.id;
 
     await ctx.editMessageText(lang === 'es' ? 'Procesando...' : 'Processing...');
 
-    const result = await PromoService.initiatePromoPayment(promoCode, userId, provider, chatId);
+    const result = await PromoService.initiatePromoPayment(promoCode, userId, provider, chatId, planId || null);
 
     if (result.success) {
       const successMessage = lang === 'es'
@@ -257,6 +331,96 @@ async function handlePromoPayment(ctx, provider) {
  * Register promo payment action handlers
  */
 function registerPromoHandlers(bot) {
+  // Select plan for any-plan promo
+  bot.action(/^promo_select_plan_(.+)$/, async (ctx) => {
+    const lang = getLanguage(ctx);
+    try {
+      await ctx.answerCbQuery();
+      const raw = ctx.match?.[1] || '';
+      const [promoCode, planId] = raw.split('|');
+      if (!promoCode || !planId) {
+        return;
+      }
+
+      const userId = ctx.from.id.toString();
+      const promoDetails = await PromoService.getPromoForUser(promoCode, userId);
+      if (!promoDetails.success) {
+        await ctx.reply(lang === 'es' ? 'Promo no disponible.' : 'Promo not available.');
+        return;
+      }
+
+      const promo = promoDetails.promo;
+      const plan = await PlanModel.getById(planId);
+      if (!plan) {
+        await ctx.reply(lang === 'es' ? 'Plan no encontrado.' : 'Plan not found.');
+        return;
+      }
+
+      const pricing = PromoModel.calculatePriceForPlan(promo, plan);
+      const promoName = lang === 'es' ? (promo.nameEs || promo.name) : promo.name;
+      const promoDesc = lang === 'es' ? (promo.descriptionEs || promo.description) : promo.description;
+      const planName = lang === 'es' && plan.nameEs ? plan.nameEs : plan.name;
+
+      let message = lang === 'es'
+        ? `*OFERTA ESPECIAL!*\n\n`
+        : `*SPECIAL OFFER!*\n\n`;
+
+      message += `*${promoName}*\n`;
+      if (promoDesc) message += `${promoDesc}\n`;
+      message += `━━━━━━━━━━━━━━━━━━\n\n`;
+      message += `${lang === 'es' ? 'Plan' : 'Plan'}: *${planName}*\n`;
+      message += lang === 'es'
+        ? `Precio Original: ~$${pricing.originalPrice}~\n`
+        : `Original Price: ~$${pricing.originalPrice}~\n`;
+      message += lang === 'es'
+        ? `*Tu Precio: $${pricing.finalPrice}*\n`
+        : `*Your Price: $${pricing.finalPrice}*\n`;
+      message += lang === 'es'
+        ? `Ahorras: $${pricing.discountAmount}\n\n`
+        : `You Save: $${pricing.discountAmount}\n\n`;
+
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback(
+          lang === 'es' ? `Pagar $${pricing.finalPrice} con Tarjeta` : `Pay $${pricing.finalPrice} with Card`,
+          `promo_pay_epayco_${promo.code}|${plan.id}`
+        )],
+        [Markup.button.callback(
+          lang === 'es' ? `Pagar $${pricing.finalPrice} con Crypto` : `Pay $${pricing.finalPrice} with Crypto`,
+          `promo_pay_daimo_${promo.code}|${plan.id}`
+        )],
+        [Markup.button.callback(lang === 'es' ? '◀️ Elegir otro plan' : '◀️ Choose another plan', `promo_select_any_${promo.code}`)],
+        [Markup.button.callback(lang === 'es' ? 'Menu Principal' : 'Main Menu', 'menu:back')],
+      ]);
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...keyboard,
+      });
+    } catch (error) {
+      logger.error('Error selecting promo plan:', error);
+      await ctx.reply(lang === 'es' ? 'Error al cargar el plan.' : 'Error loading plan.');
+    }
+  });
+
+  // Re-open any-plan selection
+  bot.action(/^promo_select_any_(.+)$/, async (ctx) => {
+    const lang = getLanguage(ctx);
+    try {
+      await ctx.answerCbQuery();
+      const promoCode = ctx.match?.[1];
+      if (!promoCode) return;
+      const userId = ctx.from.id.toString();
+      const promoDetails = await PromoService.getPromoForUser(promoCode, userId);
+      if (!promoDetails.success) {
+        await ctx.reply(lang === 'es' ? 'Promo no disponible.' : 'Promo not available.');
+        return;
+      }
+      await sendAnyPlanSelection(ctx, promoDetails.promo, promoDetails.remainingSpots, lang);
+    } catch (error) {
+      logger.error('Error reopening promo plan selection:', error);
+    }
+  });
+
   // Pay with ePayco (credit card)
   bot.action(/^promo_pay_epayco_(.+)$/, async (ctx) => {
     await handlePromoPayment(ctx, 'epayco');

@@ -139,8 +139,11 @@ const registerBroadcastHandlers = (bot) => {
       }
 
       ctx.session.temp.isRecurring = false;
+      ctx.session.temp.schedulingContext = 'single';
       ctx.session.temp.scheduledTimes = [];
       ctx.session.temp.scheduleCount = 1;
+      ctx.session.temp.schedulingStep = 'selecting_datetime';
+      ctx.session.temp.timezone = null;
       await ctx.saveSession();
 
       await ctx.answerCbQuery();
@@ -176,6 +179,7 @@ const registerBroadcastHandlers = (bot) => {
       }
 
       ctx.session.temp.broadcastStep = 'schedule_count';
+      ctx.session.temp.schedulingContext = 'multi';
       ctx.session.temp.isRecurring = false;
       ctx.session.temp.scheduledTimes = [];
       await ctx.saveSession();
@@ -219,6 +223,7 @@ const registerBroadcastHandlers = (bot) => {
 
       ctx.session.temp.broadcastStep = 'recurring_pattern';
       ctx.session.temp.isRecurring = true;
+      ctx.session.temp.schedulingContext = 'recurring_start';
       await ctx.saveSession();
 
       await ctx.answerCbQuery();
@@ -422,32 +427,22 @@ const registerBroadcastHandlers = (bot) => {
 
         ctx.session.temp.timezone = tz;
         ctx.session.temp.broadcastStep = 'recurring_start_datetime';
+        ctx.session.temp.schedulingContext = 'recurring_start';
+        ctx.session.temp.schedulingStep = 'selecting_datetime';
         await ctx.saveSession();
 
         await ctx.answerCbQuery();
 
-        const patternLabel = patternLabels[ctx.session.temp.recurrencePattern] || ctx.session.temp.recurrencePattern;
-        const maxLabel = ctx.session.temp.maxOccurrences
-          ? `${ctx.session.temp.maxOccurrences} veces`
-          : 'Sin límite';
+        const lang = ctx.session?.language || 'es';
+        const dateTimePicker = require('../../utils/dateTimePicker');
+        const PREFIX = 'bcast_sched';
 
-        await ctx.editMessageText(
-          `🔄 *Broadcast Recurrente - ${patternLabel}*\n\n`
-          + `📊 Repeticiones: ${maxLabel}\n`
-          + `🌍 Zona horaria: ${tz}\n\n`
-          + 'Por favor envía la fecha y hora de inicio:\n\n'
-          + '`YYYY-MM-DD HH:MM`\n\n'
-          + '*Ejemplos:*\n'
-          + '• `2025-12-15 14:30` (15 dic 2025, 2:30 PM)\n'
-          + '• `2025-12-25 09:00` (25 dic 2025, 9:00 AM)\n\n'
-          + '💡 El primer envío será en esta fecha/hora',
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
-            ]),
-          }
-        );
+        const { text, keyboard } = dateTimePicker.getSchedulingMenu(lang, PREFIX);
+
+        await ctx.editMessageText(text, {
+          parse_mode: 'Markdown',
+          ...keyboard,
+        });
       } catch (error) {
         logger.error('Error selecting timezone:', error);
         await ctx.answerCbQuery('❌ Error').catch(() => {});
@@ -473,29 +468,23 @@ const registerBroadcastHandlers = (bot) => {
         ctx.session.temp.scheduleCount = i;
         ctx.session.temp.scheduledTimes = [];
         ctx.session.temp.currentScheduleIndex = 0;
+        ctx.session.temp.schedulingContext = 'multi';
+        ctx.session.temp.schedulingStep = 'selecting_datetime';
+        ctx.session.temp.timezone = null;
         await ctx.saveSession();
 
         await ctx.answerCbQuery();
 
-        // Show timezone selection for one-time schedules
-        await ctx.editMessageText(
-          '🌍 *Zona Horaria*\n\n'
-          + `Programando ${i} broadcast(s)\n\n`
-          + 'Selecciona la zona horaria para la programación:\n\n'
-          + '⏰ Las horas que ingreses serán interpretadas en esta zona',
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback('🌎 América/New York (EST)', 'onetime_tz_America/New_York')],
-              [Markup.button.callback('🌎 América/Los Angeles (PST)', 'onetime_tz_America/Los_Angeles')],
-              [Markup.button.callback('🌎 América/Mexico City (CST)', 'onetime_tz_America/Mexico_City')],
-              [Markup.button.callback('🌍 Europa/Madrid (CET)', 'onetime_tz_Europe/Madrid')],
-              [Markup.button.callback('🌍 Europa/London (GMT)', 'onetime_tz_Europe/London')],
-              [Markup.button.callback('🌏 UTC', 'onetime_tz_UTC')],
-              [Markup.button.callback('◀️ Volver', 'schedule_type_once')],
-            ]),
-          }
-        );
+        const lang = ctx.session?.language || 'es';
+        const dateTimePicker = require('../../utils/dateTimePicker');
+        const PREFIX = 'bcast_sched';
+
+        const { text, keyboard } = dateTimePicker.getSchedulingMenu(lang, PREFIX);
+
+        await ctx.editMessageText(text, {
+          parse_mode: 'Markdown',
+          ...keyboard,
+        });
       } catch (error) {
         logger.error('Error selecting schedule count:', error);
         await ctx.answerCbQuery('❌ Error').catch(() => {});
@@ -609,6 +598,7 @@ const registerBroadcastHandlers = (bot) => {
           mediaFileId: broadcastData.mediaFileId || null,
           s3Key: broadcastData.s3Key || null,
           s3Bucket: broadcastData.s3Bucket || null,
+          includeFilters: broadcastData.includeFilters || {},
           scheduledAt: scheduledDate,
           timezone: timezone,
         });
@@ -651,7 +641,7 @@ const registerBroadcastHandlers = (bot) => {
           ? `✅ *Broadcast Programado*\n\n` +
             `📅 ${formattedDate}\n` +
             `🌍 ${timezone}\n` +
-            `🎯 Audiencia: ${broadcastTarget === 'all' ? 'Todos' : broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Gratis' : broadcastTarget}\n` +
+            `🎯 Audiencia: ${broadcastTarget === 'all' ? 'Todos' : broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Gratis' : broadcastTarget === 'payment_incomplete' ? 'Pagos no completados' : broadcastTarget}\n` +
             `🆔 ID: \`${broadcast.broadcast_id}\`\n` +
             `${broadcastData.mediaType ? `📎 Con media (${broadcastData.mediaType})` : '📝 Solo texto'}\n` +
             `${broadcastData.s3Key ? '☁️ Almacenado en S3\n' : ''}` +
@@ -659,7 +649,7 @@ const registerBroadcastHandlers = (bot) => {
           : `✅ *Broadcast Scheduled*\n\n` +
             `📅 ${formattedDate}\n` +
             `🌍 ${timezone}\n` +
-            `🎯 Audience: ${broadcastTarget === 'all' ? 'All' : broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Free' : broadcastTarget}\n` +
+            `🎯 Audience: ${broadcastTarget === 'all' ? 'All' : broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Free' : broadcastTarget === 'payment_incomplete' ? 'Payment Not Completed' : broadcastTarget}\n` +
             `🆔 ID: \`${broadcast.broadcast_id}\`\n` +
             `${broadcastData.mediaType ? `📎 With media (${broadcastData.mediaType})` : '📝 Text only'}\n` +
             `${broadcastData.s3Key ? '☁️ Stored in S3\n' : ''}` +
@@ -780,6 +770,7 @@ async function sendBroadcastNow(ctx, bot) {
       mediaFileId: broadcastData.mediaFileId || null,
       s3Key: broadcastData.s3Key || null,
       s3Bucket: broadcastData.s3Bucket || null,
+      includeFilters: broadcastData.includeFilters || {},
       scheduledAt: null, // Immediate
       timezone: 'UTC',
     });
@@ -824,7 +815,7 @@ async function sendBroadcastNow(ctx, bot) {
       + `🚫 Bloqueados: ${results.blocked}\n`
       + `👤 Desactivados: ${results.deactivated}\n`
       + `📈 Total intentos: ${results.total}\n\n`
-      + `🎯 Audiencia: ${broadcastTarget}\n`
+      + `🎯 Audiencia: ${broadcastTarget === 'all' ? 'Todos' : broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Gratis' : broadcastTarget === 'payment_incomplete' ? 'Pagos no completados' : broadcastTarget}\n`
       + `🆔 ID: \`${broadcast.broadcast_id}\`\n`
       + `${broadcastData.mediaType ? `📎 Con media (${broadcastData.mediaType})` : '📝 Solo texto'}\n`
       + `${broadcastData.s3Key ? '☁️ Almacenado en S3' : ''}`,
@@ -877,6 +868,7 @@ async function scheduleBroadcastForLater(ctx, scheduledDate) {
       mediaFileId: broadcastData.mediaFileId || null,
       s3Key: broadcastData.s3Key || null,
       s3Bucket: broadcastData.s3Bucket || null,
+      includeFilters: broadcastData.includeFilters || {},
       scheduledAt: scheduledDate,
       timezone: 'UTC',
     });
@@ -896,7 +888,7 @@ async function scheduleBroadcastForLater(ctx, scheduledDate) {
     await ctx.reply(
       `✅ *Broadcast Programado*\n\n`
       + `📅 Fecha programada: ${scheduledDate.toLocaleString('es-ES', { timeZone: 'UTC' })} UTC\n`
-      + `🎯 Audiencia: ${broadcastTarget}\n`
+      + `🎯 Audiencia: ${broadcastTarget === 'all' ? 'Todos' : broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Gratis' : broadcastTarget === 'payment_incomplete' ? 'Pagos no completados' : broadcastTarget}\n`
       + `🆔 ID: \`${broadcast.broadcast_id}\`\n`
       + `${broadcastData.mediaType ? `📎 Con media (${broadcastData.mediaType})` : '📝 Solo texto'}\n`
       + `${broadcastData.s3Key ? '☁️ Almacenado en S3\n' : ''}`

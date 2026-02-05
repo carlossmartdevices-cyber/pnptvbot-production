@@ -11,7 +11,10 @@ class PerformanceMonitor {
    * @param {string} operationName - Name of the operation to time
    */
   start(operationName) {
-    this.startTimes[operationName] = process.hrtime();
+    if (!this.startTimes[operationName]) {
+      this.startTimes[operationName] = [];
+    }
+    this.startTimes[operationName].push(process.hrtime());
   }
 
   /**
@@ -20,12 +23,13 @@ class PerformanceMonitor {
    * @param {Object} [context] - Additional context for logging
    */
   end(operationName, context = {}) {
-    const startTime = this.startTimes[operationName];
-    if (!startTime) {
+    const startTimes = this.startTimes[operationName];
+    if (!startTimes || startTimes.length === 0) {
       logger.warn(`Performance monitoring: No start time found for ${operationName}`);
       return;
     }
 
+    const startTime = startTimes.pop();
     const diff = process.hrtime(startTime);
     const durationMs = (diff[0] * 1000) + (diff[1] / 1000000);
     
@@ -40,7 +44,9 @@ class PerformanceMonitor {
       logger.debug(`Performance: ${operationName} took ${durationMs.toFixed(2)}ms`, context);
     }
     
-    delete this.startTimes[operationName];
+    if (startTimes.length === 0) {
+      delete this.startTimes[operationName];
+    }
     return durationMs;
   }
 

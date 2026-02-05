@@ -1009,6 +1009,10 @@ const showPrivacySettings = async (ctx) => {
 
     await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
   } catch (error) {
+    const description = error?.response?.description || error?.description || error?.message || '';
+    if (String(description).toLowerCase().includes('message is not modified')) {
+      return;
+    }
     logger.error('Error showing privacy settings:', error);
   }
 };

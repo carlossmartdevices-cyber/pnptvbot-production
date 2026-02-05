@@ -170,6 +170,28 @@ CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
 CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments(created_at);
 CREATE INDEX IF NOT EXISTS idx_payments_provider ON payments(provider);
 
+-- Payment webhook events (audit all payment attempts)
+CREATE TABLE IF NOT EXISTS payment_webhook_events (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  provider VARCHAR(50) NOT NULL,
+  event_id VARCHAR(255),
+  payment_id UUID,
+  status VARCHAR(50),
+  state_code VARCHAR(50),
+  is_valid_signature BOOLEAN DEFAULT TRUE,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_webhook_events_provider
+  ON payment_webhook_events(provider);
+CREATE INDEX IF NOT EXISTS idx_payment_webhook_events_event_id
+  ON payment_webhook_events(event_id);
+CREATE INDEX IF NOT EXISTS idx_payment_webhook_events_payment_id
+  ON payment_webhook_events(payment_id);
+CREATE INDEX IF NOT EXISTS idx_payment_webhook_events_created_at
+  ON payment_webhook_events(created_at DESC);
+
 -- Calls table
 CREATE TABLE IF NOT EXISTS calls (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

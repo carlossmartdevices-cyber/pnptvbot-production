@@ -379,12 +379,14 @@ function getConfirmationView(scheduledDate, timezone, lang = 'es', prefix = 'sch
       `Is this correct?`;
 
   const confirmButton = lang === 'es' ? '✅ Confirmar' : '✅ Confirm';
-  const changeButton = lang === 'es' ? '✏️ Cambiar' : '✏️ Change';
+  const changeButton = lang === 'es' ? '✏️ Cambiar hora' : '✏️ Change time';
+  const changeTzButton = lang === 'es' ? '🌍 Cambiar zona' : '🌍 Change timezone';
   const cancelButton = lang === 'es' ? '❌ Cancelar' : '❌ Cancel';
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback(confirmButton, `${prefix}_confirm`)],
     [Markup.button.callback(changeButton, `${prefix}_back_to_presets`)],
+    [Markup.button.callback(changeTzButton, `${prefix}_change_tz`)],
     [Markup.button.callback(cancelButton, 'admin_cancel')],
   ]);
 

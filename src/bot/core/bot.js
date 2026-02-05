@@ -7,7 +7,7 @@ const path = require('path');
 dns.setDefaultResultOrder('ipv4first');
 
 require('dotenv').config({ allowEmptyValues: true });
-const { Telegraf } = require('telegraf');
+const { Telegraf, Markup } = require('telegraf');
 const ADMIN_USER_IDS = [
   ...(process.env.ADMIN_USER_IDS || '').split(','),
   ...(process.env.ADMIN_IDS || '').split(','),
@@ -21,6 +21,7 @@ const { userExistsMiddleware } = require('./middleware/userExistsMiddleware');
 const globalBanCheck = require('./middleware/globalBanCheck');
 const rateLimitMiddleware = require('./middleware/rateLimit');
 const chatCleanupMiddleware = require('./middleware/chatCleanup');
+const privateOutboundGuardMiddleware = require('./middleware/privateOutboundGuard');
 const moderationFilter = require('./middleware/moderationFilter');
 const groupCommandReminder = require('./middleware/groupCommandReminder');
 const errorHandler = require('./middleware/errorHandler');
@@ -74,6 +75,7 @@ const registerCallFeedbackHandlers = require('../handlers/user/callFeedback');
 const registerCallPackageHandlers = require('../handlers/user/callPackages');
 const { registerPromoHandlers } = require('../handlers/promo/promoHandler');
 const { getLanguage } = require('../utils/helpers');
+const { t } = require('../../utils/i18n');
 const { buildOnboardingPrompt } = require('../handlers/user/menu');
 const UserService = require('../services/userService');
 // Middleware
@@ -279,6 +281,25 @@ const startBot = async () => {
     // Create bot instance
     const bot = new Telegraf(process.env.BOT_TOKEN);
 
+    // Global safeguard: ignore "message is not modified" errors on edits
+    bot.use(async (ctx, next) => {
+      if (ctx.editMessageText) {
+        const originalEditMessageText = ctx.editMessageText.bind(ctx);
+        ctx.editMessageText = async (...args) => {
+          try {
+            return await originalEditMessageText(...args);
+          } catch (error) {
+            const description = error?.response?.description || error?.description || error?.message || '';
+            if (String(description).toLowerCase().includes('message is not modified')) {
+              return null;
+            }
+            throw error;
+          }
+        };
+      }
+      return next();
+    });
+
     // FIX: Register /menu command early to avoid middleware conflicts
     const { showMainMenu: showPrivateMenu } = require('../handlers/user/menu');
     bot.command('menu', async (ctx) => {
@@ -329,6 +350,7 @@ const startBot = async () => {
 
     // Register middleware
     bot.use(sessionMiddleware());
+    bot.use(privateOutboundGuardMiddleware());
     bot.use(userExistsMiddleware()); // Check if user exists in DB, force onboarding if not
     bot.use(globalBanCheck()); // Block globally banned users
     bot.use(rateLimitMiddleware());
@@ -450,9 +472,71 @@ const startBot = async () => {
         return next();
       }
 
-      // Let specialized support handlers process text flows
+      // Handle support-intent text flows here to avoid double-processing
       if (ctx.message?.text && (isContactingAdmin || isRequestingActivation || isReplyToSupport)) {
-        return next();
+        const lang = getLanguage(ctx);
+
+        if (isReplyToSupport) {
+          try {
+            await supportRoutingService.forwardUserMessage(ctx, 'text', 'support');
+            const confirmMsg = lang === 'es'
+              ? '✅ Tu respuesta ha sido enviada al equipo de soporte.'
+              : '✅ Your reply has been sent to the support team.';
+            await ctx.reply(confirmMsg, { reply_to_message_id: ctx.message.message_id });
+          } catch (error) {
+            logger.error('Error forwarding user reply to support:', error);
+          }
+          return;
+        }
+
+        try {
+          const requestType = isRequestingActivation ? 'activation' : 'support';
+          const message = ctx.message.text;
+          let supportTopic = null;
+          try {
+            supportTopic = await supportRoutingService.sendToSupportGroup(message, requestType, ctx.from, 'text', ctx);
+          } catch (routingError) {
+            logger.error('Failed to send message to support group:', routingError.message);
+          }
+
+          const adminIds = process.env.ADMIN_USER_IDS?.split(',').filter((id) => id.trim()) || [];
+          for (const adminId of adminIds) {
+            try {
+              const escapedUsername = ctx.from.username ? ctx.from.username.replace(/@/g, '\\@') : 'no username';
+              const prefix = requestType === 'activation' ? '🎁 Activation Request' : '📬 Support Message';
+              await ctx.telegram.sendMessage(adminId.trim(), `${prefix} from User ${ctx.from.id} (@${escapedUsername}):\n\n${message}`);
+            } catch (sendError) {
+              logger.error('Error sending to admin:', sendError);
+            }
+          }
+
+          if (ctx.session?.temp) {
+            ctx.session.temp.contactingAdmin = false;
+            ctx.session.temp.requestingActivation = false;
+          }
+          if (ctx.session?.awaitingSupportMessage) {
+            ctx.session.awaitingSupportMessage = false;
+          }
+          await ctx.saveSession();
+
+          const replyInstructions = lang === 'es'
+            ? '\n\n💡 *Para responder:* Mantén presionado el mensaje de soporte y selecciona "Responder".'
+            : '\n\n💡 *To reply:* Tap and hold the support message and select "Reply".';
+
+          const confirmationMessage = supportTopic
+            ? (lang === 'es'
+                ? `✅ *Mensaje enviado*\n\n🎫 Tu ticket de soporte: #${supportTopic.thread_id}\n\nNuestro equipo te responderá pronto. Recibirás las respuestas directamente aquí.${replyInstructions}`
+                : `✅ *Message sent*\n\n🎫 Your support ticket: #${supportTopic.thread_id}\n\nOur team will respond shortly. You'll receive responses directly here.${replyInstructions}`)
+            : t('messageSent', lang);
+
+          await ctx.reply(confirmationMessage, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.callback(t('back', lang), 'show_support')]])
+          });
+        } catch (error) {
+          logger.error('Error processing support-intent text:', error);
+        }
+        return;
       }
 
       // Check if the message is media or text
@@ -512,7 +596,10 @@ const startBot = async () => {
     // Register support routing handlers (for forum topic-based support)
     registerSupportRoutingHandlers(bot);
 
-    // Start SLA monitor if configured
+    // Initialize support routing service with telegram instance
+    supportRoutingService.initialize(bot.telegram);
+    logger.info('✓ Support routing service initialized');
+    // Start SLA monitor if configured (after support routing is ready)
     const slaCheckInterval = parseInt(process.env.SLA_CHECK_INTERVAL) || 3600000;
     if (process.env.SUPPORT_GROUP_ID && process.env.SLA_MONITOR_ENABLED !== 'false') {
       slaMonitor.start(slaCheckInterval);
@@ -520,9 +607,6 @@ const startBot = async () => {
     } else {
       logger.info('SLA monitor disabled (SUPPORT_GROUP_ID not configured or SLA_MONITOR_ENABLED=false)');
     }
-    // Initialize support routing service with telegram instance
-    supportRoutingService.initialize(bot.telegram);
-    logger.info('✓ Support routing service initialized');
     // Setup age verification middleware for protected features
     setupAgeVerificationMiddleware(bot);
     logger.info('✓ Age verification middleware configured');

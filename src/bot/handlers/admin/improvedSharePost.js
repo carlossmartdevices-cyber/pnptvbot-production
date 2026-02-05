@@ -15,6 +15,7 @@ const performanceUtils = require('../../utils/performanceUtils');
 const uxUtils = require('../../utils/uxUtils');
 const XPostService = require('../../services/xPostService');
 const { registerXAccountHandlers } = require('./xAccountWizard');
+const dateTimePicker = require('../../utils/dateTimePicker');
 
 // Use shared utilities
 const {
@@ -675,6 +676,7 @@ const registerImprovedSharePostHandlers = (bot) => {
   // Text input handling
   bot.on('text', async (ctx, next) => {
     try {
+      if (ctx.chat?.type && ctx.chat.type !== 'private') return next();
       if (!ctx.session.temp?.sharePostStep) return next();
 
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
@@ -979,6 +981,7 @@ const registerImprovedSharePostHandlers = (bot) => {
   // Custom link text handling
   bot.on('text', async (ctx, next) => {
     try {
+      if (ctx.chat?.type && ctx.chat.type !== 'private') return next();
       if (!ctx.session.temp?.sharePostStep) return next();
 
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
@@ -1131,7 +1134,7 @@ const registerImprovedSharePostHandlers = (bot) => {
     }
   });
 
-  // Schedule for later
+  // Schedule for later (inline date/time picker)
   bot.action('share_post_schedule', async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
@@ -1140,81 +1143,272 @@ const registerImprovedSharePostHandlers = (bot) => {
         return;
       }
 
-      ctx.session.temp.sharePostStep = 'schedule_datetime';
+      ctx.session.temp.sharePostStep = 'schedule_datetime_picker';
+      ctx.session.temp.sharePostTimezone = ctx.session.temp.sharePostTimezone || DEFAULT_TZ;
       await ctx.saveSession();
 
       await ctx.answerCbQuery();
 
-      await ctx.editMessageText(
-        '📅 *Programar Publicacion*\n\n'
-        + 'Por favor envia la fecha y hora en el siguiente formato:\n\n'
-        + '`YYYY-MM-DD HH:MM`\n\n'
-        + '*Ejemplos:*\n'
-        + '• `2025-12-15 14:30` (15 dic 2025, 2:30 PM)\n'
-        + '• `2025-12-25 09:00` (25 dic 2025, 9:00 AM)\n\n'
-        + '⏰ *Zona horaria:* UTC\n\n'
-        + '💡 Tip: Asegurate de que la fecha sea en el futuro',
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('❌ Cancelar', 'share_post_cancel')],
-          ]),
-        }
-      );
-
-      ctx.session.temp.waitingForDateTime = true;
-      await ctx.saveSession();
+      const PREFIX = 'share_post_sched';
+      const { text, keyboard } = dateTimePicker.getSchedulingMenu('es', PREFIX);
+      await ctx.editMessageText(text, {
+        parse_mode: 'Markdown',
+        ...keyboard,
+      });
     } catch (error) {
       logger.error('Error scheduling post:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
 
-  // Handle datetime input for scheduling
+  // Inline picker handlers for scheduling
+  const SCHED_PREFIX = 'share_post_sched';
+  const DEFAULT_TZ = 'America/Bogota';
+  for (let i = 0; i < 6; i++) {
+    bot.action(`${SCHED_PREFIX}_preset_${i}`, async (ctx) => {
+      try {
+        const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+        if (!isAdmin) return;
+        await ctx.answerCbQuery();
+        const scheduledDate = dateTimePicker.calculatePresetDate(i);
+        if (!scheduledDate) return;
+        const tz = ctx.session.temp.sharePostTimezone || DEFAULT_TZ;
+        const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, tz, 'es', SCHED_PREFIX);
+        ctx.session.temp.sharePostTempDate = scheduledDate.toISOString();
+        await ctx.saveSession();
+        await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
+      } catch (error) {
+        logger.error('Error handling share post preset:', error);
+        await ctx.answerCbQuery('❌ Error').catch(() => {});
+      }
+    });
+  }
+
+  bot.action(`${SCHED_PREFIX}_open_calendar`, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery();
+      const now = new Date();
+      const { text, keyboard } = dateTimePicker.getCalendarView(now.getFullYear(), now.getMonth(), 'es', SCHED_PREFIX);
+      await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
+    } catch (error) {
+      logger.error('Error opening share post calendar:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  bot.action(new RegExp(`^${SCHED_PREFIX}_month_(\\d{4})_(-?\\d+)$`), async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery();
+      const parsed = dateTimePicker.parseMonthCallback(ctx.match[0]);
+      if (!parsed) return;
+      let { year, month } = parsed;
+      while (month < 0) { month += 12; year--; }
+      while (month > 11) { month -= 12; year++; }
+      const now = new Date();
+      if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth())) return;
+      const { text, keyboard } = dateTimePicker.getCalendarView(year, month, 'es', SCHED_PREFIX);
+      await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
+    } catch (error) {
+      logger.error('Error navigating share post month:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  bot.action(new RegExp(`^${SCHED_PREFIX}_date_(\\d{4})_(\\d+)_(\\d+)$`), async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery();
+      const parsed = dateTimePicker.parseDateCallback(ctx.match[0]);
+      if (!parsed) return;
+      const { year, month, day } = parsed;
+      const { text, keyboard } = dateTimePicker.getTimeSelectionView(year, month, day, 'es', SCHED_PREFIX);
+      await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
+    } catch (error) {
+      logger.error('Error selecting share post date:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  bot.action(new RegExp(`^${SCHED_PREFIX}_time_(\\d{4})-(\\d{2})-(\\d{2})_(\\d{2})_(\\d{2})$`), async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery();
+      const parsed = dateTimePicker.parseTimeCallback(ctx.match[0]);
+      if (!parsed) return;
+      const { year, month, day, hour, minute } = parsed;
+      const scheduledDate = new Date(year, month, day, hour, minute);
+      if (scheduledDate <= new Date()) {
+        await ctx.answerCbQuery('❌ La hora seleccionada ya pasó', { show_alert: true });
+        return;
+      }
+      const tz = ctx.session.temp.sharePostTimezone || DEFAULT_TZ;
+      const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, tz, 'es', SCHED_PREFIX);
+      ctx.session.temp.sharePostTempDate = scheduledDate.toISOString();
+      await ctx.saveSession();
+      await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
+    } catch (error) {
+      logger.error('Error selecting share post time:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  bot.action(new RegExp(`^${SCHED_PREFIX}_custom_time_(\\d{4})-(\\d{2})-(\\d{2})$`), async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery();
+      const match = ctx.match[0].match(/custom_time_(\d{4})-(\d{2})-(\d{2})/);
+      if (!match) return;
+      const [, year, month, day] = match;
+      ctx.session.temp.sharePostCustomDate = { year: parseInt(year, 10), month: parseInt(month, 10) - 1, day: parseInt(day, 10) };
+      ctx.session.temp.sharePostStep = 'schedule_custom_time';
+      await ctx.saveSession();
+      const monthName = dateTimePicker.MONTHS_FULL.es[parseInt(month, 10) - 1];
+      const formattedDate = `${day} ${monthName} ${year}`;
+      await ctx.editMessageText(
+        `⌨️ *Hora Personalizada*\n\n📅 Fecha: *${formattedDate}*\n\nEscribe la hora en formato HH:MM (24 horas)`,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Volver', `${SCHED_PREFIX}_date_${year}_${parseInt(month, 10) - 1}_${day}`)],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error requesting share post custom time:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  bot.action(`${SCHED_PREFIX}_confirm`, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery();
+      const scheduledIso = ctx.session.temp.sharePostTempDate;
+      if (!scheduledIso) return;
+      const scheduledDate = new Date(scheduledIso);
+      ctx.session.temp.sharePostData.scheduledAt = scheduledDate;
+      ctx.session.temp.sharePostData.isScheduled = true;
+      await ctx.saveSession();
+      await confirmScheduledPost(ctx);
+    } catch (error) {
+      logger.error('Error confirming share post schedule:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  bot.action(`${SCHED_PREFIX}_change_tz`, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await ctx.answerCbQuery();
+      await ctx.editMessageText(
+        '🌍 *Zona Horaria*\n\nSelecciona tu zona horaria:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🇨🇴 Bogotá', `${SCHED_PREFIX}_tz_America/Bogota`)],
+            [Markup.button.callback('🇺🇸 New York', `${SCHED_PREFIX}_tz_America/New_York`)],
+            [Markup.button.callback('🇺🇸 Los Angeles', `${SCHED_PREFIX}_tz_America/Los_Angeles`)],
+            [Markup.button.callback('🇲🇽 Mexico City', `${SCHED_PREFIX}_tz_America/Mexico_City`)],
+            [Markup.button.callback('🇪🇸 Madrid', `${SCHED_PREFIX}_tz_Europe/Madrid`)],
+            [Markup.button.callback('🇬🇧 London', `${SCHED_PREFIX}_tz_Europe/London`)],
+            [Markup.button.callback('🌐 UTC', `${SCHED_PREFIX}_tz_UTC`)],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error changing share post timezone:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  const sharePostTimezones = [
+    'America/Bogota',
+    'America/New_York',
+    'America/Los_Angeles',
+    'America/Mexico_City',
+    'Europe/Madrid',
+    'Europe/London',
+    'UTC',
+  ];
+
+  for (const tz of sharePostTimezones) {
+    bot.action(`${SCHED_PREFIX}_tz_${tz}`, async (ctx) => {
+      try {
+        const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+        if (!isAdmin) return;
+        await ctx.answerCbQuery();
+        ctx.session.temp.sharePostTimezone = tz;
+        await ctx.saveSession();
+        const scheduledIso = ctx.session.temp.sharePostTempDate;
+        if (!scheduledIso) return;
+        const scheduledDate = new Date(scheduledIso);
+        const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, tz, 'es', SCHED_PREFIX);
+        await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
+      } catch (error) {
+        logger.error('Error setting share post timezone:', error);
+        await ctx.answerCbQuery('❌ Error').catch(() => {});
+      }
+    });
+  }
+
+  // Handle custom time input (HH:MM)
   bot.on('text', async (ctx, next) => {
     try {
-      if (!ctx.session.temp?.waitingForDateTime) return next();
+      if (ctx.chat?.type && ctx.chat.type !== 'private') return next();
+      if (ctx.session.temp?.sharePostStep !== 'schedule_custom_time') return next();
 
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return next();
 
-      const dateTimeStr = ctx.message.text.trim();
-      
-      // Check if this is a command (starts with /) - if so, pass to other handlers
-      if (dateTimeStr && dateTimeStr.startsWith('/')) {
-        return next();
-      }
+      const input = ctx.message.text.trim();
+      if (input.startsWith('/')) return next();
 
-      const dateTimeRegex = /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2})$/;
-
-      if (!dateTimeRegex.test(dateTimeStr)) {
-        await ctx.reply('❌ Formato invalido. Usa: YYYY-MM-DD HH:MM');
+      const match = input.match(/^(\d{1,2}):(\d{2})$/);
+      if (!match) {
+        await ctx.reply('❌ Formato inválido. Usa HH:MM (24 horas).');
         return;
       }
 
-      const dateTime = new Date(dateTimeStr + ' UTC');
-      if (isNaN(dateTime.getTime())) {
-        await ctx.reply('❌ Fecha/hora invalida');
+      const hour = parseInt(match[1], 10);
+      const minute = parseInt(match[2], 10);
+      if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+        await ctx.reply('❌ Hora inválida. Usa HH:MM (00-23 / 00-59).');
         return;
       }
 
-      if (dateTime <= new Date()) {
-        await ctx.reply('❌ La fecha debe estar en el futuro');
+      const dateInfo = ctx.session.temp.sharePostCustomDate;
+      if (!dateInfo) {
+        await ctx.reply('❌ Sesión expirada. Selecciona la fecha de nuevo.');
         return;
       }
 
-      ctx.session.temp.sharePostData.scheduledAt = dateTime;
-      ctx.session.temp.sharePostData.isScheduled = true;
-      ctx.session.temp.waitingForDateTime = false;
+      const scheduledDate = new Date(dateInfo.year, dateInfo.month, dateInfo.day, hour, minute);
+      if (scheduledDate <= new Date()) {
+        await ctx.reply('❌ La fecha debe estar en el futuro.');
+        return;
+      }
+
+      ctx.session.temp.sharePostTempDate = scheduledDate.toISOString();
+      ctx.session.temp.sharePostStep = 'schedule_datetime_picker';
       await ctx.saveSession();
 
-      await ctx.reply('✅ Fecha programada');
-      await confirmScheduledPost(ctx);
+      const tz = ctx.session.temp.sharePostTimezone || DEFAULT_TZ;
+      const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, tz, 'es', SCHED_PREFIX);
+      await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
       return;
     } catch (error) {
-      logger.error('Error handling datetime input:', error);
-      await ctx.reply('❌ Error al procesar la fecha').catch(() => {});
-      return next(); // Pass to other handlers even on error
+      logger.error('Error handling share post custom time input:', error);
+      await ctx.reply('❌ Error al procesar la hora').catch(() => {});
+      return next();
     }
   });
 
@@ -1227,7 +1421,7 @@ const registerImprovedSharePostHandlers = (bot) => {
 
       await ctx.reply(
         '📅 *Publicación Programada*\n\n'
-        + '🗓️ Fecha: ' + scheduledAt.toISOString().replace('T', ' ').substring(0, 16) + ' UTC\n'
+        + '🗓️ Fecha: ' + scheduledAt.toISOString().replace('T', ' ').substring(0, 16) + ` ${ctx.session.temp.sharePostTimezone || DEFAULT_TZ}\n`
         + '📢 Destinos: ' + destinations.length + '\n\n'
         + '✅ ¿Confirmar programación?',
         {
@@ -1299,7 +1493,7 @@ const registerImprovedSharePostHandlers = (bot) => {
         try {
           // No parse_mode to avoid Markdown conflicts with AI-generated text
           const options = {
-            reply_markup: kb.reply_markup,
+            ...(kb?.reply_markup ? { reply_markup: kb.reply_markup } : {}),
           };
 
           // Add thread_id for topics

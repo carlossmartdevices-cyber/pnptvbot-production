@@ -174,7 +174,7 @@ Manually confirm that you are of legal age.
 How would you like to verify your age?`;
 
   const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
-  const cameraUrl = `${webhookDomain}/age-verification-camera.html?user_id=${ctx.from.id}&token=${ctx.session?.token}&lang=${lang}`;
+  const cameraUrl = `${webhookDomain}/age-verification-camera.html?user_id=${ctx.from.id}&lang=${lang}`;
 
   await ctx.reply(
     message,

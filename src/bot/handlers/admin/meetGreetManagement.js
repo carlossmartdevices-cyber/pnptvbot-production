@@ -96,6 +96,7 @@ const registerMeetGreetManagementHandlers = (bot) => {
    */
   bot.on('text', async (ctx, next) => {
     try {
+      if (ctx.chat?.type && ctx.chat.type !== 'private') return next();
       if (!ctx.session.meetGreetAdmin || !ctx.session.meetGreetAdmin.step) {
         return next();
       }
@@ -1031,6 +1032,7 @@ const registerMeetGreetManagementHandlers = (bot) => {
    */
   bot.on('text', async (ctx, next) => {
     try {
+      if (ctx.chat?.type && ctx.chat.type !== 'private') return next();
       if (!ctx.session.meetGreetAdmin || !ctx.session.meetGreetAdmin.editStep) {
         return next();
       }

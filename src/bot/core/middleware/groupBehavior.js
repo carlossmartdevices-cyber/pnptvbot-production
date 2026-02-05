@@ -31,15 +31,8 @@ function primeChannelSilentRedirectMiddleware() {
     }
 
     const userId = ctx.from?.id;
-    const isAdmin = userId && (
-      PermissionService.isEnvSuperAdmin(userId) ||
-      PermissionService.isEnvAdmin(userId)
-    );
 
-    // Admins can use bot normally in PRIME channel
-    if (isAdmin) {
-      return next();
-    }
+    // PRIME channel must stay clean: block bot responses for everyone
 
     // BLOCK ALL BOT RESPONSES IN PRIME CHANNEL
     // Override ctx.reply to silently block any message

@@ -6,7 +6,10 @@ const UserModel = require('../../../models/userModel');
 const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
 const ModerationModel = require('../../../models/moderationModel');
+const PaymentWebhookEventModel = require('../../../models/paymentWebhookEventModel');
 const PaymentService = require('../../services/paymentService');
+const PromoService = require('../../services/promoService');
+const PromoModel = require('../../../models/promoModel');
 const adminService = require('../../services/adminService');
 const { getBroadcastQueueIntegration } = require('../../services/broadcastQueueIntegration');
 const BroadcastService = require('../../services/broadcastService');
@@ -19,6 +22,7 @@ const broadcastUtils = require('../../utils/broadcastUtils');
 const performanceUtils = require('../../utils/performanceUtils');
 const uxUtils = require('../../utils/uxUtils');
 const BroadcastButtonModel = require('../../../models/broadcastButtonModel');
+const { registerBroadcastHandlers } = require('./broadcastManagement');
 const { registerXAccountHandlers } = require('./xAccountWizard');
 const { registerXPostWizardHandlers, handleTextInput: handleXPostTextInput, handleMediaInput: handleXPostMediaInput, getSession: getXPostSession, STEPS: XPOST_STEPS } = require('./xPostWizard');
 const PlaylistAdminService = require('../../services/PlaylistAdminService');
@@ -26,6 +30,22 @@ const RadioAdminService = require('../../services/RadioAdminService');
 
 // Use shared utilities
 const { sanitizeInput } = broadcastUtils;
+
+const formatBroadcastTargetLabel = (target, lang = 'es') => {
+  const labels = {
+    all: { es: 'Todos', en: 'All' },
+    premium: { es: 'Premium', en: 'Premium' },
+    free: { es: 'Gratis', en: 'Free' },
+    churned: { es: 'Churned (Ex-Premium)', en: 'Churned (Ex-Premium)' },
+    payment_incomplete: { es: 'Pagos no completados', en: 'Payment Not Completed' },
+  };
+  return labels[target]?.[lang] || target;
+};
+
+const generateRecoveryPromoCode = () => {
+  const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `RECOV30${suffix}`;
+};
 
 const safeAnswerCbQuery = async (ctx, text, options = {}) => {
   if (!ctx?.answerCbQuery) return;
@@ -105,6 +125,117 @@ function summarizeBroadcastButtons(buttons) {
   });
 }
 
+async function createScheduledBroadcastsFromTimes(ctx, scheduledTimes, timezone) {
+  const { broadcastTarget, broadcastData } = ctx.session.temp;
+
+  if (!broadcastData || !broadcastData.textEn || !broadcastData.textEs) {
+    await ctx.reply('❌ Error: Faltan datos del broadcast');
+    return { successCount: 0, errorCount: 1, broadcastIds: [] };
+  }
+
+  const broadcastIds = [];
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (let i = 0; i < scheduledTimes.length; i += 1) {
+    try {
+      const scheduledTime = scheduledTimes[i];
+      const broadcast = await BroadcastService.createBroadcast({
+        adminId: String(ctx.from.id),
+        adminUsername: ctx.from.username || 'Admin',
+        title: `Broadcast programado ${scheduledTime.toLocaleDateString()} ${scheduledTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} (${timezone})`,
+        messageEn: broadcastData.textEn,
+        messageEs: broadcastData.textEs,
+        targetType: broadcastTarget,
+        mediaType: broadcastData.mediaType || null,
+        mediaUrl: broadcastData.s3Url || broadcastData.mediaFileId || null,
+        mediaFileId: broadcastData.mediaFileId || null,
+        s3Key: broadcastData.s3Key || null,
+        s3Bucket: broadcastData.s3Bucket || null,
+        includeFilters: broadcastData.includeFilters || {},
+        scheduledAt: scheduledTime,
+        timezone: timezone,
+      });
+
+      if (broadcastData.buttons && broadcastData.buttons.length > 0) {
+        try {
+          await BroadcastButtonModel.addButtonsToBroadcast(broadcast.broadcast_id, broadcastData.buttons);
+          logger.info(`Buttons added to broadcast ${broadcast.broadcast_id}`, {
+            buttonCount: broadcastData.buttons.length
+          });
+        } catch (buttonError) {
+          logger.error(`Error adding buttons to broadcast ${broadcast.broadcast_id}:`, buttonError);
+        }
+      }
+
+      broadcastIds.push(broadcast.broadcast_id);
+      successCount += 1;
+    } catch (error) {
+      logger.error(`Error creating broadcast ${i + 1}:`, error);
+      errorCount += 1;
+    }
+  }
+
+  return { successCount, errorCount, broadcastIds };
+}
+
+async function createRecurringBroadcastFromSchedule(ctx, scheduledDate) {
+  const timezone = ctx.session.temp.timezone || 'UTC';
+  const {
+    broadcastTarget,
+    broadcastData,
+    recurrencePattern,
+    maxOccurrences,
+    cronExpression,
+  } = ctx.session.temp;
+
+  if (!broadcastData || !broadcastData.textEn || !broadcastData.textEs) {
+    await ctx.reply('❌ Error: Faltan datos del broadcast');
+    return null;
+  }
+
+  const patternLabels = {
+    daily: 'Diario',
+    weekly: 'Semanal',
+    monthly: 'Mensual',
+    custom: 'Personalizado',
+  };
+
+  const broadcast = await BroadcastService.createRecurringBroadcast({
+    adminId: String(ctx.from.id),
+    adminUsername: ctx.from.username || 'Admin',
+    title: `Broadcast recurrente ${patternLabels[recurrencePattern] || recurrencePattern} - ${scheduledDate.toLocaleDateString()}`,
+    messageEn: broadcastData.textEn,
+    messageEs: broadcastData.textEs,
+    targetType: broadcastTarget,
+    mediaType: broadcastData.mediaType || null,
+    mediaUrl: broadcastData.s3Url || broadcastData.mediaFileId || null,
+    mediaFileId: broadcastData.mediaFileId || null,
+    s3Key: broadcastData.s3Key || null,
+    s3Bucket: broadcastData.s3Bucket || null,
+    includeFilters: broadcastData.includeFilters || {},
+    scheduledAt: scheduledDate,
+    timezone: timezone,
+    isRecurring: true,
+    recurrencePattern: recurrencePattern,
+    cronExpression: cronExpression || null,
+    maxOccurrences: maxOccurrences,
+  });
+
+  if (broadcastData.buttons && broadcastData.buttons.length > 0) {
+    try {
+      await BroadcastButtonModel.addButtonsToBroadcast(broadcast.broadcast_id, broadcastData.buttons);
+      logger.info(`Buttons added to recurring broadcast ${broadcast.broadcast_id}`, {
+        buttonCount: broadcastData.buttons.length
+      });
+    } catch (buttonError) {
+      logger.error(`Error adding buttons to broadcast ${broadcast.broadcast_id}:`, buttonError);
+    }
+  }
+
+  return broadcast;
+}
+
 async function sendBroadcastPreview(ctx) {
   const lang = getLanguage(ctx);
   const data = ctx.session?.temp?.broadcastData;
@@ -150,6 +281,13 @@ async function sendBroadcastPreview(ctx) {
     (hasTextEn ? `*EN:*\n${data.textEn}\n\n` : '') +
     (hasTextEs ? `*ES:*\n${data.textEs}\n\n` : '') +
     `*Botones:*\n${buttonsText}\n\n` +
+    (ctx.session.temp?.broadcastData?.sendEmail
+      ? `*Email:*\n` +
+        `• EN subject: ${data.emailSubjectEn || '_auto_'}\n` +
+        `• ES subject: ${data.emailSubjectEs || '_auto_'}\n` +
+        `• EN preheader: ${data.emailPreheaderEn || '_auto_'}\n` +
+        `• ES preheader: ${data.emailPreheaderEs || '_auto_'}\n\n`
+      : '') +
     '¿Listo para enviar?';
 
   // Check if email sending is enabled
@@ -158,13 +296,24 @@ async function sendBroadcastPreview(ctx) {
     ? '✅ También enviar por Email'
     : '📧 También enviar por Email';
 
-  const keyboard = Markup.inlineKeyboard([
-    [Markup.button.callback(emailToggleText, 'broadcast_toggle_email')],
-    [Markup.button.callback('📤 Enviar Ahora', 'broadcast_send_now_with_buttons')],
-    [Markup.button.callback('📅 Programar Envío', 'broadcast_schedule_with_buttons')],
-    [Markup.button.callback('◀️ Volver a Botones', 'broadcast_resume_buttons')],
-    [Markup.button.callback('❌ Cancelar Broadcast', 'admin_cancel')],
-  ]);
+    const keyboardRows = [
+      [Markup.button.callback(emailToggleText, 'broadcast_toggle_email')],
+      [Markup.button.callback('📤 Enviar Ahora', 'broadcast_send_now_with_buttons')],
+      [Markup.button.callback('📅 Programar Envío', 'broadcast_schedule_with_buttons')],
+      [Markup.button.callback('◀️ Volver a Botones', 'broadcast_resume_buttons')],
+      [Markup.button.callback('❌ Cancelar Broadcast', 'admin_cancel')],
+    ];
+
+    if (sendEmail) {
+      keyboardRows.splice(1, 0,
+        [Markup.button.callback('✉️ Subject EN', 'broadcast_edit_email_subject_en')],
+        [Markup.button.callback('✉️ Subject ES', 'broadcast_edit_email_subject_es')],
+        [Markup.button.callback('📝 Preheader EN', 'broadcast_edit_email_preheader_en')],
+        [Markup.button.callback('📝 Preheader ES', 'broadcast_edit_email_preheader_es')]
+      );
+    }
+
+    const keyboard = Markup.inlineKeyboard(keyboardRows);
 
   // Also send a "rendered" preview with buttons for one language (EN) so admin sees layout.
   try {
@@ -593,6 +742,9 @@ async function showAdminPanel(ctx, edit = false) {
       buttons.push([
         Markup.button.callback('🎁 Promos', 'promo_admin_menu'),
       ]);
+      buttons.push([
+        Markup.button.callback('⚡ Recovery 30%', 'admin_recovery_30'),
+      ]);
 
       // ═══ PNP LIVE / PERFORMERS ═══
       buttons.push([
@@ -609,6 +761,9 @@ async function showAdminPanel(ctx, edit = false) {
       buttons.push([
         Markup.button.callback('📦 Cola', 'admin_queue_status'),
         Markup.button.callback('👁️ Vista Previa', 'admin_view_mode'),
+      ]);
+      buttons.push([
+        Markup.button.callback('💳 Webhooks Pago', 'admin_payment_webhooks'),
       ]);
     }
 
@@ -1216,6 +1371,7 @@ let registerAdminHandlers = (bot) => {
             [Markup.button.callback('💎 Solo Premium', 'broadcast_premium')],
             [Markup.button.callback('🆓 Solo Gratis', 'broadcast_free')],
             [Markup.button.callback('↩️ Churned (Ex-Premium)', 'broadcast_churned')],
+            [Markup.button.callback('💸 Pagos No Completados', 'broadcast_payment_incomplete')],
             [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
           ]),
         },
@@ -1228,6 +1384,85 @@ let registerAdminHandlers = (bot) => {
       } catch (e) {
         logger.error('Failed to send error message:', e);
       }
+    }
+  });
+
+  // One-click recovery promo + broadcast draft
+  bot.action('admin_recovery_30', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const lang = getLanguage(ctx);
+
+      // Create 30% any-plan promo
+      let promo = null;
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (!promo && attempts < maxAttempts) {
+        attempts += 1;
+        const code = generateRecoveryPromoCode();
+        try {
+          promo = await PromoService.createPromo({
+            code,
+            name: 'Recovery 30% OFF',
+            nameEs: 'Recuperación 30% OFF',
+            description: '30% off any plan for incomplete payments',
+            descriptionEs: '30% de descuento en cualquier plan para pagos no completados',
+            basePlanId: 'any',
+            discountType: 'percentage',
+            discountValue: 30,
+            targetAudience: 'all',
+            maxSpots: null,
+            validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+            createdBy: String(ctx.from.id),
+          });
+        } catch (error) {
+          if (attempts >= maxAttempts) throw error;
+        }
+      }
+
+      if (!promo) {
+        await ctx.reply('❌ Error creando promo. Intenta de nuevo.');
+        return;
+      }
+
+      const deepLink = PromoModel.generateDeepLink(promo.code);
+
+      // Prepare broadcast draft
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.broadcastTarget = 'payment_incomplete';
+      ctx.session.temp.broadcastFilters = { paymentIncompleteDays: null };
+      ctx.session.temp.broadcastData = {
+        textEn: 'Ey, listen up, boy… Meth Daddy’s calling you back!\n\nMissed your shot? I’m giving you a 30% discount on ANY plan to get you in my dark ritual. Come feel the clouds hit hard and let me split you deep on my altar while we party ☁️🔥. Claim it now at pnptv before I change my mind, parce.\n\n#PNPLatinoTV #MethDaddy #ChimbaDura #OfrendaOscura',
+        textEs: 'Ey parce… Meth Daddy te llama al culto.\n\nVolvimos más duros que nunca y pa’ que regreses, te doy un 30% de descuento en cualquier plan en pnptv. Únete ya, siente el rush conmigo y déjame partirte mientras las nubes nos elevan ☁️🔥. ¿Listo pa’ esta ofrenda oscura?\n\n#PNPLatinoTV #CultoSantino #MethDaddy #ChimbaDura #OfrendaOscura',
+        emailSubjectEn: 'Meth Daddy is calling you back — 30% OFF any plan',
+        emailSubjectEs: 'Meth Daddy te llama de vuelta — 30% OFF en cualquier plan',
+        emailPreheaderEn: '30% off any plan on PNPtv. Claim it before I change my mind.',
+        emailPreheaderEs: '30% de descuento en cualquier plan en PNPtv. Reclámalo antes de que cambie de idea.',
+        buttons: [
+          { key: 'promo', text: '🔥 Reclamar 30% OFF', type: 'url', target: deepLink },
+        ],
+        sendEmail: true,
+        includeFilters: { paymentIncompleteDays: null },
+      };
+      ctx.session.temp.broadcastStep = 'preview';
+      ctx.session.temp.maxCompletedStep = 'preview';
+      await ctx.saveSession();
+
+      await ctx.reply(
+        lang === 'es'
+          ? `✅ Promo creada: *${promo.code}*\n\nLink:\n\`${deepLink}\`\n\nSe preparó un broadcast para pagos no completados con email activado.`
+          : `✅ Promo created: *${promo.code}*\n\nLink:\n\`${deepLink}\`\n\nPrepared a broadcast for incomplete payments with email enabled.`,
+        { parse_mode: 'Markdown' }
+      );
+
+      await sendBroadcastPreview(ctx);
+    } catch (error) {
+      logger.error('Error in admin_recovery_30:', error);
+      await ctx.reply('❌ Error al crear la promo de recovery.').catch(() => {});
     }
   });
 
@@ -1389,6 +1624,73 @@ let registerAdminHandlers = (bot) => {
     }
   });
 
+  bot.action('broadcast_payment_incomplete', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp.broadcastTarget = 'payment_incomplete';
+      ctx.session.temp.broadcastData = {};
+      ctx.session.temp.broadcastFilters = {};
+      ctx.session.temp.broadcastStep = 'payment_incomplete_window';
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        '⏱️ *Pagos No Completados*\n\nSelecciona la ventana de tiempo para segmentar:',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('Últimos 7 días', 'broadcast_payment_window_7')],
+            [Markup.button.callback('Últimos 30 días', 'broadcast_payment_window_30')],
+            [Markup.button.callback('Último mes', 'broadcast_payment_window_30')],
+            [Markup.button.callback('Todos', 'broadcast_payment_window_all')],
+            [Markup.button.callback('✏️ Custom', 'broadcast_payment_window_custom')],
+            [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error selecting broadcast audience (payment_incomplete):', error);
+    }
+  });
+
+  bot.action(/^broadcast_payment_window_(\d+|all|custom)$/, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const choice = ctx.match?.[1];
+      ctx.session.temp.broadcastFilters = ctx.session.temp.broadcastFilters || {};
+
+      if (choice === 'custom') {
+        ctx.session.temp.broadcastStep = 'payment_incomplete_window_custom';
+        await ctx.saveSession();
+        await ctx.editMessageText(
+          '✏️ Ingresa el número de días (ej: 30):',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+            ]),
+          }
+        );
+        return;
+      }
+
+      const days = choice === 'all' ? null : parseInt(choice, 10);
+      ctx.session.temp.broadcastFilters.paymentIncompleteDays = Number.isFinite(days) ? days : null;
+      if (ctx.session.temp.broadcastData) {
+        ctx.session.temp.broadcastData.includeFilters = { paymentIncompleteDays: ctx.session.temp.broadcastFilters.paymentIncompleteDays };
+      }
+      await updateBroadcastStep(ctx, 'media');
+      await ctx.saveSession();
+      await renderBroadcastStep(ctx);
+    } catch (error) {
+      logger.error('Error selecting payment window:', error);
+    }
+  });
+
   bot.action('broadcast_resume', async (ctx) => {
     try {
       await ctx.answerCbQuery();
@@ -1414,6 +1716,7 @@ let registerAdminHandlers = (bot) => {
           [Markup.button.callback('💎 Solo Premium', 'broadcast_premium')],
           [Markup.button.callback('🆓 Solo Gratis', 'broadcast_free')],
           [Markup.button.callback('↩️ Churned (Ex-Premium)', 'broadcast_churned')],
+          [Markup.button.callback('💸 Pagos No Completados', 'broadcast_payment_incomplete')],
           [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
         ]),
       );
@@ -2120,6 +2423,58 @@ let registerAdminHandlers = (bot) => {
     }
   });
 
+  bot.action('broadcast_edit_email_subject_en', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp.broadcastStep = 'email_subject_en';
+      await ctx.saveSession();
+      await ctx.reply('✉️ Subject EN:\nEnvía el asunto para email (inglés).');
+    } catch (error) {
+      logger.error('Error editing email subject EN:', error);
+    }
+  });
+
+  bot.action('broadcast_edit_email_subject_es', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp.broadcastStep = 'email_subject_es';
+      await ctx.saveSession();
+      await ctx.reply('✉️ Subject ES:\nEnvía el asunto para email (español).');
+    } catch (error) {
+      logger.error('Error editing email subject ES:', error);
+    }
+  });
+
+  bot.action('broadcast_edit_email_preheader_en', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp.broadcastStep = 'email_preheader_en';
+      await ctx.saveSession();
+      await ctx.reply('📝 Preheader EN:\nEnvía el preheader para email (inglés).');
+    } catch (error) {
+      logger.error('Error editing email preheader EN:', error);
+    }
+  });
+
+  bot.action('broadcast_edit_email_preheader_es', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      ctx.session.temp.broadcastStep = 'email_preheader_es';
+      await ctx.saveSession();
+      await ctx.reply('📝 Preheader ES:\nEnvía el preheader para email (español).');
+    } catch (error) {
+      logger.error('Error editing email preheader ES:', error);
+    }
+  });
+
   // Broadcast - Schedule with buttons
   bot.action('broadcast_schedule_with_buttons', async (ctx) => {
     try {
@@ -2142,15 +2497,16 @@ let registerAdminHandlers = (bot) => {
 
       await ctx.editMessageText(
         '📅 *Programar Broadcasts*\n\n'
-        + '¿Cuántas veces deseas programar este broadcast?\n\n'
-        + '🔄 *Opciones:* 1 a 12 programaciones diferentes',
+        + '¿Qué tipo de programación deseas?\n\n'
+        + '📆 *Una vez:* Envío único en fecha/hora específica\n'
+        + '📅 *Múltiples:* Programar varias fechas diferentes\n'
+        + '🔄 *Recurrente:* Envíos repetidos (diario, semanal, mensual)',
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('1️⃣ Una vez', 'schedule_count_1'), Markup.button.callback('2️⃣ Dos veces', 'schedule_count_2'), Markup.button.callback('3️⃣ Tres veces', 'schedule_count_3')],
-            [Markup.button.callback('4️⃣ Cuatro', 'schedule_count_4'), Markup.button.callback('5️⃣ Cinco', 'schedule_count_5'), Markup.button.callback('6️⃣ Seis', 'schedule_count_6')],
-            [Markup.button.callback('7️⃣ Siete', 'schedule_count_7'), Markup.button.callback('8️⃣ Ocho', 'schedule_count_8'), Markup.button.callback('9️⃣ Nueve', 'schedule_count_9')],
-            [Markup.button.callback('🔟 Diez', 'schedule_count_10'), Markup.button.callback('1️⃣1️⃣ Once', 'schedule_count_11'), Markup.button.callback('1️⃣2️⃣ Doce', 'schedule_count_12')],
+            [Markup.button.callback('📆 Una vez', 'schedule_type_once')],
+            [Markup.button.callback('📅 Múltiples fechas', 'schedule_type_multiple')],
+            [Markup.button.callback('🔄 Recurrente', 'schedule_type_recurring')],
             [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
           ]),
         }
@@ -2158,6 +2514,177 @@ let registerAdminHandlers = (bot) => {
     } catch (error) {
       logger.error('Error in broadcast schedule with buttons:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  bot.action('broadcast_create_scheduled_multiple', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      await ctx.answerCbQuery();
+
+      const timezone = ctx.session.temp?.timezone || 'UTC';
+      const scheduledTimesRaw = ctx.session.temp?.scheduledTimes || [];
+      const scheduledTimes = scheduledTimesRaw.map((time) => new Date(time));
+
+      if (!scheduledTimes.length) {
+        await ctx.reply('❌ No hay fechas programadas.');
+        return;
+      }
+
+      await ctx.reply(
+        '📤 *Creando broadcasts programados...*',
+        { parse_mode: 'Markdown' }
+      );
+
+      const { successCount, errorCount, broadcastIds } = await createScheduledBroadcastsFromTimes(
+        ctx,
+        scheduledTimes,
+        timezone
+      );
+
+      const broadcastTarget = ctx.session.temp?.broadcastTarget;
+      const broadcastData = ctx.session.temp?.broadcastData;
+
+      // Clear session data
+      ctx.session.temp.broadcastTarget = null;
+      ctx.session.temp.broadcastStep = null;
+      ctx.session.temp.broadcastData = null;
+      ctx.session.temp.scheduledTimes = null;
+      ctx.session.temp.scheduleCount = null;
+      ctx.session.temp.currentScheduleIndex = null;
+      ctx.session.temp.timezone = null;
+      ctx.session.temp.schedulingStep = null;
+      ctx.session.temp.schedulingContext = null;
+      await ctx.saveSession();
+
+      let resultMessage = `✅ *Broadcasts Programados*\n\n`;
+      resultMessage += `📊 *Resultados:*\n`;
+      resultMessage += `✓ Creados: ${successCount}/${scheduledTimes.length}\n`;
+      if (errorCount > 0) {
+        resultMessage += `✗ Errores: ${errorCount}\n`;
+      }
+      resultMessage += `\n🎯 Audiencia: ${formatBroadcastTargetLabel(broadcastTarget, 'es')}\n`;
+      resultMessage += `🌍 Zona horaria: ${timezone}\n`;
+      resultMessage += `🌐 Mensajes bilingües: EN / ES\n`;
+      resultMessage += `${broadcastData?.mediaType ? `📎 Con media: ${broadcastData.mediaType}` : '📝 Solo texto'}\n`;
+      resultMessage += `\n📅 *Programaciones:*\n`;
+
+      scheduledTimes.forEach((time, idx) => {
+        resultMessage += `${idx + 1}. ${time.toLocaleString('es-ES', { timeZone: timezone })} (${timezone})\n`;
+      });
+
+      resultMessage += `\n💡 Los broadcasts se enviarán automáticamente a la hora programada.`;
+
+      await ctx.reply(
+        resultMessage,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Volver al Panel Admin', 'admin_cancel')],
+          ]),
+        }
+      );
+
+      logger.info('Broadcast scheduling completed (picker)', {
+        adminId: ctx.from.id,
+        totalSchedules: scheduledTimes.length,
+        successCount,
+        errorCount,
+        broadcastIds,
+      });
+    } catch (error) {
+      logger.error('Error creating scheduled broadcasts (picker):', error);
+      await ctx.reply(
+        '❌ *Error al programar broadcasts*\n\n'
+        + `Detalles: ${error.message}`,
+        { parse_mode: 'Markdown' }
+      );
+    }
+  });
+
+  bot.action('broadcast_create_recurring_from_picker', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      await ctx.answerCbQuery();
+
+      const confirmed = ctx.session.temp?.confirmedSchedule;
+      if (!confirmed?.date) {
+        await ctx.reply('❌ Sesión expirada. Inicia de nuevo.');
+        return;
+      }
+
+      const timezone = ctx.session.temp?.timezone || 'UTC';
+      const scheduledDate = new Date(confirmed.date);
+      const { broadcastTarget, broadcastData, recurrencePattern, maxOccurrences, cronExpression } = ctx.session.temp;
+
+      await ctx.reply(
+        '📤 *Creando broadcast recurrente...*',
+        { parse_mode: 'Markdown' }
+      );
+
+      const broadcast = await createRecurringBroadcastFromSchedule(ctx, scheduledDate);
+
+      const patternLabel = recurrencePattern || 'custom';
+      const maxLabel = maxOccurrences ? `${maxOccurrences} veces` : 'Sin límite';
+      const cronInfo = cronExpression ? `\n⚙️ Cron: \`${cronExpression}\`` : '';
+
+      // Clear session data
+      ctx.session.temp.broadcastTarget = null;
+      ctx.session.temp.broadcastStep = null;
+      ctx.session.temp.broadcastData = null;
+      ctx.session.temp.isRecurring = null;
+      ctx.session.temp.recurrencePattern = null;
+      ctx.session.temp.cronExpression = null;
+      ctx.session.temp.maxOccurrences = null;
+      ctx.session.temp.timezone = null;
+      ctx.session.temp.schedulingStep = null;
+      ctx.session.temp.schedulingContext = null;
+      ctx.session.temp.confirmedSchedule = null;
+      await ctx.saveSession();
+
+      await ctx.reply(
+        `✅ *Broadcast Recurrente Creado*\n\n`
+        + `🔄 Frecuencia: ${patternLabel}${cronInfo}\n`
+        + `📊 Repeticiones: ${maxLabel}\n`
+        + `📅 Primer envío: ${scheduledDate.toLocaleString('es-ES', { timeZone: timezone })} (${timezone})\n`
+        + `🎯 Audiencia: ${formatBroadcastTargetLabel(broadcastTarget, 'es')}\n`
+        + `🆔 ID: \`${broadcast.broadcast_id}\`\n`
+        + `${broadcastData?.mediaType ? `📎 Con media (${broadcastData.mediaType})` : '📝 Solo texto'}\n\n`
+        + `💡 El broadcast se enviará automáticamente según la programación.`,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Volver al Panel Admin', 'admin_cancel')],
+          ]),
+        }
+      );
+
+      logger.info('Recurring broadcast created (picker)', {
+        broadcastId: broadcast.broadcast_id,
+        adminId: ctx.from.id,
+        pattern: recurrencePattern,
+        cronExpression,
+        maxOccurrences,
+        scheduledAt: scheduledDate,
+        timezone,
+      });
+    } catch (error) {
+      logger.error('Error creating recurring broadcast (picker):', error);
+      await ctx.reply(
+        '❌ *Error al crear broadcast recurrente*\n\n'
+        + `Detalles: ${error.message}`,
+        { parse_mode: 'Markdown' }
+      );
     }
   });
 
@@ -2201,6 +2728,66 @@ let registerAdminHandlers = (bot) => {
       );
     } catch (error) {
       logger.error('Error in admin analytics:', error);
+    }
+  });
+
+  // Payment webhook summary
+  bot.action('admin_payment_webhooks', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const lang = getLanguage(ctx);
+      const summary = await PaymentWebhookEventModel.getSummary({ sinceHours: 24 });
+      const recent = await PaymentWebhookEventModel.getRecent(10);
+
+      let message = lang === 'es'
+        ? '💳 *Webhooks de Pago (últimas 24h)*\n\n'
+        : '💳 *Payment Webhooks (last 24h)*\n\n';
+
+      if (!summary.length) {
+        message += lang === 'es'
+          ? 'No hay eventos recientes.\n\n'
+          : 'No recent events.\n\n';
+      } else {
+        message += lang === 'es' ? '*Resumen:*\n' : '*Summary:*\n';
+        summary.forEach((row) => {
+          const provider = row.provider || 'unknown';
+          const status = row.status || 'unknown';
+          const sig = row.is_valid_signature ? '✓' : '✗';
+          message += `• ${provider} | ${status} | sig ${sig}: ${row.count}\n`;
+        });
+        message += '\n';
+      }
+
+      if (recent.length) {
+        message += lang === 'es' ? '*Recientes:*\n' : '*Recent:*\n';
+        recent.forEach((row) => {
+          const provider = row.provider || 'unknown';
+          const status = row.status || 'unknown';
+          const sig = row.is_valid_signature ? '✓' : '✗';
+          const ts = row.created_at
+            ? new Date(row.created_at).toLocaleString(lang === 'es' ? 'es-ES' : 'en-US')
+            : '';
+          const eventId = row.event_id || row.payment_id || 'n/a';
+          message += `• ${ts} | ${provider} | ${status} | sig ${sig} | ${eventId}\n`;
+        });
+      }
+
+      await ctx.editMessageText(
+        message,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(lang === 'es' ? '🔄 Actualizar' : '🔄 Refresh', 'admin_payment_webhooks')],
+            [Markup.button.callback(lang === 'es' ? '◀️ Volver' : '◀️ Back', 'admin_cancel')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error in admin_payment_webhooks:', error);
+      await ctx.reply('❌ Error').catch(() => {});
     }
   });
 
@@ -2679,6 +3266,13 @@ let registerAdminHandlers = (bot) => {
 
   // Handle admin text inputs
   bot.on('text', async (ctx, next) => {
+    // Guard: ignore non-private chats (e.g., support topics) to prevent wizard contamination
+    if (ctx.chat?.type && ctx.chat.type !== 'private') {
+      return next();
+    }
+    if (ctx.session?.temp?.promoCreate?.step === 'custom_code') {
+      return next();
+    }
     logger.info('[TEXT-HANDLER-RAW] Raw text message received BEFORE admin check', {
       userId: ctx.from.id,
       messageText: (ctx.message.text || '').substring(0, 50),
@@ -2773,6 +3367,15 @@ let registerAdminHandlers = (bot) => {
     if (ctx.session.temp?.awaitingMessageInput) {
       logger.info('[TEXT-HANDLER] Processing awaitingMessageInput flow', { userId: ctx.from.id });
       try {
+        const requiredPromptId = ctx.session.temp.awaitingMessagePromptId;
+        const replyToId = ctx.message?.reply_to_message?.message_id;
+        if (requiredPromptId && replyToId !== requiredPromptId) {
+          await ctx.reply(
+            '⚠️ Responde al mensaje de solicitud para enviar el texto al usuario.',
+            { reply_to_message_id: ctx.message.message_id },
+          );
+          return;
+        }
         const message = ctx.message.text;
         const recipientId = ctx.session.temp.messageRecipientId;
         const user = await UserModel.getById(recipientId);
@@ -2828,6 +3431,7 @@ let registerAdminHandlers = (bot) => {
         // Clear message input state
         ctx.session.temp.awaitingMessageInput = false;
         ctx.session.temp.messageRecipientId = null;
+        ctx.session.temp.awaitingMessagePromptId = null;
         await ctx.saveSession();
       } catch (error) {
         logger.error('Error handling message input:', error);
@@ -3081,6 +3685,101 @@ let registerAdminHandlers = (bot) => {
     }
 
     // Broadcast flow - Handle text inputs
+    if (ctx.session.temp?.broadcastStep === 'payment_incomplete_window_custom') {
+      try {
+        const input = (ctx.message.text || '').trim();
+        const days = parseInt(input, 10);
+        if (!Number.isFinite(days) || days <= 0 || days > 3650) {
+          await ctx.reply('❌ Ingresa un número válido de días (1-3650).');
+          return;
+        }
+
+        ctx.session.temp.broadcastFilters = ctx.session.temp.broadcastFilters || {};
+        ctx.session.temp.broadcastFilters.paymentIncompleteDays = days;
+        if (ctx.session.temp.broadcastData) {
+          ctx.session.temp.broadcastData.includeFilters = { paymentIncompleteDays: days };
+        }
+        await updateBroadcastStep(ctx, 'media');
+        await ctx.saveSession();
+        await renderBroadcastStep(ctx);
+      } catch (error) {
+        logger.error('Error saving custom payment window:', error);
+      }
+      return;
+    }
+
+    if (ctx.session.temp?.broadcastStep === 'email_subject_en') {
+      try {
+        const input = (ctx.message.text || '').trim();
+        if (!input) {
+          await ctx.reply('❌ Subject EN vacío.');
+          return;
+        }
+        if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
+        ctx.session.temp.broadcastData.emailSubjectEn = input;
+        ctx.session.temp.broadcastStep = 'preview';
+        await ctx.saveSession();
+        await sendBroadcastPreview(ctx);
+      } catch (error) {
+        logger.error('Error saving email subject EN:', error);
+      }
+      return;
+    }
+
+    if (ctx.session.temp?.broadcastStep === 'email_subject_es') {
+      try {
+        const input = (ctx.message.text || '').trim();
+        if (!input) {
+          await ctx.reply('❌ Subject ES vacío.');
+          return;
+        }
+        if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
+        ctx.session.temp.broadcastData.emailSubjectEs = input;
+        ctx.session.temp.broadcastStep = 'preview';
+        await ctx.saveSession();
+        await sendBroadcastPreview(ctx);
+      } catch (error) {
+        logger.error('Error saving email subject ES:', error);
+      }
+      return;
+    }
+
+    if (ctx.session.temp?.broadcastStep === 'email_preheader_en') {
+      try {
+        const input = (ctx.message.text || '').trim();
+        if (!input) {
+          await ctx.reply('❌ Preheader EN vacío.');
+          return;
+        }
+        if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
+        ctx.session.temp.broadcastData.emailPreheaderEn = input;
+        ctx.session.temp.broadcastStep = 'preview';
+        await ctx.saveSession();
+        await sendBroadcastPreview(ctx);
+      } catch (error) {
+        logger.error('Error saving email preheader EN:', error);
+      }
+      return;
+    }
+
+    if (ctx.session.temp?.broadcastStep === 'email_preheader_es') {
+      try {
+        const input = (ctx.message.text || '').trim();
+        if (!input) {
+          await ctx.reply('❌ Preheader ES vacío.');
+          return;
+        }
+        if (!ctx.session.temp.broadcastData) ctx.session.temp.broadcastData = {};
+        ctx.session.temp.broadcastData.emailPreheaderEs = input;
+        ctx.session.temp.broadcastStep = 'preview';
+        await ctx.saveSession();
+        await sendBroadcastPreview(ctx);
+      } catch (error) {
+        logger.error('Error saving email preheader ES:', error);
+      }
+      return;
+    }
+
     if (ctx.session.temp?.broadcastStep === 'text_en') {
       try {
         const message = ctx.message.text;
@@ -3436,29 +4135,44 @@ let registerAdminHandlers = (bot) => {
         // Store in session and move to timezone selection
         ctx.session.temp.scheduledDate = scheduledDate.toISOString();
         ctx.session.temp.schedulingStep = 'selecting_timezone';
+        if (!ctx.session.temp.timezone) {
+          ctx.session.temp.timezone = 'America/Bogota';
+        }
         await ctx.saveSession();
 
-        // Show timezone selection
-        const dateTimePicker = require('../../utils/dateTimePicker');
-        const PREFIX = 'bcast_sched';
+        if (ctx.session.temp.timezone) {
+          const dateTimePicker = require('../../utils/dateTimePicker');
+          const PREFIX = 'bcast_sched';
+          const { text, keyboard } = dateTimePicker.getConfirmationView(
+            scheduledDate,
+            ctx.session.temp.timezone,
+            lang,
+            PREFIX,
+          );
+          await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
+        } else {
+          // Show timezone selection
+          const dateTimePicker = require('../../utils/dateTimePicker');
+          const PREFIX = 'bcast_sched';
 
-        const text = '🌍 *Zona Horaria*\n\n' +
-            'Selecciona tu zona horaria:\n\n' +
-            '⏰ La programación será en esta zona';
+          const text = '🌍 *Zona Horaria*\n\n' +
+              'Selecciona tu zona horaria:\n\n' +
+              '⏰ La programación será en esta zona';
 
-        await ctx.reply(text, {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('🌎 New York (EST)', `${PREFIX}_tz_America/New_York`)],
-            [Markup.button.callback('🌎 Los Angeles (PST)', `${PREFIX}_tz_America/Los_Angeles`)],
-            [Markup.button.callback('🌎 Mexico City (CST)', `${PREFIX}_tz_America/Mexico_City`)],
-            [Markup.button.callback('🌎 Bogotá (COT)', `${PREFIX}_tz_America/Bogota`)],
-            [Markup.button.callback('🌍 Madrid (CET)', `${PREFIX}_tz_Europe/Madrid`)],
-            [Markup.button.callback('🌍 London (GMT)', `${PREFIX}_tz_Europe/London`)],
-            [Markup.button.callback('🌏 UTC', `${PREFIX}_tz_UTC`)],
-            [Markup.button.callback('◀️ Volver', `${PREFIX}_back_to_presets`)],
-          ]),
-        });
+          await ctx.reply(text, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('🌎 New York (EST)', `${PREFIX}_tz_America/New_York`)],
+              [Markup.button.callback('🌎 Los Angeles (PST)', `${PREFIX}_tz_America/Los_Angeles`)],
+              [Markup.button.callback('🌎 Mexico City (CST)', `${PREFIX}_tz_America/Mexico_City`)],
+              [Markup.button.callback('🌎 Bogotá (COT)', `${PREFIX}_tz_America/Bogota`)],
+              [Markup.button.callback('🌍 Madrid (CET)', `${PREFIX}_tz_Europe/Madrid`)],
+              [Markup.button.callback('🌍 London (GMT)', `${PREFIX}_tz_Europe/London`)],
+              [Markup.button.callback('🌏 UTC', `${PREFIX}_tz_UTC`)],
+              [Markup.button.callback('◀️ Volver', `${PREFIX}_back_to_presets`)],
+            ]),
+          });
+        }
       } catch (error) {
         logger.error('Error handling custom time input:', error);
         await ctx.reply('❌ Error processing time. Please try again.');
@@ -3530,57 +4244,12 @@ let registerAdminHandlers = (bot) => {
           { parse_mode: 'Markdown' }
         );
 
-        const broadcastIds = [];
-        let successCount = 0;
-        let errorCount = 0;
-
-        // Create a broadcast for each scheduled time
-        for (let i = 0; i < ctx.session.temp.scheduledTimes.length; i += 1) {
-          try {
-            const scheduledTime = ctx.session.temp.scheduledTimes[i];
-            const broadcast = await BroadcastService.createBroadcast({
-              adminId: String(ctx.from.id),
-              adminUsername: ctx.from.username || 'Admin',
-              title: `Broadcast programado ${scheduledTime.toLocaleDateString()} ${scheduledTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} (${timezone})`,
-              messageEn: broadcastData.textEn,
-              messageEs: broadcastData.textEs,
-              targetType: broadcastTarget,
-              mediaType: broadcastData.mediaType || null,
-              mediaUrl: broadcastData.s3Url || broadcastData.mediaFileId || null,
-              mediaFileId: broadcastData.mediaFileId || null,
-              s3Key: broadcastData.s3Key || null,
-              s3Bucket: broadcastData.s3Bucket || null,
-              scheduledAt: scheduledTime,
-              timezone: timezone,
-            });
-
-            // Add buttons to the broadcast if they exist
-            if (broadcastData.buttons && broadcastData.buttons.length > 0) {
-              try {
-                await BroadcastButtonModel.addButtonsToBroadcast(broadcast.broadcast_id, broadcastData.buttons);
-                logger.info(`Buttons added to broadcast ${broadcast.broadcast_id}`, {
-                  buttonCount: broadcastData.buttons.length
-                });
-              } catch (buttonError) {
-                logger.error(`Error adding buttons to broadcast ${broadcast.broadcast_id}:`, buttonError);
-                // Continue even if buttons fail - broadcast can still be sent without buttons
-              }
-            }
-
-            broadcastIds.push(broadcast.broadcast_id);
-            successCount += 1;
-
-            logger.info('Broadcast scheduled', {
-              broadcastId: broadcast.broadcast_id,
-              scheduleNumber: i + 1,
-              scheduledAt: scheduledTime,
-              totalSchedules: scheduleCount,
-            });
-          } catch (error) {
-            logger.error(`Error creating broadcast ${i + 1}:`, error);
-            errorCount += 1;
-          }
-        }
+        const scheduledTimes = ctx.session.temp.scheduledTimes.map((time) => new Date(time));
+        const { successCount, errorCount, broadcastIds } = await createScheduledBroadcastsFromTimes(
+          ctx,
+          scheduledTimes,
+          timezone
+        );
 
         // Store timezone before clearing (for result message)
         const savedTimezone = timezone;
@@ -3594,6 +4263,7 @@ let registerAdminHandlers = (bot) => {
         ctx.session.temp.scheduleCount = null;
         ctx.session.temp.currentScheduleIndex = null;
         ctx.session.temp.timezone = null;
+        ctx.session.temp.schedulingContext = null;
         await ctx.saveSession();
 
         // Show results
@@ -3603,7 +4273,7 @@ let registerAdminHandlers = (bot) => {
         if (errorCount > 0) {
           resultMessage += `✗ Errores: ${errorCount}\n`;
         }
-        resultMessage += `\n🎯 Audiencia: ${broadcastTarget === 'all' ? 'Todos' : broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Gratis' : 'Churned'}\n`;
+        resultMessage += `\n🎯 Audiencia: ${formatBroadcastTargetLabel(broadcastTarget, 'es')}\n`;
         resultMessage += `🌍 Zona horaria: ${savedTimezone}\n`;
         resultMessage += `🌐 Mensajes bilingües: EN / ES\n`;
         resultMessage += `${broadcastData.mediaType ? `📎 Con media: ${broadcastData.mediaType}` : '📝 Solo texto'}\n`;
@@ -3661,6 +4331,7 @@ let registerAdminHandlers = (bot) => {
 
         // Parse date in the selected timezone
         const timezone = ctx.session.temp.timezone || 'UTC';
+        const { broadcastTarget, broadcastData, recurrencePattern, maxOccurrences, cronExpression } = ctx.session.temp;
         const scheduledDate = new Date(input);
 
         if (scheduledDate <= new Date()) {
@@ -3668,57 +4339,17 @@ let registerAdminHandlers = (bot) => {
           return;
         }
 
-        const { broadcastTarget, broadcastData, recurrencePattern, maxOccurrences, isRecurring, cronExpression } = ctx.session.temp;
-
-        if (!broadcastData || !broadcastData.textEn || !broadcastData.textEs) {
-          await ctx.reply('❌ Error: Faltan datos del broadcast');
-          return;
-        }
-
-        const patternLabels = {
-          daily: 'Diario',
-          weekly: 'Semanal',
-          monthly: 'Mensual',
-          custom: 'Personalizado',
-        };
-
         await ctx.reply(
           '📤 *Creando broadcast recurrente...*',
           { parse_mode: 'Markdown' }
         );
 
-        // Create the recurring broadcast
-        const broadcast = await BroadcastService.createRecurringBroadcast({
-          adminId: String(ctx.from.id),
-          adminUsername: ctx.from.username || 'Admin',
-          title: `Broadcast recurrente ${patternLabels[recurrencePattern] || recurrencePattern} - ${scheduledDate.toLocaleDateString()}`,
-          messageEn: broadcastData.textEn,
-          messageEs: broadcastData.textEs,
-          targetType: broadcastTarget,
-          mediaType: broadcastData.mediaType || null,
-          mediaUrl: broadcastData.s3Url || broadcastData.mediaFileId || null,
-          mediaFileId: broadcastData.mediaFileId || null,
-          s3Key: broadcastData.s3Key || null,
-          s3Bucket: broadcastData.s3Bucket || null,
-          scheduledAt: scheduledDate,
-          timezone: timezone,
-          isRecurring: true,
-          recurrencePattern: recurrencePattern,
-          cronExpression: cronExpression || null,
-          maxOccurrences: maxOccurrences,
-        });
+        const broadcast = await createRecurringBroadcastFromSchedule(ctx, scheduledDate);
 
-        // Add buttons to the broadcast if they exist
-        if (broadcastData.buttons && broadcastData.buttons.length > 0) {
-          try {
-            await BroadcastButtonModel.addButtonsToBroadcast(broadcast.broadcast_id, broadcastData.buttons);
-            logger.info(`Buttons added to recurring broadcast ${broadcast.broadcast_id}`, {
-              buttonCount: broadcastData.buttons.length
-            });
-          } catch (buttonError) {
-            logger.error(`Error adding buttons to broadcast ${broadcast.broadcast_id}:`, buttonError);
-          }
-        }
+        // Prepare labels before clearing session
+        const patternLabel = recurrencePattern || 'custom';
+        const maxLabel = maxOccurrences ? `${maxOccurrences} veces` : 'Sin límite';
+        const cronInfo = cronExpression ? `\n⚙️ Cron: \`${cronExpression}\`` : '';
 
         // Clear session data
         ctx.session.temp.broadcastTarget = null;
@@ -3729,17 +4360,16 @@ let registerAdminHandlers = (bot) => {
         ctx.session.temp.cronExpression = null;
         ctx.session.temp.maxOccurrences = null;
         ctx.session.temp.timezone = null;
+        ctx.session.temp.schedulingContext = null;
         await ctx.saveSession();
 
         // Show confirmation
-        const maxLabel = maxOccurrences ? `${maxOccurrences} veces` : 'Sin límite';
-        const cronInfo = cronExpression ? `\n⚙️ Cron: \`${cronExpression}\`` : '';
         await ctx.reply(
           `✅ *Broadcast Recurrente Creado*\n\n`
-          + `🔄 Frecuencia: ${patternLabels[recurrencePattern] || recurrencePattern}${cronInfo}\n`
+          + `🔄 Frecuencia: ${patternLabel}${cronInfo}\n`
           + `📊 Repeticiones: ${maxLabel}\n`
           + `📅 Primer envío: ${scheduledDate.toLocaleString('es-ES', { timeZone: timezone })} (${timezone})\n`
-          + `🎯 Audiencia: ${broadcastTarget === 'all' ? 'Todos' : broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Gratis' : 'Churned'}\n`
+          + `🎯 Audiencia: ${formatBroadcastTargetLabel(broadcastTarget, 'es')}\n`
           + `🆔 ID: \`${broadcast.broadcast_id}\`\n`
           + `${broadcastData.mediaType ? `📎 Con media (${broadcastData.mediaType})` : '📝 Solo texto'}\n\n`
           + `💡 El broadcast se enviará automáticamente según la programación.`,
@@ -5000,6 +5630,7 @@ let registerAdminHandlers = (bot) => {
       // Set up session to capture message input
       ctx.session.temp.messageRecipientId = userId;
       ctx.session.temp.awaitingMessageInput = true;
+      ctx.session.temp.awaitingMessagePromptId = null;
       await ctx.saveSession();
 
       const lang = user.language || 'es';
@@ -5007,7 +5638,13 @@ let registerAdminHandlers = (bot) => {
         ? `📝 **Enviar Mensaje a ${user.firstName}**\n\nPor favor, escribe el mensaje que deseas enviar a este usuario. Usa /cancelar para salir.`
         : `📝 **Send Message to ${user.firstName}**\n\nPlease type the message you want to send to this user. Use /cancelar to cancel.`;
 
-      await ctx.reply(messagePrompt, { parse_mode: 'Markdown' });
+      const promptMessage = await ctx.reply(messagePrompt, { parse_mode: 'Markdown' });
+      try {
+        ctx.session.temp.awaitingMessagePromptId = promptMessage?.message_id || null;
+        await ctx.saveSession();
+      } catch (promptSaveError) {
+        logger.warn('Could not store admin message prompt id', { error: promptSaveError.message });
+      }
       try {
         await ctx.answerCbQuery('Escribe tu mensaje');
       } catch (cbError) {
@@ -5076,6 +5713,7 @@ async function sendBroadcastWithButtons(ctx, bot) {
     const { broadcastTarget, broadcastData } = ctx.session.temp;
     const { getLanguage } = require('../../utils/helpers');
     const emailService = require('../../../services/emailService');
+    const lang = getLanguage(ctx);
 
     if (!broadcastData || (!broadcastData.textEn && !broadcastData.textEs)) {
       logger.error('Broadcast data missing', { broadcastData: !!broadcastData, textEn: !!broadcastData?.textEn, textEs: !!broadcastData?.textEs });
@@ -5102,6 +5740,9 @@ async function sendBroadcastWithButtons(ctx, bot) {
       users = await UserModel.getBySubscriptionStatus('free');
     } else if (broadcastTarget === 'churned') {
       users = await UserModel.getChurnedUsers();
+    } else if (broadcastTarget === 'payment_incomplete') {
+      const days = ctx.session.temp?.broadcastFilters?.paymentIncompleteDays ?? null;
+      users = await UserModel.getUsersWithIncompletePayments({ sinceDays: days });
     }
 
     let sent = 0;
@@ -5238,7 +5879,11 @@ async function sendBroadcastWithButtons(ctx, bot) {
           messageEn: textEn,
           messageEs: textEs,
           mediaUrl: broadcastData.mediaUrl || null,
-          buttons: broadcastData.buttons || []
+          buttons: broadcastData.buttons || [],
+          subjectEn: broadcastData.emailSubjectEn || null,
+          subjectEs: broadcastData.emailSubjectEs || null,
+          preheaderEn: broadcastData.emailPreheaderEn || null,
+          preheaderEs: broadcastData.emailPreheaderEs || null
         });
 
         emailSent = emailResult.sent;
@@ -5276,7 +5921,7 @@ async function sendBroadcastWithButtons(ctx, bot) {
       + `✓ Enviados: ${sent}\n`
       + `✗ Fallidos: ${failed}\n`
       + `📈 Total intentos: ${sent + failed}\n`
-      + `🎯 Audiencia: ${broadcastTarget}\n`
+      + `🎯 Audiencia: ${formatBroadcastTargetLabel(broadcastTarget, lang)}\n`
       + `🌐 Mensajes bilingües: EN / ES`
       + buttonInfo
       + emailInfo,
@@ -5735,6 +6380,7 @@ const registerRadioAdminHandlers = (bot) => {
 // Create wrapper function that also registers audio management and group cleanup
 const finalRegisterAdminHandlers = (bot) => {
   wrappedRegisterAdminHandlers(bot);
+  registerBroadcastHandlers(bot);
   registerAudioManagementHandlers(bot);
   registerDateTimePickerHandlers(bot);
   registerNearbyPlacesAdminHandlers(bot);

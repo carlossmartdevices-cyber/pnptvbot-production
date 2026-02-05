@@ -226,10 +226,9 @@ class BroadcastService {
     const query = `
       SELECT
         bs.*,
-        b.message, b.title, b.media_type, b.media_url,
-        b.target_tier, b.created_by as admin_id
+        b.broadcast_id
       FROM broadcast_schedules bs
-      JOIN broadcasts b ON bs.broadcast_id = b.id
+      JOIN broadcasts b ON bs.broadcast_id = b.broadcast_id
       WHERE bs.status = 'scheduled'
         AND bs.next_execution_at <= CURRENT_TIMESTAMP
       ORDER BY bs.next_execution_at ASC
@@ -408,8 +407,45 @@ class BroadcastService {
    * @param {Array} excludeUserIds - User IDs to exclude
    * @returns {Promise<Array>} List of target users
    */
-  async getTargetUsers(targetType, excludeUserIds = []) {
+  async getTargetUsers(targetType, excludeUserIds = [], includeFilters = {}) {
     try {
+      const filters = typeof includeFilters === 'string'
+        ? (() => { try { return JSON.parse(includeFilters); } catch (e) { return {}; } })()
+        : (includeFilters || {});
+
+      if (targetType === 'payment_incomplete') {
+        const sinceDays = filters.paymentIncompleteDays ?? null;
+        const params = [];
+        let query = `
+          WITH latest_payments AS (
+            SELECT DISTINCT ON (p.user_id) p.user_id, p.status, p.created_at
+            FROM payments p
+            ${sinceDays ? 'WHERE p.created_at >= NOW() - ($1 || \' days\')::interval' : ''}
+            ORDER BY p.user_id, p.created_at DESC
+          )
+          SELECT u.id, u.language, u.subscription_status
+          FROM users u
+          INNER JOIN latest_payments lp ON lp.user_id = u.id
+          WHERE lp.status IN ('pending', 'processing', 'failed', 'cancelled', 'expired')
+        `;
+
+        if (sinceDays) {
+          params.push(Number(sinceDays));
+        }
+
+        if (excludeUserIds.length > 0) {
+          const offset = params.length;
+          query += ` AND u.id NOT IN (${excludeUserIds.map((_, i) => `$${offset + i + 1}`).join(',')})`;
+          params.push(...excludeUserIds);
+        }
+
+        query += " AND u.id != '1087968824'";
+
+        const result = await getPool().query(query, params);
+        logger.info(`Found ${result.rows.length} target users for broadcast (type: ${targetType})`);
+        return result.rows;
+      }
+
       let query = 'SELECT id, language, subscription_status FROM users WHERE 1=1';
       const params = [];
 
@@ -485,7 +521,8 @@ class BroadcastService {
       // Get target users
       const targetUsers = await this.getTargetUsers(
         broadcast.target_type,
-        broadcast.exclude_user_ids || []
+        broadcast.exclude_user_ids || [],
+        broadcast.include_filters || {}
       );
 
       const stats = {

@@ -4,18 +4,13 @@ const XPostService = require('../../services/xPostService');
 const XOAuthService = require('../../services/xOAuthService');
 const GrokService = require('../../services/grokService');
 const logger = require('../../../utils/logger');
+const dateTimePicker = require('../../utils/dateTimePicker');
 
 const SESSION_KEY = 'xPostWizard';
 const X_MAX_TEXT_LENGTH = 280;
 const X_REQUIRED_LINKS = ['t.me/pnplatinotv_bot', 'pnptv.app/lifetime100'];
 
-const SERVER_TIMEZONE = (() => {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  } catch (error) {
-    return 'UTC';
-  }
-})();
+const SERVER_TIMEZONE = 'America/Bogota';
 
 const escapeMarkdown = (text) => {
   if (!text) return '';
@@ -449,11 +444,12 @@ const showPreview = async (ctx, edit = false) => {
 const showSchedule = async (ctx, edit = false) => {
   const session = getSession(ctx);
   session.step = STEPS.SCHEDULE;
+  session.scheduleTimezone = session.scheduleTimezone || SERVER_TIMEZONE;
   await ctx.saveSession?.();
 
   let message = '🕐 **Programar Publicación**\n\n';
   message += 'Selecciona cuándo deseas publicar:\n\n';
-  message += `🌍 Zona horaria: \`${SERVER_TIMEZONE}\`\n\n`;
+  message += `🌍 Zona horaria: \`${session.scheduleTimezone}\`\n\n`;
 
   // Quick schedule options
   const buttons = [
@@ -469,7 +465,7 @@ const showSchedule = async (ctx, edit = false) => {
       Markup.button.callback('📅 Mañana 9:00', 'xpost_schedule_tomorrow_9'),
       Markup.button.callback('📅 Mañana 18:00', 'xpost_schedule_tomorrow_18'),
     ],
-    [Markup.button.callback('🗓️ Fecha personalizada', 'xpost_schedule_custom')],
+    [Markup.button.callback('🗓️ Elegir fecha', 'xpost_schedule_custom')],
     [Markup.button.callback('◀️ Volver', 'xpost_preview')],
     [Markup.button.callback('❌ Cancelar', 'xpost_menu')],
   ];
@@ -484,24 +480,14 @@ const showSchedule = async (ctx, edit = false) => {
 
 const showCustomSchedule = async (ctx) => {
   const session = getSession(ctx);
-  session.step = 'schedule_custom';
+  session.step = 'schedule_custom_picker';
+  session.scheduleTimezone = session.scheduleTimezone || SERVER_TIMEZONE;
   await ctx.saveSession?.();
-
-  const exampleYear = new Date().getFullYear();
-  const message = '🗓️ **Programar Fecha Personalizada**\n\n'
-    + 'Envía la fecha y hora en formato:\n'
-    + '`DD/MM/YYYY HH:MM`\n\n'
-    + `Ejemplo: \`25/12/${exampleYear} 15:30\`\n\n`
-    + `⚠️ La hora debe ser en formato 24h (\`${SERVER_TIMEZONE}\`).`;
-
-  const buttons = [
-    [Markup.button.callback('◀️ Volver', 'xpost_schedule')],
-    [Markup.button.callback('❌ Cancelar', 'xpost_menu')],
-  ];
-
-  await ctx.reply(message, {
+  const PREFIX = 'xpost_sched';
+  const { text, keyboard } = dateTimePicker.getSchedulingMenu('es', PREFIX);
+  await ctx.reply(text, {
     parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard(buttons),
+    ...keyboard,
   });
 };
 
@@ -766,7 +752,8 @@ const schedulePost = async (ctx, minutes) => {
     let message = '✅ **Post Programado Exitosamente**\n\n';
     const safeHandle = session.accountHandle ? escapeMarkdown(session.accountHandle) : 'desconocida';
     message += `📤 Cuenta: @${safeHandle}\n`;
-    message += `📅 Fecha: ${escapeMarkdown(formatDate(scheduledAt))} (\`${SERVER_TIMEZONE}\`)\n`;
+    const displayTz = session.scheduleTimezone || SERVER_TIMEZONE;
+    message += `📅 Fecha: ${escapeMarkdown(formatDate(scheduledAt))} (\`${displayTz}\`)\n`;
     message += `🆔 ID: ${postId.substring(0, 8)}...\n\n`;
     message += 'El post se publicará automáticamente en la fecha indicada.';
 
@@ -918,38 +905,46 @@ const handleTextInput = async (ctx, next) => {
     return showComposeText(ctx);
   }
 
-  // Handle custom schedule date input
-  if (session.step === 'schedule_custom') {
+  // Handle custom time input from inline picker
+  if (session.step === 'schedule_custom_time') {
     const text = ctx.message?.text?.trim();
     if (!text) return next();
 
-    // Parse DD/MM/YYYY HH:MM
-    const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/);
+    if (text.startsWith('/')) return next();
+
+    const match = text.match(/^(\d{1,2}):(\d{2})$/);
     if (!match) {
-      const exampleYear = new Date().getFullYear();
-      await ctx.reply(
-        '❌ Formato inválido.\n\n'
-        + 'Usa: `DD/MM/YYYY HH:MM`\n'
-        + `Ejemplo: \`25/12/${exampleYear} 15:30\`\n`
-        + `Zona horaria: \`${SERVER_TIMEZONE}\``,
-        { parse_mode: 'Markdown' },
-      );
+      await ctx.reply('❌ Formato inválido. Usa HH:MM (24 horas).');
       return;
     }
 
-    const [, day, month, year, hour, minute] = match.map(Number);
-    const scheduledAt = new Date(year, month - 1, day, hour, minute);
+    const hour = parseInt(match[1], 10);
+    const minute = parseInt(match[2], 10);
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+      await ctx.reply('❌ Hora inválida. Usa HH:MM (00-23 / 00-59).');
+      return;
+    }
 
+    const dateInfo = session.scheduleCustomDate;
+    if (!dateInfo) {
+      await ctx.reply('❌ Sesión expirada. Selecciona la fecha de nuevo.');
+      return;
+    }
+
+    const scheduledAt = new Date(dateInfo.year, dateInfo.month, dateInfo.day, hour, minute);
     if (scheduledAt <= new Date()) {
       await ctx.reply('❌ La fecha debe ser en el futuro.');
       return;
     }
 
-    const minutesUntil = Math.round((scheduledAt.getTime() - Date.now()) / 60000);
-    session.step = STEPS.PREVIEW;
+    session.scheduleTempDate = scheduledAt.toISOString();
+    session.step = 'schedule_custom_picker';
     await ctx.saveSession?.();
 
-    return schedulePost(ctx, minutesUntil);
+    const PREFIX = 'xpost_sched';
+    const { text: confirmText, keyboard } = dateTimePicker.getConfirmationView(scheduledAt, SERVER_TIMEZONE, 'es', PREFIX);
+    await ctx.reply(confirmText, { parse_mode: 'Markdown', ...keyboard });
+    return;
   }
 
   return next();
@@ -1266,6 +1261,144 @@ const registerXPostWizardHandlers = (bot) => {
     await safeAnswer(ctx);
     await showCustomSchedule(ctx);
   });
+
+  // Inline date/time picker for X scheduling
+  const XPOST_PREFIX = 'xpost_sched';
+
+  for (let i = 0; i < 6; i++) {
+    bot.action(`${XPOST_PREFIX}_preset_${i}`, async (ctx) => {
+      await safeAnswer(ctx);
+      const session = getSession(ctx);
+      const scheduledDate = dateTimePicker.calculatePresetDate(i);
+      if (!scheduledDate) return;
+      session.scheduleTempDate = scheduledDate.toISOString();
+      await ctx.saveSession?.();
+      const tz = session.scheduleTimezone || SERVER_TIMEZONE;
+      const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, tz, 'es', XPOST_PREFIX);
+      await safeEditOrReply(ctx, text, { parse_mode: 'Markdown', ...keyboard });
+    });
+  }
+
+  bot.action(`${XPOST_PREFIX}_open_calendar`, async (ctx) => {
+    await safeAnswer(ctx);
+    const now = new Date();
+    const { text, keyboard } = dateTimePicker.getCalendarView(now.getFullYear(), now.getMonth(), 'es', XPOST_PREFIX);
+    await safeEditOrReply(ctx, text, { parse_mode: 'Markdown', ...keyboard });
+  });
+
+  bot.action(new RegExp(`^${XPOST_PREFIX}_month_(\\d{4})_(-?\\d+)$`), async (ctx) => {
+    await safeAnswer(ctx);
+    const parsed = dateTimePicker.parseMonthCallback(ctx.match[0]);
+    if (!parsed) return;
+    let { year, month } = parsed;
+    while (month < 0) { month += 12; year--; }
+    while (month > 11) { month -= 12; year++; }
+    const now = new Date();
+    if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth())) return;
+    const { text, keyboard } = dateTimePicker.getCalendarView(year, month, 'es', XPOST_PREFIX);
+    await safeEditOrReply(ctx, text, { parse_mode: 'Markdown', ...keyboard });
+  });
+
+  bot.action(new RegExp(`^${XPOST_PREFIX}_date_(\\d{4})_(\\d+)_(\\d+)$`), async (ctx) => {
+    await safeAnswer(ctx);
+    const parsed = dateTimePicker.parseDateCallback(ctx.match[0]);
+    if (!parsed) return;
+    const { year, month, day } = parsed;
+    const { text, keyboard } = dateTimePicker.getTimeSelectionView(year, month, day, 'es', XPOST_PREFIX);
+    await safeEditOrReply(ctx, text, { parse_mode: 'Markdown', ...keyboard });
+  });
+
+  bot.action(new RegExp(`^${XPOST_PREFIX}_time_(\\d{4})-(\\d{2})-(\\d{2})_(\\d{2})_(\\d{2})$`), async (ctx) => {
+    await safeAnswer(ctx);
+    const session = getSession(ctx);
+    const parsed = dateTimePicker.parseTimeCallback(ctx.match[0]);
+    if (!parsed) return;
+    const { year, month, day, hour, minute } = parsed;
+    const scheduledDate = new Date(year, month, day, hour, minute);
+    if (scheduledDate <= new Date()) {
+      await ctx.answerCbQuery('❌ La hora seleccionada ya pasó', { show_alert: true }).catch(() => {});
+      return;
+    }
+    session.scheduleTempDate = scheduledDate.toISOString();
+    await ctx.saveSession?.();
+    const tz = session.scheduleTimezone || SERVER_TIMEZONE;
+    const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, tz, 'es', XPOST_PREFIX);
+    await safeEditOrReply(ctx, text, { parse_mode: 'Markdown', ...keyboard });
+  });
+
+  bot.action(new RegExp(`^${XPOST_PREFIX}_custom_time_(\\d{4})-(\\d{2})-(\\d{2})$`), async (ctx) => {
+    await safeAnswer(ctx);
+    const session = getSession(ctx);
+    const match = ctx.match[0].match(/custom_time_(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return;
+    const [, year, month, day] = match;
+    session.scheduleCustomDate = { year: parseInt(year, 10), month: parseInt(month, 10) - 1, day: parseInt(day, 10) };
+    session.step = 'schedule_custom_time';
+    await ctx.saveSession?.();
+    const monthName = dateTimePicker.MONTHS_FULL.es[parseInt(month, 10) - 1];
+    const formattedDate = `${day} ${monthName} ${year}`;
+    await safeEditOrReply(ctx, `⌨️ *Hora Personalizada*\n\n📅 Fecha: *${formattedDate}*\n\nEscribe la hora en formato HH:MM (24 horas)`, {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('◀️ Volver', `${XPOST_PREFIX}_date_${year}_${parseInt(month, 10) - 1}_${day}`)],
+      ]),
+    });
+  });
+
+  bot.action(`${XPOST_PREFIX}_confirm`, async (ctx) => {
+    await safeAnswer(ctx);
+    const session = getSession(ctx);
+    const scheduledIso = session.scheduleTempDate;
+    if (!scheduledIso) return;
+    const scheduledAt = new Date(scheduledIso);
+    const minutesUntil = Math.round((scheduledAt.getTime() - Date.now()) / 60000);
+    session.step = STEPS.PREVIEW;
+    await ctx.saveSession?.();
+    await schedulePost(ctx, minutesUntil);
+  });
+
+  bot.action(`${XPOST_PREFIX}_change_tz`, async (ctx) => {
+    await safeAnswer(ctx);
+    const session = getSession(ctx);
+    session.scheduleTimezone = session.scheduleTimezone || SERVER_TIMEZONE;
+    await ctx.saveSession?.();
+    await safeEditOrReply(ctx, '🌍 *Zona Horaria*\n\nSelecciona tu zona horaria:', {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('🇨🇴 Bogotá', `${XPOST_PREFIX}_tz_America/Bogota`)],
+        [Markup.button.callback('🇺🇸 New York', `${XPOST_PREFIX}_tz_America/New_York`)],
+        [Markup.button.callback('🇺🇸 Los Angeles', `${XPOST_PREFIX}_tz_America/Los_Angeles`)],
+        [Markup.button.callback('🇲🇽 Mexico City', `${XPOST_PREFIX}_tz_America/Mexico_City`)],
+        [Markup.button.callback('🇪🇸 Madrid', `${XPOST_PREFIX}_tz_Europe/Madrid`)],
+        [Markup.button.callback('🇬🇧 London', `${XPOST_PREFIX}_tz_Europe/London`)],
+        [Markup.button.callback('🌐 UTC', `${XPOST_PREFIX}_tz_UTC`)],
+      ]),
+    });
+  });
+
+  const xpostTimezones = [
+    'America/Bogota',
+    'America/New_York',
+    'America/Los_Angeles',
+    'America/Mexico_City',
+    'Europe/Madrid',
+    'Europe/London',
+    'UTC',
+  ];
+
+  for (const tz of xpostTimezones) {
+    bot.action(`${XPOST_PREFIX}_tz_${tz}`, async (ctx) => {
+      await safeAnswer(ctx);
+      const session = getSession(ctx);
+      session.scheduleTimezone = tz;
+      await ctx.saveSession?.();
+      const scheduledIso = session.scheduleTempDate;
+      if (!scheduledIso) return;
+      const scheduledDate = new Date(scheduledIso);
+      const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, tz, 'es', XPOST_PREFIX);
+      await safeEditOrReply(ctx, text, { parse_mode: 'Markdown', ...keyboard });
+    });
+  }
 
   // View scheduled
   bot.action('xpost_view_scheduled', async (ctx) => {

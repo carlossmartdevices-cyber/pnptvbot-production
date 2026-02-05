@@ -1,4 +1,5 @@
 const UserModel = require('../../../models/userModel');
+const { cache } = require('../../../config/redis');
 const logger = require('../../../utils/logger');
 
 /**
@@ -26,8 +27,13 @@ const userExistsMiddleware = () => async (ctx, next) => {
   }
 
   const userId = ctx.from.id.toString();
+  const recentCreateKey = `user:recent_create:${userId}`;
 
   try {
+    const recentlyCreated = await cache.get(recentCreateKey);
+    if (recentlyCreated) {
+      return next();
+    }
     // Check if user exists in database
     const user = await UserModel.getById(userId);
 
@@ -58,6 +64,7 @@ const userExistsMiddleware = () => async (ctx, next) => {
           termsAccepted: false,
           privacyAccepted: false,
         });
+        await cache.set(recentCreateKey, true, 60);
         logger.info('Created basic user record for onboarding', { userId });
       } catch (createError) {
         logger.error('Error creating user record:', createError);

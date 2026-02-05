@@ -8,6 +8,14 @@ const logger = require('../../../utils/logger');
 const PermissionService = require('../../services/permissionService');
 const dateTimePicker = require('../../utils/dateTimePicker');
 
+const DEFAULT_TIMEZONE = 'America/Bogota';
+
+const ensureTimezone = (ctx) => {
+  if (!ctx.session?.temp) ctx.session.temp = {};
+  if (!ctx.session.temp.timezone) ctx.session.temp.timezone = DEFAULT_TIMEZONE;
+  return ctx.session.temp.timezone;
+};
+
 /**
  * Register date/time picker handlers for broadcast scheduling
  * @param {Telegraf} bot - Bot instance
@@ -80,10 +88,10 @@ const registerDateTimePickerHandlers = (bot) => {
         if (!ctx.session.temp) ctx.session.temp = {};
         ctx.session.temp.scheduledDate = scheduledDate.toISOString();
         ctx.session.temp.schedulingStep = 'confirming';
+        const tz = ensureTimezone(ctx);
         await ctx.saveSession();
 
-        // Show timezone selection before confirmation
-        await showTimezoneSelection(ctx, lang);
+        await showConfirmation(ctx, lang, tz);
       } catch (error) {
         logger.error('Error handling preset:', error);
         await ctx.answerCbQuery('❌ Error').catch(() => {});
@@ -253,10 +261,10 @@ const registerDateTimePickerHandlers = (bot) => {
       if (!ctx.session.temp) ctx.session.temp = {};
       ctx.session.temp.scheduledDate = scheduledDate.toISOString();
       ctx.session.temp.schedulingStep = 'selecting_timezone';
+      const tz = ensureTimezone(ctx);
       await ctx.saveSession();
 
-      // Show timezone selection
-      await showTimezoneSelection(ctx, lang);
+      await showConfirmation(ctx, lang, tz);
     } catch (error) {
       logger.error('Error selecting time:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
@@ -352,6 +360,31 @@ const registerDateTimePickerHandlers = (bot) => {
     });
   }
 
+  bot.action(`${PREFIX}_change_tz`, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+      await ctx.answerCbQuery();
+      const lang = ctx.session?.language || 'es';
+      await showTimezoneSelection(ctx, lang);
+    } catch (error) {
+      logger.error('Error changing timezone:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  async function showConfirmation(ctx, lang, timezone) {
+    const scheduledDate = new Date(ctx.session.temp.scheduledDate);
+    const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, timezone, lang, PREFIX);
+    await ctx.editMessageText(text, {
+      parse_mode: 'Markdown',
+      ...keyboard,
+    });
+  }
+
   /**
    * Handle timezone selection
    */
@@ -384,13 +417,7 @@ const registerDateTimePickerHandlers = (bot) => {
         await ctx.saveSession();
 
         // Show confirmation
-        const scheduledDate = new Date(ctx.session.temp.scheduledDate);
-        const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, tz, lang, PREFIX);
-
-        await ctx.editMessageText(text, {
-          parse_mode: 'Markdown',
-          ...keyboard,
-        });
+        await showConfirmation(ctx, lang, tz);
       } catch (error) {
         logger.error('Error selecting timezone:', error);
         await ctx.answerCbQuery('❌ Error').catch(() => {});
@@ -416,13 +443,15 @@ const registerDateTimePickerHandlers = (bot) => {
       await ctx.answerCbQuery();
       const lang = ctx.session?.language || 'es';
 
-      if (!ctx.session.temp?.scheduledDate || !ctx.session.temp?.timezone) {
+      if (!ctx.session.temp?.scheduledDate) {
         await ctx.answerCbQuery(lang === 'es' ? '❌ Sesión expirada' : '❌ Session expired', { show_alert: true });
         return;
       }
 
       const scheduledDate = new Date(ctx.session.temp.scheduledDate);
-      const timezone = ctx.session.temp.timezone;
+      const timezone = ensureTimezone(ctx);
+
+      const schedulingContext = ctx.session.temp.schedulingContext || (ctx.session.temp.scheduleCount > 1 ? 'multi' : 'single');
 
       // Store the final scheduled info for broadcast creation
       ctx.session.temp.confirmedSchedule = {
@@ -434,6 +463,80 @@ const registerDateTimePickerHandlers = (bot) => {
       await ctx.saveSession();
 
       const formattedDate = dateTimePicker.formatDate(scheduledDate, lang);
+
+      if (schedulingContext === 'multi') {
+        if (!ctx.session.temp.scheduledTimes) ctx.session.temp.scheduledTimes = [];
+        ctx.session.temp.scheduledTimes.push(scheduledDate.toISOString());
+        const currentIndex = ctx.session.temp.scheduledTimes.length;
+        const totalCount = ctx.session.temp.scheduleCount || currentIndex;
+        await ctx.saveSession();
+
+        if (currentIndex >= totalCount) {
+          const text = lang === 'es'
+            ? `✅ *Programación ${currentIndex}/${totalCount} Confirmada*\n\n` +
+              `📅 ${formattedDate}\n` +
+              `🌍 ${timezone}\n\n` +
+              `Ya están listas todas las fechas.`
+            : `✅ *Schedule ${currentIndex}/${totalCount} Confirmed*\n\n` +
+              `📅 ${formattedDate}\n` +
+              `🌍 ${timezone}\n\n` +
+              `All dates are ready.`;
+
+          await ctx.editMessageText(text, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(lang === 'es' ? '✅ Crear broadcasts' : '✅ Create broadcasts', 'broadcast_create_scheduled_multiple')],
+              [Markup.button.callback(lang === 'es' ? '❌ Cancelar' : '❌ Cancel', 'admin_cancel')],
+            ]),
+          });
+        } else {
+          const text = lang === 'es'
+            ? `✅ *Programación ${currentIndex}/${totalCount} Confirmada*\n\n` +
+              `📅 ${formattedDate}\n` +
+              `🌍 ${timezone}\n\n` +
+              `¿Deseas agregar otra fecha?`
+            : `✅ *Schedule ${currentIndex}/${totalCount} Confirmed*\n\n` +
+              `📅 ${formattedDate}\n` +
+              `🌍 ${timezone}\n\n` +
+              `Do you want to add another date?`;
+
+          const nextLabel = lang === 'es' ? '➕ Agregar otra fecha' : '➕ Add another date';
+          const finishLabel = lang === 'es' ? '✅ Finalizar y crear' : '✅ Finish and create';
+
+          await ctx.editMessageText(text, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(nextLabel, `${PREFIX}_next`)],
+              [Markup.button.callback(finishLabel, `${PREFIX}_finish_multi`)],
+              [Markup.button.callback(lang === 'es' ? '❌ Cancelar' : '❌ Cancel', 'admin_cancel')],
+            ]),
+          });
+        }
+        return;
+      }
+
+      if (schedulingContext === 'recurring_start') {
+        const text = lang === 'es'
+          ? `✅ *Inicio Programado*\n\n` +
+            `📅 ${formattedDate}\n` +
+            `🌍 ${timezone}\n\n` +
+            `El broadcast recurrente usará esta fecha como inicio.`
+          : `✅ *Start Scheduled*\n\n` +
+            `📅 ${formattedDate}\n` +
+            `🌍 ${timezone}\n\n` +
+            `The recurring broadcast will use this as the start date.`;
+
+        const continueLabel = lang === 'es' ? '✅ Crear Recurrente' : '✅ Create Recurring';
+
+        await ctx.editMessageText(text, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(continueLabel, 'broadcast_create_recurring_from_picker')],
+            [Markup.button.callback(lang === 'es' ? '✏️ Cambiar' : '✏️ Change', `${PREFIX}_back_to_presets`)],
+          ]),
+        });
+        return;
+      }
 
       const text = lang === 'es'
         ? `✅ *Programación Confirmada*\n\n` +
@@ -456,6 +559,67 @@ const registerDateTimePickerHandlers = (bot) => {
       });
     } catch (error) {
       logger.error('Error confirming schedule:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  // ==========================================
+  // MULTI-SCHEDULE CONTROLS
+  // ==========================================
+
+  bot.action(`${PREFIX}_next`, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      await ctx.answerCbQuery();
+      const lang = ctx.session?.language || 'es';
+
+      ctx.session.temp.schedulingStep = 'selecting_datetime';
+      ctx.session.temp.scheduledDate = null;
+      await ctx.saveSession();
+
+      const { text, keyboard } = dateTimePicker.getSchedulingMenu(lang, PREFIX);
+      await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
+    } catch (error) {
+      logger.error('Error moving to next schedule:', error);
+      await ctx.answerCbQuery('❌ Error').catch(() => {});
+    }
+  });
+
+  bot.action(`${PREFIX}_finish_multi`, async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        await ctx.answerCbQuery('❌ No autorizado');
+        return;
+      }
+
+      await ctx.answerCbQuery();
+      const lang = ctx.session?.language || 'es';
+
+      const scheduledTimes = ctx.session.temp?.scheduledTimes || [];
+      if (!scheduledTimes.length) {
+        await ctx.answerCbQuery(lang === 'es' ? '❌ No hay fechas' : '❌ No dates', { show_alert: true });
+        return;
+      }
+
+      const text = lang === 'es'
+        ? `✅ *Fechas listas*\n\nSe crearán ${scheduledTimes.length} broadcasts programados.`
+        : `✅ *Dates ready*\n\n${scheduledTimes.length} scheduled broadcasts will be created.`;
+
+      await ctx.editMessageText(text, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(lang === 'es' ? '✅ Crear broadcasts' : '✅ Create broadcasts', 'broadcast_create_scheduled_multiple')],
+          [Markup.button.callback(lang === 'es' ? '✏️ Agregar otra fecha' : '✏️ Add another date', `${PREFIX}_next`)],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error finishing multi schedule:', error);
       await ctx.answerCbQuery('❌ Error').catch(() => {});
     }
   });
