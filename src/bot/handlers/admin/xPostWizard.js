@@ -46,6 +46,7 @@ const STEPS = {
   MENU: 'menu',
   SELECT_ACCOUNT: 'select_account',
   COMPOSE_TEXT: 'compose_text',
+  AI_LANGUAGE: 'ai_language',
   AI_PROMPT: 'ai_prompt',
   ADD_MEDIA: 'add_media',
   PREVIEW: 'preview',
@@ -68,6 +69,7 @@ const getSession = (ctx) => {
       mediaType: null,
       scheduledAt: null,
       lastAiPrompt: null,
+      aiLanguage: null,
     };
   }
   return ctx.session.temp[SESSION_KEY];
@@ -276,7 +278,8 @@ const showComposeText = async (ctx, edit = false) => {
   buttons.push([Markup.button.callback('🤖 Generar con Grok', 'xpost_ai_generate')]);
 
   if (session.lastAiPrompt) {
-    buttons.push([Markup.button.callback('🔄 Regenerar Grok', 'xpost_ai_regenerate')]);
+    const langLabel = session.aiLanguage === 'English' ? '🇬🇧' : '🇪🇸';
+    buttons.push([Markup.button.callback(`🔄 Regenerar ${langLabel}`, 'xpost_ai_regenerate')]);
   }
 
   if (session.text) {
@@ -838,31 +841,62 @@ const generateAIContent = async (ctx, prompt, isRegenerate = false) => {
   session.lastAiPrompt = prompt;
   await ctx.saveSession?.();
 
-  await ctx.reply('⏳ Generando post con Grok...');
+  const language = session.aiLanguage || 'Spanish';
+  const langLabel = language === 'English' ? '🇬🇧' : '🇪🇸';
+  await ctx.reply(`⏳ Generando post en ${langLabel} con Grok...`);
 
   try {
+    // Build a focused sales prompt for X/Twitter
+    const salesPrompt = language === 'English'
+      ? `Create a SINGLE sales tweet for X (Twitter) about: ${prompt}
+
+STRICT RULES:
+- MAXIMUM 280 characters total (including links, emojis, hashtags)
+- Language: English only
+- Structure: HOOK (caps) + brief pitch + CTA
+- Include ONE link: t.me/pnplatinotv_bot OR pnptv.app/lifetime100
+- Use 2-3 emojis max
+- 2-3 hashtags max
+- NO explanations, ONLY the final tweet text`
+      : `Crea UN SOLO tweet de venta para X (Twitter) sobre: ${prompt}
+
+REGLAS ESTRICTAS:
+- MÁXIMO 280 caracteres total (incluyendo links, emojis, hashtags)
+- Idioma: Español únicamente
+- Estructura: GANCHO (mayúsculas) + pitch breve + CTA
+- Incluir UN link: t.me/pnplatinotv_bot O pnptv.app/lifetime100
+- Usar 2-3 emojis máximo
+- 2-3 hashtags máximo
+- SIN explicaciones, SOLO el texto final del tweet`;
+
     const aiText = await GrokService.chat({
       mode: 'xPost',
-      language: 'Spanish',
-      prompt: `Solicitud del usuario: ${prompt}`,
-      maxTokens: 180,
+      language,
+      prompt: salesPrompt,
+      maxTokens: 150,
     });
 
-    const normalized = XPostService.ensureRequiredLinks(
-      aiText,
-      X_REQUIRED_LINKS,
-      X_MAX_TEXT_LENGTH,
-    );
-    session.text = normalized.text;
+    // Clean up the response - remove any explanations or extra text
+    let cleanText = aiText.trim();
+    // If Grok added explanations, try to extract just the tweet
+    if (cleanText.length > 350) {
+      const lines = cleanText.split('\n').filter(l => l.trim());
+      // Find the line that looks most like a tweet (has emojis/hashtags)
+      const tweetLine = lines.find(l => l.includes('#') || /[\u{1F300}-\u{1F9FF}]/u.test(l)) || lines[0];
+      cleanText = tweetLine || cleanText.substring(0, 280);
+    }
 
+    // Ensure we don't exceed 280 chars
+    if (cleanText.length > X_MAX_TEXT_LENGTH) {
+      cleanText = cleanText.substring(0, X_MAX_TEXT_LENGTH - 3) + '...';
+    }
+
+    session.text = cleanText;
     session.step = STEPS.COMPOSE_TEXT;
     await ctx.saveSession?.();
 
     const genLabel = isRegenerate ? 'regenerado' : 'generado';
-    const notice = normalized.truncated
-      ? `✅ Post ${genLabel} (texto recortado para incluir links).`
-      : `✅ Post ${genLabel} exitosamente.`;
-    await ctx.reply(notice);
+    await ctx.reply(`✅ Post ${genLabel} (${cleanText.length}/${X_MAX_TEXT_LENGTH} chars)`);
 
     return showComposeText(ctx);
   } catch (error) {
@@ -1056,34 +1090,86 @@ const registerXPostWizardHandlers = (bot) => {
     await showComposeText(ctx, true);
   });
 
-  // AI Generate button
+  // AI Generate button - show language selection first
   bot.action('xpost_ai_generate', async (ctx) => {
     const isAdmin = await PermissionService.isAdmin(ctx.from.id);
     if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
 
     const session = getSession(ctx);
-    session.step = STEPS.AI_PROMPT;
+    session.step = STEPS.AI_LANGUAGE;
     await ctx.saveSession?.();
 
     await safeAnswer(ctx);
-    await ctx.reply(
+    await safeEditOrReply(ctx,
       '🤖 *Generar post con Grok*\n\n'
-      + 'Describe en una frase lo que quieres publicar.\n\n'
-      + '*Ejemplos:*\n'
-      + '• `Anuncia show en vivo esta noche`\n'
-      + '• `Promo lifetime con urgencia`\n'
-      + '• `Nuevo video de clouds subido`',
+      + '🌍 Selecciona el idioma del post:',
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
+          [Markup.button.callback('🇪🇸 Español', 'xpost_ai_lang_es')],
+          [Markup.button.callback('🇬🇧 English', 'xpost_ai_lang_en')],
           [Markup.button.callback('◀️ Volver', 'xpost_compose')],
-          [Markup.button.callback('❌ Cancelar', 'xpost_menu')],
         ]),
       },
     );
   });
 
-  // Regenerate AI
+  // Language selection handlers
+  bot.action('xpost_ai_lang_es', async (ctx) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
+
+    const session = getSession(ctx);
+    session.aiLanguage = 'Spanish';
+    session.step = STEPS.AI_PROMPT;
+    await ctx.saveSession?.();
+
+    await safeAnswer(ctx, '🇪🇸 Español');
+    await safeEditOrReply(ctx,
+      '🤖 *Generar post en Español*\n\n'
+      + 'Describe brevemente lo que quieres promocionar:\n\n'
+      + '*Ejemplos:*\n'
+      + '• `Show en vivo esta noche`\n'
+      + '• `Promo lifetime $100`\n'
+      + '• `Nuevo video de clouds`',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('◀️ Cambiar idioma', 'xpost_ai_generate')],
+          [Markup.button.callback('❌ Cancelar', 'xpost_compose')],
+        ]),
+      },
+    );
+  });
+
+  bot.action('xpost_ai_lang_en', async (ctx) => {
+    const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+    if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
+
+    const session = getSession(ctx);
+    session.aiLanguage = 'English';
+    session.step = STEPS.AI_PROMPT;
+    await ctx.saveSession?.();
+
+    await safeAnswer(ctx, '🇬🇧 English');
+    await safeEditOrReply(ctx,
+      '🤖 *Generate post in English*\n\n'
+      + 'Briefly describe what you want to promote:\n\n'
+      + '*Examples:*\n'
+      + '• `Live show tonight`\n'
+      + '• `Lifetime promo $100`\n'
+      + '• `New clouds video`',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('◀️ Change language', 'xpost_ai_generate')],
+          [Markup.button.callback('❌ Cancel', 'xpost_compose')],
+        ]),
+      },
+    );
+  });
+
+  // Regenerate AI - uses the same language as before
   bot.action('xpost_ai_regenerate', async (ctx) => {
     const isAdmin = await PermissionService.isAdmin(ctx.from.id);
     if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
@@ -1094,7 +1180,8 @@ const registerXPostWizardHandlers = (bot) => {
       return;
     }
 
-    await safeAnswer(ctx, '🔄 Regenerando...');
+    const langLabel = session.aiLanguage === 'English' ? '🇬🇧' : '🇪🇸';
+    await safeAnswer(ctx, `🔄 Regenerando ${langLabel}...`);
     await generateAIContent(ctx, session.lastAiPrompt, true);
   });
 
