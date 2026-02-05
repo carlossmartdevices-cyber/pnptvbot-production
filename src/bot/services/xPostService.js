@@ -9,12 +9,37 @@ const logger = require('../../utils/logger');
 const PaymentSecurityService = require('./paymentSecurityService');
 
 const X_API_BASE = 'https://api.twitter.com/2';
-const X_MEDIA_UPLOAD_URL = 'https://api.x.com/2/media/upload';
+const X_MEDIA_UPLOAD_BASE = 'https://api.x.com/2/media/upload';
 const X_MAX_TEXT_LENGTH = 280;
 const X_TOKEN_EXPIRY_BUFFER_MS = 2 * 60 * 1000;
 const XOAuthService = require('./xOAuthService');
-const X_MEDIA_CHUNK_SIZE = 4 * 1024 * 1024; // 4MB
+const X_MEDIA_CHUNK_SIZE = 1 * 1024 * 1024; // 1MB (v2 limit)
 
+// Detect MIME type from file magic bytes
+function detectMimeType(filePath) {
+  const fd = fs.openSync(filePath, 'r');
+  const buf = Buffer.alloc(12);
+  fs.readSync(fd, buf, 0, 12, 0);
+  fs.closeSync(fd);
+
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return 'image/jpeg';
+  // PNG: 89 50 4E 47
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return 'image/png';
+  // GIF: 47 49 46
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return 'image/gif';
+  // BMP: 42 4D
+  if (buf[0] === 0x42 && buf[1] === 0x4D) return 'image/bmp';
+  // WebP: 52 49 46 46 ... 57 45 42 50
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+      buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return 'image/webp';
+  // MP4: ... 66 74 79 70 (ftyp at offset 4)
+  if (buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) return 'video/mp4';
+  // WebM: 1A 45 DF A3
+  if (buf[0] === 0x1A && buf[1] === 0x45 && buf[2] === 0xDF && buf[3] === 0xA3) return 'video/webm';
+
+  return null;
+}
 
 class XPostService {
   static normalizeXText(text) {
@@ -304,7 +329,8 @@ class XPostService {
       maxBodyLength: Infinity,
     });
 
-    const contentType = response.headers['content-type'] || 'application/octet-stream';
+    const rawContentType = response.headers['content-type'] || '';
+    const headerType = rawContentType.split(';')[0].trim();
     const totalBytes = Number(response.headers['content-length'] || 0);
 
     await new Promise((resolve, reject) => {
@@ -316,9 +342,21 @@ class XPostService {
 
     const stats = await fs.promises.stat(tempPath);
 
+    let mimeType = headerType && headerType !== 'application/octet-stream' ? headerType : null;
+    if (!mimeType) {
+      const detected = detectMimeType(tempPath);
+      if (detected) {
+        mimeType = detected;
+      }
+    }
+
+    if (!mimeType) {
+      throw new Error('No se pudo detectar el tipo MIME del archivo (solo imágenes y videos son válidos)');
+    }
+
     return {
       filePath: tempPath,
-      mimeType: contentType,
+      mimeType,
       size: totalBytes || stats.size,
     };
   }
@@ -338,20 +376,18 @@ class XPostService {
       const mediaCategory = this.getMediaCategory(mimeType);
       logger.info('X media upload INIT (v2)', { mimeType, size, mediaCategory });
 
-      // INIT
-      const initForm = new FormData();
-      initForm.append('command', 'INIT');
-      initForm.append('media_type', mimeType);
-      initForm.append('total_bytes', String(size));
-      initForm.append('media_category', mediaCategory);
-
+      // INIT (v2)
       const initRes = await axios.post(
-        X_MEDIA_UPLOAD_URL,
-        initForm,
+        `${X_MEDIA_UPLOAD_BASE}/initialize`,
+        {
+          media_type: mimeType,
+          total_bytes: size,
+          media_category: mediaCategory,
+        },
         {
           headers: {
             Authorization: authHeader,
-            ...initForm.getHeaders(),
+            'Content-Type': 'application/json',
           },
           timeout: 30000,
           maxBodyLength: Infinity,
@@ -359,12 +395,14 @@ class XPostService {
       );
 
       // v2 returns 'id' in data, v1.1 returned 'media_id_string'
-      const mediaId = initRes.data?.data?.id || initRes.data?.media_id_string || initRes.data?.media_id;
+      const mediaId = initRes.data?.data?.id || initRes.data?.id || initRes.data?.media_id_string || initRes.data?.media_id;
       if (!mediaId) {
         logger.error('X media upload INIT failed - no media_id', { responseData: initRes.data });
         throw new Error('No se recibió media_id al inicializar upload');
       }
       logger.info('X media upload INIT ok', { mediaId });
+
+      const appendUrl = `${X_MEDIA_UPLOAD_BASE}/${mediaId}/append`;
 
       // APPEND chunks
       const fileHandle = await fs.promises.open(filePath, 'r');
@@ -379,8 +417,6 @@ class XPostService {
 
           const chunk = buffer.subarray(0, bytesRead);
           const appendForm = new FormData();
-          appendForm.append('command', 'APPEND');
-          appendForm.append('media_id', String(mediaId));
           appendForm.append('segment_index', String(segmentIndex));
           appendForm.append('media', chunk, {
             filename: `chunk_${segmentIndex}`,
@@ -388,7 +424,7 @@ class XPostService {
           });
 
           await axios.post(
-            X_MEDIA_UPLOAD_URL,
+            appendUrl,
             appendForm,
             {
               headers: {
@@ -407,25 +443,21 @@ class XPostService {
         await fileHandle.close();
       }
 
-      // FINALIZE
-      const finalizeForm = new FormData();
-      finalizeForm.append('command', 'FINALIZE');
-      finalizeForm.append('media_id', String(mediaId));
-
+      // FINALIZE (v2)
       const finalizeRes = await axios.post(
-        X_MEDIA_UPLOAD_URL,
-        finalizeForm,
+        `${X_MEDIA_UPLOAD_BASE}/${mediaId}/finalize`,
+        {},
         {
           headers: {
             Authorization: authHeader,
-            ...finalizeForm.getHeaders(),
+            'Content-Type': 'application/json',
           },
           timeout: 30000,
           maxBodyLength: Infinity,
         }
       );
 
-      const processingInfo = finalizeRes.data?.processing_info || finalizeRes.data?.data?.processing_info;
+      const processingInfo = finalizeRes.data?.data?.processing_info || finalizeRes.data?.processing_info;
       logger.info('X media upload FINALIZE ok', { mediaId, hasProcessing: !!processingInfo });
       if (processingInfo) {
         await this.waitForMediaProcessing(accessToken, mediaId, processingInfo);
@@ -461,15 +493,14 @@ class XPostService {
     while (state && state !== 'succeeded' && state !== 'failed' && attempts < 10) {
       await new Promise((resolve) => setTimeout(resolve, checkAfter * 1000));
       const statusRes = await axios.get(
-        X_MEDIA_UPLOAD_URL,
+        `${X_MEDIA_UPLOAD_BASE}/${mediaId}`,
         {
-          params: { command: 'STATUS', media_id: String(mediaId) },
           headers: { Authorization: `Bearer ${accessToken}` },
           timeout: 15000,
         }
       );
 
-      const info = statusRes.data?.processing_info;
+      const info = statusRes.data?.data?.processing_info || statusRes.data?.processing_info;
       state = info?.state || state;
       checkAfter = info?.check_after_secs || checkAfter;
       attempts += 1;

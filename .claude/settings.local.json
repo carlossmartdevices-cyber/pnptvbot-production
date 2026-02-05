@@ -158,7 +158,10 @@
       "Bash(npx prisma db pull:*)",
       "Bash(DATABASE_URL=\"postgresql://pnptvbot:Apelo801050%23@76.13.26.234:5432/pnptvbot\" DIRECT_URL=\"postgresql://pnptvbot:Apelo801050%23@76.13.26.234:5432/pnptvbot\" npx prisma db pull --print)",
       "Bash(DATABASE_URL=\"postgresql://pnptvbot:Apelo801050%23@76.13.26.234:5432/pnptvbot\" DIRECT_URL=\"postgresql://pnptvbot:Apelo801050%23@76.13.26.234:5432/pnptvbot\" npx prisma migrate deploy:*)",
-      "Bash(DATABASE_URL=\"postgresql://pnptvbot:Apelo801050%23@76.13.26.234:5432/pnptvbot\" DIRECT_URL=\"postgresql://pnptvbot:Apelo801050%23@76.13.26.234:5432/pnptvbot\" npx prisma generate:*)"
+      "Bash(DATABASE_URL=\"postgresql://pnptvbot:Apelo801050%23@76.13.26.234:5432/pnptvbot\" DIRECT_URL=\"postgresql://pnptvbot:Apelo801050%23@76.13.26.234:5432/pnptvbot\" npx prisma generate:*)",
+      "WebFetch(domain:developer.x.com)",
+      "WebFetch(domain:devcommunity.x.com)",
+      "WebFetch(domain:docs.x.com)"
     ],
     "deny": [],
     "ask": []
