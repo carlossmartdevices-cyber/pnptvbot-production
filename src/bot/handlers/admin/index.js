@@ -3296,13 +3296,12 @@ let registerAdminHandlers = (bot) => {
       return next();
     }
 
-    // X Post Wizard text input (compose, AI prompt, or schedule custom)
+    // X Post Wizard text input (compose, AI prompt, or schedule custom time)
     const xPostSession = getXPostSession(ctx);
     if (
       xPostSession.step === XPOST_STEPS.COMPOSE_TEXT
-      || xPostSession.step === XPOST_STEPS.AI_PROMPT_EN
-      || xPostSession.step === XPOST_STEPS.AI_PROMPT_ES
-      || xPostSession.step === 'schedule_custom'
+      || xPostSession.step === XPOST_STEPS.AI_PROMPT
+      || xPostSession.step === 'schedule_custom_time'
     ) {
       logger.info('[TEXT-HANDLER] Processing X post wizard text input', { userId: ctx.from.id, step: xPostSession.step });
       return handleXPostTextInput(ctx, next);

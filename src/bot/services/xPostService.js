@@ -9,11 +9,12 @@ const logger = require('../../utils/logger');
 const PaymentSecurityService = require('./paymentSecurityService');
 
 const X_API_BASE = 'https://api.twitter.com/2';
-const X_MEDIA_UPLOAD_URL = 'https://upload.twitter.com/1.1/media/upload.json';
+const X_MEDIA_UPLOAD_URL = 'https://api.x.com/2/media/upload';
 const X_MAX_TEXT_LENGTH = 280;
 const X_TOKEN_EXPIRY_BUFFER_MS = 2 * 60 * 1000;
 const XOAuthService = require('./xOAuthService');
 const X_MEDIA_CHUNK_SIZE = 4 * 1024 * 1024; // 4MB
+
 
 class XPostService {
   static normalizeXText(text) {
@@ -232,7 +233,7 @@ class XPostService {
         });
       } catch (error) {
         if (error?.response?.status === 403) {
-          throw new Error('X API 403 al subir media. Revisa permisos (media.write) o reconecta la cuenta.');
+          throw new Error('X API 403 al subir media. Reconecta la cuenta desde ⚙️ Gestionar Cuentas para obtener el scope media.write.');
         }
         throw error;
       }
@@ -331,10 +332,11 @@ class XPostService {
 
   static async uploadMediaToX({ accessToken, mediaUrl }) {
     const { filePath, mimeType, size } = await this.downloadMediaToFile(mediaUrl);
+    const authHeader = `Bearer ${accessToken}`;
 
     try {
       const mediaCategory = this.getMediaCategory(mimeType);
-      logger.info('X media upload INIT', { mimeType, size, mediaCategory });
+      logger.info('X media upload INIT (v2)', { mimeType, size, mediaCategory });
 
       // INIT
       const initForm = new FormData();
@@ -348,7 +350,7 @@ class XPostService {
         initForm,
         {
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: authHeader,
             ...initForm.getHeaders(),
           },
           timeout: 30000,
@@ -356,7 +358,8 @@ class XPostService {
         }
       );
 
-      const mediaId = initRes.data?.media_id_string || initRes.data?.media_id;
+      // v2 returns 'id' in data, v1.1 returned 'media_id_string'
+      const mediaId = initRes.data?.data?.id || initRes.data?.media_id_string || initRes.data?.media_id;
       if (!mediaId) {
         logger.error('X media upload INIT failed - no media_id', { responseData: initRes.data });
         throw new Error('No se recibió media_id al inicializar upload');
@@ -389,10 +392,10 @@ class XPostService {
             appendForm,
             {
               headers: {
-                Authorization: `Bearer ${accessToken}`,
+                Authorization: authHeader,
                 ...appendForm.getHeaders(),
               },
-              timeout: 30000,
+              timeout: 60000,
               maxBodyLength: Infinity,
             }
           );
@@ -414,7 +417,7 @@ class XPostService {
         finalizeForm,
         {
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: authHeader,
             ...finalizeForm.getHeaders(),
           },
           timeout: 30000,
@@ -422,7 +425,7 @@ class XPostService {
         }
       );
 
-      const processingInfo = finalizeRes.data?.processing_info;
+      const processingInfo = finalizeRes.data?.processing_info || finalizeRes.data?.data?.processing_info;
       logger.info('X media upload FINALIZE ok', { mediaId, hasProcessing: !!processingInfo });
       if (processingInfo) {
         await this.waitForMediaProcessing(accessToken, mediaId, processingInfo);

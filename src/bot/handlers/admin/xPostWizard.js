@@ -1011,23 +1011,17 @@ const handleMediaInput = async (ctx, media) => {
   }
 
   try {
-    let downloadUrl = null;
-    if (process.env.BOT_TOKEN) {
-      const filePath = await ctx.telegram.getFile(fileId);
-      if (filePath?.file_path) {
-        downloadUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${filePath.file_path}`;
-      }
-    }
-
+    // Store the fileId instead of the temporary download URL.
+    // The fileId is permanent and will be resolved to a fresh URL at send time.
     session.mediaType = media.type || 'media';
     session.mediaFileId = fileId;
-    session.mediaUrl = downloadUrl || fileId;
+    session.mediaUrl = fileId;
     await ctx.saveSession?.();
 
     logger.info('X post media saved', {
       userId: ctx.from?.id,
       type: session.mediaType,
-      hasUrl: !!downloadUrl,
+      fileId,
     });
 
     await ctx.reply('✅ Media guardada correctamente');
@@ -1051,13 +1045,23 @@ const registerXPostWizardHandlers = (bot) => {
     await showXPostMenu(ctx, true);
   });
 
-  // New post flow
+  // New post flow - auto-select if only 1 account
   bot.action('xpost_new', async (ctx) => {
     const isAdmin = await PermissionService.isAdmin(ctx.from.id);
     if (!isAdmin) return ctx.answerCbQuery('❌ No autorizado');
     clearSession(ctx);
     await safeAnswer(ctx);
-    await showAccountSelection(ctx, true);
+
+    const accounts = await XPostService.listActiveAccounts();
+    if (accounts.length === 1) {
+      const session = getSession(ctx);
+      session.accountId = accounts[0].account_id;
+      session.accountHandle = accounts[0].handle;
+      await ctx.saveSession?.();
+      await showComposeText(ctx, true);
+    } else {
+      await showAccountSelection(ctx, true);
+    }
   });
 
   // Account selection
