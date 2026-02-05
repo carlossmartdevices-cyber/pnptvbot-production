@@ -153,14 +153,14 @@ class PaymentService {
 
       let paymentUrl;
       const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
-      const checkoutDomain = process.env.CHECKOUT_DOMAIN || process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
+      const checkoutDomain = process.env.CHECKOUT_DOMAIN || 'https://easybots.store';
 
       if (provider === 'epayco') {
         // Create payment reference
         const paymentRef = `PAY-${payment.id.substring(0, 8).toUpperCase()}`;
 
         // Use landing page before ePayco checkout
-        paymentUrl = `${checkoutDomain}/pay/${payment.id}`;
+        paymentUrl = `${checkoutDomain}/payment/${payment.id}`;
         
         await PaymentModel.updateStatus(payment.id, 'pending', {
           paymentUrl,
@@ -177,7 +177,7 @@ class PaymentService {
         // Create Daimo payment using official API
         try {
           const daimoResult = await DaimoConfig.createDaimoPayment({
-            amount: plan.price,
+            amount: payment.amount,
             userId,
             planId,
             chatId,
@@ -325,7 +325,7 @@ class PaymentService {
     const md5Ready = invoice && x_amount && x_currency_code;
     let md5Valid = false;
     if (md5Ready) {
-      const md5String = `${custId}${pKey}${invoice}${x_amount}${x_currency_code}`;
+      const md5String = `${custId}^${pKey}^${invoice}^${x_amount}^${x_currency_code}`;
       const expected = crypto.createHash('md5').update(md5String).digest('hex');
       md5Valid = expected === signatureValue;
     }
@@ -352,7 +352,7 @@ class PaymentService {
       return null;
     }
 
-    const signatureString = `${custId}${pKey}${invoice}${amount}${currencyCode}`;
+    const signatureString = `${custId}^${pKey}^${invoice}^${amount}^${currencyCode}`;
     return crypto.createHash('md5').update(signatureString).digest('hex');
   }
 

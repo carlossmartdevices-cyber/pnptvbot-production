@@ -152,6 +152,32 @@ class SubscriptionController {
 
       // Create checkout data for frontend
       const baseUrl = process.env.BOT_WEBHOOK_DOMAIN || 'http://localhost:3000';
+      if (process.env.NODE_ENV === 'production' && baseUrl.includes('localhost')) {
+        return res.status(500).json({
+          success: false,
+          error: 'BOT_WEBHOOK_DOMAIN must be set to a public HTTPS domain in production.',
+        });
+      }
+
+      if (process.env.NODE_ENV === 'production') {
+        const missing = [];
+        if (!process.env.EPAYCO_P_KEY && !process.env.EPAYCO_PRIVATE_KEY) missing.push('EPAYCO_P_KEY');
+        if (!process.env.EPAYCO_P_CUST_ID && !process.env.EPAYCO_PUBLIC_KEY) missing.push('EPAYCO_P_CUST_ID');
+        if (!process.env.EPAYCO_PUBLIC_KEY) missing.push('EPAYCO_PUBLIC_KEY');
+        if (missing.length > 0) {
+          return res.status(500).json({
+            success: false,
+            error: `Missing required ePayco configuration: ${missing.join(', ')}`,
+          });
+        }
+      }
+
+      if (!epaycoSignature) {
+        return res.status(500).json({
+          success: false,
+          error: 'Unable to generate ePayco signature. Check ePayco configuration.',
+        });
+      }
       const checkoutData = {
         planId,
         planName: plan.name,

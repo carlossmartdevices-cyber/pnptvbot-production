@@ -67,7 +67,7 @@
     - `webapps/live/src/utils/api.js`
     - `webapps/radio/src/utils/api.js`
     - `webapps/videorama/src/utils/api.js`
-    - `webapps/design-system/styles.css` (reverted and re-added icon-check)
+    - `webapps/design-system/styles.css`
     - `public/lifetime-pass.html`
     - `webapps/portal/src/App.jsx`
 - RENAMED:

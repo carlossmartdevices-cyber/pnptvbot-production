@@ -36,9 +36,9 @@ const SUPPORTED_PAYMENT_APPS = [
 const getDaimoConfig = () => {
   const treasuryAddress = process.env.DAIMO_TREASURY_ADDRESS;
   const refundAddress = process.env.DAIMO_REFUND_ADDRESS;
-  const webhookUrl = process.env.BOT_WEBHOOK_DOMAIN
-    ? `${process.env.BOT_WEBHOOK_DOMAIN}/api/webhooks/daimo`
-    : null;
+  // Daimo webhooks must go to easybots.store (payment webhook domain)
+  const webhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || process.env.CHECKOUT_DOMAIN || 'https://easybots.store';
+  const webhookUrl = `${webhookDomain}/api/webhooks/daimo`;
 
   // Validate critical configuration
   if (!treasuryAddress) {
@@ -79,9 +79,8 @@ const getDaimoConfig = () => {
     // App metadata
     appName: 'PNPtv Bot',
     appDescription: 'Premium subscriptions and content access',
-    appIcon: process.env.BOT_WEBHOOK_DOMAIN
-      ? `${process.env.BOT_WEBHOOK_DOMAIN}/logo.png`
-      : null,
+    // App icon URL (optional) - defaults to null if not configured
+    appIcon: process.env.DAIMO_APP_ICON || null,
   };
 };
 

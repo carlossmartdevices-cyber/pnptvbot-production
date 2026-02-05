@@ -79,8 +79,8 @@ class PaymentController {
       const paymentRef = `PAY-${actualPaymentId.substring(0, 8).toUpperCase()}`;
 
       // Prepare response data
-      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN;
-      const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || webhookDomain;
+      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
+      const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.store';
       const provider = payment.provider || 'epayco';
 
       // Handle both camelCase and snake_case from payment
@@ -118,34 +118,61 @@ class PaymentController {
       if (provider === 'epayco') {
         basePaymentData.epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;
         basePaymentData.testMode = process.env.EPAYCO_TEST_MODE === 'true';
+        // Confirmation URL: ePayco server sends webhook callbacks here
         basePaymentData.confirmationUrl = `${epaycoWebhookDomain}/api/webhooks/epayco`;
-        basePaymentData.responseUrl = `${epaycoWebhookDomain}/api/payment-response`;
+        // Response URL: User's browser redirects here after payment
+        basePaymentData.responseUrl = `${webhookDomain}/api/payment-response`;
         basePaymentData.epaycoSignature = PaymentService.generateEpaycoCheckoutSignature({
           invoice: paymentRef,
           amount: amountCOPString,
           currencyCode,
         });
+        if (!basePaymentData.epaycoSignature) {
+          logger.error('Missing ePayco signature for payment', {
+            paymentId: payment.id,
+            paymentRef,
+          });
+          return res.status(500).json({
+            success: false,
+            error: 'Error de configuración del pago. Por favor, genera un nuevo enlace desde el bot.',
+          });
+        }
       } else if (provider === 'daimo') {
         try {
-          const daimoResult = await DaimoConfig.createDaimoPayment({
-            amount: plan.price,
-            userId,
-            planId,
-            chatId: '',
-            paymentId: payment.id,
-            description: `${plan.display_name || plan.name} Subscription`,
-          });
+          const existingLink = payment.daimoLink || payment.paymentUrl;
+          const isExternalLink = existingLink
+            && /^https?:\/\//i.test(existingLink)
+            && !existingLink.includes('/daimo-checkout/');
 
-          if (daimoResult.success) {
-            basePaymentData.daimoPaymentLink = daimoResult.paymentUrl;
-            // Optionally, save the daimo_payment_id to the payment record
-            if (daimoResult.daimoPaymentId) {
+          if (existingLink && existingLink.includes('/daimo-checkout/')) {
+            logger.warn('Ignoring self-referential Daimo checkout link', {
+              paymentId: payment.id,
+              existingLink,
+            });
+          }
+
+          if (isExternalLink) {
+            basePaymentData.daimoPaymentLink = existingLink;
+          } else {
+            const daimoResult = await DaimoConfig.createDaimoPayment({
+              amount: paymentAmount,
+              userId,
+              planId,
+              chatId: '',
+              paymentId: payment.id,
+              description: `${plan.display_name || plan.name} Subscription`,
+            });
+
+            if (daimoResult.success) {
+              basePaymentData.daimoPaymentLink = daimoResult.paymentUrl;
+              // Save the Daimo payment id and URL to prevent duplicate creation on refresh
               await PaymentModel.updateStatus(payment.id, 'pending', {
                 daimo_payment_id: daimoResult.daimoPaymentId,
+                paymentUrl: daimoResult.paymentUrl,
               });
+            } else {
+              throw new Error(daimoResult.error || 'Daimo payment creation failed');
             }
-          } else {
-            throw new Error(daimoResult.error || 'Daimo payment creation failed');
           }
         } catch (error) {
           logger.error('Error creating Daimo payment link:', error);
