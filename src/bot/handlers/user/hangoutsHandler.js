@@ -5,6 +5,8 @@ const logger = require('../../../utils/logger');
 const { hasFullAccess, safeReplyOrEdit } = require('../../utils/helpers');
 const { consumeRateLimit, getRateLimitInfo } = require('../../core/middleware/rateLimitGranular');
 const { buildHangoutsWebAppUrl } = require('../../utils/hangoutsWebApp');
+const { buildJitsiHangoutsUrl, buildJitsiRoomConfig } = require('../../utils/jitsiHangoutsWebApp');
+const jaasService = require('../../services/jaasService');
 
 /**
  * Hangouts handlers for video calls and main rooms
@@ -172,7 +174,19 @@ const registerHangoutsHandlers = (bot) => {
       });
 
       const displayName = ctx.from.first_name || ctx.from.username || 'User';
-      const webAppUrl = buildHangoutsWebAppUrl({
+
+      // Generate Jitsi URL with JAAS authentication (primary)
+      const jitsiUrl = buildJitsiHangoutsUrl({
+        roomName: call.channelName,
+        userId: ctx.from.id,
+        userName: displayName,
+        isModerator: true,
+        callId: call.id,
+        type: call.isPublic ? 'public' : 'private',
+      });
+
+      // Generate Agora WebApp URL (fallback)
+      const agoraUrl = buildHangoutsWebAppUrl({
         baseUrl: HANGOUTS_WEB_APP_URL,
         room: call.channelName,
         token: call.rtcToken,
@@ -182,22 +196,24 @@ const registerHangoutsHandlers = (bot) => {
         appId: call.appId,
         callId: call.id,
       });
+
       const joinLink = `https://t.me/${ctx.botInfo.username}?start=call_${call.id}`;
 
       const message = lang === 'es'
         ? `✅ *¡Videollamada Creada!*\n\n` +
           `👥 Capacidad: 0/10 personas\n` +
           `🔗 Comparte: \`${joinLink}\`\n\n` +
-          `Presiona "Lanzar" para iniciar la llamada.`
+          `Elige cómo quieres entrar:`
         : `✅ *Video Call Created!*\n\n` +
           `👥 Capacity: 0/10 people\n` +
           `🔗 Share: \`${joinLink}\`\n\n` +
-          `Tap "Launch" to start the call.`;
+          `Choose how to join:`;
 
       await safeReplyOrEdit(ctx, message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.webApp(lang === 'es' ? '🚀 Lanzar Llamada' : '🚀 Launch Call', webAppUrl)],
+          [Markup.button.url(lang === 'es' ? '🎥 Entrar (Jitsi)' : '🎥 Join (Jitsi)', jitsiUrl)],
+          [Markup.button.webApp(lang === 'es' ? '📱 Entrar (App)' : '📱 Join (App)', agoraUrl)],
           [Markup.button.callback(lang === 'es' ? '❌ Terminar Llamada' : '❌ End Call', `end_call_${call.id}`)],
           [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'hangouts_menu')],
         ]),
@@ -346,7 +362,22 @@ const registerHangoutsHandlers = (bot) => {
 
       const call = joinResult.call;
       const participantCount = call.currentParticipants + (joinResult.alreadyJoined ? 0 : 1);
-      const webAppUrl = buildHangoutsWebAppUrl({
+
+      // Check if user is creator (moderator)
+      const isModerator = call.creatorId === ctx.from.id;
+
+      // Generate Jitsi URL with appropriate permissions
+      const jitsiUrl = buildJitsiHangoutsUrl({
+        roomName: call.channelName,
+        userId: ctx.from.id,
+        userName: displayName,
+        isModerator,
+        callId: call.id,
+        type: call.isPublic ? 'public' : 'private',
+      });
+
+      // Generate Agora WebApp URL (fallback)
+      const agoraUrl = buildHangoutsWebAppUrl({
         baseUrl: HANGOUTS_WEB_APP_URL,
         room: call.channelName,
         token: joinResult.rtcToken,
@@ -362,16 +393,19 @@ const registerHangoutsHandlers = (bot) => {
         ? `📞 *Detalles de Llamada*\n\n` +
           `👥 Participantes: ${participantCount}/${call.maxParticipants}\n` +
           `📅 Creada: ${new Date(call.createdAt).toLocaleString()}\n` +
-          `🔗 Compartir: \`${joinLink}\``
+          `🔗 Compartir: \`${joinLink}\`\n\n` +
+          `Elige cómo quieres entrar:`
         : `📞 *Call Details*\n\n` +
           `👥 Participants: ${participantCount}/${call.maxParticipants}\n` +
           `📅 Created: ${new Date(call.createdAt).toLocaleString()}\n` +
-          `🔗 Share: \`${joinLink}\``;
+          `🔗 Share: \`${joinLink}\`\n\n` +
+          `Choose how to join:`;
 
       await safeReplyOrEdit(ctx, message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.webApp(lang === 'es' ? '🚀 Entrar' : '🚀 Join', webAppUrl)],
+          [Markup.button.url(lang === 'es' ? '🎥 Entrar (Jitsi)' : '🎥 Join (Jitsi)', jitsiUrl)],
+          [Markup.button.webApp(lang === 'es' ? '📱 Entrar (App)' : '📱 Join (App)', agoraUrl)],
           [Markup.button.callback(lang === 'es' ? '❌ Terminar' : '❌ End', `end_call_${call.id}`)],
           [Markup.button.callback(lang === 'es' ? '🗑️ Eliminar' : '🗑️ Delete', `delete_call_${call.id}`)],
           [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'my_active_calls')],
@@ -443,7 +477,19 @@ const registerHangoutsHandlers = (bot) => {
       );
 
       const displayName = ctx.from.first_name || ctx.from.username || 'User';
-      const webAppUrl = buildHangoutsWebAppUrl({
+
+      // Generate authenticated Jitsi URL using JAAS (primary option)
+      const roomNameForJitsi = `pnptv-main-room-${resolvedRoomId}`;
+      const jitsiUrl = buildJitsiHangoutsUrl({
+        roomName: roomNameForJitsi,
+        userId: ctx.from.id,
+        userName: displayName,
+        isModerator: false, // Main room participants join as viewers
+        type: 'main',
+      });
+
+      // Generate Agora WebApp URL (fallback)
+      const agoraUrl = buildHangoutsWebAppUrl({
         baseUrl: HANGOUTS_WEB_APP_URL,
         room: room.channelName,
         token: rtcToken,
@@ -452,9 +498,6 @@ const registerHangoutsHandlers = (bot) => {
         type: 'main',
         appId,
       });
-
-      // Also provide Jitsi fallback
-      const jitsiUrl = `https://meet.jit.si/pnptv-main-room-${resolvedRoomId}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&userInfo.displayName=${encodeURIComponent(displayName)}`;
 
       const message = lang === 'es'
         ? `🏠 *${room.name}*\n\n` +
@@ -469,8 +512,8 @@ const registerHangoutsHandlers = (bot) => {
       await safeReplyOrEdit(ctx, message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.webApp(lang === 'es' ? '🚀 Entrar (Agora)' : '🚀 Join (Agora)', webAppUrl)],
           [Markup.button.url(lang === 'es' ? '🎥 Entrar (Jitsi)' : '🎥 Join (Jitsi)', jitsiUrl)],
+          [Markup.button.webApp(lang === 'es' ? '📱 Entrar (App)' : '📱 Join (App)', agoraUrl)],
           [Markup.button.callback(lang === 'es' ? '⬅️ Volver' : '⬅️ Back', 'hangouts_menu')],
         ]),
       });
