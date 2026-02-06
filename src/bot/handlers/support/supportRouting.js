@@ -191,6 +191,10 @@ const registerSupportRoutingHandlers = (bot) => {
 
       try {
         await ctx.telegram.sendMessage(targetUserId, notificationMessage, { parse_mode: 'Markdown' });
+
+        // Send PRIME main menu after activation message
+        const { sendPrimeMenuToUser } = require('../user/menu');
+        await sendPrimeMenuToUser(ctx.telegram, targetUserId, userLang || 'es');
       } catch (notifyError) {
         logger.warn('Could not notify user about membership activation:', notifyError.message);
       }

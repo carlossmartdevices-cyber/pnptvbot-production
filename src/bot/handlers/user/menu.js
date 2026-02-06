@@ -647,8 +647,31 @@ const showMainMenuEdit = async (ctx) => {
 
 
 
+/**
+ * Send the PRIME main menu to a user by their Telegram ID (used after activation)
+ * @param {object} telegram - ctx.telegram instance
+ * @param {string|number} userId - Telegram user ID
+ * @param {string} lang - Language code ('es' or 'en')
+ */
+const sendPrimeMenuToUser = async (telegram, userId, lang = 'es') => {
+  try {
+    const menuText = `💎 *${lang === 'es' ? 'Membresía' : 'Membership'}: PRIME* (Lifetime)\n\n` +
+      t(lang === 'es' ? 'pnpLatinoPrimeMenu' : 'pnpLatinoPrimeMenu', lang);
+    const buttons = buildPrimeMenuButtons(lang);
+    const keyboard = Markup.inlineKeyboard(buttons);
+
+    await telegram.sendMessage(userId, sanitizeMarkdown(menuText), {
+      parse_mode: 'Markdown',
+      ...keyboard,
+    });
+  } catch (error) {
+    logger.warn('Could not send PRIME menu to user after activation', { userId, error: error.message });
+  }
+};
+
 // Export as default function for consistency with other handlers
 module.exports = registerMenuHandlers;
 module.exports.showMainMenu = showMainMenu;
 module.exports.buildOnboardingPrompt = buildOnboardingPrompt;
 module.exports.sendPrimeWelcome = sendPrimeWelcome;
+module.exports.sendPrimeMenuToUser = sendPrimeMenuToUser;

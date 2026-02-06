@@ -3622,11 +3622,38 @@ let registerAdminHandlers = (bot) => {
       logger.info('[TEXT-HANDLER] Processing adminSearchingUser flow', { userId: ctx.from.id });
       try {
         const lang = getLanguage(ctx);
-        const query = ctx.message.text;
+        const searchQuery = ctx.message.text.trim();
 
         let user = null;
-        if (!Number.isNaN(parseInt(query, 10))) {
-          user = await UserModel.getById(query);
+        // Try by numeric ID first
+        if (/^\d+$/.test(searchQuery)) {
+          user = await UserModel.getById(searchQuery);
+        }
+        // Try by username (strip leading @)
+        if (!user) {
+          const { query: dbQuery } = require('../../../config/postgres');
+          const username = searchQuery.replace(/^@/, '');
+          const result = await dbQuery(
+            `SELECT * FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1`,
+            [username]
+          );
+          if (result.rows.length > 0) {
+            user = UserModel.mapRowToUser(result.rows[0]);
+          }
+          // Try by first_name
+          if (!user) {
+            const nameResult = await dbQuery(
+              `SELECT * FROM users WHERE first_name ILIKE $1 LIMIT 1`,
+              [`%${searchQuery}%`]
+            );
+            if (nameResult.rows.length > 0) {
+              user = UserModel.mapRowToUser(nameResult.rows[0]);
+            }
+          }
+        }
+        // Try by email
+        if (!user) {
+          user = await UserModel.getByEmail(searchQuery);
         }
 
         if (!user) {
@@ -5108,8 +5135,18 @@ let registerAdminHandlers = (bot) => {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
-      const userId = ctx.session.temp.selectedUserId;
+      const userId = ctx.session?.temp?.selectedUserId;
       const lang = getLanguage(ctx);
+
+      if (!userId) {
+        await ctx.editMessageText(
+          '❌ No se encontró el usuario. Búscalo de nuevo desde 👥 Usuarios.',
+          Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Volver', 'admin_cancel')],
+          ]),
+        );
+        return;
+      }
 
       await UserModel.updateSubscription(userId, {
         status: 'deactivated',
@@ -5118,7 +5155,7 @@ let registerAdminHandlers = (bot) => {
       });
 
       await ctx.editMessageText(
-        `✅ User ${userId} deactivated`,
+        `✅ Usuario ${userId} desactivado`,
         Markup.inlineKeyboard([
           [Markup.button.callback('◀️ Volver', 'admin_cancel')],
         ]),
@@ -5718,6 +5755,10 @@ let registerAdminHandlers = (bot) => {
             `📱 Use /menu to see all available features.`;
 
         await ctx.telegram.sendMessage(userId, welcomeMessage, { parse_mode: 'Markdown', disable_web_page_preview: false });
+
+        // Send PRIME main menu after activation message
+        const { sendPrimeMenuToUser } = require('../user/menu');
+        await sendPrimeMenuToUser(ctx.telegram, userId, lang);
       } catch (notifyError) {
         logger.warn('Could not notify user about courtesy pass', { userId, error: notifyError.message });
       }
@@ -5899,6 +5940,10 @@ let registerAdminHandlers = (bot) => {
             `📱 Use /menu to see all available features.`;
 
         await ctx.telegram.sendMessage(userId, welcomeMessage, { parse_mode: 'Markdown', disable_web_page_preview: false });
+
+        // Send PRIME main menu after activation message
+        const { sendPrimeMenuToUser } = require('../user/menu');
+        await sendPrimeMenuToUser(ctx.telegram, userId, lang);
       } catch (notifyError) {
         logger.warn('Could not notify user about plan activation', { userId, error: notifyError.message });
       }
