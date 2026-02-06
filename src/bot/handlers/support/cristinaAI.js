@@ -7,11 +7,46 @@ const { Markup } = require('telegraf');
 const logger = require('../../../utils/logger');
 const { detectLanguage } = require('../../../utils/languageDetector');
 const { chatWithCristina, isCristinaAIAvailable } = require('../../services/cristinaAIService');
+const CristinaAdminInfoService = require('../../../services/cristinaAdminInfoService');
+const sanitize = require('../../../utils/sanitizer');
 
-const buildCristinaSystemPrompt = (language) => {
+const CRISTINA_OFFICIAL_GUIDE = `
+1️⃣ ¿Qué es PNP Latino TV y qué es el PNPtv Bot?
+2️⃣ ¿Qué puedes hacer dentro del PNPtv Bot?
+3️⃣ Mini tutorial en 1 minuto
+4️⃣ Diferencias FREE vs PRIME
+5️⃣ Calendario de lanzamientos semanales (Nearby, Hangouts, Videorama, PNP Live)
+6️⃣ Nota de despliegue: prueba botones, reporta errores, abraza el beta queer underground
+7️⃣ Soporte: botón Soporte o @pnptvadmin
+8️⃣ Cierre vibe: agradecimiento del caos creativo con Santino & Lex
+`;
+
+const buildCristinaSystemPrompt = async (language) => {
   const langSpecificInstructions = language === 'es' ? `Responde siempre en español.` : `Always respond in English.`;
+  let briefLines = [];
 
-  return `You are Cristina, the PNPtv Customer Support AI Assistant - a professional, helpful, and friendly support chatbot.
+  try {
+    const brief = await CristinaAdminInfoService.getBrief();
+    const formatBriefValue = (value = '', max = 300) => {
+      if (!value) return null;
+      const normalized = value.trim().replace(/\s+/g, ' ');
+      return normalized.length > max ? `${normalized.substring(0, max)}…` : normalized;
+    };
+
+    const lexUpdate = formatBriefValue(brief.lexPlan);
+    const channelUpdate = formatBriefValue(brief.channelPlan);
+    const pricingUpdate = formatBriefValue(brief.pricingUpdates, 400);
+    const botUpdate = formatBriefValue(brief.botStatus, 400);
+
+    if (lexUpdate) briefLines.push(`• Plan Lex: ${lexUpdate}`);
+    if (channelUpdate) briefLines.push(`• Plan del canal: ${channelUpdate}`);
+    if (pricingUpdate) briefLines.push(`• Precios: ${pricingUpdate}`);
+    if (botUpdate) briefLines.push(`• Estado del bot: ${botUpdate}`);
+  } catch (error) {
+    logger.warn('No se pudo leer el resumen administrativo de Cristina', { error: error.message });
+  }
+
+  let prompt = `You are Cristina, the PNPtv Customer Support AI Assistant - a professional, helpful, and friendly support chatbot.
 
 🎯 YOUR ROLE
 You are the official customer support assistant for PNPtv, and also a trusted friend to the community.
@@ -72,10 +107,16 @@ You provide:
 ✅ RESPONSE RULES
 - Always end with either (a) one simple self‑care tip OR (b) a gentle invitation to subscribe to PNP Latino PRIME.
 - Keep tone calm and supportive; avoid blame or shame.`;
+  if (briefLines.length) {
+    prompt += `\n\n📘 *Actualizaciones administradas por Cristina:*\n${briefLines.join('\n')}`;
+  }
+  prompt += `\n\n📘 Guía Oficial PNP Latino TV & PNPtv Bot\n${CRISTINA_OFFICIAL_GUIDE}`;
+  return prompt;
 };
 
-// Store active conversations
+// Store active conversations with message history
 const activeConversations = new Map();
+const MAX_HISTORY_MESSAGES = 6; // 3 user + 3 assistant pairs
 
 /**
  * Get user's language preference
@@ -83,6 +124,24 @@ const activeConversations = new Map();
 async function getUserLanguage(ctx) {
   const detectedLang = await detectLanguage(ctx);
   return detectedLang || ctx.from?.language_code || 'en';
+}
+
+/**
+ * Add a message to the user's conversation history, keeping only the last N messages
+ */
+function addMessageToHistory(userId, role, content) {
+  let conversation = activeConversations.get(userId);
+  if (!conversation) {
+    conversation = { startedAt: Date.now(), lang: 'en', messagesCount: 0, messages: [] };
+    activeConversations.set(userId, conversation);
+  }
+  if (!conversation.messages) {
+    conversation.messages = [];
+  }
+  conversation.messages.push({ role, content });
+  if (conversation.messages.length > MAX_HISTORY_MESSAGES) {
+    conversation.messages = conversation.messages.slice(-MAX_HISTORY_MESSAGES);
+  }
 }
 
 /**
@@ -165,7 +224,8 @@ You can also use the buttons below for quick access to common topics.`;
       activeConversations.set(userId, {
         startedAt: Date.now(),
         lang,
-        messagesCount: 0
+        messagesCount: 0,
+        messages: []
       });
 
       logger.info(`Cristina AI conversation started for user ${userId}`);
@@ -184,7 +244,8 @@ You can also use the buttons below for quick access to common topics.`;
     const conversation = activeConversations.get(userId) || {
       startedAt: Date.now(),
       lang,
-      messagesCount: 0
+      messagesCount: 0,
+      messages: []
     };
     conversation.messagesCount++;
     activeConversations.set(userId, conversation);
@@ -388,14 +449,24 @@ async function processQuestion(question, lang, userId) {
   // Try Grok first
   if (isCristinaAIAvailable()) {
     try {
+      const systemPrompt = await buildCristinaSystemPrompt(lang);
+
+      // Build message history for context
+      const conversation = activeConversations.get(userId);
+      const history = conversation?.messages || [];
+      const messages = [...history, { role: 'user', content: question }];
+
       const aiResponse = await chatWithCristina({
-        systemPrompt: buildCristinaSystemPrompt(lang),
-        messages: [{ role: 'user', content: question }],
+        systemPrompt,
+        messages,
         maxTokens: parseInt(process.env.CRISTINA_MAX_TOKENS || '500', 10),
         temperature: 0.7,
       });
 
       if (aiResponse) {
+        // Store conversation history
+        addMessageToHistory(userId, 'user', question);
+        addMessageToHistory(userId, 'assistant', aiResponse);
         logger.info(`Cristina AI: Grok response generated for user ${userId}`);
         return aiResponse;
       }
@@ -600,10 +671,11 @@ What else can I help you with?`;
   }
 
   // Default response for unrecognized questions
+  const safeQuestion = sanitize.telegramMarkdown(question.substring(0, 100));
   return lang === 'es'
     ? `🤖 *Cristina AI*
 
-Entiendo tu pregunta: "${question}"
+Entiendo tu pregunta: "${safeQuestion}"
 
 Estoy trabajando en mejorar mis respuestas. Mientras tanto, puedes:
 
@@ -623,7 +695,7 @@ O intenta reformular tu pregunta de manera más específica.
 • Configuración`
     : `🤖 *Cristina AI*
 
-I understand your question: "${question}"
+I understand your question: "${safeQuestion}"
 
 I'm working on improving my responses. In the meantime, you can:
 

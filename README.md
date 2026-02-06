@@ -27,6 +27,144 @@ A comprehensive, production-ready Telegram bot for PNPtv featuring live streamin
 - 📝 **Logging**: Structured logging with Winston and daily log rotation
 - ✅ **Testing**: Jest unit tests with coverage reporting
 
+## 🌈🔥 Guía Oficial – PNP Latino TV & PNPtv Bot
+
+Tu puerta de entrada al universo PNP queer en Telegram
+
+1️⃣ **¿Qué es PNP Latino TV y qué es el PNPtv Bot?**
+
+PNP Latino TV es una comunidad digital queer para adultos que viven, crean y conectan alrededor de la cultura PNP (Party ‘n Play), el arte, la música, el sexo positivo y la conversación sin tabúes.
+No somos solo porno. Somos comunidad + tecnología + experiencias en vivo.
+El PNPtv Bot es el corazón de todo: un bot de Telegram que te permite acceder a contenidos, salas, playlists, eventos en vivo y herramientas sociales desde un solo lugar.
+En esencia, PNP Latino TV es:
+✨ Una comunidad gratuita en Telegram  
+✨ Una membresía PRIME para acceso completo  
+✨ Un espacio seguro para adultos verificados  
+✨ Un laboratorio de experiencias queer digitales
+
+2️⃣ **¿Qué puedes hacer dentro del PNPtv Bot?**
+
+Dentro del bot vas a encontrar (progresivamente):
+
+📍 Nearby – Mapa social para ver quién está cerca de ti  
+🎥 Hangouts – Salas de video para fumar, hablar, ligar y socializar  
+🎶 Videorama – Playlists, podcasts y contenido curado por la comunidad  
+📺 PNP Live – Shows, performances y transmisiones en vivo  
+🧑‍🎤 Perfiles – Tu bio, foto, tribu, links y mood  
+🎟 Eventos – Acceso a fiestas virtuales y experiencias especiales
+
+3️⃣ **Mini tutorial – Cómo usar el PNPtv Bot (en 1 minuto)**
+
+Paso 1 Entra al bot desde Telegram: 👉 `t.me/pnplatinotv_bot`  
+Paso 2 Presiona Start / Iniciar. El bot te pedirá:
+  - Aceptar Términos y Condiciones
+  - Confirmar que eres +18
+  - Elegir idioma (ES / EN)
+Paso 3 Verás el menú principal con botones como:
+  - Nearby  
+  - Hangouts  
+  - Videorama  
+  - PNP Live  
+  - Mi Perfil  
+  - Soporte  
+Paso 4 Explora libremente si eres usuario FREE o desbloquea todo con PNPtv PRIME
+
+4️⃣ **FREE vs PRIME (simple y sin drama)**
+
+**Usuario FREE**
+  - Ver salas públicas  
+  - Unirte a salas abiertas  
+  - Escuchar playlists públicas  
+  - Ver previews de contenido  
+  - Acceder a eventos abiertos
+
+**Usuario PRIME**
+  - Crear salas privadas y públicas  
+  - Acceder a todo Videorama  
+  - Ver PNP Live completo  
+  - Crear playlists y podcasts  
+  - Acceder a eventos exclusivos  
+  - Soporte prioritario
+
+5️⃣ **📆 Calendario de Lanzamiento de Features**
+
+(Todo se libera por fases – una por semana)
+
+Estamos lanzando cada módulo poco a poco para hacerlo bien, testearlo contigo y pulir la experiencia.
+
+🔹 **Fase 1 – Nearby**  
+📅 Lanzamiento: 3 de febrero 2026  
+📍 Mapa social para ver quién está cerca  
+👥 Perfiles básicos  
+🧪 Pruebas abiertas con la comunidad
+
+🔹 **Fase 2 – Hangouts**  
+📅 Lanzamiento: 10 de febrero 2026  
+🎥 Salas de video públicas y privadas  
+🔥 Smoke sessions, chats calientes, afters  
+🧪 Stress test de llamadas y salas
+
+🔹 **Fase 3 – Videorama**  
+📅 Lanzamiento: 17 de febrero 2026  
+🎶 Playlists  
+🎙 Podcasts  
+🎬 Contenido curado  
+🧪 Pruebas de carga y calidad
+
+🔹 **Fase 4 – PNP Live**  
+📅 Lanzamiento: 24 de febrero 2026  
+📺 Shows en vivo  
+🎭 Performances  
+💬 Chat en tiempo real  
+🧪 Pruebas de transmisión
+
+6️⃣ **Nota importante sobre el despliegue 🛠**
+
+Durante cada semana de lanzamiento:
+  - Te vamos a enviar instrucciones simples  
+  - Te pediremos que pruebes botones, entres a salas, reportes errores y digas qué se siente raro  
+  - Algunas funciones pueden caerse, cambiar de diseño o reiniciarse
+  
+Eso es normal. Estás dentro del beta queer underground más delicioso de Telegram 😈
+
+7️⃣ **Soporte & contacto**
+
+Si algo no funciona o tenés dudas:
+  - Botón Soporte dentro del bot  
+  - O DM directo a 👉 `@pnptvadmin`
+
+8️⃣ **Cierre vibe PNP**
+
+Esto no es solo una app. Es una experiencia viva que estamos creando con vos.  
+Gracias por ser parte del caos creativo, del humo digital y del futuro raro y hermoso de PNP Latino TV.  
+💜 Santino & Lex PNP Latino TV
+
+## 🗂️ Flujos y menús actuales
+
+El bot mantiene una experiencia guiada con las acciones principales expuestas desde el menú principal. Cada entrada abre secciones dedicadas:
+
+  - `Nearby`: mapa interactivo, discovery social y acciones de perfil inmediato.  
+  - `Hangouts`: salas públicas, privadas y funciones premium para iniciar sesiones.  
+  - `Videorama`: listas curadas, podcasts y contenido bajo demanda.  
+  - `PNP Live`: acceso a shows y chat en vivo.  
+  - `Mi Perfil`: edición de bio, links, fotos y tribu.  
+  - `Soporte`: acceso a Cristina AI, soporte humano y documentos útiles.
+
+Las instrucciones y flujos también están indexados en la nueva opción `🧠 Cristina Asistente Admin` dentro del panel de administradores. Desde ahí:
+  - Se alimentan bloques de conocimiento sobre planes (Lex/canal).  
+  - Se actualizan precios y estado del bot con un click.  
+  - Se activa “Cristina soy Lex” para obtener estrategias, uso de herramientas y traducciones bajo pedido explícito.
+
+## 💳 Pagos: Daimo, Epayco y Meru
+
+El bot soporta múltiples procesadores para cubrir distintas monedas y regiones. Siguen las instrucciones principales:
+
+  - **Daimo (USDC)**: Generá una billetera USDC y enviá el monto exacto a la dirección indicada en el bot. Incluí tu `user_id` en la referencia y subí un comprobante si hay verificación manual.  
+  - **Epayco (USD)**: Elegí el plan desde el menú, seleccioná Epayco y completá los datos de tarjeta o PSE cuando el bot envía el enlace seguro. La confirmación llega por webhook y se actualiza automáticamente tu membresía.  
+  - **Meru (Moneda local)**: Si Meru está habilitado, el bot despliega opciones de pago con puntos o balance. Seleccioná el proveedor, confirmá el monto y Meru notifica la activación sin salir del flujo de Telegram.
+
+En todos los casos el usuario recibe mensaje de confirmación y, si es necesario, el equipo de soporte puede verificar desde `/support` o el panel admin.
+
 ## 📋 Prerequisites
 
 - Node.js 18.x or higher

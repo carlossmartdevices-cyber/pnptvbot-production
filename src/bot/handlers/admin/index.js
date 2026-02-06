@@ -27,6 +27,8 @@ const { registerXAccountHandlers } = require('./xAccountWizard');
 const { registerXPostWizardHandlers, handleTextInput: handleXPostTextInput, handleMediaInput: handleXPostMediaInput, getSession: getXPostSession, STEPS: XPOST_STEPS } = require('./xPostWizard');
 const PlaylistAdminService = require('../../services/PlaylistAdminService');
 const RadioAdminService = require('../../services/RadioAdminService');
+const CristinaAdminInfoService = require('../../../services/cristinaAdminInfoService');
+const { chatWithCristina, isCristinaAIAvailable } = require('../../services/cristinaAIService');
 
 // Use shared utilities
 const { sanitizeInput } = broadcastUtils;
@@ -123,6 +125,126 @@ function summarizeBroadcastButtons(buttons) {
     const obj = typeof b === 'string' ? JSON.parse(b) : b;
     return obj.text;
   });
+}
+
+const CRISTINA_SUMMARY_MAX = 200;
+
+function shortenCristinaValue(value = '', max = CRISTINA_SUMMARY_MAX) {
+  if (!value) return '_Sin actualizaciones._';
+  if (value.length <= max) {
+    return value;
+  }
+  return `${value.substring(0, max)}…`;
+}
+
+async function replyOrEditMessage(ctx, message, keyboard, edit) {
+  const options = {
+    parse_mode: 'Markdown',
+    ...keyboard,
+  };
+
+  if (edit) {
+    try {
+      await ctx.editMessageText(message, options);
+      return;
+    } catch (error) {
+      logger.warn('Editar mensaje falló, reintentando con reply', {
+        error: error.message,
+      });
+    }
+  }
+
+  await ctx.reply(message, options);
+}
+
+async function showCristinaAdminMenu(ctx, edit = false) {
+  const brief = await CristinaAdminInfoService.getBrief();
+  const summaryLines = [
+    '*📌 Actualizaciones almacenadas*',
+    `• *Planes de Lex:* ${shortenCristinaValue(brief.lexPlan)}`,
+    `• *Planes del canal:* ${shortenCristinaValue(brief.channelPlan)}`,
+  ].join('\n');
+
+  const message = [
+    '`🧠 Cristina Asistente Admin`',
+    'Actualiza el conocimiento que necesita Cristina para recomendar planes y canales, y mantén los precios/estado del bot sincronizados.',
+    summaryLines,
+  ].join('\n\n');
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback('📝 Alimentar info (Lex/Canal)', 'cristina_admin_feed_menu')],
+    [Markup.button.callback('🔄 Actualizar precios + bot', 'cristina_admin_refresh_system')],
+    [Markup.button.callback('👑 Cristina soy Lex', 'cristina_admin_lex_mode')],
+    [Markup.button.callback('◀️ Volver', 'admin_home')],
+  ]);
+
+  await replyOrEditMessage(ctx, message, keyboard, edit);
+}
+
+async function showCristinaFeedMenu(ctx, edit = false) {
+  const message = [
+    '`📝 Alimentar a Cristina`',
+    'Escribe un párrafo corto (1–2 frases) describiendo los planes actualizados para Lex o para el canal. Cristina guardará el texto tal como lo mandes y lo usará en sus respuestas.',
+  ].join('\n\n');
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback('✍️ Planes de Lex', 'cristina_admin_feed_section_lex')],
+    [Markup.button.callback('✍️ Planes del canal', 'cristina_admin_feed_section_channel')],
+    [Markup.button.callback('◀️ Volver', 'cristina_admin_menu')],
+  ]);
+
+  await replyOrEditMessage(ctx, message, keyboard, edit);
+}
+
+const LEX_MODE_SYSTEM_PROMPT = `Eres Cristina, asesora privada de administración de PNP Latino TV. Estás hablando directamente con Lex, el administrador principal.
+
+TU ROL:
+- Ayudar a Lex a entender y usar todas las opciones del panel de administración del bot.
+- Dar consejos prácticos de marketing digital y redes sociales para una plataforma de entretenimiento LGBTQ+ latina.
+- Traducir textos entre inglés y español cuando se te pida explícitamente.
+
+ESTILO:
+- Habla en español por defecto, a menos que Lex pida inglés.
+- Sé directa, concisa y profesional. Máximo un párrafo.
+- Si Lex te pide traducir, proporciona SOLO la traducción sin explicaciones adicionales.
+
+FUNCIONES DEL BOT que puedes explicar:
+- Broadcasts (enviar mensajes a usuarios), Cola de broadcasts, Programación
+- Gestión de usuarios (búsqueda, roles, permisos, moderación)
+- Planes y precios (crear, editar, promociones)
+- Contenido (playlists, radio, videos, streams en vivo)
+- X/Twitter (publicaciones, cuenta conectada)
+- Pagos y webhooks
+- Nearby, Hangouts, Videorama, PNP Live
+
+NO:
+- No reveles información técnica interna del código.
+- No hagas cambios al sistema, solo asesora.`;
+
+const lexModeHistory = new Map();
+const LEX_HISTORY_MAX = 6;
+
+async function processLexModeMessage(userId, text) {
+  const history = lexModeHistory.get(userId) || [];
+  const messages = [...history, { role: 'user', content: text }];
+
+  const response = await chatWithCristina({
+    systemPrompt: LEX_MODE_SYSTEM_PROMPT,
+    messages,
+    maxTokens: parseInt(process.env.CRISTINA_MAX_TOKENS || '500', 10),
+    temperature: 0.7,
+  });
+
+  // Update history
+  history.push({ role: 'user', content: text });
+  history.push({ role: 'assistant', content: response });
+  if (history.length > LEX_HISTORY_MAX) {
+    lexModeHistory.set(userId, history.slice(-LEX_HISTORY_MAX));
+  } else {
+    lexModeHistory.set(userId, history);
+  }
+
+  return response;
 }
 
 async function createScheduledBroadcastsFromTimes(ctx, scheduledTimes, timezone) {
@@ -710,6 +832,13 @@ async function showAdminPanel(ctx, edit = false) {
       logger.warn(`Admin stats unavailable (continuing without stats): ${error.message}`);
     }
 
+    const cristinaBrief = await CristinaAdminInfoService.getBrief();
+    const cristinaSummaryText = [
+      '*Cristina Admin Info:*',
+      `• Lex: ${shortenCristinaValue(cristinaBrief.lexPlan)}`,
+      `• Canal: ${shortenCristinaValue(cristinaBrief.channelPlan)}`,
+    ].join('\n');
+
     // Build menu based on role with organized sections
     const buttons = [];
 
@@ -763,6 +892,9 @@ async function showAdminPanel(ctx, edit = false) {
         Markup.button.callback('👁️ Vista Previa', 'admin_view_mode'),
       ]);
       buttons.push([
+        Markup.button.callback('🧠 Cristina Asistente Admin', 'cristina_admin_menu'),
+      ]);
+      buttons.push([
         Markup.button.callback('💳 Webhooks Pago', 'admin_payment_webhooks'),
       ]);
     }
@@ -786,7 +918,8 @@ async function showAdminPanel(ctx, edit = false) {
     const divider = '━━━━━━━━━━━━━━━━━━━━';
     const footer = '`Selecciona una opción 💜`';
 
-    const message = `${header}\n${divider}\n\n${roleDisplay}\n\n${statsText}${footer}`;
+    const statsSection = statsText ? `${statsText}\n\n` : '';
+    const message = `${header}\n${divider}\n\n${roleDisplay}\n\n${statsSection}${cristinaSummaryText}\n\n${footer}`;
 
     const options = {
       parse_mode: 'Markdown',
@@ -854,6 +987,138 @@ let registerAdminHandlers = (bot) => {
       await showAdminPanel(ctx, true);
     } catch (error) {
       logger.error('Error in admin_refresh:', error);
+    }
+  });
+
+  bot.action('cristina_admin_menu', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await showCristinaAdminMenu(ctx, true);
+    } catch (error) {
+      logger.error('Error opening Cristina admin menu:', error);
+    }
+  });
+
+  bot.action('cristina_admin_feed_menu', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+      await showCristinaFeedMenu(ctx, true);
+    } catch (error) {
+      logger.error('Error opening Cristina feed menu:', error);
+    }
+  });
+
+  bot.action('cristina_admin_feed_section_lex', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.awaitingCristinaAdminText = true;
+      ctx.session.temp.cristinaAdminFeed = { section: 'lex' };
+      await ctx.saveSession();
+
+      await ctx.reply(
+        '✍️ Envía un párrafo corto que describa los planes recientes de Lex. Cristina guardará este contenido para usarlo en sus respuestas de soporte.'
+      );
+    } catch (error) {
+      logger.error('Error preparando el feed de Lex:', error);
+    }
+  });
+
+  bot.action('cristina_admin_feed_section_channel', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.awaitingCristinaAdminText = true;
+      ctx.session.temp.cristinaAdminFeed = { section: 'channel' };
+      await ctx.saveSession();
+
+      await ctx.reply(
+        '✍️ Cuéntale a Cristina en un párrafo corto qué novedades hay sobre los planes del canal. Ella incorporará esa información a sus respuestas.'
+      );
+    } catch (error) {
+      logger.error('Error preparando el feed del canal:', error);
+    }
+  });
+
+  bot.action('cristina_admin_refresh_system', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const { pricing, botStatus } = await CristinaAdminInfoService.refreshSystemInfo();
+
+      const message = [
+        '`🔄 Actualizaciones del sistema`',
+        '*Precios*',
+        pricing,
+        '*Estado del bot*',
+        botStatus,
+      ].join('\n\n');
+
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('◀️ Volver a Cristina', 'cristina_admin_menu')],
+      ]);
+
+      await replyOrEditMessage(ctx, message, keyboard, true);
+    } catch (error) {
+      logger.error('Error actualizando la info del sistema:', error);
+      await ctx.reply('❌ No se pudo actualizar la información del sistema. Reintenta más tarde.');
+    }
+  });
+
+  bot.action('cristina_admin_lex_mode', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.cristinaLexMode = true;
+      await ctx.saveSession();
+
+      const message = [
+        '*👑 Modo Lex Activado*',
+        'Cristina ahora te responderá como asesora de administración. Puedes:',
+        '1. Preguntarle cómo usar cualquier opción del panel de admin.',
+        '2. Pedirle consejos de marketing y redes sociales.',
+        '3. Pedirle traducciones EN↔ES empezando con `Lex: traduce...`.',
+        'Escribe tu mensaje directamente. Para salir, usa el botón de abajo.',
+      ].join('\n\n');
+
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('🚪 Salir del modo Lex', 'cristina_admin_lex_exit')],
+        [Markup.button.callback('◀️ Volver a Cristina', 'cristina_admin_menu')],
+      ]);
+
+      await replyOrEditMessage(ctx, message, keyboard, true);
+    } catch (error) {
+      logger.error('Error en modo Cristina soy Lex:', error);
+    }
+  });
+
+  bot.action('cristina_admin_lex_exit', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      delete ctx.session.temp?.cristinaLexMode;
+      await ctx.saveSession();
+
+      await showCristinaAdminMenu(ctx, true);
+    } catch (error) {
+      logger.error('Error saliendo del modo Lex:', error);
     }
   });
 
@@ -3294,6 +3559,51 @@ let registerAdminHandlers = (bot) => {
     if (!isAdmin) {
       logger.info('[TEXT-HANDLER] User is not admin, passing to next handler', { userId: ctx.from.id });
       return next();
+    }
+
+    // Lex mode: route messages through admin AI assistant
+    if (ctx.session.temp?.cristinaLexMode && isCristinaAIAvailable()) {
+      const lexKeyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('🚪 Salir del modo Lex', 'cristina_admin_lex_exit')],
+      ]);
+      try {
+        const response = await processLexModeMessage(ctx.from.id, ctx.message.text);
+        await ctx.reply(response, { parse_mode: 'Markdown', ...lexKeyboard });
+      } catch (error) {
+        logger.error('Error en modo Lex AI:', error);
+        await ctx.reply(
+          '❌ No pude procesar tu mensaje. Intenta de nuevo.',
+          lexKeyboard
+        );
+      }
+      return;
+    }
+
+    const awaitingCristinaInput = ctx.session.temp?.awaitingCristinaAdminText;
+    const cristinaFeed = ctx.session.temp?.cristinaAdminFeed;
+    if (awaitingCristinaInput && cristinaFeed?.section) {
+      const sectionLabel = cristinaFeed.section === 'lex' ? 'Planes de Lex' : 'Planes del canal';
+      const backKeyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('◀️ Volver a Cristina', 'cristina_admin_menu')],
+      ]);
+      try {
+        const savedText = await CristinaAdminInfoService.updateSection(cristinaFeed.section, ctx.message.text);
+        await ctx.reply(
+          `✅ Información guardada para *${sectionLabel}*:\n\n${shortenCristinaValue(savedText, 500)}`,
+          { parse_mode: 'Markdown', ...backKeyboard }
+        );
+      } catch (error) {
+        logger.error('Error guardando info de Cristina desde admin:', error);
+        await ctx.reply(
+          '❌ No pude guardar la información. Por favor intenta de nuevo.',
+          backKeyboard
+        );
+      } finally {
+        delete ctx.session.temp.awaitingCristinaAdminText;
+        delete ctx.session.temp.cristinaAdminFeed;
+        await ctx.saveSession();
+      }
+      return;
     }
 
     // X Post Wizard text input (compose, AI prompt, or schedule custom time)
