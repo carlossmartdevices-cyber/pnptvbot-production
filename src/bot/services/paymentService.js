@@ -812,13 +812,29 @@ class PaymentService {
    */
   static async processDaimoWebhook(webhookData) {
     try {
+      // Normalize payload: Daimo Pay v2 nests data under `payment` object
+      // New format: { type, paymentId, payment: { id, status, source, destination, metadata } }
+      // Legacy format: { id, status, source, metadata }
+      let normalizedData;
+      if (webhookData.payment && typeof webhookData.payment === 'object') {
+        normalizedData = {
+          id: webhookData.payment.id || webhookData.paymentId,
+          status: webhookData.payment.status || webhookData.type,
+          source: webhookData.payment.source,
+          destination: webhookData.payment.destination,
+          metadata: webhookData.payment.metadata,
+        };
+      } else {
+        normalizedData = webhookData;
+      }
+
       // Extract webhook data
       const {
         id,
         status,
         source,
         metadata,
-      } = webhookData;
+      } = normalizedData;
 
       const userId = metadata?.userId;
       const planId = metadata?.planId;
@@ -1046,6 +1062,19 @@ class PaymentService {
 
           await cache.releaseLock(lockKey);
           return { success: true }; // Return success to acknowledge webhook
+        } else if (status === 'payment_refunded') {
+          // Payment refunded
+          if (paymentId) {
+            await PaymentModel.updateStatus(paymentId, 'refunded', {
+              transaction_id: source?.txHash || id,
+              daimo_event_id: id,
+            });
+          }
+
+          logger.info('Daimo payment refunded', { userId, planId, eventId: id });
+
+          await cache.releaseLock(lockKey);
+          return { success: true };
         } else if (status === 'payment_started' || status === 'payment_unpaid') {
           // Payment pending/started
           if (paymentId) {

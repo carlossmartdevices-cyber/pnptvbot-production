@@ -39,7 +39,24 @@ const translations = {
 
     // Main Menu
     mainMenuIntro: '🎬 Welcome to PNPtv - Your Entertainment Hub!\n\nWhat would you like to do?',
+    mainMenuIntroFree: `\`🔒 UNLOCK ALL CONTENT\`
+
+Hey {username}, you're on the FREE version.
+
+**With PRIME you get unlimited access to:**
+
+🎬 Full videos & exclusive shows
+📍 Find papis near you (Nearby)
+🎥 Live video rooms 24/7
+💬 Priority chat & support
+
+**Go PRIME now and enjoy everything!**
+
+\`Passes starting at just $14.99 USD\``,
     subscribe: `Subscribe to PNPtv PRIME\n----------------------------------\n\nJoin the most intense PNP content platform created by and for the community.\n\nPRIME gives you full access to:\n• Full-length PNP videos with real latinos smoking and slamming  \n• Exclusive releases starring Santino (x.com/pnpmethdaddy)  \n• Live streams and Call Rooms.\n• Unlimited Nearby to explore users around you  \n• Complete music and podcast library  \n\nChoose the plan that fits you best and complete your payment.\nYour membership will be activated automatically.\n\nPayment methods available: debit/credit card, Crypto, and most popular payment apps.`,
+    upgradeToPrime: '💎 Upgrade to PRIME',
+    exploreFeatures: '✨ Explore Premium Features',
+    specialOffers: '🔥 Special Offers',
     myProfile: '👤 My Profile',
     nearbyUsers: '🌍 Nearby Users',
     liveStreams: '🎤 Live Streams',
@@ -416,7 +433,11 @@ Your FREE access includes:
 
     // Main Menu
     mainMenuIntro: '🎬 Bienvenido a PNPtv - ¡Tu Centro de Entretenimiento!\n\n¿Qué te gustaría hacer?',
+    mainMenuIntroFree: '`🔒 DESBLOQUEA TODO EL CONTENIDO`\n\nHola {username}, estás usando la versión FREE.\n\n**Con PRIME obtienes acceso ilimitado a:**\n\n🎬 Videos completos y shows exclusivos\n📍 Encuentra papis cerca de ti (Nearby)\n🎥 Salas de video en vivo 24/7\n💬 Chat y soporte prioritario\n\n**¡Hazte PRIME ahora y disfruta todo!**\n\n`Pases desde solo $14.99 USD`',
     subscribe: `Suscríbete a PNPtv PRIME\n----------------------------------\n\nÚnete a la plataforma de contenido PNP más intensa, creada por y para la comunidad.\n\nPRIME te da acceso total a:\n• Videos PNP completos con latinos reales fumando y slameando  \n• Estrenos exclusivos protagonizados por Santino (x.com/pnpmethdaddy)  \n• Transmisiones en vivo y Salas de Video.\n• Nearby ilimitado para explorar usuarios cerca de ti  \n• Biblioteca completa de música y podcasts  \n\nElige el plan que mejor se adapte a ti y completa tu pago.\nTu membresía se activará automáticamente.\n\nMétodos de pago disponibles: tarjeta débito/crédito, Crypto y las apps de pago más populares.`,
+    upgradeToPrime: '💎 Actualizar a PRIME',
+    exploreFeatures: '✨ Explorar Funciones Premium',
+    specialOffers: '🔥 Ofertas Especiales',
     myProfile: '👤 Mi Perfil',
     nearbyUsers: '🌍 Usuarios Cercanos',
     liveStreams: '🎤 Transmisiones en Vivo',

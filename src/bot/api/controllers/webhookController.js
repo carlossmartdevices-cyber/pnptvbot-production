@@ -106,26 +106,30 @@ const validateDaimoPayload = (payload) => {
     return { valid: true, isTestEvent: true };
   }
 
-  // Support two payload shapes:
-  // 1) Official Daimo webhook structure (id, status, source, destination, metadata)
-  // 2) Simplified test-friendly shape (transaction_id, status, metadata)
+  // Normalize: Daimo Pay v2 nests data under `payment` object
+  const data = (payload?.payment && typeof payload.payment === 'object')
+    ? payload.payment
+    : payload;
+
+  // Support simplified test-friendly shape (transaction_id, status, metadata)
   if (payload && payload.transaction_id && payload.status && payload.metadata) {
-    // Metadata must be an object
     if (typeof payload.metadata !== 'object' || payload.metadata === null) {
       return { valid: false, error: 'Invalid metadata structure' };
     }
-    // Check for required metadata fields
     const { paymentId, userId, planId } = payload.metadata;
     if (!paymentId || !userId || !planId) {
       return { valid: false, error: 'Invalid metadata structure' };
     }
     return { valid: true };
   }
-  // Fallback to official validator
+
+  // Validate using normalized data
   try {
-    const result = DaimoConfig.validateWebhookPayload(payload);
+    const result = DaimoConfig.validateWebhookPayload(
+      // Pass the nested payment object so validateWebhookPayload sees flat fields
+      (payload?.payment && typeof payload.payment === 'object') ? payload.payment : payload
+    );
     if (result && typeof result === 'object') {
-      // If missing paymentId, userId, planId, normalize error
       if (result.error && result.error.toLowerCase().includes('missing required fields')) {
         return { valid: false, error: 'Missing required fields' };
       }
@@ -147,8 +151,8 @@ const validateDaimoPayload = (payload) => {
       const metadataErrors = ['metadata', 'source', 'destination'];
       const isMetadataError = metadataErrors.some((term) => errMsg.includes(term));
       if (isMetadataError) {
-      return { valid: false, error: 'Invalid metadata structure' };
-    }
+        return { valid: false, error: 'Invalid metadata structure' };
+      }
     }
     return { valid: false, error: 'Invalid metadata structure' };
   }
@@ -298,9 +302,18 @@ const handleDaimoWebhook = async (req, res) => {
   const DaimoService = require('../../services/daimoService');
 
   try {
-    const {
-      id, status, source, metadata,
-    } = req.body;
+    // Normalize payload: Daimo Pay v2 nests data under `payment` object
+    // New format: { type, paymentId, chainId, txHash, payment: { id, status, source, destination, metadata } }
+    // Legacy format: { id, status, source, metadata }
+    let id, status, source, metadata;
+    if (req.body.payment && typeof req.body.payment === 'object') {
+      id = req.body.payment.id || req.body.paymentId;
+      status = req.body.payment.status || req.body.type;
+      source = req.body.payment.source;
+      metadata = req.body.payment.metadata;
+    } else {
+      ({ id, status, source, metadata } = req.body);
+    }
 
     // Use event ID as idempotency key
     const idempotencyKey = `daimo_${id}`;

@@ -100,20 +100,34 @@ const schemas = {
    * Daimo webhook payload validation
    */
   daimoWebhook: Joi.object({
-    event: Joi.string().valid('payment.completed', 'payment.failed', 'payment.refunded').required(),
+    type: Joi.string().valid(
+      'payment_started',
+      'payment_completed',
+      'payment_bounced',
+      'payment_refunded',
+    ).optional(),
+    paymentId: Joi.string().optional(),
+    chainId: Joi.number().optional(),
+    txHash: Joi.string().optional(),
     payment: Joi.object({
       id: Joi.string().required(),
-      amount: Joi.number().positive().required(),
-      currency: Joi.string().valid('USDC').required(),
-      status: Joi.string().valid('completed', 'failed', 'refunded').required(),
-      txHash: Joi.string().pattern(/^0x[a-fA-F0-9]{64}$/).optional(),
-      createdAt: Joi.date().iso().required(),
-    }).required(),
-    user: Joi.object({
-      id: Joi.string().required(),
+      status: Joi.string().valid(
+        'payment_unpaid',
+        'payment_started',
+        'payment_completed',
+        'payment_bounced',
+        'payment_refunded',
+      ).required(),
+      source: Joi.object().allow(null).optional(),
+      destination: Joi.object().optional(),
+      metadata: Joi.object().optional(),
     }).optional(),
+    // Legacy flat format fields
+    id: Joi.string().optional(),
+    status: Joi.string().optional(),
+    source: Joi.object().allow(null).optional(),
     metadata: Joi.object().optional(),
-  }),
+  }).unknown(true),
 
   /**
    * ePayco webhook payload validation

@@ -161,7 +161,17 @@
       "Bash(DATABASE_URL=\"postgresql://pnptvbot:Apelo801050%23@76.13.26.234:5432/pnptvbot\" DIRECT_URL=\"postgresql://pnptvbot:Apelo801050%23@76.13.26.234:5432/pnptvbot\" npx prisma generate:*)",
       "WebFetch(domain:developer.x.com)",
       "WebFetch(domain:devcommunity.x.com)",
-      "WebFetch(domain:docs.x.com)"
+      "WebFetch(domain:docs.x.com)",
+      "WebFetch(domain:doc.qatouch.com)",
+      "WebFetch(domain:www.qatouch.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:help.qatouch.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.epayco.co)",
+      "WebFetch(domain:docs.epayco.com)",
+      "WebFetch(domain:docs.epayco.co)",
+      "WebFetch(domain:epayco.com)",
+      "WebFetch(domain:paydocs.daimo.com)"
     ],
     "deny": [],
     "ask": []

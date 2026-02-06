@@ -104,13 +104,27 @@ class DaimoService {
    */
   parseWebhookEvent(event) {
     try {
+      // Normalize: Daimo Pay v2 nests data under `payment` object
+      let normalizedEvent;
+      if (event.payment && typeof event.payment === 'object') {
+        normalizedEvent = {
+          id: event.payment.id || event.paymentId,
+          status: event.payment.status || event.type,
+          source: event.payment.source,
+          destination: event.payment.destination,
+          metadata: event.payment.metadata,
+        };
+      } else {
+        normalizedEvent = event;
+      }
+
       const {
         id,
         status,
         source,
         destination,
         metadata,
-      } = event;
+      } = normalizedEvent;
 
       // Validate required fields
       if (!id || !status) {
@@ -189,6 +203,7 @@ class DaimoService {
       payment_started: 'Iniciado',
       payment_completed: 'Completado',
       payment_bounced: 'Rechazado/Devuelto',
+      payment_refunded: 'Reembolsado',
     };
 
     return statusMap[status] || status;

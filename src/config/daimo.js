@@ -230,9 +230,15 @@ const createDaimoPayment = async ({
  * @returns {Object} { valid: boolean, error?: string }
  */
 const validateWebhookPayload = (payload) => {
-  // Daimo Pay webhook structure (based on official docs)
-  const requiredFields = ['id', 'status', 'source', 'destination', 'metadata'];
-  const missingFields = requiredFields.filter((field) => !payload[field]);
+  // Normalize: Daimo Pay v2 nests data under `payment` object
+  // New format: { type, paymentId, payment: { id, status, source, destination, metadata } }
+  // Legacy format: { id, status, source, destination, metadata }
+  const data = (payload?.payment && typeof payload.payment === 'object')
+    ? payload.payment
+    : payload;
+
+  const requiredFields = ['id', 'status'];
+  const missingFields = requiredFields.filter((field) => !data[field]);
 
   if (missingFields.length > 0) {
     return {
@@ -241,27 +247,19 @@ const validateWebhookPayload = (payload) => {
     };
   }
 
-  // Validate source structure
-  if (!payload.source?.payerAddress || !payload.source?.txHash) {
+  // Source may be null for payment_unpaid events
+  if (data.source && (!data.source.payerAddress && !data.source.txHash)) {
     return {
       valid: false,
-      error: 'Invalid source structure: payerAddress and txHash are required',
+      error: 'Invalid source structure',
     };
   }
 
-  // Validate destination structure
-  if (!payload.destination?.toAddress || !payload.destination?.toToken) {
+  // Validate metadata (required for processing)
+  if (!data.metadata?.userId && !data.metadata?.paymentId) {
     return {
       valid: false,
-      error: 'Invalid destination structure: toAddress and toToken are required',
-    };
-  }
-
-  // Validate metadata
-  if (!payload.metadata?.userId || !payload.metadata?.planId) {
-    return {
-      valid: false,
-      error: 'Invalid metadata: userId and planId are required',
+      error: 'Invalid metadata: userId or paymentId are required',
     };
   }
 
@@ -279,6 +277,7 @@ const mapDaimoStatus = (daimoStatus) => {
     payment_started: 'pending',
     payment_completed: 'success',
     payment_bounced: 'failed',
+    payment_refunded: 'refunded',
   };
 
   return statusMap[daimoStatus] || 'pending';

@@ -497,27 +497,7 @@ const showMainMenu = async (ctx) => {
     buttons = buildPrimeMenuButtons(lang);
   } else {
     // FREE MEMBER VERSION - SALES FOCUSED
-    menuText = previewBanner + membershipHeader + (lang === 'es'
-      ? '`🔒 DESBLOQUEA TODO EL CONTENIDO`\n\n' +
-        `Hola ${username}, estás usando la versión FREE.\n\n` +
-        '**Con PRIME obtienes acceso ilimitado a:**\n\n' +
-        '🎬 Videos completos y shows exclusivos\n' +
-        '📍 Encuentra papis cerca de ti (Nearby)\n' +
-        '🎥 Salas de video en vivo 24/7\n' +
-
-        '💬 Chat y soporte prioritario\n\n' +
-        '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
-        '`Pases desde solo $14.99 USD`'
-      : '`🔒 UNLOCK ALL CONTENT`\n\n' +
-        `Hey ${username}, you're on the FREE version.\n\n` +
-        '**With PRIME you get unlimited access to:**\n\n' +
-        '🎬 Full videos & exclusive shows\n' +
-        '📍 Find papis near you (Nearby)\n' +
-        '🎥 Live video rooms 24/7\n' +
-
-        '💬 Priority chat & support\n\n' +
-        '**Go PRIME now and enjoy everything!**\n\n' +
-        '`Passes starting at just $14.99 USD`');
+    menuText = previewBanner + membershipHeader + t('mainMenuIntroFree', lang, { username });
 
     const planButtons = await buildPlanButtons(lang);
     buttons = [
@@ -626,27 +606,7 @@ const showMainMenuEdit = async (ctx) => {
     buttons = buildPrimeMenuButtons(lang);
   } else {
     // FREE MEMBER VERSION - SALES FOCUSED
-    menuText = previewBanner + membershipHeader + (lang === 'es'
-      ? '`🔒 DESBLOQUEA TODO EL CONTENIDO`\n\n' +
-        `Hola ${username}, estás usando la versión FREE.\n\n` +
-        '**Con PRIME obtienes acceso ilimitado a:**\n\n' +
-        '🎬 Videos completos y shows exclusivos\n' +
-        '📍 Encuentra papis cerca de ti (Nearby)\n' +
-        '🎥 Salas de video en vivo 24/7\n' +
-
-        '💬 Chat y soporte prioritario\n\n' +
-        '**¡Hazte PRIME ahora y disfruta todo!**\n\n' +
-        '`Pases desde solo $14.99 USD`'
-      : '`🔒 UNLOCK ALL CONTENT`\n\n' +
-        `Hey ${username}, you're on the FREE version.\n\n` +
-        '**With PRIME you get unlimited access to:**\n\n' +
-        '🎬 Full videos & exclusive shows\n' +
-        '📍 Find papis near you (Nearby)\n' +
-        '🎥 Live video rooms 24/7\n' +
-
-        '💬 Priority chat & support\n\n' +
-        '**Go PRIME now and enjoy everything!**\n\n' +
-        '`Passes starting at just $14.99 USD`');
+    menuText = previewBanner + membershipHeader + t('mainMenuIntroFree', lang, { username });
 
     const planButtons = await buildPlanButtons(lang);
     buttons = [

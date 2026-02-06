@@ -176,59 +176,116 @@
             <div id="error" class="error" style="display: none;"></div>
         </main>
     </div>
+    <script src="https://checkout.epayco.co/checkout.js"></script>
     <script>
         const bookingId = window.location.pathname.split('/').pop();
+        let epaycoHandler = null;
+        let bookingData = null;
 
         async function loadBooking() {
             try {
                 const response = await fetch(`/api/pnp-live/booking/${bookingId}`);
+                 if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Failed to load booking details: ${response.status} ${errorText}`);
+                }
+
                 const data = await response.json();
 
                 if (!data.success) {
                     throw new Error(data.error || 'Booking not found');
                 }
 
-                const booking = data.booking;
-                document.getElementById('model-name').textContent = booking.modelName;
-                document.getElementById('duration').textContent = `${booking.durationMinutes} minutes`;
-                document.getElementById('datetime').textContent = new Date(booking.bookingTime).toLocaleString();
-                document.getElementById('price').textContent = booking.priceUsd;
+                bookingData = data.booking;
+                displayBookingDetails(bookingData);
+                initializeEpayco(bookingData);
 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('booking-details').style.display = 'block';
 
-                // Setup ePayco checkout
-                document.getElementById('pay-btn').onclick = () => openEpaycoCheckout(booking);
+                document.getElementById('pay-btn').onclick = () => openEpaycoCheckout(bookingData);
             } catch (error) {
+                console.error('Error loading booking:', error);
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').textContent = error.message;
                 document.getElementById('error').style.display = 'block';
             }
         }
 
-        function openEpaycoCheckout(booking) {
-            const handler = ePayco.checkout.configure({
-                key: process.env.EPAYCO_PUBLIC_KEY || 'PUBLIC_KEY_HERE',
-                test: process.env.EPAYCO_TEST_MODE === 'true'
-            });
+        function displayBookingDetails(booking) {
+            document.getElementById('model-name').textContent = booking.modelName;
+            document.getElementById('duration').textContent = `${booking.durationMinutes} minutes`;
+            document.getElementById('datetime').textContent = new Date(booking.bookingTime).toLocaleString();
+            document.getElementById('price').textContent = parseFloat(booking.priceUsd).toFixed(2);
+        }
 
-            handler.open({
+        function initializeEpayco(booking) {
+            if (!booking.epaycoPublicKey) {
+                showError('ePayco configuration is missing.');
+                return;
+            }
+            epaycoHandler = ePayco.checkout.configure({
+                key: booking.epaycoPublicKey,
+                test: booking.testMode
+            });
+        }
+
+        function openEpaycoCheckout(booking) {
+            if (!epaycoHandler) {
+                showError('ePayco is not initialized.');
+                return;
+            }
+            
+            const payButton = document.getElementById('pay-btn');
+            payButton.disabled = true;
+            payButton.textContent = 'Opening ePayco...';
+
+            const epaycoData = {
                 name: `PNP Live - ${booking.modelName}`,
                 description: `Private Show - ${booking.durationMinutes} minutes`,
                 invoice: `PNP-LIVE-${booking.id}`,
-                currency: 'usd',
-                amount: booking.priceUsd,
+                currency: 'USD',
+                amount: String(booking.priceUsd),
                 tax_base: '0',
                 tax: '0',
                 country: 'co',
                 lang: 'es',
                 external: 'false',
-                confirmation: `${window.location.origin}/api/webhooks/epayco`,
-                response: `${window.location.origin}/api/payment-response`,
+
+                // From API
+                signature: booking.epaycoSignature,
+                confirmation: booking.confirmationUrl,
+                response: booking.responseUrl,
+
+                // Extra data for webhook
                 extra1: booking.userId,
                 extra2: booking.id,
-                extra3: 'pnp_live'
-            });
+                extra3: 'pnp_live',
+
+                // UX
+                autoclick: false
+            };
+            
+            try {
+                epaycoHandler.open(epaycoData);
+            } catch (error) {
+                console.error('Error opening ePayco checkout:', error);
+                showError('Could not open ePayco checkout. Please try again.');
+            } finally {
+                // Re-enable the button
+                setTimeout(() => {
+                    payButton.disabled = false;
+                    payButton.textContent = 'Pay with Credit Card';
+                }, 2000);
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('booking-details').style.display = 'none';
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
         }
 
         loadBooking();

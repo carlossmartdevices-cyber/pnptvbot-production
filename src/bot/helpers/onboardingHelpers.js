@@ -511,15 +511,21 @@ async function completeOnboarding(ctx) {
  */
 async function showMainMenu(ctx) {
   const lang = ctx.session.language || 'en';
+  const userId = ctx.from.id.toString();
+
+  // Fetch user data to determine subscription status
+  const user = await UserModel.getById(userId);
+  const isPrimeUser = user?.subscription?.isPrime;
 
   // Sanitize the intro text
   const introText = sanitize.telegramMarkdown(t('mainMenuIntro', lang));
 
-  await ctx.reply(
-    introText,
-    Markup.inlineKeyboard([
+  let menuButtons;
+
+  if (isPrimeUser) {
+    // Prime User Menu (current menu)
+    menuButtons = [
       [
-        // Sanitize button texts
         Markup.button.callback(sanitize.telegramMarkdown(t('subscribe', lang)), 'show_subscription_plans'),
       ],
       [
@@ -533,8 +539,27 @@ async function showMainMenu(ctx) {
         Markup.button.callback(sanitize.telegramMarkdown(t('support', lang)), 'show_support'),
         Markup.button.callback(sanitize.telegramMarkdown(t('settings', lang)), 'show_settings'),
       ],
-    ]),
-    // Explicitly set parse_mode
+    ];
+  } else {
+    // Free User / Sales-Oriented Menu
+    menuButtons = [
+      [
+        Markup.button.callback(sanitize.telegramMarkdown(t('upgradeToPrime', lang)), 'show_subscription_plans'),
+      ],
+      [
+        Markup.button.callback(sanitize.telegramMarkdown(t('exploreFeatures', lang)), 'show_premium_features'),
+        Markup.button.callback(sanitize.telegramMarkdown(t('specialOffers', lang)), 'show_special_offers'),
+      ],
+      [
+        Markup.button.callback(sanitize.telegramMarkdown(t('myProfile', lang)), 'show_profile'),
+        Markup.button.callback(sanitize.telegramMarkdown(t('support', lang)), 'show_support'),
+      ],
+    ];
+  }
+
+  await ctx.reply(
+    introText,
+    Markup.inlineKeyboard(menuButtons),
     { parse_mode: 'MarkdownV2' }
   );
 }

@@ -32,6 +32,12 @@ jobs:
       - name: Run tests
         run: npm test
         continue-on-error: true
+        env:
+          QATOUCH_ENABLED: ${{ secrets.QATOUCH_API_TOKEN && 'true' || 'false' }}
+          QATOUCH_DOMAIN: ${{ secrets.QATOUCH_DOMAIN }}
+          QATOUCH_API_TOKEN: ${{ secrets.QATOUCH_API_TOKEN }}
+          QATOUCH_PROJECT_KEY: ${{ secrets.QATOUCH_PROJECT_KEY }}
+          QATOUCH_TEST_RUN_ID: ${{ secrets.QATOUCH_TEST_RUN_ID }}
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3
