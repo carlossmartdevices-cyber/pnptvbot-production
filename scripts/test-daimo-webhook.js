@@ -102,6 +102,7 @@ async function testWebhook() {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'Daimo-Webhook-Test/1.0',
+        'Authorization': `Basic ${process.env.DAIMO_WEBHOOK_SECRET}`,
       },
       timeout: 10000,
     });
