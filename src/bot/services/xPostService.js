@@ -684,15 +684,35 @@ class XPostService {
   }
 
   static async getPendingPosts() {
-    const query = `
-      SELECT post_id, account_id, text, media_url, admin_id, admin_username
-      FROM x_post_jobs
-      WHERE status = 'scheduled'
-      AND scheduled_at <= NOW()
-      ORDER BY scheduled_at ASC
-    `;
-    const result = await db.query(query);
-    return result.rows;
+    const client = await db.getClient();
+    try {
+      await client.query('BEGIN');
+
+      const query = `
+        UPDATE x_post_jobs
+        SET status = 'sending',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE post_id = (
+            SELECT post_id
+            FROM x_post_jobs
+            WHERE status = 'scheduled'
+              AND scheduled_at <= NOW()
+            ORDER BY scheduled_at ASC
+            FOR UPDATE SKIP LOCKED
+            LIMIT 1
+        )
+        RETURNING post_id, account_id, text, media_url, admin_id, admin_username, retry_count;
+      `;
+      const result = await client.query(query);
+      await client.query('COMMIT');
+      return result.rows; // Will return an array with 0 or 1 post
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error claiming pending X post:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   static async getScheduledPosts() {
