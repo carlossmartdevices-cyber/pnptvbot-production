@@ -369,20 +369,10 @@ class XPostService {
     return 'tweet_image';
   }
 
-  static shouldUseV1Upload(mimeType) {
-    if (!mimeType) return true;
-    if (mimeType.startsWith('video/')) return true;
-    if (mimeType === 'image/gif') return true;
-    return false;
-  }
-
   static async uploadMediaToX({ accessToken, mediaUrl }) {
     const { filePath, mimeType, size } = await this.downloadMediaToFile(mediaUrl);
 
     try {
-      if (this.shouldUseV1Upload(mimeType)) {
-        return await this.uploadMediaToXV1({ accessToken, filePath, mimeType, size });
-      }
       return await this.uploadMediaToXV2({ accessToken, filePath, mimeType, size });
     } catch (error) {
       const status = error.response?.status;
@@ -610,9 +600,10 @@ class XPostService {
     while (state && state !== 'succeeded' && state !== 'failed' && attempts < 10) {
       await new Promise((resolve) => setTimeout(resolve, checkAfter * 1000));
       const statusRes = await axios.get(
-        `${X_MEDIA_UPLOAD_V2_BASE}/${mediaId}`,
+        X_MEDIA_UPLOAD_V2_BASE,
         {
           headers: { Authorization: `Bearer ${accessToken}` },
+          params: { command: 'STATUS', media_id: mediaId },
           timeout: 15000,
         }
       );

@@ -120,6 +120,15 @@ class UserModel {
         throw new Error('User ID is required to create or update a user');
       }
       const userId = rawUserId.toString();
+      const onboardingCompleteProvided = Object.prototype.hasOwnProperty.call(userData, 'onboardingComplete')
+        || Object.prototype.hasOwnProperty.call(userData, 'onboarding_complete');
+      const ageVerifiedProvided = Object.prototype.hasOwnProperty.call(userData, 'ageVerified')
+        || Object.prototype.hasOwnProperty.call(userData, 'age_verified');
+      const termsAcceptedProvided = Object.prototype.hasOwnProperty.call(userData, 'termsAccepted')
+        || Object.prototype.hasOwnProperty.call(userData, 'terms_accepted');
+      const privacyAcceptedProvided = Object.prototype.hasOwnProperty.call(userData, 'privacyAccepted')
+        || Object.prototype.hasOwnProperty.call(userData, 'privacy_accepted');
+
       const sql = `
         INSERT INTO ${TABLE} (
           id, username, first_name, last_name, email, bio, photo_file_id,
@@ -137,10 +146,10 @@ class UserModel {
         first_name = COALESCE(EXCLUDED.first_name, ${TABLE}.first_name),
         last_name = COALESCE(EXCLUDED.last_name, ${TABLE}.last_name),
         status = COALESCE(EXCLUDED.status, ${TABLE}.status),
-        onboarding_complete = COALESCE(EXCLUDED.onboarding_complete, ${TABLE}.onboarding_complete),
-        age_verified = COALESCE(EXCLUDED.age_verified, ${TABLE}.age_verified),
-        terms_accepted = COALESCE(EXCLUDED.terms_accepted, ${TABLE}.terms_accepted),
-        privacy_accepted = COALESCE(EXCLUDED.privacy_accepted, ${TABLE}.privacy_accepted),
+        onboarding_complete = CASE WHEN $30 THEN EXCLUDED.onboarding_complete ELSE ${TABLE}.onboarding_complete END,
+        age_verified = CASE WHEN $31 THEN EXCLUDED.age_verified ELSE ${TABLE}.age_verified END,
+        terms_accepted = CASE WHEN $32 THEN EXCLUDED.terms_accepted ELSE ${TABLE}.terms_accepted END,
+        privacy_accepted = CASE WHEN $33 THEN EXCLUDED.privacy_accepted ELSE ${TABLE}.privacy_accepted END,
         language = COALESCE(EXCLUDED.language, ${TABLE}.language),
         updated_at = NOW()
       RETURNING *
@@ -173,12 +182,24 @@ class UserModel {
         userData.favorites || [],
         userData.blocked || [],
         userData.badges || [],
-        userData.onboardingComplete || false,
-        userData.ageVerified || false,
-        userData.termsAccepted || false,
-        userData.privacyAccepted || false,
+        onboardingCompleteProvided
+          ? (userData.onboardingComplete ?? userData.onboarding_complete ?? false)
+          : false,
+        ageVerifiedProvided
+          ? (userData.ageVerified ?? userData.age_verified ?? false)
+          : false,
+        termsAcceptedProvided
+          ? (userData.termsAccepted ?? userData.terms_accepted ?? false)
+          : false,
+        privacyAcceptedProvided
+          ? (userData.privacyAccepted ?? userData.privacy_accepted ?? false)
+          : false,
         userData.language || 'en',
         userData.isActive !== false,
+        onboardingCompleteProvided,
+        ageVerifiedProvided,
+        termsAcceptedProvided,
+        privacyAcceptedProvided,
       ]);
 
       let result;
