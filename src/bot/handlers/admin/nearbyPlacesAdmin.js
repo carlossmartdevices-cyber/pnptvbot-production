@@ -1,6 +1,9 @@
 const { Markup } = require('telegraf');
 const NearbyPlaceService = require('../../services/nearbyPlaceService');
+const NearbyPlaceCategoryModel = require('../../../models/nearbyPlaceCategoryModel');
+const NearbyPlaceModel = require('../../../models/nearbyPlaceModel');
 const PermissionService = require('../../services/permissionService');
+const { parse } = require('csv-parse/sync');
 const logger = require('../../../utils/logger');
 
 /**
@@ -45,6 +48,7 @@ const registerNearbyPlacesAdminHandlers = (bot) => {
         )],
         [Markup.button.callback('📋 All Places', 'admin_all_places')],
         [Markup.button.callback('📊 Statistics', 'admin_places_stats')],
+        [Markup.button.callback('📤 Bulk Upload', 'admin_bulk_upload_places')],
         [Markup.button.callback('🔙 Back', 'admin_panel')],
       ];
 
@@ -742,6 +746,296 @@ const registerNearbyPlacesAdminHandlers = (bot) => {
       });
     } catch (error) {
       logger.error('Error showing statistics:', error);
+    }
+  });
+
+  // ===========================================
+  // BULK UPLOAD
+  // ===========================================
+
+  const VALID_CATEGORY_SLUGS = [
+    'wellness', 'cruising', 'adult_entertainment', 'pnp_friendly',
+    'help_centers', 'saunas', 'bars_clubs', 'community_business',
+  ];
+
+  bot.action('admin_bulk_upload_places', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      let text = '`📤 Bulk Upload Places`\n\n';
+      text += '*CSV Format:*\n';
+      text += 'Upload a CSV file with the following columns:\n\n';
+      text += '*Required:* `name`, `place_type`, `category_slug`\n';
+      text += '*Optional:* `address`, `city`, `country`, `lat`, `lng`, `description`, `phone`, `email`, `website`, `telegram_username`, `instagram`, `price_range`, `is_community_owned`\n\n';
+      text += '*Valid place types:* `business`, `place_of_interest`\n\n';
+      text += '*Valid category slugs:*\n';
+      text += VALID_CATEGORY_SLUGS.map(s => `• \`${s}\``).join('\n');
+      text += '\n\n_Download the template for the exact format._';
+
+      await ctx.editMessageText(text, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('📄 Download Template', 'admin_bulk_template')],
+          [Markup.button.callback('📤 Upload CSV', 'admin_bulk_upload_start')],
+          [Markup.button.callback('🔙 Back', 'admin_nearby_places')],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error showing bulk upload panel:', error);
+    }
+  });
+
+  bot.action('admin_bulk_template', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      await ctx.answerCbQuery();
+
+      const headers = [
+        'name', 'place_type', 'category_slug', 'address', 'city', 'country',
+        'lat', 'lng', 'description', 'phone', 'email', 'website',
+        'telegram_username', 'instagram', 'price_range', 'is_community_owned',
+      ];
+
+      const exampleRows = [
+        ['Rainbow Wellness Spa', 'business', 'wellness', '123 Main St', 'Madrid', 'Spain',
+          '40.4168', '-3.7038', 'A welcoming wellness center', '+34 612 345 678', 'info@example.com', 'https://example.com',
+          'rainbowspa', 'rainbowspa', '$$', 'true'],
+        ['Sunset Park Lookout', 'place_of_interest', 'cruising', 'Sunset Blvd', 'Barcelona', 'Spain',
+          '41.3851', '2.1734', 'Popular meeting spot near the park', '', '', '',
+          '', '', '', 'false'],
+      ];
+
+      const csvLines = [
+        headers.join(','),
+        ...exampleRows.map(row => row.map(v => `"${v}"`).join(',')),
+      ];
+      const csvString = csvLines.join('\n');
+
+      await ctx.replyWithDocument({
+        source: Buffer.from(csvString),
+        filename: 'nearby_places_template.csv',
+      }, {
+        caption: 'Here is the CSV template with 2 example rows. Fill it in and upload.',
+      });
+    } catch (error) {
+      logger.error('Error sending bulk template:', error);
+    }
+  });
+
+  bot.action('admin_bulk_upload_start', async (ctx) => {
+    try {
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      ctx.session.temp = ctx.session.temp || {};
+      ctx.session.temp.awaitingBulkUpload = true;
+      await ctx.saveSession();
+
+      await ctx.editMessageText(
+        '`📤 Bulk Upload`\n\n' +
+        'Send me the CSV file now.\n\n' +
+        '_Make sure it follows the template format._',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancel', 'admin_bulk_upload_cancel')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error starting bulk upload:', error);
+    }
+  });
+
+  bot.action('admin_bulk_upload_cancel', async (ctx) => {
+    try {
+      if (ctx.session?.temp) {
+        delete ctx.session.temp.awaitingBulkUpload;
+        await ctx.saveSession();
+      }
+      // Redirect back to bulk upload panel
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      await ctx.editMessageText(
+        '`❌ Upload Cancelled`',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Back', 'admin_bulk_upload_places')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error cancelling bulk upload:', error);
+    }
+  });
+
+  bot.on('document', async (ctx, next) => {
+    try {
+      if (ctx.chat?.type && ctx.chat.type !== 'private') return next();
+      if (!ctx.session?.temp?.awaitingBulkUpload) return next();
+
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) {
+        delete ctx.session.temp.awaitingBulkUpload;
+        await ctx.saveSession();
+        return next();
+      }
+
+      const doc = ctx.message.document;
+
+      // Validate file
+      if (!doc.file_name || !doc.file_name.toLowerCase().endsWith('.csv')) {
+        await ctx.reply('Please send a CSV file (.csv extension).');
+        return;
+      }
+
+      if (doc.file_size > 1024 * 1024) {
+        await ctx.reply('File too large. Maximum size is 1 MB.');
+        return;
+      }
+
+      // Clear session flag
+      delete ctx.session.temp.awaitingBulkUpload;
+      await ctx.saveSession();
+
+      await ctx.reply('Processing CSV file...');
+
+      // Download file
+      const fileLink = await ctx.telegram.getFileLink(doc.file_id);
+      const response = await fetch(fileLink.href);
+      const csvText = await response.text();
+
+      // Parse CSV
+      let records;
+      try {
+        records = parse(csvText, {
+          columns: true,
+          skip_empty_lines: true,
+          trim: true,
+          bom: true,
+        });
+      } catch (parseError) {
+        await ctx.reply(`CSV parse error: ${parseError.message}`);
+        return;
+      }
+
+      if (records.length === 0) {
+        await ctx.reply('CSV file is empty (no data rows found).');
+        return;
+      }
+
+      // Load categories and build slug->id map
+      const categories = await NearbyPlaceCategoryModel.getAll(false);
+      const categoryMap = {};
+      for (const cat of categories) {
+        categoryMap[cat.slug] = cat.id;
+      }
+
+      const errors = [];
+      let created = 0;
+
+      for (let i = 0; i < records.length; i++) {
+        const row = records[i];
+        const rowNum = i + 2; // +2 because row 1 is headers, data starts at row 2
+        const rowErrors = [];
+
+        // Validate required fields
+        if (!row.name || !row.name.trim()) {
+          rowErrors.push('missing name');
+        }
+        if (!row.place_type || !['business', 'place_of_interest'].includes(row.place_type.trim())) {
+          rowErrors.push('invalid place_type (must be business or place_of_interest)');
+        }
+        if (!row.category_slug || !categoryMap[row.category_slug.trim()]) {
+          rowErrors.push(`invalid category_slug "${row.category_slug || ''}"`);
+        }
+
+        // Validate lat/lng if provided
+        let lat = null;
+        let lng = null;
+        if (row.lat && row.lat.trim()) {
+          lat = parseFloat(row.lat);
+          if (isNaN(lat) || lat < -90 || lat > 90) {
+            rowErrors.push('invalid lat (must be -90 to 90)');
+            lat = null;
+          }
+        }
+        if (row.lng && row.lng.trim()) {
+          lng = parseFloat(row.lng);
+          if (isNaN(lng) || lng < -180 || lng > 180) {
+            rowErrors.push('invalid lng (must be -180 to 180)');
+            lng = null;
+          }
+        }
+
+        if (rowErrors.length > 0) {
+          errors.push(`Row ${rowNum}: ${rowErrors.join(', ')}`);
+          continue;
+        }
+
+        // Build location object
+        let location = null;
+        if (lat !== null && lng !== null) {
+          location = { lat, lng };
+        }
+
+        // Build place data
+        const isCommunityOwned = row.is_community_owned
+          && ['true', '1', 'yes'].includes(row.is_community_owned.trim().toLowerCase());
+
+        try {
+          await NearbyPlaceModel.create({
+            name: row.name.trim(),
+            placeType: row.place_type.trim(),
+            categoryId: categoryMap[row.category_slug.trim()],
+            address: row.address?.trim() || null,
+            city: row.city?.trim() || null,
+            country: row.country?.trim() || null,
+            location,
+            description: row.description?.trim() || null,
+            phone: row.phone?.trim() || null,
+            email: row.email?.trim() || null,
+            website: row.website?.trim() || null,
+            telegramUsername: row.telegram_username?.trim() || null,
+            instagram: row.instagram?.trim() || null,
+            priceRange: row.price_range?.trim() || null,
+            isCommunityOwned,
+            status: 'approved',
+          });
+          created++;
+        } catch (createError) {
+          errors.push(`Row ${rowNum}: ${createError.message}`);
+        }
+      }
+
+      // Build summary
+      let summary = `*Bulk Upload Complete*\n\n`;
+      summary += `Created: ${created}/${records.length} places\n`;
+
+      if (errors.length > 0) {
+        summary += `\n*Errors (${errors.length}):*\n`;
+        const errorText = errors.slice(0, 20).map(e => `• ${e}`).join('\n');
+        summary += errorText;
+        if (errors.length > 20) {
+          summary += `\n_...and ${errors.length - 20} more errors_`;
+        }
+      }
+
+      await ctx.reply(summary, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('📋 View Places', 'admin_all_places')],
+          [Markup.button.callback('🔙 Back', 'admin_nearby_places')],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error processing bulk upload:', error);
+      await ctx.reply('Error processing CSV file. Please check the format and try again.');
     }
   });
 
