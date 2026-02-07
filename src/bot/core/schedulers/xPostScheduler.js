@@ -3,6 +3,7 @@ const XPostService = require('../../services/xPostService');
 
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [5, 15, 30]; // minutes
+const RATE_LIMIT_RETRY_DELAYS = [15, 30, 60]; // minutes - longer for 429
 
 class XPostScheduler {
   constructor(bot = null) {
@@ -103,10 +104,15 @@ class XPostScheduler {
 
     // Check if error is retryable
     const isRetryable = this.isRetryableError(error);
+    const isRateLimit = error.response?.status === 429;
 
     if (isRetryable && retryCount < MAX_RETRIES) {
-      // Schedule retry
-      const delayMinutes = RETRY_DELAYS[retryCount - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+      // Use longer delays for rate limit errors; respect Retry-After header
+      const delays = isRateLimit ? RATE_LIMIT_RETRY_DELAYS : RETRY_DELAYS;
+      const retryAfter = parseInt(error.response?.headers?.['retry-after'] || '0', 10);
+      const retryAfterMinutes = retryAfter > 0 ? Math.ceil(retryAfter / 60) : 0;
+      const baseDelay = delays[retryCount - 1] || delays[delays.length - 1];
+      const delayMinutes = Math.max(baseDelay, retryAfterMinutes);
 
       await XPostService.reschedulePost(postId, delayMinutes);
 

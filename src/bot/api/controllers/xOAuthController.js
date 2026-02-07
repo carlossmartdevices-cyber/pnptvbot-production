@@ -117,13 +117,21 @@ const handleCallback = async (req, res) => {
     }
 
     if (!code && !state) {
-      logger.warn('X OAuth callback missing code/state', {
+      logger.warn('X OAuth callback missing code/state – trying hash recovery', {
         originalUrl: req.originalUrl,
-        query: req.query || {},
       });
       return res.status(200).send(buildHashRecoveryPage(
         'Procesando conexion',
         'Si la autorizacion fue correcta, esta pagina se actualizara sola en segundos. Si no, vuelve al bot y genera un nuevo enlace.',
+        botLink
+      ));
+    }
+
+    if (!code) {
+      logger.warn('X OAuth callback has state but no code', { state });
+      return res.status(400).send(buildRedirectPage(
+        'Parametros incompletos',
+        'No se recibio el codigo de autorizacion. Vuelve al bot y genera un nuevo enlace.',
         botLink
       ));
     }
@@ -135,13 +143,25 @@ const handleCallback = async (req, res) => {
       botLink
     ));
   } catch (error) {
+    // If the state was already consumed (duplicate request), show a friendly page
+    const isDuplicate = error.message?.includes('ya utilizado')
+      || error.message?.includes('no valido')
+      || (error.isAxiosError && error.response?.status === 400);
+
+    if (isDuplicate) {
+      logger.warn('X OAuth duplicate or expired callback', { message: error.message });
+      return res.send(buildRedirectPage(
+        'Conexion procesada',
+        'Si ya autorizaste tu cuenta, la conexion fue exitosa. Puedes regresar al bot.',
+        botLink
+      ));
+    }
+
     logger.error('Error handling X OAuth callback:', error);
     return res.status(400).send(buildRedirectPage(
       'Error al conectar',
       error.message || 'No se pudo conectar la cuenta de X.',
-      sanitizeBotUsername(process.env.BOT_USERNAME)
-        ? `https://t.me/${sanitizeBotUsername(process.env.BOT_USERNAME)}`
-        : null
+      botLink
     ));
   }
 };

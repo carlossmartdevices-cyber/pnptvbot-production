@@ -79,22 +79,18 @@ class XOAuthService {
       throw new Error('Parametros OAuth incompletos');
     }
 
-    const stateQuery = `
-      SELECT state, code_verifier, admin_id, admin_username, expires_at
-      FROM x_oauth_states
-      WHERE state = $1
-    `;
-
-    const stateResult = await db.query(stateQuery, [state]);
+    // Atomic DELETE ... RETURNING prevents race conditions on duplicate callbacks
+    const stateResult = await db.query(
+      `DELETE FROM x_oauth_states
+       WHERE state = $1 AND expires_at > NOW()
+       RETURNING state, code_verifier, admin_id, admin_username`,
+      [state]
+    );
     const storedState = stateResult.rows[0];
 
     if (!storedState) {
-      throw new Error('Estado OAuth no valido o expirado');
-    }
-
-    if (storedState.expires_at && new Date(storedState.expires_at) < new Date()) {
-      await db.query('DELETE FROM x_oauth_states WHERE state = $1', [state]);
-      throw new Error('Estado OAuth expirado');
+      // State was already consumed by a prior request or expired
+      throw new Error('Estado OAuth ya utilizado o expirado');
     }
 
     const tokens = await this.exchangeCodeForTokens({ code, codeVerifier: storedState.code_verifier });
@@ -110,8 +106,6 @@ class XOAuthService {
       tokenType: tokens.token_type,
       profile,
     });
-
-    await db.query('DELETE FROM x_oauth_states WHERE state = $1', [state]);
 
     return account;
   }

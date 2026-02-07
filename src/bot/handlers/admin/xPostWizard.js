@@ -714,6 +714,26 @@ const sendNow = async (ctx) => {
   } catch (error) {
     logger.error('Error sending X post via wizard:', error);
 
+    // Rate limited - post was auto-scheduled
+    if (error.rescheduled) {
+      const safeHandle = session.accountHandle ? escapeMarkdown(session.accountHandle) : 'desconocida';
+      let msg = '⏰ **Post Programado Automáticamente**\n\n';
+      msg += `📤 Cuenta: @${safeHandle}\n`;
+      msg += `⚠️ X tiene límite de publicaciones. El post se enviará automáticamente en ~${error.delayMinutes} minutos.\n`;
+
+      clearSession(ctx);
+
+      await safeEditOrReply(ctx, msg, {
+        parse_mode: 'Markdown',
+        disable_web_page_preview: true,
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('📋 Ver Programados', 'xpost_scheduled')],
+          [Markup.button.callback('◀️ Volver al menú', 'xpost_menu')],
+        ]),
+      });
+      return;
+    }
+
     let errorMsg = '❌ **Error al Publicar**\n\n';
     const safeHandle = session.accountHandle ? escapeMarkdown(session.accountHandle) : 'desconocida';
     const safeError = escapeMarkdown(error.message || 'Error desconocido');

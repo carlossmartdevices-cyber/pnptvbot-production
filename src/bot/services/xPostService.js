@@ -209,6 +209,34 @@ class XPostService {
         truncated,
       };
     } catch (error) {
+      // On 429 rate limit, auto-schedule for later instead of failing
+      if (error.response?.status === 429) {
+        const retryAfter = parseInt(error.response?.headers?.['retry-after'] || '0', 10);
+        const delayMinutes = retryAfter > 0 ? Math.ceil(retryAfter / 60) : 15;
+        const scheduledAt = new Date(Date.now() + delayMinutes * 60 * 1000);
+
+        await this.updatePostJob(postId, {
+          status: 'scheduled',
+          errorMessage: null,
+        });
+        await db.query(
+          `UPDATE x_post_jobs SET scheduled_at = $1, updated_at = CURRENT_TIMESTAMP WHERE post_id = $2`,
+          [scheduledAt, postId]
+        );
+
+        logger.warn('X API rate limited on send now, auto-scheduled', {
+          postId,
+          delayMinutes,
+          scheduledAt: scheduledAt.toISOString(),
+        });
+
+        const rateLimitError = new Error(`Rate limited por X. Post programado automáticamente para ${delayMinutes} minutos.`);
+        rateLimitError.rescheduled = true;
+        rateLimitError.scheduledAt = scheduledAt;
+        rateLimitError.delayMinutes = delayMinutes;
+        throw rateLimitError;
+      }
+
       const errorMessage = error.response?.data || error.message || 'Error desconocido';
 
       await this.updatePostJob(postId, {

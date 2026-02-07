@@ -66,10 +66,10 @@ describe('API Health Checks', () => {
 
     test('X OAuth callback endpoint exists', async () => {
       const response = await axios.get(`${BASE_URL}/api/auth/x/callback`, {
-        params: { state: 'test' },
         validateStatus: () => true,
       });
 
+      // No params → hash recovery page (200) or error (400)
       expect([200, 400, 401]).toContain(response.status);
     });
   });
