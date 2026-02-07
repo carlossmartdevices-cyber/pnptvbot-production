@@ -1,6 +1,7 @@
 const UserModel = require('../../models/userModel');
 const { query } = require('../../config/postgres');
 const logger = require('../../utils/logger');
+const BusinessNotificationService = require('./businessNotificationService');
 
 /**
  * Membership Cleanup Service
@@ -58,6 +59,9 @@ class MembershipCleanupService {
         statusUpdates: results.statusUpdates,
         channelKicks: results.channelKicks
       });
+
+      // Business channel notification
+      BusinessNotificationService.notifyCleanupSummary(results).catch(() => {});
 
       return results;
     } catch (error) {

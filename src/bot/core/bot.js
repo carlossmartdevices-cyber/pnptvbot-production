@@ -86,6 +86,7 @@ const GroupCleanupService = require('../services/groupCleanupService');
 const broadcastScheduler = require('../../services/broadcastScheduler');
 const SubscriptionReminderService = require('../services/subscriptionReminderService');
 const MembershipCleanupService = require('../services/membershipCleanupService');
+const BusinessNotificationService = require('../services/businessNotificationService');
 const TutorialReminderService = require('../services/tutorialReminderService');
 const MessageRateLimiter = require('../services/messageRateLimiter');
 
@@ -633,6 +634,8 @@ const startBot = async () => {
     // Initialize membership cleanup service (for daily status updates and channel management)
     MembershipCleanupService.initialize(bot);
     logger.info('✓ Membership cleanup service initialized');
+    BusinessNotificationService.initialize(bot);
+    logger.info('✓ Business notification service initialized');
     // Start cron jobs for scheduled tasks (membership sync, cleanup, etc.)
     try {
       await startCronJobs(bot);

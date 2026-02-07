@@ -7,6 +7,7 @@ const MessageTemplates = require('../../services/messageTemplates');
 const supportRoutingService = require('../../services/supportRoutingService');
 const UserModel = require('../../../models/userModel');
 const { createChatInviteLink } = require('../../utils/telegramAdmin');
+const BusinessNotificationService = require('../../services/businessNotificationService');
 
 const PRIME_FALLBACK_LINK = 'https://t.me/PNPTV_PRIME';
 
@@ -176,6 +177,13 @@ const registerActivationHandlers = (bot) => {
         product,
         success: true,
       });
+
+      BusinessNotificationService.notifyCodeActivation({
+        userId: ctx.from.id,
+        username: ctx.from.username,
+        code,
+        product,
+      }).catch(() => {});
 
       const inviteLink = await getPrimeInviteLink(ctx, ctx.from.id);
       await ctx.reply(
@@ -381,6 +389,13 @@ const registerActivationHandlers = (bot) => {
         product,
         success: true,
       });
+
+      BusinessNotificationService.notifyCodeActivation({
+        userId: targetUserId,
+        username: targetUser?.username,
+        code,
+        product,
+      }).catch(() => {});
 
       const inviteLink = await getPrimeInviteLink(ctx, targetUserId);
       await ctx.telegram.sendMessage(

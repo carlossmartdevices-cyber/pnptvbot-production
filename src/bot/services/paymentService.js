@@ -16,6 +16,7 @@ const DaimoService = require('./daimoService');
 const DaimoConfig = require('../../config/daimo');
 const MessageTemplates = require('./messageTemplates');
 const sanitize = require('../../utils/sanitizer');
+const BusinessNotificationService = require('./businessNotificationService');
 
 class PaymentService {
     /**
@@ -665,6 +666,25 @@ class PaymentService {
               refPayco: x_ref_payco,
             });
           }
+
+          // Business channel notification
+          try {
+            const plan = await PlanModel.getById(planIdOrBookingId);
+            const user = await UserModel.getById(userId);
+            const promoInfo = payment?.metadata?.promoCode
+              ? ` (Promo: ${payment.metadata.promoCode})`
+              : '';
+            await BusinessNotificationService.notifyPayment({
+              userId,
+              planName: (plan?.display_name || plan?.name || 'N/A') + promoInfo,
+              amount: parseFloat(x_amount),
+              provider: 'ePayco',
+              transactionId: x_ref_payco,
+              customerName: x_customer_name || user?.first_name || 'Unknown',
+            });
+          } catch (bizError) {
+            logger.error('Business notification failed (non-critical):', { error: bizError.message });
+          }
         } else {
           logger.warn('ePayco webhook missing required data', {
             userId,
@@ -987,6 +1007,24 @@ class PaymentService {
                 error: adminError.message,
                 eventId: id,
               });
+            }
+
+            // Business channel notification
+            try {
+              const daimoAmount = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
+              const promoInfo2 = payment?.metadata?.promoCode
+                ? ` (Promo: ${payment.metadata.promoCode})`
+                : '';
+              await BusinessNotificationService.notifyPayment({
+                userId,
+                planName: (plan.display_name || plan.name) + promoInfo2,
+                amount: daimoAmount,
+                provider: 'Daimo Pay',
+                transactionId: source?.txHash || id,
+                customerName: user?.first_name || user?.username || 'Unknown',
+              });
+            } catch (bizError) {
+              logger.error('Business notification failed (non-critical):', { error: bizError.message });
             }
 
             // Send both emails if we have an email

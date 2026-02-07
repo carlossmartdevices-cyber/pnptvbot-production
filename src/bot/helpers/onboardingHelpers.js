@@ -4,6 +4,7 @@ const { isValidEmail } = require('../../utils/validation');
 const logger = require('../../utils/logger');
 const UserModel = require('../../models/userModel');
 const sanitize = require('../../utils/sanitizer');
+const BusinessNotificationService = require('../services/businessNotificationService');
 
 /**
  * Handle language selection
@@ -477,6 +478,14 @@ async function completeOnboarding(ctx) {
       await UserModel.createOrUpdate(userData);
     }
     console.log(`[Onboarding] User record created in PostgreSQL for user ${userId}`);
+
+    // Business channel notification
+    BusinessNotificationService.notifyNewUser({
+      userId,
+      username: ctx.from.username,
+      firstName: ctx.from.first_name,
+      language: ctx.session?.language,
+    }).catch(() => {});
 
     // Auto-activate free membership if enabled
     if (process.env.AUTO_ACTIVATE_FREE_USERS === 'true') {
