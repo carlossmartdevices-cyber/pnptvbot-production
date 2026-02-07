@@ -271,44 +271,11 @@ function App() {
     <>
       <Header
         title="PNPtv Videorama"
-        subtitle="Your Media Center"
         telegramUser={telegramUser}
         onLogout={handleLogout}
-        // loginRef={loginRef} // loginRef is no longer needed in Header
       />
 
       <main className="container">
-        <section className="hero-section">
-          <div className="hero-copy">
-            <p className="hero-eyebrow">Curated media feed</p>
-            <h2>Video drops, podcasts, and radio — all in one place.</h2>
-            <p>
-              Browse categories or jump into a collection. New uploads and PRIME content are synced
-              to your membership automatically.
-            </p>
-            <div className="flex flex-wrap gap-2 mt-4">
-              <span className="badge">Fresh drops</span>
-              <span className="badge">Community picks</span>
-              <span className="badge">Live radio</span>
-            </div>
-          </div>
-          <div className="card p-4">
-            <p className="text-lg font-semibold">Radio status</p>
-            <div className="flex items-center gap-2 mt-2">
-              <span>{radioNowPlaying ? 'Live now' : 'Offline'}</span>
-              <span className={`w-3 h-3 rounded-full ${radioNowPlaying ? 'bg-green-500' : 'bg-gray-500'}`}></span>
-            </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              {radioNowPlaying?.title || 'Check back soon for the live mix.'}
-            </p>
-            {radioNowPlaying && (
-              <button type="button" className="button mt-4" onClick={() => setIsRadioExpanded(true)}>
-                Open radio
-              </button>
-            )}
-          </div>
-        </section>
-
         <CategoryNav
           selected={selectedCategory}
           onChange={handleCategoryChange}
@@ -328,12 +295,9 @@ function App() {
         )}
 
         {collections.length > 0 && (
-          <section className="section">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h2>Collections</h2>
-                <p>Curated playlists and podcasts powered by Videorama.</p>
-              </div>
+          <section className="collections-section">
+            <div className="collections-header">
+              <h2>Collections</h2>
               {canManageCollections && (
                 <a href="https://pnptv.app/videorama/create" target="_blank" rel="noreferrer" className="button button-primary">
                   + Create collection

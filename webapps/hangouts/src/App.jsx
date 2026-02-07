@@ -73,8 +73,7 @@ function App() {
     return (
       <>
         <Header 
-          title="PNPtv Hangouts" 
-          subtitle="Video Calls" 
+          title="PNPtv Hangouts"
           telegramUser={telegramUser} 
           onLogout={handleLogout} 
         />

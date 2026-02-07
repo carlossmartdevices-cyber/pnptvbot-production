@@ -146,54 +146,6 @@ function Lobby({ telegramUser, role }) {
 
   return (
     <main className="container">
-      <section className="hero-section">
-        <h2 className="hero-title">Find a room or start one.</h2>
-        <p className="hero-text">
-          {telegramUser ? (
-            <>
-              Connected as <span className="font-mono">{telegramUser.displayName}</span>. Public
-              rooms appear below.
-            </>
-          ) : (
-            <>Open from Telegram for instant join and creator credit.</>
-          )}
-        </p>
-        <div className="flex flex-wrap gap-2 mb-4">
-          <span className={`badge ${isTelegram ? 'badge-success' : 'badge-muted'}`}>
-            {isTelegram ? 'Telegram linked' : 'Telegram required'}
-          </span>
-          <span className={`badge ${canCreate ? 'badge-success' : 'badge-warning'}`}>
-            {canCreate ? 'Creator access' : 'Viewer access'}
-          </span>
-          <span className="badge badge-muted">Instant join links</span>
-        </div>
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="card text-center">
-            <div className="text-2xl font-bold">{roomCount}</div>
-            <div className="text-sm text-muted-foreground">Public rooms</div>
-          </div>
-          <div className="card text-center">
-            <div className="text-2xl font-bold">{participantCount}</div>
-            <div className="text-sm text-muted-foreground">Guests online</div>
-          </div>
-          <div className="card text-center">
-            <div className="text-2xl font-bold">{capacityCount}</div>
-            <div className="text-sm text-muted-foreground">Total capacity</div>
-          </div>
-        </div>
-        {!isTelegram && (
-          <div className="alert alert-info">
-            This feature requires Telegram authentication. Open this link inside Telegram to join or
-            create public rooms.
-          </div>
-        )}
-        {!canCreate && (
-          <div className="alert alert-warning">
-            Room creation is restricted to PRIME/ADMIN members in the full webapp.
-          </div>
-        )}
-      </section>
-
       <section className="card">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <label className="form-group">

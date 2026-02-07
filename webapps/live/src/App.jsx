@@ -230,44 +230,11 @@ function App() {
     <>
       <Header
         title="PNPtv Live"
-        subtitle="Your Media Center"
         telegramUser={telegramUser}
         onLogout={handleLogout}
       />
 
       <main className="container">
-        <section className="hero-section">
-          <div className="hero-copy">
-            <p className="hero-eyebrow">Live Streaming Platform</p>
-            <h2>Experience live events, shows, and more.</h2>
-            <p>
-              Join live streams, interact with creators, and enjoy exclusive content. 
-              All powered by PNPtv.
-            </p>
-            <div className="flex flex-wrap gap-2 mt-4">
-              <span className="badge">Live Events</span>
-              <span className="badge">Creator Streams</span>
-              <span className="badge">24/7 Radio</span>
-            </div>
-          </div>
-          <div className="card p-4">
-            
-            <p className="text-lg font-semibold">Radio status</p>
-            <div className="flex items-center gap-2 mt-2">
-              <span>{radioNowPlaying ? 'Live now' : 'Offline'}</span>
-              <span className={`w-3 h-3 rounded-full ${radioNowPlaying ? 'bg-green-500' : 'bg-gray-500'}`}></span>
-            </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              {radioNowPlaying?.title || 'Check back soon for the live mix.'}
-            </p>
-            {radioNowPlaying && (
-              <button type="button" className="button mt-4" onClick={() => setIsRadioExpanded(true)}>
-                Open radio
-              </button>
-            )}
-          </div>
-        </section>
-
         <CategoryNav
           selected={selectedCategory}
           onChange={handleCategoryChange}
