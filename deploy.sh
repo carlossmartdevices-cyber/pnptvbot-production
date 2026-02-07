@@ -28,31 +28,32 @@ fi
 # Step 2: Clean up Docker
 echo ""
 echo "Step 2/4: Cleaning up Docker containers..."
-docker-compose down --remove-orphans 2>/dev/null || true
+docker compose down --remove-orphans 2>/dev/null || true
 echo "  ✓ Cleanup complete"
 
 # Step 3: Build and start services
 echo ""
 echo "Step 3/4: Building and starting Docker services..."
-docker-compose up -d --build
+docker compose build
+docker compose up -d
 
 # Step 4: Verify deployment
 echo ""
 echo "Step 4/4: Verifying deployment..."
 sleep 5
-docker-compose ps
+docker compose ps
 
 echo ""
 echo "=========================================="
 echo "  Deployment Status"
 echo "=========================================="
-docker-compose ps
+docker compose ps
 
 echo ""
 echo "=========================================="
 echo "  Recent Logs"
 echo "=========================================="
-docker-compose logs --tail=30 bot
+docker compose logs --tail=30 bot
 
 echo ""
 echo "=========================================="
@@ -62,8 +63,8 @@ echo ""
 echo "Access your bot at: http://localhost:3000"
 echo ""
 echo "Useful commands:"
-echo "  - View logs: docker-compose logs -f bot"
-echo "  - Check status: docker-compose ps"
-echo "  - Restart: docker-compose restart bot"
-echo "  - Stop: docker-compose down"
+echo "  - View logs: docker compose logs -f bot"
+echo "  - Check status: docker compose ps"
+echo "  - Restart: docker compose restart bot"
+echo "  - Stop: docker compose down"
 echo ""

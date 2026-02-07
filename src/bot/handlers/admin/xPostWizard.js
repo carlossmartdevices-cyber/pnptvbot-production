@@ -172,7 +172,9 @@ const showXPostMenu = async (ctx, edit = false) => {
     recentPosts.forEach(post => {
       const status = getStatusEmoji(post.status);
       const date = formatDate(post.sent_at || post.scheduled_at);
-      const textPreview = (post.text || '').substring(0, 30) + (post.text?.length > 30 ? '...' : '');
+      const fullText = post.text || '';
+      const chars = [...fullText];
+      const textPreview = chars.slice(0, 30).join('') + (chars.length > 30 ? '...' : '');
       message += `  ${status} ${escapeMarkdown(date)} - ${escapeMarkdown(textPreview)}\n`;
     });
   }

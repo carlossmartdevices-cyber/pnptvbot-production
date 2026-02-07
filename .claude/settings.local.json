@@ -171,7 +171,9 @@
       "WebFetch(domain:docs.epayco.com)",
       "WebFetch(domain:docs.epayco.co)",
       "WebFetch(domain:epayco.com)",
-      "WebFetch(domain:paydocs.daimo.com)"
+      "WebFetch(domain:paydocs.daimo.com)",
+      "WebFetch(domain:easybots.qatouch.com)",
+      "WebFetch(domain:www.cake.me)"
     ],
     "deny": [],
     "ask": []
