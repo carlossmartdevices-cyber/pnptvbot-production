@@ -363,6 +363,9 @@ class PaymentService {
 
     const secret = process.env.DAIMO_WEBHOOK_SECRET;
     if (!secret) {
+      if (process.env.NODE_ENV === 'development') {
+        return true;
+      }
       throw new Error('DAIMO_WEBHOOK_SECRET must be configured');
     }
 
