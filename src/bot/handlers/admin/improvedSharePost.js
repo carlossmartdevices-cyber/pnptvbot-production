@@ -132,9 +132,9 @@ const registerImprovedSharePostHandlers = (bot) => {
   };
 
   // Available destinations - dynamically configured from env
-  // NOTE: General topic (thread 1) doesn't work for this forum - removed
   const SHARE_DESTINATIONS = [
     { id: 'prime', chatId: process.env.PRIME_CHANNEL_ID, threadId: null, name: '💎 Prime Channel', type: 'channel' },
+    { id: 'community', chatId: process.env.GROUP_ID, threadId: null, name: '👥 Community (General)', type: 'group' },
     { id: 'news', chatId: process.env.GROUP_ID, threadId: 5525, name: '📰 PNP Latino News', type: 'topic' },
     { id: 'walloffame', chatId: process.env.GROUP_ID, threadId: parseTopicId(process.env.WALL_OF_FAME_TOPIC_ID), name: '🏆 Wall Of Fame', type: 'topic' },
   ].filter(d => d && d.chatId);
@@ -234,16 +234,28 @@ const registerImprovedSharePostHandlers = (bot) => {
     // Prime Channel section
     buttons.push([Markup.button.callback('━━ Canal ━━', 'share_post_header_channel')]);
     const primeChannel = SHARE_DESTINATIONS.find(d => d.id === 'prime');
-    const isPrimeSelected = selectedDestinations.some(d => d.id === 'prime');
-    buttons.push([
-      Markup.button.callback(
-        (isPrimeSelected ? '✅ ' : '⬜ ') + primeChannel.name,
-        'share_post_dest_prime'
-      ),
-    ]);
+    if (primeChannel) {
+      const isPrimeSelected = selectedDestinations.some(d => d.id === 'prime');
+      buttons.push([
+        Markup.button.callback(
+          (isPrimeSelected ? '✅ ' : '⬜ ') + primeChannel.name,
+          'share_post_dest_prime'
+        ),
+      ]);
+    }
 
-    // Community Group Topics section
-    buttons.push([Markup.button.callback('━━ Comunidad (Topics) ━━', 'share_post_header_topics')]);
+    // Community Group section (General + Topics)
+    buttons.push([Markup.button.callback('━━ Comunidad ━━', 'share_post_header_topics')]);
+    const communityDest = SHARE_DESTINATIONS.find(d => d.id === 'community');
+    if (communityDest) {
+      const isCommunitySelected = selectedDestinations.some(d => d.id === 'community');
+      buttons.push([
+        Markup.button.callback(
+          (isCommunitySelected ? '✅ ' : '⬜ ') + communityDest.name,
+          'share_post_dest_community'
+        ),
+      ]);
+    }
     const topicDestinations = SHARE_DESTINATIONS.filter(d => d.type === 'topic');
     for (const dest of topicDestinations) {
       const isSelected = selectedDestinations.some(d => d.id === dest.id);
@@ -267,7 +279,8 @@ const registerImprovedSharePostHandlers = (bot) => {
       + 'Destinos seleccionados: *' + selectedCount + '*\n\n'
       + '━━━━━━━━━━━━━━━━━\n\n'
       + '💎 *Prime Channel:* Canal principal\n'
-      + '👥 *Comunidad:* Grupo con topics\n\n'
+      + '👥 *Comunidad (General):* Post sin topic\n'
+      + '📰 *Topics:* Post en topic específico\n\n'
       + '💡 Selecciona donde quieres publicar.';
 
     await ctx.editMessageText(message, {
@@ -1625,8 +1638,9 @@ const registerImprovedSharePostHandlers = (bot) => {
 
       await ctx.answerCbQuery('⏳ Programando...');
 
-      // Extract channel and group IDs for compatibility with database
+      // Extract channel, group, and topic IDs for compatibility with database
       const channelDests = destinations.filter(d => d.type === 'channel');
+      const groupDests = destinations.filter(d => d.type === 'group');
       const topicDests = destinations.filter(d => d.type === 'topic');
 
       // Create the post in database for scheduling
@@ -1639,9 +1653,12 @@ const registerImprovedSharePostHandlers = (bot) => {
         mediaType: postData.mediaType,
         mediaUrl: postData.mediaFileId,
         telegramFileId: postData.mediaFileId,
-        targetGroupIds: topicDests.map(d => d.chatId),
+        targetGroupIds: [...topicDests.map(d => d.chatId), ...groupDests.map(d => d.chatId)],
         targetChannelIds: channelDests.map(d => d.chatId),
-        targetTopics: topicDests.map(d => ({ chatId: d.chatId, threadId: d.threadId, name: d.name })),
+        targetTopics: [
+          ...topicDests.map(d => ({ chatId: d.chatId, threadId: d.threadId, name: d.name })),
+          ...groupDests.map(d => ({ chatId: d.chatId, threadId: null, name: d.name })),
+        ],
         targetAllGroups: false,
         postToPrimeChannel: channelDests.length > 0,
         templateType: 'standard',
