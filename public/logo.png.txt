@@ -1,2 +1,0 @@
-# Placeholder file - Replace with actual logo.png image
-# This file is referenced in the Daimo configuration
