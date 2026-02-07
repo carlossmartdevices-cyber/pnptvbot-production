@@ -6,48 +6,39 @@
   <title>Terms of Service - PNPtv</title>
   <meta name="description" content="Terms of Service for PNPtv Digital Community - Adult content platform terms, membership, and community rules.">
   <link rel="stylesheet" href="/webapps/design-system/static.css">
+  <script src="/webapps/design-system/telegram-theme.js" type="module"></script>
   <style>
-    /* Add any specific styles for terms page here, if needed, that are not covered by static.css */
-    .header .header-links a[href="/terms"] {
-      background: var(--accent);
-      color: var(--bg);
-    }
     .back-to-top {
       position: fixed;
-      bottom: 20px;
-      right: 20px;
+      bottom: 16px;
+      right: 16px;
       background: var(--accent);
-      color: var(--bg);
+      color: #2d1d00;
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 24px;
+      font-size: 18px;
       cursor: pointer;
       opacity: 0;
       visibility: hidden;
-      transition: opacity 0.3s ease, visibility 0.3s ease;
+      transition: opacity 0.2s, visibility 0.2s;
+      border: none;
+      box-shadow: var(--shadow);
     }
-
-    .back-to-top.visible {
-      opacity: 1;
-      visibility: visible;
-    }
+    .back-to-top.visible { opacity: 1; visibility: visible; }
+    .back-to-top:active { transform: scale(0.95); }
   </style>
 </head>
 <body>
 
   <header class="header">
     <div class="header-logo">
-      <div class="logo-icon">
-        <!-- You can replace this with an SVG icon or an image -->
-        <span>PNP</span>
-      </div>
+      <div class="logo-icon"><span>PNP</span></div>
       <div class="header-text">
         <h1>PNPtv!</h1>
-        <p>Legal</p>
       </div>
     </div>
     <div class="header-links">
@@ -229,12 +220,12 @@
       <ul>
         <li>This agreement is governed by the laws of the Republic of Colombia</li>
         <li>Disputes should first be addressed amicably via <a href="mailto:support@pnptv.app">support@pnptv.app</a></li>
-        <li>Failing resolution, competent courts in Bogotá, Colombia have jurisdiction</li>
+        <li>Failing resolution, competent courts in Bogota, Colombia have jurisdiction</li>
         <li><strong>Class Action Waiver:</strong> Claims must be brought individually; you waive the right to participate in class actions against PNPtv!</li>
       </ul>
     </section>
 
-    <div class="highlight-box" style="text-align: center; margin-top: 40px;">
+    <div class="highlight-box" style="text-align: center; margin-top: 24px;">
       <p>By using PNPtv!, you acknowledge that you have read, understood, and agree to these Terms of Service.</p>
     </div>
   </main>
@@ -244,17 +235,12 @@
     <p><a href="/terms">Terms</a> | <a href="/privacy">Privacy</a> | <a href="/">Home</a></p>
   </footer>
 
-  <div class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">↑</div>
+  <button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">&#8593;</button>
 
   <script>
-    // Show/hide back to top button
     window.addEventListener('scroll', () => {
       const btn = document.querySelector('.back-to-top');
-      if (window.scrollY > 300) {
-        btn.classList.add('visible');
-      } else {
-        btn.classList.remove('visible');
-      }
+      btn.classList.toggle('visible', window.scrollY > 300);
     });
   </script>
 </body>

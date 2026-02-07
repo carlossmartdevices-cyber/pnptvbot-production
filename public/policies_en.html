@@ -5,137 +5,83 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PNPtv! Digital Community — Terms, Refunds & Privacy</title>
 <meta name="description" content="Terms of Service, Refund Policy, and Privacy Policy of PNPtv! Digital Community.">
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
-
+<link rel="stylesheet" href="/webapps/design-system/static.css">
+<script src="/webapps/design-system/telegram-theme.js" type="module"></script>
 <style>
-  :root {
-    --bg: #28282B;
-    --panel: #2F2F33;
-    --text: #EAEAF0;
-    --muted: #C6C6CD;
-    --primary: #6A40A7;
-    --accent: #DF00FF;
-    --link: #DF00FF;
-    --border: #3A3A40;
-    --radius: 22px; /* rounded-2xl */
-    --shadow: 0 8px 22px rgba(0,0,0,0.25);
-  }
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0; padding: 0;
-    background: var(--bg); color: var(--text);
-    font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-    line-height: 1.6;
-  }
-  h1, h2, h3 { font-family: 'Space Grotesk', Inter, system-ui, sans-serif; }
-  code, pre { font-family: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace; }
-  a { color: var(--link); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .container { max-width: 980px; margin: 0 auto; padding: 28px; }
-  header {
-    background: linear-gradient(180deg, rgba(106,64,167,0.18), rgba(223,0,255,0.06));
-    border-bottom: 1px solid var(--border);
-    box-shadow: 0 6px 18px rgba(106,64,167,0.25);
-  }
-  header .container { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-  .brand { display:flex; align-items:center; gap:12px; }
-  .badge {
-    background: rgba(223,0,255,0.10);
-    color: var(--accent);
-    border: 1px solid rgba(223,0,255,0.35);
-    padding: 6px 12px;
-    border-radius: 999px;
-    font-size: 12px; font-weight: 700; letter-spacing: .3px;
-  }
-  h1 { font-size: 30px; margin: 14px 0 6px; }
-  .updated { color: var(--muted); font-size: 14px; }
-  nav.toc {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 18px;
-    margin: 22px 0 30px;
+  .back-to-top {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: var(--accent);
+    color: #2d1d00;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+    border: none;
     box-shadow: var(--shadow);
   }
-  nav.toc h2 { font-size: 16px; margin: 0 0 10px; color: var(--muted); }
-  nav.toc ol {
-    margin: 0; padding-left: 18px;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 8px 18px;
-  }
-  section {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 22px;
-    margin-bottom: 20px;
-    box-shadow: var(--shadow);
-  }
-  h2 { font-size: 22px; margin: 0 0 10px; }
-  h3 { font-size: 17px; margin: 14px 0 8px; color: var(--muted); }
-  ul, ol { padding-left: 18px; }
-  .cta {
-    display:inline-block; padding:10px 14px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, var(--primary), var(--accent));
-    color:#101014; font-weight:700;
-    border:1px solid rgba(255,255,255,0.08);
-    box-shadow: 0 6px 20px rgba(223,0,255,0.25);
-  }
-  footer {
-    color: var(--muted);
-    font-size: 14px;
-    border-top: 1px solid var(--border);
-    margin-top: 24px;
-  }
-  .chip { display:inline-block; background:#232329; border:1px solid var(--border); padding:6px 10px; border-radius:10px; font-size:12px; color:var(--muted);}
-  .pill { display:inline-block; background:rgba(223,0,255,0.10); border:1px solid rgba(223,0,255,0.3); padding:6px 12px; border-radius:999px; font-size:12px; color:#f5d0ff; }
+  .back-to-top.visible { opacity: 1; visibility: visible; }
+  .back-to-top:active { transform: scale(0.95); }
 </style>
 </head>
 <body>
-  <header>
-    <div class="container">
-      <div class="brand">
-        <span class="badge">PNPtv! Digital Community</span>
-        <span class="chip">Legal</span>
+
+  <header class="header">
+    <div class="header-logo">
+      <div class="logo-icon"><span>PNP</span></div>
+      <div class="header-text">
+        <h1>PNPtv!</h1>
       </div>
-      <div class="updated">Effective date: 2025-10-19</div>
+    </div>
+    <div class="header-links">
+      <a href="/policies_es">ES</a>
+      <a href="/policies_en" class="active">EN</a>
     </div>
   </header>
 
   <main class="container">
-    <h1>Terms, Refunds & Privacy</h1>
-    <p class="updated">Support: <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>
+    <div class="page-title">
+      <h2>Terms, Refunds & Privacy</h2>
+      <p class="updated">Effective date: October 2025 | Support: <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>
+    </div>
 
     <nav class="toc" aria-label="Table of contents">
-      <h2>Contents</h2>
+      <h3>Contents</h3>
       <ol>
-        <li><a href="#intro">1. Introduction</a></li>
-        <li><a href="#health">2. Health, Wellness, Age & Responsibility Clauses</a></li>
-        <li><a href="#scope">3. Service Scope</a></li>
-        <li><a href="#membership">4. Membership & Access</a></li>
-        <li><a href="#conduct">5. Community Conduct Rules</a></li>
-        <li><a href="#refunds">6. Refund Policy</a></li>
-        <li><a href="#privacy">7. Privacy Policy</a></li>
-        <li><a href="#jurisdiction">8. Disclaimer & Legal Jurisdiction</a></li>
+        <li><a href="#intro">Introduction</a></li>
+        <li><a href="#health">Health, Wellness, Age & Responsibility Clauses</a></li>
+        <li><a href="#scope">Service Scope</a></li>
+        <li><a href="#membership">Membership & Access</a></li>
+        <li><a href="#conduct">Community Conduct Rules</a></li>
+        <li><a href="#refunds">Refund Policy</a></li>
+        <li><a href="#privacy">Privacy Policy</a></li>
+        <li><a href="#jurisdiction">Disclaimer & Legal Jurisdiction</a></li>
       </ol>
     </nav>
 
-    <section id="intro">
-      <h2>1. Introduction</h2>
+    <section class="section" id="intro">
+      <h3><span class="number">1</span> Introduction</h3>
       <p>PNPtv! Digital Community is an international online membership platform operated from Colombia with global reach. It functions as a private, adult-only community hosted primarily on Telegram and other electronic media. By accessing our services, you agree to these Terms, the Refund Policy, and the Privacy Policy.</p>
       <p>PNPtv! provides a subscription-only adult content channel, an interactive community space, and an optional geolocation feature to discover nearby members.</p>
-      <p>These terms are designed to align with U.S., EU, and Colombian regulations for digital services, data protection, and adult content.</p>
+      <div class="highlight-box">
+        <p><strong>Important:</strong> These terms are designed to align with U.S., EU, and Colombian regulations for digital services, data protection, and adult content.</p>
+      </div>
     </section>
 
-    <section id="health">
-      <h2>2. Health, Wellness, Age & Responsibility Clauses</h2>
+    <section class="section" id="health">
+      <h3><span class="number">2</span> Health, Wellness, Age & Responsibility Clauses</h3>
+      <div class="warning-box">
+        <p><strong>18+ Only:</strong> Access is strictly limited to individuals aged 18 years or older.</p>
+      </div>
       <ul>
-        <li>Access is strictly limited to individuals aged 18+.</li>
         <li>All content is recreational and <em>not</em> a substitute for medical, psychological, or legal advice.</li>
         <li>Users facing mental health challenges or addictions should seek professional help.</li>
         <li>Any substances or items depicted are fictional props for entertainment only.</li>
@@ -143,8 +89,8 @@
       </ul>
     </section>
 
-    <section id="scope">
-      <h2>3. Service Scope</h2>
+    <section class="section" id="scope">
+      <h3><span class="number">3</span> Service Scope</h3>
       <ul>
         <li><strong>Private adult channel</strong> with exclusive content available by subscription.</li>
         <li><strong>Interactive Telegram community</strong> with moderated discussions.</li>
@@ -154,165 +100,172 @@
       <p>The purpose is to provide a safe, private, consent-driven experience for adults built on respect and personal freedom.</p>
     </section>
 
-    <section id="membership">
-      <h2>4. Membership & Access</h2>
-      <h3>4.1 Access Requirements</h3>
+    <section class="section" id="membership">
+      <h3><span class="number">4</span> Membership & Access</h3>
+      <h4>4.1 Access Requirements</h4>
       <ul>
         <li>User represents they are <strong>18+</strong>.</li>
         <li>User must ensure adult content access is legal in their jurisdiction.</li>
         <li>We may request age or identity verification.</li>
       </ul>
-      <h3>4.2 Nature of Membership</h3>
+      <h4>4.2 Nature of Membership</h4>
       <ul>
         <li>Subscriptions grant a <strong>personal, limited, non-transferable, revocable license</strong>.</li>
         <li>No ownership of content or platform is transferred.</li>
         <li>Sharing, reposting, recording, distributing, or selling content is prohibited.</li>
       </ul>
-      <h3>4.3 Suspension & Termination</h3>
+      <h4>4.3 Suspension & Termination</h4>
       <ul>
         <li>We may suspend or terminate access for violations.</li>
         <li>Termination for breach does <strong>not</strong> entitle refunds.</li>
       </ul>
-      <h3>4.4 User Responsibility</h3>
+      <h4>4.4 User Responsibility</h4>
       <ul>
         <li>Users are responsible for their use of the platform.</li>
         <li>Users agree to act with respect, consent, and ethics.</li>
       </ul>
     </section>
 
-    <section id="conduct">
-      <h2>5. Community Conduct Rules</h2>
-      <h3>5.1 Respect & Consent</h3>
+    <section class="section" id="conduct">
+      <h3><span class="number">5</span> Community Conduct Rules</h3>
+      <h4>5.1 Respect & Consent</h4>
       <ul>
         <li>All interactions must be consensual and respectful.</li>
         <li>No abusive, intimidating, or discriminatory behavior.</li>
-        <li>No sharing of another member’s private information without consent.</li>
+        <li>No sharing of another member's private information without consent.</li>
       </ul>
-      <h3>5.2 Prohibited Content</h3>
-      <ul>
-        <li><strong>Minors (pedophilia)</strong></li>
-        <li><strong>Animals (zoophilia)</strong></li>
-        <li><strong>Sexual violence or non-consensual acts</strong></li>
-        <li><strong>Incest, human trafficking, or exploitation</strong></li>
-        <li><strong>Hate speech, racism, or extreme violence</strong></li>
-      </ul>
+      <h4>5.2 Prohibited Content</h4>
+      <div class="prohibited-list">
+        <p><strong>The following content is strictly prohibited and will result in immediate removal:</strong></p>
+        <ul>
+          <li><strong>Minors (pedophilia)</strong></li>
+          <li><strong>Animals (zoophilia)</strong></li>
+          <li><strong>Sexual violence or non-consensual acts</strong></li>
+          <li><strong>Incest, human trafficking, or exploitation</strong></li>
+          <li><strong>Hate speech, racism, or extreme violence</strong></li>
+        </ul>
+      </div>
       <p>Any violation leads to immediate removal and may be reported to authorities.</p>
-      <h3>5.3 Responsible Geolocation Use</h3>
+      <h4>5.3 Responsible Geolocation Use</h4>
       <ul>
         <li>Feature is optional; use courteously and responsibly.</li>
         <li>No harassment or excessive messaging.</li>
       </ul>
-      <h3>5.4 Positive Environment</h3>
+      <h4>5.4 Positive Environment</h4>
       <ul>
         <li>Contribute constructively to the community.</li>
         <li>Hostile or conflict-seeking messages are not tolerated.</li>
       </ul>
     </section>
 
-    <section id="refunds">
-      <h2>6. Refund Policy</h2>
-      <p>Digital access is immediate. <strong>All sales are final and non-refundable</strong>, except where required by law or in the event of a verified technical error solely attributable to the platform.</p>
-      <h3>6.1 Refunds Not Applicable For</h3>
+    <section class="section" id="refunds">
+      <h3><span class="number">6</span> Refund Policy</h3>
+      <div class="warning-box">
+        <p>Digital access is immediate. <strong>All sales are final and non-refundable</strong>, except where required by law or in the event of a verified technical error solely attributable to the platform.</p>
+      </div>
+      <h4>6.1 Refunds Not Applicable For</h4>
       <ul>
         <li>Change of mind.</li>
         <li>Voluntary non-use.</li>
         <li>Removal for community violations.</li>
         <li>User device or connection issues.</li>
       </ul>
-      <h3>6.2 Exceptional Cases</h3>
+      <h4>6.2 Exceptional Cases</h4>
       <p>In case of duplicate payment without access granted, email <a href="mailto:support@pnptv.app">support@pnptv.app</a> within 7 days with proof.</p>
-      <h3>6.3 Access Confirmation</h3>
+      <h4>6.3 Access Confirmation</h4>
       <p>Upon payment, you acknowledge immediate delivery and <strong>waive withdrawal rights</strong> for instantly delivered digital content where applicable.</p>
     </section>
 
-    <section id="privacy">
-      <h2>7. Privacy Policy</h2>
-      <h3>7.0 AI Use & Promotional Messages</h3>
+    <section class="section" id="privacy">
+      <h3><span class="number">7</span> Privacy Policy</h3>
+      <h4>7.0 AI Use & Promotional Messages</h4>
       <p>We use AI systems to provide recommendations, automate responses, and personalize your experience. By using the platform, you accept that interactions may be AI-assisted. You authorize promotional messages about new services or benefits via Telegram or email. You can opt out any time from your profile settings or by contacting support.</p>
 
-      <h3>7.0A Face++ Age Verification - Privacy First</h3>
+      <h4>7.0A Face++ Age Verification - Privacy First</h4>
       <p><strong>Your privacy is our top priority during age verification:</strong></p>
       <ul>
         <li><strong>Zero Storage:</strong> Your facial photograph is <strong>NEVER</strong> stored on our servers. It is only processed temporarily.</li>
         <li><strong>Temporary Processing:</strong> Your photo is sent directly to Face++ (AI provider), analyzed to estimate your age, and immediately deleted. We do NOT keep the image.</li>
-        <li><strong>What We Save:</strong>
-          <ul>
-            <li>Verification date</li>
-            <li>Result (verified yes/no)</li>
-            <li>Estimated age (approximate)</li>
-          </ul>
-        </li>
-        <li><strong>What We DO NOT Save:</strong>
-          <ul>
-            <li>Facial identifiers or biometric features</li>
-            <li>Facial data or facial mappings</li>
-            <li>Facial images or photos</li>
-            <li>Persistent biometric information</li>
-          </ul>
-        </li>
+        <li><strong>What We Save:</strong> Verification date, result (verified yes/no), estimated age (approximate).</li>
+        <li><strong>What We DO NOT Save:</strong> Facial identifiers, biometric features, facial data, facial mappings, facial images, photos, persistent biometric information.</li>
         <li><strong>Third-Party Provider:</strong> Face++ is a trusted facial recognition provider. Their privacy policies are available at <a href="https://www.faceplusplus.com/privacy/" target="_blank">faceplusplus.com/privacy</a>.</li>
         <li><strong>Right to Alternatives:</strong> You can choose manual age confirmation without providing any photo.</li>
         <li><strong>Your Control:</strong> You can delete your account anytime, and all associated data will be deleted per applicable law.</li>
       </ul>
 
-      <h3>7.1 Data We Collect</h3>
+      <h4>7.1 Data We Collect</h4>
       <ul>
         <li>Identifiers (Telegram handle or other voluntary identifiers).</li>
         <li>Subscription status and membership type.</li>
         <li>Optional geolocation (only with your consent).</li>
         <li>Support communications.</li>
       </ul>
-      <h3>7.2 Purpose</h3>
+      <h4>7.2 Purpose</h4>
       <ul>
         <li>Manage access and personalize experience.</li>
         <li>Security and fraud prevention.</li>
         <li>Compliance with legal obligations.</li>
       </ul>
-      <p><strong>We do not sell or trade personal data.</strong></p>
-      <h3>7.3 Legal Bases</h3>
+      <div class="highlight-box">
+        <p><strong>We do not sell or trade personal data.</strong></p>
+      </div>
+      <h4>7.3 Legal Bases</h4>
       <ul>
         <li>User consent.</li>
         <li>Performance of a digital membership contract.</li>
         <li>Legitimate interest in platform security.</li>
       </ul>
-      <h3>7.4 Your Rights</h3>
+      <h4>7.4 Your Rights</h4>
       <ul>
         <li>Access, correct, or delete your data.</li>
         <li>Withdraw consent for geolocation at any time.</li>
       </ul>
       <p>Requests: <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>
-      <h3>7.5 Security</h3>
+      <h4>7.5 Security</h4>
       <p>We apply technical and administrative safeguards; please limit what you share publicly.</p>
-      <h3>7.6 Retention</h3>
+      <h4>7.6 Retention</h4>
       <p>We retain data only as long as needed to provide services or meet legal duties.</p>
     </section>
 
-    <section id="jurisdiction">
-      <h2>8. Disclaimer & Legal Jurisdiction</h2>
-      <h3>8.0 AI-Enabled Services & Promotional Messaging</h3>
+    <section class="section" id="jurisdiction">
+      <h3><span class="number">8</span> Disclaimer & Legal Jurisdiction</h3>
+      <h4>8.0 AI-Enabled Services & Promotional Messaging</h4>
       <ul>
         <li>We use AI to enhance user experience; use of the bot is your responsibility.</li>
         <li>You authorize promotional messages via Telegram or email; you can opt out from your profile or by contacting support.</li>
       </ul>
-      <h3>8.1 Disclaimer</h3>
+      <h4>8.1 Disclaimer</h4>
       <ul>
         <li>We are not responsible for personal decisions or member interactions on or off the platform.</li>
         <li>We are not liable for third-party outages or force majeure.</li>
         <li>Content is recreational and not professional advice.</li>
       </ul>
-      <h3>8.2 Jurisdiction</h3>
+      <h4>8.2 Jurisdiction</h4>
       <ul>
         <li>This agreement is governed by the laws of the Republic of Colombia.</li>
         <li>Disputes should first be addressed amicably; failing that, competent courts in Bogotá, Colombia have jurisdiction.</li>
       </ul>
-      <h3>8.3 Class Action Waiver</h3>
+      <h4>8.3 Class Action Waiver</h4>
       <p>Claims must be brought individually; you waive the right to participate in class actions against PNPtv! Digital Community.</p>
-      <p class="pill">By continuing to use the platform, you acknowledge and agree to this document.</p>
     </section>
 
-    <footer class="container">
-      <p>© 2025 PNPtv! Digital Community — <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>
-    </footer>
+    <div class="highlight-box" style="text-align: center; margin-top: 24px;">
+      <p>By continuing to use the platform, you acknowledge and agree to this document.</p>
+    </div>
   </main>
+
+  <footer class="footer">
+    <p>&copy; 2025 PNPtv! Digital Community | <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>
+    <p><a href="/terms">Terms</a> | <a href="/privacy">Privacy</a> | <a href="/">Home</a></p>
+  </footer>
+
+  <button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">&#8593;</button>
+
+  <script>
+    window.addEventListener('scroll', () => {
+      const btn = document.querySelector('.back-to-top');
+      btn.classList.toggle('visible', window.scrollY > 300);
+    });
+  </script>
 </body>
 </html>

@@ -1,13 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Camera Age Verification - PNPtv</title>
+  <link rel="stylesheet" href="/webapps/design-system/static.css">
+  <script src="/webapps/design-system/telegram-theme.js" type="module"></script>
+  <style>
+    .consent-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .consent-modal.active { display: flex; }
+    .consent-content {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 420px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .consent-content h2 { font-size: 17px; margin-bottom: 12px; }
+    .consent-content p { font-size: 13px; color: var(--muted); }
+    .consent-content ul { font-size: 13px; padding-left: 16px; }
+    .data-handling {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .data-handling strong { color: var(--accent-2); display: block; margin-bottom: 4px; }
+    .consent-buttons { display: flex; gap: 10px; margin-top: 16px; }
+    .btn-decline {
+      flex: 1; padding: 12px; border-radius: 10px; border: 1px solid var(--border);
+      background: rgba(255,255,255,0.06); color: var(--muted); cursor: pointer; font-size: 14px; font-weight: 600;
+    }
+    .btn-accept {
+      flex: 2; padding: 12px; border-radius: 10px; border: none;
+      background: var(--accent); color: #2d1d00; cursor: pointer; font-size: 14px; font-weight: 600;
+    }
+    .btn-decline:active, .btn-accept:active { transform: scale(0.97); }
+
+    .container {
+      max-width: 420px;
+      text-align: center;
+    }
+    .container h1 { font-size: 18px; color: var(--accent); margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    .privacy-notice {
+      background: rgba(44,226,201,0.1); border: 1px solid rgba(44,226,201,0.3);
+      border-radius: 10px; padding: 12px; margin-bottom: 16px; font-size: 12px; color: var(--muted); text-align: left;
+    }
+    .privacy-notice strong { color: var(--accent-2); }
+    .instructions {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;
+    }
+    .instruction-item {
+      background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px; font-size: 12px; color: var(--muted);
+    }
+    .camera-section { position: relative; margin-bottom: 16px; }
+    #cameraFeed {
+      width: 100%; border-radius: 12px; background: #000; display: block;
+      max-height: 320px; object-fit: cover;
+    }
+    #captureCanvas { display: none; }
+    .loader {
+      display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.7);
+      border-radius: 12px; align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+    }
+    .loader.active { display: flex; }
+    .loader .spinner { width: 36px; height: 36px; }
+    .loader p { color: var(--muted); font-size: 13px; }
+    .result-box {
+      margin-top: 12px; padding: 14px; border-radius: 10px; font-size: 14px;
+    }
+    .result-box.success { background: rgba(44,226,201,0.1); border: 1px solid rgba(44,226,201,0.3); color: var(--accent-2); }
+    .result-box.error { background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.3); color: var(--accent-3); }
+    .result-box h3 { font-size: 15px; margin-bottom: 4px; }
+    .result-box p { font-size: 13px; margin: 0; }
+    .info-box {
+      margin-top: 10px; padding: 10px; border-radius: 8px; font-size: 12px; text-align: left;
+    }
+    .info-box.success { background: rgba(44,226,201,0.08); color: var(--accent-2); }
+    .info-box.error { background: rgba(255,107,107,0.08); color: var(--accent-3); }
+    .button-group { display: flex; gap: 10px; margin-bottom: 10px; }
+    .btn-primary {
+      flex: 1; padding: 12px; border-radius: 10px; border: none;
+      background: var(--accent); color: #2d1d00; cursor: pointer; font-size: 14px; font-weight: 600;
+    }
+    .btn-secondary {
+      flex: 1; padding: 12px; border-radius: 10px;
+      border: 1px solid var(--border); background: rgba(255,255,255,0.06);
+      color: var(--text); cursor: pointer; font-size: 14px; font-weight: 600;
+    }
+    .btn-success {
+      flex: 1; padding: 12px; border-radius: 10px; border: none;
+      background: var(--accent-2); color: #001318; cursor: pointer; font-size: 14px; font-weight: 600;
+    }
+    .btn-danger {
+      flex: 1; padding: 12px; border-radius: 10px;
+      border: 1px solid rgba(255,107,107,0.3); background: rgba(255,107,107,0.1);
+      color: var(--accent-3); cursor: pointer; font-size: 14px; font-weight: 600;
+    }
+    .btn-primary:active, .btn-secondary:active, .btn-success:active, .btn-danger:active { transform: scale(0.97); }
+    .footer-text { font-size: 11px; color: var(--muted); margin-top: 16px; }
+    .footer-text a { color: var(--accent-2); }
+    .hidden { display: none !important; }
+  </style>
+</head>
 <body>
     <!-- Explicit Consent Modal -->
     <div class="consent-modal active" id="consentModal">
         <div class="consent-content">
-            <h2>🔒 Privacy & Consent Notice</h2>
+            <h2>Privacy & Consent Notice</h2>
 
             <p><strong>Before we proceed, please review what happens with your data:</strong></p>
 
             <div class="data-handling">
-                <strong>✓ What We Do:</strong>
+                <strong>What We Do:</strong>
                 <ul style="margin: 8px 0 0 0;">
                     <li>Analyze your selfie in real-time using AI</li>
                     <li>Estimate age from facial features</li>
@@ -16,7 +138,7 @@
             </div>
 
             <div class="data-handling">
-                <strong>✓ What We DON'T Do:</strong>
+                <strong>What We DON'T Do:</strong>
                 <ul style="margin: 8px 0 0 0;">
                     <li>Never store facial images or photos</li>
                     <li>Never share data with third parties</li>
@@ -32,31 +154,29 @@
                 <li>Secure connection verified by certificate</li>
             </ul>
 
-            <p style="font-size: 12px; color: #999; margin-top: 15px;">
+            <p style="font-size: 11px; color: var(--muted); margin-top: 12px;">
                 By clicking "I Understand & Consent", you agree that:
-                <br>• Your camera data is processed for age verification only
-                <br>• You understand data handling practices
-                <br>• You agree to our <a href="https://pnptv.app/privacy" target="_blank" style="color: var(--accent);">Privacy Policy</a>
+                <br>&#8226; Your camera data is processed for age verification only
+                <br>&#8226; You understand data handling practices
+                <br>&#8226; You agree to our <a href="https://pnptv.app/privacy" target="_blank" style="color: var(--accent);">Privacy Policy</a>
             </p>
 
             <div class="consent-buttons">
                 <button class="btn-decline" id="declineBtn">Decline</button>
-                <button class="btn-accept" id="acceptConsentBtn">✓ I Understand & Consent</button>
+                <button class="btn-accept" id="acceptConsentBtn">I Understand & Consent</button>
             </div>
         </div>
     </div>
 
     <div class="container" id="mainContainer" style="display: none;">
-        <h1>🔒 Age Verification</h1>
+        <h1>Age Verification</h1>
         <p class="subtitle">Device Camera Verification</p>
 
-        <!-- Privacy Notice -->
         <div class="privacy-notice">
-            <strong>🔐 Your Privacy is Protected:</strong><br>
+            <strong>Your Privacy is Protected:</strong><br>
             Your photo is analyzed in real-time and deleted immediately. We never store facial images.
         </div>
 
-        <!-- Instructions -->
         <div class="instructions" id="instructions">
             <div class="instruction-item">Take a clear selfie</div>
             <div class="instruction-item">Ensure good lighting</div>
@@ -64,43 +184,37 @@
             <div class="instruction-item">No filters or effects</div>
         </div>
 
-        <!-- Camera Section -->
         <div class="camera-section">
             <video id="cameraFeed" autoplay playsinline></video>
             <canvas id="captureCanvas"></canvas>
 
-            <!-- Loader -->
             <div class="loader" id="loader">
                 <div class="spinner"></div>
                 <p>Analyzing your photo with AI...</p>
             </div>
 
-            <!-- Result Display -->
             <div class="result-box hidden" id="resultBox">
                 <h3 id="resultStatus">Verifying...</h3>
                 <p id="resultMessage"></p>
             </div>
 
-            <!-- Info Box -->
             <div class="info-box" id="infoBox"></div>
         </div>
 
-        <!-- Control Buttons -->
         <div class="button-group" id="controlButtons">
-            <button class="btn-primary" id="captureBtn">📸 Capture Photo</button>
-            <button class="btn-secondary" id="switchBtn">🔄 Switch Camera</button>
+            <button class="btn-primary" id="captureBtn">Capture Photo</button>
+            <button class="btn-secondary" id="switchBtn">Switch Camera</button>
         </div>
 
         <div class="button-group hidden" id="resultButtons">
-            <button class="btn-success" id="acceptBtn">✅ Verify & Continue</button>
-            <button class="btn-danger" id="retryBtn">🔄 Try Again</button>
+            <button class="btn-success" id="acceptBtn">Verify & Continue</button>
+            <button class="btn-danger" id="retryBtn">Try Again</button>
         </div>
 
         <button class="btn-secondary" id="manualBtn" style="width: 100%; margin-top: 10px;">
             Skip to Manual Verification
         </button>
 
-        <!-- Footer -->
         <div class="footer-text">
             By continuing, you agree to our <a href="https://pnptv.app/privacy" target="_blank">Privacy Policy</a>
             and <a href="https://pnptv.app/terms" target="_blank">Terms of Service</a>
@@ -132,7 +246,6 @@
         let verificationResult = null;
         let consentGiven = false;
 
-        // Handle consent acceptance
         acceptConsentBtn.addEventListener('click', () => {
             consentGiven = true;
             localStorage.setItem('ageVerificationConsent', 'true');
@@ -141,7 +254,6 @@
             initCamera();
         });
 
-        // Handle consent decline
         declineBtn.addEventListener('click', () => {
             alert('You must consent to age verification to continue.');
             if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
@@ -151,7 +263,6 @@
             }
         });
 
-        // Check if consent was previously given (within session)
         function checkConsent() {
             if (localStorage.getItem('ageVerificationConsent') === 'true') {
                 consentGiven = true;
@@ -160,12 +271,8 @@
             }
         }
 
-        // Initialize camera only after consent
         async function initCamera() {
-            if (!consentGiven) {
-                return;
-            }
-
+            if (!consentGiven) return;
             try {
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: currentFacingMode },
@@ -173,42 +280,29 @@
                 });
                 video.srcObject = stream;
                 video.play();
-                updateInfoBox('success', '✓ Camera ready. Tap capture when you\'re ready.');
+                updateInfoBox('success', 'Camera ready. Tap capture when you\'re ready.');
             } catch (error) {
-                updateInfoBox('error', '✗ Camera access denied. Please enable camera permissions and refresh.');
+                updateInfoBox('error', 'Camera access denied. Please enable camera permissions and refresh.');
                 captureBtn.disabled = true;
                 console.error('Camera error:', error);
             }
         }
 
-        // Capture photo
         captureBtn.addEventListener('click', async () => {
-            if (!stream) {
-                updateInfoBox('error', '✗ Camera not ready');
-                return;
-            }
-
+            if (!stream) { updateInfoBox('error', 'Camera not ready'); return; }
             const ctx = canvas.getContext('2d');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0);
-
-            // Convert canvas to blob
-            canvas.toBlob(async (blob) => {
-                await verifyAge(blob);
-            }, 'image/jpeg', 0.9);
+            canvas.toBlob(async (blob) => { await verifyAge(blob); }, 'image/jpeg', 0.9);
         });
 
-        // Switch camera
         switchBtn.addEventListener('click', async () => {
             currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
+            if (stream) { stream.getTracks().forEach(track => track.stop()); }
             await initCamera();
         });
 
-        // Manual verification fallback
         manualBtn.addEventListener('click', () => {
             if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
                 Telegram.WebApp.sendData('manual_verification');
@@ -217,51 +311,37 @@
             }
         });
 
-        // Verify age with AI
         async function verifyAge(photoBlob) {
             loader.classList.add('active');
             captureBtn.disabled = true;
             switchBtn.disabled = true;
-
             try {
-                // Send to backend for AI verification
                 const formData = new FormData();
                 formData.append('photo', photoBlob);
                 formData.append('user_id', USER_ID);
                 formData.append('lang', LANGUAGE);
 
-                const response = await fetch('/api/verify-age', {
-                    method: 'POST',
-                    body: formData
-                });
-
+                const response = await fetch('/api/verify-age', { method: 'POST', body: formData });
                 let result = null;
-                try {
-                    result = await response.json();
-                } catch (parseError) {
-                    result = {
-                        success: false,
-                        message: 'Verification service error. Please try again in a moment.'
-                    };
+                try { result = await response.json(); } catch (parseError) {
+                    result = { success: false, message: 'Verification service error. Please try again in a moment.' };
                 }
                 if (!response.ok) {
                     result = result || { success: false };
                     result.success = false;
-                    if (!result.message) {
-                        result.message = 'We could not process your photo. Please try again or use manual verification.';
-                    }
+                    if (!result.message) result.message = 'We could not process your photo. Please try again or use manual verification.';
                 }
                 verificationResult = result;
 
                 if (result.success && result.ageVerified) {
                     loader.classList.remove('active');
-                    showResult(true, '✅ Age Verified!', 'You have been verified as 18 or older.');
+                    showResult(true, 'Age Verified!', 'You have been verified as 18 or older.');
                     document.getElementById('controlButtons').classList.add('hidden');
                     document.getElementById('resultButtons').classList.remove('hidden');
                 } else {
                     const failureMessage = result?.message || result?.error || 'We could not verify your age. Please try again or use manual verification.';
                     loader.classList.remove('active');
-                    showResult(false, '❌ Verification Failed', failureMessage);
+                    showResult(false, 'Verification Failed', failureMessage);
                     document.getElementById('controlButtons').classList.remove('hidden');
                     document.getElementById('resultButtons').classList.add('hidden');
                     captureBtn.disabled = false;
@@ -269,28 +349,25 @@
                 }
             } catch (error) {
                 loader.classList.remove('active');
-                updateInfoBox('error', '✗ Verification error: ' + error.message);
+                updateInfoBox('error', 'Verification error: ' + error.message);
                 captureBtn.disabled = false;
                 switchBtn.disabled = false;
                 console.error('Verification error:', error);
             }
         }
 
-        // Show result
         function showResult(success, status, message) {
             resultBox.classList.remove('hidden');
             document.getElementById('resultStatus').textContent = status;
             document.getElementById('resultMessage').textContent = message;
-            resultBox.className = resultBox.className.replace('error success', '') + (success ? ' success' : ' error');
+            resultBox.className = 'result-box ' + (success ? 'success' : 'error');
         }
 
-        // Update info box
         function updateInfoBox(type, message) {
             infoBox.textContent = message;
             infoBox.className = 'info-box ' + type;
         }
 
-        // Accept verification
         acceptBtn.addEventListener('click', () => {
             if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
                 Telegram.WebApp.sendData('age_verified:' + verificationResult.estimatedAge);
@@ -300,7 +377,6 @@
             }
         });
 
-        // Retry
         retryBtn.addEventListener('click', () => {
             resultBox.classList.add('hidden');
             document.getElementById('controlButtons').classList.remove('hidden');
@@ -310,29 +386,20 @@
             updateInfoBox('success', 'Ready to try again. Tap capture when ready.');
         });
 
-        // Initialize on load
         window.addEventListener('load', () => {
             checkConsent();
-            // Only init camera if consent already given, otherwise user must click accept
-            if (consentGiven) {
-                initCamera();
-            }
+            if (consentGiven) initCamera();
         });
 
-        // Cleanup on unload
         window.addEventListener('beforeunload', () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
+            if (stream) stream.getTracks().forEach(track => track.stop());
         });
 
-        // Handle Telegram WebApp
         if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
             Telegram.WebApp.ready();
             Telegram.WebApp.expand();
         }
 
-        // Add page visibility to pause/resume stream
         document.addEventListener('visibilitychange', () => {
             if (document.hidden && stream) {
                 stream.getTracks().forEach(track => track.stop());

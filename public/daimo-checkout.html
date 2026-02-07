@@ -6,6 +6,7 @@
     <meta name="robots" content="noindex, nofollow">
     <title>Checkout con Daimo - PNPtv</title>
     <link rel="stylesheet" href="/webapps/design-system/static.css">
+    <script src="/webapps/design-system/telegram-theme.js" type="module"></script>
     <style>
         .header {
             background: var(--panel-strong);
@@ -135,9 +136,9 @@
             margin-top: 10px;
         }
 
-        .pay-button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(255, 180, 84, 0.4);
+        .pay-button:active:not(:disabled) {
+            transform: scale(0.97);
+            
         }
 
         .pay-button:disabled {

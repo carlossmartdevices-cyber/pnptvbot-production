@@ -6,6 +6,7 @@
     <meta name="robots" content="noindex, nofollow">
     <title>PNP Live Crypto Checkout - PNPtv</title>
     <link rel="stylesheet" href="/webapps/design-system/static.css">
+    <script src="/webapps/design-system/telegram-theme.js" type="module"></script>
     <style>
         .header {
             background: var(--panel-strong);
@@ -132,9 +133,9 @@
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(255, 180, 84, 0.4);
+        .btn:active {
+            transform: scale(0.97);
+            
         }
 
         .btn:disabled {
@@ -185,7 +186,7 @@
             transition: opacity 0.2s;
         }
 
-        .copy-btn:hover {
+        .copy-btn:active {
             opacity: 0.9;
         }
 
