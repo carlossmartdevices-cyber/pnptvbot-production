@@ -1519,8 +1519,8 @@ const registerImprovedSharePostHandlers = (bot) => {
       // Send to each destination directly
       for (const dest of destinations) {
         try {
-          // No parse_mode to avoid Markdown conflicts with AI-generated text
           const options = {
+            parse_mode: 'Markdown',
             ...(kb?.reply_markup ? { reply_markup: kb.reply_markup } : {}),
           };
 
@@ -1529,19 +1529,47 @@ const registerImprovedSharePostHandlers = (bot) => {
             options.message_thread_id = dest.threadId;
           }
 
-          if (postData.mediaType === 'photo' && postData.mediaFileId) {
-            await ctx.telegram.sendPhoto(dest.chatId, postData.mediaFileId, {
-              caption: postData.text,
-              ...options,
-            });
-          } else if (postData.mediaType === 'video' && postData.mediaFileId) {
-            await ctx.telegram.sendVideo(dest.chatId, postData.mediaFileId, {
-              caption: postData.text,
-              ...options,
-            });
-          } else {
-            await ctx.telegram.sendMessage(dest.chatId, postData.text, options);
-          }
+          // Try with Markdown first, fall back to plain text if it fails
+          const sendWithFallback = async () => {
+            try {
+              if (postData.mediaType === 'photo' && postData.mediaFileId) {
+                await ctx.telegram.sendPhoto(dest.chatId, postData.mediaFileId, {
+                  caption: postData.text,
+                  ...options,
+                });
+              } else if (postData.mediaType === 'video' && postData.mediaFileId) {
+                await ctx.telegram.sendVideo(dest.chatId, postData.mediaFileId, {
+                  caption: postData.text,
+                  ...options,
+                });
+              } else {
+                await ctx.telegram.sendMessage(dest.chatId, postData.text, options);
+              }
+            } catch (markdownError) {
+              // If Markdown parsing fails, retry without parse_mode
+              if (markdownError.response?.description?.includes("can't parse")) {
+                logger.warn(`Markdown parse failed for ${dest.name}, retrying as plain text`);
+                delete options.parse_mode;
+                if (postData.mediaType === 'photo' && postData.mediaFileId) {
+                  await ctx.telegram.sendPhoto(dest.chatId, postData.mediaFileId, {
+                    caption: postData.text,
+                    ...options,
+                  });
+                } else if (postData.mediaType === 'video' && postData.mediaFileId) {
+                  await ctx.telegram.sendVideo(dest.chatId, postData.mediaFileId, {
+                    caption: postData.text,
+                    ...options,
+                  });
+                } else {
+                  await ctx.telegram.sendMessage(dest.chatId, postData.text, options);
+                }
+              } else {
+                throw markdownError;
+              }
+            }
+          };
+
+          await sendWithFallback();
 
           sent++;
           logger.info(`Post sent to ${dest.name}`, { chatId: dest.chatId, threadId: dest.threadId });
