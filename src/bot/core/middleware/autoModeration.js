@@ -184,8 +184,7 @@ async function deleteAndNotify(ctx, reason) {
     // Delete the message
     await ctx.deleteMessage();
 
-    // Send notification (auto-delete after 30 seconds)
-    // NOTE: Don't use reply_to_message_id since we just deleted the message
+    // Send notification (auto-delete after 15 seconds)
     const username = ctx.from.username ? `@${ctx.from.username}` : ctx.from.first_name;
     const notification = await ctx.telegram.sendMessage(
       ctx.chat.id,
@@ -198,11 +197,74 @@ async function deleteAndNotify(ctx, reason) {
       } catch (error) {
         logger.debug('Could not delete notification:', error.message);
       }
-    }, 30000);
+    }, 15000);
 
     logger.info('Message auto-moderated', { userId: ctx.from.id, reason });
   } catch (error) {
     logger.error('Error deleting message:', error);
+  }
+}
+
+/**
+ * Enforce warning action: mute or ban based on warning count
+ */
+async function enforceWarningAction(ctx, warningResult) {
+  if (!warningResult) return;
+
+  const userId = ctx.from.id;
+  const chatId = ctx.chat.id;
+  const username = ctx.from.username ? `@${ctx.from.username}` : ctx.from.first_name;
+  const { warningCount, action, isMaxWarnings } = warningResult;
+
+  try {
+    if (isMaxWarnings || action.type === 'ban') {
+      // BAN the user
+      await ctx.telegram.banChatMember(chatId, userId);
+      const msg = await ctx.telegram.sendMessage(
+        chatId,
+        `🚫 ${username} ha sido expulsado del grupo. (${warningCount} advertencias)`
+      );
+      setTimeout(() => ctx.telegram.deleteMessage(chatId, msg.message_id).catch(() => {}), 30000);
+
+      await WarningService.recordAction({
+        userId,
+        adminId: 'system',
+        action: 'ban',
+        reason: `Auto-ban: ${warningCount} warnings reached`,
+        groupId: chatId,
+      });
+
+      logger.info('User auto-banned', { userId, username, warningCount });
+    } else if (action.type === 'mute') {
+      // MUTE the user
+      const muteDuration = action.duration || 24 * 60 * 60 * 1000;
+      const until = Math.floor((Date.now() + muteDuration) / 1000);
+
+      await ctx.telegram.restrictChatMember(chatId, userId, {
+        until_date: until,
+        permissions: { can_send_messages: false },
+      });
+
+      const hours = Math.round(muteDuration / (60 * 60 * 1000));
+      const msg = await ctx.telegram.sendMessage(
+        chatId,
+        `🔇 ${username} ha sido silenciado por ${hours}h. (${warningCount}/3 advertencias)`
+      );
+      setTimeout(() => ctx.telegram.deleteMessage(chatId, msg.message_id).catch(() => {}), 30000);
+
+      await WarningService.recordAction({
+        userId,
+        adminId: 'system',
+        action: 'mute',
+        reason: `Auto-mute: ${warningCount} warnings`,
+        duration: muteDuration,
+        groupId: chatId,
+      });
+
+      logger.info('User auto-muted', { userId, username, warningCount, hours });
+    }
+  } catch (error) {
+    logger.error('Error enforcing warning action', { userId, error: error.message });
   }
 }
 
@@ -246,13 +308,13 @@ const autoModerationMiddleware = () => async (ctx, next) => {
     if (isForwardedMessage(message)) {
       await deleteAndNotify(ctx, autoModerationReasons.forwarded);
 
-      // Issue auto-warning
-      await WarningService.addWarning({
+      const result = await WarningService.addWarning({
         userId,
         adminId: 'system',
         reason: 'Auto-moderation: Forwarded message',
         groupId: ctx.chat.id,
       });
+      await enforceWarningAction(ctx, result);
 
       return; // Don't proceed
     }
@@ -265,13 +327,13 @@ const autoModerationMiddleware = () => async (ctx, next) => {
       if (checkSpam(userId, messageText)) {
         await deleteAndNotify(ctx, autoModerationReasons.spam);
 
-        // Issue auto-warning
-        await WarningService.addWarning({
+        const result = await WarningService.addWarning({
           userId,
           adminId: 'system',
           reason: 'Auto-moderation: Spam',
           groupId: ctx.chat.id,
         });
+        await enforceWarningAction(ctx, result);
 
         return; // Don't proceed
       }
@@ -303,17 +365,37 @@ const autoModerationMiddleware = () => async (ctx, next) => {
     }
 
     // ENHANCED: Check for ANY links - COMPLETE BLOCK
-    // Check both text patterns and URL entities
-    if (messageText && (detectAnyLink(messageText) || hasUrlEntities(message))) {
+    // Check both text patterns, URL entities, and captions
+    const hasLink = (messageText && detectAnyLink(messageText)) ||
+                    hasUrlEntities(message) ||
+                    (message.caption && detectAnyLink(message.caption));
+    if (hasLink) {
       await deleteAndNotify(ctx, autoModerationReasons.links);
 
-      // Issue auto-warning
+      // Links/spam links → immediate ban (zero tolerance)
+      await ctx.telegram.banChatMember(ctx.chat.id, userId);
+      const username = ctx.from.username ? `@${ctx.from.username}` : ctx.from.first_name;
+      const banMsg = await ctx.telegram.sendMessage(
+        ctx.chat.id,
+        `🚫 ${username} ha sido expulsado por enviar enlaces/spam.`
+      );
+      setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, banMsg.message_id).catch(() => {}), 30000);
+
       await WarningService.addWarning({
         userId,
         adminId: 'system',
-        reason: 'Auto-moderation: Link detected',
+        reason: 'Auto-moderation: Link detected - auto-banned',
         groupId: ctx.chat.id,
       });
+      await WarningService.recordAction({
+        userId,
+        adminId: 'system',
+        action: 'ban',
+        reason: 'Auto-ban: Link/spam detected (zero tolerance)',
+        groupId: ctx.chat.id,
+      });
+
+      logger.info('User auto-banned for link spam', { userId, username: ctx.from.username });
 
       return; // Don't proceed
     }
@@ -322,13 +404,13 @@ const autoModerationMiddleware = () => async (ctx, next) => {
     if (messageText && checkProfanity(messageText)) {
       await deleteAndNotify(ctx, autoModerationReasons.profanity);
 
-      // Issue auto-warning
-      await WarningService.addWarning({
+      const result = await WarningService.addWarning({
         userId,
         adminId: 'system',
         reason: 'Auto-moderation: Profanity',
         groupId: ctx.chat.id,
       });
+      await enforceWarningAction(ctx, result);
 
       return; // Don't proceed
     }
