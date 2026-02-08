@@ -154,8 +154,21 @@ function groupBehaviorMiddleware() {
       PermissionService.isEnvAdmin(userId)
     );
 
-    // Admins can use bot normally in group
+    // Admins can use bot normally in group, but still delete their commands
     if (isAdmin) {
+      if (messageText.startsWith('/') && ctx.message?.message_id) {
+        try {
+          await ctx.deleteMessage();
+        } catch (e) {
+          ChatCleanupService.scheduleDelete(
+            ctx.telegram,
+            chatId,
+            ctx.message.message_id,
+            'admin-command-delete',
+            500
+          );
+        }
+      }
       return next();
     }
 

@@ -34,6 +34,7 @@ const botAdditionPreventionMiddleware = require('./middleware/botAdditionPrevent
 const autoModerationMiddleware = require('./middleware/autoModeration');
 const { commandRedirectionMiddleware, notificationsAutoDelete } = require('./middleware/commandRedirection');
 const { groupSecurityEnforcementMiddleware, registerGroupSecurityHandlers } = require('./middleware/groupSecurityEnforcement');
+const { groupMessageAutoDeleteMiddleware } = require('./middleware/groupMessageAutoDelete');
 // Group behavior rules (overrides previous rules)
 const {
   groupBehaviorMiddleware,
@@ -361,6 +362,7 @@ const startBot = async () => {
     bot.use(groupSecurityEnforcementMiddleware());
 
     bot.use(chatCleanupMiddleware());
+    bot.use(groupMessageAutoDeleteMiddleware()); // Auto-delete bot messages in groups after 5 minutes
     // DISABLED: bot.use(usernameEnforcement()); // Username enforcement rules disabled
     bot.use(botAdditionPreventionMiddleware()); // Prevent unauthorized bot additions
     bot.use(autoModerationMiddleware()); // Auto-moderation for links, spam, flooding

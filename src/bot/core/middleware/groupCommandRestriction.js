@@ -149,19 +149,21 @@ const groupCommandRestrictionMiddleware = () => {
           // Check if user is admin/moderator
           const isAdmin = await PermissionService.isAdmin(ctx.from?.id);
 
-          // ADMIN/MODERATOR COMMANDS - Silent (no response in group)
+          // ADMIN/MODERATOR COMMANDS
           if (ADMIN_COMMANDS.includes(command)) {
+            // Always delete the command message to keep group clean
+            try {
+              await ctx.deleteMessage();
+            } catch (e) {
+              ChatCleanupService.scheduleDelete(ctx.telegram, ctx.chat.id, ctx.message.message_id, 'admin-command-delete', 100);
+            }
+
             if (isAdmin) {
               // Allow admin commands to proceed for admins
               return next();
             }
 
-            // Non-admins trying admin commands - silently delete
-            try {
-              await ctx.deleteMessage();
-            } catch (e) {
-              logger.debug('Could not delete admin command from non-admin');
-            }
+            // Non-admins trying admin commands - already deleted above
             return;
           }
 
