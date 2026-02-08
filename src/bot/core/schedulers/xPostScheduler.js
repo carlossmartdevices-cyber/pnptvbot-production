@@ -9,6 +9,7 @@ class XPostScheduler {
   constructor(bot = null) {
     this.interval = null;
     this.isRunning = false;
+    this.isProcessing = false;
     this.bot = bot;
     this.processingPosts = new Set();
   }
@@ -40,6 +41,12 @@ class XPostScheduler {
   }
 
   async processQueue() {
+    // Mutex guard: prevent overlapping runs from setInterval
+    if (this.isProcessing) {
+      return;
+    }
+    this.isProcessing = true;
+
     try {
       const pendingPosts = await XPostService.getPendingPosts();
 
@@ -66,6 +73,8 @@ class XPostScheduler {
       }
     } catch (error) {
       logger.error('Error processing X post queue:', error);
+    } finally {
+      this.isProcessing = false;
     }
   }
 
@@ -73,9 +82,7 @@ class XPostScheduler {
     const postId = post.post_id;
 
     try {
-      // Mark as sending
-      await XPostService.updatePostJob(postId, { status: 'sending' });
-
+      // getPendingPosts() already atomically set status to 'sending'
       // Attempt to publish
       const response = await XPostService.publishScheduledPost(post);
 
@@ -198,7 +205,9 @@ class XPostScheduler {
     try {
       let message = '';
       const handle = post.handle || 'desconocido';
-      const textPreview = (post.text || '').substring(0, 50) + (post.text?.length > 50 ? '...' : '');
+      const rawPreview = (post.text || '').substring(0, 50) + (post.text?.length > 50 ? '...' : '');
+      // Strip lone surrogates that cause UTF-8 errors in Telegram API
+      const textPreview = rawPreview.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
 
       switch (status) {
         case 'success': {

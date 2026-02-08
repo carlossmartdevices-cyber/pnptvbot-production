@@ -12,14 +12,20 @@ const X_REQUIRED_LINKS = ['t.me/pnplatinotv_bot', 'pnptv.app/lifetime100'];
 
 const SERVER_TIMEZONE = 'America/Bogota';
 
+const stripInvalidUnicode = (text) => {
+  if (!text) return '';
+  // Remove lone surrogates that cause UTF-8 encoding errors
+  return String(text).replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
+};
+
 const escapeMarkdown = (text) => {
   if (!text) return '';
-  return String(text).replace(/[_*\\[\]()~`>#+=|{}.!-]/g, '\\$&');
+  return stripInvalidUnicode(String(text)).replace(/[_*\\[\]()~`>#+=|{}.!-]/g, '\\$&');
 };
 
 const safeCodeBlock = (text) => {
   if (!text) return '';
-  return String(text).replace(/```/g, '``\\`');
+  return stripInvalidUnicode(String(text)).replace(/```/g, '``\\`');
 };
 
 const getMissingRequiredLinks = (text) => {
