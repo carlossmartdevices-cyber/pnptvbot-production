@@ -1032,6 +1032,15 @@ const handleMediaInput = async (ctx, media) => {
     return true;
   }
 
+  // Telegram Bot API can only download files up to 20MB
+  const TELEGRAM_MAX_FILE_SIZE = 20 * 1024 * 1024;
+  const fileSize = media.file_size || 0;
+  if (fileSize > TELEGRAM_MAX_FILE_SIZE) {
+    const sizeMB = (fileSize / (1024 * 1024)).toFixed(1);
+    await ctx.reply(`❌ El archivo es demasiado grande (${sizeMB}MB). Telegram permite máximo 20MB para bots.\n\nIntenta comprimir el archivo o enviar uno más pequeño.`);
+    return true;
+  }
+
   try {
     // Store the fileId instead of the temporary download URL.
     // The fileId is permanent and will be resolved to a fresh URL at send time.

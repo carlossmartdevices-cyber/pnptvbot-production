@@ -296,17 +296,25 @@ class XPostService {
       }
     }
 
-    const response = await axios.post(
-      `${X_API_BASE}/tweets`,
-      payload,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 15000,
+    let response;
+    try {
+      response = await axios.post(
+        `${X_API_BASE}/tweets`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 15000,
+        }
+      );
+    } catch (error) {
+      if (error?.response?.status === 403) {
+        throw new Error(`403 Forbidden al publicar tweet con @${account.handle}. Reconecta la cuenta desde ⚙️ Gestionar Cuentas para renovar los permisos.`);
       }
-    );
+      throw error;
+    }
 
     logger.info('X post published', {
       accountId: account.account_id,
@@ -329,10 +337,19 @@ class XPostService {
       throw new Error('BOT_TOKEN no configurado para resolver media de Telegram');
     }
 
-    const res = await axios.get(`https://api.telegram.org/bot${botToken}/getFile`, {
-      params: { file_id: mediaUrlOrFileId },
-      timeout: 15000,
-    });
+    let res;
+    try {
+      res = await axios.get(`https://api.telegram.org/bot${botToken}/getFile`, {
+        params: { file_id: mediaUrlOrFileId },
+        timeout: 15000,
+      });
+    } catch (error) {
+      const tgError = error.response?.data?.description || error.message;
+      if (tgError && tgError.toLowerCase().includes('file is too big')) {
+        throw new Error('El archivo es demasiado grande para descargar desde Telegram (máx 20MB para bots). Envía un archivo más pequeño.');
+      }
+      throw new Error(`Error al obtener archivo de Telegram: ${tgError}`);
+    }
 
     const filePath = res.data?.result?.file_path;
     if (!filePath) {
@@ -397,10 +414,24 @@ class XPostService {
     return 'tweet_image';
   }
 
+  static validateMediaSize(mimeType, size) {
+    const sizeMB = size / (1024 * 1024);
+    if (mimeType === 'image/gif' && size > 15 * 1024 * 1024) {
+      throw new Error(`GIF demasiado grande (${sizeMB.toFixed(1)}MB). X permite máx 15MB para GIFs.`);
+    }
+    if (mimeType?.startsWith('image/') && size > 5 * 1024 * 1024) {
+      throw new Error(`Imagen demasiado grande (${sizeMB.toFixed(1)}MB). X permite máx 5MB para imágenes.`);
+    }
+    if (mimeType?.startsWith('video/') && size > 512 * 1024 * 1024) {
+      throw new Error(`Video demasiado grande (${sizeMB.toFixed(1)}MB). X permite máx 512MB para videos.`);
+    }
+  }
+
   static async uploadMediaToX({ accessToken, mediaUrl }) {
     const { filePath, mimeType, size } = await this.downloadMediaToFile(mediaUrl);
 
     try {
+      this.validateMediaSize(mimeType, size);
       return await this.uploadMediaToXV2({ accessToken, filePath, mimeType, size });
     } catch (error) {
       const status = error.response?.status;
