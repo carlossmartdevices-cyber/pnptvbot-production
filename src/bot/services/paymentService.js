@@ -17,6 +17,7 @@ const DaimoConfig = require('../../config/daimo');
 const MessageTemplates = require('./messageTemplates');
 const sanitize = require('../../utils/sanitizer');
 const BusinessNotificationService = require('./businessNotificationService');
+const { getEpaycoSubscriptionUrl, isSubscriptionPlan } = require('../../config/epaycoSubscriptionPlans');
 
 class PaymentService {
     /**
@@ -160,19 +161,35 @@ class PaymentService {
         // Create payment reference
         const paymentRef = `PAY-${payment.id.substring(0, 8).toUpperCase()}`;
 
-        // Use landing page before ePayco checkout
-        paymentUrl = `${checkoutDomain}/payment/${payment.id}`;
-        
+        // Check if this is a recurring subscription plan
+        const subscriptionUrl = getEpaycoSubscriptionUrl(planId, {
+          extra1: String(userId),
+          extra2: planId,
+          extra3: payment.id,
+        });
+
+        if (subscriptionUrl) {
+          // Recurring plan → ePayco hosted subscription page
+          paymentUrl = subscriptionUrl;
+          logger.info('ePayco subscription URL created', {
+            paymentId: payment.id,
+            planId,
+            paymentUrl,
+          });
+        } else {
+          // One-time plan → custom checkout page
+          paymentUrl = `${checkoutDomain}/payment/${payment.id}`;
+          logger.info('ePayco checkout URL created', {
+            paymentId: payment.id,
+            paymentUrl,
+          });
+        }
+
         await PaymentModel.updateStatus(payment.id, 'pending', {
           paymentUrl,
           provider,
           reference: paymentRef,
-          fallback: false, 
-        });
-        
-        logger.info('ePayco landing checkout URL created', {
-          paymentId: payment.id,
-          paymentUrl,
+          fallback: false,
         });
       } else if (provider === 'daimo') {
         // Create Daimo payment using official API
@@ -503,12 +520,13 @@ class PaymentService {
         x_transaction_state,
         x_approval_code,
         x_amount,
-        x_extra1: userId,
-        x_extra2: planIdOrBookingId,
-        x_extra3: paymentIdOrType,
         x_customer_email,
         x_customer_name,
       } = webhookData;
+
+      let userId = webhookData.x_extra1;
+      let planIdOrBookingId = webhookData.x_extra2;
+      let paymentIdOrType = webhookData.x_extra3;
 
       // Validate required fields
       if (!x_ref_payco || !x_transaction_state) {
@@ -516,6 +534,21 @@ class PaymentService {
           webhookData,
         });
         return { success: false, error: 'Missing required webhook fields' };
+      }
+
+      // Fallback: for recurring subscription charges, ePayco may not preserve extras.
+      // Look up the subscriber by ePayco reference to recover userId and planId.
+      if (!userId && x_ref_payco) {
+        const subscriber = await SubscriberModel.getBySubscriptionId(x_ref_payco);
+        if (subscriber) {
+          userId = subscriber.telegramId;
+          planIdOrBookingId = subscriber.plan;
+          logger.info('Recovered user from subscriber record (recurring charge)', {
+            x_ref_payco,
+            userId,
+            planId: planIdOrBookingId,
+          });
+        }
       }
 
       logger.info('Processing ePayco webhook', {
@@ -578,8 +611,17 @@ class PaymentService {
         if (userId && planIdOrBookingId) {
           const plan = await PlanModel.getById(planIdOrBookingId);
           if (plan) {
-            const expiryDate = new Date();
             const durationDays = plan.duration_days || plan.duration || 30;
+
+            // For renewals: extend from current expiry if still active
+            let expiryDate;
+            const user = await UserModel.getById(userId);
+            const currentExpiry = user?.subscription?.expiry || user?.subscription_expiry;
+            if (currentExpiry && new Date(currentExpiry) > new Date()) {
+              expiryDate = new Date(currentExpiry);
+            } else {
+              expiryDate = new Date();
+            }
             expiryDate.setDate(expiryDate.getDate() + durationDays);
 
             await UserModel.updateSubscription(userId, {
@@ -593,10 +635,34 @@ class PaymentService {
               planId: planIdOrBookingId,
               expiryDate,
               refPayco: x_ref_payco,
+              renewed: !!(currentExpiry && new Date(currentExpiry) > new Date()),
             });
 
+            // Store subscriber mapping for recurring charge lookups
+            if (isSubscriptionPlan(planIdOrBookingId)) {
+              try {
+                await SubscriberModel.create({
+                  email: x_customer_email || `telegram-${userId}@pnptv.app`,
+                  name: x_customer_name || null,
+                  telegramId: userId,
+                  plan: planIdOrBookingId,
+                  subscriptionId: x_ref_payco,
+                  provider: 'epayco',
+                });
+                logger.info('Subscriber mapping stored for recurring charges', {
+                  userId,
+                  planId: planIdOrBookingId,
+                  subscriptionRef: x_ref_payco,
+                });
+              } catch (subError) {
+                logger.error('Error storing subscriber mapping (non-critical):', {
+                  error: subError.message,
+                  userId,
+                });
+              }
+            }
+
             // Send enhanced payment confirmation notification via bot (with PRIME channel link)
-            const user = await UserModel.getById(userId);
             const userLanguage = user?.language || 'es';
             try {
               await this.sendPaymentConfirmationNotification({
@@ -1314,6 +1380,252 @@ class PaymentService {
         stack: error.stack,
       });
       return false;
+    }
+  }
+
+  /**
+   * Process a tokenized charge using ePayco SDK.
+   * Flow: create token → create customer → single charge (no recurring).
+   * If the charge is approved, activates the subscription immediately.
+   *
+   * @param {Object} params
+   * @param {string} params.paymentId - Internal payment ID
+   * @param {Object} params.card - Card data { number, exp_year, exp_month, cvc }
+   * @param {Object} params.customer - Customer data { name, last_name, email, doc_type, doc_number, city, address, phone, cell_phone }
+   * @param {string} params.dues - Number of installments (e.g. "1")
+   * @param {string} params.ip - Client IP address
+   * @returns {Promise<Object>} { success, transactionId, status, message }
+   */
+  static async processTokenizedCharge({ paymentId, card, customer, dues = '1', ip = '127.0.0.1' }) {
+    const { getEpaycoClient } = require('../../config/epayco');
+
+    try {
+      // 1. Get payment and plan
+      const payment = await PaymentModel.getById(paymentId);
+      if (!payment) {
+        return { success: false, error: 'Payment not found' };
+      }
+
+      if (payment.status === 'completed') {
+        return { success: false, error: 'Payment already completed' };
+      }
+
+      const planId = payment.planId || payment.plan_id;
+      const plan = await PlanModel.getById(planId);
+      if (!plan) {
+        return { success: false, error: 'Plan not found' };
+      }
+
+      const userId = payment.userId || payment.user_id;
+      const amountCOP = Math.round((payment.amount || parseFloat(plan.price)) * 4000);
+      const paymentRef = `PAY-${paymentId.substring(0, 8).toUpperCase()}`;
+
+      const epaycoClient = getEpaycoClient();
+
+      // 2. Create card token
+      logger.info('Creating ePayco token for tokenized charge', { paymentId });
+      const tokenResult = await epaycoClient.token.create({
+        'card[number]': card.number,
+        'card[exp_year]': card.exp_year,
+        'card[exp_month]': card.exp_month,
+        'card[cvc]': card.cvc,
+        hasCvv: true,
+      });
+
+      if (!tokenResult || tokenResult.status === false || !tokenResult.id) {
+        logger.error('ePayco token creation failed', { paymentId, tokenResult });
+        return { success: false, error: 'Error al tokenizar la tarjeta. Verifica los datos e intenta nuevamente.' };
+      }
+
+      const tokenId = tokenResult.id;
+      logger.info('ePayco token created', { paymentId, tokenId });
+
+      // 3. Create customer
+      logger.info('Creating ePayco customer', { paymentId });
+      const customerResult = await epaycoClient.customers.create({
+        token_card: tokenId,
+        name: customer.name,
+        last_name: customer.last_name || customer.name,
+        email: customer.email,
+        default: true,
+        city: customer.city || 'Bogota',
+        address: customer.address || 'N/A',
+        phone: customer.phone || '0000000000',
+        cell_phone: customer.cell_phone || customer.phone || '0000000000',
+      });
+
+      if (!customerResult || customerResult.status === false) {
+        logger.error('ePayco customer creation failed', { paymentId, customerResult });
+        return { success: false, error: 'Error al crear el cliente. Intenta nuevamente.' };
+      }
+
+      const customerId = customerResult.data?.customerId || customerResult.data?.id_customer || customerResult.id;
+      logger.info('ePayco customer created', { paymentId, customerId });
+
+      // 4. Make single charge (NOT recurring/subscription)
+      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
+      const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.store';
+
+      logger.info('Creating ePayco tokenized charge', { paymentId, amountCOP });
+      const chargeResult = await epaycoClient.charge.create({
+        token_card: tokenId,
+        customer_id: customerId,
+        doc_type: customer.doc_type || 'CC',
+        doc_number: customer.doc_number || '0000000000',
+        name: customer.name,
+        last_name: customer.last_name || customer.name,
+        email: customer.email,
+        city: customer.city || 'Bogota',
+        address: customer.address || 'N/A',
+        phone: customer.phone || '0000000000',
+        cell_phone: customer.cell_phone || customer.phone || '0000000000',
+        bill: paymentRef,
+        description: plan.sku || `PNPtv - ${plan.display_name || plan.name}`,
+        value: String(amountCOP),
+        tax: '0',
+        tax_base: '0',
+        currency: 'COP',
+        dues: String(dues),
+        ip,
+        url_response: `${webhookDomain}/api/payment-response`,
+        url_confirmation: `${epaycoWebhookDomain}/api/webhook/epayco`,
+        method_confirmation: 'POST',
+        use_default_card_customer: true,
+        extras: {
+          extra1: String(userId),
+          extra2: planId,
+          extra3: paymentId,
+        },
+      });
+
+      logger.info('ePayco charge result', {
+        paymentId,
+        chargeStatus: chargeResult?.data?.estado,
+        chargeResponse: chargeResult?.data?.respuesta,
+        refPayco: chargeResult?.data?.ref_payco,
+      });
+
+      // 5. Process result
+      const estado = chargeResult?.data?.estado;
+      const respuesta = chargeResult?.data?.respuesta;
+      const refPayco = chargeResult?.data?.ref_payco;
+      const transactionId = chargeResult?.data?.transactionID || chargeResult?.data?.transaction_id;
+
+      if (estado === 'Aceptada' || estado === 'Aprobada' || respuesta === 'Aprobada') {
+        // Charge approved - activate subscription
+        await PaymentModel.updateStatus(paymentId, 'completed', {
+          transaction_id: transactionId,
+          reference: refPayco,
+          epayco_ref: refPayco,
+          payment_method: 'tokenized_card',
+        });
+
+        // Activate user subscription
+        const expiryDate = new Date();
+        const durationDays = plan.duration_days || plan.duration || 30;
+        expiryDate.setDate(expiryDate.getDate() + durationDays);
+
+        await UserModel.updateSubscription(userId, {
+          status: 'active',
+          planId,
+          expiry: expiryDate,
+        });
+
+        logger.info('Subscription activated via tokenized charge', {
+          userId,
+          planId,
+          expiryDate,
+          refPayco,
+        });
+
+        // Send payment confirmation notification (async, non-blocking)
+        const user = await UserModel.getById(userId);
+        const userLanguage = user?.language || 'es';
+
+        this.sendPaymentConfirmationNotification({
+          userId,
+          plan,
+          transactionId: refPayco || transactionId,
+          amount: amountCOP,
+          expiryDate,
+          language: userLanguage,
+          provider: 'epayco',
+        }).catch((err) => {
+          logger.error('Error sending tokenized charge confirmation (non-critical)', { error: err.message });
+        });
+
+        // Complete promo redemption if applicable
+        if (payment.metadata?.redemptionId) {
+          PromoService.completePromoRedemption(payment.metadata.redemptionId, paymentId).catch((err) => {
+            logger.error('Error completing promo redemption (non-critical)', { error: err.message });
+          });
+        }
+
+        // Business notification (async, non-blocking)
+        BusinessNotificationService.notifyPayment({
+          userId,
+          planName: plan.display_name || plan.name,
+          amount: amountCOP,
+          provider: 'ePayco (Tokenizado)',
+          transactionId: refPayco || transactionId,
+          customerName: customer.name || 'Unknown',
+        }).catch((err) => {
+          logger.error('Business notification failed (non-critical)', { error: err.message });
+        });
+
+        return {
+          success: true,
+          status: 'approved',
+          transactionId: refPayco || transactionId,
+          message: 'Pago aprobado exitosamente',
+        };
+      } else if (estado === 'Pendiente') {
+        // Check for 3DS redirect URL (bank authentication)
+        const redirectUrl = chargeResult?.data?.urlbanco || chargeResult?.data?.url_response_bank || null;
+
+        await PaymentModel.updateStatus(paymentId, 'pending', {
+          transaction_id: transactionId,
+          reference: refPayco,
+          epayco_ref: refPayco,
+          payment_method: 'tokenized_card',
+        });
+
+        const pendingResult = {
+          success: true,
+          status: 'pending',
+          transactionId: refPayco || transactionId,
+          message: 'El pago está pendiente de confirmación',
+        };
+
+        if (redirectUrl) {
+          pendingResult.redirectUrl = redirectUrl;
+        }
+
+        return pendingResult;
+      } else {
+        // Rejected or failed
+        await PaymentModel.updateStatus(paymentId, 'failed', {
+          transaction_id: transactionId,
+          reference: refPayco,
+          epayco_ref: refPayco,
+          payment_method: 'tokenized_card',
+        });
+
+        const errorMsg = chargeResult?.data?.respuesta || 'Transacción rechazada';
+        return {
+          success: false,
+          status: 'rejected',
+          transactionId: refPayco || transactionId,
+          error: errorMsg,
+        };
+      }
+    } catch (error) {
+      logger.error('Error processing tokenized charge', {
+        paymentId,
+        error: error.message,
+        stack: error.stack,
+      });
+      return { success: false, error: `Error procesando el pago: ${error.message}` };
     }
   }
 }

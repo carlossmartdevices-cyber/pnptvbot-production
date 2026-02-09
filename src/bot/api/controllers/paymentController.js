@@ -119,7 +119,7 @@ class PaymentController {
         basePaymentData.epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;
         basePaymentData.testMode = process.env.EPAYCO_TEST_MODE === 'true';
         // Confirmation URL: ePayco server sends webhook callbacks here
-        basePaymentData.confirmationUrl = `${epaycoWebhookDomain}/api/webhooks/epayco`;
+        basePaymentData.confirmationUrl = `${epaycoWebhookDomain}/api/webhook/epayco`;
         // Response URL: User's browser redirects here after payment
         basePaymentData.responseUrl = `${webhookDomain}/api/payment-response`;
         basePaymentData.epaycoSignature = PaymentService.generateEpaycoCheckoutSignature({
@@ -289,6 +289,122 @@ class PaymentController {
       res.status(500).json({
         success: false,
         error: 'Error processing confirmation. Please try again or contact support.',
+      });
+    }
+  }
+
+  /**
+   * Get payment status (for polling after ePayco checkout)
+   * GET /api/payment/:paymentId/status
+   */
+  static async getPaymentStatus(req, res) {
+    try {
+      const { paymentId } = req.params;
+
+      if (!paymentId) {
+        return res.status(400).json({ success: false, error: 'Payment ID is required' });
+      }
+
+      const payment = await PaymentModel.getById(paymentId);
+
+      if (!payment) {
+        return res.status(404).json({ success: false, error: 'Payment not found' });
+      }
+
+      res.json({ success: true, status: payment.status });
+    } catch (error) {
+      logger.error('Error getting payment status:', {
+        error: error.message,
+        paymentId: req.params.paymentId,
+      });
+      res.status(500).json({ success: false, error: 'Error checking payment status' });
+    }
+  }
+
+  /**
+   * Process a tokenized charge (card form → token → customer → charge)
+   * POST /api/payment/tokenized-charge
+   */
+  static async processTokenizedCharge(req, res) {
+    try {
+      const {
+        paymentId,
+        cardNumber,
+        expYear,
+        expMonth,
+        cvc,
+        name,
+        lastName,
+        email,
+        docType,
+        docNumber,
+        city,
+        address,
+        phone,
+        dues,
+      } = req.body;
+
+      // Validate required fields
+      if (!paymentId || !cardNumber || !expYear || !expMonth || !cvc || !name || !email || !docType || !docNumber) {
+        return res.status(400).json({
+          success: false,
+          error: 'Faltan campos requeridos. Completa todos los datos de la tarjeta y personales.',
+        });
+      }
+
+      // Basic card number validation (13-19 digits)
+      const cleanCard = cardNumber.replace(/\s+/g, '');
+      if (!/^\d{13,19}$/.test(cleanCard)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Número de tarjeta inválido.',
+        });
+      }
+
+      // Get client IP
+      const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+        || req.headers['x-real-ip']
+        || req.connection?.remoteAddress
+        || '127.0.0.1';
+
+      const result = await PaymentService.processTokenizedCharge({
+        paymentId,
+        card: {
+          number: cleanCard,
+          exp_year: String(expYear),
+          exp_month: String(expMonth).padStart(2, '0'),
+          cvc: String(cvc),
+        },
+        customer: {
+          name,
+          last_name: lastName || name,
+          email,
+          doc_type: docType,
+          doc_number: String(docNumber),
+          city: city || 'Bogota',
+          address: address || 'N/A',
+          phone: phone || '0000000000',
+          cell_phone: phone || '0000000000',
+        },
+        dues: String(dues || '1'),
+        ip: clientIp,
+      });
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(result.status === 'rejected' ? 402 : 400).json(result);
+      }
+    } catch (error) {
+      logger.error('Error in tokenized charge endpoint:', {
+        error: error.message,
+        stack: error.stack,
+        paymentId: req.body?.paymentId,
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'Error interno al procesar el pago. Intenta nuevamente.',
       });
     }
   }

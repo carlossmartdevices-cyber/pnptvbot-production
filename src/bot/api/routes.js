@@ -397,18 +397,9 @@ app.get('/pnp/live/daimo-checkout/:bookingId', pageLimiter, (req, res) => {
   res.redirect(302, '/pnp-live-daimo-checkout.html');
 });
 
-// Payment checkout page with language support
-app.get('/payment/:paymentId', (req, res) => {
-  // Get language from query parameter (e.g., ?lang=en)
-  const lang = req.query.lang || 'es'; // Default to Spanish
-
-  let fileName;
-  if (lang === 'en') {
-    fileName = 'payment-checkout-en.html';
-  } else {
-    fileName = 'payment-checkout-es.html';
-  }
-  res.sendFile(path.join(__dirname, `../../../public/${fileName}`));
+// Payment checkout page
+app.get('/payment/:paymentId', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
 });
 
 // Function to conditionally apply middleware (skip for Telegram webhook)
@@ -637,6 +628,7 @@ app.post(
 
 // Webhook endpoints
 app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
+app.post('/api/webhook/epayco', webhookLimiter, webhookController.handleEpaycoWebhook); // singular alias
 app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
 app.post('/api/webhooks/visa-cybersource', webhookLimiter, require('./controllers/visaCybersourceWebhookController').handleWebhook);
 app.get('/api/webhooks/visa-cybersource/health', require('./controllers/visaCybersourceWebhookController').healthCheck);
@@ -644,6 +636,8 @@ app.get('/api/payment-response', webhookController.handlePaymentResponse);
 
 // Payment API routes
 app.get('/api/payment/:paymentId', asyncHandler(paymentController.getPaymentInfo));
+app.get('/api/payment/:paymentId/status', asyncHandler(paymentController.getPaymentStatus));
+app.post('/api/payment/tokenized-charge', asyncHandler(paymentController.processTokenizedCharge));
 app.get('/api/confirm-payment/:token', asyncHandler(paymentController.confirmPaymentToken));
 
 // Meet & Greet API routes
@@ -686,7 +680,7 @@ app.get('/api/meet-greet/booking/:bookingId', asyncHandler(async (req, res) => {
       epaycoPublicKey: process.env.EPAYCO_PUBLIC_KEY,
       testMode: process.env.EPAYCO_TEST_MODE === 'true',
       epaycoSignature: PaymentService.generateEpaycoCheckoutSignature({ invoice, amount, currencyCode }),
-      confirmationUrl: `${epaycoWebhookDomain}/api/webhooks/epayco`,
+      confirmationUrl: `${epaycoWebhookDomain}/api/webhook/epayco`,
       responseUrl: `${webhookDomain}/api/payment-response`,
     }
   });
@@ -742,7 +736,7 @@ app.get('/api/pnp-live/booking/:bookingId', asyncHandler(async (req, res) => {
       epaycoPublicKey: process.env.EPAYCO_PUBLIC_KEY,
       testMode: process.env.EPAYCO_TEST_MODE === 'true',
       epaycoSignature: PaymentService.generateEpaycoCheckoutSignature({ invoice, amount, currencyCode }),
-      confirmationUrl: `${epaycoWebhookDomain}/api/webhooks/epayco`,
+      confirmationUrl: `${epaycoWebhookDomain}/api/webhook/epayco`,
       responseUrl: `${webhookDomain}/api/payment-response`,
     }
   });

@@ -15,111 +15,83 @@
             text-align: center;
             border-bottom: 1px solid var(--border);
         }
+        .header h1 { font-size: 24px; margin-bottom: 5px; color: var(--accent); }
+        .header p { font-size: 14px; color: var(--muted); }
 
-        .header h1 {
-            font-size: 24px;
-            margin-bottom: 5px;
-            color: var(--accent);
-        }
+        .content { padding: 20px; max-width: 480px; margin: 0 auto; }
 
-        .header p {
-            font-size: 14px;
-            color: var(--muted);
-        }
-
-        .content {
-            padding: 20px;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px 20px;
-        }
-
+        .loading { text-align: center; padding: 40px 20px; }
         .spinner {
             border: 3px solid var(--border);
             border-top: 3px solid var(--accent);
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 40px; height: 40px;
             animation: spin 1s linear infinite;
             margin: 0 auto 20px;
         }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .plan-info {
             background: var(--bg-2);
             border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 25px;
+            padding: 16px;
+            margin-bottom: 20px;
             border: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
+        .plan-left { display: flex; align-items: center; gap: 10px; }
+        .plan-name { font-size: 16px; font-weight: 600; color: var(--text); }
+        .plan-price { font-size: 20px; font-weight: 700; color: var(--accent); }
 
-        .plan-name {
-            font-size: 18px;
+        .form-group { margin-bottom: 14px; }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 15px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--accent);
+        }
+        .form-group input::placeholder { color: var(--muted); opacity: 0.6; }
+        .form-group input.invalid { border-color: #ff6b6b; }
+        .form-group input.valid { border-color: #4caf50; }
+
+        .form-row { display: flex; gap: 10px; }
+        .form-row .form-group { flex: 1; }
+
+        .section-title {
+            font-size: 14px;
             font-weight: 600;
             color: var(--text);
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            margin: 20px 0 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border);
         }
 
-        .plan-price {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--accent);
-            margin: 10px 0;
-        }
-
-        .plan-price .currency {
-            font-size: 14px;
-            color: var(--muted);
-        }
-
-        .promo-badge {
-            margin-top: 6px;
-            padding: 4px 10px;
-            border-radius: 15px;
-            background: rgba(255, 180, 84, 0.2);
-            color: var(--accent);
-            font-size: 11px;
-            display: inline-block;
-            font-weight: 600;
-            border: 1px solid rgba(255, 180, 84, 0.4);
-        }
-
-        .promo-savings {
-            margin-top: 8px;
+        .card-brand {
+            float: right;
             font-size: 12px;
-            color: var(--accent-2);
             font-weight: 600;
-        }
-
-        .plan-features {
-            list-style: none;
-            margin-top: 15px;
-            padding: 0;
-        }
-
-        .plan-features li {
-            padding: 8px 0;
-            color: var(--muted);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 13px;
-        }
-
-        .plan-features li:before {
-            content: "✓";
-            color: var(--accent-2);
-            font-weight: bold;
-            font-size: 16px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: var(--bg-2);
+            color: var(--accent);
         }
 
         .pay-button {
@@ -132,330 +104,469 @@
             font-size: 16px;
             font-weight: 700;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            margin-top: 10px;
+            transition: transform 0.2s;
+            margin-top: 16px;
         }
-
-        .pay-button:active:not(:disabled) {
-            transform: scale(0.97);
-            
-        }
-
+        .pay-button:active:not(:disabled) { transform: scale(0.97); }
         .pay-button:disabled {
             background: var(--bg-2);
             color: var(--muted);
             opacity: 0.8;
             cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
         }
 
-        .security-note {
-            text-align: center;
-            margin-top: 20px;
-            padding: 12px;
-            background: rgba(44, 226, 201, 0.1);
-            border: 1px solid rgba(44, 226, 201, 0.3);
-            border-radius: 8px;
-            font-size: 12px;
-            color: var(--accent-2);
-        }
-
-        .security-note svg {
-            vertical-align: middle;
-            margin-right: 5px;
-            color: var(--accent-2);
-        }
-
-        .error {
+        .error-msg {
             background: rgba(255, 107, 107, 0.1);
             color: var(--accent-3);
             padding: 12px;
             border-radius: 8px;
             margin-bottom: 15px;
             text-align: center;
-            display: none;
             border: 1px solid rgba(255, 107, 107, 0.3);
         }
 
-        .back-link {
+        .success-msg {
+            background: rgba(76, 175, 80, 0.1);
+            color: #4caf50;
+            padding: 20px;
+            border-radius: 12px;
             text-align: center;
-            margin-top: 20px;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+        .success-msg h2 { margin: 0 0 10px; font-size: 20px; }
+        .success-msg p { margin: 5px 0; font-size: 14px; color: var(--muted); }
+
+        .pending-msg {
+            background: rgba(255, 193, 7, 0.1);
+            color: #ffc107;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(255, 193, 7, 0.3);
+        }
+        .pending-msg h2 { margin: 0 0 10px; font-size: 20px; }
+        .pending-msg p { margin: 5px 0; font-size: 14px; color: var(--muted); }
+
+        .secure-badge {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--muted);
         }
 
-        .back-link a {
-            color: var(--text);
-            text-decoration: none;
-            font-size: 14px;
-        }
+        .back-link { text-align: center; margin-top: 16px; }
+        .back-link a { color: var(--text); text-decoration: none; font-size: 14px; }
 
-        .back-link a:hover {
-            text-decoration: underline;
+        .polling-status {
+            text-align: center;
+            padding: 20px;
+            display: none;
         }
-
-        @media (max-width: 600px) {
-            .header h1 {
-                font-size: 20px;
-            }
-
-            .plan-price {
-                font-size: 28px;
-            }
+        .polling-status .spinner {
+            width: 30px; height: 30px;
+            margin: 0 auto 12px;
         }
+        .polling-status p { font-size: 14px; color: var(--muted); }
     </style>
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <h1>🎬 PNPtv</h1>
-            <p>Completa tu suscripción</p>
+            <h1>PNPtv</h1>
+            <p>Completa tu suscripcion</p>
         </header>
 
         <main class="content">
             <div id="loading" class="loading">
                 <div class="spinner"></div>
-                <p>Cargando información del pago...</p>
+                <p>Cargando informacion del pago...</p>
             </div>
 
-            <div id="error" class="error" style="display: none;"></div>
+            <div id="error" style="display: none;"></div>
 
             <div id="checkout-form" style="display: none;">
                 <div class="plan-info">
-                    <div class="plan-name">
-                        <span id="plan-icon">💎</span>
-                        <span id="plan-name">Premium</span>
+                    <div class="plan-left">
+                        <span id="plan-icon"></span>
+                        <span class="plan-name" id="plan-name"></span>
                     </div>
-                    <div style="color: var(--muted); font-size: 13px; margin: 8px 0;">
-                        SKU: <span id="plan-sku">EASYBOTS-PNP-030</span>
-                    </div>
-                    <div style="color: var(--accent); font-weight: 600; font-size: 15px; margin: 8px 0;">
-                        <span id="plan-duration">30</span> días - Acceso a PNPtv!
-                    </div>
-                    <div class="plan-price">
-                        USD $<span id="plan-price-usd">0</span>
-                    </div>
-                    <div style="color: var(--muted); font-size: 14px; margin-top: 5px;">
-                        COP $<span id="plan-price-cop">0</span>
-                    </div>
-                    <div id="plan-promo" class="promo-badge" style="display: none;"></div>
-                    <div id="plan-savings" class="promo-savings" style="display: none;"></div>
-                    <ul class="plan-features" id="plan-features" style="display: none;"></ul>
+                    <span class="plan-price">$<span id="plan-price-usd">0</span></span>
                 </div>
 
-                <button type="button" class="pay-button" id="pay-button">
-                    💳 Pagar con ePayco
+                <div class="section-title">
+                    Datos de tarjeta
+                    <span class="card-brand" id="card-brand" style="display: none;"></span>
+                </div>
+
+                <div class="form-group">
+                    <label>Numero de tarjeta</label>
+                    <input type="text" id="cardNumber" placeholder="4575 6231 8229 0326" maxlength="19" inputmode="numeric" autocomplete="cc-number">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Mes</label>
+                        <select id="expMonth" autocomplete="cc-exp-month">
+                            <option value="">MM</option>
+                            <option value="01">01</option><option value="02">02</option>
+                            <option value="03">03</option><option value="04">04</option>
+                            <option value="05">05</option><option value="06">06</option>
+                            <option value="07">07</option><option value="08">08</option>
+                            <option value="09">09</option><option value="10">10</option>
+                            <option value="11">11</option><option value="12">12</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Ano</label>
+                        <select id="expYear" autocomplete="cc-exp-year"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>CVC</label>
+                        <input type="text" id="cvc" placeholder="123" maxlength="4" inputmode="numeric" autocomplete="cc-csc">
+                    </div>
+                </div>
+
+                <div class="section-title">Datos personales</div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nombre</label>
+                        <input type="text" id="name" placeholder="Juan" autocomplete="given-name">
+                    </div>
+                    <div class="form-group">
+                        <label>Apellido</label>
+                        <input type="text" id="lastName" placeholder="Perez" autocomplete="family-name">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="email" placeholder="correo@ejemplo.com" autocomplete="email">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tipo doc.</label>
+                        <select id="docType">
+                            <option value="CC">CC</option>
+                            <option value="CE">CE</option>
+                            <option value="NIT">NIT</option>
+                            <option value="PP">Pasaporte</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Numero documento</label>
+                        <input type="text" id="docNumber" placeholder="1234567890" inputmode="numeric">
+                    </div>
+                </div>
+
+                <div id="form-error" class="error-msg" style="display: none;"></div>
+
+                <button id="pay-button" class="pay-button">
+                    Pagar
                 </button>
 
-                <div class="security-note">
-                    Será llevado al checkout y su pago será procesado en pesos colombianos. En su estado de cuenta se verá como cobro por parte de <strong>Easy Bots</strong>.
-                </div>
+                <div class="secure-badge">Pago seguro procesado por ePayco</div>
 
                 <div class="back-link">
-                    <a href="#" onclick="window.close(); return false;">← Volver al bot</a>
+                    <a href="#" onclick="window.close(); return false;">Volver al bot</a>
                 </div>
+            </div>
+
+            <div id="polling-status" class="polling-status">
+                <div class="spinner"></div>
+                <p>Verificando el estado del pago...</p>
+            </div>
+
+            <div id="success" class="success-msg" style="display: none;">
+                <h2>Pago aprobado</h2>
+                <p>Tu suscripcion ha sido activada.</p>
+                <p>Revisa el bot de Telegram para tu enlace de acceso.</p>
+            </div>
+
+            <div id="pending" class="pending-msg" style="display: none;">
+                <h2>Pago pendiente</h2>
+                <p>Tu pago esta siendo procesado. Recibiras confirmacion pronto.</p>
+                <p>Revisa el bot de Telegram en unos minutos.</p>
             </div>
         </main>
     </div>
 
-    <!-- ePayco Checkout Script -->
-    <script src="https://checkout.epayco.co/checkout.js"></script>
-
     <script>
-        // Get payment ID from URL
-        const pathParts = window.location.pathname.split('/');
-        const paymentId = pathParts[pathParts.length - 1];
+        var pathParts = window.location.pathname.split('/');
+        var paymentId = pathParts[pathParts.length - 1];
+        var paymentData = null;
 
-        let paymentData = null;
-        let ePaycoHandler = null;
-
-        // Load payment information
-        async function loadPaymentInfo() {
-            try {
-                const response = await fetch(`/api/payment/${paymentId}`);
-
-                if (!response.ok) {
-                    throw new Error('No se pudo cargar la información del pago');
-                }
-
-                const data = await response.json();
-
-                if (!data.success) {
-                    throw new Error(data.error || 'Error al cargar el pago');
-                }
-
-                paymentData = data.payment;
-                displayPaymentInfo();
-                initializeEpayco();
-
-            } catch (error) {
-                console.error('Error loading payment:', error);
-                showError(error.message || 'Error al cargar la información del pago. Por favor, intenta nuevamente.');
-            }
+        // --- Card brand detection ---
+        function detectCardBrand(number) {
+            var n = number.replace(/\s/g, '');
+            if (/^4/.test(n)) return 'Visa';
+            if (/^5[1-5]/.test(n) || /^2[2-7]/.test(n)) return 'Mastercard';
+            if (/^3[47]/.test(n)) return 'Amex';
+            if (/^3(0[0-5]|[68])/.test(n)) return 'Diners';
+            return '';
         }
 
-        // Display payment information
-        function displayPaymentInfo() {
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('checkout-form').style.display = 'block';
-
-            // Plan info
-            document.getElementById('plan-icon').textContent = paymentData.plan.icon || '💎';
-            document.getElementById('plan-name').textContent = paymentData.plan.name;
-            document.getElementById('plan-sku').textContent = paymentData.plan.sku || 'EASYBOTS-PNP-030';
-
-            // Duration text
-            const duration = paymentData.plan.duration;
-            let durationText;
-            if (duration >= 36500) {
-                durationText = 'Acceso de por vida';
-            } else if (duration === 7) {
-                durationText = '7 días';
-            } else if (duration === 30) {
-                durationText = '30 días';
-            } else {
-                durationText = duration + ' días';
-            }
-            document.getElementById('plan-duration').textContent = durationText;
-
-            // Prices
-            document.getElementById('plan-price-usd').textContent = paymentData.amountUSD.toFixed(2);
-            document.getElementById('plan-price-cop').textContent = formatNumber(paymentData.amountCOP);
-
-            const promoBadge = document.getElementById('plan-promo');
-            const promoSavings = document.getElementById('plan-savings');
-            if (paymentData.isPromo && paymentData.promoCode) {
-                promoBadge.textContent = `PROMO: ${paymentData.promoCode}`;
-                promoBadge.style.display = 'inline-block';
-                if (paymentData.discountAmount !== null) {
-                    const lang = document.documentElement.lang || 'es';
-                    const savingsText = lang === 'es'
-                        ? `Ahorras $${paymentData.discountAmount.toFixed(2)} USD`
-                        : `You save $${paymentData.discountAmount.toFixed(2)} USD`;
-                    promoSavings.textContent = savingsText;
-                    promoSavings.style.display = 'block';
+        // --- Luhn algorithm ---
+        function luhnCheck(number) {
+            var n = number.replace(/\s/g, '');
+            if (!/^\d{13,19}$/.test(n)) return false;
+            var sum = 0;
+            var alternate = false;
+            for (var i = n.length - 1; i >= 0; i--) {
+                var digit = parseInt(n[i], 10);
+                if (alternate) {
+                    digit *= 2;
+                    if (digit > 9) digit -= 9;
                 }
-            } else {
-                promoBadge.style.display = 'none';
-                promoSavings.style.display = 'none';
+                sum += digit;
+                alternate = !alternate;
             }
-
-            const featuresList = document.getElementById('plan-features');
-            if (paymentData.plan.features && paymentData.plan.features.length > 0) {
-                featuresList.innerHTML = '';
-                paymentData.plan.features.forEach((feature) => {
-                    const li = document.createElement('li');
-                    li.textContent = feature;
-                    featuresList.appendChild(li);
-                });
-                featuresList.style.display = 'block';
-            } else {
-                featuresList.style.display = 'none';
-            }
+            return sum % 10 === 0;
         }
 
-        // Initialize ePayco Checkout
-        function initializeEpayco() {
-            if (!paymentData.epaycoPublicKey || !paymentData.epaycoSignature) {
-                showError('Configuración de pago incompleta');
-                return;
-            }
-
-            ePaycoHandler = ePayco.checkout.configure({
-                key: paymentData.epaycoPublicKey,
-                test: paymentData.testMode
-            });
+        // --- Populate year dropdown ---
+        var yearSelect = document.getElementById('expYear');
+        var currentYear = new Date().getFullYear();
+        var opt0 = document.createElement('option');
+        opt0.value = ''; opt0.textContent = 'AAAA';
+        yearSelect.appendChild(opt0);
+        for (var y = currentYear; y <= currentYear + 10; y++) {
+            var opt = document.createElement('option');
+            opt.value = String(y); opt.textContent = String(y);
+            yearSelect.appendChild(opt);
         }
 
-        // Handle pay button click
-        document.getElementById('pay-button').addEventListener('click', function(e) {
-            e.preventDefault();
+        // --- Card number formatting + brand detection ---
+        document.getElementById('cardNumber').addEventListener('input', function(e) {
+            var v = e.target.value.replace(/\D/g, '').substring(0, 16);
+            e.target.value = v.replace(/(\d{4})(?=\d)/g, '$1 ');
 
-            // Disable button
-            const payButton = document.getElementById('pay-button');
-            payButton.disabled = true;
-            payButton.textContent = 'Abriendo ePayco...';
+            // Detect and display brand
+            var brand = detectCardBrand(v);
+            var brandEl = document.getElementById('card-brand');
+            if (brand && v.length >= 2) {
+                brandEl.textContent = brand;
+                brandEl.style.display = 'inline';
+            } else {
+                brandEl.style.display = 'none';
+            }
 
-            // Prepare ePayco data
-            const epaycoData = {
-                // Plan info - use SKU only, not plan name
-                name: paymentData.plan.sku,
-                description: paymentData.plan.sku,
-                invoice: paymentData.paymentRef,
-                currency: paymentData.currencyCode || "COP",
-                amount: paymentData.amountCOP.toString(),
-                tax_base: "0",
-                tax: "0",
-                country: "co",
-                lang: "es",
-                signature: paymentData.epaycoSignature,
-
-                // Extra data for webhook (no customer data - ePayco will collect it)
-                extra1: paymentData.userId.toString(),
-                extra2: paymentData.planId,
-                extra3: paymentData.paymentId,
-
-                // URLs
-                confirmation: paymentData.confirmationUrl,
-                response: paymentData.responseUrl,
-
-                // Optional
-                methodsDisable: [],
-                autoclick: false,
-                external: 'false'
-            };
-
-            // Add event handlers for better UX
-            const checkoutOptions = {
-                ...epaycoData,
-                // Event handlers (optional but recommended for better UX)
-                onCreated: function() {
-                    console.log('ePayco checkout created successfully');
-                    // Re-enable button after popup opens
-                    setTimeout(() => {
-                        payButton.disabled = false;
-                        payButton.textContent = '💳 Pagar con ePayco';
-                    }, 1000);
-                },
-                onErrors: function(errors) {
-                    console.error('ePayco checkout errors:', errors);
-                    showError('Error al procesar el pago. Por favor, intenta nuevamente.');
-                    payButton.disabled = false;
-                    payButton.textContent = '💳 Pagar con ePayco';
-                },
-                onClosed: function() {
-                    console.log('ePayco checkout closed');
-                    // User closed the checkout without completing payment
-                    payButton.disabled = false;
-                    payButton.textContent = '💳 Pagar con ePayco';
+            // Visual validation (Luhn) once enough digits
+            if (v.length >= 13) {
+                if (luhnCheck(v)) {
+                    e.target.classList.remove('invalid');
+                    e.target.classList.add('valid');
+                } else {
+                    e.target.classList.remove('valid');
+                    e.target.classList.add('invalid');
                 }
-            };
-
-            try {
-                ePaycoHandler.open(checkoutOptions);
-            } catch (error) {
-                console.error('Error opening ePayco checkout:', error);
-                showError('Error al abrir el checkout. Por favor, intenta nuevamente.');
-                payButton.disabled = false;
-                payButton.textContent = '💳 Pagar con ePayco';
+            } else {
+                e.target.classList.remove('valid', 'invalid');
             }
         });
 
-        // Show error
+        // --- CVC: digits only ---
+        document.getElementById('cvc').addEventListener('input', function(e) {
+            e.target.value = e.target.value.replace(/\D/g, '').substring(0, 4);
+        });
+
+        // --- Load payment info ---
+        async function loadPaymentInfo() {
+            try {
+                var response = await fetch('/api/payment/' + paymentId);
+                if (!response.ok) throw new Error('No se pudo cargar la informacion del pago');
+                var data = await response.json();
+                if (!data.success) throw new Error(data.error || 'Error al cargar el pago');
+                paymentData = data.payment;
+                displayPaymentInfo();
+            } catch (error) {
+                showError(error.message || 'Error al cargar la informacion del pago.');
+            }
+        }
+
+        function displayPaymentInfo() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('checkout-form').style.display = 'block';
+            document.getElementById('plan-icon').textContent = paymentData.plan.icon || '';
+            document.getElementById('plan-name').textContent = paymentData.plan.name;
+            document.getElementById('plan-price-usd').textContent = paymentData.amountUSD.toFixed(2);
+
+            var btn = document.getElementById('pay-button');
+            btn.textContent = 'Pagar $' + paymentData.amountUSD.toFixed(2) + ' USD';
+        }
+
+        // --- Submit payment ---
+        document.getElementById('pay-button').addEventListener('click', async function() {
+            var btn = document.getElementById('pay-button');
+            var errDiv = document.getElementById('form-error');
+            errDiv.style.display = 'none';
+
+            var cardNumber = document.getElementById('cardNumber').value.replace(/\s/g, '');
+            var expMonth = document.getElementById('expMonth').value;
+            var expYear = document.getElementById('expYear').value;
+            var cvc = document.getElementById('cvc').value;
+            var name = document.getElementById('name').value.trim();
+            var lastName = document.getElementById('lastName').value.trim();
+            var email = document.getElementById('email').value.trim();
+            var docType = document.getElementById('docType').value;
+            var docNumber = document.getElementById('docNumber').value.trim();
+
+            // --- Validations ---
+            if (!cardNumber || cardNumber.length < 13) {
+                return showFormError('Ingresa un numero de tarjeta valido.');
+            }
+            if (!luhnCheck(cardNumber)) {
+                return showFormError('Numero de tarjeta invalido. Verifica los digitos.');
+            }
+            if (!expMonth || !expYear) {
+                return showFormError('Selecciona la fecha de vencimiento.');
+            }
+            // Check expiry isn't in the past
+            var now = new Date();
+            var expDate = new Date(parseInt(expYear), parseInt(expMonth) - 1);
+            if (expDate < new Date(now.getFullYear(), now.getMonth())) {
+                return showFormError('La tarjeta esta vencida.');
+            }
+            var brand = detectCardBrand(cardNumber);
+            var expectedCvcLen = brand === 'Amex' ? 4 : 3;
+            if (!cvc || cvc.length < expectedCvcLen) {
+                return showFormError('Ingresa el codigo CVC (' + expectedCvcLen + ' digitos).');
+            }
+            if (!name) return showFormError('Ingresa tu nombre.');
+            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                return showFormError('Ingresa un email valido.');
+            }
+            if (!docNumber) return showFormError('Ingresa tu numero de documento.');
+
+            btn.disabled = true;
+            btn.textContent = 'Procesando...';
+
+            try {
+                var response = await fetch('/api/payment/tokenized-charge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        paymentId: paymentId,
+                        cardNumber: cardNumber,
+                        expYear: expYear,
+                        expMonth: expMonth,
+                        cvc: cvc,
+                        name: name,
+                        lastName: lastName,
+                        email: email,
+                        docType: docType,
+                        docNumber: docNumber,
+                        dues: '1',
+                    }),
+                });
+
+                var result = await response.json();
+
+                if (result.success && result.status === 'approved') {
+                    document.getElementById('checkout-form').style.display = 'none';
+                    document.getElementById('success').style.display = 'block';
+                } else if (result.status === 'pending') {
+                    // Check for 3DS redirect
+                    if (result.redirectUrl) {
+                        window.location.href = result.redirectUrl;
+                        return;
+                    }
+                    // No 3DS redirect — start polling for webhook confirmation
+                    document.getElementById('checkout-form').style.display = 'none';
+                    pollPaymentStatus();
+                } else {
+                    showFormError(result.error || 'El pago fue rechazado. Intenta con otra tarjeta.');
+                    btn.disabled = false;
+                    btn.textContent = 'Pagar $' + paymentData.amountUSD.toFixed(2) + ' USD';
+                }
+            } catch (error) {
+                showFormError('Error de conexion. Intenta nuevamente.');
+                btn.disabled = false;
+                btn.textContent = 'Pagar $' + paymentData.amountUSD.toFixed(2) + ' USD';
+            }
+        });
+
+        // --- Payment status polling (after 3DS or pending) ---
+        var pollAttempts = 0;
+        var maxPollAttempts = 10;
+        var pollInterval = 3000;
+        var polling = false;
+
+        function pollPaymentStatus() {
+            if (polling) return;
+            polling = true;
+            pollAttempts = 0;
+
+            document.getElementById('checkout-form').style.display = 'none';
+            document.getElementById('polling-status').style.display = 'block';
+
+            doPoll();
+        }
+
+        function doPoll() {
+            if (pollAttempts >= maxPollAttempts) {
+                document.getElementById('polling-status').style.display = 'none';
+                document.getElementById('pending').style.display = 'block';
+                polling = false;
+                return;
+            }
+
+            pollAttempts++;
+
+            fetch('/api/payment/' + paymentId + '/status')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (!data.success) {
+                        document.getElementById('polling-status').style.display = 'none';
+                        showError('Error al verificar el estado del pago.');
+                        polling = false;
+                        return;
+                    }
+
+                    if (data.status === 'completed') {
+                        document.getElementById('polling-status').style.display = 'none';
+                        document.getElementById('success').style.display = 'block';
+                        polling = false;
+                    } else if (data.status === 'failed' || data.status === 'rejected') {
+                        document.getElementById('polling-status').style.display = 'none';
+                        document.getElementById('checkout-form').style.display = 'block';
+                        showFormError('El pago fue rechazado. Intenta con otra tarjeta.');
+                        var btn = document.getElementById('pay-button');
+                        btn.disabled = false;
+                        btn.textContent = 'Pagar $' + paymentData.amountUSD.toFixed(2) + ' USD';
+                        polling = false;
+                    } else {
+                        setTimeout(doPoll, pollInterval);
+                    }
+                })
+                .catch(function() {
+                    setTimeout(doPoll, pollInterval);
+                });
+        }
+
+        // --- If returning from 3DS redirect, start polling ---
+        var urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('ref_payco') || urlParams.get('transactionID')) {
+            document.getElementById('loading').style.display = 'none';
+            pollPaymentStatus();
+        } else {
+            loadPaymentInfo();
+        }
+
+        function showFormError(msg) {
+            var errDiv = document.getElementById('form-error');
+            errDiv.textContent = msg;
+            errDiv.style.display = 'block';
+        }
+
         function showError(message) {
             document.getElementById('loading').style.display = 'none';
-            document.getElementById('checkout-form').style.display = 'none';
-            const errorDiv = document.getElementById('error');
+            var errorDiv = document.getElementById('error');
+            errorDiv.className = 'error-msg';
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
         }
-
-        // Format number with thousands separator
-        function formatNumber(num) {
-            return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-        }
-
-        // Load payment info on page load
-        loadPaymentInfo();
     </script>
 </body>
 </html>
