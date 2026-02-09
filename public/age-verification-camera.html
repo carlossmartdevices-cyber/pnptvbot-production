@@ -393,27 +393,51 @@
       }
     };
 
-    // 6. Simulación de API (Backend Logic)
     async function sendToVerification(blob) {
-      // Mostrar Loader
       document.getElementById('loaderModal').classList.add('active');
-      
-      // Aquí iría tu fetch real a /api/verify-age
-      // const formData = new FormData();
-      // formData.append('photo', blob);
-      
-      // Simulamos espera de 2 segundos para demo visual
-      setTimeout(() => {
+      document.getElementById('statusText').innerText = 'Uploading photo...';
+
+      const formData = new FormData();
+      formData.append('photo', blob, 'photo.jpg');
+      if (USER_ID) formData.append('user_id', USER_ID);
+      if (LANG) formData.append('lang', LANG);
+
+      try {
+        const response = await fetch('/api/verify-age', {
+          method: 'POST',
+          body: formData,
+        });
+
+        let payload = null;
+        try {
+          payload = await response.json();
+        } catch (err) {
+          // Ignore JSON parse errors
+        }
+
+        const ageVerified = Boolean(payload?.ageVerified);
+        const message = payload?.message || (ageVerified ? 'Age verification successful.' : 'Could not verify age.');
+
+        showResult({
+          verified: ageVerified,
+          message,
+          responseOk: response.ok,
+          errorCode: payload?.error,
+        });
+      } catch (error) {
+        showResult({
+          verified: false,
+          message: 'Network error. Please try again.',
+          responseOk: false,
+          errorCode: error.message,
+        });
+      } finally {
         document.getElementById('loaderModal').classList.remove('active');
-        
-        // Simular Éxito (Cambiar a false para probar error)
-        const success = true; 
-        
-        showResult(success);
-      }, 2000);
+        scannerOverlay.style.borderColor = 'rgba(255,255,255,0.1)';
+      }
     }
 
-    function showResult(success) {
+    function showResult({ verified, message, responseOk }) {
       const modal = document.getElementById('resultModal');
       const title = document.getElementById('resultTitle');
       const msg = document.getElementById('resultMsg');
@@ -423,11 +447,11 @@
 
       modal.classList.add('active');
 
-      if (success) {
+      if (verified) {
         icon.innerText = "💎";
         title.innerText = "Verified 18+";
         title.style.color = "var(--neon-cyan)";
-        msg.innerText = "Age verification successful. Access granted.";
+        msg.innerText = message || "Age verification successful. Access granted.";
         btn.classList.remove('hidden');
         retry.classList.add('hidden');
         
@@ -442,10 +466,10 @@
         icon.innerText = "⚠️";
         title.innerText = "Verification Failed";
         title.style.color = "var(--error-color)";
-        msg.innerText = "Could not verify age. Lighting might be poor.";
+        msg.innerText = message || "Could not verify age. Lighting might be poor.";
         btn.classList.add('hidden');
         retry.classList.remove('hidden');
-        
+
         retry.onclick = () => {
           modal.classList.remove('active');
           scannerOverlay.style.borderColor = "rgba(255,255,255,0.1)";
