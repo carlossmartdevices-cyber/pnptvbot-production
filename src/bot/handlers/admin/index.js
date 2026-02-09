@@ -8,6 +8,7 @@ const PlanModel = require('../../../models/planModel');
 const ModerationModel = require('../../../models/moderationModel');
 const PaymentWebhookEventModel = require('../../../models/paymentWebhookEventModel');
 const PaymentService = require('../../services/paymentService');
+const PaymentSecurityService = require('../../services/paymentSecurityService');
 const PromoService = require('../../services/promoService');
 const PromoModel = require('../../../models/promoModel');
 const adminService = require('../../services/adminService');
@@ -896,6 +897,7 @@ async function showAdminPanel(ctx, edit = false) {
       ]);
       buttons.push([
         Markup.button.callback('💳 Webhooks Pago', 'admin_payment_webhooks'),
+        Markup.button.callback('🔒 Security Report', 'admin_security_report'),
       ]);
     }
 
@@ -3053,6 +3055,59 @@ let registerAdminHandlers = (bot) => {
     } catch (error) {
       logger.error('Error in admin_payment_webhooks:', error);
       await ctx.reply('❌ Error').catch(() => {});
+    }
+  });
+
+  // Security Report handler
+  bot.action('admin_security_report', async (ctx) => {
+    try {
+      await safeAnswerCbQuery(ctx);
+      const isAdmin = await PermissionService.isAdmin(ctx.from.id);
+      if (!isAdmin) return;
+
+      const lang = getLanguage(ctx);
+      const report = await PaymentSecurityService.generateSecurityReport(30);
+
+      let message = '🔒 *Payment Security Report (30 days)*\n';
+      message += '━━━━━━━━━━━━━━━━━━━━\n\n';
+
+      if (!report || report.length === 0) {
+        message += lang === 'es' ? 'No hay datos de seguridad aún.' : 'No security data yet.';
+      } else {
+        let totalEvents = 0;
+        let totalBlocked = 0;
+        let totalFailed = 0;
+
+        for (const row of report.slice(0, 10)) {
+          const date = new Date(row.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          const events = parseInt(row.total_events) || 0;
+          const blocked = parseInt(row.blocked_payments) || 0;
+          const failed = parseInt(row.failed_payments) || 0;
+          const users = parseInt(row.unique_users) || 0;
+
+          totalEvents += events;
+          totalBlocked += blocked;
+          totalFailed += failed;
+
+          message += `📅 *${date}*: ${events} events, ${blocked} blocked, ${failed} failed, ${users} users\n`;
+        }
+
+        message += `\n📊 *Totals*: ${totalEvents} events, ${totalBlocked} blocked, ${totalFailed} failed\n`;
+      }
+
+      await ctx.editMessageText(
+        message,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 Refresh', 'admin_security_report')],
+            [Markup.button.callback('⬅️ Back', 'admin_cancel')],
+          ]),
+        }
+      );
+    } catch (error) {
+      logger.error('Error in admin_security_report:', error);
+      await ctx.reply('❌ Error loading security report').catch(() => {});
     }
   });
 

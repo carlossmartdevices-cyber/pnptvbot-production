@@ -1,213 +1,316 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
-    <title>Checkout - PNPtv</title>
-    <link rel="stylesheet" href="/webapps/design-system/static.css">
-    <script src="/webapps/design-system/telegram-theme.js" type="module"></script>
+    <title>Secure Checkout - EasyBots</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://checkout.epayco.co/checkout.js"></script>
     <script src="https://multimedia.epayco.co/general/3DS/validateThreeds.min.js"></script>
     <style>
-        .header {
-            background: var(--panel-strong);
-            color: var(--text);
-            padding: 20px;
-            text-align: center;
-            border-bottom: 1px solid var(--border);
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #1A1A1D;
+            color: #FFFFFF;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
         }
-        .header h1 { font-size: 24px; margin-bottom: 5px; color: var(--accent); }
-        .header p { font-size: 14px; color: var(--muted); }
 
-        .content { padding: 20px; max-width: 480px; margin: 0 auto; }
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 0 16px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
 
-        .loading { text-align: center; padding: 40px 20px; }
+        .header {
+            padding: 24px 0 20px;
+            text-align: center;
+        }
+        .header-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .header-logo svg { width: 36px; height: 36px; }
+        .header-logo span {
+            font-size: 22px;
+            font-weight: 700;
+            color: #FFFFFF;
+            letter-spacing: -0.3px;
+        }
+        .header-subtitle {
+            font-size: 14px;
+            color: #888;
+            font-weight: 400;
+        }
+
+        .content { flex: 1; padding-bottom: 24px; }
+
+        .loading { text-align: center; padding: 60px 20px; }
         .spinner {
-            border: 3px solid var(--border);
-            border-top: 3px solid var(--accent);
+            border: 3px solid #2A2A2D;
+            border-top: 3px solid #FFF700;
             border-radius: 50%;
             width: 40px; height: 40px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+            margin: 0 auto 16px;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading p { font-size: 14px; color: #888; }
 
-        .plan-info {
-            background: var(--bg-2);
+        .plan-card {
+            background: #222225;
             border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 20px;
-            border: 1px solid var(--border);
+            padding: 16px 18px;
+            margin-bottom: 24px;
+            border-left: 3px solid #FFF700;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
         .plan-left { display: flex; align-items: center; gap: 10px; }
-        .plan-name { font-size: 16px; font-weight: 600; color: var(--text); }
-        .plan-price { font-size: 20px; font-weight: 700; color: var(--accent); }
+        .plan-icon { font-size: 20px; }
+        .plan-name { font-size: 15px; font-weight: 600; color: #FFF; }
+        .plan-price { font-size: 22px; font-weight: 700; color: #FFF700; }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 0 0 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .card-brand {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #2A2A2D;
+            color: #FFF700;
+            text-transform: none;
+            letter-spacing: 0;
+        }
 
         .form-group { margin-bottom: 14px; }
         .form-group label {
             display: block;
             font-size: 13px;
-            color: var(--muted);
-            margin-bottom: 5px;
+            color: #AAA;
+            margin-bottom: 6px;
             font-weight: 500;
         }
         .form-group input, .form-group select {
             width: 100%;
-            padding: 10px 12px;
-            background: var(--bg-2);
-            color: var(--text);
-            border: 1px solid var(--border);
+            padding: 12px 14px;
+            background: #2A2A2D;
+            color: #FFFFFF;
+            border: 1px solid #3A3A3D;
             border-radius: 8px;
             font-size: 15px;
-            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
             outline: none;
             transition: border-color 0.2s;
+            -webkit-appearance: none;
+            min-height: 48px;
+        }
+        .form-group select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='%23888'%3E%3Cpath d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 36px;
         }
         .form-group input:focus, .form-group select:focus {
-            border-color: var(--accent);
+            border-color: #FFF700;
+            box-shadow: 0 0 0 2px rgba(255, 247, 0, 0.15);
         }
-        .form-group input::placeholder { color: var(--muted); opacity: 0.6; }
-        .form-group input.invalid { border-color: #ff6b6b; }
-        .form-group input.valid { border-color: #4caf50; }
+        .form-group input::placeholder { color: #555; }
+        .form-group input.invalid { border-color: #ff4444; }
+        .form-group input.valid { border-color: #44bb44; }
 
         .form-row { display: flex; gap: 10px; }
         .form-row .form-group { flex: 1; }
 
-        .section-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text);
-            margin: 20px 0 10px;
-            padding-bottom: 6px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .card-brand {
-            float: right;
-            font-size: 12px;
-            font-weight: 600;
-            padding: 2px 8px;
-            border-radius: 4px;
-            background: var(--bg-2);
-            color: var(--accent);
-        }
-
         .pay-button {
             width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, var(--accent), #ffd27a);
-            color: var(--bg);
+            padding: 16px;
+            background: #FFF700;
+            color: #1A1A1D;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 16px;
             font-weight: 700;
+            font-family: 'Inter', sans-serif;
             cursor: pointer;
-            transition: transform 0.2s;
-            margin-top: 16px;
+            transition: transform 0.15s, opacity 0.15s;
+            margin-top: 20px;
+            min-height: 52px;
         }
-        .pay-button:active:not(:disabled) { transform: scale(0.97); }
+        .pay-button:active:not(:disabled) { transform: scale(0.98); }
         .pay-button:disabled {
-            background: var(--bg-2);
-            color: var(--muted);
-            opacity: 0.8;
+            background: #2A2A2D;
+            color: #555;
             cursor: not-allowed;
         }
 
         .error-msg {
-            background: rgba(255, 107, 107, 0.1);
-            color: var(--accent-3);
-            padding: 12px;
+            background: rgba(255, 68, 68, 0.1);
+            color: #ff6666;
+            padding: 12px 14px;
             border-radius: 8px;
-            margin-bottom: 15px;
+            margin-bottom: 14px;
             text-align: center;
-            border: 1px solid rgba(255, 107, 107, 0.3);
+            font-size: 14px;
+            border: 1px solid rgba(255, 68, 68, 0.2);
         }
 
         .success-msg {
-            background: rgba(76, 175, 80, 0.1);
-            color: #4caf50;
-            padding: 20px;
+            background: rgba(68, 187, 68, 0.1);
+            color: #44bb44;
+            padding: 28px 20px;
             border-radius: 12px;
             text-align: center;
-            border: 1px solid rgba(76, 175, 80, 0.3);
+            border: 1px solid rgba(68, 187, 68, 0.2);
         }
-        .success-msg h2 { margin: 0 0 10px; font-size: 20px; }
-        .success-msg p { margin: 5px 0; font-size: 14px; color: var(--muted); }
+        .success-msg h2 { font-size: 20px; margin-bottom: 10px; }
+        .success-msg p { font-size: 14px; color: #888; margin: 6px 0; }
 
         .pending-msg {
-            background: rgba(255, 193, 7, 0.1);
-            color: #ffc107;
-            padding: 20px;
+            background: rgba(255, 247, 0, 0.08);
+            color: #FFF700;
+            padding: 28px 20px;
             border-radius: 12px;
             text-align: center;
-            border: 1px solid rgba(255, 193, 7, 0.3);
+            border: 1px solid rgba(255, 247, 0, 0.2);
         }
-        .pending-msg h2 { margin: 0 0 10px; font-size: 20px; }
-        .pending-msg p { margin: 5px 0; font-size: 14px; color: var(--muted); }
+        .pending-msg h2 { font-size: 20px; margin-bottom: 10px; }
+        .pending-msg p { font-size: 14px; color: #888; margin: 6px 0; }
 
-        .secure-badge {
+        .footer {
+            padding: 16px 0 24px;
             text-align: center;
-            margin-top: 12px;
-            font-size: 12px;
-            color: var(--muted);
+            border-top: 1px solid #2A2A2D;
         }
-
-        .back-link { text-align: center; margin-top: 16px; }
-        .back-link a { color: var(--text); text-decoration: none; font-size: 14px; }
+        .footer-badge {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+        }
+        .footer-links a {
+            font-size: 12px;
+            color: #888;
+            text-decoration: none;
+        }
+        .footer-links a:hover { color: #FFF700; }
 
         .polling-status {
             text-align: center;
-            padding: 20px;
+            padding: 40px 20px;
             display: none;
         }
         .polling-status .spinner {
             width: 30px; height: 30px;
             margin: 0 auto 12px;
         }
-        .polling-status p { font-size: 14px; color: var(--muted); }
+        .polling-status p { font-size: 14px; color: #888; }
+
+        .back-link { text-align: center; margin-top: 14px; }
+        .back-link a { color: #888; text-decoration: none; font-size: 13px; }
+        .back-link a:hover { color: #FFF700; }
+
+        .divider { height: 1px; background: #2A2A2D; margin: 20px 0; }
+
+        .terms-notice {
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+            margin-top: 16px;
+            line-height: 1.5;
+        }
+        .terms-notice a { color: #FFF700; text-decoration: none; }
+        .terms-notice a:hover { text-decoration: underline; }
+
+        .lang-toggle {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: #2A2A2D;
+            border: 1px solid #3A3A3D;
+            color: #AAA;
+            font-size: 12px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .lang-toggle:hover { color: #FFF700; border-color: #FFF700; }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container" style="position: relative;">
+        <button class="lang-toggle" id="lang-toggle" onclick="toggleLang()">ES</button>
+
         <header class="header">
-            <h1>PNPtv</h1>
-            <p>Completa tu suscripcion</p>
+            <div class="header-logo">
+                <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="#FFF700"/>
+                    <path d="M10 8C10 6.9 10.9 6 12 6H24C25.1 6 26 6.9 26 8V20C26 21.1 25.1 22 24 22H20L14 28V22H12C10.9 22 10 21.1 10 20V8Z" fill="#1A1A1D"/>
+                    <path d="M19.5 9L16 16H19L17 23L22 14.5H18.5L19.5 9Z" fill="#FFF700"/>
+                </svg>
+                <span>EasyBots</span>
+            </div>
+            <p class="header-subtitle" data-i18n="subtitle"></p>
         </header>
 
         <main class="content">
             <div id="loading" class="loading">
                 <div class="spinner"></div>
-                <p>Cargando informacion del pago...</p>
+                <p data-i18n="loading"></p>
             </div>
 
             <div id="error" style="display: none;"></div>
 
             <div id="checkout-form" style="display: none;">
-                <div class="plan-info">
+                <div class="plan-card">
                     <div class="plan-left">
-                        <span id="plan-icon"></span>
+                        <span class="plan-icon" id="plan-icon"></span>
                         <span class="plan-name" id="plan-name"></span>
                     </div>
                     <span class="plan-price">$<span id="plan-price-usd">0</span></span>
                 </div>
 
                 <div class="section-title">
-                    Datos de tarjeta
+                    <span data-i18n="cardDetails"></span>
                     <span class="card-brand" id="card-brand" style="display: none;"></span>
                 </div>
 
                 <div class="form-group">
-                    <label>Numero de tarjeta</label>
+                    <label data-i18n="cardNumber"></label>
                     <input type="text" id="cardNumber" placeholder="4575 6231 8229 0326" maxlength="19" inputmode="numeric" autocomplete="cc-number">
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Mes</label>
+                        <label data-i18n="month"></label>
                         <select id="expMonth" autocomplete="cc-exp-month">
                             <option value="">MM</option>
                             <option value="01">01</option><option value="02">02</option>
@@ -219,7 +322,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Ano</label>
+                        <label data-i18n="year"></label>
                         <select id="expYear" autocomplete="cc-exp-year"></select>
                     </div>
                     <div class="form-group">
@@ -228,15 +331,17 @@
                     </div>
                 </div>
 
-                <div class="section-title">Datos personales</div>
+                <div class="divider"></div>
+
+                <div class="section-title"><span data-i18n="personalInfo"></span></div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Nombre</label>
+                        <label data-i18n="firstName"></label>
                         <input type="text" id="name" placeholder="Juan" autocomplete="given-name">
                     </div>
                     <div class="form-group">
-                        <label>Apellido</label>
+                        <label data-i18n="lastName"></label>
                         <input type="text" id="lastName" placeholder="Perez" autocomplete="family-name">
                     </div>
                 </div>
@@ -248,53 +353,190 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Tipo doc.</label>
+                        <label data-i18n="docType"></label>
                         <select id="docType">
                             <option value="CC">CC</option>
                             <option value="CE">CE</option>
                             <option value="NIT">NIT</option>
-                            <option value="PP">Pasaporte</option>
+                            <option value="PP" data-i18n-opt="passport"></option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Numero documento</label>
+                        <label data-i18n="docNumber"></label>
                         <input type="text" id="docNumber" placeholder="1234567890" inputmode="numeric">
                     </div>
                 </div>
 
                 <div id="form-error" class="error-msg" style="display: none;"></div>
 
-                <button id="pay-button" class="pay-button">
-                    Pagar
-                </button>
+                <p class="terms-notice" id="terms-notice"></p>
 
-                <div class="secure-badge">Pago seguro procesado por ePayco</div>
+                <button id="pay-button" class="pay-button" data-i18n="pay"></button>
 
                 <div class="back-link">
-                    <a href="#" onclick="window.close(); return false;">Volver al bot</a>
+                    <a href="#" onclick="window.close(); return false;" data-i18n="backToBot"></a>
                 </div>
             </div>
 
             <div id="polling-status" class="polling-status">
                 <div class="spinner"></div>
-                <p>Verificando el estado del pago...</p>
+                <p data-i18n="verifying"></p>
             </div>
 
             <div id="success" class="success-msg" style="display: none;">
-                <h2>Pago aprobado</h2>
-                <p>Tu suscripcion ha sido activada.</p>
-                <p>Revisa el bot de Telegram para tu enlace de acceso.</p>
+                <h2 data-i18n="successTitle"></h2>
+                <p data-i18n="successMsg1"></p>
+                <p data-i18n="successMsg2"></p>
             </div>
 
             <div id="pending" class="pending-msg" style="display: none;">
-                <h2>Pago pendiente</h2>
-                <p>Tu pago esta siendo procesado. Recibiras confirmacion pronto.</p>
-                <p>Revisa el bot de Telegram en unos minutos.</p>
+                <h2 data-i18n="pendingTitle"></h2>
+                <p data-i18n="pendingMsg1"></p>
+                <p data-i18n="pendingMsg2"></p>
             </div>
         </main>
+
+        <footer class="footer">
+            <div class="footer-badge" data-i18n="securedBy"></div>
+            <div class="footer-links">
+                <a href="/terms" data-i18n="terms"></a>
+                <a href="/contact" data-i18n="contact"></a>
+            </div>
+        </footer>
     </div>
 
     <script>
+        // ── i18n ──
+        var I = {
+            en: {
+                subtitle: 'Secure Checkout',
+                loading: 'Loading payment info...',
+                cardDetails: 'Card Details',
+                cardNumber: 'Card Number',
+                month: 'Month',
+                year: 'Year',
+                personalInfo: 'Personal Info',
+                firstName: 'First Name',
+                lastName: 'Last Name',
+                docType: 'Doc Type',
+                docNumber: 'Document Number',
+                passport: 'Passport',
+                pay: 'Pay',
+                payAmount: 'Pay ${amount} USD',
+                backToBot: 'Return to bot',
+                verifying: 'Verifying payment status...',
+                successTitle: 'Payment Approved',
+                successMsg1: 'Your subscription has been activated.',
+                successMsg2: 'Check the Telegram bot for your access link.',
+                pendingTitle: 'Payment Pending',
+                pendingMsg1: "Your payment is being processed. You'll receive confirmation shortly.",
+                pendingMsg2: 'Check the Telegram bot in a few minutes.',
+                securedBy: 'Secured by ePayco',
+                terms: 'Terms',
+                contact: 'Contact',
+                tokenizing: 'Tokenizing card...',
+                processing: 'Processing payment...',
+                errCardInvalid: 'Enter a valid card number.',
+                errCardLuhn: 'Invalid card number. Check the digits.',
+                errExpDate: 'Select the expiration date.',
+                errExpired: 'Card is expired.',
+                errCvc: 'Enter the CVC code ({n} digits).',
+                errName: 'Enter your first name.',
+                errEmail: 'Enter a valid email.',
+                errDoc: 'Enter your document number.',
+                errTokenize: 'Error tokenizing card.',
+                errDeclined: 'Payment was declined. Try another card.',
+                errConnection: 'Connection error. Please try again.',
+                errLoadPayment: 'Could not load payment info',
+                errLoadGeneric: 'Error loading payment',
+                errVerify: 'Error verifying payment status.',
+                errEpaycoKey: 'Could not load ePayco public key.',
+                errEpaycoScript: 'ePayco script did not load correctly.',
+                errEpaycoToken: 'ePayco tokenization function is not available.',
+                errTokenGen: 'Could not generate token.',
+                termsNotice: 'By proceeding, you agree to our <a href="/terms">Terms & Conditions</a> and <a href="/terms#data">Data Treatment Policy</a>.',
+            },
+            es: {
+                subtitle: 'Pago Seguro',
+                loading: 'Cargando informaci\u00f3n del pago...',
+                cardDetails: 'Datos de Tarjeta',
+                cardNumber: 'N\u00famero de Tarjeta',
+                month: 'Mes',
+                year: 'A\u00f1o',
+                personalInfo: 'Datos Personales',
+                firstName: 'Nombre',
+                lastName: 'Apellido',
+                docType: 'Tipo Doc.',
+                docNumber: 'N\u00famero de Documento',
+                passport: 'Pasaporte',
+                pay: 'Pagar',
+                payAmount: 'Pagar ${amount} USD',
+                backToBot: 'Volver al bot',
+                verifying: 'Verificando el estado del pago...',
+                successTitle: 'Pago Aprobado',
+                successMsg1: 'Tu suscripci\u00f3n ha sido activada.',
+                successMsg2: 'Revisa el bot de Telegram para tu enlace de acceso.',
+                pendingTitle: 'Pago Pendiente',
+                pendingMsg1: 'Tu pago est\u00e1 siendo procesado. Recibir\u00e1s confirmaci\u00f3n pronto.',
+                pendingMsg2: 'Revisa el bot de Telegram en unos minutos.',
+                securedBy: 'Pago seguro procesado por ePayco',
+                terms: 'T\u00e9rminos',
+                contact: 'Contacto',
+                tokenizing: 'Tokenizando tarjeta...',
+                processing: 'Procesando pago...',
+                errCardInvalid: 'Ingresa un n\u00famero de tarjeta v\u00e1lido.',
+                errCardLuhn: 'N\u00famero de tarjeta inv\u00e1lido. Verifica los d\u00edgitos.',
+                errExpDate: 'Selecciona la fecha de vencimiento.',
+                errExpired: 'La tarjeta est\u00e1 vencida.',
+                errCvc: 'Ingresa el c\u00f3digo CVC ({n} d\u00edgitos).',
+                errName: 'Ingresa tu nombre.',
+                errEmail: 'Ingresa un email v\u00e1lido.',
+                errDoc: 'Ingresa tu n\u00famero de documento.',
+                errTokenize: 'Error al tokenizar la tarjeta.',
+                errDeclined: 'El pago fue rechazado. Intenta con otra tarjeta.',
+                errConnection: 'Error de conexi\u00f3n. Intenta nuevamente.',
+                errLoadPayment: 'No se pudo cargar la informaci\u00f3n del pago',
+                errLoadGeneric: 'Error al cargar el pago',
+                errVerify: 'Error al verificar el estado del pago.',
+                errEpaycoKey: 'No se pudo cargar la clave p\u00fablica de ePayco.',
+                errEpaycoScript: 'El script de ePayco no se carg\u00f3 correctamente.',
+                errEpaycoToken: 'La funci\u00f3n de tokenizaci\u00f3n de ePayco no est\u00e1 disponible.',
+                errTokenGen: 'No se pudo generar el token.',
+                termsNotice: 'Al continuar, aceptas nuestros <a href="/terms">T\u00e9rminos y Condiciones</a> y la <a href="/terms#data">Pol\u00edtica de Tratamiento de Datos</a>.',
+            }
+        };
+
+        var lang = (navigator.language || '').startsWith('es') ? 'es' : 'en';
+
+        function t(key) { return (I[lang] && I[lang][key]) || I.en[key] || key; }
+
+        function applyLang() {
+            document.documentElement.lang = lang;
+            document.getElementById('lang-toggle').textContent = lang === 'en' ? 'ES' : 'EN';
+            document.querySelectorAll('[data-i18n]').forEach(function(el) {
+                el.textContent = t(el.getAttribute('data-i18n'));
+            });
+            document.querySelectorAll('[data-i18n-opt]').forEach(function(el) {
+                el.textContent = t(el.getAttribute('data-i18n-opt'));
+            });
+            // Update terms notice (uses innerHTML for links)
+            var tn = document.getElementById('terms-notice');
+            if (tn) tn.innerHTML = t('termsNotice');
+            // Update pay button if payment loaded
+            if (paymentData) {
+                var btn = document.getElementById('pay-button');
+                if (!btn.disabled) {
+                    btn.textContent = t('payAmount').replace('${amount}', '$' + paymentData.amountUSD.toFixed(2));
+                }
+            }
+        }
+
+        function toggleLang() {
+            lang = lang === 'en' ? 'es' : 'en';
+            applyLang();
+        }
+
+        // ── Payment logic ──
         const pathParts = window.location.pathname.split('/');
         const paymentId = pathParts[pathParts.length - 1];
         let paymentData = null;
@@ -303,50 +545,52 @@
         const createEpaycoClient = () => {
             if (epaycoTokenClient) return epaycoTokenClient;
             if (!paymentData || !paymentData.epaycoPublicKey) {
-                throw new Error('No se pudo cargar la clave pública de ePayco.');
+                throw new Error(t('errEpaycoKey'));
             }
 
-            const Constructor = window.Epayco || window.epayco;
-            if (!Constructor) {
-                throw new Error('El script de ePayco no se cargó correctamente.');
+            const sdk = window.ePayco || window.Epayco || window.epayco;
+            if (!sdk) {
+                throw new Error(t('errEpaycoScript'));
             }
 
-            if (typeof Constructor === 'function') {
-                epaycoTokenClient = new Constructor({
-                    public_key: paymentData.epaycoPublicKey,
-                    lang: 'es',
-                    test: paymentData.testMode ? 'true' : 'false',
-                });
-            } else {
-                epaycoTokenClient = Constructor;
-                if (typeof epaycoTokenClient.setPublicKey === 'function') {
-                    epaycoTokenClient.setPublicKey(paymentData.epaycoPublicKey);
-                }
-                if (typeof epaycoTokenClient.setLang === 'function') {
-                    epaycoTokenClient.setLang('es');
-                }
-                if (typeof epaycoTokenClient.setTestMode === 'function') {
-                    epaycoTokenClient.setTestMode(paymentData.testMode ? 'true' : 'false');
-                }
+            if (typeof sdk.setPublicKey === 'function') {
+                sdk.setPublicKey(paymentData.epaycoPublicKey);
             }
 
-            if (!epaycoTokenClient || !epaycoTokenClient.token || typeof epaycoTokenClient.token.create !== 'function') {
-                throw new Error('La función de tokenización de ePayco no está disponible.');
+            if (!sdk.token || typeof sdk.token.create !== 'function') {
+                throw new Error(t('errEpaycoToken'));
             }
 
+            epaycoTokenClient = sdk;
             return epaycoTokenClient;
         };
 
-        const tokenizeCard = async (payload) => {
+        const tokenizeCard = (payload) => {
             const client = createEpaycoClient();
-            const tokenResult = await client.token.create(payload);
-            if (!tokenResult || !tokenResult.id) {
-                throw new Error(tokenResult?.description || 'No se pudo generar el token.');
-            }
-            return tokenResult;
+            return new Promise((resolve, reject) => {
+                const result = client.token.create(payload, function(error, token) {
+                    if (error) {
+                        reject(new Error(typeof error === 'string' ? error : (error.message || t('errTokenize'))));
+                        return;
+                    }
+                    if (!token || !token.id) {
+                        reject(new Error(token?.description || t('errTokenGen')));
+                        return;
+                    }
+                    resolve(token);
+                });
+                if (result && typeof result.then === 'function') {
+                    result.then(function(token) {
+                        if (!token || !token.id) {
+                            reject(new Error(token?.description || t('errTokenGen')));
+                            return;
+                        }
+                        resolve(token);
+                    }).catch(reject);
+                }
+            });
         };
 
-        // --- Card brand detection ---
         function detectCardBrand(number) {
             var n = number.replace(/\s/g, '');
             if (/^4/.test(n)) return 'Visa';
@@ -356,7 +600,6 @@
             return '';
         }
 
-        // --- Luhn algorithm ---
         function luhnCheck(number) {
             var n = number.replace(/\s/g, '');
             if (!/^\d{13,19}$/.test(n)) return false;
@@ -374,11 +617,10 @@
             return sum % 10 === 0;
         }
 
-        // --- Populate year dropdown ---
         var yearSelect = document.getElementById('expYear');
         var currentYear = new Date().getFullYear();
         var opt0 = document.createElement('option');
-        opt0.value = ''; opt0.textContent = 'AAAA';
+        opt0.value = ''; opt0.textContent = lang === 'es' ? 'AAAA' : 'YYYY';
         yearSelect.appendChild(opt0);
         for (var y = currentYear; y <= currentYear + 10; y++) {
             var opt = document.createElement('option');
@@ -386,12 +628,10 @@
             yearSelect.appendChild(opt);
         }
 
-        // --- Card number formatting + brand detection ---
         document.getElementById('cardNumber').addEventListener('input', function(e) {
             var v = e.target.value.replace(/\D/g, '').substring(0, 16);
             e.target.value = v.replace(/(\d{4})(?=\d)/g, '$1 ');
 
-            // Detect and display brand
             var brand = detectCardBrand(v);
             var brandEl = document.getElementById('card-brand');
             if (brand && v.length >= 2) {
@@ -401,7 +641,6 @@
                 brandEl.style.display = 'none';
             }
 
-            // Visual validation (Luhn) once enough digits
             if (v.length >= 13) {
                 if (luhnCheck(v)) {
                     e.target.classList.remove('invalid');
@@ -415,18 +654,20 @@
             }
         });
 
-        // --- CVC: digits only ---
         document.getElementById('cvc').addEventListener('input', function(e) {
             e.target.value = e.target.value.replace(/\D/g, '').substring(0, 4);
         });
 
-        // --- Load payment info ---
+        function payBtnLabel() {
+            return t('payAmount').replace('${amount}', '$' + paymentData.amountUSD.toFixed(2));
+        }
+
         async function loadPaymentInfo() {
             try {
                 var response = await fetch('/api/payment/' + paymentId);
-                if (!response.ok) throw new Error('No se pudo cargar la informacion del pago');
+                if (!response.ok) throw new Error(t('errLoadPayment'));
                 var data = await response.json();
-                if (!data.success) throw new Error(data.error || 'Error al cargar el pago');
+                if (!data.success) throw new Error(data.error || t('errLoadGeneric'));
                 paymentData = data.payment;
                 try {
                     createEpaycoClient();
@@ -436,7 +677,7 @@
                 }
                 displayPaymentInfo();
             } catch (error) {
-                showError(error.message || 'Error al cargar la informacion del pago.');
+                showError(error.message || t('errLoadPayment'));
             }
         }
 
@@ -448,10 +689,9 @@
             document.getElementById('plan-price-usd').textContent = paymentData.amountUSD.toFixed(2);
 
             var btn = document.getElementById('pay-button');
-            btn.textContent = 'Pagar $' + paymentData.amountUSD.toFixed(2) + ' USD';
+            btn.textContent = payBtnLabel();
         }
 
-        // --- Submit payment ---
         document.getElementById('pay-button').addEventListener('click', async function() {
             const btn = document.getElementById('pay-button');
             const errDiv = document.getElementById('form-error');
@@ -467,34 +707,33 @@
             const docType = document.getElementById('docType').value;
             const docNumber = document.getElementById('docNumber').value.trim();
 
-            // --- Validations ---
             if (!cardNumber || cardNumber.length < 13) {
-                return showFormError('Ingresa un numero de tarjeta valido.');
+                return showFormError(t('errCardInvalid'));
             }
             if (!luhnCheck(cardNumber)) {
-                return showFormError('Numero de tarjeta invalido. Verifica los digitos.');
+                return showFormError(t('errCardLuhn'));
             }
             if (!expMonth || !expYear) {
-                return showFormError('Selecciona la fecha de vencimiento.');
+                return showFormError(t('errExpDate'));
             }
             const now = new Date();
             const expDate = new Date(parseInt(expYear, 10), parseInt(expMonth, 10) - 1);
             if (expDate < new Date(now.getFullYear(), now.getMonth())) {
-                return showFormError('La tarjeta esta vencida.');
+                return showFormError(t('errExpired'));
             }
             const brand = detectCardBrand(cardNumber);
             const expectedCvcLen = brand === 'Amex' ? 4 : 3;
             if (!cvc || cvc.length < expectedCvcLen) {
-                return showFormError('Ingresa el codigo CVC (' + expectedCvcLen + ' digitos).');
+                return showFormError(t('errCvc').replace('{n}', expectedCvcLen));
             }
-            if (!name) return showFormError('Ingresa tu nombre.');
-            if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
-                return showFormError('Ingresa un email valido.');
+            if (!name) return showFormError(t('errName'));
+            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                return showFormError(t('errEmail'));
             }
-            if (!docNumber) return showFormError('Ingresa tu numero de documento.');
+            if (!docNumber) return showFormError(t('errDoc'));
 
             btn.disabled = true;
-            btn.textContent = 'Tokenizando tarjeta...';
+            btn.textContent = t('tokenizing');
 
             let tokenResult;
             try {
@@ -510,13 +749,13 @@
                     hasCvv: true,
                 });
             } catch (tokenError) {
-                showFormError(tokenError.message || 'Error al tokenizar la tarjeta.');
+                showFormError(tokenError.message || t('errTokenize'));
                 btn.disabled = false;
-                btn.textContent = 'Pagar $' + paymentData.amountUSD.toFixed(2) + ' USD';
+                btn.textContent = payBtnLabel();
                 return;
             }
 
-            btn.textContent = 'Procesando pago...';
+            btn.textContent = t('processing');
 
             try {
                 const response = await fetch('/api/payment/tokenized-charge', {
@@ -550,18 +789,17 @@
                     document.getElementById('checkout-form').style.display = 'none';
                     pollPaymentStatus();
                 } else {
-                    showFormError(result.error || 'El pago fue rechazado. Intenta con otra tarjeta.');
+                    showFormError(result.error || t('errDeclined'));
                     btn.disabled = false;
-                    btn.textContent = 'Pagar $' + paymentData.amountUSD.toFixed(2) + ' USD';
+                    btn.textContent = payBtnLabel();
                 }
             } catch (error) {
-                showFormError('Error de conexion. Intenta nuevamente.');
+                showFormError(t('errConnection'));
                 btn.disabled = false;
-                btn.textContent = 'Pagar $' + paymentData.amountUSD.toFixed(2) + ' USD';
+                btn.textContent = payBtnLabel();
             }
         });
 
-        // --- Payment status polling (after 3DS or pending) ---
         var pollAttempts = 0;
         var maxPollAttempts = 10;
         var pollInterval = 3000;
@@ -593,7 +831,7 @@
                 .then(function(data) {
                     if (!data.success) {
                         document.getElementById('polling-status').style.display = 'none';
-                        showError('Error al verificar el estado del pago.');
+                        showError(t('errVerify'));
                         polling = false;
                         return;
                     }
@@ -605,10 +843,10 @@
                     } else if (data.status === 'failed' || data.status === 'rejected') {
                         document.getElementById('polling-status').style.display = 'none';
                         document.getElementById('checkout-form').style.display = 'block';
-                        showFormError('El pago fue rechazado. Intenta con otra tarjeta.');
+                        showFormError(t('errDeclined'));
                         var btn = document.getElementById('pay-button');
                         btn.disabled = false;
-                        btn.textContent = 'Pagar $' + paymentData.amountUSD.toFixed(2) + ' USD';
+                        btn.textContent = payBtnLabel();
                         polling = false;
                     } else {
                         setTimeout(doPoll, pollInterval);
@@ -619,7 +857,9 @@
                 });
         }
 
-        // --- If returning from 3DS redirect, start polling ---
+        // Apply language on load
+        applyLang();
+
         var urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('ref_payco') || urlParams.get('transactionID')) {
             document.getElementById('loading').style.display = 'none';

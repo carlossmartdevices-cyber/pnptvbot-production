@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Terms & Conditions - EasyBots</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #1A1A1D;
+            color: #CCCCCC;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 0 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .header {
+            padding: 24px 0 20px;
+            text-align: center;
+            border-bottom: 1px solid #2A2A2D;
+            margin-bottom: 32px;
+        }
+        .header-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .header-logo svg { width: 32px; height: 32px; }
+        .header-logo span {
+            font-size: 20px;
+            font-weight: 700;
+            color: #FFFFFF;
+            letter-spacing: -0.3px;
+        }
+
+        .content { flex: 1; padding-bottom: 32px; }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #FFFFFF;
+            margin-bottom: 8px;
+        }
+        .last-updated {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 32px;
+        }
+
+        h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #FFF700;
+            margin: 28px 0 12px;
+        }
+
+        p { margin-bottom: 12px; font-size: 14px; }
+        ul { margin: 8px 0 16px 20px; font-size: 14px; }
+        li { margin-bottom: 6px; }
+
+        a { color: #FFF700; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .footer {
+            padding: 16px 0 24px;
+            text-align: center;
+            border-top: 1px solid #2A2A2D;
+        }
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+        }
+        .footer-links a {
+            font-size: 12px;
+            color: #888;
+        }
+        .footer-links a:hover { color: #FFF700; }
+
+        .lang-toggle {
+            position: absolute;
+            top: 16px;
+            right: 0;
+            background: #2A2A2D;
+            border: 1px solid #3A3A3D;
+            color: #AAA;
+            font-size: 12px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .lang-toggle:hover { color: #FFF700; border-color: #FFF700; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="lang-toggle" id="lang-toggle" onclick="toggleLang()">ES</button>
+
+        <header class="header">
+            <div class="header-logo">
+                <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="#FFF700"/>
+                    <path d="M10 8C10 6.9 10.9 6 12 6H24C25.1 6 26 6.9 26 8V20C26 21.1 25.1 22 24 22H20L14 28V22H12C10.9 22 10 21.1 10 20V8Z" fill="#1A1A1D"/>
+                    <path d="M19.5 9L16 16H19L17 23L22 14.5H18.5L19.5 9Z" fill="#FFF700"/>
+                </svg>
+                <span>EasyBots</span>
+            </div>
+        </header>
+
+        <main class="content" id="content-en">
+            <h1>Terms & Conditions</h1>
+            <p class="last-updated">Last updated: February 2026</p>
+
+            <h2>1. Service Description</h2>
+            <p>EasyBots operates as a digital subscription payment processor. We facilitate secure payment transactions for digital service subscriptions through our platform at easybots.site. EasyBots processes payments on behalf of service providers using certified third-party payment gateways.</p>
+
+            <h2>2. Payment Terms</h2>
+            <ul>
+                <li>All subscription payments are processed in Colombian Pesos (COP) or US Dollars (USD) depending on the plan selected.</li>
+                <li>Payments are processed securely through ePayco, a PCI DSS compliant payment gateway.</li>
+                <li>Subscription fees are non-refundable once the digital service has been activated.</li>
+                <li>Prices are subject to change with prior notice. Existing subscriptions will honor their original pricing until renewal.</li>
+                <li>Failed payment attempts may result in temporary service suspension.</li>
+            </ul>
+
+            <h2>3. Subscriptions & Cancellation</h2>
+            <ul>
+                <li>Subscriptions provide access for the duration specified at the time of purchase (7 days, 30 days, 90 days, 180 days, 365 days, or lifetime).</li>
+                <li>Subscriptions do not auto-renew unless explicitly stated.</li>
+                <li>No partial refunds are issued for unused subscription time.</li>
+            </ul>
+
+            <h2>4. Refund Policy</h2>
+            <ul>
+                <li>Digital subscriptions are non-refundable once the service has been activated and delivered.</li>
+                <li>If the service cannot be delivered due to a technical error on our part, a full refund will be issued within 30 calendar days.</li>
+                <li>Duplicate charges will be refunded upon verification.</li>
+                <li>To request a refund, contact us at <a href="mailto:contact@easybots.store">contact@easybots.store</a> with your transaction reference.</li>
+            </ul>
+
+            <h2>5. Right of Retraction</h2>
+            <p>In accordance with Article 47 of Colombian Consumer Law (Estatuto del Consumidor, Ley 1480 de 2011), buyers have the right to retract from a purchase within five (5) business days following delivery. To exercise this right, contact us at <a href="mailto:contact@easybots.store">contact@easybots.store</a>.</p>
+            <p>Please note: As these are digital subscriptions that are activated and delivered immediately upon payment, the right of retraction may not apply once the digital service has been accessed, in accordance with Article 47 paragraph exceptions for immediately-delivered digital content.</p>
+            <p>Where the right of retraction applies, refunds will be processed within thirty (30) calendar days.</p>
+
+            <h2>6. Personal Data Treatment Policy</h2>
+            <p>In compliance with Colombian Law 1581 of 2012 (Ley de Protecci&oacute;n de Datos Personales) and Decree 1074 of 2015, EasyBots collects and processes only the minimum personal data required for payment processing:</p>
+            <ul>
+                <li>Name, email, and document number for payment processing and identity verification.</li>
+                <li>Card data is tokenized by ePayco (PCI DSS compliant) and is never stored on our servers.</li>
+                <li>We do not share personal data with third parties beyond what is strictly required for payment processing.</li>
+                <li>Transaction records are retained for legal and accounting purposes as required by law.</li>
+            </ul>
+            <p>As a data subject, you have the right to:</p>
+            <ul>
+                <li>Access your personal data held by EasyBots.</li>
+                <li>Request correction of inaccurate or incomplete data.</li>
+                <li>Request deletion of your data when it is no longer necessary for the purposes for which it was collected.</li>
+                <li>Revoke your authorization for data processing.</li>
+            </ul>
+            <p>To exercise any of these rights, contact us at <a href="mailto:contact@easybots.store">contact@easybots.store</a>.</p>
+
+            <h2>7. Limitation of Liability</h2>
+            <p>EasyBots provides payment processing services on an "as-is" basis. We are not liable for:</p>
+            <ul>
+                <li>Service interruptions caused by third-party payment providers.</li>
+                <li>Losses resulting from unauthorized use of your payment credentials.</li>
+                <li>The content or quality of the digital services you are subscribing to.</li>
+                <li>Technical issues beyond our reasonable control.</li>
+            </ul>
+
+            <h2>8. Dispute Resolution</h2>
+            <p>For payment disputes or billing inquiries, contact us at <a href="mailto:contact@easybots.store">contact@easybots.store</a>. We will respond within 48 business hours. Disputes not resolved directly may be escalated through ePayco's dispute resolution process.</p>
+
+            <h2>9. Changes to Terms</h2>
+            <p>We reserve the right to update these terms at any time. Changes will be posted on this page with an updated revision date. Continued use of our services constitutes acceptance of the revised terms.</p>
+
+            <h2>10. Applicable Law</h2>
+            <p>These terms are governed by the laws of the Republic of Colombia, including Law 1480 of 2011 (Consumer Statute), Law 1581 of 2012 (Data Protection), and Decree 1074 of 2015.</p>
+
+            <h2>11. Contact</h2>
+            <p>For any questions regarding these terms, contact us at:<br>
+            <a href="mailto:contact@easybots.store">contact@easybots.store</a></p>
+        </main>
+
+        <main class="content" id="content-es" style="display: none;">
+            <h1>T&eacute;rminos y Condiciones</h1>
+            <p class="last-updated">&Uacute;ltima actualizaci&oacute;n: Febrero 2026</p>
+
+            <h2>1. Descripci&oacute;n del Servicio</h2>
+            <p>EasyBots opera como procesador de pagos para suscripciones digitales. Facilitamos transacciones de pago seguras para suscripciones de servicios digitales a trav&eacute;s de nuestra plataforma en easybots.site. EasyBots procesa pagos en nombre de proveedores de servicios utilizando pasarelas de pago certificadas de terceros.</p>
+
+            <h2>2. T&eacute;rminos de Pago</h2>
+            <ul>
+                <li>Todos los pagos de suscripci&oacute;n se procesan en Pesos Colombianos (COP) o D&oacute;lares Estadounidenses (USD) seg&uacute;n el plan seleccionado.</li>
+                <li>Los pagos se procesan de forma segura a trav&eacute;s de ePayco, una pasarela de pago compatible con PCI DSS.</li>
+                <li>Las tarifas de suscripci&oacute;n no son reembolsables una vez activado el servicio digital.</li>
+                <li>Los precios est&aacute;n sujetos a cambios con previo aviso. Las suscripciones existentes mantendr&aacute;n su precio original hasta la renovaci&oacute;n.</li>
+                <li>Los intentos de pago fallidos pueden resultar en la suspensi&oacute;n temporal del servicio.</li>
+            </ul>
+
+            <h2>3. Suscripciones y Cancelaci&oacute;n</h2>
+            <ul>
+                <li>Las suscripciones proporcionan acceso por la duraci&oacute;n especificada al momento de la compra (7 d&iacute;as, 30 d&iacute;as, 90 d&iacute;as, 180 d&iacute;as, 365 d&iacute;as o de por vida).</li>
+                <li>Las suscripciones no se renuevan autom&aacute;ticamente a menos que se indique expl&iacute;citamente.</li>
+                <li>No se emiten reembolsos parciales por tiempo de suscripci&oacute;n no utilizado.</li>
+            </ul>
+
+            <h2>4. Pol&iacute;tica de Reembolso</h2>
+            <ul>
+                <li>Las suscripciones digitales no son reembolsables una vez que el servicio ha sido activado y entregado.</li>
+                <li>Si el servicio no puede ser entregado debido a un error t&eacute;cnico de nuestra parte, se emitir&aacute; un reembolso completo dentro de 30 d&iacute;as calendario.</li>
+                <li>Los cargos duplicados ser&aacute;n reembolsados previa verificaci&oacute;n.</li>
+                <li>Para solicitar un reembolso, cont&aacute;ctenos en <a href="mailto:contact@easybots.store">contact@easybots.store</a> con su referencia de transacci&oacute;n.</li>
+            </ul>
+
+            <h2>5. Derecho de Retracto</h2>
+            <p>De conformidad con el Art&iacute;culo 47 de la Ley 1480 de 2011 (Estatuto del Consumidor), los compradores tienen derecho a retractarse de una compra dentro de los cinco (5) d&iacute;as h&aacute;biles siguientes a la entrega. Para ejercer este derecho, cont&aacute;ctenos en <a href="mailto:contact@easybots.store">contact@easybots.store</a>.</p>
+            <p>Nota: Al tratarse de suscripciones digitales que se activan y entregan inmediatamente tras el pago, el derecho de retracto puede no aplicar una vez que se haya accedido al servicio digital, de acuerdo con las excepciones del Art&iacute;culo 47 para contenido digital entregado inmediatamente.</p>
+            <p>Cuando aplique el derecho de retracto, los reembolsos se procesar&aacute;n dentro de los treinta (30) d&iacute;as calendario.</p>
+
+            <h2>6. Pol&iacute;tica de Tratamiento de Datos Personales</h2>
+            <p>En cumplimiento de la Ley 1581 de 2012 (Ley de Protecci&oacute;n de Datos Personales) y el Decreto 1074 de 2015, EasyBots recopila y procesa &uacute;nicamente los datos personales m&iacute;nimos necesarios para el procesamiento de pagos:</p>
+            <ul>
+                <li>Nombre, correo electr&oacute;nico y n&uacute;mero de documento para el procesamiento del pago y verificaci&oacute;n de identidad.</li>
+                <li>Los datos de la tarjeta son tokenizados por ePayco (compatible con PCI DSS) y nunca se almacenan en nuestros servidores.</li>
+                <li>No compartimos datos personales con terceros m&aacute;s all&aacute; de lo estrictamente necesario para el procesamiento del pago.</li>
+                <li>Los registros de transacciones se conservan con fines legales y contables seg&uacute;n lo exige la ley.</li>
+            </ul>
+            <p>Como titular de datos, usted tiene derecho a:</p>
+            <ul>
+                <li>Acceder a sus datos personales en poder de EasyBots.</li>
+                <li>Solicitar la correcci&oacute;n de datos inexactos o incompletos.</li>
+                <li>Solicitar la eliminaci&oacute;n de sus datos cuando ya no sean necesarios para los fines para los que fueron recopilados.</li>
+                <li>Revocar su autorizaci&oacute;n para el tratamiento de datos.</li>
+            </ul>
+            <p>Para ejercer cualquiera de estos derechos, cont&aacute;ctenos en <a href="mailto:contact@easybots.store">contact@easybots.store</a>.</p>
+
+            <h2>7. Limitaci&oacute;n de Responsabilidad</h2>
+            <p>EasyBots proporciona servicios de procesamiento de pagos "tal cual". No somos responsables de:</p>
+            <ul>
+                <li>Interrupciones del servicio causadas por proveedores de pago de terceros.</li>
+                <li>P&eacute;rdidas resultantes del uso no autorizado de sus credenciales de pago.</li>
+                <li>El contenido o la calidad de los servicios digitales a los que se est&aacute; suscribiendo.</li>
+                <li>Problemas t&eacute;cnicos fuera de nuestro control razonable.</li>
+            </ul>
+
+            <h2>8. Resoluci&oacute;n de Disputas</h2>
+            <p>Para disputas de pago o consultas de facturaci&oacute;n, cont&aacute;ctenos en <a href="mailto:contact@easybots.store">contact@easybots.store</a>. Responderemos dentro de 48 horas h&aacute;biles. Las disputas no resueltas directamente pueden escalarse a trav&eacute;s del proceso de resoluci&oacute;n de disputas de ePayco.</p>
+
+            <h2>9. Cambios en los T&eacute;rminos</h2>
+            <p>Nos reservamos el derecho de actualizar estos t&eacute;rminos en cualquier momento. Los cambios se publicar&aacute;n en esta p&aacute;gina con una fecha de revisi&oacute;n actualizada. El uso continuado de nuestros servicios constituye la aceptaci&oacute;n de los t&eacute;rminos revisados.</p>
+
+            <h2>10. Ley Aplicable</h2>
+            <p>Estos t&eacute;rminos se rigen por las leyes de la Rep&uacute;blica de Colombia, incluyendo la Ley 1480 de 2011 (Estatuto del Consumidor), la Ley 1581 de 2012 (Protecci&oacute;n de Datos) y el Decreto 1074 de 2015.</p>
+
+            <h2>11. Contacto</h2>
+            <p>Para cualquier pregunta sobre estos t&eacute;rminos, cont&aacute;ctenos en:<br>
+            <a href="mailto:contact@easybots.store">contact@easybots.store</a></p>
+        </main>
+
+        <footer class="footer">
+            <div class="footer-links">
+                <a href="/contact" id="footer-contact">Contact</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        var lang = (navigator.language || '').startsWith('es') ? 'es' : 'en';
+
+        function applyLang() {
+            document.documentElement.lang = lang;
+            document.getElementById('lang-toggle').textContent = lang === 'en' ? 'ES' : 'EN';
+            document.getElementById('content-en').style.display = lang === 'en' ? 'block' : 'none';
+            document.getElementById('content-es').style.display = lang === 'es' ? 'block' : 'none';
+            document.getElementById('footer-contact').textContent = lang === 'es' ? 'Contacto' : 'Contact';
+        }
+
+        function toggleLang() {
+            lang = lang === 'en' ? 'es' : 'en';
+            applyLang();
+        }
+
+        applyLang();
+    </script>
+</body>
+</html>

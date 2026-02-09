@@ -331,7 +331,7 @@ app.get('/lifetime100', pageLimiter, (req, res) => {
 app.get('/terms', pageLimiter, (req, res) => {
   const host = req.get('host') || '';
   if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Not found');
+    return res.sendFile(path.join(__dirname, '../../../public/easybots-terms.html'));
   }
   const lang = req.query.lang || 'en';
   const fileName = lang === 'es' ? 'policies_es.html' : 'terms.html';
@@ -341,7 +341,7 @@ app.get('/terms', pageLimiter, (req, res) => {
 app.get('/privacy', pageLimiter, (req, res) => {
   const host = req.get('host') || '';
   if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Not found');
+    return res.sendFile(path.join(__dirname, '../../../public/easybots-terms.html'));
   }
   const lang = req.query.lang || 'en';
   const fileName = lang === 'es' ? 'policies_es.html' : 'privacy.html';
@@ -351,11 +351,20 @@ app.get('/privacy', pageLimiter, (req, res) => {
 app.get('/policies', pageLimiter, (req, res) => {
   const host = req.get('host') || '';
   if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Not found');
+    return res.sendFile(path.join(__dirname, '../../../public/easybots-terms.html'));
   }
   const lang = req.query.lang || 'en';
   const fileName = lang === 'es' ? 'policies_es.html' : 'terms.html';
   res.sendFile(path.join(__dirname, `../../../public/${fileName}`));
+});
+
+// Contact page (EasyBots only)
+app.get('/contact', pageLimiter, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.sendFile(path.join(__dirname, '../../../public/easybots-contact.html'));
+  }
+  return res.status(404).send('Not found');
 });
 
 // Age Verification page
@@ -432,7 +441,11 @@ app.use((req, res, next) => {
       '/webhook/telegram',
       '/checkout/',
       '/daimo-checkout/',
-      '/payment/'
+      '/payment/',
+      '/terms',
+      '/privacy',
+      '/policies',
+      '/contact'
     ];
     
     const isAllowed = allowedPaths.some(path => 
@@ -638,6 +651,7 @@ app.get('/api/payment-response', webhookController.handlePaymentResponse);
 app.get('/api/payment/:paymentId', asyncHandler(paymentController.getPaymentInfo));
 app.get('/api/payment/:paymentId/status', asyncHandler(paymentController.getPaymentStatus));
 app.post('/api/payment/tokenized-charge', asyncHandler(paymentController.processTokenizedCharge));
+app.post('/api/payment/verify-2fa', asyncHandler(paymentController.verify2FA));
 app.get('/api/confirm-payment/:token', asyncHandler(paymentController.confirmPaymentToken));
 
 // Meet & Greet API routes

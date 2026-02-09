@@ -1,5 +1,6 @@
 const { schemas } = require('../../../validation/schemas/payment.schema');
 const PaymentService = require('../../services/paymentService');
+const PaymentSecurityService = require('../../services/paymentSecurityService');
 const logger = require('../../../utils/logger');
 const DaimoConfig = require('../../../config/daimo');
 const PaymentWebhookEventModel = require('../../../models/paymentWebhookEventModel');
@@ -229,6 +230,18 @@ const handleEpaycoWebhook = async (req, res) => {
         isValidSignature: true,
       });
 
+      // Security: Replay attack detection (30-day Redis retention)
+      try {
+        const replayKey = `${req.body.x_ref_payco}_${stateCode}`;
+        const replay = await PaymentSecurityService.checkReplayAttack(replayKey, 'epayco');
+        if (replay.isReplay) {
+          logger.warn('ePayco replay attack detected', { refPayco: req.body.x_ref_payco, stateCode });
+          return res.status(200).json({ success: true, duplicate: true });
+        }
+      } catch (err) {
+        logger.error('Replay check failed (non-critical)', { error: err.message });
+      }
+
       logger.info('ePayco webhook received', {
         transactionId: req.body.x_ref_payco,
         state: req.body.x_transaction_state,
@@ -266,6 +279,16 @@ const handleEpaycoWebhook = async (req, res) => {
     }
   } catch (error) {
     logger.error('Error handling ePayco webhook:', error);
+
+    PaymentSecurityService.logPaymentError({
+      paymentId: req.body?.x_extra3,
+      userId: req.body?.x_extra1,
+      provider: 'epayco',
+      errorCode: 'EPAYCO_WEBHOOK_HANDLER_ERROR',
+      errorMessage: error.message,
+      stackTrace: error.stack,
+    }).catch(() => {});
+
     return sendError(res, 500, 'INTERNAL_ERROR', 'Internal server error');
   }
 };
@@ -380,6 +403,18 @@ const handleDaimoWebhook = async (req, res) => {
         isValidSignature: true,
       });
 
+      // Security: Replay attack detection (30-day Redis retention)
+      try {
+        const replayKey = `${id}_${status}`;
+        const replay = await PaymentSecurityService.checkReplayAttack(replayKey, 'daimo');
+        if (replay.isReplay) {
+          logger.warn('Daimo replay attack detected', { eventId: id, status });
+          return res.status(200).json({ success: true, duplicate: true });
+        }
+      } catch (err) {
+        logger.error('Replay check failed (non-critical)', { error: err.message });
+      }
+
       // Validate payload structure
       const validation = validateDaimoPayload(req.body);
       if (!validation || !validation.valid) {
@@ -431,6 +466,16 @@ const handleDaimoWebhook = async (req, res) => {
         error: error.message,
         stack: error.stack,
       });
+
+      PaymentSecurityService.logPaymentError({
+        paymentId: metadata?.paymentId,
+        userId: metadata?.userId,
+        provider: 'daimo',
+        errorCode: 'DAIMO_WEBHOOK_HANDLER_ERROR',
+        errorMessage: error.message,
+        stackTrace: error.stack,
+      }).catch(() => {});
+
       return res.status(500).json({
         success: false,
         code: 'INTERNAL_ERROR',

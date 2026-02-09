@@ -17,6 +17,7 @@ const DaimoConfig = require('../../config/daimo');
 const MessageTemplates = require('./messageTemplates');
 const sanitize = require('../../utils/sanitizer');
 const BusinessNotificationService = require('./businessNotificationService');
+const PaymentSecurityService = require('./paymentSecurityService');
 const { getEpaycoSubscriptionUrl, isSubscriptionPlan } = require('../../config/epaycoSubscriptionPlans');
 
 class PaymentService {
@@ -234,6 +235,32 @@ class PaymentService {
       } else {
         throw new Error(`Invalid payment provider: ${provider}`);
       }
+
+      // Security: Set payment timeout (1 hour window to complete)
+      PaymentSecurityService.setPaymentTimeout(payment.id, 3600).catch(() => {});
+
+      // Security: Generate secure payment token
+      PaymentSecurityService.generateSecurePaymentToken(payment.id, userId, plan.price).catch(() => {});
+
+      // Security: Create payment request hash for integrity verification
+      PaymentSecurityService.createPaymentRequestHash({
+        userId,
+        amount: plan.price,
+        currency: plan.currency || 'USD',
+        planId,
+        timestamp: Date.now(),
+      });
+
+      // Security: Audit trail - payment created
+      PaymentSecurityService.logPaymentEvent({
+        paymentId: payment.id,
+        userId,
+        eventType: 'created',
+        provider,
+        amount: plan.price,
+        status: 'pending',
+        details: { planId, sku: sku || plan.sku },
+      }).catch(() => {});
 
       return { success: true, paymentUrl, paymentId: payment.id };
     } catch (error) {
@@ -563,6 +590,17 @@ class PaymentService {
         paymentIdOrType,
       });
 
+      // Security: Audit trail - webhook received
+      PaymentSecurityService.logPaymentEvent({
+        paymentId: paymentIdOrType,
+        userId,
+        eventType: 'webhook_received',
+        provider: 'epayco',
+        amount: x_amount ? parseFloat(x_amount) : null,
+        status: x_transaction_state,
+        details: { x_ref_payco, x_transaction_id },
+      }).catch(() => {});
+
       // Check if this is a Meet & Greet payment
       const isMeetGreet = paymentIdOrType === 'meet_greet';
       const isPNPLive = paymentIdOrType === 'pnp_live';
@@ -867,6 +905,17 @@ class PaymentService {
       return { success: true };
     } catch (error) {
       logger.error('Error processing ePayco webhook', error);
+
+      // Security: Log webhook processing error
+      PaymentSecurityService.logPaymentError({
+        paymentId: webhookData?.x_extra3,
+        userId: webhookData?.x_extra1,
+        provider: 'epayco',
+        errorCode: 'EPAYCO_WEBHOOK_ERROR',
+        errorMessage: error.message,
+        stackTrace: error.stack,
+      }).catch(() => {});
+
       return { success: false, error: error.message };
     }
   }
@@ -937,6 +986,17 @@ class PaymentService {
       if (!paymentId || !userId) {
         return { success: false, error: 'Missing required fields' };
       }
+
+      // Security: Audit trail - Daimo webhook received
+      PaymentSecurityService.logPaymentEvent({
+        paymentId,
+        userId,
+        eventType: 'webhook_received',
+        provider: 'daimo',
+        amount: null,
+        status,
+        details: { daimoEventId: id, planId },
+      }).catch(() => {});
 
       if (bookingId) {
         // This is a booking payment
@@ -1225,6 +1285,17 @@ class PaymentService {
         error: error.message,
         eventId: webhookData.id,
       });
+
+      // Security: Log Daimo webhook processing error
+      PaymentSecurityService.logPaymentError({
+        paymentId: webhookData?.payment?.metadata?.paymentId || webhookData?.metadata?.paymentId,
+        userId: webhookData?.payment?.metadata?.userId || webhookData?.metadata?.userId,
+        provider: 'daimo',
+        errorCode: 'DAIMO_WEBHOOK_ERROR',
+        errorMessage: error.message,
+        stackTrace: error.stack,
+      }).catch(() => {});
+
       return { success: false, error: 'Internal server error' };
     }
   }
@@ -1424,6 +1495,34 @@ class PaymentService {
       const amountCOP = Math.round((payment.amount || parseFloat(plan.price)) * 4000);
       const paymentRef = `PAY-${paymentId.substring(0, 8).toUpperCase()}`;
 
+      // Security: Validate payment amount integrity
+      try {
+        const amountCheck = await PaymentSecurityService.validatePaymentAmount(paymentId, payment.amount || parseFloat(plan.price));
+        if (!amountCheck.valid) {
+          logger.warn('Payment amount integrity warning', { paymentId, reason: amountCheck.reason });
+        }
+      } catch (err) {
+        logger.error('Amount validation failed (non-critical)', { error: err.message });
+      }
+
+      // Security: 2FA check for large payments
+      try {
+        const twoFA = await PaymentSecurityService.requireTwoFactorAuth(paymentId, userId, payment.amount || parseFloat(plan.price));
+        if (twoFA.required) {
+          // Check if already verified
+          const verified = await cache.get(`payment:2fa:verified:${paymentId}`);
+          if (!verified) {
+            return {
+              success: false,
+              status: 'requires_2fa',
+              message: 'Este pago requiere verificación adicional.',
+            };
+          }
+        }
+      } catch (err) {
+        logger.error('2FA check failed (non-critical)', { error: err.message });
+      }
+
       const epaycoClient = getEpaycoClient();
 
       if (!tokenCard) {
@@ -1471,7 +1570,7 @@ class PaymentService {
         phone: customer.phone || '0000000000',
         cell_phone: customer.cell_phone || customer.phone || '0000000000',
         bill: paymentRef,
-        description: plan.sku || `PNPtv - ${plan.display_name || plan.name}`,
+        description: plan.sku || `${plan.display_name || plan.name}`,
         value: String(amountCOP),
         tax: '0',
         tax_base: '0',
@@ -1527,6 +1626,16 @@ class PaymentService {
           planId,
           expiryDate,
           refPayco,
+        });
+
+        // Security: Encrypt payment data at rest (async, non-blocking)
+        PaymentSecurityService.encryptPaymentDataAtRest(paymentId).catch((err) => {
+          logger.error('Encrypt at rest failed (non-critical)', { error: err.message });
+        });
+
+        // Security: Validate payment consistency (async, non-blocking)
+        PaymentSecurityService.validatePaymentConsistency(paymentId).catch((err) => {
+          logger.error('Consistency check failed (non-critical)', { error: err.message });
         });
 
         // Send payment confirmation notification (async, non-blocking)
@@ -1603,6 +1712,17 @@ class PaymentService {
         });
 
         const errorMsg = chargeResult?.data?.respuesta || 'Transacción rechazada';
+
+        // Security: Log rejected charge
+        PaymentSecurityService.logPaymentError({
+          paymentId,
+          userId,
+          provider: 'epayco',
+          errorCode: 'CHARGE_REJECTED',
+          errorMessage: errorMsg,
+          stackTrace: null,
+        }).catch(() => {});
+
         return {
           success: false,
           status: 'rejected',
@@ -1616,6 +1736,17 @@ class PaymentService {
         error: error.message,
         stack: error.stack,
       });
+
+      // Security: Log tokenized charge exception
+      PaymentSecurityService.logPaymentError({
+        paymentId,
+        userId: null,
+        provider: 'epayco',
+        errorCode: 'TOKENIZED_CHARGE_EXCEPTION',
+        errorMessage: error.message,
+        stackTrace: error.stack,
+      }).catch(() => {});
+
       return { success: false, error: `Error procesando el pago: ${error.message}` };
     }
   }

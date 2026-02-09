@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Contact - EasyBots</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #1A1A1D;
+            color: #CCCCCC;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 0 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .header {
+            padding: 24px 0 20px;
+            text-align: center;
+            border-bottom: 1px solid #2A2A2D;
+            margin-bottom: 32px;
+        }
+        .header-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .header-logo svg { width: 32px; height: 32px; }
+        .header-logo span {
+            font-size: 20px;
+            font-weight: 700;
+            color: #FFFFFF;
+            letter-spacing: -0.3px;
+        }
+
+        .content {
+            flex: 1;
+            padding-bottom: 32px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #FFFFFF;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .contact-card {
+            background: #222225;
+            border-radius: 12px;
+            padding: 28px 24px;
+            width: 100%;
+            max-width: 400px;
+            border-left: 3px solid #FFF700;
+        }
+
+        .contact-item {
+            margin-bottom: 20px;
+        }
+        .contact-item:last-child { margin-bottom: 0; }
+
+        .contact-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .contact-value {
+            font-size: 16px;
+            color: #FFFFFF;
+        }
+        .contact-value a {
+            color: #FFF700;
+            text-decoration: none;
+        }
+        .contact-value a:hover { text-decoration: underline; }
+
+        .contact-note {
+            font-size: 13px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .footer {
+            padding: 16px 0 24px;
+            text-align: center;
+            border-top: 1px solid #2A2A2D;
+        }
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+        }
+        .footer-links a {
+            font-size: 12px;
+            color: #888;
+            text-decoration: none;
+        }
+        .footer-links a:hover { color: #FFF700; }
+
+        .lang-toggle {
+            position: absolute;
+            top: 16px;
+            right: 0;
+            background: #2A2A2D;
+            border: 1px solid #3A3A3D;
+            color: #AAA;
+            font-size: 12px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .lang-toggle:hover { color: #FFF700; border-color: #FFF700; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="lang-toggle" id="lang-toggle" onclick="toggleLang()">ES</button>
+
+        <header class="header">
+            <div class="header-logo">
+                <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="#FFF700"/>
+                    <path d="M10 8C10 6.9 10.9 6 12 6H24C25.1 6 26 6.9 26 8V20C26 21.1 25.1 22 24 22H20L14 28V22H12C10.9 22 10 21.1 10 20V8Z" fill="#1A1A1D"/>
+                    <path d="M19.5 9L16 16H19L17 23L22 14.5H18.5L19.5 9Z" fill="#FFF700"/>
+                </svg>
+                <span>EasyBots</span>
+            </div>
+        </header>
+
+        <main class="content">
+            <h1 data-i18n="title"></h1>
+
+            <div class="contact-card">
+                <div class="contact-item">
+                    <div class="contact-label">Email</div>
+                    <div class="contact-value">
+                        <a href="mailto:contact@easybots.store">contact@easybots.store</a>
+                    </div>
+                </div>
+
+                <div class="contact-item">
+                    <div class="contact-label" data-i18n="hoursLabel"></div>
+                    <div class="contact-value" data-i18n="hoursValue"></div>
+                    <div class="contact-note">9:00 AM - 6:00 PM (COT, UTC-5)</div>
+                </div>
+
+                <div class="contact-item">
+                    <div class="contact-label" data-i18n="responseLabel"></div>
+                    <div class="contact-value" data-i18n="responseValue"></div>
+                    <div class="contact-note" data-i18n="responseNote"></div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="footer-links">
+                <a href="/terms" data-i18n="terms"></a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        var I = {
+            en: {
+                title: 'Contact Us',
+                hoursLabel: 'Support Hours',
+                hoursValue: 'Monday - Friday',
+                responseLabel: 'Response Time',
+                responseValue: 'Within 48 business hours',
+                responseNote: 'For payment inquiries, include your transaction reference.',
+                terms: 'Terms',
+            },
+            es: {
+                title: 'Cont\u00e1ctenos',
+                hoursLabel: 'Horario de Atenci\u00f3n',
+                hoursValue: 'Lunes - Viernes',
+                responseLabel: 'Tiempo de Respuesta',
+                responseValue: 'Dentro de 48 horas h\u00e1biles',
+                responseNote: 'Para consultas de pago, incluya su referencia de transacci\u00f3n.',
+                terms: 'T\u00e9rminos',
+            }
+        };
+
+        var lang = (navigator.language || '').startsWith('es') ? 'es' : 'en';
+
+        function t(key) { return (I[lang] && I[lang][key]) || I.en[key] || key; }
+
+        function applyLang() {
+            document.documentElement.lang = lang;
+            document.getElementById('lang-toggle').textContent = lang === 'en' ? 'ES' : 'EN';
+            document.querySelectorAll('[data-i18n]').forEach(function(el) {
+                el.textContent = t(el.getAttribute('data-i18n'));
+            });
+        }
+
+        function toggleLang() {
+            lang = lang === 'en' ? 'es' : 'en';
+            applyLang();
+        }
+
+        applyLang();
+    </script>
+</body>
+</html>

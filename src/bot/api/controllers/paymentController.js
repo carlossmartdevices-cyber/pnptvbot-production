@@ -3,6 +3,7 @@ const PaymentModel = require('../../../models/paymentModel');
 const PlanModel = require('../../../models/planModel');
 const ConfirmationTokenService = require('../../services/confirmationTokenService');
 const PaymentService = require('../../services/paymentService');
+const PaymentSecurityService = require('../../services/paymentSecurityService');
 const logger = require('../../../utils/logger');
 
 /**
@@ -103,11 +104,11 @@ class PaymentController {
         promoCode: payment.metadata?.promoCode || null,
         plan: {
           id: plan.id,
-          sku: plan.sku || 'EASYBOTS-PNP-030',
+          sku: plan.sku || '030PASS',
           name: plan.display_name || plan.name,
           description: isPromo
             ? `Promo ${payment.metadata?.promoCode || ''} - ${plan.display_name || plan.name}`
-            : `Suscripción ${plan.display_name || plan.name} - PNPtv`,
+            : `${plan.display_name || plan.name} Subscription`,
           icon: plan.icon || '💎',
           duration: plan.duration || 30,
           features: plan.features || [],
@@ -348,11 +349,64 @@ class PaymentController {
         });
       }
 
-      // Get client IP
+      // Get client IP and user agent for security checks
       const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
         || req.headers['x-real-ip']
         || req.connection?.remoteAddress
         || '127.0.0.1';
+      const userAgent = req.headers['user-agent'] || '';
+
+      // Security: Rate limiting per payment
+      try {
+        const rateLimit = await PaymentSecurityService.checkPaymentRateLimit(paymentId);
+        if (!rateLimit.allowed) {
+          return res.status(429).json({
+            success: false,
+            error: 'Demasiados intentos de pago. Por favor, espera antes de intentar nuevamente.',
+          });
+        }
+      } catch (err) {
+        logger.error('Rate limit check failed (non-critical)', { error: err.message });
+      }
+
+      // Security: PCI compliance check
+      try {
+        const pciCheck = PaymentSecurityService.validatePCICompliance(req.body);
+        if (!pciCheck.compliant) {
+          return res.status(400).json({
+            success: false,
+            error: 'Datos de pago no válidos.',
+          });
+        }
+      } catch (err) {
+        logger.error('PCI compliance check failed (non-critical)', { error: err.message });
+      }
+
+      // Security: Payment timeout check
+      try {
+        const timeout = await PaymentSecurityService.checkPaymentTimeout(paymentId);
+        if (timeout.expired) {
+          return res.status(400).json({
+            success: false,
+            error: 'El tiempo para completar este pago ha expirado. Por favor, genera un nuevo enlace desde el bot.',
+          });
+        }
+      } catch (err) {
+        logger.error('Payment timeout check failed (non-critical)', { error: err.message });
+      }
+
+      // Security: Audit trail - charge attempted
+      PaymentSecurityService.logPaymentEvent({
+        paymentId,
+        userId: null,
+        eventType: 'charge_attempted',
+        provider: 'epayco',
+        amount: null,
+        status: 'pending',
+        ipAddress: clientIp,
+        userAgent,
+        details: { tokenCard: tokenCard?.substring(0, 8) + '...' },
+      }).catch(() => {});
 
       const result = await PaymentService.processTokenizedCharge({
         paymentId,
@@ -373,6 +427,19 @@ class PaymentController {
       });
 
       if (result.success) {
+        // Security: Audit trail - charge completed
+        PaymentSecurityService.logPaymentEvent({
+          paymentId,
+          userId: null,
+          eventType: 'charge_completed',
+          provider: 'epayco',
+          amount: null,
+          status: 'completed',
+          ipAddress: clientIp,
+          userAgent,
+          details: { transactionId: result.transactionId },
+        }).catch(() => {});
+
         res.json(result);
       } else {
         res.status(result.status === 'rejected' ? 402 : 400).json(result);
@@ -384,9 +451,85 @@ class PaymentController {
         paymentId: req.body?.paymentId,
       });
 
+      // Security: Log payment error
+      PaymentSecurityService.logPaymentError({
+        paymentId: req.body?.paymentId,
+        userId: null,
+        provider: 'epayco',
+        errorCode: 'TOKENIZED_CHARGE_ERROR',
+        errorMessage: error.message,
+        stackTrace: error.stack,
+      }).catch(() => {});
+
       res.status(500).json({
         success: false,
         error: 'Error interno al procesar el pago. Intenta nuevamente.',
+      });
+    }
+  }
+  /**
+   * Verify 2FA OTP for large payments
+   * POST /api/payment/verify-2fa
+   */
+  static async verify2FA(req, res) {
+    try {
+      const { paymentId, otp } = req.body;
+
+      if (!paymentId || !otp) {
+        return res.status(400).json({
+          success: false,
+          error: 'Payment ID and OTP are required.',
+        });
+      }
+
+      const { cache } = require('../../../config/redis');
+      const key = `payment:2fa:${paymentId}`;
+      const data = await cache.get(key);
+
+      if (!data) {
+        return res.status(400).json({
+          success: false,
+          error: 'Código expirado o no encontrado. Intenta iniciar el pago nuevamente.',
+        });
+      }
+
+      // Check max attempts
+      if (data.attempts >= 3) {
+        await cache.del(key);
+        return res.status(400).json({
+          success: false,
+          error: 'Demasiados intentos fallidos. Intenta iniciar el pago nuevamente.',
+        });
+      }
+
+      if (data.otp !== otp) {
+        data.attempts = (data.attempts || 0) + 1;
+        await cache.set(key, data, 300);
+        return res.status(400).json({
+          success: false,
+          error: 'Código incorrecto. Intentos restantes: ' + (3 - data.attempts),
+        });
+      }
+
+      // OTP valid - mark as verified (10-minute window to complete payment)
+      await cache.set(`payment:2fa:verified:${paymentId}`, true, 600);
+      await cache.del(key);
+
+      logger.info('2FA verification successful', { paymentId });
+
+      res.json({
+        success: true,
+        message: 'Verificación exitosa.',
+      });
+    } catch (error) {
+      logger.error('Error in 2FA verification:', {
+        error: error.message,
+        paymentId: req.body?.paymentId,
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'Error al verificar el código.',
       });
     }
   }

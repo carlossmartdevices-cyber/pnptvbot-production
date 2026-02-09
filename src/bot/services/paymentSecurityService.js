@@ -5,7 +5,7 @@
 
 const crypto = require('crypto');
 const logger = require('../../utils/logger');
-const redis = require('../../config/redis');
+const { cache } = require('../../config/redis');
 const { query } = require('../../config/postgres');
 
 class PaymentSecurityService {
@@ -23,7 +23,7 @@ class PaymentSecurityService {
       encrypted += cipher.final('hex');
 
       const result = `${iv.toString('hex')}:${encrypted}`;
-      logger.info('Payment data encrypted', { dataSize: data.length });
+      logger.info('Payment data encrypted', { dataType: typeof data });
       return result;
     } catch (error) {
       logger.error('Error encrypting payment data:', error);
@@ -56,7 +56,7 @@ class PaymentSecurityService {
   /**
    * ENHANCEMENT 3: Generate Secure Payment Token
    */
-  static generateSecurePaymentToken(paymentId, userId, amount) {
+  static async generateSecurePaymentToken(paymentId, userId, amount) {
     try {
       const data = `${paymentId}:${userId}:${amount}:${Date.now()}`;
       const token = crypto
@@ -74,7 +74,7 @@ class PaymentSecurityService {
       };
 
       // Store token in Redis
-      redis.setex(`payment:token:${token}`, 3600, JSON.stringify(tokenData));
+      await cache.set(`payment:token:${token}`, tokenData, 3600);
 
       logger.info('Secure payment token generated', { paymentId, expiresIn: '1 hour' });
       return token;
@@ -89,22 +89,14 @@ class PaymentSecurityService {
    */
   static async validatePaymentToken(token) {
     try {
-      const tokenData = await redis.get(`payment:token:${token}`);
-      if (!tokenData) {
+      const data = await cache.get(`payment:token:${token}`);
+      if (!data) {
         logger.warn('Invalid or expired payment token', { token: token.substring(0, 10) });
         return { valid: false, reason: 'Token expired or not found' };
       }
 
-      let data;
-      try {
-        data = JSON.parse(tokenData);
-      } catch (parseErr) {
-        logger.error('Error parsing token data:', parseErr);
-        return { valid: false, reason: 'Invalid token format' };
-      }
-
       if (new Date(data.expiresAt) < new Date()) {
-        await redis.del(`payment:token:${token}`);
+        await cache.del(`payment:token:${token}`);
         logger.warn('Payment token expired', { token: token.substring(0, 10) });
         return { valid: false, reason: 'Token expired' };
       }
@@ -218,11 +210,7 @@ class PaymentSecurityService {
   static async checkPaymentRateLimit(userId, maxPerHour = 10) {
     try {
       const key = `payment:ratelimit:${userId}`;
-      const current = await redis.incr(key);
-
-      if (current === 1) {
-        await redis.expire(key, 3600); // 1 hour window
-      }
+      const current = await cache.incr(key, 3600);
 
       const isLimited = current > maxPerHour;
 
@@ -275,10 +263,10 @@ class PaymentSecurityService {
   static async checkReplayAttack(transactionId, provider) {
     try {
       const key = `payment:replay:${provider}:${transactionId}`;
-      const exists = await redis.get(key);
+      const exists = await cache.get(key);
 
       if (exists) {
-        logger.error('🚨 REPLAY ATTACK DETECTED', {
+        logger.error('REPLAY ATTACK DETECTED', {
           transactionId,
           provider,
         });
@@ -286,8 +274,8 @@ class PaymentSecurityService {
         return { isReplay: true, reason: 'Transaction already processed' };
       }
 
-      // Mark as processed
-      await redis.setex(key, 86400 * 30, 'processed'); // 30-day retention
+      // Mark as processed (30-day retention)
+      await cache.set(key, 'processed', 86400 * 30);
 
       logger.info('Transaction replay check passed', { transactionId });
       return { isReplay: false };
@@ -303,7 +291,7 @@ class PaymentSecurityService {
   static async setPaymentTimeout(paymentId, timeoutSeconds = 3600) {
     try {
       const key = `payment:timeout:${paymentId}`;
-      await redis.setex(key, timeoutSeconds, JSON.stringify({ paymentId, createdAt: new Date() }));
+      await cache.set(key, { paymentId, createdAt: new Date() }, timeoutSeconds);
 
       logger.info('Payment timeout set', { paymentId, timeoutSeconds });
       return true;
@@ -319,7 +307,7 @@ class PaymentSecurityService {
   static async checkPaymentTimeout(paymentId) {
     try {
       const key = `payment:timeout:${paymentId}`;
-      const timeout = await redis.get(key);
+      const timeout = await cache.get(key);
 
       if (!timeout) {
         logger.warn('Payment timeout expired or not found', { paymentId });
@@ -352,7 +340,7 @@ class PaymentSecurityService {
       } = eventData;
 
       await query(
-        `INSERT INTO payment_audit_log 
+        `INSERT INTO payment_audit_log
          (payment_id, user_id, event_type, provider, amount, status, ip_address, user_agent, details, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
         [paymentId, userId, eventType, provider, amount, status, ipAddress, userAgent, JSON.stringify(details)]
@@ -371,7 +359,7 @@ class PaymentSecurityService {
     try {
       // Never store full credit card numbers
       if (cardData.fullNumber && cardData.fullNumber.length > 6) {
-        logger.error('🚨 PCI VIOLATION: Full card number detected!');
+        logger.error('PCI VIOLATION: Full card number detected!');
         return { compliant: false, reason: 'Full card number should never be stored' };
       }
 
@@ -383,7 +371,7 @@ class PaymentSecurityService {
 
       // Ensure no sensitive data in logs
       if (JSON.stringify(cardData).includes('CVV') || JSON.stringify(cardData).includes('CVC')) {
-        logger.error('🚨 PCI VIOLATION: CVV/CVC data detected!');
+        logger.error('PCI VIOLATION: CVV/CVC data detected!');
         return { compliant: false, reason: 'CVV/CVC should never be stored' };
       }
 
@@ -400,18 +388,10 @@ class PaymentSecurityService {
    */
   static async checkAdminIPWhitelist(userId, ipAddress) {
     try {
-      const whitelistedIPs = await redis.get(`admin:whitelist:${userId}`);
-      if (!whitelistedIPs) {
+      const ips = await cache.get(`admin:whitelist:${userId}`);
+      if (!ips) {
         logger.info('No IP whitelist for admin', { userId });
         return { allowed: true };
-      }
-
-      let ips;
-      try {
-        ips = JSON.parse(whitelistedIPs);
-      } catch (parseErr) {
-        logger.error('Error parsing admin IP whitelist:', parseErr);
-        return { allowed: true }; // Don't block on error
       }
 
       const isAllowed = Array.isArray(ips) && ips.includes(ipAddress);
@@ -440,12 +420,12 @@ class PaymentSecurityService {
       }
 
       const key = `payment:2fa:${paymentId}`;
-      const existing = await redis.get(key);
+      const existing = await cache.get(key);
 
       if (!existing) {
         // Generate OTP
         const otp = Math.random().toString().slice(2, 8);
-        await redis.setex(key, 300, JSON.stringify({ otp, attempts: 0 })); // 5 minutes
+        await cache.set(key, { otp, attempts: 0 }, 300); // 5 minutes
 
         logger.info('2FA required for large payment', {
           paymentId,
@@ -479,7 +459,7 @@ class PaymentSecurityService {
       } = errorData;
 
       await query(
-        `INSERT INTO payment_errors 
+        `INSERT INTO payment_errors
          (payment_id, user_id, provider, error_code, error_message, stack_trace, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
         [paymentId, userId, provider, errorCode, errorMessage, stackTrace]
@@ -501,17 +481,17 @@ class PaymentSecurityService {
   static async generateSecurityReport(days = 30) {
     try {
       const report = await query(
-        `SELECT 
+        `SELECT
            DATE(created_at) as date,
            COUNT(*) as total_events,
            SUM(CASE WHEN event_type = 'blocked' THEN 1 ELSE 0 END) as blocked_payments,
            SUM(CASE WHEN event_type = 'failed' THEN 1 ELSE 0 END) as failed_payments,
            COUNT(DISTINCT user_id) as unique_users
          FROM payment_audit_log
-         WHERE created_at > NOW() - INTERVAL '${days} days'
+         WHERE created_at > NOW() - $1::interval
          GROUP BY DATE(created_at)
          ORDER BY date DESC`,
-        []
+        [`${Number(days)} days`]
       );
 
       logger.info('Payment security report generated', { days, records: report.rowCount });
@@ -528,7 +508,7 @@ class PaymentSecurityService {
   static async validatePaymentConsistency(paymentId) {
     try {
       const payment = await query(
-        `SELECT 
+        `SELECT
            p.id, p.user_id, p.amount, p.status, p.created_at,
            COUNT(pa.id) as audit_count
          FROM payments p
