@@ -1471,7 +1471,7 @@ class PaymentService {
    * @param {string} params.ip - Client IP address
    * @returns {Promise<Object>} { success, transactionId, status, message }
    */
-  static async processTokenizedCharge({ paymentId, tokenCard, customer, dues = '1', ip = '127.0.0.1' }) {
+  static async processTokenizedCharge({ paymentId, tokenCard, card, customer, dues = '1', ip = '127.0.0.1' }) {
     const { getEpaycoClient } = require('../../config/epayco');
 
     try {
@@ -1525,15 +1525,38 @@ class PaymentService {
 
       const epaycoClient = getEpaycoClient();
 
-      if (!tokenCard) {
+      // 2. Get or create token
+      let tokenId = tokenCard;
+
+      if (!tokenId && card) {
+        // Server-side tokenization from raw card data
+        logger.info('Creating ePayco token (server-side)', { paymentId });
+        const tokenResult = await epaycoClient.token.create({
+          'card[number]': card.number,
+          'card[exp_year]': card.exp_year,
+          'card[exp_month]': card.exp_month,
+          'card[cvc]': card.cvc,
+          hasCvv: true,
+        });
+
+        if (!tokenResult || tokenResult.status === false || !tokenResult.id) {
+          logger.error('ePayco token creation failed', { paymentId, tokenResult });
+          return { success: false, error: 'Error al tokenizar la tarjeta. Verifica los datos e intenta nuevamente.' };
+        }
+
+        tokenId = tokenResult.id;
+        logger.info('ePayco token created', { paymentId, tokenId });
+      }
+
+      if (!tokenId) {
         logger.error('Token de tarjeta faltante', { paymentId });
         return { success: false, error: 'Token de tarjeta inválido.' };
       }
 
       // 3. Create customer
-      logger.info('Creating ePayco customer', { paymentId, tokenCard });
+      logger.info('Creating ePayco customer', { paymentId, tokenCard: tokenId });
       const customerResult = await epaycoClient.customers.create({
-        token_card: tokenCard,
+        token_card: tokenId,
         name: customer.name,
         last_name: customer.last_name || customer.name,
         email: customer.email,
@@ -1556,9 +1579,9 @@ class PaymentService {
       const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
       const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.store';
 
-      logger.info('Creating ePayco tokenized charge', { paymentId, amountCOP, tokenCard });
+      logger.info('Creating ePayco tokenized charge', { paymentId, amountCOP, tokenId });
       const chargeResult = await epaycoClient.charge.create({
-        token_card: tokenCard,
+        token_card: tokenId,
         customer_id: customerId,
         doc_type: customer.doc_type || 'CC',
         doc_number: customer.doc_number || '0000000000',

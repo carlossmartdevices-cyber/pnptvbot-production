@@ -8,8 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://checkout.epayco.co/checkout.js"></script>
-    <script src="https://multimedia.epayco.co/general/3DS/validateThreeds.min.js"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -434,7 +432,6 @@
                 securedBy: 'Secured by ePayco',
                 terms: 'Terms',
                 contact: 'Contact',
-                tokenizing: 'Tokenizing card...',
                 processing: 'Processing payment...',
                 errCardInvalid: 'Enter a valid card number.',
                 errCardLuhn: 'Invalid card number. Check the digits.',
@@ -444,16 +441,11 @@
                 errName: 'Enter your first name.',
                 errEmail: 'Enter a valid email.',
                 errDoc: 'Enter your document number.',
-                errTokenize: 'Error tokenizing card.',
                 errDeclined: 'Payment was declined. Try another card.',
                 errConnection: 'Connection error. Please try again.',
                 errLoadPayment: 'Could not load payment info',
                 errLoadGeneric: 'Error loading payment',
                 errVerify: 'Error verifying payment status.',
-                errEpaycoKey: 'Could not load ePayco public key.',
-                errEpaycoScript: 'ePayco script did not load correctly.',
-                errEpaycoToken: 'ePayco tokenization function is not available.',
-                errTokenGen: 'Could not generate token.',
                 termsNotice: 'By proceeding, you agree to our <a href="/terms">Terms & Conditions</a> and <a href="/terms#data">Data Treatment Policy</a>.',
             },
             es: {
@@ -482,7 +474,6 @@
                 securedBy: 'Pago seguro procesado por ePayco',
                 terms: 'T\u00e9rminos',
                 contact: 'Contacto',
-                tokenizing: 'Tokenizando tarjeta...',
                 processing: 'Procesando pago...',
                 errCardInvalid: 'Ingresa un n\u00famero de tarjeta v\u00e1lido.',
                 errCardLuhn: 'N\u00famero de tarjeta inv\u00e1lido. Verifica los d\u00edgitos.',
@@ -492,16 +483,11 @@
                 errName: 'Ingresa tu nombre.',
                 errEmail: 'Ingresa un email v\u00e1lido.',
                 errDoc: 'Ingresa tu n\u00famero de documento.',
-                errTokenize: 'Error al tokenizar la tarjeta.',
                 errDeclined: 'El pago fue rechazado. Intenta con otra tarjeta.',
                 errConnection: 'Error de conexi\u00f3n. Intenta nuevamente.',
                 errLoadPayment: 'No se pudo cargar la informaci\u00f3n del pago',
                 errLoadGeneric: 'Error al cargar el pago',
                 errVerify: 'Error al verificar el estado del pago.',
-                errEpaycoKey: 'No se pudo cargar la clave p\u00fablica de ePayco.',
-                errEpaycoScript: 'El script de ePayco no se carg\u00f3 correctamente.',
-                errEpaycoToken: 'La funci\u00f3n de tokenizaci\u00f3n de ePayco no est\u00e1 disponible.',
-                errTokenGen: 'No se pudo generar el token.',
                 termsNotice: 'Al continuar, aceptas nuestros <a href="/terms">T\u00e9rminos y Condiciones</a> y la <a href="/terms#data">Pol\u00edtica de Tratamiento de Datos</a>.',
             }
         };
@@ -540,56 +526,6 @@
         const pathParts = window.location.pathname.split('/');
         const paymentId = pathParts[pathParts.length - 1];
         let paymentData = null;
-        let epaycoTokenClient = null;
-
-        const createEpaycoClient = () => {
-            if (epaycoTokenClient) return epaycoTokenClient;
-            if (!paymentData || !paymentData.epaycoPublicKey) {
-                throw new Error(t('errEpaycoKey'));
-            }
-
-            const sdk = window.ePayco || window.Epayco || window.epayco;
-            if (!sdk) {
-                throw new Error(t('errEpaycoScript'));
-            }
-
-            if (typeof sdk.setPublicKey === 'function') {
-                sdk.setPublicKey(paymentData.epaycoPublicKey);
-            }
-
-            if (!sdk.token || typeof sdk.token.create !== 'function') {
-                throw new Error(t('errEpaycoToken'));
-            }
-
-            epaycoTokenClient = sdk;
-            return epaycoTokenClient;
-        };
-
-        const tokenizeCard = (payload) => {
-            const client = createEpaycoClient();
-            return new Promise((resolve, reject) => {
-                const result = client.token.create(payload, function(error, token) {
-                    if (error) {
-                        reject(new Error(typeof error === 'string' ? error : (error.message || t('errTokenize'))));
-                        return;
-                    }
-                    if (!token || !token.id) {
-                        reject(new Error(token?.description || t('errTokenGen')));
-                        return;
-                    }
-                    resolve(token);
-                });
-                if (result && typeof result.then === 'function') {
-                    result.then(function(token) {
-                        if (!token || !token.id) {
-                            reject(new Error(token?.description || t('errTokenGen')));
-                            return;
-                        }
-                        resolve(token);
-                    }).catch(reject);
-                }
-            });
-        };
 
         function detectCardBrand(number) {
             var n = number.replace(/\s/g, '');
@@ -669,12 +605,6 @@
                 var data = await response.json();
                 if (!data.success) throw new Error(data.error || t('errLoadGeneric'));
                 paymentData = data.payment;
-                try {
-                    createEpaycoClient();
-                } catch (initError) {
-                    showError(initError.message);
-                    return;
-                }
                 displayPaymentInfo();
             } catch (error) {
                 showError(error.message || t('errLoadPayment'));
@@ -733,28 +663,6 @@
             if (!docNumber) return showFormError(t('errDoc'));
 
             btn.disabled = true;
-            btn.textContent = t('tokenizing');
-
-            let tokenResult;
-            try {
-                tokenResult = await tokenizeCard({
-                    'card[number]': cardNumber,
-                    'card[exp_year]': expYear,
-                    'card[exp_month]': expMonth.padStart ? expMonth.padStart(2, '0') : expMonth,
-                    'card[cvc]': cvc,
-                    'card[name]': `${name} ${lastName || ''}`.trim(),
-                    'card[email]': email,
-                    doc_type: docType,
-                    doc_number: docNumber,
-                    hasCvv: true,
-                });
-            } catch (tokenError) {
-                showFormError(tokenError.message || t('errTokenize'));
-                btn.disabled = false;
-                btn.textContent = payBtnLabel();
-                return;
-            }
-
             btn.textContent = t('processing');
 
             try {
@@ -763,7 +671,10 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         paymentId,
-                        tokenCard: tokenResult.id,
+                        cardNumber,
+                        expYear,
+                        expMonth,
+                        cvc,
                         name,
                         lastName: lastName || name,
                         email,

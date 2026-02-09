@@ -331,6 +331,10 @@ class PaymentController {
       const {
         paymentId,
         tokenCard,
+        cardNumber,
+        expYear,
+        expMonth,
+        cvc,
         name,
         lastName,
         email,
@@ -342,11 +346,27 @@ class PaymentController {
         dues,
       } = req.body;
 
-      if (!paymentId || !tokenCard || !name || !email || !docType || !docNumber) {
+      // Accept either a pre-made token or raw card data for server-side tokenization
+      const hasToken = !!tokenCard;
+      const hasCard = !!(cardNumber && expYear && expMonth && cvc);
+
+      if (!paymentId || (!hasToken && !hasCard) || !name || !email || !docType || !docNumber) {
         return res.status(400).json({
           success: false,
           error: 'Faltan campos requeridos. Completa todos los datos necesarios.',
         });
+      }
+
+      // Basic card number validation when sending raw card data
+      let cleanCard;
+      if (hasCard) {
+        cleanCard = cardNumber.replace(/\s+/g, '');
+        if (!/^\d{13,19}$/.test(cleanCard)) {
+          return res.status(400).json({
+            success: false,
+            error: 'Número de tarjeta inválido.',
+          });
+        }
       }
 
       // Get client IP and user agent for security checks
@@ -405,12 +425,11 @@ class PaymentController {
         status: 'pending',
         ipAddress: clientIp,
         userAgent,
-        details: { tokenCard: tokenCard?.substring(0, 8) + '...' },
+        details: hasToken ? { tokenCard: tokenCard?.substring(0, 8) + '...' } : { cardLast4: cleanCard?.slice(-4) },
       }).catch(() => {});
 
-      const result = await PaymentService.processTokenizedCharge({
+      const chargeParams = {
         paymentId,
-        tokenCard,
         customer: {
           name,
           last_name: lastName || name,
@@ -424,7 +443,20 @@ class PaymentController {
         },
         dues: String(dues || '1'),
         ip: clientIp,
-      });
+      };
+
+      if (hasToken) {
+        chargeParams.tokenCard = tokenCard;
+      } else {
+        chargeParams.card = {
+          number: cleanCard,
+          exp_year: String(expYear),
+          exp_month: String(expMonth).padStart(2, '0'),
+          cvc: String(cvc),
+        };
+      }
+
+      const result = await PaymentService.processTokenizedCharge(chargeParams);
 
       if (result.success) {
         // Security: Audit trail - charge completed

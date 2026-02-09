@@ -80,6 +80,37 @@ app.use(session({
   cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 }
 }));
 
+// Function to conditionally apply middleware (skip for Telegram webhook)
+const conditionalMiddleware = (middleware) => (req, res, next) => {
+  // Skip middleware for Telegram webhook to prevent connection issues
+  if (req.path === '/pnp/webhook/telegram') {
+    return next();
+  }
+  return middleware(req, res, next);
+};
+
+// Security middleware - MUST be before any route registration
+app.use(conditionalMiddleware(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+      fontSrc: ["'self'", "https:", "data:"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+})));
+app.use(conditionalMiddleware(cors()));
+app.use(conditionalMiddleware(compression()));
+
 // Logging (before other middleware for accurate request tracking)
 app.use(morgan('combined', { stream: logger.stream }));
 
@@ -411,23 +442,7 @@ app.get('/payment/:paymentId', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
 });
 
-// Function to conditionally apply middleware (skip for Telegram webhook)
-const conditionalMiddleware = (middleware) => (req, res, next) => {
-  // Skip middleware for Telegram webhook to prevent connection issues
-  if (req.path === '/pnp/webhook/telegram') {
-    return next();
-  }
-  return middleware(req, res, next);
-};
-
-// Security middleware (conditionally applied, skips Telegram webhook)
-app.use(conditionalMiddleware(helmet()));
-app.use(conditionalMiddleware(cors()));
-app.use(conditionalMiddleware(compression()));
-// Security middleware
-app.use(helmet());
-app.use(cors());
-app.use(compression());
+// (Security middleware moved to top of middleware chain, before route registration)
 
 // Global middleware to block all PNPtv content for easybots.store
 app.use((req, res, next) => {
