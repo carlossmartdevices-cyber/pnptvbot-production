@@ -139,12 +139,14 @@ const queryCache = {
   ttl: process.env.POSTGRES_QUERY_CACHE_TTL ? parseInt(process.env.POSTGRES_QUERY_CACHE_TTL) : 120, // 120 seconds default
   maxSize: process.env.POSTGRES_QUERY_CACHE_MAX_SIZE ? parseInt(process.env.POSTGRES_QUERY_CACHE_MAX_SIZE) : 2000,
   cache: new Map(),
+  cleanupEnabled: process.env.POSTGRES_QUERY_CACHE_CLEANUP !== 'false',
   // Add cache cleanup interval
   cleanupInterval: null
 };
 
 // Start cache cleanup interval
 const startCacheCleanup = () => {
+  if (!queryCache.cleanupEnabled || process.env.NODE_ENV === 'test') return;
   if (queryCache.cleanupInterval) return;
   
   queryCache.cleanupInterval = setInterval(() => {

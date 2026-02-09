@@ -1,6 +1,21 @@
 // Mock dependencies
 jest.mock('../../src/bot/services/paymentService');
 jest.mock('../../src/utils/logger');
+jest.mock('../../src/models/paymentWebhookEventModel', () => ({
+  logEvent: jest.fn().mockResolvedValue(true),
+}));
+jest.mock('../../src/config/redis', () => ({
+  cache: {
+    acquireLock: jest.fn().mockResolvedValue(true),
+    releaseLock: jest.fn().mockResolvedValue(true),
+  },
+}));
+jest.mock('../../src/bot/services/daimoService', () => ({
+  verifyWebhookSignature: jest.fn().mockReturnValue(true),
+}));
+jest.mock('../../src/config/daimo', () => ({
+  validateWebhookPayload: jest.fn().mockReturnValue({ valid: true }),
+}));
 
 const PaymentService = require('../../src/bot/services/paymentService');
 const webhookController = require('../../src/bot/api/controllers/webhookController');

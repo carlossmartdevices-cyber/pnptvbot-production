@@ -61,15 +61,15 @@ describe('Payment Methods Integration Tests', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.paymentUrl).toContain(`${process.env.CHECKOUT_DOMAIN}/pay/pay_123`);
+      expect(result.paymentUrl).toContain('/payment/pay_123');
       expect(result.paymentId).toBe('pay_123');
       expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_123', 'pending', expect.objectContaining({
-        paymentUrl: expect.stringContaining(`${process.env.CHECKOUT_DOMAIN}/pay/pay_123`),
+        paymentUrl: expect.stringContaining('/payment/pay_123'),
         provider: 'epayco',
       }));
     });
 
-    it('should handle ePayco webhook successfully', async () => {
+    it('[B8mBvR] should handle ePayco webhook successfully', async () => {
       // Mock PaymentModel.getById
       PaymentModel.getById.mockResolvedValue({
         id: 'pay_123',

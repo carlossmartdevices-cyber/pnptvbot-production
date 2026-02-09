@@ -306,6 +306,10 @@ class PaymentService {
       throw new Error('EPAYCO_P_KEY or EPAYCO_PRIVATE_KEY must be configured');
     }
 
+    if (process.env.NODE_ENV === 'production' && !process.env.EPAYCO_PRIVATE_KEY) {
+      throw new Error('EPAYCO_P_KEY or EPAYCO_PRIVATE_KEY must be configured');
+    }
+
     const envCustId = process.env.EPAYCO_P_CUST_ID || process.env.EPAYCO_PUBLIC_KEY;
     if (!envCustId && process.env.NODE_ENV === 'production') {
       throw new Error('EPAYCO_P_CUST_ID or EPAYCO_PUBLIC_KEY must be configured in production');

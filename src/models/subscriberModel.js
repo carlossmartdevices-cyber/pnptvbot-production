@@ -155,6 +155,32 @@ class SubscriberModel {
   }
 
   /**
+   * Get subscriber by ePayco subscription ID (for recurring charge lookups)
+   * @param {string} subscriptionId - ePayco subscription reference
+   * @returns {Promise<Object|null>} Subscriber data or null
+   */
+  static async getBySubscriptionId(subscriptionId) {
+    try {
+      const cacheKey = `subscriber:sub:${subscriptionId}`;
+
+      return await cache.getOrSet(
+        cacheKey,
+        async () => {
+          const result = await query(
+            `SELECT * FROM ${TABLE} WHERE subscription_id = $1 LIMIT 1`,
+            [subscriptionId]
+          );
+          return this._formatSubscriber(result.rows[0]);
+        },
+        600
+      );
+    } catch (error) {
+      logger.error('Error getting subscriber by subscription ID:', error);
+      return null;
+    }
+  }
+
+  /**
    * Update subscriber status
    * @param {string} email - Subscriber email
    * @param {string} status - New status (active, inactive, cancelled)

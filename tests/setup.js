@@ -8,6 +8,7 @@ process.env.FIREBASE_CLIENT_EMAIL = 'test@test.com';
 process.env.BROADCAST_QUEUE_POLL_INTERVAL_MS = '50';
 process.env.BROADCAST_QUEUE_RETRY_DELAY_MS = '50';
 process.env.SKIP_DB_TESTS = 'true';
+process.env.QATOUCH_ENABLED = 'false';
 
 jest.mock('../src/utils/logger', () => ({
   info: jest.fn(),

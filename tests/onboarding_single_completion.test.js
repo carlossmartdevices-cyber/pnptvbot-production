@@ -20,7 +20,7 @@ describe('Onboarding Single Completion', function() {
   });
 
   describe('Onboarding Completion Flag', function() {
-    it('should prevent duplicate onboarding completion', async function() {
+    it('[xmGPy5] should prevent duplicate onboarding completion', async function() {
       // Mock a user who has already completed onboarding
       const mockUser = {
         id: 'test_user_123',
@@ -57,7 +57,7 @@ describe('Onboarding Single Completion', function() {
       expect(updateStub.called).to.be.false;
     });
 
-    it('should allow onboarding completion for new users', async function() {
+    it('[vaEVyx] should allow onboarding completion for new users', async function() {
       // Mock a new user who has not completed onboarding
       const mockNewUser = {
         id: 'new_user_456',

@@ -1314,7 +1314,6 @@ const registerCommunityPostHandlers = (bot) => {
       ctx.session.temp.communityPostTempDate = scheduledDate.toISOString();
       ctx.session.temp.communityPostStep = 'enter_schedule_datetime';
       await ctx.saveSession();
-      const tz = ctx.session.temp.communityPostTimezone || DEFAULT_TZ;
       const { text, keyboard } = dateTimePicker.getConfirmationView(scheduledDate, tz, 'es', COMMUNITY_PREFIX);
       await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
       return;

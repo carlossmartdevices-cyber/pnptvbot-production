@@ -10,4 +10,8 @@ module.exports = {
     '**/tests/**/*.test.js',
   ],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+  reporters: [
+    'default',
+    '<rootDir>/tests/reporters/qaTouchReporter.js',
+  ],
 };

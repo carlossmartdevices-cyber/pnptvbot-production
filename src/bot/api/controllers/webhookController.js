@@ -111,6 +111,14 @@ const validateDaimoPayload = (payload) => {
     ? payload.payment
     : payload;
 
+  // Require basic fields before deeper validation
+  const hasTransactionId = Boolean(data?.transaction_id || data?.id);
+  const hasStatus = Boolean(data?.status);
+  const hasMetadata = Boolean(data?.metadata && typeof data.metadata === 'object');
+  if (!hasTransactionId || !hasStatus || !hasMetadata) {
+    return { valid: false, error: 'Missing required fields' };
+  }
+
   // Support simplified test-friendly shape (transaction_id, status, metadata)
   if (payload && payload.transaction_id && payload.status && payload.metadata) {
     if (typeof payload.metadata !== 'object' || payload.metadata === null) {
@@ -245,12 +253,14 @@ const handleEpaycoWebhook = async (req, res) => {
 
       logger.warn('ePayco webhook rejected during processing', {
         transactionId: req.body.x_ref_payco,
-        error: result.error,
+        error: result.error || result.message,
         idempotencyKey,
         provider: 'epayco',
         signaturePresent: Boolean(req.body.x_signature),
       });
-      return sendError(res, 400, 'EPAYCO_REJECTED', result.error || 'Webhook processing failed');
+      const rejectionMessage = result.message || result.error || 'Webhook processing failed';
+      const rejectionCode = result.code || 'EPAYCO_REJECTED';
+      return sendError(res, 400, rejectionCode, rejectionMessage);
     } finally {
       await cache.releaseLock(idempotencyKey);
     }
@@ -373,12 +383,12 @@ const handleDaimoWebhook = async (req, res) => {
       // Validate payload structure
       const validation = validateDaimoPayload(req.body);
       if (!validation || !validation.valid) {
-          const errorMsg = validation?.error || 'Invalid metadata structure';
-          logger.warn('Invalid Daimo webhook payload', {
-            error: errorMsg,
-            receivedFields: Object.keys(req.body),
-          });
-          return res.status(400).json({ success: false, error: 'Invalid metadata structure' });
+        const errorMsg = validation?.error || 'Invalid metadata structure';
+        logger.warn('Invalid Daimo webhook payload', {
+          error: errorMsg,
+          receivedFields: Object.keys(req.body),
+        });
+        return res.status(400).json({ success: false, error: errorMsg });
       }
 
       // Handle test events - acknowledge without processing
@@ -388,31 +398,44 @@ const handleDaimoWebhook = async (req, res) => {
       }
 
       // Process webhook with auth header
-      const result = await PaymentService.processDaimoWebhook(req.body, authHeader);
+      const result = await PaymentService.processDaimoWebhook(req.body);
 
       if (result.success) {
         logger.info('Daimo webhook processed successfully', {
           eventId: id,
           status,
-          alreadyProcessed: result.alreadyProcessed || false,
+          alreadyProcessed: !!result.alreadyProcessed,
         });
-        return res.status(200).json({ success: true });
+        const responseBody = { success: true };
+        if (result.alreadyProcessed) {
+          responseBody.alreadyProcessed = true;
+        }
+        return res.status(200).json(responseBody);
       }
 
       logger.warn('Daimo webhook processing failed', {
         eventId: id,
-        error: result.error,
+        error: result.error || result.message,
       });
-      return res.status(400).json({ success: false, error: result.error });
+      const errorResponse = {
+        success: false,
+        code: result.code || 'DAIMO_REJECTED',
+        message: result.message || result.error || 'Webhook processing failed',
+      };
+      return res.status(400).json(errorResponse);
     } finally {
       await cache.releaseLock(idempotencyKey);
     }
-  } catch (error) {
-    logger.error('Error handling Daimo webhook:', {
-      error: error.message,
-      stack: error.stack,
-    });
-    return res.status(500).json({ success: false, error: 'Internal server error' });
+    } catch (error) {
+      logger.error('Error handling Daimo webhook:', {
+        error: error.message,
+        stack: error.stack,
+      });
+      return res.status(500).json({
+        success: false,
+        code: 'INTERNAL_ERROR',
+        message: 'Internal server error',
+      });
   }
 };
 

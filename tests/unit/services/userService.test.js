@@ -66,7 +66,7 @@ describe('UserService', () => {
   });
 
   describe('updateProfile', () => {
-    it('should update profile successfully', async () => {
+    it('[dy5wWw] should update profile successfully', async () => {
       const updatedUser = {
         id: '123456789',
         firstName: 'Updated Name',

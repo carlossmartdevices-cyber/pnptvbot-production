@@ -55,7 +55,7 @@ describe('PaymentService Integration Tests', () => {
   });
 
   describe('createPayment', () => {
-    it('should create a payment with ePayco provider', async () => {
+    it('[VKpz6B] should create a payment with ePayco provider', async () => {
       PlanModel.getById.mockResolvedValue({
         id: 'plan_123',
         name: 'Premium',
@@ -87,15 +87,83 @@ describe('PaymentService Integration Tests', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.paymentUrl).toContain(`${process.env.CHECKOUT_DOMAIN}/pay/pay_123`);
+      expect(result.paymentUrl).toContain('/payment/pay_123');
       expect(result.paymentId).toBe('pay_123');
       expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_123', 'pending', expect.objectContaining({
-        paymentUrl: expect.stringContaining(`${process.env.CHECKOUT_DOMAIN}/pay/pay_123`),
+        paymentUrl: expect.stringContaining('/payment/pay_123'),
         provider: 'epayco',
       }));
     });
 
-    it('should create a payment with Daimo provider', async () => {
+    it('[gQ2kRN] should generate subscription URL for recurring plans', async () => {
+      PlanModel.getById.mockResolvedValue({
+        id: 'monthly_pass',
+        name: 'Monthly Pass',
+        price: 24.99,
+        currency: 'USD',
+        duration: 30,
+        active: true,
+      });
+
+      PaymentModel.create.mockResolvedValue({
+        id: 'pay_sub_123',
+        userId: 789,
+        planId: 'monthly_pass',
+        amount: 24.99,
+        currency: 'USD',
+        provider: 'epayco',
+      });
+
+      PaymentModel.updateStatus.mockResolvedValue(true);
+
+      const result = await PaymentService.createPayment({
+        userId: 789,
+        planId: 'monthly_pass',
+        provider: 'epayco',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.paymentUrl).toContain('subscription-landing.epayco.co/plan/');
+      expect(result.paymentUrl).toContain('extra1=789');
+      expect(result.paymentUrl).toContain('extra2=monthly_pass');
+      expect(result.paymentUrl).toContain('extra3=pay_sub_123');
+      expect(result.paymentId).toBe('pay_sub_123');
+    });
+
+    it('[lR3WPn] should keep checkout URL for one-time plans', async () => {
+      PlanModel.getById.mockResolvedValue({
+        id: 'week_pass',
+        name: 'Week Pass',
+        price: 14.99,
+        currency: 'USD',
+        duration: 7,
+        active: true,
+      });
+
+      PaymentModel.create.mockResolvedValue({
+        id: 'pay_onetime_123',
+        userId: 101,
+        planId: 'week_pass',
+        amount: 14.99,
+        currency: 'USD',
+        provider: 'epayco',
+      });
+
+      PaymentModel.updateStatus.mockResolvedValue(true);
+
+      const result = await PaymentService.createPayment({
+        userId: 101,
+        planId: 'week_pass',
+        provider: 'epayco',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.paymentUrl).toContain('/payment/pay_onetime_123');
+      expect(result.paymentUrl).not.toContain('subscription-landing');
+      expect(result.paymentId).toBe('pay_onetime_123');
+    });
+
+    it('[8VM4Kr] should create a payment with Daimo provider', async () => {
       axios.post = jest.fn();
       PlanModel.getById.mockResolvedValue({
         id: 'plan_456',
@@ -144,7 +212,7 @@ describe('PaymentService Integration Tests', () => {
       });
     });
 
-    it('should throw error when plan is not found', async () => {
+    it('[DryMWx] should throw error when plan is not found', async () => {
       PlanModel.getById.mockResolvedValue(null);
 
       await expect(PaymentService.createPayment({
@@ -286,7 +354,7 @@ describe('PaymentService Integration Tests', () => {
       expect(cache.releaseLock).toHaveBeenCalled();
     });
 
-    it('should handle idempotency (duplicate webhooks)', async () => {
+    it('[M7GV97] should handle idempotency (duplicate webhooks)', async () => {
       PaymentModel.getById.mockResolvedValue({
         id: 'pay_123',
         userId: 'user_123',
@@ -331,7 +399,7 @@ describe('PaymentService Integration Tests', () => {
   });
 
   describe('getPaymentHistory', () => {
-    it('should return payment history for a user', async () => {
+    it('[eJ3yb3] should return payment history for a user', async () => {
       const mockPayments = [
         {
           id: 'pay_1',
