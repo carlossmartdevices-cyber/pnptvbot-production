@@ -329,10 +329,7 @@ class PaymentController {
     try {
       const {
         paymentId,
-        cardNumber,
-        expYear,
-        expMonth,
-        cvc,
+        tokenCard,
         name,
         lastName,
         email,
@@ -344,20 +341,10 @@ class PaymentController {
         dues,
       } = req.body;
 
-      // Validate required fields
-      if (!paymentId || !cardNumber || !expYear || !expMonth || !cvc || !name || !email || !docType || !docNumber) {
+      if (!paymentId || !tokenCard || !name || !email || !docType || !docNumber) {
         return res.status(400).json({
           success: false,
-          error: 'Faltan campos requeridos. Completa todos los datos de la tarjeta y personales.',
-        });
-      }
-
-      // Basic card number validation (13-19 digits)
-      const cleanCard = cardNumber.replace(/\s+/g, '');
-      if (!/^\d{13,19}$/.test(cleanCard)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Número de tarjeta inválido.',
+          error: 'Faltan campos requeridos. Completa todos los datos necesarios.',
         });
       }
 
@@ -369,12 +356,7 @@ class PaymentController {
 
       const result = await PaymentService.processTokenizedCharge({
         paymentId,
-        card: {
-          number: cleanCard,
-          exp_year: String(expYear),
-          exp_month: String(expMonth).padStart(2, '0'),
-          cvc: String(cvc),
-        },
+        tokenCard,
         customer: {
           name,
           last_name: lastName || name,

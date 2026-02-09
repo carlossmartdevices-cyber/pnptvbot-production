@@ -7,6 +7,8 @@
     <title>Checkout - PNPtv</title>
     <link rel="stylesheet" href="/webapps/design-system/static.css">
     <script src="/webapps/design-system/telegram-theme.js" type="module"></script>
+    <script src="https://checkout.epayco.co/checkout.js"></script>
+    <script src="https://multimedia.epayco.co/general/3DS/validateThreeds.min.js"></script>
     <style>
         .header {
             background: var(--panel-strong);
@@ -293,9 +295,56 @@
     </div>
 
     <script>
-        var pathParts = window.location.pathname.split('/');
-        var paymentId = pathParts[pathParts.length - 1];
-        var paymentData = null;
+        const pathParts = window.location.pathname.split('/');
+        const paymentId = pathParts[pathParts.length - 1];
+        let paymentData = null;
+        let epaycoTokenClient = null;
+
+        const createEpaycoClient = () => {
+            if (epaycoTokenClient) return epaycoTokenClient;
+            if (!paymentData || !paymentData.epaycoPublicKey) {
+                throw new Error('No se pudo cargar la clave pública de ePayco.');
+            }
+
+            const Constructor = window.Epayco || window.epayco;
+            if (!Constructor) {
+                throw new Error('El script de ePayco no se cargó correctamente.');
+            }
+
+            if (typeof Constructor === 'function') {
+                epaycoTokenClient = new Constructor({
+                    public_key: paymentData.epaycoPublicKey,
+                    lang: 'es',
+                    test: paymentData.testMode ? 'true' : 'false',
+                });
+            } else {
+                epaycoTokenClient = Constructor;
+                if (typeof epaycoTokenClient.setPublicKey === 'function') {
+                    epaycoTokenClient.setPublicKey(paymentData.epaycoPublicKey);
+                }
+                if (typeof epaycoTokenClient.setLang === 'function') {
+                    epaycoTokenClient.setLang('es');
+                }
+                if (typeof epaycoTokenClient.setTestMode === 'function') {
+                    epaycoTokenClient.setTestMode(paymentData.testMode ? 'true' : 'false');
+                }
+            }
+
+            if (!epaycoTokenClient || !epaycoTokenClient.token || typeof epaycoTokenClient.token.create !== 'function') {
+                throw new Error('La función de tokenización de ePayco no está disponible.');
+            }
+
+            return epaycoTokenClient;
+        };
+
+        const tokenizeCard = async (payload) => {
+            const client = createEpaycoClient();
+            const tokenResult = await client.token.create(payload);
+            if (!tokenResult || !tokenResult.id) {
+                throw new Error(tokenResult?.description || 'No se pudo generar el token.');
+            }
+            return tokenResult;
+        };
 
         // --- Card brand detection ---
         function detectCardBrand(number) {
@@ -379,6 +428,12 @@
                 var data = await response.json();
                 if (!data.success) throw new Error(data.error || 'Error al cargar el pago');
                 paymentData = data.payment;
+                try {
+                    createEpaycoClient();
+                } catch (initError) {
+                    showError(initError.message);
+                    return;
+                }
                 displayPaymentInfo();
             } catch (error) {
                 showError(error.message || 'Error al cargar la informacion del pago.');
@@ -398,19 +453,19 @@
 
         // --- Submit payment ---
         document.getElementById('pay-button').addEventListener('click', async function() {
-            var btn = document.getElementById('pay-button');
-            var errDiv = document.getElementById('form-error');
+            const btn = document.getElementById('pay-button');
+            const errDiv = document.getElementById('form-error');
             errDiv.style.display = 'none';
 
-            var cardNumber = document.getElementById('cardNumber').value.replace(/\s/g, '');
-            var expMonth = document.getElementById('expMonth').value;
-            var expYear = document.getElementById('expYear').value;
-            var cvc = document.getElementById('cvc').value;
-            var name = document.getElementById('name').value.trim();
-            var lastName = document.getElementById('lastName').value.trim();
-            var email = document.getElementById('email').value.trim();
-            var docType = document.getElementById('docType').value;
-            var docNumber = document.getElementById('docNumber').value.trim();
+            const cardNumber = document.getElementById('cardNumber').value.replace(/\s/g, '');
+            const expMonth = document.getElementById('expMonth').value;
+            const expYear = document.getElementById('expYear').value;
+            const cvc = document.getElementById('cvc').value;
+            const name = document.getElementById('name').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const docType = document.getElementById('docType').value;
+            const docNumber = document.getElementById('docNumber').value.trim();
 
             // --- Validations ---
             if (!cardNumber || cardNumber.length < 13) {
@@ -422,57 +477,76 @@
             if (!expMonth || !expYear) {
                 return showFormError('Selecciona la fecha de vencimiento.');
             }
-            // Check expiry isn't in the past
-            var now = new Date();
-            var expDate = new Date(parseInt(expYear), parseInt(expMonth) - 1);
+            const now = new Date();
+            const expDate = new Date(parseInt(expYear, 10), parseInt(expMonth, 10) - 1);
             if (expDate < new Date(now.getFullYear(), now.getMonth())) {
                 return showFormError('La tarjeta esta vencida.');
             }
-            var brand = detectCardBrand(cardNumber);
-            var expectedCvcLen = brand === 'Amex' ? 4 : 3;
+            const brand = detectCardBrand(cardNumber);
+            const expectedCvcLen = brand === 'Amex' ? 4 : 3;
             if (!cvc || cvc.length < expectedCvcLen) {
                 return showFormError('Ingresa el codigo CVC (' + expectedCvcLen + ' digitos).');
             }
             if (!name) return showFormError('Ingresa tu nombre.');
-            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
                 return showFormError('Ingresa un email valido.');
             }
             if (!docNumber) return showFormError('Ingresa tu numero de documento.');
 
             btn.disabled = true;
-            btn.textContent = 'Procesando...';
+            btn.textContent = 'Tokenizando tarjeta...';
+
+            let tokenResult;
+            try {
+                tokenResult = await tokenizeCard({
+                    'card[number]': cardNumber,
+                    'card[exp_year]': expYear,
+                    'card[exp_month]': expMonth.padStart ? expMonth.padStart(2, '0') : expMonth,
+                    'card[cvc]': cvc,
+                    'card[name]': `${name} ${lastName || ''}`.trim(),
+                    'card[email]': email,
+                    doc_type: docType,
+                    doc_number: docNumber,
+                    hasCvv: true,
+                });
+            } catch (tokenError) {
+                showFormError(tokenError.message || 'Error al tokenizar la tarjeta.');
+                btn.disabled = false;
+                btn.textContent = 'Pagar $' + paymentData.amountUSD.toFixed(2) + ' USD';
+                return;
+            }
+
+            btn.textContent = 'Procesando pago...';
 
             try {
-                var response = await fetch('/api/payment/tokenized-charge', {
+                const response = await fetch('/api/payment/tokenized-charge', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        paymentId: paymentId,
-                        cardNumber: cardNumber,
-                        expYear: expYear,
-                        expMonth: expMonth,
-                        cvc: cvc,
-                        name: name,
-                        lastName: lastName,
-                        email: email,
-                        docType: docType,
-                        docNumber: docNumber,
+                        paymentId,
+                        tokenCard: tokenResult.id,
+                        name,
+                        lastName: lastName || name,
+                        email,
+                        docType,
+                        docNumber,
+                        city: 'Bogota',
+                        address: 'N/A',
+                        phone: '',
                         dues: '1',
                     }),
                 });
 
-                var result = await response.json();
+                const result = await response.json();
 
                 if (result.success && result.status === 'approved') {
                     document.getElementById('checkout-form').style.display = 'none';
                     document.getElementById('success').style.display = 'block';
                 } else if (result.status === 'pending') {
-                    // Check for 3DS redirect
                     if (result.redirectUrl) {
                         window.location.href = result.redirectUrl;
                         return;
                     }
-                    // No 3DS redirect — start polling for webhook confirmation
                     document.getElementById('checkout-form').style.display = 'none';
                     pollPaymentStatus();
                 } else {
