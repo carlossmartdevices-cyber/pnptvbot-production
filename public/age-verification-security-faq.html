@@ -1,441 +1,326 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Age Verification - Security & Privacy FAQ</title>
-    <link rel="stylesheet" href="/webapps/design-system/static.css">
-    <script src="/webapps/design-system/telegram-theme.js" type="module"></script>
-    <style>
-        .page-container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: var(--bg-2);
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: var(--shadow);
-            border: 1px solid var(--border);
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PNPtv! - Security FAQ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-color: #1C1C1E;
+      --text-main: #FFFFFF;
+      --text-muted: #8E8E93;
+      --neon-pink: #FF00CC;
+      --neon-amber: #FFB454;
+      --neon-cyan: #00E5FF;
+      --neon-green: #32D74B;
+      --glass-bg: rgba(44, 44, 46, 0.7);
+      --glass-border: rgba(255, 180, 84, 0.3);
+      --card-radius: 16px;
+    }
 
-        .page-header {
-            background: var(--panel-strong);
-            padding: 24px 20px;
-            text-align: center;
-            border-bottom: 1px solid var(--border);
-        }
-        .page-header h1 { font-size: 20px; color: var(--accent); margin-bottom: 4px; }
-        .page-header p { font-size: 14px; color: var(--muted); }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-        .content { padding: 20px; }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      padding-bottom: 40px;
+    }
 
-        .faq-section { margin-bottom: 24px; }
-        .faq-section h2 {
-            color: var(--accent);
-            font-size: 16px;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--border);
-        }
+    /* --- Header --- */
+    .header {
+      position: sticky;
+      top: 0;
+      background: rgba(28, 28, 30, 0.95);
+      backdrop-filter: blur(12px);
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 100;
+    }
 
-        .faq-item {
-            margin-bottom: 10px;
-            padding: 14px;
-            background: var(--bg);
-            border-radius: 10px;
-            border: 1px solid var(--border);
-        }
-        .faq-item h3 {
-            color: var(--text);
-            margin-bottom: 0;
-            font-size: 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .faq-item h3:active { color: var(--accent); }
-        .faq-item h3::after {
-            content: "\25BC";
-            font-size: 10px;
-            transition: transform 0.2s;
-        }
-        .faq-item h3.expanded::after { transform: rotate(180deg); }
-        .faq-item p { display: none; color: var(--muted); line-height: 1.6; margin-top: 8px; font-size: 13px; }
-        .faq-item p.expanded { display: block; }
+    .brand {
+      font-weight: 900;
+      font-size: 18px;
+      color: var(--neon-cyan);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
 
-        .highlight {
-            background: rgba(255, 180, 84, 0.1);
-            padding: 12px;
-            border-radius: 8px;
-            margin: 12px 0;
-            border-left: 3px solid var(--accent);
-            color: var(--accent);
-            font-size: 13px;
-        }
-        .highlight strong { color: var(--accent); }
+    .close-btn {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+    }
 
-        .success-box {
-            background: rgba(44, 226, 201, 0.1);
-            border: 1px solid rgba(44, 226, 201, 0.3);
-            color: var(--accent-2);
-            padding: 12px;
-            border-radius: 8px;
-            margin: 12px 0;
-            font-size: 13px;
-        }
+    /* --- Container --- */
+    .container {
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
 
-        .warning-box {
-            background: rgba(255, 107, 107, 0.1);
-            border: 1px solid rgba(255, 107, 107, 0.3);
-            color: var(--accent-3);
-            padding: 12px;
-            border-radius: 8px;
-            margin: 12px 0;
-            font-size: 13px;
-        }
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 5px;
+    }
 
-        .info-box {
-            background: rgba(102, 126, 234, 0.1);
-            border: 1px solid rgba(102, 126, 234, 0.3);
-            color: var(--text);
-            padding: 12px;
-            border-radius: 8px;
-            margin: 12px 0;
-            font-size: 13px;
-        }
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
 
-        ul, ol { margin: 10px 0 10px 20px; line-height: 1.7; }
-        li { margin-bottom: 6px; }
+    /* --- Trust Grid (Iconos de Seguridad) --- */
+    .trust-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 30px;
+    }
 
-        code {
-            background: var(--bg);
-            color: var(--text);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-        }
+    .trust-card {
+      background: rgba(0, 229, 255, 0.05);
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      border-radius: 12px;
+      padding: 15px;
+      text-align: center;
+    }
 
-        .trust-signals {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 10px;
-            margin: 12px 0;
-        }
-        .trust-signal {
-            padding: 12px;
-            background: var(--bg);
-            border-radius: 8px;
-            text-align: center;
-            border: 1px solid var(--border);
-        }
-        .trust-signal .icon { font-size: 24px; color: var(--accent-2); margin-bottom: 6px; }
-        .trust-signal strong { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
-        .trust-signal small { color: var(--muted); font-size: 11px; }
+    .trust-icon { font-size: 24px; margin-bottom: 8px; display: block; }
+    .trust-title { color: var(--neon-cyan); font-weight: 700; font-size: 13px; margin-bottom: 4px; display: block; }
+    .trust-desc { color: var(--text-muted); font-size: 11px; line-height: 1.2; }
 
-        .page-footer {
-            background: var(--panel-strong);
-            padding: 16px 20px;
-            text-align: center;
-            color: var(--muted);
-            font-size: 12px;
-            border-top: 1px solid var(--border);
-        }
-    </style>
+    /* --- FAQ Accordion --- */
+    .faq-group { margin-bottom: 30px; }
+    
+    .group-title {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 5px;
+    }
+
+    .faq-item {
+      background: var(--glass-bg);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+
+    .faq-header {
+      padding: 15px;
+      font-weight: 600;
+      font-size: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .faq-header .icon {
+      color: var(--text-muted);
+      font-size: 12px;
+      transition: transform 0.3s;
+    }
+
+    .faq-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+      padding: 0 15px;
+      color: #D1D1D6;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .faq-item.active {
+      border-color: var(--neon-cyan);
+      background: rgba(0, 229, 255, 0.05);
+    }
+    
+    .faq-item.active .icon { transform: rotate(180deg); color: var(--neon-cyan); }
+
+    ul { padding-left: 20px; margin: 10px 0; }
+    li { margin-bottom: 5px; }
+
+    .antivirus-box {
+      background: rgba(255, 180, 84, 0.1);
+      border-left: 3px solid var(--neon-amber);
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: #FFD6A5;
+    }
+    
+    .tech-tag {
+      display: inline-block;
+      background: rgba(255,255,255,0.1);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--neon-cyan);
+      margin: 2px;
+    }
+
+    .contact-link {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      display: block;
+      margin-top: 30px;
+      text-decoration: none;
+    }
+  </style>
 </head>
 <body>
-    <div class="page-container">
-        <div class="page-header">
-            <h1>Age Verification</h1>
-            <p>Security & Privacy FAQ</p>
-        </div>
 
-        <div class="content">
-            <div class="faq-section">
-                <h2>Why Can You Trust This System?</h2>
-                <div class="trust-signals">
-                    <div class="trust-signal">
-                        <div class="icon">&#128274;</div>
-                        <strong>HTTPS Encrypted</strong>
-                        <small>All data sent securely</small>
-                    </div>
-                    <div class="trust-signal">
-                        <div class="icon">&#128203;</div>
-                        <strong>Explicit Consent</strong>
-                        <small>You control everything</small>
-                    </div>
-                    <div class="trust-signal">
-                        <div class="icon">&#128465;</div>
-                        <strong>Auto-Delete</strong>
-                        <small>Photos deleted immediately</small>
-                    </div>
-                    <div class="trust-signal">
-                        <div class="icon">&#9989;</div>
-                        <strong>No Storage</strong>
-                        <small>No facial images kept</small>
-                    </div>
-                </div>
-            </div>
+  <header class="header">
+    <div class="brand">🔒 Security Hub</div>
+    <a href="javascript:history.back()" class="close-btn">Close</a>
+  </header>
 
-            <div class="faq-section">
-                <h2>Security Software Warnings</h2>
+  <div class="container">
+    <h1>Security FAQ</h1>
+    <p class="subtitle">How we protect your data and privacy.</p>
 
-                <div class="faq-item">
-                    <h3>Why does my security software warn me?</h3>
-                    <p>Security software is designed to be cautious about camera access and sending images to external services. This is actually a good sign - it means your security is working! Age verification systems naturally trigger these warnings because they:
-                    <ul>
-                        <li>Request camera access (legitimate privacy concern)</li>
-                        <li>Send images to AI services (legitimate security concern)</li>
-                        <li>Process biometric data (legitimate regulation under GDPR)</li>
-                    </ul>
-                    These warnings are <strong>normal and expected</strong> for any legitimate age verification system.</p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>Is this page malware?</h3>
-                    <p>No. The warning is a <strong>false positive</strong>. Here's how you can tell:
-                    <ul>
-                        <li>Valid HTTPS certificate for pnptv.app</li>
-                        <li>No code obfuscation or hiding</li>
-                        <li>Clear, transparent data handling</li>
-                        <li>No suspicious network behavior</li>
-                        <li>No file system modifications</li>
-                        <li>Legitimate business purpose (age verification)</li>
-                    </ul>
-                    </p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>Should I allow camera access?</h3>
-                    <p>Only if you feel comfortable. The system is designed with <strong>multiple privacy protections</strong>:
-                    <ul>
-                        <li>You see a consent modal explaining everything first</li>
-                        <li>You can always click "Decline" to refuse</li>
-                        <li>Camera only activates AFTER you click "Accept"</li>
-                        <li>You can use manual verification instead (no camera needed)</li>
-                        <li>You control when the camera captures photos</li>
-                    </ul>
-                    </p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>Can I whitelist this site?</h3>
-                    <p>Yes. If you trust pnptv.app, you can:
-                    <ul>
-                        <li><strong>Windows:</strong> Allow in Windows Defender SmartScreen</li>
-                        <li><strong>Mac:</strong> Allow in macOS Gatekeeper settings</li>
-                        <li><strong>Browser:</strong> Add pnptv.app to trusted sites</li>
-                        <li><strong>Antivirus:</strong> Add pnptv.app to whitelist in security software</li>
-                    </ul>
-                    </p>
-                </div>
-            </div>
-
-            <div class="faq-section">
-                <h2>Privacy & Data Handling</h2>
-
-                <div class="faq-item">
-                    <h3>What happens to my photo?</h3>
-                    <p><strong>It's deleted immediately.</strong> Here's the flow:
-                    <ol>
-                        <li>You take a selfie in your browser</li>
-                        <li>Photo is sent to Face++ AI (encrypted via HTTPS)</li>
-                        <li>Face++ analyzes it in real-time</li>
-                        <li>Face++ deletes the photo from its servers</li>
-                        <li>Our server deletes the photo from memory</li>
-                        <li>Garbage collection clears the memory buffer</li>
-                    </ol>
-                    <strong>Result:</strong> Photo is gone within seconds. We never store it.</p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>What data IS stored?</h3>
-                    <p>Only verification metadata:
-                    <ul>
-                        <li>Estimated age (from AI analysis)</li>
-                        <li>Confidence score (how certain the AI is)</li>
-                        <li>Verification date</li>
-                        <li>Which AI provider was used</li>
-                    </ul>
-                    <strong>What's NOT stored:</strong>
-                    <ul>
-                        <li>No facial images</li>
-                        <li>No photos</li>
-                        <li>No facial recognition data</li>
-                        <li>No personal identification data</li>
-                    </ul>
-                    </p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>How long is my data kept?</h3>
-                    <p>Verification expires after <strong>7 days</strong>. After that:
-                    <ul>
-                        <li>You'll need to re-verify if accessing age-restricted features</li>
-                        <li>Old verification records are automatically deleted</li>
-                        <li>You can request manual deletion at any time</li>
-                    </ul>
-                    </p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>Is my data sold to third parties?</h3>
-                    <p><strong>No.</strong> Your data is:
-                    <ul>
-                        <li>Never sold</li>
-                        <li>Never shared with advertisers</li>
-                        <li>Never used for marketing</li>
-                        <li>Only used for age verification</li>
-                        <li>Protected under our Privacy Policy</li>
-                    </ul>
-                    </p>
-                </div>
-            </div>
-
-            <div class="faq-section">
-                <h2>Technical Details</h2>
-
-                <div class="faq-item">
-                    <h3>What's Face++?</h3>
-                    <p>Face++ (also called Megvii) is a legitimate AI company specializing in facial analysis. They:
-                    <ul>
-                        <li>Serve 50+ million users worldwide</li>
-                        <li>Focus on age estimation (not facial recognition)</li>
-                        <li>Are ISO/IEC 27001 certified</li>
-                        <li>Follow GDPR and data protection standards</li>
-                        <li>Do NOT store facial images sent via API</li>
-                    </ul>
-                    </p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>Is the connection secure?</h3>
-                    <p><strong>Yes.</strong> All connections are:
-                    <ul>
-                        <li>HTTPS encrypted (TLS 1.2+)</li>
-                        <li>Certificate verified</li>
-                        <li>Protected against man-in-the-middle attacks</li>
-                        <li>Using modern encryption standards</li>
-                    </ul>
-                    </p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>What security headers are in place?</h3>
-                    <p>The system uses multiple security headers:
-                    <ul>
-                        <li><code>X-Content-Type-Options: nosniff</code> - Prevents MIME type attacks</li>
-                        <li><code>X-Frame-Options: SAMEORIGIN</code> - Prevents clickjacking</li>
-                        <li><code>X-XSS-Protection</code> - Blocks XSS attacks</li>
-                        <li><code>Content-Security-Policy</code> - Strict limits on scripts</li>
-                        <li><code>Permissions-Policy</code> - Limits camera/microphone access</li>
-                    </ul>
-                    </p>
-                </div>
-            </div>
-
-            <div class="faq-section">
-                <h2>Not Comfortable With Camera?</h2>
-
-                <div class="faq-item">
-                    <h3>Can I skip AI verification?</h3>
-                    <p><strong>Yes!</strong> You have two options:
-                    <ol>
-                        <li><strong>Click "Decline"</strong> on the consent modal - Returns to main menu</li>
-                        <li><strong>Click "Skip to Manual Verification"</strong> - Confirm age manually</li>
-                    </ol>
-                    <strong>Manual verification:</strong>
-                    <ul>
-                        <li>No camera access required</li>
-                        <li>No photos taken</li>
-                        <li>No external APIs</li>
-                        <li>Just confirm you're 18+</li>
-                    </ul>
-                    </p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>What if the camera doesn't work?</h3>
-                    <p>If your camera isn't working:
-                    <ol>
-                        <li>Check browser camera permissions (usually in address bar)</li>
-                        <li>Refresh the page and try again</li>
-                        <li>Use a different browser that has camera support</li>
-                        <li>Use manual verification as fallback</li>
-                    </ol>
-                    </p>
-                </div>
-            </div>
-
-            <div class="faq-section">
-                <h2>Legal & Compliance</h2>
-
-                <div class="faq-item">
-                    <h3>Is this GDPR compliant?</h3>
-                    <p><strong>Yes.</strong> The system complies with:
-                    <ul>
-                        <li>GDPR (European regulation)</li>
-                        <li>CCPA (California regulation)</li>
-                        <li>LGPD (Brazilian regulation)</li>
-                    </ul>
-                    Key compliance measures:
-                    <ul>
-                        <li>Explicit user consent required</li>
-                        <li>Data minimization (only age estimates)</li>
-                        <li>Transparent processing</li>
-                        <li>Right to deletion available</li>
-                        <li>Privacy policy provided</li>
-                    </ul>
-                    </p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>Why is age verification needed?</h3>
-                    <p>Age verification is required for:
-                    <ul>
-                        <li>Legal compliance (COPPA, GDPR, local laws)</li>
-                        <li>Protecting minors from age-restricted content</li>
-                        <li>Verifying access to premium features</li>
-                        <li>Platform safety and responsibility</li>
-                    </ul>
-                    </p>
-                </div>
-            </div>
-
-            <div class="faq-section">
-                <h2>Need Help?</h2>
-
-                <div class="success-box">
-                    <strong>Questions about age verification?</strong><br>
-                    Review our <a href="https://pnptv.app/privacy" target="_blank">Privacy Policy</a> and <a href="https://pnptv.app/terms" target="_blank">Terms of Service</a>
-                </div>
-
-                <div class="info-box">
-                    <strong>Security concerns?</strong><br>
-                    Email us at security@pnptv.app with details of the issue
-                </div>
-
-                <div class="warning-box">
-                    <strong>Still seeing warnings?</strong><br>
-                    This is likely a false positive. You can safely whitelist pnptv.app in your security software.
-                </div>
-            </div>
-        </div>
-
-        <div class="page-footer">
-            <p>&copy; 2025 PNPtv. Age Verification System - Protecting Privacy While Verifying Age</p>
-            <p style="margin-top: 8px;">For more information, visit our <a href="https://pnptv.app/privacy" target="_blank">Privacy Policy</a></p>
-        </div>
+    <div class="trust-grid">
+      <div class="trust-card">
+        <span class="trust-icon">🔐</span>
+        <span class="trust-title">Encrypted</span>
+        <span class="trust-desc">HTTPS TLS 1.2+</span>
+      </div>
+      <div class="trust-card">
+        <span class="trust-icon">🗑️</span>
+        <span class="trust-title">Auto-Delete</span>
+        <span class="trust-desc">Instant Removal</span>
+      </div>
+      <div class="trust-card">
+        <span class="trust-icon">👁️</span>
+        <span class="trust-title">No Storage</span>
+        <span class="trust-desc">Zero Face Data</span>
+      </div>
+      <div class="trust-card">
+        <span class="trust-icon">🛡️</span>
+        <span class="trust-title">Verified</span>
+        <span class="trust-desc">Face++ AI Tech</span>
+      </div>
     </div>
 
-    <script>
-        document.querySelectorAll('.faq-item h3').forEach(header => {
-            header.addEventListener('click', function() {
-                const paragraph = this.nextElementSibling;
-                this.classList.toggle('expanded');
-                paragraph.classList.toggle('expanded');
-            });
-        });
-    </script>
+    <div class="faq-group">
+      <div class="group-title">Privacy & Data</div>
+
+      <div class="faq-item" onclick="toggle(this)">
+        <div class="faq-header">
+          Where does my photo go?
+          <span class="icon">▼</span>
+        </div>
+        <div class="faq-content">
+          <p>Nowhere permanent. Here is the flow:</p>
+          <ol>
+            <li>Photo is sent encrypted to Face++ AI.</li>
+            <li>AI estimates age (e.g., "25").</li>
+            <li><strong>Photo is deleted immediately.</strong></li>
+          </ol>
+          <p>We do not have a database of user faces.</p>
+        </div>
+      </div>
+
+      <div class="faq-item" onclick="toggle(this)">
+        <div class="faq-header">
+          Do you sell my data?
+          <span class="icon">▼</span>
+        </div>
+        <div class="faq-content">
+          <p><strong>Never.</strong> We make money from subscriptions, not from selling your personal information to advertisers or third parties.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-group">
+      <div class="group-title">Technical & Warnings</div>
+
+      <div class="faq-item" onclick="toggle(this)">
+        <div class="faq-header">
+          Why did my Antivirus warn me?
+          <span class="icon">▼</span>
+        </div>
+        <div class="faq-content">
+          <div class="antivirus-box">
+            <strong>Don't Panic:</strong> It is likely a "False Positive".
+          </div>
+          <p>Security software often flags any site requesting camera access as "Suspicious" by default. This is a safety precaution.</p>
+          <p>We are safe because:</p>
+          <ul>
+            <li>We use valid SSL Certificates.</li>
+            <li>We ask for explicit permission first.</li>
+            <li>We do not run hidden scripts.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="faq-item" onclick="toggle(this)">
+        <div class="faq-header">
+          Is the connection secure?
+          <span class="icon">▼</span>
+        </div>
+        <div class="faq-content">
+          <p>Yes. We use industry-standard encryption protocols.</p>
+          <div>
+            <span class="tech-tag">TLS 1.3</span>
+            <span class="tech-tag">AES-256</span>
+            <span class="tech-tag">XSS-Protection</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-group">
+      <div class="group-title">Alternatives</div>
+
+      <div class="faq-item" onclick="toggle(this)">
+        <div class="faq-header">
+          I don't want to use the camera
+          <span class="icon">▼</span>
+        </div>
+        <div class="faq-content">
+          <p>No problem. You can choose <strong>Manual Verification</strong> on the previous screen. This relies on a self-declaration of age without sending any biometric data.</p>
+        </div>
+      </div>
+    </div>
+
+    <a href="mailto:security@pnptv.app" class="contact-link">security@pnptv.app</a>
+  </div>
+
+  <script>
+    function toggle(element) {
+      element.classList.toggle('active');
+      var content = element.querySelector('.faq-content');
+      
+      if (content.style.maxHeight) {
+        content.style.maxHeight = null;
+        content.style.paddingBottom = "0";
+      } else {
+        content.style.maxHeight = content.scrollHeight + "px";
+        content.style.paddingBottom = "15px";
+      }
+    }
+  </script>
 </body>
 </html>

@@ -2,341 +2,225 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Age Verification - PNPtv</title>
-  <meta name="description" content="Age verification required to access PNPtv adult content platform.">
-  <link rel="stylesheet" href="/webapps/design-system/static.css">
-  <script src="/webapps/design-system/telegram-theme.js" type="module"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PNPtv! - Age Verification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  
   <style>
+    :root {
+      --bg-color: #1C1C1E;
+      --text-main: #FFFFFF;
+      --text-muted: #8E8E93;
+      --neon-pink: #FF00CC;
+      --neon-amber: #FFB454;
+      --glass-bg: rgba(44, 44, 46, 0.7);
+      --glass-border: rgba(255, 180, 84, 0.3);
+      --card-radius: 24px;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
     body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 20px;
       min-height: 100vh;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-    }
-
-    .verification-container {
-      max-width: 420px;
-      width: 100%;
-      background: var(--bg-2);
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: var(--shadow);
-      border: 1px solid var(--border);
-    }
-
-    .logo {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
-    .logo h1 {
-      font-size: 24px;
-      color: var(--accent);
-      margin-bottom: 4px;
-    }
-
-    .logo .tagline {
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .warning-box .icon {
-      font-size: 36px;
-      margin-bottom: 8px;
-    }
-
-    .warning-box h2 {
-      color: var(--accent-3);
-      font-size: 16px;
-      margin-bottom: 8px;
-    }
-
-    .warning-box p {
-      color: #ffaaaa;
-      font-size: 13px;
-    }
-
-    .age-question {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
-    .age-question h3 {
-      font-size: 18px;
-      margin-bottom: 6px;
-    }
-
-    .age-question p {
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .verification-options {
-      display: flex;
       flex-direction: column;
-      gap: 10px;
-      margin-bottom: 20px;
+      align-items: center;
+      justify-content: center;
+      background-image: radial-gradient(circle at top center, rgba(255, 0, 204, 0.1) 0%, transparent 70%);
     }
 
-    .verify-btn {
+    /* --- Brand Logo --- */
+    .brand-logo {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 24px;
+      position: relative;
+    }
+    
+    /* Neon Squircle CSS Shape */
+    .squircle {
       width: 100%;
-      padding: 14px 20px;
-      border: none;
-      border-radius: 12px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
+      height: 100%;
+      background: transparent;
+      border: 3px solid transparent;
+      border-radius: 22px;
+      background-image: linear-gradient(var(--bg-color), var(--bg-color)), 
+                        linear-gradient(135deg, var(--neon-pink), var(--neon-amber));
+      background-origin: border-box;
+      background-clip: content-box, border-box;
+      box-shadow: 0 0 20px rgba(255, 0, 204, 0.3);
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      transition: transform 0.12s;
     }
 
-    .verify-btn:active { transform: scale(0.97); }
-
-    .verify-btn.primary {
-      background: var(--accent);
-      color: #2d1d00;
+    .logo-text {
+      font-weight: 900;
+      font-size: 20px;
+      background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
-    .verify-btn.secondary {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-
-    .verify-btn.exit {
-      background: rgba(255, 107, 107, 0.15);
-      color: var(--accent-3);
-      border: 1px solid rgba(255, 107, 107, 0.3);
-    }
-
-    .verify-btn .icon { font-size: 18px; }
-
-    .privacy-notice {
-      background: rgba(44, 226, 201, 0.1);
-      border: 1px solid rgba(44, 226, 201, 0.3);
-      border-radius: 10px;
-      padding: 12px;
-      margin-bottom: 16px;
-    }
-
-    .privacy-notice h4 {
-      color: var(--accent-2);
-      font-size: 13px;
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .privacy-notice ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .privacy-notice ul li {
-      padding: 3px 0;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .privacy-notice ul li::before {
-      content: "\2713";
-      color: var(--accent-2);
-      font-weight: bold;
-    }
-
-    .legal-links {
+    /* --- Glass Card --- */
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--card-radius);
+      padding: 30px 24px;
+      width: 100%;
+      max-width: 400px;
       text-align: center;
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 16px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
     }
 
-    .legal-links a { color: var(--text); }
+    h1 {
+      font-size: 28px;
+      font-weight: 900;
+      margin: 0 0 10px;
+      letter-spacing: -0.5px;
+    }
 
-    .language-switcher {
-      position: absolute;
-      top: 16px;
-      right: 16px;
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-bottom: 30px;
+      line-height: 1.5;
+    }
+
+    /* --- 18+ Warning Badge --- */
+    .warning-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 107, 107, 0.1);
+      border: 1px solid rgba(255, 107, 107, 0.3);
+      padding: 8px 16px;
+      border-radius: 50px;
+      color: #FF6B6B;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 24px;
+    }
+
+    /* --- Buttons --- */
+    .btn {
       display: flex;
-      gap: 6px;
-    }
-
-    .lang-btn {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid var(--border);
-      color: white;
-      padding: 6px 10px;
-      border-radius: 8px;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 16px;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 12px;
       cursor: pointer;
+      border: none;
+      transition: transform 0.2s;
+      text-decoration: none;
+    }
+
+    .btn:active { transform: scale(0.98); }
+
+    .btn-primary {
+      background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+      color: white;
+      box-shadow: 0 0 15px rgba(255, 0, 204, 0.3);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-top: 10px;
+    }
+
+    /* --- Footer Links --- */
+    .legal-links {
+      margin-top: 30px;
       font-size: 12px;
+      color: var(--text-muted);
     }
+    .legal-links a { color: var(--text-muted); text-decoration: underline; }
 
-    .lang-btn:active, .lang-btn.active {
-      background: rgba(255, 255, 255, 0.15);
-    }
-
-    .hidden { display: none !important; }
-
-    .confirmation-screen { text-align: center; }
-    .confirmation-screen .success-icon { font-size: 48px; margin-bottom: 16px; color: var(--accent-2); }
-    .confirmation-screen h2 { color: var(--text); margin-bottom: 10px; font-size: 18px; }
-    .confirmation-screen p { color: var(--muted); margin-bottom: 20px; font-size: 14px; }
-
-    .denied-screen { text-align: center; }
-    .denied-screen .denied-icon { font-size: 48px; margin-bottom: 16px; color: var(--accent-3); }
-    .denied-screen h2 { color: var(--accent-3); margin-bottom: 10px; font-size: 18px; }
-    .denied-screen p { color: var(--muted); margin-bottom: 20px; font-size: 14px; }
-
-    @media (max-width: 480px) {
-      .verification-container { padding: 20px; }
-      .logo h1 { font-size: 22px; }
-      .verify-btn { padding: 12px 16px; font-size: 14px; }
-    }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <div class="language-switcher">
-    <button class="lang-btn active" data-lang="en">EN</button>
-    <button class="lang-btn" data-lang="es">ES</button>
+
+  <div class="brand-logo">
+    <div class="squircle">
+      <span class="logo-text">PNPtv!</span>
+    </div>
   </div>
 
-  <div class="verification-container">
-    <!-- Main verification screen -->
-    <div id="main-screen">
-      <div class="logo">
-        <h1>PNPtv!</h1>
-        <p class="tagline">Digital Community</p>
-      </div>
-
-      <div class="warning-box" style="text-align: center; margin-bottom: 20px;">
-        <div class="icon">18+</div>
-        <h2>Adult Content Warning</h2>
-        <p>This platform contains adult content intended only for individuals aged 18 years or older. By proceeding, you confirm you meet the age requirement.</p>
-      </div>
-
-      <div class="age-question">
-        <h3>Are you 18 or older?</h3>
-        <p>Select a verification method below</p>
-      </div>
-
-      <div class="verification-options">
-        <button class="verify-btn primary" id="btn-camera">
-          <span class="icon">&#128247;</span> Verify with Camera (AI)
-        </button>
-        <button class="verify-btn secondary" id="btn-manual">
-          <span class="icon">&#9989;</span> I confirm I am 18+
-        </button>
-        <button class="verify-btn exit" id="btn-exit">
-          <span class="icon">&#10060;</span> I am under 18 - Exit
-        </button>
-      </div>
-
-      <div class="privacy-notice">
-        <h4>Your Privacy is Protected</h4>
-        <ul>
-          <li>Photos are deleted immediately after analysis</li>
-          <li>We never store facial images</li>
-          <li>Manual option requires no camera</li>
-          <li>All data encrypted in transit</li>
-        </ul>
-      </div>
-
-      <div class="legal-links">
-        <a href="/terms">Terms of Service</a> &middot; <a href="/privacy">Privacy Policy</a> &middot;
-        <a href="/age-verification-security-faq">Security FAQ</a>
-      </div>
+  <div class="glass-card" id="main-screen">
+    <div class="warning-badge">
+      <span>🔞</span> ADULT CONTENT 18+
     </div>
 
-    <!-- Confirmation screen -->
-    <div id="confirmed-screen" class="confirmation-screen hidden">
-      <div class="success-icon">&#9989;</div>
-      <h2>Age Verified!</h2>
-      <p>You can now access PNPtv! content. Returning to the bot...</p>
-      <button class="verify-btn primary" id="btn-continue">Continue</button>
-    </div>
+    <h1>Age Verification</h1>
+    <p class="subtitle">This community is restricted to adults only. Please verify your age to continue.</p>
 
-    <!-- Denied screen -->
-    <div id="denied-screen" class="denied-screen hidden">
-      <div class="denied-icon">&#128683;</div>
-      <h2>Access Denied</h2>
-      <p>You must be 18 or older to access this platform. Please close this window.</p>
-      <button class="verify-btn exit" id="btn-close">Close</button>
+    <button class="btn btn-primary" id="btn-camera">
+      Verify with Camera (AI)
+    </button>
+    
+    <button class="btn btn-secondary" id="btn-manual">
+      I confirm I am 18+
+    </button>
+    
+    <button class="btn btn-ghost" id="btn-exit">
+      I am under 18 (Exit)
+    </button>
+
+    <div class="legal-links">
+      <a href="/terms.html">Terms</a> • <a href="/privacy.html">Privacy</a> • <a href="/policies_en.html">Policies</a>
     </div>
+  </div>
+
+  <div class="glass-card hidden" id="denied-screen" style="border-color: #FF6B6B;">
+    <h1 style="color: #FF6B6B;">Access Denied</h1>
+    <p class="subtitle">You must be 18 or older to enter PNPtv!</p>
+    <button class="btn btn-secondary" onclick="window.close()">Close Window</button>
   </div>
 
   <script>
     const USER_ID = new URLSearchParams(window.location.search).get('user_id');
-    const LANGUAGE = new URLSearchParams(window.location.search).get('lang') || 'en';
+    const LANG = new URLSearchParams(window.location.search).get('lang') || 'en';
 
-    // Camera verification
-    document.getElementById('btn-camera').addEventListener('click', () => {
-      window.location.href = `/age-verification-camera?user_id=${USER_ID}&lang=${LANGUAGE}`;
-    });
+    document.getElementById('btn-camera').onclick = () => {
+      window.location.href = `/age-verification-camera.html?user_id=${USER_ID}&lang=${LANG}`;
+    };
 
-    // Manual confirmation
-    document.getElementById('btn-manual').addEventListener('click', () => {
-      if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-        Telegram.WebApp.sendData('age_confirmed_manual');
-      } else {
-        document.getElementById('main-screen').classList.add('hidden');
-        document.getElementById('confirmed-screen').classList.remove('hidden');
-      }
-    });
+    document.getElementById('btn-manual').onclick = () => {
+       if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+          Telegram.WebApp.sendData('age_confirmed_manual');
+       } else {
+          window.location.href = 'tg://resolve?domain=pnplatinotv_bot';
+       }
+    };
 
-    // Exit (underage)
-    document.getElementById('btn-exit').addEventListener('click', () => {
+    document.getElementById('btn-exit').onclick = () => {
       document.getElementById('main-screen').classList.add('hidden');
       document.getElementById('denied-screen').classList.remove('hidden');
-    });
-
-    // Continue after confirmation
-    document.getElementById('btn-continue').addEventListener('click', () => {
-      if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-        Telegram.WebApp.close();
-      } else {
-        window.location.href = 'tg://resolve?domain=pnplatinotv_bot';
-      }
-    });
-
-    // Close after denial
-    document.getElementById('btn-close').addEventListener('click', () => {
-      if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-        Telegram.WebApp.close();
-      } else {
-        window.close();
-      }
-    });
-
-    // Language switcher
-    document.querySelectorAll('.lang-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const lang = btn.dataset.lang;
-        const url = new URL(window.location);
-        url.searchParams.set('lang', lang);
-        window.location.href = url.toString();
-      });
-    });
-
-    // Highlight active language
-    document.querySelectorAll('.lang-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.lang === LANGUAGE);
-    });
-
-    // Handle Telegram WebApp
-    if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-      Telegram.WebApp.ready();
-      Telegram.WebApp.expand();
-    }
+    };
   </script>
+
 </body>
 </html>

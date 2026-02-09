@@ -1,272 +1,310 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PNPtv! Comunidad Digital — Términos, Reembolsos y Privacidad</title>
-<meta name="description" content="Términos y Condiciones, Política de Reembolsos y Política de Privacidad de PNPtv! Comunidad Digital.">
-<link rel="stylesheet" href="/webapps/design-system/static.css">
-<script src="/webapps/design-system/telegram-theme.js" type="module"></script>
-<style>
-  .back-to-top {
-    position: fixed;
-    bottom: 16px;
-    right: 16px;
-    background: var(--accent);
-    color: #2d1d00;
-    border-radius: 50%;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    cursor: pointer;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.2s, visibility 0.2s;
-    border: none;
-    box-shadow: var(--shadow);
-  }
-  .back-to-top.visible { opacity: 1; visibility: visible; }
-  .back-to-top:active { transform: scale(0.95); }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PNPtv! - Políticas y Términos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-color: #1C1C1E;
+      --text-main: #FFFFFF;
+      --text-muted: #8E8E93;
+      --neon-pink: #FF00CC;
+      --neon-amber: #FFB454;
+      --glass-bg: rgba(44, 44, 46, 0.7);
+      --glass-border: rgba(255, 180, 84, 0.3);
+      --card-radius: 16px;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      padding-bottom: 40px;
+    }
+
+    /* --- Header Fijo --- */
+    .header {
+      position: sticky;
+      top: 0;
+      background: rgba(28, 28, 30, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 100;
+    }
+
+    .brand {
+      font-weight: 900;
+      font-size: 20px;
+      background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .lang-switch {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-decoration: none;
+      background: rgba(255,255,255,0.1);
+      padding: 5px 12px;
+      border-radius: 20px;
+    }
+
+    /* --- Contenedor Principal --- */
+    .container {
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 5px;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+    /* --- Tarjetas Acordeón --- */
+    .policy-card {
+      background: var(--glass-bg);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: var(--card-radius);
+      margin-bottom: 12px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .policy-header {
+      padding: 18px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 16px;
+      user-select: none;
+    }
+
+    .policy-header .num {
+      color: var(--neon-amber);
+      margin-right: 12px;
+      font-size: 14px;
+      opacity: 0.8;
+    }
+
+    .icon-plus {
+      transition: transform 0.3s ease;
+      font-size: 20px;
+      color: var(--text-muted);
+      font-weight: 300;
+    }
+
+    /* Estado Activo */
+    .policy-card.active {
+      border-color: var(--neon-pink);
+      box-shadow: 0 0 15px rgba(255, 0, 204, 0.1);
+      background: rgba(44, 44, 46, 0.95);
+    }
+
+    .policy-card.active .icon-plus {
+      transform: rotate(45deg); /* Se convierte en X */
+      color: var(--neon-pink);
+    }
+
+    .policy-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s ease-out;
+      padding: 0 20px;
+      color: #D1D1D6;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .policy-content p { margin-bottom: 15px; }
+    .policy-content ul { padding-left: 20px; margin-bottom: 15px; }
+    .policy-content li { margin-bottom: 8px; }
+
+    /* --- Cajas de Alerta --- */
+    .alert-box {
+      background: rgba(255, 107, 107, 0.1);
+      border-left: 3px solid #FF6B6B;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+      color: #FF9F9F;
+      font-size: 13px;
+    }
+
+    .info-box {
+      background: rgba(255, 180, 84, 0.1);
+      border: 1px solid var(--neon-amber);
+      padding: 15px;
+      border-radius: 12px;
+      margin-top: 15px;
+      color: var(--neon-amber);
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .contact-link {
+      display: block;
+      text-align: center;
+      margin-top: 40px;
+      color: var(--text-muted);
+      font-size: 14px;
+      text-decoration: none;
+      padding: 20px;
+    }
+  </style>
 </head>
 <body>
 
   <header class="header">
-    <div class="header-logo">
-      <div class="logo-icon"><span>PNP</span></div>
-      <div class="header-text">
-        <h1>PNPtv!</h1>
-      </div>
-    </div>
-    <div class="header-links">
-      <a href="/policies_es" class="active">ES</a>
-      <a href="/policies_en">EN</a>
-    </div>
+    <div class="brand">PNPtv!</div>
+    <a href="/policies_en.html" class="lang-switch">EN</a>
   </header>
 
-  <main class="container">
-    <div class="page-title">
-      <h2>Términos, Reembolsos y Privacidad</h2>
-      <p class="updated">Vigente desde: Octubre 2025 | Contacto: <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>
+  <div class="container">
+    <h1>Políticas y Términos</h1>
+    <p class="subtitle">Actualizado: Octubre 2025</p>
+
+    <div class="policy-card" onclick="toggle(this)">
+      <div class="policy-header">
+        <div><span class="num">01</span> Introducción</div>
+        <div class="icon-plus">+</div>
+      </div>
+      <div class="policy-content">
+        <p>Bienvenido a PNPtv! Comunidad Digital. Al acceder a nuestros servicios, aceptas estos términos. Somos una comunidad privada para adultos operada desde Colombia con alcance global.</p>
+        <p>Estas políticas cumplen con normativas de EE.UU., UE y Colombia sobre contenido digital y protección de datos.</p>
+      </div>
     </div>
 
-    <nav class="toc" aria-label="Tabla de contenidos">
-      <h3>Índice</h3>
-      <ol>
-        <li><a href="#intro">Introducción</a></li>
-        <li><a href="#salud">Cláusulas de Salud, Bienestar, Edad y Responsabilidad</a></li>
-        <li><a href="#objeto">Objeto del Servicio</a></li>
-        <li><a href="#membresia">Condiciones de Membresía y Acceso</a></li>
-        <li><a href="#normas">Normas de Conducta de la Comunidad</a></li>
-        <li><a href="#reembolsos">Política de Reembolsos</a></li>
-        <li><a href="#privacidad">Política de Privacidad</a></li>
-        <li><a href="#jurisdiccion">Exención de Responsabilidad y Jurisdicción Legal</a></li>
-      </ol>
-    </nav>
-
-    <section class="section" id="intro">
-      <h3><span class="number">1</span> Introducción</h3>
-      <p>PNPtv! Comunidad Digital es una plataforma internacional de membresía en línea operada desde Colombia, con alcance global. Funciona como una comunidad digital privada basada en Telegram y otros medios electrónicos, destinada exclusivamente a adultos mayores de 18 años. Al acceder a nuestros servicios, el usuario reconoce y acepta que esta comunidad se rige por las leyes de Colombia, así como por los principios establecidos en la normativa internacional aplicable en materia de protección de datos, derechos digitales y contenido para adultos.</p>
-      <p>Bienvenido a <strong>PNPtv! Comunidad Digital</strong>, una comunidad digital basada en Telegram que ofrece acceso a contenido exclusivo para adultos, interacción social entre miembros y servicios de geolocalización para facilitar conexiones entre usuarios. Al utilizar nuestros servicios, aceptas cumplir con estos Términos y Condiciones, así como con nuestra Política de Privacidad y Política de Reembolsos.</p>
-      <div class="highlight-box">
-        <p><strong>Importante:</strong> Este documento ha sido adaptado para cumplir con la normativa vigente en Colombia, Estados Unidos y la Unión Europea.</p>
+    <div class="policy-card" onclick="toggle(this)">
+      <div class="policy-header">
+        <div><span class="num">02</span> Edad y Responsabilidad</div>
+        <div class="icon-plus">+</div>
       </div>
-    </section>
-
-    <section class="section" id="salud">
-      <h3><span class="number">2</span> Cláusulas de Salud, Bienestar, Edad y Responsabilidad</h3>
-      <div class="warning-box">
-        <p><strong>18+ Únicamente:</strong> La plataforma está destinada exclusivamente a personas mayores de 18 años.</p>
-      </div>
-      <ul>
-        <li>Todo el contenido es de carácter recreativo y <em>no</em> sustituye asesoramiento médico, psicológico o legal.</li>
-        <li>Los usuarios que enfrenten problemas de salud mental, adicciones o situaciones de riesgo deben buscar ayuda profesional.</li>
-        <li>Todo el material presentado se basa en actuación; cualquier elemento que simule sustancias es únicamente un accesorio ficticio.</li>
-        <li>Todos los participantes son mayores de edad al momento de la grabación.</li>
-      </ul>
-    </section>
-
-    <section class="section" id="objeto">
-      <h3><span class="number">3</span> Objeto del Servicio</h3>
-      <ul>
-        <li><strong>Canal privado</strong> de contenido exclusivo para mayores de 18 años, mediante suscripción.</li>
-        <li><strong>Comunidad interactiva en Telegram</strong>, con moderación y convivencia respetuosa.</li>
-        <li><strong>Geolocalización opcional</strong> para facilitar conexiones cercanas, sin compartir datos exactos.</li>
-        <li><strong>Eventos, lives, retos y minijuegos</strong> y futuras funciones de entretenimiento digital.</li>
-      </ul>
-      <p>El propósito es brindar una experiencia social digital segura, privada y exclusiva para adultos, basada en el consentimiento, la libertad personal y el respeto mutuo.</p>
-    </section>
-
-    <section class="section" id="membresia">
-      <h3><span class="number">4</span> Condiciones de Membresía y Acceso</h3>
-      <h4>4.1 Requisitos de Acceso</h4>
-      <ul>
-        <li>El usuario declara tener <strong>18 años o más</strong>.</li>
-        <li>Debe asegurar que el acceso a contenido para adultos es legal en su jurisdicción.</li>
-        <li>Podemos solicitar verificación de edad o identidad.</li>
-      </ul>
-      <h4>4.2 Naturaleza de la Membresía</h4>
-      <ul>
-        <li>La suscripción otorga una <strong>licencia personal, limitada, no transferible y revocable</strong>.</li>
-        <li>El usuario no adquiere propiedad sobre el contenido ni la plataforma.</li>
-        <li>Prohibido compartir, reenviar, grabar, distribuir o vender el contenido.</li>
-      </ul>
-      <h4>4.3 Suspensión y Terminación</h4>
-      <ul>
-        <li>Podemos suspender o finalizar acceso por violaciones o incumplimientos.</li>
-        <li>La terminación por incumplimiento <strong>no</strong> otorga derecho a reembolso.</li>
-      </ul>
-      <h4>4.4 Responsabilidad del Usuario</h4>
-      <ul>
-        <li>El usuario es responsable del uso que haga de la plataforma.</li>
-        <li>Se compromete a actuar con respeto, consentimiento y ética.</li>
-      </ul>
-    </section>
-
-    <section class="section" id="normas">
-      <h3><span class="number">5</span> Normas de Conducta de la Comunidad</h3>
-      <h4>5.1 Respeto y Consentimiento</h4>
-      <ul>
-        <li>Interacciones basadas en respeto mutuo y consentimiento.</li>
-        <li>Prohibidos comportamientos abusivos, intimidantes o discriminatorios.</li>
-        <li>Prohibido compartir información privada de otros sin autorización.</li>
-      </ul>
-      <h4>5.2 Contenido Prohibido</h4>
-      <div class="prohibited-list">
-        <p><strong>El siguiente contenido está estrictamente prohibido y resultará en expulsión inmediata:</strong></p>
+      <div class="policy-content">
+        <div class="alert-box">
+          <strong>Solo Mayores de 18 Años:</strong> El acceso está estrictamente limitado a adultos.
+        </div>
         <ul>
-          <li><strong>Menores de edad (pedofilia)</strong></li>
-          <li><strong>Animales (zoofilia)</strong></li>
-          <li><strong>Violencia sexual o no consentida</strong></li>
-          <li><strong>Incesto, trata de personas o explotación</strong></li>
-          <li><strong>Apología del odio, racismo o violencia extrema</strong></li>
+          <li>Todo el contenido es recreativo y no sustituye consejo profesional.</li>
+          <li>Si enfrentas problemas de salud mental, busca ayuda profesional.</li>
+          <li>Todos los participantes en el contenido son mayores de edad verificados.</li>
         </ul>
       </div>
-      <p>Quien incurra en estas conductas será expulsado inmediatamente y, de ser necesario, reportado a las autoridades.</p>
-      <h4>5.3 Uso Responsable de Geolocalización</h4>
-      <ul>
-        <li>Función opcional, úsala con responsabilidad y cordialidad.</li>
-        <li>Prohibido acosar o insistir de forma invasiva a otros miembros.</li>
-      </ul>
-      <h4>5.4 Ambiente Positivo</h4>
-      <ul>
-        <li>Contribuye de forma positiva a la comunidad.</li>
-        <li>No se toleran discusiones hostiles o con intención de conflicto.</li>
-      </ul>
-    </section>
-
-    <section class="section" id="reembolsos">
-      <h3><span class="number">6</span> Política de Reembolsos</h3>
-      <div class="warning-box">
-        <p>El acceso a contenido digital es inmediato. <strong>Todas las ventas son finales y no se ofrecen reembolsos</strong>, salvo obligación legal o error técnico comprobado atribuible a la plataforma.</p>
-      </div>
-      <h4>6.1 No aplican reembolsos por</h4>
-      <ul>
-        <li>Cambio de opinión.</li>
-        <li>No utilización voluntaria.</li>
-        <li>Expulsión por violación de normas.</li>
-        <li>Dificultades del dispositivo o conexión del usuario.</li>
-      </ul>
-      <h4>6.2 Casos excepcionales</h4>
-      <p>Si hubo doble pago y no se recibió acceso, escribe a <a href="mailto:support@pnptv.app">support@pnptv.app</a> dentro de 7 días con comprobantes.</p>
-      <h4>6.3 Confirmación de acceso</h4>
-      <p>Al pagar, reconoces la entrega inmediata y <strong>renuncias al derecho de retracto</strong> según normativa de contenido digital de consumo instantáneo.</p>
-    </section>
-
-    <section class="section" id="privacidad">
-      <h3><span class="number">7</span> Política de Privacidad</h3>
-      <h4>7.0 Uso de Inteligencia Artificial y Mensajes Promocionales</h4>
-      <p>Utilizamos sistemas de inteligencia artificial para recomendaciones, automatización y personalización. Al usar la plataforma, aceptas este uso y reconoces que las interacciones pueden estar asistidas por IA.</p>
-      <p>Autorizas la recepción de mensajes promocionales sobre nuevos servicios o beneficios por Telegram o correo. Puedes darte de baja en cualquier momento desde tu perfil o escribiendo a soporte.</p>
-
-      <h4>7.0A Verificación de Edad mediante Face++ - Privacidad Garantizada</h4>
-      <p><strong>Nuestro compromiso con tu privacidad en la verificación de edad:</strong></p>
-      <ul>
-        <li><strong>Zero Storage (Almacenamiento Cero):</strong> Tu fotografía facial <strong>NUNCA</strong> se almacena en nuestros servidores. Solo se procesa temporalmente.</li>
-        <li><strong>Procesamiento Temporal:</strong> La foto se envía directamente a Face++ (proveedor de IA), se analiza para estimar tu edad, y se elimina inmediatamente. No guardamos la imagen.</li>
-        <li><strong>Datos Guardados:</strong> Solo guardamos: fecha de verificación, resultado (verificado sí/no), edad estimada (aproximada).</li>
-        <li><strong>Lo Que NO Guardamos:</strong> Identificadores faciales, características biométricas, datos faciales, mapeos faciales, imágenes faciales, fotos, información biométrica persistente.</li>
-        <li><strong>Proveedor Externo:</strong> Face++ es un proveedor confiable de reconocimiento facial. Sus políticas de privacidad están disponibles en <a href="https://www.faceplusplus.com/privacy/" target="_blank">faceplusplus.com/privacy</a>.</li>
-        <li><strong>Derecho a Usar Alternativas:</strong> Puedes optar por confirmación manual de edad sin necesidad de fotografía.</li>
-        <li><strong>Tu Control:</strong> Puedes eliminar tu cuenta en cualquier momento, y todos tus datos asociados serán eliminados según la ley aplicable.</li>
-      </ul>
-
-      <h4>7.1 Datos que Recopilamos</h4>
-      <ul>
-        <li>Identificadores (usuario de Telegram u otros voluntarios).</li>
-        <li>Estatus de pago y tipo de membresía.</li>
-        <li>Geolocalización opcional (solo con consentimiento).</li>
-        <li>Comunicaciones con soporte.</li>
-      </ul>
-      <h4>7.2 Finalidad</h4>
-      <ul>
-        <li>Gestionar acceso y personalizar experiencia.</li>
-        <li>Seguridad y prevención de fraude.</li>
-        <li>Cumplimiento de obligaciones legales.</li>
-      </ul>
-      <div class="highlight-box">
-        <p><strong>No vendemos ni comercializamos datos personales.</strong></p>
-      </div>
-      <h4>7.3 Base Legal</h4>
-      <ul>
-        <li>Consentimiento del usuario.</li>
-        <li>Ejecución de contrato digital de membresía.</li>
-        <li>Interés legítimo en seguridad.</li>
-      </ul>
-      <h4>7.4 Derechos</h4>
-      <ul>
-        <li>Acceso, corrección o eliminación de datos.</li>
-        <li>Revocar consentimiento de geolocalización.</li>
-      </ul>
-      <p>Solicitudes a: <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>
-      <h4>7.5 Seguridad</h4>
-      <p>Usamos medidas técnicas y administrativas para proteger la información; limita lo que compartes públicamente.</p>
-      <h4>7.6 Conservación</h4>
-      <p>Conservamos datos solo el tiempo necesario para prestar el servicio o cumplir obligaciones legales.</p>
-    </section>
-
-    <section class="section" id="jurisdiccion">
-      <h3><span class="number">8</span> Exención de Responsabilidad y Jurisdicción Legal</h3>
-      <h4>8.0 Uso de Inteligencia Artificial y Mensajería Promocional</h4>
-      <ul>
-        <li>Usamos IA para mejorar la experiencia; el uso del bot es responsabilidad del usuario.</li>
-        <li>Autorizas mensajes promocionales por Telegram o correo; puedes darte de baja desde tu perfil o escribiendo a soporte.</li>
-      </ul>
-      <h4>8.1 Exención de Responsabilidad</h4>
-      <ul>
-        <li>No somos responsables de decisiones personales ni de interacciones entre miembros dentro o fuera de la plataforma.</li>
-        <li>No respondemos por fallos de terceros o fuerza mayor.</li>
-        <li>El contenido es recreativo; no es consejo profesional.</li>
-      </ul>
-      <h4>8.2 Jurisdicción</h4>
-      <ul>
-        <li>Este acuerdo se rige por las leyes de la República de Colombia.</li>
-        <li>Las disputas se intentarán resolver amistosamente primero; de no ser posible, ante tribunales competentes en Bogotá, Colombia.</li>
-      </ul>
-      <h4>8.3 Renuncia a Demandas Colectivas</h4>
-      <p>Las reclamaciones se resolverán de forma individual; renuncias a participar en acciones colectivas contra PNPtv! Comunidad Digital.</p>
-    </section>
-
-    <div class="highlight-box" style="text-align: center; margin-top: 24px;">
-      <p>Al continuar usando la plataforma declaras haber leído y aceptado este documento.</p>
     </div>
-  </main>
 
-  <footer class="footer">
-    <p>&copy; 2025 PNPtv! Comunidad Digital | <a href="mailto:support@pnptv.app">support@pnptv.app</a></p>
-    <p><a href="/terms">Terms</a> | <a href="/privacy">Privacy</a> | <a href="/">Home</a></p>
-  </footer>
+    <div class="policy-card" onclick="toggle(this)">
+      <div class="policy-header">
+        <div><span class="num">03</span> Membresía y Acceso</div>
+        <div class="icon-plus">+</div>
+      </div>
+      <div class="policy-content">
+        <p>Tu suscripción otorga una licencia personal, intransferible y revocable.</p>
+        <ul>
+          <li><strong>Prohibido Compartir:</strong> Una cuenta por persona.</li>
+          <li><strong>Prohibido Distribuir:</strong> Grabar o filtrar contenido resultará en expulsión inmediata y acciones legales.</li>
+          <li><strong>Terminación:</strong> Podemos suspender el acceso por violación de normas sin derecho a reembolso.</li>
+        </ul>
+      </div>
+    </div>
 
-  <button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">&#8593;</button>
+    <div class="policy-card" onclick="toggle(this)">
+      <div class="policy-header">
+        <div><span class="num">04</span> Normas de la Comunidad</div>
+        <div class="icon-plus">+</div>
+      </div>
+      <div class="policy-content">
+        <p>Mantenemos un ambiente de respeto y consentimiento.</p>
+        <div class="alert-box">
+          <strong>Cero Tolerancia:</strong> Contenido ilegal, odio, violencia, o cualquier material relacionado con menores será reportado a las autoridades.
+        </div>
+        <p>El uso de la geolocalización es opcional; úsalo con responsabilidad y no acoses a otros miembros.</p>
+      </div>
+    </div>
+
+    <div class="policy-card" onclick="toggle(this)">
+      <div class="policy-header">
+        <div><span class="num">05</span> Política de Reembolsos</div>
+        <div class="icon-plus">+</div>
+      </div>
+      <div class="policy-content">
+        <p><strong>Todas las ventas son finales.</strong> Dado que el acceso al contenido digital es inmediato, no ofrecemos reembolsos por cambio de opinión o no uso del servicio.</p>
+        <p><strong>Excepción:</strong> Si hubo un error técnico (cobro doble), contáctanos en support@pnptv.app dentro de los 7 días.</p>
+      </div>
+    </div>
+
+    <div class="policy-card" onclick="toggle(this)">
+      <div class="policy-header">
+        <div><span class="num">06</span> Privacidad y Datos</div>
+        <div class="icon-plus">+</div>
+      </div>
+      <div class="policy-content">
+        <p><strong>No vendemos tus datos.</strong></p>
+        <ul>
+          <li><strong>Verificación de Edad (Face++):</strong> Si usas la cámara, tu foto se analiza y se elimina inmediatamente. Nunca guardamos tu imagen facial.</li>
+          <li><strong>Datos Recopilados:</strong> ID de Telegram, estado de suscripción y datos de soporte.</li>
+          <li><strong>Tus Derechos:</strong> Puedes solicitar eliminar tu cuenta y todos tus datos en cualquier momento.</li>
+        </ul>
+        <div class="info-box">
+          Autorizas el uso de IA para mejorar tu experiencia y recibir novedades del servicio.
+        </div>
+      </div>
+    </div>
+
+    <div class="policy-card" onclick="toggle(this)">
+      <div class="policy-header">
+        <div><span class="num">07</span> Jurisdicción Legal</div>
+        <div class="icon-plus">+</div>
+      </div>
+      <div class="policy-content">
+        <p>Este acuerdo se rige por las leyes de la República de Colombia. Cualquier disputa se intentará resolver primero de forma amistosa.</p>
+        <p>Renuncias a participar en demandas colectivas contra PNPtv!.</p>
+      </div>
+    </div>
+
+    <a href="mailto:support@pnptv.app" class="contact-link">
+      ¿Dudas? Contactar Soporte →
+    </a>
+
+  </div>
 
   <script>
-    window.addEventListener('scroll', () => {
-      const btn = document.querySelector('.back-to-top');
-      btn.classList.toggle('visible', window.scrollY > 300);
-    });
+    function toggle(element) {
+      element.classList.toggle('active');
+      var content = element.querySelector('.policy-content');
+
+      if (content.style.maxHeight) {
+        content.style.maxHeight = null;
+        content.style.paddingBottom = "0";
+      } else {
+        content.style.maxHeight = content.scrollHeight + "px";
+        content.style.paddingBottom = "20px";
+      }
+    }
   </script>
 </body>
 </html>
