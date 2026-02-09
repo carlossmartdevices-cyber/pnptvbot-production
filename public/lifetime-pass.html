@@ -2,208 +2,448 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PNPtv – Lifetime Access - $100 USD</title>
-    <meta name="description" content="Lifetime access to PNPtv. Pay once, enjoy forever. HD/4K videos, exclusive content, and more.">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" crossorigin="anonymous">
-    <link rel="stylesheet" href="/webapps/design-system/styles.css">
-    <link rel="stylesheet" href="static.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PNPtv! PRIME - Lifetime Access</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #1C1C1E;
+            --text-main: #FFFFFF;
+            --text-muted: #8E8E93;
+            --neon-pink: #FF00CC;
+            --neon-amber: #FFB454;
+            --glass-bg: rgba(44, 44, 46, 0.7);
+            --glass-border: rgba(255, 180, 84, 0.3);
+            --card-radius: 24px;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            padding-bottom: 100px; /* Space for sticky button */
+        }
+
+        /* --- Background Effects --- */
+        .ambient-glow {
+            position: fixed;
+            top: -20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100vw;
+            height: 100vw;
+            background: radial-gradient(circle, rgba(255, 0, 204, 0.15) 0%, rgba(28, 28, 30, 0) 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* --- Header --- */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+        }
+
+        .logo {
+            font-weight: 900;
+            font-size: 24px;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(255, 0, 204, 0.5);
+        }
+
+        .lang-toggle {
+            display: flex;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 2px;
+        }
+
+        .lang-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 18px;
+            transition: all 0.3s ease;
+        }
+
+        .lang-btn.active {
+            background: var(--text-main);
+            color: var(--bg-color);
+        }
+
+        /* --- Hero Section --- */
+        .hero {
+            text-align: center;
+            padding: 20px 24px 10px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        /* --- Pricing Card (Glassmorphism) --- */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--card-radius);
+            margin: 20px;
+            padding: 30px 24px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        /* The "Velvet Rope" Top Border */
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+        }
+
+        .card-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--neon-amber);
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .price-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .old-price {
+            font-size: 20px;
+            color: #636366;
+            text-decoration: line-through;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .new-price {
+            font-size: 64px;
+            font-weight: 900;
+            color: var(--text-main);
+            line-height: 1;
+            text-shadow: 0 0 30px rgba(255, 180, 84, 0.4);
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .currency {
+            font-size: 24px;
+            margin-top: 8px;
+            opacity: 0.8;
+        }
+
+        /* --- Benefits List --- */
+        .benefits-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            text-align: left;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .icon-check {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        /* --- Sticky CTA Footer --- */
+        .sticky-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            background: linear-gradient(to top, var(--bg-color) 80%, transparent);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .cta-button {
+            width: 100%;
+            max-width: 400px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            border: none;
+            border-radius: 16px;
+            padding: 16px;
+            color: white;
+            font-size: 18px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 20px rgba(255, 0, 204, 0.4);
+            cursor: pointer;
+            transition: transform 0.2s;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        .cta-button:active {
+            transform: scale(0.98);
+        }
+
+        .guarantee {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* --- Content Sections (Lang Toggle) --- */
+        .lang-content {
+            display: none;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        .lang-content.active {
+            display: block;
+        }
+
+        /* --- Diamond Separator --- */
+        .separator {
+            display: flex;
+            justify-content: center;
+            margin: 30px 0;
+            opacity: 0.5;
+        }
+    </style>
 </head>
 <body>
-    <div class="container flex flex-col items-center justify-center min-h-screen p-8">
-        <div class="text-center mb-12">
-            <h1 class="text-6xl font-bold mb-4 text-primary-gradient">PNPtv</h1>
-            <p class="text-lg text-muted-foreground">Pay once. Access forever.</p>
+
+    <div class="ambient-glow"></div>
+
+    <header>
+        <div class="logo">PNPtv!</div>
+        <div class="lang-toggle">
+            <button class="lang-btn active" onclick="setLang('en')" id="btn-en">EN</button>
+            <button class="lang-btn" onclick="setLang('es')" id="btn-es">ES</button>
         </div>
+    </header>
 
-        <div class="flex justify-center space-x-2 mb-10">
-            <button onclick="showLanguage('es')" class="button button-secondary active" id="btn-es">Español</button>
-            <button onclick="showLanguage('en')" class="button button-secondary" id="btn-en">English</button>
-        </div>
+    <div id="en" class="lang-content active">
+        <section class="hero">
+            <h1>Stop Renting.<br>Start Owning.</h1>
+            <p class="subtitle">One payment. Lifetime VIP Status.</p>
+        </section>
 
-        <!-- Spanish Version -->
-        <div id="es" class="language active w-full max-w-2xl">
-            <div class="card p-8 rounded-2xl shadow-xl border border-border-dark bg-card-background">
-                <div class="text-center mb-10 pb-10 border-b border-border-dark">
-                    <div class="text-sm uppercase tracking-wider font-semibold text-primary mb-4">Acceso de Por Vida</div>
-                    <div class="text-7xl font-bold mb-2 text-white">$100<span class="text-3xl text-muted-foreground align-super"> USD</span></div>
-                    <p class="text-muted-foreground text-lg">Pago único - Sin renovaciones</p>
-                </div>
-
-                <button class="button button-primary w-full py-4 text-xl mb-3" onclick="payNow()">
-                    Pagar Ahora
-                </button>
-                <p class="text-center text-sm text-muted-foreground mb-10">Pago seguro con Meru</p>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
-                    <div class="card p-6 border border-border-dark bg-card-secondary">
-                        <h3 class="text-lg font-semibold text-white mb-2">Videos HD/4K</h3>
-                        <p class="text-muted-foreground text-sm">Contenido premium de alta calidad</p>
-                    </div>
-                    <div class="card p-6 border border-border-dark bg-card-secondary">
-                        <h3 class="text-lg font-semibold text-white mb-2">Contenido Exclusivo</h3>
-                        <p class="text-muted-foreground text-sm">Acceso a material único</p>
-                    </div>
-                    <div class="card p-6 border border-border-dark bg-card-secondary">
-                        <h3 class="text-lg font-semibold text-white mb-2">Conexión Geográfica</h3>
-                        <p class="text-muted-foreground text-sm">Encuentra personas cerca de ti</p>
-                    </div>
-                    <div class="card p-6 border border-border-dark bg-card-secondary">
-                        <h3 class="text-lg font-semibold text-white mb-2">Soporte 24/7</h3>
-                        <p class="text-muted-foreground text-sm">Asistencia siempre disponible</p>
-                    </div>
-                </div>
-
-                <div class="mb-10">
-                    <h3 class="text-xl font-semibold text-white mb-5">Qué está incluido</h3>
-                    <ul class="space-y-3">
-                        <li class="flex items-center text-muted-foreground">
-                            <span class="icon-check mr-4 text-primary"></span>
-                            Acceso ilimitado de por vida
-                        </li>
-                        <li class="flex items-center text-muted-foreground">
-                            <span class="icon-check mr-4 text-primary"></span>
-                            Nuevos videos sin costo adicional
-                        </li>
-                        <li class="flex items-center text-muted-foreground">
-                            <span class="icon-check mr-4 text-primary"></span>
-                            Comunidad privada verificada
-                        </li>
-                        <li class="flex items-center text-muted-foreground">
-                            <span class="icon-check mr-4 text-primary"></span>
-                            Geolocalización para encuentros
-                        </li>
-                        <li class="flex items-center text-muted-foreground">
-                            <span class="icon-check mr-4 text-primary"></span>
-                            Contenido exclusivo único
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="card p-8 rounded-2xl border border-border-dark bg-card-secondary">
-                    <h3 class="text-xl font-semibold text-white mb-4">Cómo Activar Tu Cuenta</h3>
-                    <p class="text-muted-foreground mb-5">Después de completar el pago, solicita la activación de tu cuenta haciendo clic en el botón de abajo. Nuestro equipo procesará tu solicitud en menos de 24 horas.</p>
-                    <div class="text-center">
-                        <a href="https://t.me/pnplatinotv_bot?start=activate_lifetime" class="button button-secondary-outline inline-flex items-center justify-center" target="_blank">
-                            Solicitar Activación
-                        </a>
-                    </div>
-                    <p class="text-sm text-muted-foreground mt-4 text-center">Activación típica: menos de 24 horas</p>
+        <div class="glass-card">
+            <span class="card-label">Limited Time Offer</span>
+            
+            <div class="price-container">
+                <div class="old-price">$250</div>
+                <div class="new-price">
+                    <span class="currency">$</span>100
                 </div>
             </div>
+
+            <ul class="benefits-list">
+                <li class="benefit-item">
+                    <svg class="icon-check" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
+                    </svg>
+                    <span>Unlimited <b>Lifetime Access</b></span>
+                </li>
+                <li class="benefit-item">
+                    <svg class="icon-check" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
+                    </svg>
+                    <span><b>HD/4K</b> Premium Content</span>
+                </li>
+                <li class="benefit-item">
+                    <svg class="icon-check" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
+                    </svg>
+                    <span>Private <b>Verified Community</b></span>
+                </li>
+                <li class="benefit-item">
+                    <svg class="icon-check" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
+                    </svg>
+                    <span><b>No Monthly Fees</b> Ever</span>
+                </li>
+            </ul>
         </div>
 
-        <!-- English Version -->
-        <div id="en" class="language w-full max-w-2xl">
-            <div class="card p-8 rounded-2xl shadow-xl border border-border-dark bg-card-background">
-                <div class="text-center mb-10 pb-10 border-b border-border-dark">
-                    <div class="text-sm uppercase tracking-wider font-semibold text-primary mb-4">Lifetime Access</div>
-                    <div class="text-7xl font-bold mb-2 text-white">$100<span class="text-3xl text-muted-foreground align-super"> USD</span></div>
-                    <p class="text-muted-foreground text-lg">One-time payment - No renewals</p>
-                </div>
+        <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px;">
+            <p>"The Netflix of the underground."</p>
+            <div class="separator">
+                <span style="color:var(--neon-pink)">⬥</span> 
+                <span style="margin:0 5px; color:var(--text-muted)">⬥</span> 
+                <span style="color:var(--neon-amber)">⬥</span>
+            </div>
+            <p>After payment, tap "Activate" below.<br>Access is granted within 24 hours.</p>
+            <a href="https://t.me/pnplatinotv_bot?start=activate_lifetime" style="color: var(--neon-amber); text-decoration: none; font-weight: 600; display: inline-block; margin-top: 10px; border-bottom: 1px solid;">
+                Already paid? Activate here
+            </a>
+        </div>
+    </div>
 
-                <button class="button button-primary w-full py-4 text-xl mb-3" onclick="payNow()">
-                    Pay Now
-                </button>
-                <p class="text-center text-sm text-muted-foreground mb-10">Secure payment with Meru</p>
+    <div id="es" class="lang-content">
+        <section class="hero">
+            <h1>Deja de Rentar.<br>Empieza a Poseer.</h1>
+            <p class="subtitle">Un solo pago. Estatus VIP Vitalicio.</p>
+        </section>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
-                    <div class="card p-6 border border-border-dark bg-card-secondary">
-                        <h3 class="text-lg font-semibold text-white mb-2">HD/4K Videos</h3>
-                        <p class="text-muted-foreground text-sm">Premium high-quality content</p>
-                    </div>
-                    <div class="card p-6 border border-border-dark bg-card-secondary">
-                        <h3 class="text-lg font-semibold text-white mb-2">Exclusive Content</h3>
-                        <p class="text-muted-foreground text-sm">Access to unique material</p>
-                    </div>
-                    <div class="card p-6 border border-border-dark bg-card-secondary">
-                        <h3 class="text-lg font-semibold text-white mb-2">Geographic Connection</h3>
-                        <p class="text-muted-foreground text-sm">Find people near you</p>
-                    </div>
-                    <div class="card p-6 border border-border-dark bg-card-secondary">
-                        <h3 class="text-lg font-semibold text-white mb-2">24/7 Support</h3>
-                        <p class="text-muted-foreground text-sm">Assistance always available</p>
-                    </div>
-                </div>
-
-                <div class="mb-10">
-                    <h3 class="text-xl font-semibold text-white mb-5">What's Included</h3>
-                    <ul class="space-y-3">
-                        <li class="flex items-center text-muted-foreground">
-                            <span class="icon-check mr-4 text-primary"></span>
-                            Unlimited lifetime access
-                        </li>
-                        <li class="flex items-center text-muted-foreground">
-                            <span class="icon-check mr-4 text-primary"></span>
-                            New videos at no extra cost
-                        </li>
-                        <li class="flex items-center text-muted-foreground">
-                            <span class="icon-check mr-4 text-primary"></span>
-                            Private verified community
-                        </li>
-                        <li class="flex items-center text-muted-foreground">
-                            <span class="icon-check mr-4 text-primary"></span>
-                            Geolocation for meetups
-                        </li>
-                        <li class="flex items-center text-muted-foreground">
-                            <span class="icon-check mr-4 text-primary"></span>
-                            Exclusive unique content
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="card p-8 rounded-2xl border border-border-dark bg-card-secondary">
-                    <h3 class="text-xl font-semibold text-white mb-4">How to Activate Your Account</h3>
-                    <p class="text-muted-foreground mb-5">After completing payment, request account activation by clicking the button below. Our team will process your request within 24 hours.</p>
-                    <div class="text-center">
-                        <a href="https://t.me/pnplatinotv_bot?start=activate_lifetime" class="button button-secondary-outline inline-flex items-center justify-center" target="_blank">
-                            Request Activation
-                        </a>
-                    </div>
-                    <p class="text-sm text-muted-foreground mt-4 text-center">Typical activation: under 24 hours</p>
+        <div class="glass-card">
+            <span class="card-label">Oferta Limitada</span>
+            
+            <div class="price-container">
+                <div class="old-price">$250</div>
+                <div class="new-price">
+                    <span class="currency">$</span>100
                 </div>
             </div>
+
+            <ul class="benefits-list">
+                <li class="benefit-item">
+                    <svg class="icon-check" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
+                    </svg>
+                    <span>Acceso Vitalicio <b>Ilimitado</b></span>
+                </li>
+                <li class="benefit-item">
+                    <svg class="icon-check" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
+                    </svg>
+                    <span>Contenido Premium <b>HD/4K</b></span>
+                </li>
+                <li class="benefit-item">
+                    <svg class="icon-check" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
+                    </svg>
+                    <span>Comunidad <b>Privada Verificada</b></span>
+                </li>
+                <li class="benefit-item">
+                    <svg class="icon-check" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
+                    </svg>
+                    <span><b>Sin Pagos Mensuales</b> Nunca</span>
+                </li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px;">
+            <p>"El Netflix del underground."</p>
+            <div class="separator">
+                <span style="color:var(--neon-pink)">⬥</span> 
+                <span style="margin:0 5px; color:var(--text-muted)">⬥</span> 
+                <span style="color:var(--neon-amber)">⬥</span>
+            </div>
+            <p>Después del pago, toca "Activar" abajo.<br>El acceso se otorga en 24 horas.</p>
+            <a href="https://t.me/pnplatinotv_bot?start=activate_lifetime" style="color: var(--neon-amber); text-decoration: none; font-weight: 600; display: inline-block; margin-top: 10px; border-bottom: 1px solid;">
+                ¿Ya pagaste? Activa aquí
+            </a>
+        </div>
+    </div>
+
+    <div class="sticky-footer">
+        <button class="cta-button" onclick="payNow()">
+            <span id="cta-text">JOIN NOW</span>
+        </button>
+        <div class="guarantee">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+            Secure Payment via Meru
         </div>
     </div>
 
     <script>
-        // Meru payment links - randomizer will select one
+        // Meru payment links - randomizer
         const meruPaymentLinks = [
-            'https://pay.getmeru.com/74E9pA',
-            'https://pay.getmeru.com/I0uf3R',
-            'https://pay.getmeru.com/eEnWer',
-            'https://pay.getmeru.com/C8w85t',
-            'https://pay.getmeru.com/TLAOg8',
-            'https://pay.getmeru.com/rVB-gs',
-            'https://pay.getmeru.com/_vGzZk',
-            'https://pay.getmeru.com/UBKonch',
-            'https://pay.getmeru.com/AGc5lb',
-            'https://pay.getmeru.com/SOseUx',
-            'https://pay.getmeru.com/pInI3g',
-            'https://pay.getmeru.com/rVuKhL',
-            'https://pay.getmeru.com/5gJF8u',
-            'https://pay.getmeru.com/W4s9gI',
-            'https://pay.getmeru.com/O5-Qau',
-            'https://pay.getmeru.com/zJRcn6',
+            'https://pay.getmeru.com/74E9pA', 'https://pay.getmeru.com/I0uf3R',
+            'https://pay.getmeru.com/eEnWer', 'https://pay.getmeru.com/C8w85t',
+            'https://pay.getmeru.com/TLAOg8', 'https://pay.getmeru.com/rVB-gs',
+            'https://pay.getmeru.com/_vGzZk', 'https://pay.getmeru.com/UBKonch',
+            'https://pay.getmeru.com/AGc5lb', 'https://pay.getmeru.com/SOseUx',
+            'https://pay.getmeru.com/pInI3g', 'https://pay.getmeru.com/rVuKhL',
+            'https://pay.getmeru.com/5gJF8u', 'https://pay.getmeru.com/W4s9gI',
+            'https://pay.getmeru.com/O5-Qau', 'https://pay.getmeru.com/zJRcn6',
             'https://pay.getmeru.com/IvvxqX'
         ];
 
-        // Pay Now function - redirects to random Meru link
         function payNow() {
             const randomIndex = Math.floor(Math.random() * meruPaymentLinks.length);
-            const selectedLink = meruPaymentLinks[randomIndex];
-            window.open(selectedLink, '_blank');
+            window.open(meruPaymentLinks[randomIndex], '_blank');
         }
 
-        // Show language
-        function showLanguage(lang) {
-            // Update language sections
-            document.querySelectorAll('.language').forEach(el => el.classList.remove('active'));
+        // Language Logic
+        function setLang(lang) {
+            // Content
+            document.querySelectorAll('.lang-content').forEach(el => el.classList.remove('active'));
             document.getElementById(lang).classList.add('active');
-
-            // Update buttons
-            document.querySelectorAll('.language-selector button').forEach(btn => btn.classList.remove('active'));
+            
+            // Buttons
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById('btn-' + lang).classList.add('active');
+
+            // Update CTA Button Text
+            const btnText = document.getElementById('cta-text');
+            if(lang === 'es') {
+                btnText.innerText = "ACCESO TOTAL - $100";
+            } else {
+                btnText.innerText = "GET LIFETIME ACCESS";
+            }
         }
     </script>
 </body>
