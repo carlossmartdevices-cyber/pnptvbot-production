@@ -188,7 +188,13 @@
       "Bash(npx jest --passWithNoTests --forceExit --detectOpenHandles)",
       "Bash(set:*)",
       "Bash(npx dotenv:*)",
-      "Bash(node -e \"require\\(''''dotenv''''\\).config\\(\\)\")"
+      "Bash(node -e \"require\\(''''dotenv''''\\).config\\(\\)\")",
+      "Bash(xargs ls:*)",
+      "Bash(rsync:*)",
+      "WebFetch(domain:epayco.co)",
+      "Bash(python3 -c \"\nimport sys, re\ncode = sys.stdin.read\\(\\)\n# Find token.create or create method\nmatches = re.findall\\(r''''.{0,100}token.{0,200}'''', code\\)\nfor m in matches[:5]:\n    print\\(m[:200]\\)\n    print\\(''''---''''\\)\n\")",
+      "Bash(npm view:*)",
+      "Bash(sudo sed:*)"
     ],
     "deny": [],
     "ask": []

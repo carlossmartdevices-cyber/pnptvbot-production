@@ -35,7 +35,7 @@
             display: flex;
             flex-direction: column;
             overflow-x: hidden;
-            padding-bottom: 100px; /* Space for sticky button */
+            padding-bottom: 120px; /* Increased space for sticky button */
         }
 
         /* --- Background Effects --- */
@@ -104,6 +104,7 @@
             font-weight: 900;
             line-height: 1.1;
             margin-bottom: 10px;
+            text-transform: uppercase;
         }
 
         .subtitle {
@@ -190,9 +191,10 @@
 
         .benefit-item {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             margin-bottom: 16px;
-            font-size: 15px;
+            font-size: 14px;
+            line-height: 1.4;
             color: rgba(255, 255, 255, 0.9);
         }
 
@@ -201,6 +203,7 @@
             height: 20px;
             margin-right: 12px;
             flex-shrink: 0;
+            margin-top: 2px;
         }
 
         /* --- Sticky CTA Footer --- */
@@ -210,7 +213,7 @@
             left: 0;
             width: 100%;
             padding: 20px;
-            background: linear-gradient(to top, var(--bg-color) 80%, transparent);
+            background: linear-gradient(to top, var(--bg-color) 85%, transparent);
             z-index: 100;
             display: flex;
             flex-direction: column;
@@ -225,10 +228,10 @@
             border-radius: 16px;
             padding: 16px;
             color: white;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             box-shadow: 0 0 20px rgba(255, 0, 204, 0.4);
             cursor: pointer;
             transition: transform 0.2s;
@@ -268,6 +271,13 @@
             margin: 30px 0;
             opacity: 0.5;
         }
+        
+        .instruction-text {
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
     </style>
 </head>
 <body>
@@ -284,8 +294,8 @@
 
     <div id="en" class="lang-content active">
         <section class="hero">
-            <h1>Stop Renting.<br>Start Owning.</h1>
-            <p class="subtitle">One payment. Lifetime VIP Status.</p>
+            <h1>PRIME member for life.</h1>
+            <p class="subtitle">One time payment.</p>
         </section>
 
         <div class="glass-card">
@@ -303,38 +313,41 @@
                     <svg class="icon-check" viewBox="0 0 24 24" fill="none">
                         <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
                     </svg>
-                    <span>Unlimited <b>Lifetime Access</b></span>
+                    <span>Full access to <b>PNPtv PRIME</b>: the best PNP Adult Content on Telegram.</span>
                 </li>
                 <li class="benefit-item">
                     <svg class="icon-check" viewBox="0 0 24 24" fill="none">
                         <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
                     </svg>
-                    <span><b>HD/4K</b> Premium Content</span>
+                    <span>Access to <b>PNP Nearby</b>, <b>PNP Hangouts</b>, <b>PNP Live</b>, and <b>PNP Videorama</b>.</span>
                 </li>
                 <li class="benefit-item">
                     <svg class="icon-check" viewBox="0 0 24 24" fill="none">
                         <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
                     </svg>
-                    <span>Private <b>Verified Community</b></span>
+                    <span>Access to our <b>Community Telegram Group</b>.</span>
                 </li>
                 <li class="benefit-item">
                     <svg class="icon-check" viewBox="0 0 24 24" fill="none">
                         <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
                     </svg>
-                    <span><b>No Monthly Fees</b> Ever</span>
+                    <span><b>24/7 Support</b> through our AI powered chat bot.</span>
                 </li>
             </ul>
         </div>
 
-        <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px;">
-            <p>"The Netflix of the underground."</p>
+        <div style="text-align: center; padding: 20px;">
             <div class="separator">
                 <span style="color:var(--neon-pink)">⬥</span> 
                 <span style="margin:0 5px; color:var(--text-muted)">⬥</span> 
                 <span style="color:var(--neon-amber)">⬥</span>
             </div>
-            <p>After payment, tap "Activate" below.<br>Access is granted within 24 hours.</p>
-            <a href="https://t.me/pnplatinotv_bot?start=activate_lifetime" style="color: var(--neon-amber); text-decoration: none; font-weight: 600; display: inline-block; margin-top: 10px; border-bottom: 1px solid;">
+            
+            <p class="instruction-text">
+                Complete your payment, make a screenshot, and come back to this page to activate your membership.
+            </p>
+
+            <a href="https://t.me/pnplatinotv_bot?start=activate_lifetime" style="color: var(--neon-amber); text-decoration: none; font-weight: 600; display: inline-block; border-bottom: 1px solid;">
                 Already paid? Activate here
             </a>
         </div>
@@ -342,8 +355,8 @@
 
     <div id="es" class="lang-content">
         <section class="hero">
-            <h1>Deja de Rentar.<br>Empieza a Poseer.</h1>
-            <p class="subtitle">Un solo pago. Estatus VIP Vitalicio.</p>
+            <h1>Miembro PRIME de por vida.</h1>
+            <p class="subtitle">Un solo pago único.</p>
         </section>
 
         <div class="glass-card">
@@ -361,38 +374,41 @@
                     <svg class="icon-check" viewBox="0 0 24 24" fill="none">
                         <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
                     </svg>
-                    <span>Acceso Vitalicio <b>Ilimitado</b></span>
+                    <span>Acceso total a <b>PNPtv PRIME</b>: el mejor contenido PNP en Telegram.</span>
                 </li>
                 <li class="benefit-item">
                     <svg class="icon-check" viewBox="0 0 24 24" fill="none">
                         <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
                     </svg>
-                    <span>Contenido Premium <b>HD/4K</b></span>
+                    <span>Acceso a <b>PNP Nearby</b>, <b>Hangouts</b>, <b>Live</b> y <b>Videorama</b>.</span>
                 </li>
                 <li class="benefit-item">
                     <svg class="icon-check" viewBox="0 0 24 24" fill="none">
                         <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
                     </svg>
-                    <span>Comunidad <b>Privada Verificada</b></span>
+                    <span>Acceso a nuestro <b>Grupo de Comunidad</b> en Telegram.</span>
                 </li>
                 <li class="benefit-item">
                     <svg class="icon-check" viewBox="0 0 24 24" fill="none">
                         <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#FFB454"/>
                     </svg>
-                    <span><b>Sin Pagos Mensuales</b> Nunca</span>
+                    <span><b>Soporte 24/7</b> a través de nuestro chat bot con IA.</span>
                 </li>
             </ul>
         </div>
 
-        <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px;">
-            <p>"El Netflix del underground."</p>
+        <div style="text-align: center; padding: 20px;">
             <div class="separator">
                 <span style="color:var(--neon-pink)">⬥</span> 
                 <span style="margin:0 5px; color:var(--text-muted)">⬥</span> 
                 <span style="color:var(--neon-amber)">⬥</span>
             </div>
-            <p>Después del pago, toca "Activar" abajo.<br>El acceso se otorga en 24 horas.</p>
-            <a href="https://t.me/pnplatinotv_bot?start=activate_lifetime" style="color: var(--neon-amber); text-decoration: none; font-weight: 600; display: inline-block; margin-top: 10px; border-bottom: 1px solid;">
+            
+            <p class="instruction-text">
+                Completa tu pago, toma una captura de pantalla y regresa a esta página para activar tu membresía.
+            </p>
+
+            <a href="https://t.me/pnplatinotv_bot?start=activate_lifetime" style="color: var(--neon-amber); text-decoration: none; font-weight: 600; display: inline-block; border-bottom: 1px solid;">
                 ¿Ya pagaste? Activa aquí
             </a>
         </div>
@@ -400,7 +416,7 @@
 
     <div class="sticky-footer">
         <button class="cta-button" onclick="payNow()">
-            <span id="cta-text">JOIN NOW</span>
+            <span id="cta-text">GET LIFETIME ACCESS</span>
         </button>
         <div class="guarantee">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
@@ -409,17 +425,37 @@
     </div>
 
     <script>
-        // Meru payment links - randomizer
+        // Updated Meru payment links - randomizer
         const meruPaymentLinks = [
-            'https://pay.getmeru.com/74E9pA', 'https://pay.getmeru.com/I0uf3R',
-            'https://pay.getmeru.com/eEnWer', 'https://pay.getmeru.com/C8w85t',
-            'https://pay.getmeru.com/TLAOg8', 'https://pay.getmeru.com/rVB-gs',
-            'https://pay.getmeru.com/_vGzZk', 'https://pay.getmeru.com/UBKonch',
-            'https://pay.getmeru.com/AGc5lb', 'https://pay.getmeru.com/SOseUx',
-            'https://pay.getmeru.com/pInI3g', 'https://pay.getmeru.com/rVuKhL',
-            'https://pay.getmeru.com/5gJF8u', 'https://pay.getmeru.com/W4s9gI',
-            'https://pay.getmeru.com/O5-Qau', 'https://pay.getmeru.com/zJRcn6',
-            'https://pay.getmeru.com/IvvxqX'
+            'https://pay.getmeru.com/LSJUek',
+            'https://pay.getmeru.com/FCqG-z',
+            'https://pay.getmeru.com/MEz8OG',
+            'https://pay.getmeru.com/_DIFtk',
+            'https://pay.getmeru.com/no4m1d',
+            'https://pay.getmeru.com/9lDA6e',
+            'https://pay.getmeru.com/SKYO2w',
+            'https://pay.getmeru.com/m-3CVd',
+            'https://pay.getmeru.com/daq_Ak',
+            'https://pay.getmeru.com/_26Hnr',
+            'https://pay.getmeru.com/nyj8t0',
+            'https://pay.getmeru.com/TUXYsC',
+            'https://pay.getmeru.com/AObuN_',
+            'https://pay.getmeru.com/UHf4aO',
+            'https://pay.getmeru.com/ziQSge',
+            'https://pay.getmeru.com/rVB-gs',
+            'https://pay.getmeru.com/eEnWer',
+            'https://pay.getmeru.com/-rSgg8',
+            'https://pay.getmeru.com/C8w85t',
+            'https://pay.getmeru.com/UBKonch',
+            'https://pay.getmeru.com/rVuKhL',
+            'https://pay.getmeru.com/W4s9gI',
+            'https://pay.getmeru.com/5gJF8u',
+            'https://pay.getmeru.com/pInI3g',
+            'https://pay.getmeru.com/IvvxqX',
+            'https://pay.getmeru.com/O5-Qau',
+            'https://pay.getmeru.com/e8YzFl',
+            'https://pay.getmeru.com/QrHN40',
+            'https://pay.getmeru.com/-xYerM'
         ];
 
         function payNow() {
@@ -440,7 +476,7 @@
             // Update CTA Button Text
             const btnText = document.getElementById('cta-text');
             if(lang === 'es') {
-                btnText.innerText = "ACCESO TOTAL - $100";
+                btnText.innerText = "OBTENER ACCESO DE POR VIDA";
             } else {
                 btnText.innerText = "GET LIFETIME ACCESS";
             }
