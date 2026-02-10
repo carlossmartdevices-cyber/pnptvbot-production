@@ -197,6 +197,14 @@ app.get('/auth/not-registered', (req, res) => {
   res.redirect(302, '/auth/not-registered.html');
 });
 
+// Login route - redirects to telegram login with return URL handling
+app.get('/login', (req, res) => {
+  const returnUrl = req.query.return || '/videorama';
+  // Redirect to telegram login complete page with the return URL as 'from' parameter
+  // The telegram-login-complete.html expects 'from' parameter for redirect handling
+  res.redirect(302, `/auth/telegram-login-complete.html?from=${encodeURIComponent(returnUrl)}`);
+});
+
 // Add cache control headers for static assets to prevent browser caching issues
 app.use((req, res, next) => {
   if (req.path.startsWith('/videorama-app/') &&
