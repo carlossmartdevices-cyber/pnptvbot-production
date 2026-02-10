@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PNPtv - Telegram Login</title>
-    <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="pnptvbot" data-size="large" data-auth-url="/api/telegram-auth" data-request-access="write"></script>
     <style>
         * {
             margin: 0;
@@ -236,7 +235,13 @@
         <p style="margin-bottom: 20px; color: #e0e0e0;">Login with Telegram to get started</p>
 
         <div class="telegram-widget">
-            <!-- Telegram Login Widget will render here -->
+            <script async src="https://telegram.org/js/telegram-widget.js?22"
+                data-telegram-login="pnptvbot"
+                data-size="large"
+                data-auth-url="/api/telegram-auth"
+                data-request-access="write"
+                onload="window.onTelegramAuth = onTelegramAuth;">
+            </script>
         </div>
 
         <div class="loading-spinner" id="loadingSpinner">
@@ -254,8 +259,44 @@
     </div>
 
     <script>
+        // Handle Telegram authentication callback
+        function onTelegramAuth(user) {
+            console.log('Telegram login successful:', user);
+            document.getElementById('loadingSpinner').style.display = 'block';
+
+            // Send to backend for authentication
+            fetch('/api/telegram-auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegramUser: user })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Auth response:', data);
+
+                if (data.success && data.termsAccepted) {
+                    // User authenticated and accepted terms - go to portal
+                    window.location.href = '/portal';
+                } else if (data.redirect) {
+                    // Follow redirect (could be terms page or registration)
+                    window.location.href = data.redirect;
+                } else if (data.success) {
+                    // User authenticated but needs to accept terms
+                    localStorage.setItem('userId', user.id);
+                    window.location.href = '/auth/terms?from=/portal';
+                } else {
+                    throw new Error(data.error || 'Authentication failed');
+                }
+            })
+            .catch(error => {
+                console.error('Authentication error:', error);
+                document.getElementById('loadingSpinner').style.display = 'none';
+                alert('Authentication failed: ' + error.message);
+            });
+        }
+
+        // Generate animated stars background
         document.addEventListener('DOMContentLoaded', function() {
-            // Generate random stars
             const starsContainer = document.getElementById('stars');
             for (let i = 0; i < 50; i++) {
                 const star = document.createElement('div');
@@ -266,40 +307,6 @@
                 star.style.top = Math.random() * 100 + '%';
                 star.style.animationDelay = Math.random() * 3 + 's';
                 starsContainer.appendChild(star);
-            }
-
-            // Handle Telegram login widget response
-            if (window.Telegram && window.Telegram.Login) {
-                window.Telegram.Login.onAuth = function(user) {
-                    console.log('Telegram login:', user);
-                    document.getElementById('loadingSpinner').style.display = 'block';
-
-                    // Send to backend for auth
-                    fetch('/api/telegram-auth', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ telegramUser: user })
-                    })
-                    .then(r => r.json())
-                    .then(data => {
-                        console.log('Auth response:', data);
-                        if (data.success && data.termsAccepted) {
-                            // Redirect to portal dashboard
-                            window.location.href = '/portal';
-                        } else if (data.redirect) {
-                            window.location.href = data.redirect;
-                        } else if (data.success) {
-                            // Save user ID and redirect to terms
-                            localStorage.setItem('userId', user.id);
-                            window.location.href = '/auth/terms?from=/portal';
-                        }
-                    })
-                    .catch(err => {
-                        console.error('Auth error:', err);
-                        document.getElementById('loadingSpinner').style.display = 'none';
-                        alert('Authentication failed. Please try again.');
-                    });
-                };
             }
         });
     </script>
