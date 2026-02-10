@@ -1,7 +1,9 @@
 const PaymentService = require('../../../src/bot/services/paymentService');
+const PaymentSecurityService = require('../../../src/bot/services/paymentSecurityService');
 const PaymentController = require('../../../src/bot/api/controllers/paymentController');
 
 jest.mock('../../../src/bot/services/paymentService');
+jest.mock('../../../src/bot/services/paymentSecurityService');
 
 // Helper to create mock req/res
 function createMockReqRes(body = {}, headers = {}) {
@@ -20,6 +22,13 @@ function createMockReqRes(body = {}, headers = {}) {
 describe('PaymentController.processTokenizedCharge', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Mock PaymentSecurityService methods to pass validation
+    PaymentSecurityService.checkPaymentRateLimit.mockResolvedValue({ allowed: true });
+    PaymentSecurityService.validatePCICompliance.mockReturnValue({ compliant: true });
+    PaymentSecurityService.checkPaymentTimeout.mockResolvedValue({ expired: false });
+    PaymentSecurityService.logPaymentEvent.mockReturnValue(Promise.resolve({}));
+    PaymentSecurityService.logPaymentError.mockReturnValue(Promise.resolve({}));
   });
 
   describe('Validation', () => {

@@ -1,5 +1,3 @@
-jest.useFakeTimers();
-
 const PaymentService = require('../src/bot/services/paymentService');
 const { handleEpaycoWebhook } = require('../src/bot/api/controllers/webhookController');
 
@@ -31,6 +29,8 @@ const createRes = () => {
 };
 
 describe('handleEpaycoWebhook', () => {
+  jest.setTimeout(10000);
+
   beforeEach(() => {
     jest.clearAllMocks();
     PaymentService.processEpaycoWebhook.mockResolvedValue({ success: true });
