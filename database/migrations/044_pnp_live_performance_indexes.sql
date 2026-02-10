@@ -31,14 +31,6 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_pnp_bookings_model_status_time
 ON pnp_bookings(model_id, status, booking_time);
 
 -- =====================================================
--- 5. Index for feedback requests worker query
--- Optimizes: WHERE status = 'completed' AND rating IS NULL AND show_ended_at BETWEEN X AND Y
--- =====================================================
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_pnp_bookings_feedback_pending
-ON pnp_bookings(status, show_ended_at)
-WHERE status = 'completed' AND rating IS NULL;
-
--- =====================================================
 -- 6. Add rating and notification tracking columns to pnp_bookings
 -- (Used for quick feedback check and duplicate notification prevention)
 -- =====================================================
@@ -47,6 +39,14 @@ ADD COLUMN IF NOT EXISTS rating INTEGER,
 ADD COLUMN IF NOT EXISTS feedback_text TEXT,
 ADD COLUMN IF NOT EXISTS reminder_1h_sent BOOLEAN DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS reminder_5m_sent BOOLEAN DEFAULT FALSE;
+
+-- =====================================================
+-- 5. Index for feedback requests worker query
+-- Optimizes: WHERE status = 'completed' AND rating IS NULL AND show_ended_at BETWEEN X AND Y
+-- =====================================================
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_pnp_bookings_feedback_pending
+ON pnp_bookings(status, show_ended_at)
+WHERE status = 'completed' AND rating IS NULL;
 
 -- =====================================================
 -- 7. Composite index for promo usage unique check

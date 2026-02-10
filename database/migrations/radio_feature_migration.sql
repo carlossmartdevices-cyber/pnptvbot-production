@@ -115,8 +115,8 @@ CREATE TRIGGER radio_schedule_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_radio_updated_at();
 
-DROP TRIGGER IF EXISTS radio_now_playing_updated_at ON radio_now_playing;
-CREATE TRIGGER radio_now_playing_updated_at
-  BEFORE UPDATE ON radio_now_playing
-  FOR EACH ROW
-  EXECUTE FUNCTION update_radio_updated_at();
+-- DROP TRIGGER IF EXISTS radio_now_playing_updated_at ON radio_now_playing;
+-- CREATE TRIGGER radio_now_playing_updated_at
+--   BEFORE UPDATE ON radio_now_playing
+--   FOR EACH ROW
+--   EXECUTE FUNCTION update_radio_updated_at();

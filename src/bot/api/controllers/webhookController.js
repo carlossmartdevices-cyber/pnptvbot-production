@@ -496,7 +496,7 @@ const handlePaymentResponse = async (req, res) => {
     if (status === 'success' || status === 'approved') {
       res.send(`
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
           <title>Payment Successful</title>
           <meta charset="UTF-8">
@@ -558,7 +558,7 @@ const handlePaymentResponse = async (req, res) => {
     } else {
       res.send(`
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
           <title>Payment Failed</title>
           <meta charset="UTF-8">

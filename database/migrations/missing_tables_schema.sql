@@ -159,12 +159,12 @@ CREATE INDEX IF NOT EXISTS idx_banned_users_group_id ON banned_users(group_id);
 CREATE INDEX IF NOT EXISTS idx_banned_users_banned_at ON banned_users(banned_at);
 CREATE INDEX IF NOT EXISTS idx_moderation_logs_group_id ON moderation_logs(group_id);
 CREATE INDEX IF NOT EXISTS idx_moderation_logs_user_id ON moderation_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_moderation_logs_timestamp ON moderation_logs(timestamp);
+CREATE INDEX IF NOT EXISTS idx_moderation_logs_timestamp ON moderation_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_username_history_user_id ON username_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_username_history_group_id ON username_history(group_id);
 CREATE INDEX IF NOT EXISTS idx_username_history_changed_at ON username_history(changed_at);
 CREATE INDEX IF NOT EXISTS idx_username_history_flagged ON username_history(flagged);
-CREATE INDEX IF NOT EXISTS idx_username_history_flagged_at ON username_history(flagged_at);
+-- CREATE INDEX IF NOT EXISTS idx_username_history_flagged_at ON username_history(flagged_at);
 CREATE INDEX IF NOT EXISTS idx_forwarded_violations_user_id ON forwarded_violations(user_id);
 CREATE INDEX IF NOT EXISTS idx_forwarded_violations_group_id ON forwarded_violations(group_id);
 CREATE INDEX IF NOT EXISTS idx_forwarded_violations_timestamp ON forwarded_violations(timestamp);
@@ -273,7 +273,7 @@ CREATE TABLE IF NOT EXISTS radio_schedule (
 );
 
 -- Indexes for radio tables
-CREATE INDEX IF NOT EXISTS idx_radio_now_playing_started_at ON radio_now_playing(started_at);
+-- CREATE INDEX IF NOT EXISTS idx_radio_now_playing_started_at ON radio_now_playing(started_at);
 CREATE INDEX IF NOT EXISTS idx_radio_requests_user_id ON radio_requests(user_id);
 CREATE INDEX IF NOT EXISTS idx_radio_requests_status ON radio_requests(status);
 CREATE INDEX IF NOT EXISTS idx_radio_requests_requested_at ON radio_requests(requested_at);
@@ -356,11 +356,18 @@ CREATE INDEX IF NOT EXISTS idx_profile_compliance_purged ON profile_compliance(p
 CREATE INDEX IF NOT EXISTS idx_profile_compliance_compliance_issues ON profile_compliance(compliance_issues);
 
 -- Triggers for updated_at
+DROP TRIGGER IF EXISTS update_custom_emotes_updated_at ON custom_emotes;
 CREATE TRIGGER update_custom_emotes_updated_at BEFORE UPDATE ON custom_emotes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_group_settings_updated_at ON group_settings;
 CREATE TRIGGER update_group_settings_updated_at BEFORE UPDATE ON group_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_subscribers_updated_at ON subscribers;
 CREATE TRIGGER update_subscribers_updated_at BEFORE UPDATE ON subscribers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_radio_requests_updated_at ON radio_requests;
 CREATE TRIGGER update_radio_requests_updated_at BEFORE UPDATE ON radio_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_radio_schedule_updated_at ON radio_schedule;
 CREATE TRIGGER update_radio_schedule_updated_at BEFORE UPDATE ON radio_schedule FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_emotes_updated_at ON emotes;
 CREATE TRIGGER update_emotes_updated_at BEFORE UPDATE ON emotes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_profile_compliance_updated_at ON profile_compliance;
 CREATE TRIGGER update_profile_compliance_updated_at BEFORE UPDATE ON profile_compliance FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 

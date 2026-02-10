@@ -218,6 +218,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_performers_updated_at ON performers;
 CREATE TRIGGER trigger_performers_updated_at
 BEFORE UPDATE ON performers
 FOR EACH ROW
@@ -232,6 +233,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_call_bookings_updated_at ON call_bookings;
 CREATE TRIGGER trigger_call_bookings_updated_at
 BEFORE UPDATE ON call_bookings
 FOR EACH ROW
@@ -246,6 +248,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_call_availability_slots_updated_at ON call_availability_slots;
 CREATE TRIGGER trigger_call_availability_slots_updated_at
 BEFORE UPDATE ON call_availability_slots
 FOR EACH ROW
@@ -281,6 +284,6 @@ ON CONFLICT (display_name) DO NOTHING;
 -- =====================================================
 
 -- Log migration completion
-INSERT INTO migrations (name, applied_at, description)
+-- INSERT INTO migrations (name, applied_at, description)
 VALUES ('036_add_performers_and_enhanced_calls', NOW(), 'Added performers table and enhanced private calls system')
-ON CONFLICT (name) DO NOTHING;
+-- ON CONFLICT (name) DO NOTHING;

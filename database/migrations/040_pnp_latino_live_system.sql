@@ -95,6 +95,7 @@ CREATE INDEX IF NOT EXISTS idx_pnp_feedback_booking ON pnp_feedback(booking_id);
 CREATE INDEX IF NOT EXISTS idx_pnp_refunds_booking ON pnp_refunds(booking_id);
 
 -- Create trigger for updating model online status
+DROP TRIGGER IF EXISTS trigger_update_model_online ON pnp_models;
 CREATE OR REPLACE FUNCTION update_model_online_status()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -111,6 +112,7 @@ FOR EACH ROW
 EXECUTE FUNCTION update_model_online_status();
 
 -- Create trigger for updating booking timestamps
+DROP TRIGGER IF EXISTS trigger_update_booking_timestamp ON pnp_bookings;
 CREATE OR REPLACE FUNCTION update_booking_timestamp()
 RETURNS TRIGGER AS $$
 BEGIN

@@ -25,22 +25,26 @@ BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'radio_now_playing') THEN
         -- Try to copy data from old table
         BEGIN
+            -- Only copy existing columns from old table to new table
+            -- Assuming 'track_id', 'started_at', 'ends_at', 'listener_count', 'updated_at' are common
             UPDATE radio_now_playing_new SET
-                title = old.title,
-                artist = old.artist,
-                duration = old.duration,
-                cover_url = old.cover_url,
-                started_at = old.started_at
+                track_id = old.track_id,
+                started_at = old.started_at,
+                ends_at = old.ends_at,
+                listener_count = old.listener_count,
+                updated_at = old.updated_at
             FROM (
-                SELECT title, artist, duration, cover_url, started_at 
-                FROM radio_now_playing 
-                ORDER BY started_at DESC 
+                SELECT track_id, started_at, ends_at, listener_count, updated_at
+                FROM radio_now_playing
+                ORDER BY started_at DESC
                 LIMIT 1
             ) AS old
             WHERE radio_now_playing_new.id = 1;
             EXCEPTION WHEN OTHERS THEN
                 RAISE NOTICE 'Could not migrate data from old table: %', SQLERRM;
             END;
+        -- Drop the old table before creating the view
+        DROP TABLE radio_now_playing;
     END IF;
 END $$;
 

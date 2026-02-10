@@ -358,6 +358,6 @@ $$ LANGUAGE plpgsql;
 -- =====================================================
 
 -- Log migration completion
-INSERT INTO migrations (name, applied_at, description)
+-- INSERT INTO migrations (name, applied_at, description)
 VALUES ('037_private_calls_pronto', NOW(), 'Enhanced private calls booking system with hold mechanism, payments, sessions, notifications, and audit logs')
-ON CONFLICT (name) DO NOTHING;
+-- ON CONFLICT (name) DO NOTHING;

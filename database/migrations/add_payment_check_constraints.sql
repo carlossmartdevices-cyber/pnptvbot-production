@@ -5,46 +5,78 @@
 -- =====================================================
 
 -- Add CHECK constraint for payment amount (must be positive)
-ALTER TABLE payments
-DROP CONSTRAINT IF EXISTS payments_amount_positive;
-
-ALTER TABLE payments
-ADD CONSTRAINT payments_amount_positive CHECK (amount > 0);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'payments_amount_positive'
+        AND table_name = 'payments'
+    ) THEN
+        ALTER TABLE payments
+        ADD CONSTRAINT payments_amount_positive CHECK (amount > 0);
+    END IF;
+END
+$$;
 
 -- Add CHECK constraint for payment status (must be one of valid values)
-ALTER TABLE payments
-DROP CONSTRAINT IF EXISTS payments_status_valid;
-
-ALTER TABLE payments
-ADD CONSTRAINT payments_status_valid CHECK (
-  status IN (
-    'pending',
-    'processing',
-    'completed',
-    'failed',
-    'cancelled',
-    'expired',
-    'refunded'
-  )
-);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'payments_status_valid'
+        AND table_name = 'payments'
+    ) THEN
+        ALTER TABLE payments
+        ADD CONSTRAINT payments_status_valid CHECK (
+            status IN (
+                'pending',
+                'processing',
+                'completed',
+                'failed',
+                'cancelled',
+                'expired',
+                'refunded'
+            )
+        );
+    END IF;
+END
+$$;
 
 -- Add CHECK constraint for currency (must be one of supported values)
-ALTER TABLE payments
-DROP CONSTRAINT IF EXISTS payments_currency_valid;
-
-ALTER TABLE payments
-ADD CONSTRAINT payments_currency_valid CHECK (
-  currency IN ('USD', 'USDC', 'EUR', 'COP')
-);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'payments_currency_valid'
+        AND table_name = 'payments'
+    ) THEN
+        ALTER TABLE payments
+        ADD CONSTRAINT payments_currency_valid CHECK (
+            currency IN ('USD', 'USDC', 'EUR', 'COP')
+        );
+    END IF;
+END
+$$;
 
 -- Add CHECK constraint for provider (must be one of supported providers)
-ALTER TABLE payments
-DROP CONSTRAINT IF EXISTS payments_provider_valid;
-
-ALTER TABLE payments
-ADD CONSTRAINT payments_provider_valid CHECK (
-  provider IN ('epayco', 'daimo', 'paypal', 'stripe', 'manual', NULL)
-);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'payments_provider_valid'
+        AND table_name = 'payments'
+    ) THEN
+        ALTER TABLE payments
+        ADD CONSTRAINT payments_provider_valid CHECK (
+            provider IN ('epayco', 'daimo', 'paypal', 'stripe', 'manual', NULL)
+        );
+    END IF;
+END
+$$;
 
 -- Add index on status for faster queries
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);

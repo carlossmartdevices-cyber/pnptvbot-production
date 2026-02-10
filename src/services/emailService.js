@@ -372,7 +372,7 @@ class EmailService {
 
         return `
 <!DOCTYPE html>
-<html>
+<html lang="${isSpanish ? 'es' : 'en'}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -552,7 +552,7 @@ class EmailService {
 
         return `
 <!DOCTYPE html>
-<html>
+<html lang="${isSpanish ? 'es' : 'en'}">
 <head>
     <meta charset="UTF-8">
     <title>${welcomeTitle}</title>
@@ -758,7 +758,7 @@ class EmailService {
 
         return `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <style>
@@ -909,7 +909,7 @@ class EmailService {
 
         return `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Invoice #${invoiceNumber} from ${storeName}</title>
@@ -1077,7 +1077,7 @@ class EmailService {
         const { lifetimeDealLink = "https://pnptv.app/lifetime100", telegramLink = "https://t.me/pnplatinotv_bot", language = 'es' } = data;
 
         const spanishTemplate = `<!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <title>PNP Latino TV Está de Vuelta</title>
@@ -1227,7 +1227,7 @@ class EmailService {
 </html>`;
 
         const englishTemplate = `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>PNP Latino TV Is Back</title>

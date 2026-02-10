@@ -16,8 +16,18 @@ ON pnp_models(user_id);
 -- =====================================================
 -- 3. Add constraint for user_id uniqueness
 -- =====================================================
-ALTER TABLE pnp_models
-ADD CONSTRAINT IF NOT EXISTS pnp_models_user_id_unique UNIQUE (user_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'pnp_models_user_id_unique'
+        AND table_name = 'pnp_models'
+    ) THEN
+        ALTER TABLE pnp_models ADD CONSTRAINT pnp_models_user_id_unique UNIQUE (user_id);
+    END IF;
+END
+$$;
 
 -- =====================================================
 -- 4. Analyze table

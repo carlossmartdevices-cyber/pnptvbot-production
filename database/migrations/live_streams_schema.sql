@@ -172,16 +172,19 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create triggers for updated_at
+DROP TRIGGER IF EXISTS live_streams_updated_at ON live_streams;
 CREATE TRIGGER live_streams_updated_at
     BEFORE UPDATE ON live_streams
     FOR EACH ROW
     EXECUTE FUNCTION update_live_streams_updated_at();
 
+DROP TRIGGER IF EXISTS stream_viewers_updated_at ON stream_viewers;
 CREATE TRIGGER stream_viewers_updated_at
     BEFORE UPDATE ON stream_viewers
     FOR EACH ROW
     EXECUTE FUNCTION update_live_streams_updated_at();
 
+DROP TRIGGER IF EXISTS stream_analytics_updated_at ON stream_analytics;
 CREATE TRIGGER stream_analytics_updated_at
     BEFORE UPDATE ON stream_analytics
     FOR EACH ROW

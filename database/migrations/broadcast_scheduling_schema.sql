@@ -261,24 +261,28 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Triggers for broadcasts
+DROP TRIGGER IF EXISTS trigger_broadcasts_updated_at ON broadcasts;
 CREATE TRIGGER trigger_broadcasts_updated_at
 BEFORE UPDATE ON broadcasts
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
 -- Triggers for broadcast_media
+DROP TRIGGER IF EXISTS trigger_broadcast_media_updated_at ON broadcast_media;
 CREATE TRIGGER trigger_broadcast_media_updated_at
 BEFORE UPDATE ON broadcast_media
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
 -- Triggers for broadcast_schedules
+DROP TRIGGER IF EXISTS trigger_broadcast_schedules_updated_at ON broadcast_schedules;
 CREATE TRIGGER trigger_broadcast_schedules_updated_at
 BEFORE UPDATE ON broadcast_schedules
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
 -- Triggers for broadcast_templates
+DROP TRIGGER IF EXISTS trigger_broadcast_templates_updated_at ON broadcast_templates;
 CREATE TRIGGER trigger_broadcast_templates_updated_at
 BEFORE UPDATE ON broadcast_templates
 FOR EACH ROW

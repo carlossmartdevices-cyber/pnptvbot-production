@@ -1,7 +1,3 @@
--- Models Management System
--- Complete system for 1:1 private calls with models
-
--- Models table
 CREATE TABLE IF NOT EXISTS models (
   id SERIAL PRIMARY KEY,
   model_id BIGINT UNIQUE NOT NULL,
@@ -13,6 +9,28 @@ CREATE TABLE IF NOT EXISTS models (
   min_duration_minutes INT DEFAULT 15,
   max_duration_minutes INT DEFAULT 120,
   is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Model bookings/reservations
+CREATE TABLE IF NOT EXISTS model_bookings (
+  id SERIAL PRIMARY KEY,
+  model_id BIGINT NOT NULL REFERENCES models(model_id),
+  user_id BIGINT NOT NULL,
+  telegram_user_id BIGINT NOT NULL,
+  username VARCHAR(255),
+  scheduled_date DATE NOT NULL,
+  start_time TIME NOT NULL,
+  duration_minutes INT NOT NULL,
+  end_time TIME NOT NULL,
+  status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'confirmed', 'active', 'completed', 'cancelled'
+  payment_status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'paid', 'failed', 'refunded'
+  payment_method VARCHAR(50), -- 'stripe', 'epayco', 'daimo', etc
+  transaction_id VARCHAR(255),
+  total_price DECIMAL(10, 2) NOT NULL,
+  notes TEXT,
+  call_room_url VARCHAR(512),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -36,28 +54,6 @@ CREATE TABLE IF NOT EXISTS model_status (
   status VARCHAR(20) DEFAULT 'offline', -- 'online', 'offline', 'busy'
   current_booking_id INT REFERENCES model_bookings(id) ON DELETE SET NULL,
   last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Model bookings/reservations
-CREATE TABLE IF NOT EXISTS model_bookings (
-  id SERIAL PRIMARY KEY,
-  model_id BIGINT NOT NULL REFERENCES models(model_id),
-  user_id BIGINT NOT NULL,
-  telegram_user_id BIGINT NOT NULL,
-  username VARCHAR(255),
-  scheduled_date DATE NOT NULL,
-  start_time TIME NOT NULL,
-  duration_minutes INT NOT NULL,
-  end_time TIME NOT NULL,
-  status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'confirmed', 'active', 'completed', 'cancelled'
-  payment_status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'paid', 'failed', 'refunded'
-  payment_method VARCHAR(50), -- 'stripe', 'epayco', 'daimo', etc
-  transaction_id VARCHAR(255),
-  total_price DECIMAL(10, 2) NOT NULL,
-  notes TEXT,
-  call_room_url VARCHAR(512),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Model photos gallery
@@ -96,11 +92,11 @@ CREATE TABLE IF NOT EXISTS model_earnings (
 );
 
 -- Create indexes for better performance
-CREATE INDEX idx_models_active ON models(is_active);
-CREATE INDEX idx_model_availability_day ON model_availability(day_of_week);
-CREATE INDEX idx_model_bookings_model ON model_bookings(model_id);
-CREATE INDEX idx_model_bookings_user ON model_bookings(user_id);
-CREATE INDEX idx_model_bookings_date ON model_bookings(scheduled_date);
-CREATE INDEX idx_model_bookings_status ON model_bookings(status);
-CREATE INDEX idx_model_status_model ON model_status(model_id);
-CREATE INDEX idx_model_photos_model ON model_photos(model_id);
+CREATE INDEX IF NOT EXISTS idx_models_active ON models(is_active);
+CREATE INDEX IF NOT EXISTS idx_model_availability_day ON model_availability(day_of_week);
+CREATE INDEX IF NOT EXISTS idx_model_bookings_model ON model_bookings(model_id);
+CREATE INDEX IF NOT EXISTS idx_model_bookings_user ON model_bookings(user_id);
+CREATE INDEX IF NOT EXISTS idx_model_bookings_date ON model_bookings(scheduled_date);
+CREATE INDEX IF NOT EXISTS idx_model_bookings_status ON model_bookings(status);
+CREATE INDEX IF NOT EXISTS idx_model_status_model ON model_status(model_id);
+CREATE INDEX IF NOT EXISTS idx_model_photos_model ON model_photos(model_id);

@@ -337,16 +337,35 @@ ORDER BY m.id, a.available_from;
 -- =====================================================
 
 -- Ensure availability slots don't overlap for the same model
--- This is a partial constraint that helps catch some conflicts
-ALTER TABLE pnp_availability
-ADD CONSTRAINT valid_availability_duration CHECK (available_from < available_to);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'valid_availability_duration'
+        AND table_name = 'pnp_availability'
+    ) THEN
+        ALTER TABLE pnp_availability ADD CONSTRAINT valid_availability_duration CHECK (available_from < available_to);
+    END IF;
+END
+$$;
 
 -- Ensure hold expiration is in the future if hold_user_id is set
-ALTER TABLE pnp_availability
-ADD CONSTRAINT valid_hold_expiration CHECK (
-    (hold_user_id IS NULL AND hold_expires_at IS NULL) OR
-    (hold_user_id IS NOT NULL AND hold_expires_at > NOW())
-);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'valid_hold_expiration'
+        AND table_name = 'pnp_availability'
+    ) THEN
+        ALTER TABLE pnp_availability ADD CONSTRAINT valid_hold_expiration CHECK (
+            (hold_user_id IS NULL AND hold_expires_at IS NULL) OR
+            (hold_user_id IS NOT NULL AND hold_expires_at > NOW())
+        );
+    END IF;
+END
+$$;
 
 -- =====================================================
 -- 11. Analyze tables for query optimization
@@ -359,6 +378,9 @@ ANALYZE user_notifications;
 ANALYZE booking_holds;
 ANALYZE availability_change_log;
 
+-- ANALYZE available_slots_view;
+-- ANALYZE model_availability_calendar;
+
 -- =====================================================
 -- 12. Comments for documentation
 -- =====================================================
@@ -367,10 +389,10 @@ COMMENT ON TABLE pnp_model_blocked_dates IS 'Stores dates when models are not av
 COMMENT ON TABLE user_notifications IS 'Manages user notification preferences for availability changes';
 COMMENT ON TABLE availability_change_log IS 'Tracks all changes to availability slots for auditing';
 COMMENT ON TABLE booking_holds IS 'Tracks temporary holds on availability slots during booking process';
-COMMENT ON TABLE available_slots_view IS 'View showing currently available booking slots';
-COMMENT ON TABLE model_availability_calendar IS 'Comprehensive view of model availability and bookings';
+-- COMMENT ON TABLE available_slots_view IS 'View showing currently available booking slots';
+-- COMMENT ON TABLE model_availability_calendar IS 'Comprehensive view of model availability and bookings';
 
--- =====================================================
+-- =================================0====================
 -- 13. Add missing tables if they don't exist
 -- =====================================================
 DO $$

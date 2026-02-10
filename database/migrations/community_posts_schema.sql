@@ -35,8 +35,8 @@ VALUES
   ('🎬 Videorama', '-1001234567895', 'Video Section', '🎬', 6, true)
 ON CONFLICT (telegram_group_id) DO NOTHING;
 
-CREATE INDEX idx_community_groups_is_active ON community_groups(is_active);
-CREATE INDEX idx_community_groups_display_order ON community_groups(display_order);
+CREATE INDEX IF NOT EXISTS idx_community_groups_is_active ON community_groups(is_active);
+CREATE INDEX IF NOT EXISTS idx_community_groups_display_order ON community_groups(display_order);
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 2. COMMUNITY POSTS TABLE
@@ -91,11 +91,11 @@ CREATE TABLE IF NOT EXISTS community_posts (
   FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_community_posts_status ON community_posts(status);
-CREATE INDEX idx_community_posts_admin_id ON community_posts(admin_id);
-CREATE INDEX idx_community_posts_scheduled_at ON community_posts(scheduled_at);
-CREATE INDEX idx_community_posts_is_recurring ON community_posts(is_recurring);
-CREATE INDEX idx_community_posts_created_at ON community_posts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_community_posts_status ON community_posts(status);
+CREATE INDEX IF NOT EXISTS idx_community_posts_admin_id ON community_posts(admin_id);
+CREATE INDEX IF NOT EXISTS idx_community_posts_scheduled_at ON community_posts(scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_community_posts_is_recurring ON community_posts(is_recurring);
+CREATE INDEX IF NOT EXISTS idx_community_posts_created_at ON community_posts(created_at DESC);
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 3. COMMUNITY POST BUTTONS TABLE
@@ -114,8 +114,8 @@ CREATE TABLE IF NOT EXISTS community_post_buttons (
   FOREIGN KEY (post_id) REFERENCES community_posts(post_id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_community_post_buttons_post_id ON community_post_buttons(post_id);
-CREATE INDEX idx_community_post_buttons_button_order ON community_post_buttons(post_id, button_order);
+CREATE INDEX IF NOT EXISTS idx_community_post_buttons_post_id ON community_post_buttons(post_id);
+CREATE INDEX IF NOT EXISTS idx_community_post_buttons_button_order ON community_post_buttons(post_id, button_order);
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 4. COMMUNITY POST SCHEDULES TABLE
@@ -142,10 +142,10 @@ CREATE TABLE IF NOT EXISTS community_post_schedules (
   FOREIGN KEY (post_id) REFERENCES community_posts(post_id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_community_post_schedules_scheduled_for ON community_post_schedules(scheduled_for);
-CREATE INDEX idx_community_post_schedules_post_id ON community_post_schedules(post_id);
-CREATE INDEX idx_community_post_schedules_status ON community_post_schedules(status);
-CREATE INDEX idx_community_post_schedules_next_execution ON community_post_schedules(next_execution_at);
+CREATE INDEX IF NOT EXISTS idx_community_post_schedules_scheduled_for ON community_post_schedules(scheduled_for);
+CREATE INDEX IF NOT EXISTS idx_community_post_schedules_post_id ON community_post_schedules(post_id);
+CREATE INDEX IF NOT EXISTS idx_community_post_schedules_status ON community_post_schedules(status);
+CREATE INDEX IF NOT EXISTS idx_community_post_schedules_next_execution ON community_post_schedules(next_execution_at);
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 5. COMMUNITY POST DELIVERY TRACKING
@@ -172,10 +172,10 @@ CREATE TABLE IF NOT EXISTS community_post_deliveries (
   FOREIGN KEY (group_id) REFERENCES community_groups(group_id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_community_post_deliveries_post_id ON community_post_deliveries(post_id);
-CREATE INDEX idx_community_post_deliveries_status ON community_post_deliveries(status);
-CREATE INDEX idx_community_post_deliveries_group_id ON community_post_deliveries(group_id);
-CREATE INDEX idx_community_post_deliveries_schedule_id ON community_post_deliveries(schedule_id);
+CREATE INDEX IF NOT EXISTS idx_community_post_deliveries_post_id ON community_post_deliveries(post_id);
+CREATE INDEX IF NOT EXISTS idx_community_post_deliveries_status ON community_post_deliveries(status);
+CREATE INDEX IF NOT EXISTS idx_community_post_deliveries_group_id ON community_post_deliveries(group_id);
+CREATE INDEX IF NOT EXISTS idx_community_post_deliveries_schedule_id ON community_post_deliveries(schedule_id);
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 6. COMMUNITY POST ANALYTICS
@@ -203,8 +203,8 @@ CREATE TABLE IF NOT EXISTS community_post_analytics (
   FOREIGN KEY (group_id) REFERENCES community_groups(group_id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_community_post_analytics_post_id ON community_post_analytics(post_id);
-CREATE INDEX idx_community_post_analytics_group_id ON community_post_analytics(group_id);
+CREATE INDEX IF NOT EXISTS idx_community_post_analytics_post_id ON community_post_analytics(post_id);
+CREATE INDEX IF NOT EXISTS idx_community_post_analytics_group_id ON community_post_analytics(group_id);
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Predefined Button Configuration
@@ -238,5 +238,5 @@ VALUES
   ('custom', '🔗 Custom Link', 'Learn More', 'User-provided URL', '🔗', true, true)
 ON CONFLICT (button_type) DO NOTHING;
 
-CREATE INDEX idx_community_button_presets_button_type ON community_button_presets(button_type);
-CREATE INDEX idx_community_button_presets_is_active ON community_button_presets(is_active);
+CREATE INDEX IF NOT EXISTS idx_community_button_presets_button_type ON community_button_presets(button_type);
+CREATE INDEX IF NOT EXISTS idx_community_button_presets_is_active ON community_button_presets(is_active);

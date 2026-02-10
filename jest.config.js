@@ -9,6 +9,11 @@ module.exports = {
   testMatch: [
     '**/tests/**/*.test.js',
   ],
+
+  transform: {
+    '^.+\\.js$': 'babel-jest',
+  },
+
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
   reporters: [
     'default',

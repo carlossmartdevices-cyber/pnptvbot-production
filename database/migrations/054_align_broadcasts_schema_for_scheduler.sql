@@ -26,16 +26,26 @@ ALTER TABLE broadcasts
   ADD COLUMN IF NOT EXISTS last_processed_user_id VARCHAR(255),
   ADD COLUMN IF NOT EXISTS progress_percentage DECIMAL(5,2) DEFAULT 0.00;
 
-ALTER TABLE broadcasts
-  ALTER COLUMN message SET DEFAULT '';
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'broadcasts' AND column_name = 'message'
+    ) THEN
+        ALTER TABLE broadcasts
+        ALTER COLUMN message SET DEFAULT '';
+    END IF;
+END
+$$;
 
 UPDATE broadcasts
 SET
-  admin_id = COALESCE(admin_id, created_by),
-  admin_username = COALESCE(admin_username, created_by),
-  message_en = COALESCE(message_en, message),
-  message_es = COALESCE(message_es, message),
-  target_type = COALESCE(target_type, target_tier)
+  admin_id = COALESCE(admin_id, NULL), -- Assuming admin_id is BIGINT, set to NULL if missing
+  admin_username = COALESCE(admin_username, ''), -- Assuming admin_username can be empty if created_by is missing
+  message_en = COALESCE(message_en, message_es, ''),
+  message_es = COALESCE(message_es, ''),
+  target_type = COALESCE(target_type, '') -- Assuming target_type can be empty if target_tier is missing
 WHERE admin_id IS NULL
    OR admin_username IS NULL
    OR message_en IS NULL

@@ -40,10 +40,10 @@ CREATE TABLE IF NOT EXISTS stream_chat_violations (
     
     -- Metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     
     -- Foreign key
-    FOREIGN KEY (stream_id) REFERENCES live_streams(stream_id) ON DELETE CASCADE
+    -- FOREIGN KEY (stream_id) REFERENCES live_streams(stream_id) ON DELETE CASCADE
 );
 
 -- =====================================================
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS stream_moderation_stats (
     unique_violators INTEGER DEFAULT 0,
     
     -- Foreign key
-    FOREIGN KEY (stream_id) REFERENCES live_streams(stream_id) ON DELETE CASCADE,
+    -- FOREIGN KEY (stream_id) REFERENCES live_streams(stream_id) ON DELETE CASCADE
     
     -- Unique constraint
     UNIQUE (stream_id, date)
@@ -147,11 +147,13 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create triggers for updated_at
+DROP TRIGGER IF EXISTS stream_violations_updated_at ON stream_chat_violations;
 CREATE TRIGGER stream_violations_updated_at
     BEFORE UPDATE ON stream_chat_violations
     FOR EACH ROW
     EXECUTE FUNCTION update_stream_violations_updated_at();
 
+DROP TRIGGER IF EXISTS user_moderation_history_updated_at ON user_moderation_history;
 CREATE TRIGGER user_moderation_history_updated_at
     BEFORE UPDATE ON user_moderation_history
     FOR EACH ROW

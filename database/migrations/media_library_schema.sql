@@ -184,21 +184,25 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_media_library_updated_at ON media_library;
 CREATE TRIGGER trigger_media_library_updated_at
 BEFORE UPDATE ON media_library
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trigger_media_playlists_updated_at ON media_playlists;
 CREATE TRIGGER trigger_media_playlists_updated_at
 BEFORE UPDATE ON media_playlists
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trigger_player_states_updated_at ON player_states;
 CREATE TRIGGER trigger_player_states_updated_at
 BEFORE UPDATE ON player_states
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trigger_media_ratings_updated_at ON media_ratings;
 CREATE TRIGGER trigger_media_ratings_updated_at
 BEFORE UPDATE ON media_ratings
 FOR EACH ROW
