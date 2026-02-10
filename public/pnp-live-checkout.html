@@ -2,181 +2,215 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <meta name="robots" content="noindex, nofollow">
     <title>PNP Live Checkout - PNPtv</title>
-    <link rel="stylesheet" href="/webapps/design-system/static.css">
-    <script src="/webapps/design-system/telegram-theme.js" type="module"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-color: #1C1C1E;
+            --text-main: #FFFFFF;
+            --text-muted: #8E8E93;
+            --neon-pink: #FF00CC;
+            --neon-amber: #FFB454;
+            --glass-bg: rgba(44, 44, 46, 0.7);
+            --glass-border: rgba(255, 180, 84, 0.3);
+            --card-radius: 20px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            padding-bottom: 40px;
+        }
+
+        .ambient-glow {
+            position: fixed;
+            top: -30%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100vw;
+            height: 100vw;
+            background: radial-gradient(circle, rgba(255, 0, 204, 0.1) 0%, transparent 65%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
         .header {
-            background: var(--panel-strong);
-            color: var(--text);
-            padding: 20px;
+            background: rgba(28, 28, 30, 0.95);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 20px 24px;
             text-align: center;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .header h1 {
-            font-size: 24px;
-            margin-bottom: 5px;
-            color: var(--accent);
+            font-size: 22px;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .header p {
-            font-size: 14px;
-            color: var(--muted);
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
         }
 
         .content {
             padding: 20px;
+            max-width: 500px;
+            margin: 0 auto;
         }
 
         .loading {
             text-align: center;
-            padding: 40px 20px;
+            padding: 60px 20px;
         }
 
         .spinner {
-            border: 3px solid var(--border);
-            border-top: 3px solid var(--accent);
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid var(--neon-amber);
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        .loading p { color: var(--text-muted); font-size: 14px; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         .booking-info {
-            background: var(--bg-2);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 25px;
-            border: 1px solid var(--border);
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--card-radius);
+            padding: 24px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .booking-info::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 3px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
         }
 
         .booking-info h3 {
-            font-size: 18px;
-            margin-bottom: 15px;
-            color: var(--text);
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--text-main);
         }
 
         .booking-detail {
             display: flex;
             justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
             font-size: 14px;
         }
 
-        .booking-detail:last-child {
-            border-bottom: none;
-        }
-
-        .booking-detail .label {
-            color: var(--muted);
-        }
-
-        .booking-detail .value {
-            font-weight: 600;
-            color: var(--text);
-        }
+        .booking-detail:last-child { border-bottom: none; }
+        .booking-detail .label { color: var(--text-muted); }
+        .booking-detail .value { font-weight: 600; color: var(--text-main); }
 
         .price {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--accent);
+            font-size: 36px;
+            font-weight: 900;
             text-align: center;
-            margin: 20px 0;
+            margin: 24px 0;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .error {
             background: rgba(255, 107, 107, 0.1);
-            color: var(--accent-3);
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 15px;
+            color: #FF9F9F;
+            padding: 14px;
+            border-radius: 12px;
             text-align: center;
             display: none;
-            border: 1px solid rgba(255, 107, 107, 0.3);
+            border: 1px solid rgba(255, 107, 107, 0.2);
+            font-size: 14px;
         }
 
         .btn {
             display: block;
             width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, var(--accent), #ffd27a);
-            color: var(--bg);
+            padding: 16px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            color: white;
             border: none;
-            border-radius: 8px;
-            font-size: 16px;
+            border-radius: 14px;
+            font-size: 15px;
             font-weight: 700;
             cursor: pointer;
             text-align: center;
             text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-family: inherit;
+            box-shadow: 0 8px 24px rgba(255, 0, 204, 0.25);
         }
 
-        .btn:active {
-            transform: scale(0.97);
-            
-        }
+        .btn:active { transform: scale(0.98); }
 
         .btn:disabled {
-            background: var(--bg-2);
-            color: var(--muted);
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
             cursor: not-allowed;
-            transform: none;
             box-shadow: none;
-        }
-
-        @media (max-width: 480px) {
-            .header h1 {
-                font-size: 20px;
-            }
-
-            .price {
-                font-size: 20px;
-            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <h1>PNP Live</h1>
-            <p>Private Show Checkout</p>
-        </header>
-        <main class="content">
-            <div id="loading" class="loading">
-                <div class="spinner"></div>
-                <p>Loading booking details...</p>
-            </div>
-            <div id="booking-details" style="display: none;">
-                <div class="booking-info">
-                    <h3>Booking Details</h3>
-                    <div class="booking-detail">
-                        <span class="label">Model:</span>
-                        <span class="value" id="model-name">-</span>
-                    </div>
-                    <div class="booking-detail">
-                        <span class="label">Duration:</span>
-                        <span class="value" id="duration">-</span>
-                    </div>
-                    <div class="booking-detail">
-                        <span class="label">Date & Time:</span>
-                        <span class="value" id="datetime">-</span>
-                    </div>
+    <div class="ambient-glow"></div>
+    <header class="header">
+        <h1>PNP Live</h1>
+        <p>Private Show Checkout</p>
+    </header>
+    <main class="content">
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Loading booking details...</p>
+        </div>
+        <div id="booking-details" style="display: none;">
+            <div class="booking-info">
+                <h3>Booking Details</h3>
+                <div class="booking-detail">
+                    <span class="label">Model:</span>
+                    <span class="value" id="model-name">-</span>
                 </div>
-                <div class="price">$<span id="price">0</span> USD</div>
-                <button id="pay-btn" class="btn">Pay with Credit Card</button>
+                <div class="booking-detail">
+                    <span class="label">Duration:</span>
+                    <span class="value" id="duration">-</span>
+                </div>
+                <div class="booking-detail">
+                    <span class="label">Date & Time:</span>
+                    <span class="value" id="datetime">-</span>
+                </div>
             </div>
-            <div id="error" class="error" style="display: none;"></div>
-        </main>
-    </div>
+            <div class="price">$<span id="price">0</span> USD</div>
+            <button id="pay-btn" class="btn">Pay with Credit Card</button>
+        </div>
+        <div id="error" class="error" style="display: none;"></div>
+    </main>
     <script src="https://checkout.epayco.co/checkout.js"></script>
     <script>
         const bookingId = window.location.pathname.split('/').pop();
@@ -236,7 +270,7 @@
                 showError('ePayco is not initialized.');
                 return;
             }
-            
+
             const payButton = document.getElementById('pay-btn');
             payButton.disabled = true;
             payButton.textContent = 'Opening ePayco...';
@@ -252,28 +286,21 @@
                 country: 'co',
                 lang: 'es',
                 external: 'false',
-
-                // From API
                 signature: booking.epaycoSignature,
                 confirmation: booking.confirmationUrl,
                 response: booking.responseUrl,
-
-                // Extra data for webhook
                 extra1: booking.userId,
                 extra2: booking.id,
                 extra3: 'pnp_live',
-
-                // UX
                 autoclick: false
             };
-            
+
             try {
                 epaycoHandler.open(epaycoData);
             } catch (error) {
                 console.error('Error opening ePayco checkout:', error);
                 showError('Could not open ePayco checkout. Please try again.');
             } finally {
-                // Re-enable the button
                 setTimeout(() => {
                     payButton.disabled = false;
                     payButton.textContent = 'Pay with Credit Card';

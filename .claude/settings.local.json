@@ -194,7 +194,14 @@
       "WebFetch(domain:epayco.co)",
       "Bash(python3 -c \"\nimport sys, re\ncode = sys.stdin.read\\(\\)\n# Find token.create or create method\nmatches = re.findall\\(r''''.{0,100}token.{0,200}'''', code\\)\nfor m in matches[:5]:\n    print\\(m[:200]\\)\n    print\\(''''---''''\\)\n\")",
       "Bash(npm view:*)",
-      "Bash(sudo sed:*)"
+      "Bash(sudo sed:*)",
+      "Bash(curl -s https://easybots.site/payment/test-123)",
+      "Bash(curl -sI https://easybots.site/payment/test-123)",
+      "Bash(git -C /root/pnptvbot-production log --oneline -5)",
+      "Bash(git -C /root/pnptvbot-production push origin main)",
+      "Bash(git -C /root/pnptvbot-production diff --stat)",
+      "Bash(git -C /root/pnptvbot-production add .claude/settings.local.json public/daimo-checkout.html public/index.html public/meet-greet-checkout.html public/meet-greet-daimo-checkout.html public/pnp-live-checkout.html public/pnp-live-daimo-checkout.html public/recurring-checkout.html public/youtube-playlist.html)",
+      "Bash(git -C /root/pnptvbot-production commit -m \"$\\(cat <<''EOF''\nUpdate checkout pages and public HTML assets\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
     ],
     "deny": [],
     "ask": []

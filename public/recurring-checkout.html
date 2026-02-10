@@ -2,412 +2,346 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <meta name="robots" content="noindex, nofollow">
-    <title>Suscripción Recurrente - PNPtv</title>
-    <link rel="stylesheet" href="/webapps/design-system/static.css">
-    <script src="/webapps/design-system/telegram-theme.js" type="module"></script>
+    <title>Recurring Subscription - PNPtv</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-color: #1C1C1E;
+            --text-main: #FFFFFF;
+            --text-muted: #8E8E93;
+            --neon-pink: #FF00CC;
+            --neon-amber: #FFB454;
+            --glass-bg: rgba(44, 44, 46, 0.7);
+            --glass-border: rgba(255, 180, 84, 0.3);
+            --card-radius: 20px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            padding-bottom: 40px;
+        }
+
+        .ambient-glow {
+            position: fixed; top: -30%; left: 50%; transform: translateX(-50%);
+            width: 100vw; height: 100vw;
+            background: radial-gradient(circle, rgba(255, 0, 204, 0.1) 0%, transparent 65%);
+            z-index: -1; pointer-events: none;
+        }
+
         .header {
-            background: var(--panel-strong);
-            color: var(--text);
-            padding: 20px;
-            text-align: center;
-            border-bottom: 1px solid var(--border);
+            background: rgba(28, 28, 30, 0.95);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            padding: 20px 24px; text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .header h1 {
-            font-size: 24px;
-            margin-bottom: 5px;
-            color: var(--accent);
+            font-size: 22px; font-weight: 800;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
 
-        .header p {
-            font-size: 14px;
-            color: var(--muted);
-        }
+        .header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
 
         .recurring-badge {
             display: inline-block;
-            background: rgba(44, 226, 201, 0.2);
-            padding: 4px 10px;
-            border-radius: 15px;
-            font-size: 11px;
-            color: var(--accent-2);
-            margin-top: 8px;
-            border: 1px solid rgba(44, 226, 201, 0.4);
+            background: rgba(255, 180, 84, 0.15);
+            padding: 4px 12px; border-radius: 20px;
+            font-size: 11px; color: var(--neon-amber);
+            margin-top: 8px; font-weight: 700;
+            border: 1px solid rgba(255, 180, 84, 0.3);
+            letter-spacing: 0.5px;
         }
 
-        .content {
-            padding: 20px;
-        }
+        .content { padding: 20px; max-width: 500px; margin: 0 auto; }
 
-        .loading {
-            text-align: center;
-            padding: 40px 20px;
-        }
+        .loading { text-align: center; padding: 60px 20px; }
 
         .spinner {
-            border: 3px solid var(--border);
-            border-top: 3px solid var(--accent);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+            width: 36px; height: 36px;
+            border: 3px solid rgba(255, 255, 255, 0.1); border-top: 3px solid var(--neon-amber);
+            border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        .loading p { color: var(--text-muted); font-size: 14px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* Plan Info Card */
         .plan-info {
-            background: var(--bg-2);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 25px;
-            border: 1px solid var(--border);
+            background: var(--glass-bg); backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--card-radius); padding: 24px; margin-bottom: 20px;
+            position: relative; overflow: hidden;
+        }
+
+        .plan-info::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
         }
 
         .plan-name {
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--text);
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            font-size: 16px; font-weight: 700; margin-bottom: 8px;
+            display: flex; align-items: center; gap: 10px;
         }
 
         .plan-price {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--accent);
-            margin: 10px 0;
+            font-size: 32px; font-weight: 900; margin: 12px 0;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
 
         .plan-price .period {
-            font-size: 12px;
-            color: var(--muted);
-            font-weight: normal;
+            font-size: 13px; color: var(--text-muted); font-weight: 400;
+            -webkit-text-fill-color: var(--text-muted);
         }
 
         .plan-features {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid var(--border);
+            margin-top: 16px; padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .feature {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 8px 0;
-            font-size: 13px;
-            color: var(--muted);
+            display: flex; align-items: center; gap: 10px;
+            margin: 8px 0; font-size: 13px; color: rgba(255, 255, 255, 0.7);
         }
 
         .feature::before {
-            content: "✓";
-            color: var(--accent-2);
-            font-weight: bold;
+            content: ""; width: 8px; height: 8px; flex-shrink: 0;
+            background: linear-gradient(135deg, var(--neon-pink), var(--neon-amber));
+            border-radius: 2px; transform: rotate(45deg);
         }
 
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-            color: var(--text);
-            font-size: 13px;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 15px;
-            background: var(--bg);
-            color: var(--text);
-            transition: border-color 0.3s;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-
-        .form-row {
-            display: flex;
-            gap: 15px;
-        }
-
-        .form-row .form-group {
-            flex: 1;
-        }
-
-        .card-icons {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            justify-content: center;
-            opacity: 0.7;
-        }
-
-        .card-icon {
-            width: 45px;
-            height: 28px;
-            background: var(--bg-2);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 9px;
-            font-weight: bold;
-            color: var(--muted);
-        }
-
-        .submit-btn {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, var(--accent), #ffd27a);
-            color: var(--bg);
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .submit-btn:active {
-            transform: scale(0.97);
-            
-        }
-
-        .submit-btn:disabled {
-            background: var(--bg-2);
-            color: var(--muted);
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .security-note {
-            text-align: center;
-            margin-top: 20px;
-            padding: 12px;
-            background: rgba(44, 226, 201, 0.1);
-            border: 1px solid rgba(44, 226, 201, 0.3);
-            border-radius: 8px;
-            font-size: 12px;
-            color: var(--accent-2);
-        }
-
-        .security-note::before {
-            content: "🔒 ";
-        }
-
-        .terms {
-            margin-top: 15px;
-            font-size: 11px;
-            color: var(--muted);
-            text-align: center;
-        }
-
-        .terms a {
-            color: var(--accent-2);
-            text-decoration: none;
-        }
-
-        .error-message {
-            background: rgba(255, 107, 107, 0.1);
-            color: var(--accent-3);
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            text-align: center;
-            display: none;
-            border: 1px solid rgba(255, 107, 107, 0.3);
-        }
-
-        .success-message {
-            text-align: center;
-            padding: 40px 20px;
-            background: var(--bg-2);
-            border-radius: 16px;
-            border: 1px solid var(--border);
-        }
-
-        .success-icon {
-            font-size: 48px;
-            margin-bottom: 15px;
-            color: var(--accent-2);
-        }
-
-        .success-message h2 {
-            color: var(--text);
-            margin-bottom: 10px;
-            font-size: 22px;
-        }
-
-        .success-message p {
-            color: var(--muted);
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-
-        .telegram-btn {
-            display: inline-block;
-            padding: 12px 25px;
-            background: linear-gradient(135deg, var(--accent-2), #66f2d8);
-            color: var(--bg);
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .telegram-btn:active {
-            transform: scale(0.97);
-            
-        }
-
+        /* Cancel Info */
         .cancel-info {
-            background: rgba(255, 180, 84, 0.1);
-            border: 1px solid rgba(255, 180, 84, 0.3);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 20px;
-            font-size: 12px;
-            color: var(--accent);
+            background: rgba(255, 180, 84, 0.08);
+            border: 1px solid rgba(255, 180, 84, 0.2);
+            border-radius: 14px; padding: 16px; margin-bottom: 20px;
+            font-size: 13px; color: rgba(255, 255, 255, 0.7); line-height: 1.5;
         }
 
         .cancel-info strong {
-            display: block;
-            margin-bottom: 5px;
-            color: var(--accent);
+            display: block; margin-bottom: 6px; color: var(--neon-amber); font-size: 13px;
         }
 
+        /* Error / Success */
+        .error-message {
+            background: rgba(255, 107, 107, 0.1); color: #FF9F9F;
+            padding: 14px; border-radius: 12px; text-align: center;
+            display: none; border: 1px solid rgba(255, 107, 107, 0.2);
+            font-size: 14px; margin-bottom: 16px;
+        }
+
+        .success-message {
+            text-align: center; padding: 48px 24px;
+            background: var(--glass-bg); backdrop-filter: blur(16px);
+            border-radius: var(--card-radius);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .success-icon { font-size: 48px; margin-bottom: 16px; }
+
+        .success-message h2 {
+            font-size: 22px; font-weight: 800; margin-bottom: 8px;
+        }
+
+        .success-message p {
+            color: var(--text-muted); font-size: 14px; margin-bottom: 24px; line-height: 1.5;
+        }
+
+        .telegram-btn {
+            display: inline-block; padding: 14px 28px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            color: white; text-decoration: none; border-radius: 14px;
+            font-weight: 700; font-size: 14px; text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .telegram-btn:active { transform: scale(0.98); }
+
+        /* Card Icons */
+        .card-icons {
+            display: flex; gap: 8px; margin-bottom: 20px; justify-content: center;
+        }
+
+        .card-icon {
+            width: 48px; height: 30px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px; display: flex; align-items: center; justify-content: center;
+            font-size: 9px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;
+        }
+
+        /* Form */
+        .form-group { margin-bottom: 16px; }
+
+        .form-group label {
+            display: block; margin-bottom: 6px;
+            font-weight: 600; color: var(--text-main); font-size: 13px;
+        }
+
+        .form-group input {
+            width: 100%; padding: 14px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px; font-size: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input::placeholder { color: rgba(255, 255, 255, 0.25); }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--neon-amber);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .form-row { display: flex; gap: 12px; }
+        .form-row .form-group { flex: 1; }
+
+        /* Submit Button */
+        .submit-btn {
+            width: 100%; padding: 16px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            color: white; border: none; border-radius: 14px;
+            font-size: 15px; font-weight: 700; cursor: pointer;
+            font-family: inherit; text-transform: uppercase; letter-spacing: 0.5px;
+            box-shadow: 0 8px 24px rgba(255, 0, 204, 0.25);
+        }
+
+        .submit-btn:active { transform: scale(0.98); }
+
+        .submit-btn:disabled {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-muted); cursor: not-allowed; box-shadow: none;
+        }
+
+        /* Security & Terms */
+        .security-note {
+            text-align: center; margin-top: 20px; padding: 14px;
+            background: rgba(255, 180, 84, 0.08);
+            border: 1px solid rgba(255, 180, 84, 0.15);
+            border-radius: 12px; font-size: 12px; color: var(--neon-amber);
+        }
+
+        .terms {
+            margin-top: 16px; font-size: 11px;
+            color: var(--text-muted); text-align: center; line-height: 1.5;
+        }
+
+        .terms a { color: var(--neon-amber); text-decoration: none; }
+
         @media (max-width: 480px) {
-            .form-row {
-                flex-direction: column;
-                gap: 0;
-            }
-
-            .header h1 {
-                font-size: 20px;
-            }
-
-            .plan-price {
-                font-size: 20px;
-            }
+            .form-row { flex-direction: column; gap: 0; }
+            .header h1 { font-size: 20px; }
+            .plan-price { font-size: 28px; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <h1>💎 <span id="header-title">Suscripción PRIME</span></h1>
-            <p id="header-subtitle">Renovación automática mensual</p>
-            <div class="recurring-badge">🔄 Auto-renovación</div>
-        </header>
+    <div class="ambient-glow"></div>
+    <header class="header">
+        <h1><span id="header-title">PRIME Subscription</span></h1>
+        <p id="header-subtitle">Automatic monthly renewal</p>
+        <div class="recurring-badge">Auto-renewal</div>
+    </header>
 
-        <main class="content">
-            <!-- Loading State -->
-            <div id="loading" class="loading">
-                <div class="spinner"></div>
-                <p id="loading-text">Cargando información del plan...</p>
-            </div>
+    <main class="content">
+        <!-- Loading State -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p id="loading-text">Loading plan information...</p>
+        </div>
 
-            <!-- Checkout Form -->
-            <div id="checkout-form" style="display: none;">
-                <div class="plan-info">
-                    <div class="plan-name">
-                        <span>📋</span>
-                        <span id="plan-name">Monthly Pass</span>
-                    </div>
-                    <div class="plan-price">
-                        $<span id="plan-price">24.99</span> USD <span class="period">/ mes</span>
-                    </div>
-                    <div class="plan-features">
-                        <div class="feature" id="feature-1">Acceso ilimitado a contenido PRIME</div>
-                        <div class="feature" id="feature-2">Canal exclusivo de Telegram</div>
-                        <div class="feature" id="feature-3">Cancela cuando quieras</div>
-                    </div>
+        <!-- Checkout Form -->
+        <div id="checkout-form" style="display: none;">
+            <div class="plan-info">
+                <div class="plan-name">
+                    <span id="plan-name">Monthly Pass</span>
                 </div>
-
-                <div class="cancel-info">
-                    <strong>📌 Información importante:</strong>
-                    Puedes cancelar tu suscripción en cualquier momento desde el bot con el comando /subscription.
-                    No hay compromisos a largo plazo.
+                <div class="plan-price">
+                    $<span id="plan-price">24.99</span> USD <span class="period">/ month</span>
                 </div>
-
-                <div class="error-message" id="error-message"></div>
-
-                <div class="card-icons">
-                    <div class="card-icon">VISA</div>
-                    <div class="card-icon">MC</div>
-                    <div class="card-icon">AMEX</div>
-                </div>
-
-                <form id="payment-form" onsubmit="return handleSubmit(event)">
-                    <div class="form-group">
-                        <label for="card-holder" id="label-holder">Nombre en la tarjeta</label>
-                        <input type="text" id="card-holder" name="cardHolder" placeholder="JOHN DOE" required autocomplete="cc-name">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="card-number" id="label-number">Número de tarjeta</label>
-                        <input type="text" id="card-number" name="cardNumber" placeholder="4242 4242 4242 4242" required maxlength="19" autocomplete="cc-number">
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="expiry" id="label-expiry">Fecha de expiración</label>
-                            <input type="text" id="expiry" name="expiry" placeholder="MM/YY" required maxlength="5" autocomplete="cc-exp">
-                        </div>
-                        <div class="form-group">
-                            <label for="cvv" id="label-cvv">CVV</label>
-                            <input type="text" id="cvv" name="cvv" placeholder="123" required maxlength="4" autocomplete="cc-csc">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="email" id="label-email">Correo electrónico</label>
-                        <input type="email" id="email" name="email" placeholder="tu@email.com" required autocomplete="email">
-                    </div>
-
-                    <button type="submit" class="submit-btn" id="submit-btn">
-                        🔒 Activar Suscripción Mensual
-                    </button>
-                </form>
-
-                <div class="security-note" id="security-note">
-                    Tus datos están protegidos con encriptación SSL de 256 bits
-                </div>
-
-                <div class="terms" id="terms-text">
-                    Al suscribirte, aceptas nuestros <a href="/terms" target="_blank">Términos y Condiciones</a>
-                    y la <a href="/privacy" target="_blank">Política de Privacidad</a>
+                <div class="plan-features">
+                    <div class="feature" id="feature-1">Unlimited access to PRIME content</div>
+                    <div class="feature" id="feature-2">Exclusive Telegram channel</div>
+                    <div class="feature" id="feature-3">Cancel anytime</div>
                 </div>
             </div>
 
-            <!-- Success State -->
-            <div id="success" class="success-message" style="display: none;">
-                <div class="success-icon">🎉</div>
-                <h2 id="success-title">¡Suscripción Activada!</h2>
-                <p id="success-text">Tu membresía PRIME con renovación automática está activa. Revisa tu Telegram para el enlace de acceso.</p>
-                <a href="https://t.me/pnptv_bot" class="telegram-btn" id="telegram-link">Abrir Telegram</a>
+            <div class="cancel-info">
+                <strong>Important information:</strong>
+                You can cancel your subscription anytime from the bot with the /subscription command. No long-term commitments.
             </div>
-        </main>
-    </div>
+
+            <div class="error-message" id="error-message"></div>
+
+            <div class="card-icons">
+                <div class="card-icon">VISA</div>
+                <div class="card-icon">MC</div>
+                <div class="card-icon">AMEX</div>
+            </div>
+
+            <form id="payment-form" onsubmit="return handleSubmit(event)">
+                <div class="form-group">
+                    <label for="card-holder" id="label-holder">Name on card</label>
+                    <input type="text" id="card-holder" name="cardHolder" placeholder="JOHN DOE" required autocomplete="cc-name">
+                </div>
+
+                <div class="form-group">
+                    <label for="card-number" id="label-number">Card number</label>
+                    <input type="text" id="card-number" name="cardNumber" placeholder="4242 4242 4242 4242" required maxlength="19" autocomplete="cc-number">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="expiry" id="label-expiry">Expiration date</label>
+                        <input type="text" id="expiry" name="expiry" placeholder="MM/YY" required maxlength="5" autocomplete="cc-exp">
+                    </div>
+                    <div class="form-group">
+                        <label for="cvv" id="label-cvv">CVV</label>
+                        <input type="text" id="cvv" name="cvv" placeholder="123" required maxlength="4" autocomplete="cc-csc">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="email" id="label-email">Email address</label>
+                    <input type="email" id="email" name="email" placeholder="you@email.com" required autocomplete="email">
+                </div>
+
+                <button type="submit" class="submit-btn" id="submit-btn">
+                    Activate Monthly Subscription
+                </button>
+            </form>
+
+            <div class="security-note" id="security-note">
+                Your data is protected with 256-bit SSL encryption
+            </div>
+
+            <div class="terms" id="terms-text">
+                By subscribing, you agree to our <a href="/terms" target="_blank">Terms & Conditions</a>
+                and <a href="/privacy" target="_blank">Privacy Policy</a>
+            </div>
+        </div>
+
+        <!-- Success State -->
+        <div id="success" class="success-message" style="display: none;">
+            <div class="success-icon">&#10003;</div>
+            <h2 id="success-title">Subscription Activated!</h2>
+            <p id="success-text">Your PRIME membership with auto-renewal is active. Check your Telegram for the access link.</p>
+            <a href="https://t.me/pnptv_bot" class="telegram-btn" id="telegram-link">Open Telegram</a>
+        </div>
+    </main>
 
     <script>
         // Get URL parameters
@@ -423,23 +357,23 @@
         // Translations
         const translations = {
             es: {
-                headerTitle: 'Suscripción PRIME',
-                headerSubtitle: 'Renovación automática mensual',
-                loadingText: 'Cargando información del plan...',
+                headerTitle: 'Suscripcion PRIME',
+                headerSubtitle: 'Renovacion automatica mensual',
+                loadingText: 'Cargando informacion del plan...',
                 planFeature1: 'Acceso ilimitado a contenido PRIME',
                 planFeature2: 'Canal exclusivo de Telegram',
                 planFeature3: 'Cancela cuando quieras',
-                cancelInfo: 'Puedes cancelar tu suscripción en cualquier momento desde el bot con el comando /subscription. No hay compromisos a largo plazo.',
+                cancelInfo: 'Puedes cancelar tu suscripcion en cualquier momento desde el bot con el comando /subscription. No hay compromisos a largo plazo.',
                 labelHolder: 'Nombre en la tarjeta',
-                labelNumber: 'Número de tarjeta',
-                labelExpiry: 'Fecha de expiración',
+                labelNumber: 'Numero de tarjeta',
+                labelExpiry: 'Fecha de expiracion',
                 labelCvv: 'CVV',
-                labelEmail: 'Correo electrónico',
-                submitBtn: '🔒 Activar Suscripción Mensual',
-                securityNote: 'Tus datos están protegidos con encriptación SSL de 256 bits',
+                labelEmail: 'Correo electronico',
+                submitBtn: 'Activar Suscripcion Mensual',
+                securityNote: 'Tus datos estan protegidos con encriptacion SSL de 256 bits',
                 termsText: 'Al suscribirte, aceptas nuestros',
-                successTitle: '¡Suscripción Activada!',
-                successText: 'Tu membresía PRIME con renovación automática está activa. Revisa tu Telegram para el enlace de acceso.',
+                successTitle: 'Suscripcion Activada!',
+                successText: 'Tu membresia PRIME con renovacion automatica esta activa. Revisa tu Telegram para el enlace de acceso.',
                 telegramBtn: 'Abrir Telegram',
                 processing: 'Procesando...',
                 errorGeneric: 'Error al procesar el pago. Por favor intenta de nuevo.',
@@ -458,7 +392,7 @@
                 labelExpiry: 'Expiration date',
                 labelCvv: 'CVV',
                 labelEmail: 'Email address',
-                submitBtn: '🔒 Activate Monthly Subscription',
+                submitBtn: 'Activate Monthly Subscription',
                 securityNote: 'Your data is protected with 256-bit SSL encryption',
                 termsText: 'By subscribing, you agree to our',
                 successTitle: 'Subscription Activated!',
@@ -479,7 +413,7 @@
         document.getElementById('feature-1').textContent = t.planFeature1;
         document.getElementById('feature-2').textContent = t.planFeature2;
         document.getElementById('feature-3').textContent = t.planFeature3;
-        document.querySelector('.cancel-info').innerHTML = `<strong>📌 ${isSpanish ? 'Información importante:' : 'Important information:'}</strong> ${t.cancelInfo}`;
+        document.querySelector('.cancel-info').innerHTML = `<strong>${isSpanish ? 'Informacion importante:' : 'Important information:'}</strong> ${t.cancelInfo}`;
         document.getElementById('label-holder').textContent = t.labelHolder;
         document.getElementById('label-number').textContent = t.labelNumber;
         document.getElementById('label-expiry').textContent = t.labelExpiry;

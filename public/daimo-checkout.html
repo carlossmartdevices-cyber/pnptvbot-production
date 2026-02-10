@@ -5,40 +5,93 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <title>Checkout con Daimo - PNPtv</title>
-    <link rel="stylesheet" href="/webapps/design-system/static.css">
-    <script src="/webapps/design-system/telegram-theme.js" type="module"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-color: #1C1C1E;
+            --text-main: #FFFFFF;
+            --text-muted: #8E8E93;
+            --neon-pink: #FF00CC;
+            --neon-amber: #FFB454;
+            --glass-bg: rgba(44, 44, 46, 0.7);
+            --glass-border: rgba(255, 180, 84, 0.3);
+            --card-radius: 20px;
+        }
+
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .ambient-glow {
+            position: fixed;
+            top: -40%;
+            left: -20%;
+            width: 140%;
+            height: 120%;
+            background: radial-gradient(ellipse at 30% 20%, rgba(255, 0, 204, 0.08) 0%, transparent 60%),
+                        radial-gradient(ellipse at 70% 60%, rgba(255, 180, 84, 0.06) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 480px;
+            margin: 0 auto;
+            min-height: 100vh;
+        }
+
         .header {
-            background: var(--panel-strong);
-            color: var(--text);
-            padding: 20px;
+            padding: 28px 20px 20px;
             text-align: center;
-            border-bottom: 1px solid var(--border);
         }
 
         .header h1 {
-            font-size: 24px;
-            margin-bottom: 5px;
-            color: var(--accent);
+            font-size: 28px;
+            font-weight: 900;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 6px;
         }
 
         .header p {
             font-size: 14px;
-            color: var(--muted);
+            color: var(--text-muted);
+            font-weight: 400;
         }
 
         .content {
-            padding: 20px;
+            padding: 0 20px 40px;
         }
 
         .loading {
             text-align: center;
-            padding: 40px 20px;
+            padding: 60px 20px;
+        }
+
+        .loading p {
+            color: var(--text-muted);
+            font-size: 14px;
         }
 
         .spinner {
-            border: 3px solid var(--border);
-            border-top: 3px solid var(--accent);
+            border: 3px solid rgba(255, 255, 255, 0.06);
+            border-top: 3px solid var(--neon-pink);
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -52,17 +105,19 @@
         }
 
         .plan-info {
-            background: var(--bg-2);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 25px;
-            border: 1px solid var(--border);
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: var(--card-radius);
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .plan-name {
             font-size: 18px;
-            font-weight: 600;
-            color: var(--text);
+            font-weight: 700;
+            color: var(--text-main);
             margin-bottom: 10px;
             display: flex;
             align-items: center;
@@ -70,33 +125,37 @@
         }
 
         .plan-price {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--accent);
-            margin: 10px 0;
+            font-size: 32px;
+            font-weight: 900;
+            margin: 12px 0 4px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .plan-price .currency {
             font-size: 14px;
-            color: var(--muted);
+            -webkit-text-fill-color: var(--text-muted);
+            font-weight: 600;
         }
 
         .promo-badge {
             margin-top: 6px;
             padding: 4px 10px;
             border-radius: 15px;
-            background: rgba(255, 180, 84, 0.2);
-            color: var(--accent);
+            background: rgba(255, 180, 84, 0.15);
+            color: var(--neon-amber);
             font-size: 11px;
             display: inline-block;
             font-weight: 600;
-            border: 1px solid rgba(255, 180, 84, 0.4);
+            border: 1px solid rgba(255, 180, 84, 0.3);
         }
 
         .promo-savings {
             margin-top: 8px;
             font-size: 12px;
-            color: var(--accent-2);
+            color: var(--neon-amber);
             font-weight: 600;
         }
 
@@ -108,7 +167,7 @@
 
         .plan-features li {
             padding: 8px 0;
-            color: var(--muted);
+            color: var(--text-muted);
             display: flex;
             align-items: center;
             gap: 10px;
@@ -116,69 +175,45 @@
         }
 
         .plan-features li:before {
-            content: "✓";
-            color: var(--accent-2);
+            content: "\2713";
+            color: var(--neon-amber);
             font-weight: bold;
             font-size: 16px;
         }
 
-        .pay-button {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, var(--accent), #ffd27a);
-            color: var(--bg);
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            margin-top: 10px;
+        .plan-duration {
+            color: var(--neon-amber);
+            font-weight: 600;
+            font-size: 15px;
+            margin: 8px 0;
         }
 
-        .pay-button:active:not(:disabled) {
-            transform: scale(0.97);
-            
+        .sku-text {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin: 8px 0;
         }
 
-        .pay-button:disabled {
-            background: var(--bg-2);
-            color: var(--muted);
-            opacity: 0.8;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .security-note {
-            text-align: center;
-            margin-top: 20px;
-            padding: 12px;
-            background: rgba(44, 226, 201, 0.1);
-            border: 1px solid rgba(44, 226, 201, 0.3);
-            border-radius: 8px;
-            font-size: 12px;
-            color: var(--accent-2);
-        }
-
-        .security-note svg {
-            vertical-align: middle;
-            margin-right: 5px;
-            color: var(--accent-2);
+        .price-cop {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-top: 5px;
         }
 
         .payment-methods {
-            background: var(--bg-2);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 15px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--card-radius);
+            padding: 20px;
             margin-bottom: 20px;
             font-size: 13px;
-            color: var(--muted);
+            color: var(--text-muted);
         }
 
         .payment-methods strong {
-            color: var(--text);
+            color: var(--text-main);
         }
 
         .payment-methods ul {
@@ -192,14 +227,20 @@
         }
 
         .instructions {
-            background: var(--bg-2);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 15px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--card-radius);
+            padding: 20px;
             margin-bottom: 20px;
             font-size: 13px;
-            color: var(--muted);
-            border-left: 4px solid var(--accent);
+            color: var(--text-muted);
+            border-left: 4px solid var(--neon-pink);
+        }
+
+        .instructions strong {
+            color: var(--text-main);
         }
 
         .instructions ol {
@@ -213,15 +254,59 @@
             line-height: 1.5;
         }
 
+        .pay-button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            color: #FFFFFF;
+            border: none;
+            border-radius: 14px;
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+            box-shadow: 0 4px 24px rgba(255, 0, 204, 0.25);
+        }
+
+        .pay-button:active:not(:disabled) {
+            transform: scale(0.97);
+        }
+
+        .pay-button:disabled {
+            background: rgba(44, 44, 46, 0.7);
+            color: var(--text-muted);
+            opacity: 0.8;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .security-note {
+            text-align: center;
+            margin-top: 20px;
+            padding: 14px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
         .error {
-            background: rgba(255, 107, 107, 0.1);
-            color: var(--accent-3);
-            padding: 12px;
-            border-radius: 8px;
+            background: rgba(255, 59, 48, 0.12);
+            color: #FF6B6B;
+            padding: 16px;
+            border-radius: 14px;
             margin-bottom: 15px;
             text-align: center;
             display: none;
-            border: 1px solid rgba(255, 107, 107, 0.3);
+            border: 1px solid rgba(255, 59, 48, 0.25);
+            font-size: 14px;
         }
 
         .back-link {
@@ -230,37 +315,19 @@
         }
 
         .back-link a {
-            color: var(--text);
+            color: var(--text-muted);
             text-decoration: none;
             font-size: 14px;
+            transition: color 0.2s;
         }
 
         .back-link a:hover {
-            text-decoration: underline;
-        }
-
-        .plan-duration {
-            color: var(--accent);
-            font-weight: 600;
-            font-size: 15px;
-            margin: 8px 0;
-        }
-
-        .sku-text {
-            color: var(--muted);
-            font-size: 13px;
-            margin: 8px 0;
-        }
-
-        .price-cop {
-            color: var(--muted);
-            font-size: 14px;
-            margin-top: 5px;
+            color: var(--text-main);
         }
 
         @media (max-width: 600px) {
             .header h1 {
-                font-size: 20px;
+                font-size: 24px;
             }
 
             .plan-price {
@@ -271,20 +338,26 @@
                 padding: 14px;
                 font-size: 16px;
             }
+
+            .content {
+                padding: 0 16px 32px;
+            }
         }
     </style>
 </head>
 <body>
+    <div class="ambient-glow"></div>
+
     <div class="container">
         <header class="header">
-            <h1>🎬 PNPtv</h1>
+            <h1>PNPtv</h1>
             <p>Paga con Daimo (Stablecoin USDC)</p>
         </header>
 
         <main class="content">
             <div id="loading" class="loading">
                 <div class="spinner"></div>
-                <p>Cargando información del pago...</p>
+                <p>Cargando informacion del pago...</p>
             </div>
 
             <div id="error" class="error" style="display: none;"></div>
@@ -299,7 +372,7 @@
                         SKU: <span id="plan-sku">EASYBOTS-PNP-030</span>
                     </div>
                     <div class="plan-duration">
-                        <span id="plan-duration">30</span> días - ¡Acceso a PNPtv!
+                        <span id="plan-duration">30</span> dias - Acceso a PNPtv!
                     </div>
                     <div class="plan-price">
                         <span class="currency">USD</span> $<span id="plan-price-usd">0</span>
@@ -310,39 +383,39 @@
                 </div>
 
                 <div class="payment-methods">
-                    <strong>📱 Formas de pago aceptadas:</strong>
+                    <strong>Formas de pago aceptadas:</strong>
                     <p style="margin-top: 8px;">
                         Daimo funciona con monederos que usen stablecoin USDC (Optimism):
                     </p>
                     <ul style="margin-left: 20px; margin-top: 8px;">
-                        <li>💰 Wallets: MetaMask, Wallet Connect, Coinbase Wallet</li>
-                        <li>🏦 Apps de pago: Venmo, Cash App, Revolut, Wise, Zelle</li>
-                        <li>🔄 Exchange: Kraken, Coinbase y otros</li>
+                        <li>Wallets: MetaMask, Wallet Connect, Coinbase Wallet</li>
+                        <li>Apps de pago: Venmo, Cash App, Revolut, Wise, Zelle</li>
+                        <li>Exchange: Kraken, Coinbase y otros</li>
                     </ul>
                 </div>
 
                 <div class="instructions">
-                    <strong>📋 Pasos para pagar:</strong>
+                    <strong>Pasos para pagar:</strong>
                     <ol>
-                        <li>Haz clic en el botón "Pagar con Daimo" abajo</li>
-                        <li>Se abrirá una nueva ventana con el checkout de Daimo</li>
-                        <li>Selecciona tu método de pago (Venmo, Cash App, etc.)</li>
-                        <li>Completa la transacción</li>
-                        <li>¡Una vez confirmado, recibirás automáticamente tu acceso a PRIME!</li>
+                        <li>Haz clic en el boton "Pagar con Daimo" abajo</li>
+                        <li>Se abrira una nueva ventana con el checkout de Daimo</li>
+                        <li>Selecciona tu metodo de pago (Venmo, Cash App, etc.)</li>
+                        <li>Completa la transaccion</li>
+                        <li>Una vez confirmado, recibiras automaticamente tu acceso a PRIME!</li>
                     </ol>
                 </div>
 
                 <button type="button" class="pay-button" id="pay-button">
-                    💎 Pagar con Daimo
+                    Pagar con Daimo
                 </button>
 
                 <div class="security-note">
-                    ✅ Pago seguro con Daimo. Tu información será protegida durante la transacción.
-                    Una vez confirmado el pago, tendrás acceso inmediato a tu suscripción.
+                    Pago seguro con Daimo. Tu informacion sera protegida durante la transaccion.
+                    Una vez confirmado el pago, tendras acceso inmediato a tu suscripcion.
                 </div>
 
                 <div class="back-link">
-                    <a href="#" onclick="window.close(); return false;">← Volver al bot</a>
+                    <a href="#" onclick="window.close(); return false;">Volver al bot</a>
                 </div>
             </div>
         </main>
