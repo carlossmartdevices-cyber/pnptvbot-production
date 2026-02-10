@@ -1,5 +1,5 @@
 # Build stage - install all dependencies including dev dependencies
-FROM node:18 AS builder
+FROM node:22-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -13,8 +13,8 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Production stage - using full Node.js image (all build tools pre-installed)
-FROM node:18 AS production
+# Production stage - using lean Alpine image for security & size
+FROM node:22-alpine AS production
 
 # Set working directory
 WORKDIR /app
