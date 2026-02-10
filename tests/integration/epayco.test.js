@@ -19,7 +19,7 @@ const { getPool } = require('../../src/config/postgres');
 const { cache } = require('../../src/config/redis');
 const { execSync } = require('child_process');
 
-const BASE_URL = process.env.TEST_BASE_URL || 'https://easybots.site';
+const BASE_URL = process.env.TEST_BASE_URL || 'https://easybots.store';
 const TIMEOUT = 30000;
 
 // Helpers
