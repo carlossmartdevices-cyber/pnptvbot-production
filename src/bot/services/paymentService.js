@@ -1604,6 +1604,9 @@ class PaymentService {
         url_confirmation: `${epaycoWebhookDomain}/api/webhook/epayco`,
         method_confirmation: 'POST',
         use_default_card_customer: true,
+        // SECURITY: Enable 3D Secure (3DS) for all tokenized charges
+        // This enforces bank-side authentication for added security
+        three_d_secure: true,
         extras: {
           extra1: String(userId),
           extra2: planId,
