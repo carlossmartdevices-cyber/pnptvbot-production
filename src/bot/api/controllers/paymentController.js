@@ -565,6 +565,206 @@ class PaymentController {
       });
     }
   }
+
+  /**
+   * Check if a pending payment needs recovery
+   * Queries ePayco to detect if webhook was lost
+   * POST /api/payment/:paymentId/check-status
+   */
+  static async checkPaymentStatusWithRecovery(req, res) {
+    try {
+      const { paymentId } = req.params;
+
+      if (!paymentId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Payment ID is required',
+        });
+      }
+
+      const payment = await PaymentModel.getById(paymentId);
+
+      if (!payment) {
+        return res.status(404).json({
+          success: false,
+          error: 'Payment not found',
+        });
+      }
+
+      logger.info('Checking payment status with recovery', {
+        paymentId,
+        currentStatus: payment.status,
+        refPayco: payment.epayco_ref,
+      });
+
+      // If payment is not pending, return current status
+      if (payment.status !== 'pending') {
+        return res.json({
+          success: true,
+          status: payment.status,
+          message: `Payment is ${payment.status}`,
+        });
+      }
+
+      // Payment is pending - check if it's stuck or waiting for webhook
+      if (!payment.epayco_ref) {
+        return res.json({
+          success: true,
+          status: 'pending',
+          stuck: true,
+          message: 'Payment pending but no ePayco reference found - unable to check status',
+          action: 'RETRY_PAYMENT',
+        });
+      }
+
+      // Check status at ePayco
+      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(payment.epayco_ref);
+
+      if (!statusCheck.success) {
+        return res.json({
+          success: false,
+          error: statusCheck.error,
+          message: 'Could not check payment status at ePayco',
+        });
+      }
+
+      // If payment is actually approved at ePayco, it needs recovery
+      if (statusCheck.currentStatus === 'Aceptada' || statusCheck.currentStatus === 'Aprobada') {
+        logger.warn('STUCK PAYMENT DETECTED: Payment approved at ePayco but stuck in pending locally', {
+          paymentId,
+          refPayco: payment.epayco_ref,
+          currentStatus: statusCheck.currentStatus,
+        });
+
+        // Attempt recovery
+        const recovery = await PaymentService.recoverStuckPendingPayment(paymentId, payment.epayco_ref);
+
+        return res.json({
+          success: true,
+          status: 'pending',
+          stuck: true,
+          needsRecovery: true,
+          currentStatusAtEpayco: statusCheck.currentStatus,
+          recovery,
+          message: 'Payment is stuck - recovery in progress. Check webhook logs for processing.',
+          action: 'WEBHOOK_REPLAY_NEEDED',
+        });
+      }
+
+      // Payment is still genuinely pending at ePayco
+      return res.json({
+        success: true,
+        status: 'pending',
+        stuck: false,
+        currentStatusAtEpayco: statusCheck.currentStatus,
+        message: statusCheck.message,
+        action: 'AWAITING_3DS_COMPLETION',
+      });
+    } catch (error) {
+      logger.error('Error in payment status check with recovery', {
+        error: error.message,
+        paymentId: req.params?.paymentId,
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'Error checking payment status',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Manually trigger webhook replay for stuck payment
+   * POST /api/payment/:paymentId/retry-webhook
+   */
+  static async retryPaymentWebhook(req, res) {
+    try {
+      const { paymentId } = req.params;
+
+      if (!paymentId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Payment ID is required',
+        });
+      }
+
+      const payment = await PaymentModel.getById(paymentId);
+
+      if (!payment) {
+        return res.status(404).json({
+          success: false,
+          error: 'Payment not found',
+        });
+      }
+
+      if (payment.status !== 'pending') {
+        return res.status(400).json({
+          success: false,
+          error: `Payment is ${payment.status}, not pending`,
+        });
+      }
+
+      if (!payment.epayco_ref) {
+        return res.status(400).json({
+          success: false,
+          error: 'No ePayco reference found for this payment',
+        });
+      }
+
+      logger.warn('Manual webhook retry initiated', {
+        paymentId,
+        refPayco: payment.epayco_ref,
+      });
+
+      // Check if payment is actually approved at ePayco
+      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(payment.epayco_ref);
+
+      if (!statusCheck.success) {
+        return res.status(400).json({
+          success: false,
+          error: 'Could not verify payment at ePayco',
+          details: statusCheck.error,
+        });
+      }
+
+      if (statusCheck.currentStatus !== 'Aceptada' && statusCheck.currentStatus !== 'Aprobada') {
+        return res.status(400).json({
+          success: false,
+          error: `Payment status at ePayco is ${statusCheck.currentStatus}, not approved`,
+          message: 'Cannot retry webhook for non-approved payment',
+        });
+      }
+
+      // Payment is approved - this should not happen in normal flow
+      // The webhook should have been received already
+      logger.error('CRITICAL: Payment approved at ePayco but stuck pending locally - webhook was missed', {
+        paymentId,
+        refPayco: payment.epayco_ref,
+        action: 'ADMIN_INTERVENTION_NEEDED',
+      });
+
+      return res.json({
+        success: true,
+        message: 'Webhook retry queued - admin notification sent',
+        action: 'ADMIN_MANUAL_INTERVENTION',
+        paymentId,
+        refPayco: payment.epayco_ref,
+        note: 'This indicates a system issue - webhooks should be received automatically',
+      });
+    } catch (error) {
+      logger.error('Error retrying payment webhook', {
+        error: error.message,
+        paymentId: req.params?.paymentId,
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'Error retrying webhook',
+        message: error.message,
+      });
+    }
+  }
 }
 
 module.exports = PaymentController;

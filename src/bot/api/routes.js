@@ -668,6 +668,9 @@ app.get('/api/payment/:paymentId/status', asyncHandler(paymentController.getPaym
 app.post('/api/payment/tokenized-charge', asyncHandler(paymentController.processTokenizedCharge));
 app.post('/api/payment/verify-2fa', asyncHandler(paymentController.verify2FA));
 app.get('/api/confirm-payment/:token', asyncHandler(paymentController.confirmPaymentToken));
+// Payment recovery endpoints for stuck 3DS payments
+app.post('/api/payment/:paymentId/check-status', asyncHandler(paymentController.checkPaymentStatusWithRecovery));
+app.post('/api/payment/:paymentId/retry-webhook', asyncHandler(paymentController.retryPaymentWebhook));
 
 // Meet & Greet API routes
 const MeetGreetService = require('../services/meetGreetService');

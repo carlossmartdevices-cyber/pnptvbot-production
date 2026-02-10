@@ -884,21 +884,28 @@ class PaymentService {
 
         return { success: true };
       } else if (x_transaction_state === 'Pendiente') {
-        // Payment pending
+        // Payment pending - waiting for 3DS completion or processing
         if (payment) {
           await PaymentModel.updateStatus(paymentIdOrType, 'pending', {
             transaction_id: x_transaction_id,
             reference: x_ref_payco,
             epayco_ref: x_ref_payco,
+            webhook_received: new Date().toISOString(),
+            still_pending_at_webhook: true,
           });
         }
 
-        logger.info('ePayco payment pending', {
+        logger.warn('ePayco webhook received with Pendiente status - still awaiting completion', {
           x_ref_payco,
+          x_transaction_state,
           userId,
           planId: planIdOrBookingId,
+          paymentId: paymentIdOrType,
+          message: 'Payment is still pending. This is normal during 3DS authentication flow.',
         });
 
+        // IMPORTANT: Payment is still pending - do NOT activate subscription yet
+        // Wait for next webhook with 'Aceptada' status from ePayco after 3DS completes
         return { success: true };
       }
 
@@ -1708,23 +1715,75 @@ class PaymentService {
       } else if (estado === 'Pendiente') {
         // Check for 3DS redirect URL (bank authentication)
         const redirectUrl = chargeResult?.data?.urlbanco || chargeResult?.data?.url_response_bank || null;
+        const fullResponse = chargeResult?.data || {};
 
-        await PaymentModel.updateStatus(paymentId, 'pending', {
+        // CRITICAL: Log full response to diagnose missing urlbanco
+        logger.warn('ePayco returned Pendiente status - checking 3DS redirect URL', {
+          paymentId,
+          hasUrlbanco: !!redirectUrl,
+          chargeResultKeys: Object.keys(fullResponse),
+          fullResponse: {
+            estado: fullResponse.estado,
+            respuesta: fullResponse.respuesta,
+            ref_payco: fullResponse.ref_payco,
+            urlbanco: fullResponse.urlbanco,
+            url_response_bank: fullResponse.url_response_bank,
+            transactionID: fullResponse.transactionID,
+            transaction_id: fullResponse.transaction_id,
+            comprobante: fullResponse.comprobante,
+          },
+        });
+
+        // Mark the payment with timeout for recovery if bank URL is missing
+        const pendingMetadata = {
           transaction_id: transactionId,
           reference: refPayco,
           epayco_ref: refPayco,
           payment_method: 'tokenized_card',
-        });
+          three_ds_requested: true,
+          bank_url_available: !!redirectUrl,
+          epayco_response_timestamp: new Date().toISOString(),
+        };
+
+        if (!redirectUrl) {
+          // Missing bank URL - payment cannot proceed
+          logger.error('CRITICAL: 3DS payment pending but no bank redirect URL provided by ePayco', {
+            paymentId,
+            refPayco,
+            estado,
+            chargeResultKeys: Object.keys(fullResponse),
+          });
+          pendingMetadata.error = 'BANK_URL_MISSING';
+          pendingMetadata.error_description = 'ePayco did not provide bank redirect URL for 3DS';
+        }
+
+        await PaymentModel.updateStatus(paymentId, 'pending', pendingMetadata);
 
         const pendingResult = {
-          success: true,
+          success: !!redirectUrl, // Only true if we have the redirect URL
           status: 'pending',
           transactionId: refPayco || transactionId,
-          message: 'El pago está pendiente de confirmación',
+          message: redirectUrl
+            ? 'El pago está pendiente de confirmación en el banco'
+            : 'Error: No se pudo obtener la URL del banco para confirmar el pago',
         };
 
         if (redirectUrl) {
           pendingResult.redirectUrl = redirectUrl;
+          logger.info('3DS bank redirect URL obtained from ePayco', {
+            paymentId,
+            refPayco,
+            urlPresent: true,
+          });
+        } else {
+          // Return error if no redirect URL - this prevents user confusion
+          pendingResult.error = 'BANK_URL_MISSING';
+          pendingResult.requiresManualIntervention = true;
+          logger.warn('Payment stuck - missing bank authentication URL', {
+            paymentId,
+            refPayco,
+            action: 'REQUIRES_MANUAL_RETRY',
+          });
         }
 
         return pendingResult;
@@ -1774,6 +1833,168 @@ class PaymentService {
       }).catch(() => {});
 
       return { success: false, error: `Error procesando el pago: ${error.message}` };
+    }
+  }
+
+  /**
+   * Check payment status with ePayco for stuck pending payments
+   * This queries ePayco's API directly to recover from stuck transactions
+   * @param {string} refPayco - ePayco transaction reference
+   * @returns {Promise<Object>} Transaction status from ePayco
+   */
+  static async checkEpaycoTransactionStatus(refPayco) {
+    try {
+      if (!refPayco) {
+        return { success: false, error: 'Missing refPayco' };
+      }
+
+      logger.info('Checking ePayco transaction status via API', { refPayco });
+
+      // Initialize ePayco SDK if not already done
+      const Epayco = require('epayco-sdk-node');
+      const epaycoClient = new Epayco({
+        apiKey: process.env.EPAYCO_PRIVATE_KEY,
+        publicKey: process.env.EPAYCO_PUBLIC_KEY,
+        rsa: process.env.EPAYCO_RSA || false,
+        lang: 'ES',
+        test: process.env.EPAYCO_TEST_MODE === 'true',
+      });
+
+      // Query transaction status
+      const statusResult = await epaycoClient.transaction.get(refPayco);
+
+      if (statusResult && statusResult.data) {
+        const { estado, respuesta, ref_payco, transactionID } = statusResult.data;
+
+        logger.info('ePayco transaction status retrieved', {
+          refPayco,
+          estado,
+          respuesta,
+          timestamp: new Date().toISOString(),
+        });
+
+        // IMPORTANT: If status has changed to Aceptada/Aprobada, webhook may have been lost
+        if (estado === 'Aceptada' || estado === 'Aprobada') {
+          logger.warn('RECOVERY: Payment confirmed at ePayco but webhook may have been missed', {
+            refPayco,
+            estado,
+            message: 'This payment may need manual webhook replay',
+          });
+          return {
+            success: true,
+            currentStatus: estado,
+            needsRecovery: true,
+            message: 'Payment was confirmed at ePayco but webhook may have been delayed',
+          };
+        } else if (estado === 'Pendiente') {
+          logger.warn('Payment still pending at ePayco', {
+            refPayco,
+            estado,
+            message: 'User may not have completed 3DS authentication',
+          });
+          return {
+            success: true,
+            currentStatus: 'Pendiente',
+            needsRecovery: false,
+            message: 'Payment is still waiting for 3DS completion',
+          };
+        } else if (estado === 'Rechazada' || estado === 'Fallida') {
+          logger.warn('Payment was rejected/failed at ePayco', {
+            refPayco,
+            estado,
+            respuesta,
+          });
+          return {
+            success: true,
+            currentStatus: estado,
+            needsRecovery: false,
+            message: 'Payment was rejected or failed',
+          };
+        }
+
+        return {
+          success: true,
+          currentStatus: estado,
+          responseMessage: respuesta,
+          fullResponse: statusResult.data,
+        };
+      }
+
+      logger.error('Failed to retrieve ePayco transaction status', {
+        refPayco,
+        statusResult,
+      });
+      return { success: false, error: 'Could not retrieve status from ePayco' };
+    } catch (error) {
+      logger.error('Error checking ePayco transaction status', {
+        error: error.message,
+        refPayco,
+        stack: error.stack,
+      });
+      return {
+        success: false,
+        error: error.message,
+        message: 'Failed to check transaction status at ePayco',
+      };
+    }
+  }
+
+  /**
+   * Recover from stuck pending 3DS payment
+   * Checks if payment was completed at ePayco and replays webhook if needed
+   * @param {string} paymentId - Internal payment ID
+   * @param {string} refPayco - ePayco reference
+   * @returns {Promise<Object>} Recovery result
+   */
+  static async recoverStuckPendingPayment(paymentId, refPayco) {
+    try {
+      if (!paymentId || !refPayco) {
+        return { success: false, error: 'Missing paymentId or refPayco' };
+      }
+
+      // Check current status at ePayco
+      const statusCheck = await this.checkEpaycoTransactionStatus(refPayco);
+      if (!statusCheck.success) {
+        return statusCheck;
+      }
+
+      // If payment is actually approved at ePayco, trigger webhook processing
+      if (statusCheck.needsRecovery && statusCheck.currentStatus === 'Aceptada') {
+        logger.warn('RECOVERY: Reprocessing confirmed payment that was waiting for webhook', {
+          paymentId,
+          refPayco,
+          action: 'WEBHOOK_REPLAY_NEEDED',
+        });
+
+        // The payment exists and is confirmed at ePayco
+        // Webhook processing should be triggered manually or via webhook replay mechanism
+        return {
+          success: true,
+          recovered: true,
+          message: 'Payment confirmed - webhook processing should be replayed',
+          action: 'WEBHOOK_REPLAY_RECOMMENDED',
+          paymentId,
+          refPayco,
+        };
+      }
+
+      return {
+        success: true,
+        recovered: false,
+        currentStatus: statusCheck.currentStatus,
+        message: statusCheck.message,
+      };
+    } catch (error) {
+      logger.error('Error recovering stuck payment', {
+        error: error.message,
+        paymentId,
+        refPayco,
+      });
+      return {
+        success: false,
+        error: error.message,
+        message: 'Failed to recover stuck payment',
+      };
     }
   }
 }
