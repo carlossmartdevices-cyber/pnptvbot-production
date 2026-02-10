@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRIME Hub - Select Your Experience</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <script async src="https://telegram.org/js/telegram-widget.js?22"></script>
+    <style>
+        :root {
+            --bg-color: #1C1C1E;
+            --text-main: #FFFFFF;
+            --text-muted: #8E8E93;
+            --neon-pink: #FF00CC;
+            --neon-amber: #FFB454;
+            --glass-bg: rgba(44, 44, 46, 0.7);
+            --glass-border: rgba(255, 180, 84, 0.3);
+            --card-radius: 20px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* --- Ambient Glow --- */
+        .ambient-glow {
+            position: fixed;
+            top: -30%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120vw;
+            height: 120vw;
+            background: radial-gradient(circle, rgba(255, 0, 204, 0.12) 0%, transparent 65%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .ambient-glow-2 {
+            position: fixed;
+            bottom: -40%;
+            right: -20%;
+            width: 80vw;
+            height: 80vw;
+            background: radial-gradient(circle, rgba(255, 180, 84, 0.08) 0%, transparent 65%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* --- Header --- */
+        header {
+            padding: 30px 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .logo {
+            font-weight: 900;
+            font-size: 32px;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        /* --- Main Container --- */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 60px 20px;
+            min-height: calc(100vh - 120px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .hero h1 {
+            font-size: clamp(28px, 6vw, 48px);
+            font-weight: 900;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+        }
+
+        .gradient-text {
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            color: var(--text-muted);
+            font-size: 15px;
+            margin-bottom: 24px;
+        }
+
+        /* --- Apps Grid --- */
+        .apps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 24px;
+            margin-bottom: 60px;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .app-icon {
+            background: linear-gradient(135deg, rgba(255, 0, 204, 0.1) 0%, rgba(255, 180, 84, 0.05) 100%);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--card-radius);
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .app-icon::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+            transition: all 0.5s;
+            transform: scale(0);
+        }
+
+        .app-icon:hover {
+            background: linear-gradient(135deg, rgba(255, 0, 204, 0.2) 0%, rgba(255, 180, 84, 0.1) 100%);
+            border-color: rgba(255, 180, 84, 0.5);
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(255, 0, 204, 0.15);
+        }
+
+        .app-icon:hover::before {
+            transform: scale(1);
+        }
+
+        .app-emoji {
+            font-size: 60px;
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        .app-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .app-description {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* --- Auth Section --- */
+        .auth-section {
+            background: linear-gradient(135deg, var(--glass-bg) 0%, rgba(44, 44, 46, 0.5) 100%);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--card-radius);
+            padding: 40px;
+            max-width: 500px;
+            margin: 0 auto;
+            text-align: center;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .auth-section h3 {
+            font-size: 18px;
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+
+        .auth-section p {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .telegram-widget {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .or-divider {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        .or-divider::before,
+        .or-divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 40%;
+            height: 1px;
+            background: var(--glass-border);
+        }
+
+        .or-divider::before {
+            left: 0;
+        }
+
+        .or-divider::after {
+            right: 0;
+        }
+
+        .guest-btn {
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            border: none;
+            color: white;
+            padding: 12px 32px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .guest-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(255, 0, 204, 0.3);
+        }
+
+        /* --- Footer --- */
+        footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 32px 20px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 12px;
+        }
+
+        footer a {
+            color: var(--neon-amber);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        footer a:hover {
+            color: var(--neon-pink);
+        }
+
+        /* --- Animations --- */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .hero, .apps-grid, .auth-section {
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .app-icon {
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .app-icon:nth-child(2) { animation-delay: 0.1s; }
+        .app-icon:nth-child(3) { animation-delay: 0.2s; }
+        .app-icon:nth-child(4) { animation-delay: 0.3s; }
+
+        /* --- Mobile --- */
+        @media (max-width: 768px) {
+            .apps-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 16px;
+            }
+
+            .app-icon {
+                padding: 30px 15px;
+            }
+
+            .app-emoji {
+                font-size: 48px;
+                margin-bottom: 12px;
+            }
+
+            .app-name {
+                font-size: 16px;
+                margin-bottom: 6px;
+            }
+
+            .auth-section {
+                padding: 30px 20px;
+            }
+
+            .hero h1 {
+                font-size: 28px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 40px 15px;
+            }
+
+            .apps-grid {
+                gap: 12px;
+            }
+
+            .app-icon {
+                padding: 24px 12px;
+            }
+
+            .app-emoji {
+                font-size: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow"></div>
+    <div class="ambient-glow-2"></div>
+
+    <header>
+        <div class="logo">PRIME Hub</div>
+        <p class="subtitle">Select Your Experience</p>
+    </header>
+
+    <div class="container">
+        <div class="hero">
+            <h1>Choose Your <span class="gradient-text">Experience</span></h1>
+            <p>Select from Live Streaming, Nearby Connections, Hangouts, or Video Content</p>
+        </div>
+
+        <div class="apps-grid">
+            <a href="/live" class="app-icon">
+                <span class="app-emoji">🎤</span>
+                <div class="app-name">Live</div>
+                <p class="app-description">Join live broadcasts and interact in real-time</p>
+            </a>
+
+            <a href="/nearby" class="app-icon">
+                <span class="app-emoji">📍</span>
+                <div class="app-name">Nearby</div>
+                <p class="app-description">Discover people and connections near you</p>
+            </a>
+
+            <a href="/hangouts" class="app-icon">
+                <span class="app-emoji">👥</span>
+                <div class="app-name">Hangouts</div>
+                <p class="app-description">Connect and chat with your community</p>
+            </a>
+
+            <a href="/videorama" class="app-icon">
+                <span class="app-emoji">📹</span>
+                <div class="app-name">Videorama</div>
+                <p class="app-description">Stream premium video content on demand</p>
+            </a>
+        </div>
+
+        <div class="auth-section">
+            <h3>Ready to Explore?</h3>
+            <p>Login with Telegram to access all features and connect with the PRIME community</p>
+
+            <div class="telegram-widget">
+                <script async src="https://telegram.org/js/telegram-widget.js?22"
+                    data-telegram-login="pnptvbot"
+                    data-size="large"
+                    data-auth-url="/api/telegram-auth"
+                    data-request-access="write"
+                    data-radius="10"
+                    onload="window.onTelegramAuth = onTelegramAuth;">
+                </script>
+            </div>
+
+            <div class="or-divider">or</div>
+
+            <a href="/guest" class="guest-btn">Continue as Guest</a>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 PRIME Hub. All rights reserved. | <a href="/terms">Terms</a> | <a href="/privacy">Privacy</a> | <a href="https://t.me/PNPtvbot" target="_blank">Support</a></p>
+        <p style="margin-top: 8px;">18+ Only | Verify your age before accessing content</p>
+    </footer>
+
+    <script>
+        // Handle Telegram authentication callback
+        window.onTelegramAuth = function(user) {
+            console.log('Telegram login successful:', user);
+
+            // Send to backend for authentication
+            fetch('/api/telegram-auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegramUser: user })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Auth response:', data);
+
+                if (data.success && data.termsAccepted) {
+                    // User authenticated and accepted terms - go to portal
+                    window.location.href = '/portal';
+                } else if (data.redirect) {
+                    // Follow redirect (could be terms page or registration)
+                    window.location.href = data.redirect;
+                } else if (data.success) {
+                    // User authenticated but needs to accept terms
+                    localStorage.setItem('userId', user.id);
+                    window.location.href = '/auth/terms?from=/portal';
+                } else {
+                    throw new Error(data.error || 'Authentication failed');
+                }
+            })
+            .catch(error => {
+                console.error('Authentication error:', error);
+                alert('Authentication failed: ' + error.message);
+            });
+        };
+    </script>
+</body>
+</html>

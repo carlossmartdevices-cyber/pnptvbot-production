@@ -226,11 +226,11 @@ app.use((req, res, next) => {
 });
 
 // Landing page routes
-// Home page - domain aware routing
+// Home page - redirect to /login for PRIME Hub
 app.get('/', (req, res) => {
   const host = req.get('host') || '';
   if (host.includes('easybots.store') || host.includes('easybots')) {
-    // Serve easybots-specific landing page (not PNPtv content)
+    // Serve easybots-specific landing page (not PRIME Hub content)
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
@@ -315,8 +315,17 @@ app.get('/', (req, res) => {
     `);
     return;
   }
-  // Redirect to Nginx-served index.html
-  res.redirect(302, '/index.html');
+  // Redirect to PRIME Hub login page
+  res.redirect(302, '/login');
+});
+
+// PRIME Hub login page - shows 4 app icons
+app.get('/login', pageLimiter, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
+  res.sendFile(path.join(__dirname, '../../../public/login.html'));
 });
 
 // PNPtv Haus page
