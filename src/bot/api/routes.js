@@ -41,10 +41,9 @@ const requirePageAuth = (req, res, next) => {
   const user = req.session?.user;
 
   if (!user) {
-    // Save the original URL to redirect back after login
-    const returnUrl = encodeURIComponent(req.originalUrl);
-    logger.info(`Unauthenticated access to ${req.originalUrl}, redirecting to login`);
-    return res.redirect(`/login?return=${returnUrl}`);
+    // Redirect unauthenticated users to home page to login
+    logger.info(`Unauthenticated access to ${req.originalUrl}, redirecting to home`);
+    return res.redirect('/');
   }
 
   // User is authenticated
@@ -197,12 +196,22 @@ app.get('/auth/not-registered', (req, res) => {
   res.redirect(302, '/auth/not-registered.html');
 });
 
-// Login route - redirects to telegram login with return URL handling
-app.get('/login', (req, res) => {
-  const returnUrl = req.query.return || '/videorama';
-  // Redirect to telegram login complete page with the return URL as 'from' parameter
-  // The telegram-login-complete.html expects 'from' parameter for redirect handling
-  res.redirect(302, `/auth/telegram-login-complete.html?from=${encodeURIComponent(returnUrl)}`);
+// Portal dashboard - shows after login with navigation buttons
+app.get('/portal', pageLimiter, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
+  res.sendFile(path.join(__dirname, '../../../public/portal.html'));
+});
+
+// Nearby feature - map-based user discovery
+app.get('/nearby', pageLimiter, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
+  res.sendFile(path.join(__dirname, '../../../public/nearby.html'));
 });
 
 // Add cache control headers for static assets to prevent browser caching issues

@@ -235,12 +235,12 @@
                             } else if (data.success) {
                                 // Authentication successful, check if terms are accepted
                                 if (data.termsAccepted) {
-                                    // Redirect to the original destination
-                                    const redirectUrl = localStorage.getItem('originalUrl') || '/hangouts';
+                                    // Redirect to portal dashboard
+                                    const redirectUrl = localStorage.getItem('originalUrl') || '/portal';
                                     window.location.href = redirectUrl;
                                 } else {
                                     // Store where user wanted to go
-                                    localStorage.setItem('originalUrl', localStorage.getItem('originalUrl') || '/hangouts');
+                                    localStorage.setItem('originalUrl', localStorage.getItem('originalUrl') || '/portal');
                                     // Redirect to terms
                                     window.location.href = '/auth/terms';
                                 }
