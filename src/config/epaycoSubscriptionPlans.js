@@ -7,9 +7,17 @@
  */
 
 const EPAYCO_SUBSCRIPTION_PLANS = {
-  monthly_pass: '98903d6a955eb9e6a02b248',
-  crystal_pass: '989cabf46421ac748080082',
-  six_months_pass: '989cb93a2ebe4596309bb12',
+  // WEEK PASS - 007PASS - $14.99 USD
+  week_pass: '007PASS',
+
+  // 3X MONTHLY PASS - 090PASS - $49.99 USD (3 months = 90 days)
+  three_months_pass: '090PASS',
+
+  // CRYSTAL PASS - 180PASS - $74.99 USD (6 months = 180 days)
+  crystal_pass: '180PASS',
+  six_months_pass: '180PASS',
+
+  // YEARLY PASS - 365PASS
   yearly_pass: '989cc3619e2a37cfe0111f0',
 };
 
