@@ -672,69 +672,10 @@ app.get('/api/confirm-payment/:token', asyncHandler(paymentController.confirmPay
 app.post('/api/payment/:paymentId/check-status', asyncHandler(paymentController.checkPaymentStatusWithRecovery));
 app.post('/api/payment/:paymentId/retry-webhook', asyncHandler(paymentController.retryPaymentWebhook));
 
-// Meet & Greet API routes
-const MeetGreetService = require('../services/meetGreetService');
+// PNP Live API routes (formerly Meet & Greet, now consolidated)
 const PNPLiveService = require('../services/pnpLiveService');
 const ModelService = require('../services/modelService');
-const AvailabilityService = require('../services/availabilityService');
 const PaymentService = require('../services/paymentService');
-
-app.get('/api/meet-greet/booking/:bookingId', asyncHandler(async (req, res) => {
-  const { bookingId } = req.params;
-
-  const booking = await MeetGreetService.getBookingById(bookingId);
-  if (!booking) {
-    return res.status(404).json({ success: false, error: 'Booking not found' });
-  }
-
-  const model = await ModelService.getModelById(booking.model_id);
-
-  // Generate ePayco checkout config for frontend
-  const invoice = `MG-${booking.id}`;
-  const amount = String(booking.price_usd);
-  const currencyCode = 'USD';
-  const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
-  const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.store';
-
-  res.json({
-    success: true,
-    booking: {
-      id: booking.id,
-      userId: booking.user_id,
-      modelId: booking.model_id,
-      modelName: model?.name || 'Unknown',
-      durationMinutes: booking.duration_minutes,
-      priceUsd: booking.price_usd,
-      bookingTime: booking.booking_time,
-      status: booking.status,
-      paymentStatus: booking.payment_status,
-      paymentMethod: booking.payment_method,
-      epaycoPublicKey: process.env.EPAYCO_PUBLIC_KEY,
-      testMode: process.env.EPAYCO_TEST_MODE === 'true',
-      epaycoSignature: PaymentService.generateEpaycoCheckoutSignature({ invoice, amount, currencyCode }),
-      confirmationUrl: `${epaycoWebhookDomain}/api/webhook/epayco`,
-      responseUrl: `${webhookDomain}/api/payment-response`,
-    }
-  });
-}));
-
-app.post('/api/meet-greet/booking/:bookingId/confirm', asyncHandler(async (req, res) => {
-  const { bookingId } = req.params;
-  const { transactionId } = req.body;
-
-  const booking = await MeetGreetService.getBookingById(bookingId);
-  if (!booking) {
-    return res.status(404).json({ success: false, error: 'Booking not found' });
-  }
-
-  // Update booking status
-  await MeetGreetService.updateBookingStatus(bookingId, 'confirmed');
-  await MeetGreetService.updatePaymentStatus(bookingId, 'paid', transactionId);
-
-  res.json({ success: true, message: 'Booking confirmed' });
-}));
-
-// PNP Live API routes
 app.get('/api/pnp-live/booking/:bookingId', asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
 

@@ -6,7 +6,6 @@ const UserModel = require('../../models/userModel');
 const PromoService = require('./promoService');
 const SubscriberModel = require('../../models/subscriberModel');
 const ModelService = require('./modelService');
-const MeetGreetService = require('./meetGreetService');
 const PNPLiveService = require('./pnpLiveService');
 const { cache } = require('../../config/redis');
 const logger = require('../../utils/logger');
@@ -434,15 +433,6 @@ class PaymentService {
   }
 
   /**
-   * Process Meet & Greet ePayco webhook confirmation
-   * @param {Object} params - Webhook data for Meet & Greet
-   * @returns {Object} { success: boolean, error?: string }
-   */
-  static async processMeetGreetEpaycoWebhook(params) {
-    return this._processBookingEpaycoWebhook(params, MeetGreetService, 'Meet & Greet');
-  }
-
-  /**
    * Process PNP Live ePayco webhook confirmation
    * @param {Object} params - Webhook data for PNP Live
    * @returns {Object} { success: boolean, error?: string }
@@ -601,24 +591,8 @@ class PaymentService {
         details: { x_ref_payco, x_transaction_id },
       }).catch(() => {});
 
-      // Check if this is a Meet & Greet payment
-      const isMeetGreet = paymentIdOrType === 'meet_greet';
+      // Check if this is a PNP Live payment
       const isPNPLive = paymentIdOrType === 'pnp_live';
-
-      if (isMeetGreet) {
-        // Handle Meet & Greet payment
-        return await this.processMeetGreetEpaycoWebhook({
-          x_ref_payco,
-          x_transaction_id,
-          x_transaction_state,
-          x_approval_code,
-          x_amount,
-          userId,
-          bookingId: planIdOrBookingId,
-          x_customer_email,
-          x_customer_name,
-        });
-      }
 
       if (isPNPLive) {
         return await this.processPNPLiveEpaycoWebhook({
