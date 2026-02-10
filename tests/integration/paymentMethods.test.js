@@ -8,7 +8,52 @@ const DaimoService = require('../../src/bot/services/daimoService');
 jest.mock('../../src/models/planModel');
 jest.mock('../../src/models/paymentModel');
 jest.mock('../../src/models/userModel');
+jest.mock('../../src/models/subscriberModel', () => ({
+  getBySubscriptionId: jest.fn().mockResolvedValue(null),
+  create: jest.fn().mockResolvedValue(true),
+}));
 jest.mock('../../src/bot/services/daimoService');
+jest.mock('../../src/bot/services/emailservice', () => ({
+  sendInvoiceEmail: jest.fn().mockResolvedValue({ success: true }),
+}));
+jest.mock('../../src/bot/services/invoiceservice', () => ({
+  generateInvoice: jest.fn().mockResolvedValue({ success: true }),
+}));
+jest.mock('../../src/bot/services/businessNotificationService', () => ({
+  notifyPayment: jest.fn().mockResolvedValue(true),
+}));
+jest.mock('../../src/bot/services/paymentSecurityService', () => ({
+  logPaymentEvent: jest.fn().mockResolvedValue(true),
+  logPaymentError: jest.fn().mockResolvedValue(true),
+  encryptPaymentDataAtRest: jest.fn().mockResolvedValue(true),
+  validatePaymentConsistency: jest.fn().mockResolvedValue({ valid: true }),
+  checkReplayAttack: jest.fn().mockResolvedValue({ isReplay: false }),
+  setPaymentTimeout: jest.fn().mockResolvedValue(true),
+  generateSecurePaymentToken: jest.fn().mockResolvedValue('token'),
+  createPaymentRequestHash: jest.fn().mockResolvedValue('hash'),
+}));
+jest.mock('../../src/config/redis', () => ({
+  cache: {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(true),
+    del: jest.fn().mockResolvedValue(true),
+    acquireLock: jest.fn().mockResolvedValue(true),
+    releaseLock: jest.fn().mockResolvedValue(true),
+  },
+}));
+jest.mock('../../src/utils/logger', () => ({
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+}));
+jest.mock('telegraf', () => ({
+  Telegraf: jest.fn().mockImplementation(() => ({
+    telegram: {
+      sendMessage: jest.fn().mockResolvedValue(true),
+    },
+  })),
+}));
 
 describe('Payment Methods Integration Tests', () => {
   beforeEach(() => {

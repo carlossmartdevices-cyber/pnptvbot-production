@@ -1,7 +1,29 @@
-const PaymentService = require('../src/bot/services/paymentService');
-const { handleEpaycoWebhook } = require('../src/bot/api/controllers/webhookController');
-
 jest.mock('../src/bot/services/paymentService');
+jest.mock('../src/utils/logger');
+jest.mock('../src/models/paymentWebhookEventModel', () => ({
+  logEvent: jest.fn().mockResolvedValue(true),
+}));
+jest.mock('../src/config/redis', () => ({
+  cache: {
+    acquireLock: jest.fn().mockResolvedValue(true),
+    releaseLock: jest.fn().mockResolvedValue(true),
+  },
+}));
+jest.mock('../src/bot/services/paymentSecurityService', () => ({
+  checkReplayAttack: jest.fn().mockResolvedValue({ isReplay: false }),
+  logPaymentError: jest.fn().mockResolvedValue(true),
+}));
+jest.mock('../src/validation/schemas/payment.schema', () => ({
+  schemas: {
+    epaycoWebhook: {
+      validate: jest.fn().mockReturnValue({ error: null }),
+    },
+  },
+}));
+
+const PaymentService = require('../src/bot/services/paymentService');
+const { cache } = require('../src/config/redis');
+const { handleEpaycoWebhook } = require('../src/bot/api/controllers/webhookController');
 
 const basePayload = {
   x_transaction_id: 'txn_123',
@@ -87,6 +109,11 @@ describe('handleEpaycoWebhook', () => {
   });
 
   test('marks duplicate webhooks after successful processing', async () => {
+    // First call succeeds (lock acquired)
+    cache.acquireLock.mockResolvedValueOnce(true);
+    // Second call fails (lock already held = duplicate)
+    cache.acquireLock.mockResolvedValueOnce(false);
+
     const req = { body: basePayload };
     const res1 = createRes();
     const res2 = createRes();
@@ -96,6 +123,7 @@ describe('handleEpaycoWebhook', () => {
 
     expect(res1.statusCode).toBe(200);
     expect(res1.body).toMatchObject({ success: true });
+    expect(res2.statusCode).toBe(200);
     expect(res2.body).toMatchObject({ success: true, duplicate: true });
   });
 

@@ -1585,8 +1585,8 @@ class PaymentService {
         url_confirmation: `${epaycoWebhookDomain}/api/webhook/epayco`,
         method_confirmation: 'POST',
         use_default_card_customer: true,
-        // SECURITY: Enable 3D Secure (3DS) for all tokenized charges
-        // This enforces bank-side authentication for added security
+        // 3D Secure: Hint to API (actual 3DS enforcement is via ePayco dashboard rules)
+        // Configure in ePayco Dashboard: Configuración → Seguridad → Enable 3D Secure
         three_d_secure: true,
         extras: {
           extra1: String(userId),
@@ -1824,26 +1824,27 @@ class PaymentService {
 
       logger.info('Checking ePayco transaction status via API', { refPayco });
 
-      // Initialize ePayco SDK if not already done
-      const Epayco = require('epayco-sdk-node');
-      const epaycoClient = new Epayco({
-        apiKey: process.env.EPAYCO_PRIVATE_KEY,
-        publicKey: process.env.EPAYCO_PUBLIC_KEY,
-        rsa: process.env.EPAYCO_RSA || false,
-        lang: 'ES',
-        test: process.env.EPAYCO_TEST_MODE === 'true',
-      });
+      // Use the shared ePayco client (correctly initialized in config/epayco.js)
+      const { getEpaycoClient } = require('../../config/epayco');
+      const epaycoClient = getEpaycoClient();
 
-      // Query transaction status
-      const statusResult = await epaycoClient.transaction.get(refPayco);
+      // Query transaction status using charge.get() (the correct SDK method)
+      // SDK endpoint: GET /restpagos/transaction/response.json?ref_payco=UID&public_key=KEY
+      const statusResult = await epaycoClient.charge.get(refPayco);
 
       if (statusResult && statusResult.data) {
-        const { estado, respuesta, ref_payco, transactionID } = statusResult.data;
+        // charge.get() returns x_-prefixed fields from ePayco REST API
+        const estado = statusResult.data.x_transaction_state || statusResult.data.x_respuesta || statusResult.data.x_response;
+        const respuesta = statusResult.data.x_respuesta || statusResult.data.x_response || statusResult.data.x_response_reason_text;
+        const ref_payco = statusResult.data.x_ref_payco;
+        const transactionID = statusResult.data.x_transaction_id;
 
         logger.info('ePayco transaction status retrieved', {
           refPayco,
           estado,
           respuesta,
+          ref_payco,
+          transactionID,
           timestamp: new Date().toISOString(),
         });
 
@@ -1858,6 +1859,7 @@ class PaymentService {
             success: true,
             currentStatus: estado,
             needsRecovery: true,
+            transactionData: statusResult.data,
             message: 'Payment was confirmed at ePayco but webhook may have been delayed',
           };
         } else if (estado === 'Pendiente') {
@@ -1932,24 +1934,63 @@ class PaymentService {
         return statusCheck;
       }
 
-      // If payment is actually approved at ePayco, trigger webhook processing
-      if (statusCheck.needsRecovery && statusCheck.currentStatus === 'Aceptada') {
-        logger.warn('RECOVERY: Reprocessing confirmed payment that was waiting for webhook', {
+      // If payment is actually approved at ePayco, trigger webhook replay
+      if (statusCheck.needsRecovery && (statusCheck.currentStatus === 'Aceptada' || statusCheck.currentStatus === 'Aprobada')) {
+        logger.warn('RECOVERY: Replaying confirmed payment webhook', {
           paymentId,
           refPayco,
-          action: 'WEBHOOK_REPLAY_NEEDED',
+          action: 'WEBHOOK_REPLAY',
         });
 
-        // The payment exists and is confirmed at ePayco
-        // Webhook processing should be triggered manually or via webhook replay mechanism
-        return {
-          success: true,
-          recovered: true,
-          message: 'Payment confirmed - webhook processing should be replayed',
-          action: 'WEBHOOK_REPLAY_RECOMMENDED',
-          paymentId,
-          refPayco,
+        // Build webhook-compatible data from the charge.get() response
+        const txData = statusCheck.transactionData || {};
+        const syntheticWebhook = {
+          x_ref_payco: txData.x_ref_payco || refPayco,
+          x_transaction_id: txData.x_transaction_id,
+          x_transaction_state: statusCheck.currentStatus,
+          x_approval_code: txData.x_approval_code,
+          x_amount: txData.x_amount,
+          x_currency_code: txData.x_currency_code,
+          x_customer_email: txData.x_customer_email,
+          x_customer_name: txData.x_customer_name,
+          x_extra1: txData.x_extra1,
+          x_extra2: txData.x_extra2,
+          x_extra3: txData.x_extra3,
+          _recovery: true, // Flag to indicate this is a recovery replay
         };
+
+        try {
+          const webhookResult = await this.processEpaycoWebhook(syntheticWebhook);
+          logger.info('RECOVERY: Webhook replay completed', {
+            paymentId,
+            refPayco,
+            webhookResult: webhookResult.success,
+          });
+          return {
+            success: true,
+            recovered: true,
+            webhookReplayed: true,
+            webhookResult,
+            message: 'Payment confirmed and webhook replayed successfully',
+            paymentId,
+            refPayco,
+          };
+        } catch (replayError) {
+          logger.error('RECOVERY: Webhook replay failed', {
+            paymentId,
+            refPayco,
+            error: replayError.message,
+          });
+          return {
+            success: true,
+            recovered: false,
+            webhookReplayed: false,
+            message: 'Payment confirmed at ePayco but webhook replay failed',
+            action: 'MANUAL_INTERVENTION_NEEDED',
+            paymentId,
+            refPayco,
+          };
+        }
       }
 
       return {

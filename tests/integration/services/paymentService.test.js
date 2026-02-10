@@ -97,19 +97,19 @@ describe('PaymentService Integration Tests', () => {
 
     it('[gQ2kRN] should generate subscription URL for recurring plans', async () => {
       PlanModel.getById.mockResolvedValue({
-        id: 'monthly_pass',
-        name: 'Monthly Pass',
-        price: 24.99,
+        id: 'three_months_pass',
+        name: '3X Monthly Pass',
+        price: 49.99,
         currency: 'USD',
-        duration: 30,
+        duration: 90,
         active: true,
       });
 
       PaymentModel.create.mockResolvedValue({
         id: 'pay_sub_123',
         userId: 789,
-        planId: 'monthly_pass',
-        amount: 24.99,
+        planId: 'three_months_pass',
+        amount: 49.99,
         currency: 'USD',
         provider: 'epayco',
       });
@@ -118,33 +118,33 @@ describe('PaymentService Integration Tests', () => {
 
       const result = await PaymentService.createPayment({
         userId: 789,
-        planId: 'monthly_pass',
+        planId: 'three_months_pass',
         provider: 'epayco',
       });
 
       expect(result.success).toBe(true);
       expect(result.paymentUrl).toContain('subscription-landing.epayco.co/plan/');
       expect(result.paymentUrl).toContain('extra1=789');
-      expect(result.paymentUrl).toContain('extra2=monthly_pass');
+      expect(result.paymentUrl).toContain('extra2=three_months_pass');
       expect(result.paymentUrl).toContain('extra3=pay_sub_123');
       expect(result.paymentId).toBe('pay_sub_123');
     });
 
     it('[lR3WPn] should keep checkout URL for one-time plans', async () => {
       PlanModel.getById.mockResolvedValue({
-        id: 'week_pass',
-        name: 'Week Pass',
-        price: 14.99,
+        id: 'lifetime_pass',
+        name: 'Lifetime Pass',
+        price: 99.99,
         currency: 'USD',
-        duration: 7,
+        duration: 365,
         active: true,
       });
 
       PaymentModel.create.mockResolvedValue({
         id: 'pay_onetime_123',
         userId: 101,
-        planId: 'week_pass',
-        amount: 14.99,
+        planId: 'lifetime_pass',
+        amount: 99.99,
         currency: 'USD',
         provider: 'epayco',
       });
@@ -153,7 +153,7 @@ describe('PaymentService Integration Tests', () => {
 
       const result = await PaymentService.createPayment({
         userId: 101,
-        planId: 'week_pass',
+        planId: 'lifetime_pass',
         provider: 'epayco',
       });
 

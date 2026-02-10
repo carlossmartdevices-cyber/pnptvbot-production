@@ -216,6 +216,7 @@ describe('PaymentService.processTokenizedCharge', () => {
         estado: 'Pendiente',
         ref_payco: 'ref_pend',
         transactionID: 'txn_pend',
+        urlbanco: 'https://bank.epayco.co/3ds/test123',
       },
     });
 
@@ -223,6 +224,7 @@ describe('PaymentService.processTokenizedCharge', () => {
 
     expect(result.success).toBe(true);
     expect(result.status).toBe('pending');
+    expect(result.redirectUrl).toBe('https://bank.epayco.co/3ds/test123');
     expect(PaymentModel.updateStatus).toHaveBeenCalledWith(
       'pay-abcd1234-test',
       'pending',

@@ -467,9 +467,11 @@ const handleDaimoWebhook = async (req, res) => {
         stack: error.stack,
       });
 
+      // Extract metadata from request body (metadata variable is scoped to try block)
+      const errMeta = req.body?.payment?.metadata || req.body?.metadata;
       PaymentSecurityService.logPaymentError({
-        paymentId: metadata?.paymentId,
-        userId: metadata?.userId,
+        paymentId: errMeta?.paymentId,
+        userId: errMeta?.userId,
         provider: 'daimo',
         errorCode: 'DAIMO_WEBHOOK_HANDLER_ERROR',
         errorMessage: error.message,
