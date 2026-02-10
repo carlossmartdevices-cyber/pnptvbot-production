@@ -224,7 +224,8 @@
       "Bash(# Kill all connections\nPGPASSWORD=\"\"2P15LqNF1hucUilg7ramfZJE9z2T4QUV\"\" psql -h localhost -U pnptvbot -d pnptvbot << 'SQL'\nSELECT pg_terminate_backend\\(pid\\) FROM pg_stat_activity WHERE datname = 'pnptvbot' AND pid <> pg_backend_pid\\(\\);\nSQL\n\nsleep 2\n\n# Kill PM2 completely\npm2 kill\n\nsleep 3\n\n# Restart\npm2 start ecosystem.config.js --env production\nsleep 8\n\necho \"\"=== Bot Status ===\"\" && pm2 list && echo \"\"\"\" && echo \"\"=== Errors ===\"\" && tail -5 /root/pnptvbot-production/logs/error-2026-02-10.log 2>/dev/null | jq -r ''.message'' 2>/dev/null || echo \"\"No new errors!\"\")",
       "Bash(PGPASSWORD=\"Apelo801050#\" psql:*)",
       "Bash(git reset:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: standardize nginx proxy addresses to explicit IPv4\n\n- Change all localhost:3001 references to 127.0.0.1:3001 for consistent IPv4 binding and better reliability\n- Update both pnptv-bot and webhook configurations to use explicit IPv4 addresses\n- Add git reset command to allowed Bash commands in local settings\n\nCo-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: standardize nginx proxy addresses to explicit IPv4\n\n- Change all localhost:3001 references to 127.0.0.1:3001 for consistent IPv4 binding and better reliability\n- Update both pnptv-bot and webhook configurations to use explicit IPv4 addresses\n- Add git reset command to allowed Bash commands in local settings\n\nCo-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(npm outdated:*)"
     ],
     "deny": [],
     "ask": []
