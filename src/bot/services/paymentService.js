@@ -1522,12 +1522,10 @@ class PaymentService {
         });
 
         const tokenResult = await epaycoClient.token.create({
-          card: {
-            number: card.number,
-            exp_year: card.exp_year,
-            exp_month: card.exp_month,
-            cvc: card.cvc,
-          },
+          'card[number]': card.number,
+          'card[exp_year]': card.exp_year,
+          'card[exp_month]': card.exp_month,
+          'card[cvc]': card.cvc,
         });
 
         logger.info('ePayco token response received', {
@@ -1538,7 +1536,7 @@ class PaymentService {
           errorMessage: tokenResult?.data?.description || tokenResult?.message,
         });
 
-        if (!tokenResult || tokenResult.status === false || !tokenResult.data?.token) {
+        if (!tokenResult || tokenResult.status === false || !tokenResult?.data?.token) {
           logger.error('ePayco token creation failed', {
             paymentId,
             fullResponse: JSON.stringify(tokenResult)
