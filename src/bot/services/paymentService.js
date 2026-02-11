@@ -1531,12 +1531,13 @@ class PaymentService {
         logger.info('ePayco token response received', {
           paymentId,
           tokenStatus: tokenResult?.status,
-          tokenHasData: !!tokenResult?.data,
-          tokenHasToken: !!tokenResult?.data?.token,
+          tokenId: tokenResult?.id,
           errorMessage: tokenResult?.data?.description || tokenResult?.message,
         });
 
-        if (!tokenResult || tokenResult.status === false || !tokenResult?.data?.token) {
+        // Token ID is at root level (tokenResult.id), not in data
+        const token = tokenResult?.id || tokenResult?.data?.id;
+        if (!tokenResult || tokenResult.status === false || !token) {
           logger.error('ePayco token creation failed', {
             paymentId,
             fullResponse: JSON.stringify(tokenResult)
@@ -1544,7 +1545,7 @@ class PaymentService {
           return { success: false, error: 'Error al tokenizar la tarjeta. Verifica los datos e intenta nuevamente.' };
         }
 
-        tokenId = tokenResult.data.token;
+        tokenId = token;
         logger.info('ePayco token created', { paymentId, tokenId });
       }
 
