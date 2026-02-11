@@ -243,7 +243,11 @@
       "Bash(node scripts/verify-epayco-3ds.js:*)",
       "Bash(/tmp/test_payment_api.sh:*)",
       "Bash(__NEW_LINE_54c757fe1a4fa615__ chmod +x /tmp/test_payment_api.sh)",
-      "Bash(/tmp/test_payment_api.sh)"
+      "Bash(/tmp/test_payment_api.sh)",
+      "Bash(node scripts/functional-test.js:*)",
+      "Bash(docker compose build:*)",
+      "Bash(docker compose up:*)",
+      "Bash(docker compose:*)"
     ],
     "deny": [],
     "ask": []
