@@ -94,10 +94,10 @@ app.use(conditionalMiddleware(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "https://songbird.cardinalcommerce.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
-      fontSrc: ["'self'", "https:", "data:"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https:", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'", "https://songbird.cardinalcommerce.com", "https://centinelapi.cardinalcommerce.com"],
+      connectSrc: ["'self'", "https://songbird.cardinalcommerce.com", "https://centinelapi.cardinalcommerce.com", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
