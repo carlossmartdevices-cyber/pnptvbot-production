@@ -15,11 +15,14 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env'), override: true });
 
 const crypto = require('crypto');
-const { getPool } = require('../../src/config/postgres');
-const { cache } = require('../../src/config/redis');
+const { getPool, initializePostgres } = require('../../src/config/postgres');
 const { execSync } = require('child_process');
 
-const BASE_URL = process.env.TEST_BASE_URL || 'https://easybots.store';
+const apiApp = require('../../src/bot/api/routes'); // Import the Express app
+let server;
+let serverPort = 3005; // Use a fixed port for testing
+let BASE_URL; // Will be set in beforeAll
+
 const TIMEOUT = 30000;
 
 // Helpers
@@ -30,8 +33,107 @@ let pool;
 let testUserId;
 let testPlan;
 
+// --- Mock Redis for integration tests ---
+jest.mock('../../src/config/redis', () => {
+  const mockRedisData = new Map(); // Define inside the factory
+
+  const createMockRedisClient = () => { // Define inside the factory
+    const client = {
+      ping: jest.fn().mockResolvedValue('PONG'),
+      flushdb: jest.fn(async () => {
+        mockRedisData.clear();
+        return 'OK';
+      }),
+      set: jest.fn(async (key, value, expirationType, expirationTime) => {
+        mockRedisData.set(key, value);
+        if (expirationType === 'EX' && expirationTime) {
+          setTimeout(() => mockRedisData.delete(key), expirationTime * 1000);
+        }
+        return 'OK';
+      }),
+      setNX: jest.fn(async (key, value, expirationType, expirationTime, NX) => {
+        if (!mockRedisData.has(key)) {
+          mockRedisData.set(key, value);
+          if (expirationType === 'EX' && expirationTime) {
+            setTimeout(() => mockRedisData.delete(key), expirationTime * 1000);
+          }
+          return 1; // 1 for success
+        }
+        return 0; // 0 for already exists
+      }),
+      get: jest.fn(async (key) => mockRedisData.get(key)),
+      del: jest.fn(async (...keys) => {
+        let count = 0;
+        keys.forEach(key => {
+          if (mockRedisData.has(key)) {
+            mockRedisData.delete(key);
+            count++;
+          }
+        });
+        return count;
+      }),
+      on: jest.fn(),
+      quit: jest.fn().mockResolvedValue('OK'),
+    };
+    return client;
+  };
+
+  // This instance will be local to the mock factory
+  const currentMockRedisClient = createMockRedisClient(); // Use const, as it's not reassigned within this scope
+
+  return { // Return the mock object
+    initializeRedis: jest.fn(() => {
+      // Re-initialize for each test to ensure clean state
+      // We need to re-create the client object itself to reset its internal state (like mock call history)
+      Object.assign(currentMockRedisClient, createMockRedisClient());
+      return currentMockRedisClient;
+    }),
+    getRedis: jest.fn(() => currentMockRedisClient),
+    closeRedis: jest.fn().mockResolvedValue(true),
+    cache: {
+      get: jest.fn(async (key) => {
+        const val = await currentMockRedisClient.get(key);
+        return val ? JSON.parse(val) : null;
+      }),
+      set: jest.fn((key, value, ttl) => currentMockRedisClient.set(key, JSON.stringify(value), 'EX', ttl)),
+      setNX: jest.fn((key, value, ttl) => currentMockRedisClient.setNX(key, JSON.stringify(value), 'EX', ttl, 'NX')),
+      del: jest.fn((key) => currentMockRedisClient.del(key)),
+      acquireLock: jest.fn((key, ttl) => currentMockRedisClient.setNX(`lock:${key}`, JSON.stringify({ acquiredAt: new Date().toISOString() }), 'EX', ttl, 'NX')),
+      releaseLock: jest.fn((key) => currentMockRedisClient.del(`lock:${key}`)),
+    },
+  };
+});
+
+// Now import cache, initializeRedis, closeRedis, getRedis after the mock has been defined
+const { cache, initializeRedis, closeRedis, getRedis } = require('../../src/config/redis');
+
 beforeAll(async () => {
+  // Set up test Redis DB (mocked, so this is mostly for consistency with real client config)
+  process.env.REDIS_DB = process.env.REDIS_DB || '1'; // Use DB 1 for tests
+
+  // Initialize Redis (now uses the mock)
+  initializeRedis();
+  const redisClientInstance = getRedis(); // Get the Mock Redis client instance
+  console.log('DEBUG: redisClientInstance after getRedis():', redisClientInstance);
+  await redisClientInstance.ping(); // Wait for Mock Redis to respond
+  await redisClientInstance.flushdb(); // Clear Mock Redis DB before tests
+
+  // Start the API server
+  process.env.TEST_BASE_URL = `http://localhost:${serverPort}`;
+  BASE_URL = process.env.TEST_BASE_URL; // Update local BASE_URL variable
+  process.env.NODE_ENV = 'test'; // Ensure test environment
+
+  await new Promise((resolve) => {
+    server = apiApp.listen(serverPort, () => {
+      console.log(`Test API server started on port ${serverPort}`);
+      resolve();
+    });
+  });
+
+  // Initialize PostgreSQL
+  initializePostgres(); // Added this
   pool = getPool();
+  console.log('DEBUG: pool after getPool():', pool);
 
   // Get a real user (FK constraint on payments)
   const users = await pool.query('SELECT id FROM users LIMIT 1');
@@ -47,6 +149,25 @@ beforeAll(async () => {
 }, TIMEOUT);
 
 afterAll(async () => {
+  // Stop the API server
+  await new Promise((resolve, reject) => {
+    if (server) {
+      server.close((err) => {
+        if (err) {
+          console.error('Error closing test API server:', err);
+          return reject(err);
+        }
+        console.log(`Test API server on port ${serverPort} closed.`);
+        resolve();
+      });
+    } else {
+      resolve();
+    }
+  });
+
+  // Close Redis connection (now closes the mock client)
+  await closeRedis();
+
   // Clean up test payments
   try {
     await pool.query("DELETE FROM payments WHERE user_id = $1 AND reference LIKE 'PAY-%' AND status IN ('pending','failed')", [testUserId]);
@@ -61,9 +182,9 @@ async function createTestPayment() {
     'INSERT INTO payments (id, reference, user_id, plan_id, provider, amount, currency, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
     [id, ref, testUserId, testPlan.id, 'epayco', testPlan.price, 'USD', 'pending'],
   );
-  // Use redis-cli directly to guarantee key is in Redis server (bypasses any node client issues)
+  // Use Redis cache.setNX for idempotency / timeout
   const value = JSON.stringify({ paymentId: id, createdAt: new Date().toISOString() });
-  execSync(`redis-cli SET "payment:timeout:${id}" '${value}' EX 3600`);
+  await cache.setNX(`payment:timeout:${id}`, value, 3600); // Set timeout key with TTL
   return { id, ref };
 }
 
@@ -481,7 +602,7 @@ describe('5. Input Validation & Security', () => {
   test('5.6 Rate limiting returns 429 after excessive attempts', async () => {
     const payment = await createTestPayment();
     // Manually set rate limit counter high (above max 10)
-    execSync(`redis-cli SET "payment:ratelimit:${payment.id}" "999" EX 3600`);
+    await cache.set(`payment:ratelimit:${payment.id}`, '999', 3600);
 
     const res = await fetch(`${BASE_URL}/api/payment/tokenized-charge`, {
       method: 'POST',

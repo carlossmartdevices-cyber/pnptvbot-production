@@ -574,6 +574,7 @@ const registerCommunityPostHandlers = (bot) => {
     }
     ctx.session.temp.waitingForText = true;
     await ctx.saveSession();
+  } // Added missing closing brace
   // Toggle Lex inclusion
   bot.action('share_post_toggle_lex', async (ctx) => {
     try {
@@ -729,7 +730,7 @@ const registerCommunityPostHandlers = (bot) => {
       logger.error('Error showing button selection:', error);
       await ctx.reply('❌ Error al mostrar botones').catch(() => {});
     }
-  }
+  });
   bot.action(/^share_post_toggle_(.+)$/, async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
