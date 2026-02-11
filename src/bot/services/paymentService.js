@@ -1838,15 +1838,14 @@ class PaymentService {
         };
 
         if (redirectUrl) {
-          // Prioritize 3DS 1.0 redirect (works everywhere including Telegram browser)
           pendingResult.redirectUrl = redirectUrl;
-          logger.info('3DS 1.0 bank redirect URL obtained from ePayco', {
+          logger.info('3DS bank redirect URL obtained from ePayco', {
             paymentId,
             refPayco,
             urlPresent: true,
           });
         } else if (is3ds2 && threedsInfo) {
-          // Fallback to Cardinal Commerce 3DS 2.0 for modern browsers
+          // Return Cardinal Commerce 3DS 2.0 device data collection info
           pendingResult.threeDSecure = {
             version: '2.0',
             provider: 'CardinalCommerce',
@@ -1857,13 +1856,13 @@ class PaymentService {
               token: threedsInfo.token,
             },
           };
-          logger.info('Fallback: Cardinal Commerce 3DS 2.0 data provided (3DS 1.0 redirect not available)', {
+          logger.info('Cardinal Commerce 3DS 2.0 device data collection info obtained from ePayco', {
             paymentId,
             refPayco,
             referenceId: threedsInfo.referenceId,
           });
         } else {
-          // Return error if no redirect URL or 3DS 2.0 data
+          // Return error if no redirect URL or 3DS 2.0 data - this prevents user confusion
           pendingResult.error = 'BANK_URL_MISSING';
           pendingResult.requiresManualIntervention = true;
           logger.warn('Payment stuck - missing bank authentication URL or 3DS 2.0 data', {
