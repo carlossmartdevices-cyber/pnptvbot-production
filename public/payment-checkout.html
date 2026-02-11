@@ -688,21 +688,27 @@
                 });
 
                 const result = await response.json();
+                console.log('[PAYMENT] Full API response:', JSON.stringify(result, null, 2));
+                console.log('[PAYMENT] threeDSecure:', result.threeDSecure);
 
                 if (result.success && result.status === 'approved') {
                     document.getElementById('checkout-form').style.display = 'none';
                     document.getElementById('success').style.display = 'block';
                 } else if (result.status === 'pending') {
+                    console.log('[PAYMENT] Status is pending, checking for redirect or 3DS');
                     if (result.redirectUrl) {
+                        console.log('[PAYMENT] Redirecting to:', result.redirectUrl);
                         window.location.href = result.redirectUrl;
                         return;
                     }
                     // Check for Cardinal Commerce 3DS 2.0 device data collection
                     if (result.threeDSecure && result.threeDSecure.version === '2.0') {
+                        console.log('[PAYMENT] 3DS 2.0 detected in response, initiating handler');
                         document.getElementById('checkout-form').style.display = 'none';
                         handle3DS2Authentication(result.threeDSecure, paymentId);
                         return;
                     }
+                    console.log('[PAYMENT] No 3DS 2.0 or redirect found, starting polling');
                     document.getElementById('checkout-form').style.display = 'none';
                     pollPaymentStatus();
                 } else {
