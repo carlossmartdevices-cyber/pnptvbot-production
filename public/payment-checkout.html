@@ -814,32 +814,53 @@
          */
         function loadCardinalCommerceSdk(data, paymentId) {
             try {
-                console.log('[3DS 2.0] Loading Cardinal Commerce SDK', { paymentId });
+                console.log('[3DS 2.0] Loading Cardinal Commerce SDK from production', { paymentId });
+
+                // Check if SDK already loaded
+                if (window.Cardinal) {
+                    console.log('[3DS 2.0] Cardinal SDK already in memory, using cached version');
+                    initCardinalSession(data, paymentId);
+                    return;
+                }
 
                 // Cardinal Commerce SDK script (production endpoint)
                 const script = document.createElement('script');
                 script.src = 'https://songbird.cardinalcommerce.com/edge/v1/songbird.js';
                 script.async = true;
+                script.defer = false;
+
+                let loadTimeout = setTimeout(function() {
+                    console.warn('[3DS 2.0] SDK load timeout, falling back', { paymentId });
+                    submitPaymentWith3DS2Token(data, paymentId);
+                }, 8000); // 8 second timeout
 
                 script.onload = function() {
-                    console.log('[3DS 2.0] Cardinal SDK loaded, initializing session', { paymentId });
-                    // SDK is loaded, now initialize the session
+                    clearTimeout(loadTimeout);
+                    console.log('[3DS 2.0] Cardinal SDK loaded successfully', { paymentId });
                     if (window.Cardinal) {
                         initCardinalSession(data, paymentId);
                     } else {
-                        console.warn('[3DS 2.0] Cardinal object not available after script load');
-                        submitPaymentWith3DS2Token(data, paymentId);
+                        console.warn('[3DS 2.0] Cardinal object not available, retrying');
+                        setTimeout(() => {
+                            if (window.Cardinal) {
+                                initCardinalSession(data, paymentId);
+                            } else {
+                                submitPaymentWith3DS2Token(data, paymentId);
+                            }
+                        }, 500);
                     }
                 };
 
                 script.onerror = function() {
-                    console.warn('[3DS 2.0] Failed to load Cardinal SDK, submitting without device data', { paymentId });
+                    clearTimeout(loadTimeout);
+                    console.warn('[3DS 2.0] Failed to load SDK, fallback to token submission', { paymentId });
                     submitPaymentWith3DS2Token(data, paymentId);
                 };
 
                 document.head.appendChild(script);
+                console.log('[3DS 2.0] SDK script appended to head', { paymentId });
             } catch (error) {
-                console.error('[3DS 2.0] Error loading Cardinal SDK', error);
+                console.error('[3DS 2.0] Exception loading Cardinal SDK', error);
                 submitPaymentWith3DS2Token(data, paymentId);
             }
         }
@@ -851,52 +872,61 @@
             try {
                 console.log('[3DS 2.0] Initializing Cardinal session', {
                     paymentId,
-                    referenceId: data.referenceId
+                    referenceId: data.referenceId,
+                    hasAccessToken: !!data.accessToken
                 });
 
                 if (!window.Cardinal) {
-                    console.error('[3DS 2.0] Cardinal not available');
+                    console.error('[3DS 2.0] Cardinal not available after load');
                     submitPaymentWith3DS2Token(data, paymentId);
                     return;
                 }
 
-                // Setup Cardinal session
+                if (!data.accessToken) {
+                    console.error('[3DS 2.0] No access token provided');
+                    submitPaymentWith3DS2Token(data, paymentId);
+                    return;
+                }
+
+                // Setup Cardinal session with verbose logging
                 window.Cardinal.setup('init', {
                     logging: {
                         level: 'verbose'
                     }
                 });
 
-                // Start device data collection
+                // Handler for setup complete
+                let setupComplete = false;
                 window.Cardinal.on('payments.setupComplete', function() {
-                    console.log('[3DS 2.0] Cardinal setup complete, starting authentication', { paymentId });
+                    setupComplete = true;
+                    console.log('[3DS 2.0] Setup complete, collecting device data', { paymentId });
                     collectDeviceData(data, paymentId);
                 });
 
+                // Handler for validation complete
                 window.Cardinal.on('payments.validationComplete', function(validationData) {
                     console.log('[3DS 2.0] Validation complete', {
                         paymentId,
-                        actionCode: validationData.ActionCode
+                        actionCode: validationData.ActionCode,
+                        serverJWT: !!validationData.ServerJWT
                     });
-
-                    if (validationData.ActionCode === 'SUCCESS' || validationData.ActionCode === 'NOACTION') {
-                        // Device data collected successfully
-                        submitPaymentWith3DS2JWT(data, paymentId, validationData);
-                    } else {
-                        // Authentication required or failed
-                        console.warn('[3DS 2.0] Authentication challenge required', {
-                            paymentId,
-                            actionCode: validationData.ActionCode
-                        });
-                        // Still submit with JWT - let ePayco handle it
-                        submitPaymentWith3DS2JWT(data, paymentId, validationData);
-                    }
+                    submitPaymentWith3DS2JWT(data, paymentId, validationData);
                 });
 
                 // Initialize with access token
+                console.log('[3DS 2.0] Configuring with JWT token', { paymentId });
                 window.Cardinal.configure({
                     jwt: data.accessToken
                 });
+
+                // Timeout if setup doesn't complete
+                setTimeout(function() {
+                    if (!setupComplete) {
+                        console.warn('[3DS 2.0] Setup timeout, submitting with token', { paymentId });
+                        submitPaymentWith3DS2Token(data, paymentId);
+                    }
+                }, 5000);
+
             } catch (error) {
                 console.error('[3DS 2.0] Error initializing Cardinal session', error);
                 submitPaymentWith3DS2Token(data, paymentId);
