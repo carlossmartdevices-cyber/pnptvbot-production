@@ -448,9 +448,15 @@ class PaymentController {
       if (hasToken) {
         chargeParams.tokenCard = tokenCard;
       } else {
+        // Ensure year is 4 digits (if 2-digit, assume 20xx)
+        let year = String(expYear);
+        if (year.length === 2) {
+          year = '20' + year;
+        }
+
         chargeParams.card = {
           number: cleanCard,
-          exp_year: String(expYear),
+          exp_year: year,
           exp_month: String(expMonth).padStart(2, '0'),
           cvc: String(cvc),
         };

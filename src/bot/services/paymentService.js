@@ -1511,7 +1511,16 @@ class PaymentService {
 
       if (!tokenId && card) {
         // Server-side tokenization from raw card data
-        logger.info('Creating ePayco token (server-side)', { paymentId });
+        logger.info('Creating ePayco token (server-side)', {
+          paymentId,
+          cardData: {
+            number: card.number?.substring(0, 6) + '...' + card.number?.slice(-4),
+            exp_year: card.exp_year,
+            exp_month: card.exp_month,
+            cvc_length: card.cvc?.length,
+          }
+        });
+
         const tokenResult = await epaycoClient.token.create({
           card: {
             number: card.number,
@@ -1521,8 +1530,19 @@ class PaymentService {
           },
         });
 
+        logger.info('ePayco token response received', {
+          paymentId,
+          tokenStatus: tokenResult?.status,
+          tokenHasData: !!tokenResult?.data,
+          tokenHasToken: !!tokenResult?.data?.token,
+          errorMessage: tokenResult?.data?.description || tokenResult?.message,
+        });
+
         if (!tokenResult || tokenResult.status === false || !tokenResult.data?.token) {
-          logger.error('ePayco token creation failed', { paymentId, tokenResult });
+          logger.error('ePayco token creation failed', {
+            paymentId,
+            fullResponse: JSON.stringify(tokenResult)
+          });
           return { success: false, error: 'Error al tokenizar la tarjeta. Verifica los datos e intenta nuevamente.' };
         }
 
