@@ -167,7 +167,7 @@ const serveStaticWithBlocking = (staticPath) => {
       }
     }
 
-    express.static(staticPath)(req, res, next);
+    express.static(staticPath, { fallthrough: true })(req, res, next);
   };
 };
 
