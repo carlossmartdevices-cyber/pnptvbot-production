@@ -1513,19 +1513,20 @@ class PaymentService {
         // Server-side tokenization from raw card data
         logger.info('Creating ePayco token (server-side)', { paymentId });
         const tokenResult = await epaycoClient.token.create({
-          'card[number]': card.number,
-          'card[exp_year]': card.exp_year,
-          'card[exp_month]': card.exp_month,
-          'card[cvc]': card.cvc,
-          hasCvv: true,
+          card: {
+            number: card.number,
+            exp_year: card.exp_year,
+            exp_month: card.exp_month,
+            cvc: card.cvc,
+          },
         });
 
-        if (!tokenResult || tokenResult.status === false || !tokenResult.id) {
+        if (!tokenResult || tokenResult.status === false || !tokenResult.data?.token) {
           logger.error('ePayco token creation failed', { paymentId, tokenResult });
           return { success: false, error: 'Error al tokenizar la tarjeta. Verifica los datos e intenta nuevamente.' };
         }
 
-        tokenId = tokenResult.id;
+        tokenId = tokenResult.data.token;
         logger.info('ePayco token created', { paymentId, tokenId });
       }
 
@@ -1688,13 +1689,37 @@ class PaymentService {
         };
       } else if (estado === 'Pendiente') {
         // Check for 3DS redirect URL (bank authentication)
-        const redirectUrl = chargeResult?.data?.urlbanco || chargeResult?.data?.url_response_bank || null;
+        // ePayco can return 3DS info in different fields depending on configuration
         const fullResponse = chargeResult?.data || {};
 
-        // CRITICAL: Log full response to diagnose missing urlbanco
+        // Try multiple field names for 3DS redirect URL
+        let redirectUrl = null;
+        let threedsInfo = null;
+
+        // Check different possible field names for 3DS URL
+        if (fullResponse.urlbanco) {
+          redirectUrl = fullResponse.urlbanco;
+        } else if (fullResponse.url_response_bank) {
+          redirectUrl = fullResponse.url_response_bank;
+        } else if (fullResponse['3DS']) {
+          // ePayco might return 3DS info as an object or string with URL
+          threedsInfo = fullResponse['3DS'];
+          if (typeof threedsInfo === 'string') {
+            redirectUrl = threedsInfo;
+          } else if (typeof threedsInfo === 'object' && threedsInfo.url) {
+            redirectUrl = threedsInfo.url;
+          } else if (typeof threedsInfo === 'object' && threedsInfo.urlbanco) {
+            redirectUrl = threedsInfo.urlbanco;
+          }
+        } else if (fullResponse.url) {
+          redirectUrl = fullResponse.url;
+        }
+
+        // CRITICAL: Log full response to diagnose missing 3DS URL
         logger.warn('ePayco returned Pendiente status - checking 3DS redirect URL', {
           paymentId,
-          hasUrlbanco: !!redirectUrl,
+          hasRedirectUrl: !!redirectUrl,
+          redirectUrlSource: redirectUrl ? (fullResponse.urlbanco ? 'urlbanco' : fullResponse.url_response_bank ? 'url_response_bank' : fullResponse['3DS'] ? '3DS' : 'url') : 'NOT_FOUND',
           chargeResultKeys: Object.keys(fullResponse),
           fullResponse: {
             estado: fullResponse.estado,
@@ -1702,6 +1727,8 @@ class PaymentService {
             ref_payco: fullResponse.ref_payco,
             urlbanco: fullResponse.urlbanco,
             url_response_bank: fullResponse.url_response_bank,
+            url: fullResponse.url,
+            '3DS': fullResponse['3DS'],
             transactionID: fullResponse.transactionID,
             transaction_id: fullResponse.transaction_id,
             comprobante: fullResponse.comprobante,
