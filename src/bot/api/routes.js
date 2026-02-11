@@ -113,7 +113,24 @@ app.use(conditionalMiddleware(compression()));
 // Logging (before other middleware for accurate request tracking)
 app.use(morgan('combined', { stream: logger.stream }));
 
+// ========== PAYMENT ROUTES (BEFORE static middleware) ==========
+// These must be BEFORE serveStaticWithBlocking to ensure they're processed first
+app.get('/payment/:paymentId', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
+});
 
+app.get('/checkout/:paymentId', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
+});
+
+app.get('/daimo-checkout/:paymentId', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/daimo-checkout.html'));
+});
+
+app.get('/api/pnp/checkout', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
+});
+// ========== END PAYMENT ROUTES ==========
 
 // Protected paths that require authentication (don't serve static files directly)
 const PROTECTED_PATHS = ['/videorama', '/hangouts', '/live', '/pnplive'];
@@ -449,16 +466,6 @@ app.get('/age-verification', pageLimiter, (req, res) => {
 
 
 
-// ePayco Checkout page - serves payment-checkout.html for /checkout/:paymentId
-app.get('/checkout/:paymentId', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
-});
-
-// Daimo Checkout page - serves daimo-checkout.html for /daimo-checkout/:paymentId
-app.get('/daimo-checkout/:paymentId', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/daimo-checkout.html'));
-});
-
 // Meet & Greet Checkout pages
 app.get('/pnp/meet-greet/checkout/:bookingId', pageLimiter, (req, res) => {
   res.redirect(302, '/meet-greet-checkout.html');
@@ -475,16 +482,6 @@ app.get('/pnp/live/checkout/:bookingId', pageLimiter, (req, res) => {
 
 app.get('/pnp/live/daimo-checkout/:bookingId', pageLimiter, (req, res) => {
   res.redirect(302, '/pnp-live-daimo-checkout.html');
-});
-
-// Payment checkout page
-app.get('/payment/:paymentId', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
-});
-
-// Payment checkout page served via API URL
-app.get('/api/pnp/checkout', pageLimiter, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
 });
 
 // (Security middleware moved to top of middleware chain, before route registration)
