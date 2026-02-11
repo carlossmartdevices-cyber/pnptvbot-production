@@ -93,11 +93,11 @@ app.use(conditionalMiddleware(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://songbird.cardinalcommerce.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https:"],
       fontSrc: ["'self'", "https:", "data:"],
       imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'"],
+      connectSrc: ["'self'", "https://songbird.cardinalcommerce.com", "https://centinelapi.cardinalcommerce.com"],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
