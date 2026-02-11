@@ -1635,7 +1635,7 @@ class PaymentService {
         phone: customer.phone || '0000000000',
         cell_phone: customer.cell_phone || customer.phone || '0000000000',
         bill: paymentRef,
-        description: plan.sku || `${plan.display_name || plan.name}`,
+        description: plan.sku,
         value: String(amountCOP),
         tax: '0',
         tax_base: '0',
