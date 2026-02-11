@@ -482,6 +482,11 @@ app.get('/payment/:paymentId', pageLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
 });
 
+// Payment checkout page served via API URL
+app.get('/api/pnp/checkout', pageLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
+});
+
 // (Security middleware moved to top of middleware chain, before route registration)
 
 // Global middleware to block all PNPtv content for easybots.store
@@ -497,6 +502,7 @@ app.use((req, res, next) => {
       '/checkout/',
       '/daimo-checkout/',
       '/payment/',
+      '/api/pnp/checkout', // NEW: Allow the API checkout page
       '/terms',
       '/privacy',
       '/policies',
