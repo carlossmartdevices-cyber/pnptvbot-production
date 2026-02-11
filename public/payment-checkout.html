@@ -687,9 +687,15 @@
                     }),
                 });
 
-                const result = await response.json();
+                const responseText = await response.text();
+                console.log('[PAYMENT] Raw response text length:', responseText.length);
+                console.log('[PAYMENT] Raw response (first 1000 chars):', responseText.substring(0, 1000));
+
+                const result = JSON.parse(responseText);
                 console.log('[PAYMENT] Full API response:', JSON.stringify(result, null, 2));
+                console.log('[PAYMENT] Response keys:', Object.keys(result));
                 console.log('[PAYMENT] threeDSecure:', result.threeDSecure);
+                console.log('[PAYMENT] Has threeDSecure?', !!result.threeDSecure);
 
                 if (result.success && result.status === 'approved') {
                     document.getElementById('checkout-form').style.display = 'none';
