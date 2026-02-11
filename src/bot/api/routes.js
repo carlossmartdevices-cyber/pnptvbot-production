@@ -136,6 +136,19 @@ const serveStaticWithBlocking = (staticPath) => {
 
     // Block easybots.store from accessing PNPtv static files
     if (host.includes('easybots.store') || host.includes('easybots')) {
+      // Define specific payment-related HTML files that should be allowed
+      const allowedPaymentHtmls = [
+        'payment-checkout.html',
+        'pnp-live-checkout.html',
+        'pnp-live-daimo-checkout.html',
+        'recurring-checkout.html',
+        'meet-greet-daimo-checkout.html',
+        'daimo-checkout.html'
+      ];
+
+      // Check if the request path ends with one of the allowed payment HTML files
+      const isAllowedPaymentHtml = allowedPaymentHtmls.some(fileName => req.path.endsWith('/' + fileName));
+
       const isPnptvStaticFile = req.path.endsWith('.html') ||
                                 req.path.endsWith('.css') ||
                                 req.path.endsWith('.js') ||
@@ -148,7 +161,8 @@ const serveStaticWithBlocking = (staticPath) => {
                                 req.path.endsWith('.mp4') ||
                                 req.path.endsWith('.webm');
 
-      if (isPnptvStaticFile && req.path !== '/') {
+      // Block if it's a general PNPtv static file AND not one of the specifically allowed payment HTMLs
+      if (isPnptvStaticFile && req.path !== '/' && !isAllowedPaymentHtml) {
         return res.status(404).send('Not found');
       }
     }
