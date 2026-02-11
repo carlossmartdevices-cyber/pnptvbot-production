@@ -804,9 +804,9 @@
             try {
                 console.log('[3DS 2.0] Loading Cardinal Commerce SDK', { paymentId });
 
-                // Cardinal Commerce SDK script
+                // Cardinal Commerce SDK script (production endpoint)
                 const script = document.createElement('script');
-                script.src = 'https://songbirdstag.cardinalcommerce.com/edge/v1/songbird.js';
+                script.src = 'https://songbird.cardinalcommerce.com/edge/v1/songbird.js';
                 script.async = true;
 
                 script.onload = function() {
