@@ -18,15 +18,66 @@ function isEnvAdminOrSuperAdmin(userId) {
  */
 class UserService {
   /**
-   * Get user profile
+   * Get or create user
    * @param {string|number} userId - Telegram user ID
-   * @returns {Promise<Object|null>}
+   * @param {Object.<string, *>} userData - Initial user data if creating
+   * @returns {Promise<Object>} User object
    */
-  static async getUserProfile(userId) {
+  async getOrCreateUser(userId, userData) {
     try {
-      return await UserModel.findByTelegramId(userId);
+      let user = await UserModel.getById(userId);
+      if (!user) {
+        logger.info('User not found, creating new user', { userId });
+        // Ensure onboardingComplete is false for new users
+        user = await UserModel.createOrUpdate({
+          id: userId,
+          ...userData,
+          onboardingComplete: false,
+          status: 'online', // Default status for new users
+        });
+      } else {
+        // Optionally update existing user's basic info if needed, e.g., username change
+        // For simplicity, we'll only update status if it's not already online or active
+        if (user.status === 'offline') {
+          user = await UserModel.createOrUpdate({ id: userId, status: 'online' });
+        }
+      }
+      return user;
     } catch (error) {
-      logger.error('Error getting user profile:', error);
+      logger.error('Error in getOrCreateUser:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user by ID
+   * @param {string|number} userId - Telegram user ID
+   * @returns {Promise<Object|null>} User object or null
+   */
+  async getUser(userId) {
+    try {
+      return await UserModel.getById(userId);
+    } catch (error) {
+      logger.error('Error getting user:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update user
+   * @param {string|number} userId - Telegram user ID
+   * @param {Object.<string, *>} updates - Fields to update
+   * @returns {Promise<Object|null>} Updated user object or null
+   */
+  async updateUser(userId, updates) {
+    try {
+      await UserModel.updateProfile(userId, updates);
+      // After update, fetch the latest user data to return
+      const updatedUser = await UserModel.getById(userId);
+      logger.info('User updated', { userId, updates });
+      return updatedUser;
+    } catch (error) {
+      logger.error('Error updating user:', error);
       return null;
     }
   }
@@ -36,28 +87,11 @@ class UserService {
    * @param {string} email - Email address
    * @returns {Promise<Object|null>} User object or null
    */
-  static async getByEmail(email) {
+  async getByEmail(email) {
     try {
       return await UserModel.getByEmail(email);
     } catch (error) {
       logger.error('Error getting user by email:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Update user profile
-   * @param {string|number} userId - Telegram user ID
-   * @param {Object.<string, *>} updates - Fields to update
-   * @returns {Promise<Object|null>} Updated user object or null
-   */
-  static async updateUserProfile(userId, updates) {
-    try {
-      const user = await UserModel.updateByTelegramId(userId, updates);
-      logger.info('User profile updated', { userId });
-      return user;
-    } catch (error) {
-      logger.error('Error updating user profile:', error);
       return null;
     }
   }
@@ -68,7 +102,7 @@ class UserService {
    * @param {string|number} userId - Telegram user ID
    * @returns {Promise<boolean>}
    */
-  static async isPremium(userId) {
+  async isPremium(userId) {
     try {
       // BYPASS: Admin and SuperAdmin always have premium access
       if (isEnvAdminOrSuperAdmin(userId)) {
@@ -76,7 +110,7 @@ class UserService {
         return true;
       }
       
-      const user = await UserModel.findByTelegramId(userId);
+      const user = await UserModel.getById(userId); // Use getById
       return user && user.subscriptionStatus === 'active';
     } catch (error) {
       logger.error('Error checking premium status:', error);
@@ -89,7 +123,7 @@ class UserService {
    * @param {string|number} userId - Telegram user ID
    * @returns {Promise<boolean>}
    */
-  static async isAdmin(userId) {
+  async isAdmin(userId) {
     try {
       const adminIds = (process.env.ADMIN_USER_IDS || '').split(',').map(id => id.trim());
       return adminIds.includes(String(userId));
@@ -104,9 +138,9 @@ class UserService {
    * @param {string|number} userId - Telegram user ID
    * @returns {Promise<Object|null>}
    */
-  static async getUserSubscription(userId) {
+  async getUserSubscription(userId) {
     try {
-      const user = await UserModel.findByTelegramId(userId);
+      const user = await UserModel.getById(userId); // Use getById
       if (!user) return null;
 
       return {
@@ -128,7 +162,7 @@ class UserService {
    * @param {Object} metadata - Additional data
    * @returns {Promise<boolean>}
    */
-  static async recordActivity(userId, action, metadata = {}) {
+  async recordActivity(userId, action, metadata = {}) {
     try {
       logger.info('User activity recorded', {
         userId,
@@ -143,4 +177,4 @@ class UserService {
   }
 }
 
-module.exports = UserService;
+module.exports = new UserService();
