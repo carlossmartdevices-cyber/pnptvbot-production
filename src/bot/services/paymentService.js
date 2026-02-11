@@ -628,6 +628,29 @@ class PaymentService {
       // Check if payment exists (for regular subscriptions)
       const payment = paymentIdOrType ? await PaymentModel.getById(paymentIdOrType) : null;
 
+      // Get customer email with fallback chain
+      // Try: x_customer_email → user.email → subscriber.email
+      let customerEmail = x_customer_email;
+      if (!customerEmail && userId) {
+        const user = await UserModel.getById(userId);
+        customerEmail = user?.email;
+
+        if (!customerEmail) {
+          try {
+            const subscriber = await SubscriberModel.getByTelegramId(userId);
+            customerEmail = subscriber?.email;
+            if (customerEmail) {
+              logger.info('Using fallback email from subscriber', {
+                userId,
+                refPayco: x_ref_payco,
+              });
+            }
+          } catch (e) {
+            logger.warn('Could not find subscriber email', { userId });
+          }
+        }
+      }
+
       // Process based on transaction state
       if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
         // Payment successful
@@ -675,7 +698,7 @@ class PaymentService {
             if (isSubscriptionPlan(planIdOrBookingId)) {
               try {
                 await SubscriberModel.create({
-                  email: x_customer_email || `telegram-${userId}@pnptv.app`,
+                  email: customerEmail || `telegram-${userId}@pnptv.app`,
                   name: x_customer_name || null,
                   telegramId: userId,
                   plan: planIdOrBookingId,
@@ -756,7 +779,7 @@ class PaymentService {
                 provider: 'ePayco',
                 transactionId: x_ref_payco,
                 customerName: x_customer_name || user?.first_name || 'Unknown',
-                customerEmail: x_customer_email || 'N/A',
+                customerEmail: customerEmail || 'N/A',
               });
             }
           } catch (adminError) {
@@ -794,7 +817,7 @@ class PaymentService {
         }
 
         // Send both emails after successful payment (only if email available)
-        if (x_customer_email && userId && planIdOrBookingId) {
+        if (customerEmail && userId && planIdOrBookingId) {
           const plan = await PlanModel.getById(planIdOrBookingId);
           const user = await UserModel.getById(userId);
 
@@ -808,7 +831,7 @@ class PaymentService {
             // 1. Send invoice email from pnptv.app
             try {
               const invoiceEmailResult = await EmailService.sendInvoiceEmail({
-                to: x_customer_email,
+                to: customerEmail,
                 customerName: x_customer_name || user?.first_name || 'Valued Customer',
                 invoiceNumber: x_ref_payco,
                 amount: parseFloat(x_amount),
@@ -818,7 +841,7 @@ class PaymentService {
 
               if (invoiceEmailResult.success) {
                 logger.info('Invoice email sent successfully', {
-                  to: x_customer_email,
+                  to: customerEmail,
                   refPayco: x_ref_payco,
                 });
               }
@@ -832,7 +855,7 @@ class PaymentService {
             // 2. Send welcome email from pnptv.app
             try {
               const welcomeEmailResult = await EmailService.sendWelcomeEmail({
-                to: x_customer_email,
+                to: customerEmail,
                 customerName: x_customer_name || user?.first_name || 'Valued Customer',
                 planName: plan.display_name || plan.name,
                 duration: plan.duration,
@@ -842,7 +865,7 @@ class PaymentService {
 
               if (welcomeEmailResult.success) {
                 logger.info('Welcome email sent successfully', {
-                  to: x_customer_email,
+                  to: customerEmail,
                   planId: planIdOrBookingId,
                   language: userLanguage,
                 });

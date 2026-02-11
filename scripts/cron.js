@@ -8,6 +8,7 @@ const TutorialReminderService = require('../src/bot/services/tutorialReminderSer
 const CultEventService = require('../src/bot/services/cultEventService');
 const VisaCybersourceService = require('../src/bot/services/visaCybersourceService');
 const logger = require('../src/utils/logger');
+const PaymentRecoveryService = require('../src/bot/services/paymentRecoveryService');
 
 /**
  * Initialize and start cron jobs
@@ -25,6 +26,39 @@ const startCronJobs = async (bot = null) => {
       MembershipCleanupService.initialize(bot);
       TutorialReminderService.initialize(bot);
     }
+
+    // Payment recovery - process stuck pending payments every 2 hours
+    // Checks ePayco API for completed payments and replays webhooks if needed
+    cron.schedule(process.env.PAYMENT_RECOVERY_CRON || '0 */2 * * *', async () => {
+      try {
+        logger.info('Running payment recovery process...');
+        const results = await PaymentRecoveryService.processStuckPayments();
+        logger.info('Payment recovery completed', {
+          checked: results.checked,
+          recovered: results.recovered,
+          stillPending: results.stillPending,
+          failed: results.failed,
+          errors: results.errors,
+        });
+      } catch (error) {
+        logger.error('Error in payment recovery cron:', error);
+      }
+    });
+
+    // Abandoned payment cleanup - daily at midnight
+    // Marks payments pending > 24 hours as abandoned (prevents 3DS timeout issues)
+    cron.schedule(process.env.PAYMENT_CLEANUP_CRON || '0 0 * * *', async () => {
+      try {
+        logger.info('Running abandoned payment cleanup...');
+        const results = await PaymentRecoveryService.cleanupAbandonedPayments();
+        logger.info('Abandoned payment cleanup completed', {
+          cleaned: results.cleaned,
+          errors: results.errors,
+        });
+      } catch (error) {
+        logger.error('Error in abandoned payment cleanup cron:', error);
+      }
+    });
 
     // Full membership cleanup daily at midnight
     // Updates statuses (active/churned/free) and kicks expired users from PRIME channel
