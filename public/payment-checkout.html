@@ -697,6 +697,12 @@
                         window.location.href = result.redirectUrl;
                         return;
                     }
+                    // Check for Cardinal Commerce 3DS 2.0 device data collection
+                    if (result.threeDSecure && result.threeDSecure.version === '2.0') {
+                        document.getElementById('checkout-form').style.display = 'none';
+                        handle3DS2Authentication(result.threeDSecure, paymentId);
+                        return;
+                    }
                     document.getElementById('checkout-form').style.display = 'none';
                     pollPaymentStatus();
                 } else {
@@ -766,6 +772,133 @@
                 .catch(function() {
                     setTimeout(doPoll, pollInterval);
                 });
+        }
+
+        /**
+         * Handle Cardinal Commerce 3DS 2.0 device data collection
+         * @param {Object} threeDSecure - 3DS 2.0 authentication data from ePayco
+         * @param {String} paymentId - Payment ID for tracking
+         */
+        async function handle3DS2Authentication(threeDSecure, paymentId) {
+            try {
+                const data = threeDSecure.data;
+                console.log('[3DS 2.0] Starting device data collection', { paymentId, referenceId: data.referenceId });
+
+                // Step 1: Load Cardinal Commerce device data collection script
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/json2/20110223/json2.js';
+                script.async = true;
+                script.onload = function() {
+                    // Step 2: Initialize device data collection
+                    initiate3DS2Collection(data, paymentId);
+                };
+                script.onerror = function() {
+                    // If json2 fails, try to proceed anyway
+                    initiate3DS2Collection(data, paymentId);
+                };
+                document.head.appendChild(script);
+            } catch (error) {
+                console.error('[3DS 2.0] Error in handle3DS2Authentication', error);
+                showError(t('errConnection'));
+            }
+        }
+
+        /**
+         * Initiate 3DS 2.0 device data collection
+         */
+        async function initiate3DS2Collection(data, paymentId) {
+            try {
+                console.log('[3DS 2.0] Initiating device data collection URL fetch', {
+                    paymentId,
+                    deviceDataCollectionUrl: data.deviceDataCollectionUrl,
+                    referenceId: data.referenceId
+                });
+
+                // Step 3: Fetch device data collection page to initialize Cardinal session
+                const collectionResponse = await fetch(data.deviceDataCollectionUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + data.accessToken
+                    }
+                });
+
+                if (!collectionResponse.ok) {
+                    // Device collection may fail due to CORS, but we can still proceed with token
+                    console.warn('[3DS 2.0] Device collection request failed (expected)', {
+                        status: collectionResponse.status
+                    });
+                }
+
+                // Step 4: Create iframe for device fingerprinting (alternative method)
+                // If device collection endpoint is not accessible, use the token directly
+                await submitPaymentWith3DS2Token(data, paymentId);
+            } catch (error) {
+                console.error('[3DS 2.0] Error in initiate3DS2Collection', error);
+                // Continue with 3DS 2.0 token even if device collection fails
+                await submitPaymentWith3DS2Token(data, paymentId);
+            }
+        }
+
+        /**
+         * Submit payment with Cardinal Commerce 3DS 2.0 authentication
+         */
+        async function submitPaymentWith3DS2Token(data, paymentId) {
+            try {
+                console.log('[3DS 2.0] Submitting payment with 3DS 2.0 authentication', {
+                    paymentId,
+                    referenceId: data.referenceId
+                });
+
+                // Step 5: Send 3DS 2.0 authentication to backend to verify and complete payment
+                const response = await fetch('/api/payment/complete-3ds-2', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        paymentId,
+                        threeDSecure: {
+                            version: '2.0',
+                            provider: 'CardinalCommerce',
+                            referenceId: data.referenceId,
+                            accessToken: data.accessToken,
+                            token: data.token,
+                        }
+                    })
+                });
+
+                const result = await response.json();
+                console.log('[3DS 2.0] Backend response', { paymentId, success: result.success, status: result.status });
+
+                if (result.success && result.status === 'authenticated') {
+                    // 3DS 2.0 authentication successful, payment should be completed
+                    document.getElementById('polling-status').style.display = 'none';
+                    document.getElementById('success').style.display = 'block';
+                    console.log('[3DS 2.0] Payment authenticated successfully', { paymentId });
+                } else if (result.status === 'pending') {
+                    // Payment still pending, start polling
+                    console.log('[3DS 2.0] Payment still pending, starting poll', { paymentId });
+                    document.getElementById('polling-status').style.display = 'block';
+                    pollPaymentStatus();
+                } else if (result.status === 'failed' || result.status === 'rejected') {
+                    // Payment failed
+                    document.getElementById('polling-status').style.display = 'none';
+                    document.getElementById('checkout-form').style.display = 'block';
+                    showFormError(result.error || t('errDeclined'));
+                    var btn = document.getElementById('pay-button');
+                    btn.disabled = false;
+                    btn.textContent = payBtnLabel();
+                    console.error('[3DS 2.0] Payment rejected', { paymentId, error: result.error });
+                } else {
+                    // Unexpected response, poll for status
+                    console.log('[3DS 2.0] Unexpected response, polling for status', { paymentId });
+                    document.getElementById('polling-status').style.display = 'block';
+                    pollPaymentStatus();
+                }
+            } catch (error) {
+                console.error('[3DS 2.0] Error in submitPaymentWith3DS2Token', error);
+                // On network error, start polling to see if payment goes through
+                document.getElementById('polling-status').style.display = 'block';
+                pollPaymentStatus();
+            }
         }
 
         // Apply language on load

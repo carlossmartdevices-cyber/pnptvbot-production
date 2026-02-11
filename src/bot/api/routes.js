@@ -710,6 +710,7 @@ app.get('/api/payment/:paymentId', asyncHandler(paymentController.getPaymentInfo
 app.get('/api/payment/:paymentId/status', asyncHandler(paymentController.getPaymentStatus));
 app.post('/api/payment/tokenized-charge', asyncHandler(paymentController.processTokenizedCharge));
 app.post('/api/payment/verify-2fa', asyncHandler(paymentController.verify2FA));
+app.post('/api/payment/complete-3ds-2', asyncHandler(paymentController.complete3DS2Authentication));
 app.get('/api/confirm-payment/:token', asyncHandler(paymentController.confirmPaymentToken));
 // Payment recovery endpoints for stuck 3DS payments
 app.post('/api/payment/:paymentId/check-status', asyncHandler(paymentController.checkPaymentStatusWithRecovery));

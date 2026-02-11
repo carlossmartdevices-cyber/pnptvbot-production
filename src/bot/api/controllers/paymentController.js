@@ -782,6 +782,154 @@ class PaymentController {
       });
     }
   }
+
+  /**
+   * Complete Cardinal Commerce 3DS 2.0 authentication
+   * POST /api/payment/complete-3ds-2
+   */
+  static async complete3DS2Authentication(req, res) {
+    try {
+      const { paymentId, threeDSecure } = req.body;
+
+      if (!paymentId || !threeDSecure) {
+        return res.status(400).json({
+          success: false,
+          error: 'Payment ID and 3DS 2.0 data are required',
+        });
+      }
+
+      logger.info('3DS 2.0 authentication completion initiated', {
+        paymentId,
+        referenceId: threeDSecure.referenceId,
+      });
+
+      // Get payment from database
+      const payment = await PaymentModel.getById(paymentId);
+
+      if (!payment) {
+        return res.status(404).json({
+          success: false,
+          error: 'Payment not found',
+        });
+      }
+
+      if (payment.status !== 'pending') {
+        return res.status(400).json({
+          success: false,
+          error: `Payment is ${payment.status}, not pending`,
+        });
+      }
+
+      // Store 3DS 2.0 authentication data in payment metadata
+      await PaymentModel.updateStatus(paymentId, 'pending', {
+        three_ds_authentication: {
+          version: threeDSecure.version,
+          provider: threeDSecure.provider,
+          referenceId: threeDSecure.referenceId,
+          authenticated_at: new Date().toISOString(),
+        },
+      });
+
+      logger.info('3DS 2.0 authentication data stored', {
+        paymentId,
+        referenceId: threeDSecure.referenceId,
+      });
+
+      // Check payment status with ePayco to see if it's been approved after 3DS
+      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(payment.epayco_ref);
+
+      if (!statusCheck.success) {
+        logger.warn('Could not verify payment status at ePayco', {
+          paymentId,
+          refPayco: payment.epayco_ref,
+        });
+        // Return pending - let client poll
+        return res.json({
+          success: true,
+          status: 'pending',
+          message: 'Payment status being verified',
+        });
+      }
+
+      const currentStatus = statusCheck.currentStatus;
+
+      if (currentStatus === 'Aceptada' || currentStatus === 'Aprobada') {
+        // Payment is approved at ePayco
+        logger.info('Payment approved at ePayco after 3DS 2.0 authentication', {
+          paymentId,
+          refPayco: payment.epayco_ref,
+          currentStatus,
+        });
+
+        // Update payment status to completed
+        await PaymentModel.updateStatus(paymentId, 'completed', {
+          transaction_id: payment.epayco_ref,
+          reference: payment.epayco_ref,
+          epayco_ref: payment.epayco_ref,
+          payment_method: 'tokenized_card',
+          three_ds_authenticated: true,
+        });
+
+        // Activate subscription
+        const userId = payment.user_id || payment.userId;
+        const planId = payment.plan_id || payment.planId;
+        const plan = await PlanModel.getById(planId);
+
+        if (userId && plan) {
+          const expiryDate = new Date();
+          const durationDays = plan.duration_days || plan.duration || 30;
+          expiryDate.setDate(expiryDate.getDate() + durationDays);
+
+          const UserModel = require('../../../models/userModel');
+          await UserModel.updateSubscription(userId, {
+            status: 'active',
+            planId,
+            expiry: expiryDate,
+          });
+
+          logger.info('Subscription activated after 3DS 2.0 authentication', {
+            userId,
+            planId,
+            expiryDate,
+            paymentId,
+          });
+        }
+
+        return res.json({
+          success: true,
+          status: 'authenticated',
+          message: 'Payment authenticated and approved',
+          paymentId,
+        });
+      } else {
+        // Payment still pending at ePayco
+        logger.info('Payment still pending at ePayco after 3DS 2.0 authentication', {
+          paymentId,
+          refPayco: payment.epayco_ref,
+          currentStatus,
+        });
+
+        return res.json({
+          success: true,
+          status: 'pending',
+          message: 'Payment pending 3DS verification completion',
+          paymentId,
+        });
+      }
+    } catch (error) {
+      logger.error('Error completing 3DS 2.0 authentication', {
+        error: error.message,
+        paymentId: req.body?.paymentId,
+        stack: error.stack,
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'Error processing 3DS 2.0 authentication',
+        message: error.message,
+      });
+    }
+  }
 }
 
 module.exports = PaymentController;

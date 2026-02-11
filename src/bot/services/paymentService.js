@@ -1748,13 +1748,13 @@ class PaymentService {
           message: 'Pago aprobado exitosamente',
         };
       } else if (estado === 'Pendiente') {
-        // Check for 3DS redirect URL (bank authentication)
-        // ePayco can return 3DS info in different fields depending on configuration
+        // Check for 3DS authentication (can be simple redirect or Cardinal Commerce 3DS 2.0)
         const fullResponse = chargeResult?.data || {};
 
-        // Try multiple field names for 3DS redirect URL
+        // Try multiple field names for 3DS redirect URL or info
         let redirectUrl = null;
         let threedsInfo = null;
+        let is3ds2 = false;
 
         // Check different possible field names for 3DS URL
         if (fullResponse.urlbanco) {
@@ -1762,23 +1762,30 @@ class PaymentService {
         } else if (fullResponse.url_response_bank) {
           redirectUrl = fullResponse.url_response_bank;
         } else if (fullResponse['3DS']) {
-          // ePayco might return 3DS info as an object or string with URL
+          // ePayco might return 3DS info as string (redirect URL) or object (Cardinal Commerce 3DS 2.0)
           threedsInfo = fullResponse['3DS'];
           if (typeof threedsInfo === 'string') {
             redirectUrl = threedsInfo;
-          } else if (typeof threedsInfo === 'object' && threedsInfo.url) {
-            redirectUrl = threedsInfo.url;
-          } else if (typeof threedsInfo === 'object' && threedsInfo.urlbanco) {
-            redirectUrl = threedsInfo.urlbanco;
+          } else if (typeof threedsInfo === 'object') {
+            // Check for Cardinal Commerce 3DS 2.0 device data collection
+            if (threedsInfo.data && threedsInfo.data.deviceDataCollectionUrl) {
+              is3ds2 = true;
+              threedsInfo = threedsInfo.data; // Extract data object
+            } else if (threedsInfo.url) {
+              redirectUrl = threedsInfo.url;
+            } else if (threedsInfo.urlbanco) {
+              redirectUrl = threedsInfo.urlbanco;
+            }
           }
         } else if (fullResponse.url) {
           redirectUrl = fullResponse.url;
         }
 
-        // CRITICAL: Log full response to diagnose missing 3DS URL
-        logger.warn('ePayco returned Pendiente status - checking 3DS redirect URL', {
+        // CRITICAL: Log full response to diagnose missing 3DS URL or 3DS 2.0 data
+        logger.warn('ePayco returned Pendiente status - checking 3DS info', {
           paymentId,
           hasRedirectUrl: !!redirectUrl,
+          is3ds2: is3ds2,
           redirectUrlSource: redirectUrl ? (fullResponse.urlbanco ? 'urlbanco' : fullResponse.url_response_bank ? 'url_response_bank' : fullResponse['3DS'] ? '3DS' : 'url') : 'NOT_FOUND',
           chargeResultKeys: Object.keys(fullResponse),
           fullResponse: {
@@ -1795,36 +1802,37 @@ class PaymentService {
           },
         });
 
-        // Mark the payment with timeout for recovery if bank URL is missing
+        // Mark the payment with timeout for recovery if bank URL/3DS data is missing
         const pendingMetadata = {
           transaction_id: transactionId,
           reference: refPayco,
           epayco_ref: refPayco,
           payment_method: 'tokenized_card',
           three_ds_requested: true,
+          three_ds_version: is3ds2 ? '2.0' : '1.0',
           bank_url_available: !!redirectUrl,
           epayco_response_timestamp: new Date().toISOString(),
         };
 
-        if (!redirectUrl) {
-          // Missing bank URL - payment cannot proceed
-          logger.error('CRITICAL: 3DS payment pending but no bank redirect URL provided by ePayco', {
+        if (!redirectUrl && !is3ds2) {
+          // Missing bank URL or 3DS 2.0 data - payment cannot proceed
+          logger.error('CRITICAL: 3DS payment pending but no bank redirect URL or 3DS 2.0 data provided by ePayco', {
             paymentId,
             refPayco,
             estado,
             chargeResultKeys: Object.keys(fullResponse),
           });
           pendingMetadata.error = 'BANK_URL_MISSING';
-          pendingMetadata.error_description = 'ePayco did not provide bank redirect URL for 3DS';
+          pendingMetadata.error_description = 'ePayco did not provide bank redirect URL or 3DS 2.0 data';
         }
 
         await PaymentModel.updateStatus(paymentId, 'pending', pendingMetadata);
 
         const pendingResult = {
-          success: !!redirectUrl, // Only true if we have the redirect URL
+          success: !!(redirectUrl || is3ds2), // True if we have redirect URL or 3DS 2.0 data
           status: 'pending',
           transactionId: refPayco || transactionId,
-          message: redirectUrl
+          message: redirectUrl || is3ds2
             ? 'El pago está pendiente de confirmación en el banco'
             : 'Error: No se pudo obtener la URL del banco para confirmar el pago',
         };
@@ -1836,11 +1844,28 @@ class PaymentService {
             refPayco,
             urlPresent: true,
           });
+        } else if (is3ds2 && threedsInfo) {
+          // Return Cardinal Commerce 3DS 2.0 device data collection info
+          pendingResult.threeDSecure = {
+            version: '2.0',
+            provider: 'CardinalCommerce',
+            data: {
+              accessToken: threedsInfo.accessToken,
+              deviceDataCollectionUrl: threedsInfo.deviceDataCollectionUrl,
+              referenceId: threedsInfo.referenceId,
+              token: threedsInfo.token,
+            },
+          };
+          logger.info('Cardinal Commerce 3DS 2.0 device data collection info obtained from ePayco', {
+            paymentId,
+            refPayco,
+            referenceId: threedsInfo.referenceId,
+          });
         } else {
-          // Return error if no redirect URL - this prevents user confusion
+          // Return error if no redirect URL or 3DS 2.0 data - this prevents user confusion
           pendingResult.error = 'BANK_URL_MISSING';
           pendingResult.requiresManualIntervention = true;
-          logger.warn('Payment stuck - missing bank authentication URL', {
+          logger.warn('Payment stuck - missing bank authentication URL or 3DS 2.0 data', {
             paymentId,
             refPayco,
             action: 'REQUIRES_MANUAL_RETRY',
