@@ -103,6 +103,17 @@ CREATE INDEX IF NOT EXISTS idx_users_location_sharing ON users(location_sharing_
 CREATE INDEX IF NOT EXISTS idx_users_plan_expiry ON users(plan_expiry) WHERE plan_expiry IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(last_active);
 
+-- User roles table (access control)
+CREATE TABLE IF NOT EXISTS user_roles (
+  user_id VARCHAR(255) PRIMARY KEY,
+  role VARCHAR(50) NOT NULL,
+  granted_by VARCHAR(255),
+  granted_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role);
+CREATE INDEX IF NOT EXISTS idx_user_roles_granted_at ON user_roles(granted_at);
+
 -- Plans table
 CREATE TABLE IF NOT EXISTS plans (
   id VARCHAR(100) PRIMARY KEY,

@@ -94,7 +94,8 @@ const registerOnboardingHandlers = (bot) => {
       if (startParam === 'activate_lifetime') {
         const lang = getLanguage(ctx);
         const userId = ctx.from.id;
-        const username = ctx.from.username ? `@${ctx.from.username}` : 'No username';
+        const escapeMarkdown = (text = '') => String(text).replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
+        const username = ctx.from.username ? `@${escapeMarkdown(ctx.from.username)}` : 'No username';
         const firstName = ctx.from.first_name || 'Unknown';
 
         // Send confirmation to user

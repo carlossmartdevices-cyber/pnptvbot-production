@@ -6,7 +6,22 @@ const os = require('os');
 const path = require('path');
 dns.setDefaultResultOrder('ipv4first');
 
-require('dotenv').config({ allowEmptyValues: true });
+const dotenv = require('dotenv');
+if (process.env.NODE_ENV === 'production') {
+  // In production, prefer .env.production as canonical source.
+  dotenv.config({
+    path: path.resolve(process.cwd(), '.env.production'),
+    allowEmptyValues: true,
+  });
+  // Load .env only as non-overriding fallback for any missing key.
+  dotenv.config({
+    path: path.resolve(process.cwd(), '.env'),
+    allowEmptyValues: true,
+    override: false,
+  });
+} else {
+  dotenv.config({ allowEmptyValues: true });
+}
 const { Telegraf, Markup } = require('telegraf');
 const ADMIN_USER_IDS = [
   ...(process.env.ADMIN_USER_IDS || '').split(','),
@@ -15,6 +30,7 @@ const ADMIN_USER_IDS = [
 ].map((id) => id.trim()).filter(Boolean);
 const { initializePostgres, testConnection } = require('../../config/postgres');
 const { initializeRedis } = require('../../config/redis');
+const { initializeCoreTables } = require('../../config/ensureCoreTables');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
 const { userExistsMiddleware } = require('./middleware/userExistsMiddleware');
@@ -263,6 +279,12 @@ const startBot = async () => {
           logger.info('✓ Support topics table initialized');
         } catch (tableError) {
           logger.warn('Support topics table initialization failed:', tableError.message);
+        }
+        try {
+          await initializeCoreTables();
+          logger.info('✓ Core tables initialized');
+        } catch (coreTablesError) {
+          logger.warn('Core tables initialization failed:', coreTablesError.message);
         }
       } else {
         logger.warn('⚠️ PostgreSQL connection test failed, but will retry on first query');

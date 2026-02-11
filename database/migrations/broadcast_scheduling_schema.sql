@@ -87,9 +87,11 @@ CREATE TABLE IF NOT EXISTS broadcast_recipients (
   -- User metadata at time of send
   language VARCHAR(10) DEFAULT 'en',
   subscription_tier VARCHAR(50), -- 'free', 'premium', 'churned'
+  retry_count INTEGER DEFAULT 0,
 
   -- Metadata
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
   FOREIGN KEY (broadcast_id) REFERENCES broadcasts(broadcast_id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

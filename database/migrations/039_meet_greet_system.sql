@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Migration for Meet & Greet System
 -- Adds tables for models, availability, bookings, and payments
 
@@ -12,6 +14,9 @@ CREATE TABLE IF NOT EXISTS models (
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Drop the table first to ensure a clean slate, as it might exist in a broken state
+DROP TABLE IF EXISTS model_availability CASCADE;
 
 -- Create model availability table
 CREATE TABLE IF NOT EXISTS model_availability (
@@ -63,3 +68,5 @@ CREATE INDEX IF NOT EXISTS idx_meet_greet_bookings_model ON meet_greet_bookings(
 CREATE INDEX IF NOT EXISTS idx_meet_greet_bookings_status ON meet_greet_bookings(status);
 CREATE INDEX IF NOT EXISTS idx_meet_greet_payments_booking ON meet_greet_payments(booking_id);
 CREATE INDEX IF NOT EXISTS idx_meet_greet_payments_status ON meet_greet_payments(status);
+
+COMMIT;

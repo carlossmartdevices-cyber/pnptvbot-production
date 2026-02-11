@@ -7,6 +7,24 @@ const ACCESS_CONTROL_CONFIG = require('../config/accessControlConfig');
  * Manages user roles for access control
  */
 class RoleService {
+  static tableReady = false;
+
+  static tableInitPromise = null;
+
+  static async ensureTablesReady() {
+    if (this.tableReady) return;
+    if (!this.tableInitPromise) {
+      this.tableInitPromise = this.initializeTables()
+        .then(() => {
+          this.tableReady = true;
+        })
+        .finally(() => {
+          this.tableInitPromise = null;
+        });
+    }
+    await this.tableInitPromise;
+  }
+
   /**
    * Get user's role
    * @param {string} userId - User ID
@@ -14,6 +32,7 @@ class RoleService {
    */
   static async getUserRole(userId) {
     try {
+      await this.ensureTablesReady();
       const result = await query(
         'SELECT role FROM user_roles WHERE user_id = $1',
         [userId.toString()]
@@ -60,6 +79,7 @@ class RoleService {
    */
   static async setUserRole(userId, role, grantedBy) {
     try {
+      await this.ensureTablesReady();
       // Normalize role to uppercase for consistency
       const normalizedRole = role.toUpperCase();
 
@@ -132,6 +152,7 @@ class RoleService {
    */
   static async getUsersByRole(role) {
     try {
+      await this.ensureTablesReady();
       // Normalize role to uppercase for query
       const normalizedRole = role.toUpperCase();
       const result = await query(
@@ -188,6 +209,7 @@ class RoleService {
    */
   static async removeRole(userId, removedBy = null) {
     try {
+      await this.ensureTablesReady();
       // Remove from user_roles table
       await query(
         'DELETE FROM user_roles WHERE user_id = $1',
@@ -215,6 +237,7 @@ class RoleService {
    */
   static async getRoleStats() {
     try {
+      await this.ensureTablesReady();
       const result = await query(
         'SELECT UPPER(role) as role, COUNT(*) as count FROM user_roles GROUP BY UPPER(role)'
       );
@@ -260,6 +283,7 @@ class RoleService {
       await query('CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role)');
       await query('CREATE INDEX IF NOT EXISTS idx_user_roles_granted_at ON user_roles(granted_at)');
 
+      this.tableReady = true;
       logger.info('Role service tables initialized');
     } catch (error) {
       logger.error('Error initializing role tables:', error);

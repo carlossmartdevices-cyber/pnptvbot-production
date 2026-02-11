@@ -16,10 +16,27 @@ const DaimoConfig = require('../../config/daimo');
 const MessageTemplates = require('./messageTemplates');
 const sanitize = require('../../utils/sanitizer');
 const BusinessNotificationService = require('./businessNotificationService');
+const PaymentNotificationService = require('./paymentNotificationService');
+const BookingAvailabilityIntegration = require('./bookingAvailabilityIntegration');
 const PaymentSecurityService = require('./paymentSecurityService');
 const { getEpaycoSubscriptionUrl, isSubscriptionPlan } = require('../../config/epaycoSubscriptionPlans');
 
 class PaymentService {
+  static safeCompareHex(expectedHex, receivedHex) {
+    if (!expectedHex || !receivedHex) return false;
+
+    const expected = String(expectedHex).toLowerCase();
+    const received = String(receivedHex).toLowerCase();
+    const expectedBuffer = Buffer.from(expected, 'utf8');
+    const receivedBuffer = Buffer.from(received, 'utf8');
+
+    if (expectedBuffer.length !== receivedBuffer.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+  }
+
     /**
      * Send payment confirmation notification to user via Telegram bot
      * Includes purchase details and unique invite link to PRIME channel
@@ -364,7 +381,7 @@ class PaymentService {
     if (sha256Ready) {
       const signatureString = `${custId}^${pKey}^${x_ref_payco}^${x_transaction_id}^${x_amount}^${x_currency_code}`;
       const expected = crypto.createHash('sha256').update(signatureString).digest('hex');
-      sha256Valid = expected === signatureValue;
+      sha256Valid = PaymentService.safeCompareHex(expected, signatureValue);
     }
 
     // Checkout 2.0 signature validation (MD5):
@@ -375,7 +392,7 @@ class PaymentService {
     if (md5Ready) {
       const md5String = `${custId}^${pKey}^${invoice}^${x_amount}^${x_currency_code}`;
       const expected = crypto.createHash('md5').update(md5String).digest('hex');
-      md5Valid = expected === signatureValue;
+      md5Valid = PaymentService.safeCompareHex(expected, signatureValue);
     }
 
     return sha256Valid || md5Valid;
@@ -1526,6 +1543,7 @@ class PaymentService {
           'card[exp_year]': card.exp_year,
           'card[exp_month]': card.exp_month,
           'card[cvc]': card.cvc,
+          hasCvv: true,
         });
 
         logger.info('ePayco token response received', {

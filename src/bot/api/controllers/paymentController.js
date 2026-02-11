@@ -376,9 +376,20 @@ class PaymentController {
         || '127.0.0.1';
       const userAgent = req.headers['user-agent'] || '';
 
-      // Security: Rate limiting per payment
+      // Security: Rate limiting per user (fallback to paymentId when user is unknown)
+      let rateLimitKey = paymentId;
       try {
-        const rateLimit = await PaymentSecurityService.checkPaymentRateLimit(paymentId);
+        const paymentForRateLimit = await PaymentModel.getById(paymentId);
+        const paymentUserId = paymentForRateLimit?.userId || paymentForRateLimit?.user_id;
+        if (paymentUserId) {
+          rateLimitKey = paymentUserId;
+        }
+      } catch (err) {
+        logger.error('Rate limit identity lookup failed (non-critical)', { error: err.message, paymentId });
+      }
+
+      try {
+        const rateLimit = await PaymentSecurityService.checkPaymentRateLimit(rateLimitKey);
         if (!rateLimit.allowed) {
           return res.status(429).json({
             success: false,

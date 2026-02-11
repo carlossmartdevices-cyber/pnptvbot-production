@@ -1,3 +1,12 @@
+BEGIN;
+
+-- Drop tables in reverse order of creation to avoid foreign key constraint issues
+DROP TABLE IF EXISTS stream_moderators CASCADE;
+DROP TABLE IF EXISTS stream_analytics CASCADE;
+DROP TABLE IF EXISTS stream_chat_messages CASCADE;
+DROP TABLE IF EXISTS stream_viewers CASCADE;
+DROP TABLE IF EXISTS live_streams CASCADE;
+
 -- Live Streams Schema
 -- Tracks live streaming sessions, viewers, and chat messages
 
@@ -228,3 +237,5 @@ COMMENT ON TABLE stream_viewers IS 'Tracks viewers who join live streams';
 COMMENT ON TABLE stream_chat_messages IS 'Stores chat messages sent during live streams';
 COMMENT ON TABLE stream_analytics IS 'Daily aggregated analytics for streams';
 COMMENT ON TABLE stream_moderators IS 'Manages moderators for live streams';
+
+COMMIT;
