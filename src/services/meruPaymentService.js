@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer');
 const logger = require('../utils/logger');
+const meruLinkService = require('./meruLinkService');
 
 /**
  * MeruPaymentService - Verifica pagos de Meru usando un navegador headless

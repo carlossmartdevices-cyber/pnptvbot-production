@@ -17,6 +17,7 @@ const { getPrimeInviteLink, activateMembership, fetchActivationCode, markCodeUse
 const MessageTemplates = require('../../services/messageTemplates');
 const BusinessNotificationService = require('../../services/businessNotificationService');
 const meruPaymentService = require('../../../services/meruPaymentService');
+const meruLinkService = require('../../../services/meruLinkService');
 
 const activationStrings = {
   en: {
@@ -499,6 +500,22 @@ const registerOnboardingHandlers = (bot) => {
 
           // Mark code as used
           await markCodeUsed(matchingLinkCode, userId, ctx.from.username);
+
+          // IMPORTANT: Invalidate the Meru link to prevent reuse
+          const linkInvalidation = await meruLinkService.invalidateLinkAfterActivation(
+            matchingLinkCode,
+            userId,
+            ctx.from.username
+          );
+
+          if (!linkInvalidation.success) {
+            logger.warn('Failed to invalidate Meru link after activation', {
+              code: matchingLinkCode,
+              userId,
+              reason: linkInvalidation.message,
+            });
+          }
+
           await logActivation({ userId, username: ctx.from.username, code: matchingLinkCode, product, success: true });
           BusinessNotificationService.notifyCodeActivation({ userId, username: ctx.from.username, code: matchingLinkCode, product });
 
