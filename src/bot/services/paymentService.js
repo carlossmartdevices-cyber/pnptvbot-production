@@ -1694,6 +1694,11 @@ class PaymentService {
       const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
       const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.store';
 
+      // For pnptv-bot payments, use new checkout/pnp route; for others use legacy api/webhook path
+      const confirmationPath = planId?.includes('lifetime') || planId === 'week_pass'
+        ? '/checkout/pnp/confirmation'  // New route for pnptv-bot
+        : '/api/webhook/epayco';        // Legacy route for easybots.store
+
       logger.info('Creating ePayco tokenized charge', { paymentId, amountCOP, tokenId });
       const chargeResult = await epaycoClient.charge.create({
         token_card: tokenId,
@@ -1716,7 +1721,7 @@ class PaymentService {
         dues: String(dues),
         ip,
         url_response: `${webhookDomain}/api/payment-response`,
-        url_confirmation: `${epaycoWebhookDomain}/api/webhook/epayco`,
+        url_confirmation: `${epaycoWebhookDomain}${confirmationPath}`,
         method_confirmation: 'POST',
         use_default_card_customer: true,
         // 3D Secure: Hint to API (actual 3DS enforcement is via ePayco dashboard rules)
