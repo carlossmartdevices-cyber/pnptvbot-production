@@ -20,7 +20,7 @@ const PaymentNotificationService = require('./paymentNotificationService');
 const BookingAvailabilityIntegration = require('./bookingAvailabilityIntegration');
 const PaymentSecurityService = require('./paymentSecurityService');
 const { getEpaycoSubscriptionUrl, isSubscriptionPlan } = require('../../config/epaycoSubscriptionPlans');
-const PaymentHistoryService = require('./paymentHistoryService');
+const PaymentHistoryService = require('../../services/paymentHistoryService');
 
 class PaymentService {
   static safeCompareHex(expectedHex, receivedHex) {

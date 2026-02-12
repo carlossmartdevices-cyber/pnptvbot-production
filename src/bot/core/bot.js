@@ -102,7 +102,7 @@ const { setupAgeVerificationMiddleware } = require('./middleware/ageVerification
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
 const broadcastScheduler = require('../../services/broadcastScheduler');
-const SubscriptionReminderService = require('../services/subscriptionReminderService');
+const SubscriptionReminderService = require('../../services/subscriptionReminderEmailService');
 const MembershipCleanupService = require('../services/membershipCleanupService');
 const BusinessNotificationService = require('../services/businessNotificationService');
 const TutorialReminderService = require('../services/tutorialReminderService');
@@ -288,7 +288,8 @@ const startBot = async () => {
           logger.warn('Core tables initialization failed:', coreTablesError.message);
         }
         // Initialize Meru Link tracking in background (fire and forget)
-        meruLinkInitializer.initialize();
+        // Temporarily disabled - causing initialization hang
+        // meruLinkInitializer.initialize();
       } else {
         logger.warn('⚠️ PostgreSQL connection test failed, but will retry on first query');
       }
