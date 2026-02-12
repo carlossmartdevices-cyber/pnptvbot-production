@@ -120,7 +120,11 @@ class PaymentController {
         basePaymentData.epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;
         basePaymentData.testMode = process.env.EPAYCO_TEST_MODE === 'true';
         // Confirmation URL: ePayco server sends webhook callbacks here
-        basePaymentData.confirmationUrl = `${epaycoWebhookDomain}/api/webhook/epayco`;
+        // For pnptv-bot payments, use new checkout/pnp route; for others use legacy api/webhook path
+        const confirmationPath = planId?.includes('lifetime') || planId === 'week_pass'
+          ? '/checkout/pnp/confirmation'  // New route for pnptv-bot
+          : '/api/webhook/epayco';        // Legacy route for easybots.store
+        basePaymentData.confirmationUrl = `${epaycoWebhookDomain}${confirmationPath}`;
         // Response URL: User's browser redirects here after payment
         basePaymentData.responseUrl = `${webhookDomain}/api/payment-response`;
         basePaymentData.epaycoSignature = PaymentService.generateEpaycoCheckoutSignature({
