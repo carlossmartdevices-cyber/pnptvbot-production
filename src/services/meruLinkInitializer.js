@@ -1,6 +1,7 @@
 const logger = require('../utils/logger');
 const { query } = require('../utils/db');
 const meruLinkService = require('./meruLinkService');
+const paymentHistoryService = require('./paymentHistoryService');
 
 /**
  * Initialize Meru Link tracking system
@@ -11,7 +12,10 @@ class MeruLinkInitializer {
     try {
       logger.info('Initializing Meru Link tracking system...');
 
-      // Create the table
+      // Create the payment history table
+      await this.createPaymentHistoryTable();
+
+      // Create the meru links table
       await this.createMeruLinksTable();
 
       // Initialize with known links from lifetime-pass.html
@@ -22,6 +26,64 @@ class MeruLinkInitializer {
     } catch (error) {
       logger.error('Error initializing Meru Link system:', error);
       return false;
+    }
+  }
+
+  async createPaymentHistoryTable() {
+    try {
+      // Create payment_history table
+      await query(`
+        CREATE TABLE IF NOT EXISTS payment_history (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          payment_method VARCHAR(50) NOT NULL,
+          amount DECIMAL(12, 2) NOT NULL,
+          currency VARCHAR(10) DEFAULT 'USD',
+          plan_id VARCHAR(100),
+          plan_name VARCHAR(255),
+          product VARCHAR(100),
+          payment_reference VARCHAR(255) NOT NULL UNIQUE,
+          provider_transaction_id VARCHAR(255),
+          provider_payment_id VARCHAR(255),
+          webhook_data JSONB,
+          status VARCHAR(50) DEFAULT 'completed',
+          payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          ip_address INET,
+          user_agent TEXT,
+          metadata JSONB,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Create indexes
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_payment_history_user_id ON payment_history(user_id);
+        CREATE INDEX IF NOT EXISTS idx_payment_history_payment_date ON payment_history(payment_date DESC);
+        CREATE INDEX IF NOT EXISTS idx_payment_history_method ON payment_history(payment_method);
+        CREATE INDEX IF NOT EXISTS idx_payment_history_reference ON payment_history(payment_reference);
+        CREATE INDEX IF NOT EXISTS idx_payment_history_status ON payment_history(status)
+      `);
+
+      // Add columns to users table if they don't exist
+      await query(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS last_payment_date TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS last_payment_amount DECIMAL(12, 2),
+        ADD COLUMN IF NOT EXISTS last_payment_method VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS last_payment_reference VARCHAR(255)
+      `);
+
+      // Create index on users
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_users_last_payment_date ON users(last_payment_date)
+      `);
+
+      logger.info('✓ payment_history table created');
+    } catch (error) {
+      logger.error('Error creating payment_history table:', error);
+      throw error;
     }
   }
 
