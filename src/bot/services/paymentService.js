@@ -1558,7 +1558,13 @@ class PaymentService {
             exp_year: card.exp_year,
             exp_month: card.exp_month,
             cvc_length: card.cvc?.length,
-          }
+          },
+          testModeActive: process.env.EPAYCO_TEST_MODE === 'true',
+          rawCardObject: JSON.stringify({
+            number: card.number?.substring(0, 6) + '...' + card.number?.slice(-4),
+            exp_year: card.exp_year,
+            exp_month: card.exp_month,
+          })
         });
 
         const tokenResult = await epaycoClient.token.create({
@@ -1574,6 +1580,7 @@ class PaymentService {
           tokenStatus: tokenResult?.status,
           tokenId: tokenResult?.id,
           errorMessage: tokenResult?.data?.description || tokenResult?.message,
+          fullResponse: JSON.stringify(tokenResult, null, 2),
         });
 
         // Token ID is at root level (tokenResult.id), not in data

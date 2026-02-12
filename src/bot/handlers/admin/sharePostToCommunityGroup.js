@@ -730,7 +730,7 @@ const registerCommunityPostHandlers = (bot) => {
       logger.error('Error showing button selection:', error);
       await ctx.reply('❌ Error al mostrar botones').catch(() => {});
     }
-  });
+  }
   bot.action(/^share_post_toggle_(.+)$/, async (ctx) => {
     try {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);

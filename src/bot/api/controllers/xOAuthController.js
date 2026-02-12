@@ -93,10 +93,11 @@ const startOAuth = async (req, res) => {
 };
 
 const handleCallback = async (req, res) => {
+  const botUsername = sanitizeBotUsername(process.env.BOT_USERNAME);
+  const botLink = botUsername ? `https://t.me/${botUsername}` : null;
+
   try {
     const { state, code, error, error_description: errorDescription } = req.query;
-    const botUsername = sanitizeBotUsername(process.env.BOT_USERNAME);
-    const botLink = botUsername ? `https://t.me/${botUsername}` : null;
 
     logger.info('X OAuth callback received', {
       hasCode: !!code,
