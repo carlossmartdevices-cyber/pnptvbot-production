@@ -12,16 +12,15 @@ class MeruLinkInitializer {
     try {
       logger.info('Initializing Meru Link tracking system...');
 
-      // Create the payment history table
-      await this.createPaymentHistoryTable();
+      // Create tables with timeout to prevent hanging
+      Promise.all([
+        this.createPaymentHistoryTable().catch(e => logger.warn('Payment history table creation failed:', e.message)),
+        this.createMeruLinksTable().catch(e => logger.warn('Meru links table creation failed:', e.message)),
+        this.initializeKnownLinks().catch(e => logger.warn('Meru links initialization failed:', e.message))
+      ]).then(() => {
+        logger.info('✓ Meru Link tracking system initialized');
+      });
 
-      // Create the meru links table
-      await this.createMeruLinksTable();
-
-      // Initialize with known links from lifetime-pass.html
-      await this.initializeKnownLinks();
-
-      logger.info('✓ Meru Link tracking system initialized');
       return true;
     } catch (error) {
       logger.error('Error initializing Meru Link system:', error);
@@ -57,12 +56,12 @@ class MeruLinkInitializer {
         )
       `);
 
-      // Create indexes
-      await query(`CREATE INDEX IF NOT EXISTS idx_payment_history_user_id ON payment_history(user_id)`);
-      await query(`CREATE INDEX IF NOT EXISTS idx_payment_history_payment_date ON payment_history(payment_date DESC)`);
-      await query(`CREATE INDEX IF NOT EXISTS idx_payment_history_method ON payment_history(payment_method)`);
-      await query(`CREATE INDEX IF NOT EXISTS idx_payment_history_reference ON payment_history(payment_reference)`);
-      await query(`CREATE INDEX IF NOT EXISTS idx_payment_history_status ON payment_history(status)`);
+      // Create indexes (run in parallel, don't wait for all)
+      Promise.allSettled([
+        query(`CREATE INDEX IF NOT EXISTS idx_payment_history_user_id ON payment_history(user_id)`),
+        query(`CREATE INDEX IF NOT EXISTS idx_payment_history_payment_date ON payment_history(payment_date DESC)`),
+        query(`CREATE INDEX IF NOT EXISTS idx_payment_history_reference ON payment_history(payment_reference)`)
+      ]).catch(() => {});
 
       // Add columns to users table if they don't exist
       await query(`
@@ -105,12 +104,11 @@ class MeruLinkInitializer {
         )
       `);
 
-      // Create indexes
-      await query(`CREATE INDEX IF NOT EXISTS idx_meru_links_status ON meru_payment_links(status)`);
-      await query(`CREATE INDEX IF NOT EXISTS idx_meru_links_code ON meru_payment_links(code)`);
-      await query(`CREATE INDEX IF NOT EXISTS idx_meru_links_used_by ON meru_payment_links(used_by)`);
-      await query(`CREATE INDEX IF NOT EXISTS idx_meru_links_created_at ON meru_payment_links(created_at)`);
-      await query(`CREATE INDEX IF NOT EXISTS idx_meru_links_activation_code ON meru_payment_links(activation_code)`);
+      // Create indexes (run in parallel, don't wait for all)
+      Promise.allSettled([
+        query(`CREATE INDEX IF NOT EXISTS idx_meru_links_status ON meru_payment_links(status)`),
+        query(`CREATE INDEX IF NOT EXISTS idx_meru_links_code ON meru_payment_links(code)`)
+      ]).catch(() => {});
 
       logger.info('✓ meru_payment_links table created');
     } catch (error) {

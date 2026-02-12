@@ -287,10 +287,8 @@ const startBot = async () => {
         } catch (coreTablesError) {
           logger.warn('Core tables initialization failed:', coreTablesError.message);
         }
-        // Initialize Meru Link tracking in background (non-blocking)
-        meruLinkInitializer.initialize().catch((meruError) => {
-          logger.warn('Meru Link tracking initialization failed:', meruError.message);
-        });
+        // Initialize Meru Link tracking in background (fire and forget)
+        meruLinkInitializer.initialize();
       } else {
         logger.warn('⚠️ PostgreSQL connection test failed, but will retry on first query');
       }
