@@ -23,6 +23,7 @@ const podcastController = require('./controllers/podcastController');
 const ageVerificationController = require('./controllers/ageVerificationController');
 const healthController = require('./controllers/healthController');
 const hangoutsController = require('./controllers/hangoutsController');
+const mainRoomController = require('./controllers/mainRoomController');
 const xOAuthRoutes = require('./xOAuthRoutes');
 
 // Middleware
@@ -975,6 +976,17 @@ app.delete('/api/audio/:filename', asyncHandler(async (req, res) => {
 app.get('/api/hangouts/public', asyncHandler(hangoutsController.listPublic));
 app.post('/api/hangouts/create', asyncHandler(hangoutsController.create));
 app.post('/api/hangouts/join/:callId', asyncHandler(hangoutsController.join));
+
+// Main Rooms API Routes (3 permanent 50-person community rooms)
+app.get('/api/rooms', asyncHandler(mainRoomController.listRooms));
+app.get('/api/rooms/:roomId', asyncHandler(mainRoomController.getRoom));
+app.get('/api/rooms/:roomId/participants', asyncHandler(mainRoomController.getParticipants));
+app.post('/api/rooms/:roomId/join', asyncHandler(mainRoomController.joinRoom));
+app.post('/api/rooms/:roomId/leave', asyncHandler(mainRoomController.leaveRoom));
+app.get('/api/rooms/:roomId/events', asyncHandler(mainRoomController.getEvents));
+app.post('/api/rooms/:roomId/kick', asyncHandler(mainRoomController.kickParticipant));
+app.post('/api/rooms/:roomId/mute', asyncHandler(mainRoomController.muteParticipant));
+app.post('/api/rooms/:roomId/spotlight', asyncHandler(mainRoomController.setSpotlight));
 
 // ==========================================
 // Media Library API (for Videorama)
