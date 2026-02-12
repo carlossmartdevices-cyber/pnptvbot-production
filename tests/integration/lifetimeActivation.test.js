@@ -149,11 +149,6 @@ describe('Lifetime Pass Activation Flow', () => {
       isPremium: false,
     });
     UserService.updateProfile.mockResolvedValue({ success: true });
-    jest.mock('../../src/models/userModel', () => ({
-      updateSubscription: jest.fn(),
-      getById: jest.fn(),
-    }));
-    UserModel.updateSubscription.mockResolvedValue(true);
   });
 
   // Helper to simulate calling the command handler
@@ -239,6 +234,7 @@ describe('Lifetime Pass Activation Flow', () => {
 
     axios.get.mockResolvedValueOnce({ data: 'This payment link is expired or already paid. Thank you for your purchase.' });
     getPrimeInviteLink.mockResolvedValueOnce('https://t.me/prime_channel_link');
+    activateMembership.mockResolvedValueOnce(true);
 
     await simulateText(paidCode);
 
@@ -298,7 +294,7 @@ describe('Lifetime Pass Activation Flow', () => {
 
   // Test for Spanish language
   it('should use Spanish messages when language is es for initial prompt', async () => {
-    require('../../src/bot/utils/helpers').getLanguage.mockReturnValue('es'); // Set language to Spanish
+    require('../../src/bot/utils/helpers').getLanguage = jest.fn(() => 'es');
     await simulateCommand('/start activate_lifetime');
 
     expect(mockCtx.reply).toHaveBeenCalledWith(
@@ -312,7 +308,7 @@ describe('Lifetime Pass Activation Flow', () => {
   });
 
   it('should activate lifetime pass for a successfully paid code (Spanish)', async () => {
-    require('../../src/bot/utils/helpers').getLanguage.mockReturnValue('es');
+    require('../../src/bot/utils/helpers').getLanguage = jest.fn(() => 'es');
     mockCtx.session.temp.waitingForLifetimeCode = true;
     const paidCode = 'PAIDCODE';
     const meruUrl = `https://pay.getmeru.com/${paidCode}`;
@@ -340,7 +336,7 @@ describe('Lifetime Pass Activation Flow', () => {
   });
 
   it('should inform user if payment is not confirmed (Spanish)', async () => {
-    require('../../src/bot/utils/helpers').getLanguage.mockReturnValue('es');
+    require('../../src/bot/utils/helpers').getLanguage = jest.fn(() => 'es');
     mockCtx.session.temp.waitingForLifetimeCode = true;
     const unpaidCode = 'UNPAIDCODE';
     const meruUrl = `https://pay.getmeru.com/${unpaidCode}`;

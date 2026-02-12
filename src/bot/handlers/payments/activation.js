@@ -415,3 +415,8 @@ const registerActivationHandlers = (bot) => {
 };
 
 module.exports = registerActivationHandlers;
+module.exports.activateMembership = activateMembership;
+module.exports.getPrimeInviteLink = getPrimeInviteLink;
+module.exports.fetchActivationCode = fetchActivationCode;
+module.exports.markCodeUsed = markCodeUsed;
+module.exports.logActivation = logActivation;

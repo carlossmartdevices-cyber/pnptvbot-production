@@ -11,12 +11,12 @@ const paymentHandlers = require('../payments');
 const { showNearbyMenu } = require('./nearbyUnified');
 const supportRoutingService = require('../../services/supportRoutingService');
 const { handlePromoDeepLink } = require('../promo/promoHandler');
-const axios = require('axios');
 const path = require('path');
 const fs = require('fs/promises');
 const { getPrimeInviteLink, activateMembership, fetchActivationCode, markCodeUsed, logActivation } = require('../payments/activation');
 const MessageTemplates = require('../../services/messageTemplates');
 const BusinessNotificationService = require('../../services/businessNotificationService');
+const meruPaymentService = require('../../../services/meruPaymentService');
 
 const activationStrings = {
   en: {
@@ -468,13 +468,17 @@ const registerOnboardingHandlers = (bot) => {
         const meruPaymentUrl = `https://pay.getmeru.com/${matchingLinkCode}`;
         await ctx.reply(`Verificando pago para el código: \`${matchingLinkCode}\`...`, { parse_mode: 'Markdown' });
 
-        const response = await axios.get(meruPaymentUrl);
-        const pageContent = response.data;
+        // Usar Puppeteer para verificar el pago (lee contenido real con JavaScript ejecutado)
+        // Pasar el idioma del usuario para que Meru muestre el mensaje en el idioma correcto
+        const paymentCheck = await meruPaymentService.verifyPayment(matchingLinkCode, lang);
 
-        const isPaidEn = pageContent.includes('Payment link expired or already paid');
-        const isPaidEs = pageContent.includes('El enlace de pago ha caducado o ya ha sido pagado');
+        logger.info('Meru payment verification result', {
+          code: matchingLinkCode,
+          isPaid: paymentCheck.isPaid,
+          userId: ctx.from.id,
+        });
 
-        if (isPaidEn || isPaidEs) {
+        if (paymentCheck.isPaid) {
           // Payment confirmed, activate PRIME
           const userId = ctx.from.id;
           const planId = 'lifetime_pass'; // Assuming this is the plan ID for Lifetime Pass
