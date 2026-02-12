@@ -4,11 +4,11 @@
 services:
   nginx:
     image: nginx:alpine
-    container_name: pnptv-nginx
+    container_name: pnptv-nginx-sandbox
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "8081:80"
+      - "8444:443"
     volumes:
       - ./nginx/pnptv-app.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/pnptv-bot.conf:/etc/nginx/conf.d/easybots.conf:ro
@@ -30,7 +30,7 @@ services:
 
   certbot:
     image: certbot/certbot:latest
-    container_name: pnptv-certbot
+    container_name: pnptv-certbot-sandbox
     volumes:
       - certbot-etc:/etc/letsencrypt
       - certbot-var:/var/lib/letsencrypt
@@ -43,7 +43,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    container_name: pnptv-postgres
+    container_name: pnptv-postgres-sandbox
     restart: unless-stopped
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-pnptvbot}
@@ -67,7 +67,7 @@ services:
     build:
       context: .
       target: production
-    container_name: pnptv-bot
+    container_name: pnptv-bot-sandbox
     restart: unless-stopped
     # Expose port only to internal Docker network (not to host)
     expose:
@@ -98,7 +98,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: pnptv-redis
+    container_name: pnptv-redis-sandbox
     restart: unless-stopped
     # Ports removed - only accessible via internal Docker network
     # Uncomment if you need external access: ports: ["${REDIS_PORT:-6379}:6379"]

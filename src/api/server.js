@@ -176,7 +176,56 @@ app.post('/api/logout', (req, res) => {
   });
 });
 
+// --- PNPtv Hybrid Feature Endpoints ---
 
+// Middleware to protect feature endpoints
+const featureAuthMiddleware = [
+  telegramAuth,
+  checkTermsAccepted,
+];
+
+// Hangouts URL Endpoint
+app.get('/api/features/hangout/url', ...featureAuthMiddleware, (req, res) => {
+  try {
+    const hangoutUrl = process.env.HANGOUTS_WEB_URL;
+    if (!hangoutUrl) {
+      throw new Error('HANGOUTS_WEB_URL is not configured');
+    }
+    // Here you could add logic to generate a specific room or token
+    res.json({ success: true, url: hangoutUrl });
+  } catch (error) {
+    logger.error('Error getting Hangout URL:', error);
+    res.status(500).json({ success: false, error: 'Could not retrieve Hangout URL.' });
+  }
+});
+
+// Videorama URL Endpoint
+app.get('/api/features/videorama/url', ...featureAuthMiddleware, (req, res) => {
+  try {
+    const videoramaUrl = process.env.VIDEORAMA_WEB_URL; // Assuming this env var exists
+    if (!videoramaUrl) {
+      throw new Error('VIDEORAMA_WEB_URL is not configured');
+    }
+    res.json({ success: true, url: videoramaUrl });
+  } catch (error) {
+    logger.error('Error getting Videorama URL:', error);
+    res.status(500).json({ success: false, error: 'Could not retrieve Videorama URL.' });
+  }
+});
+
+// Nearby URL Endpoint
+app.get('/api/features/nearby/url', ...featureAuthMiddleware, (req, res) => {
+  try {
+    const nearbyUrl = process.env.NEARBY_WEB_URL; // Assuming this env var exists
+    if (!nearbyUrl) {
+      throw new Error('NEARBY_WEB_URL is not configured');
+    }
+    res.json({ success: true, url: nearbyUrl });
+  } catch (error) {
+    logger.error('Error getting Nearby URL:', error);
+    res.status(500).json({ success: false, error: 'Could not retrieve Nearby URL.' });
+  }
+});
 
 // Start server
 function startServer() {

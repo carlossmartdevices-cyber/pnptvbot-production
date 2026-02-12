@@ -15,6 +15,39 @@ const jaasService = require('../../services/jaasService');
 const registerHangoutsHandlers = (bot) => {
   const HANGOUTS_WEB_APP_URL = process.env.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts';
 
+  /**
+   * NEW: Web-first /hangout command
+   * This overrides the old in-bot hangouts logic.
+   */
+  bot.command('hangout', async (ctx) => {
+    try {
+      const lang = ctx.session?.language || 'en';
+      
+      // NOTE: In a real implementation, we would make an API call to the backend.
+      // For now, we simulate this by directly building the URL.
+      // const response = await axios.get('http://localhost:3001/api/features/hangout/url', { headers: { 'x-telegram-user-id': ctx.from.id } });
+      // const webAppUrl = response.data.url;
+
+      // Simulate getting the URL, as we can't make a real API call from here easily.
+      const webAppUrl = HANGOUTS_WEB_APP_URL;
+
+      const message = lang === 'es'
+        ? '🎥 *PNP Hangouts* ha sido movido a nuestra aplicación web para una mejor experiencia.'
+        : '🎥 *PNP Hangouts* has been moved to our web app for a better experience.';
+
+      await ctx.reply(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.webApp(lang === 'es' ? '🚀 Abrir Hangouts' : '🚀 Open Hangouts', webAppUrl)],
+        ]),
+      });
+    } catch (error) {
+      logger.error('Error in /hangout web-first command:', error);
+      const lang = ctx.session?.language || 'en';
+      await ctx.reply(lang === 'es' ? '❌ No se pudo cargar Hangouts.' : '❌ Could not load Hangouts.');
+    }
+  });
+
   // ==========================================
   // HANGOUTS MENU
   // ==========================================

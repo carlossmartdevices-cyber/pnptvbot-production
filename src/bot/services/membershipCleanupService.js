@@ -43,7 +43,15 @@ class MembershipCleanupService {
       const statusResults = await this.updateAllSubscriptionStatuses();
       results.statusUpdates = statusResults;
 
-      // Step 2: Kick churned/expired users from PRIME channel
+      // Step 2: Add missing PRIME users to the channel
+      if (this.bot && this.primeChannelId) {
+        const addResults = await this.addMissingUsersToPrimeChannel();
+        results.channelAdds = addResults;
+      } else {
+        logger.warn('Skipping channel adds: Bot or PRIME_CHANNEL_ID not configured');
+      }
+
+      // Step 3: Kick churned/expired users from PRIME channel
       if (this.bot && this.primeChannelId) {
         const kickResults = await this.kickExpiredUsersFromPrimeChannel();
         results.channelKicks = kickResults;
@@ -57,6 +65,7 @@ class MembershipCleanupService {
       logger.info('Membership cleanup completed', {
         duration: `${duration}s`,
         statusUpdates: results.statusUpdates,
+        channelAdds: results.channelAdds,
         channelKicks: results.channelKicks
       });
 
@@ -71,6 +80,76 @@ class MembershipCleanupService {
     }
   }
 
+  /**
+   * Add active Prime members to the PRIME channel if they are not already members
+   * @returns {Promise<Object>} Add results
+   */
+  static async addMissingUsersToPrimeChannel() {
+    const results = { added: 0, failed: 0, skipped: 0 };
+
+    if (!this.bot || !this.primeChannelId) {
+      logger.warn('Cannot add users: Bot or PRIME_CHANNEL_ID not configured');
+      return results;
+    }
+
+    try {
+      // Get all active Prime users from the database
+      const primeUsers = await query(`
+        SELECT id, username FROM users
+        WHERE subscription_status = 'active' AND tier = 'Prime'
+      `);
+
+      logger.info(`Found ${primeUsers.rows.length} active Prime users to check for PRIME channel access`);
+
+      for (const user of primeUsers.rows) {
+        try {
+          // Check if user is in the PRIME channel
+          const chatMember = await this.bot.telegram.getChatMember(this.primeChannelId, user.id);
+
+          // If user is not in the channel (left, kicked, or never joined), add them
+          if (['left', 'kicked'].includes(chatMember.status)) {
+            // To add a user, we create an invite link and send it to them
+            const inviteLink = await this.bot.telegram.createChatInviteLink(this.primeChannelId, {
+              member_limit: 1,
+              expire_date: Math.floor(Date.now() / 1000) + 3600 // 1 hour expiry
+            });
+
+            await this.bot.telegram.sendMessage(user.id,
+              `🎉 ¡Tu acceso al canal PRIME ha sido restaurado!\n\nUsa este enlace de un solo uso para unirte:\n${inviteLink.invite_link}`
+            );
+
+            results.added++;
+            logger.info(`Sent invite link to user ${user.id} (${user.username || 'no username'}) for PRIME channel`);
+            
+            // Rate limit protection
+            await new Promise(resolve => setTimeout(resolve, 100));
+          } else {
+            results.skipped++;
+          }
+        } catch (error) {
+          if (error.response?.error_code === 400 && error.response?.description?.includes('user not found')) {
+            // Bot cannot initiate conversation, user must start the bot first. Skip.
+            results.skipped++;
+             logger.warn(`Cannot send invite to user ${user.id} because they have not started the bot.`);
+          } else {
+            results.failed++;
+            logger.error(`Error processing user ${user.id} for PRIME channel addition:`, {
+              message: error.message,
+              description: error.response?.description,
+              error_code: error.response?.error_code
+            });
+          }
+        }
+      }
+
+      logger.info('PRIME channel additions completed', results);
+      return results;
+    } catch (error) {
+      logger.error('Error adding users to PRIME channel:', error);
+      return results;
+    }
+  }
+  
   /**
    * Update subscription statuses for all users
    * - active + expired plan_expiry → churned
