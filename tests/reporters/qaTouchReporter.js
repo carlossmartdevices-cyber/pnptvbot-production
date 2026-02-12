@@ -17,7 +17,7 @@ try { require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
  * Test titles must contain a QA Touch case key in brackets, e.g.:
  *   it('[M6DR7] should create a payment', ...)
  *
- * Status mapping:  pass → 1,  fail → 2,  skip/pending → 3
+ * Status mapping:  pass → 1,  fail → 5,  skip/pending → 3 (Blocked)
  */
 class QATouchReporter {
   constructor(globalConfig, reporterOptions) {
@@ -26,7 +26,6 @@ class QATouchReporter {
   }
 
   async onRunComplete(contexts, results) {
-    if (process.env.NODE_ENV === 'test') return;
     if (process.env.QATOUCH_ENABLED !== 'true') return;
 
     const domain = process.env.QATOUCH_DOMAIN;
@@ -52,8 +51,8 @@ class QATouchReporter {
         const caseKey = match[1];
         let status;
         if (test.status === 'passed') status = 1;
-        else if (test.status === 'failed') status = 2;
-        else status = 3; // skipped/pending
+        else if (test.status === 'failed') status = 5;
+        else status = 3; // skipped/pending → Blocked
 
         cases[String(idx)] = { case: caseKey, status };
         idx++;
@@ -65,16 +64,16 @@ class QATouchReporter {
       return;
     }
 
-    const casesJson = JSON.stringify(cases);
-    const path = `/api/v1/runresult/updatestatus/multiple?project=${projectKey}&test_run=${testRunId}&cases=${encodeURIComponent(casesJson)}`;
+    const resultPayload = JSON.stringify(cases);
+    const apiPath = `/api/v1/testRunResults/status/multiple?project=${projectKey}&test_run=${testRunId}&result=${encodeURIComponent(resultPayload)}&comments=${encodeURIComponent('Updated by Jest automation')}`;
 
     return new Promise((resolve) => {
       const req = https.request(
         {
           hostname: 'api.qatouch.com',
           port: 443,
-          path,
-          method: 'POST',
+          path: apiPath,
+          method: 'PATCH',
           headers: {
             'api-token': apiToken,
             domain,
@@ -88,6 +87,8 @@ class QATouchReporter {
             console.log(`[QATouch] Synced ${idx} results → HTTP ${res.statusCode}`);
             if (res.statusCode >= 400) {
               console.log(`[QATouch] Response: ${body}`);
+            } else {
+              console.log(`[QATouch] Success: ${body}`);
             }
             resolve();
           });

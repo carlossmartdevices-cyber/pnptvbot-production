@@ -11,6 +11,37 @@ const paymentHandlers = require('../payments');
 const { showNearbyMenu } = require('./nearbyUnified');
 const supportRoutingService = require('../../services/supportRoutingService');
 const { handlePromoDeepLink } = require('../promo/promoHandler');
+const axios = require('axios');
+const path = require('path');
+const fs = require('fs/promises');
+const { getPrimeInviteLink, activateMembership, fetchActivationCode, markCodeUsed, logActivation } = require('../payments/activation');
+const MessageTemplates = require('../../services/messageTemplates');
+const BusinessNotificationService = require('../../services/businessNotificationService');
+
+const activationStrings = {
+  en: {
+    thanks: "Thank you for your purchase!\n\nTo activate your *Lifetime Pass*, please press the button below and send us your confirmation code.",
+    sendCodeButton: "✉️ Send My Confirmation Code",
+    promptCode: "Please send your payment confirmation code:",
+    invalidCodeFormat: "❌ Invalid code format. Please send the code as plain text.",
+    codeNotFound: "❌ Code not found or invalid. Please check your code and try again.",
+    paymentExpiredOrPaid: "✅ Your Lifetime Pass has been activated! Welcome to PRIME!\n\n🌟 Access the PRIME channel:\n👉 {inviteLink}",
+    paymentNotCompleted: "⚠️ We could not confirm your payment. Please ensure your payment is complete and try again, or contact support if you believe this is an error.",
+    errorActivating: "❌ An error occurred during activation. Please try again later.",
+    receiptReceived: "✅ Receipt received. Our team will review and activate your account soon."
+  },
+  es: {
+    thanks: "¡Muchas gracias por tu compra!\n\nPara activar tu *Lifetime Pass*, por favor presiona el botón de abajo y envíanos tu código de confirmación.",
+    sendCodeButton: "✉️ Enviar mi código de confirmación",
+    promptCode: "Por favor, envía tu código de confirmación de pago:",
+    invalidCodeFormat: "❌ Formato de código inválido. Por favor, envía el código como texto simple.",
+    codeNotFound: "❌ Código no encontrado o inválido. Por favor, verifica tu código e inténtalo de nuevo.",
+    paymentExpiredOrPaid: "✅ ¡Tu Lifetime Pass ha sido activado! ¡Bienvenido a PRIME!\n\n🌟 Accede al canal PRIME:\n👉 {inviteLink}",
+    paymentNotCompleted: "⚠️ No pudimos confirmar tu pago. Por favor, asegúrate de que tu pago esté completo e inténtalo de nuevo, o contacta a soporte si crees que es un error.",
+    errorActivating: "❌ Ocurrió un error durante la activación. Por favor, inténtalo de nuevo más tarde.",
+    receiptReceived: "✅ Recibo recibido. Nuestro equipo revisará y activará tu cuenta pronto."
+  }
+};
 
 /**
  * Onboarding handlers
@@ -40,6 +71,21 @@ const registerOnboardingHandlers = (bot) => {
     } catch (error) {
       logger.error('Error in /onboard command:', error);
       await ctx.reply('An error occurred. Please try again.');
+    }
+  });
+
+  // Action to prompt user for activation code
+  bot.action('activate_lifetime_send_code', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const lang = getLanguage(ctx);
+      if (!ctx.session.temp) ctx.session.temp = {};
+      ctx.session.temp.waitingForLifetimeCode = true;
+      await ctx.saveSession();
+      await ctx.reply(activationStrings[lang].promptCode);
+    } catch (error) {
+      logger.error('Error in activate_lifetime_send_code action:', error);
+      await ctx.reply(activationStrings[getLanguage(ctx)].errorActivating);
     }
   });
 
@@ -94,51 +140,16 @@ const registerOnboardingHandlers = (bot) => {
       if (startParam === 'activate_lifetime') {
         const lang = getLanguage(ctx);
         const userId = ctx.from.id;
-        const escapeMarkdown = (text = '') => String(text).replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
-        const username = ctx.from.username ? `@${escapeMarkdown(ctx.from.username)}` : 'No username';
-        const firstName = ctx.from.first_name || 'Unknown';
 
-        // Send confirmation to user
-        const userMessage = lang === 'es'
-          ? `✅ *Solicitud de Activación Recibida*
-
-Hemos recibido tu solicitud para activar el *Lifetime Pass*.
-
-📋 *Detalles:*
-• Plan: Lifetime Pass ($100 USD)
-• Usuario: ${username}
-
-⏱️ Tu suscripción será activada en menos de 24 horas.
-
-Te enviaremos un mensaje de confirmación cuando esté lista.
-
-Si tienes alguna pregunta, usa /support para contactarnos.`
-          : `✅ *Activation Request Received*
-
-We have received your request to activate the *Lifetime Pass*.
-
-📋 *Details:*
-• Plan: Lifetime Pass ($100 USD)
-• User: ${username}
-
-⏱️ Your subscription will be activated within 24 hours.
-
-We will send you a confirmation message when it's ready.
-
-If you have any questions, use /support to contact us.`;
-
-        await ctx.reply(userMessage, { parse_mode: 'Markdown' });
-
-        // Send notification to support group using centralized method
-        try {
-          const user = ctx.from;
-          const supportMessage = `💎 *Plan:* Lifetime Pass ($100 USD)\n\n⚠️ Verificar pago en Meru y activar manualmente.`;
-          const supportTopic = await supportRoutingService.sendToSupportGroup(supportMessage, 'activation', user, 'text', ctx);
-          logger.info(`Lifetime activation request sent to support group`, { userId, username, threadId: supportTopic?.thread_id });
-        } catch (err) {
-          logger.error('Failed to send activation request to support group:', err);
-        }
-
+        await ctx.reply(
+          activationStrings[lang].thanks,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(activationStrings[lang].sendCodeButton, 'activate_lifetime_send_code')],
+            ]),
+          }
+        );
         return;
       }
 
@@ -417,8 +428,92 @@ If you have any questions, use /support to contact us.`;
     logger.info('Onboarding text handler checking for email', {
       userId: ctx.from?.id,
       waitingForEmail: ctx.session?.temp?.waitingForEmail,
+      waitingForLifetimeCode: ctx.session?.temp?.waitingForLifetimeCode,
       text: ctx.message?.text?.substring(0, 50)
     });
+
+    // New logic for Lifetime Code Activation
+    if (ctx.session?.temp?.waitingForLifetimeCode) {
+      const lang = getLanguage(ctx);
+      const rawCode = ctx.message?.text?.trim();
+
+      if (!rawCode || rawCode.length === 0 || rawCode.includes(' ')) { // Simple validation for now
+        await ctx.reply(activationStrings[lang].invalidCodeFormat);
+        ctx.session.temp.waitingForLifetimeCode = false; // Clear the flag
+        await ctx.saveSession();
+        return;
+      }
+
+      ctx.session.temp.waitingForLifetimeCode = false; // Clear the flag
+      await ctx.saveSession();
+
+      try {
+        const lifetimePassHtmlPath = path.join(__dirname, '../../../../public/lifetime-pass.html'); // Correct path to the HTML file
+        const htmlContent = await fs.readFile(lifetimePassHtmlPath, 'utf8');
+
+        const meruLinksRegex = /https:\/\/pay\.getmeru\.com\/([a-zA-Z0-9_-]+)/g;
+        let match;
+        const meruCodes = [];
+        while ((match = meruLinksRegex.exec(htmlContent)) !== null) {
+            meruCodes.push(match[1]);
+        }
+        
+        const matchingLinkCode = meruCodes.find(code => code === rawCode);
+
+        if (!matchingLinkCode) {
+            await ctx.reply(activationStrings[lang].codeNotFound);
+            return;
+        }
+
+        const meruPaymentUrl = `https://pay.getmeru.com/${matchingLinkCode}`;
+        await ctx.reply(`Verificando pago para el código: \`${matchingLinkCode}\`...`, { parse_mode: 'Markdown' });
+
+        const response = await axios.get(meruPaymentUrl);
+        const pageContent = response.data;
+
+        const isPaidEn = pageContent.includes('Payment link expired or already paid');
+        const isPaidEs = pageContent.includes('El enlace de pago ha caducado o ya ha sido pagado');
+
+        if (isPaidEn || isPaidEs) {
+          // Payment confirmed, activate PRIME
+          const userId = ctx.from.id;
+          const planId = 'lifetime_pass'; // Assuming this is the plan ID for Lifetime Pass
+          const product = 'lifetime-pass';
+
+          const activated = await activateMembership({
+            ctx,
+            userId,
+            planId,
+            product,
+            // successMessage will be handled below
+          });
+
+          if (!activated) {
+            await ctx.reply(activationStrings[lang].errorActivating);
+            return;
+          }
+
+          // Mark code as used
+          await markCodeUsed(matchingLinkCode, userId, ctx.from.username);
+          await logActivation({ userId, username: ctx.from.username, code: matchingLinkCode, product, success: true });
+          BusinessNotificationService.notifyCodeActivation({ userId, username: ctx.from.username, code: matchingLinkCode, product });
+
+          const inviteLink = await getPrimeInviteLink(ctx, userId);
+          await ctx.reply(
+            activationStrings[lang].paymentExpiredOrPaid.replace('{inviteLink}', inviteLink),
+            { parse_mode: 'Markdown', disable_web_page_preview: true }
+          );
+          await showMainMenu(ctx); // Show main menu after activation
+        } else {
+          // Payment not confirmed
+          await ctx.reply(activationStrings[lang].paymentNotCompleted);
+        }
+      } catch (error) {
+        logger.error('Error processing lifetime code activation:', error);
+        await ctx.reply(activationStrings[lang].errorActivating);
+      }
+      return; // Crucial to return here to prevent further text processing
+    }
 
     if (ctx.session?.temp?.waitingForEmail) {
       const lang = getLanguage(ctx);
