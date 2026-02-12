@@ -1695,7 +1695,10 @@ class PaymentService {
       const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.store';
 
       // For pnptv-bot payments, use new checkout/pnp route; for others use legacy api/webhook path
-      const confirmationPath = planId?.includes('lifetime') || planId === 'week_pass'
+      // Include all pnptv-bot plan types (not just lifetime and week_pass)
+      const pnptvPlans = ['week_pass', 'three_months_pass', 'crystal_pass', 'six_months_pass', 'yearly_pass', 'lifetime_pass', 'lifetime100_promo', 'pnp_hot_monthly_pass'];
+      const isPnptvPlan = pnptvPlans.includes(planId);
+      const confirmationPath = isPnptvPlan
         ? '/checkout/pnp/confirmation'  // New route for pnptv-bot
         : '/api/webhook/epayco';        // Legacy route for easybots.store
 
