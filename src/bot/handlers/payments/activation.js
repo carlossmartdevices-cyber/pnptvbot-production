@@ -8,6 +8,7 @@ const supportRoutingService = require('../../services/supportRoutingService');
 const UserModel = require('../../../models/userModel');
 const { createChatInviteLink } = require('../../utils/telegramAdmin');
 const BusinessNotificationService = require('../../services/businessNotificationService');
+const PaymentHistoryService = require('../../services/paymentHistoryService');
 
 const PRIME_FALLBACK_LINK = 'https://t.me/PNPTV_PRIME';
 
@@ -389,6 +390,33 @@ const registerActivationHandlers = (bot) => {
         product,
         success: true,
       });
+
+      // Record payment in history
+      try {
+        await PaymentHistoryService.recordPayment({
+          userId: targetUserId,
+          paymentMethod: 'lifetime100',
+          amount: 100,  // Standard lifetime100 price
+          currency: 'USD',
+          planId: 'lifetime100_promo',
+          planName: 'Lifetime100 Promo',
+          product: product || 'lifetime100-promo',
+          paymentReference: code,  // Activation code is the payment reference
+          status: 'completed',
+          metadata: {
+            activated_by: ctx.from.id,
+            activated_by_username: ctx.from.username,
+            manual_activation: true,
+            activation_code: code,
+          },
+        });
+      } catch (historyError) {
+        logger.warn('Failed to record lifetime100 payment in history (non-critical):', {
+          error: historyError.message,
+          userId: targetUserId,
+          code,
+        });
+      }
 
       BusinessNotificationService.notifyCodeActivation({
         userId: targetUserId,

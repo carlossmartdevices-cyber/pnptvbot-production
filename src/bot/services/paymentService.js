@@ -20,6 +20,7 @@ const PaymentNotificationService = require('./paymentNotificationService');
 const BookingAvailabilityIntegration = require('./bookingAvailabilityIntegration');
 const PaymentSecurityService = require('./paymentSecurityService');
 const { getEpaycoSubscriptionUrl, isSubscriptionPlan } = require('../../config/epaycoSubscriptionPlans');
+const PaymentHistoryService = require('./paymentHistoryService');
 
 class PaymentService {
   static safeCompareHex(expectedHex, receivedHex) {
@@ -694,6 +695,36 @@ class PaymentService {
               renewed: !!(currentExpiry && new Date(currentExpiry) > new Date()),
             });
 
+            // Record payment in history
+            try {
+              await PaymentHistoryService.recordPayment({
+                userId,
+                paymentMethod: 'epayco',
+                amount: parseFloat(x_amount) || 0,
+                currency: 'USD',
+                planId: planIdOrBookingId,
+                planName: plan?.name,
+                product: plan?.name,
+                paymentReference: x_ref_payco,
+                providerTransactionId: x_transaction_id,
+                providerPaymentId: paymentIdOrType,
+                webhookData: webhookData,
+                status: 'completed',
+                ipAddress: null,
+                metadata: {
+                  approval_code: x_approval_code,
+                  renewed: !!(currentExpiry && new Date(currentExpiry) > new Date()),
+                  promoCode: payment?.metadata?.promoCode,
+                },
+              });
+            } catch (historyError) {
+              logger.warn('Failed to record ePayco payment in history (non-critical):', {
+                error: historyError.message,
+                userId,
+                refPayco: x_ref_payco,
+              });
+            }
+
             // Store subscriber mapping for recurring charge lookups
             if (isSubscriptionPlan(planIdOrBookingId)) {
               try {
@@ -1085,6 +1116,38 @@ class PaymentService {
               expiryDate,
               txHash: source?.txHash,
             });
+
+            // Record payment in history
+            try {
+              const amountUSD = DaimoService.convertUSDCToUSD(source?.amountUnits || '0');
+              await PaymentHistoryService.recordPayment({
+                userId,
+                paymentMethod: 'daimo',
+                amount: amountUSD,
+                currency: 'USD',
+                planId,
+                planName: plan?.name,
+                product: plan?.name,
+                paymentReference: source?.txHash || id,
+                providerTransactionId: source?.txHash,
+                providerPaymentId: id,
+                webhookData: normalizedData,
+                status: 'completed',
+                ipAddress: null,
+                metadata: {
+                  chain_id: source?.chainId,
+                  payer_address: source?.payerAddress,
+                  amount_units: source?.amountUnits,
+                  promoCode: payment?.metadata?.promoCode,
+                },
+              });
+            } catch (historyError) {
+              logger.warn('Failed to record Daimo payment in history (non-critical):', {
+                error: historyError.message,
+                userId,
+                txHash: source?.txHash,
+              });
+            }
 
             // Send enhanced payment confirmation notification via bot (with PRIME channel link)
             const userLanguage = user?.language || 'es';

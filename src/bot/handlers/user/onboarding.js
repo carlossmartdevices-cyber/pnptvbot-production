@@ -18,6 +18,7 @@ const MessageTemplates = require('../../services/messageTemplates');
 const BusinessNotificationService = require('../../services/businessNotificationService');
 const meruPaymentService = require('../../../services/meruPaymentService');
 const meruLinkService = require('../../../services/meruLinkService');
+const PaymentHistoryService = require('../../../services/paymentHistoryService');
 
 const activationStrings = {
   en: {
@@ -513,6 +514,32 @@ const registerOnboardingHandlers = (bot) => {
               code: matchingLinkCode,
               userId,
               reason: linkInvalidation.message,
+            });
+          }
+
+          // Record payment in history
+          try {
+            await PaymentHistoryService.recordPayment({
+              userId,
+              paymentMethod: 'meru',
+              amount: 50,  // Standard lifetime pass price
+              currency: 'USD',
+              planId: 'lifetime_pass',
+              planName: 'Lifetime Pass',
+              product: product || 'lifetime-pass',
+              paymentReference: matchingLinkCode,  // Meru link code is the payment reference
+              status: 'completed',
+              metadata: {
+                meru_link: `https://pay.getmeru.com/${matchingLinkCode}`,
+                verification_method: 'puppeteer',
+                language: lang,
+              },
+            });
+          } catch (historyError) {
+            logger.warn('Failed to record Meru payment in history (non-critical):', {
+              error: historyError.message,
+              userId,
+              code: matchingLinkCode,
             });
           }
 
