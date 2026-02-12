@@ -887,6 +887,9 @@ class PaymentService {
             transaction_id: x_transaction_id,
             reference: x_ref_payco,
             epayco_ref: x_ref_payco,
+            epayco_estado: x_transaction_state,
+            epayco_respuesta: webhookData.x_response_reason_text || webhookData.x_respuesta,
+            error: webhookData.x_response_reason_text || webhookData.x_respuesta || x_transaction_state,
           });
         }
 
@@ -1887,6 +1890,9 @@ class PaymentService {
           reference: refPayco,
           epayco_ref: refPayco,
           payment_method: 'tokenized_card',
+          epayco_estado: estado,
+          epayco_respuesta: chargeResult?.data?.respuesta,
+          error: chargeResult?.data?.respuesta || 'Transacción rechazada',
         });
 
         const errorMsg = chargeResult?.data?.respuesta || 'Transacción rechazada';
