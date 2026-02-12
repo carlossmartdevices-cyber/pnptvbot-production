@@ -8,7 +8,7 @@ const supportRoutingService = require('../../services/supportRoutingService');
 const UserModel = require('../../../models/userModel');
 const { createChatInviteLink } = require('../../utils/telegramAdmin');
 const BusinessNotificationService = require('../../services/businessNotificationService');
-const PaymentHistoryService = require('../../services/paymentHistoryService');
+const PaymentHistoryService = require('../../../services/paymentHistoryService');
 
 const PRIME_FALLBACK_LINK = 'https://t.me/PNPTV_PRIME';
 
