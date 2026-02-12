@@ -700,6 +700,9 @@ app.post(
 // Webhook endpoints
 app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
 app.post('/api/webhook/epayco', webhookLimiter, webhookController.handleEpaycoWebhook); // singular alias
+// New route for pnptv-bot ePayco payments via easybots.store domain
+app.post('/checkout/pnp', webhookLimiter, webhookController.handleEpaycoWebhook);
+app.post('/checkout/pnp/confirmation', webhookLimiter, webhookController.handleEpaycoWebhook);
 app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
 app.post('/api/webhooks/visa-cybersource', webhookLimiter, require('./controllers/visaCybersourceWebhookController').handleWebhook);
 app.get('/api/webhooks/visa-cybersource/health', require('./controllers/visaCybersourceWebhookController').healthCheck);
