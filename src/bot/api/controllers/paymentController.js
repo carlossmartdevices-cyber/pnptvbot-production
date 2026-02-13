@@ -207,6 +207,26 @@ class PaymentController {
         },
       };
 
+      // Persist expected webhook values for strict amount/currency validation.
+      try {
+        const expectedAmount = amountCOPString;
+        const expectedCurrency = currencyCode;
+        if (
+          payment.metadata?.expected_epayco_amount !== expectedAmount
+          || payment.metadata?.expected_epayco_currency !== expectedCurrency
+        ) {
+          await PaymentModel.updateStatus(payment.id, payment.status, {
+            expected_epayco_amount: expectedAmount,
+            expected_epayco_currency: expectedCurrency,
+          });
+        }
+      } catch (metaError) {
+        logger.error('Failed to persist expected ePayco webhook amount/currency (non-critical)', {
+          paymentId: payment.id,
+          error: metaError.message,
+        });
+      }
+
       // Add provider-specific data
       if (provider === 'epayco') {
         basePaymentData.epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;
@@ -430,10 +450,6 @@ class PaymentController {
       const {
         paymentId,
         tokenCard,
-        cardNumber,
-        expYear,
-        expMonth,
-        cvc,
         name,
         lastName,
         email,
@@ -443,29 +459,31 @@ class PaymentController {
         address,
         phone,
         dues,
+        browserInfo,
       } = req.body;
 
-      // Accept either a pre-made token or raw card data for server-side tokenization
-      const hasToken = !!tokenCard;
-      const hasCard = !!(cardNumber && expYear && expMonth && cvc);
+      const hasToken = typeof tokenCard === 'string' && tokenCard.trim().length >= 8;
+      const hasRawCardData = Boolean(
+        req.body?.card
+        || req.body?.cardNumber
+        || req.body?.cvc
+        || req.body?.expMonth
+        || req.body?.expYear
+      );
 
-      if (!paymentId || (!hasToken && !hasCard) || !name || !email || !docType || !docNumber) {
+      // PCI-DSS hardening: backend must not receive PAN/CVC.
+      if (hasRawCardData) {
         return res.status(400).json({
           success: false,
-          error: 'Faltan campos requeridos. Completa todos los datos necesarios.',
+          error: 'Por seguridad PCI-DSS, este endpoint solo acepta token_card. No envíes PAN/CVC al backend.',
         });
       }
 
-      // Basic card number validation when sending raw card data
-      let cleanCard;
-      if (hasCard) {
-        cleanCard = cardNumber.replace(/\s+/g, '');
-        if (!/^\d{13,19}$/.test(cleanCard)) {
-          return res.status(400).json({
-            success: false,
-            error: 'Número de tarjeta inválido.',
-          });
-        }
+      if (!paymentId || !hasToken || !name || !email || !docType || !docNumber) {
+        return res.status(400).json({
+          success: false,
+          error: 'Faltan campos requeridos. Debes enviar paymentId, tokenCard y datos de titular.',
+        });
       }
 
       // Get client IP and user agent for security checks
@@ -474,6 +492,7 @@ class PaymentController {
         || req.connection?.remoteAddress
         || '127.0.0.1';
       const userAgent = req.headers['user-agent'] || '';
+      const acceptHeader = req.headers.accept || '*/*';
 
       // Security: Rate limiting per user (fallback to paymentId when user is unknown)
       let rateLimitKey = paymentId;
@@ -538,7 +557,18 @@ class PaymentController {
         status: 'pending',
         ipAddress: clientIp,
         userAgent,
-        details: hasToken ? { tokenCard: tokenCard?.substring(0, 8) + '...' } : { cardLast4: cleanCard?.slice(-4) },
+        details: {
+          tokenCard: tokenCard?.substring(0, 8) + '...',
+          browserInfo: browserInfo && typeof browserInfo === 'object'
+            ? {
+                language: browserInfo.language,
+                colorDepth: browserInfo.colorDepth,
+                screenWidth: browserInfo.screenWidth,
+                screenHeight: browserInfo.screenHeight,
+                timezoneOffset: browserInfo.timezoneOffset,
+              }
+            : null,
+        },
       }).catch(() => {});
 
       const chargeParams = {
@@ -556,24 +586,11 @@ class PaymentController {
         },
         dues: String(dues || '1'),
         ip: clientIp,
+        userAgent,
+        acceptHeader,
+        browserInfo: browserInfo && typeof browserInfo === 'object' ? browserInfo : null,
+        tokenCard: tokenCard.trim(),
       };
-
-      if (hasToken) {
-        chargeParams.tokenCard = tokenCard;
-      } else {
-        // Ensure year is 4 digits (if 2-digit, assume 20xx)
-        let year = String(expYear);
-        if (year.length === 2) {
-          year = '20' + year;
-        }
-
-        chargeParams.card = {
-          number: cleanCard,
-          exp_year: year,
-          exp_month: String(expMonth).padStart(2, '0'),
-          cvc: String(cvc),
-        };
-      }
 
       const result = await PaymentService.processTokenizedCharge(chargeParams);
 
@@ -593,7 +610,13 @@ class PaymentController {
 
         res.json(result);
       } else {
-        res.status(result.status === 'rejected' ? 402 : 400).json(result);
+        if (result.status === 'rejected') {
+          return res.status(402).json(result);
+        }
+        if (result.status === 'processing') {
+          return res.status(409).json(result);
+        }
+        res.status(400).json(result);
       }
     } catch (error) {
       logger.error('Error in tokenized charge endpoint:', {
@@ -1061,16 +1084,7 @@ class PaymentController {
           currentStatus,
         });
 
-        // Update payment status to completed
-        await PaymentModel.updateStatus(paymentId, 'completed', {
-          transaction_id: refPayco || payment.transactionId,
-          reference: refPayco || payment.reference,
-          epayco_ref: refPayco,
-          payment_method: 'tokenized_card',
-          three_ds_authenticated: true,
-        });
-
-        // Activate subscription
+        // Activate subscription first, then mark completed to avoid polling race conditions.
         const userId = payment.user_id || payment.userId;
         const planId = payment.plan_id || payment.planId;
         const plan = await PlanModel.getById(planId);
@@ -1094,6 +1108,15 @@ class PaymentController {
             paymentId,
           });
         }
+
+        await PaymentModel.updateStatus(paymentId, 'completed', {
+          transaction_id: refPayco || payment.transactionId,
+          reference: refPayco || payment.reference,
+          epayco_ref: refPayco,
+          payment_method: 'tokenized_card',
+          three_ds_authenticated: true,
+          webhook_processed_at: new Date().toISOString(),
+        });
 
         return res.json({
           success: true,

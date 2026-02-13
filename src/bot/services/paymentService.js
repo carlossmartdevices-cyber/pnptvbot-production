@@ -185,6 +185,86 @@ class PaymentService {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''));
   }
 
+  static resolveExpectedEpaycoAmountAndCurrency(payment) {
+    const metadata = payment?.metadata || {};
+    const rawCurrencyCandidates = [
+      metadata.expected_epayco_currency,
+      metadata.expected_currency,
+      metadata.currency_code,
+      payment?.currency,
+      'COP',
+    ];
+
+    const currencyCandidates = Array.from(new Set(
+      rawCurrencyCandidates
+        .map((value) => this.normalizeEpaycoCurrencyCode(value))
+        .filter(Boolean),
+    ));
+
+    const rawAmountCandidates = [
+      metadata.expected_epayco_amount,
+      metadata.expected_amount,
+      metadata.expected_amount_cop,
+      metadata.amount_cop,
+      metadata.charge_amount_cop,
+      metadata.epayco_amount_cop,
+    ].filter((value) => value !== undefined && value !== null && String(value).trim() !== '');
+
+    // Fallback for one-time card charges in this project:
+    // Internal amount is stored in USD and ePayco charge is sent in COP.
+    const internalAmount = Number(payment?.amount);
+    if (Number.isFinite(internalAmount) && internalAmount > 0) {
+      rawAmountCandidates.push(Math.round(internalAmount * 4000));
+      rawAmountCandidates.push(internalAmount);
+    }
+
+    const amountCandidates = Array.from(new Set(
+      rawAmountCandidates.flatMap((value) => this.buildEpaycoAmountCandidates(value)),
+    ));
+
+    return {
+      amountCandidates,
+      currencyCandidates,
+    };
+  }
+
+  static validateWebhookAmountCurrency(payment, webhookData) {
+    if (!payment || !webhookData) {
+      return { valid: false, reason: 'missing_context' };
+    }
+
+    const expected = this.resolveExpectedEpaycoAmountAndCurrency(payment);
+    if (expected.amountCandidates.length === 0 || expected.currencyCandidates.length === 0) {
+      return {
+        valid: true,
+        skipped: true,
+        reason: 'missing_expected_values',
+        expectedAmounts: expected.amountCandidates,
+        expectedCurrencies: expected.currencyCandidates,
+      };
+    }
+
+    const webhookAmountCandidates = this.buildEpaycoAmountCandidates(webhookData.x_amount);
+    const webhookCurrency = this.normalizeEpaycoCurrencyCode(webhookData.x_currency_code);
+
+    const expectedAmountSet = new Set(expected.amountCandidates.map((value) => String(value).trim()));
+    const webhookAmountSet = new Set(webhookAmountCandidates.map((value) => String(value).trim()));
+
+    const amountMatched = Array.from(webhookAmountSet).some((value) => expectedAmountSet.has(value));
+    const currencyMatched = webhookCurrency ? expected.currencyCandidates.includes(webhookCurrency) : false;
+
+    return {
+      valid: amountMatched && currencyMatched,
+      amountMatched,
+      currencyMatched,
+      expectedAmounts: expected.amountCandidates,
+      expectedCurrencies: expected.currencyCandidates,
+      receivedAmount: webhookData.x_amount,
+      receivedCurrency: webhookData.x_currency_code,
+      normalizedReceivedCurrency: webhookCurrency,
+    };
+  }
+
     /**
      * Send payment confirmation notification to user via Telegram bot
      * Includes purchase details and unique invite link to PRIME channel
@@ -546,7 +626,7 @@ class PaymentService {
       }
     }
 
-    // Checkout 2.0 signature validation (MD5):
+    // Legacy Checkout 2.0 signature validation (MD5):
     // MD5(p_cust_id_cliente + p_key + p_id_invoice + p_amount + p_currency_code)
     const invoice = x_id_invoice || x_invoice;
     const md5Ready = invoice && amountCandidates.length > 0 && currencyCandidates.length > 0;
@@ -565,7 +645,20 @@ class PaymentService {
       }
     }
 
-    return sha256Valid || md5Valid;
+    // Security hardening: webhook signature validation must use SHA256.
+    // Legacy MD5 can be temporarily enabled only via explicit migration flag.
+    const allowLegacyMd5 = process.env.EPAYCO_ALLOW_MD5_SIGNATURE === 'true';
+
+    if (sha256Valid) {
+      return true;
+    }
+
+    if (md5Valid && allowLegacyMd5) {
+      logger.warn('Accepted legacy MD5 ePayco signature (migration mode enabled)');
+      return true;
+    }
+
+    return false;
   }
 
   static generateEpaycoCheckoutSignature({
@@ -770,6 +863,18 @@ class PaymentService {
         payment = await PaymentModel.getById(String(x_ref_payco));
       }
 
+      if (!payment && paymentIdOrType && paymentIdOrType !== 'pnp_live' && this.isUuidLike(paymentIdOrType)) {
+        logger.error('ePayco webhook references unknown internal payment id', {
+          paymentId: paymentIdOrType,
+          refPayco: x_ref_payco,
+        });
+        return {
+          success: false,
+          code: 'PAYMENT_NOT_FOUND',
+          message: 'Webhook paymentId was not found in local records',
+        };
+      }
+
       // Recover missing extras from the internal payment record.
       // Some ePayco callbacks omit extra fields in later notifications/retries.
       if (payment) {
@@ -826,6 +931,28 @@ class PaymentService {
         details: { x_ref_payco, x_transaction_id },
       }).catch(() => {});
 
+      // Financial integrity check: webhook amount and currency must match internal expectations.
+      if (payment) {
+        const amountCurrencyCheck = this.validateWebhookAmountCurrency(payment, webhookData);
+        if (!amountCurrencyCheck.valid) {
+          logger.error('ePayco webhook amount/currency mismatch', {
+            paymentId: payment.id,
+            refPayco: x_ref_payco,
+            amountMatched: amountCurrencyCheck.amountMatched,
+            currencyMatched: amountCurrencyCheck.currencyMatched,
+            expectedAmounts: amountCurrencyCheck.expectedAmounts,
+            expectedCurrencies: amountCurrencyCheck.expectedCurrencies,
+            receivedAmount: amountCurrencyCheck.receivedAmount,
+            receivedCurrency: amountCurrencyCheck.receivedCurrency,
+          });
+          return {
+            success: false,
+            code: 'AMOUNT_CURRENCY_MISMATCH',
+            message: 'Webhook amount/currency does not match payment record',
+          };
+        }
+      }
+
       // Check if this is a PNP Live payment
       const isPNPLive = paymentIdOrType === 'pnp_live';
 
@@ -868,16 +995,6 @@ class PaymentService {
 
       // Process based on transaction state
       if (effectiveState === 'Aceptada' || effectiveState === 'Aprobada') {
-        // Payment successful
-        if (payment) {
-          await PaymentModel.updateStatus(paymentIdOrType, 'completed', {
-            transaction_id: x_transaction_id,
-            approval_code: x_approval_code,
-            reference: x_ref_payco,
-            epayco_ref: x_ref_payco,
-          });
-        }
-
         // Activate user subscription
         if (userId && planIdOrBookingId) {
           const plan = await PlanModel.getById(planIdOrBookingId);
@@ -1122,6 +1239,19 @@ class PaymentService {
               });
             }
           }
+        }
+
+        // Mark payment as completed only after business processing finishes.
+        // This prevents polling from showing "completed" before subscription activation.
+        if (payment) {
+          await PaymentModel.updateStatus(paymentIdOrType, 'completed', {
+            transaction_id: x_transaction_id,
+            approval_code: x_approval_code,
+            reference: x_ref_payco,
+            epayco_ref: x_ref_payco,
+            webhook_processed_at: new Date().toISOString(),
+            amount_currency_validated: true,
+          });
         }
 
         return { success: true };
@@ -1787,19 +1917,65 @@ class PaymentService {
 
   /**
    * Process a tokenized charge using ePayco SDK.
-   * Flow: create token → create customer → single charge (no recurring).
+   * Flow: frontend tokenizes card → backend creates/reuses customer → single charge (no recurring).
    * If the charge is approved, activates the subscription immediately.
    *
    * @param {Object} params
    * @param {string} params.paymentId - Internal payment ID
-   * @param {Object} params.card - Card data { number, exp_year, exp_month, cvc }
+   * @param {string} params.tokenCard - ePayco token_card from frontend
    * @param {Object} params.customer - Customer data { name, last_name, email, doc_type, doc_number, city, address, phone, cell_phone }
    * @param {string} params.dues - Number of installments (e.g. "1")
    * @param {string} params.ip - Client IP address
    * @returns {Promise<Object>} { success, transactionId, status, message }
    */
-  static async processTokenizedCharge({ paymentId, tokenCard, card, customer, dues = '1', ip = '127.0.0.1' }) {
+  static buildChargeBrowserInfo({
+    browserInfo,
+    userAgent,
+    acceptHeader,
+    ip,
+  }) {
+    const safeBrowserInfo = (browserInfo && typeof browserInfo === 'object') ? browserInfo : {};
+    const toNumber = (value, fallback) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    };
+
+    return {
+      user_agent: String(safeBrowserInfo.userAgent || userAgent || '').slice(0, 1024),
+      accept_header: String(safeBrowserInfo.acceptHeader || acceptHeader || '*/*').slice(0, 512),
+      language: String(safeBrowserInfo.language || '').slice(0, 16) || 'es-CO',
+      color_depth: toNumber(safeBrowserInfo.colorDepth, 24),
+      screen_height: toNumber(safeBrowserInfo.screenHeight, 0),
+      screen_width: toNumber(safeBrowserInfo.screenWidth, 0),
+      timezone_offset: toNumber(safeBrowserInfo.timezoneOffset, 0),
+      java_enabled: Boolean(safeBrowserInfo.javaEnabled),
+      javascript_enabled: true,
+      ip: String(ip || '').slice(0, 64),
+    };
+  }
+
+  static async processTokenizedCharge({
+    paymentId,
+    tokenCard,
+    card,
+    customer,
+    dues = '1',
+    ip = '127.0.0.1',
+    browserInfo = null,
+    userAgent = '',
+    acceptHeader = '*/*',
+  }) {
     const { getEpaycoClient } = require('../../config/epayco');
+
+    const chargeLockKey = `tokenized_charge:${paymentId}`;
+    const lockAcquired = await cache.acquireLock(chargeLockKey, 120);
+    if (!lockAcquired) {
+      return {
+        success: false,
+        status: 'processing',
+        error: 'Ya existe un intento de cobro en curso para este pago. Espera unos segundos.',
+      };
+    }
 
     try {
       // 1. Get payment and plan
@@ -1809,7 +1985,12 @@ class PaymentService {
       }
 
       if (payment.status === 'completed') {
-        return { success: false, error: 'Payment already completed' };
+        return {
+          success: true,
+          status: 'approved',
+          transactionId: payment.epaycoRef || payment.reference || payment.transactionId || null,
+          message: 'Pago ya procesado previamente.',
+        };
       }
 
       const planId = payment.planId || payment.plan_id;
@@ -1821,6 +2002,18 @@ class PaymentService {
       const userId = payment.userId || payment.user_id;
       const amountCOP = Math.round((payment.amount || parseFloat(plan.price)) * 4000);
       const paymentRef = `PAY-${paymentId.substring(0, 8).toUpperCase()}`;
+      const normalizedBrowserInfo = this.buildChargeBrowserInfo({
+        browserInfo,
+        userAgent,
+        acceptHeader,
+        ip,
+      });
+
+      // PCI hardening: backend must receive only tokenized card data.
+      if (!tokenCard || typeof tokenCard !== 'string' || tokenCard.trim().length < 8) {
+        logger.error('Tokenized charge called without valid tokenCard', { paymentId });
+        return { success: false, error: 'Token de tarjeta inválido.' };
+      }
 
       // Security: Validate payment amount integrity
       try {
@@ -1852,57 +2045,41 @@ class PaymentService {
 
       const epaycoClient = getEpaycoClient();
 
-      // 2. Get or create token
-      let tokenId = tokenCard;
+      if (card) {
+        logger.error('Raw card data received in processTokenizedCharge', { paymentId });
+        return {
+          success: false,
+          error: 'Por seguridad PCI-DSS, solo se permite token_card generado en frontend.',
+        };
+      }
 
-      if (!tokenId && card) {
-        // Server-side tokenization from raw card data
-        logger.info('Creating ePayco token (server-side)', {
-          paymentId,
-          cardData: {
-            number: card.number?.substring(0, 6) + '...' + card.number?.slice(-4),
-            exp_year: card.exp_year,
-            exp_month: card.exp_month,
-            cvc_length: card.cvc?.length,
-          },
-          testModeActive: process.env.EPAYCO_TEST_MODE === 'true',
-          rawCardObject: JSON.stringify({
-            number: card.number?.substring(0, 6) + '...' + card.number?.slice(-4),
-            exp_year: card.exp_year,
-            exp_month: card.exp_month,
-          })
+      // 2. Token comes from frontend tokenization with ePayco.js
+      const tokenId = tokenCard.trim();
+
+      // 3. Create or reuse customer to avoid duplicates on retries.
+      let customerId = payment.metadata?.epayco_customer_id || null;
+      if (!customerId) {
+        logger.info('Creating ePayco customer', { paymentId, tokenCard: tokenId.substring(0, 8) + '...' });
+        const customerResult = await epaycoClient.customers.create({
+          token_card: tokenId,
+          name: customer.name,
+          last_name: customer.last_name || customer.name,
+          email: customer.email,
+          default: true,
+          city: customer.city || 'Bogota',
+          address: customer.address || 'N/A',
+          phone: customer.phone || '0000000000',
+          cell_phone: customer.cell_phone || customer.phone || '0000000000',
         });
 
-        const tokenResult = await epaycoClient.token.create({
-          'card[number]': card.number,
-          'card[exp_year]': card.exp_year,
-          'card[exp_month]': card.exp_month,
-          'card[cvc]': card.cvc,
-          'card[holder_name]': card.name || customer.name,
-          hasCvv: true,
-        });
-
-        logger.info('ePayco token response received', {
-          paymentId,
-          tokenStatus: tokenResult?.status,
-          tokenId: tokenResult?.id,
-          errorMessage: tokenResult?.data?.description || tokenResult?.message,
-          fullResponse: JSON.stringify(tokenResult, null, 2),
-        });
-
-        // Token ID is at root level (tokenResult.id), not in data
-        const token = tokenResult?.id || tokenResult?.data?.id;
-        if (!tokenResult || tokenResult.status === false || !token) {
-          const epaycoError = this.parseEpaycoError(
-            tokenResult,
-            'Error al tokenizar la tarjeta. Verifica los datos e intenta nuevamente.'
-          );
-          logger.error('ePayco token creation failed', {
+        if (!customerResult || customerResult.status === false) {
+          const epaycoError = this.parseEpaycoError(customerResult, 'Error al crear el cliente. Intenta nuevamente.');
+          logger.error('ePayco customer creation failed', {
             paymentId,
             code: epaycoError.code,
             message: epaycoError.message,
             rawMessage: epaycoError.rawMessage,
-            fullResponse: JSON.stringify(tokenResult),
+            customerResult,
           });
           return {
             success: false,
@@ -1911,47 +2088,22 @@ class PaymentService {
           };
         }
 
-        tokenId = token;
-        logger.info('ePayco token created', { paymentId, tokenId });
-      }
-
-      if (!tokenId) {
-        logger.error('Token de tarjeta faltante', { paymentId });
-        return { success: false, error: 'Token de tarjeta inválido.' };
-      }
-
-      // 3. Create customer
-      logger.info('Creating ePayco customer', { paymentId, tokenCard: tokenId });
-      const customerResult = await epaycoClient.customers.create({
-        token_card: tokenId,
-        name: customer.name,
-        last_name: customer.last_name || customer.name,
-        email: customer.email,
-        default: true,
-        city: customer.city || 'Bogota',
-        address: customer.address || 'N/A',
-        phone: customer.phone || '0000000000',
-        cell_phone: customer.cell_phone || customer.phone || '0000000000',
-      });
-
-      if (!customerResult || customerResult.status === false) {
-        const epaycoError = this.parseEpaycoError(customerResult, 'Error al crear el cliente. Intenta nuevamente.');
-        logger.error('ePayco customer creation failed', {
+        customerId = customerResult.data?.customerId || customerResult.data?.id_customer || customerResult.id;
+        logger.info('ePayco customer created', { paymentId, customerId });
+      } else {
+        logger.info('Reusing persisted ePayco customer for idempotent retry', {
           paymentId,
-          code: epaycoError.code,
-          message: epaycoError.message,
-          rawMessage: epaycoError.rawMessage,
-          customerResult,
+          customerId,
         });
-        return {
-          success: false,
-          error: epaycoError.message,
-          errorCode: epaycoError.code,
-        };
       }
 
-      const customerId = customerResult.data?.customerId || customerResult.data?.id_customer || customerResult.id;
-      logger.info('ePayco customer created', { paymentId, customerId });
+      await PaymentModel.updateStatus(paymentId, 'pending', {
+        epayco_customer_id: customerId,
+        expected_epayco_amount: String(amountCOP),
+        expected_epayco_currency: 'COP',
+        token_card_prefix: tokenId.substring(0, 8),
+        browser_info: normalizedBrowserInfo,
+      });
 
       // 4. Make single charge (NOT recurring/subscription)
       const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
@@ -1982,6 +2134,9 @@ class PaymentService {
         currency: 'COP',
         dues: String(dues),
         ip,
+        browser_info: normalizedBrowserInfo,
+        user_agent: normalizedBrowserInfo.user_agent,
+        accept_header: normalizedBrowserInfo.accept_header,
         url_response: `${webhookDomain}/api/payment-response`,
         url_confirmation: `${epaycoWebhookDomain}${confirmationPath}`,
         method_confirmation: 'POST',
@@ -1990,6 +2145,9 @@ class PaymentService {
         // Configure in ePayco Dashboard: Configuración → Seguridad → Enable 3D Secure
         three_d_secure: true,
         country: customer.country || 'CO',
+        extra1: String(userId),
+        extra2: planId,
+        extra3: paymentId,
         extras: {
           extra1: String(userId),
           extra2: planId,
@@ -2011,15 +2169,7 @@ class PaymentService {
       const transactionId = chargeResult?.data?.transactionID || chargeResult?.data?.transaction_id;
 
       if (estado === 'Aceptada' || estado === 'Aprobada' || respuesta === 'Aprobada') {
-        // Charge approved - activate subscription
-        await PaymentModel.updateStatus(paymentId, 'completed', {
-          transaction_id: transactionId,
-          reference: refPayco,
-          epayco_ref: refPayco,
-          payment_method: 'tokenized_card',
-        });
-
-        // Activate user subscription
+        // Charge approved - activate subscription before exposing completed status.
         const expiryDate = new Date();
         const durationDays = plan.duration_days || plan.duration || 30;
         expiryDate.setDate(expiryDate.getDate() + durationDays);
@@ -2035,6 +2185,17 @@ class PaymentService {
           planId,
           expiryDate,
           refPayco,
+        });
+
+        await PaymentModel.updateStatus(paymentId, 'completed', {
+          transaction_id: transactionId,
+          reference: refPayco,
+          epayco_ref: refPayco,
+          payment_method: 'tokenized_card',
+          expected_epayco_amount: String(amountCOP),
+          expected_epayco_currency: 'COP',
+          webhook_processed_at: new Date().toISOString(),
+          amount_currency_validated: true,
         });
 
         // Security: Encrypt payment data at rest (async, non-blocking)
@@ -2163,9 +2324,13 @@ class PaymentService {
           reference: refPayco,
           epayco_ref: refPayco,
           payment_method: 'tokenized_card',
+          epayco_customer_id: customerId,
+          expected_epayco_amount: String(amountCOP),
+          expected_epayco_currency: 'COP',
           three_ds_requested: true,
           three_ds_version: is3ds2 ? '2.0' : '1.0',
           bank_url_available: !!redirectUrl,
+          browser_info: normalizedBrowserInfo,
           epayco_response_timestamp: new Date().toISOString(),
         };
 
@@ -2310,6 +2475,8 @@ class PaymentService {
       }).catch(() => {});
 
       return { success: false, error: `Error procesando el pago: ${error.message}` };
+    } finally {
+      await cache.releaseLock(chargeLockKey);
     }
   }
 
@@ -2640,25 +2807,24 @@ class PaymentService {
       `https://secure.epayco.co/validation/v1/reference/${encodedRef}`,
     ];
 
-    const token = await this.getEpaycoValidationAuthToken();
+    let token = await this.getEpaycoValidationAuthToken();
+    if (!token) {
+      return {
+        success: false,
+        error: 'Missing authenticated token for ePayco validation API',
+      };
+    }
     let lastError = null;
 
     for (const url of urls) {
-      const requestVariants = token
-        ? [
-          { useAuth: true, headers: { Authorization: `Bearer ${token}` } },
-          { useAuth: false, headers: {} },
-        ]
-        : [{ useAuth: false, headers: {} }];
-
-      for (const variant of requestVariants) {
+      for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const response = await axios.get(url, {
             timeout: 7000,
             headers: {
               Accept: 'application/json',
               'User-Agent': 'pnptvbot/1.0',
-              ...variant.headers,
+              Authorization: `Bearer ${token}`,
             },
           });
 
@@ -2667,7 +2833,6 @@ class PaymentService {
             logger.warn('Validation API responded without recognizable transaction status', {
               refPayco,
               url,
-              usedAuth: variant.useAuth,
               keys: response?.data && typeof response.data === 'object' ? Object.keys(response.data) : [],
             });
             continue;
@@ -2677,17 +2842,28 @@ class PaymentService {
             success: true,
             statusData: extracted,
             fullResponse: response.data,
-            source: `validation_api:${new URL(url).hostname}${variant.useAuth ? ':auth' : ':public'}`,
+            source: `validation_api:${new URL(url).hostname}:auth`,
           };
         } catch (error) {
           lastError = error;
           logger.warn('Validation API status check failed for endpoint', {
             refPayco,
             url,
-            usedAuth: variant.useAuth,
             status: error?.response?.status,
             error: error.message,
+            attempt,
           });
+
+          // Refresh token once when auth expires.
+          if ((error?.response?.status === 401 || error?.response?.status === 403) && attempt === 0) {
+            token = await this.getEpaycoValidationAuthToken(true);
+            if (!token) {
+              break;
+            }
+            continue;
+          }
+
+          break;
         }
       }
     }

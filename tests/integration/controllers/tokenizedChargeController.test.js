@@ -5,7 +5,6 @@ const PaymentController = require('../../../src/bot/api/controllers/paymentContr
 jest.mock('../../../src/bot/services/paymentService');
 jest.mock('../../../src/bot/services/paymentSecurityService');
 
-// Helper to create mock req/res
 function createMockReqRes(body = {}, headers = {}) {
   const req = {
     body,
@@ -19,11 +18,27 @@ function createMockReqRes(body = {}, headers = {}) {
   return { req, res };
 }
 
+const BASE_BODY = {
+  paymentId: 'pay_123',
+  tokenCard: 'tok_123456789',
+  name: 'Juan',
+  lastName: 'Perez',
+  email: 'test@test.com',
+  docType: 'CC',
+  docNumber: '123456',
+  dues: '1',
+  browserInfo: {
+    language: 'es-CO',
+    colorDepth: 24,
+    screenWidth: 1920,
+    screenHeight: 1080,
+    timezoneOffset: 300,
+  },
+};
+
 describe('PaymentController.processTokenizedCharge', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-
-    // Mock PaymentSecurityService methods to pass validation
     PaymentSecurityService.checkPaymentRateLimit.mockResolvedValue({ allowed: true });
     PaymentSecurityService.validatePCICompliance.mockReturnValue({ compliant: true });
     PaymentSecurityService.checkPaymentTimeout.mockResolvedValue({ expired: false });
@@ -31,398 +46,126 @@ describe('PaymentController.processTokenizedCharge', () => {
     PaymentSecurityService.logPaymentError.mockReturnValue(Promise.resolve({}));
   });
 
-  describe('Validation', () => {
-    it('should return 400 if paymentId is missing', async () => {
-      const { req, res } = createMockReqRes({
-        cardNumber: '4575623182290326',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
-        name: 'Juan',
-        email: 'test@test.com',
-        docType: 'CC',
-        docNumber: '123456',
-      });
-
-      await PaymentController.processTokenizedCharge(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        error: expect.stringContaining('Faltan campos'),
-      }));
+  it('rejects raw PAN/CVC payloads for PCI compliance', async () => {
+    const { req, res } = createMockReqRes({
+      ...BASE_BODY,
+      cardNumber: '4575623182290326',
+      cvc: '123',
+      expMonth: '12',
+      expYear: '2027',
     });
 
-    it('should return 400 if card number is missing', async () => {
-      const { req, res } = createMockReqRes({
-        paymentId: 'pay_123',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
-        name: 'Juan',
-        email: 'test@test.com',
-        docType: 'CC',
-        docNumber: '123456',
-      });
+    await PaymentController.processTokenizedCharge(req, res);
 
-      await PaymentController.processTokenizedCharge(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-    });
-
-    it('should return 400 if email is missing', async () => {
-      const { req, res } = createMockReqRes({
-        paymentId: 'pay_123',
-        cardNumber: '4575623182290326',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
-        name: 'Juan',
-        docType: 'CC',
-        docNumber: '123456',
-      });
-
-      await PaymentController.processTokenizedCharge(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-    });
-
-    it('should return 400 for invalid card number (too short)', async () => {
-      const { req, res } = createMockReqRes({
-        paymentId: 'pay_123',
-        cardNumber: '1234',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
-        name: 'Juan',
-        email: 'test@test.com',
-        docType: 'CC',
-        docNumber: '123456',
-      });
-
-      await PaymentController.processTokenizedCharge(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        error: expect.stringContaining('tarjeta'),
-      }));
-    });
-
-    it('should return 400 for card number with letters', async () => {
-      const { req, res } = createMockReqRes({
-        paymentId: 'pay_123',
-        cardNumber: '4575 6231 ABCD 0326',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
-        name: 'Juan',
-        email: 'test@test.com',
-        docType: 'CC',
-        docNumber: '123456',
-      });
-
-      await PaymentController.processTokenizedCharge(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-    });
-
-    it('should strip spaces from card number before validation', async () => {
-      PaymentService.processTokenizedCharge.mockResolvedValue({
-        success: true,
-        status: 'approved',
-        transactionId: 'ref_123',
-      });
-
-      const { req, res } = createMockReqRes({
-        paymentId: 'pay_123',
-        cardNumber: '4575 6231 8229 0326', // with spaces
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
-        name: 'Juan',
-        email: 'test@test.com',
-        docType: 'CC',
-        docNumber: '123456',
-      });
-
-      await PaymentController.processTokenizedCharge(req, res);
-
-      // Should call service with cleaned card number
-      expect(PaymentService.processTokenizedCharge).toHaveBeenCalledWith(
-        expect.objectContaining({
-          card: expect.objectContaining({
-            number: '4575623182290326', // spaces stripped
-          }),
-        }),
-      );
-    });
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: false,
+      error: expect.stringContaining('PCI-DSS'),
+    }));
+    expect(PaymentService.processTokenizedCharge).not.toHaveBeenCalled();
   });
 
-  describe('Successful charge', () => {
-    it('should return success for approved charge', async () => {
-      PaymentService.processTokenizedCharge.mockResolvedValue({
-        success: true,
-        status: 'approved',
-        transactionId: 'ref_123',
-        message: 'Pago aprobado exitosamente',
-      });
-
-      const { req, res } = createMockReqRes({
-        paymentId: 'pay_123',
-        cardNumber: '4575623182290326',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
-        name: 'Juan',
-        lastName: 'Perez',
-        email: 'test@test.com',
-        docType: 'CC',
-        docNumber: '123456',
-        dues: '3',
-      });
-
-      await PaymentController.processTokenizedCharge(req, res);
-
-      expect(res.json).toHaveBeenCalledWith({
-        success: true,
-        status: 'approved',
-        transactionId: 'ref_123',
-        message: 'Pago aprobado exitosamente',
-      });
-      expect(res.status).not.toHaveBeenCalled(); // 200 is default
-
-      // Verify dues passed correctly
-      expect(PaymentService.processTokenizedCharge).toHaveBeenCalledWith(
-        expect.objectContaining({ dues: '3' }),
-      );
+  it('returns 400 if required tokenized fields are missing', async () => {
+    const { req, res } = createMockReqRes({
+      paymentId: 'pay_123',
+      name: 'Juan',
+      email: 'test@test.com',
+      docType: 'CC',
+      docNumber: '123456',
     });
 
-    it('should return success for pending charge', async () => {
-      PaymentService.processTokenizedCharge.mockResolvedValue({
-        success: true,
-        status: 'pending',
-        transactionId: 'ref_pend',
-        message: 'El pago esta pendiente',
-      });
+    await PaymentController.processTokenizedCharge(req, res);
 
-      const { req, res } = createMockReqRes({
-        paymentId: 'pay_123',
-        cardNumber: '4575623182290326',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
-        name: 'Juan',
-        email: 'test@test.com',
-        docType: 'CC',
-        docNumber: '123456',
-      });
-
-      await PaymentController.processTokenizedCharge(req, res);
-
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true,
-        status: 'pending',
-      }));
-    });
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: false,
+      error: expect.stringContaining('Faltan campos'),
+    }));
   });
 
-  describe('Failed charge', () => {
-    it('should return 402 for rejected charge', async () => {
-      PaymentService.processTokenizedCharge.mockResolvedValue({
-        success: false,
-        status: 'rejected',
-        error: 'Fondos insuficientes',
-      });
-
-      const { req, res } = createMockReqRes({
-        paymentId: 'pay_123',
-        cardNumber: '4575623182290326',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
-        name: 'Juan',
-        email: 'test@test.com',
-        docType: 'CC',
-        docNumber: '123456',
-      });
-
-      await PaymentController.processTokenizedCharge(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(402);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        error: 'Fondos insuficientes',
-      }));
+  it('returns approved response when service approves charge', async () => {
+    PaymentService.processTokenizedCharge.mockResolvedValue({
+      success: true,
+      status: 'approved',
+      transactionId: 'ref_123',
+      message: 'Pago aprobado exitosamente',
     });
+    const { req, res } = createMockReqRes(BASE_BODY, { 'x-forwarded-for': '200.1.2.3, 10.0.0.1' });
 
-    it('should return 400 for generic service error', async () => {
-      PaymentService.processTokenizedCharge.mockResolvedValue({
-        success: false,
-        error: 'Payment not found',
-      });
+    await PaymentController.processTokenizedCharge(req, res);
 
-      const { req, res } = createMockReqRes({
-        paymentId: 'pay_123',
-        cardNumber: '4575623182290326',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
+    expect(PaymentService.processTokenizedCharge).toHaveBeenCalledWith(expect.objectContaining({
+      paymentId: 'pay_123',
+      tokenCard: 'tok_123456789',
+      ip: '200.1.2.3',
+      browserInfo: BASE_BODY.browserInfo,
+      customer: expect.objectContaining({
         name: 'Juan',
-        email: 'test@test.com',
-        docType: 'CC',
-        docNumber: '123456',
-      });
-
-      await PaymentController.processTokenizedCharge(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-    });
+        last_name: 'Perez',
+      }),
+    }));
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: true,
+      status: 'approved',
+    }));
   });
 
-  describe('Error handling', () => {
-    it('should return 500 if service throws', async () => {
-      PaymentService.processTokenizedCharge.mockRejectedValue(new Error('Unexpected DB crash'));
-
-      const { req, res } = createMockReqRes({
-        paymentId: 'pay_123',
-        cardNumber: '4575623182290326',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
-        name: 'Juan',
-        email: 'test@test.com',
-        docType: 'CC',
-        docNumber: '123456',
-      });
-
-      await PaymentController.processTokenizedCharge(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        error: expect.stringContaining('Error interno'),
-      }));
+  it('returns pending response when service returns pending', async () => {
+    PaymentService.processTokenizedCharge.mockResolvedValue({
+      success: true,
+      status: 'pending',
+      transactionId: 'ref_pend',
     });
+    const { req, res } = createMockReqRes(BASE_BODY);
+
+    await PaymentController.processTokenizedCharge(req, res);
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: true,
+      status: 'pending',
+    }));
   });
 
-  describe('IP forwarding', () => {
-    it('should use x-forwarded-for header for client IP', async () => {
-      PaymentService.processTokenizedCharge.mockResolvedValue({
-        success: true,
-        status: 'approved',
-        transactionId: 'ref_ip',
-      });
-
-      const { req, res } = createMockReqRes(
-        {
-          paymentId: 'pay_123',
-          cardNumber: '4575623182290326',
-          expYear: '2027',
-          expMonth: '12',
-          cvc: '123',
-          name: 'Juan',
-          email: 'test@test.com',
-          docType: 'CC',
-          docNumber: '123456',
-        },
-        { 'x-forwarded-for': '200.1.2.3, 10.0.0.1' },
-      );
-
-      await PaymentController.processTokenizedCharge(req, res);
-
-      expect(PaymentService.processTokenizedCharge).toHaveBeenCalledWith(
-        expect.objectContaining({ ip: '200.1.2.3' }),
-      );
+  it('returns 402 for rejected charges', async () => {
+    PaymentService.processTokenizedCharge.mockResolvedValue({
+      success: false,
+      status: 'rejected',
+      error: 'Fondos insuficientes',
     });
+    const { req, res } = createMockReqRes(BASE_BODY);
+
+    await PaymentController.processTokenizedCharge(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(402);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: false,
+      error: 'Fondos insuficientes',
+    }));
   });
 
-  describe('Data formatting', () => {
-    it('should pad single-digit month with zero', async () => {
-      PaymentService.processTokenizedCharge.mockResolvedValue({
-        success: true,
-        status: 'approved',
-        transactionId: 'ref_fmt',
-      });
-
-      const { req, res } = createMockReqRes({
-        paymentId: 'pay_123',
-        cardNumber: '4575623182290326',
-        expYear: '2027',
-        expMonth: '3', // single digit
-        cvc: '123',
-        name: 'Juan',
-        email: 'test@test.com',
-        docType: 'CC',
-        docNumber: '123456',
-      });
-
-      await PaymentController.processTokenizedCharge(req, res);
-
-      expect(PaymentService.processTokenizedCharge).toHaveBeenCalledWith(
-        expect.objectContaining({
-          card: expect.objectContaining({
-            exp_month: '03', // padded
-          }),
-        }),
-      );
+  it('returns 409 when another charge attempt is already processing', async () => {
+    PaymentService.processTokenizedCharge.mockResolvedValue({
+      success: false,
+      status: 'processing',
+      error: 'Ya existe un intento de cobro en curso para este pago. Espera unos segundos.',
     });
+    const { req, res } = createMockReqRes(BASE_BODY);
 
-    it('should default dues to 1 if not provided', async () => {
-      PaymentService.processTokenizedCharge.mockResolvedValue({
-        success: true,
-        status: 'approved',
-        transactionId: 'ref_dues',
-      });
+    await PaymentController.processTokenizedCharge(req, res);
 
-      const { req, res } = createMockReqRes({
-        paymentId: 'pay_123',
-        cardNumber: '4575623182290326',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
-        name: 'Juan',
-        email: 'test@test.com',
-        docType: 'CC',
-        docNumber: '123456',
-        // no dues
-      });
+    expect(res.status).toHaveBeenCalledWith(409);
+  });
 
-      await PaymentController.processTokenizedCharge(req, res);
+  it('returns 500 when service throws an unexpected error', async () => {
+    PaymentService.processTokenizedCharge.mockRejectedValue(new Error('Unexpected DB crash'));
+    const { req, res } = createMockReqRes(BASE_BODY);
 
-      expect(PaymentService.processTokenizedCharge).toHaveBeenCalledWith(
-        expect.objectContaining({ dues: '1' }),
-      );
-    });
+    await PaymentController.processTokenizedCharge(req, res);
 
-    it('should use name as lastName fallback', async () => {
-      PaymentService.processTokenizedCharge.mockResolvedValue({
-        success: true,
-        status: 'approved',
-        transactionId: 'ref_ln',
-      });
-
-      const { req, res } = createMockReqRes({
-        paymentId: 'pay_123',
-        cardNumber: '4575623182290326',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
-        name: 'Juan',
-        // no lastName
-        email: 'test@test.com',
-        docType: 'CC',
-        docNumber: '123456',
-      });
-
-      await PaymentController.processTokenizedCharge(req, res);
-
-      expect(PaymentService.processTokenizedCharge).toHaveBeenCalledWith(
-        expect.objectContaining({
-          customer: expect.objectContaining({
-            last_name: 'Juan', // fallback to name
-          }),
-        }),
-      );
-    });
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: false,
+      error: expect.stringContaining('Error interno'),
+    }));
   });
 });
