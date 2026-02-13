@@ -97,6 +97,7 @@ app.use(conditionalMiddleware(helmet({
       scriptSrc: [
         "'self'",
         "'unsafe-inline'",
+        "https://multimedia.epayco.co",
         "https://songbird.cardinalcommerce.com",
         "https://checkout.epayco.co",
       ],
@@ -105,6 +106,7 @@ app.use(conditionalMiddleware(helmet({
       imgSrc: ["'self'", "data:"],
       connectSrc: [
         "'self'",
+        "https://multimedia.epayco.co",
         "https://songbird.cardinalcommerce.com",
         "https://centinelapi.cardinalcommerce.com",
         "https://checkout.epayco.co",
@@ -112,7 +114,13 @@ app.use(conditionalMiddleware(helmet({
         "https://fonts.googleapis.com",
         "https://fonts.gstatic.com",
       ],
-      frameSrc: ["'self'", "https://checkout.epayco.co", "https://secure.epayco.co"],
+      frameSrc: [
+        "'self'",
+        "https://checkout.epayco.co",
+        "https://secure.epayco.co",
+        "https://songbird.cardinalcommerce.com",
+        "https://centinelapi.cardinalcommerce.com",
+      ],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'", "https://checkout.epayco.co", "https://secure.epayco.co"],

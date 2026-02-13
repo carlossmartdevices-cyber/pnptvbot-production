@@ -1840,7 +1840,8 @@ class PaymentService {
 
         // Try multiple field names for 3DS redirect URL or info
         let redirectUrl = null;
-        let threedsInfo = null;
+        const rawThreeDS = fullResponse['3DS'];
+        let threeDSData = null;
         let is3ds2 = false;
 
         // Check different possible field names for 3DS URL
@@ -1848,20 +1849,19 @@ class PaymentService {
           redirectUrl = fullResponse.urlbanco;
         } else if (fullResponse.url_response_bank) {
           redirectUrl = fullResponse.url_response_bank;
-        } else if (fullResponse['3DS']) {
+        } else if (rawThreeDS) {
           // ePayco might return 3DS info as string (redirect URL) or object (Cardinal Commerce 3DS 2.0)
-          threedsInfo = fullResponse['3DS'];
-          if (typeof threedsInfo === 'string') {
-            redirectUrl = threedsInfo;
-          } else if (typeof threedsInfo === 'object') {
+          if (typeof rawThreeDS === 'string') {
+            redirectUrl = rawThreeDS;
+          } else if (typeof rawThreeDS === 'object') {
             // Check for Cardinal Commerce 3DS 2.0 device data collection
-            if (threedsInfo.data && threedsInfo.data.deviceDataCollectionUrl) {
+            if (rawThreeDS.data && rawThreeDS.data.deviceDataCollectionUrl) {
               is3ds2 = true;
-              threedsInfo = threedsInfo.data; // Extract data object
-            } else if (threedsInfo.url) {
-              redirectUrl = threedsInfo.url;
-            } else if (threedsInfo.urlbanco) {
-              redirectUrl = threedsInfo.urlbanco;
+              threeDSData = rawThreeDS.data;
+            } else if (rawThreeDS.url) {
+              redirectUrl = rawThreeDS.url;
+            } else if (rawThreeDS.urlbanco) {
+              redirectUrl = rawThreeDS.urlbanco;
             }
           }
         } else if (fullResponse.url) {
@@ -1931,22 +1931,29 @@ class PaymentService {
             refPayco,
             urlPresent: true,
           });
-        } else if (is3ds2 && threedsInfo) {
+        } else if (is3ds2 && threeDSData) {
           // Return Cardinal Commerce 3DS 2.0 device data collection info
           pendingResult.threeDSecure = {
             version: '2.0',
             provider: 'CardinalCommerce',
+            integration: 'epayco_api_validate3ds',
+            transactionData: {
+              franquicia: fullResponse.franquicia,
+              '3DS': rawThreeDS,
+              ref_payco: fullResponse.ref_payco || refPayco,
+              cc_network_response: fullResponse.cc_network_response,
+            },
             data: {
-              accessToken: threedsInfo.accessToken,
-              deviceDataCollectionUrl: threedsInfo.deviceDataCollectionUrl,
-              referenceId: threedsInfo.referenceId,
-              token: threedsInfo.token,
+              accessToken: threeDSData.accessToken,
+              deviceDataCollectionUrl: threeDSData.deviceDataCollectionUrl,
+              referenceId: threeDSData.referenceId,
+              token: threeDSData.token,
             },
           };
           logger.info('Cardinal Commerce 3DS 2.0 device data collection info obtained from ePayco', {
             paymentId,
             refPayco,
-            referenceId: threedsInfo.referenceId,
+            referenceId: threeDSData.referenceId,
           });
         } else {
           // Return error if no redirect URL or 3DS 2.0 data - this prevents user confusion
