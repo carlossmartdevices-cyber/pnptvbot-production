@@ -9,9 +9,9 @@
  * - POST /api/nearby/clear - Clear user location
  */
 
-const nearbyService = require('../../services/nearbyService');
+const nearbyService = require('../../../services/nearbyService');
 const { validateToken } = require('../middleware/auth');
-const logger = require('../../utils/logger');
+const logger = require('../../../utils/logger');
 
 class NearbyController {
   /**
