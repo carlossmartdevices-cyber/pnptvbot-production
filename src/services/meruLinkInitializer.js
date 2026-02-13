@@ -4,26 +4,39 @@ const meruLinkService = require('./meruLinkService');
 const paymentHistoryService = require('./paymentHistoryService');
 
 /**
- * Initialize Meru Link tracking system
- * Creates table and initializes with existing links from lifetime-pass.html
+ * PASO 1️⃣: INICIALIZACIÓN DEL SISTEMA
+ *
+ * MeruLinkInitializer - Inicializa el sistema de tracking de links de Meru
+ * Se ejecuta al arrancar la aplicación
+ *
+ * Crea:
+ * 1. Tabla meru_payment_links en BD
+ * 2. Tabla payment_history en BD
+ * 3. Carga los links conocidos de Meru
+ *
+ * Referencia: MERU_PAYMENT_FLOW_DETAILED.md - PASO 1️⃣
  */
 class MeruLinkInitializer {
+  /**
+   * Inicializa todo el sistema de Meru en paralelo
+   * @returns {Promise<boolean>}
+   */
   async initialize() {
     try {
-      logger.info('Initializing Meru Link tracking system...');
+      logger.info('🔵 PASO 1️⃣: Inicializando sistema de tracking de Meru...');
 
-      // Create tables with timeout to prevent hanging
+      // Crear tablas en paralelo (sin bloquear)
       Promise.all([
-        this.createPaymentHistoryTable().catch(e => logger.warn('Payment history table creation failed:', e.message)),
-        this.createMeruLinksTable().catch(e => logger.warn('Meru links table creation failed:', e.message)),
-        this.initializeKnownLinks().catch(e => logger.warn('Meru links initialization failed:', e.message))
+        this.createPaymentHistoryTable().catch(e => logger.warn('⚠️  Creación de payment_history falló:', e.message)),
+        this.createMeruLinksTable().catch(e => logger.warn('⚠️  Creación de meru_payment_links falló:', e.message)),
+        this.initializeKnownLinks().catch(e => logger.warn('⚠️  Inicialización de links falló:', e.message))
       ]).then(() => {
-        logger.info('✓ Meru Link tracking system initialized');
+        logger.info('✅ 1.1 Sistema de tracking de Meru inicializado');
       });
 
       return true;
     } catch (error) {
-      logger.error('Error initializing Meru Link system:', error);
+      logger.error('❌ Error inicializando sistema Meru:', error);
       return false;
     }
   }
@@ -84,9 +97,22 @@ class MeruLinkInitializer {
     }
   }
 
+  /**
+   * PASO 1.1️⃣: Crear tabla meru_payment_links en BD
+   *
+   * Estructura:
+   * - code: Código único del link (ej: "LSJUek")
+   * - meru_link: URL completa del link (ej: "https://pay.getmeru.com/LSJUek")
+   * - status: Estado actual ('active', 'used', 'expired', 'invalid')
+   * - used_by: ID del usuario que activó el link
+   * - used_by_username: Username del usuario que activó el link
+   * - used_at: Timestamp de cuando se activó
+   */
   async createMeruLinksTable() {
     try {
-      // Create the main table
+      logger.info('🔵 PASO 1.1️⃣: Creando tabla meru_payment_links...');
+
+      // Crear tabla principal con estructura de tracking
       await query(`
         CREATE TABLE IF NOT EXISTS meru_payment_links (
           id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -104,21 +130,32 @@ class MeruLinkInitializer {
         )
       `);
 
-      // Create indexes (run in parallel, don't wait for all)
+      // Crear índices para búsquedas rápidas
       Promise.allSettled([
         query(`CREATE INDEX IF NOT EXISTS idx_meru_links_status ON meru_payment_links(status)`),
         query(`CREATE INDEX IF NOT EXISTS idx_meru_links_code ON meru_payment_links(code)`)
       ]).catch(() => {});
 
-      logger.info('✓ meru_payment_links table created');
+      logger.info('✅ 1.1 Tabla meru_payment_links creada');
     } catch (error) {
-      logger.error('Error creating meru_payment_links table:', error);
+      logger.error('❌ Error creando tabla meru_payment_links:', error);
       throw error;
     }
   }
 
+  /**
+   * PASO 1.2️⃣: Cargar links conocidos en BD
+   *
+   * Se cargan 10 links predefinidos de Meru
+   * Cada link:
+   * - Tiene un código único (ej: "LSJUek")
+   * - Se inserta con status = 'active'
+   * - Está listo para ser usado por usuarios
+   */
   async initializeKnownLinks() {
     try {
+      logger.info('🔵 PASO 1.2️⃣: Cargando links conocidos de Meru...');
+
       const knownLinks = [
         { code: 'LSJUek', url: 'https://pay.getmeru.com/LSJUek' },
         { code: 'FCqG-z', url: 'https://pay.getmeru.com/FCqG-z' },
@@ -138,9 +175,9 @@ class MeruLinkInitializer {
         if (success) addedCount++;
       }
 
-      logger.info(`✓ Initialized ${addedCount}/${knownLinks.length} known Meru links`);
+      logger.info(`✅ 1.2 Cargados ${addedCount}/${knownLinks.length} links de Meru`);
     } catch (error) {
-      logger.error('Error initializing known Meru links:', error);
+      logger.error('❌ Error inicializando links de Meru:', error);
       throw error;
     }
   }
