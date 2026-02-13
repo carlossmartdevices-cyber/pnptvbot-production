@@ -318,7 +318,36 @@ function registerUserManagementHandlers(bot) {
         }
 
         logger.info('Admin found user', { adminId, userId: user.id });
-        await showUserManagementMenu(ctx, user);
+
+        // Use reply instead of editMessageText since this comes from a text message
+        const userInfo = `
+👤 **Usuario encontrado**
+ID: \`${user.id}\`
+Username: @${user.username || 'N/A'}
+Email: ${user.email || 'N/A'}
+Tier: ${user.tier || 'Free'}
+Estado: ${user.subscription_status || 'free'}
+Baneado: ${user.status === 'banned' ? 'Sí ⛔' : 'No ✅'}
+        `.trim();
+
+        const buttons = [
+          [Markup.button.callback('✏️ Cambiar username', `manage_user_${user.id}_username`)],
+          [Markup.button.callback('📧 Cambiar email', `manage_user_${user.id}_email`)],
+          [Markup.button.callback('💎 Cambiar Tier', `manage_user_${user.id}_tier`)],
+          [Markup.button.callback('📊 Suscripción', `manage_user_${user.id}_subscription`)],
+          [
+            user.status === 'banned'
+              ? Markup.button.callback('✅ Desbanear', `manage_user_${user.id}_unban`)
+              : Markup.button.callback('⛔ Banear', `manage_user_${user.id}_ban`),
+          ],
+          [Markup.button.callback('💬 Enviar mensaje', `manage_user_${user.id}_message`)],
+          [Markup.button.callback('↩️ Volver', 'admin_users_search')],
+        ];
+
+        await ctx.reply(userInfo, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard(buttons),
+        });
         return;
       }
 
