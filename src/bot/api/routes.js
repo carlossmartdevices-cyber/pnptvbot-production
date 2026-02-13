@@ -94,15 +94,28 @@ app.use(conditionalMiddleware(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://songbird.cardinalcommerce.com"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "https://songbird.cardinalcommerce.com",
+        "https://checkout.epayco.co",
+      ],
       styleSrc: ["'self'", "'unsafe-inline'", "https:", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https:", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'", "https://songbird.cardinalcommerce.com", "https://centinelapi.cardinalcommerce.com", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
-      frameSrc: ["'none'"],
+      connectSrc: [
+        "'self'",
+        "https://songbird.cardinalcommerce.com",
+        "https://centinelapi.cardinalcommerce.com",
+        "https://checkout.epayco.co",
+        "https://secure.epayco.co",
+        "https://fonts.googleapis.com",
+        "https://fonts.gstatic.com",
+      ],
+      frameSrc: ["'self'", "https://checkout.epayco.co", "https://secure.epayco.co"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
-      formAction: ["'self'"],
+      formAction: ["'self'", "https://checkout.epayco.co", "https://secure.epayco.co"],
       scriptSrcAttr: ["'unsafe-inline'"],
       upgradeInsecureRequests: [],
     },
@@ -117,14 +130,32 @@ app.use(morgan('combined', { stream: logger.stream }));
 // ========== PAYMENT ROUTES (BEFORE static middleware) ==========
 // These must be BEFORE serveStaticWithBlocking to ensure they're processed first
 app.get('/payment/:paymentId', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
+});
+
+// PNPtv Smart Checkout v2 (must be before /checkout/:paymentId)
+app.get('/checkout/pnp', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  // Use the tokenized checkout flow currently integrated with /api/payment/tokenized-charge
   res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
 });
 
 app.get('/checkout/:paymentId', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
 });
 
 app.get('/daimo-checkout/:paymentId', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, '../../../public/daimo-checkout.html'));
 });
 
@@ -697,11 +728,6 @@ app.post(
 
 // Telegram webhook is handled in bot.js, not here
 // The webhook handler is registered via apiApp.post(webhookPath, ...) in bot.js
-
-// PNPtv Smart Checkout v2 (ePayco with 3DS 2.0)
-app.get('/checkout/pnp', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/pnp/checkout-v2.html'));
-});
 
 // Webhook endpoints
 app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
@@ -1311,7 +1337,6 @@ const healthLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-app.get('/health', healthLimiter, asyncHandler(healthController.healthCheck));
 app.get('/api/health', healthLimiter, asyncHandler(healthController.healthCheck));
 app.get('/api/metrics', healthLimiter, asyncHandler(healthController.performanceMetrics));
 app.post('/api/metrics/reset', healthLimiter, asyncHandler(healthController.resetMetrics));

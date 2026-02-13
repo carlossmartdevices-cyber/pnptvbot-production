@@ -11,6 +11,21 @@ const logger = require('../../../utils/logger');
  */
 class PaymentController {
   /**
+   * Resolve ePayco reference from different persisted fields.
+   * Some flows store it in `reference` / `transactionId` instead of `epayco_ref`.
+   */
+  static resolveEpaycoRef(payment) {
+    if (!payment) return null;
+    return payment.epayco_ref
+      || payment.epaycoRef
+      || payment.reference
+      || payment.transactionId
+      || payment.transaction_id
+      || payment.metadata?.epayco_ref
+      || null;
+  }
+
+  /**
    * Get payment information for checkout page
    * GET /api/payment/:paymentId
    */
@@ -314,6 +329,11 @@ class PaymentController {
         return res.status(404).json({ success: false, error: 'Payment not found' });
       }
 
+      // Prevent browser/proxy caching during polling (avoids 304 loops in checkout).
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
       res.json({ success: true, status: payment.status });
     } catch (error) {
       logger.error('Error getting payment status:', {
@@ -610,10 +630,12 @@ class PaymentController {
         });
       }
 
+      const refPayco = PaymentController.resolveEpaycoRef(payment);
+
       logger.info('Checking payment status with recovery', {
         paymentId,
         currentStatus: payment.status,
-        refPayco: payment.epayco_ref,
+        refPayco,
       });
 
       // If payment is not pending, return current status
@@ -626,7 +648,7 @@ class PaymentController {
       }
 
       // Payment is pending - check if it's stuck or waiting for webhook
-      if (!payment.epayco_ref) {
+      if (!refPayco) {
         return res.json({
           success: true,
           status: 'pending',
@@ -637,7 +659,7 @@ class PaymentController {
       }
 
       // Check status at ePayco
-      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(payment.epayco_ref);
+      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(refPayco);
 
       if (!statusCheck.success) {
         return res.json({
@@ -651,12 +673,12 @@ class PaymentController {
       if (statusCheck.currentStatus === 'Aceptada' || statusCheck.currentStatus === 'Aprobada') {
         logger.warn('STUCK PAYMENT DETECTED: Payment approved at ePayco but stuck in pending locally', {
           paymentId,
-          refPayco: payment.epayco_ref,
+          refPayco,
           currentStatus: statusCheck.currentStatus,
         });
 
         // Attempt recovery
-        const recovery = await PaymentService.recoverStuckPendingPayment(paymentId, payment.epayco_ref);
+        const recovery = await PaymentService.recoverStuckPendingPayment(paymentId, refPayco);
 
         return res.json({
           success: true,
@@ -717,6 +739,8 @@ class PaymentController {
         });
       }
 
+      const refPayco = PaymentController.resolveEpaycoRef(payment);
+
       if (payment.status !== 'pending') {
         return res.status(400).json({
           success: false,
@@ -724,7 +748,7 @@ class PaymentController {
         });
       }
 
-      if (!payment.epayco_ref) {
+      if (!refPayco) {
         return res.status(400).json({
           success: false,
           error: 'No ePayco reference found for this payment',
@@ -733,11 +757,11 @@ class PaymentController {
 
       logger.warn('Manual webhook retry initiated', {
         paymentId,
-        refPayco: payment.epayco_ref,
+        refPayco,
       });
 
       // Check if payment is actually approved at ePayco
-      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(payment.epayco_ref);
+      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(refPayco);
 
       if (!statusCheck.success) {
         return res.status(400).json({
@@ -759,7 +783,7 @@ class PaymentController {
       // The webhook should have been received already
       logger.error('CRITICAL: Payment approved at ePayco but stuck pending locally - webhook was missed', {
         paymentId,
-        refPayco: payment.epayco_ref,
+        refPayco,
         action: 'ADMIN_INTERVENTION_NEEDED',
       });
 
@@ -768,7 +792,7 @@ class PaymentController {
         message: 'Webhook retry queued - admin notification sent',
         action: 'ADMIN_MANUAL_INTERVENTION',
         paymentId,
-        refPayco: payment.epayco_ref,
+        refPayco,
         note: 'This indicates a system issue - webhooks should be received automatically',
       });
     } catch (error) {
@@ -815,6 +839,8 @@ class PaymentController {
         });
       }
 
+      const refPayco = PaymentController.resolveEpaycoRef(payment);
+
       if (payment.status !== 'pending') {
         return res.status(400).json({
           success: false,
@@ -838,12 +864,12 @@ class PaymentController {
       });
 
       // Check payment status with ePayco to see if it's been approved after 3DS
-      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(payment.epayco_ref);
+      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(refPayco);
 
       if (!statusCheck.success) {
         logger.warn('Could not verify payment status at ePayco', {
           paymentId,
-          refPayco: payment.epayco_ref,
+          refPayco,
         });
         // Return pending - let client poll
         return res.json({
@@ -859,15 +885,15 @@ class PaymentController {
         // Payment is approved at ePayco
         logger.info('Payment approved at ePayco after 3DS 2.0 authentication', {
           paymentId,
-          refPayco: payment.epayco_ref,
+          refPayco,
           currentStatus,
         });
 
         // Update payment status to completed
         await PaymentModel.updateStatus(paymentId, 'completed', {
-          transaction_id: payment.epayco_ref,
-          reference: payment.epayco_ref,
-          epayco_ref: payment.epayco_ref,
+          transaction_id: refPayco || payment.transactionId,
+          reference: refPayco || payment.reference,
+          epayco_ref: refPayco,
           payment_method: 'tokenized_card',
           three_ds_authenticated: true,
         });

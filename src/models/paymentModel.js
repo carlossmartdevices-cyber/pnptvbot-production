@@ -64,6 +64,7 @@ class PaymentModel {
    */
   static _formatPayment(row) {
     if (!row) return null;
+    const metadata = row.metadata || {};
     return {
       id: row.id,
       paymentId: row.id, // Use id as paymentId for backwards compatibility
@@ -77,6 +78,7 @@ class PaymentModel {
       status: row.status,
       reference: row.reference,
       transactionId: row.transaction_id,
+      epaycoRef: row.epayco_ref || metadata.epayco_ref || row.reference || null,
       paymentUrl: row.payment_url,
       daimoLink: row.daimo_link,
       daimoPaymentId: row.daimo_payment_id,
@@ -86,7 +88,7 @@ class PaymentModel {
       expiresAt: row.expires_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      metadata: row.metadata || {},
+      metadata,
     };
   }
 
@@ -133,42 +135,65 @@ class PaymentModel {
       const updates = ['status = $1', 'updated_at = $2'];
       const values = [status, new Date()];
       let paramIndex = 3;
+      const consumedMetadataKeys = new Set();
 
       if (metadata.completedAt) {
         updates.push(`completed_at = $${paramIndex++}`);
         values.push(metadata.completedAt);
+        consumedMetadataKeys.add('completedAt');
       }
       if (metadata.completedBy) {
         updates.push(`completed_by = $${paramIndex++}`);
         values.push(metadata.completedBy);
+        consumedMetadataKeys.add('completedBy');
       }
       if (metadata.manualCompletion !== undefined) {
         updates.push(`manual_completion = $${paramIndex++}`);
         values.push(metadata.manualCompletion);
+        consumedMetadataKeys.add('manualCompletion');
       }
       if (metadata.reference) {
         updates.push(`reference = $${paramIndex++}`);
         values.push(metadata.reference);
+        consumedMetadataKeys.add('reference');
       }
       if (metadata.transaction_id) {
         updates.push(`transaction_id = $${paramIndex++}`);
         values.push(metadata.transaction_id);
+        consumedMetadataKeys.add('transaction_id');
       }
       if (metadata.paymentUrl) {
         updates.push(`payment_url = $${paramIndex++}`);
         values.push(metadata.paymentUrl);
+        consumedMetadataKeys.add('paymentUrl');
       }
       if (metadata.daimoLink) {
         updates.push(`daimo_link = $${paramIndex++}`);
         values.push(metadata.daimoLink);
+        consumedMetadataKeys.add('daimoLink');
       }
       if (metadata.daimo_payment_id) {
         updates.push(`daimo_payment_id = $${paramIndex++}`);
         values.push(metadata.daimo_payment_id);
+        consumedMetadataKeys.add('daimo_payment_id');
       }
       if (metadata.provider) {
         updates.push(`provider = $${paramIndex++}`);
         values.push(metadata.provider);
+        consumedMetadataKeys.add('provider');
+      }
+
+      // Persist non-column fields in metadata jsonb (epayco_ref, 3DS data, etc).
+      const extraMetadata = {};
+      Object.entries(metadata).forEach(([key, value]) => {
+        if (!consumedMetadataKeys.has(key) && value !== undefined) {
+          extraMetadata[key] = value;
+        }
+      });
+
+      if (Object.keys(extraMetadata).length > 0) {
+        updates.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${paramIndex++}::jsonb`);
+        values.push(JSON.stringify(extraMetadata));
       }
 
       values.push(paymentId);

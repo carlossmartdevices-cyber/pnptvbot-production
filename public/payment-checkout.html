@@ -523,8 +523,11 @@
         }
 
         // ── Payment logic ──
+        const checkoutQueryParams = new URLSearchParams(window.location.search);
+        const paymentIdFromQuery = checkoutQueryParams.get('paymentId');
         const pathParts = window.location.pathname.split('/');
-        const paymentId = pathParts[pathParts.length - 1];
+        const paymentIdFromPath = pathParts[pathParts.length - 1];
+        const paymentId = paymentIdFromQuery || paymentIdFromPath;
         let paymentData = null;
 
         function detectCardBrand(number) {
@@ -747,16 +750,26 @@
 
         function doPoll() {
             if (pollAttempts >= maxPollAttempts) {
-                document.getElementById('polling-status').style.display = 'none';
-                document.getElementById('pending').style.display = 'block';
-                polling = false;
+                attemptRecoveryCheck();
                 return;
             }
 
             pollAttempts++;
 
-            fetch('/api/payment/' + paymentId + '/status')
-                .then(function(response) { return response.json(); })
+            fetch('/api/payment/' + paymentId + '/status', {
+                method: 'GET',
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            })
+                .then(function(response) {
+                    if (response.status === 304) {
+                        return { success: true, status: 'pending' };
+                    }
+                    return response.json();
+                })
                 .then(function(data) {
                     if (!data.success) {
                         document.getElementById('polling-status').style.display = 'none';
@@ -783,6 +796,40 @@
                 })
                 .catch(function() {
                     setTimeout(doPoll, pollInterval);
+                });
+        }
+
+        function attemptRecoveryCheck() {
+            fetch('/api/payment/' + paymentId + '/check-status', {
+                method: 'POST',
+                cache: 'no-store',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                },
+                body: JSON.stringify({})
+            })
+                .then(function(response) {
+                    if (!response.ok) return null;
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (data && data.success && data.status === 'completed') {
+                        document.getElementById('polling-status').style.display = 'none';
+                        document.getElementById('success').style.display = 'block';
+                        polling = false;
+                        return;
+                    }
+
+                    document.getElementById('polling-status').style.display = 'none';
+                    document.getElementById('pending').style.display = 'block';
+                    polling = false;
+                })
+                .catch(function() {
+                    document.getElementById('polling-status').style.display = 'none';
+                    document.getElementById('pending').style.display = 'block';
+                    polling = false;
                 });
         }
 

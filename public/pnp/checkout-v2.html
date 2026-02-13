@@ -321,11 +321,18 @@
         let paymentId = null;
         let paymentData = null;
         let handler = null;
+        let epaycoConfig = null;
 
         // Force open outside Telegram WebApp
         function forceOpenOutsideTelegram() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('external') === '1') {
+                return false;
+            }
+
             // Check if running inside Telegram WebApp
-            const isTelegramWebApp = !!window.TelegramWebApp || !!window.Telegram;
+            const telegramWebApp = window.Telegram?.WebApp || window.TelegramWebApp;
+            const isTelegramWebApp = !!telegramWebApp;
             const userAgent = navigator.userAgent.toLowerCase();
             const isTelegramBrowser = userAgent.includes('telegram') || userAgent.includes('tdesktop');
 
@@ -334,12 +341,8 @@
                 const currentUrl = window.location.href;
 
                 // Try to open in external browser
-                if (window.TelegramWebApp && window.TelegramWebApp.openLink) {
-                    // Telegram WebApp method
-                    window.TelegramWebApp.openLink(currentUrl, { try_instant_view: false });
-                } else if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
-                    // Alternative Telegram API
-                    window.Telegram.WebApp.openLink(currentUrl, false);
+                if (telegramWebApp && telegramWebApp.openLink) {
+                    telegramWebApp.openLink(currentUrl, { try_instant_view: false });
                 } else {
                     // Fallback: use window.open with target="_blank"
                     // Add parameter to prevent infinite loop
@@ -348,8 +351,8 @@
 
                     // Close the in-app browser window after 1 second
                     setTimeout(() => {
-                        if (window.TelegramWebApp && window.TelegramWebApp.close) {
-                            window.TelegramWebApp.close();
+                        if (telegramWebApp && telegramWebApp.close) {
+                            telegramWebApp.close();
                         } else if (window.history.length > 1) {
                             window.history.back();
                         } else {
@@ -391,11 +394,11 @@
                 });
 
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Failed to load payment info');
+                    const errorBody = await response.json().catch(() => null);
+                    throw new Error(errorBody?.error || `Error ${response.status} cargando información del pago`);
                 }
 
-                const result = await response.json();
+                const result = await response.json().catch(() => null);
                 if (!result.success || !result.payment) {
                     throw new Error('Invalid payment response');
                 }
@@ -416,7 +419,10 @@
 
         // Initialize ePayco Smart Checkout
         function initEPaycoCheckout() {
-            return new ePayco({
+            if (!window.ePayco || !window.ePayco.checkout || typeof window.ePayco.checkout.configure !== 'function') {
+                throw new Error('SDK de ePayco no disponible');
+            }
+            return window.ePayco.checkout.configure({
                 key: paymentData.epaycoPublicKey,
                 test: paymentData.testMode === true,
             });
@@ -425,6 +431,8 @@
         // Render checkout page
         function renderCheckout() {
             const mainContent = document.getElementById('main-content');
+            const amountUSD = Number(paymentData.amountUSD || 0);
+            const amountCOP = Number(paymentData.amountCOP || 0);
 
             mainContent.innerHTML = `
                 <div class="card">
@@ -438,8 +446,8 @@
 
                     <div style="text-align: center; margin: 20px 0;">
                         <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">MONTO A PAGAR</p>
-                        <div class="amount-display">$${paymentData.amountUSD.toFixed(2)} USD</div>
-                        <p style="color: var(--text-muted); font-size: 12px;">Equivalente a $${paymentData.amountCOP.toLocaleString()} COP</p>
+                        <div class="amount-display">$${amountUSD.toFixed(2)} USD</div>
+                        <p style="color: var(--text-muted); font-size: 12px;">Equivalente a $${amountCOP.toLocaleString()} COP</p>
                     </div>
 
                     <div class="security-info">
@@ -474,50 +482,51 @@
                 </div>
             `;
 
-            // Initialize ePayco handler
-            handler = initEPaycoCheckout();
-
-            // Render ePayco Smart Checkout form
-            renderEPaycoSmartCheckout();
+            try {
+                // Initialize ePayco handler
+                handler = initEPaycoCheckout();
+                // Render ePayco Smart Checkout form
+                renderEPaycoSmartCheckout();
+            } catch (error) {
+                console.error('Error initializing ePayco:', error);
+                showError('Error cargando ePayco. Intenta nuevamente en unos segundos.');
+            }
         }
 
         // Render ePayco Smart Checkout form
         function renderEPaycoSmartCheckout() {
-            const config = {
+            epaycoConfig = {
                 key: paymentData.epaycoPublicKey,
                 test: paymentData.testMode === true,
                 currency: paymentData.currencyCode || 'COP',
                 amount: String(paymentData.amountCOP),
+                tax_base: '0',
+                tax: '0',
+                country: 'co',
+                lang: 'es',
                 invoice: paymentData.paymentRef,
                 description: paymentData.plan.description,
                 currency_code: paymentData.currencyCode || 'COP',
                 name: 'Cliente PNP',
                 email: 'checkout@pnptv.app',
-                external: 'true',
+                external: 'false',
                 response: paymentData.responseUrl,
                 confirmation: paymentData.confirmationUrl,
                 signature: paymentData.epaycoSignature,
                 extra1: paymentData.userId,
                 extra2: paymentData.planId,
                 extra3: paymentData.paymentId,
+                autoclick: false,
             };
 
-            console.log('ePayco config:', config);
+            console.log('ePayco config:', epaycoConfig);
 
-            // Create ePayco button instance
-            const options = {
-                container: 'ePayco-container',
-                ...config,
-            };
-
-            // Use ePayco Smart Checkout
-            try {
-                const button = handler.button(options);
-                button.render();
-            } catch (error) {
-                console.error('Error rendering ePayco button:', error);
-                showError('Error cargando formulario de pago');
-            }
+            const container = document.getElementById('ePayco-container');
+            container.innerHTML = `
+                <div class="security-info" style="margin:0;">
+                    Verifica los datos y presiona "Pagar Ahora" para abrir ePayco.
+                </div>
+            `;
         }
 
         // Handle payment
@@ -533,9 +542,15 @@
             payBtn.textContent = 'Procesando...';
 
             try {
-                // The ePayco button will handle the payment flow
-                // This is just a fallback/confirmation
-                console.log('Payment initiated for:', paymentData.paymentId);
+                if (!handler || !epaycoConfig) {
+                    throw new Error('ePayco no está inicializado');
+                }
+                console.log('Opening ePayco for payment:', paymentData.paymentId);
+                handler.open(epaycoConfig);
+                setTimeout(() => {
+                    payBtn.disabled = false;
+                    payBtn.textContent = '💳 Pagar Ahora';
+                }, 2000);
             } catch (error) {
                 console.error('Error:', error);
                 showError('Error procesando pago');
@@ -571,13 +586,9 @@
 
         // Initialize on load
         document.addEventListener('DOMContentLoaded', () => {
-            // Force open outside Telegram first
-            const forcedOutside = forceOpenOutsideTelegram();
-
-            // Only proceed if not in Telegram (or already opened external)
-            if (!forcedOutside) {
-                loadPaymentInfo();
-            }
+            // Try opening outside Telegram, but always load payment as fallback.
+            forceOpenOutsideTelegram();
+            loadPaymentInfo();
         });
 
         // Security: Prevent navigation away without confirmation
