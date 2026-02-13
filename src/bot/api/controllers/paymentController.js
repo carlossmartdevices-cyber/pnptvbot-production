@@ -11,6 +11,8 @@ const { query } = require('../../../config/postgres');
  * Payment Controller - Handles payment-related API endpoints
  */
 class PaymentController {
+  static EPAYCO_3DS_PENDING_TIMEOUT_MINUTES = Number(process.env.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES || 12);
+
   static isInternalPaymentReference(value) {
     if (!value) return false;
     const ref = String(value).trim();
@@ -767,6 +769,53 @@ class PaymentController {
           stuck: false,
           currentStatusAtEpayco: statusCheck.currentStatus,
           message: statusCheck.message || 'Payment failed at ePayco',
+          action: 'RETRY_PAYMENT',
+        });
+      }
+
+      // Payment is still pending at ePayco.
+      // If this was a 3DS flow and it has exceeded a safe timeout window,
+      // fail locally to avoid indefinite "verifying payment" loops.
+      const createdAt = payment.createdAt || payment.created_at;
+      const createdAtMs = createdAt ? new Date(createdAt).getTime() : null;
+      const ageMs = Number.isFinite(createdAtMs) ? (Date.now() - createdAtMs) : null;
+      const ageMinutes = ageMs !== null ? ageMs / (60 * 1000) : null;
+      const metadata = payment.metadata || {};
+      const isLikelyThreeDSFlow = Boolean(
+        metadata.three_ds_requested
+        || metadata.three_ds_authentication
+        || metadata.three_ds_version
+        || metadata.bank_url_available === false
+      );
+
+      if (
+        statusCheck.currentStatus === 'Pendiente'
+        && isLikelyThreeDSFlow
+        && ageMinutes !== null
+        && ageMinutes >= PaymentController.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES
+      ) {
+        await PaymentModel.updateStatus(paymentId, 'failed', {
+          epayco_ref: refPayco,
+          epayco_estado: statusCheck.currentStatus,
+          abandoned_3ds: true,
+          timeout_recovered_via_status_check: true,
+          recovered_via_status_check: true,
+          error: `3DS timeout after ${Math.floor(ageMinutes)} minutes without final confirmation`,
+        });
+
+        logger.warn('3DS payment timed out in pending state; marking as failed', {
+          paymentId,
+          refPayco,
+          ageMinutes: Math.floor(ageMinutes),
+          timeoutMinutes: PaymentController.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES,
+        });
+
+        return res.json({
+          success: true,
+          status: 'failed',
+          stuck: true,
+          currentStatusAtEpayco: statusCheck.currentStatus,
+          message: '3DS no se completó a tiempo. Intenta nuevamente con un nuevo enlace de pago.',
           action: 'RETRY_PAYMENT',
         });
       }
