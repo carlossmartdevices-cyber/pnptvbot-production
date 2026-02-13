@@ -42,6 +42,8 @@ DETALLES PASO A PASO DE MERU
   'https://pay.getmeru.com/FCqG-z' },
     { code: 'MEz8OG', url:
   'https://pay.getmeru.com/MEz8OG' },
+    { code: 'uqLZH9', url:
+  'https://pay.getmeru.com/uqLZH9' },
     // ... 7 más
   ];
 
