@@ -234,6 +234,16 @@ class PaymentService {
     }
 
     const expected = this.resolveExpectedEpaycoAmountAndCurrency(payment);
+    if (expected.amountCandidates.length === 0 || expected.currencyCandidates.length === 0) {
+      return {
+        valid: true,
+        skipped: true,
+        reason: 'missing_expected_values',
+        expectedAmounts: expected.amountCandidates,
+        expectedCurrencies: expected.currencyCandidates,
+      };
+    }
+
     const webhookAmountCandidates = this.buildEpaycoAmountCandidates(webhookData.x_amount);
     const webhookCurrency = this.normalizeEpaycoCurrencyCode(webhookData.x_currency_code);
 
@@ -636,9 +646,8 @@ class PaymentService {
     }
 
     // Security hardening: webhook signature validation must use SHA256.
-    // Legacy MD5 can be temporarily enabled only for tests/migrations.
-    const allowLegacyMd5 = process.env.EPAYCO_ALLOW_MD5_SIGNATURE === 'true'
-      || process.env.NODE_ENV === 'test';
+    // Legacy MD5 can be temporarily enabled only via explicit migration flag.
+    const allowLegacyMd5 = process.env.EPAYCO_ALLOW_MD5_SIGNATURE === 'true';
 
     if (sha256Valid) {
       return true;
@@ -852,6 +861,18 @@ class PaymentService {
 
       if (!payment && x_ref_payco) {
         payment = await PaymentModel.getById(String(x_ref_payco));
+      }
+
+      if (!payment && paymentIdOrType && paymentIdOrType !== 'pnp_live' && this.isUuidLike(paymentIdOrType)) {
+        logger.error('ePayco webhook references unknown internal payment id', {
+          paymentId: paymentIdOrType,
+          refPayco: x_ref_payco,
+        });
+        return {
+          success: false,
+          code: 'PAYMENT_NOT_FOUND',
+          message: 'Webhook paymentId was not found in local records',
+        };
       }
 
       // Recover missing extras from the internal payment record.

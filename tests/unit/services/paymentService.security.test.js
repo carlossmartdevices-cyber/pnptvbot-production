@@ -153,6 +153,7 @@ describe('PaymentService Security Tests', () => {
       const secret = 'test-secret-key';
       process.env.EPAYCO_P_KEY = secret;
       process.env.EPAYCO_P_CUST_ID = 'cust123';
+      process.env.EPAYCO_ALLOW_MD5_SIGNATURE = 'true';
 
       const webhookData = {
         x_id_invoice: 'inv-123',

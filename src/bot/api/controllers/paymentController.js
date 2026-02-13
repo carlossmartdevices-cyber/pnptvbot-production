@@ -207,6 +207,26 @@ class PaymentController {
         },
       };
 
+      // Persist expected webhook values for strict amount/currency validation.
+      try {
+        const expectedAmount = amountCOPString;
+        const expectedCurrency = currencyCode;
+        if (
+          payment.metadata?.expected_epayco_amount !== expectedAmount
+          || payment.metadata?.expected_epayco_currency !== expectedCurrency
+        ) {
+          await PaymentModel.updateStatus(payment.id, payment.status, {
+            expected_epayco_amount: expectedAmount,
+            expected_epayco_currency: expectedCurrency,
+          });
+        }
+      } catch (metaError) {
+        logger.error('Failed to persist expected ePayco webhook amount/currency (non-critical)', {
+          paymentId: payment.id,
+          error: metaError.message,
+        });
+      }
+
       // Add provider-specific data
       if (provider === 'epayco') {
         basePaymentData.epaycoPublicKey = process.env.EPAYCO_PUBLIC_KEY;

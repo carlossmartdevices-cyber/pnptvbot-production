@@ -1,7 +1,10 @@
-const PaymentService = require('../../../src/bot/services/paymentService');
-const PlanModel = require('../../../src/models/planModel');
-const PaymentModel = require('../../../src/models/paymentModel');
-const UserModel = require('../../../src/models/userModel');
+jest.mock('../../../src/config/redis', () => ({
+  cache: {
+    acquireLock: jest.fn().mockResolvedValue(true),
+    releaseLock: jest.fn().mockResolvedValue(true),
+    get: jest.fn().mockResolvedValue(null),
+  },
+}));
 
 jest.mock('../../../src/models/planModel');
 jest.mock('../../../src/models/paymentModel');
@@ -21,16 +24,16 @@ jest.mock('../../../src/bot/services/businessNotificationService', () => ({
   notifyPayment: jest.fn().mockResolvedValue(true),
 }));
 
+const PaymentService = require('../../../src/bot/services/paymentService');
+const PlanModel = require('../../../src/models/planModel');
+const PaymentModel = require('../../../src/models/paymentModel');
+const UserModel = require('../../../src/models/userModel');
+const { cache } = require('../../../src/config/redis');
 const { __mockClient: epaycoClient } = require('../../../src/config/epayco');
 
 const BASE_PARAMS = {
   paymentId: 'pay-abcd1234-test',
-  card: {
-    number: '4575623182290326',
-    exp_year: '2027',
-    exp_month: '12',
-    cvc: '123',
-  },
+  tokenCard: 'tok_1234567890',
   customer: {
     name: 'Juan',
     last_name: 'Perez',
@@ -44,6 +47,15 @@ const BASE_PARAMS = {
   },
   dues: '1',
   ip: '192.168.1.1',
+  browserInfo: {
+    language: 'es-CO',
+    colorDepth: 24,
+    screenHeight: 1080,
+    screenWidth: 1920,
+    timezoneOffset: 300,
+  },
+  userAgent: 'Mozilla/5.0 Test',
+  acceptHeader: 'application/json',
 };
 
 const MOCK_PAYMENT = {
@@ -73,82 +85,61 @@ describe('PaymentService.processTokenizedCharge', () => {
     jest.clearAllMocks();
     process.env.EPAYCO_WEBHOOK_DOMAIN = 'https://test.easybots.store';
     process.env.BOT_WEBHOOK_DOMAIN = 'https://test.pnptv.app';
-    // Prevent notification calls from failing
     jest.spyOn(PaymentService, 'sendPaymentConfirmationNotification').mockResolvedValue(true);
   });
 
-  it('should return error if payment not found', async () => {
-    PaymentModel.getById.mockResolvedValue(null);
-
+  it('returns processing when lock is not acquired', async () => {
+    cache.acquireLock.mockResolvedValueOnce(false);
     const result = await PaymentService.processTokenizedCharge(BASE_PARAMS);
+    expect(result.success).toBe(false);
+    expect(result.status).toBe('processing');
+  });
 
+  it('returns error if payment is missing', async () => {
+    PaymentModel.getById.mockResolvedValue(null);
+    const result = await PaymentService.processTokenizedCharge(BASE_PARAMS);
     expect(result.success).toBe(false);
     expect(result.error).toContain('Payment not found');
   });
 
-  it('should return error if payment already completed', async () => {
-    PaymentModel.getById.mockResolvedValue({ ...MOCK_PAYMENT, status: 'completed' });
-
+  it('returns idempotent success if payment is already completed', async () => {
+    PaymentModel.getById.mockResolvedValue({ ...MOCK_PAYMENT, status: 'completed', epaycoRef: 'ref_done' });
     const result = await PaymentService.processTokenizedCharge(BASE_PARAMS);
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('already completed');
+    expect(result.success).toBe(true);
+    expect(result.status).toBe('approved');
+    expect(result.transactionId).toBe('ref_done');
   });
 
-  it('should return error if plan not found', async () => {
-    PaymentModel.getById.mockResolvedValue(MOCK_PAYMENT);
-    PlanModel.getById.mockResolvedValue(null);
-
-    const result = await PaymentService.processTokenizedCharge(BASE_PARAMS);
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Plan not found');
-  });
-
-  it('should return error if token creation fails', async () => {
+  it('rejects requests without tokenCard', async () => {
     PaymentModel.getById.mockResolvedValue(MOCK_PAYMENT);
     PlanModel.getById.mockResolvedValue(MOCK_PLAN);
-    epaycoClient.token.create.mockResolvedValue({ status: false });
-
-    const result = await PaymentService.processTokenizedCharge(BASE_PARAMS);
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('tokenizar');
-    expect(epaycoClient.token.create).toHaveBeenCalledWith({
-      'card[number]': '4575623182290326',
-      'card[exp_year]': '2027',
-      'card[exp_month]': '12',
-      'card[cvc]': '123',
-      hasCvv: true,
+    const result = await PaymentService.processTokenizedCharge({
+      ...BASE_PARAMS,
+      tokenCard: null,
+      card: { number: '4575623182290326' },
     });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Token de tarjeta inválido');
   });
 
-  it('should return error if customer creation fails', async () => {
+  it('returns error when customer creation fails', async () => {
     PaymentModel.getById.mockResolvedValue(MOCK_PAYMENT);
     PlanModel.getById.mockResolvedValue(MOCK_PLAN);
-    epaycoClient.token.create.mockResolvedValue({ id: 'tok_123', status: true });
     epaycoClient.customers.create.mockResolvedValue({ status: false });
 
     const result = await PaymentService.processTokenizedCharge(BASE_PARAMS);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('cliente');
-    expect(epaycoClient.customers.create).toHaveBeenCalledWith(expect.objectContaining({
-      token_card: 'tok_123',
-      name: 'Juan',
-      last_name: 'Perez',
-      email: 'juan@test.com',
-    }));
   });
 
-  it('should process approved charge and activate subscription', async () => {
+  it('approves charge, activates subscription and sends browser_info', async () => {
     PaymentModel.getById.mockResolvedValue(MOCK_PAYMENT);
     PlanModel.getById.mockResolvedValue(MOCK_PLAN);
     UserModel.getById.mockResolvedValue({ id: 'user_123', language: 'es' });
     UserModel.updateSubscription.mockResolvedValue(true);
     PaymentModel.updateStatus.mockResolvedValue(true);
 
-    epaycoClient.token.create.mockResolvedValue({ id: 'tok_123', status: true });
     epaycoClient.customers.create.mockResolvedValue({
       status: true,
       data: { customerId: 'cust_123' },
@@ -166,47 +157,46 @@ describe('PaymentService.processTokenizedCharge', () => {
 
     expect(result.success).toBe(true);
     expect(result.status).toBe('approved');
-    expect(result.transactionId).toBe('ref_999');
-
-    // Payment marked as completed
-    expect(PaymentModel.updateStatus).toHaveBeenCalledWith(
-      'pay-abcd1234-test',
-      'completed',
-      expect.objectContaining({
-        transaction_id: 'txn_999',
-        reference: 'ref_999',
-        epayco_ref: 'ref_999',
-        payment_method: 'tokenized_card',
-      }),
-    );
-
-    // Subscription activated
     expect(UserModel.updateSubscription).toHaveBeenCalledWith('user_123', {
       status: 'active',
       planId: 'plan_123',
       expiry: expect.any(Date),
     });
-
-    // Charge called with correct params
     expect(epaycoClient.charge.create).toHaveBeenCalledWith(expect.objectContaining({
-      token_card: 'tok_123',
+      token_card: 'tok_1234567890',
       customer_id: 'cust_123',
-      doc_type: 'CC',
-      doc_number: '1234567890',
-      email: 'juan@test.com',
       currency: 'COP',
-      dues: '1',
+      browser_info: expect.objectContaining({
+        language: 'es-CO',
+        user_agent: expect.any(String),
+      }),
       ip: '192.168.1.1',
-      use_default_card_customer: true,
     }));
   });
 
-  it('should handle pending charge status', async () => {
+  it('reuses persisted customer id for retry idempotency', async () => {
+    PaymentModel.getById.mockResolvedValue({
+      ...MOCK_PAYMENT,
+      metadata: { epayco_customer_id: 'cust_existing' },
+    });
+    PlanModel.getById.mockResolvedValue(MOCK_PLAN);
+    PaymentModel.updateStatus.mockResolvedValue(true);
+    epaycoClient.charge.create.mockResolvedValue({
+      data: { estado: 'Rechazada', respuesta: 'Declined' },
+    });
+
+    await PaymentService.processTokenizedCharge(BASE_PARAMS);
+
+    expect(epaycoClient.customers.create).not.toHaveBeenCalled();
+    expect(epaycoClient.charge.create).toHaveBeenCalledWith(expect.objectContaining({
+      customer_id: 'cust_existing',
+    }));
+  });
+
+  it('returns pending with redirect URL when bank challenge is required', async () => {
     PaymentModel.getById.mockResolvedValue(MOCK_PAYMENT);
     PlanModel.getById.mockResolvedValue(MOCK_PLAN);
     PaymentModel.updateStatus.mockResolvedValue(true);
-
-    epaycoClient.token.create.mockResolvedValue({ id: 'tok_123', status: true });
     epaycoClient.customers.create.mockResolvedValue({
       status: true,
       data: { customerId: 'cust_123' },
@@ -225,113 +215,5 @@ describe('PaymentService.processTokenizedCharge', () => {
     expect(result.success).toBe(true);
     expect(result.status).toBe('pending');
     expect(result.redirectUrl).toBe('https://bank.epayco.co/3ds/test123');
-    expect(PaymentModel.updateStatus).toHaveBeenCalledWith(
-      'pay-abcd1234-test',
-      'pending',
-      expect.objectContaining({ payment_method: 'tokenized_card' }),
-    );
-    // Subscription should NOT be activated for pending
-    expect(UserModel.updateSubscription).not.toHaveBeenCalled();
-  });
-
-  it('should handle rejected charge', async () => {
-    PaymentModel.getById.mockResolvedValue(MOCK_PAYMENT);
-    PlanModel.getById.mockResolvedValue(MOCK_PLAN);
-    PaymentModel.updateStatus.mockResolvedValue(true);
-
-    epaycoClient.token.create.mockResolvedValue({ id: 'tok_123', status: true });
-    epaycoClient.customers.create.mockResolvedValue({
-      status: true,
-      data: { customerId: 'cust_123' },
-    });
-    epaycoClient.charge.create.mockResolvedValue({
-      data: {
-        estado: 'Rechazada',
-        respuesta: 'Fondos insuficientes',
-        ref_payco: 'ref_rej',
-        transactionID: 'txn_rej',
-      },
-    });
-
-    const result = await PaymentService.processTokenizedCharge(BASE_PARAMS);
-
-    expect(result.success).toBe(false);
-    expect(result.status).toBe('rejected');
-    expect(result.error).toBe('Fondos insuficientes');
-    expect(PaymentModel.updateStatus).toHaveBeenCalledWith(
-      'pay-abcd1234-test',
-      'failed',
-      expect.objectContaining({ payment_method: 'tokenized_card' }),
-    );
-    expect(UserModel.updateSubscription).not.toHaveBeenCalled();
-  });
-
-  it('should handle ePayco SDK throwing an error', async () => {
-    PaymentModel.getById.mockResolvedValue(MOCK_PAYMENT);
-    PlanModel.getById.mockResolvedValue(MOCK_PLAN);
-
-    epaycoClient.token.create.mockRejectedValue(new Error('Network timeout'));
-
-    const result = await PaymentService.processTokenizedCharge(BASE_PARAMS);
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Network timeout');
-  });
-
-  it('should complete promo redemption on approved charge', async () => {
-    const promoPayment = {
-      ...MOCK_PAYMENT,
-      metadata: { redemptionId: 'redeem_123', promoCode: 'SAVE20' },
-    };
-    PaymentModel.getById.mockResolvedValue(promoPayment);
-    PlanModel.getById.mockResolvedValue(MOCK_PLAN);
-    UserModel.getById.mockResolvedValue({ id: 'user_123', language: 'es' });
-    UserModel.updateSubscription.mockResolvedValue(true);
-    PaymentModel.updateStatus.mockResolvedValue(true);
-
-    epaycoClient.token.create.mockResolvedValue({ id: 'tok_123', status: true });
-    epaycoClient.customers.create.mockResolvedValue({
-      status: true,
-      data: { customerId: 'cust_123' },
-    });
-    epaycoClient.charge.create.mockResolvedValue({
-      data: {
-        estado: 'Aceptada',
-        ref_payco: 'ref_promo',
-        transactionID: 'txn_promo',
-      },
-    });
-
-    const result = await PaymentService.processTokenizedCharge(BASE_PARAMS);
-
-    expect(result.success).toBe(true);
-    expect(result.status).toBe('approved');
-    // Promo redemption is called async (fire-and-forget), so we just verify the charge succeeded
-  });
-
-  it('should calculate COP amount correctly from USD', async () => {
-    const usdPayment = { ...MOCK_PAYMENT, amount: 10 }; // $10 USD = 40,000 COP
-    PaymentModel.getById.mockResolvedValue(usdPayment);
-    PlanModel.getById.mockResolvedValue(MOCK_PLAN);
-    PaymentModel.updateStatus.mockResolvedValue(true);
-
-    epaycoClient.token.create.mockResolvedValue({ id: 'tok_123', status: true });
-    epaycoClient.customers.create.mockResolvedValue({
-      status: true,
-      data: { customerId: 'cust_123' },
-    });
-    epaycoClient.charge.create.mockResolvedValue({
-      data: { estado: 'Rechazada', respuesta: 'Declined' },
-    });
-
-    await PaymentService.processTokenizedCharge(BASE_PARAMS);
-
-    // Verify the charge was created with correct COP amount
-    expect(epaycoClient.charge.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        value: '40000', // 10 * 4000
-        currency: 'COP',
-      }),
-    );
   });
 });

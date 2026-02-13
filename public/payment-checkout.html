@@ -8,6 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://checkout.epayco.co/checkout.js"></script>
+    <script src="https://multimedia.epayco.co/general/3DS/validateThreeds.min.js"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -529,6 +531,47 @@
         const paymentIdFromPath = pathParts[pathParts.length - 1];
         const paymentId = paymentIdFromQuery || paymentIdFromPath;
         let paymentData = null;
+        var epaycoInstance = null;
+
+        function collectBrowserInfo() {
+            return {
+                userAgent: navigator.userAgent,
+                language: navigator.language || '',
+                colorDepth: window.screen ? window.screen.colorDepth : null,
+                screenHeight: window.screen ? window.screen.height : null,
+                screenWidth: window.screen ? window.screen.width : null,
+                timezoneOffset: new Date().getTimezoneOffset(),
+            };
+        }
+
+        function getEpaycoInstance() {
+            if (epaycoInstance) return epaycoInstance;
+            if (!window.ePayco || typeof window.ePayco.setup !== 'function') {
+                throw new Error('SDK de ePayco no disponible.');
+            }
+            epaycoInstance = window.ePayco.setup({
+                key: paymentData.epaycoPublicKey,
+                test: paymentData.testMode === true,
+            });
+            return epaycoInstance;
+        }
+
+        function tokenizeCardWithEpayco(cardPayload) {
+            return new Promise(function(resolve, reject) {
+                try {
+                    var epayco = getEpaycoInstance();
+                    epayco.token.create(cardPayload, function(error, data) {
+                        if (error) {
+                            reject(error);
+                            return;
+                        }
+                        resolve(data);
+                    });
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }
 
         function detectCardBrand(number) {
             var n = number.replace(/\s/g, '');
@@ -669,15 +712,26 @@
             btn.textContent = t('processing');
 
             try {
+                var tokenResult = await tokenizeCardWithEpayco({
+                    'card[number]': cardNumber,
+                    'card[exp_year]': expYear,
+                    'card[exp_month]': expMonth,
+                    'card[cvc]': cvc,
+                    'card[holder_name]': (name + ' ' + (lastName || '')).trim(),
+                    hasCvv: true,
+                });
+
+                if (!tokenResult || !tokenResult.id) {
+                    throw new Error('No fue posible tokenizar la tarjeta.');
+                }
+
+                // Never send PAN/CVC to backend.
                 const response = await fetch('/api/payment/tokenized-charge', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         paymentId,
-                        cardNumber,
-                        expYear,
-                        expMonth,
-                        cvc,
+                        tokenCard: tokenResult.id,
                         name,
                         lastName: lastName || name,
                         email,
@@ -687,50 +741,48 @@
                         address: 'N/A',
                         phone: '',
                         dues: '1',
+                        browserInfo: collectBrowserInfo(),
                     }),
                 });
 
-                const responseText = await response.text();
-                console.log('[PAYMENT] Raw response text length:', responseText.length);
-                console.log('[PAYMENT] Raw response (first 1000 chars):', responseText.substring(0, 1000));
-
-                const result = JSON.parse(responseText);
-                console.log('[PAYMENT] Full API response:', JSON.stringify(result, null, 2));
-                console.log('[PAYMENT] Response keys:', Object.keys(result));
-                console.log('[PAYMENT] threeDSecure:', result.threeDSecure);
-                console.log('[PAYMENT] Has threeDSecure?', !!result.threeDSecure);
-
-                if (result.success && result.status === 'approved') {
-                    document.getElementById('checkout-form').style.display = 'none';
-                    document.getElementById('success').style.display = 'block';
-                } else if (result.status === 'pending') {
-                    console.log('[PAYMENT] Status is pending, checking for redirect or 3DS');
-                    if (result.redirectUrl) {
-                        console.log('[PAYMENT] Redirecting to:', result.redirectUrl);
-                        window.location.href = result.redirectUrl;
-                        return;
-                    }
-                    // Check for Cardinal Commerce 3DS 2.0 device data collection
-                    if (result.threeDSecure && result.threeDSecure.version === '2.0') {
-                        console.log('[PAYMENT] 3DS 2.0 detected in response, initiating handler');
-                        document.getElementById('checkout-form').style.display = 'none';
-                        handle3DS2Authentication(result.threeDSecure, paymentId);
-                        return;
-                    }
-                    console.log('[PAYMENT] No 3DS 2.0 or redirect found, starting polling');
-                    document.getElementById('checkout-form').style.display = 'none';
-                    pollPaymentStatus();
-                } else {
-                    showFormError(result.error || t('errDeclined'));
-                    btn.disabled = false;
-                    btn.textContent = payBtnLabel();
-                }
+                const result = await response.json();
+                document.getElementById('cvc').value = '';
+                handleBackendResponse(result);
             } catch (error) {
-                showFormError(t('errConnection'));
+                var epaycoError = (error && (error.description || error.error || error.message)) || t('errConnection');
+                showFormError(epaycoError);
                 btn.disabled = false;
                 btn.textContent = payBtnLabel();
             }
         });
+
+        function handleBackendResponse(result) {
+            var btn = document.getElementById('pay-button');
+            if (result && result.success && (result.status === 'approved' || result.status === 'completed')) {
+                document.getElementById('checkout-form').style.display = 'none';
+                document.getElementById('success').style.display = 'block';
+                return;
+            }
+
+            if (result && result.status === 'pending') {
+                if (result.redirectUrl) {
+                    window.location.href = result.redirectUrl;
+                    return;
+                }
+                if (result.threeDSecure && result.threeDSecure.version === '2.0') {
+                    document.getElementById('checkout-form').style.display = 'none';
+                    handle3DS2Authentication(result.threeDSecure, paymentId);
+                    return;
+                }
+                document.getElementById('checkout-form').style.display = 'none';
+                pollPaymentStatus();
+                return;
+            }
+
+            showFormError((result && result.error) || t('errDeclined'));
+            btn.disabled = false;
+            btn.textContent = payBtnLabel();
+        }
 
         var pollAttempts = 0;
         var maxPollAttempts = 30;
@@ -979,11 +1031,45 @@
             return data3ds;
         }
 
+        async function runDeviceDataCollection(methodUrl) {
+            if (!methodUrl) return false;
+            return new Promise(function(resolve) {
+                var done = false;
+                var iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.setAttribute('aria-hidden', 'true');
+
+                function finish(result) {
+                    if (done) return;
+                    done = true;
+                    setTimeout(function() {
+                        if (iframe && iframe.parentNode) {
+                            iframe.parentNode.removeChild(iframe);
+                        }
+                    }, 5000);
+                    resolve(result);
+                }
+
+                iframe.onload = function() { finish(true); };
+                iframe.onerror = function() { finish(false); };
+                iframe.src = methodUrl;
+                document.body.appendChild(iframe);
+
+                setTimeout(function() { finish(false); }, 4000);
+            });
+        }
+
         async function tryOfficialEpayco3DSFlow(threeDSecure, paymentId) {
             var data3DS = buildEpayco3DSPayload(threeDSecure, paymentId);
             if (!data3DS['3DS']) {
                 return false;
             }
+
+            await runDeviceDataCollection(
+                threeDSecure
+                && threeDSecure.data
+                && threeDSecure.data.deviceDataCollectionUrl
+            );
 
             await loadEpayco3DSValidator();
             attachEpayco3DSMessageHandler();
