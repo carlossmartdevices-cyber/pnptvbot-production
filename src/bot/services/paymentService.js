@@ -1717,6 +1717,7 @@ class PaymentService {
           'card[exp_year]': card.exp_year,
           'card[exp_month]': card.exp_month,
           'card[cvc]': card.cvc,
+          'card[holder_name]': card.name || customer.name,
           hasCvv: true,
         });
 
@@ -1804,14 +1805,14 @@ class PaymentService {
         token_card: tokenId,
         customer_id: customerId,
         doc_type: customer.doc_type || 'CC',
-        doc_number: customer.doc_number || '0000000000',
+        doc_number: customer.doc_number || '1000000000',
         name: customer.name,
         last_name: customer.last_name || customer.name,
         email: customer.email,
         city: customer.city || 'Bogota',
-        address: customer.address || 'N/A',
-        phone: customer.phone || '0000000000',
-        cell_phone: customer.cell_phone || customer.phone || '0000000000',
+        address: customer.address || 'Calle Principal 123',
+        phone: customer.phone || '3101234567',
+        cell_phone: customer.cell_phone || customer.phone || '3101234567',
         bill: paymentRef,
         description: plan.sku,
         value: String(amountCOP),
@@ -1827,6 +1828,7 @@ class PaymentService {
         // 3D Secure: Hint to API (actual 3DS enforcement is via ePayco dashboard rules)
         // Configure in ePayco Dashboard: Configuración → Seguridad → Enable 3D Secure
         three_d_secure: true,
+        country: customer.country || 'CO',
         extras: {
           extra1: String(userId),
           extra2: planId,
@@ -1945,10 +1947,24 @@ class PaymentService {
           if (typeof rawThreeDS === 'string') {
             redirectUrl = rawThreeDS;
           } else if (typeof rawThreeDS === 'object') {
-            // Check for Cardinal Commerce 3DS 2.0 device data collection
-            if (rawThreeDS.data && rawThreeDS.data.deviceDataCollectionUrl) {
+            // Check for Cardinal Commerce 3DS 2.0 device data collection (multiple possible formats)
+            const deviceDataCollectionUrl =
+              rawThreeDS.data?.deviceDataCollectionUrl ||        // Format 1: Nested under data
+              rawThreeDS.deviceDataCollectionUrl ||              // Format 2: Direct property
+              fullResponse?.cardinal_commerce_url ||             // Format 3: Alternative naming
+              fullResponse?.threeds_url;                         // Format 4: 3DS URL variant
+
+            if (deviceDataCollectionUrl) {
               is3ds2 = true;
-              threeDSData = rawThreeDS.data;
+              threeDSData = {
+                version: '2.0',
+                provider: 'CardinalCommerce',
+                data: rawThreeDS.data || rawThreeDS,
+                deviceDataCollectionUrl: deviceDataCollectionUrl,
+                accessToken: rawThreeDS.data?.accessToken || rawThreeDS.accessToken,
+                referenceId: rawThreeDS.data?.referenceId || rawThreeDS.referenceId,
+                token: rawThreeDS.data?.token || rawThreeDS.token,
+              };
             } else if (rawThreeDS.url) {
               redirectUrl = rawThreeDS.url;
             } else if (rawThreeDS.urlbanco) {
