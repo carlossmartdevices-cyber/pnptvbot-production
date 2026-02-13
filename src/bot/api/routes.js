@@ -698,6 +698,11 @@ app.post(
 // Telegram webhook is handled in bot.js, not here
 // The webhook handler is registered via apiApp.post(webhookPath, ...) in bot.js
 
+// PNPtv Smart Checkout v2 (ePayco with 3DS 2.0)
+app.get('/checkout/pnp', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/pnp/checkout-v2.html'));
+});
+
 // Webhook endpoints
 app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
 app.post('/api/webhook/epayco', webhookLimiter, webhookController.handleEpaycoWebhook); // singular alias

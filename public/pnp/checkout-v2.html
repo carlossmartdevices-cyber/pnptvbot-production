@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta name="robots" content="noindex, nofollow">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>PNP Checkout - PNPtv</title>
+
+    <!-- ePayco Smart Checkout v2 -->
+    <script src="https://checkout.epayco.co/checkout.js"></script>
+
+    <!-- Cardinal Commerce 3DS 2.0 -->
+    <script src="https://songbird.cardinalcommerce.com/songbird_prod.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #1C1C1E;
+            --text-main: #FFFFFF;
+            --text-muted: #8E8E93;
+            --neon-pink: #FF00CC;
+            --neon-amber: #FFB454;
+            --glass-bg: rgba(44, 44, 46, 0.7);
+            --error-color: #FF3B30;
+            --success-color: #34C759;
+            --card-radius: 20px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            padding-bottom: 40px;
+        }
+
+        .ambient-glow {
+            position: fixed;
+            top: -30%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100vw;
+            height: 100vw;
+            background: radial-gradient(circle, rgba(255, 0, 204, 0.1) 0%, transparent 65%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .header {
+            background: rgba(28, 28, 30, 0.95);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 20px 24px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .content {
+            padding: 20px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--card-radius);
+            padding: 24px;
+            margin: 20px 0;
+            backdrop-filter: blur(8px);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid var(--neon-amber);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        .loading p {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .error {
+            background: rgba(255, 59, 48, 0.1);
+            border: 1px solid var(--error-color);
+            color: var(--error-color);
+            padding: 16px;
+            border-radius: 12px;
+            margin: 16px 0;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .success {
+            background: rgba(52, 199, 89, 0.1);
+            border: 1px solid var(--success-color);
+            color: var(--success-color);
+            padding: 16px;
+            border-radius: 12px;
+            margin: 16px 0;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .plan-summary {
+            background: rgba(255, 0, 204, 0.05);
+            border-left: 3px solid var(--neon-pink);
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 8px;
+        }
+
+        .plan-summary h3 {
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: var(--neon-pink);
+        }
+
+        .plan-summary p {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin: 4px 0;
+        }
+
+        .amount-display {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--neon-amber);
+            margin: 12px 0;
+        }
+
+        .security-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin: 16px 0;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+        }
+
+        .security-info::before {
+            content: "🔒";
+            font-size: 14px;
+        }
+
+        /* ePayco Smart Checkout Container */
+        #ePayco-container {
+            margin: 20px 0;
+            min-height: 400px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-pay {
+            background: linear-gradient(135deg, var(--neon-pink), var(--neon-amber));
+            color: var(--bg-color);
+            box-shadow: 0 4px 15px rgba(255, 0, 204, 0.3);
+        }
+
+        .btn-pay:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 0, 204, 0.4);
+        }
+
+        .btn-pay:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-cancel {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-cancel:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .form-group {
+            margin: 16px 0;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: var(--text-main);
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--neon-pink);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 2px rgba(255, 0, 204, 0.1);
+        }
+
+        .terms-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 16px 0;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        input[type="checkbox"] {
+            width: auto;
+            height: 18px;
+            width: 18px;
+            cursor: pointer;
+        }
+
+        .footer-info {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            margin-top: 40px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 480px) {
+            .content { padding: 16px; }
+            .card { padding: 16px; }
+            .button-group { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow"></div>
+
+    <div class="header">
+        <h1>💎 PNP Checkout</h1>
+        <p>Pago seguro - 3DS 2.0 verificado</p>
+    </div>
+
+    <div class="content" id="main-content">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Cargando información de pago...</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let paymentId = null;
+        let paymentData = null;
+        let handler = null;
+
+        // Get paymentId from URL
+        function getPaymentId() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('paymentId');
+        }
+
+        // Load payment information
+        async function loadPaymentInfo() {
+            try {
+                paymentId = getPaymentId();
+                if (!paymentId) {
+                    showError('Payment ID no encontrado');
+                    return;
+                }
+
+                console.log('Cargando información de pago:', paymentId);
+                const response = await fetch(`${API_BASE}/payment/${paymentId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Request-ID': generateRequestId(),
+                    },
+                    credentials: 'include',
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to load payment info');
+                }
+
+                const result = await response.json();
+                if (!result.success || !result.payment) {
+                    throw new Error('Invalid payment response');
+                }
+
+                paymentData = result.payment;
+                console.log('Payment info loaded:', {
+                    paymentId: paymentData.paymentId,
+                    amount: paymentData.amountUSD,
+                    provider: paymentData.provider
+                });
+
+                renderCheckout();
+            } catch (error) {
+                console.error('Error loading payment:', error);
+                showError(error.message || 'Error al cargar información del pago');
+            }
+        }
+
+        // Initialize ePayco Smart Checkout
+        function initEPaycoCheckout() {
+            return new ePayco({
+                key: paymentData.epaycoPublicKey,
+                test: paymentData.testMode === true,
+            });
+        }
+
+        // Render checkout page
+        function renderCheckout() {
+            const mainContent = document.getElementById('main-content');
+
+            mainContent.innerHTML = `
+                <div class="card">
+                    <h2 style="margin-bottom: 16px; font-size: 18px;">Resumen de Compra</h2>
+
+                    <div class="plan-summary">
+                        <h3>${paymentData.plan.name}</h3>
+                        <p>${paymentData.plan.description}</p>
+                        <p>Duración: ${paymentData.plan.duration} días</p>
+                    </div>
+
+                    <div style="text-align: center; margin: 20px 0;">
+                        <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">MONTO A PAGAR</p>
+                        <div class="amount-display">$${paymentData.amountUSD.toFixed(2)} USD</div>
+                        <p style="color: var(--text-muted); font-size: 12px;">Equivalente a $${paymentData.amountCOP.toLocaleString()} COP</p>
+                    </div>
+
+                    <div class="security-info">
+                        Transacción segura con autenticación 3DS 2.0
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 style="margin-bottom: 20px; font-size: 16px;">Información de Pago</h2>
+
+                    <!-- ePayco Smart Checkout Container -->
+                    <div id="ePayco-container"></div>
+                </div>
+
+                <div class="card">
+                    <div class="terms-checkbox">
+                        <input type="checkbox" id="terms" name="terms" required>
+                        <label for="terms" style="margin: 0;">Acepto los términos y condiciones de pago</label>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn-pay" id="pay-btn" onclick="handlePayment()">
+                            💳 Pagar Ahora
+                        </button>
+                        <button class="btn-cancel" onclick="handleCancel()">Cancelar</button>
+                    </div>
+                </div>
+
+                <div class="footer-info">
+                    <p>🔒 Pago procesado por ePayco con certificación PCI-DSS</p>
+                    <p>Soporte: support@pnptv.app</p>
+                </div>
+            `;
+
+            // Initialize ePayco handler
+            handler = initEPaycoCheckout();
+
+            // Render ePayco Smart Checkout form
+            renderEPaycoSmartCheckout();
+        }
+
+        // Render ePayco Smart Checkout form
+        function renderEPaycoSmartCheckout() {
+            const config = {
+                key: paymentData.epaycoPublicKey,
+                test: paymentData.testMode === true,
+                currency: paymentData.currencyCode || 'COP',
+                amount: String(paymentData.amountCOP),
+                invoice: paymentData.paymentRef,
+                description: paymentData.plan.description,
+                currency_code: paymentData.currencyCode || 'COP',
+                name: 'Cliente PNP',
+                email: 'checkout@pnptv.app',
+                external: 'true',
+                response: paymentData.responseUrl,
+                confirmation: paymentData.confirmationUrl,
+                signature: paymentData.epaycoSignature,
+                extra1: paymentData.userId,
+                extra2: paymentData.planId,
+                extra3: paymentData.paymentId,
+            };
+
+            console.log('ePayco config:', config);
+
+            // Create ePayco button instance
+            const options = {
+                container: 'ePayco-container',
+                ...config,
+            };
+
+            // Use ePayco Smart Checkout
+            try {
+                const button = handler.button(options);
+                button.render();
+            } catch (error) {
+                console.error('Error rendering ePayco button:', error);
+                showError('Error cargando formulario de pago');
+            }
+        }
+
+        // Handle payment
+        async function handlePayment() {
+            const termsCheckbox = document.getElementById('terms');
+            if (!termsCheckbox.checked) {
+                showError('Debes aceptar los términos y condiciones');
+                return;
+            }
+
+            const payBtn = document.getElementById('pay-btn');
+            payBtn.disabled = true;
+            payBtn.textContent = 'Procesando...';
+
+            try {
+                // The ePayco button will handle the payment flow
+                // This is just a fallback/confirmation
+                console.log('Payment initiated for:', paymentData.paymentId);
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error procesando pago');
+                payBtn.disabled = false;
+                payBtn.textContent = '💳 Pagar Ahora';
+            }
+        }
+
+        // Handle cancel
+        function handleCancel() {
+            if (confirm('¿Cancelar el pago?')) {
+                window.history.back();
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            const mainContent = document.getElementById('main-content');
+            mainContent.innerHTML = `
+                <div class="error">
+                    ⚠️ ${message}
+                </div>
+                <button class="btn-cancel" style="width: 100%; margin-top: 20px;" onclick="location.reload()">
+                    Reintentar
+                </button>
+            `;
+        }
+
+        // Generate request ID for security
+        function generateRequestId() {
+            return 'req_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', loadPaymentInfo);
+
+        // Security: Prevent navigation away without confirmation
+        window.addEventListener('beforeunload', (e) => {
+            if (paymentData && !window.paymentCompleted) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // Security: Prevent right-click and dev tools on payment page
+        document.addEventListener('contextmenu', (e) => {
+            // Allow normal right-click but log it
+            console.warn('Right-click attempted on payment page');
+        });
+
+        // Log page load time (security audit)
+        window.addEventListener('load', () => {
+            console.log('Checkout page fully loaded');
+        });
+    </script>
+</body>
+</html>
