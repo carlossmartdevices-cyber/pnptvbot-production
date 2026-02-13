@@ -228,7 +228,22 @@ _El usuario ha sido notificado._`, {
   };
 
   const resolveSupportTicket = async (ctx, userId, threadId, resolutionNote) => {
-    const supportTopic = await SupportTopicModel.getByUserId(userId);
+    let supportTopic = await SupportTopicModel.getByUserId(String(userId));
+    let effectiveUserId = String(userId);
+
+    // Handle stale callback payloads by recovering topic from current thread.
+    if (!supportTopic && threadId) {
+      const topicByThread = await SupportTopicModel.getByThreadId(threadId);
+      if (topicByThread) {
+        supportTopic = topicByThread;
+        effectiveUserId = String(topicByThread.user_id);
+        logger.warn('Support ticket recovered by thread fallback', {
+          requestedUserId: String(userId),
+          effectiveUserId,
+          threadId,
+        });
+      }
+    }
 
     if (!supportTopic) {
       await ctx.reply('❌ No se encontró el ticket de soporte para este usuario.', {
@@ -238,8 +253,8 @@ _El usuario ha sido notificado._`, {
     }
 
     try {
-      await SupportTopicModel.updateStatus(userId, 'resolved');
-      await SupportTopicModel.updateResolutionTime(userId);
+      await SupportTopicModel.updateStatus(effectiveUserId, 'resolved');
+      await SupportTopicModel.updateResolutionTime(effectiveUserId);
 
       if (supportTopic.thread_id) {
         try {
@@ -249,8 +264,8 @@ _El usuario ha sido notificado._`, {
         }
       }
 
-      const user = await UserModel.getById(userId);
-      const userName = escapeMarkdown(user?.firstName || user?.username || userId);
+      const user = await UserModel.getById(effectiveUserId);
+      const userName = escapeMarkdown(user?.firstName || user?.username || effectiveUserId);
       const adminName = escapeMarkdown(ctx.from.first_name || 'Soporte');
       const userLang = user?.language || 'es';
       const safeResolutionNote = escapeMarkdown(resolutionNote || '');
@@ -259,15 +274,15 @@ _El usuario ha sido notificado._`, {
       : `✅ *Caso Resuelto*\n\nTu ticket de soporte ha sido marcado como resuelto por ${adminName}.\n\n${safeResolutionNote ? `📝 *Nota:* ${safeResolutionNote}\n\n` : ''}Si necesitas algo más en el futuro, no dudes en contactarnos.\n\n⭐ _¡Nos encantaría saber tu experiencia! Por favor califícanos del 1 al 4._\n\n¡Gracias por ser parte de PNP! 💜`;
 
     const ratingButtons = [
-      { text: '⭐️', callback_data: `rate_ticket:${userId}:1` },
-      { text: '⭐️⭐️', callback_data: `rate_ticket:${userId}:2` },
-      { text: '⭐️⭐️⭐️', callback_data: `rate_ticket:${userId}:3` },
-      { text: '⭐️⭐️⭐️⭐️', callback_data: `rate_ticket:${userId}:4` },
+      { text: '⭐️', callback_data: `rate_ticket:${effectiveUserId}:1` },
+      { text: '⭐️⭐️', callback_data: `rate_ticket:${effectiveUserId}:2` },
+      { text: '⭐️⭐️⭐️', callback_data: `rate_ticket:${effectiveUserId}:3` },
+      { text: '⭐️⭐️⭐️⭐️', callback_data: `rate_ticket:${effectiveUserId}:4` },
     ];
-    const reopenButton = { text: 'Re-open Ticket', callback_data: `reopen_ticket:${userId}` };
+    const reopenButton = { text: 'Re-open Ticket', callback_data: `reopen_ticket:${effectiveUserId}` };
 
     try {
-      await ctx.telegram.sendMessage(userId, resolvedMessage, {
+      await ctx.telegram.sendMessage(effectiveUserId, resolvedMessage, {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [ratingButtons, [reopenButton]],
@@ -289,7 +304,7 @@ _El usuario ha sido notificado._`, {
 
       await ctx.reply(`✅ *Caso Resuelto*
 
-👤 *Usuario:* ${userName} (\`${escapeMarkdown(String(userId))}\`)
+👤 *Usuario:* ${userName} (\`${escapeMarkdown(String(effectiveUserId))}\`)
 ⏱️ *Tiempo de resolución:* ${resolutionTime}
 👨‍💼 *Resuelto por:* ${adminName}
 ${safeResolutionNote ? `📝 *Nota:* ${safeResolutionNote}` : ''}
@@ -301,7 +316,7 @@ _El topic ha sido cerrado._`, {
       });
 
       logger.info('Support ticket resolved', {
-        userId,
+        userId: effectiveUserId,
         resolvedBy: ctx.from.id,
         resolutionTime,
         note: resolutionNote,
@@ -1818,7 +1833,22 @@ También puedes ejecutar acciones del ticket con los botones superiores.`;
   });
   
   const closeSupportTicket = async (ctx, userId, threadId) => {
-    const supportTopic = await SupportTopicModel.getByUserId(userId);
+    let supportTopic = await SupportTopicModel.getByUserId(String(userId));
+    let effectiveUserId = String(userId);
+
+    // Handle stale callback payloads by recovering topic from current thread.
+    if (!supportTopic && threadId) {
+      const topicByThread = await SupportTopicModel.getByThreadId(threadId);
+      if (topicByThread) {
+        supportTopic = topicByThread;
+        effectiveUserId = String(topicByThread.user_id);
+        logger.warn('Support close recovered by thread fallback', {
+          requestedUserId: String(userId),
+          effectiveUserId,
+          threadId,
+        });
+      }
+    }
 
     if (!supportTopic) {
       await ctx.reply('❌ No se encontró el ticket de soporte para este usuario.', {
@@ -1828,7 +1858,7 @@ También puedes ejecutar acciones del ticket con los botones superiores.`;
     }
 
     try {
-      await SupportTopicModel.updateStatus(userId, 'closed');
+      await SupportTopicModel.updateStatus(effectiveUserId, 'closed');
 
       if (supportTopic.thread_id) {
         try {
@@ -1838,7 +1868,7 @@ También puedes ejecutar acciones del ticket con los botones superiores.`;
         }
       }
 
-      const user = await UserModel.getById(userId);
+      const user = await UserModel.getById(effectiveUserId);
       const adminName = ctx.from.first_name || 'Soporte';
       const userLang = user?.language || 'es';
       const closedMessage = userLang === 'en'
@@ -1846,14 +1876,14 @@ También puedes ejecutar acciones del ticket con los botones superiores.`;
         : `✅ *Caso Cerrado*\n\nNo hemos recibido respuesta de tu parte, por lo que hemos cerrado este ticket. Si necesitas más ayuda, por favor abre un nuevo ticket. ¡Gracias por contactar a PNP! 💜`;
 
       try {
-        await ctx.telegram.sendMessage(userId, closedMessage, { parse_mode: 'Markdown' });
+        await ctx.telegram.sendMessage(effectiveUserId, closedMessage, { parse_mode: 'Markdown' });
       } catch (notifyError) {
         logger.warn('Could not notify user about closure:', notifyError.message);
       }
 
       await ctx.reply(`✅ *Caso Cerrado*
 
-👤 *Usuario:* ${user?.firstName || user?.username || userId} (\`${userId}\`)
+👤 *Usuario:* ${user?.firstName || user?.username || effectiveUserId} (\`${effectiveUserId}\`)
 👨‍💼 *Cerrado por:* ${adminName}
 
 _El usuario ha sido notificado._
@@ -1863,7 +1893,7 @@ _El topic ha sido cerrado._`, {
       });
 
       logger.info('Support ticket closed', {
-        userId,
+        userId: effectiveUserId,
         closedBy: ctx.from.id,
       });
     } catch (error) {
