@@ -1,0 +1,192 @@
+{
+  "info": {
+    "name": "ePayco 3DS Integration Tests",
+    "description": "Test cases for ePayco 3DS fixes (commit 0c2c9d6)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "8645eb8b8e532f65025806f315ba604e244d9397e5d27280b94d6a6cc9b9772f"
+  },
+  "item": [
+    {
+      "name": "1. TC-001.1 - Audit Log user_id Not NULL",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "User-Agent",
+            "value": "Postman-Test/1.0"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"paymentId\": \"pay-test-001\",\n  \"cardNumber\": \"4111111111111111\",\n  \"expYear\": \"2025\",\n  \"expMonth\": \"12\",\n  \"cvc\": \"123\",\n  \"name\": \"Test User\",\n  \"lastName\": \"Testing\",\n  \"email\": \"test@example.com\",\n  \"docType\": \"CC\",\n  \"docNumber\": \"123456789\",\n  \"city\": \"Bogota\",\n  \"address\": \"Test St\",\n  \"phone\": \"3001234567\",\n  \"dues\": \"1\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/payment/tokenized-charge",
+          "host": ["{{base_url}}"],
+          "path": ["api", "payment", "tokenized-charge"]
+        },
+        "description": "Test that audit log records user_id correctly (FIX 1)"
+      },
+      "response": []
+    },
+    {
+      "name": "2. TC-002.1 - Payment Without Bank URL Fails",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"paymentId\": \"pay-test-002\",\n  \"cardNumber\": \"4111111111111111\",\n  \"expYear\": \"2025\",\n  \"expMonth\": \"12\",\n  \"cvc\": \"123\",\n  \"name\": \"No Bank URL Test\",\n  \"lastName\": \"Test\",\n  \"email\": \"nobank@example.com\",\n  \"docType\": \"CC\",\n  \"docNumber\": \"987654321\",\n  \"city\": \"Bogota\",\n  \"address\": \"Test St\",\n  \"phone\": \"3001234567\",\n  \"dues\": \"1\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/payment/tokenized-charge",
+          "host": ["{{base_url}}"],
+          "path": ["api", "payment", "tokenized-charge"]
+        },
+        "description": "Test that payment fails immediately when ePayco returns Pendiente without bank URL (FIX 2)"
+      },
+      "response": []
+    },
+    {
+      "name": "3. TC-003.1 - Database NULL user_id",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"paymentId\": \"pay-test-003\",\n  \"cardNumber\": \"4111111111111111\",\n  \"expYear\": \"2025\",\n  \"expMonth\": \"12\",\n  \"cvc\": \"123\",\n  \"name\": \"NULL Test\",\n  \"lastName\": \"Test\",\n  \"email\": \"nulltest@example.com\",\n  \"docType\": \"CC\",\n  \"docNumber\": \"555555555\",\n  \"city\": \"Bogota\",\n  \"address\": \"Test St\",\n  \"phone\": \"3001234567\",\n  \"dues\": \"1\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/payment/tokenized-charge",
+          "host": ["{{base_url}}"],
+          "path": ["api", "payment", "tokenized-charge"]
+        },
+        "description": "Test that database allows NULL user_id after migration 058 (FIX 3)"
+      },
+      "response": []
+    },
+    {
+      "name": "4. TC-004.1 - 3DS 2.0 Cardinal Commerce Flow",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"paymentId\": \"pay-test-004\",\n  \"cardNumber\": \"4111111111111111\",\n  \"expYear\": \"2025\",\n  \"expMonth\": \"12\",\n  \"cvc\": \"123\",\n  \"name\": \"3DS 2.0 Test\",\n  \"lastName\": \"Test\",\n  \"email\": \"3ds2@example.com\",\n  \"docType\": \"CC\",\n  \"docNumber\": \"666666666\",\n  \"city\": \"Bogota\",\n  \"address\": \"Test St\",\n  \"phone\": \"3001234567\",\n  \"dues\": \"1\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/payment/tokenized-charge",
+          "host": ["{{base_url}}"],
+          "path": ["api", "payment", "tokenized-charge"]
+        },
+        "description": "Test 3DS 2.0 with Cardinal Commerce device data collection"
+      },
+      "response": []
+    },
+    {
+      "name": "5. TC-005.1 - 3DS 1.0 Bank Redirect",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"paymentId\": \"pay-test-005\",\n  \"cardNumber\": \"4111111111111111\",\n  \"expYear\": \"2025\",\n  \"expMonth\": \"12\",\n  \"cvc\": \"123\",\n  \"name\": \"3DS 1.0 Test\",\n  \"lastName\": \"Test\",\n  \"email\": \"3ds1@example.com\",\n  \"docType\": \"CC\",\n  \"docNumber\": \"777777777\",\n  \"city\": \"Bogota\",\n  \"address\": \"Test St\",\n  \"phone\": \"3001234567\",\n  \"dues\": \"1\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/payment/tokenized-charge",
+          "host": ["{{base_url}}"],
+          "path": ["api", "payment", "tokenized-charge"]
+        },
+        "description": "Test 3DS 1.0 simple bank redirect flow"
+      },
+      "response": []
+    },
+    {
+      "name": "6. TC-006.1 - Successful Payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"paymentId\": \"pay-test-006\",\n  \"cardNumber\": \"4111111111111111\",\n  \"expYear\": \"2025\",\n  \"expMonth\": \"12\",\n  \"cvc\": \"123\",\n  \"name\": \"Success Test\",\n  \"lastName\": \"Test\",\n  \"email\": \"success@example.com\",\n  \"docType\": \"CC\",\n  \"docNumber\": \"888888888\",\n  \"city\": \"Bogota\",\n  \"address\": \"Test St\",\n  \"phone\": \"3001234567\",\n  \"dues\": \"1\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/payment/tokenized-charge",
+          "host": ["{{base_url}}"],
+          "path": ["api", "payment", "tokenized-charge"]
+        },
+        "description": "Test successful payment approval and subscription activation"
+      },
+      "response": []
+    },
+    {
+      "name": "7. GET - Check Payment Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/payment/{{paymentId}}/status",
+          "host": ["{{base_url}}"],
+          "path": ["api", "payment", "{{paymentId}}", "status"]
+        },
+        "description": "Check payment status after processing"
+      },
+      "response": []
+    },
+    {
+      "name": "8. GET - Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/health",
+          "host": ["{{base_url}}"],
+          "path": ["api", "health"]
+        },
+        "description": "Verify API is up and database/Redis are connected"
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "paymentId",
+      "value": "pay-test-001",
+      "type": "string"
+    }
+  ]
+}

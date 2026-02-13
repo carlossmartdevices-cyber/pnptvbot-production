@@ -11,13 +11,39 @@ const paymentHandlers = require('../payments');
 const { showNearbyMenu } = require('./nearbyUnified');
 const supportRoutingService = require('../../services/supportRoutingService');
 const { handlePromoDeepLink } = require('../promo/promoHandler');
-const fs = require('fs/promises');
 const path = require('path');
+const fs = require('fs/promises');
+const { getPrimeInviteLink, activateMembership, fetchActivationCode, markCodeUsed, logActivation } = require('../payments/activation');
+const MessageTemplates = require('../../services/messageTemplates');
+const BusinessNotificationService = require('../../services/businessNotificationService');
+const meruPaymentService = require('../../../services/meruPaymentService');
+const meruLinkService = require('../../../services/meruLinkService');
+const PaymentHistoryService = require('../../../services/paymentHistoryService');
 
-// PASO 2️⃣ & 3️⃣: Imports para Meru payment flow
-const meruPaymentService = require('../../services/meruPaymentService');
-const meruLinkService = require('../../services/meruLinkService');
-const PaymentHistoryService = require('../../services/paymentHistoryService');
+const activationStrings = {
+  en: {
+    thanks: "Thank you for your purchase!\n\nTo activate your *Lifetime Pass*, please press the button below and send us your confirmation code.",
+    sendCodeButton: "✉️ Send My Confirmation Code",
+    promptCode: "Please send your payment confirmation code:",
+    invalidCodeFormat: "❌ Invalid code format. Please send the code as plain text.",
+    codeNotFound: "❌ Code not found or invalid. Please check your code and try again.",
+    paymentExpiredOrPaid: "✅ Your Lifetime Pass has been activated! Welcome to PRIME!\n\n🌟 Access the PRIME channel:\n👉 {inviteLink}",
+    paymentNotCompleted: "⚠️ We could not confirm your payment. Please ensure your payment is complete and try again, or contact support if you believe this is an error.",
+    errorActivating: "❌ An error occurred during activation. Please try again later.",
+    receiptReceived: "✅ Receipt received. Our team will review and activate your account soon."
+  },
+  es: {
+    thanks: "¡Muchas gracias por tu compra!\n\nPara activar tu *Lifetime Pass*, por favor presiona el botón de abajo y envíanos tu código de confirmación.",
+    sendCodeButton: "✉️ Enviar mi código de confirmación",
+    promptCode: "Por favor, envía tu código de confirmación de pago:",
+    invalidCodeFormat: "❌ Formato de código inválido. Por favor, envía el código como texto simple.",
+    codeNotFound: "❌ Código no encontrado o inválido. Por favor, verifica tu código e inténtalo de nuevo.",
+    paymentExpiredOrPaid: "✅ ¡Tu Lifetime Pass ha sido activado! ¡Bienvenido a PRIME!\n\n🌟 Accede al canal PRIME:\n👉 {inviteLink}",
+    paymentNotCompleted: "⚠️ No pudimos confirmar tu pago. Por favor, asegúrate de que tu pago esté completo e inténtalo de nuevo, o contacta a soporte si crees que es un error.",
+    errorActivating: "❌ Ocurrió un error durante la activación. Por favor, inténtalo de nuevo más tarde.",
+    receiptReceived: "✅ Recibo recibido. Nuestro equipo revisará y activará tu cuenta pronto."
+  }
+};
 
 /**
  * Onboarding handlers
@@ -47,6 +73,21 @@ const registerOnboardingHandlers = (bot) => {
     } catch (error) {
       logger.error('Error in /onboard command:', error);
       await ctx.reply('An error occurred. Please try again.');
+    }
+  });
+
+  // Action to prompt user for activation code
+  bot.action('activate_lifetime_send_code', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const lang = getLanguage(ctx);
+      if (!ctx.session.temp) ctx.session.temp = {};
+      ctx.session.temp.waitingForLifetimeCode = true;
+      await ctx.saveSession();
+      await ctx.reply(activationStrings[lang].promptCode);
+    } catch (error) {
+      logger.error('Error in activate_lifetime_send_code action:', error);
+      await ctx.reply(activationStrings[getLanguage(ctx)].errorActivating);
     }
   });
 
@@ -102,35 +143,15 @@ const registerOnboardingHandlers = (bot) => {
         const lang = getLanguage(ctx);
         const userId = ctx.from.id;
 
-        logger.info('🔵 PASO 2️⃣: Inicio del flujo de activación de Lifetime Pass', {
-          userId,
-          username: ctx.from.username
-        });
-
-        // PASO 2.1️⃣: Mostrar mensaje de bienvenida y botón
-        const userMessage = lang === 'es'
-          ? `¡*Muchas gracias por tu compra!*
-
-Para activar tu *Lifetime Pass*, por favor presiona el botón de abajo y envíanos tu código de confirmación.`
-          : `*Thank you for your purchase!*
-
-To activate your *Lifetime Pass*, please press the button below and send us your confirmation code.`;
-
-        // PASO 2.2️⃣: Mostrar botón "Enviar código"
         await ctx.reply(
-          userMessage,
+          activationStrings[lang].thanks,
           {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-              [Markup.button.callback(
-                lang === 'es' ? '✉️ Enviar mi código de confirmación' : '✉️ Send My Confirmation Code',
-                'activate_lifetime_send_code'
-              )]
-            ])
+              [Markup.button.callback(activationStrings[lang].sendCodeButton, 'activate_lifetime_send_code')],
+            ]),
           }
         );
-
-        logger.info('✅ Mensaje de bienvenida enviado con botón', { userId });
         return;
       }
 
@@ -459,100 +480,133 @@ To activate your *Lifetime Pass*, please press the button below and send us your
       text: ctx.message?.text?.substring(0, 50)
     });
 
-    // ═══════════════════════════════════════════════════════════════
-    // PASO 3️⃣: USUARIO ENVÍA EL CÓDIGO
-    // ═══════════════════════════════════════════════════════════════
-    /**
-     * PASO 3.1️⃣ & 3.2️⃣: Validar y procesar código de Meru
-     * Usuario envía: LSJUek
-     * Bot valida: formato, existe en HTML
-     * Bot busca: coincidencia exacta
-     */
+    // New logic for Lifetime Code Activation
     if (ctx.session?.temp?.waitingForLifetimeCode) {
       const lang = getLanguage(ctx);
       const rawCode = ctx.message?.text?.trim();
 
-      logger.info('🔵 PASO 3.1️⃣: Usuario enviando código', {
-        userId: ctx.from.id,
-        code: rawCode?.substring(0, 10)
-      });
-
-      // PASO 3.2️⃣: Validación 1 - Formato correcto (no vacío, sin espacios)
-      if (!rawCode || rawCode.length === 0 || rawCode.includes(' ')) {
-        logger.warn('❌ Formato de código inválido', {
-          userId: ctx.from.id,
-          rawCode,
-          reason: 'vacío, muy corto o contiene espacios'
-        });
-
-        await ctx.reply(lang === 'es'
-          ? '❌ Formato de código inválido. Por favor, envía el código como texto simple sin espacios.'
-          : '❌ Invalid code format. Please send the code as plain text without spaces.');
+      if (!rawCode || rawCode.length === 0 || rawCode.includes(' ')) { // Simple validation for now
+        await ctx.reply(activationStrings[lang].invalidCodeFormat);
+        ctx.session.temp.waitingForLifetimeCode = false; // Clear the flag
+        await ctx.saveSession();
         return;
       }
 
-      // Limpiar flag para no volver a procesar
-      ctx.session.temp.waitingForLifetimeCode = false;
+      ctx.session.temp.waitingForLifetimeCode = false; // Clear the flag
       await ctx.saveSession();
 
       try {
-        // PASO 3.2️⃣: Validación 2 - Verificar que existe en lifetime-pass.html
-        logger.info('🔵 PASO 3.2️⃣: Validando código en HTML', { userId: ctx.from.id });
+        const lifetimePassHtmlPath = path.join(__dirname, '../../../../public/lifetime-pass.html'); // Correct path to the HTML file
+        const htmlContent = await fs.readFile(lifetimePassHtmlPath, 'utf8');
 
-        const htmlPath = path.join(__dirname, '../../../public/lifetime-pass.html');
-        const htmlContent = await fs.readFile(htmlPath, 'utf8');
-
-        // Extraer todos los códigos válidos del HTML
-        // Regex busca: https://pay.getmeru.com/{CODIGO}
         const meruLinksRegex = /https:\/\/pay\.getmeru\.com\/([a-zA-Z0-9_-]+)/g;
         let match;
         const meruCodes = [];
-
         while ((match = meruLinksRegex.exec(htmlContent)) !== null) {
-          meruCodes.push(match[1]);
+            meruCodes.push(match[1]);
         }
-
-        logger.info('✅ Códigos encontrados en HTML', {
-          totalCodes: meruCodes.length,
-          codes: meruCodes.join(', ')
-        });
-
-        // Buscar coincidencia exacta
+        
         const matchingLinkCode = meruCodes.find(code => code === rawCode);
 
         if (!matchingLinkCode) {
-          logger.warn('❌ Código no encontrado en HTML', {
-            userId: ctx.from.id,
-            providedCode: rawCode,
-            validCodes: meruCodes.length
-          });
-
-          await ctx.reply(lang === 'es'
-            ? '❌ Código no encontrado o inválido. Por favor, verifica tu código e inténtalo de nuevo.'
-            : '❌ Code not found or invalid. Please check your code and try again.');
-          return;
+            await ctx.reply(activationStrings[lang].codeNotFound);
+            return;
         }
 
-        logger.info('✅ Código válido encontrado', {
+        const meruPaymentUrl = `https://pay.getmeru.com/${matchingLinkCode}`;
+        await ctx.reply(`Verificando pago para el código: \`${matchingLinkCode}\`...`, { parse_mode: 'Markdown' });
+
+        // Usar Puppeteer para verificar el pago (lee contenido real con JavaScript ejecutado)
+        // Pasar el idioma del usuario para que Meru muestre el mensaje en el idioma correcto
+        const paymentCheck = await meruPaymentService.verifyPayment(matchingLinkCode, lang);
+
+        logger.info('Meru payment verification result', {
+          code: matchingLinkCode,
+          isPaid: paymentCheck.isPaid,
           userId: ctx.from.id,
-          code: matchingLinkCode
         });
 
-        // Código válido, proceder a PASO 4️⃣
-        await verifyAndActivateMeruPayment(ctx, matchingLinkCode, lang);
+        if (paymentCheck.isPaid) {
+          // Payment confirmed, activate PRIME
+          const userId = ctx.from.id;
+          const planId = 'lifetime_pass'; // Assuming this is the plan ID for Lifetime Pass
+          const product = 'lifetime-pass';
 
+          const activated = await activateMembership({
+            ctx,
+            userId,
+            planId,
+            product,
+            // successMessage will be handled below
+          });
+
+          if (!activated) {
+            await ctx.reply(activationStrings[lang].errorActivating);
+            return;
+          }
+
+          // Mark code as used
+          await markCodeUsed(matchingLinkCode, userId, ctx.from.username);
+
+          // IMPORTANT: Invalidate the Meru link to prevent reuse
+          const linkInvalidation = await meruLinkService.invalidateLinkAfterActivation(
+            matchingLinkCode,
+            userId,
+            ctx.from.username
+          );
+
+          if (!linkInvalidation.success) {
+            logger.warn('Failed to invalidate Meru link after activation', {
+              code: matchingLinkCode,
+              userId,
+              reason: linkInvalidation.message,
+            });
+          }
+
+          // Record payment in history
+          try {
+            await PaymentHistoryService.recordPayment({
+              userId,
+              paymentMethod: 'meru',
+              amount: 50,  // Standard lifetime pass price
+              currency: 'USD',
+              planId: 'lifetime_pass',
+              planName: 'Lifetime Pass',
+              product: product || 'lifetime-pass',
+              paymentReference: matchingLinkCode,  // Meru link code is the payment reference
+              status: 'completed',
+              metadata: {
+                meru_link: `https://pay.getmeru.com/${matchingLinkCode}`,
+                verification_method: 'puppeteer',
+                language: lang,
+              },
+            });
+          } catch (historyError) {
+            logger.warn('Failed to record Meru payment in history (non-critical):', {
+              error: historyError.message,
+              userId,
+              code: matchingLinkCode,
+            });
+          }
+
+          await logActivation({ userId, username: ctx.from.username, code: matchingLinkCode, product, success: true });
+          BusinessNotificationService.notifyCodeActivation({ userId, username: ctx.from.username, code: matchingLinkCode, product });
+
+          const inviteLink = await getPrimeInviteLink(ctx, userId);
+          await ctx.reply(
+            activationStrings[lang].paymentExpiredOrPaid.replace('{inviteLink}', inviteLink),
+            { parse_mode: 'Markdown', disable_web_page_preview: true }
+          );
+          await showMainMenu(ctx); // Show main menu after activation
+        } else {
+          // Payment not confirmed
+          await ctx.reply(activationStrings[lang].paymentNotCompleted);
+        }
       } catch (error) {
-        logger.error('❌ Error en validación de código de Meru', {
-          userId: ctx.from.id,
-          error: error.message
-        });
-
-        await ctx.reply(lang === 'es'
-          ? '❌ Ocurrió un error al verificar tu código. Por favor, inténtalo de nuevo más tarde.'
-          : '❌ An error occurred while verifying your code. Please try again later.');
+        logger.error('Error processing lifetime code activation:', error);
+        await ctx.reply(activationStrings[lang].errorActivating);
       }
-
-      return;
+      return; // Crucial to return here to prevent further text processing
     }
 
     if (ctx.session?.temp?.waitingForEmail) {

@@ -5,11 +5,103 @@ const ConfirmationTokenService = require('../../services/confirmationTokenServic
 const PaymentService = require('../../services/paymentService');
 const PaymentSecurityService = require('../../services/paymentSecurityService');
 const logger = require('../../../utils/logger');
+const { query } = require('../../../config/postgres');
 
 /**
  * Payment Controller - Handles payment-related API endpoints
  */
 class PaymentController {
+  static EPAYCO_3DS_PENDING_TIMEOUT_MINUTES = Number(process.env.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES || 12);
+
+  /**
+   * Get userId from payment record for audit logging
+   * @param {string} paymentId - Payment ID
+   * @returns {Promise<string|null>} User ID or null if not found
+   */
+  static async getUserIdFromPayment(paymentId) {
+    try {
+      if (!paymentId) return null;
+      const payment = await PaymentModel.getById(paymentId);
+      return payment?.userId || payment?.user_id || null;
+    } catch (error) {
+      logger.error('Failed to get userId from payment', {
+        paymentId,
+        error: error.message
+      });
+      return null;
+    }
+  }
+
+  static isInternalPaymentReference(value) {
+    if (!value) return false;
+    const ref = String(value).trim();
+    return /^PAY-/i.test(ref) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref);
+  }
+
+  /**
+   * Resolve ePayco reference from different persisted fields.
+   * Some flows store it in `reference` / `transactionId` instead of `epayco_ref`.
+   */
+  static resolveEpaycoRef(payment) {
+    if (!payment) return null;
+    const candidates = [
+      payment.metadata?.epayco_ref,
+      payment.epayco_ref,
+      payment.epaycoRef,
+      payment.metadata?.reference,
+      payment.transactionId,
+      payment.transaction_id,
+      payment.reference,
+    ];
+
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      const value = String(candidate).trim();
+      if (!value) continue;
+      if (PaymentController.isInternalPaymentReference(value)) continue;
+      return value;
+    }
+
+    return null;
+  }
+
+  static async resolveEpaycoRefFromDb(paymentId) {
+    try {
+      if (!paymentId) return null;
+      const result = await query(
+        `SELECT reference, transaction_id, metadata
+         FROM payments
+         WHERE id = $1::uuid`,
+        [paymentId]
+      );
+      const row = result?.rows?.[0];
+      if (!row) return null;
+
+      const metadata = row.metadata || {};
+      const candidates = [
+        metadata.epayco_ref,
+        metadata.reference,
+        row.reference,
+        row.transaction_id,
+      ];
+
+      for (const candidate of candidates) {
+        if (!candidate) continue;
+        const value = String(candidate).trim();
+        if (!value) continue;
+        if (PaymentController.isInternalPaymentReference(value)) continue;
+        return value;
+      }
+      return null;
+    } catch (error) {
+      logger.error('Error resolving ePayco reference from DB', {
+        error: error.message,
+        paymentId,
+      });
+      return null;
+    }
+  }
+
   /**
    * Get payment information for checkout page
    * GET /api/payment/:paymentId
@@ -314,6 +406,11 @@ class PaymentController {
         return res.status(404).json({ success: false, error: 'Payment not found' });
       }
 
+      // Prevent browser/proxy caching during polling (avoids 304 loops in checkout).
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
       res.json({ success: true, status: payment.status });
     } catch (error) {
       logger.error('Error getting payment status:', {
@@ -428,10 +525,13 @@ class PaymentController {
         logger.error('Payment timeout check failed (non-critical)', { error: err.message });
       }
 
+      // Get userId for audit logging
+      const userId = await PaymentController.getUserIdFromPayment(paymentId);
+
       // Security: Audit trail - charge attempted
       PaymentSecurityService.logPaymentEvent({
         paymentId,
-        userId: null,
+        userId,
         eventType: 'charge_attempted',
         provider: 'epayco',
         amount: null,
@@ -481,7 +581,7 @@ class PaymentController {
         // Security: Audit trail - charge completed
         PaymentSecurityService.logPaymentEvent({
           paymentId,
-          userId: null,
+          userId,
           eventType: 'charge_completed',
           provider: 'epayco',
           amount: null,
@@ -503,9 +603,10 @@ class PaymentController {
       });
 
       // Security: Log payment error
+      const errorUserId = await PaymentController.getUserIdFromPayment(req.body?.paymentId).catch(() => null);
       PaymentSecurityService.logPaymentError({
         paymentId: req.body?.paymentId,
-        userId: null,
+        userId: errorUserId,
         provider: 'epayco',
         errorCode: 'TOKENIZED_CHARGE_ERROR',
         errorMessage: error.message,
@@ -610,10 +711,13 @@ class PaymentController {
         });
       }
 
+      const refPayco = PaymentController.resolveEpaycoRef(payment)
+        || await PaymentController.resolveEpaycoRefFromDb(paymentId);
+
       logger.info('Checking payment status with recovery', {
         paymentId,
         currentStatus: payment.status,
-        refPayco: payment.epayco_ref,
+        refPayco,
       });
 
       // If payment is not pending, return current status
@@ -626,7 +730,7 @@ class PaymentController {
       }
 
       // Payment is pending - check if it's stuck or waiting for webhook
-      if (!payment.epayco_ref) {
+      if (!refPayco) {
         return res.json({
           success: true,
           status: 'pending',
@@ -637,7 +741,7 @@ class PaymentController {
       }
 
       // Check status at ePayco
-      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(payment.epayco_ref);
+      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(refPayco);
 
       if (!statusCheck.success) {
         return res.json({
@@ -651,12 +755,12 @@ class PaymentController {
       if (statusCheck.currentStatus === 'Aceptada' || statusCheck.currentStatus === 'Aprobada') {
         logger.warn('STUCK PAYMENT DETECTED: Payment approved at ePayco but stuck in pending locally', {
           paymentId,
-          refPayco: payment.epayco_ref,
+          refPayco,
           currentStatus: statusCheck.currentStatus,
         });
 
         // Attempt recovery
-        const recovery = await PaymentService.recoverStuckPendingPayment(paymentId, payment.epayco_ref);
+        const recovery = await PaymentService.recoverStuckPendingPayment(paymentId, refPayco);
 
         return res.json({
           success: true,
@@ -667,6 +771,94 @@ class PaymentController {
           recovery,
           message: 'Payment is stuck - recovery in progress. Check webhook logs for processing.',
           action: 'WEBHOOK_REPLAY_NEEDED',
+        });
+      }
+
+      if (
+        statusCheck.currentStatus === 'Rechazada'
+        || statusCheck.currentStatus === 'Fallida'
+        || statusCheck.currentStatus === 'Abandonada'
+        || statusCheck.currentStatus === 'Cancelada'
+      ) {
+        await PaymentModel.updateStatus(paymentId, 'failed', {
+          epayco_ref: refPayco,
+          epayco_estado: statusCheck.currentStatus,
+          error: statusCheck.message || `Payment ${statusCheck.currentStatus.toLowerCase()} at ePayco`,
+          recovered_via_status_check: true,
+        });
+
+        return res.json({
+          success: true,
+          status: 'failed',
+          stuck: false,
+          currentStatusAtEpayco: statusCheck.currentStatus,
+          message: statusCheck.message || 'Payment failed at ePayco',
+          action: 'RETRY_PAYMENT',
+        });
+      }
+
+      if (statusCheck.currentStatus === 'Reversada') {
+        await PaymentModel.updateStatus(paymentId, 'refunded', {
+          epayco_ref: refPayco,
+          epayco_estado: statusCheck.currentStatus,
+          recovered_via_status_check: true,
+          error: statusCheck.message || 'Payment reversed/refunded at ePayco',
+        });
+
+        return res.json({
+          success: true,
+          status: 'refunded',
+          stuck: false,
+          currentStatusAtEpayco: statusCheck.currentStatus,
+          message: statusCheck.message || 'Payment reversed/refunded at ePayco',
+          action: 'NO_RETRY',
+        });
+      }
+
+      // Payment is still pending at ePayco.
+      // If this was a 3DS flow and it has exceeded a safe timeout window,
+      // fail locally to avoid indefinite "verifying payment" loops.
+      const createdAt = payment.createdAt || payment.created_at;
+      const createdAtMs = createdAt ? new Date(createdAt).getTime() : null;
+      const ageMs = Number.isFinite(createdAtMs) ? (Date.now() - createdAtMs) : null;
+      const ageMinutes = ageMs !== null ? ageMs / (60 * 1000) : null;
+      const metadata = payment.metadata || {};
+      const isLikelyThreeDSFlow = Boolean(
+        metadata.three_ds_requested
+        || metadata.three_ds_authentication
+        || metadata.three_ds_version
+        || metadata.bank_url_available === false
+      );
+
+      if (
+        statusCheck.currentStatus === 'Pendiente'
+        && isLikelyThreeDSFlow
+        && ageMinutes !== null
+        && ageMinutes >= PaymentController.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES
+      ) {
+        await PaymentModel.updateStatus(paymentId, 'failed', {
+          epayco_ref: refPayco,
+          epayco_estado: statusCheck.currentStatus,
+          abandoned_3ds: true,
+          timeout_recovered_via_status_check: true,
+          recovered_via_status_check: true,
+          error: `3DS timeout after ${Math.floor(ageMinutes)} minutes without final confirmation`,
+        });
+
+        logger.warn('3DS payment timed out in pending state; marking as failed', {
+          paymentId,
+          refPayco,
+          ageMinutes: Math.floor(ageMinutes),
+          timeoutMinutes: PaymentController.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES,
+        });
+
+        return res.json({
+          success: true,
+          status: 'failed',
+          stuck: true,
+          currentStatusAtEpayco: statusCheck.currentStatus,
+          message: '3DS no se completó a tiempo. Intenta nuevamente con un nuevo enlace de pago.',
+          action: 'RETRY_PAYMENT',
         });
       }
 
@@ -717,6 +909,9 @@ class PaymentController {
         });
       }
 
+      const refPayco = PaymentController.resolveEpaycoRef(payment)
+        || await PaymentController.resolveEpaycoRefFromDb(paymentId);
+
       if (payment.status !== 'pending') {
         return res.status(400).json({
           success: false,
@@ -724,7 +919,7 @@ class PaymentController {
         });
       }
 
-      if (!payment.epayco_ref) {
+      if (!refPayco) {
         return res.status(400).json({
           success: false,
           error: 'No ePayco reference found for this payment',
@@ -733,11 +928,11 @@ class PaymentController {
 
       logger.warn('Manual webhook retry initiated', {
         paymentId,
-        refPayco: payment.epayco_ref,
+        refPayco,
       });
 
       // Check if payment is actually approved at ePayco
-      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(payment.epayco_ref);
+      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(refPayco);
 
       if (!statusCheck.success) {
         return res.status(400).json({
@@ -759,7 +954,7 @@ class PaymentController {
       // The webhook should have been received already
       logger.error('CRITICAL: Payment approved at ePayco but stuck pending locally - webhook was missed', {
         paymentId,
-        refPayco: payment.epayco_ref,
+        refPayco,
         action: 'ADMIN_INTERVENTION_NEEDED',
       });
 
@@ -768,7 +963,7 @@ class PaymentController {
         message: 'Webhook retry queued - admin notification sent',
         action: 'ADMIN_MANUAL_INTERVENTION',
         paymentId,
-        refPayco: payment.epayco_ref,
+        refPayco,
         note: 'This indicates a system issue - webhooks should be received automatically',
       });
     } catch (error) {
@@ -815,6 +1010,9 @@ class PaymentController {
         });
       }
 
+      const refPayco = PaymentController.resolveEpaycoRef(payment)
+        || await PaymentController.resolveEpaycoRefFromDb(paymentId);
+
       if (payment.status !== 'pending') {
         return res.status(400).json({
           success: false,
@@ -838,12 +1036,12 @@ class PaymentController {
       });
 
       // Check payment status with ePayco to see if it's been approved after 3DS
-      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(payment.epayco_ref);
+      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(refPayco);
 
       if (!statusCheck.success) {
         logger.warn('Could not verify payment status at ePayco', {
           paymentId,
-          refPayco: payment.epayco_ref,
+          refPayco,
         });
         // Return pending - let client poll
         return res.json({
@@ -859,15 +1057,15 @@ class PaymentController {
         // Payment is approved at ePayco
         logger.info('Payment approved at ePayco after 3DS 2.0 authentication', {
           paymentId,
-          refPayco: payment.epayco_ref,
+          refPayco,
           currentStatus,
         });
 
         // Update payment status to completed
         await PaymentModel.updateStatus(paymentId, 'completed', {
-          transaction_id: payment.epayco_ref,
-          reference: payment.epayco_ref,
-          epayco_ref: payment.epayco_ref,
+          transaction_id: refPayco || payment.transactionId,
+          reference: refPayco || payment.reference,
+          epayco_ref: refPayco,
           payment_method: 'tokenized_card',
           three_ds_authenticated: true,
         });
@@ -901,6 +1099,39 @@ class PaymentController {
           success: true,
           status: 'authenticated',
           message: 'Payment authenticated and approved',
+          paymentId,
+        });
+      } else if (
+        currentStatus === 'Rechazada'
+        || currentStatus === 'Fallida'
+        || currentStatus === 'Abandonada'
+        || currentStatus === 'Cancelada'
+      ) {
+        await PaymentModel.updateStatus(paymentId, 'failed', {
+          epayco_ref: refPayco,
+          epayco_estado: currentStatus,
+          error: `Payment ${currentStatus.toLowerCase()} after 3DS authentication`,
+          three_ds_authenticated: true,
+        });
+
+        return res.json({
+          success: true,
+          status: 'failed',
+          message: `Payment ${currentStatus.toLowerCase()} at ePayco`,
+          paymentId,
+        });
+      } else if (currentStatus === 'Reversada') {
+        await PaymentModel.updateStatus(paymentId, 'refunded', {
+          epayco_ref: refPayco,
+          epayco_estado: currentStatus,
+          error: 'Payment reversed/refunded after 3DS authentication',
+          three_ds_authenticated: true,
+        });
+
+        return res.json({
+          success: true,
+          status: 'refunded',
+          message: 'Payment reversed/refunded at ePayco',
           paymentId,
         });
       } else {

@@ -2,38 +2,20 @@ const logger = require('../utils/logger');
 const { query } = require('../utils/db');
 
 /**
- * PASO 5️⃣: BOT ACTIVA LA MEMBRESÍA
- *
- * MeruLinkService - Gestiona links de pago de Meru
- * Previene duplicados marcando links como "used" después de activación
- *
- * Flujo:
- * - 5.1: Si pago confirmado, activar membresía
- * - 5.2: Marcar código como usado en BD
- *
- * Referencia: MERU_PAYMENT_FLOW_DETAILED.md - PASO 5️⃣
+ * MeruLinkService - Manages Meru payment links and tracks their usage
+ * Prevents duplicate payments and sales loss by marking links as invalid when used
  */
 class MeruLinkService {
   /**
-   * PASO 5.2️⃣: Marcar código como usado en la BD
-   *
-   * Cambios en BD:
-   * status: 'active' → 'used'
-   * used_by: NULL → ID del usuario
-   * used_by_username: NULL → Username del usuario
-   * used_at: NULL → Timestamp actual
-   *
-   * Previene reutilización porque solo se procesan links con status='active'
-   *
-   * @param {string} meruCode - Código del link (ej: "LSJUek")
-   * @param {string} userId - ID del usuario (ej: "123456789")
-   * @param {string} username - Username del usuario (ej: "@juanperu")
-   * @returns {Promise<{success: boolean, message: string, link: Object}>}
+   * Mark a Meru link as used/invalidated
+   * This prevents the same link from being used again in the randomizer
+   * @param {string} meruCode - The code extracted from the Meru link (e.g., "daq_Ak")
+   * @param {string} userId - The user who activated this link
+   * @param {string} username - The username of the user
+   * @returns {Promise<{success: boolean, message: string}>}
    */
   async invalidateLinkAfterActivation(meruCode, userId, username) {
     try {
-      logger.info(`🔵 PASO 5.2️⃣: Marcando link como usado - código: ${meruCode}`);
-
       const result = await query(
         `UPDATE meru_payment_links
          SET status = 'used',
@@ -46,7 +28,7 @@ class MeruLinkService {
       );
 
       if (result.rows.length === 0) {
-        logger.warn('❌ Link no encontrado o ya usado', { code: meruCode, userId });
+        logger.warn('Meru link not found or already used', { code: meruCode, userId });
         return {
           success: false,
           message: 'Link not found or already used',
@@ -54,12 +36,11 @@ class MeruLinkService {
       }
 
       const link = result.rows[0];
-      logger.info('✅ Link marcado como usado', {
+      logger.info('Meru link invalidated after activation', {
         code: meruCode,
         linkId: link.id,
         userId,
         username,
-        previenePrevention: 'Ahora status="used", no se puede reutilizar',
       });
 
       return {
@@ -68,7 +49,7 @@ class MeruLinkService {
         link,
       };
     } catch (error) {
-      logger.error('❌ Error marcando link como usado:', error);
+      logger.error('Error invalidating Meru link:', error);
       return {
         success: false,
         message: `Error: ${error.message}`,

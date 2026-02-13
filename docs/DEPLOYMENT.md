@@ -233,6 +233,225 @@ gcloud run services update pnptv-bot \
   --set-env-vars BOT_TOKEN=your_token,NODE_ENV=production
 ```
 
+## Advanced Deployment and Hardening
+
+This section provides additional details and best practices for securing and maintaining your PNPtv Bot deployment, particularly when using a Docker-based setup with Nginx and Let's Encrypt.
+
+### Detailed SSL Certificate Setup
+
+#### Initial Certificate Installation
+
+To install Let's Encrypt SSL certificates using a helper script:
+
+```bash
+# Ensure scripts are executable
+chmod +x scripts/*.sh
+
+# Run SSL setup script with your domain and admin email
+sudo ./scripts/setup-ssl.sh yourdomain.com admin@yourdomain.com
+```
+
+This script typically:
+- Installs Certbot.
+- Requests an SSL certificate from Let's Encrypt.
+- Configures automatic renewal.
+- Sets up a renewal cron job.
+
+#### Manual Certificate Installation
+
+If you prefer to install certificates manually, for example, if Certbot needs to run in standalone mode:
+
+```bash
+# Stop nginx temporarily to free up port 80/443
+docker-compose stop nginx
+
+# Request certificate using standalone mode
+sudo certbot certonly --standalone \
+  --preferred-challenges http \
+  --email admin@yourdomain.com \
+  --agree-tos \
+  --no-eff-email \
+  -d yourdomain.com \
+  -d www.yourdomain.com
+
+# Copy certificates to Docker volumes used by Nginx (adjust service name if different)
+# Replace 'pnptv-nginx' with your actual Nginx service name if applicable
+sudo docker cp /etc/letsencrypt/live/yourdomain.com/. pnptv-nginx:/etc/letsencrypt/live/
+sudo docker cp /etc/letsencrypt/archive/yourdomain.com/. pnptv-nginx:/etc/letsencrypt/archive/
+
+# Restart nginx
+docker-compose start nginx
+```
+*Note: Ensure the Nginx container is configured to mount these certificate paths.*
+
+#### Certificate Renewal
+
+Automatic renewal is configured via cron job by the `setup-ssl.sh` script. You can manage it with:
+
+```bash
+# View renewal cron job
+crontab -l | grep certbot
+
+# Manual renewal
+sudo certbot renew
+
+# Test renewal (dry-run)
+sudo certbot renew --dry-run
+
+# Force renewal (if certificate expires in <30 days)
+sudo certbot renew --force-renewal
+
+# Restart Nginx after successful renewal
+docker-compose restart nginx
+```
+
+### Advanced Security Configuration
+
+#### Firewall Status (UFW)
+
+Check and manage your Uncomplicated Firewall (UFW) status:
+
+```bash
+# Check firewall status
+sudo ufw status verbose
+
+# View allowed services
+sudo ufw status numbered
+
+# Add custom rule (e.g., for port 8080)
+sudo ufw allow 8080/tcp
+
+# Remove rule by number
+sudo ufw delete [rule_number]
+```
+
+#### Intrusion Prevention (Fail2ban Monitoring)
+
+Monitor and manage Fail2ban to protect against brute-force attacks:
+
+```bash
+# Check fail2ban status
+sudo fail2ban-client status
+
+# Check a specific jail (e.g., sshd, pnptv-api)
+sudo fail2ban-client status sshd
+sudo fail2ban-client status pnptv-api
+
+# View currently banned IPs
+sudo fail2ban-client status | grep "Banned"
+
+# Unban an IP address
+sudo fail2ban-client set sshd unbanip 1.2.3.4
+
+# View fail2ban logs
+sudo tail -f /var/log/fail2ban.log
+```
+
+#### Security Logs
+
+Review various security-related logs:
+
+```bash
+# Nginx access logs (adjust path if different)
+sudo tail -f /var/log/nginx/pnptv-access.log
+
+# Nginx error logs (adjust path if different)
+sudo tail -f /var/log/nginx/pnptv-error.log
+
+# UFW firewall logs
+sudo tail -f /var/log/ufw.log
+
+# System authentication logs
+sudo tail -f /var/log/auth.log
+```
+
+### Enhanced Verification Steps
+
+In addition to the standard verification, ensure these security aspects:
+
+#### Security Headers
+
+Check that your application is serving appropriate security headers:
+
+```bash
+curl -I https://yourdomain.com
+```
+
+Expected headers might include:
+- `Strict-Transport-Security: max-age=...`
+- `X-Frame-Options: SAMEORIGIN`
+- `X-Content-Type-Options: nosniff`
+- `X-XSS-Protection: 1; mode=block`
+- `Content-Security-Policy: ...`
+
+#### Rate Limiting Verification
+
+Verify API rate limiting is active and configured correctly. For example, to test an `/api/stats` endpoint:
+
+```bash
+# This command sends 110 requests, expecting a 429 "Too Many Requests" after the limit is hit
+for i in {1..110}; do curl -I https://yourdomain.com/api/stats 2>/dev/null | grep HTTP; done
+```
+
+### Advanced Troubleshooting
+
+#### Issue: SSL Certificate Not Found
+
+**Symptom**: Nginx fails to start with "certificate not found" error in logs.
+
+**Solution**:
+1. Verify certificate existence:
+   ```bash
+   sudo ls -la /etc/letsencrypt/live/yourdomain.com/
+   ```
+2. If certificates are missing, re-run the SSL setup script:
+   ```bash
+   sudo ./scripts/setup-ssl.sh yourdomain.com admin@yourdomain.com
+   ```
+3. Restart Nginx:
+   ```bash
+   docker-compose restart nginx
+   ```
+
+#### Issue: Port 80/443 Already in Use
+
+**Symptom**: Docker Compose or Nginx reports "port is already allocated" or similar error.
+
+**Solution**:
+1. Identify the process using the ports:
+   ```bash
+   sudo lsof -i :80
+   sudo lsof -i :443
+   ```
+2. Stop the conflicting service (e.g., Apache, another Nginx instance):
+   ```bash
+   sudo systemctl stop apache2 # or nginx
+   ```
+3. Restart Docker Compose to reclaim ports:
+   ```bash
+   docker-compose down
+   docker-compose up -d
+   ```
+
+### Updates and Maintenance
+
+#### Update Application (Docker)
+
+To update your Docker-based application to the latest version from your Git repository:
+
+```bash
+# 1. Pull latest changes from your desired branch
+git pull origin your_deployment_branch # e.g., main or production
+
+# 2. Rebuild and restart all Docker services to apply changes
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+
+# 3. Verify deployment health
+curl -I https://yourdomain.com/health
+```
+
 ## Firebase Configuration
 
 ### 1. Create Firestore Indexes

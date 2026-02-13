@@ -5,8 +5,20 @@ jest.mock('../../../src/config/redis');
 jest.mock('../../../src/models/paymentModel');
 jest.mock('../../../src/models/userModel');
 jest.mock('../../../src/models/planModel');
+jest.mock('../../../src/models/subscriberModel');
+jest.mock('../../../src/bot/services/paymentSecurityService', () => ({
+  logPaymentEvent: jest.fn().mockResolvedValue(true),
+  logPaymentError: jest.fn().mockResolvedValue(true),
+  setPaymentTimeout: jest.fn().mockResolvedValue(true),
+  generateSecurePaymentToken: jest.fn().mockResolvedValue('token'),
+  createPaymentRequestHash: jest.fn().mockReturnValue('hash'),
+  validatePaymentAmount: jest.fn().mockResolvedValue({ valid: true }),
+  requireTwoFactorAuth: jest.fn().mockResolvedValue({ required: false }),
+  checkReplayAttack: jest.fn().mockResolvedValue({ isReplay: false }),
+}));
 jest.mock('../../../src/utils/logger');
 
+const PaymentModel = require('../../../src/models/paymentModel');
 const PaymentService = require('../../../src/bot/services/paymentService');
 
 describe('PaymentService Security Tests', () => {
@@ -115,6 +127,52 @@ describe('PaymentService Security Tests', () => {
       const result = PaymentService.verifyEpaycoSignature(webhookData);
 
       expect(result).toBe(false);
+    });
+
+    it('should verify signature with normalized amount and currency variants', () => {
+      const secret = 'test-secret-key';
+      process.env.EPAYCO_P_KEY = secret;
+      process.env.EPAYCO_P_CUST_ID = 'cust123';
+
+      const webhookData = {
+        x_ref_payco: 'ref-amount-1',
+        x_transaction_id: 'txn-amount-1',
+        x_amount: 10000,
+        x_currency_code: 'cop',
+      };
+
+      const signatureString = `${process.env.EPAYCO_P_CUST_ID}^${secret}^${webhookData.x_ref_payco}^${webhookData.x_transaction_id}^10000.00^COP`;
+      webhookData.x_signature = crypto.createHash('sha256').update(signatureString).digest('hex');
+
+      const result = PaymentService.verifyEpaycoSignature(webhookData);
+
+      expect(result).toBe(true);
+    });
+
+    it('should verify checkout md5 signature using invoice data', () => {
+      const secret = 'test-secret-key';
+      process.env.EPAYCO_P_KEY = secret;
+      process.env.EPAYCO_P_CUST_ID = 'cust123';
+
+      const webhookData = {
+        x_id_invoice: 'inv-123',
+        x_amount: 49,
+        x_currency_code: 'usd',
+      };
+
+      const md5String = `${process.env.EPAYCO_P_CUST_ID}^${secret}^${webhookData.x_id_invoice}^49.00^USD`;
+      webhookData.x_signature = crypto.createHash('md5').update(md5String).digest('hex');
+
+      const result = PaymentService.verifyEpaycoSignature(webhookData);
+
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('ePayco State Normalization', () => {
+    it('should normalize by transaction state code', () => {
+      expect(PaymentService.normalizeEpaycoTransactionState(null, 5)).toBe('Cancelada');
+      expect(PaymentService.normalizeEpaycoTransactionState(undefined, '6')).toBe('Reversada');
     });
   });
 
@@ -333,6 +391,111 @@ describe('PaymentService Security Tests', () => {
 
       jest.useRealTimers();
     }, 30000);
+  });
+
+  describe('ePayco Recovery Robustness', () => {
+    it('should recover webhook context from payment record when extras are missing', async () => {
+      const payment = {
+        id: '4a8f5d18-9f02-4ca8-a0c4-c1507e8f8ff8',
+        userId: '8599671840',
+        planId: 'diamond-pass',
+      };
+
+      PaymentModel.getById.mockResolvedValue(payment);
+      PaymentModel.updateStatus.mockResolvedValue(true);
+
+      const result = await PaymentService.processEpaycoWebhook({
+        x_ref_payco: '335234189',
+        x_transaction_id: '3352341891770988814',
+        x_transaction_state: 'Pendiente',
+        x_cod_transaction_state: '3',
+        x_amount: '399960',
+        x_currency_code: 'COP',
+        x_customer_email: 'test@example.com',
+      });
+
+      expect(result.success).toBe(true);
+      expect(PaymentModel.getById).toHaveBeenCalledWith('335234189');
+      expect(PaymentModel.updateStatus).toHaveBeenCalledWith(
+        '4a8f5d18-9f02-4ca8-a0c4-c1507e8f8ff8',
+        'pending',
+        expect.objectContaining({
+          epayco_ref: '335234189',
+          transaction_id: '3352341891770988814',
+        }),
+      );
+    });
+
+    it('should backfill x_extra fields during recovery replay', async () => {
+      const paymentId = '9f11d5cd-ec86-4625-bcd5-ffeb9a008730';
+      const refPayco = '339999001';
+
+      jest.spyOn(PaymentService, 'checkEpaycoTransactionStatus').mockResolvedValue({
+        success: true,
+        needsRecovery: true,
+        currentStatus: 'Aprobada',
+        statusData: {
+          estado: 'Aprobada',
+          reference: refPayco,
+          transactionId: 'trx-ep-001',
+        },
+        transactionData: {
+          data: [{ estado: 'Aprobada', ref_payco: refPayco, transaction_id: 'trx-ep-001' }],
+        },
+      });
+
+      const processSpy = jest.spyOn(PaymentService, 'processEpaycoWebhook')
+        .mockResolvedValue({ success: true });
+
+      PaymentModel.getById.mockResolvedValue({
+        id: paymentId,
+        userId: '8391276595',
+        planId: 'week-trial-pass',
+        amount: 14.99,
+        currency: 'USD',
+      });
+
+      const result = await PaymentService.recoverStuckPendingPayment(paymentId, refPayco);
+
+      expect(result.success).toBe(true);
+      expect(result.webhookReplayed).toBe(true);
+      expect(processSpy).toHaveBeenCalledWith(expect.objectContaining({
+        x_ref_payco: refPayco,
+        x_extra1: '8391276595',
+        x_extra2: 'week-trial-pass',
+        x_extra3: paymentId,
+        _recovery: true,
+      }));
+
+      PaymentService.checkEpaycoTransactionStatus.mockRestore();
+      processSpy.mockRestore();
+    });
+
+    it('should extract transaction status from array-based payloads', () => {
+      const extracted = PaymentService.extractEpaycoStatusFromPayload({
+        data: [
+          {
+            estado: 'Aprobada',
+            ref_payco: '338887766',
+            transaction_id: 'tx-338887766',
+            extras: {
+              extra1: '12345',
+              extra2: 'week-pass',
+              extra3: 'pay-uuid-1',
+            },
+          },
+        ],
+      });
+
+      expect(extracted).toEqual(expect.objectContaining({
+        estado: 'Aprobada',
+        reference: '338887766',
+        transactionId: 'tx-338887766',
+        extra1: '12345',
+        extra2: 'week-pass',
+        extra3: 'pay-uuid-1',
+      }));
+    });
   });
 
   describe('Production Security Checks', () => {

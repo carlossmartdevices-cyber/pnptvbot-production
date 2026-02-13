@@ -83,14 +83,24 @@ const sanitizeBotUsername = (username) => {
  * @returns {Object} { valid: boolean, error?: string }
  */
 const validateEpaycoPayload = (payload) => {
-  const { error } = schemas.epaycoWebhook.validate(payload);
+  const normalizedPayload = {
+    ...payload,
+    x_transaction_state: PaymentService.normalizeEpaycoTransactionState(
+      payload?.x_transaction_state,
+      payload?.x_cod_transaction_state,
+    ) || payload?.x_transaction_state,
+    x_currency_code: PaymentService.normalizeEpaycoCurrencyCode(payload?.x_currency_code)
+      || payload?.x_currency_code,
+  };
+
+  const { error } = schemas.epaycoWebhook.validate(normalizedPayload);
   if (error) {
     return {
       valid: false,
       error: error.details.map((d) => d.message).join(', '),
     };
   }
-  return { valid: true };
+  return { valid: true, payload: normalizedPayload };
 };
 
 /**
@@ -174,6 +184,11 @@ const validateDaimoPayload = (payload) => {
  */
 const handleEpaycoWebhook = async (req, res) => {
   try {
+    const normalizedState = PaymentService.normalizeEpaycoTransactionState(
+      req.body?.x_transaction_state,
+      req.body?.x_cod_transaction_state,
+    );
+
     // Ensure ref_payco is present to build a stable idempotency key
     if (!req.body.x_ref_payco) {
       logger.warn('ePayco webhook missing ref_payco', {
@@ -186,15 +201,15 @@ const handleEpaycoWebhook = async (req, res) => {
 
     // Use ref_payco + transaction state as idempotency key
     // This allows pending -> accepted transitions to be processed
-    // x_cod_transaction_state: 1=Accepted, 2=Rejected, 3=Pending, 4=Failed
-    const stateCode = req.body.x_cod_transaction_state || req.body.x_transaction_state || 'unknown';
+    // x_cod_transaction_state: 1=Accepted, 2=Rejected, 3=Pending, 4=Failed, 5=Cancelled, 6=Reversed, 10=Abandoned
+    const stateCode = req.body.x_cod_transaction_state || normalizedState || req.body.x_transaction_state || 'unknown';
     const idempotencyKey = `epayco_${req.body.x_ref_payco}_${stateCode}`;
 
     const acquired = await cache.acquireLock(idempotencyKey, 60);
     if (!acquired) {
       logger.info('Duplicate ePayco webhook detected (already processed)', {
         refPayco: req.body.x_ref_payco,
-        state: req.body.x_transaction_state,
+        state: normalizedState || req.body.x_transaction_state,
         stateCode: req.body.x_cod_transaction_state,
         idempotencyKey,
         provider: 'epayco',
@@ -209,8 +224,8 @@ const handleEpaycoWebhook = async (req, res) => {
         provider: 'epayco',
         eventId: req.body.x_ref_payco || req.body.x_transaction_id,
         paymentId,
-        status: req.body.x_transaction_state,
-        stateCode: req.body.x_cod_transaction_state || req.body.x_transaction_state,
+        status: normalizedState || req.body.x_transaction_state,
+        stateCode: req.body.x_cod_transaction_state || normalizedState || req.body.x_transaction_state,
         payload: req.body,
       };
 
@@ -244,7 +259,7 @@ const handleEpaycoWebhook = async (req, res) => {
 
       logger.info('ePayco webhook received', {
         transactionId: req.body.x_ref_payco,
-        state: req.body.x_transaction_state,
+        state: normalizedState || req.body.x_transaction_state,
         idempotencyKey,
         provider: 'epayco',
         signaturePresent: Boolean(req.body.x_signature),
@@ -258,7 +273,7 @@ const handleEpaycoWebhook = async (req, res) => {
         return sendError(res, 400, 'INVALID_PAYLOAD', errorMsg);
       }
 
-      const result = await PaymentService.processEpaycoWebhook(req.body);
+      const result = await PaymentService.processEpaycoWebhook(validation.payload || req.body);
 
       if (result.success) {
         return res.status(200).json({ success: true });

@@ -479,6 +479,142 @@ Type /subscribe to view membership plans and reactivate your access!`;
       return null;
     }
   }
+
+  /**
+   * Get churned users sorted by last payment date
+   * Helps identify inactive churned users for re-engagement campaigns
+   * @param {number} daysSincePayment - Days since last payment (default: 30)
+   * @param {number} limit - Max records to return
+   * @returns {Promise<Array>} Churned users with payment info
+   */
+  static async getInactiveChurnedUsers(daysSincePayment = 30, limit = 100) {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysSincePayment);
+
+      const result = await query(
+        `SELECT
+          id, username, email, subscription_status, tier,
+          last_payment_date, last_payment_amount, last_payment_method,
+          created_at,
+          EXTRACT(DAY FROM (NOW() - last_payment_date)) as days_since_payment
+        FROM users
+        WHERE subscription_status IN ('churned', 'expired', 'free')
+          AND last_payment_date IS NOT NULL
+          AND last_payment_date < $1
+        ORDER BY last_payment_date ASC
+        LIMIT $2`,
+        [cutoffDate, limit]
+      );
+
+      return result.rows;
+    } catch (error) {
+      logger.error('Error fetching inactive churned users:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get churn analysis statistics
+   * Shows breakdown of inactive users by payment method
+   * @returns {Promise<Object>} Churn statistics
+   */
+  static async getChurnAnalysis() {
+    try {
+      const result = await query(`
+        SELECT
+          last_payment_method as payment_method,
+          COUNT(*) as churned_count,
+          COUNT(CASE WHEN last_payment_date > NOW() - INTERVAL '30 days' THEN 1 END) as recent_30d,
+          COUNT(CASE WHEN last_payment_date > NOW() - INTERVAL '60 days' THEN 1 END) as recent_60d,
+          COUNT(CASE WHEN last_payment_date > NOW() - INTERVAL '90 days' THEN 1 END) as recent_90d,
+          MIN(last_payment_date) as oldest_payment,
+          MAX(last_payment_date) as newest_payment,
+          AVG(last_payment_amount) as avg_payment_amount
+        FROM users
+        WHERE subscription_status IN ('churned', 'expired', 'free')
+          AND last_payment_date IS NOT NULL
+        GROUP BY last_payment_method
+        ORDER BY churned_count DESC
+      `);
+
+      return {
+        byMethod: result.rows,
+        timestamp: new Date()
+      };
+    } catch (error) {
+      logger.error('Error getting churn analysis:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get users who need re-engagement emails
+   * Identifies active premium users approaching expiry without recent payment
+   * @returns {Promise<Array>} Users for re-engagement
+   */
+  static async getUsersForReEngagement() {
+    try {
+      const result = await query(`
+        SELECT
+          id, username, email, language,
+          plan_expiry,
+          last_payment_date,
+          EXTRACT(DAY FROM (plan_expiry - NOW())) as days_until_expiry,
+          EXTRACT(DAY FROM (NOW() - last_payment_date)) as days_since_payment,
+          last_payment_method
+        FROM users
+        WHERE subscription_status = 'active'
+          AND plan_expiry IS NOT NULL
+          AND plan_expiry > NOW()
+          AND plan_expiry < NOW() + INTERVAL '14 days'
+          AND last_payment_date IS NOT NULL
+        ORDER BY plan_expiry ASC
+        LIMIT 500
+      `);
+
+      return result.rows;
+    } catch (error) {
+      logger.error('Error getting re-engagement users:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get subscription renewal statistics
+   * Shows payment trends and renewal rates
+   * @param {Date} startDate - Start of analysis period
+   * @param {Date} endDate - End of analysis period
+   * @returns {Promise<Object>} Renewal statistics
+   */
+  static async getRenewalStats(startDate, endDate) {
+    try {
+      const result = await query(
+        `SELECT
+          last_payment_method,
+          COUNT(*) as total_users,
+          COUNT(CASE WHEN last_payment_date >= $1 AND last_payment_date <= $2 THEN 1 END) as renewed,
+          COUNT(CASE WHEN subscription_status = 'active' THEN 1 END) as active_now,
+          COUNT(CASE WHEN subscription_status IN ('churned', 'expired') THEN 1 END) as churned,
+          ROUND(100.0 * COUNT(CASE WHEN subscription_status = 'active' THEN 1 END) / COUNT(*), 2) as retention_rate,
+          AVG(last_payment_amount) as avg_payment
+        FROM users
+        WHERE last_payment_date IS NOT NULL
+        GROUP BY last_payment_method
+        ORDER BY total_users DESC`,
+        [startDate, endDate]
+      );
+
+      return {
+        byMethod: result.rows,
+        period: { startDate, endDate },
+        timestamp: new Date()
+      };
+    } catch (error) {
+      logger.error('Error getting renewal statistics:', error);
+      return null;
+    }
+  }
 }
 
 module.exports = MembershipCleanupService;

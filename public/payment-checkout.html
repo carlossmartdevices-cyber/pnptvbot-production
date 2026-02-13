@@ -523,8 +523,11 @@
         }
 
         // ── Payment logic ──
+        const checkoutQueryParams = new URLSearchParams(window.location.search);
+        const paymentIdFromQuery = checkoutQueryParams.get('paymentId');
         const pathParts = window.location.pathname.split('/');
-        const paymentId = pathParts[pathParts.length - 1];
+        const paymentIdFromPath = pathParts[pathParts.length - 1];
+        const paymentId = paymentIdFromQuery || paymentIdFromPath;
         let paymentData = null;
 
         function detectCardBrand(number) {
@@ -730,7 +733,7 @@
         });
 
         var pollAttempts = 0;
-        var maxPollAttempts = 10;
+        var maxPollAttempts = 30;
         var pollInterval = 3000;
         var polling = false;
 
@@ -747,16 +750,26 @@
 
         function doPoll() {
             if (pollAttempts >= maxPollAttempts) {
-                document.getElementById('polling-status').style.display = 'none';
-                document.getElementById('pending').style.display = 'block';
-                polling = false;
+                attemptRecoveryCheck();
                 return;
             }
 
             pollAttempts++;
 
-            fetch('/api/payment/' + paymentId + '/status')
-                .then(function(response) { return response.json(); })
+            fetch('/api/payment/' + paymentId + '/status', {
+                method: 'GET',
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            })
+                .then(function(response) {
+                    if (response.status === 304) {
+                        return { success: true, status: 'pending' };
+                    }
+                    return response.json();
+                })
                 .then(function(data) {
                     if (!data.success) {
                         document.getElementById('polling-status').style.display = 'none';
@@ -769,7 +782,7 @@
                         document.getElementById('polling-status').style.display = 'none';
                         document.getElementById('success').style.display = 'block';
                         polling = false;
-                    } else if (data.status === 'failed' || data.status === 'rejected') {
+                    } else if (data.status === 'failed' || data.status === 'rejected' || data.status === 'cancelled') {
                         document.getElementById('polling-status').style.display = 'none';
                         document.getElementById('checkout-form').style.display = 'block';
                         showFormError(t('errDeclined'));
@@ -786,26 +799,248 @@
                 });
         }
 
+        function attemptRecoveryCheck() {
+            fetch('/api/payment/' + paymentId + '/check-status', {
+                method: 'POST',
+                cache: 'no-store',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                },
+                body: JSON.stringify({})
+            })
+                .then(function(response) {
+                    if (!response.ok) return null;
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (data && data.success && data.status === 'completed') {
+                        document.getElementById('polling-status').style.display = 'none';
+                        document.getElementById('success').style.display = 'block';
+                        polling = false;
+                        return;
+                    }
+
+                    if (data && data.success && (data.status === 'failed' || data.status === 'rejected' || data.status === 'cancelled')) {
+                        document.getElementById('polling-status').style.display = 'none';
+                        document.getElementById('checkout-form').style.display = 'block';
+                        showFormError(t('errDeclined'));
+                        var btn = document.getElementById('pay-button');
+                        btn.disabled = false;
+                        btn.textContent = payBtnLabel();
+                        polling = false;
+                        return;
+                    }
+
+                    document.getElementById('polling-status').style.display = 'none';
+                    document.getElementById('pending').style.display = 'block';
+                    polling = false;
+                })
+                .catch(function() {
+                    document.getElementById('polling-status').style.display = 'none';
+                    document.getElementById('pending').style.display = 'block';
+                    polling = false;
+                });
+        }
+
+        var epayco3dsMessageListener = null;
+        var epayco3dsSafetyTimer = null;
+
+        function loadEpayco3DSValidator() {
+            return new Promise(function(resolve, reject) {
+                if (typeof window.validate3ds === 'function') {
+                    resolve();
+                    return;
+                }
+
+                var existingScript = document.getElementById('epayco-validate-3ds-script');
+                if (existingScript) {
+                    if (typeof window.validate3ds === 'function') {
+                        resolve();
+                        return;
+                    }
+                    existingScript.addEventListener('load', function() { resolve(); }, { once: true });
+                    existingScript.addEventListener('error', function() { reject(new Error('3DS script load error')); }, { once: true });
+                    setTimeout(function() {
+                        if (typeof window.validate3ds === 'function') {
+                            resolve();
+                            return;
+                        }
+                        reject(new Error('3DS script exists but validate3ds is unavailable'));
+                    }, 3000);
+                    return;
+                }
+
+                var script = document.createElement('script');
+                script.id = 'epayco-validate-3ds-script';
+                script.src = 'https://multimedia.epayco.co/general/3DS/validateThreeds.min.js';
+                script.async = true;
+                script.onload = function() {
+                    if (typeof window.validate3ds === 'function') {
+                        resolve();
+                    } else {
+                        reject(new Error('validate3ds not exposed after script load'));
+                    }
+                };
+                script.onerror = function() { reject(new Error('Failed to load validateThreeds.min.js')); };
+                document.head.appendChild(script);
+            });
+        }
+
+        function cleanup3DSArtifacts() {
+            try {
+                document.querySelectorAll('iframe').forEach(function(frame) {
+                    var src = (frame.src || '').toLowerCase();
+                    if (src.indexOf('cardinalcommerce.com') !== -1 || src.indexOf('epayco.co') !== -1 || src.indexOf('payco.co') !== -1) {
+                        frame.remove();
+                    }
+                });
+
+                document.querySelectorAll('div, section, aside').forEach(function(node) {
+                    var token = ((node.id || '') + ' ' + (node.className || '')).toLowerCase();
+                    if (!token) return;
+                    if (token.indexOf('3ds') === -1 && token.indexOf('cardinal') === -1 && token.indexOf('epayco') === -1) return;
+
+                    var style = window.getComputedStyle(node);
+                    if (style.position === 'fixed' || style.position === 'absolute') {
+                        node.remove();
+                    }
+                });
+
+                document.documentElement.style.overflow = '';
+                document.body.style.overflow = '';
+            } catch (e) {
+                console.warn('[3DS] cleanup warning', e && e.message ? e.message : e);
+            }
+        }
+
+        function isTrusted3DSOrigin(origin) {
+            if (!origin) return true;
+            try {
+                var parsed = new URL(origin);
+                var host = (parsed.hostname || '').toLowerCase();
+                return host === 'localhost'
+                    || host.endsWith('.epayco.co')
+                    || host.endsWith('.payco.co')
+                    || host.endsWith('.cardinalcommerce.com');
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function attachEpayco3DSMessageHandler() {
+            if (epayco3dsMessageListener) {
+                window.removeEventListener('message', epayco3dsMessageListener);
+                epayco3dsMessageListener = null;
+            }
+
+            epayco3dsMessageListener = function(event) {
+                var origin = event && event.origin ? event.origin : '';
+                if (!isTrusted3DSOrigin(origin)) {
+                    return;
+                }
+
+                var payload = event && event.data ? event.data : {};
+                if (!(payload.success || payload.message || payload.ref_payco || payload.transactionId)) {
+                    return;
+                }
+
+                console.log('[3DS ePayco] message event received', payload);
+                if (epayco3dsSafetyTimer) {
+                    clearTimeout(epayco3dsSafetyTimer);
+                    epayco3dsSafetyTimer = null;
+                }
+                window.removeEventListener('message', epayco3dsMessageListener);
+                epayco3dsMessageListener = null;
+                cleanup3DSArtifacts();
+
+                document.getElementById('checkout-form').style.display = 'none';
+                document.getElementById('polling-status').style.display = 'block';
+                pollPaymentStatus();
+            };
+
+            window.addEventListener('message', epayco3dsMessageListener);
+        }
+
+        function buildEpayco3DSPayload(threeDSecure, paymentId) {
+            var tx = (threeDSecure && threeDSecure.transactionData) || {};
+            var data3ds = {
+                franquicia: tx.franquicia,
+                '3DS': tx['3DS'],
+                ref_payco: tx.ref_payco,
+                cc_network_response: tx.cc_network_response
+            };
+
+            if (!data3ds.ref_payco) {
+                data3ds.ref_payco = (threeDSecure && threeDSecure.reference) || paymentId;
+            }
+
+            return data3ds;
+        }
+
+        async function tryOfficialEpayco3DSFlow(threeDSecure, paymentId) {
+            var data3DS = buildEpayco3DSPayload(threeDSecure, paymentId);
+            if (!data3DS['3DS']) {
+                return false;
+            }
+
+            await loadEpayco3DSValidator();
+            attachEpayco3DSMessageHandler();
+
+            document.getElementById('checkout-form').style.display = 'none';
+            document.getElementById('polling-status').style.display = 'block';
+            window.validate3ds(data3DS);
+
+            // Safety net: if postMessage is blocked, start status polling without interrupting challenge UI.
+            if (epayco3dsSafetyTimer) {
+                clearTimeout(epayco3dsSafetyTimer);
+                epayco3dsSafetyTimer = null;
+            }
+            epayco3dsSafetyTimer = setTimeout(function() {
+                if (epayco3dsMessageListener) {
+                    console.warn('[3DS ePayco] No postMessage received yet, starting status polling fallback', { paymentId });
+                    pollPaymentStatus();
+                }
+            }, 30000);
+            return true;
+        }
+
         /**
-         * Handle Cardinal Commerce 3DS 2.0 device data collection
+         * Handle 3DS authentication with ePayco official API flow first.
+         * Fallback to direct Cardinal flow for backward compatibility.
          * @param {Object} threeDSecure - 3DS 2.0 authentication data from ePayco
          * @param {String} paymentId - Payment ID for tracking
          */
         async function handle3DS2Authentication(threeDSecure, paymentId) {
             try {
-                const data = threeDSecure.data;
-                console.log('[3DS 2.0] Starting Cardinal Commerce authentication', {
+                var usedOfficialFlow = await tryOfficialEpayco3DSFlow(threeDSecure, paymentId);
+                if (usedOfficialFlow) {
+                    console.log('[3DS ePayco] validate3ds flow started', { paymentId });
+                    return;
+                }
+            } catch (flowError) {
+                console.warn('[3DS ePayco] Official validate3ds flow failed, fallback to Cardinal', {
                     paymentId,
-                    referenceId: data.referenceId,
+                    error: flowError.message
+                });
+            }
+
+            try {
+                const data = threeDSecure.data;
+                console.log('[3DS 2.0] Starting Cardinal Commerce fallback', {
+                    paymentId,
+                    referenceId: data && data.referenceId,
                     provider: threeDSecure.provider
                 });
 
-                // Load Cardinal Commerce SDK
+                // Fallback: Load Cardinal Commerce SDK
                 loadCardinalCommerceSdk(data, paymentId);
             } catch (error) {
-                console.error('[3DS 2.0] Error in handle3DS2Authentication', error);
-                // Fallback: submit without device data collection
-                await submitPaymentWith3DS2Token(data, paymentId);
+                console.error('[3DS 2.0] Error in handle3DS2Authentication fallback', error);
+                document.getElementById('checkout-form').style.display = 'none';
+                document.getElementById('polling-status').style.display = 'block';
+                pollPaymentStatus();
             }
         }
 

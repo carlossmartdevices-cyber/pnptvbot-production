@@ -21,8 +21,29 @@ const BookingAvailabilityIntegration = require('./bookingAvailabilityIntegration
 const PaymentSecurityService = require('./paymentSecurityService');
 const { getEpaycoSubscriptionUrl, isSubscriptionPlan } = require('../../config/epaycoSubscriptionPlans');
 const PaymentHistoryService = require('../../services/paymentHistoryService');
+const axios = require('axios');
 
 class PaymentService {
+  static EPAYCO_ERROR_MESSAGES = {
+    A001: 'Faltan campos obligatorios en la solicitud.',
+    A002: 'Uno o más campos tienen un valor inválido.',
+    A003: 'Uno o más campos superan la longitud máxima permitida.',
+    A004: 'Código no encontrado en los catálogos de ePayco.',
+    A005: 'El correo ya existe en ePayco.',
+    A006: 'La operación fue bloqueada por listas restrictivas.',
+    A007: 'Ocurrió un error durante la validación en ePayco.',
+    AL001: 'No se envió la URL requerida.',
+    AL002: 'La URL es obligatoria.',
+    AL003: 'La estructura de la URL es inválida.',
+    AED100: 'La información no cumple los parámetros definidos por ePayco.',
+  };
+
+  static EPAYCO_VALIDATION_TOKEN_TTL_MS = 14 * 60 * 1000;
+
+  static epaycoValidationToken = null;
+
+  static epaycoValidationTokenExpiresAt = 0;
+
   static safeCompareHex(expectedHex, receivedHex) {
     if (!expectedHex || !receivedHex) return false;
 
@@ -36,6 +57,132 @@ class PaymentService {
     }
 
     return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+  }
+
+  static parseEpaycoError(result, fallbackMessage) {
+    const candidateSources = [
+      result,
+      result?.data,
+      result?.error,
+      result?.response,
+      result?.response?.data,
+    ].filter(Boolean);
+
+    let code = null;
+    let rawMessage = null;
+
+    for (const src of candidateSources) {
+      if (typeof src === 'string') {
+        if (!rawMessage) rawMessage = src;
+        continue;
+      }
+
+      if (typeof src !== 'object') continue;
+
+      const localCode = src.code
+        || src.error_code
+        || src.errorCode
+        || src.cod_error
+        || src.x_cod_response;
+
+      const localMsg = src.message
+        || src.description
+        || src.error
+        || src.x_response_reason_text
+        || src.respuesta;
+
+      if (!code && localCode && /^[A-Z]{1,3}\d{3}$/i.test(String(localCode))) {
+        code = String(localCode).toUpperCase();
+      }
+
+      if (!rawMessage && localMsg) {
+        rawMessage = String(localMsg);
+      }
+    }
+
+    if (!code && rawMessage) {
+      const match = rawMessage.match(/\b([A-Z]{1,3}\d{3})\b/i);
+      if (match && match[1]) {
+        code = match[1].toUpperCase();
+      }
+    }
+
+    const mapped = code ? this.EPAYCO_ERROR_MESSAGES[code] : null;
+    const message = mapped || rawMessage || fallbackMessage || 'Error procesando pago con ePayco.';
+
+    return { code, message, rawMessage };
+  }
+
+  static normalizeEpaycoCurrencyCode(currencyCode) {
+    if (currencyCode === undefined || currencyCode === null) return null;
+    const normalized = String(currencyCode).trim().toUpperCase();
+    return normalized || null;
+  }
+
+  static normalizeEpaycoTransactionState(rawState, rawStateCode = null) {
+    const fromCode = this.mapEpaycoStateCode(rawStateCode);
+    if (fromCode) return fromCode;
+
+    if (rawState === undefined || rawState === null) return null;
+    const state = String(rawState).trim();
+    if (!state) return null;
+
+    const normalized = state
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    const mapping = {
+      aceptada: 'Aceptada',
+      aprobada: 'Aprobada',
+      approved: 'Aprobada',
+      paid: 'Aprobada',
+      rechazada: 'Rechazada',
+      rejected: 'Rechazada',
+      denied: 'Rechazada',
+      pendiente: 'Pendiente',
+      pending: 'Pendiente',
+      fallida: 'Fallida',
+      failed: 'Fallida',
+      abandonada: 'Abandonada',
+      abandoned: 'Abandonada',
+      cancelada: 'Cancelada',
+      canceled: 'Cancelada',
+      cancelled: 'Cancelada',
+      reversada: 'Reversada',
+      refunded: 'Reversada',
+    };
+
+    return mapping[normalized] || state;
+  }
+
+  static buildEpaycoAmountCandidates(amount) {
+    if (amount === undefined || amount === null) return [];
+
+    const raw = String(amount).trim();
+    if (!raw) return [];
+
+    const sanitized = raw.replace(',', '.');
+    const candidates = new Set([raw, sanitized]);
+    const numericAmount = Number(sanitized);
+
+    if (Number.isFinite(numericAmount)) {
+      candidates.add(String(numericAmount));
+      candidates.add(numericAmount.toFixed(2));
+      const noTrailingZeros = numericAmount.toFixed(6).replace(/\.?0+$/, '');
+      if (noTrailingZeros) {
+        candidates.add(noTrailingZeros);
+      }
+      if (Number.isInteger(numericAmount)) {
+        candidates.add(String(Math.trunc(numericAmount)));
+      }
+    }
+
+    return Array.from(candidates).filter(Boolean);
+  }
+
+  static isUuidLike(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''));
   }
 
     /**
@@ -195,9 +342,9 @@ class PaymentService {
             paymentUrl,
           });
         } else {
-          // One-time plan → custom checkout page
-          paymentUrl = `${checkoutDomain}/payment/${payment.id}`;
-          logger.info('ePayco checkout URL created', {
+          // One-time plan → PNPtv custom checkout page via /checkout/pnp
+          paymentUrl = `${checkoutDomain}/checkout/pnp?paymentId=${payment.id}`;
+          logger.info('ePayco checkout URL created (PNPtv route)', {
             paymentId: payment.id,
             paymentUrl,
           });
@@ -377,23 +524,45 @@ class PaymentService {
       x_invoice,
     } = webhookData || {};
 
-    const sha256Ready = x_ref_payco && x_transaction_id && x_amount && x_currency_code;
+    const amountCandidates = this.buildEpaycoAmountCandidates(x_amount);
+    const currencyCandidates = Array.from(new Set([
+      x_currency_code,
+      this.normalizeEpaycoCurrencyCode(x_currency_code),
+    ].filter(Boolean).map((value) => String(value).trim())));
+
+    const sha256Ready = x_ref_payco && x_transaction_id && amountCandidates.length > 0 && currencyCandidates.length > 0;
     let sha256Valid = false;
     if (sha256Ready) {
-      const signatureString = `${custId}^${pKey}^${x_ref_payco}^${x_transaction_id}^${x_amount}^${x_currency_code}`;
-      const expected = crypto.createHash('sha256').update(signatureString).digest('hex');
-      sha256Valid = PaymentService.safeCompareHex(expected, signatureValue);
+      for (const amountCandidate of amountCandidates) {
+        for (const currencyCandidate of currencyCandidates) {
+          const signatureString = `${custId}^${pKey}^${x_ref_payco}^${x_transaction_id}^${amountCandidate}^${currencyCandidate}`;
+          const expected = crypto.createHash('sha256').update(signatureString).digest('hex');
+          if (PaymentService.safeCompareHex(expected, signatureValue)) {
+            sha256Valid = true;
+            break;
+          }
+        }
+        if (sha256Valid) break;
+      }
     }
 
     // Checkout 2.0 signature validation (MD5):
     // MD5(p_cust_id_cliente + p_key + p_id_invoice + p_amount + p_currency_code)
     const invoice = x_id_invoice || x_invoice;
-    const md5Ready = invoice && x_amount && x_currency_code;
+    const md5Ready = invoice && amountCandidates.length > 0 && currencyCandidates.length > 0;
     let md5Valid = false;
     if (md5Ready) {
-      const md5String = `${custId}^${pKey}^${invoice}^${x_amount}^${x_currency_code}`;
-      const expected = crypto.createHash('md5').update(md5String).digest('hex');
-      md5Valid = PaymentService.safeCompareHex(expected, signatureValue);
+      for (const amountCandidate of amountCandidates) {
+        for (const currencyCandidate of currencyCandidates) {
+          const md5String = `${custId}^${pKey}^${invoice}^${amountCandidate}^${currencyCandidate}`;
+          const expected = crypto.createHash('md5').update(md5String).digest('hex');
+          if (PaymentService.safeCompareHex(expected, signatureValue)) {
+            md5Valid = true;
+            break;
+          }
+        }
+        if (md5Valid) break;
+      }
     }
 
     return sha256Valid || md5Valid;
@@ -520,7 +689,11 @@ class PaymentService {
         }
 
         return { success: true };
-      } else if (x_transaction_state === 'Fallida' || x_transaction_state === 'Rechazada') {
+      } else if (
+        x_transaction_state === 'Fallida'
+        || x_transaction_state === 'Rechazada'
+        || x_transaction_state === 'Abandonada'
+      ) {
         await bookingService.cancelBooking(bookingId, 'Payment failed');
 
         logger.warn(`${bookingType} payment failed, booking cancelled`, {
@@ -557,22 +730,66 @@ class PaymentService {
         x_ref_payco,
         x_transaction_id,
         x_transaction_state,
+        x_cod_transaction_state,
         x_approval_code,
         x_amount,
+        x_currency_code,
         x_customer_email,
         x_customer_name,
       } = webhookData;
 
+      const normalizedState = this.normalizeEpaycoTransactionState(
+        x_transaction_state,
+        x_cod_transaction_state,
+      );
+      const normalizedCurrencyCode = this.normalizeEpaycoCurrencyCode(x_currency_code);
+      const effectiveState = normalizedState || x_transaction_state;
+
       let userId = webhookData.x_extra1;
       let planIdOrBookingId = webhookData.x_extra2;
       let paymentIdOrType = webhookData.x_extra3;
+      let payment = null;
 
       // Validate required fields
-      if (!x_ref_payco || !x_transaction_state) {
+      if (!x_ref_payco || !effectiveState) {
         logger.warn('Invalid ePayco webhook - missing required fields', {
           webhookData,
+          normalizedState,
         });
         return { success: false, error: 'Missing required webhook fields' };
+      }
+
+      // Resolve internal payment first:
+      // 1) explicit x_extra3 when present (UUID or legacy reference),
+      // 2) fallback by x_ref_payco (stored in reference after first status update).
+      if (paymentIdOrType && paymentIdOrType !== 'pnp_live') {
+        payment = await PaymentModel.getById(String(paymentIdOrType));
+      }
+
+      if (!payment && x_ref_payco) {
+        payment = await PaymentModel.getById(String(x_ref_payco));
+      }
+
+      // Recover missing extras from the internal payment record.
+      // Some ePayco callbacks omit extra fields in later notifications/retries.
+      if (payment) {
+        if (!paymentIdOrType && payment.id) {
+          paymentIdOrType = payment.id;
+        }
+        if (!userId) {
+          userId = payment.userId
+            || payment.user_id
+            || payment.metadata?.user_id
+            || payment.metadata?.userId
+            || null;
+        }
+        if (!planIdOrBookingId) {
+          planIdOrBookingId = payment.planId
+            || payment.plan_id
+            || payment.metadata?.plan_id
+            || payment.metadata?.planId
+            || null;
+        }
       }
 
       // Fallback: for recurring subscription charges, ePayco may not preserve extras.
@@ -592,7 +809,7 @@ class PaymentService {
 
       logger.info('Processing ePayco webhook', {
         x_ref_payco,
-        x_transaction_state,
+        x_transaction_state: effectiveState,
         userId,
         planIdOrBookingId,
         paymentIdOrType,
@@ -605,7 +822,7 @@ class PaymentService {
         eventType: 'webhook_received',
         provider: 'epayco',
         amount: x_amount ? parseFloat(x_amount) : null,
-        status: x_transaction_state,
+        status: effectiveState,
         details: { x_ref_payco, x_transaction_id },
       }).catch(() => {});
 
@@ -616,7 +833,7 @@ class PaymentService {
         return await this.processPNPLiveEpaycoWebhook({
           x_ref_payco,
           x_transaction_id,
-          x_transaction_state,
+          x_transaction_state: effectiveState,
           x_approval_code,
           x_amount,
           userId,
@@ -625,9 +842,6 @@ class PaymentService {
           x_customer_name,
         });
       }
-
-      // Check if payment exists (for regular subscriptions)
-      const payment = paymentIdOrType ? await PaymentModel.getById(paymentIdOrType) : null;
 
       // Get customer email with fallback chain
       // Try: x_customer_email → user.email → subscriber.email
@@ -653,7 +867,7 @@ class PaymentService {
       }
 
       // Process based on transaction state
-      if (x_transaction_state === 'Aceptada' || x_transaction_state === 'Aprobada') {
+      if (effectiveState === 'Aceptada' || effectiveState === 'Aprobada') {
         // Payment successful
         if (payment) {
           await PaymentModel.updateStatus(paymentIdOrType, 'completed', {
@@ -701,7 +915,7 @@ class PaymentService {
                 userId,
                 paymentMethod: 'epayco',
                 amount: parseFloat(x_amount) || 0,
-                currency: 'USD',
+                currency: normalizedCurrencyCode || 'USD',
                 planId: planIdOrBookingId,
                 planName: plan?.name,
                 product: plan?.name,
@@ -843,7 +1057,7 @@ class PaymentService {
             userId,
             planIdOrBookingId,
             x_ref_payco,
-            x_transaction_state,
+            x_transaction_state: effectiveState,
           });
         }
 
@@ -911,27 +1125,53 @@ class PaymentService {
         }
 
         return { success: true };
-      } else if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Fallida') {
-        // Payment failed
+      } else if (
+        effectiveState === 'Rechazada'
+        || effectiveState === 'Fallida'
+        || effectiveState === 'Abandonada'
+        || effectiveState === 'Cancelada'
+      ) {
+        // Payment failed/cancelled (includes abandoned 3DS authentication)
         if (payment) {
           await PaymentModel.updateStatus(paymentIdOrType, 'failed', {
             transaction_id: x_transaction_id,
             reference: x_ref_payco,
             epayco_ref: x_ref_payco,
-            epayco_estado: x_transaction_state,
+            epayco_estado: effectiveState,
             epayco_respuesta: webhookData.x_response_reason_text || webhookData.x_respuesta,
-            error: webhookData.x_response_reason_text || webhookData.x_respuesta || x_transaction_state,
+            error: webhookData.x_response_reason_text || webhookData.x_respuesta || effectiveState,
+            abandoned_3ds: effectiveState === 'Abandonada',
           });
         }
 
-        logger.info('ePayco payment failed', {
+        logger.info('ePayco payment failed/cancelled', {
           x_ref_payco,
+          x_transaction_state: effectiveState,
           userId,
           planId: planIdOrBookingId,
         });
 
         return { success: true };
-      } else if (x_transaction_state === 'Pendiente') {
+      } else if (effectiveState === 'Reversada') {
+        if (payment) {
+          await PaymentModel.updateStatus(paymentIdOrType, 'refunded', {
+            transaction_id: x_transaction_id,
+            reference: x_ref_payco,
+            epayco_ref: x_ref_payco,
+            epayco_estado: effectiveState,
+            epayco_respuesta: webhookData.x_response_reason_text || webhookData.x_respuesta,
+          });
+        }
+
+        logger.info('ePayco payment reversed/refunded', {
+          x_ref_payco,
+          x_transaction_state: effectiveState,
+          userId,
+          planId: planIdOrBookingId,
+        });
+
+        return { success: true };
+      } else if (effectiveState === 'Pendiente') {
         // Payment pending - waiting for 3DS completion or processing
         if (payment) {
           await PaymentModel.updateStatus(paymentIdOrType, 'pending', {
@@ -945,7 +1185,7 @@ class PaymentService {
 
         logger.warn('ePayco webhook received with Pendiente status - still awaiting completion', {
           x_ref_payco,
-          x_transaction_state,
+          x_transaction_state: effectiveState,
           userId,
           planId: planIdOrBookingId,
           paymentId: paymentIdOrType,
@@ -1638,6 +1878,7 @@ class PaymentService {
           'card[exp_year]': card.exp_year,
           'card[exp_month]': card.exp_month,
           'card[cvc]': card.cvc,
+          'card[holder_name]': card.name || customer.name,
           hasCvv: true,
         });
 
@@ -1652,11 +1893,22 @@ class PaymentService {
         // Token ID is at root level (tokenResult.id), not in data
         const token = tokenResult?.id || tokenResult?.data?.id;
         if (!tokenResult || tokenResult.status === false || !token) {
+          const epaycoError = this.parseEpaycoError(
+            tokenResult,
+            'Error al tokenizar la tarjeta. Verifica los datos e intenta nuevamente.'
+          );
           logger.error('ePayco token creation failed', {
             paymentId,
-            fullResponse: JSON.stringify(tokenResult)
+            code: epaycoError.code,
+            message: epaycoError.message,
+            rawMessage: epaycoError.rawMessage,
+            fullResponse: JSON.stringify(tokenResult),
           });
-          return { success: false, error: 'Error al tokenizar la tarjeta. Verifica los datos e intenta nuevamente.' };
+          return {
+            success: false,
+            error: epaycoError.message,
+            errorCode: epaycoError.code,
+          };
         }
 
         tokenId = token;
@@ -1683,8 +1935,19 @@ class PaymentService {
       });
 
       if (!customerResult || customerResult.status === false) {
-        logger.error('ePayco customer creation failed', { paymentId, customerResult });
-        return { success: false, error: 'Error al crear el cliente. Intenta nuevamente.' };
+        const epaycoError = this.parseEpaycoError(customerResult, 'Error al crear el cliente. Intenta nuevamente.');
+        logger.error('ePayco customer creation failed', {
+          paymentId,
+          code: epaycoError.code,
+          message: epaycoError.message,
+          rawMessage: epaycoError.rawMessage,
+          customerResult,
+        });
+        return {
+          success: false,
+          error: epaycoError.message,
+          errorCode: epaycoError.code,
+        };
       }
 
       const customerId = customerResult.data?.customerId || customerResult.data?.id_customer || customerResult.id;
@@ -1703,14 +1966,14 @@ class PaymentService {
         token_card: tokenId,
         customer_id: customerId,
         doc_type: customer.doc_type || 'CC',
-        doc_number: customer.doc_number || '0000000000',
+        doc_number: customer.doc_number || '1000000000',
         name: customer.name,
         last_name: customer.last_name || customer.name,
         email: customer.email,
         city: customer.city || 'Bogota',
-        address: customer.address || 'N/A',
-        phone: customer.phone || '0000000000',
-        cell_phone: customer.cell_phone || customer.phone || '0000000000',
+        address: customer.address || 'Calle Principal 123',
+        phone: customer.phone || '3101234567',
+        cell_phone: customer.cell_phone || customer.phone || '3101234567',
         bill: paymentRef,
         description: plan.sku,
         value: String(amountCOP),
@@ -1726,6 +1989,7 @@ class PaymentService {
         // 3D Secure: Hint to API (actual 3DS enforcement is via ePayco dashboard rules)
         // Configure in ePayco Dashboard: Configuración → Seguridad → Enable 3D Secure
         three_d_secure: true,
+        country: customer.country || 'CO',
         extras: {
           extra1: String(userId),
           extra2: planId,
@@ -1830,7 +2094,8 @@ class PaymentService {
 
         // Try multiple field names for 3DS redirect URL or info
         let redirectUrl = null;
-        let threedsInfo = null;
+        const rawThreeDS = fullResponse['3DS'];
+        let threeDSData = null;
         let is3ds2 = false;
 
         // Check different possible field names for 3DS URL
@@ -1838,20 +2103,33 @@ class PaymentService {
           redirectUrl = fullResponse.urlbanco;
         } else if (fullResponse.url_response_bank) {
           redirectUrl = fullResponse.url_response_bank;
-        } else if (fullResponse['3DS']) {
+        } else if (rawThreeDS) {
           // ePayco might return 3DS info as string (redirect URL) or object (Cardinal Commerce 3DS 2.0)
-          threedsInfo = fullResponse['3DS'];
-          if (typeof threedsInfo === 'string') {
-            redirectUrl = threedsInfo;
-          } else if (typeof threedsInfo === 'object') {
-            // Check for Cardinal Commerce 3DS 2.0 device data collection
-            if (threedsInfo.data && threedsInfo.data.deviceDataCollectionUrl) {
+          if (typeof rawThreeDS === 'string') {
+            redirectUrl = rawThreeDS;
+          } else if (typeof rawThreeDS === 'object') {
+            // Check for Cardinal Commerce 3DS 2.0 device data collection (multiple possible formats)
+            const deviceDataCollectionUrl =
+              rawThreeDS.data?.deviceDataCollectionUrl ||        // Format 1: Nested under data
+              rawThreeDS.deviceDataCollectionUrl ||              // Format 2: Direct property
+              fullResponse?.cardinal_commerce_url ||             // Format 3: Alternative naming
+              fullResponse?.threeds_url;                         // Format 4: 3DS URL variant
+
+            if (deviceDataCollectionUrl) {
               is3ds2 = true;
-              threedsInfo = threedsInfo.data; // Extract data object
-            } else if (threedsInfo.url) {
-              redirectUrl = threedsInfo.url;
-            } else if (threedsInfo.urlbanco) {
-              redirectUrl = threedsInfo.urlbanco;
+              threeDSData = {
+                version: '2.0',
+                provider: 'CardinalCommerce',
+                data: rawThreeDS.data || rawThreeDS,
+                deviceDataCollectionUrl: deviceDataCollectionUrl,
+                accessToken: rawThreeDS.data?.accessToken || rawThreeDS.accessToken,
+                referenceId: rawThreeDS.data?.referenceId || rawThreeDS.referenceId,
+                token: rawThreeDS.data?.token || rawThreeDS.token,
+              };
+            } else if (rawThreeDS.url) {
+              redirectUrl = rawThreeDS.url;
+            } else if (rawThreeDS.urlbanco) {
+              redirectUrl = rawThreeDS.urlbanco;
             }
           }
         } else if (fullResponse.url) {
@@ -1892,26 +2170,55 @@ class PaymentService {
         };
 
         if (!redirectUrl && !is3ds2) {
-          // Missing bank URL or 3DS 2.0 data - payment cannot proceed
-          logger.error('CRITICAL: 3DS payment pending but no bank redirect URL or 3DS 2.0 data provided by ePayco', {
+          // CRITICAL: No bank URL or 3DS 2.0 data - payment cannot proceed
+          // Fail immediately instead of leaving it pending indefinitely
+          logger.error('CRITICAL: 3DS payment pending but no bank redirect URL or 3DS 2.0 data provided by ePayco - FAILING PAYMENT', {
             paymentId,
             refPayco,
             estado,
             chargeResultKeys: Object.keys(fullResponse),
           });
-          pendingMetadata.error = 'BANK_URL_MISSING';
-          pendingMetadata.error_description = 'ePayco did not provide bank redirect URL or 3DS 2.0 data';
+
+          // Fail the payment
+          await PaymentModel.updateStatus(paymentId, 'failed', {
+            transaction_id: transactionId,
+            reference: refPayco,
+            epayco_ref: refPayco,
+            payment_method: 'tokenized_card',
+            error: 'BANK_URL_MISSING',
+            error_description: 'ePayco no proporcionó URL de autenticación bancaria ni datos de 3DS 2.0',
+            epayco_estado: estado,
+            bank_url_available: false,
+            is_3ds_2_data_available: false,
+            epayco_response_timestamp: new Date().toISOString(),
+          });
+
+          // Log security error
+          PaymentSecurityService.logPaymentError({
+            paymentId,
+            userId,
+            provider: 'epayco',
+            errorCode: 'BANK_URL_MISSING',
+            errorMessage: 'ePayco retornó Pendiente sin URL de autenticación bancaria ni datos de 3DS 2.0',
+            stackTrace: null,
+          }).catch(() => {});
+
+          return {
+            success: false,
+            status: 'failed',
+            error: 'No se pudo procesar el pago. El banco no proporcionó autenticación. Intenta con otra tarjeta o método de pago.',
+            transactionId: refPayco || transactionId,
+          };
         }
 
+        // Payment has either bank redirect URL or 3DS 2.0 data - mark as pending
         await PaymentModel.updateStatus(paymentId, 'pending', pendingMetadata);
 
         const pendingResult = {
-          success: !!(redirectUrl || is3ds2), // True if we have redirect URL or 3DS 2.0 data
+          success: true,
           status: 'pending',
           transactionId: refPayco || transactionId,
-          message: redirectUrl || is3ds2
-            ? 'El pago está pendiente de confirmación en el banco'
-            : 'Error: No se pudo obtener la URL del banco para confirmar el pago',
+          message: 'El pago está pendiente de confirmación en el banco',
         };
 
         if (redirectUrl) {
@@ -1921,37 +2228,39 @@ class PaymentService {
             refPayco,
             urlPresent: true,
           });
-        } else if (is3ds2 && threedsInfo) {
+        } else if (is3ds2 && threeDSData) {
           // Return Cardinal Commerce 3DS 2.0 device data collection info
           pendingResult.threeDSecure = {
             version: '2.0',
             provider: 'CardinalCommerce',
+            integration: 'epayco_api_validate3ds',
+            transactionData: {
+              franquicia: fullResponse.franquicia,
+              '3DS': rawThreeDS,
+              ref_payco: fullResponse.ref_payco || refPayco,
+              cc_network_response: fullResponse.cc_network_response,
+            },
             data: {
-              accessToken: threedsInfo.accessToken,
-              deviceDataCollectionUrl: threedsInfo.deviceDataCollectionUrl,
-              referenceId: threedsInfo.referenceId,
-              token: threedsInfo.token,
+              accessToken: threeDSData.accessToken,
+              deviceDataCollectionUrl: threeDSData.deviceDataCollectionUrl,
+              referenceId: threeDSData.referenceId,
+              token: threeDSData.token,
             },
           };
           logger.info('Cardinal Commerce 3DS 2.0 device data collection info obtained from ePayco', {
             paymentId,
             refPayco,
-            referenceId: threedsInfo.referenceId,
-          });
-        } else {
-          // Return error if no redirect URL or 3DS 2.0 data - this prevents user confusion
-          pendingResult.error = 'BANK_URL_MISSING';
-          pendingResult.requiresManualIntervention = true;
-          logger.warn('Payment stuck - missing bank authentication URL or 3DS 2.0 data', {
-            paymentId,
-            refPayco,
-            action: 'REQUIRES_MANUAL_RETRY',
+            referenceId: threeDSData.referenceId,
           });
         }
 
         return pendingResult;
       } else {
         // Rejected or failed
+        const epaycoError = this.parseEpaycoError(
+          chargeResult,
+          chargeResult?.data?.respuesta || 'Transacción rechazada'
+        );
         await PaymentModel.updateStatus(paymentId, 'failed', {
           transaction_id: transactionId,
           reference: refPayco,
@@ -1959,10 +2268,11 @@ class PaymentService {
           payment_method: 'tokenized_card',
           epayco_estado: estado,
           epayco_respuesta: chargeResult?.data?.respuesta,
-          error: chargeResult?.data?.respuesta || 'Transacción rechazada',
+          epayco_error_code: epaycoError.code,
+          error: epaycoError.message,
         });
 
-        const errorMsg = chargeResult?.data?.respuesta || 'Transacción rechazada';
+        const errorMsg = epaycoError.message;
 
         // Security: Log rejected charge
         PaymentSecurityService.logPaymentError({
@@ -1979,6 +2289,7 @@ class PaymentService {
           status: 'rejected',
           transactionId: refPayco || transactionId,
           error: errorMsg,
+          errorCode: epaycoError.code,
         };
       }
     } catch (error) {
@@ -2008,6 +2319,385 @@ class PaymentService {
    * @param {string} refPayco - ePayco transaction reference
    * @returns {Promise<Object>} Transaction status from ePayco
    */
+  static mapEpaycoStateCode(stateCode) {
+    if (stateCode === undefined || stateCode === null) return null;
+    const code = String(stateCode).trim();
+    const mapping = {
+      '1': 'Aceptada',
+      '2': 'Rechazada',
+      '3': 'Pendiente',
+      '4': 'Fallida',
+      '5': 'Cancelada',
+      '6': 'Reversada',
+      '10': 'Abandonada',
+    };
+    return mapping[code] || null;
+  }
+
+  static extractEpaycoStatusFromPayload(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+
+    const candidates = [];
+    const addCandidate = (value) => {
+      if (!value) return;
+      if (Array.isArray(value)) {
+        value.forEach(addCandidate);
+        return;
+      }
+      if (typeof value === 'object') {
+        candidates.push(value);
+      }
+    };
+
+    [
+      payload,
+      payload.data,
+      payload.transaction,
+      payload.transactionData,
+      payload.response,
+      payload.result,
+      payload.results,
+      payload.data && payload.data.transaction,
+      payload.data && payload.data.data,
+      payload.data && payload.data.result,
+      payload.data && payload.data.results,
+    ].forEach(addCandidate);
+
+    for (const candidate of candidates) {
+      if (!candidate || typeof candidate !== 'object') continue;
+      const code = candidate.x_cod_transaction_state
+        || candidate.cod_transaction_state
+        || candidate.state_code
+        || candidate.status_code;
+      const rawState = candidate.x_transaction_state
+        || candidate.transaction_state
+        || candidate.estado
+        || candidate.state
+        || this.mapEpaycoStateCode(code);
+      const estado = this.normalizeEpaycoTransactionState(rawState, code);
+
+      const respuesta = candidate.x_respuesta
+        || candidate.x_response
+        || candidate.x_response_reason_text
+        || candidate.respuesta
+        || candidate.message;
+
+      const reference = candidate.x_ref_payco
+        || candidate.ref_payco
+        || candidate.reference
+        || candidate.refPayco;
+
+      const transactionId = candidate.x_transaction_id
+        || candidate.transaction_id
+        || candidate.transactionId;
+
+      const amount = candidate.x_amount
+        || candidate.amount
+        || candidate.valor
+        || candidate.value;
+
+      const currencyCode = candidate.x_currency_code
+        || candidate.currency_code
+        || candidate.moneda
+        || candidate.currency;
+
+      const approvalCode = candidate.x_approval_code
+        || candidate.approval_code
+        || candidate.authorization
+        || candidate.autorizacion;
+
+      const extra1 = candidate.x_extra1
+        || candidate.extra1
+        || candidate.extras?.extra1
+        || candidate.metadata?.extra1;
+      const extra2 = candidate.x_extra2
+        || candidate.extra2
+        || candidate.extras?.extra2
+        || candidate.metadata?.extra2;
+      const extra3 = candidate.x_extra3
+        || candidate.extra3
+        || candidate.extras?.extra3
+        || candidate.metadata?.extra3;
+
+      const customerEmail = candidate.x_customer_email
+        || candidate.customer_email
+        || candidate.email;
+
+      const customerName = candidate.x_customer_name
+        || candidate.customer_name
+        || candidate.nombres
+        || candidate.name
+        || [candidate.nombres, candidate.apellidos].filter(Boolean).join(' ').trim()
+        || null;
+
+      if (
+        estado
+        || respuesta
+        || reference
+        || transactionId
+        || amount
+        || currencyCode
+        || approvalCode
+        || extra1
+        || extra2
+        || extra3
+        || customerEmail
+        || customerName
+      ) {
+        return {
+          estado: estado || null,
+          respuesta: respuesta || null,
+          reference: reference || null,
+          transactionId: transactionId || null,
+          amount: amount || null,
+          currencyCode: currencyCode || null,
+          approvalCode: approvalCode || null,
+          extra1: extra1 || null,
+          extra2: extra2 || null,
+          extra3: extra3 || null,
+          customerEmail: customerEmail || null,
+          customerName: customerName || null,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  static buildEpaycoStatusResult({ refPayco, statusData, fullResponse, source }) {
+    const estado = statusData?.estado || null;
+    const respuesta = statusData?.respuesta || null;
+
+    logger.info('ePayco transaction status retrieved', {
+      refPayco,
+      estado,
+      respuesta,
+      ref_payco: statusData?.reference,
+      transactionID: statusData?.transactionId,
+      source,
+      timestamp: new Date().toISOString(),
+    });
+
+    if (estado === 'Aceptada' || estado === 'Aprobada') {
+      logger.warn('RECOVERY: Payment confirmed at ePayco but webhook may have been missed', {
+        refPayco,
+        estado,
+        source,
+        message: 'This payment may need manual webhook replay',
+      });
+      return {
+        success: true,
+        currentStatus: estado,
+        needsRecovery: true,
+        statusData,
+        transactionData: fullResponse,
+        message: 'Payment was confirmed at ePayco but webhook may have been delayed',
+        source,
+      };
+    }
+
+    if (estado === 'Pendiente') {
+      logger.warn('Payment still pending at ePayco', {
+        refPayco,
+        estado,
+        source,
+        message: 'User may not have completed 3DS authentication',
+      });
+      return {
+        success: true,
+        currentStatus: 'Pendiente',
+        needsRecovery: false,
+        statusData,
+        message: 'Payment is still waiting for 3DS completion',
+        source,
+      };
+    }
+
+    if (
+      estado === 'Rechazada'
+      || estado === 'Fallida'
+      || estado === 'Abandonada'
+      || estado === 'Cancelada'
+    ) {
+      logger.warn('Payment was rejected/failed/cancelled at ePayco', {
+        refPayco,
+        estado,
+        respuesta,
+        source,
+      });
+      return {
+        success: true,
+        currentStatus: estado,
+        needsRecovery: false,
+        statusData,
+        message: 'Payment was rejected or failed',
+        source,
+      };
+    }
+
+    if (estado === 'Reversada') {
+      logger.warn('Payment was reversed/refunded at ePayco', {
+        refPayco,
+        estado,
+        respuesta,
+        source,
+      });
+      return {
+        success: true,
+        currentStatus: estado,
+        needsRecovery: false,
+        statusData,
+        message: 'Payment was reversed or refunded',
+        source,
+      };
+    }
+
+    return {
+      success: true,
+      currentStatus: estado,
+      responseMessage: respuesta,
+      statusData,
+      fullResponse,
+      source,
+    };
+  }
+
+  static async getEpaycoValidationAuthToken(forceRefresh = false) {
+    const now = Date.now();
+    if (
+      !forceRefresh
+      && this.epaycoValidationToken
+      && this.epaycoValidationTokenExpiresAt > now
+    ) {
+      return this.epaycoValidationToken;
+    }
+
+    const publicKey = process.env.EPAYCO_PUBLIC_KEY;
+    const privateKey = process.env.EPAYCO_PRIVATE_KEY;
+    if (!publicKey || !privateKey) {
+      return null;
+    }
+
+    try {
+      const response = await axios.post(
+        'https://api.secure.payco.co/v1/auth/login',
+        {
+          public_key: publicKey,
+          private_key: privateKey,
+        },
+        {
+          timeout: 7000,
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'User-Agent': 'pnptvbot/1.0',
+          },
+        },
+      );
+
+      const token = response?.data?.bearer_token
+        || response?.data?.token
+        || response?.data?.data?.bearer_token
+        || response?.data?.data?.token;
+
+      if (!token) {
+        this.epaycoValidationToken = null;
+        this.epaycoValidationTokenExpiresAt = 0;
+        return null;
+      }
+
+      const expiresInSeconds = Number(
+        response?.data?.expires_in
+        || response?.data?.expires
+        || response?.data?.data?.expires_in
+        || response?.data?.data?.expires
+        || 0,
+      );
+
+      const ttlMs = Number.isFinite(expiresInSeconds) && expiresInSeconds > 0
+        ? Math.max(60_000, (expiresInSeconds * 1000) - 60_000)
+        : this.EPAYCO_VALIDATION_TOKEN_TTL_MS;
+
+      this.epaycoValidationToken = token;
+      this.epaycoValidationTokenExpiresAt = Date.now() + ttlMs;
+      return token;
+    } catch (error) {
+      this.epaycoValidationToken = null;
+      this.epaycoValidationTokenExpiresAt = 0;
+      logger.warn('Unable to obtain ePayco validation API auth token', {
+        error: error.message,
+      });
+      return null;
+    }
+  }
+
+  static async fetchEpaycoStatusFromValidationApi(refPayco) {
+    const encodedRef = encodeURIComponent(String(refPayco).trim());
+    const urls = [
+      `https://api.secure.payco.co/validation/v1/reference/${encodedRef}`,
+      `https://secure.epayco.co/validation/v1/reference/${encodedRef}`,
+    ];
+
+    const token = await this.getEpaycoValidationAuthToken();
+    let lastError = null;
+
+    for (const url of urls) {
+      const requestVariants = token
+        ? [
+          { useAuth: true, headers: { Authorization: `Bearer ${token}` } },
+          { useAuth: false, headers: {} },
+        ]
+        : [{ useAuth: false, headers: {} }];
+
+      for (const variant of requestVariants) {
+        try {
+          const response = await axios.get(url, {
+            timeout: 7000,
+            headers: {
+              Accept: 'application/json',
+              'User-Agent': 'pnptvbot/1.0',
+              ...variant.headers,
+            },
+          });
+
+          const extracted = this.extractEpaycoStatusFromPayload(response.data);
+          if (!extracted || !extracted.estado) {
+            logger.warn('Validation API responded without recognizable transaction status', {
+              refPayco,
+              url,
+              usedAuth: variant.useAuth,
+              keys: response?.data && typeof response.data === 'object' ? Object.keys(response.data) : [],
+            });
+            continue;
+          }
+
+          return {
+            success: true,
+            statusData: extracted,
+            fullResponse: response.data,
+            source: `validation_api:${new URL(url).hostname}${variant.useAuth ? ':auth' : ':public'}`,
+          };
+        } catch (error) {
+          lastError = error;
+          logger.warn('Validation API status check failed for endpoint', {
+            refPayco,
+            url,
+            usedAuth: variant.useAuth,
+            status: error?.response?.status,
+            error: error.message,
+          });
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: lastError ? lastError.message : 'Could not retrieve status from validation API',
+    };
+  }
+
   static async checkEpaycoTransactionStatus(refPayco) {
     try {
       if (!refPayco) {
@@ -2020,79 +2710,70 @@ class PaymentService {
       const { getEpaycoClient } = require('../../config/epayco');
       const epaycoClient = getEpaycoClient();
 
-      // Query transaction status using charge.get() (the correct SDK method)
-      // SDK endpoint: GET /restpagos/transaction/response.json?ref_payco=UID&public_key=KEY
-      const statusResult = await epaycoClient.charge.get(refPayco);
-
-      if (statusResult && statusResult.data) {
-        // charge.get() returns x_-prefixed fields from ePayco REST API
-        const estado = statusResult.data.x_transaction_state || statusResult.data.x_respuesta || statusResult.data.x_response;
-        const respuesta = statusResult.data.x_respuesta || statusResult.data.x_response || statusResult.data.x_response_reason_text;
-        const ref_payco = statusResult.data.x_ref_payco;
-        const transactionID = statusResult.data.x_transaction_id;
-
-        logger.info('ePayco transaction status retrieved', {
+      // First source: SDK charge.get()
+      let sdkStatus = null;
+      let sdkPayload = null;
+      let sdkError = null;
+      try {
+        // SDK endpoint: GET /restpagos/transaction/response.json?ref_payco=UID&public_key=KEY
+        const statusResult = await epaycoClient.charge.get(refPayco);
+        sdkPayload = statusResult?.data || null;
+        sdkStatus = this.extractEpaycoStatusFromPayload(sdkPayload);
+      } catch (error) {
+        sdkError = error;
+        logger.warn('SDK charge.get status check failed', {
           refPayco,
-          estado,
-          respuesta,
-          ref_payco,
-          transactionID,
-          timestamp: new Date().toISOString(),
+          error: error.message,
         });
-
-        // IMPORTANT: If status has changed to Aceptada/Aprobada, webhook may have been lost
-        if (estado === 'Aceptada' || estado === 'Aprobada') {
-          logger.warn('RECOVERY: Payment confirmed at ePayco but webhook may have been missed', {
-            refPayco,
-            estado,
-            message: 'This payment may need manual webhook replay',
-          });
-          return {
-            success: true,
-            currentStatus: estado,
-            needsRecovery: true,
-            transactionData: statusResult.data,
-            message: 'Payment was confirmed at ePayco but webhook may have been delayed',
-          };
-        } else if (estado === 'Pendiente') {
-          logger.warn('Payment still pending at ePayco', {
-            refPayco,
-            estado,
-            message: 'User may not have completed 3DS authentication',
-          });
-          return {
-            success: true,
-            currentStatus: 'Pendiente',
-            needsRecovery: false,
-            message: 'Payment is still waiting for 3DS completion',
-          };
-        } else if (estado === 'Rechazada' || estado === 'Fallida') {
-          logger.warn('Payment was rejected/failed at ePayco', {
-            refPayco,
-            estado,
-            respuesta,
-          });
-          return {
-            success: true,
-            currentStatus: estado,
-            needsRecovery: false,
-            message: 'Payment was rejected or failed',
-          };
-        }
-
-        return {
-          success: true,
-          currentStatus: estado,
-          responseMessage: respuesta,
-          fullResponse: statusResult.data,
-        };
       }
 
-      logger.error('Failed to retrieve ePayco transaction status', {
+      // If SDK already returns a terminal/non-pending state, trust it directly.
+      if (sdkStatus && sdkStatus.estado && sdkStatus.estado !== 'Pendiente') {
+        return this.buildEpaycoStatusResult({
+          refPayco,
+          statusData: sdkStatus,
+          fullResponse: sdkPayload,
+          source: 'sdk:charge.get',
+        });
+      }
+
+      // Second source: validation API by ref_payco (helps when SDK is stale/pending in 3DS flows).
+      const validationCheck = await this.fetchEpaycoStatusFromValidationApi(refPayco);
+      if (validationCheck.success && validationCheck.statusData && validationCheck.statusData.estado) {
+        if (sdkStatus && sdkStatus.estado === 'Pendiente' && validationCheck.statusData.estado !== 'Pendiente') {
+          logger.warn('Status divergence detected: SDK pending but validation API terminal state', {
+            refPayco,
+            sdkStatus: sdkStatus.estado,
+            validationStatus: validationCheck.statusData.estado,
+          });
+        }
+        return this.buildEpaycoStatusResult({
+          refPayco,
+          statusData: validationCheck.statusData,
+          fullResponse: validationCheck.fullResponse,
+          source: validationCheck.source,
+        });
+      }
+
+      // Last fallback: if SDK had any recognizable status (including Pendiente), return it.
+      if (sdkStatus && sdkStatus.estado) {
+        return this.buildEpaycoStatusResult({
+          refPayco,
+          statusData: sdkStatus,
+          fullResponse: sdkPayload,
+          source: 'sdk:charge.get',
+        });
+      }
+
+      logger.error('Failed to retrieve ePayco transaction status from SDK and validation API', {
         refPayco,
-        statusResult,
+        sdkError: sdkError ? sdkError.message : null,
+        validationError: validationCheck.error,
       });
-      return { success: false, error: 'Could not retrieve status from ePayco' };
+      return {
+        success: false,
+        error: validationCheck.error || sdkError?.message || 'Could not retrieve status from ePayco',
+      };
     } catch (error) {
       logger.error('Error checking ePayco transaction status', {
         error: error.message,
@@ -2134,20 +2815,26 @@ class PaymentService {
           action: 'WEBHOOK_REPLAY',
         });
 
-        // Build webhook-compatible data from the charge.get() response
+        // Build webhook-compatible data from SDK/validation payload.
+        // ePayco may omit extras in status endpoints, so we backfill from local payment record.
         const txData = statusCheck.transactionData || {};
+        const extracted = statusCheck.statusData || this.extractEpaycoStatusFromPayload(txData) || {};
+        const payment = await PaymentModel.getById(paymentId);
+        const fallbackUserId = payment?.userId || payment?.user_id || payment?.metadata?.user_id || payment?.metadata?.userId;
+        const fallbackPlanId = payment?.planId || payment?.plan_id || payment?.metadata?.plan_id || payment?.metadata?.planId;
+
         const syntheticWebhook = {
-          x_ref_payco: txData.x_ref_payco || refPayco,
-          x_transaction_id: txData.x_transaction_id,
+          x_ref_payco: extracted.reference || txData?.x_ref_payco || txData?.ref_payco || refPayco,
+          x_transaction_id: extracted.transactionId || txData?.x_transaction_id || txData?.transaction_id || txData?.transactionID,
           x_transaction_state: statusCheck.currentStatus,
-          x_approval_code: txData.x_approval_code,
-          x_amount: txData.x_amount,
-          x_currency_code: txData.x_currency_code,
-          x_customer_email: txData.x_customer_email,
-          x_customer_name: txData.x_customer_name,
-          x_extra1: txData.x_extra1,
-          x_extra2: txData.x_extra2,
-          x_extra3: txData.x_extra3,
+          x_approval_code: extracted.approvalCode || txData?.x_approval_code || txData?.approval_code,
+          x_amount: extracted.amount || txData?.x_amount || txData?.amount || txData?.valor || payment?.amount,
+          x_currency_code: extracted.currencyCode || txData?.x_currency_code || txData?.currency_code || txData?.currency || payment?.currency,
+          x_customer_email: extracted.customerEmail || txData?.x_customer_email || txData?.customer_email,
+          x_customer_name: extracted.customerName || txData?.x_customer_name || txData?.customer_name,
+          x_extra1: extracted.extra1 || txData?.x_extra1 || txData?.extra1 || txData?.extras?.extra1 || fallbackUserId,
+          x_extra2: extracted.extra2 || txData?.x_extra2 || txData?.extra2 || txData?.extras?.extra2 || fallbackPlanId,
+          x_extra3: extracted.extra3 || txData?.x_extra3 || txData?.extra3 || txData?.extras?.extra3 || paymentId,
           _recovery: true, // Flag to indicate this is a recovery replay
         };
 

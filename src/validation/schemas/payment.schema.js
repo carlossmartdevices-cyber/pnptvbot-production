@@ -137,10 +137,16 @@ const schemas = {
     x_ref_payco: Joi.string().required(),
     x_transaction_id: Joi.string().required(),
     x_amount: Joi.alternatives().try(Joi.string(), Joi.number().positive()).required(),
-    x_currency_code: Joi.string().valid('COP', 'USD', 'cop', 'usd').required(),
-    x_transaction_state: Joi.string().valid('Aceptada', 'Aprobada', 'Rechazada', 'Pendiente', 'Fallida').required(),
+    x_currency_code: Joi.string().trim().length(3).required(),
+    x_transaction_state: Joi.string()
+      .valid('Aceptada', 'Aprobada', 'Rechazada', 'Pendiente', 'Fallida', 'Abandonada', 'Cancelada', 'Reversada')
+      .optional(),
+    x_cod_transaction_state: Joi.alternatives().try(
+      Joi.string().valid('1', '2', '3', '4', '5', '6', '10'),
+      Joi.number().valid(1, 2, 3, 4, 5, 6, 10),
+    ).optional(),
     x_signature: Joi.string().required(),
-  }).unknown(true),
+  }).or('x_transaction_state', 'x_cod_transaction_state').unknown(true),
 
   /**
    * Payment query filters validation
