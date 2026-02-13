@@ -203,7 +203,7 @@ All 4 critical ePayco 3DS integration fixes have been:
 - ✅ Deployed to branch `main`
 - ✅ Verified in live system
 - ✅ Tested for syntax errors
-- ✅ Bot running with new fixes
+- ✅ Bot restarted with new fixes
 
 **Key Achievement**: Fixed the root cause of missing `urlbanco` by adding required `card[holder_name]` field to token creation.
 

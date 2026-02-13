@@ -154,7 +154,7 @@ Resultado:  ❌ No retorna 3DS data
 
 ```bash
 # Via API de ePayco (requiere credenciales)
-curl -X GET "https://api.epayco.co/merchant/info" \
+curl -X GET "https://api.epayco.co/merchant/info" 
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # Buscar en respuesta:

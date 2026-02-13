@@ -127,13 +127,13 @@ FIX D: Country Code (Line 1831)
 ### Quick Test (5 minutes)
 ```bash
 # 1. Create test payment
-curl -X POST https://pnptv.app/api/payment/create \
-  -H "Content-Type: application/json" \
+curl -X POST https://pnptv.app/api/payment/create 
+  -H "Content-Type: application/json" 
   -d '{"userId": "8304222924", "planId": "lifetime-pass"}'
 
 # 2. Process with test card
-curl -X POST https://pnptv.app/api/payment/tokenized-charge \
-  -H "Content-Type: application/json" \
+curl -X POST https://pnptv.app/api/payment/tokenized-charge 
+  -H "Content-Type: application/json" 
   -d '{
     "paymentId": "[ID_FROM_STEP_1]",
     "cardNumber": "4111111111111111",

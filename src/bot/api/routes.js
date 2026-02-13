@@ -24,6 +24,7 @@ const ageVerificationController = require('./controllers/ageVerificationControll
 const healthController = require('./controllers/healthController');
 const hangoutsController = require('./controllers/hangoutsController');
 const xOAuthRoutes = require('./xOAuthRoutes');
+const xFollowersRoutes = require('./xFollowersRoutes');
 const adminUserRoutes = require('./routes/adminUserRoutes');
 
 // Middleware
@@ -99,8 +100,10 @@ app.use(conditionalMiddleware(helmet({
         "'unsafe-inline'",
         "https://multimedia.epayco.co",
         "https://songbird.cardinalcommerce.com",
+        "https://centinelapi.cardinalcommerce.com",
         "https://checkout.epayco.co",
         "https://secure.payco.co",
+        "https://secure.epayco.co",
       ],
       styleSrc: ["'self'", "'unsafe-inline'", "https:", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https:", "https://fonts.gstatic.com", "data:"],
@@ -128,7 +131,7 @@ app.use(conditionalMiddleware(helmet({
       ],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
-      formAction: ["'self'", "https://checkout.epayco.co", "https://secure.epayco.co", "https://secure.payco.co"],
+      formAction: ["'self'", "https://checkout.epayco.co", "https://secure.epayco.co", "https://secure.payco.co", "https://centinelapi.cardinalcommerce.com"],
       scriptSrcAttr: ["'unsafe-inline'"],
       upgradeInsecureRequests: [],
     },
@@ -1339,6 +1342,7 @@ app.use('/api/admin/users', adminUserRoutes);
 
 app.use('/api/admin/x/oauth', xOAuthRoutes);
 app.use('/api/auth/x', xOAuthRoutes); // Alias for X Developer Portal redirect URI
+app.use('/api/x/followers', xFollowersRoutes);
 
 // Health Check and Monitoring Endpoints
 // Health check endpoints should be accessible but with reasonable rate limits

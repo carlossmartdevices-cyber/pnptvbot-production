@@ -778,6 +778,7 @@ class PaymentController {
         statusCheck.currentStatus === 'Rechazada'
         || statusCheck.currentStatus === 'Fallida'
         || statusCheck.currentStatus === 'Abandonada'
+        || statusCheck.currentStatus === 'Cancelada'
       ) {
         await PaymentModel.updateStatus(paymentId, 'failed', {
           epayco_ref: refPayco,
@@ -793,6 +794,24 @@ class PaymentController {
           currentStatusAtEpayco: statusCheck.currentStatus,
           message: statusCheck.message || 'Payment failed at ePayco',
           action: 'RETRY_PAYMENT',
+        });
+      }
+
+      if (statusCheck.currentStatus === 'Reversada') {
+        await PaymentModel.updateStatus(paymentId, 'refunded', {
+          epayco_ref: refPayco,
+          epayco_estado: statusCheck.currentStatus,
+          recovered_via_status_check: true,
+          error: statusCheck.message || 'Payment reversed/refunded at ePayco',
+        });
+
+        return res.json({
+          success: true,
+          status: 'refunded',
+          stuck: false,
+          currentStatusAtEpayco: statusCheck.currentStatus,
+          message: statusCheck.message || 'Payment reversed/refunded at ePayco',
+          action: 'NO_RETRY',
         });
       }
 
@@ -1086,6 +1105,7 @@ class PaymentController {
         currentStatus === 'Rechazada'
         || currentStatus === 'Fallida'
         || currentStatus === 'Abandonada'
+        || currentStatus === 'Cancelada'
       ) {
         await PaymentModel.updateStatus(paymentId, 'failed', {
           epayco_ref: refPayco,
@@ -1098,6 +1118,20 @@ class PaymentController {
           success: true,
           status: 'failed',
           message: `Payment ${currentStatus.toLowerCase()} at ePayco`,
+          paymentId,
+        });
+      } else if (currentStatus === 'Reversada') {
+        await PaymentModel.updateStatus(paymentId, 'refunded', {
+          epayco_ref: refPayco,
+          epayco_estado: currentStatus,
+          error: 'Payment reversed/refunded after 3DS authentication',
+          three_ds_authenticated: true,
+        });
+
+        return res.json({
+          success: true,
+          status: 'refunded',
+          message: 'Payment reversed/refunded at ePayco',
           paymentId,
         });
       } else {

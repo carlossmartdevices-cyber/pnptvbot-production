@@ -13,9 +13,7 @@ services:
       - ./nginx/pnptv-app.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/pnptv-bot.conf:/etc/nginx/conf.d/easybots.conf:ro
       - ./public:/var/www/pnptv.app/public:ro
-      - certbot-etc:/etc/letsencrypt:ro
-      - certbot-var:/var/lib/letsencrypt:ro
-      - certbot-www:/var/www/certbot:ro
+      - ./certs:/etc/letsencrypt/live/pnptv.app:ro
       - nginx-logs:/var/log/nginx
     depends_on:
       - bot
@@ -86,6 +84,8 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./uploads:/app/uploads
+      - ./config:/app/config:ro
+      - ./locales:/app/locales:ro
     networks:
       - pnptv-network
     healthcheck:

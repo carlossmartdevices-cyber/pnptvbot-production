@@ -28,8 +28,8 @@
 
 **Request**:
 ```bash
-curl -X POST https://pnptv.app/api/payment/create \
-  -H "Content-Type: application/json" \
+curl -X POST https://pnptv.app/api/payment/create 
+  -H "Content-Type: application/json" 
   -d '{
     "userId": "8304222924",
     "planId": "lifetime-pass"
@@ -58,8 +58,8 @@ curl -X POST https://pnptv.app/api/payment/create \
 
 **Request**:
 ```bash
-curl -X POST https://pnptv.app/api/payment/tokenized-charge \
-  -H "Content-Type: application/json" \
+curl -X POST https://pnptv.app/api/payment/tokenized-charge 
+  -H "Content-Type: application/json" 
   -d '{
     "paymentId": "[PAYMENT_ID_FROM_STEP_1]",
     "cardNumber": "4111111111111111",
@@ -105,8 +105,8 @@ redirectUrl !== null && redirectUrl.startsWith('https://') && transactionId !== 
 
 **Request**:
 ```bash
-curl -X POST https://pnptv.app/api/payment/tokenized-charge \
-  -H "Content-Type: application/json" \
+curl -X POST https://pnptv.app/api/payment/tokenized-charge 
+  -H "Content-Type: application/json" 
   -d '{
     "paymentId": "[NEW_PAYMENT_ID]",
     "cardNumber": "5555555555554444",
@@ -131,7 +131,7 @@ curl -X POST https://pnptv.app/api/payment/tokenized-charge \
     "provider": "CardinalCommerce",
     "data": {
       "deviceDataCollectionUrl": "https://centinelapistag.cardinalcommerce.com/...",
-      "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+      "accessToken": "eyJhbGc...",
       "referenceId": "5f3a4b2c-1234-5678-9abc...",
       "token": "DCF645D2A..."
     }

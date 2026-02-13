@@ -129,8 +129,8 @@ extras: {
 
 ### Test 1: Create Payment
 ```bash
-curl -X POST https://localhost:3001/api/payment/create \
-  -H "Content-Type: application/json" \
+curl -X POST https://localhost:3001/api/payment/create 
+  -H "Content-Type: application/json" 
   -d '{
     "userId": "8304222924",
     "planId": "lifetime-pass"
@@ -139,8 +139,8 @@ curl -X POST https://localhost:3001/api/payment/create \
 
 ### Test 2: Process Tokenized Charge
 ```bash
-curl -X POST https://localhost:3001/api/payment/tokenized-charge \
-  -H "Content-Type: application/json" \
+curl -X POST https://localhost:3001/api/payment/tokenized-charge 
+  -H "Content-Type: application/json" 
   -d '{
     "paymentId": "[payment-id-from-test-1]",
     "cardNumber": "4111111111111111",

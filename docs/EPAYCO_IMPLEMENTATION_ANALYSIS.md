@@ -242,7 +242,7 @@ Based on analysis, here's why ePayco might not return `urlbanco` or 3DS data:
 - Falls back to looking for `urlbanco`, which is also null
 - Result: No 3DS data found
 
-**Fix**: Check all possible ePayco response structures
+**Fix**: Check all possible response structures
 
 ---
 
@@ -384,8 +384,8 @@ country: customer.country || 'CO',
 /subscribe lifetime-pass
 
 # Or via API
-curl -X POST https://localhost:3001/api/payment/create \
-  -H "Content-Type: application/json" \
+curl -X POST https://localhost:3001/api/payment/create 
+  -H "Content-Type: application/json" 
   -d '{
     "userId": "8304222924",
     "planId": "lifetime-pass",
@@ -395,8 +395,8 @@ curl -X POST https://localhost:3001/api/payment/create \
 
 ### **Step 2: Make Tokenized Charge with Test Card**
 ```bash
-curl -X POST https://localhost:3001/api/payment/tokenized-charge \
-  -H "Content-Type: application/json" \
+curl -X POST https://localhost:3001/api/payment/tokenized-charge 
+  -H "Content-Type: application/json" 
   -d '{
     "paymentId": "[payment-id]",
     "cardNumber": "4111111111111111",
