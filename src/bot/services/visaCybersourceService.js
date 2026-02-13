@@ -7,7 +7,13 @@ const PaymentModel = require('../../models/paymentModel');
 const SubscriberModel = require('../../models/subscriberModel');
 const PlanModel = require('../../models/planModel');
 const UserModel = require('../../models/userModel');
-const config = require(path.join(__dirname, '../../../config/payment.config.js'));
+let config;
+try {
+  config = require(path.join(__dirname, '../../../config/payment.config.js'));
+} catch (error) {
+  // ePayco/Visa Cybersource config not available, service will be disabled
+  config = { visaCybersource: {} };
+}
 const logger = require('../../utils/logger');
 const { Telegraf } = require('telegraf');
 
