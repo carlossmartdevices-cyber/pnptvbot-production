@@ -26,6 +26,7 @@ const BroadcastButtonModel = require('../../../models/broadcastButtonModel');
 const { registerBroadcastHandlers } = require('./broadcastManagement');
 const { registerXAccountHandlers } = require('./xAccountWizard');
 const { registerXPostWizardHandlers, handleTextInput: handleXPostTextInput, handleMediaInput: handleXPostMediaInput, getSession: getXPostSession, STEPS: XPOST_STEPS } = require('./xPostWizard');
+const { registerUserManagementHandlers } = require('./userManagementHandler');
 const PlaylistAdminService = require('../../services/PlaylistAdminService');
 const RadioAdminService = require('../../services/RadioAdminService');
 const CristinaAdminInfoService = require('../../../services/cristinaAdminInfoService');
@@ -1442,18 +1443,12 @@ let registerAdminHandlers = (bot) => {
       const isAdmin = await PermissionService.isAdmin(ctx.from.id);
       if (!isAdmin) return;
 
-      const lang = getLanguage(ctx);
-
-      // Clear any ongoing admin tasks
-      ctx.session.temp = {
-        adminSearchingUser: true,
-      };
-      await ctx.saveSession();
-
+      // Redirect to user management search
       await ctx.editMessageText(
-        t('searchUser', lang),
+        '👥 **Gestión de Usuarios**\n\nSelecciona una opción:',
         Markup.inlineKeyboard([
-          [Markup.button.callback('❌ Cancelar', 'admin_cancel')],
+          [Markup.button.callback('🔍 Buscar Usuario', 'admin_users_search')],
+          [Markup.button.callback('↩️ Volver', 'admin_cancel')],
         ]),
       );
     } catch (error) {
@@ -6798,6 +6793,7 @@ const finalRegisterAdminHandlers = (bot) => {
   addBroadcastButtonHandlers(bot);
   registerPlaylistAdminHandlers(bot);
   registerRadioAdminHandlers(bot);
+  registerUserManagementHandlers(bot);
 };
 
 module.exports = finalRegisterAdminHandlers;
