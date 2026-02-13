@@ -1993,26 +1993,55 @@ class PaymentService {
         };
 
         if (!redirectUrl && !is3ds2) {
-          // Missing bank URL or 3DS 2.0 data - payment cannot proceed
-          logger.error('CRITICAL: 3DS payment pending but no bank redirect URL or 3DS 2.0 data provided by ePayco', {
+          // CRITICAL: No bank URL or 3DS 2.0 data - payment cannot proceed
+          // Fail immediately instead of leaving it pending indefinitely
+          logger.error('CRITICAL: 3DS payment pending but no bank redirect URL or 3DS 2.0 data provided by ePayco - FAILING PAYMENT', {
             paymentId,
             refPayco,
             estado,
             chargeResultKeys: Object.keys(fullResponse),
           });
-          pendingMetadata.error = 'BANK_URL_MISSING';
-          pendingMetadata.error_description = 'ePayco did not provide bank redirect URL or 3DS 2.0 data';
+
+          // Fail the payment
+          await PaymentModel.updateStatus(paymentId, 'failed', {
+            transaction_id: transactionId,
+            reference: refPayco,
+            epayco_ref: refPayco,
+            payment_method: 'tokenized_card',
+            error: 'BANK_URL_MISSING',
+            error_description: 'ePayco no proporcionó URL de autenticación bancaria ni datos de 3DS 2.0',
+            epayco_estado: estado,
+            bank_url_available: false,
+            is_3ds_2_data_available: false,
+            epayco_response_timestamp: new Date().toISOString(),
+          });
+
+          // Log security error
+          PaymentSecurityService.logPaymentError({
+            paymentId,
+            userId,
+            provider: 'epayco',
+            errorCode: 'BANK_URL_MISSING',
+            errorMessage: 'ePayco retornó Pendiente sin URL de autenticación bancaria ni datos de 3DS 2.0',
+            stackTrace: null,
+          }).catch(() => {});
+
+          return {
+            success: false,
+            status: 'failed',
+            error: 'No se pudo procesar el pago. El banco no proporcionó autenticación. Intenta con otra tarjeta o método de pago.',
+            transactionId: refPayco || transactionId,
+          };
         }
 
+        // Payment has either bank redirect URL or 3DS 2.0 data - mark as pending
         await PaymentModel.updateStatus(paymentId, 'pending', pendingMetadata);
 
         const pendingResult = {
-          success: !!(redirectUrl || is3ds2), // True if we have redirect URL or 3DS 2.0 data
+          success: true,
           status: 'pending',
           transactionId: refPayco || transactionId,
-          message: redirectUrl || is3ds2
-            ? 'El pago está pendiente de confirmación en el banco'
-            : 'Error: No se pudo obtener la URL del banco para confirmar el pago',
+          message: 'El pago está pendiente de confirmación en el banco',
         };
 
         if (redirectUrl) {
@@ -2045,15 +2074,6 @@ class PaymentService {
             paymentId,
             refPayco,
             referenceId: threeDSData.referenceId,
-          });
-        } else {
-          // Return error if no redirect URL or 3DS 2.0 data - this prevents user confusion
-          pendingResult.error = 'BANK_URL_MISSING';
-          pendingResult.requiresManualIntervention = true;
-          logger.warn('Payment stuck - missing bank authentication URL or 3DS 2.0 data', {
-            paymentId,
-            refPayco,
-            action: 'REQUIRES_MANUAL_RETRY',
           });
         }
 

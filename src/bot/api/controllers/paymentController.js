@@ -13,6 +13,25 @@ const { query } = require('../../../config/postgres');
 class PaymentController {
   static EPAYCO_3DS_PENDING_TIMEOUT_MINUTES = Number(process.env.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES || 12);
 
+  /**
+   * Get userId from payment record for audit logging
+   * @param {string} paymentId - Payment ID
+   * @returns {Promise<string|null>} User ID or null if not found
+   */
+  static async getUserIdFromPayment(paymentId) {
+    try {
+      if (!paymentId) return null;
+      const payment = await PaymentModel.getById(paymentId);
+      return payment?.userId || payment?.user_id || null;
+    } catch (error) {
+      logger.error('Failed to get userId from payment', {
+        paymentId,
+        error: error.message
+      });
+      return null;
+    }
+  }
+
   static isInternalPaymentReference(value) {
     if (!value) return false;
     const ref = String(value).trim();
@@ -506,10 +525,13 @@ class PaymentController {
         logger.error('Payment timeout check failed (non-critical)', { error: err.message });
       }
 
+      // Get userId for audit logging
+      const userId = await PaymentController.getUserIdFromPayment(paymentId);
+
       // Security: Audit trail - charge attempted
       PaymentSecurityService.logPaymentEvent({
         paymentId,
-        userId: null,
+        userId,
         eventType: 'charge_attempted',
         provider: 'epayco',
         amount: null,
@@ -559,7 +581,7 @@ class PaymentController {
         // Security: Audit trail - charge completed
         PaymentSecurityService.logPaymentEvent({
           paymentId,
-          userId: null,
+          userId,
           eventType: 'charge_completed',
           provider: 'epayco',
           amount: null,
@@ -581,9 +603,10 @@ class PaymentController {
       });
 
       // Security: Log payment error
+      const errorUserId = await PaymentController.getUserIdFromPayment(req.body?.paymentId).catch(() => null);
       PaymentSecurityService.logPaymentError({
         paymentId: req.body?.paymentId,
-        userId: null,
+        userId: errorUserId,
         provider: 'epayco',
         errorCode: 'TOKENIZED_CHARGE_ERROR',
         errorMessage: error.message,
