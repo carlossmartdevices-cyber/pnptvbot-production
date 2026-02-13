@@ -5,6 +5,7 @@ const ConfirmationTokenService = require('../../services/confirmationTokenServic
 const PaymentService = require('../../services/paymentService');
 const PaymentSecurityService = require('../../services/paymentSecurityService');
 const logger = require('../../../utils/logger');
+const { query } = require('../../../config/postgres');
 
 /**
  * Payment Controller - Handles payment-related API endpoints
@@ -41,6 +42,43 @@ class PaymentController {
     }
 
     return null;
+  }
+
+  static async resolveEpaycoRefFromDb(paymentId) {
+    try {
+      if (!paymentId) return null;
+      const result = await query(
+        `SELECT reference, transaction_id, metadata
+         FROM payments
+         WHERE id = $1::uuid`,
+        [paymentId]
+      );
+      const row = result?.rows?.[0];
+      if (!row) return null;
+
+      const metadata = row.metadata || {};
+      const candidates = [
+        metadata.epayco_ref,
+        metadata.reference,
+        row.reference,
+        row.transaction_id,
+      ];
+
+      for (const candidate of candidates) {
+        if (!candidate) continue;
+        const value = String(candidate).trim();
+        if (!value) continue;
+        if (PaymentController.isInternalPaymentReference(value)) continue;
+        return value;
+      }
+      return null;
+    } catch (error) {
+      logger.error('Error resolving ePayco reference from DB', {
+        error: error.message,
+        paymentId,
+      });
+      return null;
+    }
   }
 
   /**
@@ -648,7 +686,8 @@ class PaymentController {
         });
       }
 
-      const refPayco = PaymentController.resolveEpaycoRef(payment);
+      const refPayco = PaymentController.resolveEpaycoRef(payment)
+        || await PaymentController.resolveEpaycoRefFromDb(paymentId);
 
       logger.info('Checking payment status with recovery', {
         paymentId,
@@ -779,7 +818,8 @@ class PaymentController {
         });
       }
 
-      const refPayco = PaymentController.resolveEpaycoRef(payment);
+      const refPayco = PaymentController.resolveEpaycoRef(payment)
+        || await PaymentController.resolveEpaycoRefFromDb(paymentId);
 
       if (payment.status !== 'pending') {
         return res.status(400).json({
@@ -879,7 +919,8 @@ class PaymentController {
         });
       }
 
-      const refPayco = PaymentController.resolveEpaycoRef(payment);
+      const refPayco = PaymentController.resolveEpaycoRef(payment)
+        || await PaymentController.resolveEpaycoRefFromDb(paymentId);
 
       if (payment.status !== 'pending') {
         return res.status(400).json({
