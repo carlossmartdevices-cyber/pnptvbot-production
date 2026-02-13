@@ -9,7 +9,8 @@
  */
 
 const redisGeoService = require('./redisGeoService');
-const { UserLocation, BlockedUser } = require('../models');
+const UserLocation = require('../models/userLocation');
+const BlockedUser = require('../models/blockedUser');
 const logger = require('../utils/logger');
 
 const RATE_LIMIT_SECONDS = 5;
