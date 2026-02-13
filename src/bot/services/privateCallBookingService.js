@@ -359,7 +359,7 @@ class PrivateCallBookingService {
           paymentLink = `${process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app'}/daimo-checkout/${paymentId}`;
           break;
         case 'epayco':
-          paymentLink = `${process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app'}/payment/${paymentId}`;
+          paymentLink = `${process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app'}/checkout/pnp?paymentId=${paymentId}`;
           break;
         default:
           paymentLink = `${process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app'}/checkout/${paymentId}`;

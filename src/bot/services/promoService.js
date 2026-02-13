@@ -140,8 +140,8 @@ class PromoService {
       let paymentUrl;
 
       if (provider === 'epayco') {
-        // Use payment landing page with promo metadata
-        paymentUrl = `${checkoutDomain}/payment/${payment.id}?promo=${promo.code}`;
+        // Use PNPtv checkout page with promo metadata
+        paymentUrl = `${checkoutDomain}/checkout/pnp?paymentId=${payment.id}&promo=${promo.code}`;
         await PaymentModel.updateStatus(payment.id, 'pending', {
           paymentUrl,
           provider,
@@ -182,7 +182,7 @@ class PromoService {
           });
         }
       } else {
-        paymentUrl = `${checkoutDomain}/payment/${payment.id}?promo=${promo.code}`;
+        paymentUrl = `${checkoutDomain}/checkout/pnp?paymentId=${payment.id}&promo=${promo.code}`;
       }
 
       logger.info('Promo payment initiated', {

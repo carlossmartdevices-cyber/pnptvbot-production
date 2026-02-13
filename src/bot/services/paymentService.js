@@ -195,9 +195,9 @@ class PaymentService {
             paymentUrl,
           });
         } else {
-          // One-time plan → custom checkout page
-          paymentUrl = `${checkoutDomain}/payment/${payment.id}`;
-          logger.info('ePayco checkout URL created', {
+          // One-time plan → PNPtv custom checkout page via /checkout/pnp
+          paymentUrl = `${checkoutDomain}/checkout/pnp?paymentId=${payment.id}`;
+          logger.info('ePayco checkout URL created (PNPtv route)', {
             paymentId: payment.id,
             paymentUrl,
           });
