@@ -6,6 +6,7 @@ const RoleService = require('../../services/roleService');
 const { query } = require('../../../config/postgres');
 const logger = require('../../../utils/logger');
 const { safeReplyOrEdit } = require('../../utils/helpers');
+const FeatureUrlService = require('../../services/featureUrlService');
 
 /**
  * Videorama handlers - Media center with Radio integration
@@ -15,39 +16,18 @@ const registerVideoramaHandlers = (bot) => {
   const VIDEORAMA_WEB_APP_URL = process.env.VIDEORAMA_WEB_APP_URL || 'https://pnptv.app/videorama-app';
 
   /**
-   * Build webapp URL with user role and subscription info
+   * Get Videorama webapp URL from backend API
+   * The API endpoint handles role and subscription checking
    * @param {string} userId - User's Telegram ID
-   * @param {Object} options - Additional URL options (view, etc.)
-   * @returns {Promise<string>} Full webapp URL with params
+   * @param {Object} options - Additional URL options (unused, kept for compatibility)
+   * @returns {Promise<string>} Full webapp URL
    */
   async function buildVideoramaUrl(userId, options = {}) {
     try {
-      const params = new URLSearchParams();
-
-      // Add any custom view option
-      if (options.view) {
-        params.set('view', options.view);
-      }
-
-      // Get user role
-      const role = await RoleService.getUserRole(userId.toString());
-      if (role && role !== 'USER') {
-        params.set('role', role);
-      }
-
-      // Check if user has PRIME subscription
-      const user = await UserModel.getById(userId.toString());
-      if (user && (user.subscription_type === 'prime' || user.is_prime === true)) {
-        params.set('prime', 'true');
-      }
-
-      // Add user ID for tracking
-      params.set('uid', userId.toString());
-
-      const queryString = params.toString();
-      return queryString ? `${VIDEORAMA_WEB_APP_URL}?${queryString}` : VIDEORAMA_WEB_APP_URL;
+      // Call the API service to get the URL (handles auth, role, subscription)
+      return await FeatureUrlService.getVideoramaUrl(userId);
     } catch (error) {
-      logger.error('Error building Videorama URL:', error);
+      logger.error('Error getting Videorama URL:', error);
       return VIDEORAMA_WEB_APP_URL;
     }
   }

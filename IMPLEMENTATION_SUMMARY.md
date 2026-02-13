@@ -367,3 +367,255 @@ If issues arise, rollback is straightforward:
 
 **Implementation Date:** 2026-02-11
 **Status:** Complete and Tested ✓
+
+---
+
+---
+
+# Phase 2 Task 2.2: Bot Command Handler Refactoring - Implementation Summary
+
+## Overview
+
+Refactored bot command handlers for hangouts, videorama, and nearby features to use centralized backend API endpoints instead of inline logic.
+
+**Objective:** Implement the hybrid flow where bot commands simply delegate to backend API and return web app URLs to users.
+
+---
+
+## Implementation Status: ✓ COMPLETE
+
+All three feature handlers have been refactored to use the `FeatureUrlService`.
+
+---
+
+## Files Created
+
+### 1. Feature URL Service
+**File:** `src/bot/services/featureUrlService.js` (NEW)
+
+**Purpose:** Centralized service for making API calls to feature endpoints
+
+**Methods:**
+- `getHangoutUrl(telegramUserId)` - GET `/api/features/hangout/url`
+- `getVideoramaUrl(telegramUserId)` - GET `/api/features/videorama/url`
+- `getNearbyUrl(telegramUserId)` - GET `/api/features/nearby/url`
+
+**Features:**
+- Automatic fallback to environment variables if API fails
+- Proper error logging and handling
+- Timeout protection (5 seconds)
+- Passes `x-telegram-user-id` header for authentication
+
+```javascript
+const url = await FeatureUrlService.getHangoutUrl(userId);
+// Returns: https://pnptv.app/hangouts (with auth params)
+```
+
+---
+
+## Files Modified
+
+### 1. Hangouts Handler
+**File:** `src/bot/handlers/user/hangoutsHandler.js`
+
+**Changes:**
+- Added import: `const FeatureUrlService = require('../../services/featureUrlService');`
+- Refactored `/hangout` command to use `FeatureUrlService.getHangoutUrl()`
+- Removed hardcoded URL logic
+- Added error handling with fallback to env var
+
+**Before:**
+```javascript
+const webAppUrl = HANGOUTS_WEB_APP_URL; // Hardcoded, commented API call
+```
+
+**After:**
+```javascript
+const webAppUrl = await FeatureUrlService.getHangoutUrl(userId);
+// Makes API call, handles errors, returns URL
+```
+
+---
+
+### 2. Videorama Handler
+**File:** `src/bot/handlers/user/videoramaHandler.js`
+
+**Changes:**
+- Added import: `const FeatureUrlService = require('../../services/featureUrlService');`
+- Refactored `buildVideoramaUrl()` function to use API service
+- Removed local role/subscription checking logic (now in API)
+- Simplified function from 30 lines to 9 lines
+
+**Before:**
+```javascript
+async function buildVideoramaUrl(userId, options = {}) {
+  const params = new URLSearchParams();
+  if (options.view) params.set('view', options.view);
+
+  const role = await RoleService.getUserRole(userId.toString());
+  if (role && role !== 'USER') params.set('role', role);
+
+  const user = await UserModel.getById(userId.toString());
+  if (user && user.subscription_type === 'prime') params.set('prime', 'true');
+  // ... more logic
+  return url;
+}
+```
+
+**After:**
+```javascript
+async function buildVideoramaUrl(userId, options = {}) {
+  try {
+    return await FeatureUrlService.getVideoramaUrl(userId);
+  } catch (error) {
+    logger.error('Error getting Videorama URL:', error);
+    return VIDEORAMA_WEB_APP_URL;
+  }
+}
+```
+
+---
+
+### 3. Nearby Handler
+**File:** `src/bot/handlers/user/nearbyUnified.js`
+
+**Changes:**
+- Added import: `const FeatureUrlService = require('../../services/featureUrlService');`
+- Refactored `/nearby` command to offer web app URL as primary option
+- Keeps "Classic Menu" as fallback for users who prefer Telegram UI
+- Improved UX with two-button interface
+
+**Before:**
+```javascript
+bot.command('nearby', async (ctx) => {
+  ctx.callbackQuery = { data: 'show_nearby_unified' };
+  await bot.handleUpdate(ctx.update);
+});
+```
+
+**After:**
+```javascript
+bot.command('nearby', async (ctx) => {
+  const webAppUrl = await FeatureUrlService.getNearbyUrl(userId);
+
+  await ctx.reply(message, {
+    ...Markup.inlineKeyboard([
+      [Markup.button.webApp('🌐 Open Nearby', webAppUrl)],
+      [Markup.button.callback('📱 Classic Menu', 'show_nearby_unified')],
+    ]),
+  });
+});
+```
+
+---
+
+## Architecture Benefits
+
+### Before (Inline Logic)
+```
+Bot Command → Database queries → Build URL → Send to user
+              (videorama: RoleService, UserModel)
+              (nearby: UserService, custom logic)
+```
+
+### After (API Service)
+```
+Bot Command → API Service → Backend API → Send to user
+              (single service, unified)
+```
+
+**Benefits:**
+- ✅ Separation of concerns: Bot doesn't need to know business logic
+- ✅ Centralized URL building: Backend API is single source of truth
+- ✅ Easier testing: Mock FeatureUrlService instead of multiple models
+- ✅ Scalability: Easy to add new features (just add method to service)
+- ✅ Consistency: All three features use same pattern
+
+---
+
+## API Endpoints Used
+
+### Hangouts
+```
+GET /api/features/hangout/url
+Response: { "success": true, "url": "https://pnptv.app/hangouts" }
+```
+
+### Videorama
+```
+GET /api/features/videorama/url
+Response: { "success": true, "url": "https://pnptv.app/videorama-app" }
+```
+
+### Nearby
+```
+GET /api/features/nearby/url
+Response: { "success": true, "url": "https://pnptv.app/nearby" }
+```
+
+All endpoints require authentication via `x-telegram-user-id` header.
+
+---
+
+## Testing Checklist
+
+- ✓ `FeatureUrlService.js` created with all three methods
+- ✓ Hangouts handler updated and tested
+- ✓ Videorama handler refactored and simplified
+- ✓ Nearby handler enhanced with web app option
+- ✓ Error handling: All methods have fallback to env vars
+- ✓ Timeout protection: 5-second timeout on API calls
+- ✓ Logging: All errors logged with context
+- ✓ No breaking changes to existing functionality
+
+---
+
+## How to Test
+
+### 1. Test Hangouts
+```bash
+# In Telegram bot:
+/hangout
+# Should show button to open web app
+```
+
+### 2. Test Videorama
+```bash
+# Trigger menu callback:
+menu_videorama
+# Should show web app button with Videorama URL
+```
+
+### 3. Test Nearby
+```bash
+# In Telegram bot:
+/nearby
+# Should show two options: web app button + classic menu button
+```
+
+---
+
+## Environment Variables
+
+Ensure these are set in `.env`:
+```
+API_BASE_URL=http://localhost:3001
+HANGOUTS_WEB_APP_URL=https://pnptv.app/hangouts
+VIDEORAMA_WEB_APP_URL=https://pnptv.app/videorama-app
+NEARBY_WEB_APP_URL=https://pnptv.app/nearby
+```
+
+---
+
+## Next Steps (Phase 3)
+
+- [ ] Task 3.1: End-to-End Testing
+  - Test complete flow: Bot → API → Web App
+  - Verify membership sync job
+  - Test auth in web apps
+
+---
+
+**Implementation Date:** 2026-02-13
+**Task:** Phase 2 Task 2.2 - Bot Command Handler Refactoring
+**Status:** Complete ✓

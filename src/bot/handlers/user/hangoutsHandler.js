@@ -7,6 +7,7 @@ const { consumeRateLimit, getRateLimitInfo } = require('../../core/middleware/ra
 const { buildHangoutsWebAppUrl } = require('../../utils/hangoutsWebApp');
 const { buildJitsiHangoutsUrl, buildJitsiRoomConfig } = require('../../utils/jitsiHangoutsWebApp');
 const jaasService = require('../../services/jaasService');
+const FeatureUrlService = require('../../services/featureUrlService');
 
 /**
  * Hangouts handlers for video calls and main rooms
@@ -16,20 +17,21 @@ const registerHangoutsHandlers = (bot) => {
   const HANGOUTS_WEB_APP_URL = process.env.HANGOUTS_WEB_APP_URL || 'https://pnptv.app/hangouts';
 
   /**
-   * NEW: Web-first /hangout command
-   * This overrides the old in-bot hangouts logic.
+   * Web-first /hangout command
+   * Calls backend API to get the Hangouts web app URL
    */
   bot.command('hangout', async (ctx) => {
     try {
       const lang = ctx.session?.language || 'en';
-      
-      // NOTE: In a real implementation, we would make an API call to the backend.
-      // For now, we simulate this by directly building the URL.
-      // const response = await axios.get('http://localhost:3001/api/features/hangout/url', { headers: { 'x-telegram-user-id': ctx.from.id } });
-      // const webAppUrl = response.data.url;
+      const userId = ctx.from?.id;
 
-      // Simulate getting the URL, as we can't make a real API call from here easily.
-      const webAppUrl = HANGOUTS_WEB_APP_URL;
+      if (!userId) {
+        await ctx.reply(lang === 'es' ? '❌ Usuario no identificado.' : '❌ User not identified.');
+        return;
+      }
+
+      // Call the API service to get the hangout URL
+      const webAppUrl = await FeatureUrlService.getHangoutUrl(userId);
 
       const message = lang === 'es'
         ? '🎥 *PNP Hangouts* ha sido movido a nuestra aplicación web para una mejor experiencia.'
@@ -42,7 +44,7 @@ const registerHangoutsHandlers = (bot) => {
         ]),
       });
     } catch (error) {
-      logger.error('Error in /hangout web-first command:', error);
+      logger.error('Error in /hangout command:', error);
       const lang = ctx.session?.language || 'en';
       await ctx.reply(lang === 'es' ? '❌ No se pudo cargar Hangouts.' : '❌ Could not load Hangouts.');
     }
