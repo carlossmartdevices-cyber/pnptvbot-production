@@ -23,8 +23,8 @@ const podcastController = require('./controllers/podcastController');
 const ageVerificationController = require('./controllers/ageVerificationController');
 const healthController = require('./controllers/healthController');
 const hangoutsController = require('./controllers/hangoutsController');
-const mainRoomController = require('./controllers/mainRoomController');
 const xOAuthRoutes = require('./xOAuthRoutes');
+const adminUserRoutes = require('./routes/adminUserRoutes');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -701,6 +701,9 @@ app.post(
 // Webhook endpoints
 app.post('/api/webhooks/epayco', webhookLimiter, webhookController.handleEpaycoWebhook);
 app.post('/api/webhook/epayco', webhookLimiter, webhookController.handleEpaycoWebhook); // singular alias
+// New route for pnptv-bot ePayco payments via easybots.store domain
+app.post('/checkout/pnp', webhookLimiter, webhookController.handleEpaycoWebhook);
+app.post('/checkout/pnp/confirmation', webhookLimiter, webhookController.handleEpaycoWebhook);
 app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
 app.post('/api/webhooks/visa-cybersource', webhookLimiter, require('./controllers/visaCybersourceWebhookController').handleWebhook);
 app.get('/api/webhooks/visa-cybersource/health', require('./controllers/visaCybersourceWebhookController').healthCheck);
@@ -976,17 +979,6 @@ app.delete('/api/audio/:filename', asyncHandler(async (req, res) => {
 app.get('/api/hangouts/public', asyncHandler(hangoutsController.listPublic));
 app.post('/api/hangouts/create', asyncHandler(hangoutsController.create));
 app.post('/api/hangouts/join/:callId', asyncHandler(hangoutsController.join));
-
-// Main Rooms API Routes (3 permanent 50-person community rooms)
-app.get('/api/rooms', asyncHandler(mainRoomController.listRooms));
-app.get('/api/rooms/:roomId', asyncHandler(mainRoomController.getRoom));
-app.get('/api/rooms/:roomId/participants', asyncHandler(mainRoomController.getParticipants));
-app.post('/api/rooms/:roomId/join', asyncHandler(mainRoomController.joinRoom));
-app.post('/api/rooms/:roomId/leave', asyncHandler(mainRoomController.leaveRoom));
-app.get('/api/rooms/:roomId/events', asyncHandler(mainRoomController.getEvents));
-app.post('/api/rooms/:roomId/kick', asyncHandler(mainRoomController.kickParticipant));
-app.post('/api/rooms/:roomId/mute', asyncHandler(mainRoomController.muteParticipant));
-app.post('/api/rooms/:roomId/spotlight', asyncHandler(mainRoomController.setSpotlight));
 
 // ==========================================
 // Media Library API (for Videorama)
@@ -1297,6 +1289,10 @@ app.get('/api/videorama/collections/:collectionId', asyncHandler(async (req, res
 // Broadcast Queue API Routes
 const broadcastQueueRoutes = require('./broadcastQueueRoutes');
 app.use('/api/admin/queue', broadcastQueueRoutes);
+
+// Admin User Management Routes
+app.use('/api/admin/users', adminUserRoutes);
+
 app.use('/api/admin/x/oauth', xOAuthRoutes);
 app.use('/api/auth/x', xOAuthRoutes); // Alias for X Developer Portal redirect URI
 

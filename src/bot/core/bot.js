@@ -31,6 +31,7 @@ const ADMIN_USER_IDS = [
 const { initializePostgres, testConnection } = require('../../config/postgres');
 const { initializeRedis } = require('../../config/redis');
 const { initializeCoreTables } = require('../../config/ensureCoreTables');
+const meruLinkInitializer = require('../../services/meruLinkInitializer');
 const { initSentry } = require('./plugins/sentry');
 const sessionMiddleware = require('./middleware/session');
 const { userExistsMiddleware } = require('./middleware/userExistsMiddleware');
@@ -101,7 +102,7 @@ const { setupAgeVerificationMiddleware } = require('./middleware/ageVerification
 const CallReminderService = require('../services/callReminderService');
 const GroupCleanupService = require('../services/groupCleanupService');
 const broadcastScheduler = require('../../services/broadcastScheduler');
-const SubscriptionReminderService = require('../services/subscriptionReminderService');
+const SubscriptionReminderService = require('../../services/subscriptionReminderEmailService');
 const MembershipCleanupService = require('../services/membershipCleanupService');
 const BusinessNotificationService = require('../services/businessNotificationService');
 const TutorialReminderService = require('../services/tutorialReminderService');
@@ -286,6 +287,9 @@ const startBot = async () => {
         } catch (coreTablesError) {
           logger.warn('Core tables initialization failed:', coreTablesError.message);
         }
+        // Initialize Meru Link tracking in background (fire and forget)
+        // Temporarily disabled - causing initialization hang
+        // meruLinkInitializer.initialize();
       } else {
         logger.warn('⚠️ PostgreSQL connection test failed, but will retry on first query');
       }

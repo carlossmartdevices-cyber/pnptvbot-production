@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>PNP Checkout - PNPtv</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #1C1C1E;
+            --text-main: #FFFFFF;
+            --text-muted: #8E8E93;
+            --neon-pink: #FF00CC;
+            --neon-amber: #FFB454;
+            --glass-bg: rgba(44, 44, 46, 0.7);
+            --glass-border: rgba(255, 180, 84, 0.3);
+            --card-radius: 20px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            padding-bottom: 40px;
+        }
+
+        .ambient-glow {
+            position: fixed;
+            top: -30%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100vw;
+            height: 100vw;
+            background: radial-gradient(circle, rgba(255, 0, 204, 0.1) 0%, transparent 65%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .header {
+            background: rgba(28, 28, 30, 0.95);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 20px 24px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .content {
+            padding: 20px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid var(--neon-amber);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        .loading p {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .order-info {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--card-radius);
+            padding: 24px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .order-info::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+        }
+
+        .order-info h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--text-main);
+        }
+
+        .order-detail {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 14px;
+        }
+
+        .order-detail:last-child {
+            border-bottom: none;
+        }
+
+        .order-detail .label {
+            color: var(--text-muted);
+        }
+
+        .order-detail .value {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .price-section {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 180, 84, 0.2);
+            border-radius: var(--card-radius);
+            padding: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .price-label {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .price {
+            font-size: 40px;
+            font-weight: 900;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .price-info {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        .error {
+            background: rgba(255, 107, 107, 0.1);
+            color: #FF9F9F;
+            padding: 14px;
+            border-radius: 12px;
+            text-align: center;
+            display: none;
+            border: 1px solid rgba(255, 107, 107, 0.2);
+            font-size: 14px;
+        }
+
+        .success {
+            background: rgba(107, 255, 107, 0.1);
+            color: #9FFF9F;
+            padding: 14px;
+            border-radius: 12px;
+            text-align: center;
+            display: none;
+            border: 1px solid rgba(107, 255, 107, 0.2);
+            font-size: 14px;
+        }
+
+        .payment-methods {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .payment-method {
+            background: var(--glass-bg);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 14px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .payment-method:hover {
+            border-color: var(--neon-pink);
+            color: var(--text-main);
+        }
+
+        .payment-method.active {
+            background: linear-gradient(135deg, var(--neon-pink), var(--neon-amber));
+            border-color: var(--neon-pink);
+            color: var(--text-main);
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-family: inherit;
+            box-shadow: 0 8px 24px rgba(255, 0, 204, 0.25);
+            transition: all 0.3s ease;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn:disabled {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .terms-info {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 16px;
+            line-height: 1.5;
+        }
+
+        .terms-info a {
+            color: var(--neon-amber);
+            text-decoration: none;
+        }
+
+        .terms-info a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 480px) {
+            .price {
+                font-size: 32px;
+            }
+
+            .payment-methods {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow"></div>
+
+    <header class="header">
+        <h1>PNP Checkout</h1>
+        <p>Secure Payment</p>
+    </header>
+
+    <main class="content">
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Processing your order...</p>
+        </div>
+
+        <div id="order-section" style="display: none;">
+            <div class="order-info">
+                <h3>Order Summary</h3>
+                <div class="order-detail">
+                    <span class="label">Order ID:</span>
+                    <span class="value" id="order-id">-</span>
+                </div>
+                <div class="order-detail">
+                    <span class="label">Description:</span>
+                    <span class="value" id="order-desc" style="text-align: right; max-width: 150px;">-</span>
+                </div>
+                <div class="order-detail">
+                    <span class="label">Status:</span>
+                    <span class="value" id="order-status">Pending</span>
+                </div>
+            </div>
+
+            <div class="price-section">
+                <div class="price-label">Total Amount</div>
+                <div class="price">$<span id="price">0.00</span></div>
+                <div class="price-info">USD - Secure payment</div>
+            </div>
+
+            <div class="payment-methods">
+                <button class="payment-method active" onclick="selectPaymentMethod('card')">
+                    💳 Credit Card
+                </button>
+                <button class="payment-method" onclick="selectPaymentMethod('other')">
+                    🔗 Other Methods
+                </button>
+            </div>
+
+            <button id="pay-btn" class="btn" onclick="processPayment()">
+                Proceed to Payment
+            </button>
+
+            <div class="terms-info">
+                By proceeding, you agree to our <a href="/terms.html" target="_blank">Terms & Conditions</a>
+                and <a href="/privacy.html" target="_blank">Privacy Policy</a>
+            </div>
+        </div>
+
+        <div id="error" class="error"></div>
+        <div id="success" class="success"></div>
+    </main>
+
+    <script>
+        let currentPaymentMethod = 'card';
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('order') || urlParams.get('id') || 'DEMO-001';
+        const amount = urlParams.get('amount') || '0.00';
+
+        function selectPaymentMethod(method) {
+            currentPaymentMethod = method;
+            document.querySelectorAll('.payment-method').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.closest('.payment-method').classList.add('active');
+        }
+
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('order-section').style.display = 'none';
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function showSuccess(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('order-section').style.display = 'none';
+            const successDiv = document.getElementById('success');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+        }
+
+        async function processPayment() {
+            const payBtn = document.getElementById('pay-btn');
+            payBtn.disabled = true;
+            payBtn.textContent = 'Processing...';
+
+            try {
+                // Send payment request to backend
+                const response = await fetch('/api/payment/process', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        orderId: orderId,
+                        amount: parseFloat(amount),
+                        method: currentPaymentMethod,
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Payment failed');
+                }
+
+                if (data.redirectUrl) {
+                    // Redirect to payment gateway
+                    window.location.href = data.redirectUrl;
+                } else {
+                    showSuccess('Payment processing initiated successfully! You will receive a confirmation email shortly.');
+                }
+            } catch (error) {
+                console.error('Payment error:', error);
+                payBtn.disabled = false;
+                payBtn.textContent = 'Proceed to Payment';
+                showError(error.message || 'Failed to process payment. Please try again.');
+            }
+        }
+
+        // Initialize page
+        function initializeCheckout() {
+            // Display order info
+            document.getElementById('order-id').textContent = orderId;
+            document.getElementById('price').textContent = parseFloat(amount).toFixed(2);
+            document.getElementById('order-desc').textContent = 'PNP Service';
+
+            // Show order section and hide loading
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('order-section').style.display = 'block';
+        }
+
+        // Load on page ready
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initializeCheckout, 500);
+        });
+    </script>
+</body>
+</html>
