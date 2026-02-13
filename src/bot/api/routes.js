@@ -24,6 +24,7 @@ const ageVerificationController = require('./controllers/ageVerificationControll
 const healthController = require('./controllers/healthController');
 const hangoutsController = require('./controllers/hangoutsController');
 const xOAuthRoutes = require('./xOAuthRoutes');
+const adminUserRoutes = require('./routes/adminUserRoutes');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -1288,6 +1289,10 @@ app.get('/api/videorama/collections/:collectionId', asyncHandler(async (req, res
 // Broadcast Queue API Routes
 const broadcastQueueRoutes = require('./broadcastQueueRoutes');
 app.use('/api/admin/queue', broadcastQueueRoutes);
+
+// Admin User Management Routes
+app.use('/api/admin/users', adminUserRoutes);
+
 app.use('/api/admin/x/oauth', xOAuthRoutes);
 app.use('/api/auth/x', xOAuthRoutes); // Alias for X Developer Portal redirect URI
 
