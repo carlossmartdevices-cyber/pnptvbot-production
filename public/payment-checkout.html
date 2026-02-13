@@ -733,7 +733,7 @@
         });
 
         var pollAttempts = 0;
-        var maxPollAttempts = 10;
+        var maxPollAttempts = 30;
         var pollInterval = 3000;
         var polling = false;
 
@@ -845,6 +845,7 @@
         }
 
         var epayco3dsMessageListener = null;
+        var epayco3dsSafetyTimer = null;
 
         function loadEpayco3DSValidator() {
             return new Promise(function(resolve, reject) {
@@ -891,7 +892,7 @@
             try {
                 document.querySelectorAll('iframe').forEach(function(frame) {
                     var src = (frame.src || '').toLowerCase();
-                    if (src.indexOf('cardinalcommerce.com') !== -1 || src.indexOf('epayco.co') !== -1) {
+                    if (src.indexOf('cardinalcommerce.com') !== -1 || src.indexOf('epayco.co') !== -1 || src.indexOf('payco.co') !== -1) {
                         frame.remove();
                     }
                 });
@@ -914,6 +915,20 @@
             }
         }
 
+        function isTrusted3DSOrigin(origin) {
+            if (!origin) return true;
+            try {
+                var parsed = new URL(origin);
+                var host = (parsed.hostname || '').toLowerCase();
+                return host === 'localhost'
+                    || host.endsWith('.epayco.co')
+                    || host.endsWith('.payco.co')
+                    || host.endsWith('.cardinalcommerce.com');
+            } catch (e) {
+                return false;
+            }
+        }
+
         function attachEpayco3DSMessageHandler() {
             if (epayco3dsMessageListener) {
                 window.removeEventListener('message', epayco3dsMessageListener);
@@ -922,8 +937,7 @@
 
             epayco3dsMessageListener = function(event) {
                 var origin = event && event.origin ? event.origin : '';
-                var trustedOrigin = origin.indexOf('epayco.co') !== -1 || origin.indexOf('cardinalcommerce.com') !== -1;
-                if (origin && !trustedOrigin) {
+                if (!isTrusted3DSOrigin(origin)) {
                     return;
                 }
 
@@ -933,6 +947,10 @@
                 }
 
                 console.log('[3DS ePayco] message event received', payload);
+                if (epayco3dsSafetyTimer) {
+                    clearTimeout(epayco3dsSafetyTimer);
+                    epayco3dsSafetyTimer = null;
+                }
                 window.removeEventListener('message', epayco3dsMessageListener);
                 epayco3dsMessageListener = null;
                 cleanup3DSArtifacts();
@@ -974,19 +992,17 @@
             document.getElementById('polling-status').style.display = 'block';
             window.validate3ds(data3DS);
 
-            // Safety net: some browsers do not propagate postMessage from 3DS iframe reliably.
-            setTimeout(function() {
+            // Safety net: if postMessage is blocked, start status polling without interrupting challenge UI.
+            if (epayco3dsSafetyTimer) {
+                clearTimeout(epayco3dsSafetyTimer);
+                epayco3dsSafetyTimer = null;
+            }
+            epayco3dsSafetyTimer = setTimeout(function() {
                 if (epayco3dsMessageListener) {
-                    window.removeEventListener('message', epayco3dsMessageListener);
-                    epayco3dsMessageListener = null;
-                    cleanup3DSArtifacts();
-                    if (threeDSecure && threeDSecure.data) {
-                        submitPaymentWith3DS2Token(threeDSecure.data, paymentId);
-                        return;
-                    }
+                    console.warn('[3DS ePayco] No postMessage received yet, starting status polling fallback', { paymentId });
                     pollPaymentStatus();
                 }
-            }, 12000);
+            }, 30000);
             return true;
         }
 
