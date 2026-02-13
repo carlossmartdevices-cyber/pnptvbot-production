@@ -138,7 +138,9 @@ const schemas = {
     x_transaction_id: Joi.string().required(),
     x_amount: Joi.alternatives().try(Joi.string(), Joi.number().positive()).required(),
     x_currency_code: Joi.string().valid('COP', 'USD', 'cop', 'usd').required(),
-    x_transaction_state: Joi.string().valid('Aceptada', 'Aprobada', 'Rechazada', 'Pendiente', 'Fallida').required(),
+    x_transaction_state: Joi.string()
+      .valid('Aceptada', 'Aprobada', 'Rechazada', 'Pendiente', 'Fallida', 'Abandonada')
+      .required(),
     x_signature: Joi.string().required(),
   }).unknown(true),
 

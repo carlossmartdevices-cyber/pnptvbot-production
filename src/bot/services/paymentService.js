@@ -520,7 +520,11 @@ class PaymentService {
         }
 
         return { success: true };
-      } else if (x_transaction_state === 'Fallida' || x_transaction_state === 'Rechazada') {
+      } else if (
+        x_transaction_state === 'Fallida'
+        || x_transaction_state === 'Rechazada'
+        || x_transaction_state === 'Abandonada'
+      ) {
         await bookingService.cancelBooking(bookingId, 'Payment failed');
 
         logger.warn(`${bookingType} payment failed, booking cancelled`, {
@@ -911,8 +915,12 @@ class PaymentService {
         }
 
         return { success: true };
-      } else if (x_transaction_state === 'Rechazada' || x_transaction_state === 'Fallida') {
-        // Payment failed
+      } else if (
+        x_transaction_state === 'Rechazada'
+        || x_transaction_state === 'Fallida'
+        || x_transaction_state === 'Abandonada'
+      ) {
+        // Payment failed/cancelled (includes abandoned 3DS authentication)
         if (payment) {
           await PaymentModel.updateStatus(paymentIdOrType, 'failed', {
             transaction_id: x_transaction_id,
@@ -921,11 +929,13 @@ class PaymentService {
             epayco_estado: x_transaction_state,
             epayco_respuesta: webhookData.x_response_reason_text || webhookData.x_respuesta,
             error: webhookData.x_response_reason_text || webhookData.x_respuesta || x_transaction_state,
+            abandoned_3ds: x_transaction_state === 'Abandonada',
           });
         }
 
-        logger.info('ePayco payment failed', {
+        logger.info('ePayco payment failed/cancelled', {
           x_ref_payco,
+          x_transaction_state,
           userId,
           planId: planIdOrBookingId,
         });
@@ -2066,8 +2076,8 @@ class PaymentService {
             needsRecovery: false,
             message: 'Payment is still waiting for 3DS completion',
           };
-        } else if (estado === 'Rechazada' || estado === 'Fallida') {
-          logger.warn('Payment was rejected/failed at ePayco', {
+        } else if (estado === 'Rechazada' || estado === 'Fallida' || estado === 'Abandonada') {
+          logger.warn('Payment was rejected/failed/cancelled at ePayco', {
             refPayco,
             estado,
             respuesta,

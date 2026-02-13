@@ -692,6 +692,28 @@ class PaymentController {
         });
       }
 
+      if (
+        statusCheck.currentStatus === 'Rechazada'
+        || statusCheck.currentStatus === 'Fallida'
+        || statusCheck.currentStatus === 'Abandonada'
+      ) {
+        await PaymentModel.updateStatus(paymentId, 'failed', {
+          epayco_ref: refPayco,
+          epayco_estado: statusCheck.currentStatus,
+          error: statusCheck.message || `Payment ${statusCheck.currentStatus.toLowerCase()} at ePayco`,
+          recovered_via_status_check: true,
+        });
+
+        return res.json({
+          success: true,
+          status: 'failed',
+          stuck: false,
+          currentStatusAtEpayco: statusCheck.currentStatus,
+          message: statusCheck.message || 'Payment failed at ePayco',
+          action: 'RETRY_PAYMENT',
+        });
+      }
+
       // Payment is still genuinely pending at ePayco
       return res.json({
         success: true,
@@ -927,6 +949,24 @@ class PaymentController {
           success: true,
           status: 'authenticated',
           message: 'Payment authenticated and approved',
+          paymentId,
+        });
+      } else if (
+        currentStatus === 'Rechazada'
+        || currentStatus === 'Fallida'
+        || currentStatus === 'Abandonada'
+      ) {
+        await PaymentModel.updateStatus(paymentId, 'failed', {
+          epayco_ref: refPayco,
+          epayco_estado: currentStatus,
+          error: `Payment ${currentStatus.toLowerCase()} after 3DS authentication`,
+          three_ds_authenticated: true,
+        });
+
+        return res.json({
+          success: true,
+          status: 'failed',
+          message: `Payment ${currentStatus.toLowerCase()} at ePayco`,
           paymentId,
         });
       } else {

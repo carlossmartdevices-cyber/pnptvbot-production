@@ -782,7 +782,7 @@
                         document.getElementById('polling-status').style.display = 'none';
                         document.getElementById('success').style.display = 'block';
                         polling = false;
-                    } else if (data.status === 'failed' || data.status === 'rejected') {
+                    } else if (data.status === 'failed' || data.status === 'rejected' || data.status === 'cancelled') {
                         document.getElementById('polling-status').style.display = 'none';
                         document.getElementById('checkout-form').style.display = 'block';
                         showFormError(t('errDeclined'));
@@ -818,6 +818,17 @@
                     if (data && data.success && data.status === 'completed') {
                         document.getElementById('polling-status').style.display = 'none';
                         document.getElementById('success').style.display = 'block';
+                        polling = false;
+                        return;
+                    }
+
+                    if (data && data.success && (data.status === 'failed' || data.status === 'rejected' || data.status === 'cancelled')) {
+                        document.getElementById('polling-status').style.display = 'none';
+                        document.getElementById('checkout-form').style.display = 'block';
+                        showFormError(t('errDeclined'));
+                        var btn = document.getElementById('pay-button');
+                        btn.disabled = false;
+                        btn.textContent = payBtnLabel();
                         polling = false;
                         return;
                     }
