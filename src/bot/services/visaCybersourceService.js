@@ -1,12 +1,13 @@
 const axios = require('axios');
 const crypto = require('crypto');
+const path = require('path');
 const { query } = require('../../config/postgres');
 const { cache } = require('../../config/redis');
 const PaymentModel = require('../../models/paymentModel');
 const SubscriberModel = require('../../models/subscriberModel');
 const PlanModel = require('../../models/planModel');
 const UserModel = require('../../models/userModel');
-const config = require('../../../config/payment.config.js');
+const config = require(path.join(__dirname, '../../../config/payment.config.js'));
 const logger = require('../../utils/logger');
 const { Telegraf } = require('telegraf');
 
