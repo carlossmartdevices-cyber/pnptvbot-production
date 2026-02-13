@@ -125,7 +125,7 @@ class PaymentController {
         const pnptvPlans = ['week_pass', 'three_months_pass', 'crystal_pass', 'six_months_pass', 'yearly_pass', 'lifetime_pass', 'lifetime100_promo', 'pnp_hot_monthly_pass'];
         const isPnptvPlan = pnptvPlans.includes(planId);
         const confirmationPath = isPnptvPlan
-          ? '/checkout/pnp/confirmation'  // New route for pnptv-bot
+          ? '/checkout/pnp'  // New route for pnptv-bot
           : '/api/webhook/epayco';        // Legacy route for easybots.store
         basePaymentData.confirmationUrl = `${epaycoWebhookDomain}${confirmationPath}`;
         // Response URL: User's browser redirects here after payment
