@@ -322,6 +322,49 @@
         let paymentData = null;
         let handler = null;
 
+        // Force open outside Telegram WebApp
+        function forceOpenOutsideTelegram() {
+            // Check if running inside Telegram WebApp
+            const isTelegramWebApp = !!window.TelegramWebApp || !!window.Telegram;
+            const userAgent = navigator.userAgent.toLowerCase();
+            const isTelegramBrowser = userAgent.includes('telegram') || userAgent.includes('tdesktop');
+
+            if (isTelegramWebApp || isTelegramBrowser) {
+                // Get current URL to reopen in external browser
+                const currentUrl = window.location.href;
+
+                // Try to open in external browser
+                if (window.TelegramWebApp && window.TelegramWebApp.openLink) {
+                    // Telegram WebApp method
+                    window.TelegramWebApp.openLink(currentUrl, { try_instant_view: false });
+                } else if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                    // Alternative Telegram API
+                    window.Telegram.WebApp.openLink(currentUrl, false);
+                } else {
+                    // Fallback: use window.open with target="_blank"
+                    // Add parameter to prevent infinite loop
+                    const separator = currentUrl.includes('?') ? '&' : '?';
+                    window.open(currentUrl + separator + 'external=1', '_blank');
+
+                    // Close the in-app browser window after 1 second
+                    setTimeout(() => {
+                        if (window.TelegramWebApp && window.TelegramWebApp.close) {
+                            window.TelegramWebApp.close();
+                        } else if (window.history.length > 1) {
+                            window.history.back();
+                        } else {
+                            // If no history, try to close
+                            window.close();
+                        }
+                    }, 1000);
+                }
+
+                console.log('Forcing open outside Telegram');
+                return true;
+            }
+            return false;
+        }
+
         // Get paymentId from URL
         function getPaymentId() {
             const params = new URLSearchParams(window.location.search);
@@ -527,7 +570,15 @@
         }
 
         // Initialize on load
-        document.addEventListener('DOMContentLoaded', loadPaymentInfo);
+        document.addEventListener('DOMContentLoaded', () => {
+            // Force open outside Telegram first
+            const forcedOutside = forceOpenOutsideTelegram();
+
+            // Only proceed if not in Telegram (or already opened external)
+            if (!forcedOutside) {
+                loadPaymentInfo();
+            }
+        });
 
         // Security: Prevent navigation away without confirmation
         window.addEventListener('beforeunload', (e) => {
