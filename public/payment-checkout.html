@@ -855,8 +855,19 @@
 
                 var existingScript = document.getElementById('epayco-validate-3ds-script');
                 if (existingScript) {
+                    if (typeof window.validate3ds === 'function') {
+                        resolve();
+                        return;
+                    }
                     existingScript.addEventListener('load', function() { resolve(); }, { once: true });
                     existingScript.addEventListener('error', function() { reject(new Error('3DS script load error')); }, { once: true });
+                    setTimeout(function() {
+                        if (typeof window.validate3ds === 'function') {
+                            resolve();
+                            return;
+                        }
+                        reject(new Error('3DS script exists but validate3ds is unavailable'));
+                    }, 3000);
                     return;
                 }
 
@@ -874,6 +885,33 @@
                 script.onerror = function() { reject(new Error('Failed to load validateThreeds.min.js')); };
                 document.head.appendChild(script);
             });
+        }
+
+        function cleanup3DSArtifacts() {
+            try {
+                document.querySelectorAll('iframe').forEach(function(frame) {
+                    var src = (frame.src || '').toLowerCase();
+                    if (src.indexOf('cardinalcommerce.com') !== -1 || src.indexOf('epayco.co') !== -1) {
+                        frame.remove();
+                    }
+                });
+
+                document.querySelectorAll('div, section, aside').forEach(function(node) {
+                    var token = ((node.id || '') + ' ' + (node.className || '')).toLowerCase();
+                    if (!token) return;
+                    if (token.indexOf('3ds') === -1 && token.indexOf('cardinal') === -1 && token.indexOf('epayco') === -1) return;
+
+                    var style = window.getComputedStyle(node);
+                    if (style.position === 'fixed' || style.position === 'absolute') {
+                        node.remove();
+                    }
+                });
+
+                document.documentElement.style.overflow = '';
+                document.body.style.overflow = '';
+            } catch (e) {
+                console.warn('[3DS] cleanup warning', e && e.message ? e.message : e);
+            }
         }
 
         function attachEpayco3DSMessageHandler() {
@@ -897,6 +935,7 @@
                 console.log('[3DS ePayco] message event received', payload);
                 window.removeEventListener('message', epayco3dsMessageListener);
                 epayco3dsMessageListener = null;
+                cleanup3DSArtifacts();
 
                 document.getElementById('checkout-form').style.display = 'none';
                 document.getElementById('polling-status').style.display = 'block';
@@ -940,9 +979,14 @@
                 if (epayco3dsMessageListener) {
                     window.removeEventListener('message', epayco3dsMessageListener);
                     epayco3dsMessageListener = null;
+                    cleanup3DSArtifacts();
+                    if (threeDSecure && threeDSecure.data) {
+                        submitPaymentWith3DS2Token(threeDSecure.data, paymentId);
+                        return;
+                    }
                     pollPaymentStatus();
                 }
-            }, 15000);
+            }, 12000);
             return true;
         }
 

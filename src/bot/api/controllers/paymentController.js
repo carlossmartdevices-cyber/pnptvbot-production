@@ -10,19 +10,37 @@ const logger = require('../../../utils/logger');
  * Payment Controller - Handles payment-related API endpoints
  */
 class PaymentController {
+  static isInternalPaymentReference(value) {
+    if (!value) return false;
+    const ref = String(value).trim();
+    return /^PAY-/i.test(ref) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref);
+  }
+
   /**
    * Resolve ePayco reference from different persisted fields.
    * Some flows store it in `reference` / `transactionId` instead of `epayco_ref`.
    */
   static resolveEpaycoRef(payment) {
     if (!payment) return null;
-    return payment.epayco_ref
-      || payment.epaycoRef
-      || payment.reference
-      || payment.transactionId
-      || payment.transaction_id
-      || payment.metadata?.epayco_ref
-      || null;
+    const candidates = [
+      payment.metadata?.epayco_ref,
+      payment.epayco_ref,
+      payment.epaycoRef,
+      payment.metadata?.reference,
+      payment.transactionId,
+      payment.transaction_id,
+      payment.reference,
+    ];
+
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      const value = String(candidate).trim();
+      if (!value) continue;
+      if (PaymentController.isInternalPaymentReference(value)) continue;
+      return value;
+    }
+
+    return null;
   }
 
   /**
