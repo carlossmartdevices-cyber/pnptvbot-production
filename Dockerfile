@@ -34,6 +34,12 @@ COPY --from=builder --chown=node:node /app/scripts ./scripts
 # Copy public directory for landing pages
 COPY --from=builder /app/public ./public
 
+# Copy config directory (payment, etc.)
+COPY --from=builder --chown=node:node /app/config ./config
+
+# Copy locales (i18n translations)
+COPY --from=builder --chown=node:node /app/locales ./locales
+
 # Copy .env.example for dotenv-safe validation
 COPY --from=builder --chown=node:node /app/.env.example ./.env.example
 
@@ -41,6 +47,7 @@ COPY --from=builder --chown=node:node /app/.env.example ./.env.example
 RUN mkdir -p logs uploads \
     && chown -R node:node /app \
     && chmod -R 755 /app/public \
+    && chmod -R 755 logs uploads \
     && find /app/public -type f -exec chmod 644 {} \;
 
 # Switch to non-root user for security
