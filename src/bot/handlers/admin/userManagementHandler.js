@@ -35,10 +35,23 @@ Baneado: ${user.status === 'banned' ? 'Sí ⛔' : 'No ✅'}
     [Markup.button.callback('↩️ Volver', 'admin_users_search')],
   ];
 
-  await ctx.editMessageText(userInfo, {
-    parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard(buttons),
-  });
+  // Try to edit message (works for callback queries), fall back to reply (works for text messages)
+  try {
+    await ctx.editMessageText(userInfo, {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard(buttons),
+    });
+  } catch (error) {
+    // If edit fails (e.g., message can't be edited), use reply instead
+    if (error.description && error.description.includes("can't be edited")) {
+      await ctx.reply(userInfo, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons),
+      });
+    } else {
+      throw error;
+    }
+  }
 }
 
 /**
