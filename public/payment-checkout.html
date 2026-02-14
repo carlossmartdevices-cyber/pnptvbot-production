@@ -638,6 +638,77 @@
             });
         }
 
+        function isGenericTokenizationError(err) {
+            var raw = '';
+            if (typeof err === 'string') {
+                raw = err;
+            } else if (err && typeof err === 'object') {
+                raw = err.description || err.error || err.message || '';
+            }
+            var msg = String(raw || '').trim().toLowerCase();
+            if (!msg) return true;
+            return msg.indexOf('inesperado') !== -1
+                || msg.indexOf('unexpected') !== -1
+                || msg === 'error'
+                || msg.indexOf('ha ocurrido un error') !== -1;
+        }
+
+        async function tokenizeCardWithFallbacks(baseData) {
+            var fullName = (baseData.name + ' ' + (baseData.lastName || '')).trim();
+            var variants = [
+                {
+                    // Primary payload: hybrid for broad SDK compatibility
+                    'card[number]': baseData.cardNumber,
+                    'card[exp_year]': baseData.expYear,
+                    'card[exp_month]': baseData.expMonth,
+                    'card[cvc]': baseData.cvc,
+                    'card[holder_name]': fullName,
+                    hasCvv: true,
+                    card: {
+                        number: baseData.cardNumber,
+                        exp_year: baseData.expYear,
+                        exp_month: baseData.expMonth,
+                        cvc: baseData.cvc,
+                        name: fullName,
+                        email: baseData.email,
+                    }
+                },
+                {
+                    // Fallback A: official minimal keys
+                    'card[number]': baseData.cardNumber,
+                    'card[exp_year]': baseData.expYear,
+                    'card[exp_month]': baseData.expMonth,
+                    'card[cvc]': baseData.cvc,
+                    hasCvv: true,
+                },
+                {
+                    // Fallback B: legacy flat-style keys used by some SDK builds
+                    number: baseData.cardNumber,
+                    exp_year: baseData.expYear,
+                    exp_month: baseData.expMonth,
+                    cvc: baseData.cvc,
+                    name: fullName,
+                    email: baseData.email,
+                    hasCvv: true,
+                }
+            ];
+
+            var lastError = null;
+            for (var i = 0; i < variants.length; i++) {
+                try {
+                    return await tokenizeCardWithEpayco(variants[i]);
+                } catch (err) {
+                    lastError = err;
+                    if (!isGenericTokenizationError(err) || i === variants.length - 1) {
+                        throw err;
+                    }
+                    console.warn('[ePayco token] retrying tokenization with fallback payload', { attempt: i + 2 });
+                }
+            }
+
+            throw lastError || new Error('No fue posible tokenizar la tarjeta.');
+        }
+
         function detectCardBrand(number) {
             var n = number.replace(/\s/g, '');
             if (/^4/.test(n)) return 'Visa';
@@ -777,23 +848,14 @@
             btn.textContent = t('processing');
 
             try {
-                var tokenResult = await tokenizeCardWithEpayco({
-                    // Official SDK style (matches ePayco docs)
-                    'card[number]': cardNumber,
-                    'card[exp_year]': expYear,
-                    'card[exp_month]': expMonth,
-                    'card[cvc]': cvc,
-                    'card[holder_name]': (name + ' ' + (lastName || '')).trim(),
-                    hasCvv: true,
-                    // Compatibility style for older ePayco.js variants that expect nested card object
-                    card: {
-                        number: cardNumber,
-                        exp_year: expYear,
-                        exp_month: expMonth,
-                        cvc: cvc,
-                        name: (name + ' ' + (lastName || '')).trim(),
-                        email: email,
-                    }
+                var tokenResult = await tokenizeCardWithFallbacks({
+                    cardNumber: cardNumber,
+                    expYear: expYear,
+                    expMonth: expMonth,
+                    cvc: cvc,
+                    name: name,
+                    lastName: lastName || '',
+                    email: email,
                 });
 
                 // Browser SDK may return token in different fields
@@ -830,6 +892,9 @@
                 var epaycoError = (error && (error.description || error.error || error.message)) || t('errConnection');
                 if (typeof epaycoError === 'string' && /^[a-f0-9]{20,64}$/i.test(epaycoError.trim())) {
                     epaycoError = t('errConnection');
+                }
+                if (typeof epaycoError === 'string' && /inesperado|unexpected/i.test(epaycoError)) {
+                    epaycoError = 'No se pudo tokenizar la tarjeta. Intenta nuevamente o usa otra tarjeta.';
                 }
                 showFormError(epaycoError);
                 btn.disabled = false;
