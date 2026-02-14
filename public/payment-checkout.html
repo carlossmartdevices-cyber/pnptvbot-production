@@ -872,14 +872,17 @@
         }
 
         var pollAttempts = 0;
-        var maxPollAttempts = 30;
+        var maxPollAttempts = 18;
         var pollInterval = 3000;
         var polling = false;
+        var pollingStartedAt = 0;
+        var maxPollingElapsedMs = 90000;
 
         function pollPaymentStatus() {
             if (polling) return;
             polling = true;
             pollAttempts = 0;
+            pollingStartedAt = Date.now();
 
             document.getElementById('checkout-form').style.display = 'none';
             document.getElementById('polling-status').style.display = 'block';
@@ -888,7 +891,8 @@
         }
 
         function doPoll() {
-            if (pollAttempts >= maxPollAttempts) {
+            var elapsedMs = Date.now() - pollingStartedAt;
+            if (pollAttempts >= maxPollAttempts || elapsedMs >= maxPollingElapsedMs) {
                 document.getElementById('polling-status').style.display = 'none';
                 document.getElementById('pending').style.display = 'block';
                 polling = false;
