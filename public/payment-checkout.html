@@ -8,7 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://checkout.epayco.co/checkout.js" onerror="window.__epaycoLoadFailed=true"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="https://checkout.epayco.co/epayco.min.js" onerror="window.__epaycoLoadFailed=true"></script>
     <script src="https://multimedia.epayco.co/general/3DS/validateThreeds.min.js"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -546,13 +547,13 @@
 
         function waitForEpaycoSDK(maxWaitMs) {
             return new Promise(function(resolve, reject) {
-                if (window.ePayco && typeof window.ePayco.setup === 'function') {
+                if (window.ePayco && typeof window.ePayco.token === 'object' && typeof window.ePayco.token.create === 'function') {
                     return resolve();
                 }
                 // If initial script load failed, try dynamic reload
                 if (window.__epaycoLoadFailed) {
                     var s = document.createElement('script');
-                    s.src = 'https://checkout.epayco.co/checkout.js';
+                    s.src = 'https://checkout.epayco.co/epayco.min.js';
                     document.head.appendChild(s);
                     window.__epaycoLoadFailed = false;
                 }
@@ -560,7 +561,7 @@
                 var interval = 300;
                 var timer = setInterval(function() {
                     waited += interval;
-                    if (window.ePayco && typeof window.ePayco.setup === 'function') {
+                    if (window.ePayco && typeof window.ePayco.token === 'object' && typeof window.ePayco.token.create === 'function') {
                         clearInterval(timer);
                         return resolve();
                     }
@@ -572,29 +573,31 @@
             });
         }
 
-        function getEpaycoInstance() {
-            if (epaycoInstance) return epaycoInstance;
-            if (!window.ePayco || typeof window.ePayco.setup !== 'function') {
+        function initEpaycoSDK() {
+            if (epaycoInstance) return;
+            if (!window.ePayco || typeof window.ePayco.setPublicKey !== 'function') {
                 throw new Error('El SDK de ePayco no pudo cargarse. Revisa tu conexión a internet y recarga la página.');
             }
-            epaycoInstance = window.ePayco.setup({
-                key: paymentData.epaycoPublicKey,
-                test: paymentData.testMode === true,
-            });
-            return epaycoInstance;
+            window.ePayco.setPublicKey(paymentData.epaycoPublicKey);
+            epaycoInstance = window.ePayco;
         }
 
         function tokenizeCardWithEpayco(cardPayload) {
             return waitForEpaycoSDK(8000).then(function() {
                 return new Promise(function(resolve, reject) {
                     try {
-                        var epayco = getEpaycoInstance();
-                        epayco.token.create(cardPayload, function(error, data) {
+                        initEpaycoSDK();
+                        // Browser SDK callback signature: callback(tokenResult, error)
+                        window.ePayco.token.create(cardPayload, function(tokenResult, error) {
                             if (error) {
-                                reject(error);
+                                reject(typeof error === 'object' ? error : new Error(String(error)));
                                 return;
                             }
-                            resolve(data);
+                            if (!tokenResult || tokenResult.status === false) {
+                                reject(new Error((tokenResult && tokenResult.description) || 'Error al tokenizar la tarjeta'));
+                                return;
+                            }
+                            resolve(tokenResult);
                         });
                     } catch (err) {
                         reject(err);
@@ -743,16 +746,21 @@
 
             try {
                 var tokenResult = await tokenizeCardWithEpayco({
-                    'card[number]': cardNumber,
-                    'card[exp_year]': expYear,
-                    'card[exp_month]': expMonth,
-                    'card[cvc]': cvc,
-                    'card[holder_name]': (name + ' ' + (lastName || '')).trim(),
-                    hasCvv: true,
+                    card: {
+                        number: cardNumber,
+                        exp_year: expYear,
+                        exp_month: expMonth,
+                        cvc: cvc,
+                        name: (name + ' ' + (lastName || '')).trim(),
+                        email: email,
+                    },
                 });
 
-                if (!tokenResult || !tokenResult.id) {
-                    throw new Error('No fue posible tokenizar la tarjeta.');
+                // Browser SDK may return token in different fields
+                var tokenId = tokenResult && (tokenResult.id || (tokenResult.data && tokenResult.data.token));
+                if (!tokenId) {
+                    var errMsg = (tokenResult && tokenResult.description) || 'No fue posible tokenizar la tarjeta.';
+                    throw new Error(errMsg);
                 }
 
                 // Never send PAN/CVC to backend.
@@ -761,7 +769,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         paymentId,
-                        tokenCard: tokenResult.id,
+                        tokenCard: tokenId,
                         name,
                         lastName: lastName || name,
                         email,

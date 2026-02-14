@@ -98,6 +98,7 @@ app.use(conditionalMiddleware(helmet({
       scriptSrc: [
         "'self'",
         "'unsafe-inline'",
+        "https://code.jquery.com",
         "https://multimedia.epayco.co",
         "https://songbird.cardinalcommerce.com",
         "https://centinelapi.cardinalcommerce.com",

@@ -11,8 +11,9 @@
  * Run: EPAYCO_TEST_MODE=true npx jest tests/integration/epayco.test.js --forceExit --detectOpenHandles
  */
 
-// Load .env BEFORE setup.js can interfere (override=true)
-require('dotenv').config({ path: require('path').join(__dirname, '../../.env.example'), override: true });
+// Load .env.production for real DB credentials, then .env.example for any remaining defaults
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env.production'), override: true });
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env.example'), override: false });
 
 jest.mock('../../src/config/epayco', () => {
   const mockEpaycoClient = {

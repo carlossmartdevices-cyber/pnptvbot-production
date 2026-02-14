@@ -1,4 +1,10 @@
 // Test setup file
+// Load .env.production so integration tests get correct credentials
+require('dotenv').config({
+  path: require('path').join(__dirname, '..', '.env.production'),
+  override: true,
+});
+
 process.env.NODE_ENV = 'test';
 process.env.BOT_TOKEN = 'test_token';
 process.env.REDIS_HOST = 'localhost';
