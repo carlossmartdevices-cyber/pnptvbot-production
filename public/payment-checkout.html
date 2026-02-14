@@ -1031,6 +1031,7 @@
         var epayco3dsSafetyTimer = null;
         var epayco3dsFallbackTriggered = false;
         var epayco3dsSecondaryAttempted = false;
+        var epayco3dsModalTimeoutMs = 180000; // ePayco default is 42s, too short for many bank challenges.
 
         function loadEpayco3DSValidator() {
             return new Promise(function(resolve, reject) {
@@ -1205,15 +1206,24 @@
             if ((networkCode === undefined || networkCode === null || networkCode === '') && tx.cod_respuesta !== undefined && tx.cod_respuesta !== null) {
                 networkCode = tx.cod_respuesta;
             }
-            // ePayco validate3ds requires cc_network_response.code=187 for preauth challenge flows.
-            if ((networkCode === undefined || networkCode === null || networkCode === '') && normalizedThreeDS) {
-                networkCode = '187';
+            // ePayco validate3ds requires cc_network_response.code === '187'.
+            // In pending responses we often get cod_respuesta='3', which makes validate3ds return false immediately.
+            if (normalizedThreeDS) {
+                if (networkCode === undefined || networkCode === null || networkCode === '') {
+                    networkCode = '187';
+                } else if (String(networkCode) !== '187') {
+                    console.warn('[3DS ePayco] Overriding cc_network_response.code for validate3ds compatibility', {
+                        paymentId: paymentId,
+                        originalCode: String(networkCode)
+                    });
+                    networkCode = '187';
+                }
             }
             if (networkCode !== undefined && networkCode !== null && networkCode !== '') {
                 normalizedNetworkResponse.code = String(networkCode);
             }
             var data3ds = {
-                franquicia: tx.franquicia,
+                franquicia: tx.franquicia || tx.franchise || tx.brand || null,
                 '3DS': normalizedThreeDS,
                 ref_payco: tx.ref_payco,
                 cc_network_response: normalizedNetworkResponse
@@ -1235,7 +1245,14 @@
                 paymentId: paymentId,
                 mode: useWrappedThreeDS ? 'wrapped-3ds' : 'inner-3ds'
             });
-            var attemptResult = window.validate3ds(payload);
+            var attemptResult = window.validate3ds(payload, 'prod', epayco3dsModalTimeoutMs);
+            if (attemptResult === false) {
+                console.warn('[3DS ePayco] validate3ds returned false (sync)', {
+                    paymentId: paymentId,
+                    mode: useWrappedThreeDS ? 'wrapped-3ds' : 'inner-3ds'
+                });
+                return false;
+            }
             if (attemptResult && typeof attemptResult.then === 'function') {
                 attemptResult
                     .then(function(ok) {
@@ -1244,6 +1261,7 @@
                                 paymentId: paymentId,
                                 mode: useWrappedThreeDS ? 'wrapped-3ds' : 'inner-3ds'
                             });
+                            force3DSFallback(threeDSecure, paymentId, 'validate3ds_promise_false');
                         }
                     })
                     .catch(function(error) {
@@ -1252,6 +1270,7 @@
                             mode: useWrappedThreeDS ? 'wrapped-3ds' : 'inner-3ds',
                             error: error && error.message ? error.message : error
                         });
+                        force3DSFallback(threeDSecure, paymentId, 'validate3ds_promise_rejected');
                     });
             }
             return true;
@@ -1271,6 +1290,26 @@
             };
         }
 
+        function force3DSFallback(threeDSecure, paymentId, reason) {
+            if (epayco3dsSafetyTimer) {
+                clearTimeout(epayco3dsSafetyTimer);
+                epayco3dsSafetyTimer = null;
+            }
+            if (epayco3dsMessageListener) {
+                window.removeEventListener('message', epayco3dsMessageListener);
+                epayco3dsMessageListener = null;
+            }
+            var cardinalData = buildCardinalFallbackData(threeDSecure);
+            if (!epayco3dsFallbackTriggered && cardinalData) {
+                epayco3dsFallbackTriggered = true;
+                console.warn('[3DS ePayco] Immediate fallback to Cardinal SDK', { paymentId: paymentId, reason: reason });
+                loadCardinalCommerceSdk(cardinalData, paymentId);
+                return;
+            }
+            console.warn('[3DS ePayco] Immediate fallback to polling', { paymentId: paymentId, reason: reason });
+            pollPaymentStatus();
+        }
+
         async function tryOfficialEpayco3DSFlow(threeDSecure, paymentId) {
             var primaryPayload = buildEpayco3DSPayload(threeDSecure, paymentId, true);
             if (!primaryPayload['3DS']) {
@@ -1283,7 +1322,28 @@
 
             document.getElementById('checkout-form').style.display = 'none';
             document.getElementById('polling-status').style.display = 'block';
-            launchEpaycoValidate3DSAttempt(threeDSecure, paymentId, true);
+            var primaryAttemptStarted = launchEpaycoValidate3DSAttempt(threeDSecure, paymentId, true);
+            if (!primaryAttemptStarted) {
+                epayco3dsSecondaryAttempted = true;
+                console.warn('[3DS ePayco] Primary validate3ds attempt did not start, retrying immediately with inner 3DS payload', { paymentId });
+                var secondaryStarted = launchEpaycoValidate3DSAttempt(threeDSecure, paymentId, false);
+                if (!secondaryStarted) {
+                    if (epayco3dsMessageListener) {
+                        window.removeEventListener('message', epayco3dsMessageListener);
+                        epayco3dsMessageListener = null;
+                    }
+                    var cardinalDataImmediate = buildCardinalFallbackData(threeDSecure);
+                    if (!epayco3dsFallbackTriggered && cardinalDataImmediate) {
+                        epayco3dsFallbackTriggered = true;
+                        console.warn('[3DS ePayco] validate3ds returned false on both payload variants, switching to Cardinal SDK fallback', { paymentId });
+                        loadCardinalCommerceSdk(cardinalDataImmediate, paymentId);
+                        return true;
+                    }
+                    console.warn('[3DS ePayco] validate3ds returned false on both payload variants, starting status polling fallback', { paymentId });
+                    pollPaymentStatus();
+                    return true;
+                }
+            }
 
             // Safety net: retry validate3ds with alternate payload shape before giving up.
             if (epayco3dsSafetyTimer) {
