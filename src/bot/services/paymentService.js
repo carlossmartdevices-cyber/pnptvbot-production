@@ -422,9 +422,9 @@ class PaymentService {
             paymentUrl,
           });
         } else {
-          // One-time plan → PNPtv custom checkout page via /checkout/pnp
-          paymentUrl = `${checkoutDomain}/checkout/pnp?paymentId=${payment.id}`;
-          logger.info('ePayco checkout URL created (PNPtv route)', {
+          // One-time plan → direct tokenized checkout page (no intermediate landing step)
+          paymentUrl = `${checkoutDomain}/payment/${payment.id}`;
+          logger.info('ePayco checkout URL created (direct tokenized checkout)', {
             paymentId: payment.id,
             paymentUrl,
           });
@@ -2168,11 +2168,6 @@ class PaymentService {
         extra1: String(userId),
         extra2: planId,
         extra3: paymentId,
-        extras: {
-          extra1: String(userId),
-          extra2: planId,
-          extra3: paymentId,
-        },
       });
 
       logger.info('ePayco charge result', {

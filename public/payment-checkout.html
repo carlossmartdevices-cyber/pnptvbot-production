@@ -582,18 +582,43 @@
             epaycoInstance = window.ePayco;
         }
 
+        function isTokenLikeResponse(value) {
+            if (!value || typeof value !== 'object') return false;
+            if (value.status === false) return false;
+            return Boolean(
+                value.id
+                || value.token
+                || (value.data && (value.data.id || value.data.token))
+            );
+        }
+
+        function extractTokenId(tokenResult) {
+            if (!tokenResult || typeof tokenResult !== 'object') return null;
+            return tokenResult.id
+                || tokenResult.token
+                || (tokenResult.data && (tokenResult.data.id || tokenResult.data.token))
+                || null;
+        }
+
         function tokenizeCardWithEpayco(cardPayload) {
             return waitForEpaycoSDK(8000).then(function() {
                 return new Promise(function(resolve, reject) {
                     try {
                         initEpaycoSDK();
-                        // Browser SDK callback signature: callback(tokenResult, error)
-                        window.ePayco.token.create(cardPayload, function(tokenResult, error) {
-                            if (error) {
+                        // ePayco SDK callback signatures can vary across versions:
+                        // callback(error, token) OR callback(token, error).
+                        window.ePayco.token.create(cardPayload, function(firstArg, secondArg) {
+                            var tokenResult = isTokenLikeResponse(firstArg)
+                                ? firstArg
+                                : (isTokenLikeResponse(secondArg) ? secondArg : null);
+                            var error = tokenResult === firstArg ? secondArg : firstArg;
+
+                            if (!tokenResult && error) {
                                 reject(typeof error === 'object' ? error : new Error(String(error)));
                                 return;
                             }
-                            if (!tokenResult || tokenResult.status === false) {
+
+                            if (!tokenResult || tokenResult.status === false || !extractTokenId(tokenResult)) {
                                 reject(new Error((tokenResult && tokenResult.description) || 'Error al tokenizar la tarjeta'));
                                 return;
                             }
@@ -746,6 +771,14 @@
 
             try {
                 var tokenResult = await tokenizeCardWithEpayco({
+                    // Official SDK style (matches ePayco docs)
+                    'card[number]': cardNumber,
+                    'card[exp_year]': expYear,
+                    'card[exp_month]': expMonth,
+                    'card[cvc]': cvc,
+                    'card[holder_name]': (name + ' ' + (lastName || '')).trim(),
+                    hasCvv: true,
+                    // Compatibility style for older ePayco.js variants that expect nested card object
                     card: {
                         number: cardNumber,
                         exp_year: expYear,
@@ -753,11 +786,11 @@
                         cvc: cvc,
                         name: (name + ' ' + (lastName || '')).trim(),
                         email: email,
-                    },
+                    }
                 });
 
                 // Browser SDK may return token in different fields
-                var tokenId = tokenResult && (tokenResult.id || (tokenResult.data && tokenResult.data.token));
+                var tokenId = extractTokenId(tokenResult);
                 if (!tokenId) {
                     var errMsg = (tokenResult && tokenResult.description) || 'No fue posible tokenizar la tarjeta.';
                     throw new Error(errMsg);
@@ -974,11 +1007,13 @@
         }
 
         function isTrusted3DSOrigin(origin) {
-            if (!origin) return true;
+            if (!origin) return false;
             try {
                 var parsed = new URL(origin);
                 var host = (parsed.hostname || '').toLowerCase();
+                var currentHost = (window.location.hostname || '').toLowerCase();
                 return host === 'localhost'
+                    || host === currentHost
                     || host.endsWith('.epayco.co')
                     || host.endsWith('.payco.co')
                     || host.endsWith('.cardinalcommerce.com');
