@@ -2362,6 +2362,10 @@ class PaymentService {
               '3DS': rawThreeDS,
               ref_payco: fullResponse.ref_payco || refPayco,
               cc_network_response: fullResponse.cc_network_response,
+              cod_error: fullResponse.cod_error,
+              cod_respuesta: fullResponse.cod_respuesta,
+              estado: fullResponse.estado,
+              respuesta: fullResponse.respuesta,
             },
             data: {
               accessToken: threeDSData.accessToken,
