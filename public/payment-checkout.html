@@ -446,6 +446,7 @@
                 errDoc: 'Enter your document number.',
                 errDeclined: 'Payment was declined. Try another card.',
                 errConnection: 'Connection error. Please try again.',
+                errChargeNotStarted: 'Payment was not started. Please press Pay again.',
                 errLoadPayment: 'Could not load payment info',
                 errLoadGeneric: 'Error loading payment',
                 errVerify: 'Error verifying payment status.',
@@ -488,6 +489,7 @@
                 errDoc: 'Ingresa tu n\u00famero de documento.',
                 errDeclined: 'El pago fue rechazado. Intenta con otra tarjeta.',
                 errConnection: 'Error de conexi\u00f3n. Intenta nuevamente.',
+                errChargeNotStarted: 'El cobro no se inici\u00f3. Presiona Pagar nuevamente.',
                 errLoadPayment: 'No se pudo cargar la informaci\u00f3n del pago',
                 errLoadGeneric: 'Error al cargar el pago',
                 errVerify: 'Error al verificar el estado del pago.',
@@ -984,6 +986,17 @@
                     if (!data.success) {
                         document.getElementById('polling-status').style.display = 'none';
                         showError(t('errVerify'));
+                        polling = false;
+                        return;
+                    }
+
+                    if (data.stuck) {
+                        document.getElementById('polling-status').style.display = 'none';
+                        document.getElementById('checkout-form').style.display = 'block';
+                        showFormError(data.message || t('errChargeNotStarted'));
+                        var retryBtn = document.getElementById('pay-button');
+                        retryBtn.disabled = false;
+                        retryBtn.textContent = payBtnLabel();
                         polling = false;
                         return;
                     }
