@@ -583,6 +583,9 @@
         }
 
         function isTokenLikeResponse(value) {
+            if (typeof value === 'string') {
+                return /^[a-f0-9]{20,64}$/i.test(value.trim());
+            }
             if (!value || typeof value !== 'object') return false;
             if (value.status === false) return false;
             return Boolean(
@@ -593,6 +596,10 @@
         }
 
         function extractTokenId(tokenResult) {
+            if (typeof tokenResult === 'string') {
+                var raw = tokenResult.trim();
+                return /^[a-f0-9]{20,64}$/i.test(raw) ? raw : null;
+            }
             if (!tokenResult || typeof tokenResult !== 'object') return null;
             return tokenResult.id
                 || tokenResult.token
@@ -821,6 +828,9 @@
                 handleBackendResponse(result);
             } catch (error) {
                 var epaycoError = (error && (error.description || error.error || error.message)) || t('errConnection');
+                if (typeof epaycoError === 'string' && /^[a-f0-9]{20,64}$/i.test(epaycoError.trim())) {
+                    epaycoError = t('errConnection');
+                }
                 showFormError(epaycoError);
                 btn.disabled = false;
                 btn.textContent = payBtnLabel();
