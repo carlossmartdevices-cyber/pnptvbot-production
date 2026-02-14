@@ -417,10 +417,32 @@
             }
         }
 
+        // Wait for ePayco SDK to load (handles slow connections)
+        function waitForEpaycoSDK(maxWaitMs) {
+            return new Promise(function(resolve, reject) {
+                if (window.ePayco && typeof window.ePayco.checkout && typeof window.ePayco.checkout.configure === 'function') {
+                    return resolve();
+                }
+                var waited = 0;
+                var interval = 200;
+                var timer = setInterval(function() {
+                    waited += interval;
+                    if (window.ePayco && window.ePayco.checkout && typeof window.ePayco.checkout.configure === 'function') {
+                        clearInterval(timer);
+                        return resolve();
+                    }
+                    if (waited >= maxWaitMs) {
+                        clearInterval(timer);
+                        reject(new Error('El SDK de ePayco no pudo cargarse. Revisa tu conexión a internet y recarga la página.'));
+                    }
+                }, interval);
+            });
+        }
+
         // Initialize ePayco Smart Checkout
         function initEPaycoCheckout() {
             if (!window.ePayco || !window.ePayco.checkout || typeof window.ePayco.checkout.configure !== 'function') {
-                throw new Error('SDK de ePayco no disponible');
+                throw new Error('El SDK de ePayco no pudo cargarse. Revisa tu conexión a internet y recarga la página.');
             }
             return window.ePayco.checkout.configure({
                 key: paymentData.epaycoPublicKey,
@@ -482,15 +504,14 @@
                 </div>
             `;
 
-            try {
-                // Initialize ePayco handler
+            // Wait for ePayco SDK then initialize
+            waitForEpaycoSDK(8000).then(function() {
                 handler = initEPaycoCheckout();
-                // Render ePayco Smart Checkout form
                 renderEPaycoSmartCheckout();
-            } catch (error) {
+            }).catch(function(error) {
                 console.error('Error initializing ePayco:', error);
-                showError('Error cargando ePayco. Intenta nuevamente en unos segundos.');
-            }
+                showError(error.message || 'Error cargando ePayco. Intenta nuevamente en unos segundos.');
+            });
         }
 
         // Render ePayco Smart Checkout form

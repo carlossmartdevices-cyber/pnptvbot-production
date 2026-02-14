@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://checkout.epayco.co/checkout.js"></script>
+    <script src="https://checkout.epayco.co/checkout.js" onerror="window.__epaycoLoadFailed=true"></script>
     <script src="https://multimedia.epayco.co/general/3DS/validateThreeds.min.js"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -544,10 +544,38 @@
             };
         }
 
+        function waitForEpaycoSDK(maxWaitMs) {
+            return new Promise(function(resolve, reject) {
+                if (window.ePayco && typeof window.ePayco.setup === 'function') {
+                    return resolve();
+                }
+                // If initial script load failed, try dynamic reload
+                if (window.__epaycoLoadFailed) {
+                    var s = document.createElement('script');
+                    s.src = 'https://checkout.epayco.co/checkout.js';
+                    document.head.appendChild(s);
+                    window.__epaycoLoadFailed = false;
+                }
+                var waited = 0;
+                var interval = 300;
+                var timer = setInterval(function() {
+                    waited += interval;
+                    if (window.ePayco && typeof window.ePayco.setup === 'function') {
+                        clearInterval(timer);
+                        return resolve();
+                    }
+                    if (waited >= maxWaitMs) {
+                        clearInterval(timer);
+                        reject(new Error('El SDK de ePayco no pudo cargarse. Revisa tu conexión a internet y recarga la página.'));
+                    }
+                }, interval);
+            });
+        }
+
         function getEpaycoInstance() {
             if (epaycoInstance) return epaycoInstance;
             if (!window.ePayco || typeof window.ePayco.setup !== 'function') {
-                throw new Error('SDK de ePayco no disponible.');
+                throw new Error('El SDK de ePayco no pudo cargarse. Revisa tu conexión a internet y recarga la página.');
             }
             epaycoInstance = window.ePayco.setup({
                 key: paymentData.epaycoPublicKey,
@@ -557,19 +585,21 @@
         }
 
         function tokenizeCardWithEpayco(cardPayload) {
-            return new Promise(function(resolve, reject) {
-                try {
-                    var epayco = getEpaycoInstance();
-                    epayco.token.create(cardPayload, function(error, data) {
-                        if (error) {
-                            reject(error);
-                            return;
-                        }
-                        resolve(data);
-                    });
-                } catch (err) {
-                    reject(err);
-                }
+            return waitForEpaycoSDK(8000).then(function() {
+                return new Promise(function(resolve, reject) {
+                    try {
+                        var epayco = getEpaycoInstance();
+                        epayco.token.create(cardPayload, function(error, data) {
+                            if (error) {
+                                reject(error);
+                                return;
+                            }
+                            resolve(data);
+                        });
+                    } catch (err) {
+                        reject(err);
+                    }
+                });
             });
         }
 
