@@ -1005,10 +1005,10 @@
                         document.getElementById('polling-status').style.display = 'none';
                         document.getElementById('success').style.display = 'block';
                         polling = false;
-                    } else if (data.status === 'failed' || data.status === 'rejected' || data.status === 'cancelled') {
+                    } else if (data.status === 'failed' || data.status === 'rejected' || data.status === 'cancelled' || data.status === 'refunded') {
                         document.getElementById('polling-status').style.display = 'none';
                         document.getElementById('checkout-form').style.display = 'block';
-                        showFormError(t('errDeclined'));
+                        showFormError((data && data.message) || t('errDeclined'));
                         var btn = document.getElementById('pay-button');
                         btn.disabled = false;
                         btn.textContent = payBtnLabel();

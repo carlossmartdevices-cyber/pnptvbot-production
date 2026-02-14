@@ -11,7 +11,11 @@ const { query } = require('../../../config/postgres');
  * Payment Controller - Handles payment-related API endpoints
  */
 class PaymentController {
-  static EPAYCO_3DS_PENDING_TIMEOUT_MINUTES = Number(process.env.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES || 12);
+  static EPAYCO_3DS_PENDING_TIMEOUT_MINUTES = Number(process.env.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES || 6);
+
+  static EPAYCO_3DS_AUTHENTICATED_PENDING_TIMEOUT_MINUTES = Number(
+    process.env.EPAYCO_3DS_AUTHENTICATED_PENDING_TIMEOUT_MINUTES || 3
+  );
 
   /**
    * Get userId from payment record for audit logging
@@ -515,23 +519,40 @@ class PaymentController {
       const isLikelyThreeDSFlow = Boolean(
         metadata.three_ds_requested || metadata.bank_url_available === false
       );
+      const authenticatedAtRaw = metadata?.three_ds_authentication?.authenticated_at;
+      const authenticatedAtMs = authenticatedAtRaw ? new Date(authenticatedAtRaw).getTime() : null;
+      const hasAuthenticatedAt = Number.isFinite(authenticatedAtMs);
+      const ageSinceAuthenticatedMs = hasAuthenticatedAt ? (Date.now() - authenticatedAtMs) : null;
+      const ageSinceAuthenticatedMinutes = ageSinceAuthenticatedMs !== null
+        ? ageSinceAuthenticatedMs / (60 * 1000)
+        : null;
+      const pendingTimeoutMinutes = hasAuthenticatedAt
+        ? PaymentController.EPAYCO_3DS_AUTHENTICATED_PENDING_TIMEOUT_MINUTES
+        : PaymentController.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES;
+      const timeoutAgeMinutes = hasAuthenticatedAt ? ageSinceAuthenticatedMinutes : ageMinutes;
 
       if (
         statusCheck.currentStatus === 'Pendiente'
         && isLikelyThreeDSFlow
-        && ageMinutes !== null
-        && ageMinutes >= PaymentController.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES
+        && timeoutAgeMinutes !== null
+        && timeoutAgeMinutes >= pendingTimeoutMinutes
       ) {
         await PaymentModel.updateStatus(paymentId, 'failed', {
           epayco_ref: refPayco,
           epayco_estado: statusCheck.currentStatus,
           abandoned_3ds: true,
           timeout_recovered_via_status_check: true,
-          error: `3DS timeout after ${Math.floor(ageMinutes)} minutes without final confirmation`,
+          timeout_window_minutes: pendingTimeoutMinutes,
+          three_ds_authenticated_at: hasAuthenticatedAt ? authenticatedAtRaw : null,
+          error: `3DS timeout after ${Math.floor(timeoutAgeMinutes)} minutes without final confirmation`,
         });
 
         logger.warn('3DS payment timed out in pending state; marking as failed (via polling)', {
-          paymentId, refPayco, ageMinutes: Math.floor(ageMinutes),
+          paymentId,
+          refPayco,
+          ageMinutes: Math.floor(timeoutAgeMinutes),
+          pendingTimeoutMinutes,
+          hasAuthenticatedAt,
         });
 
         return res.json({
