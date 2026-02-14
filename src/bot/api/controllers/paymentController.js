@@ -957,6 +957,31 @@ class PaymentController {
         });
       }
 
+      const has3DSValidationResult = Boolean(
+        threeDSecure
+        && typeof threeDSecure === 'object'
+        && (
+          (threeDSecure.validationData && typeof threeDSecure.validationData === 'object')
+          || threeDSecure.authenticated === true
+          || threeDSecure.challengeCompleted === true
+        )
+      );
+
+      // Do not mark 3DS as authenticated when there is no definitive challenge result.
+      if (!has3DSValidationResult) {
+        logger.warn('3DS completion called without validation result; keeping payment pending', {
+          paymentId,
+          provider: threeDSecure?.provider,
+          referenceId: threeDSecure?.referenceId,
+          keys: Object.keys(threeDSecure || {}),
+        });
+        return res.status(202).json({
+          success: true,
+          status: 'pending',
+          message: 'Awaiting definitive 3DS validation result',
+        });
+      }
+
       logger.info('3DS 2.0 authentication completion initiated', {
         paymentId,
         referenceId: threeDSecure.referenceId,

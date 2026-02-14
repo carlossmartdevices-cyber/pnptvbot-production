@@ -1030,6 +1030,7 @@
         var epayco3dsMessageListener = null;
         var epayco3dsSafetyTimer = null;
         var epayco3dsFallbackTriggered = false;
+        var epayco3dsSecondaryAttempted = false;
 
         function loadEpayco3DSValidator() {
             return new Promise(function(resolve, reject) {
@@ -1149,13 +1150,15 @@
             window.addEventListener('message', epayco3dsMessageListener);
         }
 
-        function buildEpayco3DSPayload(threeDSecure, paymentId) {
+        function buildEpayco3DSPayload(threeDSecure, paymentId, useWrappedThreeDS) {
             var tx = (threeDSecure && threeDSecure.transactionData) || {};
             var rawThreeDS = tx['3DS'];
-            // Some API responses wrap 3DS data as { success, data }, while validate3ds expects the inner payload.
-            var normalizedThreeDS = (rawThreeDS && typeof rawThreeDS === 'object' && rawThreeDS.data)
-                ? rawThreeDS.data
-                : rawThreeDS;
+            // Some API responses wrap 3DS data as { success, data }.
+            // We support both shapes because validate3ds behavior differs by gateway response version.
+            var normalizedThreeDS = rawThreeDS;
+            if (!useWrappedThreeDS && rawThreeDS && typeof rawThreeDS === 'object' && rawThreeDS.data) {
+                normalizedThreeDS = rawThreeDS.data;
+            }
             var data3ds = {
                 franquicia: tx.franquicia,
                 '3DS': normalizedThreeDS,
@@ -1168,6 +1171,19 @@
             }
 
             return data3ds;
+        }
+
+        function launchEpaycoValidate3DSAttempt(threeDSecure, paymentId, useWrappedThreeDS) {
+            var payload = buildEpayco3DSPayload(threeDSecure, paymentId, useWrappedThreeDS);
+            if (!payload['3DS']) {
+                return false;
+            }
+            console.log('[3DS ePayco] validate3ds attempt', {
+                paymentId: paymentId,
+                mode: useWrappedThreeDS ? 'wrapped-3ds' : 'inner-3ds'
+            });
+            window.validate3ds(payload);
+            return true;
         }
 
         async function runDeviceDataCollection(methodUrl) {
@@ -1199,8 +1215,8 @@
         }
 
         async function tryOfficialEpayco3DSFlow(threeDSecure, paymentId) {
-            var data3DS = buildEpayco3DSPayload(threeDSecure, paymentId);
-            if (!data3DS['3DS']) {
+            var primaryPayload = buildEpayco3DSPayload(threeDSecure, paymentId, false);
+            if (!primaryPayload['3DS']) {
                 return false;
             }
 
@@ -1212,41 +1228,44 @@
 
             await loadEpayco3DSValidator();
             attachEpayco3DSMessageHandler();
+            epayco3dsSecondaryAttempted = false;
 
             document.getElementById('checkout-form').style.display = 'none';
             document.getElementById('polling-status').style.display = 'block';
-            window.validate3ds(data3DS);
+            launchEpaycoValidate3DSAttempt(threeDSecure, paymentId, false);
 
-            // Safety net: if postMessage is blocked, start status polling without interrupting challenge UI.
+            // Safety net: retry validate3ds with alternate payload shape before giving up.
             if (epayco3dsSafetyTimer) {
                 clearTimeout(epayco3dsSafetyTimer);
                 epayco3dsSafetyTimer = null;
             }
             epayco3dsSafetyTimer = setTimeout(function() {
                 if (epayco3dsMessageListener) {
+                    if (!epayco3dsSecondaryAttempted) {
+                        epayco3dsSecondaryAttempted = true;
+                        console.warn('[3DS ePayco] No postMessage on primary attempt, retrying with wrapped 3DS payload', { paymentId });
+                        if (launchEpaycoValidate3DSAttempt(threeDSecure, paymentId, true)) {
+                            epayco3dsSafetyTimer = setTimeout(function() {
+                                if (!epayco3dsMessageListener) return;
+                                window.removeEventListener('message', epayco3dsMessageListener);
+                                epayco3dsMessageListener = null;
+                                console.warn('[3DS ePayco] No postMessage after both validate3ds attempts, starting status polling fallback', { paymentId });
+                                pollPaymentStatus();
+                            }, 18000);
+                            return;
+                        }
+                    }
                     window.removeEventListener('message', epayco3dsMessageListener);
                     epayco3dsMessageListener = null;
-                    if (
-                        !epayco3dsFallbackTriggered
-                        && threeDSecure
-                        && threeDSecure.data
-                        && threeDSecure.data.referenceId
-                    ) {
-                        epayco3dsFallbackTriggered = true;
-                        console.warn('[3DS ePayco] No postMessage received yet, switching to Cardinal fallback', { paymentId });
-                        loadCardinalCommerceSdk(threeDSecure.data, paymentId);
-                        return;
-                    }
                     console.warn('[3DS ePayco] No postMessage received yet, starting status polling fallback', { paymentId });
                     pollPaymentStatus();
                 }
-            }, 30000);
+            }, 12000);
             return true;
         }
 
         /**
-         * Handle 3DS authentication with ePayco official API flow first.
-         * Fallback to direct Cardinal flow for backward compatibility.
+         * Handle 3DS authentication with ePayco official validate3ds flow.
          * @param {Object} threeDSecure - 3DS 2.0 authentication data from ePayco
          * @param {String} paymentId - Payment ID for tracking
          */
@@ -1259,29 +1278,15 @@
                     return;
                 }
             } catch (flowError) {
-                console.warn('[3DS ePayco] Official validate3ds flow failed, fallback to Cardinal', {
+                console.warn('[3DS ePayco] Official validate3ds flow failed, switching to status polling fallback', {
                     paymentId,
                     error: flowError.message
                 });
             }
 
-            try {
-                const data = threeDSecure.data;
-                epayco3dsFallbackTriggered = true;
-                console.log('[3DS 2.0] Starting Cardinal Commerce fallback', {
-                    paymentId,
-                    referenceId: data && data.referenceId,
-                    provider: threeDSecure.provider
-                });
-
-                // Fallback: Load Cardinal Commerce SDK
-                loadCardinalCommerceSdk(data, paymentId);
-            } catch (error) {
-                console.error('[3DS 2.0] Error in handle3DS2Authentication fallback', error);
-                document.getElementById('checkout-form').style.display = 'none';
-                document.getElementById('polling-status').style.display = 'block';
-                pollPaymentStatus();
-            }
+            document.getElementById('checkout-form').style.display = 'none';
+            document.getElementById('polling-status').style.display = 'block';
+            pollPaymentStatus();
         }
 
         /**
