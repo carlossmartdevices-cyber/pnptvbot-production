@@ -48,6 +48,48 @@ const activationStrings = {
  * @param {Telegraf} bot - Bot instance
  */
 const registerOnboardingHandlers = (bot) => {
+  // Action: Retry start/refresh context
+  bot.action('retry_start', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const userId = ctx.from.id;
+
+      const user = await UserService.getOrCreateFromContext(ctx);
+      if (user && user.onboardingComplete) {
+        await showMainMenu(ctx);
+      } else {
+        await showLanguageSelection(ctx);
+      }
+    } catch (error) {
+      logger.error('Error in retry_start action:', error);
+    }
+  });
+
+  // Action: Refresh context (same as retry_start)
+  bot.action('refresh_context', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const user = await UserService.getOrCreateFromContext(ctx);
+      if (user && user.onboardingComplete) {
+        await showMainMenu(ctx);
+      } else {
+        await showLanguageSelection(ctx);
+      }
+    } catch (error) {
+      logger.error('Error in refresh_context action:', error);
+    }
+  });
+
+  // Action: Show language selection menu
+  bot.action('show_lang_selection', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      await showLanguageSelection(ctx);
+    } catch (error) {
+      logger.error('Error in show_lang_selection action:', error);
+    }
+  });
+
   // Onboard command - restart onboarding for testing
   bot.command('onboard', async (ctx) => {
     try {
@@ -85,7 +127,13 @@ const registerOnboardingHandlers = (bot) => {
       await ctx.reply(activationStrings[lang].promptCode);
     } catch (error) {
       logger.error('Error in activate_lifetime_send_code action:', error);
-      await ctx.reply(activationStrings[getLanguage(ctx)].errorActivating);
+      const lang = getLanguage(ctx);
+      await ctx.reply(activationStrings[lang].errorActivating, {
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(lang === 'es' ? '🏠 Volver al Inicio' : '🏠 Back to Home', 'back_to_main')],
+          [Markup.button.url(lang === 'es' ? '🆘 Contactar Soporte' : '🆘 Contact Support', 'https://t.me/pnptv_support')],
+        ]),
+      });
     }
   });
 
@@ -95,7 +143,11 @@ const registerOnboardingHandlers = (bot) => {
       // Validate context has required data
       if (!ctx.from?.id) {
         logger.error('/start command called without user context');
-        await ctx.reply('❌ Error: User context missing. Please try again.');
+        await ctx.reply('❌ Error: User context missing. Please try again.', {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 Retry', 'refresh_context')],
+          ]),
+        });
         return;
       }
 
@@ -106,7 +158,12 @@ const registerOnboardingHandlers = (bot) => {
       // Validate user was created/fetched successfully
       if (!user) {
         logger.error('[START] Failed to get or create user - database may be unavailable', { userId: ctx.from.id });
-        await ctx.reply('⚠️ We are experiencing technical difficulties. Please try again in a few moments.');
+        await ctx.reply('⚠️ We are experiencing technical difficulties. Please try again in a few moments.', {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 Retry', 'retry_start')],
+            [Markup.button.url('🆘 Support', 'https://t.me/pnptv_support')],
+          ]),
+        });
         return;
       }
 
@@ -246,7 +303,12 @@ const registerOnboardingHandlers = (bot) => {
           chatId: ctx.chat?.id
         });
         try {
-          await ctx.reply('⚠️ We are experiencing database connectivity issues. Please try again in a few minutes.');
+          await ctx.reply('⚠️ We are experiencing database connectivity issues. Please try again in a few minutes.', {
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('🔄 Retry', 'retry_start')],
+              [Markup.button.url('🆘 Support', 'https://t.me/pnptv_support')],
+            ]),
+          });
         } catch (dbError) {
           logger.error('[START] Failed to send database error message:', dbError.message);
         }
@@ -274,7 +336,12 @@ const registerOnboardingHandlers = (bot) => {
 
       // Generic error handling
       try {
-        await ctx.reply('❌ An error occurred. Please try /start again.');
+        await ctx.reply('❌ An error occurred. Please try /start again.', {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 Retry', 'retry_start')],
+            [Markup.button.url('🆘 Support', 'https://t.me/pnptv_support')],
+          ]),
+        });
       } catch (replyError) {
         if (replyError.message && replyError.message.includes('chat not found')) {
           logger.warn('[START] Cannot send error message - chat not found', {
@@ -294,7 +361,11 @@ const registerOnboardingHandlers = (bot) => {
       // Validate match result exists
       if (!ctx.match || !ctx.match[1]) {
         logger.error('Invalid language selection format');
-        await ctx.reply('An error occurred. Please try /start again.');
+        await ctx.reply('An error occurred. Please try /start again.', {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔤 Select Language', 'show_lang_selection')],
+          ]),
+        });
         return;
       }
 
@@ -484,7 +555,12 @@ const registerOnboardingHandlers = (bot) => {
       const rawCode = ctx.message?.text?.trim();
 
       if (!rawCode || rawCode.length === 0 || rawCode.includes(' ')) { // Simple validation for now
-        await ctx.reply(activationStrings[lang].invalidCodeFormat);
+        await ctx.reply(activationStrings[lang].invalidCodeFormat, {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(lang === 'es' ? '🔄 Intentar de Nuevo' : '🔄 Try Again', 'activate_lifetime_send_code')],
+            [Markup.button.callback(lang === 'es' ? '🏠 Volver al Inicio' : '🏠 Back to Home', 'back_to_main')],
+          ]),
+        });
         ctx.session.temp.waitingForLifetimeCode = false; // Clear the flag
         await ctx.saveSession();
         return;
@@ -499,7 +575,12 @@ const registerOnboardingHandlers = (bot) => {
         const matchingLink = availableLinks.find(link => link.code === rawCode);
 
         if (!matchingLink) {
-            await ctx.reply(activationStrings[lang].codeNotFound);
+            await ctx.reply(activationStrings[lang].codeNotFound, {
+              ...Markup.inlineKeyboard([
+                [Markup.button.callback(lang === 'es' ? '🔄 Intentar de Nuevo' : '🔄 Try Again', 'activate_lifetime_send_code')],
+                [Markup.button.url(lang === 'es' ? '🆘 Contactar Soporte' : '🆘 Contact Support', 'https://t.me/pnptv_support')],
+              ]),
+            });
             return;
         }
 
@@ -532,7 +613,12 @@ const registerOnboardingHandlers = (bot) => {
           });
 
           if (!activated) {
-            await ctx.reply(activationStrings[lang].errorActivating);
+            await ctx.reply(activationStrings[lang].errorActivating, {
+              ...Markup.inlineKeyboard([
+                [Markup.button.callback(lang === 'es' ? '🏠 Volver al Inicio' : '🏠 Back to Home', 'back_to_main')],
+                [Markup.button.url(lang === 'es' ? '🆘 Contactar Soporte' : '🆘 Contact Support', 'https://t.me/pnptv_support')],
+              ]),
+            });
             return;
           }
 
@@ -591,11 +677,21 @@ const registerOnboardingHandlers = (bot) => {
           await showMainMenu(ctx); // Show main menu after activation
         } else {
           // Payment not confirmed
-          await ctx.reply(activationStrings[lang].paymentNotCompleted);
+          await ctx.reply(activationStrings[lang].paymentNotCompleted, {
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(lang === 'es' ? '🏠 Volver al Inicio' : '🏠 Back to Home', 'back_to_main')],
+              [Markup.button.url(lang === 'es' ? '🆘 Contactar Soporte' : '🆘 Contact Support', 'https://t.me/pnptv_support')],
+            ]),
+          });
         }
       } catch (error) {
         logger.error('Error processing lifetime code activation:', error);
-        await ctx.reply(activationStrings[lang].errorActivating);
+        await ctx.reply(activationStrings[lang].errorActivating, {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(lang === 'es' ? '🏠 Volver al Inicio' : '🏠 Back to Home', 'back_to_main')],
+            [Markup.button.url(lang === 'es' ? '🆘 Contactar Soporte' : '🆘 Contact Support', 'https://t.me/pnptv_support')],
+          ]),
+        });
       }
       return; // Crucial to return here to prevent further text processing
     }
@@ -606,7 +702,12 @@ const registerOnboardingHandlers = (bot) => {
       // Validate message text exists
       if (!ctx.message?.text) {
         logger.warn('Email handler received message without text');
-        await ctx.reply(`${t('invalidInput', lang)}\nPlease send a valid email address.`);
+        await ctx.reply(`${t('invalidInput', lang)}\nPlease send a valid email address.`, {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(lang === 'es' ? '✏️ Intentar de Nuevo' : '✏️ Try Again', 'onboarding_retry_email')],
+            [Markup.button.callback(lang === 'es' ? '🏠 Volver al Inicio' : '🏠 Back to Home', 'back_to_main')],
+          ]),
+        });
         return;
       }
 
@@ -615,7 +716,12 @@ const registerOnboardingHandlers = (bot) => {
 
       // Check email length (emails shouldn't exceed 254 characters per RFC)
       if (rawEmail.length > 254 || rawEmail.length < 5) {
-        await ctx.reply(`${t('invalidInput', lang)}\nEmail must be between 5 and 254 characters.`);
+        await ctx.reply(`${t('invalidInput', lang)}\nEmail must be between 5 and 254 characters.`, {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(lang === 'es' ? '✏️ Intentar de Nuevo' : '✏️ Try Again', 'onboarding_retry_email')],
+            [Markup.button.callback(lang === 'es' ? '🏠 Volver al Inicio' : '🏠 Back to Home', 'back_to_main')],
+          ]),
+        });
         return;
       }
 
@@ -682,7 +788,12 @@ const registerOnboardingHandlers = (bot) => {
           await showLocationSharingPrompt(ctx);
         }
       } else {
-        await ctx.reply(`${t('invalidInput', lang)}\nPlease send a valid email address (e.g., user@example.com).`);
+        await ctx.reply(`${t('invalidInput', lang)}\nPlease send a valid email address (e.g., user@example.com).`, {
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(lang === 'es' ? '✏️ Intentar de Nuevo' : '✏️ Try Again', 'onboarding_retry_email')],
+            [Markup.button.url(lang === 'es' ? '🆘 Contactar Soporte' : '🆘 Contact Support', 'https://t.me/pnptv_support')],
+          ]),
+        });
       }
       return;
     }
@@ -822,7 +933,11 @@ const completeOnboarding = async (ctx) => {
     // Validate user context exists
     if (!ctx.from?.id) {
       logger.error('Missing user context in onboarding completion');
-      await ctx.reply('An error occurred. Please try /start again.');
+      await ctx.reply('An error occurred. Please try /start again.', {
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('🔄 Retry', 'retry_start')],
+        ]),
+      });
       return;
     }
 
@@ -846,7 +961,13 @@ const completeOnboarding = async (ctx) => {
 
     if (!result.success) {
       logger.error('Failed to update user profile:', result.error);
-      await ctx.reply('An error occurred. Please try /start again.');
+      const lang = getLanguage(ctx);
+      await ctx.reply('An error occurred. Please try /start again.', {
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(lang === 'es' ? '🔄 Reintentar' : '🔄 Retry', 'retry_start')],
+          [Markup.button.url(lang === 'es' ? '🆘 Soporte' : '🆘 Support', 'https://t.me/pnptv_support')],
+        ]),
+      });
       return;
     }
 
@@ -910,7 +1031,273 @@ const completeOnboarding = async (ctx) => {
     await showMainMenu(ctx);
   } catch (error) {
     logger.error('Error completing onboarding:', error);
-    await ctx.reply('An error occurred. Please try /start again.');
+    const lang = getLanguage(ctx);
+    await ctx.reply('An error occurred. Please try /start again.', {
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback(lang === 'es' ? '🔄 Reintentar' : '🔄 Retry', 'retry_start')],
+        [Markup.button.url(lang === 'es' ? '🆘 Soporte' : '🆘 Support', 'https://t.me/pnptv_support')],
+      ]),
+    });
+  }
+};
+const verifyAndActivateMeruPayment = async (ctx, meruCode, lang = 'es') => {
+  try {
+    const userId = ctx.from.id;
+    const username = ctx.from.username || 'unknown';
+
+    logger.info('🔵 PASO 4️⃣: Iniciando verificación de pago con Puppeteer', {
+      userId,
+      username,
+      code: meruCode
+    });
+
+    // Enviar mensaje de verificación
+    const verifyingMessage = lang === 'es'
+      ? `⏳ Verificando tu pago en Meru para el código: \`${meruCode}\`...`
+      : `⏳ Verifying your payment on Meru for code: \`${meruCode}\`...`;
+
+    const statusMsg = await ctx.reply(verifyingMessage, { parse_mode: 'Markdown' });
+
+    // ═══════════════════════════════════════════════════════════════
+    // PASO 4️⃣: BOT VERIFICA PAGO CON PUPPETEER
+    // ═══════════════════════════════════════════════════════════════
+    const paymentCheck = await meruPaymentService.verifyPayment(meruCode, lang);
+
+    logger.info('✅ Verificación completada', {
+      userId,
+      code: meruCode,
+      isPaid: paymentCheck.isPaid
+    });
+
+    if (!paymentCheck.isPaid) {
+      logger.warn('⚠️  Pago no confirmado', {
+        userId,
+        code: meruCode,
+        message: paymentCheck.message
+      });
+
+      const failMessage = lang === 'es'
+        ? `❌ No pudimos confirmar tu pago para el código \`${meruCode}\`.
+
+Por favor asegúrate de que:
+1. El link de Meru fue pagado completamente
+2. El código es correcto
+3. El link aún no ha sido usado
+
+Si el problema persiste, contacta a soporte: /support`
+        : `❌ We could not confirm your payment for code \`${meruCode}\`.
+
+Please ensure that:
+1. The Meru link was paid in full
+2. The code is correct
+3. The link has not been used yet
+
+If the problem persists, contact support: /support`;
+
+      try {
+        await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id).catch(() => {});
+      } catch (e) {
+        logger.debug('Could not delete status message');
+      }
+
+      await ctx.reply(failMessage, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(lang === 'es' ? '🏠 Volver al Inicio' : '🏠 Back to Home', 'back_to_main')],
+          [Markup.button.url(lang === 'es' ? '🆘 Contactar Soporte' : '🆘 Contact Support', 'https://t.me/pnptv_support')],
+        ]),
+      });
+      return;
+    }
+
+    logger.info('✅ Pago confirmado en Meru', { userId, code: meruCode });
+
+    // ═══════════════════════════════════════════════════════════════
+    // PASO 5️⃣: BOT ACTIVA LA MEMBRESÍA
+    // ═══════════════════════════════════════════════════════════════
+    logger.info('🔵 PASO 5️⃣: Activando membresía', { userId });
+
+    const planId = 'lifetime_pass';
+    const product = 'lifetime-pass';
+
+    // Marcar código como usado en BD
+    logger.info('🔵 PASO 5.2️⃣: Marcando link como usado', {
+      userId,
+      code: meruCode,
+      username
+    });
+
+    const linkInvalidation = await meruLinkService.invalidateLinkAfterActivation(
+      meruCode,
+      userId,
+      username
+    );
+
+    if (!linkInvalidation.success) {
+      logger.warn('⚠️  Failed to invalidate Meru link', {
+        code: meruCode,
+        userId,
+        reason: linkInvalidation.message
+      });
+    } else {
+      logger.info('✅ Link marcado como usado', {
+        code: meruCode,
+        userId
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PASO 6️⃣: REGISTRAR PAGO EN HISTORIAL
+    // ═══════════════════════════════════════════════════════════════
+    logger.info('🔵 PASO 6️⃣: Registrando pago en historial', { userId, code: meruCode });
+
+    try {
+      await PaymentHistoryService.recordPayment({
+        userId: String(userId),
+        paymentMethod: 'meru',
+        amount: 50,
+        currency: 'USD',
+        planId: 'lifetime_pass',
+        planName: 'Lifetime Pass',
+        product: product,
+        paymentReference: meruCode,
+        status: 'completed',
+        metadata: {
+          meru_link: `https://pay.getmeru.com/${meruCode}`,
+          verification_method: 'puppeteer',
+          language: lang,
+          activated_at: new Date().toISOString()
+        }
+      });
+
+      logger.info('✅ Pago registrado en historial', {
+        userId,
+        code: meruCode,
+        method: 'meru'
+      });
+    } catch (historyError) {
+      logger.warn('⚠️  Failed to record payment in history (non-critical)', {
+        error: historyError.message,
+        userId,
+        code: meruCode
+      });
+      // No fallar si el historial falla, es secundario
+    }
+
+    // Actualizar perfil del usuario
+    try {
+      await UserService.updateProfile(userId, {
+        isPremium: true,
+        premiumPlan: planId,
+        premiumActivatedDate: new Date()
+      });
+
+      logger.info('✅ Perfil de usuario actualizado', {
+        userId,
+        planId: planId
+      });
+    } catch (profileError) {
+      logger.error('❌ Error actualizando perfil de usuario', {
+        userId,
+        error: profileError.message
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PASO 7️⃣: NOTIFICACIONES FINALES
+    // ═══════════════════════════════════════════════════════════════
+    logger.info('🔵 PASO 7️⃣: Enviando notificaciones finales', { userId });
+
+    try {
+      await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id).catch(() => {});
+    } catch (e) {
+      logger.debug('Could not delete status message');
+    }
+
+    // 7.1️⃣: Mensaje de activación exitosa
+    const successMessage = lang === 'es'
+      ? `✅ *¡Tu Lifetime Pass ha sido activado!*
+
+¡Bienvenido a PRIME! 🎉
+
+Ahora tienes acceso ilimitado a todo el contenido exclusivo.
+
+📱 *Acciones a continuación:*
+• Visita tu perfil para completar información
+• Explora el catálogo de contenido premium
+• Disfruta sin límites
+
+¿Preguntas? Escribe /support`
+      : `✅ *Your Lifetime Pass has been activated!*
+
+Welcome to PRIME! 🎉
+
+You now have unlimited access to all exclusive content.
+
+📱 *Next steps:*
+• Visit your profile to complete information
+• Browse our premium content catalog
+• Enjoy without limits
+
+Questions? Write /support`;
+
+    await ctx.reply(successMessage, { parse_mode: 'Markdown' });
+
+    // 7.2️⃣: Log de auditoría
+    logger.info('✅ PASO 7.1️⃣: Lifetime Pass activado correctamente', {
+      userId,
+      username,
+      code: meruCode,
+      planId,
+      timestamp: new Date().toISOString()
+    });
+
+    // 7.3️⃣: Enviar menú principal
+    await showMainMenu(ctx);
+
+    // 7.4️⃣: Notificar a admin (opcional, sin bloquear flujo)
+    try {
+      const adminNotification = `💎 *Lifetime Pass Activado*
+
+👤 *Usuario:* ${username} (ID: \`${userId}\`)
+🔗 *Código Meru:* \`${meruCode}\`
+⏰ *Hora:* ${new Date().toLocaleString()}
+
+Pago verificado con Puppeteer ✅
+Membresía activada correctamente`;
+
+      await supportRoutingService.sendToSupportGroup(
+        adminNotification,
+        'activation',
+        { id: userId, username, first_name: username }
+      ).catch(err => {
+        logger.warn('Could not send admin notification:', err.message);
+      });
+    } catch (notifyError) {
+      logger.debug('Admin notification skipped:', notifyError.message);
+    }
+
+  } catch (error) {
+    logger.error('❌ Error en verifyAndActivateMeruPayment', {
+      userId: ctx.from?.id,
+      error: error.message,
+      stack: error.stack
+    });
+
+    const errorMessage = lang === 'es'
+      ? '❌ Ocurrió un error durante la activación. Por favor, contacta a soporte: /support'
+      : '❌ An error occurred during activation. Please contact support: /support';
+
+    try {
+      await ctx.reply(errorMessage, {
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(lang === 'es' ? '🏠 Volver al Inicio' : '🏠 Back to Home', 'back_to_main')],
+          [Markup.button.url(lang === 'es' ? '🆘 Contactar Soporte' : '🆘 Contact Support', 'https://t.me/pnptv_support')],
+        ]),
+      });
+    } catch (e) {
+      logger.error('Could not send error message:', e.message);
+    }
   }
 };
 
