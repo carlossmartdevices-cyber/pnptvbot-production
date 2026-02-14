@@ -951,6 +951,7 @@
 
         var epayco3dsMessageListener = null;
         var epayco3dsSafetyTimer = null;
+        var epayco3dsFallbackTriggered = false;
 
         function loadEpayco3DSValidator() {
             return new Promise(function(resolve, reject) {
@@ -1072,9 +1073,14 @@
 
         function buildEpayco3DSPayload(threeDSecure, paymentId) {
             var tx = (threeDSecure && threeDSecure.transactionData) || {};
+            var rawThreeDS = tx['3DS'];
+            // Some API responses wrap 3DS data as { success, data }, while validate3ds expects the inner payload.
+            var normalizedThreeDS = (rawThreeDS && typeof rawThreeDS === 'object' && rawThreeDS.data)
+                ? rawThreeDS.data
+                : rawThreeDS;
             var data3ds = {
                 franquicia: tx.franquicia,
-                '3DS': tx['3DS'],
+                '3DS': normalizedThreeDS,
                 ref_payco: tx.ref_payco,
                 cc_network_response: tx.cc_network_response
             };
@@ -1140,6 +1146,19 @@
             }
             epayco3dsSafetyTimer = setTimeout(function() {
                 if (epayco3dsMessageListener) {
+                    window.removeEventListener('message', epayco3dsMessageListener);
+                    epayco3dsMessageListener = null;
+                    if (
+                        !epayco3dsFallbackTriggered
+                        && threeDSecure
+                        && threeDSecure.data
+                        && threeDSecure.data.referenceId
+                    ) {
+                        epayco3dsFallbackTriggered = true;
+                        console.warn('[3DS ePayco] No postMessage received yet, switching to Cardinal fallback', { paymentId });
+                        loadCardinalCommerceSdk(threeDSecure.data, paymentId);
+                        return;
+                    }
                     console.warn('[3DS ePayco] No postMessage received yet, starting status polling fallback', { paymentId });
                     pollPaymentStatus();
                 }
@@ -1154,6 +1173,7 @@
          * @param {String} paymentId - Payment ID for tracking
          */
         async function handle3DS2Authentication(threeDSecure, paymentId) {
+            epayco3dsFallbackTriggered = false;
             try {
                 var usedOfficialFlow = await tryOfficialEpayco3DSFlow(threeDSecure, paymentId);
                 if (usedOfficialFlow) {
@@ -1169,6 +1189,7 @@
 
             try {
                 const data = threeDSecure.data;
+                epayco3dsFallbackTriggered = true;
                 console.log('[3DS 2.0] Starting Cardinal Commerce fallback', {
                     paymentId,
                     referenceId: data && data.referenceId,
