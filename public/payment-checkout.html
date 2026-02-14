@@ -764,6 +764,12 @@
                 return;
             }
 
+            if (result && result.status === 'processing') {
+                document.getElementById('checkout-form').style.display = 'none';
+                pollPaymentStatus();
+                return;
+            }
+
             if (result && result.status === 'pending') {
                 if (result.redirectUrl) {
                     window.location.href = result.redirectUrl;
@@ -802,7 +808,9 @@
 
         function doPoll() {
             if (pollAttempts >= maxPollAttempts) {
-                attemptRecoveryCheck();
+                document.getElementById('polling-status').style.display = 'none';
+                document.getElementById('pending').style.display = 'block';
+                polling = false;
                 return;
             }
 
@@ -842,7 +850,7 @@
                         btn.disabled = false;
                         btn.textContent = payBtnLabel();
                         polling = false;
-                    } else {
+                    } else { // This will now also handle 'pending' and 'processing'
                         setTimeout(doPoll, pollInterval);
                     }
                 })
@@ -852,48 +860,8 @@
         }
 
         function attemptRecoveryCheck() {
-            fetch('/api/payment/' + paymentId + '/check-status', {
-                method: 'POST',
-                cache: 'no-store',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Cache-Control': 'no-cache',
-                    'Pragma': 'no-cache'
-                },
-                body: JSON.stringify({})
-            })
-                .then(function(response) {
-                    if (!response.ok) return null;
-                    return response.json();
-                })
-                .then(function(data) {
-                    if (data && data.success && data.status === 'completed') {
-                        document.getElementById('polling-status').style.display = 'none';
-                        document.getElementById('success').style.display = 'block';
-                        polling = false;
-                        return;
-                    }
-
-                    if (data && data.success && (data.status === 'failed' || data.status === 'rejected' || data.status === 'cancelled')) {
-                        document.getElementById('polling-status').style.display = 'none';
-                        document.getElementById('checkout-form').style.display = 'block';
-                        showFormError(t('errDeclined'));
-                        var btn = document.getElementById('pay-button');
-                        btn.disabled = false;
-                        btn.textContent = payBtnLabel();
-                        polling = false;
-                        return;
-                    }
-
-                    document.getElementById('polling-status').style.display = 'none';
-                    document.getElementById('pending').style.display = 'block';
-                    polling = false;
-                })
-                .catch(function() {
-                    document.getElementById('polling-status').style.display = 'none';
-                    document.getElementById('pending').style.display = 'block';
-                    polling = false;
-                });
+            // This function is no longer needed as the backend handles recovery.
+            // Kept here to avoid breaking callsites, but it does nothing.
         }
 
         var epayco3dsMessageListener = null;

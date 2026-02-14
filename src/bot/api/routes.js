@@ -764,7 +764,7 @@ app.post('/api/payment/verify-2fa', asyncHandler(paymentController.verify2FA));
 app.post('/api/payment/complete-3ds-2', asyncHandler(paymentController.complete3DS2Authentication));
 app.get('/api/confirm-payment/:token', asyncHandler(paymentController.confirmPaymentToken));
 // Payment recovery endpoints for stuck 3DS payments
-app.post('/api/payment/:paymentId/check-status', asyncHandler(paymentController.checkPaymentStatusWithRecovery));
+
 app.post('/api/payment/:paymentId/retry-webhook', asyncHandler(paymentController.retryPaymentWebhook));
 
 // PNP Live API routes (formerly Meet & Greet, now consolidated)
@@ -786,7 +786,7 @@ app.get('/api/pnp-live/booking/:bookingId', asyncHandler(async (req, res) => {
   const amount = String(booking.price_usd);
   const currencyCode = 'USD';
   const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
-  const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.store';
+  const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.site';
 
   res.json({
     success: true,

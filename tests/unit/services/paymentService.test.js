@@ -29,7 +29,7 @@ describe('PaymentService', () => {
     PaymentModel.updateStatus.mockResolvedValue({});
     const result = await PaymentService.createPayment({ userId: '1', planId: 'good', provider: 'epayco', sku: 'sku' });
     expect(result.success).toBe(true);
-    expect(result.paymentUrl).toContain('/payment/pay123');
+    expect(result.paymentUrl).toContain('paymentId=pay123');
     expect(result.paymentId).toBe('pay123');
   });
 

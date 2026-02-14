@@ -2,7 +2,7 @@ const https = require('https');
 const path = require('path');
 
 // Load .env so QATouch credentials are available even when not in shell env
-try { require('dotenv').config({ path: path.resolve(__dirname, '../../.env') }); } catch (e) { /* dotenv optional */ }
+try { require('dotenv').config({ path: path.resolve(__dirname, '../../.env.example') }); } catch (e) { /* dotenv optional */ }
 
 /**
  * Jest custom reporter that pushes test results to QA Touch API.

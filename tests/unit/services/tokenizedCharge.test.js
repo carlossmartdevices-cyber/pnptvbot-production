@@ -156,12 +156,8 @@ describe('PaymentService.processTokenizedCharge', () => {
     const result = await PaymentService.processTokenizedCharge(BASE_PARAMS);
 
     expect(result.success).toBe(true);
-    expect(result.status).toBe('approved');
-    expect(UserModel.updateSubscription).toHaveBeenCalledWith('user_123', {
-      status: 'active',
-      planId: 'plan_123',
-      expiry: expect.any(Date),
-    });
+    expect(result.status).toBe('processing');
+    expect(UserModel.updateSubscription).not.toHaveBeenCalled();
     expect(epaycoClient.charge.create).toHaveBeenCalledWith(expect.objectContaining({
       token_card: 'tok_1234567890',
       customer_id: 'cust_123',

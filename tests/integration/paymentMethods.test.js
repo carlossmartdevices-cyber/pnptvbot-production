@@ -106,10 +106,10 @@ describe('Payment Methods Integration Tests', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.paymentUrl).toContain('/payment/pay_123');
+      expect(result.paymentUrl).toContain('paymentId=pay_123');
       expect(result.paymentId).toBe('pay_123');
       expect(PaymentModel.updateStatus).toHaveBeenCalledWith('pay_123', 'pending', expect.objectContaining({
-        paymentUrl: expect.stringContaining('/payment/pay_123'),
+        paymentUrl: expect.stringContaining('paymentId=pay_123'),
         provider: 'epayco',
       }));
     });
@@ -170,6 +170,8 @@ describe('Payment Methods Integration Tests', () => {
         approval_code: 'app_123',
         reference: 'ref_123',
         epayco_ref: 'ref_123',
+        amount_currency_validated: true,
+        webhook_processed_at: expect.any(String),
       });
     });
 
@@ -201,6 +203,10 @@ describe('Payment Methods Integration Tests', () => {
         transaction_id: 'txn_123',
         reference: 'ref_123',
         epayco_ref: 'ref_123',
+        epayco_estado: 'Rechazada',
+        epayco_respuesta: undefined,
+        error: 'Rechazada',
+        abandoned_3ds: false,
       });
     });
   });

@@ -101,7 +101,7 @@ describe('Webhook Controller Integration Tests', () => {
         expect(response.body).toEqual({
           success: false,
           code: 'INVALID_PAYLOAD',
-          message: expect.stringContaining('\"x_transaction_state\" is required'),
+          message: '\"value\" must contain at least one of [x_transaction_state, x_cod_transaction_state]',
         });
       });
 

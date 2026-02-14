@@ -1,7 +1,18 @@
 const crypto = require('crypto');
 
 // Mock dependencies
-jest.mock('../../../src/config/redis');
+jest.mock('../../../src/config/redis', () => ({
+  cache: {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(true),
+    del: jest.fn().mockResolvedValue(true),
+    acquireLock: jest.fn().mockResolvedValue(true),
+    releaseLock: jest.fn().mockResolvedValue(true),
+  },
+  getRedis: jest.fn(),
+  initializeRedis: jest.fn(),
+  closeRedis: jest.fn(),
+}));
 jest.mock('../../../src/models/paymentModel');
 jest.mock('../../../src/models/userModel');
 jest.mock('../../../src/models/planModel');
@@ -24,16 +35,15 @@ const PaymentService = require('../../../src/bot/services/paymentService');
 describe('PaymentService Security Tests', () => {
   const originalEnv = process.env;
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    process.env = { ...originalEnv };
-  });
-
   afterEach(() => {
     process.env = originalEnv;
   });
 
   describe('ePayco Signature Verification', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      process.env = { ...originalEnv };
+    });
     it('should return false when signature is missing', () => {
       process.env.EPAYCO_PRIVATE_KEY = 'test-secret';
 
@@ -171,6 +181,11 @@ describe('PaymentService Security Tests', () => {
   });
 
   describe('ePayco State Normalization', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      process.env = { ...originalEnv };
+    });
+
     it('should normalize by transaction state code', () => {
       expect(PaymentService.normalizeEpaycoTransactionState(null, 5)).toBe('Cancelada');
       expect(PaymentService.normalizeEpaycoTransactionState(undefined, '6')).toBe('Reversada');
@@ -178,6 +193,10 @@ describe('PaymentService Security Tests', () => {
   });
 
   describe('Daimo Signature Verification', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      process.env = { ...originalEnv };
+    });
     it('should return false when signature is missing', () => {
       process.env.DAIMO_WEBHOOK_SECRET = 'test-secret';
 
@@ -282,6 +301,10 @@ describe('PaymentService Security Tests', () => {
   });
 
   describe('Retry Logic with Exponential Backoff', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      process.env = { ...originalEnv };
+    });
     it('should succeed on first attempt', async () => {
       const operation = jest.fn().mockResolvedValue('success');
 
@@ -395,6 +418,10 @@ describe('PaymentService Security Tests', () => {
   });
 
   describe('ePayco Recovery Robustness', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      process.env = { ...originalEnv };
+    });
     it('should recover webhook context from payment record when extras are missing', async () => {
       const payment = {
         id: '4a8f5d18-9f02-4ca8-a0c4-c1507e8f8ff8',
@@ -402,6 +429,7 @@ describe('PaymentService Security Tests', () => {
         planId: 'diamond-pass',
       };
 
+      // No x_extra3 → first getById call is with x_ref_payco, should find payment
       PaymentModel.getById.mockResolvedValue(payment);
       PaymentModel.updateStatus.mockResolvedValue(true);
 
@@ -500,6 +528,10 @@ describe('PaymentService Security Tests', () => {
   });
 
   describe('Production Security Checks', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      process.env = { ...originalEnv };
+    });
     it('should enforce strict security in production environment', () => {
       process.env.NODE_ENV = 'production';
       delete process.env.EPAYCO_PRIVATE_KEY;

@@ -9,7 +9,7 @@ module.exports = {
   BOT_USERNAME: process.env.BOT_USERNAME,
 
   // ==================== URLS ====================
-  BOT_WEBHOOK_DOMAIN: process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store',
+  BOT_WEBHOOK_DOMAIN: process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app',
   BOT_WEBHOOK_PATH: process.env.BOT_WEBHOOK_PATH || '/webhook/telegram',
   EPAYCO_WEBHOOK_PATH: process.env.EPAYCO_WEBHOOK_PATH || '/api/webhooks/epayco',
   DAIMO_WEBHOOK_PATH: process.env.DAIMO_WEBHOOK_PATH || '/api/webhooks/daimo',

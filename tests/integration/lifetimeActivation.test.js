@@ -6,57 +6,69 @@ const PlanModel = require('../../src/models/planModel');
 const supportRoutingService = require('../../src/bot/services/supportRoutingService');
 const BusinessNotificationService = require('../../src/bot/services/businessNotificationService');
 const { getPrimeInviteLink, activateMembership, markCodeUsed, logActivation } = require('../../src/bot/handlers/payments/activation');
-const axios = require('axios');
 const fs = require('fs/promises');
 const path = require('path');
 const logger = require('../../src/utils/logger');
+const meruPaymentService = require('../../src/services/meruPaymentService');
+const meruLinkService = require('../../src/services/meruLinkService');
 
 
 // Mock external modules
+jest.mock('../../src/services/meruPaymentService');
+jest.mock('../../src/services/meruLinkService');
+jest.mock('../../src/services/paymentHistoryService');
 jest.mock('../../src/bot/services/userService');
 jest.mock('../../src/models/paymentModel');
 jest.mock('../../src/models/planModel');
 jest.mock('../../src/bot/services/supportRoutingService');
 jest.mock('../../src/bot/services/businessNotificationService');
 jest.mock('../../src/bot/handlers/payments/activation', () => ({
-  ...jest.requireActual('../../src/bot/handlers/payments/activation'), // Keep actual implementations for utility functions
+  ...jest.requireActual('../../src/bot/handlers/payments/activation'),
   getPrimeInviteLink: jest.fn(),
   activateMembership: jest.fn(),
   markCodeUsed: jest.fn(),
   logActivation: jest.fn(),
 }));
-jest.mock('axios');
 jest.mock('fs/promises');
-jest.mock('path', () => ({
-  ...jest.requireActual('path'),
-  join: jest.fn(),
+jest.mock('../../src/bot/utils/helpers', () => ({
+  ...jest.requireActual('../../src/bot/utils/helpers'),
+  getLanguage: jest.fn(() => 'en'),
 }));
-// Mock Telegraf to control bot behavior, but ensure core functions are callable
+jest.mock('path', () => {
+  const actual = jest.requireActual('path');
+  return { ...actual, join: jest.fn((...args) => actual.join(...args)) };
+});
+jest.mock('../../src/bot/handlers/user/menu', () => ({
+  showMainMenu: jest.fn().mockResolvedValue(true),
+}));
+jest.mock('../../src/bot/handlers/user/profile', () => ({
+  showEditProfileOverview: jest.fn().mockResolvedValue(true),
+}));
+// Mock Telegraf to control bot behavior
 jest.mock('telegraf', () => {
   const actualTelegraf = jest.requireActual('telegraf');
   return {
-    Telegraf: jest.fn().mockImplementation((token) => {
-      const botInstance = new actualTelegraf.Telegraf(token);
-      // Mock methods that are used in the handlers but not explicitly part of the handler registration
-      botInstance.telegram = {
-        createChatInviteLink: jest.fn().mockResolvedValue({ invite_link: 'https://t.me/prime_invite' }),
+    Telegraf: jest.fn().mockImplementation(() => {
+      const botInstance = {
+        command: jest.fn(),
+        action: jest.fn(),
+        on: jest.fn(),
+        __commandHandlers: {},
+        __actionHandlers: {},
+        __textHandler: null,
       };
-      // Keep track of registered handlers
-      botInstance.__commandHandlers = {};
       botInstance.command = jest.fn((commandName, handler) => {
         botInstance.__commandHandlers[commandName] = handler;
       });
-      botInstance.__actionHandlers = {};
       botInstance.action = jest.fn((actionId, handler) => {
         botInstance.__actionHandlers[actionId] = handler;
       });
-      botInstance.__textHandler = jest.fn(); // For 'bot.on('text')'
       botInstance.on = jest.fn((eventType, handler) => {
         if (eventType === 'text') botInstance.__textHandler = handler;
       });
       return botInstance;
     }),
-    Markup: actualTelegraf.Markup, // Ensure Markup is accessible
+    Markup: actualTelegraf.Markup,
   };
 });
 jest.mock('../../src/utils/logger', () => ({
@@ -75,7 +87,7 @@ describe('Lifetime Pass Activation Flow', () => {
     jest.clearAllMocks();
 
     bot = new Telegraf('test_token');
-    registerOnboardingHandlers(bot); // Register handlers with the mocked bot
+    registerOnboardingHandlers(bot);
 
     mockCtx = {
       from: { id: 123, first_name: 'Test', username: 'testuser' },
@@ -98,11 +110,10 @@ describe('Lifetime Pass Activation Flow', () => {
       }
     };
 
-    // Mock getLanguage to always return English for consistency in tests
-    // For more robust tests, this could be dynamic
-    require('../../src/bot/utils/helpers').getLanguage = jest.fn(() => 'en');
+    // Mock getLanguage to return English by default
+    require('../../src/bot/utils/helpers').getLanguage.mockReturnValue('en');
 
-    // Mock path.join to simplify file access in tests
+    // Mock path.join
     path.join.mockImplementation((...args) => {
       if (args.includes('lifetime-pass.html')) {
         return '/mock/path/to/public/lifetime-pass.html';
@@ -110,7 +121,7 @@ describe('Lifetime Pass Activation Flow', () => {
       return jest.requireActual('path').join(...args);
     });
 
-    // Mock fs.readFile to return controlled HTML content
+    // Mock fs.readFile to return controlled HTML content with Meru links
     fs.readFile.mockResolvedValue(`
       <script>
         const meruPaymentLinks = [
@@ -129,15 +140,21 @@ describe('Lifetime Pass Activation Flow', () => {
     getPrimeInviteLink.mockResolvedValue('https://t.me/prime_channel_link');
     BusinessNotificationService.notifyCodeActivation.mockResolvedValue(true);
 
-    // Mock UserService to ensure user context is always available and onboarding is complete
+    // Mock meruPaymentService.verifyPayment - default to paid
+    meruPaymentService.verifyPayment.mockResolvedValue({ isPaid: true });
+
+    // Mock meruLinkService
+    meruLinkService.invalidateLinkAfterActivation.mockResolvedValue({ success: true });
+
+    // Mock UserService
     UserService.getOrCreateFromContext.mockResolvedValue({
       id: 123,
       telegramId: 123,
       username: 'testuser',
       first_name: 'Test',
-      language: 'en', // Default language for most tests
+      language: 'en',
       onboardingComplete: true,
-      isPremium: false, // Start as non-premium
+      isPremium: false,
     });
     UserService.getById.mockResolvedValue({
       id: 123,
@@ -192,7 +209,7 @@ describe('Lifetime Pass Activation Flow', () => {
         })
       })
     );
-    expect(mockCtx.session.temp.waitingForLifetimeCode).toBeUndefined(); // Should not be set yet
+    expect(mockCtx.session.temp.waitingForLifetimeCode).toBeUndefined();
   });
 
   it('should prompt for code when "Send My Confirmation Code" button is pressed', async () => {
@@ -205,17 +222,19 @@ describe('Lifetime Pass Activation Flow', () => {
 
   it('should handle invalid code format gracefully (empty/spaces)', async () => {
     mockCtx.session.temp.waitingForLifetimeCode = true;
-    await simulateText('  '); // Empty code
+    await simulateText('  ');
 
     expect(mockCtx.reply).toHaveBeenCalledWith('❌ Invalid code format. Please send the code as plain text.');
-    expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false); // Flag should be cleared
+    expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false);
 
     jest.clearAllMocks();
     mockCtx.session.temp.waitingForLifetimeCode = true;
     mockCtx.reply.mockResolvedValue(true);
-    await simulateText('CODE WITH SPACES'); // Code with spaces
+    mockCtx.saveSession.mockResolvedValue(true);
+    require('../../src/bot/utils/helpers').getLanguage.mockReturnValue('en');
+    await simulateText('CODE WITH SPACES');
     expect(mockCtx.reply).toHaveBeenCalledWith('❌ Invalid code format. Please send the code as plain text.');
-    expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false); // Flag should be cleared
+    expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false);
   });
 
   it('should handle code not found in HTML', async () => {
@@ -223,78 +242,74 @@ describe('Lifetime Pass Activation Flow', () => {
     await simulateText('NONEXISTENTCODE');
 
     expect(mockCtx.reply).toHaveBeenCalledWith('❌ Code not found or invalid. Please check your code and try again.');
-    expect(axios.get).not.toHaveBeenCalled(); // No external call for non-existent code
-    expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false); // Flag should be cleared
+    expect(meruPaymentService.verifyPayment).not.toHaveBeenCalled();
+    expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false);
   });
 
   it('should activate lifetime pass for a successfully paid code (English)', async () => {
     mockCtx.session.temp.waitingForLifetimeCode = true;
     const paidCode = 'PAIDCODE';
-    const meruUrl = `https://pay.getmeru.com/${paidCode}`;
 
-    axios.get.mockResolvedValueOnce({ data: 'This payment link is expired or already paid. Thank you for your purchase.' });
+    meruPaymentService.verifyPayment.mockResolvedValueOnce({ isPaid: true });
     getPrimeInviteLink.mockResolvedValueOnce('https://t.me/prime_channel_link');
     activateMembership.mockResolvedValueOnce(true);
 
     await simulateText(paidCode);
 
     expect(mockCtx.reply).toHaveBeenCalledWith(`Verificando pago para el código: \`${paidCode}\`...`, { parse_mode: 'Markdown' });
-    expect(axios.get).toHaveBeenCalledWith(meruUrl);
+    expect(meruPaymentService.verifyPayment).toHaveBeenCalledWith(paidCode, 'en');
     expect(activateMembership).toHaveBeenCalledWith(expect.objectContaining({ userId: 123, planId: 'lifetime_pass', product: 'lifetime-pass' }));
     expect(markCodeUsed).toHaveBeenCalledWith(paidCode, 123, 'testuser');
     expect(logActivation).toHaveBeenCalledWith(expect.objectContaining({ code: paidCode, success: true }));
     expect(BusinessNotificationService.notifyCodeActivation).toHaveBeenCalledWith(expect.objectContaining({ code: paidCode }));
     expect(getPrimeInviteLink).toHaveBeenCalledWith(mockCtx, 123);
     expect(mockCtx.reply).toHaveBeenCalledWith(
-      expect.stringContaining(`✅ Your Lifetime Pass has been activated! Welcome to PRIME!
-🌟 Access the PRIME channel:
-👉 https://t.me/prime_channel_link`),
+      expect.stringContaining('✅ Your Lifetime Pass has been activated! Welcome to PRIME!\n\n🌟 Access the PRIME channel:\n👉 https://t.me/prime_channel_link'),
       expect.objectContaining({ parse_mode: 'Markdown', disable_web_page_preview: true })
     );
-    expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false); // Flag should be cleared
-    expect(logger.error).not.toHaveBeenCalled(); // Ensure no errors logged
+    expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false);
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   it('should inform user if payment is not confirmed (English)', async () => {
     mockCtx.session.temp.waitingForLifetimeCode = true;
     const unpaidCode = 'UNPAIDCODE';
-    const meruUrl = `https://pay.getmeru.com/${unpaidCode}`;
 
-    axios.get.mockResolvedValueOnce({ data: 'This payment link is active and waiting for payment.' }); // Simulate unpaid response
+    meruPaymentService.verifyPayment.mockResolvedValueOnce({ isPaid: false });
 
     await simulateText(unpaidCode);
 
     expect(mockCtx.reply).toHaveBeenCalledWith(`Verificando pago para el código: \`${unpaidCode}\`...`, { parse_mode: 'Markdown' });
-    expect(axios.get).toHaveBeenCalledWith(meruUrl);
-    expect(activateMembership).not.toHaveBeenCalled(); // Should not be called for unpaid
+    expect(meruPaymentService.verifyPayment).toHaveBeenCalledWith(unpaidCode, 'en');
+    expect(activateMembership).not.toHaveBeenCalled();
     expect(markCodeUsed).not.toHaveBeenCalled();
     expect(mockCtx.reply).toHaveBeenCalledWith(
       expect.stringContaining("⚠️ We could not confirm your payment. Please ensure your payment is complete and try again, or contact support if you believe this is an error.")
     );
-    expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false); // Flag should be cleared
-    expect(logger.error).not.toHaveBeenCalled(); // Ensure no errors logged
+    expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false);
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
-  it('should handle errors during external Meru API call', async () => {
+  it('should handle errors during Meru payment verification', async () => {
     mockCtx.session.temp.waitingForLifetimeCode = true;
     const testCode = 'TESTCODE1';
 
-    axios.get.mockRejectedValueOnce(new Error('Network error')); // Simulate network error
+    meruPaymentService.verifyPayment.mockRejectedValueOnce(new Error('Network error'));
 
     await simulateText(testCode);
 
     expect(mockCtx.reply).toHaveBeenCalledWith(`Verificando pago para el código: \`${testCode}\`...`, { parse_mode: 'Markdown' });
-    expect(axios.get).toHaveBeenCalled();
+    expect(meruPaymentService.verifyPayment).toHaveBeenCalled();
     expect(mockCtx.reply).toHaveBeenCalledWith(
       expect.stringContaining("❌ An error occurred during activation. Please try again later.")
     );
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Error processing lifetime code activation:'), expect.any(Error));
-    expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false); // Flag should be cleared
+    expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false);
   });
 
   // Test for Spanish language
   it('should use Spanish messages when language is es for initial prompt', async () => {
-    require('../../src/bot/utils/helpers').getLanguage = jest.fn(() => 'es');
+    require('../../src/bot/utils/helpers').getLanguage.mockReturnValue('es');
     await simulateCommand('/start activate_lifetime');
 
     expect(mockCtx.reply).toHaveBeenCalledWith(
@@ -308,27 +323,24 @@ describe('Lifetime Pass Activation Flow', () => {
   });
 
   it('should activate lifetime pass for a successfully paid code (Spanish)', async () => {
-    require('../../src/bot/utils/helpers').getLanguage = jest.fn(() => 'es');
+    require('../../src/bot/utils/helpers').getLanguage.mockReturnValue('es');
     mockCtx.session.temp.waitingForLifetimeCode = true;
     const paidCode = 'PAIDCODE';
-    const meruUrl = `https://pay.getmeru.com/${paidCode}`;
 
-    axios.get.mockResolvedValueOnce({ data: 'El enlace de pago ha caducado o ya ha sido pagado. Gracias por tu compra.' });
+    meruPaymentService.verifyPayment.mockResolvedValueOnce({ isPaid: true });
     getPrimeInviteLink.mockResolvedValueOnce('https://t.me/prime_channel_link_es');
 
     await simulateText(paidCode);
 
     expect(mockCtx.reply).toHaveBeenCalledWith(`Verificando pago para el código: \`${paidCode}\`...`, { parse_mode: 'Markdown' });
-    expect(axios.get).toHaveBeenCalledWith(meruUrl);
+    expect(meruPaymentService.verifyPayment).toHaveBeenCalledWith(paidCode, 'es');
     expect(activateMembership).toHaveBeenCalledWith(expect.objectContaining({ userId: 123, planId: 'lifetime_pass', product: 'lifetime-pass' }));
     expect(markCodeUsed).toHaveBeenCalledWith(paidCode, 123, 'testuser');
     expect(logActivation).toHaveBeenCalledWith(expect.objectContaining({ code: paidCode, success: true }));
     expect(BusinessNotificationService.notifyCodeActivation).toHaveBeenCalledWith(expect.objectContaining({ code: paidCode }));
     expect(getPrimeInviteLink).toHaveBeenCalledWith(mockCtx, 123);
     expect(mockCtx.reply).toHaveBeenCalledWith(
-      expect.stringContaining(`✅ ¡Tu Lifetime Pass ha sido activado! ¡Bienvenido a PRIME!
-🌟 Accede al canal PRIME:
-👉 https://t.me/prime_channel_link_es`),
+      expect.stringContaining('✅ ¡Tu Lifetime Pass ha sido activado! ¡Bienvenido a PRIME!\n\n🌟 Accede al canal PRIME:\n👉 https://t.me/prime_channel_link_es'),
       expect.objectContaining({ parse_mode: 'Markdown', disable_web_page_preview: true })
     );
     expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false);
@@ -336,17 +348,16 @@ describe('Lifetime Pass Activation Flow', () => {
   });
 
   it('should inform user if payment is not confirmed (Spanish)', async () => {
-    require('../../src/bot/utils/helpers').getLanguage = jest.fn(() => 'es');
+    require('../../src/bot/utils/helpers').getLanguage.mockReturnValue('es');
     mockCtx.session.temp.waitingForLifetimeCode = true;
     const unpaidCode = 'UNPAIDCODE';
-    const meruUrl = `https://pay.getmeru.com/${unpaidCode}`;
 
-    axios.get.mockResolvedValueOnce({ data: 'Este enlace de pago está activo y esperando pago.' });
+    meruPaymentService.verifyPayment.mockResolvedValueOnce({ isPaid: false });
 
     await simulateText(unpaidCode);
 
     expect(mockCtx.reply).toHaveBeenCalledWith(`Verificando pago para el código: \`${unpaidCode}\`...`, { parse_mode: 'Markdown' });
-    expect(axios.get).toHaveBeenCalledWith(meruUrl);
+    expect(meruPaymentService.verifyPayment).toHaveBeenCalledWith(unpaidCode, 'es');
     expect(activateMembership).not.toHaveBeenCalled();
     expect(markCodeUsed).not.toHaveBeenCalled();
     expect(mockCtx.reply).toHaveBeenCalledWith(
