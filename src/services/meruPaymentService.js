@@ -1,6 +1,5 @@
 const puppeteer = require('puppeteer');
 const logger = require('../utils/logger');
-const meruLinkService = require('./meruLinkService');
 
 /**
  * MeruPaymentService - Verifica pagos de Meru usando un navegador headless
@@ -9,17 +8,28 @@ const meruLinkService = require('./meruLinkService');
 class MeruPaymentService {
   constructor() {
     this.browser = null;
+    // Simple rate limiting: track recent verifications per code
+    this._recentChecks = new Map(); // code -> timestamp
+    this.RATE_LIMIT_MS = 10000; // 10 seconds between checks for same code
   }
 
   /**
-   * Inicializa el navegador una sola vez
+   * Inicializa el navegador una sola vez (with crash recovery)
    */
   async initBrowser() {
-    if (this.browser) return this.browser;
+    // Check if existing browser is still connected
+    if (this.browser) {
+      if (this.browser.connected) {
+        return this.browser;
+      }
+      // Browser crashed or disconnected — clean up and relaunch
+      logger.warn('Puppeteer browser disconnected, relaunching...');
+      this.browser = null;
+    }
 
     try {
       this.browser = await puppeteer.launch({
-        headless: 'new',
+        headless: true,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
         args: [
           '--no-sandbox',
@@ -27,6 +37,13 @@ class MeruPaymentService {
           '--disable-dev-shm-usage',
         ],
       });
+
+      // Auto-recover on unexpected disconnect
+      this.browser.on('disconnected', () => {
+        logger.warn('Puppeteer browser disconnected unexpectedly');
+        this.browser = null;
+      });
+
       logger.info('Puppeteer browser initialized');
       return this.browser;
     } catch (error) {
@@ -39,9 +56,28 @@ class MeruPaymentService {
    * Verifica si un link de Meru fue pagado
    * @param {string} meruCode - El código del link (ej: "abc123xyz")
    * @param {string} userLanguage - Idioma del usuario ('es' o 'en')
-   * @returns {Promise<{isPaid: boolean, message: string, rawContent: string}>}
+   * @returns {Promise<{isPaid: boolean, message: string}>}
    */
   async verifyPayment(meruCode, userLanguage = 'es') {
+    // Rate limiting: prevent rapid repeated checks for same code
+    const lastCheck = this._recentChecks.get(meruCode);
+    if (lastCheck && Date.now() - lastCheck < this.RATE_LIMIT_MS) {
+      logger.warn(`Rate limited: Meru code ${meruCode} checked too recently`);
+      return {
+        isPaid: false,
+        message: 'Please wait a few seconds before checking again',
+      };
+    }
+    this._recentChecks.set(meruCode, Date.now());
+
+    // Clean up old entries periodically (keep map from growing)
+    if (this._recentChecks.size > 100) {
+      const cutoff = Date.now() - this.RATE_LIMIT_MS;
+      for (const [code, ts] of this._recentChecks) {
+        if (ts < cutoff) this._recentChecks.delete(code);
+      }
+    }
+
     let page = null;
     try {
       const browser = await this.initBrowser();
@@ -71,7 +107,7 @@ class MeruPaymentService {
       const pageContent = await page.content();
 
       // Esperar un poco más para animaciones
-      await page.waitForTimeout(1000);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Obtener el texto visible
       const visibleText = await page.evaluate(() => {
@@ -83,22 +119,16 @@ class MeruPaymentService {
         textLength: visibleText.length,
       });
 
-      // Detectar si fue pagado según el idioma del usuario
-      let paidPatterns = [];
-
-      if (userLanguage === 'es') {
-        paidPatterns = [
-          'El enlace de pago ha caducado o ya ha sido pagado',
-          'El link de pago ha caducado',
-          'ya ha sido pagado',
-        ];
-      } else {
-        paidPatterns = [
-          'Payment link expired or already paid',
-          'payment link has expired',
-          'already paid',
-        ];
-      }
+      // Detectar si fue pagado — check both languages regardless of user preference
+      // (Meru may respond in either language)
+      const paidPatterns = [
+        'El enlace de pago ha caducado o ya ha sido pagado',
+        'El link de pago ha caducado',
+        'ya ha sido pagado',
+        'Payment link expired or already paid',
+        'payment link has expired',
+        'already paid',
+      ];
 
       const isPaid = paidPatterns.some(
         (pattern) =>
@@ -112,16 +142,12 @@ class MeruPaymentService {
         message: isPaid
           ? 'Payment link already used or expired'
           : 'Payment link is still active',
-        rawContent: pageContent.substring(0, 2000), // Primeros 2000 caracteres
-        visibleText: visibleText.substring(0, 1000), // Texto visible
       };
     } catch (error) {
       logger.error(`Error verifying Meru payment for ${meruCode}:`, error);
       return {
         isPaid: false,
         message: `Error checking payment: ${error.message}`,
-        rawContent: null,
-        visibleText: null,
       };
     } finally {
       if (page) {

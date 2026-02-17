@@ -4,11 +4,6 @@ jest.mock('../../src/services/meruLinkService');
 jest.mock('../../src/services/paymentHistoryService');
 jest.mock('../../src/bot/services/userService');
 jest.mock('../../src/bot/handlers/payments/activation'); // Simplified mock for automatic mocking
-jest.mock('fs/promises');
-jest.mock('path', () => {
-  const actual = jest.requireActual('path');
-  return { ...actual, join: jest.fn((...args) => actual.join(...args)) };
-});
 jest.mock('../../src/utils/logger');
 jest.mock('../../src/bot/services/businessNotificationService');
 jest.mock('../../src/bot/utils/helpers'); // Ensure this is also hoisted
@@ -48,8 +43,6 @@ jest.mock('telegraf', () => {
 
 // THEN other requires/imports
 const { Telegraf } = require('telegraf');
-const path = require('path');
-const fs = require('fs/promises');
 const registerOnboardingHandlers = require('../../src/bot/handlers/user/onboarding');
 const UserService = require('../../src/bot/services/userService');
 const { getLanguage } = require('../../src/bot/utils/helpers');
@@ -75,7 +68,10 @@ describe('Lifetime Pass Activation Flow', () => {
     // Mock meruPaymentService - default to paid
     meruPaymentService.verifyPayment.mockResolvedValue({ isPaid: true });
 
-    // Mock meruLinkService
+    // Mock meruLinkService - return available links from DB
+    meruLinkService.getAvailableLinks.mockResolvedValue([
+      { code: 'PAIDCODE', meru_link: 'https://pay.getmeru.com/PAIDCODE' },
+    ]);
     meruLinkService.invalidateLinkAfterActivation.mockResolvedValue({ success: true });
 
     bot = new Telegraf('test_token');
@@ -92,8 +88,6 @@ describe('Lifetime Pass Activation Flow', () => {
     };
 
     UserService.getOrCreateFromContext.mockResolvedValue({ id: 123, language: 'en' });
-    path.join.mockReturnValue('/fake/path/to/lifetime-pass.html');
-    fs.readFile.mockResolvedValue(`<script>const meruPaymentLinks = ['https://pay.getmeru.com/PAIDCODE'];</script>`);
   });
 
   afterEach(() => {
@@ -117,6 +111,7 @@ describe('Lifetime Pass Activation Flow', () => {
     await simulateText('PAIDCODE');
 
     // Assert
+    expect(meruLinkService.getAvailableLinks).toHaveBeenCalledWith('lifetime-pass');
     expect(meruPaymentService.verifyPayment).toHaveBeenCalledWith('PAIDCODE', 'en');
     expect(activation.activateMembership).toHaveBeenCalled();
     expect(activation.markCodeUsed).toHaveBeenCalledWith('PAIDCODE', 123, 'testuser');
@@ -133,9 +128,39 @@ describe('Lifetime Pass Activation Flow', () => {
     await simulateText('PAIDCODE');
 
     // Assert
+    expect(meruLinkService.getAvailableLinks).toHaveBeenCalledWith('lifetime-pass');
     expect(meruPaymentService.verifyPayment).toHaveBeenCalledWith('PAIDCODE', 'es');
     expect(activation.activateMembership).toHaveBeenCalled();
     expect(activation.markCodeUsed).toHaveBeenCalledWith('PAIDCODE', 123, 'testuser');
     expect(mockCtx.reply).toHaveBeenCalledWith(expect.stringContaining('¡Tu Lifetime Pass ha sido activado!'), expect.anything());
+  });
+
+  it('should reject an unknown code @lifetime200', async () => {
+    // Arrange
+    getLanguage.mockReturnValue('en');
+    mockCtx.session.temp.waitingForLifetimeCode = true;
+
+    // Act
+    await simulateText('UNKNOWNCODE');
+
+    // Assert
+    expect(meruLinkService.getAvailableLinks).toHaveBeenCalledWith('lifetime-pass');
+    expect(meruPaymentService.verifyPayment).not.toHaveBeenCalled();
+    expect(mockCtx.reply).toHaveBeenCalledWith(expect.stringContaining('not found or invalid'));
+  });
+
+  it('should handle payment not confirmed @lifetime300', async () => {
+    // Arrange
+    getLanguage.mockReturnValue('en');
+    mockCtx.session.temp.waitingForLifetimeCode = true;
+    meruPaymentService.verifyPayment.mockResolvedValue({ isPaid: false, message: 'Payment link is still active' });
+
+    // Act
+    await simulateText('PAIDCODE');
+
+    // Assert
+    expect(meruPaymentService.verifyPayment).toHaveBeenCalledWith('PAIDCODE', 'en');
+    expect(activation.activateMembership).not.toHaveBeenCalled();
+    expect(mockCtx.reply).toHaveBeenCalledWith(expect.stringContaining('could not confirm your payment'));
   });
 });

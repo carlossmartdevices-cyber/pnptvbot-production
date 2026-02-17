@@ -11,8 +11,6 @@ const paymentHandlers = require('../payments');
 const { showNearbyMenu } = require('./nearbyUnified');
 const supportRoutingService = require('../../services/supportRoutingService');
 const { handlePromoDeepLink } = require('../promo/promoHandler');
-const path = require('path');
-const fs = require('fs/promises');
 const { getPrimeInviteLink, activateMembership, fetchActivationCode, markCodeUsed, logActivation } = require('../payments/activation');
 const MessageTemplates = require('../../services/messageTemplates');
 const BusinessNotificationService = require('../../services/businessNotificationService');
@@ -496,24 +494,17 @@ const registerOnboardingHandlers = (bot) => {
       await ctx.saveSession();
 
       try {
-        const lifetimePassHtmlPath = path.join(__dirname, '../../../../public/lifetime-pass.html'); // Correct path to the HTML file
-        const htmlContent = await fs.readFile(lifetimePassHtmlPath, 'utf8');
+        // Validate code against active links in the database (single source of truth)
+        const availableLinks = await meruLinkService.getAvailableLinks('lifetime-pass');
+        const matchingLink = availableLinks.find(link => link.code === rawCode);
 
-        const meruLinksRegex = /https:\/\/pay\.getmeru\.com\/([a-zA-Z0-9_-]+)/g;
-        let match;
-        const meruCodes = [];
-        while ((match = meruLinksRegex.exec(htmlContent)) !== null) {
-            meruCodes.push(match[1]);
-        }
-        
-        const matchingLinkCode = meruCodes.find(code => code === rawCode);
-
-        if (!matchingLinkCode) {
+        if (!matchingLink) {
             await ctx.reply(activationStrings[lang].codeNotFound);
             return;
         }
 
-        const meruPaymentUrl = `https://pay.getmeru.com/${matchingLinkCode}`;
+        const matchingLinkCode = matchingLink.code;
+
         await ctx.reply(`Verificando pago para el código: \`${matchingLinkCode}\`...`, { parse_mode: 'Markdown' });
 
         // Usar Puppeteer para verificar el pago (lee contenido real con JavaScript ejecutado)
@@ -920,272 +911,6 @@ const completeOnboarding = async (ctx) => {
   } catch (error) {
     logger.error('Error completing onboarding:', error);
     await ctx.reply('An error occurred. Please try /start again.');
-  }
-};
-
-// ═══════════════════════════════════════════════════════════════
-// PASOS 4️⃣, 5️⃣, 6️⃣, 7️⃣: FUNCIÓN INTEGRADA DE VERIFICACIÓN Y ACTIVACIÓN
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Integra los PASOS 4, 5, 6, 7 del flujo de Meru
- *
- * 4️⃣: Verifica pago con Puppeteer
- * 5️⃣: Marca link como usado en BD
- * 6️⃣: Registra en historial de pagos
- * 7️⃣: Envía notificaciones finales
- *
- * @param {Context} ctx - Telegraf context
- * @param {string} meruCode - Código del link de Meru (ej: "LSJUek")
- * @param {string} lang - Idioma del usuario ('es' o 'en')
- */
-const verifyAndActivateMeruPayment = async (ctx, meruCode, lang = 'es') => {
-  try {
-    const userId = ctx.from.id;
-    const username = ctx.from.username || 'unknown';
-
-    logger.info('🔵 PASO 4️⃣: Iniciando verificación de pago con Puppeteer', {
-      userId,
-      username,
-      code: meruCode
-    });
-
-    // Enviar mensaje de verificación
-    const verifyingMessage = lang === 'es'
-      ? `⏳ Verificando tu pago en Meru para el código: \`${meruCode}\`...`
-      : `⏳ Verifying your payment on Meru for code: \`${meruCode}\`...`;
-
-    const statusMsg = await ctx.reply(verifyingMessage, { parse_mode: 'Markdown' });
-
-    // ═══════════════════════════════════════════════════════════════
-    // PASO 4️⃣: BOT VERIFICA PAGO CON PUPPETEER
-    // ═══════════════════════════════════════════════════════════════
-    const paymentCheck = await meruPaymentService.verifyPayment(meruCode, lang);
-
-    logger.info('✅ Verificación completada', {
-      userId,
-      code: meruCode,
-      isPaid: paymentCheck.isPaid
-    });
-
-    if (!paymentCheck.isPaid) {
-      logger.warn('⚠️  Pago no confirmado', {
-        userId,
-        code: meruCode,
-        message: paymentCheck.message
-      });
-
-      const failMessage = lang === 'es'
-        ? `❌ No pudimos confirmar tu pago para el código \`${meruCode}\`.
-
-Por favor asegúrate de que:
-1. El link de Meru fue pagado completamente
-2. El código es correcto
-3. El link aún no ha sido usado
-
-Si el problema persiste, contacta a soporte: /support`
-        : `❌ We could not confirm your payment for code \`${meruCode}\`.
-
-Please ensure that:
-1. The Meru link was paid in full
-2. The code is correct
-3. The link has not been used yet
-
-If the problem persists, contact support: /support`;
-
-      try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id).catch(() => {});
-      } catch (e) {
-        logger.debug('Could not delete status message');
-      }
-
-      await ctx.reply(failMessage, { parse_mode: 'Markdown' });
-      return;
-    }
-
-    logger.info('✅ Pago confirmado en Meru', { userId, code: meruCode });
-
-    // ═══════════════════════════════════════════════════════════════
-    // PASO 5️⃣: BOT ACTIVA LA MEMBRESÍA
-    // ═══════════════════════════════════════════════════════════════
-    logger.info('🔵 PASO 5️⃣: Activando membresía', { userId });
-
-    const planId = 'lifetime_pass';
-    const product = 'lifetime-pass';
-
-    // Marcar código como usado en BD
-    logger.info('🔵 PASO 5.2️⃣: Marcando link como usado', {
-      userId,
-      code: meruCode,
-      username
-    });
-
-    const linkInvalidation = await meruLinkService.invalidateLinkAfterActivation(
-      meruCode,
-      userId,
-      username
-    );
-
-    if (!linkInvalidation.success) {
-      logger.warn('⚠️  Failed to invalidate Meru link', {
-        code: meruCode,
-        userId,
-        reason: linkInvalidation.message
-      });
-    } else {
-      logger.info('✅ Link marcado como usado', {
-        code: meruCode,
-        userId
-      });
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // PASO 6️⃣: REGISTRAR PAGO EN HISTORIAL
-    // ═══════════════════════════════════════════════════════════════
-    logger.info('🔵 PASO 6️⃣: Registrando pago en historial', { userId, code: meruCode });
-
-    try {
-      await PaymentHistoryService.recordPayment({
-        userId: String(userId),
-        paymentMethod: 'meru',
-        amount: 50,
-        currency: 'USD',
-        planId: 'lifetime_pass',
-        planName: 'Lifetime Pass',
-        product: product,
-        paymentReference: meruCode,
-        status: 'completed',
-        metadata: {
-          meru_link: `https://pay.getmeru.com/${meruCode}`,
-          verification_method: 'puppeteer',
-          language: lang,
-          activated_at: new Date().toISOString()
-        }
-      });
-
-      logger.info('✅ Pago registrado en historial', {
-        userId,
-        code: meruCode,
-        method: 'meru'
-      });
-    } catch (historyError) {
-      logger.warn('⚠️  Failed to record payment in history (non-critical)', {
-        error: historyError.message,
-        userId,
-        code: meruCode
-      });
-      // No fallar si el historial falla, es secundario
-    }
-
-    // Actualizar perfil del usuario
-    try {
-      await UserService.updateProfile(userId, {
-        isPremium: true,
-        premiumPlan: planId,
-        premiumActivatedDate: new Date()
-      });
-
-      logger.info('✅ Perfil de usuario actualizado', {
-        userId,
-        planId: planId
-      });
-    } catch (profileError) {
-      logger.error('❌ Error actualizando perfil de usuario', {
-        userId,
-        error: profileError.message
-      });
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // PASO 7️⃣: NOTIFICACIONES FINALES
-    // ═══════════════════════════════════════════════════════════════
-    logger.info('🔵 PASO 7️⃣: Enviando notificaciones finales', { userId });
-
-    try {
-      await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id).catch(() => {});
-    } catch (e) {
-      logger.debug('Could not delete status message');
-    }
-
-    // 7.1️⃣: Mensaje de activación exitosa
-    const successMessage = lang === 'es'
-      ? `✅ *¡Tu Lifetime Pass ha sido activado!*
-
-¡Bienvenido a PRIME! 🎉
-
-Ahora tienes acceso ilimitado a todo el contenido exclusivo.
-
-📱 *Acciones a continuación:*
-• Visita tu perfil para completar información
-• Explora el catálogo de contenido premium
-• Disfruta sin límites
-
-¿Preguntas? Escribe /support`
-      : `✅ *Your Lifetime Pass has been activated!*
-
-Welcome to PRIME! 🎉
-
-You now have unlimited access to all exclusive content.
-
-📱 *Next steps:*
-• Visit your profile to complete information
-• Browse our premium content catalog
-• Enjoy without limits
-
-Questions? Write /support`;
-
-    await ctx.reply(successMessage, { parse_mode: 'Markdown' });
-
-    // 7.2️⃣: Log de auditoría
-    logger.info('✅ PASO 7.1️⃣: Lifetime Pass activado correctamente', {
-      userId,
-      username,
-      code: meruCode,
-      planId,
-      timestamp: new Date().toISOString()
-    });
-
-    // 7.3️⃣: Enviar menú principal
-    await showMainMenu(ctx);
-
-    // 7.4️⃣: Notificar a admin (opcional, sin bloquear flujo)
-    try {
-      const adminNotification = `💎 *Lifetime Pass Activado*
-
-👤 *Usuario:* ${username} (ID: \`${userId}\`)
-🔗 *Código Meru:* \`${meruCode}\`
-⏰ *Hora:* ${new Date().toLocaleString()}
-
-Pago verificado con Puppeteer ✅
-Membresía activada correctamente`;
-
-      await supportRoutingService.sendToSupportGroup(
-        adminNotification,
-        'activation',
-        { id: userId, username, first_name: username }
-      ).catch(err => {
-        logger.warn('Could not send admin notification:', err.message);
-      });
-    } catch (notifyError) {
-      logger.debug('Admin notification skipped:', notifyError.message);
-    }
-
-  } catch (error) {
-    logger.error('❌ Error en verifyAndActivateMeruPayment', {
-      userId: ctx.from?.id,
-      error: error.message,
-      stack: error.stack
-    });
-
-    const errorMessage = lang === 'es'
-      ? '❌ Ocurrió un error durante la activación. Por favor, contacta a soporte: /support'
-      : '❌ An error occurred during activation. Please contact support: /support';
-
-    try {
-      await ctx.reply(errorMessage);
-    } catch (e) {
-      logger.error('Could not send error message:', e.message);
-    }
   }
 };
 

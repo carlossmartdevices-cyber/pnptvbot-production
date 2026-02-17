@@ -6,8 +6,6 @@ const PlanModel = require('../../src/models/planModel');
 const supportRoutingService = require('../../src/bot/services/supportRoutingService');
 const BusinessNotificationService = require('../../src/bot/services/businessNotificationService');
 const { getPrimeInviteLink, activateMembership, markCodeUsed, logActivation } = require('../../src/bot/handlers/payments/activation');
-const fs = require('fs/promises');
-const path = require('path');
 const logger = require('../../src/utils/logger');
 const meruPaymentService = require('../../src/services/meruPaymentService');
 const meruLinkService = require('../../src/services/meruLinkService');
@@ -29,15 +27,10 @@ jest.mock('../../src/bot/handlers/payments/activation', () => ({
   markCodeUsed: jest.fn(),
   logActivation: jest.fn(),
 }));
-jest.mock('fs/promises');
 jest.mock('../../src/bot/utils/helpers', () => ({
   ...jest.requireActual('../../src/bot/utils/helpers'),
   getLanguage: jest.fn(() => 'en'),
 }));
-jest.mock('path', () => {
-  const actual = jest.requireActual('path');
-  return { ...actual, join: jest.fn((...args) => actual.join(...args)) };
-});
 jest.mock('../../src/bot/handlers/user/menu', () => ({
   showMainMenu: jest.fn().mockResolvedValue(true),
 }));
@@ -83,6 +76,14 @@ describe('Lifetime Pass Activation Flow', () => {
   let bot;
   let mockCtx;
 
+  // Known test codes returned from DB
+  const testAvailableLinks = [
+    { code: 'TESTCODE1', meru_link: 'https://pay.getmeru.com/TESTCODE1' },
+    { code: 'TESTCODE2', meru_link: 'https://pay.getmeru.com/TESTCODE2' },
+    { code: 'PAIDCODE', meru_link: 'https://pay.getmeru.com/PAIDCODE' },
+    { code: 'UNPAIDCODE', meru_link: 'https://pay.getmeru.com/UNPAIDCODE' },
+  ];
+
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -113,25 +114,9 @@ describe('Lifetime Pass Activation Flow', () => {
     // Mock getLanguage to return English by default
     require('../../src/bot/utils/helpers').getLanguage.mockReturnValue('en');
 
-    // Mock path.join
-    path.join.mockImplementation((...args) => {
-      if (args.includes('lifetime-pass.html')) {
-        return '/mock/path/to/public/lifetime-pass.html';
-      }
-      return jest.requireActual('path').join(...args);
-    });
-
-    // Mock fs.readFile to return controlled HTML content with Meru links
-    fs.readFile.mockResolvedValue(`
-      <script>
-        const meruPaymentLinks = [
-            'https://pay.getmeru.com/TESTCODE1',
-            'https://pay.getmeru.com/TESTCODE2',
-            'https://pay.getmeru.com/PAIDCODE',
-            'https://pay.getmeru.com/UNPAIDCODE'
-        ];
-      </script>
-    `);
+    // Mock meruLinkService to return available links from DB
+    meruLinkService.getAvailableLinks.mockResolvedValue(testAvailableLinks);
+    meruLinkService.invalidateLinkAfterActivation.mockResolvedValue({ success: true });
 
     // Mock successful activation by default
     activateMembership.mockResolvedValue(true);
@@ -142,9 +127,6 @@ describe('Lifetime Pass Activation Flow', () => {
 
     // Mock meruPaymentService.verifyPayment - default to paid
     meruPaymentService.verifyPayment.mockResolvedValue({ isPaid: true });
-
-    // Mock meruLinkService
-    meruLinkService.invalidateLinkAfterActivation.mockResolvedValue({ success: true });
 
     // Mock UserService
     UserService.getOrCreateFromContext.mockResolvedValue({
@@ -237,10 +219,11 @@ describe('Lifetime Pass Activation Flow', () => {
     expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false);
   });
 
-  it('should handle code not found in HTML', async () => {
+  it('should handle code not found in DB', async () => {
     mockCtx.session.temp.waitingForLifetimeCode = true;
     await simulateText('NONEXISTENTCODE');
 
+    expect(meruLinkService.getAvailableLinks).toHaveBeenCalledWith('lifetime-pass');
     expect(mockCtx.reply).toHaveBeenCalledWith('❌ Code not found or invalid. Please check your code and try again.');
     expect(meruPaymentService.verifyPayment).not.toHaveBeenCalled();
     expect(mockCtx.session.temp.waitingForLifetimeCode).toBe(false);
@@ -256,6 +239,7 @@ describe('Lifetime Pass Activation Flow', () => {
 
     await simulateText(paidCode);
 
+    expect(meruLinkService.getAvailableLinks).toHaveBeenCalledWith('lifetime-pass');
     expect(mockCtx.reply).toHaveBeenCalledWith(`Verificando pago para el código: \`${paidCode}\`...`, { parse_mode: 'Markdown' });
     expect(meruPaymentService.verifyPayment).toHaveBeenCalledWith(paidCode, 'en');
     expect(activateMembership).toHaveBeenCalledWith(expect.objectContaining({ userId: 123, planId: 'lifetime_pass', product: 'lifetime-pass' }));
@@ -279,6 +263,7 @@ describe('Lifetime Pass Activation Flow', () => {
 
     await simulateText(unpaidCode);
 
+    expect(meruLinkService.getAvailableLinks).toHaveBeenCalledWith('lifetime-pass');
     expect(mockCtx.reply).toHaveBeenCalledWith(`Verificando pago para el código: \`${unpaidCode}\`...`, { parse_mode: 'Markdown' });
     expect(meruPaymentService.verifyPayment).toHaveBeenCalledWith(unpaidCode, 'en');
     expect(activateMembership).not.toHaveBeenCalled();
@@ -298,6 +283,7 @@ describe('Lifetime Pass Activation Flow', () => {
 
     await simulateText(testCode);
 
+    expect(meruLinkService.getAvailableLinks).toHaveBeenCalledWith('lifetime-pass');
     expect(mockCtx.reply).toHaveBeenCalledWith(`Verificando pago para el código: \`${testCode}\`...`, { parse_mode: 'Markdown' });
     expect(meruPaymentService.verifyPayment).toHaveBeenCalled();
     expect(mockCtx.reply).toHaveBeenCalledWith(
@@ -332,6 +318,7 @@ describe('Lifetime Pass Activation Flow', () => {
 
     await simulateText(paidCode);
 
+    expect(meruLinkService.getAvailableLinks).toHaveBeenCalledWith('lifetime-pass');
     expect(mockCtx.reply).toHaveBeenCalledWith(`Verificando pago para el código: \`${paidCode}\`...`, { parse_mode: 'Markdown' });
     expect(meruPaymentService.verifyPayment).toHaveBeenCalledWith(paidCode, 'es');
     expect(activateMembership).toHaveBeenCalledWith(expect.objectContaining({ userId: 123, planId: 'lifetime_pass', product: 'lifetime-pass' }));
@@ -356,6 +343,7 @@ describe('Lifetime Pass Activation Flow', () => {
 
     await simulateText(unpaidCode);
 
+    expect(meruLinkService.getAvailableLinks).toHaveBeenCalledWith('lifetime-pass');
     expect(mockCtx.reply).toHaveBeenCalledWith(`Verificando pago para el código: \`${unpaidCode}\`...`, { parse_mode: 'Markdown' });
     expect(meruPaymentService.verifyPayment).toHaveBeenCalledWith(unpaidCode, 'es');
     expect(activateMembership).not.toHaveBeenCalled();
