@@ -1,0 +1,155 @@
+# Phase 2: Identity & Access Services
+# Authentik (SSO), Vaultwarden, 2FAuth, Forgejo
+#
+# All services use network_mode: host to connect to the existing
+# pnptv-postgres-sovereign and pnptv-redis-sovereign containers.
+#
+# Pre-requisites (run once before first start):
+#   bash scripts/setup-identity-dbs.sh
+#
+# Start:
+#   docker compose -f docker-compose.identity.yml up -d
+#
+# Nginx config: nginx/identity-services.conf
+
+services:
+
+  # -------------------------------------------------------
+  # AUTHENTIK — Centralized SSO
+  # Web UI:  http://127.0.0.1:9000  →  auth.pnptv.app
+  # -------------------------------------------------------
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.12
+    container_name: pnptv-authentik
+    restart: unless-stopped
+    network_mode: host
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: 127.0.0.1
+      AUTHENTIK_REDIS__PORT: 6379
+      AUTHENTIK_POSTGRESQL__HOST: 127.0.0.1
+      AUTHENTIK_POSTGRESQL__PORT: 5432
+      AUTHENTIK_POSTGRESQL__USER: ${POSTGRES_USER:-pnptvbot}
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${POSTGRES_PASSWORD}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      AUTHENTIK_LISTEN__HTTP: 0.0.0.0:9000
+      AUTHENTIK_LISTEN__HTTPS: 0.0.0.0:9443
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD}
+      AUTHENTIK_BOOTSTRAP_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN}
+    volumes:
+      - authentik-media:/media
+      - authentik-templates:/templates
+    env_file: .env.identity
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.12
+    container_name: pnptv-authentik-worker
+    restart: unless-stopped
+    network_mode: host
+    command: worker
+    environment:
+      AUTHENTIK_REDIS__HOST: 127.0.0.1
+      AUTHENTIK_REDIS__PORT: 6379
+      AUTHENTIK_POSTGRESQL__HOST: 127.0.0.1
+      AUTHENTIK_POSTGRESQL__PORT: 5432
+      AUTHENTIK_POSTGRESQL__USER: ${POSTGRES_USER:-pnptvbot}
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${POSTGRES_PASSWORD}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    volumes:
+      - authentik-media:/media
+      - authentik-templates:/templates
+      - /var/run/docker.sock:/var/run/docker.sock
+    env_file: .env.identity
+    user: root
+
+  # -------------------------------------------------------
+  # VAULTWARDEN — Password manager (Bitwarden-compatible)
+  # Web UI:  http://127.0.0.1:8222  →  vault.pnptv.app
+  # -------------------------------------------------------
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: pnptv-vaultwarden
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      DOMAIN: https://vault.pnptv.app
+      SIGNUPS_ALLOWED: "false"
+      ADMIN_TOKEN: ${VAULTWARDEN_ADMIN_TOKEN}
+      ROCKET_ADDRESS: 127.0.0.1
+      ROCKET_PORT: 8222
+      LOG_LEVEL: warn
+    volumes:
+      - vaultwarden-data:/data
+    env_file: .env.identity
+
+  # -------------------------------------------------------
+  # 2FAUTH — 2FA code manager (TOTP / WebAuthn / FIDO2)
+  # Web UI:  http://127.0.0.1:8223  →  2fa.pnptv.app
+  # -------------------------------------------------------
+  2fauth:
+    image: 2fauth/2fauth:latest
+    container_name: pnptv-2fauth
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      APP_URL: https://2fa.pnptv.app
+      APP_KEY: ${TWOFAUTH_APP_KEY}
+      NGINX_LISTEN_PORT: 8223
+      # 2FAuth uses an internal nginx; NGINX_LISTEN_PORT overrides the default 8080
+    volumes:
+      - 2fauth-data:/2fauth
+    env_file: .env.identity
+
+  # -------------------------------------------------------
+  # FORGEJO — Self-hosted Git
+  # Web UI:  http://127.0.0.1:3030  →  git.pnptv.app
+  # SSH:     port 2222
+  # -------------------------------------------------------
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:9
+    container_name: pnptv-forgejo
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      USER_UID: 1000
+      USER_GID: 1000
+      FORGEJO__database__DB_TYPE: postgres
+      FORGEJO__database__HOST: 127.0.0.1:5432
+      FORGEJO__database__NAME: forgejo
+      FORGEJO__database__USER: ${POSTGRES_USER:-pnptvbot}
+      FORGEJO__database__PASSWD: ${POSTGRES_PASSWORD}
+      FORGEJO__server__DOMAIN: git.pnptv.app
+      FORGEJO__server__ROOT_URL: https://git.pnptv.app
+      FORGEJO__server__HTTP_ADDR: 127.0.0.1
+      FORGEJO__server__HTTP_PORT: 3030
+      FORGEJO__server__SSH_DOMAIN: git.pnptv.app
+      FORGEJO__server__SSH_PORT: 2222
+      FORGEJO__server__START_SSH_SERVER: "true"
+      FORGEJO__service__DISABLE_REGISTRATION: "true"
+      FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
+      FORGEJO__log__LEVEL: Warn
+    volumes:
+      - forgejo-data:/data
+    env_file: .env.identity
+
+volumes:
+  authentik-media:
+    driver: local
+  authentik-templates:
+    driver: local
+  vaultwarden-data:
+    driver: local
+  2fauth-data:
+    driver: local
+  forgejo-data:
+    driver: local

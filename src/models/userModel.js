@@ -86,6 +86,9 @@ class UserModel {
       deactivationReason: row.deactivation_reason,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      // Sovereign identity
+      pnptvId: row.pnptv_id || null,
+      xId: row.x_id || null,
       // Social media fields
       instagram: row.instagram || null,
       twitter: row.twitter || null,
@@ -136,20 +139,21 @@ class UserModel {
           subscription_status, plan_id, plan_expiry, tier, role, status, privacy,
           profile_views, favorites, blocked, badges, onboarding_complete,
           age_verified, terms_accepted, privacy_accepted, language, is_active,
-          created_at, updated_at
+          x_id, created_at, updated_at
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-          $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, NOW(), NOW()
+          $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, NOW(), NOW()
         )
       ON CONFLICT (id) DO UPDATE SET
         username = COALESCE(EXCLUDED.username, ${TABLE}.username),
         first_name = COALESCE(EXCLUDED.first_name, ${TABLE}.first_name),
         last_name = COALESCE(EXCLUDED.last_name, ${TABLE}.last_name),
         status = COALESCE(EXCLUDED.status, ${TABLE}.status),
-        onboarding_complete = CASE WHEN $30 THEN EXCLUDED.onboarding_complete ELSE ${TABLE}.onboarding_complete END,
-        age_verified = CASE WHEN $31 THEN EXCLUDED.age_verified ELSE ${TABLE}.age_verified END,
-        terms_accepted = CASE WHEN $32 THEN EXCLUDED.terms_accepted ELSE ${TABLE}.terms_accepted END,
-        privacy_accepted = CASE WHEN $33 THEN EXCLUDED.privacy_accepted ELSE ${TABLE}.privacy_accepted END,
+        x_id = COALESCE(EXCLUDED.x_id, ${TABLE}.x_id),
+        onboarding_complete = CASE WHEN $31 THEN EXCLUDED.onboarding_complete ELSE ${TABLE}.onboarding_complete END,
+        age_verified = CASE WHEN $32 THEN EXCLUDED.age_verified ELSE ${TABLE}.age_verified END,
+        terms_accepted = CASE WHEN $33 THEN EXCLUDED.terms_accepted ELSE ${TABLE}.terms_accepted END,
+        privacy_accepted = CASE WHEN $34 THEN EXCLUDED.privacy_accepted ELSE ${TABLE}.privacy_accepted END,
         language = COALESCE(EXCLUDED.language, ${TABLE}.language),
         updated_at = NOW()
       RETURNING *
@@ -196,6 +200,7 @@ class UserModel {
           : false,
         userData.language || 'en',
         userData.isActive !== false,
+        userData.xId || userData.x_id || null,
         onboardingCompleteProvided,
         ageVerifiedProvided,
         termsAcceptedProvided,
@@ -302,6 +307,46 @@ class UserModel {
   }
 
   /**
+   * Get user by sovereign PNP TV ID (pnptv_id)
+   * @param {string} pnptvId - UUID sovereign identity
+   * @returns {Promise<Object|null>} User object or null
+   */
+  static async getByPnptvId(pnptvId) {
+    try {
+      if (!pnptvId) return null;
+      const result = await query(
+        `SELECT * FROM ${TABLE} WHERE pnptv_id = $1 LIMIT 1`,
+        [pnptvId.trim()]
+      );
+      if (result.rows.length === 0) return null;
+      return this.mapRowToUser(result.rows[0]);
+    } catch (error) {
+      logger.error('Error getting user by pnptv_id:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get user by X/Twitter OAuth ID (x_id)
+   * @param {string} xId - X/Twitter numeric user ID
+   * @returns {Promise<Object|null>} User object or null
+   */
+  static async getByXId(xId) {
+    try {
+      if (!xId) return null;
+      const result = await query(
+        `SELECT * FROM ${TABLE} WHERE x_id = $1 LIMIT 1`,
+        [xId.trim()]
+      );
+      if (result.rows.length === 0) return null;
+      return this.mapRowToUser(result.rows[0]);
+    } catch (error) {
+      logger.error('Error getting user by x_id:', error);
+      return null;
+    }
+  }
+
+  /**
    * Update user profile
    */
   static async updateProfile(userId, updates) {
@@ -328,6 +373,7 @@ class UserModel {
         tiktok: 'tiktok',
         youtube: 'youtube',
         telegram: 'telegram',
+        xId: 'x_id',
         locationSharingEnabled: 'location_sharing_enabled',
         onboardingComplete: 'onboarding_complete',
       hasSeenTutorial: 'has_seen_tutorial',
