@@ -27,7 +27,7 @@ const xOAuthRoutes = require('./xOAuthRoutes');
 const xFollowersRoutes = require('./xFollowersRoutes');
 const adminUserRoutes = require('./routes/adminUserRoutes');
 const userManagementRoutes = require('./routes/userManagementRoutes');
-// const nearbyRoutes = require('./routes/nearby.routes'); // TODO: Re-enable after Sequelize integration
+const nearbyRoutes = require('./routes/nearby.routes');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -1344,7 +1344,7 @@ app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/users', userManagementRoutes);
 
 // Nearby Geolocation API Routes
-// app.use('/api/nearby', nearbyRoutes); // TODO: Re-enable after Sequelize integration
+app.use('/api/nearby', nearbyRoutes);
 
 app.use('/api/admin/x/oauth', xOAuthRoutes);
 app.use('/api/auth/x', xOAuthRoutes); // Alias for X Developer Portal redirect URI
