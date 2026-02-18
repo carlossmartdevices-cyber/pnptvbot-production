@@ -96,19 +96,12 @@ class NearbyService {
       }
 
       // Store in PostgreSQL (persistent)
-      const userLocation = await UserLocation.upsert(
-        {
-          user_id: userId,
-          latitude,
-          longitude,
-          accuracy: Math.round(accuracy),
-          updated_at: new Date()
-        },
-        {
-          where: { user_id: userId },
-          returning: true
-        }
-      );
+      const userLocation = await UserLocation.upsert({
+        user_id: userId,
+        latitude,
+        longitude,
+        accuracy: Math.round(accuracy)
+      });
 
       // Store in Redis GEO (for fast queries)
       await redisGeoService.updateUserLocation(
@@ -227,11 +220,7 @@ class NearbyService {
    */
   async getBlockedUsers(userId) {
     try {
-      return await BlockedUser.findAll({
-        where: { user_id: userId },
-        attributes: ['blocked_user_id'],
-        raw: true
-      });
+      return await BlockedUser.getBlockedByUser(userId);
     } catch (error) {
       logger.warn(`⚠️ Failed to get blocked users:`, error);
       return [];
@@ -247,10 +236,7 @@ class NearbyService {
       await redisGeoService.removeUser(userId);
 
       // Mark as offline in PostgreSQL (optional - keep history)
-      await UserLocation.update(
-        { is_online: false, last_seen: new Date() },
-        { where: { user_id: userId } }
-      );
+      await UserLocation.markOffline(userId);
 
       logger.info(`👋 Location cleared for user ${userId}`);
 
@@ -267,7 +253,7 @@ class NearbyService {
   async getStats() {
     try {
       const onlineCount = await redisGeoService.getOnlineCount();
-      const totalLocations = await UserLocation.count();
+      const totalLocations = await UserLocation.count() || 0;
 
       return {
         online_users: onlineCount,

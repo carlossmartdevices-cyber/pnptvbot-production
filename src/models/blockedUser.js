@@ -3,188 +3,69 @@
  * Tracks blocked user relationships for privacy
  */
 
-const { DataTypes } = require('sequelize');
+const { query } = require('../config/postgres');
+const logger = require('../utils/logger');
 
-module.exports = (sequelize) => {
-  const BlockedUser = sequelize.define(
-    'BlockedUser',
-    {
-      id: {
-        type: DataTypes.UUID,
-        primaryKey: true,
-        defaultValue: DataTypes.UUIDV4
-      },
-      user_id: {
-        type: DataTypes.UUID,
-        allowNull: false,
-        references: {
-          model: 'users',
-          key: 'id'
-        },
-        onDelete: 'CASCADE'
-      },
-      blocked_user_id: {
-        type: DataTypes.UUID,
-        allowNull: false,
-        references: {
-          model: 'users',
-          key: 'id'
-        },
-        onDelete: 'CASCADE'
-      },
-      blocked_at: {
-        type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW
-      }
-    },
-    {
-      tableName: 'blocked_users',
-      timestamps: false,
-      indexes: [
-        {
-          fields: ['user_id']
-        },
-        {
-          fields: ['blocked_user_id']
-        },
-        {
-          unique: true,
-          fields: ['user_id', 'blocked_user_id']
-        }
-      ]
-    }
-  );
-
-  /**
-   * Static Methods
-   */
-
+class BlockedUser {
   /**
    * Block a user
    */
-  BlockedUser.blockUser = async function(userId, userToBlockId) {
+  static async blockUser(userId, userToBlockId) {
     if (userId === userToBlockId) {
       throw new Error('Cannot block yourself');
     }
-
-    return this.findOrCreate({
-      where: {
-        user_id: userId,
-        blocked_user_id: userToBlockId
-      },
-      defaults: {
-        user_id: userId,
-        blocked_user_id: userToBlockId,
-        blocked_at: new Date()
-      }
-    });
-  };
+    await query(
+      `INSERT INTO blocked_users (user_id, blocked_user_id, blocked_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (user_id, blocked_user_id) DO NOTHING`,
+      [userId, userToBlockId]
+    );
+  }
 
   /**
    * Unblock a user
    */
-  BlockedUser.unblockUser = async function(userId, userToUnblockId) {
-    return this.destroy({
-      where: {
-        user_id: userId,
-        blocked_user_id: userToUnblockId
-      }
-    });
-  };
+  static async unblockUser(userId, userToUnblockId) {
+    await query(
+      `DELETE FROM blocked_users WHERE user_id = $1 AND blocked_user_id = $2`,
+      [userId, userToUnblockId]
+    );
+  }
 
   /**
-   * Check if user is blocked
+   * Check if a user is blocked
    */
-  BlockedUser.isBlocked = async function(userId, blockedUserId) {
-    const block = await this.findOne({
-      where: {
-        user_id: userId,
-        blocked_user_id: blockedUserId
-      }
-    });
-
-    return !!block;
-  };
+  static async isBlocked(userId, blockedUserId) {
+    const result = await query(
+      `SELECT 1 FROM blocked_users WHERE user_id = $1 AND blocked_user_id = $2 LIMIT 1`,
+      [userId, blockedUserId]
+    );
+    return result.rowCount > 0;
+  }
 
   /**
-   * Get list of users blocked by a user
+   * Get list of user IDs blocked by this user
    */
-  BlockedUser.getBlockedByUser = async function(userId) {
-    return this.findAll({
-      where: { user_id: userId },
-      attributes: ['blocked_user_id', 'blocked_at'],
-      include: [
-        {
-          association: 'blockedUserDetails',
-          model: sequelize.models.User,
-          foreignKey: 'blocked_user_id',
-          attributes: ['id', 'username', 'first_name', 'avatar_url']
-        }
-      ]
-    });
-  };
-
-  /**
-   * Get list of users who blocked this user
-   */
-  BlockedUser.getBlockedByOthers = async function(userId) {
-    return this.findAll({
-      where: { blocked_user_id: userId },
-      attributes: ['user_id', 'blocked_at'],
-      include: [
-        {
-          association: 'blockerUserDetails',
-          model: sequelize.models.User,
-          foreignKey: 'user_id',
-          attributes: ['id', 'username', 'first_name', 'avatar_url']
-        }
-      ]
-    });
-  };
+  static async getBlockedByUser(userId) {
+    const result = await query(
+      `SELECT blocked_user_id FROM blocked_users WHERE user_id = $1`,
+      [userId]
+    );
+    return result.rows;
+  }
 
   /**
    * Get all blocked relationships for a user (both directions)
    */
-  BlockedUser.getBlockedRelationships = async function(userId) {
-    return this.findAll({
-      where: {
-        [sequelize.Op.or]: [
-          { user_id: userId },
-          { blocked_user_id: userId }
-        ]
-      }
-    });
-  };
+  static async getBlockedRelationships(userId) {
+    const result = await query(
+      `SELECT user_id, blocked_user_id, blocked_at
+       FROM blocked_users
+       WHERE user_id = $1 OR blocked_user_id = $1`,
+      [userId]
+    );
+    return result.rows;
+  }
+}
 
-  /**
-   * Clear old blocks (older than 30 days)
-   */
-  BlockedUser.clearOldBlocks = async function(daysOld = 30) {
-    const cutoffTime = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
-
-    // Delete blocks, but keep recent ones (blocks stay active)
-    // Uncomment if you want to auto-unblock after time:
-    /*
-    return this.destroy({
-      where: {
-        blocked_at: {
-          [sequelize.Op.lt]: cutoffTime
-        }
-      }
-    });
-    */
-
-    // For now, just return stats
-    const count = await this.count({
-      where: {
-        blocked_at: {
-          [sequelize.Op.lt]: cutoffTime
-        }
-      }
-    });
-
-    return { oldBlocksCount: count };
-  };
-
-  return BlockedUser;
-};
+module.exports = BlockedUser;
