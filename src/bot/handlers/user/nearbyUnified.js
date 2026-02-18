@@ -4,6 +4,7 @@ const NearbyPlaceService = require('../../services/nearbyPlaceService');
 const { t } = require('../../../utils/i18n');
 const logger = require('../../../utils/logger');
 const { getLanguage } = require('../../utils/helpers');
+const FeatureUrlService = require('../../services/featureUrlService');
 
 // Helper function to safely edit message or send new if editing fails
 // This handles cases where the original message is a photo or was deleted
@@ -739,14 +740,38 @@ const registerNearbyUnifiedHandlers = (bot) => {
     return text.replace(/[_*\\[\]()~`>#+=|{}.!-]/g, '\\$&');
   }
 
-  // Add text command support for nearby feature
+  // Unified nearby command
   bot.command('nearby', async (ctx) => {
     try {
       const lang = getLanguage(ctx);
-      
-      // Redirect to the unified nearby menu
-      ctx.callbackQuery = { data: 'show_nearby_unified' };
-      await bot.handleUpdate(ctx.update);
+      const userId = ctx.from?.id;
+
+      if (!userId) {
+        await ctx.reply(lang === 'es' ? '❌ Usuario no identificado.' : '❌ User not identified.');
+        return;
+      }
+
+      // Try to get the nearby web app URL from API
+      try {
+        const webAppUrl = await FeatureUrlService.getNearbyUrl(userId);
+
+        const message = lang === 'es'
+          ? '🔥 *PNP Nearby* ha sido movido a nuestra aplicación web para una mejor experiencia.'
+          : '🔥 *PNP Nearby* has been moved to our web app for a better experience.';
+
+        await ctx.reply(message, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.webApp(lang === 'es' ? '🌐 Abrir Nearby' : '🌐 Open Nearby', webAppUrl)],
+            [Markup.button.callback(lang === 'es' ? '📱 Menú Clásico' : '📱 Classic Menu', 'show_nearby_unified')],
+          ]),
+        });
+      } catch (error) {
+        logger.error('Error getting Nearby URL, falling back to menu:', error);
+        // Fallback to classic menu if API fails
+        ctx.callbackQuery = { data: 'show_nearby_unified' };
+        await bot.handleUpdate(ctx.update);
+      }
     } catch (error) {
       logger.error('Error handling /nearby command:', error);
     }

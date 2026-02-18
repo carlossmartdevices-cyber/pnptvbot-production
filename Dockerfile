@@ -34,11 +34,11 @@ COPY --from=builder --chown=node:node /app/scripts ./scripts
 # Copy public directory for landing pages
 COPY --from=builder /app/public ./public
 
-# Copy config directory (payment, etc.)
+# Copy config directory (payment config, JaaS keys, etc)
 COPY --from=builder --chown=node:node /app/config ./config
 
-# Copy locales (i18n translations)
-COPY --from=builder --chown=node:node /app/locales ./locales
+# Copy locales directory (i18n translations)
+COPY --from=builder --chown=node:node /app/src/locales ./src/locales
 
 # Copy .env.example for dotenv-safe validation
 COPY --from=builder --chown=node:node /app/.env.example ./.env.example

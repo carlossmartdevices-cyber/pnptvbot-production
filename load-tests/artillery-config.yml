@@ -1,0 +1,176 @@
+# Artillery.io Load Testing Configuration
+# Tests the Nearby Geolocation API endpoints under load
+# Run with: artillery run load-tests/artillery-config.yml
+
+config:
+  target: "{{ $processEnvironment.API_URL || 'http://localhost:3001' }}"
+  phases:
+    # Ramp up: 0-10 RPS over 1 minute
+    - duration: 60
+      arrivalRate: 10
+      name: "Warm up"
+
+    # Sustained: 50 RPS for 5 minutes
+    - duration: 300
+      arrivalRate: 50
+      name: "Sustained load"
+
+    # Spike: 200 RPS for 2 minutes
+    - duration: 120
+      arrivalRate: 200
+      name: "Spike test"
+
+    # Cool down: 10 RPS for 1 minute
+    - duration: 60
+      arrivalRate: 10
+      name: "Cool down"
+
+  # Default headers for all requests
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ $randomString(100) }}"
+      User-Agent: "Artillery Load Test"
+
+  # Variables used in tests
+  variables:
+    # Test user IDs (should be valid in your database)
+    users:
+      - "user-001"
+      - "user-002"
+      - "user-003"
+      - "user-004"
+      - "user-005"
+
+    # Test locations (around NYC)
+    locations:
+      - { lat: 40.7128, lon: -74.0060 } # NYC
+      - { lat: 40.7505, lon: -73.9706 } # Central Park
+      - { lat: 40.7614, lon: -73.9776 } # Times Square
+      - { lat: 40.6892, lon: -74.0445 } # Brooklyn
+      - { lat: 40.6501, lon: -73.9496 } # Queens
+
+  # Load reporting
+  processor: ./load-tests/load-processor.js
+  # plugins:
+  #   expect: {}
+  #   metrics-by-endpoint:
+  #     stripQueryString: true
+  #     includeQueryString: false
+
+scenarios:
+  # Scenario 1: Location Update Load Test
+  - name: "Location Update Flow"
+    flow:
+      - loop:
+        - post:
+            url: "/api/nearby/update-location"
+            json:
+              latitude: "{{ $randomNumber(40.7000, 40.8000) }}"
+              longitude: "{{ $randomNumber(-74.0100, -73.9000) }}"
+              accuracy: "{{ $randomNumber(5, 100) }}"
+            capture:
+              - json: "$.user_id"
+                as: "lastUserId"
+              - json: "$.timestamp"
+                as: "lastTimestamp"
+            expect:
+              - statusCode: 200
+              - hasProperty: body.success
+            think: 2  # Wait 2 seconds between requests
+        - think: 5  # Simulate user inactivity
+        count: 100
+
+  # Scenario 2: Nearby Users Search Load Test
+  - name: "Nearby Search Flow"
+    flow:
+      - loop:
+        - get:
+            url: "/api/nearby/search?latitude=40.7505&longitude=-73.9706&radius=5&limit=50"
+            headers:
+              Authorization: "Bearer {{ $randomString(100) }}"
+            expect:
+              - statusCode: 200
+              - hasProperty: body.success
+              - hasProperty: body.users
+            think: 3
+        count: 100
+
+  # Scenario 3: Rate Limit Stress Test
+  - name: "Rate Limit Stress Test"
+    flow:
+      - loop:
+        - post:
+            url: "/api/nearby/update-location"
+            json:
+              latitude: "{{ $randomNumber(40.7000, 40.8000) }}"
+              longitude: "{{ $randomNumber(-74.0100, -73.9000) }}"
+              accuracy: "{{ $randomNumber(5, 100) }}"
+            expect:
+              - statusCode: [200, 429]  # Accept rate limit response
+            think: 1  # Send every 1 second to trigger rate limit
+        count: 50
+
+  # Scenario 4: Batch Update Test
+  - name: "Batch Update Flow"
+    flow:
+      - post:
+          url: "/api/nearby/batch-update"
+          json:
+            updates:
+              - user_id: "user-001"
+                latitude: 40.7128
+                longitude: -74.0060
+                accuracy: 25
+              - user_id: "user-002"
+                latitude: 40.7505
+                longitude: -73.9706
+                accuracy: 15
+              - user_id: "user-003"
+                latitude: 40.7614
+                longitude: -73.9776
+                accuracy: 30
+          expect:
+            - statusCode: 200
+            - hasProperty: body.success
+
+  # Scenario 5: Error Handling Test
+  - name: "Error Handling"
+    flow:
+      # Invalid coordinates
+      - post:
+          url: "/api/nearby/update-location"
+          json:
+            latitude: 999  # Invalid
+            longitude: -74.0060
+            accuracy: 25
+          expect:
+            - statusCode: 400
+
+      # Missing parameters
+      - post:
+          url: "/api/nearby/update-location"
+          json:
+            latitude: 40.7128
+          expect:
+            - statusCode: 400
+
+      # No authentication
+      - get:
+          url: "/api/nearby/search?latitude=40.7128&longitude=-74.0060"
+          headers:
+            Authorization: ""
+          expect:
+            - statusCode: 401
+
+# After scenario completes
+after:
+  flow:
+    - think: 2
+
+# Custom report settings
+plugins:
+  statsd:
+    host: localhost
+    port: 8125
+    prefix: "artillery"
