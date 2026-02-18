@@ -59,7 +59,7 @@ class UserLocation {
          ul.is_online,
          u.first_name,
          u.username,
-         u.avatar_url,
+         u.photo_file_id,
          ST_Distance(
            ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography,
            ul.geom::geography
