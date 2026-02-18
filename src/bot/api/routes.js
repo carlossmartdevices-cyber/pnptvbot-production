@@ -100,6 +100,7 @@ app.use(conditionalMiddleware(helmet({
       scriptSrc: [
         "'self'",
         "'unsafe-inline'",
+        "https://code.jquery.com",
         "https://multimedia.epayco.co",
         "https://songbird.cardinalcommerce.com",
         "https://centinelapi.cardinalcommerce.com",
@@ -147,38 +148,51 @@ app.use(morgan('combined', { stream: logger.stream }));
 
 // ========== PAYMENT ROUTES (BEFORE static middleware) ==========
 // These must be BEFORE serveStaticWithBlocking to ensure they're processed first
-app.get('/payment/:paymentId', (req, res) => {
+
+// 3DS bank challenge iframes load from bank domains (e.g. jpmorgan.com, bancolombia.com).
+// Override helmet's restrictive CSP for checkout pages so frame-src, connect-src, img-src,
+// and form-action allow any HTTPS origin. script-src stays locked to known payment SDKs.
+const CHECKOUT_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://code.jquery.com https://multimedia.epayco.co https://songbird.cardinalcommerce.com https://centinelapi.cardinalcommerce.com https://checkout.epayco.co https://secure.payco.co https://secure.epayco.co",
+  "style-src 'self' 'unsafe-inline' https: https://fonts.googleapis.com",
+  "font-src 'self' https: https://fonts.gstatic.com data:",
+  "img-src 'self' https: data:",
+  "connect-src 'self' https:",
+  "frame-src https:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self' https:",
+  "script-src-attr 'unsafe-inline'",
+].join(';');
+
+function sendCheckoutHtml(res, file) {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
+  res.setHeader('Content-Security-Policy', CHECKOUT_CSP);
+  res.sendFile(path.join(__dirname, '../../../public/' + file));
+}
+
+app.get('/payment/:paymentId', (req, res) => {
+  sendCheckoutHtml(res, 'payment-checkout.html');
 });
 
 // PNPtv Smart Checkout v2 (must be before /checkout/:paymentId)
 app.get('/checkout/pnp', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  // Use the tokenized checkout flow currently integrated with /api/payment/tokenized-charge
-  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
+  sendCheckoutHtml(res, 'payment-checkout.html');
 });
 
 app.get('/checkout/:paymentId', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
+  sendCheckoutHtml(res, 'payment-checkout.html');
 });
 
 app.get('/daimo-checkout/:paymentId', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(__dirname, '../../../public/daimo-checkout.html'));
+  sendCheckoutHtml(res, 'daimo-checkout.html');
 });
 
 app.get('/api/pnp/checkout', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../../public/payment-checkout.html'));
+  sendCheckoutHtml(res, 'payment-checkout.html');
 });
 // ========== END PAYMENT ROUTES ==========
 
@@ -766,7 +780,7 @@ app.post('/api/payment/verify-2fa', asyncHandler(paymentController.verify2FA));
 app.post('/api/payment/complete-3ds-2', asyncHandler(paymentController.complete3DS2Authentication));
 app.get('/api/confirm-payment/:token', asyncHandler(paymentController.confirmPaymentToken));
 // Payment recovery endpoints for stuck 3DS payments
-app.post('/api/payment/:paymentId/check-status', asyncHandler(paymentController.checkPaymentStatusWithRecovery));
+
 app.post('/api/payment/:paymentId/retry-webhook', asyncHandler(paymentController.retryPaymentWebhook));
 
 // PNP Live API routes (formerly Meet & Greet, now consolidated)
@@ -788,7 +802,7 @@ app.get('/api/pnp-live/booking/:bookingId', asyncHandler(async (req, res) => {
   const amount = String(booking.price_usd);
   const currencyCode = 'USD';
   const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
-  const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.store';
+  const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.site';
 
   res.json({
     success: true,

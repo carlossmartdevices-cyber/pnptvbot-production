@@ -3,6 +3,12 @@
  * Comprehensive health checks for all API endpoints
  */
 
+// Load .env.production before requiring routes (which initializes DB pool)
+require('dotenv').config({
+  path: require('path').join(__dirname, '../../.env.production'),
+  override: true,
+});
+
 const axios = require('axios');
 const apiApp = require('../../src/bot/api/routes'); // Import the Express app
 let server;

@@ -11,7 +11,11 @@ const { query } = require('../../../config/postgres');
  * Payment Controller - Handles payment-related API endpoints
  */
 class PaymentController {
-  static EPAYCO_3DS_PENDING_TIMEOUT_MINUTES = Number(process.env.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES || 12);
+  static EPAYCO_3DS_PENDING_TIMEOUT_MINUTES = Number(process.env.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES || 6);
+
+  static EPAYCO_3DS_AUTHENTICATED_PENDING_TIMEOUT_MINUTES = Number(
+    process.env.EPAYCO_3DS_AUTHENTICATED_PENDING_TIMEOUT_MINUTES || 3
+  );
 
   /**
    * Get userId from payment record for audit logging
@@ -173,7 +177,7 @@ class PaymentController {
 
       // Prepare response data
       const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
-      const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.store';
+      const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.site';
       const provider = payment.provider || 'epayco';
 
       // Handle both camelCase and snake_case from payment
@@ -420,18 +424,150 @@ class PaymentController {
         return res.status(400).json({ success: false, error: 'Payment ID is required' });
       }
 
+      // Prevent browser/proxy caching during polling
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
       const payment = await PaymentModel.getById(paymentId);
 
       if (!payment) {
         return res.status(404).json({ success: false, error: 'Payment not found' });
       }
 
-      // Prevent browser/proxy caching during polling (avoids 304 loops in checkout).
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
+      const refPayco = PaymentController.resolveEpaycoRef(payment)
+        || await PaymentController.resolveEpaycoRefFromDb(paymentId);
 
-      res.json({ success: true, status: payment.status });
+      logger.info('Polling payment status with recovery', {
+        paymentId,
+        currentStatus: payment.status,
+        refPayco,
+      });
+
+      // If payment is not pending, return current status
+      if (payment.status !== 'pending') {
+        return res.json({
+          success: true,
+          status: payment.status,
+          message: `Payment is ${payment.status}`,
+        });
+      }
+
+      // Payment is pending - check if it's stuck or waiting for webhook
+      if (!refPayco) {
+        return res.json({
+          success: true,
+          status: 'pending',
+          stuck: true,
+          message: 'Payment pending but no ePayco reference found - unable to check status',
+        });
+      }
+
+      // Check status at ePayco
+      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(refPayco);
+
+      if (!statusCheck.success) {
+        return res.json({
+          success: true, // Return success so polling continues
+          status: 'pending',
+          error: statusCheck.error,
+          message: 'Could not check payment status at ePayco, will retry.',
+        });
+      }
+
+      // If payment is actually approved at ePayco, it needs recovery
+      if (statusCheck.currentStatus === 'Aceptada' || statusCheck.currentStatus === 'Aprobada') {
+        logger.warn('STUCK PAYMENT DETECTED (via polling): Payment approved at ePayco but stuck in pending locally', {
+          paymentId,
+          refPayco,
+          currentStatus: statusCheck.currentStatus,
+        });
+
+        // Attempt recovery
+        await PaymentService.recoverStuckPendingPayment(paymentId, refPayco);
+
+        return res.json({
+          success: true,
+          status: 'processing_recovery',
+          message: 'Payment is stuck - recovery in progress. Status will update shortly.',
+        });
+      }
+
+      const terminalStates = ['Rechazada', 'Fallida', 'Abandonada', 'Cancelada', 'Reversada'];
+      if (terminalStates.includes(statusCheck.currentStatus)) {
+        const newStatus = statusCheck.currentStatus === 'Reversada' ? 'refunded' : 'failed';
+        await PaymentModel.updateStatus(paymentId, newStatus, {
+          epayco_ref: refPayco,
+          epayco_estado: statusCheck.currentStatus,
+          error: statusCheck.message || `Payment ${statusCheck.currentStatus.toLowerCase()} at ePayco`,
+          recovered_via_status_check: true,
+        });
+
+        return res.json({
+          success: true,
+          status: newStatus,
+          message: statusCheck.message || `Payment ${newStatus} at ePayco`,
+        });
+      }
+
+      // Payment is still pending at ePayco. Check for 3DS timeout.
+      const createdAt = payment.createdAt || payment.created_at;
+      const createdAtMs = createdAt ? new Date(createdAt).getTime() : null;
+      const ageMs = Number.isFinite(createdAtMs) ? (Date.now() - createdAtMs) : null;
+      const ageMinutes = ageMs !== null ? ageMs / (60 * 1000) : null;
+      const metadata = payment.metadata || {};
+      const isLikelyThreeDSFlow = Boolean(
+        metadata.three_ds_requested || metadata.bank_url_available === false
+      );
+      const authenticatedAtRaw = metadata?.three_ds_authentication?.authenticated_at;
+      const authenticatedAtMs = authenticatedAtRaw ? new Date(authenticatedAtRaw).getTime() : null;
+      const hasAuthenticatedAt = Number.isFinite(authenticatedAtMs);
+      const ageSinceAuthenticatedMs = hasAuthenticatedAt ? (Date.now() - authenticatedAtMs) : null;
+      const ageSinceAuthenticatedMinutes = ageSinceAuthenticatedMs !== null
+        ? ageSinceAuthenticatedMs / (60 * 1000)
+        : null;
+      const pendingTimeoutMinutes = hasAuthenticatedAt
+        ? PaymentController.EPAYCO_3DS_AUTHENTICATED_PENDING_TIMEOUT_MINUTES
+        : PaymentController.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES;
+      const timeoutAgeMinutes = hasAuthenticatedAt ? ageSinceAuthenticatedMinutes : ageMinutes;
+
+      if (
+        statusCheck.currentStatus === 'Pendiente'
+        && isLikelyThreeDSFlow
+        && timeoutAgeMinutes !== null
+        && timeoutAgeMinutes >= pendingTimeoutMinutes
+      ) {
+        await PaymentModel.updateStatus(paymentId, 'failed', {
+          epayco_ref: refPayco,
+          epayco_estado: statusCheck.currentStatus,
+          abandoned_3ds: true,
+          timeout_recovered_via_status_check: true,
+          timeout_window_minutes: pendingTimeoutMinutes,
+          three_ds_authenticated_at: hasAuthenticatedAt ? authenticatedAtRaw : null,
+          error: `3DS timeout after ${Math.floor(timeoutAgeMinutes)} minutes without final confirmation`,
+        });
+
+        logger.warn('3DS payment timed out in pending state; marking as failed (via polling)', {
+          paymentId,
+          refPayco,
+          ageMinutes: Math.floor(timeoutAgeMinutes),
+          pendingTimeoutMinutes,
+          hasAuthenticatedAt,
+        });
+
+        return res.json({
+          success: true,
+          status: 'failed',
+          message: '3DS no se completó a tiempo. Intenta nuevamente.',
+        });
+      }
+
+      // Payment is still genuinely pending at ePayco
+      return res.json({
+        success: true,
+        status: 'pending',
+        message: 'Awaiting completion of 3DS authentication or webhook.',
+      });
     } catch (error) {
       logger.error('Error getting payment status:', {
         error: error.message,
@@ -709,204 +845,7 @@ class PaymentController {
     }
   }
 
-  /**
-   * Check if a pending payment needs recovery
-   * Queries ePayco to detect if webhook was lost
-   * POST /api/payment/:paymentId/check-status
-   */
-  static async checkPaymentStatusWithRecovery(req, res) {
-    try {
-      const { paymentId } = req.params;
 
-      if (!paymentId) {
-        return res.status(400).json({
-          success: false,
-          error: 'Payment ID is required',
-        });
-      }
-
-      const payment = await PaymentModel.getById(paymentId);
-
-      if (!payment) {
-        return res.status(404).json({
-          success: false,
-          error: 'Payment not found',
-        });
-      }
-
-      const refPayco = PaymentController.resolveEpaycoRef(payment)
-        || await PaymentController.resolveEpaycoRefFromDb(paymentId);
-
-      logger.info('Checking payment status with recovery', {
-        paymentId,
-        currentStatus: payment.status,
-        refPayco,
-      });
-
-      // If payment is not pending, return current status
-      if (payment.status !== 'pending') {
-        return res.json({
-          success: true,
-          status: payment.status,
-          message: `Payment is ${payment.status}`,
-        });
-      }
-
-      // Payment is pending - check if it's stuck or waiting for webhook
-      if (!refPayco) {
-        return res.json({
-          success: true,
-          status: 'pending',
-          stuck: true,
-          message: 'Payment pending but no ePayco reference found - unable to check status',
-          action: 'RETRY_PAYMENT',
-        });
-      }
-
-      // Check status at ePayco
-      const statusCheck = await PaymentService.checkEpaycoTransactionStatus(refPayco);
-
-      if (!statusCheck.success) {
-        return res.json({
-          success: false,
-          error: statusCheck.error,
-          message: 'Could not check payment status at ePayco',
-        });
-      }
-
-      // If payment is actually approved at ePayco, it needs recovery
-      if (statusCheck.currentStatus === 'Aceptada' || statusCheck.currentStatus === 'Aprobada') {
-        logger.warn('STUCK PAYMENT DETECTED: Payment approved at ePayco but stuck in pending locally', {
-          paymentId,
-          refPayco,
-          currentStatus: statusCheck.currentStatus,
-        });
-
-        // Attempt recovery
-        const recovery = await PaymentService.recoverStuckPendingPayment(paymentId, refPayco);
-
-        return res.json({
-          success: true,
-          status: 'pending',
-          stuck: true,
-          needsRecovery: true,
-          currentStatusAtEpayco: statusCheck.currentStatus,
-          recovery,
-          message: 'Payment is stuck - recovery in progress. Check webhook logs for processing.',
-          action: 'WEBHOOK_REPLAY_NEEDED',
-        });
-      }
-
-      if (
-        statusCheck.currentStatus === 'Rechazada'
-        || statusCheck.currentStatus === 'Fallida'
-        || statusCheck.currentStatus === 'Abandonada'
-        || statusCheck.currentStatus === 'Cancelada'
-      ) {
-        await PaymentModel.updateStatus(paymentId, 'failed', {
-          epayco_ref: refPayco,
-          epayco_estado: statusCheck.currentStatus,
-          error: statusCheck.message || `Payment ${statusCheck.currentStatus.toLowerCase()} at ePayco`,
-          recovered_via_status_check: true,
-        });
-
-        return res.json({
-          success: true,
-          status: 'failed',
-          stuck: false,
-          currentStatusAtEpayco: statusCheck.currentStatus,
-          message: statusCheck.message || 'Payment failed at ePayco',
-          action: 'RETRY_PAYMENT',
-        });
-      }
-
-      if (statusCheck.currentStatus === 'Reversada') {
-        await PaymentModel.updateStatus(paymentId, 'refunded', {
-          epayco_ref: refPayco,
-          epayco_estado: statusCheck.currentStatus,
-          recovered_via_status_check: true,
-          error: statusCheck.message || 'Payment reversed/refunded at ePayco',
-        });
-
-        return res.json({
-          success: true,
-          status: 'refunded',
-          stuck: false,
-          currentStatusAtEpayco: statusCheck.currentStatus,
-          message: statusCheck.message || 'Payment reversed/refunded at ePayco',
-          action: 'NO_RETRY',
-        });
-      }
-
-      // Payment is still pending at ePayco.
-      // If this was a 3DS flow and it has exceeded a safe timeout window,
-      // fail locally to avoid indefinite "verifying payment" loops.
-      const createdAt = payment.createdAt || payment.created_at;
-      const createdAtMs = createdAt ? new Date(createdAt).getTime() : null;
-      const ageMs = Number.isFinite(createdAtMs) ? (Date.now() - createdAtMs) : null;
-      const ageMinutes = ageMs !== null ? ageMs / (60 * 1000) : null;
-      const metadata = payment.metadata || {};
-      const isLikelyThreeDSFlow = Boolean(
-        metadata.three_ds_requested
-        || metadata.three_ds_authentication
-        || metadata.three_ds_version
-        || metadata.bank_url_available === false
-      );
-
-      if (
-        statusCheck.currentStatus === 'Pendiente'
-        && isLikelyThreeDSFlow
-        && ageMinutes !== null
-        && ageMinutes >= PaymentController.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES
-      ) {
-        await PaymentModel.updateStatus(paymentId, 'failed', {
-          epayco_ref: refPayco,
-          epayco_estado: statusCheck.currentStatus,
-          abandoned_3ds: true,
-          timeout_recovered_via_status_check: true,
-          recovered_via_status_check: true,
-          error: `3DS timeout after ${Math.floor(ageMinutes)} minutes without final confirmation`,
-        });
-
-        logger.warn('3DS payment timed out in pending state; marking as failed', {
-          paymentId,
-          refPayco,
-          ageMinutes: Math.floor(ageMinutes),
-          timeoutMinutes: PaymentController.EPAYCO_3DS_PENDING_TIMEOUT_MINUTES,
-        });
-
-        return res.json({
-          success: true,
-          status: 'failed',
-          stuck: true,
-          currentStatusAtEpayco: statusCheck.currentStatus,
-          message: '3DS no se completó a tiempo. Intenta nuevamente con un nuevo enlace de pago.',
-          action: 'RETRY_PAYMENT',
-        });
-      }
-
-      // Payment is still genuinely pending at ePayco
-      return res.json({
-        success: true,
-        status: 'pending',
-        stuck: false,
-        currentStatusAtEpayco: statusCheck.currentStatus,
-        message: statusCheck.message,
-        action: 'AWAITING_3DS_COMPLETION',
-      });
-    } catch (error) {
-      logger.error('Error in payment status check with recovery', {
-        error: error.message,
-        paymentId: req.params?.paymentId,
-      });
-
-      res.status(500).json({
-        success: false,
-        error: 'Error checking payment status',
-        message: error.message,
-      });
-    }
-  }
 
   /**
    * Manually trigger webhook replay for stuck payment
@@ -1015,6 +954,31 @@ class PaymentController {
         return res.status(400).json({
           success: false,
           error: 'Payment ID and 3DS 2.0 data are required',
+        });
+      }
+
+      const has3DSValidationResult = Boolean(
+        threeDSecure
+        && typeof threeDSecure === 'object'
+        && (
+          (threeDSecure.validationData && typeof threeDSecure.validationData === 'object')
+          || threeDSecure.authenticated === true
+          || threeDSecure.challengeCompleted === true
+        )
+      );
+
+      // Do not mark 3DS as authenticated when there is no definitive challenge result.
+      if (!has3DSValidationResult) {
+        logger.warn('3DS completion called without validation result; keeping payment pending', {
+          paymentId,
+          provider: threeDSecure?.provider,
+          referenceId: threeDSecure?.referenceId,
+          keys: Object.keys(threeDSecure || {}),
+        });
+        return res.status(202).json({
+          success: true,
+          status: 'pending',
+          message: 'Awaiting definitive 3DS validation result',
         });
       }
 

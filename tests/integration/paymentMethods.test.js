@@ -170,6 +170,8 @@ describe('Payment Methods Integration Tests', () => {
         approval_code: 'app_123',
         reference: 'ref_123',
         epayco_ref: 'ref_123',
+        amount_currency_validated: true,
+        webhook_processed_at: expect.any(String),
       });
     });
 
@@ -201,6 +203,10 @@ describe('Payment Methods Integration Tests', () => {
         transaction_id: 'txn_123',
         reference: 'ref_123',
         epayco_ref: 'ref_123',
+        epayco_estado: 'Rechazada',
+        epayco_respuesta: undefined,
+        error: 'Rechazada',
+        abandoned_3ds: false,
       });
     });
   });

@@ -1129,7 +1129,7 @@ Select your payment method:`;
       await ctx.saveSession();
 
       // Generate ePayco checkout URL
-      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
+      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
       const checkoutUrl = `${webhookDomain}/pnp/live/checkout/${booking.id}`;
 
       const message = lang === 'es'
@@ -1235,7 +1235,7 @@ Select your payment method:`;
       await ctx.saveSession();
 
       // Generate Daimo checkout URL
-      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
+      const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
       const checkoutUrl = `${webhookDomain}/pnp/live/daimo-checkout/${booking.id}`;
 
       const message = lang === 'es'

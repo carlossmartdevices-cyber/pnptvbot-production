@@ -118,7 +118,7 @@ class PromoService {
       }
 
       // Create payment with promo pricing
-      const checkoutDomain = process.env.CHECKOUT_DOMAIN || process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.store';
+      const checkoutDomain = process.env.CHECKOUT_DOMAIN || process.env.BOT_WEBHOOK_DOMAIN || 'https://easybots.site';
 
       const payment = await PaymentModel.create({
         userId: userId.toString(),
@@ -140,8 +140,8 @@ class PromoService {
       let paymentUrl;
 
       if (provider === 'epayco') {
-        // Use PNPtv checkout page with promo metadata
-        paymentUrl = `${checkoutDomain}/checkout/pnp?paymentId=${payment.id}&promo=${promo.code}`;
+        // Direct tokenized checkout page with promo metadata
+        paymentUrl = `${checkoutDomain}/payment/${payment.id}?promo=${promo.code}`;
         await PaymentModel.updateStatus(payment.id, 'pending', {
           paymentUrl,
           provider,
@@ -182,7 +182,7 @@ class PromoService {
           });
         }
       } else {
-        paymentUrl = `${checkoutDomain}/checkout/pnp?paymentId=${payment.id}&promo=${promo.code}`;
+        paymentUrl = `${checkoutDomain}/payment/${payment.id}?promo=${promo.code}`;
       }
 
       logger.info('Promo payment initiated', {

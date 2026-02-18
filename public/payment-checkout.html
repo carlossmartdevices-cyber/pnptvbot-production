@@ -8,7 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://checkout.epayco.co/checkout.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="https://checkout.epayco.co/epayco.min.js" onerror="window.__epaycoLoadFailed=true"></script>
     <script src="https://multimedia.epayco.co/general/3DS/validateThreeds.min.js"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -445,6 +446,7 @@
                 errDoc: 'Enter your document number.',
                 errDeclined: 'Payment was declined. Try another card.',
                 errConnection: 'Connection error. Please try again.',
+                errChargeNotStarted: 'Payment was not started. Please press Pay again.',
                 errLoadPayment: 'Could not load payment info',
                 errLoadGeneric: 'Error loading payment',
                 errVerify: 'Error verifying payment status.',
@@ -487,6 +489,7 @@
                 errDoc: 'Ingresa tu n\u00famero de documento.',
                 errDeclined: 'El pago fue rechazado. Intenta con otra tarjeta.',
                 errConnection: 'Error de conexi\u00f3n. Intenta nuevamente.',
+                errChargeNotStarted: 'El cobro no se inici\u00f3. Presiona Pagar nuevamente.',
                 errLoadPayment: 'No se pudo cargar la informaci\u00f3n del pago',
                 errLoadGeneric: 'Error al cargar el pago',
                 errVerify: 'Error al verificar el estado del pago.',
@@ -544,33 +547,168 @@
             };
         }
 
-        function getEpaycoInstance() {
-            if (epaycoInstance) return epaycoInstance;
-            if (!window.ePayco || typeof window.ePayco.setup !== 'function') {
-                throw new Error('SDK de ePayco no disponible.');
-            }
-            epaycoInstance = window.ePayco.setup({
-                key: paymentData.epaycoPublicKey,
-                test: paymentData.testMode === true,
+        function waitForEpaycoSDK(maxWaitMs) {
+            return new Promise(function(resolve, reject) {
+                if (window.ePayco && typeof window.ePayco.token === 'object' && typeof window.ePayco.token.create === 'function') {
+                    return resolve();
+                }
+                // If initial script load failed, try dynamic reload
+                if (window.__epaycoLoadFailed) {
+                    var s = document.createElement('script');
+                    s.src = 'https://checkout.epayco.co/epayco.min.js';
+                    document.head.appendChild(s);
+                    window.__epaycoLoadFailed = false;
+                }
+                var waited = 0;
+                var interval = 300;
+                var timer = setInterval(function() {
+                    waited += interval;
+                    if (window.ePayco && typeof window.ePayco.token === 'object' && typeof window.ePayco.token.create === 'function') {
+                        clearInterval(timer);
+                        return resolve();
+                    }
+                    if (waited >= maxWaitMs) {
+                        clearInterval(timer);
+                        reject(new Error('El SDK de ePayco no pudo cargarse. Revisa tu conexión a internet y recarga la página.'));
+                    }
+                }, interval);
             });
-            return epaycoInstance;
+        }
+
+        function initEpaycoSDK() {
+            if (epaycoInstance) return;
+            if (!window.ePayco || typeof window.ePayco.setPublicKey !== 'function') {
+                throw new Error('El SDK de ePayco no pudo cargarse. Revisa tu conexión a internet y recarga la página.');
+            }
+            window.ePayco.setPublicKey(paymentData.epaycoPublicKey);
+            epaycoInstance = window.ePayco;
+        }
+
+        function isTokenLikeResponse(value) {
+            if (typeof value === 'string') {
+                return /^[a-f0-9]{20,64}$/i.test(value.trim());
+            }
+            if (!value || typeof value !== 'object') return false;
+            if (value.status === false) return false;
+            return Boolean(
+                value.id
+                || value.token
+                || (value.data && (value.data.id || value.data.token))
+            );
+        }
+
+        function extractTokenId(tokenResult) {
+            if (typeof tokenResult === 'string') {
+                var raw = tokenResult.trim();
+                return /^[a-f0-9]{20,64}$/i.test(raw) ? raw : null;
+            }
+            if (!tokenResult || typeof tokenResult !== 'object') return null;
+            return tokenResult.id
+                || tokenResult.token
+                || (tokenResult.data && (tokenResult.data.id || tokenResult.data.token))
+                || null;
         }
 
         function tokenizeCardWithEpayco(cardPayload) {
-            return new Promise(function(resolve, reject) {
-                try {
-                    var epayco = getEpaycoInstance();
-                    epayco.token.create(cardPayload, function(error, data) {
-                        if (error) {
-                            reject(error);
-                            return;
-                        }
-                        resolve(data);
-                    });
-                } catch (err) {
-                    reject(err);
-                }
+            return waitForEpaycoSDK(8000).then(function() {
+                return new Promise(function(resolve, reject) {
+                    try {
+                        initEpaycoSDK();
+                        // ePayco SDK callback signatures can vary across versions:
+                        // callback(error, token) OR callback(token, error).
+                        window.ePayco.token.create(cardPayload, function(firstArg, secondArg) {
+                            var tokenResult = isTokenLikeResponse(firstArg)
+                                ? firstArg
+                                : (isTokenLikeResponse(secondArg) ? secondArg : null);
+                            var error = tokenResult === firstArg ? secondArg : firstArg;
+
+                            if (!tokenResult && error) {
+                                reject(typeof error === 'object' ? error : new Error(String(error)));
+                                return;
+                            }
+
+                            if (!tokenResult || tokenResult.status === false || !extractTokenId(tokenResult)) {
+                                reject(new Error((tokenResult && tokenResult.description) || 'Error al tokenizar la tarjeta'));
+                                return;
+                            }
+                            resolve(tokenResult);
+                        });
+                    } catch (err) {
+                        reject(err);
+                    }
+                });
             });
+        }
+
+        function isGenericTokenizationError(err) {
+            var raw = '';
+            if (typeof err === 'string') {
+                raw = err;
+            } else if (err && typeof err === 'object') {
+                raw = err.description || err.error || err.message || '';
+            }
+            var msg = String(raw || '').trim().toLowerCase();
+            if (!msg) return true;
+            return msg.indexOf('inesperado') !== -1
+                || msg.indexOf('unexpected') !== -1
+                || msg === 'error'
+                || msg.indexOf('ha ocurrido un error') !== -1;
+        }
+
+        async function tokenizeCardWithFallbacks(baseData) {
+            var fullName = (baseData.name + ' ' + (baseData.lastName || '')).trim();
+            var variants = [
+                {
+                    // Primary payload: hybrid for broad SDK compatibility
+                    'card[number]': baseData.cardNumber,
+                    'card[exp_year]': baseData.expYear,
+                    'card[exp_month]': baseData.expMonth,
+                    'card[cvc]': baseData.cvc,
+                    'card[holder_name]': fullName,
+                    hasCvv: true,
+                    card: {
+                        number: baseData.cardNumber,
+                        exp_year: baseData.expYear,
+                        exp_month: baseData.expMonth,
+                        cvc: baseData.cvc,
+                        name: fullName,
+                        email: baseData.email,
+                    }
+                },
+                {
+                    // Fallback A: official minimal keys
+                    'card[number]': baseData.cardNumber,
+                    'card[exp_year]': baseData.expYear,
+                    'card[exp_month]': baseData.expMonth,
+                    'card[cvc]': baseData.cvc,
+                    hasCvv: true,
+                },
+                {
+                    // Fallback B: legacy flat-style keys used by some SDK builds
+                    number: baseData.cardNumber,
+                    exp_year: baseData.expYear,
+                    exp_month: baseData.expMonth,
+                    cvc: baseData.cvc,
+                    name: fullName,
+                    email: baseData.email,
+                    hasCvv: true,
+                }
+            ];
+
+            var lastError = null;
+            for (var i = 0; i < variants.length; i++) {
+                try {
+                    return await tokenizeCardWithEpayco(variants[i]);
+                } catch (err) {
+                    lastError = err;
+                    if (!isGenericTokenizationError(err) || i === variants.length - 1) {
+                        throw err;
+                    }
+                    console.warn('[ePayco token] retrying tokenization with fallback payload', { attempt: i + 2 });
+                }
+            }
+
+            throw lastError || new Error('No fue posible tokenizar la tarjeta.');
         }
 
         function detectCardBrand(number) {
@@ -712,17 +850,21 @@
             btn.textContent = t('processing');
 
             try {
-                var tokenResult = await tokenizeCardWithEpayco({
-                    'card[number]': cardNumber,
-                    'card[exp_year]': expYear,
-                    'card[exp_month]': expMonth,
-                    'card[cvc]': cvc,
-                    'card[holder_name]': (name + ' ' + (lastName || '')).trim(),
-                    hasCvv: true,
+                var tokenResult = await tokenizeCardWithFallbacks({
+                    cardNumber: cardNumber,
+                    expYear: expYear,
+                    expMonth: expMonth,
+                    cvc: cvc,
+                    name: name,
+                    lastName: lastName || '',
+                    email: email,
                 });
 
-                if (!tokenResult || !tokenResult.id) {
-                    throw new Error('No fue posible tokenizar la tarjeta.');
+                // Browser SDK may return token in different fields
+                var tokenId = extractTokenId(tokenResult);
+                if (!tokenId) {
+                    var errMsg = (tokenResult && tokenResult.description) || 'No fue posible tokenizar la tarjeta.';
+                    throw new Error(errMsg);
                 }
 
                 // Never send PAN/CVC to backend.
@@ -731,7 +873,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         paymentId,
-                        tokenCard: tokenResult.id,
+                        tokenCard: tokenId,
                         name,
                         lastName: lastName || name,
                         email,
@@ -750,6 +892,12 @@
                 handleBackendResponse(result);
             } catch (error) {
                 var epaycoError = (error && (error.description || error.error || error.message)) || t('errConnection');
+                if (typeof epaycoError === 'string' && /^[a-f0-9]{20,64}$/i.test(epaycoError.trim())) {
+                    epaycoError = t('errConnection');
+                }
+                if (typeof epaycoError === 'string' && /inesperado|unexpected/i.test(epaycoError)) {
+                    epaycoError = 'No se pudo tokenizar la tarjeta. Intenta nuevamente o usa otra tarjeta.';
+                }
                 showFormError(epaycoError);
                 btn.disabled = false;
                 btn.textContent = payBtnLabel();
@@ -761,6 +909,12 @@
             if (result && result.success && (result.status === 'approved' || result.status === 'completed')) {
                 document.getElementById('checkout-form').style.display = 'none';
                 document.getElementById('success').style.display = 'block';
+                return;
+            }
+
+            if (result && result.status === 'processing') {
+                document.getElementById('checkout-form').style.display = 'none';
+                pollPaymentStatus();
                 return;
             }
 
@@ -785,14 +939,17 @@
         }
 
         var pollAttempts = 0;
-        var maxPollAttempts = 30;
+        var maxPollAttempts = 18;
         var pollInterval = 3000;
         var polling = false;
+        var pollingStartedAt = 0;
+        var maxPollingElapsedMs = 90000;
 
         function pollPaymentStatus() {
             if (polling) return;
             polling = true;
             pollAttempts = 0;
+            pollingStartedAt = Date.now();
 
             document.getElementById('checkout-form').style.display = 'none';
             document.getElementById('polling-status').style.display = 'block';
@@ -801,8 +958,11 @@
         }
 
         function doPoll() {
-            if (pollAttempts >= maxPollAttempts) {
-                attemptRecoveryCheck();
+            var elapsedMs = Date.now() - pollingStartedAt;
+            if (pollAttempts >= maxPollAttempts || elapsedMs >= maxPollingElapsedMs) {
+                document.getElementById('polling-status').style.display = 'none';
+                document.getElementById('pending').style.display = 'block';
+                polling = false;
                 return;
             }
 
@@ -830,19 +990,30 @@
                         return;
                     }
 
+                    if (data.stuck) {
+                        document.getElementById('polling-status').style.display = 'none';
+                        document.getElementById('checkout-form').style.display = 'block';
+                        showFormError(data.message || t('errChargeNotStarted'));
+                        var retryBtn = document.getElementById('pay-button');
+                        retryBtn.disabled = false;
+                        retryBtn.textContent = payBtnLabel();
+                        polling = false;
+                        return;
+                    }
+
                     if (data.status === 'completed') {
                         document.getElementById('polling-status').style.display = 'none';
                         document.getElementById('success').style.display = 'block';
                         polling = false;
-                    } else if (data.status === 'failed' || data.status === 'rejected' || data.status === 'cancelled') {
+                    } else if (data.status === 'failed' || data.status === 'rejected' || data.status === 'cancelled' || data.status === 'refunded') {
                         document.getElementById('polling-status').style.display = 'none';
                         document.getElementById('checkout-form').style.display = 'block';
-                        showFormError(t('errDeclined'));
+                        showFormError((data && data.message) || t('errDeclined'));
                         var btn = document.getElementById('pay-button');
                         btn.disabled = false;
                         btn.textContent = payBtnLabel();
                         polling = false;
-                    } else {
+                    } else { // This will now also handle 'pending' and 'processing'
                         setTimeout(doPoll, pollInterval);
                     }
                 })
@@ -852,52 +1023,15 @@
         }
 
         function attemptRecoveryCheck() {
-            fetch('/api/payment/' + paymentId + '/check-status', {
-                method: 'POST',
-                cache: 'no-store',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Cache-Control': 'no-cache',
-                    'Pragma': 'no-cache'
-                },
-                body: JSON.stringify({})
-            })
-                .then(function(response) {
-                    if (!response.ok) return null;
-                    return response.json();
-                })
-                .then(function(data) {
-                    if (data && data.success && data.status === 'completed') {
-                        document.getElementById('polling-status').style.display = 'none';
-                        document.getElementById('success').style.display = 'block';
-                        polling = false;
-                        return;
-                    }
-
-                    if (data && data.success && (data.status === 'failed' || data.status === 'rejected' || data.status === 'cancelled')) {
-                        document.getElementById('polling-status').style.display = 'none';
-                        document.getElementById('checkout-form').style.display = 'block';
-                        showFormError(t('errDeclined'));
-                        var btn = document.getElementById('pay-button');
-                        btn.disabled = false;
-                        btn.textContent = payBtnLabel();
-                        polling = false;
-                        return;
-                    }
-
-                    document.getElementById('polling-status').style.display = 'none';
-                    document.getElementById('pending').style.display = 'block';
-                    polling = false;
-                })
-                .catch(function() {
-                    document.getElementById('polling-status').style.display = 'none';
-                    document.getElementById('pending').style.display = 'block';
-                    polling = false;
-                });
+            // This function is no longer needed as the backend handles recovery.
+            // Kept here to avoid breaking callsites, but it does nothing.
         }
 
         var epayco3dsMessageListener = null;
         var epayco3dsSafetyTimer = null;
+        var epayco3dsFallbackTriggered = false;
+        var epayco3dsSecondaryAttempted = false;
+        var epayco3dsModalTimeoutMs = 180000; // ePayco default is 42s, too short for many bank challenges.
 
         function loadEpayco3DSValidator() {
             return new Promise(function(resolve, reject) {
@@ -968,17 +1102,54 @@
         }
 
         function isTrusted3DSOrigin(origin) {
-            if (!origin) return true;
+            if (!origin) return false;
             try {
                 var parsed = new URL(origin);
                 var host = (parsed.hostname || '').toLowerCase();
+                var currentHost = (window.location.hostname || '').toLowerCase();
                 return host === 'localhost'
+                    || host === currentHost
+                    || host === 'epayco.co'
                     || host.endsWith('.epayco.co')
+                    || host === 'epayco.com'
+                    || host.endsWith('.epayco.com')
+                    || host === 'payco.co'
                     || host.endsWith('.payco.co')
+                    || host === 'cardinalcommerce.com'
                     || host.endsWith('.cardinalcommerce.com');
             } catch (e) {
                 return false;
             }
+        }
+
+        function normalize3DSMessagePayload(data) {
+            if (!data) return null;
+            if (typeof data === 'string') {
+                try {
+                    return JSON.parse(data);
+                } catch (e) {
+                    return { message: data };
+                }
+            }
+            if (typeof data === 'object') return data;
+            return null;
+        }
+
+        function isEpayco3DSCompletionPayload(payload) {
+            if (!payload || typeof payload !== 'object') return false;
+            return Boolean(
+                payload.ref_payco
+                || payload.transactionId
+                || payload.x_ref_payco
+                || payload.x_transaction_id
+                || payload.x_transaction_state
+                || payload.transaction_state
+                || payload.status
+                || payload.state
+                || payload.type === 'modalClosed'
+                || payload.success === true
+                || payload.success === false
+            );
         }
 
         function attachEpayco3DSMessageHandler() {
@@ -993,8 +1164,8 @@
                     return;
                 }
 
-                var payload = event && event.data ? event.data : {};
-                if (!(payload.success || payload.message || payload.ref_payco || payload.transactionId)) {
+                var payload = normalize3DSMessagePayload(event && event.data ? event.data : null);
+                if (!isEpayco3DSCompletionPayload(payload)) {
                     return;
                 }
 
@@ -1015,13 +1186,47 @@
             window.addEventListener('message', epayco3dsMessageListener);
         }
 
-        function buildEpayco3DSPayload(threeDSecure, paymentId) {
+        function buildEpayco3DSPayload(threeDSecure, paymentId, useWrappedThreeDS) {
             var tx = (threeDSecure && threeDSecure.transactionData) || {};
+            var rawThreeDS = tx['3DS'];
+            // Some API responses wrap 3DS data as { success, data }.
+            // We support both shapes because validate3ds behavior differs by gateway response version.
+            var normalizedThreeDS = rawThreeDS;
+            if (!useWrappedThreeDS && rawThreeDS && typeof rawThreeDS === 'object' && rawThreeDS.data) {
+                normalizedThreeDS = rawThreeDS.data;
+            }
+            var normalizedNetworkResponse = {};
+            if (tx.cc_network_response && typeof tx.cc_network_response === 'object') {
+                normalizedNetworkResponse = Object.assign({}, tx.cc_network_response);
+            }
+            var networkCode = normalizedNetworkResponse.code;
+            if ((networkCode === undefined || networkCode === null || networkCode === '') && tx.cod_error !== undefined && tx.cod_error !== null) {
+                networkCode = tx.cod_error;
+            }
+            if ((networkCode === undefined || networkCode === null || networkCode === '') && tx.cod_respuesta !== undefined && tx.cod_respuesta !== null) {
+                networkCode = tx.cod_respuesta;
+            }
+            // ePayco validate3ds requires cc_network_response.code === '187'.
+            // In pending responses we often get cod_respuesta='3', which makes validate3ds return false immediately.
+            if (normalizedThreeDS) {
+                if (networkCode === undefined || networkCode === null || networkCode === '') {
+                    networkCode = '187';
+                } else if (String(networkCode) !== '187') {
+                    console.warn('[3DS ePayco] Overriding cc_network_response.code for validate3ds compatibility', {
+                        paymentId: paymentId,
+                        originalCode: String(networkCode)
+                    });
+                    networkCode = '187';
+                }
+            }
+            if (networkCode !== undefined && networkCode !== null && networkCode !== '') {
+                normalizedNetworkResponse.code = String(networkCode);
+            }
             var data3ds = {
-                franquicia: tx.franquicia,
-                '3DS': tx['3DS'],
+                franquicia: tx.franquicia || tx.franchise || tx.brand || null,
+                '3DS': normalizedThreeDS,
                 ref_payco: tx.ref_payco,
-                cc_network_response: tx.cc_network_response
+                cc_network_response: normalizedNetworkResponse
             };
 
             if (!data3ds.ref_payco) {
@@ -1031,74 +1236,161 @@
             return data3ds;
         }
 
-        async function runDeviceDataCollection(methodUrl) {
-            if (!methodUrl) return false;
-            return new Promise(function(resolve) {
-                var done = false;
-                var iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.setAttribute('aria-hidden', 'true');
-
-                function finish(result) {
-                    if (done) return;
-                    done = true;
-                    setTimeout(function() {
-                        if (iframe && iframe.parentNode) {
-                            iframe.parentNode.removeChild(iframe);
-                        }
-                    }, 5000);
-                    resolve(result);
-                }
-
-                iframe.onload = function() { finish(true); };
-                iframe.onerror = function() { finish(false); };
-                iframe.src = methodUrl;
-                document.body.appendChild(iframe);
-
-                setTimeout(function() { finish(false); }, 4000);
+        function launchEpaycoValidate3DSAttempt(threeDSecure, paymentId, useWrappedThreeDS) {
+            var payload = buildEpayco3DSPayload(threeDSecure, paymentId, useWrappedThreeDS);
+            if (!payload['3DS']) {
+                return false;
+            }
+            console.log('[3DS ePayco] validate3ds attempt', {
+                paymentId: paymentId,
+                mode: useWrappedThreeDS ? 'wrapped-3ds' : 'inner-3ds'
             });
+            var attemptResult = window.validate3ds(payload, 'prod', epayco3dsModalTimeoutMs);
+            if (attemptResult === false) {
+                console.warn('[3DS ePayco] validate3ds returned false (sync)', {
+                    paymentId: paymentId,
+                    mode: useWrappedThreeDS ? 'wrapped-3ds' : 'inner-3ds'
+                });
+                return false;
+            }
+            if (attemptResult && typeof attemptResult.then === 'function') {
+                attemptResult
+                    .then(function(ok) {
+                        if (ok === false) {
+                            console.warn('[3DS ePayco] validate3ds returned false', {
+                                paymentId: paymentId,
+                                mode: useWrappedThreeDS ? 'wrapped-3ds' : 'inner-3ds'
+                            });
+                            force3DSFallback(threeDSecure, paymentId, 'validate3ds_promise_false');
+                        }
+                    })
+                    .catch(function(error) {
+                        console.warn('[3DS ePayco] validate3ds promise rejected', {
+                            paymentId: paymentId,
+                            mode: useWrappedThreeDS ? 'wrapped-3ds' : 'inner-3ds',
+                            error: error && error.message ? error.message : error
+                        });
+                        force3DSFallback(threeDSecure, paymentId, 'validate3ds_promise_rejected');
+                    });
+            }
+            return true;
+        }
+
+        function buildCardinalFallbackData(threeDSecure) {
+            var data = threeDSecure && threeDSecure.data ? threeDSecure.data : null;
+            if (!data || !data.accessToken || !data.referenceId) {
+                return null;
+            }
+            return {
+                version: '2.0',
+                provider: 'CardinalCommerce',
+                referenceId: data.referenceId,
+                accessToken: data.accessToken,
+                token: data.token || null,
+            };
+        }
+
+        function force3DSFallback(threeDSecure, paymentId, reason) {
+            if (epayco3dsSafetyTimer) {
+                clearTimeout(epayco3dsSafetyTimer);
+                epayco3dsSafetyTimer = null;
+            }
+            if (epayco3dsMessageListener) {
+                window.removeEventListener('message', epayco3dsMessageListener);
+                epayco3dsMessageListener = null;
+            }
+            var cardinalData = buildCardinalFallbackData(threeDSecure);
+            if (!epayco3dsFallbackTriggered && cardinalData) {
+                epayco3dsFallbackTriggered = true;
+                console.warn('[3DS ePayco] Immediate fallback to Cardinal SDK', { paymentId: paymentId, reason: reason });
+                loadCardinalCommerceSdk(cardinalData, paymentId);
+                return;
+            }
+            console.warn('[3DS ePayco] Immediate fallback to polling', { paymentId: paymentId, reason: reason });
+            pollPaymentStatus();
         }
 
         async function tryOfficialEpayco3DSFlow(threeDSecure, paymentId) {
-            var data3DS = buildEpayco3DSPayload(threeDSecure, paymentId);
-            if (!data3DS['3DS']) {
+            var primaryPayload = buildEpayco3DSPayload(threeDSecure, paymentId, true);
+            if (!primaryPayload['3DS']) {
                 return false;
             }
 
-            await runDeviceDataCollection(
-                threeDSecure
-                && threeDSecure.data
-                && threeDSecure.data.deviceDataCollectionUrl
-            );
-
             await loadEpayco3DSValidator();
             attachEpayco3DSMessageHandler();
+            epayco3dsSecondaryAttempted = false;
 
             document.getElementById('checkout-form').style.display = 'none';
             document.getElementById('polling-status').style.display = 'block';
-            window.validate3ds(data3DS);
+            var primaryAttemptStarted = launchEpaycoValidate3DSAttempt(threeDSecure, paymentId, true);
+            if (!primaryAttemptStarted) {
+                epayco3dsSecondaryAttempted = true;
+                console.warn('[3DS ePayco] Primary validate3ds attempt did not start, retrying immediately with inner 3DS payload', { paymentId });
+                var secondaryStarted = launchEpaycoValidate3DSAttempt(threeDSecure, paymentId, false);
+                if (!secondaryStarted) {
+                    if (epayco3dsMessageListener) {
+                        window.removeEventListener('message', epayco3dsMessageListener);
+                        epayco3dsMessageListener = null;
+                    }
+                    var cardinalDataImmediate = buildCardinalFallbackData(threeDSecure);
+                    if (!epayco3dsFallbackTriggered && cardinalDataImmediate) {
+                        epayco3dsFallbackTriggered = true;
+                        console.warn('[3DS ePayco] validate3ds returned false on both payload variants, switching to Cardinal SDK fallback', { paymentId });
+                        loadCardinalCommerceSdk(cardinalDataImmediate, paymentId);
+                        return true;
+                    }
+                    console.warn('[3DS ePayco] validate3ds returned false on both payload variants, starting status polling fallback', { paymentId });
+                    pollPaymentStatus();
+                    return true;
+                }
+            }
 
-            // Safety net: if postMessage is blocked, start status polling without interrupting challenge UI.
+            // Safety net: retry validate3ds with alternate payload shape before giving up.
             if (epayco3dsSafetyTimer) {
                 clearTimeout(epayco3dsSafetyTimer);
                 epayco3dsSafetyTimer = null;
             }
             epayco3dsSafetyTimer = setTimeout(function() {
                 if (epayco3dsMessageListener) {
+                    if (!epayco3dsSecondaryAttempted) {
+                        epayco3dsSecondaryAttempted = true;
+                        console.warn('[3DS ePayco] No postMessage on primary attempt, retrying with inner 3DS payload', { paymentId });
+                        if (launchEpaycoValidate3DSAttempt(threeDSecure, paymentId, false)) {
+                            epayco3dsSafetyTimer = setTimeout(function() {
+                                if (!epayco3dsMessageListener) return;
+                                window.removeEventListener('message', epayco3dsMessageListener);
+                                epayco3dsMessageListener = null;
+                                if (!epayco3dsFallbackTriggered) {
+                                    var cardinalData = buildCardinalFallbackData(threeDSecure);
+                                    if (cardinalData) {
+                                        epayco3dsFallbackTriggered = true;
+                                        console.warn('[3DS ePayco] No postMessage after both validate3ds attempts, switching to Cardinal SDK fallback', { paymentId });
+                                        loadCardinalCommerceSdk(cardinalData, paymentId);
+                                        return;
+                                    }
+                                }
+                                console.warn('[3DS ePayco] No postMessage after both validate3ds attempts, starting status polling fallback', { paymentId });
+                                pollPaymentStatus();
+                            }, 22000);
+                            return;
+                        }
+                    }
+                    window.removeEventListener('message', epayco3dsMessageListener);
+                    epayco3dsMessageListener = null;
                     console.warn('[3DS ePayco] No postMessage received yet, starting status polling fallback', { paymentId });
                     pollPaymentStatus();
                 }
-            }, 30000);
+            }, 18000);
             return true;
         }
 
         /**
-         * Handle 3DS authentication with ePayco official API flow first.
-         * Fallback to direct Cardinal flow for backward compatibility.
+         * Handle 3DS authentication with ePayco official validate3ds flow.
          * @param {Object} threeDSecure - 3DS 2.0 authentication data from ePayco
          * @param {String} paymentId - Payment ID for tracking
          */
         async function handle3DS2Authentication(threeDSecure, paymentId) {
+            epayco3dsFallbackTriggered = false;
             try {
                 var usedOfficialFlow = await tryOfficialEpayco3DSFlow(threeDSecure, paymentId);
                 if (usedOfficialFlow) {
@@ -1106,28 +1398,24 @@
                     return;
                 }
             } catch (flowError) {
-                console.warn('[3DS ePayco] Official validate3ds flow failed, fallback to Cardinal', {
+                console.warn('[3DS ePayco] Official validate3ds flow failed, switching to status polling fallback', {
                     paymentId,
                     error: flowError.message
                 });
+                if (!epayco3dsFallbackTriggered) {
+                    var cardinalData = buildCardinalFallbackData(threeDSecure);
+                    if (cardinalData) {
+                        epayco3dsFallbackTriggered = true;
+                        console.warn('[3DS ePayco] Official flow threw error, using Cardinal SDK fallback', { paymentId });
+                        loadCardinalCommerceSdk(cardinalData, paymentId);
+                        return;
+                    }
+                }
             }
 
-            try {
-                const data = threeDSecure.data;
-                console.log('[3DS 2.0] Starting Cardinal Commerce fallback', {
-                    paymentId,
-                    referenceId: data && data.referenceId,
-                    provider: threeDSecure.provider
-                });
-
-                // Fallback: Load Cardinal Commerce SDK
-                loadCardinalCommerceSdk(data, paymentId);
-            } catch (error) {
-                console.error('[3DS 2.0] Error in handle3DS2Authentication fallback', error);
-                document.getElementById('checkout-form').style.display = 'none';
-                document.getElementById('polling-status').style.display = 'block';
-                pollPaymentStatus();
-            }
+            document.getElementById('checkout-form').style.display = 'none';
+            document.getElementById('polling-status').style.display = 'block';
+            pollPaymentStatus();
         }
 
         /**
@@ -1318,28 +1606,12 @@
          */
         async function submitPaymentWith3DS2Token(data, paymentId) {
             try {
-                console.log('[3DS 2.0] Submitting payment with 3DS 2.0 token (no Cardinal SDK)', {
+                console.log('[3DS 2.0] No definitive Cardinal validation result available; switching to status polling', {
                     paymentId,
                     referenceId: data.referenceId
                 });
-
-                const response = await fetch('/api/payment/complete-3ds-2', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        paymentId,
-                        threeDSecure: {
-                            version: '2.0',
-                            provider: 'CardinalCommerce',
-                            referenceId: data.referenceId,
-                            accessToken: data.accessToken,
-                            token: data.token,
-                        }
-                    })
-                });
-
-                const result = await response.json();
-                handlePaymentCompletion(result, paymentId);
+                document.getElementById('polling-status').style.display = 'block';
+                pollPaymentStatus();
             } catch (error) {
                 console.error('[3DS 2.0] Error in submitPaymentWith3DS2Token', error);
                 // On network error, start polling to see if payment goes through

@@ -11,8 +11,6 @@ const paymentHandlers = require('../payments');
 const { showNearbyMenu } = require('./nearbyUnified');
 const supportRoutingService = require('../../services/supportRoutingService');
 const { handlePromoDeepLink } = require('../promo/promoHandler');
-const path = require('path');
-const fs = require('fs/promises');
 const { getPrimeInviteLink, activateMembership, fetchActivationCode, markCodeUsed, logActivation } = require('../payments/activation');
 const MessageTemplates = require('../../services/messageTemplates');
 const BusinessNotificationService = require('../../services/businessNotificationService');
@@ -572,19 +570,11 @@ const registerOnboardingHandlers = (bot) => {
       await ctx.saveSession();
 
       try {
-        const lifetimePassHtmlPath = path.join(__dirname, '../../../../public/lifetime-pass.html'); // Correct path to the HTML file
-        const htmlContent = await fs.readFile(lifetimePassHtmlPath, 'utf8');
+        // Validate code against active links in the database (single source of truth)
+        const availableLinks = await meruLinkService.getAvailableLinks('lifetime-pass');
+        const matchingLink = availableLinks.find(link => link.code === rawCode);
 
-        const meruLinksRegex = /https:\/\/pay\.getmeru\.com\/([a-zA-Z0-9_-]+)/g;
-        let match;
-        const meruCodes = [];
-        while ((match = meruLinksRegex.exec(htmlContent)) !== null) {
-            meruCodes.push(match[1]);
-        }
-        
-        const matchingLinkCode = meruCodes.find(code => code === rawCode);
-
-        if (!matchingLinkCode) {
+        if (!matchingLink) {
             await ctx.reply(activationStrings[lang].codeNotFound, {
               ...Markup.inlineKeyboard([
                 [Markup.button.callback(lang === 'es' ? '🔄 Intentar de Nuevo' : '🔄 Try Again', 'activate_lifetime_send_code')],
@@ -594,7 +584,8 @@ const registerOnboardingHandlers = (bot) => {
             return;
         }
 
-        const meruPaymentUrl = `https://pay.getmeru.com/${matchingLinkCode}`;
+        const matchingLinkCode = matchingLink.code;
+
         await ctx.reply(`Verificando pago para el código: \`${matchingLinkCode}\`...`, { parse_mode: 'Markdown' });
 
         // Usar Puppeteer para verificar el pago (lee contenido real con JavaScript ejecutado)
@@ -1049,23 +1040,6 @@ const completeOnboarding = async (ctx) => {
     });
   }
 };
-
-// ═══════════════════════════════════════════════════════════════
-// PASOS 4️⃣, 5️⃣, 6️⃣, 7️⃣: FUNCIÓN INTEGRADA DE VERIFICACIÓN Y ACTIVACIÓN
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Integra los PASOS 4, 5, 6, 7 del flujo de Meru
- *
- * 4️⃣: Verifica pago con Puppeteer
- * 5️⃣: Marca link como usado en BD
- * 6️⃣: Registra en historial de pagos
- * 7️⃣: Envía notificaciones finales
- *
- * @param {Context} ctx - Telegraf context
- * @param {string} meruCode - Código del link de Meru (ej: "LSJUek")
- * @param {string} lang - Idioma del usuario ('es' o 'en')
- */
 const verifyAndActivateMeruPayment = async (ctx, meruCode, lang = 'es') => {
   try {
     const userId = ctx.from.id;

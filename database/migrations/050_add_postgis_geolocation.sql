@@ -14,12 +14,12 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 -- Stores current and historical location data
 CREATE TABLE IF NOT EXISTS user_locations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   latitude DECIMAL(10, 8) NOT NULL,
   longitude DECIMAL(11, 8) NOT NULL,
   accuracy INTEGER NOT NULL DEFAULT 0, -- meters
   is_online BOOLEAN DEFAULT TRUE,
-  geom GEOMETRY(POINT, 4326) NOT NULL, -- PostGIS geometry column
+  geom GEOMETRY(POINT, 4326), -- PostGIS geometry column (auto-set by trigger)
   last_seen TIMESTAMP DEFAULT NOW(),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
@@ -64,8 +64,8 @@ EXECUTE FUNCTION update_user_location_geom();
 -- Track who blocked whom for privacy
 CREATE TABLE IF NOT EXISTS blocked_users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  blocked_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  blocked_user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   blocked_at TIMESTAMP DEFAULT NOW(),
 
   CONSTRAINT no_self_block CHECK (user_id != blocked_user_id),
@@ -83,11 +83,11 @@ CREATE INDEX IF NOT EXISTS idx_blocked_users_blocked_user_id
 -- Stores historical location data for movement tracking
 CREATE TABLE IF NOT EXISTS user_location_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   latitude DECIMAL(10, 8) NOT NULL,
   longitude DECIMAL(11, 8) NOT NULL,
   accuracy INTEGER NOT NULL DEFAULT 0,
-  geom GEOMETRY(POINT, 4326) NOT NULL,
+  geom GEOMETRY(POINT, 4326),
   recorded_at TIMESTAMP DEFAULT NOW(),
 
   CONSTRAINT valid_latitude_history CHECK (latitude >= -90 AND latitude <= 90),
@@ -129,7 +129,7 @@ SELECT
   ul.accuracy,
   u.first_name,
   u.username,
-  u.avatar_url,
+  u.photo_file_id,
   ul.is_online,
   ul.last_seen
 FROM user_locations ul

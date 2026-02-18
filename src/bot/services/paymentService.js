@@ -400,7 +400,7 @@ class PaymentService {
 
       let paymentUrl;
       const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
-      const checkoutDomain = process.env.CHECKOUT_DOMAIN || 'https://easybots.store';
+      const checkoutDomain = process.env.CHECKOUT_DOMAIN || 'https://easybots.site';
 
       if (provider === 'epayco') {
         // Create payment reference
@@ -422,9 +422,9 @@ class PaymentService {
             paymentUrl,
           });
         } else {
-          // One-time plan → PNPtv custom checkout page via /checkout/pnp
-          paymentUrl = `${checkoutDomain}/checkout/pnp?paymentId=${payment.id}`;
-          logger.info('ePayco checkout URL created (PNPtv route)', {
+          // One-time plan → direct tokenized checkout page (no intermediate landing step)
+          paymentUrl = `${checkoutDomain}/payment/${payment.id}`;
+          logger.info('ePayco checkout URL created (direct tokenized checkout)', {
             paymentId: payment.id,
             paymentUrl,
           });
@@ -817,6 +817,16 @@ class PaymentService {
    * @returns {Object} { success: boolean, error?: string }
    */
   static async processEpaycoWebhook(webhookData) {
+    // Idempotency lock using ePayco's unique transaction reference
+    const lockKey = `epayco_webhook:${webhookData.x_ref_payco}`;
+    const acquired = await cache.acquireLock(lockKey, 120); // 2-minute lock
+    if (!acquired) {
+      logger.warn('ePayco webhook processing skipped, already in progress', {
+        refPayco: webhookData.x_ref_payco,
+      });
+      return { success: true, alreadyProcessed: true };
+    }
+
     try {
       // Extract webhook data
       const {
@@ -861,6 +871,14 @@ class PaymentService {
 
       if (!payment && x_ref_payco) {
         payment = await PaymentModel.getById(String(x_ref_payco));
+      }
+
+      if (payment && (payment.status === 'completed' || payment.status === 'success')) {
+        logger.info('ePayco webhook for already completed payment, ignoring', {
+          paymentId: payment.id,
+          refPayco: x_ref_payco,
+        });
+        return { success: true, alreadyProcessed: true };
       }
 
       if (!payment && paymentIdOrType && paymentIdOrType !== 'pnp_live' && this.isUuidLike(paymentIdOrType)) {
@@ -1342,6 +1360,8 @@ class PaymentService {
       }).catch(() => {});
 
       return { success: false, error: error.message };
+    } finally {
+      await cache.releaseLock(lockKey);
     }
   }
 
@@ -2107,7 +2127,7 @@ class PaymentService {
 
       // 4. Make single charge (NOT recurring/subscription)
       const webhookDomain = process.env.BOT_WEBHOOK_DOMAIN || 'https://pnptv.app';
-      const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.store';
+      const epaycoWebhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || 'https://easybots.site';
 
       // For pnptv-bot payments, use new checkout/pnp route
       // All payments in pnptv-bot context use the new route
@@ -2148,11 +2168,6 @@ class PaymentService {
         extra1: String(userId),
         extra2: planId,
         extra3: paymentId,
-        extras: {
-          extra1: String(userId),
-          extra2: planId,
-          extra3: paymentId,
-        },
       });
 
       logger.info('ePayco charge result', {
@@ -2169,85 +2184,28 @@ class PaymentService {
       const transactionId = chargeResult?.data?.transactionID || chargeResult?.data?.transaction_id;
 
       if (estado === 'Aceptada' || estado === 'Aprobada' || respuesta === 'Aprobada') {
-        // Charge approved - activate subscription before exposing completed status.
-        const expiryDate = new Date();
-        const durationDays = plan.duration_days || plan.duration || 30;
-        expiryDate.setDate(expiryDate.getDate() + durationDays);
-
-        await UserModel.updateSubscription(userId, {
-          status: 'active',
-          planId,
-          expiry: expiryDate,
-        });
-
-        logger.info('Subscription activated via tokenized charge', {
-          userId,
-          planId,
-          expiryDate,
-          refPayco,
-        });
-
-        await PaymentModel.updateStatus(paymentId, 'completed', {
+        // Charge approved via API. Mark as processing and wait for webhook confirmation.
+        // The webhook is the single source of truth for activating subscriptions.
+        await PaymentModel.updateStatus(paymentId, 'pending', {
           transaction_id: transactionId,
           reference: refPayco,
           epayco_ref: refPayco,
           payment_method: 'tokenized_card',
+          api_charge_status: 'approved',
           expected_epayco_amount: String(amountCOP),
           expected_epayco_currency: 'COP',
-          webhook_processed_at: new Date().toISOString(),
-          amount_currency_validated: true,
         });
 
-        // Security: Encrypt payment data at rest (async, non-blocking)
-        PaymentSecurityService.encryptPaymentDataAtRest(paymentId).catch((err) => {
-          logger.error('Encrypt at rest failed (non-critical)', { error: err.message });
-        });
-
-        // Security: Validate payment consistency (async, non-blocking)
-        PaymentSecurityService.validatePaymentConsistency(paymentId).catch((err) => {
-          logger.error('Consistency check failed (non-critical)', { error: err.message });
-        });
-
-        // Send payment confirmation notification (async, non-blocking)
-        const user = await UserModel.getById(userId);
-        const userLanguage = user?.language || 'es';
-
-        this.sendPaymentConfirmationNotification({
-          userId,
-          plan,
-          transactionId: refPayco || transactionId,
-          amount: amountCOP,
-          expiryDate,
-          language: userLanguage,
-          provider: 'epayco',
-        }).catch((err) => {
-          logger.error('Error sending tokenized charge confirmation (non-critical)', { error: err.message });
-        });
-
-        // Complete promo redemption if applicable
-        if (payment.metadata?.redemptionId) {
-          PromoService.completePromoRedemption(payment.metadata.redemptionId, paymentId).catch((err) => {
-            logger.error('Error completing promo redemption (non-critical)', { error: err.message });
-          });
-        }
-
-        // Business notification (async, non-blocking)
-        BusinessNotificationService.notifyPayment({
-          userId,
-          planName: plan.display_name || plan.name,
-          amount: amountCOP,
-          provider: 'ePayco (Tokenizado)',
-          transactionId: refPayco || transactionId,
-          customerName: customer.name || 'Unknown',
-        }).catch((err) => {
-          logger.error('Business notification failed (non-critical)', { error: err.message });
+        logger.info('ePayco charge approved via API, waiting for webhook confirmation', {
+          paymentId,
+          refPayco,
         });
 
         return {
           success: true,
-          status: 'approved',
+          status: 'processing', // Use 'processing' to indicate we are waiting for webhook
           transactionId: refPayco || transactionId,
-          message: 'Pago aprobado exitosamente',
+          message: 'Tu pago fue aprobado y está siendo procesado. Recibirás una confirmación en breve.',
         };
       } else if (estado === 'Pendiente') {
         // Check for 3DS authentication (can be simple redirect or Cardinal Commerce 3DS 2.0)
@@ -2404,6 +2362,10 @@ class PaymentService {
               '3DS': rawThreeDS,
               ref_payco: fullResponse.ref_payco || refPayco,
               cc_network_response: fullResponse.cc_network_response,
+              cod_error: fullResponse.cod_error,
+              cod_respuesta: fullResponse.cod_respuesta,
+              estado: fullResponse.estado,
+              respuesta: fullResponse.respuesta,
             },
             data: {
               accessToken: threeDSData.accessToken,

@@ -36,8 +36,8 @@ const SUPPORTED_PAYMENT_APPS = [
 const getDaimoConfig = () => {
   const treasuryAddress = process.env.DAIMO_TREASURY_ADDRESS;
   const refundAddress = process.env.DAIMO_REFUND_ADDRESS;
-  // Daimo webhooks must go to easybots.store (payment webhook domain)
-  const webhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || process.env.CHECKOUT_DOMAIN || 'https://easybots.store';
+  // Daimo webhooks must go to easybots.site (payment webhook domain)
+  const webhookDomain = process.env.EPAYCO_WEBHOOK_DOMAIN || process.env.CHECKOUT_DOMAIN || 'https://easybots.site';
   const webhookUrl = `${webhookDomain}/api/webhooks/daimo`;
 
   // Validate critical configuration

@@ -3,244 +3,94 @@
  * Stores current user locations for geolocation features
  */
 
-const { DataTypes } = require('sequelize');
+const { query } = require('../config/postgres');
+const logger = require('../utils/logger');
 
-module.exports = (sequelize) => {
-  const UserLocation = sequelize.define(
-    'UserLocation',
-    {
-      id: {
-        type: DataTypes.UUID,
-        primaryKey: true,
-        defaultValue: DataTypes.UUIDV4
-      },
-      user_id: {
-        type: DataTypes.UUID,
-        allowNull: false,
-        references: {
-          model: 'users',
-          key: 'id'
-        },
-        onDelete: 'CASCADE',
-        unique: true
-      },
-      latitude: {
-        type: DataTypes.DECIMAL(10, 8),
-        allowNull: false,
-        validate: {
-          min: -90,
-          max: 90
-        }
-      },
-      longitude: {
-        type: DataTypes.DECIMAL(11, 8),
-        allowNull: false,
-        validate: {
-          min: -180,
-          max: 180
-        }
-      },
-      accuracy: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 0,
-        validate: {
-          min: 0,
-          max: 10000
-        },
-        comment: 'GPS accuracy in meters'
-      },
-      is_online: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-      },
-      last_seen: {
-        type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW
-      },
-      created_at: {
-        type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW
-      },
-      updated_at: {
-        type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW
-      }
-    },
-    {
-      tableName: 'user_locations',
-      timestamps: false,
-      indexes: [
-        {
-          fields: ['user_id']
-        },
-        {
-          fields: ['updated_at']
-        },
-        {
-          fields: ['is_online']
-        }
-      ]
-    }
-  );
+class UserLocation {
+  /**
+   * Upsert user location — insert or update on conflict
+   */
+  static async upsert(data) {
+    const { user_id, latitude, longitude, accuracy } = data;
+    const result = await query(
+      `INSERT INTO user_locations (user_id, latitude, longitude, accuracy, is_online, last_seen, updated_at)
+       VALUES ($1, $2, $3, $4, true, NOW(), NOW())
+       ON CONFLICT (user_id) DO UPDATE SET
+         latitude   = EXCLUDED.latitude,
+         longitude  = EXCLUDED.longitude,
+         accuracy   = EXCLUDED.accuracy,
+         is_online  = true,
+         last_seen  = NOW(),
+         updated_at = NOW()
+       RETURNING *`,
+      [user_id, latitude, longitude, accuracy]
+    );
+    return result.rows[0];
+  }
 
   /**
-   * Instance Methods
+   * Mark user offline
    */
+  static async markOffline(userId) {
+    await query(
+      `UPDATE user_locations SET is_online = false, last_seen = NOW() WHERE user_id = $1`,
+      [userId]
+    );
+  }
 
   /**
-   * Get distance to another user location
+   * Count total tracked locations
    */
-  UserLocation.prototype.getDistanceTo = function(otherLatitude, otherLongitude) {
-    const R = 6371; // Earth radius in km
-    const dLat = ((otherLatitude - this.latitude) * Math.PI) / 180;
-    const dLon = ((otherLongitude - this.longitude) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((this.latitude * Math.PI) / 180) *
-        Math.cos((otherLatitude * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in km
-  };
+  static async count() {
+    const result = await query(`SELECT COUNT(*) FROM user_locations`);
+    return parseInt(result.rows[0].count, 10);
+  }
 
   /**
-   * Get accuracy description
+   * Get nearby users using PostGIS
    */
-  UserLocation.prototype.getAccuracyDescription = function() {
-    if (this.accuracy < 10) return 'Excellent';
-    if (this.accuracy < 50) return 'Good';
-    if (this.accuracy < 100) return 'Fair';
-    if (this.accuracy < 500) return 'Poor';
-    return 'Very Poor';
-  };
+  static async getNearbyUsers(latitude, longitude, radiusKm = 5, limit = 50) {
+    const result = await query(
+      `SELECT
+         ul.user_id,
+         ul.latitude,
+         ul.longitude,
+         ul.accuracy,
+         ul.is_online,
+         u.first_name,
+         u.username,
+         u.photo_file_id,
+         ST_Distance(
+           ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography,
+           ul.geom::geography
+         ) / 1000 AS distance_km
+       FROM user_locations ul
+       JOIN users u ON ul.user_id = u.id
+       WHERE ul.is_online = true
+         AND ST_DWithin(
+           ul.geom::geography,
+           ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography,
+           $3 * 1000
+         )
+       ORDER BY distance_km ASC
+       LIMIT $4`,
+      [parseFloat(latitude), parseFloat(longitude), radiusKm, limit]
+    );
+    return result.rows;
+  }
 
   /**
-   * Mark user as online
+   * Clear old offline locations
    */
-  UserLocation.prototype.markOnline = async function() {
-    this.is_online = true;
-    this.last_seen = new Date();
-    return this.save();
-  };
+  static async clearOldLocations(hoursOld = 24) {
+    const result = await query(
+      `DELETE FROM user_locations
+       WHERE is_online = false
+         AND last_seen < NOW() - INTERVAL '${parseInt(hoursOld, 10)} hours'`,
+      []
+    );
+    return result.rowCount;
+  }
+}
 
-  /**
-   * Mark user as offline
-   */
-  UserLocation.prototype.markOffline = async function() {
-    this.is_online = false;
-    this.last_seen = new Date();
-    return this.save();
-  };
-
-  /**
-   * Static Methods
-   */
-
-  /**
-   * Find or create user location
-   */
-  UserLocation.findOrCreate = async function(userId, latitude, longitude, accuracy) {
-    const [location, created] = await this.findOrCreate({
-      where: { user_id: userId },
-      defaults: {
-        user_id: userId,
-        latitude,
-        longitude,
-        accuracy,
-        is_online: true
-      }
-    });
-    return { location, created };
-  };
-
-  /**
-   * Update user location
-   */
-  UserLocation.updateUserLocation = async function(userId, latitude, longitude, accuracy) {
-    const [location, created] = await this.upsert({
-      user_id: userId,
-      latitude,
-      longitude,
-      accuracy,
-      is_online: true,
-      last_seen: new Date()
-    });
-    return location;
-  };
-
-  /**
-   * Get nearby users (using raw SQL with PostGIS)
-   */
-  UserLocation.getNearbyUsers = async function(
-    latitude,
-    longitude,
-    radiusKm = 5,
-    limit = 50
-  ) {
-    const query = `
-      SELECT
-        ul.id,
-        ul.user_id,
-        ul.latitude,
-        ul.longitude,
-        ul.accuracy,
-        ul.is_online,
-        u.first_name,
-        u.username,
-        u.avatar_url,
-        ST_Distance(
-          ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326),
-          ul.geom
-        ) * 111 AS distance_km
-      FROM user_locations ul
-      JOIN users u ON ul.user_id = u.id
-      WHERE ul.is_online = TRUE
-      AND ST_DWithin(
-        ul.geom,
-        ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326),
-        :radius * 1000 / 111000
-      )
-      ORDER BY distance_km ASC
-      LIMIT :limit
-    `;
-
-    return sequelize.query(query, {
-      replacements: {
-        latitude: parseFloat(latitude),
-        longitude: parseFloat(longitude),
-        radius: radiusKm,
-        limit
-      },
-      type: sequelize.QueryTypes.SELECT
-    });
-  };
-
-  /**
-   * Get online users count
-   */
-  UserLocation.getOnlineCount = async function() {
-    return this.count({
-      where: { is_online: true }
-    });
-  };
-
-  /**
-   * Clear old locations (older than 24 hours and offline)
-   */
-  UserLocation.clearOldLocations = async function(hoursOld = 24) {
-    const cutoffTime = new Date(Date.now() - hoursOld * 60 * 60 * 1000);
-
-    return this.destroy({
-      where: {
-        is_online: false,
-        last_seen: {
-          [sequelize.Op.lt]: cutoffTime
-        }
-      }
-    });
-  };
-
-  return UserLocation;
-};
+module.exports = UserLocation;

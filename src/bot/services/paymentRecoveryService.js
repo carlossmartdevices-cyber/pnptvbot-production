@@ -163,7 +163,7 @@ class PaymentRecoveryService {
       const cleanupResult = await query(`
         UPDATE payments
         SET status = 'abandoned',
-            metadata = metadata || '{"abandoned_at": $1, "reason": "3DS_TIMEOUT"}'::jsonb
+            metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('abandoned_at', $1::text, 'reason', '3DS_TIMEOUT')
         WHERE status = 'pending'
           AND provider = 'epayco'
           AND created_at < NOW() - INTERVAL '24 hours'

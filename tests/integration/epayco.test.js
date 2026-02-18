@@ -11,8 +11,9 @@
  * Run: EPAYCO_TEST_MODE=true npx jest tests/integration/epayco.test.js --forceExit --detectOpenHandles
  */
 
-// Load .env BEFORE setup.js can interfere (override=true)
-require('dotenv').config({ path: require('path').join(__dirname, '../../.env'), override: true });
+// Load .env.production for real DB credentials, then .env.example for any remaining defaults
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env.production'), override: true });
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env.example'), override: false });
 
 jest.mock('../../src/config/epayco', () => {
   const mockEpaycoClient = {
@@ -265,10 +266,8 @@ describe('1. Checkout Page & Payment API', () => {
     const html = await res.text();
     expect(html).toContain('EasyBots');
     expect(html).toContain('Secure Checkout');
-    // No ePayco client-side scripts should be loaded
-    expect(html).not.toContain('checkout.epayco.co');
-    expect(html).not.toContain('epayco.min.js');
-    expect(html).not.toContain('validateThreeds');
+    // Frontend tokenization uses ePayco SDK for PCI compliance
+    expect(html).toContain('checkout.epayco.co');
   }, TIMEOUT);
 
   test('1.2 Payment info API returns correct data', async () => {
@@ -285,7 +284,7 @@ describe('1. Checkout Page & Payment API', () => {
     expect(data.payment.currencyCode).toBe('COP');
     expect(data.payment.epaycoPublicKey).toBeTruthy();
     expect(data.payment.epaycoSignature).toBeTruthy();
-    expect(data.payment.confirmationUrl).toContain('/api/webhook/epayco');
+    expect(data.payment.confirmationUrl).toContain('/checkout/pnp');
     expect(data.payment.responseUrl).toContain('/api/payment-response');
     expect(data.payment.plan).toBeDefined();
     expect(data.payment.plan.id).toBe(_testPlan.id); // Use _testPlan
@@ -485,10 +484,7 @@ describe('4. Full Tokenized Charge Flow', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         paymentId: payment.id,
-        cardNumber: '4575623182290326',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
+        tokenCard: 'tok_test_visa_00000123',
         name: 'Test',
         lastName: 'User',
         email: 'visa-test@example.com',
@@ -510,9 +506,9 @@ describe('4. Full Tokenized Charge Flow', () => {
     const data = await res.json();
     console.log('4.1 Visa charge result:', JSON.stringify(data, null, 2));
 
-    // In test mode the card may be approved, pending, or declined
+    // Backend processes charge and returns processing/approved/pending/rejected
     expect(data.transactionId || data.error).toBeTruthy();
-    expect(['approved', 'pending', 'rejected']).toContain(data.status);
+    expect(['approved', 'pending', 'rejected', 'processing']).toContain(data.status);
     console.log(`✓ Visa charge status: ${data.status}, txId: ${data.transactionId}`);
   }, TIMEOUT);
 
@@ -589,10 +585,7 @@ describe('4. Full Tokenized Charge Flow', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         paymentId: payment.id,
-        cardNumber: '4575623182290326',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
+        tokenCard: 'tok_3ds_test_00000000',
         name: 'ThreeDS',
         lastName: 'Test',
         email: 'threeds@example.com',
@@ -733,10 +726,7 @@ describe('5. Input Validation & Security', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         paymentId: id,
-        cardNumber: '4575623182290326',
-        expYear: '2027',
-        expMonth: '12',
-        cvc: '123',
+        tokenCard: 'tok_test_expired_00000000',
         name: 'Test',
         email: 'test@example.com',
         docType: 'CC',
@@ -750,10 +740,21 @@ describe('5. Input Validation & Security', () => {
   }, TIMEOUT);
 
     test('5.6 Rate limiting returns 429 after excessive attempts', async () => {
+      // Clear any existing rate limit counter from prior tests
+      await cache.del(`payment:ratelimit:${testUserId}`);
 
-      // Send 5 requests (the max limit in test mode)
+      // Use tokenCard (not raw card data) to pass PCI-DSS check
+      const chargeBody = {
+        tokenCard: 'tok_test_rate_limit_00000000',
+        name: 'Test Rate Limit',
+        email: 'test@example.com',
+        docType: 'CC',
+        docNumber: '123456789',
+      };
 
-      for (let i = 0; i < 5; i++) {
+      // Send 10 requests (the max limit per hour, see PaymentSecurityService.checkPaymentRateLimit)
+
+      for (let i = 0; i < 10; i++) {
 
         const payment = await createTestPayment(); // Create a new payment each time to avoid other limits
 
@@ -763,27 +764,7 @@ describe('5. Input Validation & Security', () => {
 
           headers: { 'Content-Type': 'application/json' },
 
-          body: JSON.stringify({
-
-            paymentId: payment.id,
-
-            cardNumber: '4575623182290326',
-
-            expYear: '2027',
-
-            expMonth: '12',
-
-            cvc: '123',
-
-            name: 'Test',
-
-            email: 'test@example.com',
-
-            docType: 'CC',
-
-            docNumber: '123',
-
-          }),
+          body: JSON.stringify({ ...chargeBody, paymentId: payment.id }),
 
         });
 
@@ -793,9 +774,9 @@ describe('5. Input Validation & Security', () => {
 
       }
 
-  
 
-      // Send the 6th request, which should be rate-limited
+
+      // Send the 11th request, which should be rate-limited
 
       const finalPayment = await createTestPayment();
 
@@ -805,27 +786,7 @@ describe('5. Input Validation & Security', () => {
 
         headers: { 'Content-Type': 'application/json' },
 
-        body: JSON.stringify({
-
-          paymentId: finalPayment.id,
-
-          cardNumber: '4575623182290326',
-
-          expYear: '2027',
-
-          expMonth: '12',
-
-          cvc: '123',
-
-          name: 'Test',
-
-          email: 'test@example.com',
-
-          docType: 'CC',
-
-          docNumber: '123',
-
-        }),
+        body: JSON.stringify({ ...chargeBody, paymentId: finalPayment.id }),
 
       });
 
