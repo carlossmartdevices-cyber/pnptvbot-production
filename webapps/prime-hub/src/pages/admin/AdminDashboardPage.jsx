@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import { api } from '../../api/client';
-import { Users, BarChart3, TrendingUp, AlertCircle, DollarSign, Calendar, Music, Radio, Image } from 'lucide-react';
+import { Users, BarChart3, TrendingUp, AlertCircle, DollarSign, Calendar, Music, Radio } from 'lucide-react';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState(null);
@@ -136,14 +136,6 @@ export default function AdminDashboardPage() {
               <Radio size={20} style={{ color: '#FF6B9D' }} />
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>Now playing, queue, requests</div>
-          </Link>
-
-          <Link to="/admin/photos" className="card" style={{ padding: 16, textDecoration: 'none', color: 'inherit' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: '600' }}>Photo Gallery</span>
-              <Image size={20} style={{ color: '#FF9500' }} />
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>Upload, edit, delete photos</div>
           </Link>
         </div>
 
