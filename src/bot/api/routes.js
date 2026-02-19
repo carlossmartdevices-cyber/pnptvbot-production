@@ -1422,24 +1422,24 @@ const socialController = require('./controllers/socialController');
 const usersController = require('./controllers/usersController');
 
 // Chat (REST fallback for Socket.IO)
-app.get('/api/chat/:room/history', asyncHandler(chatController.getChatHistory));
+app.get('/api/webapp/chat/:room/history', asyncHandler(chatController.getChatHistory));
 
 // DM threads & conversations
-app.get('/api/dm/threads', asyncHandler(dmController.getThreads));
-app.get('/api/dm/conversation/:partnerId', asyncHandler(dmController.getConversation));
-app.get('/api/dm/user/:partnerId', asyncHandler(dmController.getPartnerInfo));
+app.get('/api/webapp/dm/threads', asyncHandler(dmController.getThreads));
+app.get('/api/webapp/dm/conversation/:partnerId', asyncHandler(dmController.getConversation));
+app.get('/api/webapp/dm/user/:partnerId', asyncHandler(dmController.getPartnerInfo));
 
 // Social feed, wall, posts
-app.get('/api/social/feed', asyncHandler(socialController.getFeed));
-app.get('/api/social/wall/:userId', asyncHandler(socialController.getWall));
-app.post('/api/social/posts', asyncHandler(socialController.createPost));
-app.post('/api/social/posts/:postId/like', asyncHandler(socialController.toggleLike));
-app.delete('/api/social/posts/:postId', asyncHandler(socialController.deletePost));
-app.get('/api/social/posts/:postId/replies', asyncHandler(socialController.getReplies));
-app.post('/api/social/posts/:postId/mastodon', asyncHandler(socialController.postToMastodon));
+app.get('/api/webapp/social/feed', asyncHandler(socialController.getFeed));
+app.get('/api/webapp/social/wall/:userId', asyncHandler(socialController.getWall));
+app.post('/api/webapp/social/posts', asyncHandler(socialController.createPost));
+app.post('/api/webapp/social/posts/:postId/like', asyncHandler(socialController.toggleLike));
+app.delete('/api/webapp/social/posts/:postId', asyncHandler(socialController.deletePost));
+app.get('/api/webapp/social/posts/:postId/replies', asyncHandler(socialController.getReplies));
+app.post('/api/webapp/social/posts/:postId/mastodon', asyncHandler(socialController.postToMastodon));
 
 // Users search
-app.get('/api/users/search', asyncHandler(usersController.searchUsers));
+app.get('/api/webapp/users/search', asyncHandler(usersController.searchUsers));
 
 // ==========================================
 // PRIME Hub SPA Serving

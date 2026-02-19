@@ -26,8 +26,7 @@ function ProtectedRoute({ children }) {
   }
 
   if (!user) {
-    window.location.replace('/prime-hub/login');
-    return null;
+    return <Navigate to="/login" replace />;
   }
 
   return children;

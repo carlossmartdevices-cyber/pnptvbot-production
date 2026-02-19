@@ -183,6 +183,10 @@ const telegramLogin = async (req, res) => {
 
     req.session.user = buildSession(user, { photoUrl: telegramUser.photo_url || user.photo_file_id });
 
+    await new Promise((resolve, reject) =>
+      req.session.save(err => (err ? reject(err) : resolve()))
+    );
+
     logger.info(`Web app Telegram login: user ${user.id} (${user.username})`);
     return res.json({
       authenticated: true,
