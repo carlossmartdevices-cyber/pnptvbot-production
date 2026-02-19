@@ -21,6 +21,8 @@
     "seed": "node scripts/seed.js",
     "validate:env": "node -e \"require('./src/utils/envValidator').validateEnv()\"",
     "import:legacy-customers": "node scripts/import-legacy-customers.js",
+    "build:prime-hub": "cd webapps/prime-hub && npm install && npx vite build && cp -r dist/* ../../public/prime-hub/",
+    "build:webapps": "npm run build:prime-hub",
     "prestart": ""
   },
   "keywords": [
