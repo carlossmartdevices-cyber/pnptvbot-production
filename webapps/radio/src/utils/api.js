@@ -89,15 +89,33 @@ export async function fetchTelegramUser() {
 }
 
 export function initTelegramLogin(loginRef) {
-  if (loginRef.current && window.TelegramLoginWidget) {
-    const script = document.createElement('script');
-    script.src = 'https://telegram.org/js/telegram-widget.js?22';
-    script.setAttribute('data-telegram-bot', 'PNPtv_bot'); // Replace with your bot username
-    script.setAttribute('data-size', 'large');
-    script.setAttribute('data-onauth', 'window.onTelegramAuth(user)');
-    script.setAttribute('data-request-access', 'write');
+  if (loginRef.current) {
     loginRef.current.innerHTML = ''; // Clear existing widget if any
-    loginRef.current.appendChild(script);
+    const div = document.createElement('div');
+    div.setAttribute('id', 'telegram-login-widget');
+    div.setAttribute('data-telegram-login', 'PNPtv_bot');
+    div.setAttribute('data-size', 'large');
+    div.setAttribute('data-auth-url', `${API_BASE}/webapp/auth/telegram`);
+    div.setAttribute('data-request-access', 'write');
+    loginRef.current.appendChild(div);
+
+    // Load the Telegram widget script
+    if (!window.TelegramLoginWidget) {
+      const script = document.createElement('script');
+      script.src = 'https://telegram.org/js/telegram-widget.js?22';
+      script.async = true;
+      script.onload = () => {
+        if (window.Telegram?.Login?.embed) {
+          window.Telegram.Login.embed('telegram-login-widget', {
+            bot_id: 'PNPtv_bot',
+            size: 'large',
+            auth_url: `${API_BASE}/webapp/auth/telegram`,
+            request_access: 'write',
+          });
+        }
+      };
+      document.head.appendChild(script);
+    }
   }
 }
 
