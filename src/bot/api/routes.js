@@ -1416,6 +1416,12 @@ app.put('/api/webapp/profile', asyncHandler(webAppController.updateProfile));
 // Web App Mastodon Feed
 app.get('/api/webapp/mastodon/feed', asyncHandler(webAppController.getMastodonFeed));
 
+// Web App Hangouts (session auth)
+const webappHangoutsController = require('./controllers/webappHangoutsController');
+app.get('/api/webapp/hangouts/public', asyncHandler(webappHangoutsController.listPublic));
+app.post('/api/webapp/hangouts/create', asyncHandler(webappHangoutsController.createRoom));
+app.post('/api/webapp/hangouts/join/:callId', asyncHandler(webappHangoutsController.joinRoom));
+
 // ==========================================
 // Social, DM, Chat, Users API Routes
 // ==========================================

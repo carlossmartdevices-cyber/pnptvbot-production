@@ -58,7 +58,9 @@ export const api = {
   getRadioNowPlaying: () => request('/radio/now-playing').catch(() => ({})),
 
   // Hangouts
-  getPublicHangouts: () => request('/hangouts/public').catch(() => ({ hangouts: [] })),
+  getPublicHangouts: () => request('/hangouts/public'),
+  createHangout: (data) => request('/hangouts/create', { method: 'POST', body: JSON.stringify(data) }),
+  joinHangout: (callId) => request(`/hangouts/join/${callId}`, { method: 'POST' }),
 
   // Social feed
   getFeed: (cursor) => request(`/social/feed${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
