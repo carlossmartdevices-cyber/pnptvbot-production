@@ -223,12 +223,12 @@
     <div class="divider">o</div>
 
     <!-- 2. X (Twitter) OAuth -->
-    <a href="/api/webapp/auth/x/start" class="btn btn-x" id="btn-x">
+    <button class="btn btn-x" id="btn-x" onclick="handleXLogin()">
       <svg class="x-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
         <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.745l7.73-8.835L1.254 2.25H8.08l4.258 5.63 5.906-5.63Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
       </svg>
       Continuar con X
-    </a>
+    </button>
 
     <div class="divider">o</div>
 
@@ -377,6 +377,29 @@
         showBanner('error', 'Error de red. Intenta de nuevo.');
         btn.disabled = false;
         btn.textContent = 'Crear cuenta';
+      }
+    }
+
+    // ── X (Twitter) OAuth ─────────────────────────────────────────────────────
+    async function handleXLogin() {
+      clearBanners();
+      const btn = document.getElementById('btn-x');
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+      try {
+        const res  = await fetch('/api/webapp/auth/x/start', { credentials: 'include' });
+        const data = await res.json();
+        if (res.ok && data.url) {
+          window.location.href = data.url;
+        } else {
+          showBanner('error', data.error || 'No se pudo iniciar sesión con X.');
+          btn.disabled = false;
+          btn.style.opacity = '';
+        }
+      } catch {
+        showBanner('error', 'Error de red. Intenta de nuevo.');
+        btn.disabled = false;
+        btn.style.opacity = '';
       }
     }
 

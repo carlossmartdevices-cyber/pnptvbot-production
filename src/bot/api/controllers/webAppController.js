@@ -244,10 +244,13 @@ const emailRegister = async (req, res) => {
     });
 
     req.session.user = buildSession(user);
+    await new Promise((resolve, reject) =>
+      req.session.save(err => (err ? reject(err) : resolve()))
+    );
     logger.info(`New user registered via email: ${user.id} (${emailLower})`);
 
     return res.json({
-      success: true,
+      authenticated: true,
       pnptvId: user.pnptv_id,
       user: {
         id: user.id,
@@ -298,6 +301,9 @@ const emailLogin = async (req, res) => {
     }
 
     req.session.user = buildSession(user);
+    await new Promise((resolve, reject) =>
+      req.session.save(err => (err ? reject(err) : resolve()))
+    );
     logger.info(`Web app email login: user ${user.id} (${emailLower})`);
 
     return res.json({
