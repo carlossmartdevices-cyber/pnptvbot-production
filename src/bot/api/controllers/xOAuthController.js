@@ -177,7 +177,6 @@ const handleCallback = async (req, res) => {
       req.session.user = {
         id: user.id,
         pnptvId: user.pnptv_id,
-        telegramId: user.telegram,
         username: user.username,
         firstName: user.first_name,
         lastName: user.last_name,
