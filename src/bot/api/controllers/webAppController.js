@@ -324,8 +324,11 @@ const emailLogin = async (req, res) => {
  */
 const xLoginStart = async (req, res) => {
   try {
-    const clientId = process.env.WEBAPP_X_CLIENT_ID;
-    const redirectUri = process.env.WEBAPP_X_REDIRECT_URI;
+    // Reuse the main Twitter app (TWITTER_CLIENT_ID + TWITTER_REDIRECT_URI) which is
+    // already registered in the Twitter Developer Portal. A session flag (xWebLogin)
+    // tells the shared callback to handle this as a webapp login instead of a bot link.
+    const clientId = process.env.TWITTER_CLIENT_ID;
+    const redirectUri = process.env.TWITTER_REDIRECT_URI;
 
     if (!clientId || !redirectUri) {
       return res.status(500).json({ error: 'X login not configured on this server' });
@@ -336,6 +339,7 @@ const xLoginStart = async (req, res) => {
     const codeChallenge = b64url(crypto.createHash('sha256').update(codeVerifier).digest());
 
     req.session.xOAuth = { state, codeVerifier };
+    req.session.xWebLogin = true;
     await new Promise((resolve, reject) =>
       req.session.save(err => (err ? reject(err) : resolve()))
     );

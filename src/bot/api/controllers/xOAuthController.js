@@ -1,5 +1,7 @@
 const XOAuthService = require('../../services/xOAuthService');
 const logger = require('../../../utils/logger');
+const axios = require('axios');
+const { query } = require('../../../config/postgres');
 
 const sanitizeBotUsername = (value) => String(value || '').replace(/^@/, '').trim();
 
@@ -95,6 +97,109 @@ const startOAuth = async (req, res) => {
 const handleCallback = async (req, res) => {
   const botUsername = sanitizeBotUsername(process.env.BOT_USERNAME);
   const botLink = botUsername ? `https://t.me/${botUsername}` : null;
+
+  // ── Webapp login flow ────────────────────────────────────────────────────────
+  if (req.session?.xWebLogin) {
+    delete req.session.xWebLogin;
+    const { state, code, error: xError } = req.query;
+    const stored = req.session.xOAuth;
+    delete req.session.xOAuth;
+
+    if (xError || !code || !state || !stored || stored.state !== state) {
+      logger.warn('X webapp login failed: state mismatch or missing params', { xError, hasCode: !!code, hasStored: !!stored });
+      return res.redirect('/prime-hub/login?error=auth_failed');
+    }
+
+    try {
+      const clientId = process.env.TWITTER_CLIENT_ID;
+      const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+      const redirectUri = process.env.TWITTER_REDIRECT_URI;
+
+      const tokenRes = await axios.post(
+        'https://api.twitter.com/2/oauth2/token',
+        new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: redirectUri,
+          code_verifier: stored.codeVerifier,
+        }).toString(),
+        {
+          auth: { username: clientId, password: clientSecret },
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        }
+      );
+
+      const accessToken = tokenRes.data.access_token;
+      const profileRes = await axios.get('https://api.twitter.com/2/users/me', {
+        params: { 'user.fields': 'name,profile_image_url' },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      const xData = profileRes.data?.data;
+      const xHandle = xData?.username;
+      if (!xHandle) return res.redirect('/prime-hub/login?error=auth_failed');
+
+      // Find or create user
+      let result = await query(
+        `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
+                accepted_terms, photo_file_id, bio, language
+         FROM users WHERE twitter = $1`,
+        [xHandle]
+      );
+
+      let user;
+      if (result.rows.length === 0) {
+        if (req.session?.user?.id) {
+          await query('UPDATE users SET twitter = $1 WHERE id = $2', [xHandle, req.session.user.id]);
+          result = await query(
+            `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
+                    accepted_terms, photo_file_id, bio, language FROM users WHERE id = $1`,
+            [req.session.user.id]
+          );
+          user = result.rows[0];
+        } else {
+          const { v4: uuidv4 } = require('uuid');
+          const [firstName, ...rest] = ((xData?.name || xHandle)).split(' ');
+          const { rows } = await query(
+            `INSERT INTO users (id, pnptv_id, first_name, last_name, twitter,
+              subscription_status, tier, role, accepted_terms, is_active, created_at, updated_at)
+             VALUES ($1,$2,$3,$4,$5,'free','free','user',false,true,NOW(),NOW())
+             RETURNING id, pnptv_id, first_name, last_name, username, subscription_status, accepted_terms, photo_file_id, bio, language, twitter`,
+            [uuidv4(), uuidv4(), firstName, rest.join(' ') || null, xHandle]
+          );
+          user = rows[0];
+          logger.info(`Created new user via X web login: ${user.id} (@${xHandle})`);
+        }
+      } else {
+        user = result.rows[0];
+      }
+
+      req.session.user = {
+        id: user.id,
+        pnptvId: user.pnptv_id,
+        telegramId: user.telegram,
+        username: user.username,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        subscriptionStatus: user.subscription_status,
+        acceptedTerms: user.accepted_terms,
+        photoUrl: user.photo_file_id,
+        bio: user.bio,
+        xHandle,
+      };
+
+      await new Promise((resolve, reject) =>
+        req.session.save(err => (err ? reject(err) : resolve()))
+      );
+
+      logger.info(`Web app X login success: user ${user.id} via @${xHandle}`);
+      return res.redirect('/prime-hub/');
+    } catch (err) {
+      logger.error('X webapp login callback error:', err.message);
+      return res.redirect('/prime-hub/login?error=auth_failed');
+    }
+  }
+  // ── End webapp login flow ────────────────────────────────────────────────────
 
   try {
     const { state, code, error, error_description: errorDescription } = req.query;
