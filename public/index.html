@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <meta name="theme-color" content="#1C1C1E" />
-  <meta name="description" content="PNPtv PRIME — Sign in to access your community" />
+  <meta name="description" content="PNPtv PRIME — Sign in or create your account" />
   <title>PNPtv — Sign In</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -17,19 +17,21 @@
     :root {
       --bg: #1C1C1E;
       --card: #2C2C2E;
+      --card2: #3A3A3C;
       --border: rgba(255,255,255,0.08);
       --pink: #FF00CC;
       --amber: #FFB454;
       --gradient: linear-gradient(135deg, #FF00CC, #FFB454);
       --text: #FFFFFF;
       --muted: #8E8E93;
+      --input-bg: #1C1C1E;
     }
 
     html, body {
       height: 100%;
       background: var(--bg);
       color: var(--text);
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
 
@@ -41,155 +43,110 @@
       min-height: 100vh;
       padding: 24px 16px;
       position: relative;
-      overflow: hidden;
+      overflow-x: hidden;
     }
 
-    .glow {
-      position: fixed;
-      width: 500px; height: 500px;
-      border-radius: 50%;
-      filter: blur(120px);
-      pointer-events: none;
-      z-index: 0;
-    }
+    .glow { position: fixed; width: 500px; height: 500px; border-radius: 50%; filter: blur(120px); pointer-events: none; z-index: 0; }
     .glow-pink  { background: rgba(255,0,204,0.12); top: -100px; left: -100px; }
     .glow-amber { background: rgba(255,180,84,0.10); bottom: -100px; right: -100px; }
 
     .card {
-      position: relative;
-      z-index: 1;
-      width: 100%;
-      max-width: 400px;
+      position: relative; z-index: 1;
+      width: 100%; max-width: 420px;
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 24px;
-      padding: 40px 32px 36px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      padding: 36px 32px 32px;
+      display: flex; flex-direction: column; align-items: center;
       box-shadow: 0 24px 60px rgba(0,0,0,0.4);
     }
 
-    .logo {
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: 0.25em;
-      text-transform: uppercase;
-      background: var(--gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 8px;
-    }
+    .logo { font-size: 11px; font-weight: 800; letter-spacing: 0.28em; text-transform: uppercase; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 6px; }
+    .brand { font-size: 32px; font-weight: 900; letter-spacing: -1px; margin-bottom: 6px; }
+    .tagline { font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 28px; }
 
-    .brand {
-      font-size: 36px;
-      font-weight: 900;
-      letter-spacing: -1px;
-      margin-bottom: 8px;
+    /* Tabs */
+    .tabs { display: flex; width: 100%; background: var(--input-bg); border-radius: 12px; padding: 4px; gap: 2px; margin-bottom: 24px; }
+    .tab {
+      flex: 1; padding: 9px 0; border-radius: 9px; border: none;
+      background: transparent; color: var(--muted); font-family: inherit;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
     }
+    .tab.active { background: var(--card2); color: var(--text); }
+    .tab svg { width: 14px; height: 14px; fill: currentColor; flex-shrink: 0; }
 
-    .tagline {
-      font-size: 14px;
-      color: var(--muted);
-      text-align: center;
-      line-height: 1.6;
-      margin-bottom: 36px;
-    }
+    /* Panels */
+    .panel { display: none; width: 100%; flex-direction: column; align-items: center; gap: 0; }
+    .panel.active { display: flex; }
 
-    .divider {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin: 20px 0;
-    }
-    .divider::before, .divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
-    .divider span { font-size: 12px; color: var(--muted); }
+    /* Msg */
+    .msg { width: 100%; padding: 11px 14px; border-radius: 10px; font-size: 13px; text-align: center; line-height: 1.5; margin-bottom: 14px; }
+    .msg-error { background: rgba(255,59,48,0.12); border: 1px solid rgba(255,59,48,0.25); color: #FF453A; }
+    .msg-ok    { background: rgba(52,199,89,0.12);  border: 1px solid rgba(52,199,89,0.25);  color: #30D158; }
 
+    /* Telegram widget */
+    #tg-widget { width: 100%; display: flex; justify-content: center; min-height: 48px; margin-bottom: 4px; }
+
+    /* Buttons */
     .btn {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      padding: 14px 20px;
-      border-radius: 12px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      font-family: inherit;
-      transition: opacity 0.15s, transform 0.1s;
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 14px 20px; border-radius: 12px; font-size: 15px; font-weight: 600;
+      cursor: pointer; border: none; font-family: inherit;
+      transition: opacity 0.15s, transform 0.1s; margin-top: 10px;
     }
     .btn:active { opacity: 0.75; transform: scale(0.98); }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .btn-x { background: #000; color: #fff; border: 1px solid rgba(255,255,255,0.14); }
+    .btn-primary { background: var(--gradient); color: #fff; }
+    .btn-ghost { background: var(--card2); color: var(--text); font-size: 13px; padding: 11px 20px; }
 
-    .btn-x {
-      background: #000;
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.14);
+    /* Inputs */
+    .input-group { width: 100%; display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
+    .input-row { display: flex; gap: 10px; }
+    .input-row .field { flex: 1; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 12px; color: var(--muted); font-weight: 500; }
+    .field input {
+      background: var(--input-bg); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-family: inherit;
+      font-size: 15px; padding: 12px 14px; width: 100%;
+      transition: border-color 0.2s; outline: none;
     }
+    .field input:focus { border-color: rgba(255,0,204,0.5); }
+    .field input::placeholder { color: var(--muted); }
 
-    #tg-widget {
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      min-height: 48px;
-    }
+    /* Toggle register/login */
+    .toggle-link { margin-top: 14px; font-size: 13px; color: var(--muted); }
+    .toggle-link a { color: var(--pink); text-decoration: none; font-weight: 600; cursor: pointer; }
 
-    .msg {
-      width: 100%;
-      padding: 12px 16px;
-      border-radius: 10px;
-      font-size: 13px;
-      text-align: center;
-      line-height: 1.5;
-      margin-bottom: 16px;
+    /* PNPtv ID success box */
+    .pnptv-box {
+      width: 100%; background: rgba(255,0,204,0.08); border: 1px solid rgba(255,0,204,0.2);
+      border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 12px;
     }
-    .msg-error {
-      background: rgba(255,59,48,0.12);
-      border: 1px solid rgba(255,59,48,0.25);
-      color: #FF453A;
-    }
-    .msg-ok {
-      background: rgba(52,199,89,0.12);
-      border: 1px solid rgba(52,199,89,0.25);
-      color: #30D158;
-    }
+    .pnptv-box-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+    .pnptv-box-id { font-size: 22px; font-weight: 800; letter-spacing: 0.06em; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
-    .x-icon { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
+    /* Divider */
+    .divider { width: 100%; display: flex; align-items: center; gap: 12px; margin: 14px 0; }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .divider span { font-size: 11px; color: var(--muted); }
 
-    .spinner {
-      width: 18px; height: 18px;
-      border: 2px solid rgba(255,255,255,0.2);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      flex-shrink: 0;
-    }
+    .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .footer {
-      position: relative;
-      z-index: 1;
-      margin-top: 24px;
-      font-size: 12px;
-      color: var(--muted);
-      text-align: center;
-      line-height: 1.9;
-    }
+    .x-icon { width: 17px; height: 17px; fill: currentColor; flex-shrink: 0; }
+
+    .footer { position: relative; z-index: 1; margin-top: 20px; font-size: 12px; color: var(--muted); text-align: center; line-height: 1.9; }
     .footer a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
     .footer a:hover { color: var(--text); }
 
     @media (max-width: 420px) {
-      .card { padding: 32px 20px 28px; border-radius: 20px; }
-      .brand { font-size: 30px; }
+      .card { padding: 28px 18px 24px; border-radius: 20px; }
+      .brand { font-size: 28px; }
+      .input-row { flex-direction: column; }
     }
   </style>
 </head>
@@ -201,22 +158,104 @@
   <div class="card">
     <div class="logo">PNPtv</div>
     <h1 class="brand">PRIME Zone</h1>
-    <p class="tagline">Sign in to access Live, Hangouts,<br>Videorama &amp; your community.</p>
+    <p class="tagline">Sign in or create your free account</p>
 
-    <div id="msg"></div>
+    <div id="global-msg"></div>
 
-    <!-- Telegram Login Widget -->
-    <div id="tg-widget"></div>
+    <!-- Tabs -->
+    <div class="tabs" role="tablist">
+      <button class="tab active" onclick="switchTab('telegram')" id="tab-telegram">
+        <svg viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+        Telegram
+      </button>
+      <button class="tab" onclick="switchTab('x')" id="tab-x">
+        <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.739l7.737-8.835L1.254 2.25H8.08l4.261 5.636L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        X
+      </button>
+      <button class="tab" onclick="switchTab('email')" id="tab-email">
+        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        Email
+      </button>
+    </div>
 
-    <div class="divider"><span>or</span></div>
+    <!-- Telegram Panel -->
+    <div class="panel active" id="panel-telegram">
+      <div id="tg-msg"></div>
+      <div id="tg-widget"></div>
+      <p style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center;">
+        Click the button above to sign in with your Telegram account.<br>New here? An account is created automatically.
+      </p>
+    </div>
 
-    <!-- X Login -->
-    <button class="btn btn-x" id="btn-x" onclick="loginWithX()">
-      <svg class="x-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.739l7.737-8.835L1.254 2.25H8.08l4.261 5.636L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-      </svg>
-      <span id="x-label">Sign in with X</span>
-    </button>
+    <!-- X Panel -->
+    <div class="panel" id="panel-x">
+      <div id="x-msg"></div>
+      <button class="btn btn-x" id="btn-x" onclick="loginWithX()" style="margin-top:0;">
+        <svg class="x-icon" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.739l7.737-8.835L1.254 2.25H8.08l4.261 5.636L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        <span id="x-label">Continue with X</span>
+      </button>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px;text-align:center;">
+        New here? An account is created automatically on first sign in.
+      </p>
+    </div>
+
+    <!-- Email Panel -->
+    <div class="panel" id="panel-email">
+      <div id="email-msg"></div>
+
+      <!-- Login form (default) -->
+      <div id="form-login" style="width:100%;">
+        <div class="input-group">
+          <div class="field">
+            <label for="login-email">Email</label>
+            <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email" />
+          </div>
+          <div class="field">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btn-login" onclick="doLogin()">Sign In</button>
+        <p class="toggle-link">Don't have an account? <a onclick="showRegister()">Create one</a></p>
+      </div>
+
+      <!-- Register form -->
+      <div id="form-register" style="width:100%;display:none;">
+        <div class="input-group">
+          <div class="input-row">
+            <div class="field">
+              <label for="reg-first">First Name *</label>
+              <input type="text" id="reg-first" placeholder="Carlos" autocomplete="given-name" />
+            </div>
+            <div class="field">
+              <label for="reg-last">Last Name</label>
+              <input type="text" id="reg-last" placeholder="Smith" autocomplete="family-name" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="reg-email">Email *</label>
+            <input type="email" id="reg-email" placeholder="you@example.com" autocomplete="email" />
+          </div>
+          <div class="field">
+            <label for="reg-password">Password * (min 8 chars)</label>
+            <input type="password" id="reg-password" placeholder="••••••••" autocomplete="new-password" />
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btn-register" onclick="doRegister()">Create Account</button>
+        <p class="toggle-link">Already have an account? <a onclick="showLogin()">Sign in</a></p>
+      </div>
+
+      <!-- After register: show PNPtv ID -->
+      <div id="form-success" style="width:100%;display:none;">
+        <div class="pnptv-box">
+          <div class="pnptv-box-label">Your PNPtv ID</div>
+          <div class="pnptv-box-id" id="success-pnptv-id"></div>
+        </div>
+        <p style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:14px;">Save this ID — it's your unique PNPtv identifier.</p>
+        <button class="btn btn-primary" onclick="window.location.replace('/prime-hub/')">Go to PRIME Hub →</button>
+      </div>
+    </div>
+
   </div>
 
   <p class="footer">
@@ -225,53 +264,70 @@
   </p>
 
   <script>
-    // ── Handle redirect params ──────────────────────────────────────────
-    (function () {
-      const p = new URLSearchParams(location.search);
-      if (p.get('auth') === 'success') {
-        window.location.replace('/prime-hub/');
-        return;
-      }
-      const err = p.get('error');
-      if (err === 'not_registered') {
-        const h = p.get('x_handle');
-        showError(h
-          ? `X account @${h} is not linked to a PNPtv account. Start the bot first: @PNPLatinoTV_Bot`
-          : 'Account not found. Start the bot first: @PNPLatinoTV_Bot');
-      } else if (err === 'auth_failed') {
-        showError('Authentication failed. Please try again.');
-      } else if (err === 'missing_params') {
-        showError('Sign-in was incomplete. Please try again.');
-      }
-    })();
-
-    // ── Check existing session ──────────────────────────────────────────
+    // ── Startup: check existing session ──
     fetch('/api/webapp/auth/status', { credentials: 'include' })
       .then(r => r.json())
       .then(d => { if (d.authenticated) window.location.replace('/prime-hub/'); })
       .catch(() => {});
 
-    // ── Telegram Login Widget ───────────────────────────────────────────
+    // ── Handle redirect error params ──
+    (function () {
+      const p = new URLSearchParams(location.search);
+      const err = p.get('error');
+      if (!err) return;
+      const msgs = {
+        not_registered: 'Account not found. Please register below.',
+        auth_failed: 'Authentication failed. Please try again.',
+        missing_params: 'Sign-in was incomplete. Please try again.',
+      };
+      showGlobalError(msgs[err] || 'Something went wrong. Please try again.');
+      if (err === 'not_registered') switchTab('email');
+      // Clean URL
+      history.replaceState({}, '', '/');
+    })();
+
+    // ── Tab switching ──
+    function switchTab(name) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      document.getElementById('panel-' + name).classList.add('active');
+    }
+
+    // ── Global msg ──
+    function showGlobalError(t) {
+      document.getElementById('global-msg').innerHTML = `<div class="msg msg-error" style="margin-bottom:14px;">${esc(t)}</div>`;
+    }
+    function clearGlobalMsg() { document.getElementById('global-msg').innerHTML = ''; }
+
+    function panelMsg(panel, t, type) {
+      document.getElementById(panel + '-msg').innerHTML = `<div class="msg msg-${type}">${esc(t)}</div>`;
+    }
+    function clearPanelMsg(panel) { document.getElementById(panel + '-msg').innerHTML = ''; }
+
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── Telegram Login Widget ──
     window.onTelegramAuth = async function (user) {
-      showMsg('Signing in\u2026', 'ok');
+      clearGlobalMsg(); clearPanelMsg('tg');
+      panelMsg('tg', 'Signing in…', 'ok');
       try {
         const res = await fetch('/api/webapp/auth/telegram', {
-          method: 'POST',
-          credentials: 'include',
+          method: 'POST', credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramUser: user })
+          body: JSON.stringify({ telegramUser: user }),
         });
         const data = await res.json();
-        if (data.authenticated && data.registered) {
-          showMsg('Welcome! Redirecting\u2026', 'ok');
-          setTimeout(() => window.location.replace('/prime-hub/'), 500);
-        } else if (data.registered === false) {
-          showError('Account not registered. Start the bot first: @PNPLatinoTV_Bot');
+        if (data.authenticated) {
+          panelMsg('tg', 'Welcome! Redirecting…', 'ok');
+          setTimeout(() => window.location.replace('/prime-hub/'), 600);
         } else {
-          showError(data.error || 'Login failed. Please try again.');
+          panelMsg('tg', data.error || 'Login failed. Please try again.', 'error');
         }
       } catch {
-        showError('Connection error. Please try again.');
+        panelMsg('tg', 'Connection error. Please try again.', 'error');
       }
     };
 
@@ -287,45 +343,102 @@
       document.getElementById('tg-widget').appendChild(s);
     })();
 
-    // ── X Login ─────────────────────────────────────────────────────────
+    // ── X Login ──
     async function loginWithX() {
       const btn = document.getElementById('btn-x');
       const label = document.getElementById('x-label');
+      clearGlobalMsg(); clearPanelMsg('x');
       btn.disabled = true;
-      const sp = document.createElement('span');
-      sp.className = 'spinner';
-      btn.insertBefore(sp, label);
-      label.textContent = 'Connecting\u2026';
-
+      const sp = document.createElement('span'); sp.className = 'spinner';
+      btn.insertBefore(sp, label); label.textContent = 'Connecting…';
       try {
         const res = await fetch('/api/webapp/auth/x/start', { credentials: 'include' });
         const data = await res.json();
-        if (data.success && data.url) {
-          window.location.href = data.url;
+        if (data.success && data.url) { window.location.href = data.url; return; }
+        panelMsg('x', data.error || 'Could not start X sign-in.', 'error');
+      } catch {
+        panelMsg('x', 'Connection error. Please try again.', 'error');
+      }
+      btn.disabled = false; label.textContent = 'Continue with X';
+      btn.querySelector('.spinner')?.remove();
+    }
+
+    // ── Email forms ──
+    function showRegister() {
+      document.getElementById('form-login').style.display = 'none';
+      document.getElementById('form-register').style.display = 'block';
+      clearPanelMsg('email');
+    }
+    function showLogin() {
+      document.getElementById('form-register').style.display = 'none';
+      document.getElementById('form-login').style.display = 'block';
+      clearPanelMsg('email');
+    }
+
+    async function doLogin() {
+      const btn = document.getElementById('btn-login');
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      clearPanelMsg('email');
+      if (!email || !password) { panelMsg('email', 'Please enter your email and password.', 'error'); return; }
+      btn.disabled = true; btn.textContent = 'Signing in…';
+      try {
+        const res = await fetch('/api/webapp/auth/login', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (data.authenticated) {
+          panelMsg('email', 'Welcome back! Redirecting…', 'ok');
+          setTimeout(() => window.location.replace('/prime-hub/'), 600);
         } else {
-          showError(data.error || 'Could not start X sign-in. Please try again.');
-          resetX();
+          panelMsg('email', data.error || 'Login failed.', 'error');
+          btn.disabled = false; btn.textContent = 'Sign In';
         }
       } catch {
-        showError('Connection error. Please try again.');
-        resetX();
+        panelMsg('email', 'Connection error. Please try again.', 'error');
+        btn.disabled = false; btn.textContent = 'Sign In';
       }
     }
 
-    function resetX() {
-      const btn = document.getElementById('btn-x');
-      btn.disabled = false;
-      document.getElementById('x-label').textContent = 'Sign in with X';
-      const sp = btn.querySelector('.spinner');
-      if (sp) sp.remove();
+    async function doRegister() {
+      const btn = document.getElementById('btn-register');
+      const firstName = document.getElementById('reg-first').value.trim();
+      const lastName  = document.getElementById('reg-last').value.trim();
+      const email    = document.getElementById('reg-email').value.trim();
+      const password = document.getElementById('reg-password').value;
+      clearPanelMsg('email');
+      if (!firstName || !email || !password) { panelMsg('email', 'Please fill in all required fields.', 'error'); return; }
+      if (password.length < 8) { panelMsg('email', 'Password must be at least 8 characters.', 'error'); return; }
+      btn.disabled = true; btn.textContent = 'Creating account…';
+      try {
+        const res = await fetch('/api/webapp/auth/register', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firstName, lastName, email, password }),
+        });
+        const data = await res.json();
+        if (data.success && data.pnptvId) {
+          document.getElementById('form-login').style.display = 'none';
+          document.getElementById('form-register').style.display = 'none';
+          document.getElementById('success-pnptv-id').textContent = data.pnptvId;
+          document.getElementById('form-success').style.display = 'block';
+        } else {
+          panelMsg('email', data.error || 'Registration failed.', 'error');
+          btn.disabled = false; btn.textContent = 'Create Account';
+        }
+      } catch {
+        panelMsg('email', 'Connection error. Please try again.', 'error');
+        btn.disabled = false; btn.textContent = 'Create Account';
+      }
     }
 
-    function showError(t) {
-      document.getElementById('msg').innerHTML = `<div class="msg msg-error">${t}</div>`;
-    }
-    function showMsg(t, type) {
-      document.getElementById('msg').innerHTML = `<div class="msg msg-${type}">${t}</div>`;
-    }
+    // Enter key on password fields
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('login-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+      document.getElementById('reg-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
+    });
   </script>
 
 </body>

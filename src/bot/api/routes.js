@@ -1394,6 +1394,8 @@ const webAppController = require('./controllers/webAppController');
 
 // Web App Authentication
 app.post('/api/webapp/auth/telegram', asyncHandler(webAppController.telegramLogin));
+app.post('/api/webapp/auth/register', asyncHandler(webAppController.emailRegister));
+app.post('/api/webapp/auth/login', asyncHandler(webAppController.emailLogin));
 app.get('/api/webapp/auth/x/start', asyncHandler(webAppController.xLoginStart));
 app.get('/api/webapp/auth/x/callback', asyncHandler(webAppController.xLoginCallback));
 app.get('/api/webapp/auth/status', asyncHandler(webAppController.authStatus));
