@@ -180,14 +180,14 @@
     <div class="panel active" id="panel-telegram">
       <div id="tg-msg"></div>
       <div id="tg-widget">
-        <script async
-          src="https://telegram.org/js/telegram-widget.js?22"
-          data-telegram-login="PNPLatinoTV_Bot"
-          data-size="large"
-          data-radius="10"
-          data-auth-url="https://pnptv.app/api/webapp/auth/telegram/callback"
-          data-request-access="write">
-        </script>
+        <iframe
+          src="https://oauth.telegram.org/embed/PNPLatinoTV_Bot?origin=https://pnptv.app&size=large&radius=10&request_access=write&return_to=https%3A%2F%2Fpnptv.app%2Fapi%2Fwebapp%2Fauth%2Ftelegram%2Fcallback"
+          width="220"
+          height="56"
+          frameborder="0"
+          scrolling="no"
+          style="border:none;overflow:hidden;display:block;"
+        ></iframe>
       </div>
       <p style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center;">
         Click the button above to sign in with your Telegram account.<br>New here? An account is created automatically.
