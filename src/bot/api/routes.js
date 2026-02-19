@@ -1426,6 +1426,18 @@ app.post('/api/webapp/hangouts/join/:callId', asyncHandler(webappHangoutsControl
 app.post('/api/webapp/hangouts/leave/:callId', asyncHandler(webappHangoutsController.leaveRoom));
 app.delete('/api/webapp/hangouts/:callId', asyncHandler(webappHangoutsController.endRoom));
 
+// Web App Admin Routes (session auth + role check)
+const webappAdminController = require('./controllers/webappAdminController');
+app.get('/api/webapp/admin/stats', asyncHandler(webappAdminController.getStats));
+app.get('/api/webapp/admin/users', asyncHandler(webappAdminController.listUsers));
+app.get('/api/webapp/admin/users/:id', asyncHandler(webappAdminController.getUser));
+app.put('/api/webapp/admin/users/:id', asyncHandler(webappAdminController.updateUser));
+app.post('/api/webapp/admin/users/:id/ban', asyncHandler(webappAdminController.banUser));
+app.get('/api/webapp/admin/posts', asyncHandler(webappAdminController.listPosts));
+app.delete('/api/webapp/admin/posts/:id', asyncHandler(webappAdminController.deletePost));
+app.get('/api/webapp/admin/hangouts', asyncHandler(webappAdminController.listHangouts));
+app.delete('/api/webapp/admin/hangouts/:id', asyncHandler(webappAdminController.endHangout));
+
 // ==========================================
 // Social, DM, Chat, Users API Routes
 // ==========================================

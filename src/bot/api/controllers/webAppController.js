@@ -60,6 +60,7 @@ function buildSession(user, extra = {}) {
     photoUrl: user.photo_file_id,
     bio: user.bio,
     language: user.language,
+    role: user.role || 'user',
     ...extra,
   };
 }
@@ -144,7 +145,7 @@ const telegramCallback = async (req, res) => {
 
     let result = await query(
       `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
-              accepted_terms, photo_file_id, bio, language
+              accepted_terms, photo_file_id, bio, language, role
        FROM users WHERE telegram = $1`,
       [telegramId]
     );
@@ -199,7 +200,7 @@ const telegramLogin = async (req, res) => {
     // Find existing user
     let result = await query(
       `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
-              accepted_terms, photo_file_id, bio, language
+              accepted_terms, photo_file_id, bio, language, role
        FROM users WHERE telegram = $1`,
       [telegramId]
     );
@@ -319,7 +320,7 @@ const emailLogin = async (req, res) => {
     const emailLower = email.toLowerCase().trim();
     const result = await query(
       `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
-              accepted_terms, photo_file_id, bio, language, password_hash, email
+              accepted_terms, photo_file_id, bio, language, password_hash, email, role
        FROM users WHERE email = $1`,
       [emailLower]
     );
@@ -466,7 +467,7 @@ const xLoginCallback = async (req, res) => {
     // Find user by twitter handle
     let result = await query(
       `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
-              accepted_terms, photo_file_id, bio, language
+              accepted_terms, photo_file_id, bio, language, role
        FROM users WHERE twitter = $1`,
       [xHandle]
     );
@@ -480,7 +481,7 @@ const xLoginCallback = async (req, res) => {
         await query('UPDATE users SET twitter = $1 WHERE id = $2', [xHandle, req.session.user.id]);
         result = await query(
           `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
-                  accepted_terms, photo_file_id, bio, language
+                  accepted_terms, photo_file_id, bio, language, role
            FROM users WHERE id = $1`,
           [req.session.user.id]
         );
@@ -530,6 +531,7 @@ const authStatus = (req, res) => {
       subscriptionStatus: user.subscriptionStatus,
       acceptedTerms: user.acceptedTerms,
       language: user.language,
+      role: user.role || 'user',
     },
   });
 };
