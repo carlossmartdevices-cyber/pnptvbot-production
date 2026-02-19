@@ -37,6 +37,11 @@ const { asyncHandler } = require('./middleware/errorHandler');
 const { telegramAuth, checkTermsAccepted } = require('../../api/middleware/telegramAuth');
 const { handleTelegramAuth, handleAcceptTerms, checkAuthStatus } = require('../../api/handlers/telegramAuthHandler');
 
+// New route imports for auth, subscriptions, and monetization
+const authRoutes = require('./routes/authRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
+const modelRoutes = require('./routes/modelRoutes');
+
 /**
  * Page-level authentication middleware
  * Redirects to login page if user is not authenticated
@@ -1605,6 +1610,19 @@ app.get('/prime-hub', (req, res) => {
 app.get(['/prime-hub/logi', '/prime-hub/logi/'], (req, res) => {
   res.status(404).send('Page not found.');
 });
+
+// ==========================================
+// NEW MONETIZATION & AUTH ROUTES
+// ==========================================
+
+// Authentication routes
+app.use('/api/auth', authRoutes);
+
+// Subscription routes
+app.use('/api/subscriptions', subscriptionRoutes);
+
+// Model routes
+app.use('/api/model', modelRoutes);
 
 app.get('/prime-hub/*', (req, res) => {
   const host = req.get('host') || '';
