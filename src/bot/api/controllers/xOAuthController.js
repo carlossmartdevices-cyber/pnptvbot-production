@@ -1,6 +1,5 @@
 const XOAuthService = require('../../services/xOAuthService');
 const logger = require('../../../utils/logger');
-const { query } = require('../../../config/postgres');
 
 const sanitizeBotUsername = (value) => String(value || '').replace(/^@/, '').trim();
 
@@ -139,44 +138,6 @@ const handleCallback = async (req, res) => {
     }
 
     const account = await XOAuthService.handleOAuthCallback({ code, state });
-
-    // Web login flow: set session user and redirect to PRIME Hub webapp
-    if (req.session.xWebLogin) {
-      delete req.session.xWebLogin;
-
-      // Look up user by X handle
-      const result = await query(
-        `SELECT id, telegram, username, first_name, last_name, subscription_status,
-                accepted_terms, photo_url, bio, language
-         FROM users WHERE x_handle = $1 OR x_username = $1`,
-        [account.handle]
-      );
-
-      if (result.rows.length === 0) {
-        return res.redirect(
-          `/?error=not_registered&x_handle=${encodeURIComponent(account.handle)}`
-        );
-      }
-
-      const user = result.rows[0];
-      req.session.user = {
-        id: user.id,
-        telegramId: user.telegram,
-        username: user.username,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        subscriptionStatus: user.subscription_status,
-        acceptedTerms: user.accepted_terms,
-        photoUrl: user.photo_url,
-        bio: user.bio,
-        language: user.language,
-        xHandle: account.handle
-      };
-
-      logger.info(`Web app X login via callback: user ${user.id} via @${account.handle}`);
-      return res.redirect('/prime-hub/');
-    }
-
     return res.send(buildRedirectPage(
       'Cuenta conectada',
       `La cuenta @${account.handle} fue conectada correctamente. Puedes regresar al bot.`,

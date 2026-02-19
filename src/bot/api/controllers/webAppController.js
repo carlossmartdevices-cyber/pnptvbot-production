@@ -107,25 +107,47 @@ const telegramLogin = async (req, res) => {
   }
 };
 
+// ── Webapp-only X OAuth 2.0 PKCE helpers ─────────────────────────────────────
+// Uses WEBAPP_X_CLIENT_ID / WEBAPP_X_CLIENT_SECRET / WEBAPP_X_REDIRECT_URI
+// so it is completely isolated from the bot's X posting credentials.
+const b64url = (buf) =>
+  buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
 /**
  * GET /api/webapp/auth/x/start
- * Start X OAuth flow for web login (redirects to X)
+ * Start X OAuth 2.0 PKCE flow for web login — webapp credentials only.
  */
 const xLoginStart = async (req, res) => {
   try {
-    const XOAuthService = require('../../services/xOAuthService');
-    // createAuthUrl() returns a URL string directly (not an object)
-    const authUrl = await XOAuthService.createAuthUrl();
+    const clientId = process.env.WEBAPP_X_CLIENT_ID;
+    const redirectUri = process.env.WEBAPP_X_REDIRECT_URI;
 
-    // Flag this session so the OAuth callback redirects to the webapp.
-    // Explicitly save before responding to guarantee Redis flush before the
-    // browser follows the OAuth redirect and the callback fires.
-    req.session.xWebLogin = true;
+    if (!clientId || !redirectUri) {
+      logger.error('WEBAPP_X_CLIENT_ID or WEBAPP_X_REDIRECT_URI not set');
+      return res.status(500).json({ error: 'X login not configured on this server' });
+    }
+
+    const state = crypto.randomBytes(16).toString('hex');
+    const codeVerifier = b64url(crypto.randomBytes(32));
+    const codeChallenge = b64url(crypto.createHash('sha256').update(codeVerifier).digest());
+
+    // Persist PKCE state in session — explicitly save to Redis before redirect
+    req.session.xOAuth = { state, codeVerifier };
     await new Promise((resolve, reject) =>
       req.session.save(err => (err ? reject(err) : resolve()))
     );
 
-    res.json({ success: true, url: authUrl });
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope: 'users.read tweet.read',
+      state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+    });
+
+    res.json({ success: true, url: `https://twitter.com/i/oauth2/authorize?${params}` });
   } catch (error) {
     logger.error('X OAuth start error:', error);
     res.status(500).json({ error: 'Failed to start X authentication' });
@@ -134,37 +156,70 @@ const xLoginStart = async (req, res) => {
 
 /**
  * GET /api/webapp/auth/x/callback
- * Handle X OAuth callback for web login
+ * Handle X OAuth 2.0 PKCE callback — webapp credentials only, isolated from bot.
  */
 const xLoginCallback = async (req, res) => {
   try {
-    const { code, state } = req.query;
+    const { code, state, error: xError } = req.query;
 
-    if (!code || !state) {
+    if (xError || !code || !state) {
       return res.redirect('/?error=missing_params');
     }
 
-    const XOAuthService = require('../../services/xOAuthService');
-    const account = await XOAuthService.handleOAuthCallback({ code, state });
-
-    if (!account || !account.handle) {
+    // Verify state matches what we stored in session
+    const stored = req.session.xOAuth;
+    if (!stored || stored.state !== state) {
+      logger.warn('X OAuth state mismatch or session expired');
       return res.redirect('/?error=auth_failed');
     }
 
-    // Find user by X handle
+    const { codeVerifier } = stored;
+    delete req.session.xOAuth;
+
+    const clientId = process.env.WEBAPP_X_CLIENT_ID;
+    const clientSecret = process.env.WEBAPP_X_CLIENT_SECRET;
+    const redirectUri = process.env.WEBAPP_X_REDIRECT_URI;
+
+    // Exchange code for access token
+    const tokenRes = await axios.post(
+      'https://api.twitter.com/2/oauth2/token',
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+        code_verifier: codeVerifier,
+      }).toString(),
+      {
+        auth: { username: clientId, password: clientSecret },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      }
+    );
+
+    const accessToken = tokenRes.data.access_token;
+
+    // Fetch X user profile
+    const profileRes = await axios.get('https://api.twitter.com/2/users/me', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    const xHandle = profileRes.data?.data?.username;
+    if (!xHandle) {
+      return res.redirect('/?error=auth_failed');
+    }
+
+    // Look up user in our DB by X handle
     const result = await query(
       `SELECT id, telegram, username, first_name, last_name, subscription_status,
               accepted_terms, photo_url, bio, language
        FROM users WHERE x_handle = $1 OR x_username = $1`,
-      [account.handle]
+      [xHandle]
     );
 
     if (result.rows.length === 0) {
-      return res.redirect('/prime-hub/login?error=not_registered&x_handle=' + encodeURIComponent(account.handle));
+      return res.redirect(`/?error=not_registered&x_handle=${encodeURIComponent(xHandle)}`);
     }
 
     const user = result.rows[0];
-
     req.session.user = {
       id: user.id,
       telegramId: user.telegram,
@@ -176,15 +231,14 @@ const xLoginCallback = async (req, res) => {
       photoUrl: user.photo_url,
       bio: user.bio,
       language: user.language,
-      xHandle: account.handle
+      xHandle,
     };
 
-    logger.info(`Web app X login: user ${user.id} via @${account.handle}`);
-
-    res.redirect('/prime-hub/?auth=success');
+    logger.info(`Web app X login: user ${user.id} via @${xHandle}`);
+    res.redirect('/prime-hub/');
   } catch (error) {
-    logger.error('X OAuth callback error:', error);
-    res.redirect('/prime-hub/login?error=auth_failed');
+    logger.error('X OAuth callback error:', error.message);
+    res.redirect('/?error=auth_failed');
   }
 };
 
