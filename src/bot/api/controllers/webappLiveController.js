@@ -1,6 +1,11 @@
 const LiveStreamModel = require('../../../models/liveStreamModel');
-const agoraTokenService = require('../../services/agora/agoraTokenService');
 const logger = require('../../../utils/logger');
+
+// Agora stub — reads from env; token generation not available without SDK
+const agoraTokenService = {
+  appId: process.env.AGORA_APP_ID || null,
+  generateViewerToken: () => null,
+};
 
 const authGuard = (req, res) => {
   const user = req.session?.user;
