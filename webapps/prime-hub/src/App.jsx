@@ -22,7 +22,8 @@ function ProtectedRoute({ children }) {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    window.location.replace('/');
+    return null;
   }
 
   return children;

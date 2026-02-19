@@ -45,6 +45,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     await api.logout();
     setUser(null);
+    window.location.replace('/');
   }, []);
 
   return (

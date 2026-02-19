@@ -36,7 +36,7 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login', { replace: true });
+    // redirect handled by useAuth logout()
   };
 
   const formatDate = (dateStr) => {
