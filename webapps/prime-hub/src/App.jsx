@@ -17,7 +17,6 @@ import AdminPostsPage from './pages/admin/AdminPostsPage';
 import AdminHangoutsPage from './pages/admin/AdminHangoutsPage';
 import AdminMediaPage from './pages/admin/AdminMediaPage';
 import AdminRadioPage from './pages/admin/AdminRadioPage';
-import AdminPhotoPage from './pages/admin/AdminPhotoPage';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -85,7 +84,6 @@ export default function App() {
         <Route path="/admin/posts" element={<AdminRoute><AdminPostsPage /></AdminRoute>} />
         <Route path="/admin/hangouts" element={<AdminRoute><AdminHangoutsPage /></AdminRoute>} />
         <Route path="/admin/media" element={<AdminRoute><AdminMediaPage /></AdminRoute>} />
-        <Route path="/admin/photos" element={<AdminRoute><AdminPhotoPage /></AdminRoute>} />
         <Route path="/admin/radio" element={<AdminRoute><AdminRadioPage /></AdminRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
