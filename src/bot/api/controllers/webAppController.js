@@ -343,12 +343,29 @@ const emailLogin = async (req, res) => {
       req.session,
       rememberMe === true || rememberMe === 'true'
     );
+
+    // Log session state before save
+    logger.info(`Session before save - ID: ${req.sessionID}, User: ${req.session.user?.id}`);
+
     await new Promise((resolve, reject) =>
-      req.session.save(err => (err ? reject(err) : resolve()))
+      req.session.save(err => {
+        if (err) {
+          logger.error(`Session save failed: ${err.message}`);
+          reject(err);
+        } else {
+          logger.info(`Session saved - ID: ${req.sessionID}`);
+          // Explicitly touch the session to ensure cookie is sent
+          req.session.touch();
+          resolve();
+        }
+      })
     );
     logger.info(`Web app email login: user ${user.id} (${emailLower})`);
 
-    return res.json({
+    // Force session middleware to set Set-Cookie by modifying response
+    res.setHeader('Connection', 'keep-alive');
+
+    const response = {
       authenticated: true,
       pnptvId: user.pnptv_id,
       user: {
@@ -360,7 +377,9 @@ const emailLogin = async (req, res) => {
         email: user.email,
         subscriptionStatus: user.subscription_status,
       },
-    });
+    };
+
+    return res.json(response);
   } catch (error) {
     logger.error('Email login error:', error);
     return res.status(500).json({ error: 'Login failed. Please try again.' });
@@ -516,7 +535,13 @@ const xLoginCallback = async (req, res) => {
  * GET /api/webapp/auth/status
  */
 const authStatus = (req, res) => {
+  logger.info(`[authStatus] SessionID: ${req.sessionID}, Cookie: ${req.headers.cookie}`);
   const user = req.session?.user;
+  if (user) {
+    logger.info(`[authStatus] User found: ${user.id}, Role: ${user.role}`);
+  } else {
+    logger.info(`[authStatus] No user in session. Session: ${JSON.stringify(req.session)}`);
+  }
   if (!user) return res.json({ authenticated: false });
   return res.json({
     authenticated: true,

@@ -76,13 +76,67 @@ app.use(express.urlencoded({ extended: true }));
 
 // Session middleware for Telegram auth with Redis store
 const redisClient = getRedis();
-app.use(session({
+// Session middleware with explicit response hooks to ensure Set-Cookie header is set
+const sessionMiddleware = session({
   store: new RedisStore({ client: redisClient, prefix: 'sess:' }),
   secret: process.env.SESSION_SECRET || 'pnptv-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 }
-}));
+  resave: true,
+  saveUninitialized: true,
+  name: 'connect.sid',
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000,
+    path: '/'
+  }
+});
+
+app.use(sessionMiddleware);
+
+// Middleware to ensure Set-Cookie header is sent after session.save()
+app.use((req, res, next) => {
+  // Hook into json and send methods to set Set-Cookie before headers are sent
+  const originalJson = res.json;
+  const originalSend = res.send;
+
+  const ensureSetCookie = () => {
+    if (req.sessionID && req.session && !res.headersSent && !res.get('Set-Cookie')) {
+      const cookie = req.session.cookie;
+      const maxAge = cookie.maxAge || (24 * 60 * 60 * 1000);
+      const expires = new Date(Date.now() + maxAge).toUTCString();
+      const secure = cookie.secure ? 'Secure;' : '';
+      const cookieStr = `connect.sid=${req.sessionID}; Path=${cookie.path || '/'}; HttpOnly; SameSite=${cookie.sameSite || 'Strict'}; Max-Age=${Math.floor(maxAge / 1000)}; ${secure}Expires=${expires}`;
+      res.setHeader('Set-Cookie', cookieStr);
+    }
+  };
+
+  res.json = function(data) {
+    ensureSetCookie();
+    return originalJson.call(this, data);
+  };
+
+  res.send = function(data) {
+    ensureSetCookie();
+    return originalSend.call(this, data);
+  };
+
+  next();
+});
+
+// Debug middleware to log session and response headers
+app.use((req, res, next) => {
+  const originalJson = res.json;
+  res.json = function(data) {
+    // Log session info if user is set
+    if (req.session?.user) {
+      logger.info(`[SESSION DEBUG] Path: ${req.path}, SessionID: ${req.sessionID}, HasUser: true`);
+    }
+    // Call original json
+    originalJson.call(this, data);
+  };
+  next();
+});
 
 // Function to conditionally apply middleware (skip for Telegram webhook)
 const conditionalMiddleware = (middleware) => (req, res, next) => {
