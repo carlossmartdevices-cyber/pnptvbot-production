@@ -3,6 +3,7 @@ const logger = require('../../../utils/logger');
 const crypto = require('crypto');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const emailService = require('../../../services/emailService');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -555,6 +556,96 @@ const getProfile = async (req, res) => {
 };
 
 /**
+ * POST /api/webapp/auth/forgot-password
+ * Send password reset email.
+ */
+const forgotPassword = async (req, res) => {
+  try {
+    const email = (req.body.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    const result = await query('SELECT id, first_name, email FROM users WHERE email = $1', [email]);
+    // Always return 200 to avoid email enumeration
+    if (result.rows.length === 0) return res.json({ success: true });
+
+    const user = result.rows[0];
+    // Ensure token table exists (idempotent)
+    await query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    // Invalidate old tokens for this user
+    await query('UPDATE password_reset_tokens SET used = TRUE WHERE user_id = $1 AND used = FALSE', [user.id]);
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await query(
+      'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+      [user.id, token, expiresAt]
+    );
+
+    const resetUrl = `${process.env.WEBAPP_URL || 'https://pnptv.app'}/reset-password.html?token=${token}`;
+    await emailService.send({
+      to: email,
+      subject: 'PNPtv – Restablecer contraseña',
+      html: `
+        <p>Hola ${user.first_name || 'usuario'},</p>
+        <p>Recibimos una solicitud para restablecer tu contraseña en PNPtv.</p>
+        <p><a href="${resetUrl}" style="background:#FF00CC;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin:16px 0;">Restablecer contraseña</a></p>
+        <p>Este enlace expira en 1 hora. Si no solicitaste esto, ignora este correo.</p>
+      `,
+    });
+
+    logger.info(`Password reset email sent to ${email}`);
+    return res.json({ success: true });
+  } catch (error) {
+    logger.error('Forgot password error:', error);
+    return res.status(500).json({ error: 'Failed to send reset email' });
+  }
+};
+
+/**
+ * POST /api/webapp/auth/reset-password
+ * Set new password using a reset token.
+ */
+const resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ error: 'Token and password are required' });
+    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+
+    const result = await query(
+      `SELECT t.id, t.user_id, t.expires_at, u.email, u.first_name
+       FROM password_reset_tokens t JOIN users u ON u.id = t.user_id
+       WHERE t.token = $1 AND t.used = FALSE`,
+      [token]
+    );
+    if (result.rows.length === 0) return res.status(400).json({ error: 'Invalid or expired reset link.' });
+
+    const row = result.rows[0];
+    if (new Date() > new Date(row.expires_at)) {
+      return res.status(400).json({ error: 'This reset link has expired. Please request a new one.' });
+    }
+
+    const passwordHash = await hashPassword(password);
+    await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, row.user_id]);
+    await query('UPDATE password_reset_tokens SET used = TRUE WHERE id = $1', [row.id]);
+
+    logger.info(`Password reset successful for user ${row.user_id}`);
+    return res.json({ success: true, message: 'Password updated successfully. You can now log in.' });
+  } catch (error) {
+    logger.error('Reset password error:', error);
+    return res.status(500).json({ error: 'Failed to reset password' });
+  }
+};
+
+/**
  * PUT /api/webapp/profile
  * Update editable profile fields.
  */
@@ -657,5 +748,7 @@ module.exports = {
   logout,
   getProfile,
   updateProfile,
+  forgotPassword,
+  resetPassword,
   getMastodonFeed,
 };

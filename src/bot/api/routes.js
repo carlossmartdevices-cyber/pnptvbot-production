@@ -1406,6 +1406,8 @@ app.get('/api/webapp/auth/x/start', asyncHandler(webAppController.xLoginStart));
 app.get('/api/webapp/auth/x/callback', asyncHandler(webAppController.xLoginCallback));
 app.get('/api/webapp/auth/status', asyncHandler(webAppController.authStatus));
 app.post('/api/webapp/auth/logout', asyncHandler(webAppController.logout));
+app.post('/api/webapp/auth/forgot-password', asyncHandler(webAppController.forgotPassword));
+app.post('/api/webapp/auth/reset-password', asyncHandler(webAppController.resetPassword));
 
 // Web App Profile
 app.get('/api/webapp/profile', asyncHandler(webAppController.getProfile));
