@@ -93,4 +93,15 @@ export const api = {
 
   // Users
   searchUsers: (q) => request(`/users/search?q=${encodeURIComponent(q)}`),
+
+  // Admin
+  getAdminStats: () => request('/admin/stats'),
+  listAdminUsers: (page, search) => request(`/admin/users?page=${page}&search=${encodeURIComponent(search || '')}`),
+  getAdminUser: (id) => request(`/admin/users/${id}`),
+  updateAdminUser: (id, data) => request(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  banAdminUser: (id, ban, reason) => request(`/admin/users/${id}/ban`, { method: 'POST', body: JSON.stringify({ ban, reason }) }),
+  listAdminPosts: (page) => request(`/admin/posts?page=${page}`),
+  deleteAdminPost: (id) => request(`/admin/posts/${id}`, { method: 'DELETE' }),
+  listAdminHangouts: () => request('/admin/hangouts'),
+  endAdminHangout: (id) => request(`/admin/hangouts/${id}`, { method: 'DELETE' }),
 };

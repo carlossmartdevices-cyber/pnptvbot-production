@@ -11,6 +11,10 @@ import FeedPage from './pages/FeedPage';
 import WallPage from './pages/WallPage';
 import MessagesPage from './pages/MessagesPage';
 import ConversationPage from './pages/ConversationPage';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
+import AdminPostsPage from './pages/admin/AdminPostsPage';
+import AdminHangoutsPage from './pages/admin/AdminHangoutsPage';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -33,6 +37,30 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function AdminRoute({ children }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner" />
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    window.location.replace('/login');
+    return null;
+  }
+
+  if (!['admin', 'superadmin'].includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -47,6 +75,13 @@ export default function App() {
         <Route path="/wall/:userId" element={<ProtectedRoute><WallPage /></ProtectedRoute>} />
         <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
         <Route path="/messages/:partnerId" element={<ProtectedRoute><ConversationPage /></ProtectedRoute>} />
+
+        {/* Admin Routes */}
+        <Route path="/admin" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
+        <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
+        <Route path="/admin/posts" element={<AdminRoute><AdminPostsPage /></AdminRoute>} />
+        <Route path="/admin/hangouts" element={<AdminRoute><AdminHangoutsPage /></AdminRoute>} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>

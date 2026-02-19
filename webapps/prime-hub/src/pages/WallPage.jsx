@@ -14,6 +14,7 @@ export default function WallPage() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [nextCursor, setNextCursor] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -30,6 +31,17 @@ export default function WallPage() {
 
   const handlePosted = (post) => setPosts(prev => [post, ...prev]);
   const handleDeleted = (id) => setPosts(prev => prev.filter(p => p.id !== id));
+
+  const loadMore = async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await api.getWall(userId, nextCursor);
+      setPosts(prev => [...prev, ...(res.posts || [])]);
+      setNextCursor(res.nextCursor || null);
+    } catch {}
+    setLoadingMore(false);
+  };
 
   if (loading) return <Layout><div style={{ textAlign: 'center', padding: 32 }}><div className="loading-spinner" style={{ margin: '0 auto' }} /></div></Layout>;
 
@@ -67,6 +79,18 @@ export default function WallPage() {
         </div>
       ) : (
         posts.map(post => <PostCard key={post.id} post={post} onDeleted={handleDeleted} />)
+      )}
+
+      {nextCursor && (
+        <div style={{ textAlign: 'center', padding: '12px 0' }}>
+          <button
+            className="btn-secondary"
+            onClick={loadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? 'Loading…' : 'Load more'}
+          </button>
+        </div>
       )}
     </Layout>
   );

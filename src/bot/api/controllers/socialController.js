@@ -129,7 +129,15 @@ const createPost = async (req, res) => {
       });
     }
 
-    return res.json({ success: true, post });
+    const fullPost = {
+      ...post,
+      author_id: user.id,
+      author_username: user.username,
+      author_first_name: user.firstName || user.first_name,
+      author_photo: user.photoUrl || user.photo_url,
+      liked_by_me: false,
+    };
+    return res.json({ success: true, post: fullPost });
   } catch (err) {
     logger.error('createPost error', err);
     return res.status(500).json({ error: 'Failed to create post' });

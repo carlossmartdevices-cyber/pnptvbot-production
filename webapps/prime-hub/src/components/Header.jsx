@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { FileText, HelpCircle, Rss, User, MessageSquare, Users } from 'lucide-react';
+import { FileText, HelpCircle, Rss, User, MessageSquare, Users, Shield } from 'lucide-react';
 
 export default function Header() {
   const { user } = useAuth();
@@ -15,6 +15,16 @@ export default function Header() {
       </div>
 
       <nav className="header-nav">
+        {user && ['admin', 'superadmin'].includes(user.role) && (
+          <Link
+            to="/admin"
+            className={`header-nav-btn ${location.pathname.startsWith('/admin') ? 'active' : ''}`}
+            title="Admin Panel"
+          >
+            <Shield size={18} />
+          </Link>
+        )}
+
         <Link
           to="/feed"
           className={`header-nav-btn ${location.pathname === '/feed' ? 'active' : ''}`}
