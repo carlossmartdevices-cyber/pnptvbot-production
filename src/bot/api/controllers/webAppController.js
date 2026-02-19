@@ -710,8 +710,20 @@ const updateProfile = async (req, res) => {
     allowed.forEach(key => {
       if (Object.prototype.hasOwnProperty.call(req.body, key)) {
         sets.push(`${colMap[key]} = $${sets.length + 1}`);
-        // Allow clearing fields (null / empty string → null)
-        vals.push(req.body[key] === '' ? null : req.body[key]);
+        if (key === 'interests') {
+          // DB column is text[] — parse comma-separated string to array
+          const raw = req.body[key];
+          if (!raw || raw.trim() === '') {
+            vals.push(null);
+          } else if (Array.isArray(raw)) {
+            vals.push(raw.map(s => String(s).trim()).filter(Boolean));
+          } else {
+            vals.push(String(raw).split(',').map(s => s.trim()).filter(Boolean));
+          }
+        } else {
+          // Allow clearing fields (null / empty string → null)
+          vals.push(req.body[key] === '' ? null : req.body[key]);
+        }
       }
     });
 
