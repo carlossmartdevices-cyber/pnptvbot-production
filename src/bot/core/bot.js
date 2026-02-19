@@ -123,6 +123,9 @@ const slaMonitor = require('../services/slaMonitor');
 // Async Broadcast Queue
 const { initializeAsyncBroadcastQueue } = require('../services/initializeQueue');
 // API Server
+const http = require('http');
+const { Server: SocketIOServer } = require('socket.io');
+const { initSocketIO } = require('../api/socketHandlers');
 const apiApp = require('../api/routes');
 // Broadcast buttons presets
 const BroadcastButtonModel = require('../../models/broadcastButtonModel');
@@ -206,9 +209,19 @@ const startApiServer = (modeLabel) => {
   }
 
   const PORT = process.env.PORT || 3001;
-  const server = apiApp.listen(PORT, '0.0.0.0', () => {
+  const server = http.createServer(apiApp);
+
+  // Attach Socket.IO for real-time chat/DM
+  const io = new SocketIOServer(server, {
+    cors: { origin: process.env.WEBAPP_ORIGIN || 'https://pnptv.app', credentials: true },
+    path: '/socket.io',
+  });
+  apiApp.set('io', io);
+  initSocketIO(io);
+
+  server.listen(PORT, '0.0.0.0', () => {
     const prefix = modeLabel ? `${modeLabel} ` : '';
-    logger.info(`✓ ${prefix}API server running on port ${PORT}`);
+    logger.info(`✓ ${prefix}API server running on port ${PORT} (Socket.IO attached)`);
   });
 
   server.on('error', (error) => {
