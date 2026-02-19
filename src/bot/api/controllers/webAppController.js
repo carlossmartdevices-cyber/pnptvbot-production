@@ -131,12 +131,13 @@ const telegramCallback = async (req, res) => {
   try {
     const telegramUser = req.query;
     if (!telegramUser.id || !telegramUser.hash) {
-      return res.redirect('/?error=auth_failed');
+      logger.warn('Telegram callback missing id or hash');
+      return res.redirect('/prime-hub/?error=auth_failed');
     }
 
     if (!verifyTelegramAuth(telegramUser)) {
       logger.warn('Invalid Telegram auth hash (callback)', { userId: telegramUser.id });
-      return res.redirect('/?error=auth_failed');
+      return res.redirect('/prime-hub/?error=auth_failed');
     }
 
     const telegramId = String(telegramUser.id);
@@ -171,7 +172,7 @@ const telegramCallback = async (req, res) => {
     return res.redirect('/prime-hub/');
   } catch (error) {
     logger.error('Telegram callback error:', error);
-    return res.redirect('/?error=auth_failed');
+    return res.redirect('/prime-hub/?error=auth_failed');
   }
 };
 
