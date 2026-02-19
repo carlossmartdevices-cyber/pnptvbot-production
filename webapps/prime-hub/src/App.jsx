@@ -70,7 +70,7 @@ export default function App() {
         <Route path="/nearby" element={<ProtectedRoute><NearbyPage /></ProtectedRoute>} />
         <Route path="/hangouts" element={<ProtectedRoute><HangoutsPage /></ProtectedRoute>} />
         <Route path="/live" element={<ProtectedRoute><LivePage /></ProtectedRoute>} />
-        <Route path="/videorama" element={<ProtectedRoute><VideoramaPage /></ProtectedRoute>} />
+        <Route path="/videorama" element={<VideoramaPage />} />
         <Route path="/feed" element={<ProtectedRoute><FeedPage /></ProtectedRoute>} />
         <Route path="/wall/:userId" element={<ProtectedRoute><WallPage /></ProtectedRoute>} />
         <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />

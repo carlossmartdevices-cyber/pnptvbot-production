@@ -203,7 +203,7 @@ app.get('/api/pnp/checkout', (req, res) => {
 // ========== END PAYMENT ROUTES ==========
 
 // Protected paths that require authentication (don't serve static files directly)
-const PROTECTED_PATHS = ['/videorama', '/hangouts', '/live', '/pnplive'];
+const PROTECTED_PATHS = ['/hangouts', '/live', '/pnplive'];
 
 // Custom static file middleware with easybots.store blocking and protected path exclusion
 const serveStaticWithBlocking = (staticPath) => {
@@ -718,13 +718,11 @@ app.post('/api/logout', (req, res) => {
 // ==========================================
 
 // Videorama - protected
-app.get('/videorama', requirePageAuth, (req, res) => {
-  logger.info(`User ${req.user.id} accessing Videorama`);
+app.get('/videorama', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/videorama-app/index.html'));
 });
 
-app.get('/videorama/*', requirePageAuth, (req, res) => {
-  // Serve static assets or fallback to index.html for SPA routing
+app.get('/videorama/*', (req, res) => {
   const assetPath = path.join(__dirname, '../../../public/videorama-app', req.path.replace('/videorama', ''));
   if (fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
     return res.sendFile(assetPath);
