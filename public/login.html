@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <meta name="theme-color" content="#1C1C1E" />
+  <meta name="description" content="PRIME Hub - PNPtv Community Platform" />
+  <title>PRIME Hub - PNPtv</title>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1C1C1E;
+      --surface: #2C2C2E;
+      --border: rgba(255,255,255,0.08);
+      --text: #FFFFFF;
+      --muted: #8E8E93;
+      --accent: #FF00CC;
+      --amber: #FFB454;
+      --radius: 16px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .glow {
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(255,0,204,0.15) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+    }
+
+    .logo {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+
+    /* Error / success banners */
+    .banner {
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      margin-bottom: 18px;
+      display: none;
+    }
+    .banner.error  { background: rgba(255,69,58,0.15);  border: 1px solid rgba(255,69,58,0.4);  color: #ff453a; }
+    .banner.success { background: rgba(48,209,88,0.12); border: 1px solid rgba(48,209,88,0.35); color: #30d158; }
+    .banner.show { display: block; }
+
+    /* Telegram widget wrapper */
+    #tg-widget {
+      display: flex;
+      justify-content: center;
+      min-height: 48px;
+      margin-bottom: 14px;
+    }
+
+    /* Divider */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      margin: 14px 0;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Buttons */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 13px 20px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, transform 0.1s;
+      text-decoration: none;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-x {
+      background: #000;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.15);
+      margin-bottom: 14px;
+    }
+    .btn-x:hover { background: #111; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #8A00FF);
+      color: #fff;
+      margin-top: 4px;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0;
+      background: rgba(0,0,0,0.25);
+      border-radius: 10px;
+      padding: 3px;
+      margin-bottom: 18px;
+    }
+    .tab {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.15s;
+    }
+    .tab.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+
+    /* Form */
+    .form { display: flex; flex-direction: column; gap: 10px; }
+    .form.hidden { display: none; }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: rgba(255,0,204,0.5); }
+    input::placeholder { color: var(--muted); }
+
+    /* Footer */
+    .footer {
+      margin-top: 22px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .footer a { color: var(--amber); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+
+    /* X icon SVG */
+    .x-icon { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+
+  <div class="card">
+    <div class="logo">PNPtv</div>
+    <h1>PRIME Hub</h1>
+    <p class="subtitle">Inicia sesión para acceder a la comunidad</p>
+
+    <div id="error-banner"  class="banner error"></div>
+    <div id="success-banner" class="banner success"></div>
+
+    <!-- 1. Telegram Login Widget (redirect-based) -->
+    <div id="tg-widget"></div>
+
+    <div class="divider">o</div>
+
+    <!-- 2. X (Twitter) OAuth -->
+    <a href="/api/webapp/auth/x/start" class="btn btn-x" id="btn-x">
+      <svg class="x-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.745l7.73-8.835L1.254 2.25H8.08l4.258 5.63 5.906-5.63Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+      Continuar con X
+    </a>
+
+    <div class="divider">o</div>
+
+    <!-- 3. Email / Password -->
+    <div class="tabs">
+      <button class="tab active" id="tab-login"    onclick="switchTab('login')">Iniciar sesión</button>
+      <button class="tab"        id="tab-register" onclick="switchTab('register')">Registrarse</button>
+    </div>
+
+    <!-- Login form -->
+    <div class="form" id="form-login">
+      <input type="email"    id="login-email"    placeholder="Correo electrónico" autocomplete="email" />
+      <input type="password" id="login-password" placeholder="Contraseña" autocomplete="current-password" />
+      <button class="btn btn-primary" id="btn-login" onclick="handleLogin()">Iniciar sesión</button>
+    </div>
+
+    <!-- Register form -->
+    <div class="form hidden" id="form-register">
+      <input type="text"     id="reg-name"     placeholder="Nombre" autocomplete="given-name" />
+      <input type="email"    id="reg-email"    placeholder="Correo electrónico" autocomplete="email" />
+      <input type="password" id="reg-password" placeholder="Contraseña (mínimo 8 caracteres)" autocomplete="new-password" />
+      <button class="btn btn-primary" id="btn-register" onclick="handleRegister()">Crear cuenta</button>
+    </div>
+
+    <p class="footer">
+      Al ingresar aceptas nuestros
+      <a href="/terms" target="_blank">Términos y Condiciones</a>
+      y nuestra
+      <a href="/privacy" target="_blank">Política de Privacidad</a>.<br/>
+      Debes ser mayor de 18 años para usar esta plataforma.
+    </p>
+  </div>
+
+  <script>
+    // ── Show error/success from URL params ─────────────────────────────────────
+    (function () {
+      const p = new URLSearchParams(location.search);
+      const err = p.get('error');
+      const msgs = {
+        auth_failed:     'La autenticación falló. Por favor intenta de nuevo.',
+        not_registered:  p.get('x_handle')
+          ? `La cuenta @${p.get('x_handle')} no está registrada en PNPtv. Regístrate primero con el bot de Telegram.`
+          : 'Esta cuenta no está registrada. Usa el bot de Telegram primero.',
+        missing_params:  'La autenticación fue incompleta. Por favor intenta de nuevo.',
+      };
+      if (err && msgs[err]) showBanner('error', msgs[err]);
+    })();
+
+    // ── Telegram Widget ────────────────────────────────────────────────────────
+    (function () {
+      const script = document.createElement('script');
+      script.src = 'https://telegram.org/js/telegram-widget.js?22';
+      script.async = true;
+      script.setAttribute('data-telegram-login', 'PNPLatinoTV_Bot');
+      script.setAttribute('data-size', 'large');
+      script.setAttribute('data-radius', '10');
+      script.setAttribute('data-auth-url', '/api/webapp/auth/telegram/callback');
+      script.setAttribute('data-request-access', 'write');
+      document.getElementById('tg-widget').appendChild(script);
+    })();
+
+    // ── Tab switch ─────────────────────────────────────────────────────────────
+    function switchTab(tab) {
+      document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+      document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+      document.getElementById('form-login').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('form-register').classList.toggle('hidden', tab !== 'register');
+      clearBanners();
+    }
+
+    // ── Banners ────────────────────────────────────────────────────────────────
+    function showBanner(type, msg) {
+      const el = document.getElementById(`${type}-banner`);
+      el.textContent = msg;
+      el.classList.add('show');
+    }
+    function clearBanners() {
+      document.getElementById('error-banner').classList.remove('show');
+      document.getElementById('success-banner').classList.remove('show');
+    }
+
+    // ── Email Login ────────────────────────────────────────────────────────────
+    async function handleLogin() {
+      clearBanners();
+      const email    = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      const btn      = document.getElementById('btn-login');
+
+      if (!email || !password) { showBanner('error', 'Completa todos los campos.'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Ingresando...';
+      try {
+        const res  = await fetch('/api/webapp/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (res.ok && data.authenticated) {
+          showBanner('success', '¡Bienvenido! Redirigiendo...');
+          setTimeout(() => { location.href = '/prime-hub/'; }, 800);
+        } else {
+          showBanner('error', data.error || 'Error al iniciar sesión.');
+          btn.disabled = false;
+          btn.textContent = 'Iniciar sesión';
+        }
+      } catch {
+        showBanner('error', 'Error de red. Intenta de nuevo.');
+        btn.disabled = false;
+        btn.textContent = 'Iniciar sesión';
+      }
+    }
+
+    // ── Email Register ─────────────────────────────────────────────────────────
+    async function handleRegister() {
+      clearBanners();
+      const firstName = document.getElementById('reg-name').value.trim();
+      const email     = document.getElementById('reg-email').value.trim();
+      const password  = document.getElementById('reg-password').value;
+      const btn       = document.getElementById('btn-register');
+
+      if (!firstName || !email || !password) { showBanner('error', 'Completa todos los campos.'); return; }
+      if (password.length < 8) { showBanner('error', 'La contraseña debe tener al menos 8 caracteres.'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Creando cuenta...';
+      try {
+        const res  = await fetch('/api/webapp/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ firstName, email, password }),
+        });
+        const data = await res.json();
+        if (res.ok && data.authenticated) {
+          showBanner('success', '¡Cuenta creada! Redirigiendo...');
+          setTimeout(() => { location.href = '/prime-hub/'; }, 800);
+        } else {
+          showBanner('error', data.error || 'Error al registrarse.');
+          btn.disabled = false;
+          btn.textContent = 'Crear cuenta';
+        }
+      } catch {
+        showBanner('error', 'Error de red. Intenta de nuevo.');
+        btn.disabled = false;
+        btn.textContent = 'Crear cuenta';
+      }
+    }
+
+    // ── Enter key support ──────────────────────────────────────────────────────
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const active = document.getElementById('form-login').classList.contains('hidden') ? 'register' : 'login';
+      if (active === 'login')    handleLogin();
+      else                       handleRegister();
+    });
+  </script>
+</body>
+</html>
