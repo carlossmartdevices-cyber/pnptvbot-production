@@ -62,3 +62,25 @@ dump.rdb
 
 # Docker
 docker-compose.override.yml
+
+# System / home directory files
+.bash_history
+.bashrc
+.profile
+.selected_editor
+.wget-hsts
+.cache/
+.local/
+.npm/
+.nvm/
+.config/
+.docker/
+.claude/
+.claude.json
+.gemini/
+.gitconfig
+.ssh/
+snap/
+.python_history
+__pycache__/
+*.pyc
