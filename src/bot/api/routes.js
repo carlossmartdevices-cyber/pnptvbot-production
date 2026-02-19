@@ -123,6 +123,8 @@ app.use(conditionalMiddleware(helmet({
         "https://api.secure.payco.co",
         "https://fonts.googleapis.com",
         "https://fonts.gstatic.com",
+        "https://oauth.telegram.org",
+        "https://api.telegram.org",
       ],
       frameSrc: [
         "'self'",

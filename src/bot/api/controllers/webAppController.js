@@ -281,13 +281,24 @@ const getProfile = async (req, res) => {
  */
 const getMastodonFeed = async (req, res) => {
   try {
-    const mastodonInstance = process.env.MASTODON_INSTANCE || 'https://mastodon.social';
+    // Support both MASTODON_INSTANCE (new) and MASTODON_BASE_URL (legacy alias)
+    const mastodonInstance = process.env.MASTODON_INSTANCE || process.env.MASTODON_BASE_URL || 'https://mastodon.social';
+    // Support both MASTODON_ACCOUNT_ID (numeric) and MASTODON_ACCESS_TOKEN-based lookup
     const mastodonAccount = process.env.MASTODON_ACCOUNT_ID;
+    const mastodonToken = process.env.MASTODON_ACCESS_TOKEN;
     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 20);
 
     let feedUrl;
+    const authHeaders = { 'Accept': 'application/json' };
+    if (mastodonToken) {
+      authHeaders['Authorization'] = `Bearer ${mastodonToken}`;
+    }
+
     if (mastodonAccount) {
       feedUrl = `${mastodonInstance}/api/v1/accounts/${mastodonAccount}/statuses?limit=${limit}&exclude_replies=true`;
+    } else if (mastodonToken) {
+      // Use home timeline if we have an access token but no account ID
+      feedUrl = `${mastodonInstance}/api/v1/timelines/home?limit=${limit}`;
     } else {
       // Public timeline as fallback
       feedUrl = `${mastodonInstance}/api/v1/timelines/public?limit=${limit}&local=true`;
@@ -295,9 +306,7 @@ const getMastodonFeed = async (req, res) => {
 
     const response = await axios.get(feedUrl, {
       timeout: 5000,
-      headers: {
-        'Accept': 'application/json'
-      }
+      headers: authHeaders
     });
 
     const posts = (response.data || []).map(post => ({
