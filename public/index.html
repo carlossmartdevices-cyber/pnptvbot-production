@@ -156,9 +156,7 @@
   <div class="glow glow-amber"></div>
 
   <div class="card">
-    <div class="logo">PNPtv</div>
-    <h1 class="brand">PRIME Zone</h1>
-    <p class="tagline">Sign in or create your free account</p>
+    <h1 class="brand">PNPtv!</h1>
 
     <div id="global-msg"></div>
 
@@ -181,7 +179,16 @@
     <!-- Telegram Panel -->
     <div class="panel active" id="panel-telegram">
       <div id="tg-msg"></div>
-      <div id="tg-widget"></div>
+      <div id="tg-widget">
+        <script async
+          src="https://telegram.org/js/telegram-widget.js?22"
+          data-telegram-login="PNPLatinoTV_Bot"
+          data-size="large"
+          data-radius="10"
+          data-auth-url="https://pnptv.app/api/webapp/auth/telegram/callback"
+          data-request-access="write">
+        </script>
+      </div>
       <p style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center;">
         Click the button above to sign in with your Telegram account.<br>New here? An account is created automatically.
       </p>
@@ -309,39 +316,7 @@
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    // ── Telegram Login Widget ──
-    window.onTelegramAuth = async function (user) {
-      clearGlobalMsg(); clearPanelMsg('tg');
-      panelMsg('tg', 'Signing in…', 'ok');
-      try {
-        const res = await fetch('/api/webapp/auth/telegram', {
-          method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramUser: user }),
-        });
-        const data = await res.json();
-        if (data.authenticated) {
-          panelMsg('tg', 'Welcome! Redirecting…', 'ok');
-          setTimeout(() => window.location.replace('/prime-hub/'), 600);
-        } else {
-          panelMsg('tg', data.error || 'Login failed. Please try again.', 'error');
-        }
-      } catch {
-        panelMsg('tg', 'Connection error. Please try again.', 'error');
-      }
-    };
-
-    (function () {
-      const s = document.createElement('script');
-      s.src = 'https://telegram.org/js/telegram-widget.js?22';
-      s.async = true;
-      s.setAttribute('data-telegram-login', 'PNPLatinoTV_Bot');
-      s.setAttribute('data-size', 'large');
-      s.setAttribute('data-radius', '10');
-      s.setAttribute('data-onauth', 'onTelegramAuth(user)');
-      s.setAttribute('data-request-access', 'write');
-      document.getElementById('tg-widget').appendChild(s);
-    })();
+    // Telegram uses data-auth-url redirect — no JS callback needed
 
     // ── X Login ──
     async function loginWithX() {

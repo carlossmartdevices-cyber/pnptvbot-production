@@ -86,6 +86,59 @@ const b64url = (buf) =>
 // ── Controllers ───────────────────────────────────────────────────────────────
 
 /**
+ * GET /api/webapp/auth/telegram/callback
+ * Redirect-based Telegram Login Widget (data-auth-url approach — most reliable).
+ * Telegram sends user data as query params after user authenticates.
+ */
+const telegramCallback = async (req, res) => {
+  try {
+    const telegramUser = req.query;
+    if (!telegramUser.id || !telegramUser.hash) {
+      return res.redirect('/?error=auth_failed');
+    }
+
+    if (!verifyTelegramAuth(telegramUser)) {
+      logger.warn('Invalid Telegram auth hash (callback)', { userId: telegramUser.id });
+      return res.redirect('/?error=auth_failed');
+    }
+
+    const telegramId = String(telegramUser.id);
+
+    let result = await query(
+      `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
+              accepted_terms, photo_file_id, bio, language
+       FROM users WHERE telegram = $1`,
+      [telegramId]
+    );
+
+    let user;
+    if (result.rows.length === 0) {
+      user = await createWebUser({
+        firstName: telegramUser.first_name,
+        lastName: telegramUser.last_name,
+        username: telegramUser.username,
+        telegramId,
+        photoFileId: telegramUser.photo_url || null,
+      });
+      logger.info(`Created new user via Telegram callback: ${user.id} (@${user.username})`);
+    } else {
+      user = result.rows[0];
+    }
+
+    req.session.user = buildSession(user, { photoUrl: telegramUser.photo_url || user.photo_file_id });
+    await new Promise((resolve, reject) =>
+      req.session.save(err => (err ? reject(err) : resolve()))
+    );
+
+    logger.info(`Web Telegram callback login: user ${user.id}`);
+    return res.redirect('/prime-hub/');
+  } catch (error) {
+    logger.error('Telegram callback error:', error);
+    return res.redirect('/?error=auth_failed');
+  }
+};
+
+/**
  * POST /api/webapp/auth/telegram
  * Authenticate via Telegram Login Widget — auto-creates account if needed.
  */
@@ -531,6 +584,7 @@ const getMastodonFeed = async (req, res) => {
 };
 
 module.exports = {
+  telegramCallback,
   telegramLogin,
   emailRegister,
   emailLogin,
