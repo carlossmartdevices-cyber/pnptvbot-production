@@ -33,7 +33,7 @@ const startStream = async (req, res) => {
     const stream = await LiveStreamModel.create({
       hostId: user.id,
       hostName: user.firstName || user.first_name || user.username || 'Host',
-      title: title ? String(title).trim().slice(0, 100) : null,
+      title: title ? String(title).trim().slice(0, 100) : `${user.firstName || user.first_name || user.username || 'Host'}'s Stream`,
       category: category || 'other',
       status: 'active',
       isPublic: true,

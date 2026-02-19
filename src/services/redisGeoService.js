@@ -57,7 +57,7 @@ class RedisGeoService {
       }
 
       // Store in GEO set (for spatial queries)
-      await this.redis.sendCommand(["GEOADD", this.geoKey, longitude.toString(), latitude.toString(), userId.toString()]);
+      await this.redis.geoadd(this.geoKey, longitude, latitude, userId);
 
       // Store user metadata in hash
       const userKey = `geo:user:${userId}`;
