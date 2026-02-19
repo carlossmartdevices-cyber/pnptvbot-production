@@ -28,6 +28,7 @@ const xFollowersRoutes = require('./xFollowersRoutes');
 const adminUserRoutes = require('./routes/adminUserRoutes');
 const userManagementRoutes = require('./routes/userManagementRoutes');
 const nearbyRoutes = require('./routes/nearby.routes');
+const NearbyController = require('./controllers/nearbyController');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
@@ -1436,6 +1437,20 @@ const usersController = require('./controllers/usersController');
 // Chat (REST fallback for Socket.IO)
 app.get('/api/webapp/chat/:room/history', asyncHandler(chatController.getChatHistory));
 app.post('/api/webapp/chat/:room/send', asyncHandler(chatController.sendMessage));
+
+// Nearby (webapp session-auth proxy)
+app.post('/api/webapp/nearby/update-location', asyncHandler(async (req, res) => {
+  const user = req.session?.user;
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+  req.user = { id: user.id, userId: user.id };
+  return NearbyController.updateLocation(req, res);
+}));
+app.get('/api/webapp/nearby/search', asyncHandler(async (req, res) => {
+  const user = req.session?.user;
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+  req.user = { id: user.id, userId: user.id };
+  return NearbyController.searchNearby(req, res);
+}));
 
 // DM threads & conversations
 app.get('/api/webapp/dm/threads', asyncHandler(dmController.getThreads));
