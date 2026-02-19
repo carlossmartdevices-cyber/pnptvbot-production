@@ -7,11 +7,20 @@ const jwt = require('jsonwebtoken');
 const logger = require('../../../utils/logger');
 
 /**
- * Authenticate user via JWT token or Telegram auth
- * Extracts userId from token and attaches to req.user
+ * Authenticate user via JWT token or session (prime-hub users)
+ * Extracts userId from token or session and attaches to req.user
  */
 const authenticateUser = async (req, res, next) => {
   try {
+    // Accept session auth (prime-hub / webapp users logged in via Telegram/X widget)
+    if (req.session?.user?.id) {
+      req.user = {
+        id: req.session.user.id,
+        userId: req.session.user.id,
+      };
+      return next();
+    }
+
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

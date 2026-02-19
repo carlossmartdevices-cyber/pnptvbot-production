@@ -430,7 +430,7 @@
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ latitude, longitude })
+            body: JSON.stringify({ latitude, longitude, accuracy })
           })
           .then(r => r.json())
           .then(data => {

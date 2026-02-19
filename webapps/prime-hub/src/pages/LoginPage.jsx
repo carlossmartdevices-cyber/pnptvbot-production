@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Send, Twitter } from 'lucide-react';
+import { Twitter } from 'lucide-react';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loginWithTelegram, loginWithX } = useAuth();
+  const { user, loginWithX } = useAuth();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -34,45 +34,11 @@ export default function LoginPage() {
     }
   }, [searchParams]);
 
-  // Check for successful auth from X redirect
-  useEffect(() => {
-    if (searchParams.get('auth') === 'success' && user) {
-      navigate('/', { replace: true });
-    }
-  }, [searchParams, user, navigate]);
-
-  // Handle Telegram login callback
-  const handleTelegramAuth = useCallback(async (telegramUser) => {
-    setError('');
-    setLoading(true);
-    try {
-      const result = await loginWithTelegram(telegramUser);
-      if (result.success) {
-        navigate('/', { replace: true });
-      } else if (!result.registered) {
-        setError('Your Telegram account is not registered. Please start the bot first: @PNPLatinoTV_Bot');
-      } else {
-        setError(result.message || 'Login failed');
-      }
-    } catch (err) {
-      setError(err.message || 'Authentication failed');
-    } finally {
-      setLoading(false);
-    }
-  }, [loginWithTelegram, navigate]);
-
-  // Expose Telegram auth callback globally
-  useEffect(() => {
-    window.onTelegramWidgetAuth = handleTelegramAuth;
-    return () => { delete window.onTelegramWidgetAuth; };
-  }, [handleTelegramAuth]);
-
-  // Render Telegram widget
+  // Render Telegram widget (redirect-based — more reliable, no popup blocking)
   useEffect(() => {
     const container = document.getElementById('telegram-widget-container');
     if (!container) return;
 
-    // Clear previous widget
     container.innerHTML = '';
 
     const script = document.createElement('script');
@@ -81,7 +47,7 @@ export default function LoginPage() {
     script.setAttribute('data-telegram-login', 'PNPLatinoTV_Bot');
     script.setAttribute('data-size', 'large');
     script.setAttribute('data-radius', '10');
-    script.setAttribute('data-onauth', 'onTelegramWidgetAuth(user)');
+    script.setAttribute('data-auth-url', '/api/webapp/auth/telegram/callback');
     script.setAttribute('data-request-access', 'write');
     container.appendChild(script);
   }, []);
