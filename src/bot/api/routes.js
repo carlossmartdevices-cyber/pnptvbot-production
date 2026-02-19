@@ -1154,6 +1154,30 @@ app.get('/api/media/categories', asyncHandler(async (req, res) => {
   }
 }));
 
+// Get playlists (must be before :mediaId route)
+app.get('/api/media/playlists', asyncHandler(async (req, res) => {
+  try {
+    const { getPool } = require('../../config/postgres');
+    const result = await getPool().query(`
+      SELECT * FROM media_playlists
+      WHERE is_public = true
+      ORDER BY created_at DESC
+      LIMIT 20
+    `);
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    logger.error('Error fetching playlists:', error);
+    res.json({
+      success: true,
+      data: []
+    });
+  }
+}));
+
 // Get single media item
 app.get('/api/media/:mediaId', asyncHandler(async (req, res) => {
   const { mediaId } = req.params;
@@ -1180,32 +1204,6 @@ app.get('/api/media/:mediaId', asyncHandler(async (req, res) => {
     });
   }
 }));
-
-// Get playlists
-app.get('/api/media/playlists', asyncHandler(async (req, res) => {
-  try {
-    const { getPool } = require('../../config/postgres');
-    const result = await getPool().query(`
-      SELECT * FROM media_playlists
-      WHERE is_public = true
-      ORDER BY created_at DESC
-      LIMIT 20
-    `);
-
-    res.json({
-      success: true,
-      data: result.rows
-    });
-  } catch (error) {
-    logger.error('Error fetching playlists:', error);
-    res.json({
-      success: true,
-      data: []
-    });
-  }
-}));
-
-
 
 // ==========================================
 // RADIO API ROUTES
@@ -1487,6 +1485,32 @@ app.get('/api/webapp/admin/posts', verifyAdminJWT, asyncHandler(webappAdminContr
 app.delete('/api/webapp/admin/posts/:id', verifyAdminJWT, asyncHandler(webappAdminController.deletePost));
 app.get('/api/webapp/admin/hangouts', verifyAdminJWT, asyncHandler(webappAdminController.listHangouts));
 app.delete('/api/webapp/admin/hangouts/:id', verifyAdminJWT, asyncHandler(webappAdminController.endHangout));
+
+// ==========================================
+// Media & Radio Admin Routes
+// ==========================================
+const mediaAdminController = require('./controllers/mediaAdminController');
+
+// Media library management
+app.get('/api/admin/media/library', verifyAdminJWT, asyncHandler(mediaAdminController.getMediaLibrary));
+app.get('/api/admin/media/categories', verifyAdminJWT, asyncHandler(mediaAdminController.getCategories));
+app.post('/api/admin/media/upload', verifyAdminJWT, mediaAdminController.uploadMedia);
+app.put('/api/admin/media/:mediaId', verifyAdminJWT, asyncHandler(mediaAdminController.updateMedia));
+app.delete('/api/admin/media/:mediaId', verifyAdminJWT, asyncHandler(mediaAdminController.deleteMedia));
+
+// Radio now playing
+app.get('/api/admin/radio/now-playing', verifyAdminJWT, asyncHandler(mediaAdminController.getNowPlaying));
+app.post('/api/admin/radio/now-playing', verifyAdminJWT, asyncHandler(mediaAdminController.setNowPlaying));
+
+// Radio queue management
+app.get('/api/admin/radio/queue', verifyAdminJWT, asyncHandler(mediaAdminController.getQueue));
+app.post('/api/admin/radio/queue', verifyAdminJWT, asyncHandler(mediaAdminController.addToQueue));
+app.delete('/api/admin/radio/queue/:queueId', verifyAdminJWT, asyncHandler(mediaAdminController.removeFromQueue));
+app.post('/api/admin/radio/queue/clear', verifyAdminJWT, asyncHandler(mediaAdminController.clearQueue));
+
+// Radio requests management
+app.get('/api/admin/radio/requests', verifyAdminJWT, asyncHandler(mediaAdminController.getRequests));
+app.put('/api/admin/radio/requests/:requestId', verifyAdminJWT, asyncHandler(mediaAdminController.updateRequest));
 
 // ==========================================
 // Social, DM, Chat, Users API Routes

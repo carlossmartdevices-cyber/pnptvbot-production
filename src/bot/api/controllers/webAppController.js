@@ -131,13 +131,15 @@ const telegramStart = async (req, res) => {
 const telegramCallback = async (req, res) => {
   try {
     const telegramUser = req.query;
+    logger.info('Telegram callback received:', { query: telegramUser });
+
     if (!telegramUser.id || !telegramUser.hash) {
-      logger.warn('Telegram callback missing id or hash');
+      logger.warn('Telegram callback missing id or hash', { query: telegramUser });
       return res.redirect('/login?error=auth_failed');
     }
 
     if (!verifyTelegramAuth(telegramUser)) {
-      logger.warn('Invalid Telegram auth hash (callback)', { userId: telegramUser.id });
+      logger.warn('Invalid Telegram auth hash (callback)', { userId: telegramUser.id, receivedHash: telegramUser.hash });
       return res.redirect('/login?error=auth_failed');
     }
 

@@ -144,7 +144,47 @@ export const api = {
   joinLiveStream: (streamId) => request(`/live/streams/${streamId}/join`),
   endLiveStream: (streamId) => request(`/live/streams/${streamId}/end`, { method: 'POST' }),
   leaveLiveStream: (streamId) => request(`/live/streams/${streamId}/leave`, { method: 'POST' }),
+
+  // Admin Media Management
+  getAdminMedia: (query = '') => {
+    const url = `/admin/media/library${query}`;
+    return request(url);
+  },
+  getAdminMediaCategories: () => request('/admin/media/categories'),
+  uploadAdminMedia: (formData) => {
+    const token = getAuthToken();
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return fetch(`${API_BASE}/admin/media/upload`, {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+      body: formData
+    }).then(r => r.json()).then(data => {
+      if (!data.success && !data.media) {
+        throw new Error(data.error || 'Upload failed');
+      }
+      return data;
+    });
+  },
+  updateAdminMedia: (mediaId, data) => request(`/admin/media/${mediaId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteAdminMedia: (mediaId) => request(`/admin/media/${mediaId}`, { method: 'DELETE' }),
+
+  // Admin Radio Management
+  getAdminRadioNowPlaying: () => request('/admin/radio/now-playing'),
+  setAdminRadioNowPlaying: (data) => request('/admin/radio/now-playing', { method: 'POST', body: JSON.stringify(data) }),
+  getAdminRadioQueue: () => request('/admin/radio/queue'),
+  addAdminRadioQueue: (data) => request('/admin/radio/queue', { method: 'POST', body: JSON.stringify(data) }),
+  removeAdminRadioQueue: (queueId) => request(`/admin/radio/queue/${queueId}`, { method: 'DELETE' }),
+  clearAdminRadioQueue: () => request('/admin/radio/queue/clear', { method: 'POST' }),
+  getAdminRadioRequests: (status = 'pending') => request(`/admin/radio/requests?status=${status}`),
+  updateAdminRadioRequest: (requestId, data) => request(`/admin/radio/requests/${requestId}`, { method: 'PUT', body: JSON.stringify(data) }),
 };
 
 // Export token management functions
 export { setAuthToken, getAuthToken };
+
+// Default export
+export default api;
