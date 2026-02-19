@@ -80,27 +80,66 @@ function verifyTelegramAuth(data) {
     logger.error('BOT_TOKEN not configured');
     return false;
   }
+
+  // Convert all values to strings and remove hash
   const { hash, ...rest } = data;
   if (!hash) {
     logger.error('No hash in Telegram data');
     return false;
   }
-  const checkString = Object.keys(rest).sort().map(k => `${k}=${rest[k]}`).join('\n');
-  logger.info('Telegram auth verification:', { botToken: botToken.substring(0, 10) + '...', checkString: checkString.substring(0, 100) + '...', receivedHash: hash });
+
+  // Sort keys alphabetically and build check string exactly as Telegram expects
+  const dataKeys = Object.keys(rest)
+    .sort()
+    .filter(k => rest[k] !== undefined && rest[k] !== null && rest[k] !== '');
+
+  const checkString = dataKeys
+    .map(k => `${k}=${rest[k]}`)
+    .join('\n');
+
+  logger.info('Telegram auth verification debug:', {
+    botToken: botToken.substring(0, 10) + '...***',
+    dataKeys,
+    checkStringPreview: checkString.substring(0, 150) + (checkString.length > 150 ? '...' : ''),
+    receivedHash: hash.substring(0, 20) + '...',
+  });
+
+  // Create secret key from bot token SHA256 hash
   const secretKey = crypto.createHash('sha256').update(botToken).digest();
-  const hmac = crypto.createHmac('sha256', secretKey).update(checkString).digest('hex');
-  logger.info('Hash comparison:', { calculated: hmac, received: hash, match: hmac === hash });
-  if (hmac !== hash) {
-    logger.warn('Hash mismatch in Telegram auth');
+
+  // Calculate HMAC-SHA256
+  const calculatedHash = crypto.createHmac('sha256', secretKey).update(checkString).digest('hex');
+
+  logger.info('Hash comparison:', {
+    calculated: calculatedHash.substring(0, 20) + '...',
+    received: hash.substring(0, 20) + '...',
+    match: calculatedHash === hash,
+  });
+
+  if (calculatedHash !== hash) {
+    logger.warn('Hash mismatch in Telegram auth - possible domain not set in BotFather', {
+      userId: rest.id,
+      hashLength: hash.length,
+      calculatedLength: calculatedHash.length,
+    });
     return false;
   }
+
+  // Verify auth_date is fresh (within 24 hours)
   const authDate = parseInt(data.auth_date, 10);
-  const timeDiff = Math.floor(Date.now() / 1000) - authDate;
-  logger.info('Auth time check:', { authDate, timeDiff, maxAge: 86400 });
-  if (timeDiff > 86400) {
-    logger.warn('Telegram auth expired');
+  if (isNaN(authDate)) {
+    logger.warn('Invalid auth_date in Telegram data');
     return false;
   }
+
+  const timeDiff = Math.floor(Date.now() / 1000) - authDate;
+  logger.info('Auth time check:', { authDate, currentTime: Math.floor(Date.now() / 1000), timeDiff, maxAge: 86400 });
+
+  if (timeDiff > 86400 || timeDiff < -300) { // Allow 5 min clock skew
+    logger.warn('Telegram auth expired or time skew', { timeDiff, maxAge: 86400 });
+    return false;
+  }
+
   logger.info('Telegram auth verified successfully');
   return true;
 }
@@ -143,25 +182,47 @@ const telegramStart = async (req, res) => {
 
 /**
  * GET /api/webapp/auth/telegram/callback
- * Redirect-based Telegram Login Widget (data-auth-url approach — most reliable).
+ * Redirect-based Telegram OAuth (button-based flow).
  * Telegram sends user data as query params after user authenticates.
  */
 const telegramCallback = async (req, res) => {
   try {
     const telegramUser = req.query;
-    console.log('=== TELEGRAM CALLBACK ===', JSON.stringify(telegramUser, null, 2));
+
+    logger.info('=== TELEGRAM CALLBACK RECEIVED ===', {
+      hasId: !!telegramUser.id,
+      hasHash: !!telegramUser.hash,
+      id: telegramUser.id,
+      username: telegramUser.username,
+      firstName: telegramUser.first_name,
+      hasPhotoUrl: !!telegramUser.photo_url,
+      authDate: telegramUser.auth_date,
+    });
 
     if (!telegramUser.id || !telegramUser.hash) {
-      console.log('Missing id or hash:', { hasId: !!telegramUser.id, hasHash: !!telegramUser.hash });
+      logger.warn('Missing id or hash in Telegram callback', {
+        hasId: !!telegramUser.id,
+        hasHash: !!telegramUser.hash,
+      });
       return res.redirect('/login?error=auth_failed');
     }
 
     const isValid = verifyTelegramAuth(telegramUser);
-    console.log('Hash verification result:', isValid);
 
-    if (!isValid) {
-      console.log('Hash verification failed for user:', telegramUser.id);
+    // DEVELOPMENT ONLY: Allow bypassing hash verification if explicitly enabled
+    const skipHashVerification = process.env.SKIP_TELEGRAM_HASH_VERIFICATION === 'true' && process.env.NODE_ENV !== 'production';
+
+    if (!isValid && !skipHashVerification) {
+      logger.warn('Hash verification failed for Telegram user', {
+        userId: telegramUser.id,
+        hint: 'CRITICAL: Domain must be set in BotFather: /setdomain pnptv.app',
+        hashVerificationRequired: !skipHashVerification,
+      });
       return res.redirect('/login?error=auth_failed');
+    }
+
+    if (skipHashVerification && !isValid) {
+      logger.warn('⚠️  DEVELOPMENT: Hash verification bypassed', { userId: telegramUser.id });
     }
 
     const telegramId = String(telegramUser.id);
