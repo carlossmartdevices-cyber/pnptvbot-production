@@ -29,7 +29,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (window.Telegram?.Login) {
       window.Telegram.Login.embed('tg_login_widget', {
-        bot_id: '7882893938',
+        bot_id: '8571930103',
         size: 'large',
         onAuthCallback: handleTelegramAuthCallback
       });
