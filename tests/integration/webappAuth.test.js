@@ -654,8 +654,8 @@ describe('Telegram Callback (/api/webapp/auth/telegram/callback)', () => {
 
     await webAppController.telegramCallback(req, res);
 
-    // Should redirect to prime-hub, not error
-    expect(res.redirect).toHaveBeenCalledWith('/prime-hub/');
+    // Should redirect to app root, not error
+    expect(res.redirect).toHaveBeenCalledWith('/');
   });
 
   test('should create new user on first Telegram login', async () => {
@@ -696,7 +696,7 @@ describe('Telegram Callback (/api/webapp/auth/telegram/callback)', () => {
       expect.stringContaining('INSERT INTO users'),
       expect.arrayContaining(['987654321'])
     );
-    expect(res.redirect).toHaveBeenCalledWith('/prime-hub/');
+    expect(res.redirect).toHaveBeenCalledWith('/');
   });
 
   test('should login existing Telegram user', async () => {
@@ -719,7 +719,65 @@ describe('Telegram Callback (/api/webapp/auth/telegram/callback)', () => {
     await webAppController.telegramCallback(req, res);
 
     expect(req.session.save).toHaveBeenCalled();
-    expect(res.redirect).toHaveBeenCalledWith('/prime-hub/');
+    expect(res.redirect).toHaveBeenCalledWith('/');
+  });
+});
+
+describe('Telegram Login (/api/webapp/auth/telegram)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.BOT_TOKEN = '8571930103:AAHIxAeI2CEqgF3arK4D4dZNHFYxgNa_nt0';
+    process.env.NODE_ENV = 'production';
+    process.env.SKIP_TELEGRAM_HASH_VERIFICATION = 'false';
+  });
+
+  test('should reject login payload without hash in production', async () => {
+    const req = createMockReq({
+      body: {
+        telegramUser: {
+          id: '123456789',
+          first_name: 'John',
+        },
+      },
+    });
+    const res = createMockRes();
+
+    await webAppController.telegramLogin(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: expect.stringContaining('Invalid Telegram auth data'),
+      })
+    );
+  });
+
+  test('should allow missing hash only in development when bypass is enabled', async () => {
+    process.env.NODE_ENV = 'development';
+    process.env.SKIP_TELEGRAM_HASH_VERIFICATION = 'true';
+
+    const req = createMockReq({
+      body: {
+        telegramUser: {
+          id: '123456789',
+          first_name: 'John',
+        },
+      },
+    });
+    const res = createMockRes();
+
+    query.mockResolvedValueOnce({
+      rows: [{ ...mockUserRow, telegram: '123456789' }],
+    });
+
+    await webAppController.telegramLogin(req, res);
+
+    expect(req.session.save).toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authenticated: true,
+      })
+    );
   });
 });
 
@@ -972,6 +1030,9 @@ describe('X OAuth (/api/webapp/auth/x/start and /callback)', () => {
   });
 
   test('should reject X OAuth start without client ID', async () => {
+    delete process.env.WEBAPP_X_CLIENT_ID;
+    delete process.env.WEBAPP_X_CLIENT_SECRET;
+    delete process.env.WEBAPP_X_REDIRECT_URI;
     delete process.env.TWITTER_CLIENT_ID;
     delete process.env.TWITTER_REDIRECT_URI;
 
@@ -1038,7 +1099,7 @@ describe('X OAuth (/api/webapp/auth/x/start and /callback)', () => {
 
     await webAppController.xLoginCallback(req, res);
 
-    expect(res.redirect).toHaveBeenCalledWith('/prime-hub/');
+    expect(res.redirect).toHaveBeenCalledWith('/');
   });
 
   test('should reject X callback with state mismatch', async () => {

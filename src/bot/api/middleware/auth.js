@@ -6,6 +6,8 @@
 const jwt = require('jsonwebtoken');
 const logger = require('../../../utils/logger');
 
+const AUTH_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'pnptv-secret-key';
+
 /**
  * Authenticate user via JWT token or session (prime-hub users)
  * Extracts userId from token or session and attaches to req.user
@@ -33,7 +35,7 @@ const authenticateUser = async (req, res, next) => {
     const token = authHeader.substring(7); // Remove "Bearer " prefix
 
     // Verify JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'pnptv-secret-key');
+    const decoded = jwt.verify(token, AUTH_SECRET);
 
     // Extract user ID from token
     const userId = decoded.userId || decoded.sub || decoded.id;
@@ -80,7 +82,7 @@ const authenticateUser = async (req, res, next) => {
  */
 const validateToken = (token) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'pnptv-secret-key');
+    const decoded = jwt.verify(token, AUTH_SECRET);
     return { valid: true, decoded };
   } catch (error) {
     return { valid: false, error: error.message };

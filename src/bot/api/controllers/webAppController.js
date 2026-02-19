@@ -5,6 +5,7 @@ const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const emailService = require('../../../services/emailService');
 const { generateJWT } = require('../middleware/jwtAuth');
+const { getRedis } = require('../../../config/redis');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -149,6 +150,110 @@ function verifyTelegramAuth(data) {
 const b64url = (buf) =>
   buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 
+// ── Telegram Deep Link Login ─────────────────────────────────────────────────
+
+const TELEGRAM_LOGIN_PREFIX = 'tg_login:';
+const TELEGRAM_LOGIN_TTL = 300; // 5 minutes
+
+/**
+ * POST /api/webapp/auth/telegram/token
+ * Generate a login token for Telegram deep link flow.
+ * Returns a token and the t.me deep link URL.
+ */
+const telegramGenerateToken = async (req, res) => {
+  try {
+    const token = crypto.randomBytes(16).toString('hex');
+    const redis = getRedis();
+    await redis.set(`${TELEGRAM_LOGIN_PREFIX}${token}`, 'pending', 'EX', TELEGRAM_LOGIN_TTL);
+
+    const botUsername = process.env.BOT_USERNAME || 'PNPLatinoTV_Bot';
+    const deepLink = `https://t.me/${botUsername}?start=weblogin_${token}`;
+
+    return res.json({ success: true, token, deepLink });
+  } catch (error) {
+    logger.error('Telegram token generation error:', error);
+    return res.status(500).json({ error: 'Failed to generate login token' });
+  }
+};
+
+/**
+ * GET /api/webapp/auth/telegram/check?token=xxx
+ * Poll endpoint: checks if the bot has verified the token.
+ */
+const telegramCheckToken = async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) return res.status(400).json({ authenticated: false, error: 'Missing token' });
+
+    const redis = getRedis();
+    const data = await redis.get(`${TELEGRAM_LOGIN_PREFIX}${token}`);
+
+    if (!data || data === 'pending') {
+      return res.json({ authenticated: false });
+    }
+
+    // data contains the user JSON set by the bot handler
+    const telegramUser = JSON.parse(data);
+    await redis.del(`${TELEGRAM_LOGIN_PREFIX}${token}`);
+
+    const telegramId = String(telegramUser.id);
+
+    let result = await query(
+      `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
+              accepted_terms, photo_file_id, bio, language, role
+       FROM users WHERE telegram = $1`,
+      [telegramId]
+    );
+
+    let user;
+    if (result.rows.length === 0) {
+      user = await createWebUser({
+        firstName: telegramUser.first_name,
+        lastName: telegramUser.last_name,
+        username: telegramUser.username,
+        telegramId,
+        photoFileId: telegramUser.photo_url || null,
+      });
+      logger.info(`Created new user via Telegram deep link: ${user.id} (@${user.username})`);
+    } else {
+      user = result.rows[0];
+    }
+
+    req.session.user = buildSession(user, { photoUrl: telegramUser.photo_url || user.photo_file_id });
+    await new Promise((resolve, reject) =>
+      req.session.save(err => (err ? reject(err) : resolve()))
+    );
+
+    logger.info(`Telegram deep link login: user ${user.id}`);
+    return res.json({ authenticated: true, user: { id: user.id, username: user.username } });
+  } catch (error) {
+    logger.error('Telegram check token error:', error);
+    return res.status(500).json({ authenticated: false, error: 'Server error' });
+  }
+};
+
+/**
+ * Called by the bot when it receives /start weblogin_TOKEN
+ * Stores the Telegram user data in Redis so the poll endpoint can pick it up.
+ */
+const telegramConfirmLogin = async (telegramUser, token) => {
+  try {
+    const redis = getRedis();
+    const key = `${TELEGRAM_LOGIN_PREFIX}${token}`;
+    const exists = await redis.get(key);
+    if (!exists) {
+      logger.warn('Telegram login token not found or expired:', token);
+      return false;
+    }
+    await redis.set(key, JSON.stringify(telegramUser), 'EX', 60); // 1 min to poll
+    logger.info(`Telegram login confirmed for token ${token.substring(0, 8)}...`);
+    return true;
+  } catch (error) {
+    logger.error('Telegram confirm login error:', error);
+    return false;
+  }
+};
+
 // ── Controllers ───────────────────────────────────────────────────────────────
 
 /**
@@ -254,7 +359,7 @@ const telegramCallback = async (req, res) => {
     );
 
     logger.info(`Web Telegram callback login: user ${user.id}`);
-    return res.redirect('/prime-hub/');
+    return res.redirect('/');
   } catch (error) {
     logger.error('Telegram callback error:', error);
     return res.redirect('/login?error=auth_failed');
@@ -272,11 +377,25 @@ const telegramLogin = async (req, res) => {
       return res.status(400).json({ error: 'Invalid Telegram user data' });
     }
 
-    if (process.env.NODE_ENV === 'production' && telegramUser.hash) {
-      if (!verifyTelegramAuth(telegramUser)) {
+    const skipHashVerification = process.env.SKIP_TELEGRAM_HASH_VERIFICATION === 'true'
+      && process.env.NODE_ENV !== 'production';
+
+    if (!telegramUser.hash && !skipHashVerification) {
+      logger.warn('Missing Telegram auth hash', { userId: telegramUser.id });
+      return res.status(400).json({ error: 'Invalid Telegram auth data' });
+    }
+
+    if (telegramUser.hash) {
+      const isValid = verifyTelegramAuth(telegramUser);
+      if (!isValid && !skipHashVerification) {
         logger.warn('Invalid Telegram auth hash', { userId: telegramUser.id });
         return res.status(401).json({ error: 'Invalid authentication data' });
       }
+      if (skipHashVerification && !isValid) {
+        logger.warn('DEVELOPMENT: Telegram hash verification bypassed', { userId: telegramUser.id });
+      }
+    } else if (skipHashVerification) {
+      logger.warn('DEVELOPMENT: Telegram login without hash allowed', { userId: telegramUser.id });
     }
 
     const telegramId = String(telegramUser.id);
@@ -474,11 +593,10 @@ const emailLogin = async (req, res) => {
  */
 const xLoginStart = async (req, res) => {
   try {
-    // Reuse the main Twitter app (TWITTER_CLIENT_ID + TWITTER_REDIRECT_URI) which is
-    // already registered in the Twitter Developer Portal. A session flag (xWebLogin)
-    // tells the shared callback to handle this as a webapp login instead of a bot link.
-    const clientId = process.env.TWITTER_CLIENT_ID;
-    const redirectUri = process.env.TWITTER_REDIRECT_URI;
+    // Use the webapp-specific X app credentials for web login
+    // Falls back to main Twitter app if webapp-specific not set
+    const clientId = process.env.WEBAPP_X_CLIENT_ID || process.env.TWITTER_CLIENT_ID;
+    const redirectUri = process.env.WEBAPP_X_REDIRECT_URI || process.env.TWITTER_REDIRECT_URI;
 
     if (!clientId || !redirectUri) {
       return res.status(500).json({ error: 'X login not configured on this server' });
@@ -532,24 +650,62 @@ const xLoginCallback = async (req, res) => {
     const { codeVerifier } = stored;
     delete req.session.xOAuth;
 
-    const clientId = process.env.WEBAPP_X_CLIENT_ID;
-    const clientSecret = process.env.WEBAPP_X_CLIENT_SECRET;
-    const redirectUri = process.env.WEBAPP_X_REDIRECT_URI;
+    const clientId = process.env.WEBAPP_X_CLIENT_ID || process.env.TWITTER_CLIENT_ID;
+    const clientSecret = process.env.WEBAPP_X_CLIENT_SECRET || process.env.TWITTER_CLIENT_SECRET;
+    const redirectUri = process.env.WEBAPP_X_REDIRECT_URI || process.env.TWITTER_REDIRECT_URI;
 
     // Exchange code for access token
-    const tokenRes = await axios.post(
-      'https://api.twitter.com/2/oauth2/token',
-      new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: redirectUri,
-        code_verifier: codeVerifier,
-      }).toString(),
-      {
-        auth: { username: clientId, password: clientSecret },
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    // Try confidential client (Basic Auth) first, fall back to public client (client_id in body)
+    const tokenBody = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri,
+      code_verifier: codeVerifier,
+    });
+
+    let tokenRes;
+    try {
+      if (clientSecret) {
+        // Confidential client: Basic Auth
+        tokenRes = await axios.post(
+          'https://api.twitter.com/2/oauth2/token',
+          tokenBody.toString(),
+          {
+            auth: { username: clientId, password: clientSecret },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          }
+        );
+      } else {
+        // Public client: client_id in body
+        tokenBody.set('client_id', clientId);
+        tokenRes = await axios.post(
+          'https://api.twitter.com/2/oauth2/token',
+          tokenBody.toString(),
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
       }
-    );
+    } catch (tokenErr) {
+      const errData = tokenErr.response?.data;
+      logger.error('X OAuth token exchange failed:', {
+        status: tokenErr.response?.status,
+        error: errData?.error,
+        description: errData?.error_description,
+        clientId: clientId?.substring(0, 10) + '...',
+        redirectUri,
+      });
+      // If confidential auth failed with 401, retry as public client
+      if (tokenErr.response?.status === 401 && clientSecret) {
+        logger.info('Retrying X token exchange as public client...');
+        tokenBody.set('client_id', clientId);
+        tokenRes = await axios.post(
+          'https://api.twitter.com/2/oauth2/token',
+          tokenBody.toString(),
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+      } else {
+        throw tokenErr;
+      }
+    }
 
     const accessToken = tokenRes.data.access_token;
 
@@ -607,7 +763,7 @@ const xLoginCallback = async (req, res) => {
       req.session.save(err => (err ? reject(err) : resolve()))
     );
     logger.info(`Web app X login: user ${user.id} via @${xHandle}`);
-    return res.redirect('/prime-hub/');
+    return res.redirect('/');
   } catch (error) {
     logger.error('X OAuth callback error:', error.message);
     return res.redirect('/login?error=auth_failed');
@@ -900,6 +1056,9 @@ module.exports = {
   telegramStart,
   telegramCallback,
   telegramLogin,
+  telegramGenerateToken,
+  telegramCheckToken,
+  telegramConfirmLogin,
   emailRegister,
   emailLogin,
   xLoginStart,

@@ -134,7 +134,7 @@ class AuthController {
       // Email/password login
       if (email && password) {
         const result = await query(
-          `SELECT id, email, password_hash, role, username, telegram_id, subscription_status
+          `SELECT id, email, password_hash, role, username, telegram, subscription_status
            FROM users
            WHERE email = $1 AND (role = 'model' OR role = 'admin' OR role = 'superadmin')`,
           [email.toLowerCase()]
@@ -169,9 +169,9 @@ class AuthController {
       } else if (telegramId) {
         // Telegram login
         const result = await query(
-          `SELECT id, email, username, role, telegram_id, subscription_status
+          `SELECT id, email, username, role, telegram, subscription_status
            FROM users
-           WHERE telegram_id = $1 AND (role = 'model' OR role = 'admin' OR role = 'superadmin')`,
+           WHERE telegram = $1 AND (role = 'model' OR role = 'admin' OR role = 'superadmin')`,
           [telegramId.toString()]
         );
 
@@ -211,7 +211,7 @@ class AuthController {
         email: user.email,
         username: user.username,
         role: user.role,
-        telegramId: user.telegram_id,
+        telegramId: user.telegram,
       };
 
       logger.info('Model login successful', {
@@ -228,7 +228,7 @@ class AuthController {
             email: user.email,
             username: user.username,
             role: user.role,
-            telegramId: user.telegram_id,
+            telegramId: user.telegram,
             subscriptionStatus: user.subscription_status,
           },
         },

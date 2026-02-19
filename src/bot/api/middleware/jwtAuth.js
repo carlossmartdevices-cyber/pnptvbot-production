@@ -1,11 +1,13 @@
 const crypto = require('crypto');
 const logger = require('../../../utils/logger');
 
+const AUTH_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'pnptv-secret-key';
+
 /**
  * Generate JWT Token
  * Format: header.payload.signature
  */
-function generateJWT(payload, secret = process.env.JWT_SECRET || 'pnptv-jwt-secret') {
+function generateJWT(payload, secret = AUTH_SECRET) {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const encodedPayload = Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000) })).toString('base64url');
   
@@ -20,7 +22,7 @@ function generateJWT(payload, secret = process.env.JWT_SECRET || 'pnptv-jwt-secr
 /**
  * Verify and Decode JWT Token
  */
-function verifyJWT(token, secret = process.env.JWT_SECRET || 'pnptv-jwt-secret') {
+function verifyJWT(token, secret = AUTH_SECRET) {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) {
