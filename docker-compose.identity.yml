@@ -16,7 +16,7 @@ services:
 
   # -------------------------------------------------------
   # AUTHENTIK — Centralized SSO
-  # Web UI:  http://127.0.0.1:9000  →  auth.pnptv.app
+  # Web UI:  http://127.0.0.1:9001  →  auth.pnptv.app
   # -------------------------------------------------------
   authentik-server:
     image: ghcr.io/goauthentik/server:2024.12
@@ -34,7 +34,7 @@ services:
       AUTHENTIK_POSTGRESQL__PASSWORD: ${POSTGRES_PASSWORD}
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
       AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
-      AUTHENTIK_LISTEN__HTTP: 0.0.0.0:9000
+      AUTHENTIK_LISTEN__HTTP: 0.0.0.0:9001
       AUTHENTIK_LISTEN__HTTPS: 0.0.0.0:9443
       AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD}
       AUTHENTIK_BOOTSTRAP_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN}
