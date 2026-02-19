@@ -8,8 +8,6 @@
  * - Per-user data: hash "geo:user:{userId}" (latitude, longitude, accuracy, timestamp)
  */
 
-const Redis = require('redis');
-const { GeoReplyWith } = require('redis');
 const logger = require('../utils/logger');
 
 class RedisGeoService {
@@ -59,14 +57,7 @@ class RedisGeoService {
       }
 
       // Store in GEO set (for spatial queries)
-      await this.redis.geoadd(
-        this.geoKey,
-        {
-          longitude,
-          latitude,
-          member: userId
-        }
-      );
+      await this.redis.sendCommand(["GEOADD", this.geoKey, longitude.toString(), latitude.toString(), userId.toString()]);
 
       // Store user metadata in hash
       const userKey = `geo:user:${userId}`;
@@ -118,37 +109,46 @@ class RedisGeoService {
         throw new Error('Radius must be between 0.1 and 100 km');
       }
 
-      // Query Redis GEO using geoSearchWith (replaces deprecated georadius)
-      const results = await this.redis.geoSearchWith(
+      // Query Redis GEO — ioredis positional-arg style with WITHCOORD + WITHDIST
+      // Returns: [['member', 'distance_str', ['lon_str', 'lat_str']], ...]
+      const results = await this.redis.georadius(
         this.geoKey,
-        { longitude, latitude },
-        { radius: radiusKm, unit: unit.toLowerCase() },
-        [GeoReplyWith.DISTANCE, GeoReplyWith.COORDINATES],
-        { COUNT: limit, SORT: 'ASC' }
+        longitude,
+        latitude,
+        radiusKm,
+        unit.toLowerCase(),
+        'WITHCOORD',
+        'WITHDIST',
+        'COUNT',
+        limit,
+        'ASC'
       );
 
       // Fetch user metadata for each result
       const nearbyUsers = [];
       for (const result of results) {
-        const userId = result.member;
+        // ioredis returns [member, distance, [lon, lat]] when both WITHCOORD and WITHDIST are set
+        const userId = Array.isArray(result) ? result[0] : result;
+        const distanceStr = Array.isArray(result) ? result[1] : '0';
+        const coords = Array.isArray(result) && Array.isArray(result[2]) ? result[2] : null;
 
         // Skip excluded users
         if (excludeUsers.includes(userId)) continue;
 
-        // Get user metadata from hash (accurate coords, accuracy, timestamp)
+        // Get user metadata (accurate coords + accuracy + timestamp)
         const userKey = `geo:user:${userId}`;
         const userData = await this.redis.hgetall(userKey);
 
-        const distKm = parseFloat(result.distance) || 0;
+        const distKm = parseFloat(distanceStr) || 0;
 
         nearbyUsers.push({
           user_id: userId,
-          latitude: userData?.latitude ? parseFloat(userData.latitude) : parseFloat(result.coordinates?.latitude || 0),
-          longitude: userData?.longitude ? parseFloat(userData.longitude) : parseFloat(result.coordinates?.longitude || 0),
-          accuracy: userData?.accuracy ? parseInt(userData.accuracy) : 0,
+          latitude: userData && userData.latitude ? parseFloat(userData.latitude) : (coords ? parseFloat(coords[1]) : 0),
+          longitude: userData && userData.longitude ? parseFloat(userData.longitude) : (coords ? parseFloat(coords[0]) : 0),
+          accuracy: userData && userData.accuracy ? parseInt(userData.accuracy) : 0,
           distance_km: distKm,
           distance_m: Math.round(distKm * 1000),
-          last_update: userData?.last_update || null,
+          last_update: (userData && userData.last_update) || null,
           status: 'online'
         });
       }
