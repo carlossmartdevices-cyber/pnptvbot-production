@@ -1513,6 +1513,31 @@ app.get('/api/admin/radio/requests', verifyAdminJWT, asyncHandler(mediaAdminCont
 app.put('/api/admin/radio/requests/:requestId', verifyAdminJWT, asyncHandler(mediaAdminController.updateRequest));
 
 // ==========================================
+// Role-Based Access Control (RBAC) Routes
+// ==========================================
+const { adminGuard, superadminGuard } = require('../../middleware/guards');
+const { auditLog } = require('../../middleware/auditLogger');
+const roleController = require('./controllers/roleController');
+const auditLogController = require('./controllers/auditLogController');
+
+// Apply middleware to all admin routes
+app.use('/api/admin/', auditLog);
+
+// Role Management Endpoints
+app.put('/api/admin/users/role', adminGuard, asyncHandler((req, res) => roleController.assignRole(req, res)));
+app.post('/api/admin/users/:id/role', adminGuard, asyncHandler((req, res) => roleController.assignRole(req, res)));
+app.delete('/api/admin/users/:id/role', superadminGuard, asyncHandler((req, res) => roleController.removeRole(req, res)));
+app.get('/api/admin/users/:id/roles', adminGuard, asyncHandler((req, res) => roleController.getUserRoles(req, res)));
+app.get('/api/admin/roles', adminGuard, asyncHandler((req, res) => roleController.listRoles(req, res)));
+app.get('/api/admin/permissions', adminGuard, asyncHandler((req, res) => roleController.getPermissions(req, res)));
+app.get('/api/admin/permissions/check', adminGuard, asyncHandler((req, res) => roleController.checkPermission(req, res)));
+app.get('/api/admin/users', adminGuard, asyncHandler((req, res) => roleController.filterUsersByRole(req, res)));
+
+// Audit Log Endpoints
+app.get('/api/admin/audit-logs', adminGuard, asyncHandler((req, res) => auditLogController.getAuditLogs(req, res)));
+app.get('/api/admin/audit-logs/resource', adminGuard, asyncHandler((req, res) => auditLogController.getResourceHistory(req, res)));
+
+// ==========================================
 // Social, DM, Chat, Users API Routes
 // ==========================================
 const chatController = require('./controllers/chatController');

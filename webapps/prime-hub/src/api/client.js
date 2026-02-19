@@ -181,7 +181,36 @@ export const api = {
   clearAdminRadioQueue: () => request('/admin/radio/queue/clear', { method: 'POST' }),
   getAdminRadioRequests: (status = 'pending') => request(`/admin/radio/requests?status=${status}`),
   updateAdminRadioRequest: (requestId, data) => request(`/admin/radio/requests/${requestId}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Admin Role Management
+  getAdminRoles: () => request('/admin/roles'),
+  getAdminUsersByRole: (role, page = 1, limit = 20) => request(`/admin/users?role=${role}&page=${page}&limit=${limit}`),
+  assignAdminUserRole: (userId, roleName, reason = '') => request('/admin/users/role', {
+    method: 'PUT',
+    body: JSON.stringify({ userId, roleName, reason })
+  }),
+  removeAdminUserRole: (userId, roleName) => request(`/admin/users/${userId}/role`, {
+    method: 'DELETE',
+    body: JSON.stringify({ userId, roleName })
+  }),
+  getAdminUserRoles: (userId) => request(`/admin/users/${userId}/roles`),
+  getAdminPermissions: (roleName = null) => {
+    let url = '/admin/permissions';
+    if (roleName) url += `?roleName=${roleName}`;
+    return request(url);
+  },
+  checkAdminPermission: (userId, permission) => request(`/admin/permissions/check?userId=${userId}&permission=${permission}`),
+  getAdminAuditLogs: (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+    return request(`/admin/audit-logs?${params.toString()}`);
+  },
+  getAdminAuditLogsResource: (resourceType, resourceId, limit = 50) => request(`/admin/audit-logs/resource?resourceType=${resourceType}&resourceId=${resourceId}&limit=${limit}`),
 };
+
+export const apiClient = api;
 
 // Export token management functions
 export { setAuthToken, getAuthToken };
