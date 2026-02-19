@@ -6,7 +6,7 @@ import { Twitter } from 'lucide-react';
 export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loginWithX } = useAuth();
+  const { user, loginWithTelegram, loginWithX } = useAuth();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -34,8 +34,21 @@ export default function LoginPage() {
     }
   }, [searchParams]);
 
-  // Render Telegram widget (redirect-based — more reliable, no popup blocking)
+  // Render Telegram widget (JS callback approach — fires onTelegramWidgetAuth on success)
   useEffect(() => {
+    // Must define global BEFORE the widget script loads
+    window.onTelegramWidgetAuth = async (telegramUser) => {
+      setError('');
+      setLoading(true);
+      try {
+        await loginWithTelegram(telegramUser);
+        navigate('/', { replace: true });
+      } catch (err) {
+        setError(err.message || 'Telegram authentication failed. Please try again.');
+        setLoading(false);
+      }
+    };
+
     const container = document.getElementById('telegram-widget-container');
     if (!container) return;
 
@@ -47,10 +60,14 @@ export default function LoginPage() {
     script.setAttribute('data-telegram-login', 'PNPLatinoTV_Bot');
     script.setAttribute('data-size', 'large');
     script.setAttribute('data-radius', '10');
-    script.setAttribute('data-auth-url', '/api/webapp/auth/telegram/callback');
+    script.setAttribute('data-onauth', 'onTelegramWidgetAuth(user)');
     script.setAttribute('data-request-access', 'write');
     container.appendChild(script);
-  }, []);
+
+    return () => {
+      delete window.onTelegramWidgetAuth;
+    };
+  }, [loginWithTelegram, navigate]);
 
   const handleXLogin = async () => {
     setError('');
