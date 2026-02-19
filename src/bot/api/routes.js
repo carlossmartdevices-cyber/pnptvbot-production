@@ -125,6 +125,8 @@ app.use(conditionalMiddleware(helmet({
         "https://fonts.gstatic.com",
         "https://oauth.telegram.org",
         "https://api.telegram.org",
+        "wss://pnptv.app",
+        "ws://localhost:3001",
       ],
       frameSrc: [
         "'self'",
@@ -1407,6 +1409,38 @@ app.get('/api/webapp/profile', asyncHandler(webAppController.getProfile));
 
 // Web App Mastodon Feed
 app.get('/api/webapp/mastodon/feed', asyncHandler(webAppController.getMastodonFeed));
+
+// ==========================================
+// Social Feed API
+// ==========================================
+const socialController = require('./controllers/socialController');
+app.get('/api/webapp/social/feed', asyncHandler(socialController.getFeed));
+app.get('/api/webapp/social/wall/:userId', asyncHandler(socialController.getWall));
+app.post('/api/webapp/social/posts', asyncHandler(socialController.createPost));
+app.post('/api/webapp/social/posts/:postId/like', asyncHandler(socialController.toggleLike));
+app.delete('/api/webapp/social/posts/:postId', asyncHandler(socialController.deletePost));
+app.get('/api/webapp/social/posts/:postId/replies', asyncHandler(socialController.getReplies));
+app.post('/api/webapp/mastodon/post', asyncHandler(socialController.postToMastodon));
+
+// ==========================================
+// DM API
+// ==========================================
+const dmController = require('./controllers/dmController');
+app.get('/api/webapp/dm/threads', asyncHandler(dmController.getThreads));
+app.get('/api/webapp/dm/conversation/:partnerId', asyncHandler(dmController.getConversation));
+app.get('/api/webapp/dm/user/:partnerId', asyncHandler(dmController.getPartnerInfo));
+
+// ==========================================
+// Chat API
+// ==========================================
+const chatController = require('./controllers/chatController');
+app.get('/api/webapp/chat/:room/history', asyncHandler(chatController.getChatHistory));
+
+// ==========================================
+// Users search API
+// ==========================================
+const usersController = require('./controllers/usersController');
+app.get('/api/webapp/users/search', asyncHandler(usersController.searchUsers));
 
 // ==========================================
 // PRIME Hub SPA Serving

@@ -48,4 +48,23 @@ export const api = {
   // Hangouts
   getPublicHangouts: () =>
     fetch('/api/hangouts/public', { credentials: 'include' }).then(r => r.json()),
+
+  // Social feed
+  getFeed: (cursor) => request(`/social/feed${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
+  getWall: (userId, cursor) => request(`/social/wall/${userId}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
+  createPost: (data) => request('/social/posts', { method: 'POST', body: JSON.stringify(data) }),
+  toggleLike: (postId) => request(`/social/posts/${postId}/like`, { method: 'POST' }),
+  deletePost: (postId) => request(`/social/posts/${postId}`, { method: 'DELETE' }),
+  getReplies: (postId, cursor) => request(`/social/posts/${postId}/replies${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
+
+  // DM
+  getDMThreads: () => request('/dm/threads'),
+  getConversation: (partnerId, cursor) => request(`/dm/conversation/${partnerId}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
+  getDMPartnerInfo: (partnerId) => request(`/dm/user/${partnerId}`),
+
+  // Chat
+  getChatHistory: (room = 'general') => request(`/chat/${room}/history`),
+
+  // Users
+  searchUsers: (q) => request(`/users/search?q=${encodeURIComponent(q)}`),
 };
