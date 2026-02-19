@@ -132,12 +132,12 @@ const telegramCallback = async (req, res) => {
     const telegramUser = req.query;
     if (!telegramUser.id || !telegramUser.hash) {
       logger.warn('Telegram callback missing id or hash');
-      return res.redirect('/prime-hub/?error=auth_failed');
+      return res.redirect('/login?error=auth_failed');
     }
 
     if (!verifyTelegramAuth(telegramUser)) {
       logger.warn('Invalid Telegram auth hash (callback)', { userId: telegramUser.id });
-      return res.redirect('/prime-hub/?error=auth_failed');
+      return res.redirect('/login?error=auth_failed');
     }
 
     const telegramId = String(telegramUser.id);
@@ -172,7 +172,7 @@ const telegramCallback = async (req, res) => {
     return res.redirect('/prime-hub/');
   } catch (error) {
     logger.error('Telegram callback error:', error);
-    return res.redirect('/prime-hub/?error=auth_failed');
+    return res.redirect('/login?error=auth_failed');
   }
 };
 
@@ -418,13 +418,13 @@ const xLoginCallback = async (req, res) => {
     const { code, state, error: xError } = req.query;
 
     if (xError || !code || !state) {
-      return res.redirect('/?error=missing_params');
+      return res.redirect('/login?error=missing_params');
     }
 
     const stored = req.session.xOAuth;
     if (!stored || stored.state !== state) {
       logger.warn('X OAuth state mismatch or session expired');
-      return res.redirect('/?error=auth_failed');
+      return res.redirect('/login?error=auth_failed');
     }
 
     const { codeVerifier } = stored;
@@ -461,7 +461,7 @@ const xLoginCallback = async (req, res) => {
     const xHandle = xData?.username;
     const xName = xData?.name || xHandle;
 
-    if (!xHandle) return res.redirect('/?error=auth_failed');
+    if (!xHandle) return res.redirect('/login?error=auth_failed');
 
     // Find user by twitter handle
     let result = await query(
@@ -508,7 +508,7 @@ const xLoginCallback = async (req, res) => {
     return res.redirect('/prime-hub/');
   } catch (error) {
     logger.error('X OAuth callback error:', error.message);
-    return res.redirect('/?error=auth_failed');
+    return res.redirect('/login?error=auth_failed');
   }
 };
 

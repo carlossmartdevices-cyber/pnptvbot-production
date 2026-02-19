@@ -1,7 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
-import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import NearbyPage from './pages/NearbyPage';
@@ -26,7 +25,9 @@ function ProtectedRoute({ children }) {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    // Redirect to the single HTML login page (not the React SPA route)
+    window.location.replace('/login');
+    return null;
   }
 
   return children;
@@ -36,7 +37,6 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         <Route path="/nearby" element={<ProtectedRoute><NearbyPage /></ProtectedRoute>} />
