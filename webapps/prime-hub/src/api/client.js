@@ -63,8 +63,8 @@ export const api = {
   getMediaLibrary: (type = 'all', limit = 50) =>
     fetch(`/api/media/library?type=${type}&limit=${limit}`, { credentials: 'include' }).then(r => r.json()),
 
-  // Radio
-  getRadioNowPlaying: () => request('/radio/now-playing').catch(() => ({})),
+  // Radio (public endpoint — no /api/webapp prefix)
+  getRadioNowPlaying: () => fetch('/api/radio/now-playing', { credentials: 'include' }).then(r => r.json()).catch(() => ({})),
 
   // Hangouts
   getPublicHangouts: () => request('/hangouts/public'),
