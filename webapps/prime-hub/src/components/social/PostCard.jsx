@@ -64,11 +64,7 @@ export default function PostCard({ post, onDeleted }) {
     <div className="post-card">
       <div className="post-header">
         <div className="post-avatar">
-          {post.author_photo ? (
-            <img src={`https://api.telegram.org/file/bot${post.author_photo}`} alt="" onError={e => e.target.style.display='none'} />
-          ) : (
-            <div className="post-avatar-placeholder">{(post.author_first_name || post.author_username || '?')[0].toUpperCase()}</div>
-          )}
+          <div className="post-avatar-placeholder">{(post.author_first_name || post.author_username || '?')[0].toUpperCase()}</div>
         </div>
         <div style={{ flex: 1 }}>
           <Link to={`/wall/${post.author_id}`} className="post-author-name">

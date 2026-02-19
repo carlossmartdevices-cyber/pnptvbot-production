@@ -42,13 +42,9 @@ export default function WallPage() {
       {/* Profile header */}
       <div className="card wall-profile-card">
         <div className="wall-profile-avatar">
-          {profile.photo_file_id ? (
-            <img src={`https://api.telegram.org/file/bot${profile.photo_file_id}`} alt="" onError={e => e.target.style.display='none'} />
-          ) : (
-            <div className="post-avatar-placeholder wall-avatar-big">
-              {(profile.first_name || profile.username || '?')[0].toUpperCase()}
-            </div>
-          )}
+          <div className="post-avatar-placeholder wall-avatar-big">
+            {(profile.first_name || profile.username || '?')[0].toUpperCase()}
+          </div>
         </div>
         <div className="wall-profile-info">
           <div className="wall-profile-name">{profile.first_name} {profile.last_name || ''}</div>
