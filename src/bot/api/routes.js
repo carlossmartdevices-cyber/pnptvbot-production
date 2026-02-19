@@ -41,6 +41,7 @@ const { handleTelegramAuth, handleAcceptTerms, checkAuthStatus } = require('../.
 const authRoutes = require('./routes/authRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const modelRoutes = require('./routes/modelRoutes');
+const photoRoutes = require('./routes/photoRoutes');
 
 /**
  * Page-level authentication middleware
@@ -1623,6 +1624,9 @@ app.use('/api/subscriptions', subscriptionRoutes);
 
 // Model routes
 app.use('/api/model', modelRoutes);
+
+// Photo routes
+app.use('/api', photoRoutes);
 
 app.get('/prime-hub/*', (req, res) => {
   const host = req.get('host') || '';
