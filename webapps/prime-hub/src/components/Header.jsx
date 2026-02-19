@@ -10,8 +10,7 @@ export default function Header() {
   return (
     <header className="app-header">
       <div className="header-left">
-        <Link to="/" className="header-logo">PNP</Link>
-        <Link to="/" className="header-title">tv</Link>
+        <Link to="/" className="header-logo">PNPtv</Link>
       </div>
 
       <nav className="header-nav">
