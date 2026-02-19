@@ -59,21 +59,12 @@
       box-shadow: 0 24px 80px rgba(0,0,0,0.5);
     }
 
-    .logo {
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 8px;
-      text-align: center;
-    }
-
-    h1 {
-      font-size: 26px;
-      font-weight: 800;
-      text-align: center;
-      margin-bottom: 6px;
+    .logo img {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 4px;
     }
 
     .subtitle {
@@ -220,8 +211,7 @@
   <div class="glow"></div>
 
   <div class="card">
-    <div class="logo">PNPtv</div>
-    <h1>PRIME Hub</h1>
+    <div class="logo"><img src="/logo.png" alt="PNPtv" /></div>
     <p class="subtitle">Inicia sesión para acceder a la comunidad</p>
 
     <div id="error-banner"  class="banner error"></div>
