@@ -206,6 +206,37 @@
     /* X icon SVG */
     .x-icon { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
   </style>
+  <script>
+    // Must be defined before telegram-widget.js loads
+    window.onTelegramWidgetAuth = async function(telegramUser) {
+      var errEl = document.getElementById('error-banner');
+      var sucEl = document.getElementById('success-banner');
+      errEl.classList.remove('show');
+      sucEl.textContent = 'Autenticando con Telegram…';
+      sucEl.classList.add('show');
+      try {
+        var res  = await fetch('/api/webapp/auth/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ telegramUser: telegramUser }),
+        });
+        var data = await res.json();
+        if (res.ok && data.authenticated) {
+          sucEl.textContent = '¡Bienvenido! Redirigiendo…';
+          setTimeout(function() { location.href = '/prime-hub/'; }, 600);
+        } else {
+          sucEl.classList.remove('show');
+          errEl.textContent = data.error || 'No se pudo iniciar sesión con Telegram.';
+          errEl.classList.add('show');
+        }
+      } catch(e) {
+        sucEl.classList.remove('show');
+        errEl.textContent = 'Error de red. Intenta de nuevo.';
+        errEl.classList.add('show');
+      }
+    };
+  </script>
 </head>
 <body>
   <div class="glow"></div>
@@ -217,8 +248,17 @@
     <div id="error-banner"  class="banner error"></div>
     <div id="success-banner" class="banner success"></div>
 
-    <!-- 1. Telegram Login Widget (JS callback) -->
-    <div id="tg-widget" style="display:flex;justify-content:center;min-height:48px;"></div>
+    <!-- 1. Telegram Login Widget -->
+    <div id="tg-widget" style="display:flex;justify-content:center;min-height:56px;margin-bottom:4px;">
+      <script
+        src="https://telegram.org/js/telegram-widget.js?22"
+        data-telegram-login="PNPLatinoTV_Bot"
+        data-size="large"
+        data-radius="10"
+        data-onauth="onTelegramWidgetAuth(user)"
+        data-request-access="write">
+      </script>
+    </div>
 
     <div class="divider">o</div>
 
@@ -290,39 +330,7 @@
       if (err && msgs[err]) showBanner('error', msgs[err]);
     })();
 
-    // ── Telegram Widget (JS callback approach) ─────────────────────────────────
-    window.onTelegramWidgetAuth = async function(telegramUser) {
-      clearBanners();
-      showBanner('success', 'Autenticando con Telegram...');
-      try {
-        const res  = await fetch('/api/webapp/auth/telegram', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ telegramUser }),
-        });
-        const data = await res.json();
-        if (res.ok && data.authenticated) {
-          showBanner('success', '¡Bienvenido! Redirigiendo...');
-          setTimeout(() => { location.href = '/prime-hub/'; }, 600);
-        } else {
-          showBanner('error', data.error || 'No se pudo iniciar sesión con Telegram.');
-        }
-      } catch {
-        showBanner('error', 'Error de red. Intenta de nuevo.');
-      }
-    };
-    (function () {
-      const script = document.createElement('script');
-      script.src = 'https://telegram.org/js/telegram-widget.js?22';
-      script.async = true;
-      script.setAttribute('data-telegram-login', 'PNPLatinoTV_Bot');
-      script.setAttribute('data-size', 'large');
-      script.setAttribute('data-radius', '10');
-      script.setAttribute('data-onauth', 'onTelegramWidgetAuth(user)');
-      script.setAttribute('data-request-access', 'write');
-      document.getElementById('tg-widget').appendChild(script);
-    })();
+    // Telegram callback is defined in <head> before widget loads
 
     // ── Tab switch ─────────────────────────────────────────────────────────────
     function switchTab(tab) {
