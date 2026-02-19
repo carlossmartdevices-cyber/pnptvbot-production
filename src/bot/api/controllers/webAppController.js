@@ -76,14 +76,32 @@ function setSessionCookieDuration(session, rememberMe = false) {
 
 function verifyTelegramAuth(data) {
   const botToken = process.env.BOT_TOKEN;
-  if (!botToken) return false;
+  if (!botToken) {
+    logger.error('BOT_TOKEN not configured');
+    return false;
+  }
   const { hash, ...rest } = data;
-  if (!hash) return false;
+  if (!hash) {
+    logger.error('No hash in Telegram data');
+    return false;
+  }
   const checkString = Object.keys(rest).sort().map(k => `${k}=${rest[k]}`).join('\n');
+  logger.info('Telegram auth verification:', { botToken: botToken.substring(0, 10) + '...', checkString: checkString.substring(0, 100) + '...', receivedHash: hash });
   const secretKey = crypto.createHash('sha256').update(botToken).digest();
   const hmac = crypto.createHmac('sha256', secretKey).update(checkString).digest('hex');
-  if (hmac !== hash) return false;
-  if (Date.now() / 1000 - parseInt(data.auth_date, 10) > 86400) return false;
+  logger.info('Hash comparison:', { calculated: hmac, received: hash, match: hmac === hash });
+  if (hmac !== hash) {
+    logger.warn('Hash mismatch in Telegram auth');
+    return false;
+  }
+  const authDate = parseInt(data.auth_date, 10);
+  const timeDiff = Math.floor(Date.now() / 1000) - authDate;
+  logger.info('Auth time check:', { authDate, timeDiff, maxAge: 86400 });
+  if (timeDiff > 86400) {
+    logger.warn('Telegram auth expired');
+    return false;
+  }
+  logger.info('Telegram auth verified successfully');
   return true;
 }
 
@@ -131,15 +149,18 @@ const telegramStart = async (req, res) => {
 const telegramCallback = async (req, res) => {
   try {
     const telegramUser = req.query;
-    logger.info('Telegram callback received:', { query: telegramUser });
+    console.log('=== TELEGRAM CALLBACK ===', JSON.stringify(telegramUser, null, 2));
 
     if (!telegramUser.id || !telegramUser.hash) {
-      logger.warn('Telegram callback missing id or hash', { query: telegramUser });
+      console.log('Missing id or hash:', { hasId: !!telegramUser.id, hasHash: !!telegramUser.hash });
       return res.redirect('/login?error=auth_failed');
     }
 
-    if (!verifyTelegramAuth(telegramUser)) {
-      logger.warn('Invalid Telegram auth hash (callback)', { userId: telegramUser.id, receivedHash: telegramUser.hash });
+    const isValid = verifyTelegramAuth(telegramUser);
+    console.log('Hash verification result:', isValid);
+
+    if (!isValid) {
+      console.log('Hash verification failed for user:', telegramUser.id);
       return res.redirect('/login?error=auth_failed');
     }
 
