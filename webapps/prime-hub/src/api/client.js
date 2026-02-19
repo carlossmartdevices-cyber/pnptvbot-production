@@ -104,4 +104,11 @@ export const api = {
   deleteAdminPost: (id) => request(`/admin/posts/${id}`, { method: 'DELETE' }),
   listAdminHangouts: () => request('/admin/hangouts'),
   endAdminHangout: (id) => request(`/admin/hangouts/${id}`, { method: 'DELETE' }),
+
+  // Live streaming
+  getLiveStreams: () => request('/live/streams'),
+  startLiveStream: (data) => request('/live/start', { method: 'POST', body: JSON.stringify(data) }),
+  joinLiveStream: (streamId) => request(`/live/streams/${streamId}/join`),
+  endLiveStream: (streamId) => request(`/live/streams/${streamId}/end`, { method: 'POST' }),
+  leaveLiveStream: (streamId) => request(`/live/streams/${streamId}/leave`, { method: 'POST' }),
 };

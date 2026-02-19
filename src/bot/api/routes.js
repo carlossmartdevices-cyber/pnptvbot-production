@@ -1426,6 +1426,14 @@ app.post('/api/webapp/hangouts/join/:callId', asyncHandler(webappHangoutsControl
 app.post('/api/webapp/hangouts/leave/:callId', asyncHandler(webappHangoutsController.leaveRoom));
 app.delete('/api/webapp/hangouts/:callId', asyncHandler(webappHangoutsController.endRoom));
 
+// Web App Live Streaming Routes
+const webappLiveController = require('./controllers/webappLiveController');
+app.get('/api/webapp/live/streams', asyncHandler(webappLiveController.listStreams));
+app.post('/api/webapp/live/start', asyncHandler(webappLiveController.startStream));
+app.get('/api/webapp/live/streams/:streamId/join', asyncHandler(webappLiveController.joinStream));
+app.post('/api/webapp/live/streams/:streamId/end', asyncHandler(webappLiveController.endStream));
+app.post('/api/webapp/live/streams/:streamId/leave', asyncHandler(webappLiveController.leaveStream));
+
 // Web App Admin Routes (session auth + role check)
 const webappAdminController = require('./controllers/webappAdminController');
 app.get('/api/webapp/admin/stats', asyncHandler(webappAdminController.getStats));
