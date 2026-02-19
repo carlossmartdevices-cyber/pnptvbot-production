@@ -1490,6 +1490,11 @@ app.get('/prime-hub', (req, res) => {
   res.sendFile(path.join(primeHubPath, 'index.html'));
 });
 
+// Block typo/legacy URL explicitly so it does not resolve through SPA fallback.
+app.get(['/prime-hub/logi', '/prime-hub/logi/'], (req, res) => {
+  res.status(404).send('Page not found.');
+});
+
 app.get('/prime-hub/*', (req, res) => {
   const host = req.get('host') || '';
   if (host.includes('easybots.store') || host.includes('easybots')) {
