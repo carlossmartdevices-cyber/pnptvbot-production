@@ -415,12 +415,8 @@ app.get('/', (req, res) => {
     `);
     return;
   }
-  // If already authenticated, send straight to the app
-  if (req.session?.user) {
-    return res.redirect(302, '/prime-hub/');
-  }
-  // Serve the login page
-  res.sendFile(path.join(__dirname, '../../../public/index.html'));
+  // Redirect to PRIME Hub (login page if unauthenticated, home if authenticated)
+  return res.redirect(302, '/prime-hub/');
 });
 
 // PRIME Hub login page - shows 4 app icons
