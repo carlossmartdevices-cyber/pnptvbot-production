@@ -22,8 +22,8 @@
     "validate:env": "node -e \"require('./src/utils/envValidator').validateEnv()\"",
     "import:legacy-customers": "node scripts/import-legacy-customers.js",
     "build:prime-hub": "cd webapps/prime-hub && npm install && npx vite build && rm -rf ../../public/prime-hub/assets && cp -r dist/* ../../public/prime-hub/",
-  "build:webapps": "npm run build:prime-hub",
-  "prestart": ""
+    "build:webapps": "npm run build:prime-hub",
+    "prestart": ""
   },
   "keywords": [
     "telegram",
@@ -42,6 +42,7 @@
     "agora-access-token": "^2.0.4",
     "agora-token": "^2.0.5",
     "axios": "^1.13.2",
+    "bcryptjs": "^3.0.3",
     "compression": "^1.7.4",
     "connect-redis": "^7.1.1",
     "cors": "^2.8.5",
