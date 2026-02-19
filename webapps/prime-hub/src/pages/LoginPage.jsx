@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuth.jsx';
 import { Twitter } from 'lucide-react';
 import { api } from '../api/client';
 
@@ -24,6 +24,17 @@ export default function LoginPage() {
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [forgotEmail, setForgotEmail] = useState('');
+
+  // Init Telegram Login Widget after component mounts
+  useEffect(() => {
+    if (window.Telegram?.Login) {
+      window.Telegram.Login.embed('tg_login_widget', {
+        bot_id: '7882893938',
+        size: 'large',
+        onAuthCallback: handleTelegramAuthCallback
+      });
+    }
+  }, []);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -61,11 +72,22 @@ export default function LoginPage() {
     }
   }, [searchParams]);
 
-  const handleTelegramLogin = () => {
+  const handleTelegramAuthCallback = async (user) => {
     setError('');
     setSuccess('');
     setSocialLoading(true);
-    window.location.href = '/api/webapp/auth/telegram/start';
+    try {
+      const result = await api.telegramLogin(user);
+      if (result.authenticated && result.registered) {
+        navigate('/', { replace: true });
+      } else {
+        setError(result.error || 'Telegram authentication failed');
+        setSocialLoading(false);
+      }
+    } catch (err) {
+      setError(err.message || 'Telegram authentication failed');
+      setSocialLoading(false);
+    }
   };
 
   const handleXLogin = async () => {
@@ -180,13 +202,8 @@ export default function LoginPage() {
         {error && <div className="login-error">{error}</div>}
         {success && <div className="login-success">{success}</div>}
 
-        <button
-          className="btn-login btn-telegram"
-          onClick={handleTelegramLogin}
-          disabled={socialLoading || emailLoading}
-        >
-          Continue with Telegram
-        </button>
+        <div id="tg_login_widget" style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }} />
+        <noscript>Telegram login requires JavaScript enabled</noscript>
 
         <div className="login-divider">or</div>
 
