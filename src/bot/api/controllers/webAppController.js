@@ -208,12 +208,25 @@ const xLoginCallback = async (req, res) => {
     }
 
     // Look up user in our DB by X handle
-    const result = await query(
+    let result = await query(
       `SELECT id, telegram, username, first_name, last_name, subscription_status,
               accepted_terms, photo_file_id, bio, language
        FROM users WHERE twitter = $1`,
       [xHandle]
     );
+
+    // If not found by twitter handle but there's an active Telegram session,
+    // link this X account to the existing session user
+    if (result.rows.length === 0 && req.session?.user?.id) {
+      await query(`UPDATE users SET twitter = $1 WHERE id = $2`, [xHandle, req.session.user.id]);
+      result = await query(
+        `SELECT id, telegram, username, first_name, last_name, subscription_status,
+                accepted_terms, photo_file_id, bio, language
+         FROM users WHERE id = $1`,
+        [req.session.user.id]
+      );
+      logger.info(`Linked X handle @${xHandle} to existing user ${req.session.user.id}`);
+    }
 
     if (result.rows.length === 0) {
       return res.redirect(`/?error=not_registered&x_handle=${encodeURIComponent(xHandle)}`);
