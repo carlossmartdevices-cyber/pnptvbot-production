@@ -7,19 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function generatePnptvId() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let id = 'PNP';
-  for (let i = 0; i < 7; i++) id += chars[Math.floor(Math.random() * chars.length)];
-  return id;
-}
-
-async function ensureUniquePnptvId() {
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const id = generatePnptvId();
-    const { rows } = await query('SELECT 1 FROM users WHERE pnptv_id = $1', [id]);
-    if (rows.length === 0) return id;
-  }
-  throw new Error('Could not generate unique PNPtv ID');
+  return uuidv4();
 }
 
 async function hashPassword(password) {
@@ -41,7 +29,7 @@ async function verifyPassword(password, stored) {
 
 async function createWebUser({ id, firstName, lastName, username, email, passwordHash, telegramId, twitterHandle, photoFileId } = {}) {
   const userId = id || uuidv4();
-  const pnptvId = await ensureUniquePnptvId();
+  const pnptvId = generatePnptvId();
   const displayName = username || (firstName ? `${firstName}${lastName ? `_${lastName}` : ''}`.toLowerCase().replace(/\s+/g, '_') : null);
 
   const { rows } = await query(
