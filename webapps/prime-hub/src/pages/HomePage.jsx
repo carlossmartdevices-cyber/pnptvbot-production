@@ -1,9 +1,59 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api/client';
 import { MapPin, Users, Radio, Film, Heart, Repeat2, MessageCircle } from 'lucide-react';
+
+function TelegramChannelWidget() {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.innerHTML = '';
+    const script = document.createElement('script');
+    script.src = 'https://telegram.org/js/telegram-widget.js?22';
+    script.async = true;
+    script.setAttribute('data-telegram-post', 'pnptv_community/1');
+    script.setAttribute('data-width', '100%');
+    script.setAttribute('data-color', 'FF00CC');
+    script.setAttribute('data-dark', '1');
+    ref.current.appendChild(script);
+  }, []);
+
+  return (
+    <div className="card" style={{ padding: '16px 20px' }}>
+      <div className="card-header">
+        <span className="card-title">Telegram Community</span>
+        <a
+          href="https://t.me/pnptv_community"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontSize: 12, color: 'var(--text-muted)', textDecoration: 'none' }}
+        >
+          Join →
+        </a>
+      </div>
+      <div ref={ref} style={{ minHeight: 80 }} />
+      <a
+        href="https://t.me/PNPLatinoTV_Bot"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          marginTop: 12, padding: '10px 16px', borderRadius: 10,
+          background: 'rgba(0,136,204,0.15)', border: '1px solid rgba(0,136,204,0.3)',
+          color: '#29B6F6', fontSize: 13, fontWeight: 600, textDecoration: 'none',
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+        </svg>
+        Open in Telegram Bot
+      </a>
+    </div>
+  );
+}
 
 function MastodonFeed() {
   const [posts, setPosts] = useState([]);
@@ -152,6 +202,10 @@ export default function HomePage() {
           <span className="quick-action-desc">Media center</span>
         </Link>
       </div>
+
+      {/* Telegram Community */}
+      <div className="section-label">Telegram</div>
+      <TelegramChannelWidget />
 
       {/* Mastodon Feed */}
       <div className="section-label">Latest Posts</div>
