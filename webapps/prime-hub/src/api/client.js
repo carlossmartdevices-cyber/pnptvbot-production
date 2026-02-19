@@ -33,6 +33,19 @@ export const api = {
 
   // Profile
   getProfile: () => request('/profile'),
+  updateProfile: (data) => request('/profile', { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Nearby (uses /api/nearby directly — same session)
+  nearbyUpdateLocation: (lat, lng, accuracy) =>
+    fetch('/api/nearby/update-location', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ latitude: lat, longitude: lng, accuracy }),
+    }).then(r => r.json()),
+  nearbySearch: (lat, lng, radius = 5) =>
+    fetch(`/api/nearby/search?latitude=${lat}&longitude=${lng}&radius=${radius}&limit=30`, {
+      credentials: 'include',
+    }).then(r => r.json()),
 
   // Mastodon feed
   getMastodonFeed: (limit = 10) => request(`/mastodon/feed?limit=${limit}`),

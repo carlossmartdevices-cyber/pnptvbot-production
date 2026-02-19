@@ -661,6 +661,37 @@ img {
   font-weight: 600;
 }
 
+/* Profile edit inputs */
+.profile-edit-input,
+.profile-edit-textarea {
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+  flex: 1;
+}
+.profile-edit-input:focus,
+.profile-edit-textarea:focus {
+  border-color: var(--accent);
+}
+.profile-edit-textarea {
+  width: 100%;
+  resize: vertical;
+}
+.profile-row-edit {
+  align-items: flex-start;
+  gap: 10px;
+}
+.profile-row-edit .profile-row-label {
+  padding-top: 9px;
+  min-width: 90px;
+}
+
 .btn-logout {
   display: block;
   width: 100%;

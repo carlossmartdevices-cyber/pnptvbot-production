@@ -9,6 +9,7 @@
  */
 
 const Redis = require('redis');
+const { GeoReplyWith } = require('redis');
 const logger = require('../utils/logger');
 
 class RedisGeoService {
@@ -117,21 +118,13 @@ class RedisGeoService {
         throw new Error('Radius must be between 0.1 and 100 km');
       }
 
-      // Query Redis GEO
-      const results = await this.redis.georadius(
+      // Query Redis GEO using geoSearchWith (replaces deprecated georadius)
+      const results = await this.redis.geoSearchWith(
         this.geoKey,
-        {
-          longitude,
-          latitude,
-          radius: radiusKm,
-          unit: unit.toLowerCase()
-        },
-        {
-          WITHCOORD: true,
-          WITHDIST: true,
-          COUNT: limit,
-          SORT: 'ASC'
-        }
+        { longitude, latitude },
+        { radius: radiusKm, unit: unit.toLowerCase() },
+        [GeoReplyWith.DISTANCE, GeoReplyWith.COORDINATES],
+        { COUNT: limit, SORT: 'ASC' }
       );
 
       // Fetch user metadata for each result
@@ -142,22 +135,22 @@ class RedisGeoService {
         // Skip excluded users
         if (excludeUsers.includes(userId)) continue;
 
-        // Get user metadata
+        // Get user metadata from hash (accurate coords, accuracy, timestamp)
         const userKey = `geo:user:${userId}`;
         const userData = await this.redis.hgetall(userKey);
 
-        if (userData && userData.latitude) {
-          nearbyUsers.push({
-            user_id: userId,
-            latitude: parseFloat(userData.latitude),
-            longitude: parseFloat(userData.longitude),
-            accuracy: parseInt(userData.accuracy) || 0,
-            distance_km: parseFloat(result.distance) || 0,
-            distance_m: Math.round((parseFloat(result.distance) || 0) * 1000),
-            last_update: userData.last_update || null,
-            status: 'online'
-          });
-        }
+        const distKm = parseFloat(result.distance) || 0;
+
+        nearbyUsers.push({
+          user_id: userId,
+          latitude: userData?.latitude ? parseFloat(userData.latitude) : parseFloat(result.coordinates?.latitude || 0),
+          longitude: userData?.longitude ? parseFloat(userData.longitude) : parseFloat(result.coordinates?.longitude || 0),
+          accuracy: userData?.accuracy ? parseInt(userData.accuracy) : 0,
+          distance_km: distKm,
+          distance_m: Math.round(distKm * 1000),
+          last_update: userData?.last_update || null,
+          status: 'online'
+        });
       }
 
       logger.debug(`✅ Found ${nearbyUsers.length} nearby users within ${radiusKm}km`);

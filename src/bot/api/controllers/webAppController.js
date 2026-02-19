@@ -555,6 +555,55 @@ const getProfile = async (req, res) => {
 };
 
 /**
+ * PUT /api/webapp/profile
+ * Update editable profile fields.
+ */
+const updateProfile = async (req, res) => {
+  const user = req.session?.user;
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+
+  try {
+    const allowed = ['firstName', 'lastName', 'bio', 'locationText', 'interests', 'xHandle', 'instagramHandle', 'tiktokHandle', 'youtubeHandle'];
+    const colMap  = {
+      firstName: 'first_name', lastName: 'last_name', bio: 'bio',
+      locationText: 'location_name', interests: 'interests',
+      xHandle: 'twitter', instagramHandle: 'instagram', tiktokHandle: 'tiktok', youtubeHandle: 'youtube',
+    };
+
+    const sets = [];
+    const vals = [];
+    allowed.forEach(key => {
+      if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+        sets.push(`${colMap[key]} = $${sets.length + 1}`);
+        // Allow clearing fields (null / empty string → null)
+        vals.push(req.body[key] === '' ? null : req.body[key]);
+      }
+    });
+
+    if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+    vals.push(user.id);
+    await query(
+      `UPDATE users SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${vals.length}`,
+      vals
+    );
+
+    // Refresh session name fields if changed
+    if (req.body.firstName !== undefined) req.session.user.firstName = req.body.firstName || req.session.user.firstName;
+    if (req.body.lastName  !== undefined) req.session.user.lastName  = req.body.lastName  || null;
+    await new Promise((resolve, reject) =>
+      req.session.save(err => (err ? reject(err) : resolve()))
+    );
+
+    logger.info(`Profile updated: user ${user.id}`);
+    return res.json({ success: true });
+  } catch (error) {
+    logger.error('Update profile error:', error);
+    return res.status(500).json({ error: 'Failed to update profile' });
+  }
+};
+
+/**
  * GET /api/webapp/mastodon/feed
  */
 const getMastodonFeed = async (req, res) => {
@@ -607,5 +656,6 @@ module.exports = {
   authStatus,
   logout,
   getProfile,
+  updateProfile,
   getMastodonFeed,
 };

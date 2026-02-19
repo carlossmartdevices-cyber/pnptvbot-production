@@ -1409,6 +1409,7 @@ app.post('/api/webapp/auth/logout', asyncHandler(webAppController.logout));
 
 // Web App Profile
 app.get('/api/webapp/profile', asyncHandler(webAppController.getProfile));
+app.put('/api/webapp/profile', asyncHandler(webAppController.updateProfile));
 
 // Web App Mastodon Feed
 app.get('/api/webapp/mastodon/feed', asyncHandler(webAppController.getMastodonFeed));

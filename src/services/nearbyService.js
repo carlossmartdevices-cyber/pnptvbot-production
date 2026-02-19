@@ -11,6 +11,7 @@
 const redisGeoService = require('./redisGeoService');
 const UserLocation = require('../models/userLocation');
 const BlockedUser = require('../models/blockedUser');
+const { query } = require('../config/postgres');
 const logger = require('../utils/logger');
 
 const RATE_LIMIT_SECONDS = 5;
@@ -179,7 +180,6 @@ class NearbyService {
           user_id: user.user_id,
           latitude: obfLat,
           longitude: obfLon,
-          // Don't expose exact accuracy after obfuscation
           accuracy_estimate: this.getAccuracyEstimate(user.accuracy),
           distance_km: includeDistance ? user.distance_km : undefined,
           distance_m: includeDistance ? user.distance_m : undefined,
@@ -187,6 +187,28 @@ class NearbyService {
           last_update: user.last_update
         };
       });
+
+      // Enrich with username / first_name from PostgreSQL
+      if (privacyFiltered.length > 0) {
+        const userIds = privacyFiltered.map(u => u.user_id);
+        try {
+          const profileResult = await query(
+            `SELECT id, username, first_name FROM users WHERE id = ANY($1)`,
+            [userIds]
+          );
+          const profileMap = {};
+          profileResult.rows.forEach(r => { profileMap[r.id] = r; });
+          privacyFiltered.forEach(u => {
+            const p = profileMap[u.user_id];
+            if (p) {
+              u.username = p.username || null;
+              u.name = p.first_name || null;
+            }
+          });
+        } catch (err) {
+          logger.warn('Failed to enrich nearby users with profiles:', err.message);
+        }
+      }
 
       logger.info(`✅ Found ${privacyFiltered.length} nearby users for ${userId}`);
 

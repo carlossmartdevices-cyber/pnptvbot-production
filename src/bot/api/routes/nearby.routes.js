@@ -15,6 +15,23 @@ const router = express.Router();
 
 const NearbyController = require('../controllers/nearbyController');
 const { authenticateUser } = require('../middleware/auth');
+const redisGeoService = require('../../../services/redisGeoService');
+const { getRedis } = require('../../../config/redis');
+
+// Initialize redisGeoService with Redis client
+const initializeGeoService = async () => {
+  try {
+    const redisClient = getRedis();
+    if (redisClient && !redisGeoService.redis) {
+      await redisGeoService.initialize(redisClient);
+    }
+  } catch (error) {
+    console.error('Failed to initialize redisGeoService:', error.message);
+  }
+};
+
+// Call initialization when route is loaded
+initializeGeoService();
 
 // Middleware
 router.use(authenticateUser);

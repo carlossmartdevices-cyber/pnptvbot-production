@@ -327,26 +327,7 @@
 
     <div class="section-label">Members nearby</div>
     <div class="users-row" id="users-row">
-      <div class="user-chip">
-        <div class="user-avatar">🔥</div>
-        <div class="user-name">Alex</div>
-        <div class="distance-badge">0.3 km</div>
-      </div>
-      <div class="user-chip">
-        <div class="user-avatar">⚡</div>
-        <div class="user-name">Sam</div>
-        <div class="distance-badge">1.1 km</div>
-      </div>
-      <div class="user-chip">
-        <div class="user-avatar">🌙</div>
-        <div class="user-name">Jordan</div>
-        <div class="distance-badge">2.4 km</div>
-      </div>
-      <div class="user-chip">
-        <div class="user-avatar">✨</div>
-        <div class="user-name">Chris</div>
-        <div class="distance-badge">3.8 km</div>
-      </div>
+      <div id="users-placeholder" style="font-size:13px;color:var(--muted);padding:12px 0;">Enable location to see members near you.</div>
     </div>
 
     <div class="status-bar">
@@ -466,24 +447,30 @@
       })
       .then(r => r.json())
       .then(data => {
-        if (data.users && data.users.length > 0) {
-          renderUsers(data.users);
-        }
+        renderUsers(data.users || []);
       })
-      .catch(() => {});
+      .catch(() => {
+        document.getElementById('users-row').innerHTML =
+          '<div style="font-size:13px;color:var(--muted);padding:12px 0;">Could not load nearby members.</div>';
+      });
     }
 
     function renderUsers(users) {
       const row = document.getElementById('users-row');
       row.innerHTML = '';
+      if (!users.length) {
+        row.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:12px 0;">No members nearby right now. Check back later!</div>';
+        return;
+      }
       const emojis = ['🔥','⚡','🌙','✨','💫','🎯','🎪','🌟'];
       users.forEach((u, i) => {
         const chip = document.createElement('div');
         chip.className = 'user-chip';
-        const km = u.distance_km ? u.distance_km.toFixed(1) : '?';
+        const km = u.distance_km != null ? Number(u.distance_km).toFixed(1) : '?';
+        const label = u.username ? '@' + u.username : (u.name || 'Member');
         chip.innerHTML =
           '<div class="user-avatar">' + emojis[i % emojis.length] + '</div>' +
-          '<div class="user-name">' + (u.username || 'Member') + '</div>' +
+          '<div class="user-name">' + label + '</div>' +
           '<div class="distance-badge">' + km + ' km</div>';
         row.appendChild(chip);
       });
