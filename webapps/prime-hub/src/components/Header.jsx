@@ -26,7 +26,7 @@ export default function Header() {
         </a>
 
         <a
-          href="https://t.me/PNPtvbot"
+          href="https://t.me/PNPLatinoTV_Bot"
           target="_blank"
           rel="noopener"
           className="header-nav-btn"

@@ -50,7 +50,7 @@ export default function LoginPage() {
       if (result.success) {
         navigate('/', { replace: true });
       } else if (!result.registered) {
-        setError('Your Telegram account is not registered. Please start the bot first: @PNPLatinoTV_bot');
+        setError('Your Telegram account is not registered. Please start the bot first: @PNPLatinoTV_Bot');
       } else {
         setError(result.message || 'Login failed');
       }
@@ -78,7 +78,7 @@ export default function LoginPage() {
     const script = document.createElement('script');
     script.src = 'https://telegram.org/js/telegram-widget.js?22';
     script.async = true;
-    script.setAttribute('data-telegram-login', 'pnptvbot');
+    script.setAttribute('data-telegram-login', 'PNPLatinoTV_Bot');
     script.setAttribute('data-size', 'large');
     script.setAttribute('data-radius', '10');
     script.setAttribute('data-onauth', 'onTelegramWidgetAuth(user)');

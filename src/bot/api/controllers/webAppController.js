@@ -114,16 +114,13 @@ const telegramLogin = async (req, res) => {
 const xLoginStart = async (req, res) => {
   try {
     const XOAuthService = require('../../services/xOAuthService');
-    const callbackUrl = `${process.env.BOT_WEBHOOK_DOMAIN || ''}/api/webapp/auth/x/callback`;
-    const { url, state } = await XOAuthService.createAuthUrl({
-      callbackUrl,
-      webLogin: true
-    });
+    // createAuthUrl() returns a URL string directly (not an object)
+    const authUrl = await XOAuthService.createAuthUrl();
 
-    // Store state in session for verification
-    req.session.xOAuthState = state;
+    // Flag this session so the OAuth callback can redirect to the webapp instead of the bot
+    req.session.xWebLogin = true;
 
-    res.json({ success: true, url });
+    res.json({ success: true, url: authUrl });
   } catch (error) {
     logger.error('X OAuth start error:', error);
     res.status(500).json({ error: 'Failed to start X authentication' });
