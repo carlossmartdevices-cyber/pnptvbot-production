@@ -76,15 +76,25 @@ export function useChat(room = 'general') {
 
 export function useDMSocket(onReceived) {
   const socketRef = useRef(null);
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     const socket = getSocket();
     socketRef.current = socket;
 
+    const onConnect = () => setConnected(true);
+    const onDisconnect = () => setConnected(false);
     const onDM = (msg) => onReceived && onReceived(msg);
+
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
     socket.on('dm:received', onDM);
 
+    if (socket.connected) setConnected(true);
+
     return () => {
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
       socket.off('dm:received', onDM);
       releaseSocket();
     };
@@ -102,5 +112,5 @@ export function useDMSocket(onReceived) {
     }
   }, []);
 
-  return { sendDM, sendTyping };
+  return { sendDM, sendTyping, connected };
 }

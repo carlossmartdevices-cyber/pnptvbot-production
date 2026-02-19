@@ -1440,6 +1440,7 @@ app.get('/api/webapp/chat/:room/history', asyncHandler(chatController.getChatHis
 app.get('/api/webapp/dm/threads', asyncHandler(dmController.getThreads));
 app.get('/api/webapp/dm/conversation/:partnerId', asyncHandler(dmController.getConversation));
 app.get('/api/webapp/dm/user/:partnerId', asyncHandler(dmController.getPartnerInfo));
+app.post('/api/webapp/dm/send/:recipientId', asyncHandler(dmController.sendMessage));
 
 // Social feed, wall, posts
 app.get('/api/webapp/social/feed', asyncHandler(socialController.getFeed));

@@ -88,4 +88,49 @@ const getPartnerInfo = async (req, res) => {
   }
 };
 
-module.exports = { getThreads, getConversation, getPartnerInfo };
+// Send a DM via REST (fallback when Socket.IO is unavailable)
+const sendMessage = async (req, res) => {
+  const user = authGuard(req, res); if (!user) return;
+  const { recipientId } = req.params;
+  const { content } = req.body;
+  if (!content?.trim()) return res.status(400).json({ error: 'Content required' });
+  if (recipientId === user.id) return res.status(400).json({ error: 'Cannot message yourself' });
+  try {
+    const text = content.trim().slice(0, 4000);
+    const { rows } = await query(
+      `INSERT INTO direct_messages (sender_id, recipient_id, content)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [user.id, recipientId, text]
+    );
+    const msg = rows[0];
+    // Upsert dm_threads
+    const [a, b] = [user.id, recipientId].sort();
+    const unreadField = user.id === a ? 'unread_for_b' : 'unread_for_a';
+    await query(
+      `INSERT INTO dm_threads (user_a, user_b, last_message, last_message_at, ${unreadField})
+       VALUES ($1, $2, $3, NOW(), 1)
+       ON CONFLICT (user_a, user_b) DO UPDATE SET
+         last_message = EXCLUDED.last_message,
+         last_message_at = NOW(),
+         ${unreadField} = dm_threads.${unreadField} + 1`,
+      [a, b, text.slice(0, 100)]
+    );
+    // Deliver to recipient via Socket.IO if available
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${recipientId}`).emit('dm:received', {
+        id: msg.id,
+        sender_id: msg.sender_id,
+        recipient_id: msg.recipient_id,
+        content: msg.content,
+        created_at: msg.created_at,
+      });
+    }
+    return res.json({ success: true, message: msg });
+  } catch (err) {
+    logger.error('sendMessage DM error', err);
+    return res.status(500).json({ error: 'Failed to send message' });
+  }
+};
+
+module.exports = { getThreads, getConversation, getPartnerInfo, sendMessage };

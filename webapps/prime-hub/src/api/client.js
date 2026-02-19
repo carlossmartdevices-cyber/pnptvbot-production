@@ -91,6 +91,7 @@ export const api = {
   getDMThreads: () => request('/dm/threads'),
   getConversation: (partnerId, cursor) => request(`/dm/conversation/${partnerId}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
   getDMPartnerInfo: (partnerId) => request(`/dm/user/${partnerId}`),
+  sendDMRest: (recipientId, content) => request(`/dm/send/${recipientId}`, { method: 'POST', body: JSON.stringify({ content }) }),
 
   // Chat
   getChatHistory: (room = 'general') => request(`/chat/${room}/history`),

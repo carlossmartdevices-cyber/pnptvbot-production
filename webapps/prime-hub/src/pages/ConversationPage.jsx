@@ -30,7 +30,7 @@ export default function ConversationPage() {
     }
   }, [partnerId]);
 
-  const { sendDM, sendTyping } = useDMSocket(onReceived);
+  const { sendDM, sendTyping, connected } = useDMSocket(onReceived);
 
   useEffect(() => {
     Promise.all([
@@ -46,11 +46,10 @@ export default function ConversationPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = input.trim();
     if (!text) return;
-    sendDM(partnerId, text);
-    // Optimistically add message
+    // Optimistically add message immediately
     setMessages(prev => [...prev, {
       id: `tmp-${Date.now()}`,
       sender_id: me.id,
@@ -59,6 +58,15 @@ export default function ConversationPage() {
       created_at: new Date().toISOString(),
     }]);
     setInput('');
+    if (connected) {
+      sendDM(partnerId, text);
+    } else {
+      try {
+        await api.sendDMRest(partnerId, text);
+      } catch {
+        // REST also failed — message already shown optimistically, silently ignore
+      }
+    }
   };
 
   const handleKeyDown = (e) => {
