@@ -95,6 +95,7 @@ export const api = {
 
   // Chat
   getChatHistory: (room = 'general') => request(`/chat/${room}/history`),
+  sendChatRest: (room = 'general', content) => request(`/chat/${room}/send`, { method: 'POST', body: JSON.stringify({ content }) }),
 
   // Users
   searchUsers: (q) => request(`/users/search?q=${encodeURIComponent(q)}`),

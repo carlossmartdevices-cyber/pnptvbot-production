@@ -1435,6 +1435,7 @@ const usersController = require('./controllers/usersController');
 
 // Chat (REST fallback for Socket.IO)
 app.get('/api/webapp/chat/:room/history', asyncHandler(chatController.getChatHistory));
+app.post('/api/webapp/chat/:room/send', asyncHandler(chatController.sendMessage));
 
 // DM threads & conversations
 app.get('/api/webapp/dm/threads', asyncHandler(dmController.getThreads));

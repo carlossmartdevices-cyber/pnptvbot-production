@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, X, Send, ChevronDown } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import { useAuth } from '../../hooks/useAuth';
+import { api } from '../../api/client';
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -17,7 +18,7 @@ export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const { user } = useAuth();
-  const { messages, connected, sendMessage } = useChat('general');
+  const { messages, connected, sendMessage, pushMessage } = useChat('general');
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -31,11 +32,20 @@ export default function ChatWidget() {
     if (open && inputRef.current) inputRef.current.focus();
   }, [open]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = input.trim();
-    if (!text) return;
-    sendMessage(text);
+    if (!text || !user) return;
     setInput('');
+    if (connected) {
+      sendMessage(text);
+    } else {
+      try {
+        const res = await api.sendChatRest('general', text);
+        if (res.message) pushMessage(res.message);
+      } catch {
+        // silently ignore
+      }
+    }
   };
 
   const handleKeyDown = (e) => {

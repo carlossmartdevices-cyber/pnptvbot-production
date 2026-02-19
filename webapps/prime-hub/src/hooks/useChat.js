@@ -71,7 +71,11 @@ export function useChat(room = 'general') {
     }
   }, [room]);
 
-  return { messages, connected, error, sendMessage };
+  const pushMessage = useCallback((msg) => {
+    setMessages(prev => [...prev, msg]);
+  }, []);
+
+  return { messages, connected, error, sendMessage, pushMessage };
 }
 
 export function useDMSocket(onReceived) {
