@@ -42,12 +42,10 @@ export const api = {
     fetch(`/api/media/library?type=${type}&limit=${limit}`, { credentials: 'include' }).then(r => r.json()),
 
   // Radio
-  getRadioNowPlaying: () =>
-    fetch('/api/radio/now-playing', { credentials: 'include' }).then(r => r.json()),
+  getRadioNowPlaying: () => request('/radio/now-playing').catch(() => ({})),
 
   // Hangouts
-  getPublicHangouts: () =>
-    fetch('/api/hangouts/public', { credentials: 'include' }).then(r => r.json()),
+  getPublicHangouts: () => request('/hangouts/public').catch(() => ({ hangouts: [] })),
 
   // Social feed
   getFeed: (cursor) => request(`/social/feed${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),

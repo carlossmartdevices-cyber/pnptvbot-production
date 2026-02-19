@@ -26,7 +26,7 @@ function ProtectedRoute({ children }) {
   }
 
   if (!user) {
-    window.location.replace('/');
+    window.location.replace('/prime-hub/login');
     return null;
   }
 
