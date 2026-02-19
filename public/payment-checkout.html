@@ -356,16 +356,24 @@
                     <div class="form-group">
                         <label data-i18n="docType"></label>
                         <select id="docType">
-                            <option value="CC">CC</option>
-                            <option value="CE">CE</option>
-                            <option value="NIT">NIT</option>
+                            <option value="CC">CC – Cédula</option>
+                            <option value="CE">CE – Extranjería</option>
                             <option value="PP" data-i18n-opt="passport"></option>
+                            <option value="DNI">DNI</option>
+                            <option value="DIE">DIE – Doc. Extranjero</option>
+                            <option value="TE">TE – Tarj. Extranjería</option>
+                            <option value="NIT">NIT</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label data-i18n="docNumber"></label>
-                        <input type="text" id="docNumber" placeholder="1234567890" inputmode="numeric">
+                        <input type="text" id="docNumber" placeholder="1234567890" inputmode="numeric" autocomplete="off">
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label id="phone-label" data-i18n="phone"></label>
+                    <input type="tel" id="phone" placeholder="+57 300 000 0000" inputmode="tel" autocomplete="tel">
                 </div>
 
                 <div id="form-error" class="error-msg" style="display: none;"></div>
@@ -421,7 +429,8 @@
                 lastName: 'Last Name',
                 docType: 'Doc Type',
                 docNumber: 'Document Number',
-                passport: 'Passport',
+                passport: 'Passport / PP',
+                phone: 'Phone (optional)',
                 pay: 'Pay',
                 payAmount: 'Pay ${amount} USD',
                 backToBot: 'Return to bot',
@@ -464,7 +473,8 @@
                 lastName: 'Apellido',
                 docType: 'Tipo Doc.',
                 docNumber: 'N\u00famero de Documento',
-                passport: 'Pasaporte',
+                passport: 'Pasaporte / PP',
+                phone: 'Tel\u00e9fono (opcional)',
                 pay: 'Pagar',
                 payAmount: 'Pagar ${amount} USD',
                 backToBot: 'Volver al bot',
@@ -777,6 +787,37 @@
         document.getElementById('cvc').addEventListener('input', function(e) {
             e.target.value = e.target.value.replace(/\D/g, '').substring(0, 4);
         });
+
+        // Dynamic docNumber input mode based on doc type
+        var DOC_NUMERIC = { CC: true, NIT: true, TI: true };
+        var DOC_PLACEHOLDERS = {
+            CC: '1234567890',
+            CE: '123456',
+            PP: 'AB123456',
+            DNI: '12345678',
+            DIE: 'AB123456',
+            TE: '123456789',
+            NIT: '900123456',
+        };
+        function updateDocNumberInput() {
+            var docType = document.getElementById('docType').value;
+            var docInput = document.getElementById('docNumber');
+            docInput.inputMode = DOC_NUMERIC[docType] ? 'numeric' : 'text';
+            docInput.placeholder = DOC_PLACEHOLDERS[docType] || '';
+        }
+        document.getElementById('docType').addEventListener('change', updateDocNumberInput);
+        updateDocNumberInput();
+
+        // Client-side error reporting
+        function reportClientError(stage, errorMsg, extra) {
+            try {
+                fetch('/api/payment/client-error', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ paymentId: paymentId, stage: stage, error: String(errorMsg), extra: extra || null }),
+                }).catch(function() {});
+            } catch (e) {}
+        }
 
         function payBtnLabel() {
             return t('payAmount').replace('${amount}', '$' + paymentData.amountUSD.toFixed(2));

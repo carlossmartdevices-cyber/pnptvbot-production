@@ -5,10 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
   <title>Nearby - PNPtv</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg: #1C1C1E;
       --card: #2C2C2E;
+      --surface: #2C2C2E;
+      --border: rgba(255,255,255,0.08);
       --accent: #FF00CC;
       --amber: #FFB454;
       --text: #FFF;
@@ -17,7 +22,7 @@
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, 'Inter', sans-serif;
+      font-family: 'Inter', -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -26,6 +31,75 @@
       align-items: center;
       padding: 24px 16px 40px;
     }
+
+    /* ── Login gate ────────────────────────────── */
+    .glow {
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(255,0,204,0.15) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    #login-gate {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+      width: 100%;
+      max-width: 400px;
+    }
+    #login-gate .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 36px;
+      width: 100%;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+      text-align: center;
+    }
+    #login-gate .logo img {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 8px;
+    }
+    #login-gate .title {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    #login-gate .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+    #tg-widget {
+      display: flex;
+      justify-content: center;
+      min-height: 48px;
+      margin-bottom: 16px;
+    }
+    #login-gate .footer {
+      margin-top: 18px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    #login-gate .footer a { color: var(--amber); text-decoration: none; }
+    #login-gate .footer a:hover { text-decoration: underline; }
+
+    /* ── Nearby content ────────────────────────── */
+    #nearby-content { display: none; width: 100%; }
+    #nearby-content.show { display: flex; flex-direction: column; align-items: center; }
+
     .top-bar {
       width: 100%;
       max-width: 480px;
@@ -34,10 +108,7 @@
       gap: 12px;
       margin-bottom: 24px;
     }
-    .top-bar h1 {
-      font-size: 20px;
-      font-weight: 700;
-    }
+    .top-bar h1 { font-size: 20px; font-weight: 700; }
     .pin-icon {
       width: 32px; height: 32px;
       background: linear-gradient(135deg, var(--accent), var(--amber));
@@ -46,6 +117,14 @@
       font-size: 16px;
       flex-shrink: 0;
     }
+    .welcome-msg {
+      width: 100%;
+      max-width: 480px;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .welcome-msg strong { color: var(--text); }
     .map-placeholder {
       width: 100%;
       max-width: 480px;
@@ -90,16 +169,6 @@
       position: absolute;
       top: 44%; left: 48%;
     }
-    .map-label {
-      position: relative;
-      z-index: 1;
-      text-align: center;
-    }
-    .map-label p {
-      font-size: 14px;
-      color: var(--muted);
-      margin-top: 8px;
-    }
     .status-bar {
       width: 100%;
       max-width: 480px;
@@ -109,16 +178,8 @@
       margin-bottom: 16px;
       border: 1px solid rgba(255,255,255,0.06);
     }
-    .status-bar h3 {
-      font-size: 15px;
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-    .status-bar p {
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.6;
-    }
+    .status-bar h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+    .status-bar p { font-size: 13px; color: var(--muted); line-height: 1.6; }
     .btn {
       display: inline-flex;
       align-items: center;
@@ -207,67 +268,146 @@
       color: var(--muted);
       margin-bottom: 10px;
     }
+    /* Loading spinner */
+    #loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
+  <div class="glow"></div>
 
-  <div class="top-bar">
-    <div class="pin-icon">📍</div>
-    <h1>Nearby</h1>
-  </div>
+  <!-- Loading state -->
+  <div id="loading"><div class="spinner"></div></div>
 
-  <!-- Map placeholder with dot markers -->
-  <div class="map-placeholder">
-    <div class="map-grid"></div>
-    <div class="map-dot d1"></div>
-    <div class="map-dot d2"></div>
-    <div class="map-dot d3"></div>
-    <div class="map-dot d4"></div>
-    <div class="map-you"></div>
-  </div>
-
-  <!-- Active nearby users row -->
-  <div class="section-label">Members nearby</div>
-  <div class="users-row" id="users-row">
-    <div class="user-chip">
-      <div class="user-avatar">🔥</div>
-      <div class="user-name">Alex</div>
-      <div class="distance-badge">0.3 km</div>
-    </div>
-    <div class="user-chip">
-      <div class="user-avatar">⚡</div>
-      <div class="user-name">Sam</div>
-      <div class="distance-badge">1.1 km</div>
-    </div>
-    <div class="user-chip">
-      <div class="user-avatar">🌙</div>
-      <div class="user-name">Jordan</div>
-      <div class="distance-badge">2.4 km</div>
-    </div>
-    <div class="user-chip">
-      <div class="user-avatar">✨</div>
-      <div class="user-name">Chris</div>
-      <div class="distance-badge">3.8 km</div>
+  <!-- Login gate (shown when not authenticated) -->
+  <div id="login-gate" style="display:none;">
+    <div class="card">
+      <div class="logo"><img src="/logo.png" alt="PNPtv" /></div>
+      <div class="title">Nearby</div>
+      <p class="subtitle">Inicia sesión con Telegram para descubrir miembros cerca de ti</p>
+      <div id="tg-widget"></div>
+      <p class="footer">
+        Al ingresar aceptas nuestros
+        <a href="/terms" target="_blank">Términos</a> y
+        <a href="/privacy" target="_blank">Privacidad</a>.<br/>
+        Debes ser mayor de 18 años.
+      </p>
     </div>
   </div>
 
-  <!-- Enable location CTA -->
-  <div class="status-bar">
-    <h3>📡 Share your location</h3>
-    <p>Enable location to see real community members near you and let others find you on the map.</p>
+  <!-- Nearby content (shown when authenticated) -->
+  <div id="nearby-content">
+    <div class="top-bar">
+      <div class="pin-icon">📍</div>
+      <h1>Nearby</h1>
+    </div>
+
+    <p class="welcome-msg" id="welcome-msg"></p>
+
+    <div class="map-placeholder">
+      <div class="map-grid"></div>
+      <div class="map-dot d1"></div>
+      <div class="map-dot d2"></div>
+      <div class="map-dot d3"></div>
+      <div class="map-dot d4"></div>
+      <div class="map-you"></div>
+    </div>
+
+    <div class="section-label">Members nearby</div>
+    <div class="users-row" id="users-row">
+      <div class="user-chip">
+        <div class="user-avatar">🔥</div>
+        <div class="user-name">Alex</div>
+        <div class="distance-badge">0.3 km</div>
+      </div>
+      <div class="user-chip">
+        <div class="user-avatar">⚡</div>
+        <div class="user-name">Sam</div>
+        <div class="distance-badge">1.1 km</div>
+      </div>
+      <div class="user-chip">
+        <div class="user-avatar">🌙</div>
+        <div class="user-name">Jordan</div>
+        <div class="distance-badge">2.4 km</div>
+      </div>
+      <div class="user-chip">
+        <div class="user-avatar">✨</div>
+        <div class="user-name">Chris</div>
+        <div class="distance-badge">3.8 km</div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <h3>📡 Share your location</h3>
+      <p>Enable location to see real community members near you and let others find you on the map.</p>
+    </div>
+
+    <button class="btn btn-primary" id="btn-location" onclick="enableLocation()">
+      📍 Enable Location
+    </button>
+
+    <button class="btn btn-outline" onclick="window.parent.postMessage({type:'navigate',path:'/hangouts'},'*')">
+      💬 Try Hangouts instead
+    </button>
+
+    <p id="status-msg"></p>
   </div>
-
-  <button class="btn btn-primary" id="btn-location" onclick="enableLocation()">
-    📍 Enable Location
-  </button>
-
-  <button class="btn btn-outline" onclick="window.parent.postMessage({type:'navigate',path:'/hangouts'},'*')">
-    💬 Try Hangouts instead
-  </button>
-
-  <p id="status-msg"></p>
 
   <script>
+    // ── Check auth on load ─────────────────────────────────────────────
+    (async function checkAuth() {
+      try {
+        const res = await fetch('/api/webapp/auth/status', { credentials: 'include' });
+        const data = await res.json();
+
+        document.getElementById('loading').style.display = 'none';
+
+        if (data.authenticated) {
+          showNearby(data.user);
+        } else {
+          showLogin();
+        }
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        showLogin();
+      }
+    })();
+
+    function showLogin() {
+      document.getElementById('login-gate').style.display = 'flex';
+      // Load Telegram widget
+      const script = document.createElement('script');
+      script.src = 'https://telegram.org/js/telegram-widget.js?22';
+      script.async = true;
+      script.setAttribute('data-telegram-login', 'PNPLatinoTV_Bot');
+      script.setAttribute('data-size', 'large');
+      script.setAttribute('data-radius', '10');
+      script.setAttribute('data-auth-url', '/api/webapp/auth/telegram/callback');
+      script.setAttribute('data-request-access', 'write');
+      document.getElementById('tg-widget').appendChild(script);
+    }
+
+    function showNearby(user) {
+      document.getElementById('nearby-content').classList.add('show');
+      if (user && user.username) {
+        document.getElementById('welcome-msg').innerHTML =
+          'Logged in as <strong>@' + user.username + '</strong>';
+      }
+    }
+
+    // ── Location & Nearby ──────────────────────────────────────────────
     function enableLocation() {
       const btn = document.getElementById('btn-location');
       const msg = document.getElementById('status-msg');
@@ -284,9 +424,8 @@
         (pos) => {
           const { latitude, longitude, accuracy } = pos.coords;
           btn.textContent = '✅ Location enabled';
-          msg.textContent = `Accuracy: ±${Math.round(accuracy)}m — Looking for members near you…`;
+          msg.textContent = 'Accuracy: ±' + Math.round(accuracy) + 'm — Looking for members near you…';
 
-          // Update location via API (uses session auth from shared cookie)
           fetch('/api/nearby/update-location', {
             method: 'POST',
             credentials: 'include',
@@ -296,7 +435,7 @@
           .then(r => r.json())
           .then(data => {
             if (data.error === 'UNAUTHORIZED') {
-              msg.textContent = 'Please log in via PRIME Hub to use Nearby.';
+              msg.textContent = 'Session expired. Please refresh and log in again.';
             } else {
               msg.textContent = 'Location updated! Showing real members now.';
               searchNearby(latitude, longitude);
@@ -322,7 +461,7 @@
     }
 
     function searchNearby(lat, lon) {
-      fetch(`/api/nearby/search?latitude=${lat}&longitude=${lon}&radius=10`, {
+      fetch('/api/nearby/search?latitude=' + lat + '&longitude=' + lon + '&radius=10', {
         credentials: 'include'
       })
       .then(r => r.json())
@@ -342,15 +481,13 @@
         const chip = document.createElement('div');
         chip.className = 'user-chip';
         const km = u.distance_km ? u.distance_km.toFixed(1) : '?';
-        chip.innerHTML = `
-          <div class="user-avatar">${emojis[i % emojis.length]}</div>
-          <div class="user-name">${u.username || 'Member'}</div>
-          <div class="distance-badge">${km} km</div>
-        `;
+        chip.innerHTML =
+          '<div class="user-avatar">' + emojis[i % emojis.length] + '</div>' +
+          '<div class="user-name">' + (u.username || 'Member') + '</div>' +
+          '<div class="distance-badge">' + km + ' km</div>';
         row.appendChild(chip);
       });
     }
   </script>
-
 </body>
 </html>
