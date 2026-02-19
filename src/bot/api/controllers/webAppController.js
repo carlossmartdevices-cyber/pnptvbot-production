@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const emailService = require('../../../services/emailService');
+const { generateJWT } = require('../middleware/jwtAuth');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -344,30 +345,27 @@ const emailLogin = async (req, res) => {
       rememberMe === true || rememberMe === 'true'
     );
 
-    // Log session state before save
-    logger.info(`Session before save - ID: ${req.sessionID}, User: ${req.session.user?.id}`);
-
+    // Save session
     await new Promise((resolve, reject) =>
-      req.session.save(err => {
-        if (err) {
-          logger.error(`Session save failed: ${err.message}`);
-          reject(err);
-        } else {
-          logger.info(`Session saved - ID: ${req.sessionID}`);
-          // Explicitly touch the session to ensure cookie is sent
-          req.session.touch();
-          resolve();
-        }
-      })
+      req.session.save(err => (err ? reject(err) : resolve()))
     );
     logger.info(`Web app email login: user ${user.id} (${emailLower})`);
 
-    // Force session middleware to set Set-Cookie by modifying response
-    res.setHeader('Connection', 'keep-alive');
+
+    // Generate JWT token for API access
+    const jwtPayload = {
+      id: user.id,
+      pnptvId: user.pnptv_id,
+      email: user.email,
+      username: user.username,
+      role: user.role || 'user',
+    };
+    const token = generateJWT(jwtPayload);
 
     const response = {
       authenticated: true,
       pnptvId: user.pnptv_id,
+      token, // Include JWT token for API authentication
       user: {
         id: user.id,
         pnptvId: user.pnptv_id,
@@ -376,6 +374,7 @@ const emailLogin = async (req, res) => {
         lastName: user.last_name,
         email: user.email,
         subscriptionStatus: user.subscription_status,
+        role: user.role || 'user',
       },
     };
 
@@ -535,13 +534,7 @@ const xLoginCallback = async (req, res) => {
  * GET /api/webapp/auth/status
  */
 const authStatus = (req, res) => {
-  logger.info(`[authStatus] SessionID: ${req.sessionID}, Cookie: ${req.headers.cookie}`);
   const user = req.session?.user;
-  if (user) {
-    logger.info(`[authStatus] User found: ${user.id}, Role: ${user.role}`);
-  } else {
-    logger.info(`[authStatus] No user in session. Session: ${JSON.stringify(req.session)}`);
-  }
   if (!user) return res.json({ authenticated: false });
   return res.json({
     authenticated: true,

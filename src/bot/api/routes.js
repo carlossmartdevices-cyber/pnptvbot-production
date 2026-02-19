@@ -124,19 +124,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Debug middleware to log session and response headers
-app.use((req, res, next) => {
-  const originalJson = res.json;
-  res.json = function(data) {
-    // Log session info if user is set
-    if (req.session?.user) {
-      logger.info(`[SESSION DEBUG] Path: ${req.path}, SessionID: ${req.sessionID}, HasUser: true`);
-    }
-    // Call original json
-    originalJson.call(this, data);
-  };
-  next();
-});
 
 // Function to conditionally apply middleware (skip for Telegram webhook)
 const conditionalMiddleware = (middleware) => (req, res, next) => {
@@ -1488,15 +1475,18 @@ app.post('/api/webapp/live/streams/:streamId/leave', asyncHandler(webappLiveCont
 
 // Web App Admin Routes (session auth + role check)
 const webappAdminController = require('./controllers/webappAdminController');
-app.get('/api/webapp/admin/stats', asyncHandler(webappAdminController.getStats));
-app.get('/api/webapp/admin/users', asyncHandler(webappAdminController.listUsers));
-app.get('/api/webapp/admin/users/:id', asyncHandler(webappAdminController.getUser));
-app.put('/api/webapp/admin/users/:id', asyncHandler(webappAdminController.updateUser));
-app.post('/api/webapp/admin/users/:id/ban', asyncHandler(webappAdminController.banUser));
-app.get('/api/webapp/admin/posts', asyncHandler(webappAdminController.listPosts));
-app.delete('/api/webapp/admin/posts/:id', asyncHandler(webappAdminController.deletePost));
-app.get('/api/webapp/admin/hangouts', asyncHandler(webappAdminController.listHangouts));
-app.delete('/api/webapp/admin/hangouts/:id', asyncHandler(webappAdminController.endHangout));
+const { verifyAdminJWT } = require('./middleware/jwtAuth');
+
+// Admin endpoints with JWT authentication
+app.get('/api/webapp/admin/stats', verifyAdminJWT, asyncHandler(webappAdminController.getStats));
+app.get('/api/webapp/admin/users', verifyAdminJWT, asyncHandler(webappAdminController.listUsers));
+app.get('/api/webapp/admin/users/:id', verifyAdminJWT, asyncHandler(webappAdminController.getUser));
+app.put('/api/webapp/admin/users/:id', verifyAdminJWT, asyncHandler(webappAdminController.updateUser));
+app.post('/api/webapp/admin/users/:id/ban', verifyAdminJWT, asyncHandler(webappAdminController.banUser));
+app.get('/api/webapp/admin/posts', verifyAdminJWT, asyncHandler(webappAdminController.listPosts));
+app.delete('/api/webapp/admin/posts/:id', verifyAdminJWT, asyncHandler(webappAdminController.deletePost));
+app.get('/api/webapp/admin/hangouts', verifyAdminJWT, asyncHandler(webappAdminController.listHangouts));
+app.delete('/api/webapp/admin/hangouts/:id', verifyAdminJWT, asyncHandler(webappAdminController.endHangout));
 
 // ==========================================
 // Social, DM, Chat, Users API Routes

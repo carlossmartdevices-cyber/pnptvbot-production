@@ -3,31 +3,15 @@ const { query } = require('../../../config/postgres');
 const AdminDashboardService = require('../../../services/adminDashboardService');
 const VideoCallModel = require('../../../models/videoCallModel');
 
-/**
- * Admin Guard Middleware
- * Checks if user is admin or superadmin
- */
-function adminGuard(req, res) {
-  const user = req.session?.user;
-  if (!user) {
-    res.status(401).json({ error: 'Not authenticated' });
-    return null;
-  }
-  const role = user.role || 'user';
-  if (!['admin', 'superadmin'].includes(role)) {
-    res.status(403).json({ error: 'Not authorized - admin access required' });
-    return null;
-  }
-  return user;
-}
+// Note: Admin guard is now handled by JWT middleware (verifyAdminJWT in routes.js)
+// req.user is populated by the middleware and contains user data
 
 /**
  * GET /api/webapp/admin/stats
  * Get admin dashboard stats
  */
 const getStats = async (req, res) => {
-  const user = adminGuard(req, res);
-  if (!user) return;
+  const user = req.user;
 
   try {
     const stats = await AdminDashboardService.getDashboardOverview();
@@ -47,8 +31,7 @@ const getStats = async (req, res) => {
  * List users with pagination and search
  */
 const listUsers = async (req, res) => {
-  const user = adminGuard(req, res);
-  if (!user) return;
+  const user = req.user;
 
   try {
     const page = Math.max(1, parseInt(req.query.page || '1'));
@@ -96,8 +79,7 @@ const listUsers = async (req, res) => {
  * Get user details
  */
 const getUser = async (req, res) => {
-  const user = adminGuard(req, res);
-  if (!user) return;
+  const user = req.user;
 
   try {
     const { id: userId } = req.params;
@@ -125,8 +107,7 @@ const getUser = async (req, res) => {
  * Update user details
  */
 const updateUser = async (req, res) => {
-  const user = adminGuard(req, res);
-  if (!user) return;
+  const user = req.user;
 
   try {
     const { id: userId } = req.params;
@@ -182,8 +163,7 @@ const updateUser = async (req, res) => {
  * Ban or unban user
  */
 const banUser = async (req, res) => {
-  const user = adminGuard(req, res);
-  if (!user) return;
+  const user = req.user;
 
   try {
     const { id: userId } = req.params;
@@ -212,8 +192,7 @@ const banUser = async (req, res) => {
  * List recent social posts
  */
 const listPosts = async (req, res) => {
-  const user = adminGuard(req, res);
-  if (!user) return;
+  const user = req.user;
 
   try {
     const page = Math.max(1, parseInt(req.query.page || '1'));
@@ -253,8 +232,7 @@ const listPosts = async (req, res) => {
  * Delete a post
  */
 const deletePost = async (req, res) => {
-  const user = adminGuard(req, res);
-  if (!user) return;
+  const user = req.user;
 
   try {
     const { id: postId } = req.params;
@@ -274,8 +252,7 @@ const deletePost = async (req, res) => {
  * List active hangout rooms
  */
 const listHangouts = async (req, res) => {
-  const user = adminGuard(req, res);
-  if (!user) return;
+  const user = req.user;
 
   try {
     const calls = await VideoCallModel.getAllPublic();
@@ -303,8 +280,7 @@ const listHangouts = async (req, res) => {
  * End/delete a hangout room
  */
 const endHangout = async (req, res) => {
-  const user = adminGuard(req, res);
-  if (!user) return;
+  const user = req.user;
 
   try {
     const { id: callId } = req.params;

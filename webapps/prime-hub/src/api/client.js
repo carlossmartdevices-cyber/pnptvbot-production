@@ -1,13 +1,38 @@
 const API_BASE = '/api/webapp';
 
+// Store JWT token for API requests
+let authToken = null;
+
+function setAuthToken(token) {
+  authToken = token;
+  if (token) {
+    localStorage.setItem('pnptv_token', token);
+  } else {
+    localStorage.removeItem('pnptv_token');
+  }
+}
+
+function getAuthToken() {
+  return authToken || localStorage.getItem('pnptv_token');
+}
+
 async function request(path, options = {}) {
   const url = `${API_BASE}${path}`;
+  const token = getAuthToken();
+
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+
+  // Add JWT token if available
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers
-    },
+    headers,
     ...options
   });
 
@@ -32,6 +57,11 @@ export const api = {
     request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password, rememberMe })
+    }).then(res => {
+      if (res.token) {
+        setAuthToken(res.token);
+      }
+      return res;
     }),
   emailRegister: (firstName, email, password, lastName = '') =>
     request('/auth/register', {
@@ -44,7 +74,10 @@ export const api = {
       body: JSON.stringify({ email })
     }),
   xLoginStart: () => request('/auth/x/start'),
-  logout: () => request('/auth/logout', { method: 'POST' }),
+  logout: () => {
+    setAuthToken(null);
+    return request('/auth/logout', { method: 'POST' });
+  },
 
   // Profile
   getProfile: () => request('/profile'),
@@ -112,3 +145,6 @@ export const api = {
   endLiveStream: (streamId) => request(`/live/streams/${streamId}/end`, { method: 'POST' }),
   leaveLiveStream: (streamId) => request(`/live/streams/${streamId}/leave`, { method: 'POST' }),
 };
+
+// Export token management functions
+export { setAuthToken, getAuthToken };
