@@ -109,7 +109,7 @@ module.exports = {
     // 3DS settings
     threeDs: {
       enabled: process.env.ENABLE_3DS !== 'false',
-      timeout: parseInt(process.env.3DS_TIMEOUT || '360000'), // 6 minutes
+      timeout: parseInt(process.env.THREED_DS_TIMEOUT || '360000'), // 6 minutes
     },
   },
 
