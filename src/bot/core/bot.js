@@ -224,23 +224,6 @@ const startApiServer = (modeLabel) => {
   server.headersTimeout = 66000;
   server.timeout = 120000;
   apiServer = server;
-
-  // Attach Socket.IO for real-time chat and DMs
-  try {
-    const { Server: SocketIOServer } = require('socket.io');
-    const io = new SocketIOServer(server, {
-      path: '/socket.io',
-      cors: { origin: false },
-      transports: ['websocket', 'polling'],
-    });
-    apiApp.set('io', io);
-    const { initSocketIO } = require('../api/socketHandlers');
-    initSocketIO(io);
-    logger.info('✓ Socket.IO initialized');
-  } catch (err) {
-    logger.error('Failed to initialize Socket.IO:', err.message);
-  }
-
   return server;
 };
 
