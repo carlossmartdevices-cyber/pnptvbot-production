@@ -135,6 +135,7 @@ app.use(conditionalMiddleware(helmet({
         "https://songbird.cardinalcommerce.com",
         "https://centinelapi.cardinalcommerce.com",
         "https://oauth.telegram.org",
+        "https://telegram.org",
       ],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],

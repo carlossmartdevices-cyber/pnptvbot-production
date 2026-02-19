@@ -19,6 +19,10 @@ module.exports = {
       POSTGRES_DATABASE: 'pnptvbot',
       POSTGRES_USER: 'pnptvbot',
       POSTGRES_PASSWORD: 'Apelo801050#',
+      SESSION_SECRET: '32c1d6331348d5fc1f7a4a4809e1fe5d3361a02eadd55d57338cb9b7b8842365',
+      WEBAPP_X_CLIENT_ID: 'SGwwVTZNNV9WUnQyZkh1RVFoVlk6MTpjaQ',
+      WEBAPP_X_CLIENT_SECRET: 'kAdNTI36RFFj81wHc6Z_H-g2Q5wNNSC--bL2cwpiFnSZ8GIswg',
+      WEBAPP_X_REDIRECT_URI: 'https://pnptv.app/api/webapp/auth/x/callback',
     },
     env_production: {
       NODE_ENV: 'production',
@@ -30,6 +34,10 @@ module.exports = {
       POSTGRES_DATABASE: 'pnptvbot',
       POSTGRES_USER: 'pnptvbot',
       POSTGRES_PASSWORD: 'Apelo801050#',
+      SESSION_SECRET: '32c1d6331348d5fc1f7a4a4809e1fe5d3361a02eadd55d57338cb9b7b8842365',
+      WEBAPP_X_CLIENT_ID: 'SGwwVTZNNV9WUnQyZkh1RVFoVlk6MTpjaQ',
+      WEBAPP_X_CLIENT_SECRET: 'kAdNTI36RFFj81wHc6Z_H-g2Q5wNNSC--bL2cwpiFnSZ8GIswg',
+      WEBAPP_X_REDIRECT_URI: 'https://pnptv.app/api/webapp/auth/x/callback',
     },
     env_development: {
       NODE_ENV: 'development',

@@ -57,7 +57,7 @@ const telegramLogin = async (req, res) => {
     // Look up user
     const result = await query(
       `SELECT id, telegram, username, first_name, last_name, subscription_status,
-              accepted_terms, photo_url, bio, language
+              accepted_terms, photo_file_id, bio, language
        FROM users WHERE telegram = $1`,
       [String(telegramUser.id)]
     );
@@ -81,7 +81,7 @@ const telegramLogin = async (req, res) => {
       lastName: user.last_name,
       subscriptionStatus: user.subscription_status,
       acceptedTerms: user.accepted_terms,
-      photoUrl: telegramUser.photo_url || user.photo_url,
+      photoUrl: telegramUser.photo_url || user.photo_file_id,
       bio: user.bio,
       language: user.language
     };
@@ -97,7 +97,7 @@ const telegramLogin = async (req, res) => {
         username: user.username,
         firstName: user.first_name,
         lastName: user.last_name,
-        photoUrl: telegramUser.photo_url || user.photo_url,
+        photoUrl: telegramUser.photo_url || user.photo_file_id,
         subscriptionStatus: user.subscription_status
       }
     });
@@ -210,8 +210,8 @@ const xLoginCallback = async (req, res) => {
     // Look up user in our DB by X handle
     const result = await query(
       `SELECT id, telegram, username, first_name, last_name, subscription_status,
-              accepted_terms, photo_url, bio, language
-       FROM users WHERE x_handle = $1 OR x_username = $1`,
+              accepted_terms, photo_file_id, bio, language
+       FROM users WHERE twitter = $1`,
       [xHandle]
     );
 
@@ -228,7 +228,7 @@ const xLoginCallback = async (req, res) => {
       lastName: user.last_name,
       subscriptionStatus: user.subscription_status,
       acceptedTerms: user.accepted_terms,
-      photoUrl: user.photo_url,
+      photoUrl: user.photo_file_id,
       bio: user.bio,
       language: user.language,
       xHandle,
@@ -292,10 +292,10 @@ const getProfile = async (req, res) => {
 
   try {
     const result = await query(
-      `SELECT id, telegram, username, first_name, last_name, bio, photo_url,
-              subscription_status, subscription_plan, subscription_expires_at,
-              language, interests, location_text, x_handle, x_username,
-              instagram_handle, tiktok_handle, youtube_handle,
+      `SELECT id, telegram, username, first_name, last_name, bio, photo_file_id,
+              subscription_status, plan_id, plan_expiry,
+              language, interests, location_name, twitter,
+              instagram, tiktok, youtube,
               accepted_terms, created_at
        FROM users WHERE id = $1`,
       [user.id]
@@ -314,17 +314,17 @@ const getProfile = async (req, res) => {
         firstName: profile.first_name,
         lastName: profile.last_name,
         bio: profile.bio,
-        photoUrl: profile.photo_url,
+        photoUrl: profile.photo_file_id,
         subscriptionStatus: profile.subscription_status,
-        subscriptionPlan: profile.subscription_plan,
-        subscriptionExpires: profile.subscription_expires_at,
+        subscriptionPlan: profile.plan_id,
+        subscriptionExpires: profile.plan_expiry,
         language: profile.language,
         interests: profile.interests,
-        locationText: profile.location_text,
-        xHandle: profile.x_handle || profile.x_username,
-        instagramHandle: profile.instagram_handle,
-        tiktokHandle: profile.tiktok_handle,
-        youtubeHandle: profile.youtube_handle,
+        locationText: profile.location_name,
+        xHandle: profile.twitter,
+        instagramHandle: profile.instagram,
+        tiktokHandle: profile.tiktok,
+        youtubeHandle: profile.youtube,
         memberSince: profile.created_at
       }
     });
