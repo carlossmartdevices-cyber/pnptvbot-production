@@ -209,6 +209,11 @@ const serveStaticWithBlocking = (staticPath) => {
   return (req, res, next) => {
     const host = req.get('host') || '';
 
+    // Skip static serving for root path — let the app.get('/') route handle the redirect
+    if (req.path === '/') {
+      return next();
+    }
+
     // Skip static serving for protected paths (let auth routes handle them)
     // But allow assets (/videorama/assets/, /hangouts/assets/, /live/assets/)
     const isProtectedPath = PROTECTED_PATHS.some(p =>
