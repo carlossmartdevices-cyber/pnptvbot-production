@@ -107,11 +107,10 @@ app.use(conditionalMiddleware(helmet({
         "https://checkout.epayco.co",
         "https://secure.payco.co",
         "https://secure.epayco.co",
-        "https://telegram.org",
       ],
       styleSrc: ["'self'", "'unsafe-inline'", "https:", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https:", "https://fonts.gstatic.com", "data:"],
-      imgSrc: ["'self'", "data:", "https://t.me", "https://*.telegram.org", "https:"],
+      imgSrc: ["'self'", "data:"],
       connectSrc: [
         "'self'",
         "https://multimedia.epayco.co",
@@ -123,10 +122,6 @@ app.use(conditionalMiddleware(helmet({
         "https://api.secure.payco.co",
         "https://fonts.googleapis.com",
         "https://fonts.gstatic.com",
-        "https://oauth.telegram.org",
-        "https://api.telegram.org",
-        "wss://pnptv.app",
-        "ws://localhost:3001",
       ],
       frameSrc: [
         "'self'",
@@ -136,8 +131,6 @@ app.use(conditionalMiddleware(helmet({
         "https://api.secure.payco.co",
         "https://songbird.cardinalcommerce.com",
         "https://centinelapi.cardinalcommerce.com",
-        "https://oauth.telegram.org",
-        "https://telegram.org",
       ],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
@@ -328,7 +321,7 @@ app.use((req, res, next) => {
 });
 
 // Landing page routes
-// Home page — serve login page directly; if already authenticated send to PRIME Hub
+// Home page - redirect to /login for PRIME Hub
 app.get('/', (req, res) => {
   const host = req.get('host') || '';
   if (host.includes('easybots.store') || host.includes('easybots')) {
@@ -417,12 +410,8 @@ app.get('/', (req, res) => {
     `);
     return;
   }
-  // If already authenticated, send straight to the app
-  if (req.session?.user) {
-    return res.redirect(302, '/prime-hub/');
-  }
-  // Serve the login page
-  res.sendFile(path.join(__dirname, '../../../public/index.html'));
+  // Redirect to PRIME Hub login page
+  res.redirect(302, '/login');
 });
 
 // PRIME Hub login page - shows 4 app icons
@@ -1388,93 +1377,6 @@ const healthLimiter = rateLimit({
 app.get('/api/health', healthLimiter, asyncHandler(healthController.healthCheck));
 app.get('/api/metrics', healthLimiter, asyncHandler(healthController.performanceMetrics));
 app.post('/api/metrics/reset', healthLimiter, asyncHandler(healthController.resetMetrics));
-
-// ==========================================
-// PRIME Hub Web App API Routes
-// ==========================================
-const webAppController = require('./controllers/webAppController');
-
-// Web App Authentication
-app.get('/api/webapp/auth/telegram/callback', asyncHandler(webAppController.telegramCallback));
-app.post('/api/webapp/auth/telegram', asyncHandler(webAppController.telegramLogin));
-app.post('/api/webapp/auth/register', asyncHandler(webAppController.emailRegister));
-app.post('/api/webapp/auth/login', asyncHandler(webAppController.emailLogin));
-app.get('/api/webapp/auth/x/start', asyncHandler(webAppController.xLoginStart));
-app.get('/api/webapp/auth/x/callback', asyncHandler(webAppController.xLoginCallback));
-app.get('/api/webapp/auth/status', asyncHandler(webAppController.authStatus));
-app.post('/api/webapp/auth/logout', asyncHandler(webAppController.logout));
-
-// Web App Profile
-app.get('/api/webapp/profile', asyncHandler(webAppController.getProfile));
-
-// Web App Mastodon Feed
-app.get('/api/webapp/mastodon/feed', asyncHandler(webAppController.getMastodonFeed));
-
-// ==========================================
-// Social Feed API
-// ==========================================
-const socialController = require('./controllers/socialController');
-app.get('/api/webapp/social/feed', asyncHandler(socialController.getFeed));
-app.get('/api/webapp/social/wall/:userId', asyncHandler(socialController.getWall));
-app.post('/api/webapp/social/posts', asyncHandler(socialController.createPost));
-app.post('/api/webapp/social/posts/:postId/like', asyncHandler(socialController.toggleLike));
-app.delete('/api/webapp/social/posts/:postId', asyncHandler(socialController.deletePost));
-app.get('/api/webapp/social/posts/:postId/replies', asyncHandler(socialController.getReplies));
-app.post('/api/webapp/mastodon/post', asyncHandler(socialController.postToMastodon));
-
-// ==========================================
-// DM API
-// ==========================================
-const dmController = require('./controllers/dmController');
-app.get('/api/webapp/dm/threads', asyncHandler(dmController.getThreads));
-app.get('/api/webapp/dm/conversation/:partnerId', asyncHandler(dmController.getConversation));
-app.get('/api/webapp/dm/user/:partnerId', asyncHandler(dmController.getPartnerInfo));
-
-// ==========================================
-// Chat API
-// ==========================================
-const chatController = require('./controllers/chatController');
-app.get('/api/webapp/chat/:room/history', asyncHandler(chatController.getChatHistory));
-
-// ==========================================
-// Users search API
-// ==========================================
-const usersController = require('./controllers/usersController');
-app.get('/api/webapp/users/search', asyncHandler(usersController.searchUsers));
-
-// ==========================================
-// PRIME Hub SPA Serving
-// ==========================================
-const primeHubPath = path.join(__dirname, '../../../public/prime-hub');
-
-// Serve static assets from prime-hub build
-app.use('/prime-hub/assets', express.static(path.join(primeHubPath, 'assets'), {
-  maxAge: '1y',
-  immutable: true
-}));
-
-// Serve prime-hub SPA for all /prime-hub/* routes (SPA client-side routing)
-app.get('/prime-hub', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
-  res.sendFile(path.join(primeHubPath, 'index.html'));
-});
-
-app.get('/prime-hub/*', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
-  // Serve static file if it exists, otherwise fallback to SPA index.html
-  const requestedPath = req.path.replace('/prime-hub', '');
-  const filePath = path.join(primeHubPath, requestedPath);
-  if (requestedPath !== '/' && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-    return res.sendFile(filePath);
-  }
-  res.sendFile(path.join(primeHubPath, 'index.html'));
-});
 
 // Export app WITHOUT 404/error handlers
 // These will be added in bot.js AFTER the webhook callback

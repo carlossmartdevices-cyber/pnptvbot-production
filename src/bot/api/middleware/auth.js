@@ -12,12 +12,6 @@ const logger = require('../../../utils/logger');
  */
 const authenticateUser = async (req, res, next) => {
   try {
-    // Accept webapp session auth (set by PRIME Hub login)
-    if (req.session?.user?.id) {
-      req.user = { id: req.session.user.id, userId: req.session.user.id };
-      return next();
-    }
-
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

@@ -8,17 +8,27 @@
  * - Per-user data: hash "geo:user:{userId}" (latitude, longitude, accuracy, timestamp)
  */
 
-const { getRedis } = require('../config/redis');
+const Redis = require('redis');
 const logger = require('../utils/logger');
 
 class RedisGeoService {
   constructor() {
+    this.redis = null;
     this.geoKey = 'geo:users:online';
     this.timeout = 5 * 60 * 1000; // 5 minutes before user goes offline
   }
 
-  get redis() {
-    return getRedis();
+  /**
+   * Initialize Redis connection
+   */
+  async initialize(redisClient) {
+    try {
+      this.redis = redisClient;
+      logger.info('✅ RedisGeoService initialized');
+    } catch (error) {
+      logger.error('❌ Redis initialization failed:', error);
+      throw error;
+    }
   }
 
   /**
@@ -47,18 +57,25 @@ class RedisGeoService {
         throw new Error('Invalid accuracy (must be 0-10000)');
       }
 
-      // Store in GEO set (for spatial queries) - ioredis: geoadd(key, lon, lat, member)
-      await this.redis.geoadd(this.geoKey, longitude, latitude, String(userId));
+      // Store in GEO set (for spatial queries)
+      await this.redis.geoadd(
+        this.geoKey,
+        {
+          longitude,
+          latitude,
+          member: userId
+        }
+      );
 
       // Store user metadata in hash
       const userKey = `geo:user:${userId}`;
-      await this.redis.hset(userKey,
-        'latitude', latitude.toString(),
-        'longitude', longitude.toString(),
-        'accuracy', Math.round(accuracy).toString(),
-        'timestamp', Date.now().toString(),
-        'last_update', new Date().toISOString()
-      );
+      await this.redis.hset(userKey, {
+        latitude: latitude.toString(),
+        longitude: longitude.toString(),
+        accuracy: Math.round(accuracy).toString(),
+        timestamp: Date.now().toString(),
+        last_update: new Date().toISOString()
+      });
 
       // Set expiration (5 minutes)
       await this.redis.expire(userKey, 300);
@@ -91,7 +108,8 @@ class RedisGeoService {
     try {
       const {
         limit = 50,
-        excludeUsers = []
+        excludeUsers = [],
+        unit = 'km'
       } = options;
 
       // Validate inputs
@@ -99,32 +117,32 @@ class RedisGeoService {
         throw new Error('Radius must be between 0.1 and 100 km');
       }
 
-      // Query Redis GEO - ioredis: georadius(key, lon, lat, radius, unit, ...options)
+      // Query Redis GEO
       const results = await this.redis.georadius(
         this.geoKey,
-        longitude,
-        latitude,
-        radiusKm,
-        'km',
-        'WITHCOORD',
-        'WITHDIST',
-        'COUNT',
-        limit,
-        'ASC'
+        {
+          longitude,
+          latitude,
+          radius: radiusKm,
+          unit: unit.toLowerCase()
+        },
+        {
+          WITHCOORD: true,
+          WITHDIST: true,
+          COUNT: limit,
+          SORT: 'ASC'
+        }
       );
 
       // Fetch user metadata for each result
-      // ioredis returns: [['member', 'dist', ['lon', 'lat']], ...]
       const nearbyUsers = [];
       for (const result of results) {
-        const userId = result[0];
-        const distance = parseFloat(result[1]) || 0;
-        const coords = result[2]; // ['lon', 'lat']
+        const userId = result.member;
 
         // Skip excluded users
         if (excludeUsers.includes(userId)) continue;
 
-        // Get user metadata from hash
+        // Get user metadata
         const userKey = `geo:user:${userId}`;
         const userData = await this.redis.hgetall(userKey);
 
@@ -134,21 +152,9 @@ class RedisGeoService {
             latitude: parseFloat(userData.latitude),
             longitude: parseFloat(userData.longitude),
             accuracy: parseInt(userData.accuracy) || 0,
-            distance_km: distance,
-            distance_m: Math.round(distance * 1000),
+            distance_km: parseFloat(result.distance) || 0,
+            distance_m: Math.round((parseFloat(result.distance) || 0) * 1000),
             last_update: userData.last_update || null,
-            status: 'online'
-          });
-        } else if (coords) {
-          // Fallback: use coords from geo result if hash expired
-          nearbyUsers.push({
-            user_id: userId,
-            latitude: parseFloat(coords[1]),
-            longitude: parseFloat(coords[0]),
-            accuracy: 0,
-            distance_km: distance,
-            distance_m: Math.round(distance * 1000),
-            last_update: null,
             status: 'online'
           });
         }
@@ -196,7 +202,7 @@ class RedisGeoService {
    */
   async removeUser(userId) {
     try {
-      await this.redis.zrem(this.geoKey, String(userId));
+      await this.redis.zrem(this.geoKey, userId);
       await this.redis.del(`geo:user:${userId}`);
 
       logger.debug(`👋 User ${userId} removed from online list`);

@@ -9,7 +9,8 @@
  */
 
 const redisGeoService = require('./redisGeoService');
-const { query } = require('../config/postgres');
+const UserLocation = require('../models/userLocation');
+const BlockedUser = require('../models/blockedUser');
 const logger = require('../utils/logger');
 
 const RATE_LIMIT_SECONDS = 5;
@@ -95,18 +96,12 @@ class NearbyService {
       }
 
       // Store in PostgreSQL (persistent)
-      await query(
-        `INSERT INTO user_locations (user_id, latitude, longitude, accuracy, is_online, last_seen, updated_at)
-         VALUES ($1, $2, $3, $4, TRUE, NOW(), NOW())
-         ON CONFLICT (user_id) DO UPDATE SET
-           latitude = EXCLUDED.latitude,
-           longitude = EXCLUDED.longitude,
-           accuracy = EXCLUDED.accuracy,
-           is_online = TRUE,
-           last_seen = NOW(),
-           updated_at = NOW()`,
-        [userId, latitude, longitude, Math.round(accuracy)]
-      );
+      const userLocation = await UserLocation.upsert({
+        user_id: userId,
+        latitude,
+        longitude,
+        accuracy: Math.round(accuracy)
+      });
 
       // Store in Redis GEO (for fast queries)
       await redisGeoService.updateUserLocation(
@@ -221,17 +216,11 @@ class NearbyService {
   }
 
   /**
-   * Get users who have blocked this user (and who this user has blocked)
+   * Get users who have blocked this user
    */
   async getBlockedUsers(userId) {
     try {
-      const result = await query(
-        `SELECT blocked_user_id FROM blocked_users WHERE user_id = $1
-         UNION
-         SELECT user_id AS blocked_user_id FROM blocked_users WHERE blocked_user_id = $1`,
-        [userId]
-      );
-      return result.rows;
+      return await BlockedUser.getBlockedByUser(userId);
     } catch (error) {
       logger.warn(`⚠️ Failed to get blocked users:`, error);
       return [];
@@ -247,10 +236,7 @@ class NearbyService {
       await redisGeoService.removeUser(userId);
 
       // Mark as offline in PostgreSQL (optional - keep history)
-      await query(
-        'UPDATE user_locations SET is_online = FALSE, last_seen = NOW() WHERE user_id = $1',
-        [userId]
-      );
+      await UserLocation.markOffline(userId);
 
       logger.info(`👋 Location cleared for user ${userId}`);
 
@@ -267,8 +253,7 @@ class NearbyService {
   async getStats() {
     try {
       const onlineCount = await redisGeoService.getOnlineCount();
-      const countResult = await query('SELECT COUNT(*) FROM user_locations', [], { cache: false });
-      const totalLocations = parseInt(countResult.rows[0].count);
+      const totalLocations = await UserLocation.count() || 0;
 
       return {
         online_users: onlineCount,
