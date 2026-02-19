@@ -129,6 +129,13 @@
     .btn:active { transform: scale(0.98); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+    .btn-telegram {
+      background: #2AABEE;
+      color: #fff;
+      margin-bottom: 14px;
+    }
+    .btn-telegram:hover { background: #229ED9; }
+
     .btn-x {
       background: #000;
       color: #fff;
@@ -143,6 +150,21 @@
       margin-top: 4px;
     }
     .btn-primary:hover { opacity: 0.9; }
+
+    .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: -2px;
+      user-select: none;
+    }
+    .remember-row input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: var(--accent);
+    }
 
     /* Tabs */
     .tabs {
@@ -206,37 +228,6 @@
     /* X icon SVG */
     .x-icon { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
   </style>
-  <script>
-    // Must be defined before telegram-widget.js loads
-    window.onTelegramWidgetAuth = async function(telegramUser) {
-      var errEl = document.getElementById('error-banner');
-      var sucEl = document.getElementById('success-banner');
-      errEl.classList.remove('show');
-      sucEl.textContent = 'Autenticando con Telegram…';
-      sucEl.classList.add('show');
-      try {
-        var res  = await fetch('/api/webapp/auth/telegram', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ telegramUser: telegramUser }),
-        });
-        var data = await res.json();
-        if (res.ok && data.authenticated) {
-          sucEl.textContent = '¡Bienvenido! Redirigiendo…';
-          setTimeout(function() { location.href = '/prime-hub/'; }, 600);
-        } else {
-          sucEl.classList.remove('show');
-          errEl.textContent = data.error || 'No se pudo iniciar sesión con Telegram.';
-          errEl.classList.add('show');
-        }
-      } catch(e) {
-        sucEl.classList.remove('show');
-        errEl.textContent = 'Error de red. Intenta de nuevo.';
-        errEl.classList.add('show');
-      }
-    };
-  </script>
 </head>
 <body>
   <div class="glow"></div>
@@ -248,22 +239,15 @@
     <div id="error-banner"  class="banner error"></div>
     <div id="success-banner" class="banner success"></div>
 
-    <!-- 1. Telegram Login Widget -->
-    <div id="tg-widget" style="display:flex;justify-content:center;min-height:56px;margin-bottom:4px;">
-      <script
-        src="https://telegram.org/js/telegram-widget.js?22"
-        data-telegram-login="PNPLatinoTV_Bot"
-        data-size="large"
-        data-radius="10"
-        data-onauth="onTelegramWidgetAuth(user)"
-        data-request-access="write">
-      </script>
-    </div>
+    <!-- 1. Telegram Login -->
+    <a class="btn btn-telegram" id="btn-telegram" href="/api/webapp/auth/telegram/start">
+      Continuar con Telegram
+    </a>
 
     <div class="divider">o</div>
 
     <!-- 2. X (Twitter) OAuth -->
-    <button class="btn btn-x" id="btn-x" onclick="handleXLogin()">
+    <button type="button" class="btn btn-x" id="btn-x" onclick="handleXLogin()">
       <svg class="x-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
         <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.745l7.73-8.835L1.254 2.25H8.08l4.258 5.63 5.906-5.63Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
       </svg>
@@ -274,37 +258,41 @@
 
     <!-- 3. Email / Password -->
     <div class="tabs">
-      <button class="tab active" id="tab-login"    onclick="switchTab('login')">Iniciar sesión</button>
-      <button class="tab"        id="tab-register" onclick="switchTab('register')">Registrarse</button>
+      <button type="button" class="tab active" id="tab-login"    onclick="switchTab('login')">Iniciar sesión</button>
+      <button type="button" class="tab"        id="tab-register" onclick="switchTab('register')">Registrarse</button>
     </div>
 
     <!-- Login form -->
-    <div class="form" id="form-login">
-      <input type="email"    id="login-email"    placeholder="Correo electrónico" autocomplete="email" />
-      <input type="password" id="login-password" placeholder="Contraseña" autocomplete="current-password" />
-      <button class="btn btn-primary" id="btn-login" onclick="handleLogin()">Iniciar sesión</button>
+    <form class="form" id="form-login" onsubmit="return handleLogin(event);">
+      <input type="email"    id="login-email" name="email" placeholder="Correo electrónico" autocomplete="username" />
+      <input type="password" id="login-password" name="password" placeholder="Contraseña" autocomplete="current-password" />
+      <label class="remember-row" for="login-remember">
+        <input type="checkbox" id="login-remember" name="rememberMe" />
+        Recordarme en este dispositivo (30 días)
+      </label>
+      <button type="submit" class="btn btn-primary" id="btn-login">Iniciar sesión</button>
       <div style="text-align:center;margin-top:4px;">
         <a href="#" onclick="showForgot();return false;" style="font-size:12px;color:var(--amber);text-decoration:none;">¿Olvidaste tu contraseña?</a>
       </div>
-    </div>
+    </form>
 
     <!-- Forgot password form (hidden by default) -->
-    <div class="form hidden" id="form-forgot">
+    <form class="form hidden" id="form-forgot" onsubmit="return handleForgot(event);">
       <p style="font-size:13px;color:var(--muted);margin-bottom:4px;">Ingresa tu correo y te enviamos un enlace para restablecer tu contraseña.</p>
-      <input type="email" id="forgot-email" placeholder="Correo electrónico" autocomplete="email" />
-      <button class="btn btn-primary" id="btn-forgot" onclick="handleForgot()">Enviar enlace</button>
+      <input type="email" id="forgot-email" name="email" placeholder="Correo electrónico" autocomplete="email" />
+      <button type="submit" class="btn btn-primary" id="btn-forgot">Enviar enlace</button>
       <div style="text-align:center;margin-top:4px;">
         <a href="#" onclick="hideForgot();return false;" style="font-size:12px;color:var(--amber);text-decoration:none;">← Volver</a>
       </div>
-    </div>
+    </form>
 
     <!-- Register form -->
-    <div class="form hidden" id="form-register">
-      <input type="text"     id="reg-name"     placeholder="Nombre" autocomplete="given-name" />
-      <input type="email"    id="reg-email"    placeholder="Correo electrónico" autocomplete="email" />
-      <input type="password" id="reg-password" placeholder="Contraseña (mínimo 8 caracteres)" autocomplete="new-password" />
-      <button class="btn btn-primary" id="btn-register" onclick="handleRegister()">Crear cuenta</button>
-    </div>
+    <form class="form hidden" id="form-register" onsubmit="return handleRegister(event);">
+      <input type="text"     id="reg-name" name="firstName" placeholder="Nombre" autocomplete="given-name" />
+      <input type="email"    id="reg-email" name="email" placeholder="Correo electrónico" autocomplete="email" />
+      <input type="password" id="reg-password" name="password" placeholder="Contraseña (mínimo 8 caracteres)" autocomplete="new-password" />
+      <button type="submit" class="btn btn-primary" id="btn-register">Crear cuenta</button>
+    </form>
 
     <p class="footer">
       Al ingresar aceptas nuestros
@@ -330,7 +318,23 @@
       if (err && msgs[err]) showBanner('error', msgs[err]);
     })();
 
-    // Telegram callback is defined in <head> before widget loads
+    const REMEMBER_ME_KEY = 'pnptv.rememberMe';
+    const REMEMBER_EMAIL_KEY = 'pnptv.rememberedEmail';
+
+    (function restoreRememberedLogin() {
+      try {
+        const rememberMe = localStorage.getItem(REMEMBER_ME_KEY) === '1';
+        const savedEmail = localStorage.getItem(REMEMBER_EMAIL_KEY) || '';
+        const rememberEl = document.getElementById('login-remember');
+        const emailEl = document.getElementById('login-email');
+        if (!rememberEl || !emailEl) return;
+
+        rememberEl.checked = rememberMe;
+        if (rememberMe && savedEmail) emailEl.value = savedEmail;
+      } catch (_) {
+        // Ignore browser storage issues.
+      }
+    })();
 
     // ── Tab switch ─────────────────────────────────────────────────────────────
     function switchTab(tab) {
@@ -353,7 +357,8 @@
       document.getElementById('form-login').classList.remove('hidden');
       clearBanners();
     }
-    async function handleForgot() {
+    async function handleForgot(event) {
+      if (event) event.preventDefault();
       clearBanners();
       const email = document.getElementById('forgot-email').value.trim();
       const btn   = document.getElementById('btn-forgot');
@@ -374,6 +379,7 @@
         btn.disabled = false;
         btn.textContent = 'Enviar enlace';
       }
+      return false;
     }
 
     // ── Banners ────────────────────────────────────────────────────────────────
@@ -388,10 +394,12 @@
     }
 
     // ── Email Login ────────────────────────────────────────────────────────────
-    async function handleLogin() {
+    async function handleLogin(event) {
+      if (event) event.preventDefault();
       clearBanners();
       const email    = document.getElementById('login-email').value.trim();
       const password = document.getElementById('login-password').value;
+      const rememberMe = document.getElementById('login-remember').checked;
       const btn      = document.getElementById('btn-login');
 
       if (!email || !password) { showBanner('error', 'Completa todos los campos.'); return; }
@@ -403,10 +411,21 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email, password, rememberMe }),
         });
         const data = await res.json();
         if (res.ok && data.authenticated) {
+          try {
+            if (rememberMe) {
+              localStorage.setItem(REMEMBER_ME_KEY, '1');
+              localStorage.setItem(REMEMBER_EMAIL_KEY, email);
+            } else {
+              localStorage.removeItem(REMEMBER_ME_KEY);
+              localStorage.removeItem(REMEMBER_EMAIL_KEY);
+            }
+          } catch (_) {
+            // Ignore browser storage issues.
+          }
           showBanner('success', '¡Bienvenido! Redirigiendo...');
           setTimeout(() => { location.href = '/prime-hub/'; }, 800);
         } else {
@@ -419,10 +438,12 @@
         btn.disabled = false;
         btn.textContent = 'Iniciar sesión';
       }
+      return false;
     }
 
     // ── Email Register ─────────────────────────────────────────────────────────
-    async function handleRegister() {
+    async function handleRegister(event) {
+      if (event) event.preventDefault();
       clearBanners();
       const firstName = document.getElementById('reg-name').value.trim();
       const email     = document.getElementById('reg-email').value.trim();
@@ -455,6 +476,7 @@
         btn.disabled = false;
         btn.textContent = 'Crear cuenta';
       }
+      return false;
     }
 
     // ── X (Twitter) OAuth ─────────────────────────────────────────────────────
@@ -479,14 +501,6 @@
         btn.style.opacity = '';
       }
     }
-
-    // ── Enter key support ──────────────────────────────────────────────────────
-    document.addEventListener('keydown', e => {
-      if (e.key !== 'Enter') return;
-      const active = document.getElementById('form-login').classList.contains('hidden') ? 'register' : 'login';
-      if (active === 'login')    handleLogin();
-      else                       handleRegister();
-    });
   </script>
 </body>
 </html>

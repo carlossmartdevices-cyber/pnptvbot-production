@@ -35,6 +35,24 @@ export function AuthProvider({ children }) {
     return { success: false, ...data };
   }, []);
 
+  const loginWithEmail = useCallback(async (email, password, rememberMe = false) => {
+    const data = await api.emailLogin(email, password, rememberMe);
+    if (data.authenticated) {
+      setUser(data.user);
+      return { success: true };
+    }
+    return { success: false, ...data };
+  }, []);
+
+  const registerWithEmail = useCallback(async (firstName, email, password, lastName = '') => {
+    const data = await api.emailRegister(firstName, email, password, lastName);
+    if (data.authenticated) {
+      setUser(data.user);
+      return { success: true };
+    }
+    return { success: false, ...data };
+  }, []);
+
   const loginWithX = useCallback(async () => {
     const data = await api.xLoginStart();
     if (data.success && data.url) {
@@ -49,7 +67,17 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithTelegram, loginWithX, logout, checkAuth }}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      loginWithTelegram,
+      loginWithEmail,
+      registerWithEmail,
+      loginWithX,
+      logout,
+      checkAuth,
+    }}
+    >
       {children}
     </AuthContext.Provider>
   );

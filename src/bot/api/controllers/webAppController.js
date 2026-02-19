@@ -64,6 +64,13 @@ function buildSession(user, extra = {}) {
   };
 }
 
+function setSessionCookieDuration(session, rememberMe = false) {
+  if (!session?.cookie) return;
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  const thirtyDaysMs = 30 * oneDayMs;
+  session.cookie.maxAge = rememberMe ? thirtyDaysMs : oneDayMs;
+}
+
 // ── Telegram Login Widget verification ───────────────────────────────────────
 
 function verifyTelegramAuth(data) {
@@ -85,6 +92,35 @@ const b64url = (buf) =>
   buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 
 // ── Controllers ───────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/webapp/auth/telegram/start
+ * Redirects user to Telegram OAuth page (button-based flow, no widget JS dependency).
+ */
+const telegramStart = async (req, res) => {
+  try {
+    const botId = process.env.TELEGRAM_BOT_ID || (process.env.BOT_TOKEN || '').split(':')[0];
+    if (!botId) {
+      logger.error('Telegram OAuth start error: BOT_TOKEN/TELEGRAM_BOT_ID missing');
+      return res.status(500).json({ error: 'Telegram login is not configured.' });
+    }
+
+    const origin = `${req.protocol}://${req.get('host')}`;
+    const callbackUrl = `${origin}/api/webapp/auth/telegram/callback`;
+
+    const params = new URLSearchParams({
+      bot_id: botId,
+      origin,
+      request_access: 'write',
+      return_to: callbackUrl,
+    });
+
+    return res.redirect(`https://oauth.telegram.org/auth?${params.toString()}`);
+  } catch (error) {
+    logger.error('Telegram OAuth start error:', error);
+    return res.status(500).json({ error: 'Failed to start Telegram authentication' });
+  }
+};
 
 /**
  * GET /api/webapp/auth/telegram/callback
@@ -274,7 +310,7 @@ const emailRegister = async (req, res) => {
  */
 const emailLogin = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
@@ -302,6 +338,10 @@ const emailLogin = async (req, res) => {
     }
 
     req.session.user = buildSession(user);
+    setSessionCookieDuration(
+      req.session,
+      rememberMe === true || rememberMe === 'true'
+    );
     await new Promise((resolve, reject) =>
       req.session.save(err => (err ? reject(err) : resolve()))
     );
@@ -460,6 +500,9 @@ const xLoginCallback = async (req, res) => {
     }
 
     req.session.user = buildSession(user, { xHandle });
+    await new Promise((resolve, reject) =>
+      req.session.save(err => (err ? reject(err) : resolve()))
+    );
     logger.info(`Web app X login: user ${user.id} via @${xHandle}`);
     return res.redirect('/prime-hub/');
   } catch (error) {
@@ -738,6 +781,7 @@ const getMastodonFeed = async (req, res) => {
 };
 
 module.exports = {
+  telegramStart,
   telegramCallback,
   telegramLogin,
   emailRegister,

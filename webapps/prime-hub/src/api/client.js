@@ -28,6 +28,21 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ telegramUser })
     }),
+  emailLogin: (email, password, rememberMe = false) =>
+    request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, rememberMe })
+    }),
+  emailRegister: (firstName, email, password, lastName = '') =>
+    request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ firstName, email, password, lastName })
+    }),
+  forgotPassword: (email) =>
+    request('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    }),
   xLoginStart: () => request('/auth/x/start'),
   logout: () => request('/auth/logout', { method: 'POST' }),
 

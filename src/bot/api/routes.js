@@ -1398,6 +1398,7 @@ app.post('/api/metrics/reset', healthLimiter, asyncHandler(healthController.rese
 const webAppController = require('./controllers/webAppController');
 
 // Web App Authentication
+app.get('/api/webapp/auth/telegram/start', asyncHandler(webAppController.telegramStart));
 app.get('/api/webapp/auth/telegram/callback', asyncHandler(webAppController.telegramCallback));
 app.post('/api/webapp/auth/telegram', asyncHandler(webAppController.telegramLogin));
 app.post('/api/webapp/auth/register', asyncHandler(webAppController.emailRegister));
