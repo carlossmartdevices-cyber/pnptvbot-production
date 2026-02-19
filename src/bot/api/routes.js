@@ -1421,6 +1421,8 @@ const webappHangoutsController = require('./controllers/webappHangoutsController
 app.get('/api/webapp/hangouts/public', asyncHandler(webappHangoutsController.listPublic));
 app.post('/api/webapp/hangouts/create', asyncHandler(webappHangoutsController.createRoom));
 app.post('/api/webapp/hangouts/join/:callId', asyncHandler(webappHangoutsController.joinRoom));
+app.post('/api/webapp/hangouts/leave/:callId', asyncHandler(webappHangoutsController.leaveRoom));
+app.delete('/api/webapp/hangouts/:callId', asyncHandler(webappHangoutsController.endRoom));
 
 // ==========================================
 // Social, DM, Chat, Users API Routes

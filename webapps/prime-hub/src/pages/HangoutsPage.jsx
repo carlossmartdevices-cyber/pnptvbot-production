@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../components/Layout';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
-import { Video, Plus, Users, RefreshCw, ExternalLink } from 'lucide-react';
+import { Video, Plus, Users, RefreshCw, PhoneOff, LogOut } from 'lucide-react';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -11,6 +11,150 @@ function timeAgo(dateStr) {
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m ago`;
   return `${Math.floor(mins / 60)}h ago`;
+}
+
+// Load Jitsi external_api.js once and cache it
+let jitsiApiLoaded = false;
+let jitsiApiLoadPromise = null;
+
+function loadJitsiApi() {
+  if (jitsiApiLoaded) return Promise.resolve();
+  if (jitsiApiLoadPromise) return jitsiApiLoadPromise;
+  jitsiApiLoadPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://8x8.vc/libs/external_api.min.js';
+    script.onload = () => { jitsiApiLoaded = true; resolve(); };
+    script.onerror = () => reject(new Error('Failed to load Jitsi API'));
+    document.head.appendChild(script);
+  });
+  return jitsiApiLoadPromise;
+}
+
+function CallOverlay({ activeCall, userName, onLeave, onEnd }) {
+  const containerRef = useRef(null);
+  const jitsiRef = useRef(null);
+  const [loadError, setLoadError] = useState('');
+
+  useEffect(() => {
+    let destroyed = false;
+
+    const initJitsi = async () => {
+      try {
+        await loadJitsiApi();
+        if (destroyed || !containerRef.current) return;
+        if (!window.JitsiMeetExternalAPI) throw new Error('JitsiMeetExternalAPI not available');
+
+        // Parse the jitsiUrl: https://8x8.vc/{appId}/{room}?jwt={token}
+        const url = new URL(activeCall.jitsiUrl);
+        const parts = url.pathname.split('/').filter(Boolean); // ['appId', 'room']
+        const appId = parts[0];
+        const room = parts[1];
+        const jwt = url.searchParams.get('jwt');
+
+        const api = new window.JitsiMeetExternalAPI('8x8.vc', {
+          roomName: `${appId}/${room}`,
+          jwt,
+          parentNode: containerRef.current,
+          width: '100%',
+          height: '100%',
+          configOverwrite: {
+            startWithAudioMuted: false,
+            startWithVideoMuted: false,
+            disableDeepLinking: true,
+            prejoinPageEnabled: false,
+          },
+          interfaceConfigOverwrite: {
+            SHOW_JITSI_WATERMARK: false,
+            SHOW_WATERMARK_FOR_GUESTS: false,
+            TOOLBAR_BUTTONS: [
+              'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
+              'fodeviceselection', 'hangup', 'chat', 'raisehand',
+              'videoquality', 'tileview', 'select-background', 'stats',
+            ],
+          },
+          userInfo: {
+            displayName: userName || 'Guest',
+          },
+        });
+
+        jitsiRef.current = api;
+
+        api.addEventListener('readyToClose', () => {
+          if (!destroyed) onLeave();
+        });
+
+        api.addEventListener('videoConferenceLeft', () => {
+          if (!destroyed) onLeave();
+        });
+      } catch (err) {
+        if (!destroyed) {
+          setLoadError(err.message || 'Failed to load video call');
+        }
+      }
+    };
+
+    initJitsi();
+
+    return () => {
+      destroyed = true;
+      if (jitsiRef.current) {
+        try { jitsiRef.current.dispose(); } catch (_) {}
+        jitsiRef.current = null;
+      }
+    };
+  }, [activeCall.jitsiUrl]);
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: '#000', display: 'flex', flexDirection: 'column',
+    }}>
+      {/* Top bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '8px 16px', background: 'rgba(0,0,0,0.8)',
+        borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fff', fontSize: 14 }}>
+          <Video size={16} style={{ color: '#30d158' }} />
+          <span style={{ fontWeight: 600 }}>{activeCall.title || `${activeCall.creatorName || 'Host'}'s Room`}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {activeCall.isModerator && (
+            <button
+              onClick={onEnd}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: 'rgba(255,69,58,0.2)', color: '#ff453a', fontSize: 13, fontWeight: 600,
+              }}
+            >
+              <PhoneOff size={14} /> End Room
+            </button>
+          )}
+          <button
+            onClick={onLeave}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 13, fontWeight: 600,
+            }}
+          >
+            <LogOut size={14} /> Leave
+          </button>
+        </div>
+      </div>
+
+      {/* Jitsi container */}
+      <div ref={containerRef} style={{ flex: 1, width: '100%', overflow: 'hidden' }}>
+        {loadError && (
+          <div style={{ color: '#ff453a', textAlign: 'center', padding: 40 }}>
+            {loadError}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function HangoutsPage() {
@@ -22,6 +166,7 @@ export default function HangoutsPage() {
   const [title, setTitle] = useState('');
   const [error, setError] = useState('');
   const [joiningId, setJoiningId] = useState(null);
+  const [activeCall, setActiveCall] = useState(null); // { jitsiUrl, room, id, isModerator, title, creatorName }
 
   const loadRooms = useCallback(async () => {
     try {
@@ -40,11 +185,19 @@ export default function HangoutsPage() {
     return () => clearInterval(interval);
   }, [loadRooms]);
 
-  const openCall = (jitsiUrl, room) => {
-    if (jitsiUrl) {
-      window.open(jitsiUrl, '_blank', 'noopener');
+  const startCall = (res, { title, creatorName, isModerator }) => {
+    if (res.jitsiUrl) {
+      setActiveCall({
+        jitsiUrl: res.jitsiUrl,
+        room: res.room,
+        id: res.id,
+        isModerator: isModerator ?? false,
+        title,
+        creatorName,
+      });
     } else {
-      window.open(`https://meet.jit.si/${room}`, '_blank', 'noopener');
+      // Fallback: open public Jitsi in new tab
+      window.open(`https://meet.jit.si/${res.room}`, '_blank', 'noopener');
     }
   };
 
@@ -55,7 +208,8 @@ export default function HangoutsPage() {
       const res = await api.createHangout({ title: title.trim() || null, isPublic: true });
       setShowCreate(false);
       setTitle('');
-      openCall(res.jitsiUrl, res.room);
+      const creatorName = user?.firstName || user?.username || 'You';
+      startCall(res, { title: title.trim() || null, creatorName, isModerator: true });
       await loadRooms();
     } catch (err) {
       setError(err.message || 'Failed to create room');
@@ -64,17 +218,45 @@ export default function HangoutsPage() {
     }
   };
 
-  const handleJoin = async (callId) => {
-    setJoiningId(callId);
+  const handleJoin = async (room) => {
+    setJoiningId(room.id);
+    setError('');
     try {
-      const res = await api.joinHangout(callId);
-      openCall(res.jitsiUrl, res.room);
+      const res = await api.joinHangout(room.id);
+      startCall(res, { title: room.title, creatorName: room.creatorName, isModerator: res.isModerator });
     } catch (err) {
       setError(err.message || 'Failed to join room');
     } finally {
       setJoiningId(null);
     }
   };
+
+  const handleLeave = useCallback(async () => {
+    if (!activeCall) return;
+    try { await api.leaveHangout(activeCall.id); } catch (_) {}
+    setActiveCall(null);
+    loadRooms();
+  }, [activeCall, loadRooms]);
+
+  const handleEnd = useCallback(async () => {
+    if (!activeCall) return;
+    try { await api.endHangout(activeCall.id); } catch (_) {}
+    setActiveCall(null);
+    loadRooms();
+  }, [activeCall, loadRooms]);
+
+  // Show embedded call overlay when active
+  if (activeCall) {
+    const userName = user?.firstName || user?.username || 'Guest';
+    return (
+      <CallOverlay
+        activeCall={activeCall}
+        userName={userName}
+        onLeave={handleLeave}
+        onEnd={handleEnd}
+      />
+    );
+  }
 
   return (
     <Layout>
@@ -181,12 +363,12 @@ export default function HangoutsPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => handleJoin(room.id)}
+                  onClick={() => handleJoin(room)}
                   disabled={joiningId === room.id}
                   className="btn-primary"
                   style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}
                 >
-                  <ExternalLink size={14} />
+                  <Video size={14} />
                   {joiningId === room.id ? 'Joining...' : 'Join'}
                 </button>
               </div>

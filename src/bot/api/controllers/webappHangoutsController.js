@@ -123,4 +123,32 @@ const joinRoom = async (req, res) => {
   }
 };
 
-module.exports = { listPublic, createRoom, joinRoom };
+// POST /api/webapp/hangouts/leave/:callId
+const leaveRoom = async (req, res) => {
+  const user = authGuard(req, res); if (!user) return;
+  const { callId } = req.params;
+  try {
+    await VideoCallModel.leaveCall(callId, user.id);
+    return res.json({ success: true });
+  } catch (err) {
+    logger.error('webapp leaveRoom hangouts error', err);
+    return res.status(500).json({ error: 'Failed to leave room' });
+  }
+};
+
+// DELETE /api/webapp/hangouts/:callId
+const endRoom = async (req, res) => {
+  const user = authGuard(req, res); if (!user) return;
+  const { callId } = req.params;
+  try {
+    await VideoCallModel.endCall(callId, user.id);
+    return res.json({ success: true });
+  } catch (err) {
+    logger.error('webapp endRoom hangouts error', err);
+    if (err.message?.includes('creator')) return res.status(403).json({ error: 'Only the creator can end this room' });
+    if (err.message?.includes('not found')) return res.status(404).json({ error: 'Room not found' });
+    return res.status(500).json({ error: 'Failed to end room' });
+  }
+};
+
+module.exports = { listPublic, createRoom, joinRoom, leaveRoom, endRoom };
