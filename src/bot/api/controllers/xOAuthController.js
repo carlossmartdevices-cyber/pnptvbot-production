@@ -154,7 +154,7 @@ const handleCallback = async (req, res) => {
 
       if (result.rows.length === 0) {
         return res.redirect(
-          `/prime-hub/login?error=not_registered&x_handle=${encodeURIComponent(account.handle)}`
+          `/?error=not_registered&x_handle=${encodeURIComponent(account.handle)}`
         );
       }
 
@@ -174,7 +174,7 @@ const handleCallback = async (req, res) => {
       };
 
       logger.info(`Web app X login via callback: user ${user.id} via @${account.handle}`);
-      return res.redirect('/prime-hub/?auth=success');
+      return res.redirect('/prime-hub/');
     }
 
     return res.send(buildRedirectPage(

@@ -117,8 +117,13 @@ const xLoginStart = async (req, res) => {
     // createAuthUrl() returns a URL string directly (not an object)
     const authUrl = await XOAuthService.createAuthUrl();
 
-    // Flag this session so the OAuth callback can redirect to the webapp instead of the bot
+    // Flag this session so the OAuth callback redirects to the webapp.
+    // Explicitly save before responding to guarantee Redis flush before the
+    // browser follows the OAuth redirect and the callback fires.
     req.session.xWebLogin = true;
+    await new Promise((resolve, reject) =>
+      req.session.save(err => (err ? reject(err) : resolve()))
+    );
 
     res.json({ success: true, url: authUrl });
   } catch (error) {
@@ -136,14 +141,14 @@ const xLoginCallback = async (req, res) => {
     const { code, state } = req.query;
 
     if (!code || !state) {
-      return res.redirect('/prime-hub/login?error=missing_params');
+      return res.redirect('/?error=missing_params');
     }
 
     const XOAuthService = require('../../services/xOAuthService');
     const account = await XOAuthService.handleOAuthCallback({ code, state });
 
     if (!account || !account.handle) {
-      return res.redirect('/prime-hub/login?error=auth_failed');
+      return res.redirect('/?error=auth_failed');
     }
 
     // Find user by X handle

@@ -1,1135 +1,332 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    <title>PRIME Hub - Select Your Experience</title>
-    <meta name="description" content="PNPtv - Premium adult entertainment with HD/4K videos, live video rooms, and exclusive content. Join our verified community today.">
-    <meta name="keywords" content="PNPtv, adult entertainment, video rooms, premium content, HD videos">
-    <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
-    <script async src="https://telegram.org/js/telegram-widget.js?22"></script>
-    <style>
-        :root {
-            --bg-color: #1C1C1E;
-            --text-main: #FFFFFF;
-            --text-muted: #8E8E93;
-            --neon-pink: #FF00CC;
-            --neon-amber: #FFB454;
-            --glass-bg: rgba(44, 44, 46, 0.7);
-            --glass-border: rgba(255, 180, 84, 0.3);
-            --card-radius: 20px;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        html { scroll-behavior: smooth; }
-
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            line-height: 1.6;
-            overflow-x: hidden;
-        }
-
-        /* --- Ambient Glow --- */
-        .ambient-glow {
-            position: fixed;
-            top: -30%;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 120vw;
-            height: 120vw;
-            background: radial-gradient(circle, rgba(255, 0, 204, 0.12) 0%, transparent 65%);
-            z-index: -1;
-            pointer-events: none;
-        }
-
-        .ambient-glow-2 {
-            position: fixed;
-            bottom: -40%;
-            right: -20%;
-            width: 80vw;
-            height: 80vw;
-            background: radial-gradient(circle, rgba(255, 180, 84, 0.08) 0%, transparent 65%);
-            z-index: -1;
-            pointer-events: none;
-        }
-
-        /* --- Navigation --- */
-        .navbar {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            background: rgba(28, 28, 30, 0.92);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            padding: 0 20px;
-            height: 60px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 1000;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        }
-
-        .logo {
-            font-weight: 900;
-            font-size: 22px;
-            letter-spacing: -0.5px;
-            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 24px;
-            list-style: none;
-        }
-
-        .nav-links a {
-            color: var(--text-muted);
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 13px;
-            transition: color 0.3s;
-            letter-spacing: 0.3px;
-        }
-
-        .nav-links a:hover {
-            color: var(--text-main);
-        }
-
-        .mobile-menu-btn {
-            display: none;
-            background: none;
-            border: none;
-            color: var(--text-main);
-            font-size: 24px;
-            cursor: pointer;
-            padding: 8px;
-        }
-
-        /* --- Hero --- */
-        .hero {
-            margin-top: 60px;
-            min-height: calc(100vh - 60px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 40px 20px;
-        }
-
-        .hero-content {
-            max-width: 680px;
-        }
-
-        .hero h1 {
-            font-size: clamp(32px, 8vw, 56px);
-            font-weight: 900;
-            line-height: 1.1;
-            margin-bottom: 16px;
-            text-transform: uppercase;
-            letter-spacing: -1px;
-        }
-
-        .hero .gradient-text {
-            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .hero .tagline {
-            font-size: clamp(16px, 4vw, 20px);
-            color: var(--text-muted);
-            margin-bottom: 32px;
-            font-weight: 400;
-        }
-
-        .cta-buttons {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            padding: 14px 28px;
-            font-size: 14px;
-            font-weight: 700;
-            border: none;
-            border-radius: 14px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            letter-spacing: 0.3px;
-            text-transform: uppercase;
-        }
-
-        .btn-primary {
-            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
-            color: white;
-            box-shadow: 0 8px 24px rgba(255, 0, 204, 0.3);
-        }
-
-        .btn-primary:active {
-            transform: scale(0.97);
-        }
-
-        .btn-secondary {
-            background: var(--glass-bg);
-            color: var(--text-main);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-        }
-
-        .btn-secondary:active {
-            transform: scale(0.97);
-        }
-
-        /* --- Section Shared --- */
-        .section {
-            padding: 80px 20px;
-            max-width: 1100px;
-            margin: 0 auto;
-        }
-
-        .section-title {
-            text-align: center;
-            font-size: clamp(24px, 6vw, 36px);
-            font-weight: 900;
-            margin-bottom: 12px;
-            text-transform: uppercase;
-            letter-spacing: -0.5px;
-        }
-
-        .section-subtitle {
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 15px;
-            margin-bottom: 48px;
-            max-width: 500px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        /* --- Features Grid --- */
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px;
-        }
-
-        .feature-card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: var(--card-radius);
-            padding: 28px 24px;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .feature-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        .feature-card:hover::before {
-            opacity: 1;
-        }
-
-        .feature-icon {
-            font-size: 32px;
-            margin-bottom: 16px;
-            display: block;
-        }
-
-        .feature-card h3 {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 8px;
-            color: var(--neon-amber);
-        }
-
-        .feature-card p {
-            font-size: 14px;
-            color: var(--text-muted);
-            line-height: 1.6;
-        }
-
-        /* --- Ecosystem / Platforms --- */
-        .platforms-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 16px;
-        }
-
-        .platform-card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: var(--card-radius);
-            padding: 28px 24px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .platform-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
-        }
-
-        .platform-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        .platform-icon {
-            font-size: 28px;
-        }
-
-        .platform-card h3 {
-            font-size: 20px;
-            font-weight: 800;
-        }
-
-        .platform-badge {
-            display: inline-block;
-            background: rgba(255, 180, 84, 0.15);
-            color: var(--neon-amber);
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 12px;
-            border: 1px solid rgba(255, 180, 84, 0.3);
-        }
-
-        .platform-card > p {
-            font-size: 14px;
-            color: var(--text-muted);
-            margin-bottom: 16px;
-            line-height: 1.6;
-        }
-
-        .platform-features {
-            list-style: none;
-            margin-bottom: 20px;
-        }
-
-        .platform-features li {
-            padding: 6px 0;
-            padding-left: 20px;
-            position: relative;
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.8);
-        }
-
-        .platform-features li::before {
-            content: "";
-            position: absolute;
-            left: 0;
-            top: 10px;
-            width: 8px;
-            height: 8px;
-            background: linear-gradient(135deg, var(--neon-pink), var(--neon-amber));
-            border-radius: 2px;
-            transform: rotate(45deg);
-        }
-
-        .platform-card .note {
-            font-size: 13px;
-            color: var(--text-muted);
-            font-style: italic;
-            margin-bottom: 16px;
-        }
-
-        .platform-cta {
-            display: block;
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: 700;
-            text-align: center;
-            text-decoration: none;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .platform-cta:active {
-            transform: scale(0.98);
-        }
-
-        /* --- Comparison Table --- */
-        .comparison-section {
-            padding: 0 20px 80px;
-            max-width: 1100px;
-            margin: 0 auto;
-        }
-
-        .comparison-card {
-            background: var(--glass-bg);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: var(--card-radius);
-            padding: 24px;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .comparison-card h3 {
-            text-align: center;
-            font-size: 20px;
-            font-weight: 800;
-            margin-bottom: 20px;
-        }
-
-        .comparison-card table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 500px;
-        }
-
-        .comparison-card th,
-        .comparison-card td {
-            padding: 12px 10px;
-            text-align: left;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-            font-size: 13px;
-        }
-
-        .comparison-card th {
-            color: var(--neon-amber);
-            font-weight: 700;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .comparison-card td {
-            color: rgba(255, 255, 255, 0.8);
-        }
-
-        .comparison-card tr:last-child td {
-            border-bottom: none;
-        }
-
-        /* --- How They Work Together --- */
-        .how-together {
-            text-align: center;
-            padding: 40px 20px;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .how-together h3 {
-            font-size: 22px;
-            font-weight: 800;
-            margin-bottom: 20px;
-        }
-
-        .flow-steps {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            text-align: left;
-        }
-
-        .flow-step {
-            background: var(--glass-bg);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 14px;
-            padding: 16px 20px;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
-
-        .flow-num {
-            width: 32px;
-            height: 32px;
-            border-radius: 10px;
-            background: linear-gradient(135deg, var(--neon-pink), var(--neon-amber));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 800;
-            font-size: 14px;
-            flex-shrink: 0;
-        }
-
-        .flow-step p {
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.85);
-        }
-
-        .flow-step strong {
-            color: var(--text-main);
-        }
-
-        /* --- Pricing --- */
-        .pricing-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px;
-            max-width: 700px;
-            margin: 0 auto;
-        }
-
-        .pricing-card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(16px);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--card-radius);
-            padding: 32px 24px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .pricing-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
-        }
-
-        .pricing-card h3 {
-            font-size: 20px;
-            font-weight: 800;
-            margin-bottom: 8px;
-        }
-
-        .pricing-card .price {
-            font-size: 48px;
-            font-weight: 900;
-            margin: 16px 0 4px;
-            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .pricing-card .price-label {
-            font-size: 14px;
-            color: var(--text-muted);
-            margin-bottom: 20px;
-        }
-
-        .pricing-features {
-            list-style: none;
-            text-align: left;
-            margin-bottom: 24px;
-        }
-
-        .pricing-features li {
-            padding: 8px 0;
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.8);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .pricing-features li::before {
-            content: "";
-            width: 8px;
-            height: 8px;
-            background: linear-gradient(135deg, var(--neon-pink), var(--neon-amber));
-            border-radius: 2px;
-            transform: rotate(45deg);
-            flex-shrink: 0;
-        }
-
-        .pricing-card .btn-primary {
-            width: 100%;
-            justify-content: center;
-        }
-
-        /* --- Stats --- */
-        .stats-section {
-            padding: 60px 20px;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .stat-item {
-            background: var(--glass-bg);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 16px;
-            padding: 24px 16px;
-            text-align: center;
-        }
-
-        .stat-number {
-            font-size: 32px;
-            font-weight: 900;
-            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 4px;
-        }
-
-        .stat-label {
-            font-size: 13px;
-            color: var(--text-muted);
-            font-weight: 600;
-        }
-
-        /* --- CTA Section --- */
-        .cta-section {
-            padding: 80px 20px;
-            text-align: center;
-        }
-
-        .cta-section h2 {
-            font-size: clamp(24px, 6vw, 36px);
-            font-weight: 900;
-            margin-bottom: 12px;
-            text-transform: uppercase;
-        }
-
-        .cta-section p {
-            color: var(--text-muted);
-            font-size: 15px;
-            margin-bottom: 32px;
-        }
-
-        /* --- Footer --- */
-        .footer {
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
-            padding: 32px 20px;
-            text-align: center;
-        }
-
-        .footer-links {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-        }
-
-        .footer-links a {
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 13px;
-            font-weight: 600;
-            transition: color 0.3s;
-        }
-
-        .footer-links a:hover {
-            color: var(--neon-amber);
-        }
-
-        .footer p {
-            color: rgba(255, 255, 255, 0.3);
-            font-size: 12px;
-        }
-
-        /* --- Mobile-First Responsive --- */
-        @media (max-width: 768px) {
-            .nav-links {
-                display: none;
-                position: fixed;
-                top: 60px;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(28, 28, 30, 0.98);
-                backdrop-filter: blur(20px);
-                flex-direction: column;
-                padding: 32px 24px;
-                gap: 24px;
-            }
-
-            .nav-links.active {
-                display: flex;
-            }
-
-            .nav-links a {
-                font-size: 18px;
-                color: var(--text-main);
-            }
-
-            .mobile-menu-btn {
-                display: block;
-            }
-
-            .features-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .pricing-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-
-            .cta-buttons {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .btn {
-                width: 100%;
-                justify-content: center;
-            }
-        }
-
-        @media (min-width: 769px) {
-            .platforms-grid {
-                grid-template-columns: repeat(3, 1fr);
-            }
-
-            .stats-grid {
-                grid-template-columns: repeat(4, 1fr);
-            }
-        }
-
-        /* --- Animations --- */
-        .fade-in {
-            opacity: 0;
-            transform: translateY(20px);
-            transition: opacity 0.5s ease, transform 0.5s ease;
-        }
-
-        .fade-in.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="theme-color" content="#1C1C1E" />
+  <meta name="description" content="PNPtv PRIME — Sign in to access your community" />
+  <title>PNPtv — Sign In</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #1C1C1E;
+      --card: #2C2C2E;
+      --border: rgba(255,255,255,0.08);
+      --pink: #FF00CC;
+      --amber: #FFB454;
+      --gradient: linear-gradient(135deg, #FF00CC, #FFB454);
+      --text: #FFFFFF;
+      --muted: #8E8E93;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .glow {
+      position: fixed;
+      width: 500px; height: 500px;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .glow-pink  { background: rgba(255,0,204,0.12); top: -100px; left: -100px; }
+    .glow-amber { background: rgba(255,180,84,0.10); bottom: -100px; right: -100px; }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 400px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 40px 32px 36px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+    }
+
+    .logo {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+
+    .brand {
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      margin-bottom: 8px;
+    }
+
+    .tagline {
+      font-size: 14px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.6;
+      margin-bottom: 36px;
+    }
+
+    .divider {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .divider span { font-size: 12px; color: var(--muted); }
+
+    .btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { opacity: 0.75; transform: scale(0.98); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .btn-x {
+      background: #000;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.14);
+    }
+
+    #tg-widget {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      min-height: 48px;
+    }
+
+    .msg {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      text-align: center;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+    .msg-error {
+      background: rgba(255,59,48,0.12);
+      border: 1px solid rgba(255,59,48,0.25);
+      color: #FF453A;
+    }
+    .msg-ok {
+      background: rgba(52,199,89,0.12);
+      border: 1px solid rgba(52,199,89,0.25);
+      color: #30D158;
+    }
+
+    .x-icon { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .footer {
+      position: relative;
+      z-index: 1;
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.9;
+    }
+    .footer a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+    .footer a:hover { color: var(--text); }
+
+    @media (max-width: 420px) {
+      .card { padding: 32px 20px 28px; border-radius: 20px; }
+      .brand { font-size: 30px; }
+    }
+  </style>
 </head>
 <body>
-    <div class="ambient-glow"></div>
-    <div class="ambient-glow-2"></div>
 
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="logo">PNPtv!</div>
-        <ul class="nav-links" id="navLinks">
-            <li><a href="#home">Home</a></li>
-            <li><a href="#features">Features</a></li>
-            <li><a href="#community">Platform</a></li>
-            <li><a href="#services">Pricing</a></li>
-            <li><a href="/videorama-app/">Videorama</a></li>
-            <li><a href="/lifetime-pass">Get Access</a></li>
-        </ul>
-        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" id="menuIcon">
-                <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-        </button>
-    </nav>
+  <div class="glow glow-pink"></div>
+  <div class="glow glow-amber"></div>
 
-    <!-- Hero Section -->
-    <section class="hero" id="home">
-        <div class="hero-content fade-in">
-            <h1>Welcome to <span class="gradient-text">PNPtv</span></h1>
-            <p class="tagline">PNPTV is a next-generation digital platform combining Premium HD/4K content, live video rooms, and an exclusive verified community.<br>A space designed to connect, share experiences, and access innovative real-time formats.<br>Join thousands of members who are already part of a dynamic, modern, and constantly evolving network.</p>
-            <div class="cta-buttons">
-                <a href="/lifetime-pass" class="btn btn-primary">Get Lifetime Access - $100</a>
-                <a href="/videorama-app/" class="btn btn-secondary">🎥 Live</a>
-                <a href="/hangouts" class="btn btn-secondary">👥 Hangouts</a>
-            </div>
-        </div>
-    </section>
+  <div class="card">
+    <div class="logo">PNPtv</div>
+    <h1 class="brand">PRIME Zone</h1>
+    <p class="tagline">Sign in to access Live, Hangouts,<br>Videorama &amp; your community.</p>
 
-    <!-- Features Section -->
-    <section class="section" id="features">
-        <h2 class="section-title fade-in">Why Choose <span class="gradient-text">PNPtv?</span></h2>
-        <p class="section-subtitle fade-in">Everything you need for the ultimate adult entertainment experience</p>
-        <div class="features-grid">
-            <div class="feature-card fade-in">
-                <span class="feature-icon">4K</span>
-                <h3>HD/4K Videos</h3>
-                <p>Crystal clear premium content featuring exclusive videos you won't find anywhere else.</p>
-            </div>
-            <div class="feature-card fade-in">
-                <span class="feature-icon">LIVE</span>
-                <h3>Live Video Rooms</h3>
-                <p>Connect in real-time with interactive video chat rooms. Meet and share experiences with verified members.</p>
-            </div>
-            <div class="feature-card fade-in">
-                <span class="feature-icon">GPS</span>
-                <h3>Who's Nearby</h3>
-                <p>Discover members in your area with geolocation. Connect locally and arrange real meetups safely.</p>
-            </div>
-            <div class="feature-card fade-in">
-                <span class="feature-icon">RAW</span>
-                <h3>Uncensored Content</h3>
-                <p>Real PNP action without limits. Authentic, raw, and unfiltered content for mature audiences.</p>
-            </div>
-            <div class="feature-card fade-in">
-                <span class="feature-icon">AI</span>
-                <h3>24/7 Bot Support</h3>
-                <p>Instant assistance through our Telegram bot. Get help anytime, manage your account seamlessly.</p>
-            </div>
-            <div class="feature-card fade-in">
-                <span class="feature-icon">ID</span>
-                <h3>Verified Community</h3>
-                <p>Join a private, verified community of real members. Your privacy and security are our top priority.</p>
-            </div>
-        </div>
-    </section>
+    <div id="msg"></div>
 
-    <!-- Community / Ecosystem Section -->
-    <section class="section" id="community">
-        <h2 class="section-title fade-in">Our <span class="gradient-text">Ecosystem</span></h2>
-        <p class="section-subtitle fade-in">Three platforms working together to create the ultimate experience</p>
+    <!-- Telegram Login Widget -->
+    <div id="tg-widget"></div>
 
-        <div class="platforms-grid">
-            <!-- PNPtv Bot -->
-            <div class="platform-card fade-in">
-                <div class="platform-header">
-                    <span class="platform-icon">BOT</span>
-                    <h3>PNPtv! Bot</h3>
-                </div>
-                <span class="platform-badge">Private 1-on-1</span>
-                <p>Your personal content delivery system. The bot is your private gateway to all PNPtv content and features.</p>
-                <ul class="platform-features">
-                    <li><strong>Direct messaging</strong> - Private 1-on-1 interaction</li>
-                    <li><strong>Content access</strong> - Browse and watch HD/4K videos</li>
-                    <li><strong>Account management</strong> - Check subscription, upgrade, renew</li>
-                    <li><strong>Payment processing</strong> - Secure purchases and upgrades</li>
-                    <li><strong>Instant support</strong> - 24/7 automated assistance</li>
-                    <li><strong>Privacy first</strong> - All interactions are private</li>
-                </ul>
-                <p class="note">Your personal assistant - always available, completely private.</p>
-                <a href="https://t.me/PNPtvbot" class="platform-cta" target="_blank">Open Bot</a>
-            </div>
+    <div class="divider"><span>or</span></div>
 
-            <!-- PNPtv PRIME -->
-            <div class="platform-card fade-in">
-                <div class="platform-header">
-                    <span class="platform-icon">VIP</span>
-                    <h3>PNPtv! PRIME</h3>
-                </div>
-                <span class="platform-badge">Premium Channel</span>
-                <p>Exclusive premium content broadcast. The PRIME channel delivers curated content directly to subscribers.</p>
-                <ul class="platform-features">
-                    <li><strong>Broadcast only</strong> - Content posted by admins</li>
-                    <li><strong>Premium videos</strong> - HD/4K exclusive releases</li>
-                    <li><strong>Regular updates</strong> - New content daily</li>
-                    <li><strong>Exclusive previews</strong> - Early access to new content</li>
-                    <li><strong>Organized library</strong> - Easy browsing by category</li>
-                    <li><strong>No distractions</strong> - Clean, organized content feed</li>
-                </ul>
-                <p class="note">Like a premium Netflix feed - pure entertainment delivered to your Telegram.</p>
-                <a href="https://t.me/PNPtvPRIME" class="platform-cta" target="_blank">Join PRIME</a>
-            </div>
+    <!-- X Login -->
+    <button class="btn btn-x" id="btn-x" onclick="loginWithX()">
+      <svg class="x-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.739l7.737-8.835L1.254 2.25H8.08l4.261 5.636L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+      <span id="x-label">Sign in with X</span>
+    </button>
+  </div>
 
-            <!-- PNPtv Community -->
-            <div class="platform-card fade-in">
-                <div class="platform-header">
-                    <span class="platform-icon">PPL</span>
-                    <h3>Community Group</h3>
-                </div>
-                <span class="platform-badge">Public Discussion</span>
-                <p>Where members connect and interact. The community group is your social hub for discussion and networking.</p>
-                <ul class="platform-features">
-                    <li><strong>Member chat</strong> - Discuss, share, connect</li>
-                    <li><strong>Meet others</strong> - Find people with similar interests</li>
-                    <li><strong>Local connections</strong> - "Who's nearby" features</li>
-                    <li><strong>Event planning</strong> - Organize meetups and gatherings</li>
-                    <li><strong>Community support</strong> - Help from other members</li>
-                    <li><strong>Verified members</strong> - Safe, authentic community</li>
-                </ul>
-                <p class="note">Your social network - connect with real people, build authentic relationships.</p>
-                <a href="https://t.me/PNPtvCommunity" class="platform-cta" target="_blank">Join Community</a>
-            </div>
-        </div>
-    </section>
+  <p class="footer">
+    By signing in you agree to our <a href="/terms" target="_blank">Terms &amp; Conditions</a>.<br>
+    You must be 18+ to use this platform.
+  </p>
 
-    <!-- Comparison Table -->
-    <section class="comparison-section">
-        <div class="comparison-card fade-in">
-            <h3>Quick Comparison</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Feature</th>
-                        <th>Bot</th>
-                        <th>PRIME</th>
-                        <th>Community</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Type</strong></td>
-                        <td>Private Bot</td>
-                        <td>Broadcast Channel</td>
-                        <td>Discussion Group</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Interaction</strong></td>
-                        <td>You ↔ Bot</td>
-                        <td>Admins → You</td>
-                        <td>Everyone ↔ All</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Can you chat?</strong></td>
-                        <td>Yes (with bot)</td>
-                        <td>No (view only)</td>
-                        <td>Yes (everyone)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Content</strong></td>
-                        <td>Full library</td>
-                        <td>Curated feed</td>
-                        <td>Member-shared</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Privacy</strong></td>
-                        <td>100% Private</td>
-                        <td>Anonymous</td>
-                        <td>Visible to members</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Purpose</strong></td>
-                        <td>Access & manage</td>
-                        <td>Receive content</td>
-                        <td>Connect & socialize</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </section>
+  <script>
+    // ── Handle redirect params ──────────────────────────────────────────
+    (function () {
+      const p = new URLSearchParams(location.search);
+      if (p.get('auth') === 'success') {
+        window.location.replace('/prime-hub/');
+        return;
+      }
+      const err = p.get('error');
+      if (err === 'not_registered') {
+        const h = p.get('x_handle');
+        showError(h
+          ? `X account @${h} is not linked to a PNPtv account. Start the bot first: @PNPLatinoTV_Bot`
+          : 'Account not found. Start the bot first: @PNPLatinoTV_Bot');
+      } else if (err === 'auth_failed') {
+        showError('Authentication failed. Please try again.');
+      } else if (err === 'missing_params') {
+        showError('Sign-in was incomplete. Please try again.');
+      }
+    })();
 
-    <!-- How They Work Together -->
-    <section class="how-together">
-        <h3 class="fade-in">How They Work Together</h3>
-        <div class="flow-steps">
-            <div class="flow-step fade-in">
-                <div class="flow-num">1</div>
-                <p><strong>Start with the Bot</strong> - Subscribe and manage your account privately</p>
-            </div>
-            <div class="flow-step fade-in">
-                <div class="flow-num">2</div>
-                <p><strong>Get content via PRIME</strong> - Receive curated videos in a clean feed</p>
-            </div>
-            <div class="flow-step fade-in">
-                <div class="flow-num">3</div>
-                <p><strong>Connect in the Group</strong> - Meet members, chat, and build friendships</p>
-            </div>
-        </div>
-    </section>
+    // ── Check existing session ──────────────────────────────────────────
+    fetch('/api/webapp/auth/status', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => { if (d.authenticated) window.location.replace('/prime-hub/'); })
+      .catch(() => {});
 
-    <!-- Pricing Section -->
-    <section class="section" id="services">
-        <h2 class="section-title fade-in">Choose Your <span class="gradient-text">Plan</span></h2>
-        <p class="section-subtitle fade-in">One-time payment, lifetime access</p>
-        <div class="pricing-grid">
-            <div class="pricing-card fade-in">
-                <h3>Lifetime Pass</h3>
-                <div class="price">$100</div>
-                <div class="price-label">One-time payment. Access forever.</div>
-                <ul class="pricing-features">
-                    <li>Unlimited lifetime access</li>
-                    <li>All HD/4K videos included</li>
-                    <li>New content at no extra cost</li>
-                    <li>Video rooms access</li>
-                    <li>Geolocation features</li>
-                    <li>Priority support</li>
-                    <li>Verified badge</li>
-                </ul>
-                <a href="/lifetime-pass" class="btn btn-primary">Get Lifetime Access</a>
-            </div>
-
-            <div class="pricing-card fade-in">
-                <h3>Video Rooms</h3>
-                <div class="price">FREE</div>
-                <div class="price-label">For all members</div>
-                <ul class="pricing-features">
-                    <li>Live video chat</li>
-                    <li>Screen sharing</li>
-                    <li>Camera & microphone</li>
-                    <li>Multiple participants</li>
-                    <li>Secure & private</li>
-                    <li>Mobile friendly</li>
-                    <li>24/7 availability</li>
-                </ul>
-                <a href="/videorama-app/" class="btn btn-primary">Join Videorama</a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Stats Section -->
-    <section class="stats-section">
-        <div class="stats-grid">
-            <div class="stat-item fade-in">
-                <div class="stat-number">10K+</div>
-                <div class="stat-label">Active Members</div>
-            </div>
-            <div class="stat-item fade-in">
-                <div class="stat-number">5K+</div>
-                <div class="stat-label">HD Videos</div>
-            </div>
-            <div class="stat-item fade-in">
-                <div class="stat-number">24/7</div>
-                <div class="stat-label">Support</div>
-            </div>
-            <div class="stat-item fade-in">
-                <div class="stat-number">100%</div>
-                <div class="stat-label">Verified</div>
-            </div>
-        </div>
-    </section>
-
-    <!-- CTA Section -->
-    <section class="cta-section">
-        <h2 class="fade-in">Ready to <span class="gradient-text">Get Started?</span></h2>
-        <p class="fade-in">Join thousands of members enjoying premium content and live interactions</p>
-        <div class="cta-buttons fade-in" id="telegramWidgetContainer">
-            <script async src="https://telegram.org/js/telegram-widget.js?22"
-                data-telegram-login="pnptvbot"
-                data-size="large"
-                data-auth-url="/api/telegram-auth"
-                data-request-access="write"
-                data-radius="10"
-                onload="window.onTelegramAuth = onTelegramAuth;">
-            </script>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="footer-links">
-            <a href="/terms?lang=en">Terms & Conditions</a>
-            <a href="/privacy?lang=en">Privacy Policy</a>
-            <a href="/policies?lang=en">Policies</a>
-            <a href="https://t.me/PNPtvbot" target="_blank">Support</a>
-        </div>
-        <p>&copy; 2026 PNPtv. All rights reserved. | 18+ Only | Adult Content</p>
-        <p style="margin-top: 6px;">By accessing this site, you confirm you are 18 years or older and agree to our terms.</p>
-    </footer>
-
-    <script>
-        // Mobile menu toggle
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const navLinks = document.getElementById('navLinks');
-        let menuOpen = false;
-
-        mobileMenuBtn.addEventListener('click', () => {
-            menuOpen = !menuOpen;
-            navLinks.classList.toggle('active');
-            document.getElementById('menuIcon').innerHTML = menuOpen
-                ? '<path d="M6 6l12 12M6 18L18 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'
-                : '<path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+    // ── Telegram Login Widget ───────────────────────────────────────────
+    window.onTelegramAuth = async function (user) {
+      showMsg('Signing in\u2026', 'ok');
+      try {
+        const res = await fetch('/api/webapp/auth/telegram', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegramUser: user })
         });
+        const data = await res.json();
+        if (data.authenticated && data.registered) {
+          showMsg('Welcome! Redirecting\u2026', 'ok');
+          setTimeout(() => window.location.replace('/prime-hub/'), 500);
+        } else if (data.registered === false) {
+          showError('Account not registered. Start the bot first: @PNPLatinoTV_Bot');
+        } else {
+          showError(data.error || 'Login failed. Please try again.');
+        }
+      } catch {
+        showError('Connection error. Please try again.');
+      }
+    };
 
-        navLinks.querySelectorAll('a').forEach(link => {
-            link.addEventListener('click', () => {
-                navLinks.classList.remove('active');
-                menuOpen = false;
-                document.getElementById('menuIcon').innerHTML = '<path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
-            });
-        });
+    (function () {
+      const s = document.createElement('script');
+      s.src = 'https://telegram.org/js/telegram-widget.js?22';
+      s.async = true;
+      s.setAttribute('data-telegram-login', 'PNPLatinoTV_Bot');
+      s.setAttribute('data-size', 'large');
+      s.setAttribute('data-radius', '10');
+      s.setAttribute('data-onauth', 'onTelegramAuth(user)');
+      s.setAttribute('data-request-access', 'write');
+      document.getElementById('tg-widget').appendChild(s);
+    })();
 
-        // Intersection Observer for fade-in
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('visible');
-                }
-            });
-        }, { threshold: 0.1, rootMargin: '0px 0px -30px 0px' });
+    // ── X Login ─────────────────────────────────────────────────────────
+    async function loginWithX() {
+      const btn = document.getElementById('btn-x');
+      const label = document.getElementById('x-label');
+      btn.disabled = true;
+      const sp = document.createElement('span');
+      sp.className = 'spinner';
+      btn.insertBefore(sp, label);
+      label.textContent = 'Connecting\u2026';
 
-        document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+      try {
+        const res = await fetch('/api/webapp/auth/x/start', { credentials: 'include' });
+        const data = await res.json();
+        if (data.success && data.url) {
+          window.location.href = data.url;
+        } else {
+          showError(data.error || 'Could not start X sign-in. Please try again.');
+          resetX();
+        }
+      } catch {
+        showError('Connection error. Please try again.');
+        resetX();
+      }
+    }
 
-        // Smooth scroll for anchor links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            });
-        });
+    function resetX() {
+      const btn = document.getElementById('btn-x');
+      btn.disabled = false;
+      document.getElementById('x-label').textContent = 'Sign in with X';
+      const sp = btn.querySelector('.spinner');
+      if (sp) sp.remove();
+    }
 
-        // Handle Telegram authentication callback
-        window.onTelegramAuth = function(user) {
-            console.log('Telegram login successful:', user);
+    function showError(t) {
+      document.getElementById('msg').innerHTML = `<div class="msg msg-error">${t}</div>`;
+    }
+    function showMsg(t, type) {
+      document.getElementById('msg').innerHTML = `<div class="msg msg-${type}">${t}</div>`;
+    }
+  </script>
 
-            // Send to backend for authentication
-            fetch('/api/telegram-auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ telegramUser: user })
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Auth response:', data);
-
-                if (data.success && data.termsAccepted) {
-                    // User authenticated and accepted terms - go to portal
-                    window.location.href = '/portal';
-                } else if (data.redirect) {
-                    // Follow redirect (could be terms page or registration)
-                    window.location.href = data.redirect;
-                } else if (data.success) {
-                    // User authenticated but needs to accept terms
-                    localStorage.setItem('userId', user.id);
-                    window.location.href = '/auth/terms?from=/portal';
-                } else {
-                    throw new Error(data.error || 'Authentication failed');
-                }
-            })
-            .catch(error => {
-                console.error('Authentication error:', error);
-                alert('Authentication failed: ' + error.message);
-            });
-        };
-    </script>
 </body>
 </html>

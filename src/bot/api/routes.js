@@ -325,7 +325,7 @@ app.use((req, res, next) => {
 });
 
 // Landing page routes
-// Home page - redirect to /login for PRIME Hub
+// Home page — serve login page directly; if already authenticated send to PRIME Hub
 app.get('/', (req, res) => {
   const host = req.get('host') || '';
   if (host.includes('easybots.store') || host.includes('easybots')) {
@@ -414,8 +414,12 @@ app.get('/', (req, res) => {
     `);
     return;
   }
-  // Redirect to PRIME Hub SPA
-  res.redirect(302, '/prime-hub/');
+  // If already authenticated, send straight to the app
+  if (req.session?.user) {
+    return res.redirect(302, '/prime-hub/');
+  }
+  // Serve the login page
+  res.sendFile(path.join(__dirname, '../../../public/index.html'));
 });
 
 // PRIME Hub login page - shows 4 app icons
