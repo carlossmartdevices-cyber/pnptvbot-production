@@ -4,7 +4,6 @@ import MediaGrid from './components/MediaGrid'
 import VideoPlayer from './components/VideoPlayer'
 import MiniRadioPlayer from './components/MiniRadioPlayer'
 import CategoryNav from './components/CategoryNav'
-import LoginPage from './components/LoginPage' // Import LoginPage
 import {
   getUrlParams,
   fetchMediaLibrary,
@@ -183,10 +182,12 @@ function App() {
   function handleCategoryChange(category) {
     setSelectedCategory(category)
     if (category === 'all') {
+      setCurrentView('home')
       loadMedia()
     } else if (category === 'radio') {
-      setIsRadioExpanded(true)
+      setCurrentView('radio')
     } else {
+      setCurrentView('home')
       loadMedia(category)
     }
   }
@@ -218,6 +219,25 @@ function App() {
     setCurrentView('home')
   }
 
+  function handleFeaturedNavigation(type) {
+    setCurrentView('home')
+    switch (type) {
+      case 'videorama':
+        setSelectedCategory('videos')
+        loadMedia('videos')
+        break
+      case 'live':
+        window.location.href = '/app/live'
+        break
+      case 'hangout':
+        window.location.href = '/app/hangouts'
+        break
+      default:
+        setSelectedCategory('all')
+        loadMedia()
+    }
+  }
+
   const handleLogout = async () => {
     try {
       await fetch('/api/logout', { method: 'POST' });
@@ -239,7 +259,14 @@ function App() {
   }
 
   if (!isAuthenticated) {
-    return <LoginPage onAuthSuccess={() => setIsAuthenticated(true)} authLoading={authLoading} />;
+    // Redirect to centralized login at /app
+    window.location.href = '/app';
+    return (
+      <div className="loading-container">
+        <div className="spinner-lg"></div>
+        <p className="text-muted-foreground mt-4">Redirecting to login...</p>
+      </div>
+    );
   }
 
   const isPrime = params?.isPrime === true
@@ -273,6 +300,19 @@ function App() {
           />
         )}
       </>
+    )
+  }
+
+  if (currentView === 'radio' && radioNowPlaying) {
+    return (
+      <RadioPage
+        nowPlaying={radioNowPlaying}
+        telegramUser={telegramUser}
+        onClose={() => {
+          setCurrentView('home')
+          setSelectedCategory('all')
+        }}
+      />
     )
   }
 
@@ -348,6 +388,9 @@ function App() {
             onToggle={() => setIsRadioExpanded(!isRadioExpanded)}
           />
         )}
+
+        {/* Featured Content Collage */}
+        <FeaturedContent onNavigate={handleFeaturedNavigation} />
       </main>
     </>
   )

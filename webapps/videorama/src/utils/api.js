@@ -39,6 +39,135 @@ export async function fetchRadioNowPlaying() {
   }
 }
 
+export async function fetchRadioHistory(limit = 20) {
+  try {
+    const response = await fetch(`${API_BASE}/radio/history?limit=${limit}`);
+    if (!response.ok) throw new Error('Failed to fetch radio history');
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching radio history:', error);
+    return [];
+  }
+}
+
+export async function fetchRadioSchedule() {
+  try {
+    const response = await fetch(`${API_BASE}/radio/schedule`);
+    if (!response.ok) throw new Error('Failed to fetch radio schedule');
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching radio schedule:', error);
+    return [];
+  }
+}
+
+export async function requestRadioSong(userId, songName, artist) {
+  try {
+    const response = await fetch(`${API_BASE}/radio/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, songName, artist }),
+    });
+    if (!response.ok) throw new Error('Failed to submit request');
+    return await response.json();
+  } catch (error) {
+    console.error('Error submitting song request:', error);
+    throw error;
+  }
+}
+
+export async function fetchRadioQueue() {
+  try {
+    const response = await fetch(`${API_BASE}/admin/radio/queue`, {
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Failed to fetch radio queue');
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.queue || [];
+  } catch (error) {
+    console.error('Error fetching radio queue:', error);
+    return [];
+  }
+}
+
+export async function fetchRadioRequests(status = 'pending') {
+  try {
+    const response = await fetch(`${API_BASE}/admin/radio/requests?status=${status}`, {
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Failed to fetch requests');
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.requests || [];
+  } catch (error) {
+    console.error('Error fetching radio requests:', error);
+    return [];
+  }
+}
+
+// Featured Content APIs
+export async function fetchLatestPrimeVideo() {
+  try {
+    const response = await fetch(`${API_BASE}/media/library?type=video&limit=50`, {
+      credentials: 'include',
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const videos = Array.isArray(data) ? data : data.data || [];
+    // Return first prime video found
+    return videos.find(v => v.is_prime) || null;
+  } catch (error) {
+    console.error('Error fetching prime video:', error);
+    return null;
+  }
+}
+
+export async function fetchLatestVideoramaVideo() {
+  try {
+    const response = await fetch(`${API_BASE}/media/library?type=video&limit=50`, {
+      credentials: 'include',
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const videos = Array.isArray(data) ? data : data.data || [];
+    // Return first non-prime video
+    return videos.find(v => !v.is_prime) || videos[0] || null;
+  } catch (error) {
+    console.error('Error fetching videorama video:', error);
+    return null;
+  }
+}
+
+export async function fetchActiveLiveStreams() {
+  try {
+    const response = await fetch(`${API_BASE}/webapp/live/streams`, {
+      credentials: 'include',
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    // Return first active stream
+    return Array.isArray(data) ? data[0] : data.streams?.[0] || null;
+  } catch (error) {
+    console.error('Error fetching live streams:', error);
+    return null;
+  }
+}
+
+export async function fetchMostActiveHangout() {
+  try {
+    const response = await fetch(`${API_BASE}/webapp/hangouts/public`, {
+      credentials: 'include',
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const hangouts = Array.isArray(data) ? data : data.hangouts || [];
+    // Sort by member count and return first
+    return hangouts.sort((a, b) => (b.members_count || 0) - (a.members_count || 0))[0] || null;
+  } catch (error) {
+    console.error('Error fetching hangouts:', error);
+    return null;
+  }
+}
+
 export async function fetchCategories() {
   try {
     const response = await fetch(`${API_BASE}/media/categories`);

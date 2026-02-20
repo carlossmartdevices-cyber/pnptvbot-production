@@ -11,8 +11,8 @@ const LoginPage = ({ onAuthSuccess, authLoading }) => {
   }, [authLoading]);
 
   const handleLoginRedirect = () => {
-    // Redirect to PRIME Hub login page which supports all auth methods
-    window.location.href = '/prime-hub/';
+    // Redirect to app login page which supports all auth methods
+    window.location.href = '/app';
   };
 
   return (
@@ -46,7 +46,7 @@ const LoginPage = ({ onAuthSuccess, authLoading }) => {
               >
                 Email • X/Twitter • Telegram
               </button>
-              <p className="login-hint">Access all login methods on PRIME Hub</p>
+              <p className="login-hint">Access all login methods on PNPtv App</p>
             </div>
           </div>
         )}
