@@ -4,7 +4,7 @@ export default function Header({ title, subtitle, telegramUser, onLogout, loginR
   return (
     <header className="header">
       <div className="header-logo">
-        <img src="/logo.png" alt="Logo" style={{ height: '64px' }} />
+        <img src="/logo.png" alt="Logo" />
         <div className="header-text">
           <h1>{title}</h1>
           <p>{subtitle}</p>
