@@ -4,6 +4,7 @@ import MediaGrid from './components/MediaGrid'
 import VideoPlayer from './components/VideoPlayer'
 import MiniRadioPlayer from './components/MiniRadioPlayer'
 import CategoryNav from './components/CategoryNav'
+import LoginPage from './components/LoginPage' // Import LoginPage
 import {
   getUrlParams,
   fetchMediaLibrary,
@@ -238,15 +239,7 @@ function App() {
   }
 
   if (!isAuthenticated) {
-    // Redirect to centralized login at /prime-hub/
-    // Login is managed centrally, not per-app
-    window.location.href = '/prime-hub/';
-    return (
-      <div className="loading-container">
-        <div className="spinner-lg"></div>
-        <p className="text-muted-foreground mt-4">Redirecting to login...</p>
-      </div>
-    );
+    return <LoginPage onAuthSuccess={() => setIsAuthenticated(true)} authLoading={authLoading} />;
   }
 
   const isPrime = params?.isPrime === true
