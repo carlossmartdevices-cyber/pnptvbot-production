@@ -250,6 +250,11 @@ function App() {
   // Get user tier from telegramUser (default to 'free')
   const userTier = telegramUser?.tier || 'free'
 
+  // Filter media by selected category
+  const filteredMedia = selectedCategory === 'all' || selectedCategory === 'radio'
+    ? mediaLibrary
+    : mediaLibrary.filter(media => media.category === selectedCategory)
+
   if (isPlayerView) {
     return (
       <>
