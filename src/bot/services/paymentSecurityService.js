@@ -9,13 +9,25 @@ const { cache } = require('../../config/redis');
 const { query } = require('../../config/postgres');
 
 class PaymentSecurityService {
+  static getRequiredSecret(secretName) {
+    const value = process.env[secretName];
+    if (!value) {
+      logger.error(`Missing required secret for payment security: ${secretName}`);
+      return null;
+    }
+    return value;
+  }
+
   /**
    * ENHANCEMENT 1: Encrypt Sensitive Payment Data
    */
   static encryptSensitiveData(data) {
     try {
+      const encryptionKey = this.getRequiredSecret('ENCRYPTION_KEY');
+      if (!encryptionKey) return null;
+
       const algorithm = 'aes-256-cbc';
-      const key = crypto.createHash('sha256').update(process.env.ENCRYPTION_KEY || 'default-key').digest();
+      const key = crypto.createHash('sha256').update(encryptionKey).digest();
       const iv = crypto.randomBytes(16);
 
       const cipher = crypto.createCipheriv(algorithm, key, iv);
@@ -36,8 +48,11 @@ class PaymentSecurityService {
    */
   static decryptSensitiveData(encryptedData) {
     try {
+      const encryptionKey = this.getRequiredSecret('ENCRYPTION_KEY');
+      if (!encryptionKey) return null;
+
       const algorithm = 'aes-256-cbc';
-      const key = crypto.createHash('sha256').update(process.env.ENCRYPTION_KEY || 'default-key').digest();
+      const key = crypto.createHash('sha256').update(encryptionKey).digest();
       const [ivHex, encrypted] = encryptedData.split(':');
       const iv = Buffer.from(ivHex, 'hex');
 
@@ -58,9 +73,12 @@ class PaymentSecurityService {
    */
   static async generateSecurePaymentToken(paymentId, userId, amount) {
     try {
+      const jwtSecret = this.getRequiredSecret('JWT_SECRET');
+      if (!jwtSecret) return null;
+
       const data = `${paymentId}:${userId}:${amount}:${Date.now()}`;
       const token = crypto
-        .createHmac('sha256', process.env.JWT_SECRET || 'secret')
+        .createHmac('sha256', jwtSecret)
         .update(data)
         .digest('hex');
 
@@ -114,6 +132,9 @@ class PaymentSecurityService {
    */
   static createPaymentRequestHash(paymentData) {
     try {
+      const encryptionKey = this.getRequiredSecret('ENCRYPTION_KEY');
+      if (!encryptionKey) return null;
+
       const {
         userId,
         amount,
@@ -124,7 +145,7 @@ class PaymentSecurityService {
 
       const data = `${userId}|${amount}|${currency}|${planId}|${timestamp}`;
       const hash = crypto
-        .createHmac('sha256', process.env.ENCRYPTION_KEY || 'secret')
+        .createHmac('sha256', encryptionKey)
         .update(data)
         .digest('hex');
 
@@ -141,6 +162,9 @@ class PaymentSecurityService {
    */
   static verifyPaymentRequestHash(paymentData, hash) {
     try {
+      const encryptionKey = this.getRequiredSecret('ENCRYPTION_KEY');
+      if (!encryptionKey) return false;
+
       const {
         userId,
         amount,
@@ -151,7 +175,7 @@ class PaymentSecurityService {
 
       const data = `${userId}|${amount}|${currency}|${planId}|${timestamp}`;
       const expectedHash = crypto
-        .createHmac('sha256', process.env.ENCRYPTION_KEY || 'secret')
+        .createHmac('sha256', encryptionKey)
         .update(data)
         .digest('hex');
 

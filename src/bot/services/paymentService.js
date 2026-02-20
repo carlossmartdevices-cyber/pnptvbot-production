@@ -645,17 +645,12 @@ class PaymentService {
       }
     }
 
-    // Security hardening: webhook signature validation must use SHA256.
-    // Legacy MD5 can be temporarily enabled only via explicit migration flag.
-    const allowLegacyMd5 = process.env.EPAYCO_ALLOW_MD5_SIGNATURE === 'true';
-
     if (sha256Valid) {
       return true;
     }
 
-    if (md5Valid && allowLegacyMd5) {
-      logger.warn('Accepted legacy MD5 ePayco signature (migration mode enabled)');
-      return true;
+    if (md5Valid) {
+      logger.warn('Rejected legacy MD5 ePayco signature. SHA256 is required.');
     }
 
     return false;

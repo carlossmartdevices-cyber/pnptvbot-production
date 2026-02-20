@@ -6,7 +6,9 @@
 const jwt = require('jsonwebtoken');
 const logger = require('../../../utils/logger');
 
-const AUTH_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'pnptv-secret-key';
+const AUTH_SECRET = process.env.JWT_SECRET
+  || process.env.SESSION_SECRET
+  || (process.env.NODE_ENV === 'test' ? 'test-jwt-secret' : null);
 
 /**
  * Authenticate user via JWT token or session (prime-hub users)
@@ -14,6 +16,13 @@ const AUTH_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'pnp
  */
 const authenticateUser = async (req, res, next) => {
   try {
+    if (!AUTH_SECRET && !req.session?.user?.id) {
+      return res.status(500).json({
+        error: 'AUTH_CONFIG_ERROR',
+        message: 'JWT secret is not configured',
+      });
+    }
+
     // Accept session auth (prime-hub / webapp users logged in via Telegram/X widget)
     if (req.session?.user?.id) {
       req.user = {
@@ -82,6 +91,9 @@ const authenticateUser = async (req, res, next) => {
  */
 const validateToken = (token) => {
   try {
+    if (!AUTH_SECRET) {
+      return { valid: false, error: 'JWT secret is not configured' };
+    }
     const decoded = jwt.verify(token, AUTH_SECRET);
     return { valid: true, decoded };
   } catch (error) {

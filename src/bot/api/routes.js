@@ -29,9 +29,12 @@ const adminUserRoutes = require('./routes/adminUserRoutes');
 const userManagementRoutes = require('./routes/userManagementRoutes');
 const nearbyRoutes = require('./routes/nearby.routes');
 const NearbyController = require('./controllers/nearbyController');
+const { verifyAdminJWT } = require('./middleware/jwtAuth');
 
 // Middleware
 const { asyncHandler } = require('./middleware/errorHandler');
+const { authenticateUser } = require('./middleware/auth');
+const PermissionService = require('../services/permissionService');
 
 // Authentication middleware and handlers
 const { telegramAuth, checkTermsAccepted } = require('../../api/middleware/telegramAuth');
@@ -68,6 +71,48 @@ const pageLimiter = (req, res, next) => {
   return next();
 };
 
+const getActorId = (req) => String(req.user?.id || req.user?.userId || '');
+
+const requireSelfOrAdmin = async (req, res, next) => {
+  try {
+    const actorId = getActorId(req);
+    if (!actorId) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+
+    const targetUserId = String(req.params.userId || req.body?.userId || '');
+    if (!targetUserId) {
+      return res.status(400).json({ success: false, error: 'userId is required' });
+    }
+
+    if (actorId === targetUserId) {
+      return next();
+    }
+
+    const isAdmin = await PermissionService.isAdmin(actorId);
+    if (!isAdmin) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
+    return next();
+  } catch (error) {
+    logger.error('requireSelfOrAdmin middleware error', { error: error.message });
+    return res.status(500).json({ success: false, error: 'Authorization check failed' });
+  }
+};
+
+const bindAuthenticatedUserId = (req, res, next) => {
+  const actorId = getActorId(req);
+  if (!actorId) {
+    return res.status(401).json({ success: false, error: 'Authentication required' });
+  }
+  if (!req.body || typeof req.body !== 'object') {
+    req.body = {};
+  }
+  req.body.userId = actorId;
+  return next();
+};
+
 const app = express();
 
 // Trust proxy - required for rate limiting behind reverse proxy (nginx, etc.)
@@ -81,12 +126,19 @@ app.use(express.urlencoded({ extended: true }));
 
 // Session middleware for Telegram auth with Redis store
 const redisClient = getRedis();
+const resolvedSessionSecret = process.env.SESSION_SECRET
+  || process.env.JWT_SECRET
+  || (process.env.NODE_ENV === 'production' ? null : 'dev-session-secret');
+
+if (!resolvedSessionSecret) {
+  throw new Error('SESSION_SECRET or JWT_SECRET must be configured in production');
+}
 // Session middleware with explicit response hooks to ensure Set-Cookie header is set
 const sessionMiddleware = session({
   store: new RedisStore({ client: redisClient, prefix: 'sess:' }),
-  secret: process.env.SESSION_SECRET || 'pnptv-secret-key',
-  resave: true,
-  saveUninitialized: true,
+  secret: resolvedSessionSecret,
+  resave: false,
+  saveUninitialized: false,
   name: 'connect.sid',
   cookie: {
     secure: process.env.NODE_ENV === 'production',
@@ -467,11 +519,11 @@ app.get('/', (req, res) => {
     `);
     return;
   }
-  // Already authenticated → go straight to the app
+  // Authenticated → go to the app
   if (req.session?.user) {
     return res.redirect(302, '/prime-hub/');
   }
-  // Not authenticated → serve the login page with 3 auth options
+  // Not authenticated → show login
   return res.sendFile(path.join(__dirname, '../../../public/login.html'));
 });
 
@@ -885,13 +937,26 @@ app.get('/api/pnp-live/booking/:bookingId', asyncHandler(async (req, res) => {
   });
 }));
 
-app.post('/api/pnp-live/booking/:bookingId/confirm', asyncHandler(async (req, res) => {
+app.post('/api/pnp-live/booking/:bookingId/confirm', authenticateUser, asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
   const { transactionId } = req.body;
+  const actorId = getActorId(req);
+
+  if (!transactionId) {
+    return res.status(400).json({ success: false, error: 'transactionId is required' });
+  }
 
   const booking = await PNPLiveService.getBookingById(bookingId);
   if (!booking) {
     return res.status(404).json({ success: false, error: 'Booking not found' });
+  }
+
+  const isAdmin = await PermissionService.isAdmin(actorId);
+  if (!isAdmin) {
+    return res.status(403).json({
+      success: false,
+      error: 'Only admin can manually confirm bookings',
+    });
   }
 
   await PNPLiveService.updateBookingStatus(bookingId, 'confirmed');
@@ -939,7 +1004,7 @@ app.get('/recurring-checkout/:userId/:planId', pageLimiter, (req, res) => {
 const VisaCybersourceService = require('../services/visaCybersourceService');
 
 // Tokenize card for recurring subscription
-app.post('/api/recurring/tokenize', asyncHandler(async (req, res) => {
+app.post('/api/recurring/tokenize', authenticateUser, bindAuthenticatedUserId, asyncHandler(async (req, res) => {
   const { userId, cardNumber, expMonth, expYear, cvc, cardHolderName, email } = req.body;
 
   if (!userId || !cardNumber || !expMonth || !expYear || !cvc) {
@@ -960,7 +1025,7 @@ app.post('/api/recurring/tokenize', asyncHandler(async (req, res) => {
 }));
 
 // Create recurring subscription
-app.post('/api/recurring/subscribe', asyncHandler(async (req, res) => {
+app.post('/api/recurring/subscribe', authenticateUser, bindAuthenticatedUserId, asyncHandler(async (req, res) => {
   const { userId, planId, cardToken, email, trialDays } = req.body;
 
   if (!userId || !planId) {
@@ -979,14 +1044,14 @@ app.post('/api/recurring/subscribe', asyncHandler(async (req, res) => {
 }));
 
 // Get subscription details
-app.get('/api/recurring/subscription/:userId', asyncHandler(async (req, res) => {
+app.get('/api/recurring/subscription/:userId', authenticateUser, requireSelfOrAdmin, asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const subscription = await VisaCybersourceService.getSubscriptionDetails(userId);
   res.json({ success: true, subscription });
 }));
 
 // Cancel subscription
-app.post('/api/recurring/cancel', asyncHandler(async (req, res) => {
+app.post('/api/recurring/cancel', authenticateUser, bindAuthenticatedUserId, asyncHandler(async (req, res) => {
   const { userId, immediately } = req.body;
 
   if (!userId) {
@@ -998,7 +1063,7 @@ app.post('/api/recurring/cancel', asyncHandler(async (req, res) => {
 }));
 
 // Reactivate subscription
-app.post('/api/recurring/reactivate', asyncHandler(async (req, res) => {
+app.post('/api/recurring/reactivate', authenticateUser, bindAuthenticatedUserId, asyncHandler(async (req, res) => {
   const { userId } = req.body;
 
   if (!userId) {
@@ -1011,7 +1076,7 @@ app.post('/api/recurring/reactivate', asyncHandler(async (req, res) => {
 
 // Subscription API routes
 app.get('/api/subscription/plans', asyncHandler(subscriptionController.getPlans));
-app.post('/api/subscription/create-plan', asyncHandler(subscriptionController.createEpaycoPlan));
+app.post('/api/subscription/create-plan', verifyAdminJWT, asyncHandler(subscriptionController.createEpaycoPlan));
 app.post('/api/subscription/create-checkout', asyncHandler(subscriptionController.createCheckout));
 app.post(
   '/api/subscription/epayco/confirmation',
@@ -1019,8 +1084,8 @@ app.post(
   asyncHandler(subscriptionController.handleEpaycoConfirmation)
 );
 app.get('/api/subscription/payment-response', asyncHandler(subscriptionController.handlePaymentResponse));
-app.get('/api/subscription/subscriber/:identifier', asyncHandler(subscriptionController.getSubscriber));
-app.get('/api/subscription/stats', asyncHandler(subscriptionController.getStatistics));
+app.get('/api/subscription/subscriber/:identifier', verifyAdminJWT, asyncHandler(subscriptionController.getSubscriber));
+app.get('/api/subscription/stats', verifyAdminJWT, asyncHandler(subscriptionController.getStatistics));
 
 // Audio Management API
 const audioStreamer = require('../../services/audioStreamer');
@@ -1478,7 +1543,6 @@ app.post('/api/webapp/live/streams/:streamId/leave', asyncHandler(webappLiveCont
 
 // Web App Admin Routes (session auth + role check)
 const webappAdminController = require('./controllers/webappAdminController');
-const { verifyAdminJWT } = require('./middleware/jwtAuth');
 
 // Admin endpoints with JWT authentication
 app.get('/api/webapp/admin/stats', verifyAdminJWT, asyncHandler(webappAdminController.getStats));

@@ -112,89 +112,51 @@ class AuthController {
   }
 
   /**
-   * Model login (email + password OR telegram)
+   * Model login (email + password)
    */
   static async modelLogin(req, res) {
     try {
-      const { email, password, telegramId } = req.body;
+      const { email, password } = req.body;
 
       // Validate input
-      if (!email && !telegramId) {
+      if (!email || !password) {
         return res.status(400).json({
           success: false,
           error: {
             code: 'INVALID_INPUT',
-            message: 'Email or Telegram ID is required',
+            message: 'Email and password are required',
           },
         });
       }
 
-      let user = null;
+      const result = await query(
+        `SELECT id, email, password_hash, role, username, telegram, subscription_status
+         FROM users
+         WHERE email = $1 AND (role = 'model' OR role = 'admin' OR role = 'superadmin')`,
+        [email.toLowerCase()]
+      );
 
-      // Email/password login
-      if (email && password) {
-        const result = await query(
-          `SELECT id, email, password_hash, role, username, telegram, subscription_status
-           FROM users
-           WHERE email = $1 AND (role = 'model' OR role = 'admin' OR role = 'superadmin')`,
-          [email.toLowerCase()]
-        );
-
-        user = result.rows[0];
-
-        if (!user) {
-          logger.warn('Model login failed - user not found', { email });
-          return res.status(401).json({
-            success: false,
-            error: {
-              code: 'INVALID_CREDENTIALS',
-              message: 'Invalid email or password',
-            },
-          });
-        }
-
-        // Verify password
-        const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-
-        if (!isPasswordValid) {
-          logger.warn('Model login failed - invalid password', { userId: user.id });
-          return res.status(401).json({
-            success: false,
-            error: {
-              code: 'INVALID_CREDENTIALS',
-              message: 'Invalid email or password',
-            },
-          });
-        }
-      } else if (telegramId) {
-        // Telegram login
-        const result = await query(
-          `SELECT id, email, username, role, telegram, subscription_status
-           FROM users
-           WHERE telegram = $1 AND (role = 'model' OR role = 'admin' OR role = 'superadmin')`,
-          [telegramId.toString()]
-        );
-
-        user = result.rows[0];
-
-        if (!user) {
-          logger.warn('Model login failed - telegram user not found', { telegramId });
-          return res.status(401).json({
-            success: false,
-            error: {
-              code: 'TELEGRAM_USER_NOT_FOUND',
-              message: 'Telegram user not registered',
-            },
-          });
-        }
-      }
+      const user = result.rows[0];
 
       if (!user) {
-        return res.status(400).json({
+        logger.warn('Model login failed - user not found', { email });
+        return res.status(401).json({
           success: false,
           error: {
-            code: 'INVALID_INPUT',
-            message: 'Invalid login parameters',
+            code: 'INVALID_CREDENTIALS',
+            message: 'Invalid email or password',
+          },
+        });
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+      if (!isPasswordValid) {
+        logger.warn('Model login failed - invalid password', { userId: user.id });
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'INVALID_CREDENTIALS',
+            message: 'Invalid email or password',
           },
         });
       }

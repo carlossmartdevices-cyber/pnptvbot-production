@@ -159,11 +159,10 @@ describe('PaymentService Security Tests', () => {
       expect(result).toBe(true);
     });
 
-    it('should verify checkout md5 signature using invoice data', () => {
+    it('should reject checkout md5 signature using invoice data', () => {
       const secret = 'test-secret-key';
       process.env.EPAYCO_P_KEY = secret;
       process.env.EPAYCO_P_CUST_ID = 'cust123';
-      process.env.EPAYCO_ALLOW_MD5_SIGNATURE = 'true';
 
       const webhookData = {
         x_id_invoice: 'inv-123',
@@ -176,7 +175,7 @@ describe('PaymentService Security Tests', () => {
 
       const result = PaymentService.verifyEpaycoSignature(webhookData);
 
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
   });
 
