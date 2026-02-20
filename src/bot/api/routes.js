@@ -412,14 +412,8 @@ app.get('/', (req, res) => {
   return res.sendFile(path.join(__dirname, '../../../public/login.html'));
 });
 
-// PRIME Hub login page - shows 4 app icons
-app.get('/login', pageLimiter, (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
-  res.sendFile(path.join(__dirname, '../../../public/login.html'));
-});
+// /login → redirect to /
+app.get('/login', (req, res) => res.redirect(301, '/'));
 
 // PNPtv Haus page
 app.get('/community-room', (req, res) => {
