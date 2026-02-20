@@ -106,6 +106,9 @@
     "sinon": "^21.0.1",
     "supertest": "^6.3.4"
   },
+  "overrides": {
+    "hono": "4.11.10"
+  },
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
