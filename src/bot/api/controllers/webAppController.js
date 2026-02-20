@@ -30,23 +30,122 @@ async function verifyPassword(password, stored) {
   return crypto.timingSafeEqual(hashBuf, derivedBuf);
 }
 
-async function createWebUser({ id, firstName, lastName, username, email, passwordHash, telegramId, twitterHandle, photoFileId } = {}) {
+async function createWebUser({ id, firstName, lastName, username, email, passwordHash, telegramId, twitterHandle, xId, photoFileId } = {}) {
   const userId = id || uuidv4();
   const pnptvId = generatePnptvId();
-  const displayName = username || (firstName ? `${firstName}${lastName ? `_${lastName}` : ''}`.toLowerCase().replace(/\s+/g, '_') : null);
+  let baseUsername = username || (firstName ? `${firstName}${lastName ? `_${lastName}` : ''}`.toLowerCase().replace(/[^a-z0-9_]/g, '_') : null);
+
+  // Resolve username uniqueness: try base, then base_2, base_3, etc.
+  let displayName = baseUsername;
+  if (displayName) {
+    let suffix = 2;
+    while (true) {
+      const { rows: existing } = await query('SELECT id FROM users WHERE username = $1', [displayName]);
+      if (existing.length === 0) break;
+      displayName = `${baseUsername}_${suffix}`;
+      suffix++;
+      if (suffix > 999) { displayName = `${baseUsername}_${uuidv4().substring(0, 6)}`; break; }
+    }
+  }
 
   const { rows } = await query(
     `INSERT INTO users
        (id, pnptv_id, first_name, last_name, username, email, password_hash,
-        telegram, twitter, photo_file_id, subscription_status, tier, role,
+        telegram, twitter, x_id, photo_file_id, subscription_status, tier, role,
         accepted_terms, is_active, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'free','free','user',false,true,NOW(),NOW())
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'free','free','user',false,true,NOW(),NOW())
      RETURNING id, pnptv_id, first_name, last_name, username, email,
-               subscription_status, accepted_terms, photo_file_id, bio, language, telegram, twitter`,
+               subscription_status, accepted_terms, photo_file_id, bio, language, telegram, twitter, x_id, role`,
     [userId, pnptvId, firstName || 'User', lastName || null, displayName || null,
-     email || null, passwordHash || null, telegramId || null, twitterHandle || null, photoFileId || null]
+     email || null, passwordHash || null, telegramId || null, twitterHandle || null, xId || null, photoFileId || null]
   );
   return rows[0];
+}
+
+/**
+ * Find existing user by any identity field, or create a new one.
+ * Implements account linking: if a matching user is found by email, telegramId, or xHandle,
+ * the missing identity fields are filled in (linked) on that existing record.
+ *
+ * @param {object} opts
+ * @param {string} [opts.telegramId]
+ * @param {string} [opts.twitterHandle]
+ * @param {string} [opts.xId]        - numeric X user ID (more stable than handle)
+ * @param {string} [opts.email]
+ * @param {string} [opts.firstName]
+ * @param {string} [opts.lastName]
+ * @param {string} [opts.username]
+ * @param {string} [opts.photoFileId]
+ * @returns {{ user: object, isNew: boolean }}
+ */
+async function findOrLinkUser({ telegramId, twitterHandle, xId, email, firstName, lastName, username, photoFileId } = {}) {
+  const RETURN_COLS = `id, pnptv_id, first_name, last_name, username, email,
+    subscription_status, accepted_terms, photo_file_id, bio, language, telegram, twitter, x_id, role`;
+
+  let user = null;
+
+  // 1. Lookup priority: telegramId > xId > twitterHandle > email
+  if (telegramId) {
+    const { rows } = await query(`SELECT ${RETURN_COLS} FROM users WHERE telegram = $1`, [String(telegramId)]);
+    if (rows.length > 0) user = rows[0];
+  }
+
+  if (!user && xId) {
+    const { rows } = await query(`SELECT ${RETURN_COLS} FROM users WHERE x_id = $1`, [String(xId)]);
+    if (rows.length > 0) user = rows[0];
+  }
+
+  if (!user && twitterHandle) {
+    const { rows } = await query(`SELECT ${RETURN_COLS} FROM users WHERE twitter = $1`, [twitterHandle]);
+    if (rows.length > 0) user = rows[0];
+  }
+
+  if (!user && email) {
+    const { rows } = await query(`SELECT ${RETURN_COLS} FROM users WHERE email = $1`, [email.toLowerCase().trim()]);
+    if (rows.length > 0) user = rows[0];
+  }
+
+  if (user) {
+    // Link any missing identity fields onto the existing user record
+    const updates = [];
+    const vals = [];
+    let idx = 1;
+
+    if (telegramId && !user.telegram) {
+      updates.push(`telegram = $${idx++}`);
+      vals.push(String(telegramId));
+    }
+    if (twitterHandle && !user.twitter) {
+      updates.push(`twitter = $${idx++}`);
+      vals.push(twitterHandle);
+    }
+    if (xId && !user.x_id) {
+      updates.push(`x_id = $${idx++}`);
+      vals.push(String(xId));
+    }
+    if (photoFileId && !user.photo_file_id) {
+      updates.push(`photo_file_id = $${idx++}`);
+      vals.push(photoFileId);
+    }
+
+    if (updates.length > 0) {
+      vals.push(user.id);
+      const { rows: updated } = await query(
+        `UPDATE users SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${idx} RETURNING ${RETURN_COLS}`,
+        vals
+      );
+      if (updated.length > 0) {
+        user = updated[0];
+        logger.info(`Linked identity fields to existing user ${user.id}: ${updates.join(', ')}`);
+      }
+    }
+
+    return { user, isNew: false };
+  }
+
+  // No match — create new user
+  const newUser = await createWebUser({ telegramId, twitterHandle, xId, email, firstName, lastName, username, photoFileId });
+  return { user: newUser, isNew: true };
 }
 
 function buildSession(user, extra = {}) {
@@ -181,6 +280,11 @@ const telegramGenerateToken = async (req, res) => {
  * Poll endpoint: checks if the bot has verified the token.
  */
 const telegramCheckToken = async (req, res) => {
+  // Prevent browser caching — every poll must hit the server
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+
   try {
     const { token } = req.query;
     if (!token) return res.status(400).json({ authenticated: false, error: 'Missing token' });
@@ -198,25 +302,18 @@ const telegramCheckToken = async (req, res) => {
 
     const telegramId = String(telegramUser.id);
 
-    let result = await query(
-      `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
-              accepted_terms, photo_file_id, bio, language, role
-       FROM users WHERE telegram = $1`,
-      [telegramId]
-    );
+    const { user, isNew } = await findOrLinkUser({
+      telegramId,
+      firstName: telegramUser.first_name,
+      lastName: telegramUser.last_name,
+      username: telegramUser.username,
+      photoFileId: telegramUser.photo_url || null,
+    });
 
-    let user;
-    if (result.rows.length === 0) {
-      user = await createWebUser({
-        firstName: telegramUser.first_name,
-        lastName: telegramUser.last_name,
-        username: telegramUser.username,
-        telegramId,
-        photoFileId: telegramUser.photo_url || null,
-      });
+    if (isNew) {
       logger.info(`Created new user via Telegram deep link: ${user.id} (@${user.username})`);
     } else {
-      user = result.rows[0];
+      logger.info(`Existing user login via Telegram deep link: ${user.id} (@${user.username})`);
     }
 
     req.session.user = buildSession(user, { photoUrl: telegramUser.photo_url || user.photo_file_id });
@@ -309,7 +406,7 @@ const telegramCallback = async (req, res) => {
         hasId: !!telegramUser.id,
         hasHash: !!telegramUser.hash,
       });
-      return res.redirect('/login?error=auth_failed');
+      return res.redirect('/?error=auth_failed');
     }
 
     const isValid = verifyTelegramAuth(telegramUser);
@@ -323,7 +420,7 @@ const telegramCallback = async (req, res) => {
         hint: 'CRITICAL: Domain must be set in BotFather: /setdomain pnptv.app',
         hashVerificationRequired: !skipHashVerification,
       });
-      return res.redirect('/login?error=auth_failed');
+      return res.redirect('/?error=auth_failed');
     }
 
     if (skipHashVerification && !isValid) {
@@ -332,25 +429,18 @@ const telegramCallback = async (req, res) => {
 
     const telegramId = String(telegramUser.id);
 
-    let result = await query(
-      `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
-              accepted_terms, photo_file_id, bio, language, role
-       FROM users WHERE telegram = $1`,
-      [telegramId]
-    );
+    const { user, isNew } = await findOrLinkUser({
+      telegramId,
+      firstName: telegramUser.first_name,
+      lastName: telegramUser.last_name,
+      username: telegramUser.username,
+      photoFileId: telegramUser.photo_url || null,
+    });
 
-    let user;
-    if (result.rows.length === 0) {
-      user = await createWebUser({
-        firstName: telegramUser.first_name,
-        lastName: telegramUser.last_name,
-        username: telegramUser.username,
-        telegramId,
-        photoFileId: telegramUser.photo_url || null,
-      });
+    if (isNew) {
       logger.info(`Created new user via Telegram callback: ${user.id} (@${user.username})`);
     } else {
-      user = result.rows[0];
+      logger.info(`Existing user login via Telegram callback: ${user.id} (@${user.username})`);
     }
 
     req.session.user = buildSession(user, { photoUrl: telegramUser.photo_url || user.photo_file_id });
@@ -359,10 +449,10 @@ const telegramCallback = async (req, res) => {
     );
 
     logger.info(`Web Telegram callback login: user ${user.id}`);
-    return res.redirect('/');
+    return res.redirect('/app');
   } catch (error) {
     logger.error('Telegram callback error:', error);
-    return res.redirect('/login?error=auth_failed');
+    return res.redirect('/?error=auth_failed');
   }
 };
 
@@ -400,27 +490,16 @@ const telegramLogin = async (req, res) => {
 
     const telegramId = String(telegramUser.id);
 
-    // Find existing user
-    let result = await query(
-      `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
-              accepted_terms, photo_file_id, bio, language, role
-       FROM users WHERE telegram = $1`,
-      [telegramId]
-    );
+    const { user, isNew } = await findOrLinkUser({
+      telegramId,
+      firstName: telegramUser.first_name,
+      lastName: telegramUser.last_name,
+      username: telegramUser.username,
+      photoFileId: telegramUser.photo_url || null,
+    });
 
-    let user;
-    if (result.rows.length === 0) {
-      // Auto-create account from Telegram data
-      user = await createWebUser({
-        firstName: telegramUser.first_name,
-        lastName: telegramUser.last_name,
-        username: telegramUser.username,
-        telegramId,
-        photoFileId: telegramUser.photo_url || null,
-      });
-      logger.info(`Created new user via Telegram login: ${user.id} (@${user.username})`);
-    } else {
-      user = result.rows[0];
+    if (isNew) {
+      logger.info(`Created new user via Telegram widget login: ${user.id} (@${user.username})`);
     }
 
     req.session.user = buildSession(user, { photoUrl: telegramUser.photo_url || user.photo_file_id });
@@ -433,7 +512,7 @@ const telegramLogin = async (req, res) => {
     return res.json({
       authenticated: true,
       registered: true,
-      isNew: result.rows.length === 0,
+      isNew,
       pnptvId: user.pnptv_id,
       termsAccepted: user.accepted_terms,
       user: {
@@ -622,6 +701,10 @@ const xLoginStart = async (req, res) => {
       code_challenge_method: 'S256',
     });
 
+    // Support both: JSON response (fetch) and direct redirect (navigation)
+    if (req.query.redirect === 'true') {
+      return res.redirect(`https://twitter.com/i/oauth2/authorize?${params}`);
+    }
     return res.json({ success: true, url: `https://twitter.com/i/oauth2/authorize?${params}` });
   } catch (error) {
     logger.error('X OAuth start error:', error);
@@ -637,14 +720,25 @@ const xLoginCallback = async (req, res) => {
   try {
     const { code, state, error: xError } = req.query;
 
+    logger.info('=== X OAUTH CALLBACK ===', {
+      hasCode: !!code,
+      hasState: !!state,
+      hasError: !!xError,
+      errorMsg: xError || null,
+      sessionId: req.sessionID,
+      hasXOAuth: !!req.session?.xOAuth,
+      storedState: req.session?.xOAuth?.state?.substring(0, 10) || 'none',
+      receivedState: state?.substring(0, 10) || 'none',
+    });
+
     if (xError || !code || !state) {
-      return res.redirect('/login?error=missing_params');
+      return res.redirect('/?error=missing_params');
     }
 
     const stored = req.session.xOAuth;
     if (!stored || stored.state !== state) {
       logger.warn('X OAuth state mismatch or session expired');
-      return res.redirect('/login?error=auth_failed');
+      return res.redirect('/?error=auth_failed');
     }
 
     const { codeVerifier } = stored;
@@ -717,45 +811,46 @@ const xLoginCallback = async (req, res) => {
 
     const xData = profileRes.data?.data;
     const xHandle = xData?.username;
+    const xId = xData?.id ? String(xData.id) : null; // numeric X user ID (stable)
     const xName = xData?.name || xHandle;
 
-    if (!xHandle) return res.redirect('/login?error=auth_failed');
+    if (!xHandle) return res.redirect('/?error=auth_failed');
 
-    // Find user by twitter handle
-    let result = await query(
-      `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
-              accepted_terms, photo_file_id, bio, language, role
-       FROM users WHERE twitter = $1`,
-      [xHandle]
-    );
+    // If already logged in via another method, prioritize linking to current session user
+    if (req.session?.user?.id) {
+      const existingId = req.session.user.id;
+      await query(
+        `UPDATE users SET twitter = $1, x_id = COALESCE(x_id, $2), updated_at = NOW() WHERE id = $3`,
+        [xHandle, xId, existingId]
+      );
+      const { rows: updated } = await query(
+        `SELECT id, pnptv_id, first_name, last_name, username, email,
+                subscription_status, accepted_terms, photo_file_id, bio, language, telegram, twitter, x_id, role
+         FROM users WHERE id = $1`,
+        [existingId]
+      );
+      const user = updated[0];
+      req.session.user = buildSession(user, { xHandle });
+      await new Promise((resolve, reject) =>
+        req.session.save(err => (err ? reject(err) : resolve()))
+      );
+      logger.info(`Linked X @${xHandle} to existing session user ${user.id}`);
+      return res.redirect('/app');
+    }
 
-    let user;
-    const isNew = result.rows.length === 0;
+    const [firstName, ...nameParts] = (xName || xHandle).split(' ');
+    const { user, isNew } = await findOrLinkUser({
+      twitterHandle: xHandle,
+      xId,
+      firstName,
+      lastName: nameParts.join(' ') || null,
+      username: xHandle,
+    });
 
     if (isNew) {
-      if (req.session?.user?.id) {
-        // Link to existing Telegram session
-        await query('UPDATE users SET twitter = $1 WHERE id = $2', [xHandle, req.session.user.id]);
-        result = await query(
-          `SELECT id, pnptv_id, telegram, username, first_name, last_name, subscription_status,
-                  accepted_terms, photo_file_id, bio, language, role
-           FROM users WHERE id = $1`,
-          [req.session.user.id]
-        );
-        user = result.rows[0];
-        logger.info(`Linked X @${xHandle} to existing user ${user.id}`);
-      } else {
-        // Auto-create new user from X data
-        const [firstName, ...rest] = (xName || xHandle).split(' ');
-        user = await createWebUser({
-          firstName,
-          lastName: rest.join(' ') || null,
-          twitterHandle: xHandle,
-        });
-        logger.info(`Created new user via X login: ${user.id} (@${xHandle})`);
-      }
+      logger.info(`Created new user via X login: ${user.id} (@${xHandle})`);
     } else {
-      user = result.rows[0];
+      logger.info(`Existing user login via X: ${user.id} (@${xHandle})`);
     }
 
     req.session.user = buildSession(user, { xHandle });
@@ -763,10 +858,10 @@ const xLoginCallback = async (req, res) => {
       req.session.save(err => (err ? reject(err) : resolve()))
     );
     logger.info(`Web app X login: user ${user.id} via @${xHandle}`);
-    return res.redirect('/');
+    return res.redirect('/app');
   } catch (error) {
     logger.error('X OAuth callback error:', error.message);
-    return res.redirect('/login?error=auth_failed');
+    return res.redirect('/?error=auth_failed');
   }
 };
 

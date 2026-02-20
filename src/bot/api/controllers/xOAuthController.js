@@ -107,7 +107,7 @@ const handleCallback = async (req, res) => {
 
     if (xError || !code || !state || !stored || stored.state !== state) {
       logger.warn('X webapp login failed: state mismatch or missing params', { xError, hasCode: !!code, hasStored: !!stored });
-      return res.redirect('/prime-hub/login?error=auth_failed');
+      return res.redirect('/?error=auth_failed');
     }
 
     try {
@@ -137,7 +137,7 @@ const handleCallback = async (req, res) => {
 
       const xData = profileRes.data?.data;
       const xHandle = xData?.username;
-      if (!xHandle) return res.redirect('/prime-hub/login?error=auth_failed');
+      if (!xHandle) return res.redirect('/?error=auth_failed');
 
       // Find or create user
       let result = await query(
@@ -192,10 +192,10 @@ const handleCallback = async (req, res) => {
       );
 
       logger.info(`Web app X login success: user ${user.id} via @${xHandle}`);
-      return res.redirect('/prime-hub/');
+      return res.redirect('/app');
     } catch (err) {
       logger.error('X webapp login callback error:', err.message);
-      return res.redirect('/prime-hub/login?error=auth_failed');
+      return res.redirect('/?error=auth_failed');
     }
   }
   // ── End webapp login flow ────────────────────────────────────────────────────

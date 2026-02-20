@@ -521,7 +521,7 @@ app.get('/', (req, res) => {
   }
   // Authenticated → go to the app
   if (req.session?.user) {
-    return res.redirect(302, '/prime-hub/');
+    return res.redirect(302, '/app');
   }
   // Not authenticated → show login
   return res.sendFile(path.join(__dirname, '../../../public/login.html'));
@@ -1660,14 +1660,42 @@ app.use('/prime-hub/assets', express.static(path.join(primeHubPath, 'assets'), {
   maxAge: '1y',
   immutable: true
 }));
+app.use('/app/assets', express.static(path.join(primeHubPath, 'assets'), {
+  maxAge: '1y',
+  immutable: true
+}));
 
-// Serve prime-hub SPA for all /prime-hub/* routes (SPA client-side routing)
-app.get('/prime-hub', (req, res) => {
+// /app → canonical post-login destination (serves prime-hub SPA)
+app.get('/app', (req, res) => {
   const host = req.get('host') || '';
   if (host.includes('easybots.store') || host.includes('easybots')) {
     return res.status(404).send('Page not found.');
   }
+  if (!req.session?.user) {
+    return res.redirect('/');
+  }
   res.sendFile(path.join(primeHubPath, 'index.html'));
+});
+
+app.get('/app/*', (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Page not found.');
+  }
+  if (!req.session?.user) {
+    return res.redirect('/');
+  }
+  const requestedPath = req.path.replace('/app', '');
+  const filePath = path.join(primeHubPath, requestedPath);
+  if (requestedPath !== '/' && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    return res.sendFile(filePath);
+  }
+  res.sendFile(path.join(primeHubPath, 'index.html'));
+});
+
+// Legacy /prime-hub → redirect to /app
+app.get(['/prime-hub', '/prime-hub/'], (req, res) => {
+  return res.redirect(301, '/app');
 });
 
 // Block typo/legacy URL explicitly so it does not resolve through SPA fallback.
@@ -1688,18 +1716,17 @@ app.use('/api/subscriptions', subscriptionRoutes);
 // Model routes
 app.use('/api/model', modelRoutes);
 
+// Legacy /prime-hub/* → redirect to /app (keep assets working)
 app.get('/prime-hub/*', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
+  const sub = req.path.replace('/prime-hub', '');
+  // Let asset requests through (CSS/JS/images)
+  if (sub.startsWith('/assets')) {
+    const filePath = path.join(primeHubPath, sub);
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      return res.sendFile(filePath);
+    }
   }
-  // Serve static file if it exists, otherwise fallback to SPA index.html
-  const requestedPath = req.path.replace('/prime-hub', '');
-  const filePath = path.join(primeHubPath, requestedPath);
-  if (requestedPath !== '/' && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-    return res.sendFile(filePath);
-  }
-  res.sendFile(path.join(primeHubPath, 'index.html'));
+  return res.redirect(301, '/app' + sub);
 });
 
 // Export app WITHOUT 404/error handlers

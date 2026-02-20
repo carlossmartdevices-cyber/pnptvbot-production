@@ -211,6 +211,22 @@ const registerOnboardingHandlers = (bot) => {
       }
 
       if (startParam) {
+        // Handle web login deep links
+        if (startParam.startsWith('weblogin_')) {
+          const token = startParam.replace('weblogin_', '');
+          const { telegramConfirmLogin } = require('../../api/controllers/webAppController');
+          const success = await telegramConfirmLogin(
+            { id: ctx.from.id, first_name: ctx.from.first_name, last_name: ctx.from.last_name, username: ctx.from.username },
+            token
+          );
+          if (success) {
+            await ctx.reply('✅ ¡Login exitoso! Ya puedes volver al navegador.\n\n✅ Login successful! You can go back to your browser.');
+          } else {
+            await ctx.reply('❌ El enlace de login ha expirado. Intenta de nuevo.\n\n❌ Login link expired. Please try again.');
+          }
+          return;
+        }
+
         const lang = getLanguage(ctx);
 
         if (startParam.startsWith('promo_')) {
