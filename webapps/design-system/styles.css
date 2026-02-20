@@ -1,67 +1,75 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* PNPtv Redesigned - A more professional and simple design system */
 
-* {
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap');
+
+:root {
+  --primary-color: #007AFF; /* A modern, friendly blue */
+  --primary-color-rgb: 0, 122, 255;
+  --secondary-color: #34C759; /* A vibrant green for success and secondary actions */
+  --destructive-color: #FF3B30; /* A standard red for errors and destructive actions */
+
+  --light-bg: #F9F9FB;
+  --light-bg-2: #FFFFFF;
+  --light-panel: rgba(255, 255, 255, 0.85);
+  --light-text: #1D1D1F;
+  --light-muted: #6E6E73;
+  --light-border: #E5E5EA;
+
+  --dark-bg: #1C1C1E;
+  --dark-bg-2: #2C2C2E;
+  --dark-panel: rgba(44, 44, 46, 0.85);
+  --dark-text: #F5F5F7;
+  --dark-muted: #8E8E93;
+  --dark-border: #3A3A3C;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 16px;
+}
+
+*, *::before, *::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
 }
 
-:root {
-  --primary: #6200EE;
-  --primary-variant: #3700B3;
-  --secondary: #03DAC6;
-  --secondary-variant: #018786;
-
-  --light-bg: #FFFFFF;
-  --light-bg-2: #F5F5F5;
-  --light-panel: rgba(255, 255, 255, 0.82);
-  --light-panel-strong: rgba(255, 255, 255, 0.95);
-  --light-text: #000000;
-  --light-muted: #666666;
-  --light-border: rgba(0, 0, 0, 0.12);
-
-  --dark-bg: #121212;
-  --dark-bg-2: #1e1e1e;
-  --dark-panel: rgba(30, 30, 30, 0.82);
-  --dark-panel-strong: rgba(20, 20, 20, 0.95);
-  --dark-text: #ffffff;
-  --dark-muted: #a0a0a0;
-  --dark-border: rgba(255, 255, 255, 0.1);
-
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s, color 0.3s;
   min-height: 100vh;
   overflow-x: hidden;
   touch-action: manipulation;
-  transition: background 0.3s, color 0.3s;
 }
 
 body.light {
   color-scheme: light;
-  --bg: var(--light-bg);
-  --bg-2: var(--light-bg-2);
-  --panel: var(--light-panel);
-  --panel-strong: var(--light-panel-strong);
-  --text: var(--light-text);
-  --muted: var(--light-muted);
-  --border: var(--light-border);
+  background-color: var(--light-bg);
+  color: var(--light-text);
+  --bg-color: var(--light-bg);
+  --bg-color-2: var(--light-bg-2);
+  --panel-color: var(--light-panel);
+  --text-color: var(--light-text);
+  --text-muted-color: var(--light-muted);
+  --border-color: var(--light-border);
 }
 
 body.dark {
   color-scheme: dark;
-  --bg: var(--dark-bg);
-  --bg-2: var(--dark-bg-2);
-  --panel: var(--dark-panel);
-  --panel-strong: var(--dark-panel-strong);
-  --text: var(--dark-text);
-  --muted: var(--dark-muted);
-  --border: var(--dark-border);
+  background-color: var(--dark-bg);
+  color: var(--dark-text);
+  --bg-color: var(--dark-bg);
+  --bg-color-2: var(--dark-bg-2);
+  --panel-color: var(--dark-panel);
+  --text-color: var(--dark-text);
+  --text-muted-color: var(--dark-muted);
+  --border-color: var(--dark-border);
 }
 
 #root {
@@ -69,178 +77,93 @@ body.dark {
   min-height: 100vh;
 }
 
-.app {
-  width: 100%;
-  min-height: 100vh;
-  padding-bottom: 90px;
-  position: relative;
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  color: var(--text-color);
 }
 
-/* ==================== HEADER ==================== */
+h1 { font-size: 2.25rem; line-height: 2.5rem; }
+h2 { font-size: 1.875rem; line-height: 2.25rem; }
+h3 { font-size: 1.5rem; line-height: 2rem; }
+h4 { font-size: 1.25rem; line-height: 1.75rem; }
+p { font-size: 1rem; line-height: 1.5rem; color: var(--text-muted-color); }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--border-radius-md);
+  font-size: 1rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: #fff;
+  border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.btn-secondary:hover {
+  background-color: rgba(var(--primary-color-rgb), 0.1);
+}
+
+.btn-destructive {
+  background-color: var(--destructive-color);
+  color: #fff;
+  border-color: var(--destructive-color);
+}
+
+.btn-destructive:hover {
+  opacity: 0.9;
+}
+
+/* Spinner */
+.spinner-lg {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--border-color);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Header */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
-  background: var(--panel);
+  padding: 1rem 1.5rem;
+  background: var(--panel-color);
   position: sticky;
   top: 0;
   z-index: 100;
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
-  height: 70px;
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-color);
+  height: 72px;
 }
 
-.header-logo {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.header-logo img {
-  height: 40px;
-}
-
-.header-text h1 {
-  font-family: 'Inter', -apple-system, system-ui, sans-serif;
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.header-text p {
-  display: none;
-}
-
-.header-user-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.user-greeting {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: var(--muted);
-}
-
-.logout-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-}
-
-.logout-button:hover {
-    background: rgba(0, 0, 0, 0.04);
-    color: var(--text);
-}
-
-.logout-button span {
-  display: none;
-}
-
-/* ==================== CATEGORY NAV ==================== */
-.category-nav {
-  padding: 0 24px;
-  margin-bottom: 16px;
-}
-
-.category-scroll {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 8px 0;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-
-.category-scroll::-webkit-scrollbar {
-  display: none;
-}
-
-.category-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--muted);
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.category-btn:hover {
-    background: var(--bg-2);
-    border-color: var(--primary);
-    color: var(--primary);
-}
-
-.category-btn.active {
-  background: var(--primary);
-  color: var(--dark-text);
-  border-color: var(--primary);
-}
-
-/* ==================== MEDIA GRID ==================== */
-.media-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 24px;
-  padding: 0 24px;
-}
-
-.media-card {
-  background: var(--bg-2);
-  border-radius: 16px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-}
-
-.media-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-}
-
-.media-thumbnail {
-  position: relative;
-  aspect-ratio: 16/9;
-  background: var(--bg-2);
-}
-
-.media-thumbnail img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.media-info {
-  padding: 16px;
-}
-
-.media-title {
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-.media-artist {
-  font-size: 0.875rem;
-  color: var(--muted);
+.header-logo h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
 }

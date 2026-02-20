@@ -11,16 +11,20 @@ const LoginPage = ({ onAuthSuccess, authLoading }) => {
   }, [authLoading]);
 
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <h1 className="login-title">PNPtv Hangouts</h1>
-        <p className="login-subtitle">Log in with Telegram to continue</p>
+    <div className="flex items-center justify-center min-h-screen bg-color">
+      <div className="w-full max-w-sm p-8 space-y-6 bg-color-2 rounded-lg shadow-md">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold">PNPtv Hangouts</h1>
+          <p className="mt-2 text-muted-color">
+            Log in with Telegram to continue
+          </p>
+        </div>
         {authLoading ? (
-          <div className="loading-container">
-            <div className="spinner"></div>
+          <div className="flex justify-center">
+            <div className="spinner-lg"></div>
           </div>
         ) : (
-          <div ref={loginRef} className="telegram-login-widget"></div>
+          <div ref={loginRef} className="mt-4"></div>
         )}
       </div>
     </div>

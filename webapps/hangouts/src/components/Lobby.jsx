@@ -27,13 +27,6 @@ function Lobby({ telegramUser, role }) {
   const isTelegram = isTelegramWebApp() && telegramUser?.initData;
   const normalizedRole = role?.toUpperCase() || '';
   const canCreate = normalizedRole === 'PRIME' || normalizedRole === 'ADMIN';
-  const roomCount = loading ? '—' : rooms.length;
-  const participantCount = loading
-    ? '—'
-    : rooms.reduce((sum, room) => sum + (room.currentParticipants || 0), 0);
-  const capacityCount = loading
-    ? '—'
-    : rooms.reduce((sum, room) => sum + (room.maxParticipants || 0), 0);
 
   useEffect(() => {
     let active = true;
@@ -145,56 +138,58 @@ function Lobby({ telegramUser, role }) {
   };
 
   return (
-    <main className="container">
-      <section className="card">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <label className="form-group">
-            <div className="form-label">Title</div>
+    <main className="max-w-4xl mx-auto px-4 py-8">
+      <section className="bg-color-2 p-6 rounded-lg shadow-md mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="form-group">
+            <label className="block text-sm font-medium text-muted-color mb-2">Title</label>
             <input
+              className="w-full px-4 py-2 bg-color border border-color rounded-md focus:outline-none focus:ring-2 focus:ring-primary-color"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="e.g., Late-night vibez"
             />
-          </label>
+          </div>
 
-          <label className="form-group">
-            <div className="form-label">Visibility</div>
-            <div className="segmented-control">
+          <div className="form-group">
+            <label className="block text-sm font-medium text-muted-color mb-2">Visibility</label>
+            <div className="flex rounded-md bg-color border border-color p-1">
               <button
-                className={isPublic ? 'segmented-control-button active' : 'segmented-control-button'}
+                className={`w-1/2 py-2 text-sm rounded-md transition-colors ${isPublic ? 'bg-primary-color text-white' : 'text-muted-color'}`}
                 onClick={() => setIsPublic(true)}
                 type="button"
               >
-                <Globe2 size={16} /> Public
+                <Globe2 size={16} className="inline-block mr-2" /> Public
               </button>
               <button
-                className={!isPublic ? 'segmented-control-button active' : 'segmented-control-button'}
+                className={`w-1/2 py-2 text-sm rounded-md transition-colors ${!isPublic ? 'bg-primary-color text-white' : 'text-muted-color'}`}
                 onClick={() => setIsPublic(false)}
                 type="button"
               >
-                <Lock size={16} /> Private
+                <Lock size={16} className="inline-block mr-2" /> Private
               </button>
             </div>
-          </label>
+          </div>
 
-          <label className="form-group">
-            <div className="form-label">Max participants</div>
+          <div className="form-group">
+            <label className="block text-sm font-medium text-muted-color mb-2">Max participants</label>
             <input
+              className="w-full px-4 py-2 bg-color border border-color rounded-md focus:outline-none focus:ring-2 focus:ring-primary-color"
               type="number"
               min={2}
               max={50}
               value={maxParticipants}
               onChange={(event) => setMaxParticipants(Number(event.target.value))}
             />
-          </label>
+          </div>
         </div>
 
-        <div className="text-sm text-muted-foreground mt-2">
+        <p className="text-sm text-muted-color mt-4">
           Public rooms send a community notification with a join link. Private rooms stay invite-only.
-        </div>
+        </p>
 
         <div className="flex gap-4 mt-6">
-          <button className="btn" onClick={handleCreate} disabled={creating}>
+          <button className="btn btn-primary" onClick={handleCreate} disabled={creating}>
             {creating ? 'Creating...' : 'Create room'}
           </button>
           <button className="btn btn-secondary" onClick={handleRefresh} disabled={loading}>
@@ -203,44 +198,44 @@ function Lobby({ telegramUser, role }) {
         </div>
       </section>
 
-      <h2 className="text-xl font-semibold mb-4">Public rooms</h2>
+      <h2 className="text-2xl font-bold mb-4">Public rooms</h2>
 
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && <div className="bg-destructive-color/20 text-destructive-color p-4 rounded-md mb-4">{error}</div>}
 
       {loading ? (
         <div className="flex flex-col items-center justify-center p-8">
           <div className="spinner-lg" />
-          <div className="text-muted-foreground mt-4">Loading rooms...</div>
+          <p className="text-muted-color mt-4">Loading rooms...</p>
         </div>
       ) : rooms.length === 0 ? (
-        <div className="text-center p-8">
-          <div className="text-xl font-semibold mb-2">No public rooms right now</div>
-          <div className="text-muted-foreground">Create one and it will appear here.</div>
+        <div className="text-center p-8 bg-color-2 rounded-lg shadow-md">
+          <h3 className="text-xl font-semibold mb-2">No public rooms right now</h3>
+          <p className="text-muted-color">Create one and it will appear here.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {rooms.map((room) => (
-            <div className="card" key={room.id}>
-              <div className="flex justify-between items-center mb-2">
-                <div className="badge">Public</div>
+            <div className="bg-color-2 p-6 rounded-lg shadow-md" key={room.id}>
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-xs font-medium bg-secondary-color/20 text-secondary-color px-2 py-1 rounded-full">Public</span>
                 <button
-                  className="btn btn-sm"
+                  className="btn btn-primary btn-sm"
                   onClick={() => handleJoin(room.id)}
                   disabled={joining === room.id}
                 >
                   {joining === room.id ? 'Joining...' : 'Join'}
                 </button>
               </div>
-              <div className="text-lg font-semibold">{room.title || 'Untitled room'}</div>
-              <div className="text-muted-foreground text-sm">
+              <h3 className="text-lg font-bold mb-2">{room.title || 'Untitled room'}</h3>
+              <p className="text-sm text-muted-color mb-4">
                 Host: <span className="font-mono">{room.creatorName || 'Unknown'}</span>
-              </div>
-              <div className="flex gap-2 mt-2">
-                <span className="badge badge-subtle">
-                  {room.currentParticipants || 0}/{room.maxParticipants || 0}
+              </p>
+              <div className="flex items-center gap-4 text-sm text-muted-color">
+                <span>
+                  {room.currentParticipants || 0}/{room.maxParticipants || 0} participants
                 </span>
                 {room.createdAt && (
-                  <span className="badge badge-subtle">
+                  <span>
                     {formatElapsed(Date.now() - new Date(room.createdAt).getTime())} ago
                   </span>
                 )}
@@ -250,7 +245,11 @@ function Lobby({ telegramUser, role }) {
         </div>
       )}
 
-      {toast && <div className="toast-message">{toast}</div>}
+      {toast && (
+        <div className="fixed bottom-8 right-8 bg-color-2 text-color px-6 py-3 rounded-lg shadow-lg animate-fade-in-out">
+          {toast}
+        </div>
+      )}
     </main>
   );
 }

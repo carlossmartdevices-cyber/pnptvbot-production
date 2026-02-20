@@ -56,9 +56,9 @@ function App() {
 
   if (authLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-color">
         <div className="spinner-lg"></div>
-        <p className="text-muted-foreground mt-4">Loading authentication...</p>
+        <p className="text-muted-color mt-4">Loading authentication...</p>
       </div>
     );
   }
