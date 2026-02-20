@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <meta name="theme-color" content="#1C1C1E" />
+  <meta name="description" content="PRIME - Planes de Suscripción | PNPtv" />
+  <title>Planes de Suscripción - PNPtv PRIME</title>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1C1C1E;
+      --surface: #2C2C2E;
+      --surface-dark: #252527;
+      --border: rgba(255,255,255,0.08);
+      --text: #FFFFFF;
+      --muted: #8E8E93;
+      --accent: #FF00CC;
+      --accent-pink: #FF1493;
+      --gold: #FFB454;
+      --green: #34C759;
+      --radius: 16px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .glow {
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(255,0,204,0.15) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .logo-group {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--accent-pink), var(--gold));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 20px;
+    }
+
+    h1 {
+      font-size: 48px;
+      font-weight: 900;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, var(--accent-pink), var(--gold));
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -1px;
+    }
+
+    .subtitle {
+      font-size: 18px;
+      color: var(--muted);
+      margin-bottom: 0;
+    }
+
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-bottom: 60px;
+    }
+
+    .plan {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .plan::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, rgba(255,0,204,0.05) 0%, transparent 100%);
+      pointer-events: none;
+    }
+
+    .plan:hover {
+      transform: translateY(-8px);
+      border-color: var(--accent);
+      box-shadow: 0 16px 32px rgba(255,0,204,0.1);
+    }
+
+    .plan.featured {
+      border-color: var(--gold);
+      box-shadow: 0 0 20px rgba(255,180,84,0.2);
+      transform: scale(1.05);
+    }
+
+    .plan.featured:hover {
+      transform: scale(1.05) translateY(-8px);
+      box-shadow: 0 16px 40px rgba(255,180,84,0.3);
+    }
+
+    .badge {
+      display: inline-block;
+      background: var(--gold);
+      color: var(--bg);
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      width: fit-content;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .plan-name {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .plan-desc {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 24px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .price {
+      font-size: 42px;
+      font-weight: 900;
+      margin-bottom: 4px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .price-period {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 28px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .features {
+      flex: 1;
+      margin-bottom: 32px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .feature-check {
+      color: var(--green);
+      font-weight: 700;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+
+    .cta-button {
+      background: linear-gradient(135deg, var(--accent-pink), var(--accent));
+      color: white;
+      border: none;
+      padding: 14px 24px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
+      position: relative;
+      z-index: 2;
+    }
+
+    .cta-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(255,0,204,0.3);
+    }
+
+    .cta-button:active {
+      transform: translateY(0);
+    }
+
+    .plan.featured .cta-button {
+      background: var(--gold);
+      color: var(--bg);
+    }
+
+    .plan.featured .cta-button:hover {
+      box-shadow: 0 8px 20px rgba(255,180,84,0.3);
+    }
+
+    .info-section {
+      background: var(--surface-dark);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      margin-bottom: 40px;
+      text-align: center;
+    }
+
+    .info-title {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+
+    .info-text {
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 0;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 32px;
+      }
+
+      .plans-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .plan.featured {
+        transform: scale(1);
+      }
+
+      .plan.featured:hover {
+        transform: translateY(-8px);
+      }
+    }
+
+    .footer-note {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 40px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+
+  <div class="container">
+    <header>
+      <div class="logo-group">
+        <div class="logo">👑</div>
+        <h1>PRIME</h1>
+      </div>
+      <p class="subtitle">Acceso ilimitado a contenido exclusivo</p>
+    </header>
+
+    <div class="plans-grid">
+      <!-- Free Plan -->
+      <div class="plan">
+        <div class="plan-name">Videorama</div>
+        <p class="plan-desc">Acceso a contenido estándar</p>
+        <div class="price">Gratis</div>
+        <p class="price-period">Por siempre</p>
+        <div class="features">
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Acceso a Videorama</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Chat en vivo</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Comunidad</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Radio 24/7</span>
+          </div>
+        </div>
+        <button class="cta-button" onclick="window.location.href='/'">Comenzar</button>
+      </div>
+
+      <!-- Weekly Plan -->
+      <div class="plan">
+        <div class="plan-name">PRIME 1 Semana</div>
+        <p class="plan-desc">Acceso temporal PRIME</p>
+        <div class="price">$10</div>
+        <p class="price-period">7 días</p>
+        <div class="features">
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Contenido PRIME exclusivo</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Videos sin anuncios</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Descargas offline</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Prioridad en soporte</span>
+          </div>
+        </div>
+        <button class="cta-button" onclick="goToCheckout()">Suscribirse</button>
+      </div>
+
+      <!-- Monthly Plan (Featured) -->
+      <div class="plan featured">
+        <div class="badge">Mejor Valor</div>
+        <div class="plan-name">PRIME Mensual</div>
+        <p class="plan-desc">Acceso mensual a todo PRIME</p>
+        <div class="price">$25</div>
+        <p class="price-period">30 días</p>
+        <div class="features">
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Contenido PRIME exclusivo</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Videos sin anuncios</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Descargas offline</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Acceso a eventos exclusivos</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Soporte prioritario 24/7</span>
+          </div>
+        </div>
+        <button class="cta-button" onclick="goToCheckout()">Suscribirse</button>
+      </div>
+
+      <!-- Yearly Plan -->
+      <div class="plan">
+        <div class="plan-name">PRIME Anual</div>
+        <p class="plan-desc">Mejor precio anual</p>
+        <div class="price">$200</div>
+        <p class="price-period">365 días</p>
+        <div class="features">
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Contenido PRIME exclusivo</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Videos sin anuncios</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Descargas offline ilimitadas</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Acceso prioritario a estrenos</span>
+          </div>
+        </div>
+        <button class="cta-button" onclick="goToCheckout()">Suscribirse</button>
+      </div>
+
+      <!-- Lifetime Plan -->
+      <div class="plan">
+        <div class="plan-name">PRIME Lifetime</div>
+        <p class="plan-desc">Acceso de por vida</p>
+        <div class="price">$500</div>
+        <p class="price-period">Una sola vez</p>
+        <div class="features">
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Acceso ilimitado permanente</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Contenido futuro incluido</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Sin renovación automática</span>
+          </div>
+          <div class="feature">
+            <span class="feature-check">✓</span>
+            <span>Soporte VIP prioritario</span>
+          </div>
+        </div>
+        <button class="cta-button" onclick="goToCheckout()">Suscribirse</button>
+      </div>
+    </div>
+
+    <div class="info-section">
+      <div class="info-title">💳 Métodos de Pago Seguros</div>
+      <p class="info-text">Aceptamos tarjetas de crédito, débito, e-wallets y criptomonedas. Todos los pagos son procesados de forma segura con encriptación de nivel bancario.</p>
+    </div>
+
+    <div class="info-section">
+      <div class="info-title">❓ ¿Preguntas?</div>
+      <p class="info-text">¿Necesitas ayuda para elegir tu plan? Contáctanos a través del chat en vivo o envía un correo a support@pnptv.app</p>
+    </div>
+
+    <div class="footer-note">
+      <p>Al suscribirse aceptas nuestros <a href="/" style="color: var(--accent); text-decoration: none;">Términos de Servicio</a> y <a href="/" style="color: var(--accent); text-decoration: none;">Política de Privacidad</a></p>
+    </div>
+  </div>
+
+  <script>
+    function goToCheckout() {
+      // Get the checkout domain from the server or use default
+      const checkoutDomain = 'https://easybots.site';
+      const checkoutPath = '/checkout'; // Adjust if needed
+      window.location.href = checkoutDomain + checkoutPath;
+    }
+  </script>
+</body>
+</html>

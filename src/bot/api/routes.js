@@ -345,6 +345,16 @@ app.get('/videorama/*', (req, res) => {
   res.redirect(301, newPath);
 });
 
+// Subscription/pricing page
+app.get('/suscripcion', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../../public/suscripcion.html'));
+});
+
+// Alias for subscription page (English)
+app.get('/subscription', (req, res) => {
+  res.redirect(301, '/suscripcion');
+});
+
 // Serve static files from public directory with blocking
 app.use(serveStaticWithBlocking(path.join(__dirname, '../../../public')));
 
