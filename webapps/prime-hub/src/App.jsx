@@ -7,6 +7,7 @@ import NearbyPage from './pages/NearbyPage';
 import HangoutsPage from './pages/HangoutsPage';
 import LivePage from './pages/LivePage';
 import VideoramaPage from './pages/VideoramaPage';
+import MediaLibraryPage from './pages/MediaLibraryPage';
 import FeedPage from './pages/FeedPage';
 import WallPage from './pages/WallPage';
 import MessagesPage from './pages/MessagesPage';
@@ -73,6 +74,7 @@ export default function App() {
         <Route path="/hangouts" element={<ProtectedRoute><HangoutsPage /></ProtectedRoute>} />
         <Route path="/live" element={<ProtectedRoute><LivePage /></ProtectedRoute>} />
         <Route path="/videorama" element={<VideoramaPage />} />
+        <Route path="/media" element={<ProtectedRoute><MediaLibraryPage /></ProtectedRoute>} />
         <Route path="/feed" element={<ProtectedRoute><FeedPage /></ProtectedRoute>} />
         <Route path="/wall/:userId" element={<ProtectedRoute><WallPage /></ProtectedRoute>} />
         <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />

@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MapPin, Users, Radio, Film } from 'lucide-react';
+import { MapPin, Users, Radio, Film, Library } from 'lucide-react';
 
 const tabs = [
   { path: '/nearby', label: 'Nearby', icon: MapPin },
   { path: '/hangouts', label: 'Hangouts', icon: Users },
   { path: '/live', label: 'Live', icon: Radio },
+  { path: '/media', label: 'Media', icon: Library },
   { path: '/videorama', label: 'Videorama', icon: Film },
 ];
 
