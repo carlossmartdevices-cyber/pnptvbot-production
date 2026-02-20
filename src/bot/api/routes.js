@@ -333,6 +333,18 @@ const serveStaticWithBlocking = (staticPath) => {
   };
 };
 
+// ==========================================
+// Redirect legacy /videorama paths to /app/videorama BEFORE static middleware
+// ==========================================
+app.get('/videorama', (req, res) => {
+  res.redirect(301, '/app/videorama');
+});
+
+app.get('/videorama/*', (req, res) => {
+  const newPath = req.path.replace('/videorama', '/app/videorama');
+  res.redirect(301, newPath);
+});
+
 // Serve static files from public directory with blocking
 app.use(serveStaticWithBlocking(path.join(__dirname, '../../../public')));
 
