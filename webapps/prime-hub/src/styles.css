@@ -4,16 +4,16 @@
    ================================ */
 
 :root {
-  --bg-primary: #1C1C1E;
+  --bg-primary: #120d14;
   --bg-secondary: #2C2C2E;
   --bg-tertiary: #3A3A3C;
   --bg-glass: rgba(44, 44, 46, 0.75);
   --text-primary: #FFFFFF;
   --text-secondary: #ABABAB;
   --text-muted: #8E8E93;
-  --accent-pink: #FF00CC;
-  --accent-amber: #FFB454;
-  --accent-gradient: linear-gradient(135deg, #FF00CC, #FFB454);
+  --accent-pink: #ff3377;
+  --accent-amber: #ff9933;
+  --accent-gradient: linear-gradient(135deg, #ff3377, #ff9933);
   --border-subtle: rgba(255, 255, 255, 0.08);
   --border-glow: rgba(255, 180, 84, 0.3);
   --radius-sm: 8px;

@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  --bg: var(--tg-bg, #1c1c1e);
+  --bg: var(--tg-bg, #120d14);
   --bg-2: var(--tg-secondary-bg, #2c2c2e);
   --panel: rgba(44, 44, 46, 0.78);
   --panel-strong: rgba(28, 28, 30, 0.92);

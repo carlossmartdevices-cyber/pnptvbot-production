@@ -14,7 +14,7 @@
   --panel-strong: rgba(12, 18, 28, 0.95);
   --text: #f8fbff;
   --muted: rgba(248, 251, 255, 0.65);
-  --accent: #ffb454;
+  --accent: #ff9933;
   --accent-2: #2ce2c9;
   --accent-3: #ff6b6b;
   --border: rgba(255, 255, 255, 0.1);
@@ -1735,7 +1735,7 @@ body {
 .featured-card.prime-card .featured-badge {
   background: rgba(255, 180, 84, 0.25);
   border-color: rgba(255, 180, 84, 0.5);
-  color: #ffb454;
+  color: #ff9933;
 }
 
 .featured-card.videorama-card .featured-badge {
