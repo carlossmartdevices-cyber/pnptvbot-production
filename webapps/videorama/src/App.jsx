@@ -107,20 +107,19 @@ function App() {
         if (currentUser) {
           setTelegramUser(currentUser);
           setIsAuthenticated(true);
-          // Only load media/radio/collections if authenticated
-          loadMedia();
-          loadRadioStatus();
-          loadCollections();
         } else {
           setIsAuthenticated(false);
-          // initTelegramLogin(loginRef); // No need to initialize here, LoginPage will do it
         }
       } catch (err) {
         setError(err.message);
         setIsAuthenticated(false);
-        // initTelegramLogin(loginRef); // No need to initialize here, LoginPage will do it
       } finally {
         setAuthLoading(false);
+        // Always load media/radio/collections regardless of auth status
+        // Videorama is publicly accessible
+        loadMedia();
+        loadRadioStatus();
+        loadCollections();
       }
     };
 
@@ -147,12 +146,16 @@ function App() {
     setLoading(true)
     try {
       const media = await fetchMediaLibrary('all', category)
-      setMediaLibrary(media.length > 0 ? media : DEMO_MEDIA)
+      // Always show demo data - either as supplement or placeholder
+      const displayMedia = Array.isArray(media) && media.length > 0 ? media : DEMO_MEDIA
+      setMediaLibrary(displayMedia)
     } catch (error) {
       console.error('Failed to load media, using demo data:', error)
+      // Always fall back to demo data so users see something
       setMediaLibrary(DEMO_MEDIA)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   async function loadCollections() {
@@ -163,7 +166,7 @@ function App() {
       setError(null)
     } catch (error) {
       console.error('Failed to load collections:', error)
-      setError('Could not load collections at the moment.')
+      // Don't show error, just silently fail
       setCollections([])
     } finally {
       setCollectionsLoading(false)
