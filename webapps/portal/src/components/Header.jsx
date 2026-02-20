@@ -1,12 +1,10 @@
-import { Radio, Tv, Music, User, LogOut } from 'lucide-react'
+import { User, LogOut } from 'lucide-react';
 
 export default function Header({ title, subtitle, telegramUser, onLogout, loginRef }) {
   return (
     <header className="header">
       <div className="header-logo">
-        <div className="logo-icon">
-          <Tv size={28} />
-        </div>
+        <img src="/logo.png" alt="Logo" style={{ height: '64px' }} />
         <div className="header-text">
           <h1>{title}</h1>
           <p>{subtitle}</p>
@@ -29,5 +27,5 @@ export default function Header({ title, subtitle, telegramUser, onLogout, loginR
         )}
       </div>
     </header>
-  )
+  );
 }

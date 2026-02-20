@@ -1436,17 +1436,18 @@ app.post('/api/webapp/live/streams/:streamId/leave', asyncHandler(webappLiveCont
 
 // Web App Admin Routes (session auth + role check)
 const webappAdminController = require('./controllers/webappAdminController');
+const { adminGuard } = require('../../middleware/guards');
 
-// Admin endpoints with JWT authentication
-app.get('/api/webapp/admin/stats', verifyAdminJWT, asyncHandler(webappAdminController.getStats));
-app.get('/api/webapp/admin/users', verifyAdminJWT, asyncHandler(webappAdminController.listUsers));
-app.get('/api/webapp/admin/users/:id', verifyAdminJWT, asyncHandler(webappAdminController.getUser));
-app.put('/api/webapp/admin/users/:id', verifyAdminJWT, asyncHandler(webappAdminController.updateUser));
-app.post('/api/webapp/admin/users/:id/ban', verifyAdminJWT, asyncHandler(webappAdminController.banUser));
-app.get('/api/webapp/admin/posts', verifyAdminJWT, asyncHandler(webappAdminController.listPosts));
-app.delete('/api/webapp/admin/posts/:id', verifyAdminJWT, asyncHandler(webappAdminController.deletePost));
-app.get('/api/webapp/admin/hangouts', verifyAdminJWT, asyncHandler(webappAdminController.listHangouts));
-app.delete('/api/webapp/admin/hangouts/:id', verifyAdminJWT, asyncHandler(webappAdminController.endHangout));
+// Admin endpoints with session-based authentication
+app.get('/api/webapp/admin/stats', adminGuard, asyncHandler(webappAdminController.getStats));
+app.get('/api/webapp/admin/users', adminGuard, asyncHandler(webappAdminController.listUsers));
+app.get('/api/webapp/admin/users/:id', adminGuard, asyncHandler(webappAdminController.getUser));
+app.put('/api/webapp/admin/users/:id', adminGuard, asyncHandler(webappAdminController.updateUser));
+app.post('/api/webapp/admin/users/:id/ban', adminGuard, asyncHandler(webappAdminController.banUser));
+app.get('/api/webapp/admin/posts', adminGuard, asyncHandler(webappAdminController.listPosts));
+app.delete('/api/webapp/admin/posts/:id', adminGuard, asyncHandler(webappAdminController.deletePost));
+app.get('/api/webapp/admin/hangouts', adminGuard, asyncHandler(webappAdminController.listHangouts));
+app.delete('/api/webapp/admin/hangouts/:id', adminGuard, asyncHandler(webappAdminController.endHangout));
 
 // ==========================================
 // Media & Radio Admin Routes
@@ -1477,7 +1478,7 @@ app.put('/api/admin/radio/requests/:requestId', verifyAdminJWT, asyncHandler(med
 // ==========================================
 // Role-Based Access Control (RBAC) Routes
 // ==========================================
-const { adminGuard, superadminGuard } = require('../../middleware/guards');
+const { superadminGuard } = require('../../middleware/guards');
 const { auditLog } = require('../../middleware/auditLogger');
 const roleController = require('./controllers/roleController');
 const auditLogController = require('./controllers/auditLogController');
