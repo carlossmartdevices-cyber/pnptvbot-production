@@ -4,7 +4,7 @@ import {
   SkipBack, SkipForward, X, Radio, ChevronDown
 } from 'lucide-react'
 
-export default function VideoPlayer({ media, onClose, radioNowPlaying, onRadioToggle }) {
+export default function VideoPlayer({ media, onClose, radioNowPlaying, onRadioToggle, userTier = 'free' }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -12,6 +12,7 @@ export default function VideoPlayer({ media, onClose, radioNowPlaying, onRadioTo
   const [isMuted, setIsMuted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showControls, setShowControls] = useState(true)
+  const [showPrimeOverlay, setShowPrimeOverlay] = useState(false)
 
   const videoRef = useRef(null)
   const containerRef = useRef(null)
@@ -19,6 +20,10 @@ export default function VideoPlayer({ media, onClose, radioNowPlaying, onRadioTo
 
   const isVideo = media.type === 'video'
   const isAudio = media.type === 'audio' || media.type === 'podcast'
+  const isPrimeContent = media.is_prime === true
+  const userIsPrime = userTier === 'prime'
+  const PREVIEW_DURATION_SECONDS = 15
+  const showPreviewLimit = isPrimeContent && !userIsPrime
 
   useEffect(() => {
     if (videoRef.current && media.url) {
@@ -55,7 +60,15 @@ export default function VideoPlayer({ media, onClose, radioNowPlaying, onRadioTo
 
   function handleTimeUpdate() {
     if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime)
+      const newTime = videoRef.current.currentTime
+      setCurrentTime(newTime)
+
+      // Enforce preview limit for Prime content when user is not Prime
+      if (showPreviewLimit && newTime >= PREVIEW_DURATION_SECONDS) {
+        videoRef.current.pause()
+        setIsPlaying(false)
+        setShowPrimeOverlay(true)
+      }
     }
   }
 
@@ -68,7 +81,13 @@ export default function VideoPlayer({ media, onClose, radioNowPlaying, onRadioTo
   function handleSeek(e) {
     const rect = e.currentTarget.getBoundingClientRect()
     const percent = (e.clientX - rect.left) / rect.width
-    const time = percent * duration
+    let time = percent * duration
+
+    // Prevent seeking past preview limit for Prime content
+    if (showPreviewLimit && time > PREVIEW_DURATION_SECONDS) {
+      time = PREVIEW_DURATION_SECONDS
+      setShowPrimeOverlay(true)
+    }
 
     if (videoRef.current) {
       videoRef.current.currentTime = time
@@ -233,6 +252,26 @@ export default function VideoPlayer({ media, onClose, radioNowPlaying, onRadioTo
           </div>
         </div>
       </div>
+
+      {/* Prime Content Overlay */}
+      {showPrimeOverlay && isPrimeContent && !userIsPrime && (
+        <div className="prime-overlay">
+          <div className="prime-overlay-content">
+            <div className="prime-icon">👑</div>
+            <h2>Contenido Exclusivo PRIME</h2>
+            <p>Solo viste los primeros {PREVIEW_DURATION_SECONDS} segundos de este video</p>
+            <div className="preview-info">
+              <p>Accede a todo nuestro contenido exclusivo con una suscripción PRIME</p>
+            </div>
+            <button className="prime-subscribe-btn" onClick={() => window.location.href = '/app/suscripcion'}>
+              Suscribirse Ahora
+            </button>
+            <button className="prime-close-btn" onClick={() => setShowPrimeOverlay(false)}>
+              Volver atrás
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

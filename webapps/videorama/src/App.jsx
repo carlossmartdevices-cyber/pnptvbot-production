@@ -247,6 +247,9 @@ function App() {
   const canManageCollections = ['ADMIN', 'SUPERADMIN', 'PERFORMER'].includes(telegramUser?.subscriptionStatus?.toUpperCase()) || isPrime
   const isPlayerView = currentView === 'player' && selectedMedia
 
+  // Get user tier from telegramUser (default to 'free')
+  const userTier = telegramUser?.tier || 'free'
+
   if (isPlayerView) {
     return (
       <>
@@ -255,6 +258,7 @@ function App() {
           onClose={handleClosePlayer}
           radioNowPlaying={radioNowPlaying}
           onRadioToggle={() => setIsRadioExpanded(!isRadioExpanded)}
+          userTier={userTier}
         />
         {radioNowPlaying && (
           <MiniRadioPlayer
