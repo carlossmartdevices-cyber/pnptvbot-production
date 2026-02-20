@@ -32,7 +32,7 @@ function ProtectedRoute({ children }) {
 
   if (!user) {
     // Redirect to the single HTML login page (not the React SPA route)
-    window.location.replace('/login');
+    window.location.replace('/');
     return null;
   }
 
@@ -52,7 +52,7 @@ function AdminRoute({ children }) {
   }
 
   if (!user) {
-    window.location.replace('/login');
+    window.location.replace('/');
     return null;
   }
 

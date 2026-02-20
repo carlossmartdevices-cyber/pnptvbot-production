@@ -6,7 +6,7 @@ import './styles.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter basename="/prime-hub">
+    <BrowserRouter basename="/app">
       <App />
     </BrowserRouter>
   </React.StrictMode>

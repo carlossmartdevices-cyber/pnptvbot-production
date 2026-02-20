@@ -15,7 +15,7 @@ export default function AdminRoute({ children }) {
   }
 
   if (!user) {
-    window.location.replace('/login');
+    window.location.replace('/');
     return null;
   }
 

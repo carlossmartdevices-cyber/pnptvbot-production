@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { Twitter } from 'lucide-react';
 import { api } from '../api/client';
@@ -8,7 +8,6 @@ const REMEMBER_ME_KEY = 'pnptv.rememberMe';
 const REMEMBER_EMAIL_KEY = 'pnptv.rememberedEmail';
 
 export default function LoginPage() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, loginWithEmail, registerWithEmail, loginWithX } = useAuth();
   const [error, setError] = useState('');
@@ -29,9 +28,9 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate('/', { replace: true });
+      window.location.replace('/app');
     }
-  }, [user, navigate]);
+  }, [user]);
 
   // Restore remembered email from this browser
   useEffect(() => {
@@ -110,7 +109,7 @@ export default function LoginPage() {
     try {
       await loginWithEmail(email, loginPassword, rememberMe);
       persistRememberedEmail(email, rememberMe);
-      navigate('/', { replace: true });
+      window.location.replace('/app');
     } catch (err) {
       setError(err.message || 'Login failed. Please try again.');
     } finally {
@@ -137,7 +136,7 @@ export default function LoginPage() {
     setEmailLoading(true);
     try {
       await registerWithEmail(firstName, email, registerPassword);
-      navigate('/', { replace: true });
+      window.location.replace('/app');
     } catch (err) {
       setError(err.message || 'Registration failed. Please try again.');
     } finally {
