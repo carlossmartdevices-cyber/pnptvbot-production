@@ -205,12 +205,14 @@ export function getUrlParams() {
 
 export async function fetchTelegramUser() {
   try {
-    const response = await fetch(`${API_BASE}/telegram-auth/check`);
+    const response = await fetch(`${API_BASE}/me`, {
+      credentials: 'include',
+    });
     if (!response.ok) {
       return null;
     }
     const data = await response.json();
-    return data.user || null;
+    return data.user || data || null;
   } catch (error) {
     console.error('Error fetching Telegram user:', error);
     return null;
@@ -251,24 +253,16 @@ export function initTelegramLogin(loginRef) {
 export async function handleTelegramAuth(telegramUser, setUser, setLoading, setError) {
   setLoading(true);
   try {
-    const response = await fetch(`${API_BASE}/telegram-auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(telegramUser),
-    });
-
-    const data = await response.json();
-
-    if (data.success) {
-      setUser(data.user);
+    // Telegram user data is received directly from the widget callback
+    // Just verify it's valid and set it
+    if (telegramUser && telegramUser.id) {
+      setUser(telegramUser);
     } else {
-      setError(data.message || 'Telegram login failed.');
+      setError('Invalid Telegram user data.');
     }
   } catch (err) {
     console.error('Error during Telegram auth:', err);
-    setError('Network error during Telegram login.');
+    setError('Error processing Telegram login.');
   } finally {
     setLoading(false);
   }
