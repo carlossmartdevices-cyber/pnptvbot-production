@@ -40,9 +40,22 @@ export function useChat(room = 'general') {
       socket.emit('chat:join', { room });
     };
     const onDisconnect = () => setConnected(false);
-    const onHistory = (msgs) => setMessages(msgs);
-    const onMessage = (msg) => setMessages(prev => [...prev, msg]);
-    const onError = (err) => setError(err.message);
+    const onHistory = (msgs) => {
+      // Ensure we have an array of messages
+      if (Array.isArray(msgs)) {
+        setMessages(msgs);
+      } else {
+        console.warn('chat:history received non-array:', msgs);
+        setMessages([]);
+      }
+    };
+    const onMessage = (msg) => {
+      // Only add if msg has required fields
+      if (msg && msg.id && msg.content !== undefined) {
+        setMessages(prev => [...prev, msg]);
+      }
+    };
+    const onError = (err) => setError(err?.message || 'Chat error');
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);

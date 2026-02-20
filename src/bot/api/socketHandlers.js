@@ -72,15 +72,20 @@ function initSocketIO(io) {
         return;
       }
       try {
+        // Use camelCase fields from session user object
+        const firstName = user.firstName || user.first_name || null;
+        const photoUrl = user.photoUrl || user.photo_url || null;
+
         const { rows } = await query(
           `INSERT INTO chat_messages (room, user_id, username, first_name, photo_url, content)
            VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING id, room, user_id, username, first_name, photo_url, content, created_at`,
-          [room, user.id, user.username, user.firstName, user.photoUrl, content.trim()]
+          [room, user.id, user.username || null, firstName, photoUrl, content.trim()]
         );
         io.to(`chat:${room}`).emit('chat:message', rows[0]);
       } catch (err) {
         logger.error('chat:message error', err);
+        socket.emit('chat:error', { message: 'Failed to save message' });
       }
     });
 

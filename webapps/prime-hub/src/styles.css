@@ -389,19 +389,20 @@ img {
 }
 
 .header-logo {
-  width: 36px;
-  height: 36px;
-  background: var(--accent-gradient);
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 900;
-  font-size: 10px;
-  color: #fff;
   flex-shrink: 0;
-  box-shadow: 0 4px 16px rgba(255, 0, 204, 0.3);
   text-decoration: none;
+  height: 40px;
+  width: auto;
+}
+
+.header-logo img {
+  height: 40px;
+  width: auto;
+  max-width: 140px;
+  object-fit: contain;
 }
 
 .header-nav {

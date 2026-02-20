@@ -21,6 +21,23 @@ export default function ChatWidget() {
   const { messages, connected, sendMessage, pushMessage } = useChat('general');
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
+  const initialLoadAttempted = useRef(false);
+
+  // Load chat history from REST if Socket.IO isn't available
+  useEffect(() => {
+    if (open && !connected && !initialLoadAttempted.current && messages.length === 0) {
+      initialLoadAttempted.current = true;
+      api.getChatHistory('general')
+        .then(data => {
+          if (data.success && Array.isArray(data.messages)) {
+            data.messages.forEach(msg => pushMessage(msg));
+          }
+        })
+        .catch(err => {
+          console.warn('Failed to load chat history:', err);
+        });
+    }
+  }, [open, connected, messages.length]);
 
   useEffect(() => {
     if (open && bottomRef.current) {

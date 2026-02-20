@@ -67,27 +67,11 @@
       margin-bottom: 24px;
     }
 
-    .logo {
-      width: 40px;
-      height: 40px;
-      background: linear-gradient(135deg, var(--accent-pink), var(--gold));
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 900;
-      font-size: 20px;
-    }
-
-    h1 {
-      font-size: 48px;
-      font-weight: 900;
-      margin-bottom: 12px;
-      background: linear-gradient(135deg, var(--accent-pink), var(--gold));
-      background-clip: text;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      letter-spacing: -1px;
+    .logo-img {
+      height: 80px;
+      width: auto;
+      max-width: 300px;
+      object-fit: contain;
     }
 
     .subtitle {
@@ -302,8 +286,7 @@
   <div class="container">
     <header>
       <div class="logo-group">
-        <div class="logo">👑</div>
-        <h1>PRIME</h1>
+        <img src="/logo.png" alt="PNPtv PRIME" class="logo-img" />
       </div>
       <p class="subtitle">Acceso ilimitado a contenido exclusivo</p>
     </header>

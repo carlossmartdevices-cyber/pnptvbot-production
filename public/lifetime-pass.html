@@ -148,13 +148,10 @@
         }
 
         .logo {
-            font-weight: 900;
-            font-size: 24px;
-            letter-spacing: -0.5px;
-            background: linear-gradient(90deg, var(--neon-pink), var(--neon-amber));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 20px rgba(255, 0, 204, 0.5);
+            height: 40px;
+            width: auto;
+            max-width: 150px;
+            object-fit: contain;
         }
 
         .lang-toggle {
@@ -373,7 +370,7 @@
     <div class="ambient-glow"></div>
 
     <header>
-        <div class="logo">PNPtv!</div>
+        <img src="/logo.png" alt="PNPtv PRIME" class="logo" />
         <div class="lang-toggle">
             <button class="lang-btn active" onclick="setLang('en')" id="btn-en">EN</button>
             <button class="lang-btn" onclick="setLang('es')" id="btn-es">ES</button>
