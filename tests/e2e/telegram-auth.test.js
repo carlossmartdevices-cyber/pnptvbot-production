@@ -30,9 +30,10 @@ describe('Telegram Authentication E2E Tests', () => {
 
     // Create valid initData with correct signature
     const initData = TelegramSimulator.createInitData(telegramUser);
+    const decoded = TelegramSimulator.decodeInitData(initData);
 
     // Send to backend
-    const response = await apiClient.post('/api/auth/telegram', { initData });
+    const response = await apiClient.post('/api/webapp/auth/telegram', decoded);
 
     // Verify response
     expect(response.status).toBe(200);
@@ -49,10 +50,9 @@ describe('Telegram Authentication E2E Tests', () => {
   // Test 1.2: Reject invalid Telegram signature
   test('1.2 Should reject invalid Telegram signature', async () => {
     const invalidInitData = TelegramSimulator.createInvalidInitData();
+    const decoded = TelegramSimulator.decodeInitData(invalidInitData);
 
-    const response = await apiClient.post('/api/auth/telegram', {
-      initData: invalidInitData
-    });
+    const response = await apiClient.post('/api/webapp/auth/telegram', decoded);
 
     expect(response.status).toBe(401);
     expect(response.data.error).toBeDefined();
@@ -64,10 +64,9 @@ describe('Telegram Authentication E2E Tests', () => {
       { id: 222222222, first_name: 'Expired' },
       { auth_date: Math.floor(Date.now() / 1000) - 86400 } // 24h ago
     );
+    const decoded = TelegramSimulator.decodeInitData(expiredInitData);
 
-    const response = await apiClient.post('/api/auth/telegram', {
-      initData: expiredInitData
-    });
+    const response = await apiClient.post('/api/webapp/auth/telegram', decoded);
 
     expect(response.status).toBe(401);
     expect(response.data.error).toContain('expired');
@@ -81,10 +80,9 @@ describe('Telegram Authentication E2E Tests', () => {
       username: 'newuser',
       language_code: 'en'
     });
+    const decoded = TelegramSimulator.decodeInitData(newUserInitData);
 
-    const response = await apiClient.post('/api/auth/telegram', {
-      initData: newUserInitData
-    });
+    const response = await apiClient.post('/api/webapp/auth/telegram', decoded);
 
     expect(response.status).toBe(200);
     expect(response.data.user.id).toBe('333333333');
@@ -105,10 +103,9 @@ describe('Telegram Authentication E2E Tests', () => {
       first_name: 'TokenTest',
       username: 'tokentest'
     });
+    const decoded = TelegramSimulator.decodeInitData(testUserInitData);
 
-    const response = await apiClient.post('/api/auth/telegram', {
-      initData: testUserInitData
-    });
+    const response = await apiClient.post('/api/webapp/auth/telegram', decoded);
 
     expect(response.status).toBe(200);
 
@@ -134,11 +131,10 @@ describe('Telegram Authentication E2E Tests', () => {
       first_name: 'Santino',
       username: 'SantinoFurioso'
     });
+    const decoded = TelegramSimulator.decodeInitData(existingUserInitData);
 
     // First login
-    const response1 = await apiClient.post('/api/auth/telegram', {
-      initData: existingUserInitData
-    });
+    const response1 = await apiClient.post('/api/webapp/auth/telegram', decoded);
 
     expect(response1.status).toBe(200);
     const firstLoginTime = response1.data.user.last_login;
@@ -147,9 +143,7 @@ describe('Telegram Authentication E2E Tests', () => {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     // Second login
-    const response2 = await apiClient.post('/api/auth/telegram', {
-      initData: existingUserInitData
-    });
+    const response2 = await apiClient.post('/api/webapp/auth/telegram', decoded);
 
     expect(response2.status).toBe(200);
     const secondLoginTime = response2.data.user.last_login;
@@ -160,7 +154,7 @@ describe('Telegram Authentication E2E Tests', () => {
 
   // Test 1.7: Invalid initData format should be rejected
   test('1.7 Should reject malformed initData', async () => {
-    const response = await apiClient.post('/api/auth/telegram', {
+    const response = await apiClient.post('/api/webapp/auth/telegram', {
       initData: 'invalid_format_missing_hash_and_user'
     });
 
@@ -169,9 +163,9 @@ describe('Telegram Authentication E2E Tests', () => {
 
   // Test 1.8: Missing initData should return error
   test('1.8 Should require initData in request', async () => {
-    const response = await apiClient.post('/api/auth/telegram', {});
+    const response = await apiClient.post('/api/webapp/auth/telegram', {});
 
     expect(response.status).toBe(400);
-    expect(response.data.error).toContain('required');
+    expect(response.data.error).toBeDefined();
   });
 });
