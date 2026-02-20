@@ -252,7 +252,7 @@ const createPostWithMedia = async (req, res) => {
     // Process uploaded media if present
     if (req.file) {
       const { mimetype, buffer, originalname } = req.file;
-      const uploadDir = path.join(__dirname, '../../../public/uploads/posts');
+      const uploadDir = path.join(__dirname, '../../../../public/uploads/posts');
       await fs.mkdir(uploadDir, { recursive: true });
 
       // Determine media type and process

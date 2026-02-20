@@ -1226,7 +1226,7 @@ const uploadAvatar = async (req, res) => {
 
     const ext = '.webp';
     const filename = `${user.id}-${Date.now()}${ext}`;
-    const uploadDir = path.join(__dirname, '../../../public/uploads/avatars');
+    const uploadDir = path.join(__dirname, '../../../../public/uploads/avatars');
     const filePath = path.join(uploadDir, filename);
     const relativeUrl = `/uploads/avatars/${filename}`;
 
