@@ -212,6 +212,8 @@ export const api = {
 
   // New endpoints for the home page
   getLatestPrimeVideo: () => request('/prime/latest'),
+  getLatestVideoramaVideo: () => request('/videorama/latest'),
+  getActiveLiveStreams: () => request('/livestream/active'),
   getMostActiveHangout: () => request('/hangouts/most-active'),
 };
 

@@ -88,12 +88,91 @@ function RecentFeed() {
 export default function HomePage() {
   const { user } = useAuth();
   const [latestPrimeVideo, setLatestPrimeVideo] = useState(null);
+  const [latestVideoramaVideo, setLatestVideoramaVideo] = useState(null);
+  const [activeLiveStream, setActiveLiveStream] = useState(null);
   const [mostActiveHangout, setMostActiveHangout] = useState(null);
 
   useEffect(() => {
-    api.getLatestPrimeVideo().then(data => setLatestPrimeVideo(data.data));
-    api.getMostActiveHangout().then(data => setMostActiveHangout(data.data));
+    api.getLatestPrimeVideo().then(data => setLatestPrimeVideo(data.data)).catch(() => {});
+    api.getLatestVideoramaVideo().then(data => setLatestVideoramaVideo(data.data)).catch(() => {});
+    api.getActiveLiveStreams().then(data => setActiveLiveStream(data.data)).catch(() => {});
+    api.getMostActiveHangout().then(data => setMostActiveHangout(data.data)).catch(() => {});
   }, []);
+
+  const FeaturedCard = ({ badge, badgeColor, title, subtitle, image, cta, ctaText, onClick }) => (
+    <div
+      onClick={onClick}
+      style={{
+        background: 'linear-gradient(135deg, rgba(0,0,0,0.3), rgba(0,0,0,0.6))',
+        backgroundImage: image ? `url(${image})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        borderRadius: 12,
+        overflow: 'hidden',
+        cursor: 'pointer',
+        aspectRatio: '16/9',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        padding: 16,
+        position: 'relative',
+        textDecoration: 'none',
+        color: 'inherit',
+        transition: 'transform 0.2s, box-shadow 0.2s',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'scale(1.02)';
+        e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.3)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'scale(1)';
+        e.currentTarget.style.boxShadow = 'none';
+      }}
+      as={Link}
+      to={cta}
+      className="card"
+    >
+      <span style={{
+        display: 'inline-block',
+        background: badgeColor || 'var(--accent)',
+        color: '#fff',
+        padding: '4px 8px',
+        borderRadius: 6,
+        fontSize: 11,
+        fontWeight: 600,
+        width: 'fit-content',
+        textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+      }}>
+        {badge}
+      </span>
+      <div>
+        <div style={{ fontWeight: 600, fontSize: 16, color: '#fff', marginBottom: 4, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+          {title}
+        </div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 12, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+          {subtitle}
+        </div>
+        <button
+          style={{
+            background: 'var(--accent)',
+            color: '#fff',
+            border: 'none',
+            padding: '6px 12px',
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            onClick?.();
+          }}
+        >
+          {ctaText}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <Layout>
@@ -104,20 +183,63 @@ export default function HomePage() {
 
       <NowPlaying />
 
-      <div className="section-label">Highlights</div>
-      <div className="quick-actions">
+      <div className="section-label">Featured Content</div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        gap: 12,
+        marginBottom: 24
+      }}>
         {latestPrimeVideo && (
-          <Link to={latestPrimeVideo.link} className="card quick-action">
-            <div className="quick-action-icon videorama"><Film size={24} /></div>
-            <span className="quick-action-label">Latest Prime Video</span>
-            <span className="quick-action-desc">{latestPrimeVideo.title}</span>
+          <Link to="/videorama" style={{ textDecoration: 'none' }}>
+            <FeaturedCard
+              badge="👑 PRIME"
+              badgeColor="#D4AF37"
+              title={latestPrimeVideo.title}
+              subtitle={latestPrimeVideo.artist}
+              image={latestPrimeVideo.cover}
+              cta="/suscripcion"
+              ctaText="Subscribe"
+            />
+          </Link>
+        )}
+        {latestVideoramaVideo && (
+          <Link to="/videorama" style={{ textDecoration: 'none' }}>
+            <FeaturedCard
+              badge="🎬 VIDEORAMA"
+              badgeColor="#1abc9c"
+              title={latestVideoramaVideo.title}
+              subtitle={latestVideoramaVideo.artist}
+              image={latestVideoramaVideo.cover}
+              cta="/videorama"
+              ctaText="Watch"
+            />
+          </Link>
+        )}
+        {activeLiveStream && (
+          <Link to="/livestream" style={{ textDecoration: 'none' }}>
+            <FeaturedCard
+              badge="📻 LIVE"
+              badgeColor="#ff453a"
+              title={activeLiveStream.title}
+              subtitle={activeLiveStream.host}
+              image={activeLiveStream.thumbnail}
+              cta="/livestream"
+              ctaText="Join"
+            />
           </Link>
         )}
         {mostActiveHangout && (
-          <Link to={mostActiveHangout.link} className="card quick-action">
-            <div className="quick-action-icon hangouts"><Users size={24} /></div>
-            <span className="quick-action-label">Most Active Hangout</span>
-            <span className="quick-action-desc">{mostActiveHangout.title}</span>
+          <Link to="/hangouts" style={{ textDecoration: 'none' }}>
+            <FeaturedCard
+              badge="👥 HANGOUT"
+              badgeColor="#007AFF"
+              title={mostActiveHangout.title}
+              subtitle={`${mostActiveHangout.members || 0} members`}
+              image={mostActiveHangout.thumbnail}
+              cta="/hangouts"
+              ctaText="Join"
+            />
           </Link>
         )}
       </div>

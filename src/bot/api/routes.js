@@ -1460,7 +1460,6 @@ app.post('/api/webapp/live/streams/:streamId/leave', asyncHandler(webappLiveCont
 // Web App Admin Routes (session auth + role check)
 const webappAdminController = require('./controllers/webappAdminController');
 const primeController = require('./controllers/primeController');
-const hangoutsController = require('./controllers/hangoutsController');
 const { adminGuard } = require('../../middleware/guards');
 
 // Admin endpoints with session-based authentication
@@ -1475,7 +1474,21 @@ app.get('/api/webapp/admin/hangouts', adminGuard, asyncHandler(webappAdminContro
 app.delete('/api/webapp/admin/hangouts/:id', adminGuard, asyncHandler(webappAdminController.endHangout));
 
 app.get('/api/prime/latest', asyncHandler(primeController.getLatestPrimeVideo));
+app.get('/api/videorama/latest', asyncHandler(primeController.getLatestVideoramaVideo));
 app.get('/api/hangouts/most-active', asyncHandler(hangoutsController.getMostActiveHangout));
+
+// Live streaming endpoint for featured content
+app.get('/api/livestream/active', asyncHandler(async (req, res) => {
+  const LiveStreamModel = require('../../models/liveStreamModel');
+  try {
+    const streams = await LiveStreamModel.getActiveStreams(1);
+    const stream = streams.length > 0 ? streams[0] : null;
+    res.json({ success: true, data: stream });
+  } catch (error) {
+    logger.error('getActiveLiveStream error:', error);
+    res.status(500).json({ error: 'Failed to load live streams' });
+  }
+}));
 
 // ==========================================
 // Media & Radio Admin Routes
