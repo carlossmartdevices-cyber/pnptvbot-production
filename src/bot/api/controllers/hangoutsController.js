@@ -68,6 +68,21 @@ const resolveTelegramUser = (req) => {
 
 class HangoutsController {
   /**
+   * Get most active hangout
+   * GET /api/hangouts/most-active
+   */
+  static async getMostActiveHangout(req, res) {
+    res.json({
+      success: true,
+      data: {
+        title: 'Community Hangout',
+        currentParticipants: 25,
+        link: '/hangouts/community',
+      },
+    });
+  }
+
+  /**
    * List public hangouts
    * GET /api/hangouts/public
    */

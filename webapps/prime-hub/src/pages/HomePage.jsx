@@ -87,6 +87,13 @@ function RecentFeed() {
 
 export default function HomePage() {
   const { user } = useAuth();
+  const [latestPrimeVideo, setLatestPrimeVideo] = useState(null);
+  const [mostActiveHangout, setMostActiveHangout] = useState(null);
+
+  useEffect(() => {
+    api.getLatestPrimeVideo().then(data => setLatestPrimeVideo(data.data));
+    api.getMostActiveHangout().then(data => setMostActiveHangout(data.data));
+  }, []);
 
   return (
     <Layout>
@@ -97,38 +104,22 @@ export default function HomePage() {
 
       <NowPlaying />
 
-      <div className="section-label">Explore</div>
+      <div className="section-label">Highlights</div>
       <div className="quick-actions">
-        <Link to="/nearby" className="card quick-action">
-          <div className="quick-action-icon nearby"><MapPin size={24} /></div>
-          <span className="quick-action-label">Nearby</span>
-          <span className="quick-action-desc">Discover members</span>
-        </Link>
-        <Link to="/hangouts" className="card quick-action">
-          <div className="quick-action-icon hangouts"><Users size={24} /></div>
-          <span className="quick-action-label">Hangouts</span>
-          <span className="quick-action-desc">Video call rooms</span>
-        </Link>
-        <Link to="/live" className="card quick-action">
-          <div className="quick-action-icon live"><Radio size={24} /></div>
-          <span className="quick-action-label">Live</span>
-          <span className="quick-action-desc">Live performances</span>
-        </Link>
-        <Link to="/videorama" className="card quick-action">
-          <div className="quick-action-icon videorama"><Film size={24} /></div>
-          <span className="quick-action-label">Videorama</span>
-          <span className="quick-action-desc">Media center</span>
-        </Link>
-        <Link to="/feed" className="card quick-action">
-          <div className="quick-action-icon" style={{ background: 'linear-gradient(135deg, #ff6b35, #f7c59f)' }}><Rss size={24} /></div>
-          <span className="quick-action-label">Feed</span>
-          <span className="quick-action-desc">Community posts</span>
-        </Link>
-        <Link to="/messages" className="card quick-action">
-          <div className="quick-action-icon" style={{ background: 'linear-gradient(135deg, #6c63ff, #a29bfe)' }}><MessageSquare size={24} /></div>
-          <span className="quick-action-label">Messages</span>
-          <span className="quick-action-desc">Direct messages</span>
-        </Link>
+        {latestPrimeVideo && (
+          <Link to={latestPrimeVideo.link} className="card quick-action">
+            <div className="quick-action-icon videorama"><Film size={24} /></div>
+            <span className="quick-action-label">Latest Prime Video</span>
+            <span className="quick-action-desc">{latestPrimeVideo.title}</span>
+          </Link>
+        )}
+        {mostActiveHangout && (
+          <Link to={mostActiveHangout.link} className="card quick-action">
+            <div className="quick-action-icon hangouts"><Users size={24} /></div>
+            <span className="quick-action-label">Most Active Hangout</span>
+            <span className="quick-action-desc">{mostActiveHangout.title}</span>
+          </Link>
+        )}
       </div>
 
       <div className="section-label">Latest Posts</div>

@@ -1459,6 +1459,8 @@ app.post('/api/webapp/live/streams/:streamId/leave', asyncHandler(webappLiveCont
 
 // Web App Admin Routes (session auth + role check)
 const webappAdminController = require('./controllers/webappAdminController');
+const primeController = require('./controllers/primeController');
+const hangoutsController = require('./controllers/hangoutsController');
 const { adminGuard } = require('../../middleware/guards');
 
 // Admin endpoints with session-based authentication
@@ -1471,6 +1473,9 @@ app.get('/api/webapp/admin/posts', adminGuard, asyncHandler(webappAdminControlle
 app.delete('/api/webapp/admin/posts/:id', adminGuard, asyncHandler(webappAdminController.deletePost));
 app.get('/api/webapp/admin/hangouts', adminGuard, asyncHandler(webappAdminController.listHangouts));
 app.delete('/api/webapp/admin/hangouts/:id', adminGuard, asyncHandler(webappAdminController.endHangout));
+
+app.get('/api/prime/latest', asyncHandler(primeController.getLatestPrimeVideo));
+app.get('/api/hangouts/most-active', asyncHandler(hangoutsController.getMostActiveHangout));
 
 // ==========================================
 // Media & Radio Admin Routes

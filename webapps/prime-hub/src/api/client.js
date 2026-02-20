@@ -209,6 +209,10 @@ export const api = {
     return request(`/admin/audit-logs?${params.toString()}`);
   },
   getAdminAuditLogsResource: (resourceType, resourceId, limit = 50) => request(`/admin/audit-logs/resource?resourceType=${resourceType}&resourceId=${resourceId}&limit=${limit}`),
+
+  // New endpoints for the home page
+  getLatestPrimeVideo: () => request('/prime/latest'),
+  getMostActiveHangout: () => request('/hangouts/most-active'),
 };
 
 export const apiClient = api;
