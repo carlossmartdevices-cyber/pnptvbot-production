@@ -761,6 +761,8 @@ const xLoginCallback = async (req, res) => {
       return body;
     };
 
+    const toFormEncoded = (value) => encodeURIComponent(String(value));
+
     const exchangeToken = async (mode) => {
       const config = {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -768,11 +770,17 @@ const xLoginCallback = async (req, res) => {
       if (mode === 'basic') {
         config.auth = { username: clientId, password: clientSecret };
       }
+      if (mode === 'basic_encoded') {
+        const encodedId = toFormEncoded(clientId);
+        const encodedSecret = toFormEncoded(clientSecret);
+        const basicValue = Buffer.from(`${encodedId}:${encodedSecret}`).toString('base64');
+        config.headers.Authorization = `Basic ${basicValue}`;
+      }
       return axios.post('https://api.twitter.com/2/oauth2/token', buildTokenBody(mode).toString(), config);
     };
 
     const modes = clientSecret
-      ? ['basic', 'client_secret_post', 'public']
+      ? ['basic_encoded', 'basic', 'client_secret_post', 'public']
       : ['public'];
     let tokenRes = null;
     let lastTokenError = null;

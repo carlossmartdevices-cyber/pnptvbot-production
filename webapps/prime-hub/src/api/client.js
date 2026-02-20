@@ -82,11 +82,11 @@ export const api = {
   getRadioNowPlaying: () => fetch('/api/radio/now-playing', { credentials: 'include' }).then(r => r.json()).catch(() => ({})),
 
   // Hangouts
-  getPublicHangouts: () => request('/hangouts/public'),
-  createHangout: (data) => request('/hangouts/create', { method: 'POST', body: JSON.stringify(data) }),
-  joinHangout: (callId) => request(`/hangouts/join/${callId}`, { method: 'POST' }),
-  leaveHangout: (callId) => request(`/hangouts/leave/${callId}`, { method: 'POST' }),
-  endHangout: (callId) => request(`/hangouts/${callId}`, { method: 'DELETE' }),
+  getPublicHangouts: () => request('/webapp/hangouts/public'),
+  createHangout: (data) => request('/webapp/hangouts/create', { method: 'POST', body: JSON.stringify(data) }),
+  joinHangout: (callId) => request(`/webapp/hangouts/join/${callId}`, { method: 'POST' }),
+  leaveHangout: (callId) => request(`/webapp/hangouts/leave/${callId}`, { method: 'POST' }),
+  endHangout: (callId) => request(`/webapp/hangouts/${callId}`, { method: 'DELETE' }),
 
   // Social feed
   getFeed: (cursor) => request(`/social/feed${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
