@@ -1,6 +1,10 @@
 const { query } = require('../../../config/postgres');
 const logger = require('../../../utils/logger');
 const axios = require('axios');
+const sharp = require('sharp');
+const path = require('path');
+const fs = require('fs').promises;
+const MediaCleanupService = require('../../services/mediaCleanupService');
 
 const authGuard = (req, res) => {
   const user = req.session?.user;
@@ -172,6 +176,9 @@ const deletePost = async (req, res) => {
   const user = authGuard(req, res); if (!user) return;
   const { postId } = req.params;
   try {
+    // Delete media file if present (cost optimization)
+    await MediaCleanupService.deletePostMedia(postId);
+
     const { rowCount } = await query(
       'UPDATE social_posts SET is_deleted=true WHERE id=$1 AND user_id=$2',
       [postId, user.id]
@@ -229,4 +236,107 @@ const postToMastodon = async (req, res) => {
   }
 };
 
-module.exports = { getFeed, getWall, createPost, toggleLike, deletePost, getReplies, postToMastodon };
+// ── Create Post with Media ────────────────────────────────────────────────
+
+const createPostWithMedia = async (req, res) => {
+  const user = authGuard(req, res); if (!user) return;
+  const { content, replyToId, repostOfId } = req.body;
+
+  if (!content || !content.toString().trim()) return res.status(400).json({ error: 'Content required' });
+  if (content.toString().length > 5000) return res.status(400).json({ error: 'Post too long (max 5000 chars)' });
+
+  let mediaUrl = null;
+  let mediaType = null;
+
+  try {
+    // Process uploaded media if present
+    if (req.file) {
+      const { mimetype, buffer, originalname } = req.file;
+      const uploadDir = path.join(__dirname, '../../../public/uploads/posts');
+      await fs.mkdir(uploadDir, { recursive: true });
+
+      // Determine media type and process
+      if (/^image\/(jpeg|jpg|png|webp|gif)$/i.test(mimetype)) {
+        mediaType = 'image';
+        const ext = '.webp';
+        const filename = `img-${user.id}-${Date.now()}${ext}`;
+        const filePath = path.join(uploadDir, filename);
+
+        // Aggressive compression: max 800px (not 1200), WebP 70% quality, progressive (saves ~50%)
+        await sharp(buffer)
+          .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 70, progressive: true })
+          .toFile(filePath);
+
+        mediaUrl = `/uploads/posts/${filename}`;
+      } else if (/^video\/(mp4|webm)$/i.test(mimetype)) {
+        mediaType = 'video';
+        // IMPORTANT: Videos NOT stored locally - too expensive.
+        // Instead, require external video hosting (YouTube, Vimeo, etc.)
+        return res.status(400).json({
+          error: 'Videos must be uploaded to YouTube/Vimeo and shared via link. Local video storage disabled to save costs.'
+        });
+      } else {
+        return res.status(400).json({ error: 'Only image (jpg/png/webp/gif) files are allowed' });
+      }
+    }
+
+    // Create post record
+    const { rows } = await query(
+      `INSERT INTO social_posts (user_id, content, media_url, media_type, reply_to_id, repost_of_id)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, content, media_url, media_type, reply_to_id, repost_of_id,
+                 likes_count, reposts_count, replies_count, created_at`,
+      [user.id, content.toString().trim(), mediaUrl, mediaType, replyToId || null, repostOfId || null]
+    );
+    const post = rows[0];
+
+    // Update reply count on parent
+    if (replyToId) {
+      await query('UPDATE social_posts SET replies_count = replies_count + 1 WHERE id = $1', [replyToId]);
+    }
+    // Update repost count on original
+    if (repostOfId) {
+      await query('UPDATE social_posts SET reposts_count = reposts_count + 1 WHERE id = $1', [repostOfId]);
+    }
+
+    // Mirror to Mastodon if token configured and it's a top-level post
+    if (!replyToId && !repostOfId && process.env.MASTODON_ACCESS_TOKEN && process.env.MASTODON_BASE_URL) {
+      axios.post(
+        `${process.env.MASTODON_BASE_URL}/api/v1/statuses`,
+        { status: content.toString().trim() },
+        { headers: { Authorization: `Bearer ${process.env.MASTODON_ACCESS_TOKEN}` } }
+      ).then(r => {
+        query('UPDATE social_posts SET mastodon_id = $1 WHERE id = $2', [r.data.id, post.id]).catch(() => {});
+      }).catch(() => {});
+    }
+
+    // Notify room via Socket.IO
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('feed:new_post', {
+        ...post,
+        author_id: user.id,
+        author_username: user.username,
+        author_first_name: user.firstName,
+        author_photo: user.photoUrl,
+        liked_by_me: false,
+      });
+    }
+
+    const fullPost = {
+      ...post,
+      author_id: user.id,
+      author_username: user.username,
+      author_first_name: user.firstName || user.first_name,
+      author_photo: user.photoUrl || user.photo_url,
+      liked_by_me: false,
+    };
+    return res.json({ success: true, post: fullPost });
+  } catch (err) {
+    logger.error('createPostWithMedia error', err);
+    return res.status(500).json({ error: 'Failed to create post' });
+  }
+};
+
+module.exports = { getFeed, getWall, createPost, toggleLike, deletePost, getReplies, postToMastodon, createPostWithMedia };

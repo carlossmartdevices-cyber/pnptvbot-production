@@ -9,6 +9,7 @@ const CultEventService = require('../src/bot/services/cultEventService');
 const VisaCybersourceService = require('../src/bot/services/visaCybersourceService');
 const logger = require('../src/utils/logger');
 const PaymentRecoveryService = require('../src/bot/services/paymentRecoveryService');
+const MediaCleanupService = require('../src/bot/services/mediaCleanupService');
 
 /**
  * Initialize and start cron jobs
@@ -100,6 +101,19 @@ const startCronJobs = async (bot = null) => {
         logger.info(`Processed ${processed} expired subscriptions`);
       } catch (error) {
         logger.error('Error in subscription expiry cron:', error);
+      }
+    });
+
+    // Media cleanup - daily at 3 AM UTC
+    // Deletes old avatars and orphaned post media files to minimize storage costs
+    cron.schedule(process.env.MEDIA_CLEANUP_CRON || '0 3 * * *', async () => {
+      try {
+        logger.info('Running media cleanup job...');
+        await MediaCleanupService.cleanupOldAvatars();
+        await MediaCleanupService.cleanupOldPostMedia(90); // Keep posts 90 days
+        logger.info('Media cleanup completed');
+      } catch (error) {
+        logger.error('Error in media cleanup cron:', error);
       }
     });
 

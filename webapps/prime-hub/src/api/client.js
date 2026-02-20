@@ -64,6 +64,18 @@ export const api = {
   // Profile
   getProfile: () => request('/profile'),
   updateProfile: (data) => request('/profile', { method: 'PUT', body: JSON.stringify(data) }),
+  uploadAvatar: (file) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return fetch(`${API_BASE}/profile/avatar`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData
+    }).then(r => r.json()).then(data => {
+      if (!data.success) throw new Error(data.error || 'Upload failed');
+      return data;
+    });
+  },
 
   // Nearby
   nearbyUpdateLocation: (lat, lng, accuracy) =>
@@ -92,6 +104,19 @@ export const api = {
   getFeed: (cursor) => request(`/social/feed${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
   getWall: (userId, cursor) => request(`/social/wall/${userId}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
   createPost: (data) => request('/social/posts', { method: 'POST', body: JSON.stringify(data) }),
+  createPostWithMedia: (content, file) => {
+    const formData = new FormData();
+    formData.append('content', content);
+    if (file) formData.append('media', file);
+    return fetch(`${API_BASE}/social/posts/with-media`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData
+    }).then(r => r.json()).then(data => {
+      if (!data.success) throw new Error(data.error || 'Post failed');
+      return data;
+    });
+  },
   toggleLike: (postId) => request(`/social/posts/${postId}/like`, { method: 'POST' }),
   deletePost: (postId) => request(`/social/posts/${postId}`, { method: 'DELETE' }),
   getReplies: (postId, cursor) => request(`/social/posts/${postId}/replies${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),

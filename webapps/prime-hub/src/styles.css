@@ -1674,3 +1674,46 @@ img {
   padding: 8px 14px;
   font-size: 13px;
 }
+
+/* ================================
+   UPLOAD & MEDIA STYLES
+   ================================ */
+
+.profile-avatar {
+  transition: all var(--transition);
+  position: relative;
+}
+
+.profile-avatar:hover {
+  border-color: var(--accent-pink);
+  box-shadow: 0 0 12px rgba(255, 0, 204, 0.3);
+}
+
+.composer-media-preview {
+  margin-bottom: 12px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+}
+
+.composer-media-preview img,
+.composer-media-preview video {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+}
+
+.composer-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.post-media {
+  width: 100%;
+  border-radius: var(--radius-md);
+  margin: 10px 0;
+  max-width: 100%;
+  max-height: 500px;
+}

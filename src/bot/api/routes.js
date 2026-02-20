@@ -607,6 +607,28 @@ const ageVerificationUpload = multer({
   }
 });
 
+// Avatar upload (profile picture) - 5MB max, images only
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const isImage = /^image\/(jpeg|jpg|png|webp|gif)$/i.test(file.mimetype || '');
+    if (isImage) return cb(null, true);
+    cb(new Error('Only image files are allowed'));
+  }
+});
+
+// Social post media upload - 50MB max, images or videos
+const postMediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const isAllowed = /^(image\/(jpeg|jpg|png|webp|gif)|video\/(mp4|webm))$/i.test(file.mimetype || '');
+    if (isAllowed) return cb(null, true);
+    cb(new Error('Only image (jpg/png/webp/gif) and video (mp4/webm) files are allowed'));
+  }
+});
+
 const uploadAgeVerificationPhoto = (req, res, next) => {
   ageVerificationUpload.single('photo')(req, res, (err) => {
     if (!err) {
@@ -1414,6 +1436,7 @@ app.post('/api/webapp/auth/reset-password', asyncHandler(webAppController.resetP
 // Web App Profile
 app.get('/api/webapp/profile', asyncHandler(webAppController.getProfile));
 app.put('/api/webapp/profile', asyncHandler(webAppController.updateProfile));
+app.post('/api/webapp/profile/avatar', avatarUpload.single('avatar'), asyncHandler(webAppController.uploadAvatar));
 
 // Web App Mastodon Feed
 app.get('/api/webapp/mastodon/feed', asyncHandler(webAppController.getMastodonFeed));
@@ -1536,6 +1559,7 @@ app.post('/api/webapp/dm/send/:recipientId', asyncHandler(dmController.sendMessa
 app.get('/api/webapp/social/feed', asyncHandler(socialController.getFeed));
 app.get('/api/webapp/social/wall/:userId', asyncHandler(socialController.getWall));
 app.post('/api/webapp/social/posts', asyncHandler(socialController.createPost));
+app.post('/api/webapp/social/posts/with-media', postMediaUpload.single('media'), asyncHandler(socialController.createPostWithMedia));
 app.post('/api/webapp/social/posts/:postId/like', asyncHandler(socialController.toggleLike));
 app.delete('/api/webapp/social/posts/:postId', asyncHandler(socialController.deletePost));
 app.get('/api/webapp/social/posts/:postId/replies', asyncHandler(socialController.getReplies));

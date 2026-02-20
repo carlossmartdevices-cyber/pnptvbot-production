@@ -5,6 +5,9 @@ const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const emailService = require('../../../services/emailService');
 const { getRedis } = require('../../../config/redis');
+const sharp = require('sharp');
+const path = require('path');
+const fs = require('fs').promises;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1206,6 +1209,65 @@ const getMastodonFeed = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/webapp/profile/avatar
+ * Upload and update user profile avatar
+ */
+const uploadAvatar = async (req, res) => {
+  const user = req.session?.user;
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+
+  if (!req.file) return res.status(400).json({ error: 'No file provided' });
+
+  try {
+    const { mimetype, buffer } = req.file;
+    const isImage = /^image\/(jpeg|jpg|png|webp|gif)$/i.test(mimetype);
+    if (!isImage) return res.status(400).json({ error: 'Only image files are allowed' });
+
+    const ext = '.webp';
+    const filename = `${user.id}-${Date.now()}${ext}`;
+    const uploadDir = path.join(__dirname, '../../../public/uploads/avatars');
+    const filePath = path.join(uploadDir, filename);
+    const relativeUrl = `/uploads/avatars/${filename}`;
+
+    await fs.mkdir(uploadDir, { recursive: true });
+
+    // Aggressive compression: 256x256, WebP quality 75 (saves ~40% vs 85)
+    await sharp(buffer)
+      .resize(256, 256, { fit: 'cover', position: 'center' })
+      .webp({ quality: 75, progressive: true })
+      .toFile(filePath);
+
+    // Delete old avatars for this user (keep only latest to save storage)
+    try {
+      const oldFiles = await fs.readdir(uploadDir);
+      const userOldFiles = oldFiles.filter(f => f.startsWith(`${user.id}-`) && f !== filename);
+      for (const oldFile of userOldFiles) {
+        const oldPath = path.join(uploadDir, oldFile);
+        await fs.unlink(oldPath);
+      }
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+
+    await query(
+      'UPDATE users SET photo_file_id = $1, updated_at = NOW() WHERE id = $2',
+      [relativeUrl, user.id]
+    );
+
+    req.session.user.photoUrl = relativeUrl;
+    await new Promise((resolve, reject) =>
+      req.session.save(err => (err ? reject(err) : resolve()))
+    );
+
+    logger.info(`Avatar uploaded: user ${user.id} → ${filename}`);
+    return res.json({ success: true, photoUrl: relativeUrl });
+  } catch (error) {
+    logger.error('Avatar upload error:', error);
+    return res.status(500).json({ error: 'Failed to upload avatar' });
+  }
+};
+
 module.exports = {
   telegramStart,
   telegramCallback,
@@ -1224,4 +1286,5 @@ module.exports = {
   forgotPassword,
   resetPassword,
   getMastodonFeed,
+  uploadAvatar,
 };

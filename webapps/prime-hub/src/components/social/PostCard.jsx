@@ -93,6 +93,10 @@ export default function PostCard({ post, onDeleted }) {
         <img src={post.media_url} alt="" className="post-media" />
       )}
 
+      {post.media_url && post.media_type === 'video' && (
+        <video src={post.media_url} controls className="post-media" style={{ maxHeight: 400 }} />
+      )}
+
       <div className="post-actions">
         <button onClick={handleLike} className={`post-action-btn ${liked ? 'liked' : ''}`}>
           <Heart size={16} fill={liked ? 'currentColor' : 'none'} />

@@ -17,6 +17,56 @@ function SubscriptionBadge({ status }) {
   return <span className={`sub-badge ${info.className}`}>{info.label}</span>;
 }
 
+function AvatarSection({ photoUrl, onUpload, uploading }) {
+  const inputRef = React.useRef(null);
+  const [preview, setPreview] = useState(null);
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => setPreview(ev.target.result);
+    reader.readAsDataURL(file);
+
+    try {
+      await onUpload(file);
+      setPreview(null);
+    } catch (err) {
+      setPreview(null);
+    }
+  };
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block', margin: '0 auto' }}>
+      <div
+        className="profile-avatar"
+        onClick={() => inputRef.current?.click()}
+        style={{ cursor: 'pointer', position: 'relative' }}
+        title="Click to upload avatar"
+      >
+        {preview ? (
+          <img src={preview} alt="Preview" />
+        ) : photoUrl ? (
+          <img src={photoUrl} alt="Avatar" />
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', fontSize: 28, fontWeight: 700, color: 'var(--accent-pink)' }}>
+            {uploading ? '...' : '📷'}
+          </div>
+        )}
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelect}
+        disabled={uploading}
+        style={{ display: 'none' }}
+      />
+    </div>
+  );
+}
+
 function Field({ label, value, editing, name, form, onChange, placeholder, textarea }) {
   if (!editing) {
     if (!value) return null;
@@ -45,6 +95,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({});
 
@@ -92,6 +143,19 @@ export default function ProfilePage() {
     }
   };
 
+  const handleAvatarUpload = async (file) => {
+    setUploading(true);
+    setError('');
+    try {
+      const result = await api.uploadAvatar(file);
+      setProfile(p => ({ ...p, photoUrl: result.photoUrl }));
+    } catch (err) {
+      setError(err.message || 'Failed to upload avatar');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
     return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -107,11 +171,7 @@ export default function ProfilePage() {
         <>
           {/* Profile Header */}
           <div className="card profile-header-card">
-            <div className="profile-avatar">
-              <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 700, color: 'var(--accent)' }}>
-                {(profile?.firstName || user?.firstName || '?')[0].toUpperCase()}
-              </div>
-            </div>
+            <AvatarSection photoUrl={profile?.photoUrl} onUpload={handleAvatarUpload} uploading={uploading} />
             {editing ? (
               <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                 <input name="firstName" value={form.firstName} onChange={handleChange} placeholder="First name" className="profile-edit-input" style={{ maxWidth: 130 }} />
