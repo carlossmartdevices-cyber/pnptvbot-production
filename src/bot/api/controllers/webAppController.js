@@ -765,22 +765,26 @@ const xLoginCallback = async (req, res) => {
 
     const exchangeToken = async (mode) => {
       const config = {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+        },
       };
       if (mode === 'basic') {
         config.auth = { username: clientId, password: clientSecret };
       }
       if (mode === 'basic_encoded') {
+        // X OAuth expects URL-encoded client_id in Basic auth when it contains ':' segments.
+        // Keep client_secret raw to match provider parsing expectations.
         const encodedId = toFormEncoded(clientId);
-        const encodedSecret = toFormEncoded(clientSecret);
-        const basicValue = Buffer.from(`${encodedId}:${encodedSecret}`).toString('base64');
+        const basicValue = Buffer.from(`${encodedId}:${String(clientSecret)}`).toString('base64');
         config.headers.Authorization = `Basic ${basicValue}`;
       }
       return axios.post('https://api.twitter.com/2/oauth2/token', buildTokenBody(mode).toString(), config);
     };
 
     const modes = clientSecret
-      ? ['basic_encoded', 'basic', 'client_secret_post', 'public']
+      ? ['basic_encoded', 'client_secret_post', 'basic', 'public']
       : ['public'];
     let tokenRes = null;
     let lastTokenError = null;
