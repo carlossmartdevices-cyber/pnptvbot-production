@@ -151,35 +151,7 @@ const sessionMiddleware = session({
 
 app.use(sessionMiddleware);
 
-// Middleware to ensure Set-Cookie header is sent after session.save()
-app.use((req, res, next) => {
-  // Hook into json and send methods to set Set-Cookie before headers are sent
-  const originalJson = res.json;
-  const originalSend = res.send;
-
-  const ensureSetCookie = () => {
-    if (req.sessionID && req.session && !res.headersSent && !res.get('Set-Cookie')) {
-      const cookie = req.session.cookie;
-      const maxAge = cookie.maxAge || (24 * 60 * 60 * 1000);
-      const expires = new Date(Date.now() + maxAge).toUTCString();
-      const secure = cookie.secure ? 'Secure;' : '';
-      const cookieStr = `connect.sid=${req.sessionID}; Path=${cookie.path || '/'}; HttpOnly; SameSite=${cookie.sameSite || 'Strict'}; Max-Age=${Math.floor(maxAge / 1000)}; ${secure}Expires=${expires}`;
-      res.setHeader('Set-Cookie', cookieStr);
-    }
-  };
-
-  res.json = function(data) {
-    ensureSetCookie();
-    return originalJson.call(this, data);
-  };
-
-  res.send = function(data) {
-    ensureSetCookie();
-    return originalSend.call(this, data);
-  };
-
-  next();
-});
+// express-session handles Set-Cookie automatically — no custom middleware needed
 
 
 // Function to conditionally apply middleware (skip for Telegram webhook)

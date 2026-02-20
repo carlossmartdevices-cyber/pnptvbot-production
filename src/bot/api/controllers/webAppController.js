@@ -657,10 +657,9 @@ const emailLogin = async (req, res) => {
  */
 const xLoginStart = async (req, res) => {
   try {
-    // Use the webapp-specific X app credentials for web login
-    // Falls back to main Twitter app if webapp-specific not set
-    const clientId = process.env.WEBAPP_X_CLIENT_ID || process.env.TWITTER_CLIENT_ID;
-    const redirectUri = process.env.WEBAPP_X_REDIRECT_URI || process.env.TWITTER_REDIRECT_URI;
+    // Use the main Twitter app credentials (registered in X Developer Portal)
+    const clientId = process.env.TWITTER_CLIENT_ID;
+    const redirectUri = process.env.TWITTER_REDIRECT_URI;
 
     if (!clientId || !redirectUri) {
       return res.status(500).json({ error: 'X login not configured on this server' });
@@ -729,9 +728,9 @@ const xLoginCallback = async (req, res) => {
     const { codeVerifier } = stored;
     delete req.session.xOAuth;
 
-    const clientId = process.env.WEBAPP_X_CLIENT_ID || process.env.TWITTER_CLIENT_ID;
-    const clientSecret = process.env.WEBAPP_X_CLIENT_SECRET || process.env.TWITTER_CLIENT_SECRET;
-    const redirectUri = process.env.WEBAPP_X_REDIRECT_URI || process.env.TWITTER_REDIRECT_URI;
+    const clientId = process.env.TWITTER_CLIENT_ID;
+    const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+    const redirectUri = process.env.TWITTER_REDIRECT_URI;
 
     // Exchange code for access token
     // Try confidential client (Basic Auth) first, fall back to public client (client_id in body)
