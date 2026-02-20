@@ -658,8 +658,9 @@ const emailLogin = async (req, res) => {
 const xLoginStart = async (req, res) => {
   try {
     // Prefer dedicated webapp X app credentials, fall back to main Twitter app.
-    const clientId = process.env.WEBAPP_X_CLIENT_ID || process.env.TWITTER_CLIENT_ID;
-    const redirectUri = process.env.WEBAPP_X_REDIRECT_URI || process.env.TWITTER_REDIRECT_URI;
+    const hasWebappConfig = Boolean(process.env.WEBAPP_X_CLIENT_ID && process.env.WEBAPP_X_REDIRECT_URI);
+    const clientId = hasWebappConfig ? process.env.WEBAPP_X_CLIENT_ID : process.env.TWITTER_CLIENT_ID;
+    const redirectUri = hasWebappConfig ? process.env.WEBAPP_X_REDIRECT_URI : process.env.TWITTER_REDIRECT_URI;
 
     if (!clientId || !redirectUri) {
       return res.status(500).json({ error: 'X login not configured on this server' });
@@ -669,7 +670,13 @@ const xLoginStart = async (req, res) => {
     const codeVerifier = b64url(crypto.randomBytes(32));
     const codeChallenge = b64url(crypto.createHash('sha256').update(codeVerifier).digest());
 
-    req.session.xOAuth = { state, codeVerifier };
+    req.session.xOAuth = {
+      state,
+      codeVerifier,
+      clientId,
+      redirectUri,
+      clientMode: hasWebappConfig ? 'webapp' : 'twitter',
+    };
     req.session.xWebLogin = true;
     await new Promise((resolve, reject) =>
       req.session.save(err => (err ? reject(err) : resolve()))
@@ -728,61 +735,74 @@ const xLoginCallback = async (req, res) => {
     const { codeVerifier } = stored;
     delete req.session.xOAuth;
 
-    const clientId = process.env.WEBAPP_X_CLIENT_ID || process.env.TWITTER_CLIENT_ID;
-    const clientSecret = process.env.WEBAPP_X_CLIENT_SECRET || process.env.TWITTER_CLIENT_SECRET;
-    const redirectUri = process.env.WEBAPP_X_REDIRECT_URI || process.env.TWITTER_REDIRECT_URI;
+    const clientId = stored.clientId || process.env.WEBAPP_X_CLIENT_ID || process.env.TWITTER_CLIENT_ID;
+    const redirectUri = stored.redirectUri || process.env.WEBAPP_X_REDIRECT_URI || process.env.TWITTER_REDIRECT_URI;
+    const clientSecret = stored.clientMode === 'webapp'
+      ? (process.env.WEBAPP_X_CLIENT_SECRET || process.env.TWITTER_CLIENT_SECRET)
+      : (process.env.TWITTER_CLIENT_SECRET || process.env.WEBAPP_X_CLIENT_SECRET);
 
-    // Exchange code for access token
-    // Try confidential client (Basic Auth) first, fall back to public client (client_id in body)
-    const tokenBody = new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri,
-      code_verifier: codeVerifier,
-    });
-
-    let tokenRes;
-    try {
-      if (clientSecret) {
-        // Confidential client: Basic Auth
-        tokenRes = await axios.post(
-          'https://api.twitter.com/2/oauth2/token',
-          tokenBody.toString(),
-          {
-            auth: { username: clientId, password: clientSecret },
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          }
-        );
-      } else {
-        // Public client: client_id in body
-        tokenBody.set('client_id', clientId);
-        tokenRes = await axios.post(
-          'https://api.twitter.com/2/oauth2/token',
-          tokenBody.toString(),
-          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-        );
-      }
-    } catch (tokenErr) {
-      const errData = tokenErr.response?.data;
-      logger.error('X OAuth token exchange failed:', {
-        status: tokenErr.response?.status,
-        error: errData?.error,
-        description: errData?.error_description,
-        clientId: clientId?.substring(0, 10) + '...',
-        redirectUri,
+    // Exchange code for access token.
+    // Try multiple auth modes because X apps may be configured as public or confidential.
+    const buildTokenBody = (mode) => {
+      const body = new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+        code_verifier: codeVerifier,
       });
-      // If confidential auth failed with 401, retry as public client
-      if (tokenErr.response?.status === 401 && clientSecret) {
-        logger.info('Retrying X token exchange as public client...');
-        tokenBody.set('client_id', clientId);
-        tokenRes = await axios.post(
-          'https://api.twitter.com/2/oauth2/token',
-          tokenBody.toString(),
-          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-        );
-      } else {
-        throw tokenErr;
+
+      if (mode === 'public' || mode === 'client_secret_post') {
+        body.set('client_id', clientId);
       }
+      if (mode === 'client_secret_post') {
+        body.set('client_secret', clientSecret);
+      }
+
+      return body;
+    };
+
+    const exchangeToken = async (mode) => {
+      const config = {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      };
+      if (mode === 'basic') {
+        config.auth = { username: clientId, password: clientSecret };
+      }
+      return axios.post('https://api.twitter.com/2/oauth2/token', buildTokenBody(mode).toString(), config);
+    };
+
+    const modes = clientSecret
+      ? ['basic', 'client_secret_post', 'public']
+      : ['public'];
+    let tokenRes = null;
+    let lastTokenError = null;
+
+    for (const mode of modes) {
+      try {
+        tokenRes = await exchangeToken(mode);
+        break;
+      } catch (tokenErr) {
+        lastTokenError = tokenErr;
+        const status = tokenErr.response?.status;
+        const errData = tokenErr.response?.data;
+        logger.error('X OAuth token exchange failed:', {
+          mode,
+          status,
+          error: errData?.error,
+          description: errData?.error_description,
+          clientId: clientId?.substring(0, 10) + '...',
+          redirectUri,
+        });
+
+        const shouldTryNextMode = [400, 401, 403].includes(status);
+        if (!shouldTryNextMode) {
+          throw tokenErr;
+        }
+      }
+    }
+
+    if (!tokenRes) {
+      throw lastTokenError || new Error('X OAuth token exchange failed');
     }
 
     const accessToken = tokenRes.data.access_token;
@@ -844,7 +864,11 @@ const xLoginCallback = async (req, res) => {
     logger.info(`Web app X login: user ${user.id} via @${xHandle}`);
     return res.redirect('/app');
   } catch (error) {
-    logger.error('X OAuth callback error:', error.message);
+    logger.error('X OAuth callback error:', {
+      message: error.message,
+      status: error.response?.status || null,
+      details: error.response?.data || null,
+    });
     return res.redirect('/?error=auth_failed');
   }
 };
