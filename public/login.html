@@ -416,7 +416,7 @@
       btn.disabled = true;
       btn.textContent = 'Ingresando...';
       try {
-        const res  = await fetch('/api/webapp/auth/login', {
+        const res  = await fetch('/api/webapp/auth/email/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -465,7 +465,7 @@
       btn.disabled = true;
       btn.textContent = 'Creando cuenta...';
       try {
-        const res  = await fetch('/api/webapp/auth/register', {
+        const res  = await fetch('/api/webapp/auth/email/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',

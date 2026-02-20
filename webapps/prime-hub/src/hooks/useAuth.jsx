@@ -54,10 +54,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const loginWithX = useCallback(async () => {
-    const data = await api.xLoginStart();
-    if (data.success && data.url) {
-      window.location.href = data.url;
-    }
+    await api.xLoginStart();
   }, []);
 
   const logout = useCallback(async () => {

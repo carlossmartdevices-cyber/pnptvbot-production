@@ -4,7 +4,6 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const emailService = require('../../../services/emailService');
-const { generateJWT } = require('../middleware/jwtAuth');
 const { getRedis } = require('../../../config/redis');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -633,21 +632,9 @@ const emailLogin = async (req, res) => {
     );
     logger.info(`Web app email login: user ${user.id} (${emailLower})`);
 
-
-    // Generate JWT token for API access
-    const jwtPayload = {
-      id: user.id,
-      pnptvId: user.pnptv_id,
-      email: user.email,
-      username: user.username,
-      role: user.role || 'user',
-    };
-    const token = generateJWT(jwtPayload);
-
-    const response = {
+    return res.json({
       authenticated: true,
       pnptvId: user.pnptv_id,
-      token, // Include JWT token for API authentication
       user: {
         id: user.id,
         pnptvId: user.pnptv_id,
@@ -658,9 +645,7 @@ const emailLogin = async (req, res) => {
         subscriptionStatus: user.subscription_status,
         role: user.role || 'user',
       },
-    };
-
-    return res.json(response);
+    });
   } catch (error) {
     logger.error('Email login error:', error);
     return res.status(500).json({ error: 'Login failed. Please try again.' });
@@ -732,7 +717,7 @@ const xLoginCallback = async (req, res) => {
     });
 
     if (xError || !code || !state) {
-      return res.redirect('/?error=missing_params');
+      return res.redirect('/?error=auth_failed');
     }
 
     const stored = req.session.xOAuth;

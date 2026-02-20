@@ -1,34 +1,12 @@
 const API_BASE = '/api/webapp';
 
-// Store JWT token for API requests
-let authToken = null;
-
-function setAuthToken(token) {
-  authToken = token;
-  if (token) {
-    localStorage.setItem('pnptv_token', token);
-  } else {
-    localStorage.removeItem('pnptv_token');
-  }
-}
-
-function getAuthToken() {
-  return authToken || localStorage.getItem('pnptv_token');
-}
-
 async function request(path, options = {}) {
   const url = `${API_BASE}${path}`;
-  const token = getAuthToken();
 
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers
   };
-
-  // Add JWT token if available
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
   const res = await fetch(url, {
     credentials: 'include',
@@ -47,24 +25,28 @@ async function request(path, options = {}) {
 
 export const api = {
   // Auth
-  authStatus: () => request('/auth/status'),
+  authStatus: async () => {
+    const res = await fetch('/api/me', {
+      credentials: 'include',
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || `Request failed (${res.status})`);
+    }
+    return data;
+  },
   telegramLogin: (telegramUser) =>
     request('/auth/telegram', {
       method: 'POST',
       body: JSON.stringify({ telegramUser })
     }),
   emailLogin: (email, password, rememberMe = false) =>
-    request('/auth/login', {
+    request('/auth/email/login', {
       method: 'POST',
       body: JSON.stringify({ email, password, rememberMe })
-    }).then(res => {
-      if (res.token) {
-        setAuthToken(res.token);
-      }
-      return res;
     }),
   emailRegister: (firstName, email, password, lastName = '') =>
-    request('/auth/register', {
+    request('/auth/email/register', {
       method: 'POST',
       body: JSON.stringify({ firstName, email, password, lastName })
     }),
@@ -73,11 +55,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email })
     }),
-  xLoginStart: () => request('/auth/x/start'),
-  logout: () => {
-    setAuthToken(null);
-    return request('/auth/logout', { method: 'POST' });
+  xLoginStart: async () => {
+    window.location.assign('/api/webapp/auth/x/start?redirect=true');
+    return { success: true };
   },
+  logout: () => request('/auth/logout', { method: 'POST' }),
 
   // Profile
   getProfile: () => request('/profile'),
@@ -152,15 +134,9 @@ export const api = {
   },
   getAdminMediaCategories: () => request('/admin/media/categories'),
   uploadAdminMedia: (formData) => {
-    const token = getAuthToken();
-    const headers = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
     return fetch(`${API_BASE}/admin/media/upload`, {
       method: 'POST',
       credentials: 'include',
-      headers,
       body: formData
     }).then(r => r.json()).then(data => {
       if (!data.success && !data.media) {
@@ -211,9 +187,6 @@ export const api = {
 };
 
 export const apiClient = api;
-
-// Export token management functions
-export { setAuthToken, getAuthToken };
 
 // Default export
 export default api;

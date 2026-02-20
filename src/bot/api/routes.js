@@ -432,93 +432,6 @@ app.use((req, res, next) => {
 // Landing page routes
 // Home page — serve login page directly; if already authenticated send to PRIME Hub
 app.get('/', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    // Serve easybots-specific landing page (not PRIME Hub content)
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>EasyBots - AI and Automation Platform</title>
-          <style>
-              body {
-                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                  color: white;
-                  text-align: center;
-                  padding: 50px;
-                  min-height: 100vh;
-                  margin: 0;
-              }
-              
-              .container {
-                  max-width: 800px;
-                  margin: 0 auto;
-                  padding: 50px;
-                  background: rgba(0, 0, 0, 0.3);
-                  border-radius: 20px;
-                  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-              }
-              
-              h1 {
-                  font-size: 3rem;
-                  margin-bottom: 1rem;
-                  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
-              }
-              
-              p {
-                  font-size: 1.2rem;
-                  line-height: 1.8;
-                  margin-bottom: 2rem;
-              }
-              
-              .logo {
-                  font-size: 4rem;
-                  margin-bottom: 2rem;
-                  background: linear-gradient(90deg, #ffd700, #ff6b6b);
-                  -webkit-background-clip: text;
-                  -webkit-text-fill-color: transparent;
-                  background-clip: text;
-              }
-              
-              .contact {
-                  margin-top: 3rem;
-                  padding: 2rem;
-                  background: rgba(255, 255, 255, 0.1);
-                  border-radius: 10px;
-              }
-              
-              .contact a {
-                  color: #ffd700;
-                  text-decoration: none;
-                  font-weight: bold;
-              }
-              
-              .contact a:hover {
-                  text-decoration: underline;
-              }
-          </style>
-      </head>
-      <body>
-          <div class="container">
-              <div class="logo">🤖 EasyBots</div>
-              <h1>Welcome to EasyBots</h1>
-              <p>Your AI and Automation Platform</p>
-              <p>We're currently under construction, building amazing AI-powered solutions for businesses and individuals.</p>
-              
-              <div class="contact">
-                  <p>For inquiries, please contact us at:</p>
-                  <p><a href="mailto:contact@easybots.store">contact@easybots.store</a></p>
-                  <p>Follow us for updates on our progress!</p>
-              </div>
-          </div>
-      </body>
-      </html>
-    `);
-    return;
-  }
   // Authenticated → go to the app
   if (req.session?.user) {
     return res.redirect(302, '/app');
@@ -1509,11 +1422,13 @@ const webAppController = require('./controllers/webAppController');
 app.get('/api/webapp/auth/telegram/start', asyncHandler(webAppController.telegramStart));
 app.get('/api/webapp/auth/telegram/callback', asyncHandler(webAppController.telegramCallback));
 app.post('/api/webapp/auth/telegram', asyncHandler(webAppController.telegramLogin));
-app.post('/api/webapp/auth/register', asyncHandler(webAppController.emailRegister));
-app.post('/api/webapp/auth/login', asyncHandler(webAppController.emailLogin));
+app.post('/api/webapp/auth/telegram/token', asyncHandler(webAppController.telegramGenerateToken));
+app.get('/api/webapp/auth/telegram/check', asyncHandler(webAppController.telegramCheckToken));
+app.post('/api/webapp/auth/email/register', asyncHandler(webAppController.emailRegister));
+app.post('/api/webapp/auth/email/login', asyncHandler(webAppController.emailLogin));
 app.get('/api/webapp/auth/x/start', asyncHandler(webAppController.xLoginStart));
 app.get('/api/webapp/auth/x/callback', asyncHandler(webAppController.xLoginCallback));
-app.get('/api/webapp/auth/status', asyncHandler(webAppController.authStatus));
+app.get('/api/me', asyncHandler(webAppController.authStatus));
 app.post('/api/webapp/auth/logout', asyncHandler(webAppController.logout));
 app.post('/api/webapp/auth/forgot-password', asyncHandler(webAppController.forgotPassword));
 app.post('/api/webapp/auth/reset-password', asyncHandler(webAppController.resetPassword));
@@ -1655,22 +1570,14 @@ app.get('/api/webapp/users/search', asyncHandler(usersController.searchUsers));
 // ==========================================
 const primeHubPath = path.join(__dirname, '../../../public/prime-hub');
 
-// Serve static assets from prime-hub build
-app.use('/prime-hub/assets', express.static(path.join(primeHubPath, 'assets'), {
-  maxAge: '1y',
-  immutable: true
-}));
-app.use('/app/assets', express.static(path.join(primeHubPath, 'assets'), {
+// Serve static assets from prime-hub build using root /assets path
+app.use('/assets', express.static(path.join(primeHubPath, 'assets'), {
   maxAge: '1y',
   immutable: true
 }));
 
 // /app → canonical post-login destination (serves prime-hub SPA)
 app.get('/app', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
   if (!req.session?.user) {
     return res.redirect('/');
   }
@@ -1678,10 +1585,6 @@ app.get('/app', (req, res) => {
 });
 
 app.get('/app/*', (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Page not found.');
-  }
   if (!req.session?.user) {
     return res.redirect('/');
   }
@@ -1698,11 +1601,6 @@ app.get(['/prime-hub', '/prime-hub/'], (req, res) => {
   return res.redirect(301, '/app');
 });
 
-// Block typo/legacy URL explicitly so it does not resolve through SPA fallback.
-app.get(['/prime-hub/logi', '/prime-hub/logi/'], (req, res) => {
-  res.status(404).send('Page not found.');
-});
-
 // ==========================================
 // NEW MONETIZATION & AUTH ROUTES
 // ==========================================
@@ -1716,17 +1614,9 @@ app.use('/api/subscriptions', subscriptionRoutes);
 // Model routes
 app.use('/api/model', modelRoutes);
 
-// Legacy /prime-hub/* → redirect to /app (keep assets working)
+// Legacy /prime-hub/* → redirect to /app
 app.get('/prime-hub/*', (req, res) => {
-  const sub = req.path.replace('/prime-hub', '');
-  // Let asset requests through (CSS/JS/images)
-  if (sub.startsWith('/assets')) {
-    const filePath = path.join(primeHubPath, sub);
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-      return res.sendFile(filePath);
-    }
-  }
-  return res.redirect(301, '/app' + sub);
+  return res.redirect(301, '/app');
 });
 
 // Export app WITHOUT 404/error handlers
