@@ -258,16 +258,8 @@ function App() {
     );
   }
 
-  if (!isAuthenticated) {
-    // Redirect to centralized login at /app
-    window.location.href = '/app';
-    return (
-      <div className="loading-container">
-        <div className="spinner-lg"></div>
-        <p className="text-muted-foreground mt-4">Redirecting to login...</p>
-      </div>
-    );
-  }
+  // Videorama is publicly accessible - no login required
+  // Authenticated users see personalized content, unauthenticated see public content
 
   const isPrime = params?.isPrime === true
   // Allow collection management for ADMIN, SUPERADMIN, PERFORMER, or PRIME subscribers
