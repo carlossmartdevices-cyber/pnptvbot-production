@@ -72,7 +72,10 @@ services:
     env_file:
       - .env
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
+      - NODE_ENV=production
+      - SESSION_SECRET=32c1d6331348d5fc1f7a4a4809e1fe5d3361a02eadd55d57338cb9b7b8842365
+      - JWT_SECRET=459c0de1110aa702fa9cca2a3f8d8e4c020853052245a6d034345e0f24214847fe23e7e7681abd211097c014006dfddb5f4a01468849b976a08c92587127e062
+      - LOG_LEVEL=info
       - REDIS_HOST=redis
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -82,7 +85,6 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./logs:/app/logs
       - ./uploads:/app/uploads
       - ./config:/app/config:ro
       - ./locales:/app/locales:ro
