@@ -8,6 +8,28 @@ const { getRedis } = require('../../../config/redis');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+function normalizeOrigin(value) {
+  return String(value || '').trim().replace(/\/+$/, '');
+}
+
+function getCanonicalWebOrigin() {
+  const configured = normalizeOrigin(process.env.WEBAPP_ORIGIN || process.env.BOT_WEBHOOK_DOMAIN);
+  return configured || 'https://pnptv.app';
+}
+
+function canonicalWebUrl(pathname) {
+  const suffix = String(pathname || '/').startsWith('/') ? String(pathname || '/') : `/${pathname}`;
+  return `${getCanonicalWebOrigin()}${suffix}`;
+}
+
+function redirectToCanonicalApp(res) {
+  return res.redirect(canonicalWebUrl('/app'));
+}
+
+function redirectToCanonicalAuthError(res) {
+  return res.redirect(canonicalWebUrl('/?error=auth_failed'));
+}
+
 function generatePnptvId() {
   return uuidv4();
 }
@@ -248,8 +270,6 @@ function verifyTelegramAuth(data) {
 const b64url = (buf) =>
   buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 
-const normalizeOrigin = (value) => String(value || '').trim().replace(/\/+$/, '');
-
 // ── Telegram Deep Link Login ─────────────────────────────────────────────────
 
 const TELEGRAM_LOGIN_PREFIX = 'tg_login:';
@@ -409,7 +429,7 @@ const telegramCallback = async (req, res) => {
         hasId: !!telegramUser.id,
         hasHash: !!telegramUser.hash,
       });
-      return res.redirect('/?error=auth_failed');
+      return redirectToCanonicalAuthError(res);
     }
 
     const isValid = verifyTelegramAuth(telegramUser);
@@ -423,7 +443,7 @@ const telegramCallback = async (req, res) => {
         hint: 'CRITICAL: Domain must be set in BotFather: /setdomain pnptv.app',
         hashVerificationRequired: !skipHashVerification,
       });
-      return res.redirect('/?error=auth_failed');
+      return redirectToCanonicalAuthError(res);
     }
 
     if (skipHashVerification && !isValid) {
@@ -452,10 +472,10 @@ const telegramCallback = async (req, res) => {
     );
 
     logger.info(`Web Telegram callback login: user ${user.id}`);
-    return res.redirect('/app');
+    return redirectToCanonicalApp(res);
   } catch (error) {
     logger.error('Telegram callback error:', error);
-    return res.redirect('/?error=auth_failed');
+    return redirectToCanonicalAuthError(res);
   }
 };
 
@@ -728,13 +748,13 @@ const xLoginCallback = async (req, res) => {
     });
 
     if (xError || !code || !state) {
-      return res.redirect('/?error=auth_failed');
+      return redirectToCanonicalAuthError(res);
     }
 
     const stored = req.session.xOAuth;
     if (!stored || stored.state !== state) {
       logger.warn('X OAuth state mismatch or session expired');
-      return res.redirect('/?error=auth_failed');
+      return redirectToCanonicalAuthError(res);
     }
 
     const { codeVerifier } = stored;
@@ -849,7 +869,7 @@ const xLoginCallback = async (req, res) => {
     const xId = xData?.id ? String(xData.id) : null; // numeric X user ID (stable)
     const xName = xData?.name || xHandle;
 
-    if (!xHandle) return res.redirect('/?error=auth_failed');
+    if (!xHandle) return redirectToCanonicalAuthError(res);
 
     // If already logged in via another method, prioritize linking to current session user
     if (req.session?.user?.id) {
@@ -870,7 +890,7 @@ const xLoginCallback = async (req, res) => {
         req.session.save(err => (err ? reject(err) : resolve()))
       );
       logger.info(`Linked X @${xHandle} to existing session user ${user.id}`);
-      return res.redirect('/app');
+      return redirectToCanonicalApp(res);
     }
 
     const [firstName, ...nameParts] = (xName || xHandle).split(' ');
@@ -893,14 +913,14 @@ const xLoginCallback = async (req, res) => {
       req.session.save(err => (err ? reject(err) : resolve()))
     );
     logger.info(`Web app X login: user ${user.id} via @${xHandle}`);
-    return res.redirect('/app');
+    return redirectToCanonicalApp(res);
   } catch (error) {
     logger.error('X OAuth callback error:', {
       message: error.message,
       status: error.response?.status || null,
       details: error.response?.data || null,
     });
-    return res.redirect('/?error=auth_failed');
+    return redirectToCanonicalAuthError(res);
   }
 };
 

@@ -695,16 +695,16 @@ app.post('/api/logout', (req, res) => {
 // ==========================================
 
 // Videorama - protected
-app.get('/videorama', (req, res) => {
+app.get('/app/videorama', (req, res) => {
   res.sendFile(path.join(__dirname, '../../../public/videorama/index.html'));
 });
 
-app.get('/videorama/*', (req, res) => {
-  const assetPath = path.join(__dirname, '../../../public/videorama', req.path.replace('/videorama', ''));
+app.get('/app/videorama/*', (req, res) => {
+  const assetPath = path.join(__dirname, '../../../public/videorama', req.path.replace('/app/videorama', ''));
   if (fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
     return res.sendFile(assetPath);
   }
-  res.sendFile(path.join(__dirname, '../../../public/videorama-app/index.html'));
+  res.sendFile(path.join(__dirname, '../../../public/videorama/index.html'));
 });
 
 // Hangouts - protected

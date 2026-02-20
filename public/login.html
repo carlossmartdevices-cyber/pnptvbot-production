@@ -309,6 +309,14 @@
   </div>
 
   <script>
+    const CANONICAL_ORIGIN = 'https://pnptv.app';
+    const CANONICAL_APP_URL = `${CANONICAL_ORIGIN}/app`;
+
+    // Always keep authentication on canonical domain.
+    if (window.location.origin !== CANONICAL_ORIGIN) {
+      window.location.replace(`${CANONICAL_ORIGIN}${window.location.pathname}${window.location.search}${window.location.hash}`);
+    }
+
     // ── Show error/success from URL params ─────────────────────────────────────
     (function () {
       const p = new URLSearchParams(location.search);
@@ -432,7 +440,7 @@
             // Ignore browser storage issues.
           }
           showBanner('success', '¡Bienvenido! Redirigiendo...');
-          setTimeout(() => { location.href = '/app'; }, 800);
+          setTimeout(() => { location.href = CANONICAL_APP_URL; }, 800);
         } else {
           showBanner('error', data.error || 'Error al iniciar sesión.');
           btn.disabled = false;
@@ -470,7 +478,7 @@
         const data = await res.json();
         if (res.ok && data.authenticated) {
           showBanner('success', '¡Cuenta creada! Redirigiendo...');
-          setTimeout(() => { location.href = '/app'; }, 800);
+          setTimeout(() => { location.href = CANONICAL_APP_URL; }, 800);
         } else {
           showBanner('error', data.error || 'Error al registrarse.');
           btn.disabled = false;
@@ -512,7 +520,7 @@
           try {
             const c = await fetch('/api/webapp/auth/telegram/check?token=' + data.token + '&_t=' + Date.now(), { credentials: 'include', cache: 'no-store' });
             const r = await c.json();
-            if (r.authenticated) { clearInterval(_tgPollInterval); showBanner('success', '¡Bienvenido! Redirigiendo...'); setTimeout(() => { location.href = '/app'; }, 800); }
+            if (r.authenticated) { clearInterval(_tgPollInterval); showBanner('success', '¡Bienvenido! Redirigiendo...'); setTimeout(() => { location.href = CANONICAL_APP_URL; }, 800); }
           } catch {}
         }, 2000);
       } catch { showBanner('error', 'Error de red.'); btn.disabled = false; btn.innerHTML = svgTelegram + ' Continuar con Telegram'; }
