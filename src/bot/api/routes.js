@@ -1534,20 +1534,20 @@ app.get('/api/webapp/users/search', asyncHandler(usersController.searchUsers));
 // ==========================================
 // PRIME Hub SPA Serving
 // ==========================================
-const primeHubPath = path.join(__dirname, '../../../public/prime-hub');
+const appPath = path.join(__dirname, '../../../public/prime-hub');
 
-// Serve static assets from prime-hub build using root /assets path
-app.use('/assets', express.static(path.join(primeHubPath, 'assets'), {
+// Serve static assets from app build using root /assets path
+app.use('/assets', express.static(path.join(appPath, 'assets'), {
   maxAge: '1y',
   immutable: true
 }));
 
-// /app → canonical post-login destination (serves prime-hub SPA)
+// /app → canonical post-login destination (serves app SPA)
 app.get('/app', (req, res) => {
   if (!req.session?.user) {
     return res.redirect('/');
   }
-  res.sendFile(path.join(primeHubPath, 'index.html'));
+  res.sendFile(path.join(appPath, 'index.html'));
 });
 
 app.get('/app/*', (req, res) => {
@@ -1555,11 +1555,11 @@ app.get('/app/*', (req, res) => {
     return res.redirect('/');
   }
   const requestedPath = req.path.replace('/app', '');
-  const filePath = path.join(primeHubPath, requestedPath);
+  const filePath = path.join(appPath, requestedPath);
   if (requestedPath !== '/' && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
     return res.sendFile(filePath);
   }
-  res.sendFile(path.join(primeHubPath, 'index.html'));
+  res.sendFile(path.join(appPath, 'index.html'));
 });
 
 // Legacy /prime-hub → redirect to /app

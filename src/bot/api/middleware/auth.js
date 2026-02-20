@@ -11,7 +11,7 @@ const AUTH_SECRET = process.env.JWT_SECRET
   || (process.env.NODE_ENV === 'test' ? 'test-jwt-secret' : null);
 
 /**
- * Authenticate user via JWT token or session (prime-hub users)
+ * Authenticate user via JWT token or session (app users)
  * Extracts userId from token or session and attaches to req.user
  */
 const authenticateUser = async (req, res, next) => {
@@ -23,7 +23,7 @@ const authenticateUser = async (req, res, next) => {
       });
     }
 
-    // Accept session auth (prime-hub / webapp users logged in via Telegram/X widget)
+    // Accept session auth (app users logged in via Telegram/X widget)
     if (req.session?.user?.id) {
       req.user = {
         id: req.session.user.id,

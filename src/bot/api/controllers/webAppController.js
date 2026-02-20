@@ -248,6 +248,8 @@ function verifyTelegramAuth(data) {
 const b64url = (buf) =>
   buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 
+const normalizeOrigin = (value) => String(value || '').trim().replace(/\/+$/, '');
+
 // ── Telegram Deep Link Login ─────────────────────────────────────────────────
 
 const TELEGRAM_LOGIN_PREFIX = 'tg_login:';
@@ -364,7 +366,9 @@ const telegramStart = async (req, res) => {
       return res.status(500).json({ error: 'Telegram login is not configured.' });
     }
 
-    const origin = `${req.protocol}://${req.get('host')}`;
+    const configuredOrigin = normalizeOrigin(process.env.WEBAPP_ORIGIN || process.env.BOT_WEBHOOK_DOMAIN);
+    const requestOrigin = normalizeOrigin(`${req.protocol}://${req.get('host')}`);
+    const origin = configuredOrigin || requestOrigin;
     const callbackUrl = `${origin}/api/webapp/auth/telegram/callback`;
 
     const params = new URLSearchParams({
@@ -684,6 +688,7 @@ const xLoginStart = async (req, res) => {
 
     const params = new URLSearchParams({
       response_type: 'code',
+      response_mode: 'query',
       client_id: clientId,
       redirect_uri: redirectUri,
       scope: 'users.read tweet.read',
@@ -749,11 +754,9 @@ const xLoginCallback = async (req, res) => {
         code,
         redirect_uri: redirectUri,
         code_verifier: codeVerifier,
+        client_id: clientId,
       });
 
-      if (mode === 'public' || mode === 'client_secret_post') {
-        body.set('client_id', clientId);
-      }
       if (mode === 'client_secret_post') {
         body.set('client_secret', clientSecret);
       }
@@ -763,7 +766,7 @@ const xLoginCallback = async (req, res) => {
 
     const toFormEncoded = (value) => encodeURIComponent(String(value));
 
-    const exchangeToken = async (mode) => {
+    const exchangeToken = async (mode, tokenEndpoint) => {
       const config = {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -780,37 +783,45 @@ const xLoginCallback = async (req, res) => {
         const basicValue = Buffer.from(`${encodedId}:${String(clientSecret)}`).toString('base64');
         config.headers.Authorization = `Basic ${basicValue}`;
       }
-      return axios.post('https://api.twitter.com/2/oauth2/token', buildTokenBody(mode).toString(), config);
+      return axios.post(tokenEndpoint, buildTokenBody(mode).toString(), config);
     };
 
     const modes = clientSecret
       ? ['basic_encoded', 'client_secret_post', 'basic', 'public']
       : ['public'];
+    const tokenEndpoints = [
+      'https://api.twitter.com/2/oauth2/token',
+      'https://api.x.com/2/oauth2/token',
+    ];
     let tokenRes = null;
     let lastTokenError = null;
 
-    for (const mode of modes) {
-      try {
-        tokenRes = await exchangeToken(mode);
-        break;
-      } catch (tokenErr) {
-        lastTokenError = tokenErr;
-        const status = tokenErr.response?.status;
-        const errData = tokenErr.response?.data;
-        logger.error('X OAuth token exchange failed:', {
-          mode,
-          status,
-          error: errData?.error,
-          description: errData?.error_description,
-          clientId: clientId?.substring(0, 10) + '...',
-          redirectUri,
-        });
+    for (const tokenEndpoint of tokenEndpoints) {
+      for (const mode of modes) {
+        try {
+          tokenRes = await exchangeToken(mode, tokenEndpoint);
+          break;
+        } catch (tokenErr) {
+          lastTokenError = tokenErr;
+          const status = tokenErr.response?.status;
+          const errData = tokenErr.response?.data;
+          logger.error('X OAuth token exchange failed:', {
+            mode,
+            tokenEndpoint,
+            status,
+            error: errData?.error,
+            description: errData?.error_description,
+            clientId: clientId?.substring(0, 10) + '...',
+            redirectUri,
+          });
 
-        const shouldTryNextMode = [400, 401, 403].includes(status);
-        if (!shouldTryNextMode) {
-          throw tokenErr;
+          const shouldTryNextMode = [400, 401, 403].includes(status);
+          if (!shouldTryNextMode) {
+            throw tokenErr;
+          }
         }
       }
+      if (tokenRes) break;
     }
 
     if (!tokenRes) {
@@ -820,10 +831,18 @@ const xLoginCallback = async (req, res) => {
     const accessToken = tokenRes.data.access_token;
 
     // Fetch X user profile
-    const profileRes = await axios.get('https://api.twitter.com/2/users/me', {
-      params: { 'user.fields': 'name,profile_image_url' },
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    let profileRes;
+    try {
+      profileRes = await axios.get('https://api.twitter.com/2/users/me', {
+        params: { 'user.fields': 'name,profile_image_url' },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+    } catch (profileError) {
+      profileRes = await axios.get('https://api.x.com/2/users/me', {
+        params: { 'user.fields': 'name,profile_image_url' },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+    }
 
     const xData = profileRes.data?.data;
     const xHandle = xData?.username;
