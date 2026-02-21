@@ -285,13 +285,17 @@ const TELEGRAM_LOGIN_TTL = 300; // 5 minutes
  */
 const telegramGenerateToken = async (req, res) => {
   try {
-    const token = crypto.randomBytes(16).toString('hex');
+    // Generate UUID v4 token for Telegram login session
+    const token = uuidv4();
     const redis = getRedis();
+    // Store token with expiry (default 10 minutes)
     await redis.set(`${TELEGRAM_LOGIN_PREFIX}${token}`, 'pending', 'EX', TELEGRAM_LOGIN_TTL);
 
     const botUsername = process.env.BOT_USERNAME || 'PNPLatinoTV_Bot';
+    // Create deep link for Telegram authentication
     const deepLink = `https://t.me/${botUsername}?start=weblogin_${token}`;
 
+    logger.info(`[Telegram Auth] Generated token: ${token.substring(0, 8)}...`);
     return res.json({ success: true, token, deepLink });
   } catch (error) {
     logger.error('Telegram token generation error:', error);
