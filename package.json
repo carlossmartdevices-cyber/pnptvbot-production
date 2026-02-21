@@ -7,23 +7,28 @@
     "start": "node src/bot/core/bot.js",
     "agent": "node scripts/agent-run.js",
     "dev": "nodemon src/bot/core/bot.js",
-    "test": "npx jest --coverage",
-    "test:unit": "jest --testMatch='**/unit/**/*.test.js' --coverage",
-    "test:integration": "dotenv -e .env.example -- jest --testMatch='**/integration/**/*.test.js' --detectOpenHandles --forceExit",
+    "test": "npm run test --workspace=\"@pnptv/*\"",
+    "test:unit": "jest --testMatch=**/unit/**/*.test.js --coverage",
+    "test:integration": "dotenv -e .env.example -- jest --testMatch=**/integration/**/*.test.js --detectOpenHandles --forceExit",
     "test:watch": "jest --watch",
     "test:all": "npx jest --coverage --detectOpenHandles --forceExit",
-    "lint": "eslint src/",
+    "lint": "npm run lint --workspace=\"@pnptv/*\"",
     "lint:fix": "eslint src/ --fix",
     "swagger": "node src/bot/api/swagger.js",
     "migrate": "node scripts/migrate.js",
     "migrate:users": "node scripts/migrate-existing-users.js",
     "check:subscriptions": "node scripts/check-user-subscriptions.js",
     "seed": "node scripts/seed.js",
-    "validate:env": "node -e \"require('./src/utils/envValidator').validateEnv()\"",
+    "validate:env": "node -e \"require(./src/utils/envValidator).validateEnv()\"",
     "import:legacy-customers": "node scripts/import-legacy-customers.js",
     "build:prime-hub": "cd webapps/prime-hub && npm install && npx vite build && rm -rf ../../public/prime-hub/assets && cp -r dist/* ../../public/prime-hub/",
     "build:webapps": "npm run build:prime-hub",
-    "prestart": ""
+    "prestart": "",
+    "build": "npm run build --workspace=\"@pnptv/*\"",
+    "build:hub": "npm run build --workspace=@pnptv/hub",
+    "build:backend": "npm run build --workspace=@pnptv/backend",
+    "dev:backend": "npm run dev --workspace=@pnptv/backend",
+    "dev:hub": "npm run dev --workspace=@pnptv/hub"
   },
   "keywords": [
     "telegram",
@@ -113,5 +118,11 @@
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
+  },
+  "workspaces": {
+    "packages": [
+      "packages/*",
+      "apps/*"
+    ]
   }
 }

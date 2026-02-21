@@ -1,0 +1,12 @@
+{
+  "name": "@pnptv/ui-kit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Design system and reusable React components",
+  "main": "src/index.js",
+  "keywords": ["ui", "design-system", "components"],
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  }
+}

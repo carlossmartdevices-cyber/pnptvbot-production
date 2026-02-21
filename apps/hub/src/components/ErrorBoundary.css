@@ -1,0 +1,189 @@
+/* =====================================================
+   ERROR BOUNDARY STYLES
+   Global error handling UI
+   ===================================================== */
+
+.error-boundary-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  padding: var(--space-4);
+}
+
+.error-boundary-content {
+  text-align: center;
+  max-width: 500px;
+  padding: var(--space-8);
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Error Icon */
+.error-icon-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-6);
+}
+
+.error-icon {
+  color: var(--accent-pink);
+  animation: pulse-error 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-error {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .error-icon {
+    animation: none;
+  }
+}
+
+/* Error Title */
+.error-title {
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-3);
+}
+
+/* Error Message */
+.error-message {
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  line-height: var(--line-height-relaxed);
+  margin-bottom: var(--space-8);
+}
+
+/* Error Details (Development) */
+.error-details {
+  margin: var(--space-8) 0;
+  text-align: left;
+}
+
+.error-details-toggle {
+  cursor: pointer;
+  list-style: none;
+  padding: var(--space-4);
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.error-details-toggle:hover {
+  background-color: var(--bg-quaternary);
+}
+
+.error-details-toggle summary {
+  user-select: none;
+  cursor: pointer;
+  font-weight: var(--font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.error-details-toggle summary::before {
+  content: '▶';
+  display: inline-block;
+  transition: transform var(--transition-fast);
+}
+
+.error-details-toggle[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.error-details-content {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.error-details-content p {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-4);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.error-details-content pre {
+  background-color: var(--bg-secondary);
+  padding: var(--space-4);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--accent-amber);
+  max-height: 200px;
+}
+
+/* Reload Button */
+.error-reload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  background: linear-gradient(135deg, var(--accent-pink), var(--accent-amber));
+  color: #ffffff;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-prime);
+  min-height: 44px; /* Touch target */
+}
+
+.error-reload-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(255, 58, 125, 0.35);
+}
+
+.error-reload-btn:active {
+  transform: translateY(0);
+}
+
+.error-reload-btn:focus-visible {
+  outline: 2px solid var(--accent-pink);
+  outline-offset: 2px;
+}
+
+/* Help Text */
+.error-help-text {
+  margin-top: var(--space-6);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .error-boundary-content {
+    padding: var(--space-6);
+    margin: var(--space-4);
+  }
+
+  .error-title {
+    font-size: var(--font-size-xl);
+  }
+
+  .error-message {
+    font-size: var(--font-size-sm);
+  }
+}

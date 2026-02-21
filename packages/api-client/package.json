@@ -1,0 +1,15 @@
+{
+  "name": "@pnptv/api-client",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Centralized API client with Axios and interceptors",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./src/client.js"
+  },
+  "keywords": ["api", "axios", "client"],
+  "dependencies": {
+    "axios": "^1.13.2"
+  }
+}

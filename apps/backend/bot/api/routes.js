@@ -1,3 +1,4 @@
+const Sentry = require('@sentry/node');
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -117,6 +118,22 @@ const bindAuthenticatedUserId = (req, res, next) => {
 };
 
 const app = express();
+
+// Initialize Sentry for error tracking
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV,
+    integrations: [
+      new Sentry.Integrations.Http({ tracing: true }),
+      new Sentry.Integrations.Express({ app }),
+    ],
+    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  });
+  app.use(Sentry.Handlers.requestHandler());
+  app.use(Sentry.Handlers.tracingHandler());
+  logger.info('Sentry error tracking initialized');
+}
 
 // Trust proxy - required for rate limiting behind reverse proxy (nginx, etc.)
 // Setting to 1 trusts the first proxy (direct connection from nginx)
@@ -701,44 +718,85 @@ const authLimiter = rateLimit({
   skipSuccessfulRequests: true, // Only count failed attempts
 });
 
-// Health check with dependency checks
-app.get('/health', async (req, res) => {
-  const health = {
+// Rate limiter for health checks (skip for internal/authorized requests)
+const healthLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30, // Allow 30 requests per minute for external clients
+  message: 'Too many health check requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for internal requests
+    const isInternal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+    return isInternal || req.headers['x-health-secret'] === process.env.HEALTH_SECRET;
+  },
+});
+
+// Health check with dependency checks and security
+app.get('/health', healthLimiter, async (req, res) => {
+  // Check if request is from internal network or has valid secret
+  const isInternal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+  const hasValidSecret = process.env.HEALTH_SECRET && req.headers['x-health-secret'] === process.env.HEALTH_SECRET;
+  const isAuthorized = isInternal || hasValidSecret;
+
+  // Minimal response for external requests
+  const basicHealth = {
     status: 'ok',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    dependencies: {},
   };
 
+  // Don't expose details to external requests
+  if (!isAuthorized) {
+    return res.status(200).json(basicHealth);
+  }
+
+  // Full health details only for internal/authorized requests
   try {
-    // Check Redis connection
-    const { getRedis } = require('../../config/redis');
-    const redis = getRedis();
-    // Not all test Redis mocks implement ping, guard accordingly
-    if (redis && typeof redis.ping === 'function') {
-      await redis.ping();
+    const fullHealth = {
+      ...basicHealth,
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      version: process.env.APP_VERSION || 'unknown',
+      environment: process.env.NODE_ENV,
+      dependencies: {},
+    };
+
+    try {
+      // Check Redis connection
+      const { getRedis } = require('../../config/redis');
+      const redis = getRedis();
+      // Not all test Redis mocks implement ping, guard accordingly
+      if (redis && typeof redis.ping === 'function') {
+        await redis.ping();
+      }
+      fullHealth.dependencies.redis = 'ok';
+    } catch (error) {
+      fullHealth.dependencies.redis = 'error';
+      fullHealth.status = 'degraded';
+      logger.error('Redis health check failed:', error);
     }
-    health.dependencies.redis = 'ok';
-  } catch (error) {
-    health.dependencies.redis = 'error';
-    health.status = 'degraded';
-    logger.error('Redis health check failed:', error);
-  }
 
-  try {
-    // Check PostgreSQL connection (optional in test env)
-    const { testConnection } = require('../../config/postgres');
-    const dbOk = await testConnection();
-    health.dependencies.database = dbOk ? 'ok' : 'error';
-    if (!dbOk) health.status = 'degraded';
-  } catch (error) {
-    health.dependencies.database = 'error';
-    health.status = 'degraded';
-    logger.error('Database health check failed:', error);
-  }
+    try {
+      // Check PostgreSQL connection (optional in test env)
+      const { testConnection } = require('../../config/postgres');
+      const dbOk = await testConnection();
+      fullHealth.dependencies.database = dbOk ? 'ok' : 'error';
+      if (!dbOk) fullHealth.status = 'degraded';
+    } catch (error) {
+      fullHealth.dependencies.database = 'error';
+      fullHealth.status = 'degraded';
+      logger.error('Database health check failed:', error);
+    }
 
-  const statusCode = health.status === 'ok' ? 200 : 503;
-  res.status(statusCode).json(health);
+    const statusCode = fullHealth.status === 'ok' ? 200 : 503;
+    res.status(statusCode).json(fullHealth);
+  } catch (err) {
+    res.status(503).json({
+      ...basicHealth,
+      status: 'degraded',
+      error: isAuthorized ? err.message : 'Service temporarily unavailable',
+    });
+  }
 });
 
 // API routes
@@ -1462,15 +1520,6 @@ app.use('/api/auth/x', xOAuthRoutes); // Alias for X Developer Portal redirect U
 app.use('/api/x/followers', xFollowersRoutes);
 
 // Health Check and Monitoring Endpoints
-// Health check endpoints should be accessible but with reasonable rate limits
-const healthLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 30, // Limit each IP to 30 health checks per minute
-  message: 'Too many health check requests, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 app.get('/api/health', healthLimiter, asyncHandler(healthController.healthCheck));
 app.get('/api/metrics', healthLimiter, asyncHandler(healthController.performanceMetrics));
 app.post('/api/metrics/reset', healthLimiter, asyncHandler(healthController.resetMetrics));
@@ -1701,6 +1750,11 @@ app.use('/api/model', modelRoutes);
 app.get('/prime-hub/*', (req, res) => {
   return res.redirect(301, '/app');
 });
+
+// Sentry error handler - must be last
+if (process.env.SENTRY_DSN) {
+  app.use(Sentry.Handlers.errorHandler());
+}
 
 // Export app WITHOUT 404/error handlers
 // These will be added in bot.js AFTER the webhook callback

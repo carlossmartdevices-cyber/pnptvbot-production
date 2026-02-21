@@ -1,0 +1,151 @@
+const { query } = require('../../config/postgres');
+const logger = require('../../utils/logger');
+
+/**
+ * Handle Telegram authentication callback
+ */
+const handleTelegramAuth = async (req, res) => {
+  try {
+    const { telegramUser } = req.body;
+    
+    if (!telegramUser) {
+      logger.warn('Telegram auth: No user data received');
+      return res.status(400).json({ 
+        error: 'Invalid request', 
+        redirect: '/auth/telegram-login'
+      });
+    }
+    
+    logger.info(`Telegram auth attempt for user: ${telegramUser.id} (${telegramUser.username || 'no username'})`);
+    
+    // Check if user exists in our database
+    const userQuery = await query(
+      'SELECT id, telegram, username, subscription_status, accepted_terms FROM users WHERE telegram = $1',
+      [telegramUser.id]
+    );
+    
+    if (userQuery.rows.length === 0) {
+      // User not in our database - store Telegram data in session and redirect to onboarding
+      req.session.telegramUser = {
+        id: telegramUser.id,
+        username: telegramUser.username,
+        first_name: telegramUser.first_name,
+        last_name: telegramUser.last_name,
+        photo_url: telegramUser.photo_url,
+        auth_date: telegramUser.auth_date
+      };
+      
+      logger.info(`User ${telegramUser.id} not in database, redirecting to onboarding`);
+      return res.json({
+        redirect: '/auth/not-registered',
+        telegramUser: {
+          id: telegramUser.id,
+          username: telegramUser.username,
+          first_name: telegramUser.first_name
+        }
+      });
+    }
+    
+    const user = userQuery.rows[0];
+    
+    // Store user in session
+    req.session.user = {
+      id: user.id,
+      telegramId: user.telegram_id,
+      username: user.username,
+      subscriptionStatus: user.subscription_status,
+      acceptedTerms: user.accepted_terms
+    };
+    
+    logger.info(`User ${user.id} authenticated successfully, terms accepted: ${user.accepted_terms}`);
+    
+    // Return success with terms status
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        subscriptionStatus: user.subscription_status
+      },
+      termsAccepted: user.accepted_terms
+    });
+    
+  } catch (error) {
+    logger.error('Telegram auth error:', error);
+    res.status(500).json({ 
+      error: 'Authentication failed', 
+      redirect: '/auth/telegram-login'
+    });
+  }
+};
+
+/**
+ * Handle terms acceptance
+ */
+const handleAcceptTerms = async (req, res) => {
+  try {
+    const user = req.session?.user;
+    
+    if (!user) {
+      logger.warn('Terms acceptance: No user in session');
+      return res.status(401).json({ 
+        error: 'Unauthorized', 
+        redirect: '/auth/telegram-login'
+      });
+    }
+    
+    // Update user's terms acceptance in database
+    await query(
+      'UPDATE users SET accepted_terms = TRUE WHERE id = $1',
+      [user.id]
+    );
+    
+    // Update session
+    req.session.user.acceptedTerms = true;
+    
+    logger.info(`User ${user.id} accepted terms and conditions`);
+    
+    // Get the original URL from localStorage (will be handled by frontend)
+    res.json({ success: true });
+    
+  } catch (error) {
+    logger.error('Error accepting terms:', error);
+    res.status(500).json({ error: 'Failed to accept terms' });
+  }
+};
+
+/**
+ * Check authentication status
+ */
+const checkAuthStatus = (req, res) => {
+  try {
+    const user = req.session?.user;
+    
+    if (!user) {
+      return res.json({
+        authenticated: false,
+        redirect: '/auth/telegram-login'
+      });
+    }
+    
+    res.json({
+      authenticated: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        subscriptionStatus: user.subscriptionStatus,
+        acceptedTerms: user.acceptedTerms
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Auth status check error:', error);
+    res.status(500).json({ error: 'Failed to check auth status' });
+  }
+};
+
+module.exports = {
+  handleTelegramAuth,
+  handleAcceptTerms,
+  checkAuthStatus
+};

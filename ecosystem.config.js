@@ -9,45 +9,29 @@ module.exports = {
     node_args: '--dns-result-order=ipv4first',
     exec_mode: 'fork',
     cwd: '/root/pnptvbot-production',
+    // SECURITY FIX: Remove all secrets from this file!
+    // Secrets MUST come from .env.production only (loaded by dotenv in bot.js)
+    // Never commit secrets to version control
     env: {
       NODE_ENV: 'production',
       PORT: '3001',
       NODE_OPTIONS: '--dns-result-order=ipv4first',
       BOT_LOCK_ENABLED: 'false',
-      BOT_TOKEN: '8571930103:AAHIxAeI2CEqgF3arK4D4dZNHFYxgNa_nt0',
-      TWITTER_CLIENT_ID: 'SGwwVTZNNV9WUnQyZkh1RVFoVlk6MTpjaQ',
-      TWITTER_CLIENT_SECRET: '2X3VaMwonl7lEzSNNBKoGUCXD3tLSXi4uJG-9-lc3RBtxVyOXN',
-      TWITTER_REDIRECT_URI: 'https://pnptv.app/api/auth/x/callback',
-      TWITTER_CONSUMER_KEY: 'kclnNhnkqjRR8eA6XMT6NuK1E',
-      TWITTER_CONSUMER_SECRET: 'NRituRleEcUd12trt4Vhrxj1BwnYLfgrXw6INRYLVmrbyFuK8t',
-      TWITTER_BEARER_TOKEN: 'AAAAAAAAAAAAAAAAAAAAAJbZ7gEAAAAALlnLGs13%2Fa3vkJ2GwWJv2zHZQcw%3DWBauXj6uD6EY3aTY3MycZCsEn3eqHc8zRa1APFyq1zNfjX9AP6',
-      TWITTER_ACCESS_TOKEN: '1614126754892767233-Ktr3Uyn9HCrqSSe7gU50Uwa15p1Ufl',
-      TWITTER_ACCESS_TOKEN_SECRET: '9Zv0KwkNalVbkfSlmHdtJRQeOdN46mt7Z0x8VMocHat5b',
-      POSTGRES_HOST: 'localhost',
-      POSTGRES_PORT: '5432',
-      POSTGRES_DATABASE: 'pnptvbot',
-      POSTGRES_USER: 'pnptvbot',
-      POSTGRES_PASSWORD: 'Apelo801050#',
+      // All sensitive values must be in .env.production
+      // See .env.example for required variables
     },
     env_production: {
       NODE_ENV: 'production',
       PORT: '3001',
       NODE_OPTIONS: '--dns-result-order=ipv4first',
       BOT_LOCK_ENABLED: 'false',
-      BOT_TOKEN: '8571930103:AAHIxAeI2CEqgF3arK4D4dZNHFYxgNa_nt0',
-      TWITTER_CLIENT_ID: 'SGwwVTZNNV9WUnQyZkh1RVFoVlk6MTpjaQ',
-      TWITTER_CLIENT_SECRET: '2X3VaMwonl7lEzSNNBKoGUCXD3tLSXi4uJG-9-lc3RBtxVyOXN',
-      TWITTER_REDIRECT_URI: 'https://pnptv.app/api/auth/x/callback',
-      TWITTER_CONSUMER_KEY: 'kclnNhnkqjRR8eA6XMT6NuK1E',
-      TWITTER_CONSUMER_SECRET: 'NRituRleEcUd12trt4Vhrxj1BwnYLfgrXw6INRYLVmrbyFuK8t',
-      TWITTER_BEARER_TOKEN: 'AAAAAAAAAAAAAAAAAAAAAJbZ7gEAAAAALlnLGs13%2Fa3vkJ2GwWJv2zHZQcw%3DWBauXj6uD6EY3aTY3MycZCsEn3eqHc8zRa1APFyq1zNfjX9AP6',
-      TWITTER_ACCESS_TOKEN: '1614126754892767233-Ktr3Uyn9HCrqSSe7gU50Uwa15p1Ufl',
-      TWITTER_ACCESS_TOKEN_SECRET: '9Zv0KwkNalVbkfSlmHdtJRQeOdN46mt7Z0x8VMocHat5b',
-      POSTGRES_HOST: 'localhost',
-      POSTGRES_PORT: '5432',
-      POSTGRES_DATABASE: 'pnptvbot',
-      POSTGRES_USER: 'pnptvbot',
-      POSTGRES_PASSWORD: 'Apelo801050#',
+      // SECURITY: All secrets must be in .env.production
+      // Postgres pool settings (non-sensitive)
+      POSTGRES_POOL_MAX: '20', // Increased from 10 for concurrency
+      POSTGRES_POOL_MIN: '2',
+      POSTGRES_IDLE_TIMEOUT: '10000',
+      POSTGRES_CONNECTION_TIMEOUT: '5000',
+      POSTGRES_STATEMENT_TIMEOUT: '30000', // 30s max query time
     },
     env_development: {
       NODE_ENV: 'development',
@@ -59,8 +43,8 @@ module.exports = {
     min_uptime: '10s',
     max_restarts: 10,
     restart_delay: 4000,
-    kill_timeout: 5000,
-    wait_ready: false,
+    kill_timeout: 30000, // 30s for graceful shutdown (was 5s)
+    wait_ready: true, // Wait for process.send('ready') signal
     listen_timeout: 10000,
     ignore_watch: ['node_modules', 'logs'],
   }],

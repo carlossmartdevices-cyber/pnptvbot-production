@@ -1,0 +1,12 @@
+{
+  "name": "@pnptv/config",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Centralized Vite, ESLint, and TypeScript configuration",
+  "files": ["vite.base.js", "eslint.config.js", "tsconfig.json"],
+  "keywords": ["vite", "config", "monorepo"],
+  "devDependencies": {
+    "vite": "^7.3.1",
+    "@vitejs/plugin-react": "^4.0.0"
+  }
+}

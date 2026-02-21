@@ -1,0 +1,156 @@
+/* =====================================================
+   SKELETON LOADING COMPONENTS
+   Shimmer animation for loading states
+   ===================================================== */
+
+/* Base skeleton styles */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 0%,
+    var(--bg-tertiary) 50%,
+    var(--bg-secondary) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-md);
+}
+
+/* Skeleton variants */
+.skeleton-rounded {
+  border-radius: var(--radius-md);
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+.skeleton-default {
+  border-radius: var(--radius-md);
+}
+
+/* Shimmer animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* Skeleton card container */
+.skeleton-card {
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+}
+
+/* Utility spacing classes */
+.skeleton-mb-8 {
+  margin-bottom: 8px;
+}
+
+.skeleton-mt-16 {
+  margin-top: 16px;
+}
+
+.skeleton-rounded-lg {
+  border-radius: var(--radius-lg) !important;
+}
+
+/* Wrapper for consistent spacing */
+.skeleton-wrapper {
+  display: block;
+}
+
+/* Post card skeleton specific styles */
+.post-card.skeleton-card {
+  margin-bottom: 12px;
+}
+
+.post-card.skeleton-card .post-header {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: flex-start;
+}
+
+.post-card.skeleton-card .skeleton-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.post-card.skeleton-card .post-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Media card skeleton specific styles */
+.media-card.skeleton-card {
+  overflow: hidden;
+}
+
+.media-card.skeleton-card .skeleton-wrapper {
+  width: 100%;
+  height: 240px;
+  margin-bottom: 12px;
+}
+
+/* Hangout card skeleton specific styles */
+.hangout-card.skeleton-card {
+  overflow: hidden;
+}
+
+.hangout-card.skeleton-card .skeleton-wrapper {
+  width: 100%;
+  height: 180px;
+  margin-bottom: 12px;
+}
+
+/* Skeleton grid for multiple loaders */
+.skeleton-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+/* Responsive skeleton grid */
+@media (max-width: 640px) {
+  .skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Loading list container */
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Animated pulse effect (alternative to shimmer) */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.skeleton-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

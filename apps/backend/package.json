@@ -1,0 +1,11 @@
+{
+  "name": "@pnptv/backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PNPtv Express.js backend and Telegram bot",
+  "main": "src/bot/core/bot.js",
+  "scripts": {
+    "start": "node src/bot/core/bot.js",
+    "dev": "nodemon src/bot/core/bot.js"
+  }
+}
