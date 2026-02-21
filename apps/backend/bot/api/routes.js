@@ -1746,6 +1746,18 @@ app.use('/api/subscriptions', subscriptionRoutes);
 // Model routes
 app.use('/api/model', modelRoutes);
 
+// ==========================================
+// NGINX AUTH_REQUEST ENDPOINT (Internal)
+// ==========================================
+// Used by Nginx to verify if user is authenticated before serving protected routes
+// Nginx calls this endpoint internally with the user's cookies
+// Returns 200 if authenticated, 401 if not
+app.get('/api/webapp/auth/verify', authenticateUser, (req, res) => {
+  // If we reach here, authenticateUser middleware passed (user is authenticated)
+  // Nginx just needs a 200 response to allow access
+  res.status(200).send();
+});
+
 // Legacy /prime-hub/* → redirect to /app
 app.get('/prime-hub/*', (req, res) => {
   return res.redirect(301, '/app');

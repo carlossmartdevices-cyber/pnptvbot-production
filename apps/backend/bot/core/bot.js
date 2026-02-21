@@ -112,7 +112,7 @@ const CommunityPostScheduler = require('./schedulers/communityPostScheduler');
 const XPostScheduler = require('./schedulers/xPostScheduler');
 const { initializeWorker: initializePrivateCallsWorker } = require('../../workers/privateCallsWorker');
 const PNPLiveWorker = require('../../workers/pnpLiveWorker');
-const { startCronJobs } = require('../../../scripts/cron');
+const { startCronJobs } = require('../../../../scripts/cron');
 // Models for cache prewarming
 // Support model for ticket tracking
 const SupportTopicModel = require('../../models/supportTopicModel');

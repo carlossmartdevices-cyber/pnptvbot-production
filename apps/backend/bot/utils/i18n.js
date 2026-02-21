@@ -12,7 +12,7 @@ class I18n {
    * Load all translation files
    */
   loadTranslations() {
-    const localesPath = path.join(__dirname, '../../../locales');
+    const localesPath = path.join(__dirname, '../../../../locales');
     const languages = ['en', 'es'];
 
     for (const lang of languages) {

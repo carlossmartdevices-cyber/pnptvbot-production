@@ -1,7 +1,7 @@
 module.exports = {
   apps: [{
     name: 'pnptv-bot',
-    script: './src/bot/core/bot.js',
+    script: './apps/backend/bot/core/bot.js',
     instances: 1,
     autorestart: true,
     watch: false,

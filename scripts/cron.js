@@ -1,15 +1,21 @@
 require('dotenv').config({ allowEmptyValues: true });
+const path = require('path');
 const cron = require('node-cron');
-const { initializeRedis } = require('../src/config/redis');
-const { initializePostgres } = require('../src/config/postgres');
-const UserService = require('../src/bot/services/userService');
-const MembershipCleanupService = require('../src/bot/services/membershipCleanupService');
-const TutorialReminderService = require('../src/bot/services/tutorialReminderService');
-const CultEventService = require('../src/bot/services/cultEventService');
-const VisaCybersourceService = require('../src/bot/services/visaCybersourceService');
-const logger = require('../src/utils/logger');
-const PaymentRecoveryService = require('../src/bot/services/paymentRecoveryService');
-const MediaCleanupService = require('../src/bot/services/mediaCleanupService');
+
+// Use absolute paths based on script location
+const basePath = __dirname;
+const backendPath = path.join(basePath, '../apps/backend');
+
+const { initializeRedis } = require(path.join(backendPath, 'config/redis'));
+const { initializePostgres } = require(path.join(backendPath, 'config/postgres'));
+const UserService = require(path.join(backendPath, 'bot/services/userService'));
+const MembershipCleanupService = require(path.join(backendPath, 'bot/services/membershipCleanupService'));
+const TutorialReminderService = require(path.join(backendPath, 'bot/services/tutorialReminderService'));
+const CultEventService = require(path.join(backendPath, 'bot/services/cultEventService'));
+const VisaCybersourceService = require(path.join(backendPath, 'bot/services/visaCybersourceService'));
+const logger = require(path.join(backendPath, 'utils/logger'));
+const PaymentRecoveryService = require(path.join(backendPath, 'bot/services/paymentRecoveryService'));
+const MediaCleanupService = require(path.join(backendPath, 'bot/services/mediaCleanupService'));
 
 /**
  * Initialize and start cron jobs
