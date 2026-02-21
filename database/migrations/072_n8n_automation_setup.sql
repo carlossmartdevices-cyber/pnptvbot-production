@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS payment_recovery_log (
 CREATE TABLE IF NOT EXISTS email_notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   recipient_email VARCHAR(255) NOT NULL,
-  recipient_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  recipient_user_id VARCHAR(255) REFERENCES users(id) ON DELETE CASCADE,
   notification_type VARCHAR(100) NOT NULL,
   subject VARCHAR(255),
   status VARCHAR(50) DEFAULT 'pending',
@@ -60,27 +60,22 @@ CREATE TABLE IF NOT EXISTS system_health_checks (
   response_time_ms INT,
   details JSONB,
   checked_at TIMESTAMP DEFAULT NOW(),
-  created_at TIMESTAMP DEFAULT NOW(),
-  INDEX component_status (component, status),
-  INDEX health_check_time (created_at DESC)
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Table for subscription expiry notifications (scheduled)
 CREATE TABLE IF NOT EXISTS subscription_expiry_queue (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  subscriber_id UUID NOT NULL REFERENCES subscribers(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  plan_id UUID NOT NULL REFERENCES plans(id),
+  subscriber_id UUID REFERENCES subscribers(id) ON DELETE CASCADE,
+  user_id VARCHAR(255) REFERENCES users(id) ON DELETE CASCADE,
+  plan_id VARCHAR(255) REFERENCES plans(id),
   expires_at TIMESTAMP NOT NULL,
   notification_type VARCHAR(50) NOT NULL,
   status VARCHAR(50) DEFAULT 'pending',
   sent_at TIMESTAMP,
   error_message TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
-  INDEX expiry_date (expires_at),
-  INDEX status (status),
-  INDEX subscriber_id (subscriber_id)
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Table for admin alerts
@@ -95,18 +90,20 @@ CREATE TABLE IF NOT EXISTS admin_alerts (
   acknowledged_by VARCHAR(100),
   acknowledged_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
-  INDEX alert_type (alert_type, acknowledged),
-  INDEX severity (severity),
-  INDEX created_time (created_at DESC)
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_payment_recovery_status ON payment_recovery_log(status, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_email_notifications_status ON email_notifications(status, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_workflow_logs_workflow ON workflow_execution_logs(workflow_name, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_health_checks_latest ON system_health_checks(component, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_alerts_unread ON admin_alerts(acknowledged, severity, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payment_recovery_status ON payment_recovery_log(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_email_notifications_status ON email_notifications(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_workflow_logs_workflow ON workflow_execution_logs(workflow_name, created_at);
+CREATE INDEX IF NOT EXISTS idx_health_checks_latest ON system_health_checks(component, created_at);
+CREATE INDEX IF NOT EXISTS idx_alerts_unread ON admin_alerts(acknowledged, severity, created_at);
+CREATE INDEX IF NOT EXISTS idx_payment_recovery_created ON payment_recovery_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_created ON email_notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_workflow_created ON workflow_execution_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_health_created ON system_health_checks(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alerts_created ON admin_alerts(created_at DESC);
 
 -- Trigger to update updated_at timestamps
 CREATE OR REPLACE FUNCTION update_timestamp()
