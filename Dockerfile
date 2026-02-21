@@ -25,20 +25,17 @@ COPY package*.json ./
 # Install only production dependencies
 RUN npm install --only=production && npm cache clean --force
 
-# Copy source code from builder
-COPY --from=builder --chown=node:node /app/src ./src
+# Copy apps directory (monorepo structure with backend, webapps, etc)
+COPY --from=builder --chown=node:node /app/apps ./apps
 
-# Copy scripts directory for cron jobs
-COPY --from=builder --chown=node:node /app/scripts ./scripts
-
-# Copy public directory for landing pages
-COPY --from=builder /app/public ./public
+# Copy packages directory (ui-kit, shared modules, etc)
+COPY --from=builder --chown=node:node /app/packages ./packages
 
 # Copy config directory (payment config, JaaS keys, etc)
 COPY --from=builder --chown=node:node /app/config ./config
 
-# Copy locales directory (i18n translations)
-COPY --from=builder --chown=node:node /app/src/locales ./src/locales
+# Copy public directory for landing pages
+COPY --from=builder --chown=node:node /app/public ./public
 
 # Copy .env.example for dotenv-safe validation
 COPY --from=builder --chown=node:node /app/.env.example ./.env.example
@@ -61,4 +58,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD node -e "const p=process.env.PORT||3001;require('http').get('http://localhost:'+p+'/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => {process.exit(1)})"
 
 # Start the bot directly (no init process needed - Node.js handles signals)
-CMD ["node", "src/bot/core/bot.js"]
+CMD ["node", "apps/backend/bot/core/bot.js"]
