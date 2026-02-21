@@ -19,6 +19,10 @@ const EPAYCO_SUBSCRIPTION_PLANS = {
 
   // YEARLY PASS - 365PASS
   yearly_pass: '989cc3619e2a37cfe0111f0',
+
+  // LIFETIME PASS - LIFETIME100 - $100 USD (one-time payment)
+  lifetime_pass: 'LIFETIME100',
+  lifetime_100: 'LIFETIME100',
 };
 
 /**
