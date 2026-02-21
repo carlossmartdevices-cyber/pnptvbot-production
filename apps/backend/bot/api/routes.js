@@ -562,15 +562,6 @@ app.get('/lifetime-pass', (req, res) => {
   res.redirect(302, '/lifetime-pass.html');
 });
 
-// Lifetime Pass landing page ($100)
-app.get('/lifetime100', pageLimiter, (req, res) => {
-  const host = req.get('host') || '';
-  if (host.includes('easybots.store') || host.includes('easybots')) {
-    return res.status(404).send('Not found');
-  }
-  res.redirect(302, '/lifetime-pass.html');
-});
-
 // Terms and Conditions / Privacy Policy
 app.get('/terms', pageLimiter, (req, res) => {
   const host = req.get('host') || '';
