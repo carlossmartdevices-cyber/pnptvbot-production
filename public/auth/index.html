@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <title>PNPtv - Premium Entertainment Platform | PRIME Hub</title>
+    <meta name="description" content="Join PNPtv PRIME Hub - Exclusive premium entertainment with HD/4K content, live video rooms, and verified community. Stream. Connect. Discover.">
+    <meta name="keywords" content="PNPtv, PRIME Hub, premium entertainment, video streaming, live rooms, community">
+    <meta name="theme-color" content="#0d0f14">
+
+    <!-- Preconnect to font services -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/Logo2.png">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d0f14;
+            --bg-secondary: #1a1d24;
+            --bg-tertiary: #22262f;
+            --brand-pink: #ff3a7d;
+            --brand-pink-light: rgba(255, 58, 125, 0.15);
+            --brand-amber: #ff9c38;
+            --brand-teal: #2ce2c9;
+            --text-primary: #f0f2f8;
+            --text-secondary: #9ba3b8;
+            --text-muted: #5c6478;
+            --border-color: rgba(255, 255, 255, 0.07);
+            --border-active: rgba(255, 58, 125, 0.4);
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-display: 'Outfit', var(--font-sans);
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+            --shadow-brand: 0 8px 32px rgba(255, 58, 125, 0.25);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            background: rgba(13, 15, 20, 0.8);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 32px;
+        }
+
+        .header-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: var(--text-primary);
+            font-family: var(--font-display);
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        .logo img {
+            height: 40px;
+            width: auto;
+        }
+
+        .logo span {
+            background: linear-gradient(135deg, var(--brand-pink) 0%, var(--brand-amber) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        nav {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+
+        nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        nav a:hover {
+            color: var(--brand-pink);
+        }
+
+        .cta-button {
+            padding: 10px 24px;
+            background: linear-gradient(135deg, var(--brand-pink) 0%, var(--brand-amber) 100%);
+            border: none;
+            border-radius: var(--radius-xl);
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-brand);
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(255, 58, 125, 0.35);
+        }
+
+        /* Hero */
+        .hero {
+            margin-top: 80px;
+            min-height: calc(100vh - 80px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 32px;
+            background: linear-gradient(135deg, rgba(255, 58, 125, 0.05) 0%, rgba(44, 226, 201, 0.05) 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 1000px;
+            height: 1000px;
+            background: radial-gradient(circle, rgba(255, 58, 125, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: -50%;
+            left: -50%;
+            width: 1000px;
+            height: 1000px;
+            background: radial-gradient(circle, rgba(44, 226, 201, 0.08) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .hero-content {
+            max-width: 700px;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(32px, 5vw, 56px);
+            font-weight: 800;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .hero h1 .gradient {
+            background: linear-gradient(135deg, var(--brand-pink) 0%, var(--brand-amber) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            line-height: 1.8;
+        }
+
+        .hero-cta {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .button-primary {
+            padding: 14px 32px;
+            background: linear-gradient(135deg, var(--brand-pink) 0%, var(--brand-amber) 100%);
+            border: none;
+            border-radius: var(--radius-xl);
+            color: white;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-brand);
+            text-decoration: none;
+            display: inline-block;
+            font-family: var(--font-sans);
+        }
+
+        .button-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 50px rgba(255, 58, 125, 0.4);
+        }
+
+        .button-secondary {
+            padding: 14px 32px;
+            background: transparent;
+            border: 2px solid var(--brand-teal);
+            border-radius: var(--radius-xl);
+            color: var(--brand-teal);
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            font-family: var(--font-sans);
+        }
+
+        .button-secondary:hover {
+            background: rgba(44, 226, 201, 0.1);
+            transform: translateY(-3px);
+        }
+
+        /* Features */
+        .features {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 48px 32px;
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: 36px;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 32px;
+        }
+
+        .feature-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: var(--brand-pink);
+            background: linear-gradient(135deg, rgba(255, 58, 125, 0.05) 0%, rgba(44, 226, 201, 0.02) 100%);
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            font-size: 32px;
+            margin-bottom: 16px;
+        }
+
+        .feature-card h3 {
+            font-family: var(--font-display);
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Stats */
+        .stats {
+            background: var(--bg-secondary);
+            padding: 48px 32px;
+            margin: 48px 0;
+        }
+
+        .stats-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 32px;
+            text-align: center;
+        }
+
+        .stat-item h4 {
+            font-size: 32px;
+            background: linear-gradient(135deg, var(--brand-pink) 0%, var(--brand-teal) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+            font-family: var(--font-display);
+        }
+
+        .stat-item p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Footer CTA */
+        .footer-cta {
+            max-width: 1200px;
+            margin: 48px auto;
+            padding: 48px 32px;
+            text-align: center;
+            background: linear-gradient(135deg, rgba(255, 58, 125, 0.1) 0%, rgba(44, 226, 201, 0.05) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+        }
+
+        .footer-cta h2 {
+            font-family: var(--font-display);
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 16px;
+        }
+
+        .footer-cta p {
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            font-size: 16px;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 32px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        footer a {
+            color: var(--brand-pink);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            color: var(--brand-amber);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            header {
+                padding: 12px 16px;
+            }
+
+            .header-container {
+                flex-direction: column;
+                gap: 16px;
+            }
+
+            nav {
+                flex-direction: column;
+                gap: 12px;
+                width: 100%;
+                text-align: center;
+            }
+
+            .hero {
+                margin-top: 120px;
+                padding: 32px 16px;
+            }
+
+            .hero-cta {
+                flex-direction: column;
+            }
+
+            .button-primary,
+            .button-secondary {
+                width: 100%;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <a href="/" class="logo">
+                <img src="/Logo2.png" alt="PNPtv Logo">
+                <span>PRIME</span>
+            </a>
+            <nav>
+                <a href="#features">Features</a>
+                <a href="#community">Community</a>
+                <a href="/auth/" class="cta-button">Login</a>
+            </nav>
+        </div>
+    </header>
+
+    <section class="hero" id="home">
+        <div class="hero-content">
+            <h1>Welcome to <span class="gradient">PRIME Hub</span></h1>
+            <p>Experience premium entertainment like never before. Stream HD/4K content, connect with our verified community, and discover exclusive features available only to PRIME members.</p>
+            <div class="hero-cta">
+                <a href="/auth/" class="button-primary">🔒 Sign In with Telegram</a>
+                <a href="#features" class="button-secondary">Learn More</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="features" id="features">
+        <h2 class="section-title">Exclusive Features</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🎬</div>
+                <h3>Premium Content</h3>
+                <p>Access HD/4K videos with exclusive content only available to PRIME members.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎥</div>
+                <h3>Live Streaming</h3>
+                <p>Connect with creators and community in real-time video rooms.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎵</div>
+                <h3>24/7 Radio</h3>
+                <p>Enjoy curated streams and audio content around the clock.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">👥</div>
+                <h3>Community</h3>
+                <p>Join verified community hangouts and engage with like-minded members.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔐</div>
+                <h3>Verified Members</h3>
+                <p>Safe and secure environment with verified user authentication.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Lightning Fast</h3>
+                <p>Experience seamless streaming with optimized performance.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="stats">
+        <div class="stats-container">
+            <div class="stat-item">
+                <h4>50K+</h4>
+                <p>Active Members</p>
+            </div>
+            <div class="stat-item">
+                <h4>10K+</h4>
+                <p>Premium Videos</p>
+            </div>
+            <div class="stat-item">
+                <h4>24/7</h4>
+                <p>Live Streaming</p>
+            </div>
+            <div class="stat-item">
+                <h4>99.9%</h4>
+                <p>Uptime</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="footer-cta" id="community">
+        <h2>Ready to Join?</h2>
+        <p>Get instant access to premium content with our secure Telegram authentication</p>
+        <a href="/auth/" class="button-primary">Start Free Trial</a>
+    </section>
+
+    <footer>
+        <p>&copy; 2026 PNPtv PRIME Hub. All rights reserved. | <a href="#">Privacy Policy</a> | <a href="#">Terms of Service</a></p>
+    </footer>
+
+    <script>
+        fetch('/api/auth/status', { credentials: 'include' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.data?.authenticated) {
+                    window.location.href = '/hub/';
+                }
+            })
+            .catch(() => {});
+    </script>
+</body>
+</html>

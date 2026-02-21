@@ -284,3 +284,109 @@ a:focus-visible {
   background-color: var(--color-brand-prime);
   color: var(--color-text-primary);
 }
+
+/* ========== ANIMATION KEYFRAMES ========== */
+
+/* Skeleton Loading Shimmer */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Fade animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Slide animations */
+@keyframes slide-in-up {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-out-down {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
+
+/* Pulse animation */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Spin animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Page transition animation */
+@keyframes page-transition-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-transition-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* ========== GRADIENTS ========== */
+:root {
+  --gradient-brand-primary: linear-gradient(135deg, var(--color-brand-prime) 0%, var(--color-brand-amber) 100%);
+  --gradient-brand-secondary: linear-gradient(135deg, var(--color-brand-prime) 0%, var(--color-brand-teal) 100%);
+  --gradient-hero: linear-gradient(135deg, rgba(255, 58, 125, 0.05) 0%, rgba(44, 226, 201, 0.05) 100%);
+  --gradient-card-hover: linear-gradient(135deg, rgba(255, 58, 125, 0.05) 0%, rgba(44, 226, 201, 0.02) 100%);
+}
