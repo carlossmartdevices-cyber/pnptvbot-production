@@ -1,7 +1,12 @@
 {
   "name": "📊 Payment Recovery & Status Sync (Every 2 Hours)",
   "description": "Automatically checks for failed payments, updates their status from ePayco, retries them, and notifies users",
-  "tags": ["payment", "recovery", "automation", "production"],
+  "tags": [
+    "payment",
+    "recovery",
+    "automation",
+    "production"
+  ],
   "nodes": [
     {
       "parameters": {
@@ -10,7 +15,10 @@
       "name": "Schedule Every 2 Hours",
       "type": "n8n-nodes-base:cronTrigger",
       "typeVersion": 1,
-      "position": [100, 200]
+      "position": [
+        100,
+        200
+      ]
     },
     {
       "parameters": {
@@ -30,7 +38,10 @@
       "name": "Get Failed Payments",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [300, 200]
+      "position": [
+        300,
+        200
+      ]
     },
     {
       "parameters": {
@@ -39,7 +50,10 @@
       "name": "Loop Each Payment",
       "type": "n8n-nodes-base:splitInBatches",
       "typeVersion": 3,
-      "position": [500, 200]
+      "position": [
+        500,
+        200
+      ]
     },
     {
       "parameters": {
@@ -59,7 +73,10 @@
       "name": "Check ePayco Status",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [700, 200]
+      "position": [
+        700,
+        200
+      ]
     },
     {
       "parameters": {
@@ -73,7 +90,10 @@
       "name": "Update Payment Status",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [900, 200]
+      "position": [
+        900,
+        200
+      ]
     },
     {
       "parameters": {
@@ -97,7 +117,10 @@
       "name": "Send Status Email",
       "type": "n8n-nodes-base:emailSend",
       "typeVersion": 1,
-      "position": [1100, 200]
+      "position": [
+        1100,
+        200
+      ]
     },
     {
       "parameters": {
@@ -111,7 +134,10 @@
       "name": "Log Workflow Success",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [1300, 200]
+      "position": [
+        1300,
+        200
+      ]
     },
     {
       "parameters": {
@@ -125,7 +151,10 @@
       "name": "Send Admin Summary",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [1500, 200]
+      "position": [
+        1500,
+        200
+      ]
     }
   ],
   "connections": {
@@ -206,5 +235,6 @@
         ]
       ]
     }
-  }
+  },
+  "settings": {}
 }

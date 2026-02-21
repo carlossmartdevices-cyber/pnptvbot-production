@@ -1,7 +1,12 @@
 {
   "name": "📧 Smart Email Notifications (Hourly + Daily)",
   "description": "Sends subscription reminders, payment alerts, welcome sequences, and keeps engagement high",
-  "tags": ["email", "notifications", "automation", "engagement"],
+  "tags": [
+    "email",
+    "notifications",
+    "automation",
+    "engagement"
+  ],
   "nodes": [
     {
       "parameters": {
@@ -10,7 +15,10 @@
       "name": "Hourly Trigger",
       "type": "n8n-nodes-base:cronTrigger",
       "typeVersion": 1,
-      "position": [100, 200]
+      "position": [
+        100,
+        200
+      ]
     },
     {
       "parameters": {
@@ -30,7 +38,10 @@
       "name": "Get Expiring Subscriptions",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [300, 200]
+      "position": [
+        300,
+        200
+      ]
     },
     {
       "parameters": {
@@ -39,7 +50,10 @@
       "name": "Loop Subscriptions",
       "type": "n8n-nodes-base:splitInBatches",
       "typeVersion": 3,
-      "position": [500, 200]
+      "position": [
+        500,
+        200
+      ]
     },
     {
       "parameters": {
@@ -54,7 +68,10 @@
       "name": "Send 7-Day Reminder",
       "type": "n8n-nodes-base:emailSend",
       "typeVersion": 1,
-      "position": [700, 200]
+      "position": [
+        700,
+        200
+      ]
     },
     {
       "parameters": {
@@ -74,7 +91,10 @@
       "name": "Get Expiring Tomorrow",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [300, 400]
+      "position": [
+        300,
+        400
+      ]
     },
     {
       "parameters": {
@@ -83,7 +103,10 @@
       "name": "Loop Expiring Tomorrow",
       "type": "n8n-nodes-base:splitInBatches",
       "typeVersion": 3,
-      "position": [500, 400]
+      "position": [
+        500,
+        400
+      ]
     },
     {
       "parameters": {
@@ -98,7 +121,10 @@
       "name": "Send 1-Day Urgent Reminder",
       "type": "n8n-nodes-base:emailSend",
       "typeVersion": 1,
-      "position": [700, 400]
+      "position": [
+        700,
+        400
+      ]
     },
     {
       "parameters": {
@@ -112,7 +138,10 @@
       "name": "Log 7-Day Email",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [900, 200]
+      "position": [
+        900,
+        200
+      ]
     },
     {
       "parameters": {
@@ -126,7 +155,10 @@
       "name": "Log 1-Day Email",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [900, 400]
+      "position": [
+        900,
+        400
+      ]
     },
     {
       "parameters": {
@@ -140,7 +172,10 @@
       "name": "Log Workflow Success",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [1100, 200]
+      "position": [
+        1100,
+        200
+      ]
     }
   ],
   "connections": {
@@ -237,5 +272,6 @@
         ]
       ]
     }
-  }
+  },
+  "settings": {}
 }

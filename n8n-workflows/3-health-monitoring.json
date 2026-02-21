@@ -1,7 +1,12 @@
 {
   "name": "🏥 System Health & Monitoring (Every 5 Minutes)",
   "description": "Monitors system health, API status, database connectivity, and sends alerts for degradation",
-  "tags": ["monitoring", "health", "alerts", "production"],
+  "tags": [
+    "monitoring",
+    "health",
+    "alerts",
+    "production"
+  ],
   "nodes": [
     {
       "parameters": {
@@ -10,7 +15,10 @@
       "name": "Check Every 5 Minutes",
       "type": "n8n-nodes-base:cronTrigger",
       "typeVersion": 1,
-      "position": [100, 200]
+      "position": [
+        100,
+        200
+      ]
     },
     {
       "parameters": {
@@ -30,7 +38,10 @@
       "name": "Check System Health",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [300, 200]
+      "position": [
+        300,
+        200
+      ]
     },
     {
       "parameters": {
@@ -50,7 +61,10 @@
       "name": "Is System Degraded?",
       "type": "n8n-nodes-base:if",
       "typeVersion": 1,
-      "position": [500, 200]
+      "position": [
+        500,
+        200
+      ]
     },
     {
       "parameters": {
@@ -64,7 +78,10 @@
       "name": "Send Health Alert",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [700, 100]
+      "position": [
+        700,
+        100
+      ]
     },
     {
       "parameters": {
@@ -84,7 +101,10 @@
       "name": "Get Error Summary",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [700, 300]
+      "position": [
+        700,
+        300
+      ]
     },
     {
       "parameters": {
@@ -104,7 +124,10 @@
       "name": "Are There Errors?",
       "type": "n8n-nodes-base:if",
       "typeVersion": 1,
-      "position": [900, 300]
+      "position": [
+        900,
+        300
+      ]
     },
     {
       "parameters": {
@@ -118,7 +141,10 @@
       "name": "Send Error Alert",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [1100, 300]
+      "position": [
+        1100,
+        300
+      ]
     },
     {
       "parameters": {
@@ -129,7 +155,10 @@
       "name": "Get Dashboard Metrics",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [300, 500]
+      "position": [
+        300,
+        500
+      ]
     },
     {
       "parameters": {
@@ -143,7 +172,10 @@
       "name": "Log Health Check",
       "type": "n8n-nodes-base:httpRequest",
       "typeVersion": 4.1,
-      "position": [1300, 500]
+      "position": [
+        1300,
+        500
+      ]
     }
   ],
   "connections": {
@@ -226,5 +258,6 @@
         ]
       ]
     }
-  }
+  },
+  "settings": {}
 }
