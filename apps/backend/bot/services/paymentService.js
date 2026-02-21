@@ -626,31 +626,22 @@ class PaymentService {
       }
     }
 
-    // Legacy Checkout 2.0 signature validation (MD5):
-    // MD5(p_cust_id_cliente + p_key + p_id_invoice + p_amount + p_currency_code)
-    const invoice = x_id_invoice || x_invoice;
-    const md5Ready = invoice && amountCandidates.length > 0 && currencyCandidates.length > 0;
-    let md5Valid = false;
-    if (md5Ready) {
-      for (const amountCandidate of amountCandidates) {
-        for (const currencyCandidate of currencyCandidates) {
-          const md5String = `${custId}^${pKey}^${invoice}^${amountCandidate}^${currencyCandidate}`;
-          const expected = crypto.createHash('md5').update(md5String).digest('hex');
-          if (PaymentService.safeCompareHex(expected, signatureValue)) {
-            md5Valid = true;
-            break;
-          }
-        }
-        if (md5Valid) break;
-      }
-    }
-
+    // SHA-256 is now the ONLY accepted signature algorithm
+    // Legacy MD5 signatures are rejected for production security
     if (sha256Valid) {
       return true;
     }
 
-    if (md5Valid) {
-      logger.warn('Rejected legacy MD5 ePayco signature. SHA256 is required.');
+    // Log rejection with details for debugging
+    if (!sha256Ready) {
+      logger.warn('ePayco webhook signature validation: insufficient data', {
+        hasRefPayco: !!x_ref_payco,
+        hasTransactionId: !!x_transaction_id,
+        hasAmount: amountCandidates.length > 0,
+        hasCurrency: currencyCandidates.length > 0,
+      });
+    } else {
+      logger.warn('ePayco webhook signature validation failed: SHA-256 mismatch');
     }
 
     return false;
