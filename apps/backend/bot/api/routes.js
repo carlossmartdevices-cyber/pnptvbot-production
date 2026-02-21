@@ -424,6 +424,15 @@ app.get('/subscription', (req, res) => {
   res.redirect(301, '/suscripcion');
 });
 
+// LIFETIME100 pass promo page
+app.get('/lifetime100', pageLimiter, (req, res) => {
+  const host = req.get('host') || '';
+  if (host.includes('easybots.store') || host.includes('easybots')) {
+    return res.status(404).send('Not found');
+  }
+  res.sendFile(path.join(__dirname, '../../../../public/lifetime-pass.html'));
+});
+
 // Serve static files from public directory with blocking
 app.use(serveStaticWithBlocking(path.join(__dirname, '../../../public')));
 
