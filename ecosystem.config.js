@@ -17,6 +17,8 @@ module.exports = {
       PORT: '3001',
       NODE_OPTIONS: '--dns-result-order=ipv4first',
       BOT_LOCK_ENABLED: 'false',
+      AMPACHE_URL: 'http://127.0.0.1:32768',
+      AMPACHE_USER: 'admin',
       // All sensitive values must be in .env.production
       // See .env.example for required variables
     },
@@ -25,6 +27,8 @@ module.exports = {
       PORT: '3001',
       NODE_OPTIONS: '--dns-result-order=ipv4first',
       BOT_LOCK_ENABLED: 'false',
+      AMPACHE_URL: 'http://127.0.0.1:32768',
+      AMPACHE_USER: 'admin',
       // SECURITY: All secrets must be in .env.production
       // Postgres pool settings (non-sensitive)
       POSTGRES_POOL_MAX: '20', // Increased from 10 for concurrency

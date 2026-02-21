@@ -1,5 +1,6 @@
 const { query } = require('../../config/postgres');
 const logger = require('../../utils/logger');
+const PDSProvisioningService = require('../../bot/services/PDSProvisioningService');
 
 /**
  * Handle Telegram authentication callback
@@ -7,23 +8,23 @@ const logger = require('../../utils/logger');
 const handleTelegramAuth = async (req, res) => {
   try {
     const { telegramUser } = req.body;
-    
+
     if (!telegramUser) {
       logger.warn('Telegram auth: No user data received');
-      return res.status(400).json({ 
-        error: 'Invalid request', 
+      return res.status(400).json({
+        error: 'Invalid request',
         redirect: '/auth/telegram-login'
       });
     }
-    
+
     logger.info(`Telegram auth attempt for user: ${telegramUser.id} (${telegramUser.username || 'no username'})`);
-    
+
     // Check if user exists in our database
     const userQuery = await query(
-      'SELECT id, telegram, username, subscription_status, accepted_terms FROM users WHERE telegram = $1',
+      'SELECT id, telegram_id, username, email, subscription_status, accepted_terms FROM users WHERE telegram_id = $1',
       [telegramUser.id]
     );
-    
+
     if (userQuery.rows.length === 0) {
       // User not in our database - store Telegram data in session and redirect to onboarding
       req.session.telegramUser = {
@@ -34,7 +35,7 @@ const handleTelegramAuth = async (req, res) => {
         photo_url: telegramUser.photo_url,
         auth_date: telegramUser.auth_date
       };
-      
+
       logger.info(`User ${telegramUser.id} not in database, redirecting to onboarding`);
       return res.json({
         redirect: '/auth/not-registered',
@@ -45,20 +46,47 @@ const handleTelegramAuth = async (req, res) => {
         }
       });
     }
-    
+
     const user = userQuery.rows[0];
-    
+
     // Store user in session
     req.session.user = {
       id: user.id,
       telegramId: user.telegram_id,
       username: user.username,
+      email: user.email,
       subscriptionStatus: user.subscription_status,
       acceptedTerms: user.accepted_terms
     };
-    
+
     logger.info(`User ${user.id} authenticated successfully, terms accepted: ${user.accepted_terms}`);
-    
+
+    // ASYNC: Provision PDS in background (don't block login)
+    // This runs independently without awaiting
+    setImmediate(async () => {
+      try {
+        const pdsResult = await PDSProvisioningService.createOrLinkPDS(user);
+        logger.info(`[Auth] PDS provisioning completed for user ${user.id}:`, {
+          success: pdsResult.success,
+          status: pdsResult.status
+        });
+
+        // Optionally store PDS info in session for frontend
+        if (pdsResult.success) {
+          req.session.user.pds = {
+            pnptv_uuid: pdsResult.pnptv_uuid,
+            pds_handle: pdsResult.pds_handle,
+            pds_did: pdsResult.pds_did,
+            status: pdsResult.status
+          };
+          req.session.save();
+        }
+      } catch (pdsError) {
+        logger.warn(`[Auth] PDS provisioning failed (non-blocking):`, pdsError.message);
+        // Continue - login succeeds even if PDS provisioning fails
+      }
+    });
+
     // Return success with terms status
     res.json({
       success: true,
@@ -69,11 +97,11 @@ const handleTelegramAuth = async (req, res) => {
       },
       termsAccepted: user.accepted_terms
     });
-    
+
   } catch (error) {
     logger.error('Telegram auth error:', error);
-    res.status(500).json({ 
-      error: 'Authentication failed', 
+    res.status(500).json({
+      error: 'Authentication failed',
       redirect: '/auth/telegram-login'
     });
   }

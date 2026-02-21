@@ -31,6 +31,9 @@ COPY --from=builder --chown=node:node /app/apps ./apps
 # Copy packages directory (ui-kit, shared modules, etc)
 COPY --from=builder --chown=node:node /app/packages ./packages
 
+# Copy scripts directory (cron jobs and utilities)
+COPY --from=builder --chown=node:node /app/scripts ./scripts
+
 # Copy config directory (payment config, JaaS keys, etc)
 COPY --from=builder --chown=node:node /app/config ./config
 

@@ -1,0 +1,210 @@
+{
+  "name": "📊 Payment Recovery & Status Sync (Every 2 Hours)",
+  "description": "Automatically checks for failed payments, updates their status from ePayco, retries them, and notifies users",
+  "tags": ["payment", "recovery", "automation", "production"],
+  "nodes": [
+    {
+      "parameters": {
+        "cronExpression": "0 */2 * * *"
+      },
+      "name": "Schedule Every 2 Hours",
+      "type": "n8n-nodes-base:cronTrigger",
+      "typeVersion": 1,
+      "position": [100, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:3001/api/n8n/payments/failed",
+        "authentication": "generic",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-SECRET",
+              "value": "={{ $env.N8N_WEBHOOK_SECRET }}"
+            }
+          ]
+        }
+      },
+      "name": "Get Failed Payments",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [300, 200]
+    },
+    {
+      "parameters": {
+        "loopOver": "=data"
+      },
+      "name": "Loop Each Payment",
+      "type": "n8n-nodes-base:splitInBatches",
+      "typeVersion": 3,
+      "position": [500, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:3001/api/payment/check-ePayco-status",
+        "authentication": "generic",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "refPayco",
+              "value": "={{ $node[\"Loop Each Payment\"].json.ref_payco }}"
+            }
+          ]
+        }
+      },
+      "name": "Check ePayco Status",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [700, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/api/n8n/payments/update-status",
+        "authentication": "generic",
+        "sendBody": true,
+        "contentType": "application/json",
+        "body": "{\n  \"paymentId\": \"{{ $node[\\\"Loop Each Payment\\\"].json.id }}\",\n  \"status\": \"{{ $node[\\\"Check ePayco Status\\\"].json.estado }}\",\n  \"result\": {{ JSON.stringify($node[\\\"Check ePayco Status\\\"].json) }}\n}"
+      },
+      "name": "Update Payment Status",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $node[\\\"Loop Each Payment\\\"].json.email }}",
+        "authentication": "generic",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "To",
+              "value": "={{ $node[\\\"Loop Each Payment\\\"].json.email }}"
+            },
+            {
+              "name": "Subject",
+              "value": "Payment Status Update - {{ $node[\\\"Check ePayco Status\\\"].json.estado }}"
+            }
+          ]
+        }
+      },
+      "name": "Send Status Email",
+      "type": "n8n-nodes-base:emailSend",
+      "typeVersion": 1,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/api/n8n/workflows/log",
+        "authentication": "generic",
+        "sendBody": true,
+        "contentType": "application/json",
+        "body": "{\n  \"workflowName\": \"Payment Recovery & Status Sync\",\n  \"status\": \"success\",\n  \"itemsProcessed\": {{ $node[\\\"Loop Each Payment\\\"].json.length || 0 }},\n  \"executionTimeMs\": {{ Date.now() - $now }}\n}"
+      },
+      "name": "Log Workflow Success",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [1300, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/api/n8n/alerts/admin",
+        "authentication": "generic",
+        "sendBody": true,
+        "contentType": "application/json",
+        "body": "{\n  \"alertType\": \"payment_recovery_daily\",\n  \"severity\": \"info\",\n  \"title\": \"Payment Recovery Summary\",\n  \"message\": \"Processed {{ $node[\\\"Loop Each Payment\\\"].json.length || 0 }} failed payments\",\n  \"details\": {\n    \"itemsProcessed\": {{ $node[\\\"Loop Each Payment\\\"].json.length || 0 }},\n    \"timestamp\": \"{{ now.toISOString() }}\"\n  }\n}"
+      },
+      "name": "Send Admin Summary",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [1500, 200]
+    }
+  ],
+  "connections": {
+    "Schedule Every 2 Hours": {
+      "main": [
+        [
+          {
+            "node": "Get Failed Payments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Failed Payments": {
+      "main": [
+        [
+          {
+            "node": "Loop Each Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Each Payment": {
+      "main": [
+        [
+          {
+            "node": "Check ePayco Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check ePayco Status": {
+      "main": [
+        [
+          {
+            "node": "Update Payment Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Payment Status": {
+      "main": [
+        [
+          {
+            "node": "Send Status Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Status Email": {
+      "main": [
+        [
+          {
+            "node": "Log Workflow Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Workflow Success": {
+      "main": [
+        [
+          {
+            "node": "Send Admin Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

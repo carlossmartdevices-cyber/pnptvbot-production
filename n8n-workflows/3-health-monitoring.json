@@ -1,0 +1,230 @@
+{
+  "name": "🏥 System Health & Monitoring (Every 5 Minutes)",
+  "description": "Monitors system health, API status, database connectivity, and sends alerts for degradation",
+  "tags": ["monitoring", "health", "alerts", "production"],
+  "nodes": [
+    {
+      "parameters": {
+        "cronExpression": "*/5 * * * *"
+      },
+      "name": "Check Every 5 Minutes",
+      "type": "n8n-nodes-base:cronTrigger",
+      "typeVersion": 1,
+      "position": [100, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:3001/api/n8n/health",
+        "authentication": "generic",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-SECRET",
+              "value": "={{ $env.N8N_WEBHOOK_SECRET }}"
+            }
+          ]
+        }
+      },
+      "name": "Check System Health",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [300, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "rightValue": ""
+          },
+          "combinator": "and",
+          "type": "object",
+          "compareOperation": "notEqual",
+          "value1": "={{ $node[\\\"Check System Health\\\"].json.status }}",
+          "value2": "healthy"
+        }
+      },
+      "name": "Is System Degraded?",
+      "type": "n8n-nodes-base:if",
+      "typeVersion": 1,
+      "position": [500, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/api/n8n/alerts/admin",
+        "authentication": "generic",
+        "sendBody": true,
+        "contentType": "application/json",
+        "body": "{\n  \"alertType\": \"system_health_degradation\",\n  \"severity\": \"warning\",\n  \"title\": \"System Health Degraded\",\n  \"message\": \"One or more system components are not healthy\",\n  \"details\": {{ JSON.stringify($node[\\\"Check System Health\\\"].json.checks) }}\n}"
+      },
+      "name": "Send Health Alert",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [700, 100]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:3001/api/n8n/errors/summary",
+        "authentication": "generic",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "hours",
+              "value": "1"
+            }
+          ]
+        }
+      },
+      "name": "Get Error Summary",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "rightValue": ""
+          },
+          "combinator": "and",
+          "type": "object",
+          "compareOperation": "greaterThan",
+          "value1": "={{ $node[\\\"Get Error Summary\\\"].json.data.length || 0 }}",
+          "value2": "0"
+        }
+      },
+      "name": "Are There Errors?",
+      "type": "n8n-nodes-base:if",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/api/n8n/alerts/admin",
+        "authentication": "generic",
+        "sendBody": true,
+        "contentType": "application/json",
+        "body": "{\n  \"alertType\": \"error_spike_detected\",\n  \"severity\": \"error\",\n  \"title\": \"Error Spike Detected\",\n  \"message\": \"Multiple workflow errors detected in last hour\",\n  \"details\": {{ JSON.stringify($node[\\\"Get Error Summary\\\"].json.data) }}\n}"
+      },
+      "name": "Send Error Alert",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:3001/api/n8n/metrics/dashboard",
+        "authentication": "generic"
+      },
+      "name": "Get Dashboard Metrics",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [300, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/api/n8n/workflows/log",
+        "authentication": "generic",
+        "sendBody": true,
+        "contentType": "application/json",
+        "body": "{\n  \"workflowName\": \"System Health & Monitoring\",\n  \"status\": \"{{ $node[\\\"Check System Health\\\"].json.status === 'healthy' ? 'success' : 'warning' }}\",\n  \"itemsProcessed\": 1,\n  \"executionTimeMs\": {{ $node[\\\"Check System Health\\\"].json.executionTimeMs || 0 }}\n}"
+      },
+      "name": "Log Health Check",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [1300, 500]
+    }
+  ],
+  "connections": {
+    "Check Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Check System Health",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Dashboard Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check System Health": {
+      "main": [
+        [
+          {
+            "node": "Is System Degraded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is System Degraded?": {
+      "main": [
+        [
+          {
+            "node": "Send Health Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Error Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Error Summary": {
+      "main": [
+        [
+          {
+            "node": "Are There Errors?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Are There Errors?": {
+      "main": [
+        [
+          {
+            "node": "Send Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Get Dashboard Metrics": {
+      "main": [
+        [
+          {
+            "node": "Log Health Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

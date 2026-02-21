@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Music, Trash2, Edit2, Plus, Upload } from 'lucide-react';
+import { Music, Trash2, Edit2, Plus, Upload, Star } from 'lucide-react';
 import client from '../../api/client';
 import AdminRoute from '../../components/AdminRoute';
+import AmpacheCatalog from '../../components/admin/AmpacheCatalog';
 
 export default function AdminMediaPage() {
   const [media, setMedia] = useState([]);
@@ -15,6 +16,7 @@ export default function AdminMediaPage() {
   const [showUpload, setShowUpload] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
+  const [activeTab, setActiveTab] = useState('library'); // 'library' or 'ampache'
 
   const limit = 20;
 
@@ -74,6 +76,7 @@ export default function AdminMediaPage() {
       description: item.description,
       category: item.category,
       isExplicit: item.is_explicit,
+      is_prime: item.is_prime || false,
     });
   };
 
@@ -116,31 +119,53 @@ export default function AdminMediaPage() {
     <AdminRoute>
       <div className="admin-page">
         <div className="admin-header">
-          <h1>Media Management</h1>
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowUpload(!showUpload)}
-            disabled={loading}
-          >
-            <Upload size={16} />
-            Upload Media
-          </button>
+          <div>
+            <h1>Media Management</h1>
+            <div className="media-tabs">
+              <button
+                className={`tab-btn ${activeTab === 'library' ? 'active' : ''}`}
+                onClick={() => setActiveTab('library')}
+              >
+                📚 Media Library
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'ampache' ? 'active' : ''}`}
+                onClick={() => setActiveTab('ampache')}
+              >
+                🔌 Ampache Catalog
+              </button>
+            </div>
+          </div>
+          {activeTab === 'library' && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowUpload(!showUpload)}
+              disabled={loading}
+            >
+              <Upload size={16} />
+              Upload Media
+            </button>
+          )}
         </div>
 
-        {showUpload && (
-          <div className="card" style={{ marginBottom: '20px' }}>
-            <h3>Upload Media</h3>
-            <input
-              type="file"
-              accept="audio/*,video/*"
-              onChange={handleUpload}
-              disabled={loading}
-              style={{ marginBottom: '10px' }}
-            />
-          </div>
-        )}
+        {activeTab === 'ampache' ? (
+          <AmpacheCatalog />
+        ) : (
+          <>
+            {showUpload && (
+              <div className="card" style={{ marginBottom: '20px' }}>
+                <h3>Upload Media</h3>
+                <input
+                  type="file"
+                  accept="audio/*,video/*"
+                  onChange={handleUpload}
+                  disabled={loading}
+                  style={{ marginBottom: '10px' }}
+                />
+              </div>
+            )}
 
-        <div className="filters">
+            <div className="filters">
           <select value={type} onChange={(e) => {
             setType(e.target.value);
             setPage(1);
@@ -214,6 +239,14 @@ export default function AdminMediaPage() {
                       />
                       Explicit Content
                     </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={editData.is_prime}
+                        onChange={(e) => setEditData({ ...editData, is_prime: e.target.checked })}
+                      />
+                      Prime Content (Subscription Only)
+                    </label>
                     <div className="button-group">
                       <button onClick={() => handleEditSave(item.id)} className="btn btn-success">Save</button>
                       <button onClick={() => setEditingId(null)} className="btn btn-secondary">Cancel</button>
@@ -255,15 +288,17 @@ export default function AdminMediaPage() {
           )}
         </div>
 
-        <div className="pagination">
-          <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
-            Previous
-          </button>
-          <span>Page {page} of {Math.ceil(total / limit)}</span>
-          <button onClick={() => setPage(page + 1)} disabled={page >= Math.ceil(total / limit)}>
-            Next
-          </button>
-        </div>
+            <div className="pagination">
+              <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
+                Previous
+              </button>
+              <span>Page {page} of {Math.ceil(total / limit)}</span>
+              <button onClick={() => setPage(page + 1)} disabled={page >= Math.ceil(total / limit)}>
+                Next
+              </button>
+            </div>
+          </>
+        )}
 
         <style jsx>{`
           .admin-page {
@@ -272,8 +307,34 @@ export default function AdminMediaPage() {
           .admin-header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             margin-bottom: 20px;
+            gap: 20px;
+          }
+          .media-tabs {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+          }
+          .tab-btn {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            color: #666;
+          }
+          .tab-btn:hover {
+            border-color: #007bff;
+            color: #007bff;
+          }
+          .tab-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
           }
           .filters {
             display: flex;

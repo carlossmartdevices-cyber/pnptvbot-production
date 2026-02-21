@@ -10,6 +10,7 @@ const morgan = require('morgan');
 const session = require('express-session');
 const RedisStore = require('connect-redis').default;
 const multer = require('multer');
+const axios = require('axios');
 const { getRedis } = require('../../config/redis');
 const { getPool } = require('../../config/postgres');
 const logger = require('../../utils/logger');
@@ -41,10 +42,13 @@ const PermissionService = require('../services/permissionService');
 const { telegramAuth, checkTermsAccepted } = require('../../api/middleware/telegramAuth');
 const { handleTelegramAuth, handleAcceptTerms, checkAuthStatus } = require('../../api/handlers/telegramAuthHandler');
 
-// New route imports for auth, subscriptions, and monetization
+// New route imports for auth, subscriptions, monetization, and PDS
 const authRoutes = require('./routes/authRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const modelRoutes = require('./routes/modelRoutes');
+const pdsRoutes = require('./routes/pdsRoutes');
+const blueskyRoutes = require('./routes/blueskyRoutes');
+const elementRoutes = require('./routes/elementRoutes');
 
 /**
  * Page-level authentication middleware
@@ -62,6 +66,38 @@ const requirePageAuth = (req, res, next) => {
 
   // User is authenticated
   req.user = user;
+  next();
+};
+
+// ==========================================
+// Soft & Tier Authentication Middleware
+// ==========================================
+
+/**
+ * Soft auth — populates req.user from session if present, never blocks
+ */
+const softAuth = (req, res, next) => {
+  if (req.session?.user?.id) {
+    req.user = {
+      id: req.session.user.id,
+      subscriptionStatus: req.session.user.subscription_status || 'free',
+    };
+  }
+  next();
+};
+
+/**
+ * Tier gate — requires active or prime subscription
+ */
+const requirePrimeTier = (req, res, next) => {
+  const status = req.session?.user?.subscription_status || 'free';
+  if (!['active', 'prime'].includes(status)) {
+    return res.status(403).json({
+      success: false,
+      error: 'Prime subscription required',
+      code: 'PRIME_REQUIRED'
+    });
+  }
   next();
 };
 
@@ -885,6 +921,43 @@ app.post('/api/webhook/epayco', webhookLimiter, webhookController.handleEpaycoWe
 // New route for pnptv-bot ePayco payments via easybots.store domain
 app.post('/checkout/pnp', webhookLimiter, webhookController.handleEpaycoWebhook);
 app.post('/checkout/pnp/confirmation', webhookLimiter, webhookController.handleEpaycoWebhook);
+
+// Daimo webhook diagnostic endpoint (for debugging)
+app.post('/api/webhooks/daimo/debug', express.raw({ type: 'application/json' }), asyncHandler(async (req, res) => {
+  try {
+    const contentType = req.headers['content-type'] || 'none';
+    const contentLength = req.headers['content-length'] || '0';
+    const rawBody = req.body ? (typeof req.body === 'string' ? req.body : JSON.stringify(req.body)) : '';
+    const bodyPreview = rawBody.slice(0, 1000);
+
+    logger.info('[Daimo] Diagnostic webhook received', {
+      contentType,
+      contentLength,
+      bodyLength: rawBody.length,
+      authHeader: !!req.headers['authorization'],
+      xDaimoSignature: !!req.headers['x-daimo-signature'],
+      headersKeys: Object.keys(req.headers)
+    });
+
+    res.json({
+      received: true,
+      length: rawBody.length,
+      contentType,
+      preview: bodyPreview,
+      headers: {
+        'content-type': contentType,
+        'content-length': contentLength,
+        'authorization': req.headers['authorization'] ? 'present' : 'missing',
+        'x-daimo-signature': req.headers['x-daimo-signature'] ? 'present' : 'missing'
+      }
+    });
+  } catch (error) {
+    logger.error('[Daimo] Diagnostic error:', error);
+    res.status(500).json({ error: error.message });
+  }
+}));
+
+// Main Daimo webhook handler
 app.post('/api/webhooks/daimo', webhookLimiter, webhookController.handleDaimoWebhook);
 app.post('/api/webhooks/visa-cybersource', webhookLimiter, require('./controllers/visaCybersourceWebhookController').handleWebhook);
 app.get('/api/webhooks/visa-cybersource/health', require('./controllers/visaCybersourceWebhookController').healthCheck);
@@ -1297,6 +1370,31 @@ app.get('/api/media/:mediaId', asyncHandler(async (req, res) => {
   }
 }));
 
+// Get server-side prime content (tier-gated)
+app.get('/api/media/prime', softAuth, requirePrimeTier, asyncHandler(async (req, res) => {
+  try {
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT id, title, artist, url, type, duration, category, cover_url, description, is_prime, plays, likes
+       FROM media_library WHERE is_prime = true AND is_public = true
+       ORDER BY created_at DESC LIMIT 100`
+    );
+
+    res.json({
+      success: true,
+      data: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    logger.error('Error fetching prime content:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch prime content',
+      data: []
+    });
+  }
+}));
+
 // ==========================================
 // RADIO API ROUTES
 // ==========================================
@@ -1403,6 +1501,45 @@ app.post('/api/radio/request', authenticateUser, asyncHandler(async (req, res) =
   } catch (error) {
     logger.error('Error submitting song request:', error);
     res.status(500).json({ error: 'Failed to submit request' });
+  }
+}));
+
+// Audio stream proxy (streams current radio track from Ampache)
+app.get('/api/radio/stream', asyncHandler(async (req, res) => {
+  try {
+    const AmpacheService = require('../services/ampacheService');
+    const pool = getPool();
+
+    // Get current radio track's Ampache ID
+    const result = await pool.query('SELECT ampache_song_id FROM radio_now_playing WHERE id = 1');
+    const songId = result.rows[0]?.ampache_song_id;
+
+    if (!songId) {
+      return res.status(404).json({ success: false, error: 'No radio stream configured' });
+    }
+
+    // Get stream URL from Ampache
+    const streamUrl = await AmpacheService.getStreamUrl('song', songId);
+
+    // Proxy the stream
+    const upstream = await axios.get(streamUrl, { responseType: 'stream', timeout: 30000 });
+    res.setHeader('Content-Type', upstream.headers['content-type'] || 'audio/mpeg');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    upstream.data.pipe(res);
+
+    upstream.data.on('error', (err) => {
+      logger.error('Ampache stream error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, error: 'Stream error' });
+      }
+    });
+  } catch (error) {
+    logger.error('Radio stream error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, error: 'Failed to get radio stream' });
+    }
   }
 }));
 
@@ -1628,6 +1765,128 @@ app.get('/api/admin/radio/requests', verifyAdminJWT, asyncHandler(mediaAdminCont
 app.put('/api/admin/radio/requests/:requestId', verifyAdminJWT, asyncHandler(mediaAdminController.updateRequest));
 
 // ==========================================
+// AMPACHE CATALOG ADMIN ROUTES
+// ==========================================
+
+// Browse Ampache catalog
+app.get('/api/webapp/admin/ampache/catalog', verifyAdminJWT, asyncHandler(async (req, res) => {
+  try {
+    const AmpacheService = require('../services/ampacheService');
+    const { type = 'songs', offset = 0, limit = 50 } = req.query;
+
+    const items = type === 'videos'
+      ? await AmpacheService.getVideos({ offset: +offset, limit: +limit })
+      : await AmpacheService.getSongs({ offset: +offset, limit: +limit });
+
+    res.json({ success: true, data: items, type, offset: +offset, limit: +limit });
+  } catch (error) {
+    logger.error('Error fetching Ampache catalog:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch Ampache catalog' });
+  }
+}));
+
+// Import single Ampache item to media_library
+app.post('/api/webapp/admin/ampache/import', verifyAdminJWT, asyncHandler(async (req, res) => {
+  try {
+    const AmpacheService = require('../services/ampacheService');
+    const pool = getPool();
+    const { ampache_id, type, title, artist, cover_url, duration, is_prime = false } = req.body;
+
+    if (!ampache_id || !title) {
+      return res.status(400).json({ success: false, error: 'ampache_id and title are required' });
+    }
+
+    const streamUrl = await AmpacheService.getStreamUrl(type === 'video' ? 'video' : 'song', ampache_id);
+
+    await pool.query(
+      `INSERT INTO media_library (title, artist, url, type, duration, cover_url, is_prime, ampache_song_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (ampache_song_id) DO UPDATE SET title=$1, artist=$2, url=$3, cover_url=$6, is_prime=$7`,
+      [title, artist || '', streamUrl, type || 'audio', duration || 0, cover_url || null, is_prime, String(ampache_id)]
+    );
+
+    res.json({ success: true, message: 'Item imported successfully' });
+  } catch (error) {
+    logger.error('Error importing Ampache item:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to import item' });
+  }
+}));
+
+// Bulk sync Ampache catalog to media_library
+app.post('/api/webapp/admin/ampache/sync', verifyAdminJWT, asyncHandler(async (req, res) => {
+  try {
+    const AmpacheService = require('../services/ampacheService');
+    const pool = getPool();
+    const { limit = 200 } = req.body;
+
+    const songs = await AmpacheService.getSongs({ limit: Math.min(+limit, 500) });
+    let imported = 0;
+
+    for (const song of songs) {
+      try {
+        const streamUrl = await AmpacheService.getStreamUrl('song', song.id);
+        await pool.query(
+          `INSERT INTO media_library (title, artist, url, type, duration, cover_url, ampache_song_id)
+           VALUES ($1, $2, $3, 'audio', $4, $5, $6)
+           ON CONFLICT (ampache_song_id) DO UPDATE SET url=$3, title=$1`,
+          [
+            song.title || 'Unknown',
+            (song.artist?.name || song.artist) || '',
+            streamUrl,
+            song.time || 0,
+            song.art || null,
+            String(song.id)
+          ]
+        );
+        imported++;
+      } catch (itemError) {
+        logger.warn(`Failed to sync Ampache song ${song.id}:`, itemError.message);
+      }
+    }
+
+    res.json({ success: true, imported, total: songs.length });
+  } catch (error) {
+    logger.error('Error syncing Ampache catalog:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to sync catalog' });
+  }
+}));
+
+// Set current radio track from Ampache
+app.post('/api/webapp/admin/ampache/set-radio', verifyAdminJWT, asyncHandler(async (req, res) => {
+  try {
+    const pool = getPool();
+    const { ampache_id, title, artist, cover_url, duration } = req.body;
+
+    if (!ampache_id) {
+      return res.status(400).json({ success: false, error: 'ampache_id is required' });
+    }
+
+    await pool.query(
+      `UPDATE radio_now_playing SET title=$1, artist=$2, cover_url=$3, duration=$4, ampache_song_id=$5,
+       started_at=NOW() WHERE id=1`,
+      [title || '', artist || '', cover_url || null, duration || 0, String(ampache_id)]
+    );
+
+    res.json({ success: true, message: 'Radio track updated' });
+  } catch (error) {
+    logger.error('Error setting radio track:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to set radio track' });
+  }
+}));
+
+// Ampache server health check
+app.get('/api/webapp/admin/ampache/ping', verifyAdminJWT, asyncHandler(async (req, res) => {
+  try {
+    const AmpacheService = require('../services/ampacheService');
+    const result = await AmpacheService.ping();
+    res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error('Ampache ping error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Ampache server unreachable' });
+  }
+}));
+
+// ==========================================
 // Role-Based Access Control (RBAC) Routes
 // ==========================================
 const { superadminGuard } = require('../../middleware/guards');
@@ -1745,6 +2004,32 @@ app.use('/api/subscriptions', subscriptionRoutes);
 
 // Model routes
 app.use('/api/model', modelRoutes);
+
+// PDS provisioning routes
+app.use('/api/pds', pdsRoutes);
+app.use('/api/bluesky', blueskyRoutes);
+app.use('/api/element', elementRoutes);
+
+// ==========================================
+// N8N AUTOMATION ENDPOINTS
+// ==========================================
+const n8nAutomationController = require('./controllers/n8nAutomationController');
+const n8nRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  message: 'Too many n8n requests',
+  skip: (req) => req.get('X-N8N-SECRET') === process.env.N8N_WEBHOOK_SECRET
+});
+
+app.get('/api/n8n/payments/failed', n8nRateLimiter, asyncHandler(n8nAutomationController.getFailedPayments));
+app.post('/api/n8n/payments/update-status', n8nRateLimiter, asyncHandler(n8nAutomationController.updatePaymentRecoveryStatus));
+app.get('/api/n8n/subscriptions/expiry', n8nRateLimiter, asyncHandler(n8nAutomationController.getExpiryNotifications));
+app.post('/api/n8n/workflows/log', n8nRateLimiter, asyncHandler(n8nAutomationController.logWorkflowExecution));
+app.post('/api/n8n/emails/log', n8nRateLimiter, asyncHandler(n8nAutomationController.logEmailNotification));
+app.post('/api/n8n/alerts/admin', n8nRateLimiter, asyncHandler(n8nAutomationController.sendAdminAlert));
+app.get('/api/n8n/health', n8nRateLimiter, asyncHandler(n8nAutomationController.checkSystemHealth));
+app.get('/api/n8n/errors/summary', n8nRateLimiter, asyncHandler(n8nAutomationController.getErrorSummary));
+app.get('/api/n8n/metrics/dashboard', n8nRateLimiter, asyncHandler(n8nAutomationController.getDashboardMetrics));
 
 // ==========================================
 // NGINX AUTH_REQUEST ENDPOINT (Internal)

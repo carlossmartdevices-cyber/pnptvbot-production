@@ -8,6 +8,8 @@ export default function PrimeContentPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [error, setError] = useState(null);
+  const [isPremiumBlocked, setIsPremiumBlocked] = useState(false);
 
   useEffect(() => {
     loadPrimeContent();
@@ -19,18 +21,27 @@ export default function PrimeContentPage() {
 
   async function loadPrimeContent() {
     setLoading(true);
+    setError(null);
+    setIsPremiumBlocked(false);
     try {
-      const response = await fetch('/api/media/library?type=all&limit=100', {
+      const response = await fetch('/api/media/prime', {
         credentials: 'include',
       });
-      if (!response.ok) throw new Error('Failed to load content');
-      const data = await response.json();
-      const content = Array.isArray(data) ? data : data.data || [];
-      // Filter only Prime content
-      const primeOnly = content.filter(item => item.is_prime === true);
-      setPrimeContent(primeOnly);
+
+      if (response.status === 403) {
+        // User is not a prime subscriber
+        setIsPremiumBlocked(true);
+        setPrimeContent([]);
+      } else if (!response.ok) {
+        throw new Error('Failed to load content');
+      } else {
+        const data = await response.json();
+        const content = Array.isArray(data.data) ? data.data : [];
+        setPrimeContent(content);
+      }
     } catch (err) {
       console.error('Error loading prime content:', err);
+      setError(err.message);
       setPrimeContent([]);
     } finally {
       setLoading(false);
@@ -105,6 +116,26 @@ export default function PrimeContentPage() {
           <div className="loading-container">
             <div className="loading-spinner" />
             <p>Loading premium content...</p>
+          </div>
+        ) : error ? (
+          <div className="error-state">
+            <p>⚠️ {error}</p>
+            <button onClick={loadPrimeContent} className="retry-button">Retry</button>
+          </div>
+        ) : isPremiumBlocked ? (
+          <div className="premium-required-state">
+            <div className="premium-upgrade-card">
+              <Crown size={64} className="crown-icon" />
+              <h2>Premium Content Locked</h2>
+              <p>Exclusive content is available for PRIME subscribers only</p>
+              <button
+                onClick={() => window.location.href = '/prime-hub/#/subscription'}
+                className="upgrade-button"
+              >
+                🚀 Upgrade to PRIME
+              </button>
+              <p className="premium-subtitle">Get access to exclusive curated content, ad-free streaming, and more</p>
+            </div>
           </div>
         ) : filteredContent.length > 0 ? (
           <div className="prime-grid">

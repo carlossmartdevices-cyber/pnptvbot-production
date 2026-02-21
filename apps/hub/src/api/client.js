@@ -183,6 +183,13 @@ export const api = {
   getAdminRadioRequests: (status = 'pending') => request(`/admin/radio/requests?status=${status}`),
   updateAdminRadioRequest: (requestId, data) => request(`/admin/radio/requests/${requestId}`, { method: 'PUT', body: JSON.stringify(data) }),
 
+  // Admin Ampache Catalog Management
+  getAmpacheCatalog: (query = '') => request(`/admin/ampache/catalog${query}`),
+  importAmpacheItem: (data) => request('/admin/ampache/import', { method: 'POST', body: JSON.stringify(data) }),
+  syncAmpacheCatalog: (data = {}) => request('/admin/ampache/sync', { method: 'POST', body: JSON.stringify(data) }),
+  setAmpacheRadioTrack: (data) => request('/admin/ampache/set-radio', { method: 'POST', body: JSON.stringify(data) }),
+  pingAmpache: () => request('/admin/ampache/ping'),
+
   // Admin Role Management
   getAdminRoles: () => request('/admin/roles'),
   getAdminUsersByRole: (role, page = 1, limit = 20) => request(`/admin/users?role=${role}&page=${page}&limit=${limit}`),

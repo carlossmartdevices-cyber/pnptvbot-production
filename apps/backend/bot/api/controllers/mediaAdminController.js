@@ -201,7 +201,7 @@ const updateMedia = async (req, res) => {
   const { mediaId } = req.params;
 
   try {
-    const { title, artist, description, category, isExplicit } = req.body;
+    const { title, artist, description, category, isExplicit, is_prime } = req.body;
 
     const updateFields = [];
     const values = [mediaId];
@@ -226,6 +226,10 @@ const updateMedia = async (req, res) => {
     if (isExplicit !== undefined) {
       updateFields.push(`is_explicit = $${paramIndex++}`);
       values.push(isExplicit);
+    }
+    if (is_prime !== undefined) {
+      updateFields.push(`is_prime = $${paramIndex++}`);
+      values.push(is_prime);
     }
 
     if (updateFields.length === 0) {

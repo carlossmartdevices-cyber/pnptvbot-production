@@ -1,0 +1,241 @@
+{
+  "name": "📧 Smart Email Notifications (Hourly + Daily)",
+  "description": "Sends subscription reminders, payment alerts, welcome sequences, and keeps engagement high",
+  "tags": ["email", "notifications", "automation", "engagement"],
+  "nodes": [
+    {
+      "parameters": {
+        "cronExpression": "0 * * * *"
+      },
+      "name": "Hourly Trigger",
+      "type": "n8n-nodes-base:cronTrigger",
+      "typeVersion": 1,
+      "position": [100, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:3001/api/n8n/subscriptions/expiry",
+        "authentication": "generic",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "daysAhead",
+              "value": "7"
+            }
+          ]
+        }
+      },
+      "name": "Get Expiring Subscriptions",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [300, 200]
+    },
+    {
+      "parameters": {
+        "loopOver": "=data"
+      },
+      "name": "Loop Subscriptions",
+      "type": "n8n-nodes-base:splitInBatches",
+      "typeVersion": 3,
+      "position": [500, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $node[\\\"Loop Subscriptions\\\"].json.email }}",
+        "authentication": "generic",
+        "fromEmail": "noreply@pnptv.app",
+        "toEmail": "={{ $node[\\\"Loop Subscriptions\\\"].json.email }}",
+        "subject": "Your {{ $node[\\\"Loop Subscriptions\\\"].json.plan_name }} subscription expires in 7 days",
+        "textBody": "Hi {{ $node[\\\"Loop Subscriptions\\\"].json.first_name }},\\n\\nYour subscription expires on {{ $node[\\\"Loop Subscriptions\\\"].json.expires_at }}.\\n\\nRenew now to keep access to all premium content.\\n\\nBest,\\nPNPTV Team"
+      },
+      "name": "Send 7-Day Reminder",
+      "type": "n8n-nodes-base:emailSend",
+      "typeVersion": 1,
+      "position": [700, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:3001/api/n8n/subscriptions/expiry",
+        "authentication": "generic",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "daysAhead",
+              "value": "1"
+            }
+          ]
+        }
+      },
+      "name": "Get Expiring Tomorrow",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [300, 400]
+    },
+    {
+      "parameters": {
+        "loopOver": "=data"
+      },
+      "name": "Loop Expiring Tomorrow",
+      "type": "n8n-nodes-base:splitInBatches",
+      "typeVersion": 3,
+      "position": [500, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $node[\\\"Loop Expiring Tomorrow\\\"].json.email }}",
+        "authentication": "generic",
+        "fromEmail": "noreply@pnptv.app",
+        "toEmail": "={{ $node[\\\"Loop Expiring Tomorrow\\\"].json.email }}",
+        "subject": "⏰ Your subscription expires tomorrow!",
+        "textBody": "Hi {{ $node[\\\"Loop Expiring Tomorrow\\\"].json.first_name }},\\n\\n⚠️ Your subscription expires TOMORROW.\\n\\nDon't lose access! Renew now in one click.\\n\\nBest,\\nPNPTV Team"
+      },
+      "name": "Send 1-Day Urgent Reminder",
+      "type": "n8n-nodes-base:emailSend",
+      "typeVersion": 1,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/api/n8n/emails/log",
+        "authentication": "generic",
+        "sendBody": true,
+        "contentType": "application/json",
+        "body": "{\n  \"recipientEmail\": \"{{ $node[\\\"Send 7-Day Reminder\\\"].json.email }}\",\n  \"recipientUserId\": \"{{ $node[\\\"Send 7-Day Reminder\\\"].json.user_id }}\",\n  \"notificationType\": \"subscription_expiry_7day\",\n  \"subject\": \"Subscription expiry reminder\",\n  \"status\": \"sent\"\n}"
+      },
+      "name": "Log 7-Day Email",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/api/n8n/emails/log",
+        "authentication": "generic",
+        "sendBody": true,
+        "contentType": "application/json",
+        "body": "{\n  \"recipientEmail\": \"{{ $node[\\\"Send 1-Day Urgent Reminder\\\"].json.email }}\",\n  \"recipientUserId\": \"{{ $node[\\\"Send 1-Day Urgent Reminder\\\"].json.user_id }}\",\n  \"notificationType\": \"subscription_expiry_1day\",\n  \"subject\": \"Subscription expiry urgent reminder\",\n  \"status\": \"sent\"\n}"
+      },
+      "name": "Log 1-Day Email",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/api/n8n/workflows/log",
+        "authentication": "generic",
+        "sendBody": true,
+        "contentType": "application/json",
+        "body": "{\n  \"workflowName\": \"Smart Email Notifications\",\n  \"status\": \"success\",\n  \"itemsProcessed\": {{ ($node[\\\"Loop Subscriptions\\\"].json.length || 0) + ($node[\\\"Loop Expiring Tomorrow\\\"].json.length || 0) }},\n  \"executionTimeMs\": {{ Date.now() - $now }}\n}"
+      },
+      "name": "Log Workflow Success",
+      "type": "n8n-nodes-base:httpRequest",
+      "typeVersion": 4.1,
+      "position": [1100, 200]
+    }
+  ],
+  "connections": {
+    "Hourly Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Expiring Subscriptions",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Expiring Tomorrow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Expiring Subscriptions": {
+      "main": [
+        [
+          {
+            "node": "Loop Subscriptions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Subscriptions": {
+      "main": [
+        [
+          {
+            "node": "Send 7-Day Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send 7-Day Reminder": {
+      "main": [
+        [
+          {
+            "node": "Log 7-Day Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Expiring Tomorrow": {
+      "main": [
+        [
+          {
+            "node": "Loop Expiring Tomorrow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Expiring Tomorrow": {
+      "main": [
+        [
+          {
+            "node": "Send 1-Day Urgent Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send 1-Day Urgent Reminder": {
+      "main": [
+        [
+          {
+            "node": "Log 1-Day Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log 7-Day Email": {
+      "main": [
+        [
+          {
+            "node": "Log Workflow Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

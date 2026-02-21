@@ -1,9 +1,27 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Radio, Play, Pause, Volume2, VolumeX } from 'lucide-react'
 
 export default function RadioPlayer({ nowPlaying }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
+  const audioRef = useRef(null)
+
+  // When isPlaying changes, play/pause audio
+  useEffect(() => {
+    if (!audioRef.current) return
+    if (isPlaying) {
+      audioRef.current.play().catch(err => console.error('Failed to play audio:', err))
+    } else {
+      audioRef.current.pause()
+    }
+  }, [isPlaying])
+
+  // When muted changes, apply to audio
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.muted = isMuted
+    }
+  }, [isMuted])
 
   if (!nowPlaying) {
     return (
@@ -62,6 +80,9 @@ export default function RadioPlayer({ nowPlaying }) {
           <span className="stat-label">24/7</span>
         </div>
       </div>
+
+      {/* Hidden audio element for streaming */}
+      <audio ref={audioRef} src="/api/radio/stream" preload="none" crossOrigin="anonymous" />
     </div>
   )
 }
