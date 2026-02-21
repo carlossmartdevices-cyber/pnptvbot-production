@@ -1,0 +1,20 @@
+/* Import LIFETIME100 Design System */
+@import './lifetime100-design-system.css';
+
+/* Nearby App - Location-based Services */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--lifetime-bg-color);
+  color: var(--lifetime-text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}

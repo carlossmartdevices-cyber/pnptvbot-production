@@ -1,28 +1,12 @@
 /* ================================
    PRIME Hub - Global Styles
-   Telegram Mini-App inspired design
+   Powered by LIFETIME100 Design System
    ================================ */
 
-:root {
-  --bg-primary: #120d14;
-  --bg-secondary: #2C2C2E;
-  --bg-tertiary: #3A3A3C;
-  --bg-glass: rgba(44, 44, 46, 0.75);
-  --text-primary: #FFFFFF;
-  --text-secondary: #ABABAB;
-  --text-muted: #8E8E93;
-  --accent-pink: #ff3377;
-  --accent-amber: #ff9933;
-  --accent-gradient: linear-gradient(135deg, #ff3377, #ff9933);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-glow: rgba(255, 180, 84, 0.3);
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
-  --transition: 0.2s ease;
+/* Import LIFETIME100 Design System */
+@import './lifetime100-design-system.css';
 
+:root {
   /* Telegram mini-app spacing */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);

@@ -1,3 +1,6 @@
+/* Import LIFETIME100 Design System */
+@import './lifetime100-design-system.css';
+
 /* Basic styling for the main App component, specific to the Portal.
    Global styles are handled by '../../design-system/styles.css' */
 

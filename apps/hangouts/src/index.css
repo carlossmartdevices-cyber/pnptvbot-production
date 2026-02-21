@@ -1,2 +1,5 @@
+/* Import LIFETIME100 Design System */
+@import './lifetime100-design-system.css';
+
 /* import the new design system */
 @import '../../design-system/styles.css';

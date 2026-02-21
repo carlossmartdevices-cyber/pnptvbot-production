@@ -1,0 +1,526 @@
+/* ================================
+   LIFETIME100 Design System
+   Master Styling for All PNPtv Webapps
+   Dark Theme with Neon Accents & Glass-morphism
+   ================================ */
+
+:root {
+  /* === BRAND COLORS === */
+  --lifetime-primary: #120d14;           /* Deep purple-black */
+  --lifetime-secondary: #2C2C2E;         /* Dark gray */
+  --lifetime-tertiary: #3A3A3C;          /* Lighter gray */
+  --lifetime-neon-pink: #ff3377;         /* Hot pink accent */
+  --lifetime-neon-amber: #ff9933;        /* Neon orange accent */
+  --lifetime-gradient: linear-gradient(90deg, #ff3377, #ff9933);
+
+  /* === TEXT COLORS === */
+  --lifetime-text-primary: #FFFFFF;
+  --lifetime-text-secondary: #ABABAB;
+  --lifetime-text-muted: #8E8E93;
+
+  /* === BACKGROUNDS === */
+  --lifetime-bg-color: #120d14;
+  --lifetime-glass-bg: rgba(44, 44, 46, 0.7);
+  --lifetime-glass-strong: rgba(44, 44, 46, 0.95);
+  --lifetime-overlay-dark: rgba(0, 0, 0, 0.7);
+
+  /* === BORDERS & GLASS === */
+  --lifetime-border-glass: rgba(255, 180, 84, 0.3);
+  --lifetime-border-subtle: rgba(255, 255, 255, 0.08);
+  --lifetime-border-bright: rgba(255, 255, 255, 0.1);
+
+  /* === BORDERS & RADIUS === */
+  --lifetime-radius-sm: 8px;
+  --lifetime-radius-md: 12px;
+  --lifetime-radius-lg: 16px;
+  --lifetime-radius-xl: 20px;
+  --lifetime-radius-card: 24px;
+
+  /* === SHADOWS === */
+  --lifetime-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --lifetime-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --lifetime-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --lifetime-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.5);
+
+  /* === EFFECTS === */
+  --lifetime-blur-sm: blur(10px);
+  --lifetime-blur-md: blur(20px);
+  --lifetime-transition: 0.2s ease;
+  --lifetime-transition-slow: 0.3s ease-out;
+
+  /* === SPACING === */
+  --lifetime-spacing-xs: 4px;
+  --lifetime-spacing-sm: 8px;
+  --lifetime-spacing-md: 12px;
+  --lifetime-spacing-lg: 16px;
+  --lifetime-spacing-xl: 24px;
+  --lifetime-spacing-2xl: 32px;
+}
+
+/* ================================
+   GLOBAL STYLES
+   ================================ */
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--lifetime-bg-color);
+  color: var(--lifetime-text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+/* ================================
+   GLASS-MORPHISM CARDS
+   ================================ */
+
+.lifetime-glass-card,
+.glass-card,
+[class*="card"],
+[class*="Card"] {
+  background: var(--lifetime-glass-bg);
+  backdrop-filter: var(--lifetime-blur-md);
+  -webkit-backdrop-filter: var(--lifetime-blur-md);
+  border: 1px solid var(--lifetime-border-glass);
+  border-radius: var(--lifetime-radius-card);
+  box-shadow: var(--lifetime-shadow-xl);
+  transition: all var(--lifetime-transition-slow);
+}
+
+.lifetime-glass-card::before,
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--lifetime-gradient);
+  border-radius: var(--lifetime-radius-card) var(--lifetime-radius-card) 0 0;
+}
+
+.lifetime-glass-card:hover,
+.glass-card:hover {
+  border-color: var(--lifetime-neon-pink);
+  box-shadow: 0 20px 50px rgba(255, 51, 119, 0.2), var(--lifetime-shadow-xl);
+  transform: translateY(-4px);
+}
+
+/* ================================
+   BUTTONS & INTERACTIONS
+   ================================ */
+
+.lifetime-btn,
+button,
+[role="button"] {
+  background: var(--lifetime-gradient);
+  border: none;
+  border-radius: var(--lifetime-radius-md);
+  padding: 12px 24px;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all var(--lifetime-transition);
+  box-shadow: 0 8px 20px rgba(255, 51, 119, 0.3);
+}
+
+.lifetime-btn:hover,
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(255, 51, 119, 0.4);
+}
+
+.lifetime-btn:active,
+button:active {
+  transform: scale(0.98);
+}
+
+/* Secondary Button */
+.lifetime-btn-secondary,
+button.secondary {
+  background: var(--lifetime-glass-bg);
+  border: 1px solid var(--lifetime-border-glass);
+  color: var(--lifetime-text-primary);
+  box-shadow: none;
+}
+
+.lifetime-btn-secondary:hover {
+  border-color: var(--lifetime-neon-pink);
+  background: rgba(255, 51, 119, 0.1);
+}
+
+/* ================================
+   MODAL & OVERLAYS
+   ================================ */
+
+.lifetime-modal-overlay,
+.modal-overlay,
+[class*="modal"],
+[class*="Modal"] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--lifetime-overlay-dark);
+  backdrop-filter: var(--lifetime-blur-sm);
+  -webkit-backdrop-filter: var(--lifetime-blur-sm);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.lifetime-modal-content,
+.modal-content {
+  background: var(--lifetime-glass-strong);
+  border: 1px solid var(--lifetime-border-glass);
+  border-radius: var(--lifetime-radius-card);
+  padding: 24px;
+  max-width: 90%;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--lifetime-shadow-xl);
+  animation: lifetime-fadeIn 0.3s ease-out;
+}
+
+/* ================================
+   ANIMATIONS
+   ================================ */
+
+@keyframes lifetime-fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes lifetime-slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lifetime-slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes lifetime-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes lifetime-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 51, 119, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 153, 51, 0.6);
+  }
+}
+
+/* ================================
+   AMBIENT EFFECTS
+   ================================ */
+
+.lifetime-ambient-glow,
+.ambient-glow {
+  position: fixed;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  height: 100vw;
+  background: radial-gradient(circle, rgba(255, 51, 119, 0.15) 0%, rgba(28, 28, 30, 0) 70%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ================================
+   TYPOGRAPHY
+   ================================ */
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+}
+
+h1 {
+  font-size: 32px;
+}
+
+h2 {
+  font-size: 24px;
+}
+
+h3 {
+  font-size: 20px;
+}
+
+h4 {
+  font-size: 16px;
+}
+
+.lifetime-text-muted,
+.text-muted {
+  color: var(--lifetime-text-muted);
+  font-size: 14px;
+}
+
+.lifetime-text-gradient,
+.text-gradient {
+  background: var(--lifetime-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ================================
+   FORMS & INPUTS
+   ================================ */
+
+input, textarea, select {
+  background: var(--lifetime-glass-bg);
+  border: 1px solid var(--lifetime-border-subtle);
+  border-radius: var(--lifetime-radius-md);
+  color: var(--lifetime-text-primary);
+  padding: 12px 16px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: all var(--lifetime-transition);
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--lifetime-neon-pink);
+  box-shadow: 0 0 20px rgba(255, 51, 119, 0.3);
+}
+
+/* ================================
+   LISTS & ITEMS
+   ================================ */
+
+.lifetime-list,
+[class*="list"],
+ul, ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.lifetime-list-item,
+li {
+  display: flex;
+  align-items: flex-start;
+  padding: var(--lifetime-spacing-lg) 0;
+  border-bottom: 1px solid var(--lifetime-border-subtle);
+  transition: background var(--lifetime-transition);
+}
+
+.lifetime-list-item:hover {
+  background: rgba(255, 51, 119, 0.05);
+}
+
+/* ================================
+   UTILITY CLASSES
+   ================================ */
+
+.lifetime-flex {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lifetime-flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lifetime-grid {
+  display: grid;
+  gap: var(--lifetime-spacing-lg);
+  grid-auto-fit: minmax(300px, 1fr);
+}
+
+.lifetime-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--lifetime-spacing-lg);
+}
+
+.lifetime-section {
+  padding: var(--lifetime-spacing-2xl) 0;
+}
+
+.lifetime-divider {
+  height: 1px;
+  background: var(--lifetime-border-subtle);
+  margin: var(--lifetime-spacing-lg) 0;
+}
+
+/* ================================
+   GRADIENT EFFECTS
+   ================================ */
+
+.lifetime-gradient-text {
+  background: var(--lifetime-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.lifetime-gradient-border {
+  position: relative;
+  border: 1px solid transparent;
+  background: linear-gradient(var(--lifetime-bg-color), var(--lifetime-bg-color)) padding-box,
+              var(--lifetime-gradient) border-box;
+}
+
+/* ================================
+   RESPONSIVE DESIGN
+   ================================ */
+
+@media (max-width: 768px) {
+  :root {
+    --lifetime-radius-card: 20px;
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  h2 {
+    font-size: 20px;
+  }
+
+  h3 {
+    font-size: 18px;
+  }
+
+  .lifetime-modal-content {
+    width: 95%;
+    padding: 20px;
+  }
+
+  .lifetime-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --lifetime-spacing-xl: 16px;
+    --lifetime-spacing-2xl: 20px;
+  }
+
+  h1 {
+    font-size: 20px;
+  }
+
+  .lifetime-glass-card,
+  .lifetime-modal-content {
+    border-radius: 16px;
+  }
+}
+
+/* ================================
+   DARK MODE OVERRIDES
+   (Already default, but explicit for clarity)
+   ================================ */
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: var(--lifetime-bg-color);
+    color: var(--lifetime-text-primary);
+  }
+}
+
+/* ================================
+   ACCESSIBILITY
+   ================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: more) {
+  .lifetime-glass-card,
+  .glass-card {
+    border-color: var(--lifetime-neon-pink);
+    background: var(--lifetime-glass-strong);
+  }
+}
+
+/* ================================
+   LEGACY COMPATIBILITY
+   Map old variable names to new system
+   ================================ */
+
+:root {
+  /* Hub app compatibility */
+  --bg-primary: var(--lifetime-primary);
+  --bg-secondary: var(--lifetime-secondary);
+  --bg-tertiary: var(--lifetime-tertiary);
+  --bg-glass: var(--lifetime-glass-bg);
+  --text-primary: var(--lifetime-text-primary);
+  --text-secondary: var(--lifetime-text-secondary);
+  --text-muted: var(--lifetime-text-muted);
+  --accent-pink: var(--lifetime-neon-pink);
+  --accent-amber: var(--lifetime-neon-amber);
+  --accent-gradient: var(--lifetime-gradient);
+  --border-subtle: var(--lifetime-border-subtle);
+  --border-glow: var(--lifetime-border-glass);
+  --radius-sm: var(--lifetime-radius-sm);
+  --radius-md: var(--lifetime-radius-md);
+  --radius-lg: var(--lifetime-radius-lg);
+  --radius-xl: var(--lifetime-radius-xl);
+  --shadow-card: var(--lifetime-shadow-xl);
+  --transition: var(--lifetime-transition);
+}
