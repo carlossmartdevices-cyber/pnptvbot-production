@@ -31,8 +31,7 @@ class N8nAutomationController {
           p.reference as ref_payco,
           p.plan_id,
           u.email,
-          u.first_name,
-          u.telegram_id
+          u.first_name
         FROM payments p
         JOIN users u ON p.user_id = u.id
         WHERE p.status = 'pending'
@@ -203,9 +202,10 @@ class N8nAutomationController {
 
       // Check Redis
       try {
-        const { cache } = require('../../../config/redis');
+        const { getRedis } = require('../../../config/redis');
+        const redis = getRedis();
         const redisStart = Date.now();
-        await cache.ping();
+        await redis.ping();
         checks.redis = {
           status: 'healthy',
           responseTime: Date.now() - redisStart,
@@ -273,22 +273,17 @@ class N8nAutomationController {
       const result = await query(`
         SELECT
           s.id as subscriber_id,
-          s.user_id,
-          s.plan_id,
-          s.expires_at,
-          u.email,
-          u.first_name,
-          p.name as plan_name,
-          p.price
+          s.telegram_id,
+          s.email,
+          s.name as subscriber_name,
+          s.plan as plan_name,
+          s.updated_at as expires_at,
+          s.status
         FROM subscribers s
-        JOIN users u ON s.user_id = u.id
-        JOIN plans p ON s.plan_id = p.id
-        WHERE s.expires_at > NOW()
-          AND s.expires_at <= NOW() + INTERVAL '1 day' * $1
-          AND s.status = 'active'
-        ORDER BY s.expires_at ASC
+        WHERE s.status = 'active'
+        ORDER BY s.updated_at ASC
         LIMIT 100
-      `, [daysAhead]);
+      `);
 
       logger.info('N8N: Retrieved expiry notifications', {
         count: result.rows.length,
