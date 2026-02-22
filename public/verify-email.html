@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <meta name="theme-color" content="#120d14" />
+  <meta name="description" content="Verify Email - PNPtv" />
+  <title>Verificar correo - PNPtv</title>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #120d14;
+      --surface: #2C2C2E;
+      --border: rgba(255,255,255,0.08);
+      --text: #FFFFFF;
+      --muted: #8E8E93;
+      --accent: #ff3377;
+      --amber: #ff9933;
+      --radius: 16px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .glow {
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(255,0,204,0.15) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+      text-align: center;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .message {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+
+    .message.success { color: #30d158; }
+    .message.error { color: #ff453a; }
+
+    .submessage {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 13px 24px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, transform 0.1s;
+      text-decoration: none;
+    }
+
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #8A00FF);
+      color: #fff;
+      width: 100%;
+    }
+
+    .btn-primary:hover { opacity: 0.9; }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--amber);
+      border: 1px solid var(--border);
+      width: 100%;
+    }
+
+    .btn-secondary:hover { background: rgba(255,255,255,0.05); }
+
+    .mt-16 { margin-top: 16px; }
+
+    .icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+
+  <div class="card" id="content">
+    <div class="spinner" id="spinner"></div>
+    <p class="message" id="message">Verificando tu correo...</p>
+    <p class="submessage" id="submessage">Por favor espera un momento.</p>
+    <button type="button" class="btn btn-primary mt-16" id="btn-action" style="display:none;">Ir al inicio</button>
+    <button type="button" class="btn btn-secondary mt-16" id="btn-back" style="display:none;">← Volver</button>
+  </div>
+
+  <script>
+    const CANONICAL_ORIGIN = 'https://pnptv.app';
+    const CANONICAL_APP_URL = `${CANONICAL_ORIGIN}/app`;
+
+    // Always keep verification on canonical domain
+    if (window.location.origin !== CANONICAL_ORIGIN) {
+      window.location.replace(`${CANONICAL_ORIGIN}${window.location.pathname}${window.location.search}${window.location.hash}`);
+    }
+
+    async function verifyEmail() {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+
+      if (!token) {
+        showError('No verification token provided.', 'Volver al login', '/auth/');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/webapp/auth/verify-email?token=${encodeURIComponent(token)}`, {
+          credentials: 'include',
+        });
+
+        const data = await res.json();
+
+        console.log('Verify response:', { status: res.status, data });
+
+        if (res.ok && data.authenticated) {
+          showSuccess('¡Email verificado! Redirigiendo...', 'Ir al inicio', CANONICAL_APP_URL, true);
+        } else {
+          // Map specific errors to user-friendly messages
+          let errorMsg = data.error || 'Error al verificar el correo.';
+          if (errorMsg.includes('expired') || errorMsg.includes('expirado')) {
+            errorMsg = 'El enlace ha expirado. Solicita un nuevo enlace de verificación en el login.';
+          } else if (errorMsg.includes('Invalid') || errorMsg.includes('inválido')) {
+            errorMsg = 'El enlace es inválido. Verifica que hayas copiado correctamente.';
+          }
+          showError(errorMsg, 'Volver al login', '/auth/');
+        }
+      } catch (error) {
+        console.error('Verification error:', error);
+        showError('Error de red. Intenta de nuevo.', 'Volver al login', '/auth/');
+      }
+    }
+
+    function showSuccess(message, buttonText, url, autoRedirect = false) {
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('message').textContent = '✓ ¡Email verificado!';
+      document.getElementById('message').classList.add('success');
+      document.getElementById('submessage').textContent = message;
+
+      const btn = document.getElementById('btn-action');
+      btn.textContent = buttonText;
+      btn.onclick = () => { window.location.href = url; };
+      btn.style.display = 'inline-flex';
+
+      if (autoRedirect) {
+        setTimeout(() => { window.location.href = url; }, 2000);
+      }
+    }
+
+    function showError(message, buttonText, url) {
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('message').textContent = '✗ Enlace inválido o expirado';
+      document.getElementById('message').classList.add('error');
+      document.getElementById('submessage').textContent = message;
+
+      const btn = document.getElementById('btn-back');
+      btn.textContent = buttonText;
+      btn.onclick = () => { window.location.href = url; };
+      btn.style.display = 'inline-flex';
+    }
+
+    // Verify on page load
+    verifyEmail();
+  </script>
+</body>
+</html>

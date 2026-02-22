@@ -564,6 +564,7 @@ const telegramLogin = async (req, res) => {
 /**
  * POST /api/webapp/auth/register
  * Register with email + password.
+ * Sends verification email and returns requiresVerification: true
  */
 const emailRegister = async (req, res) => {
   try {
@@ -594,22 +595,48 @@ const emailRegister = async (req, res) => {
       passwordHash,
     });
 
-    req.session.user = buildSession(user);
-    await new Promise((resolve, reject) =>
-      req.session.save(err => (err ? reject(err) : resolve()))
+    // Create email verification table if not exists
+    await query(`
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Generate verification token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await query(
+      'INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+      [user.id, token, expiresAt]
     );
-    logger.info(`New user registered via email: ${user.id} (${emailLower})`);
+
+    // Send verification email
+    const verifyUrl = `${process.env.WEBAPP_URL || 'https://pnptv.app'}/verify-email.html?token=${token}`;
+    await emailService.send({
+      to: emailLower,
+      subject: 'PNPtv – Verifica tu correo electrónico',
+      html: `
+        <p>Hola ${user.first_name || 'usuario'},</p>
+        <p>¡Bienvenido a PNPtv! Para completar tu registro, verifica tu correo electrónico.</p>
+        <p><a href="${verifyUrl}" style="background:#FF00CC;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin:16px 0;">Verificar correo</a></p>
+        <p>Este enlace expira en 24 horas. Si no realizaste este registro, ignora este correo.</p>
+      `,
+    });
+
+    logger.info(`New user registered via email: ${user.id} (${emailLower}), verification email sent`);
 
     return res.json({
-      authenticated: true,
-      pnptvId: user.pnptv_id,
+      authenticated: false,
+      requiresVerification: true,
+      message: 'Account created. Check your email to verify.',
       user: {
         id: user.id,
-        pnptvId: user.pnptv_id,
-        firstName: user.first_name,
-        lastName: user.last_name,
         email: emailLower,
-        subscriptionStatus: user.subscription_status,
       },
     });
   } catch (error) {
@@ -688,6 +715,151 @@ const emailLogin = async (req, res) => {
   } catch (error) {
     logger.error('Email login error:', error);
     return res.status(500).json({ error: 'Login failed. Please try again.' });
+  }
+};
+
+/**
+ * GET /api/webapp/auth/verify-email
+ * Verify email using token from link.
+ */
+const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' });
+    }
+
+    // Lookup token
+    const result = await query(
+      `SELECT t.id, t.user_id, t.expires_at, u.id as uid, u.pnptv_id, u.telegram, u.username,
+              u.first_name, u.last_name, u.subscription_status, u.accepted_terms, u.photo_file_id,
+              u.bio, u.language, u.role, u.email
+       FROM email_verification_tokens t
+       JOIN users u ON u.id = t.user_id
+       WHERE t.token = $1 AND t.used = FALSE`,
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      logger.warn(`Email verification: token not found or already used: ${token.substring(0, 16)}...`);
+      return res.status(400).json({ error: 'Invalid or expired verification link.' });
+    }
+
+    const row = result.rows[0];
+    const expiresAt = new Date(row.expires_at);
+    const now = new Date();
+
+    logger.info(`Email verification attempt: token=${token.substring(0, 16)}..., expires_at=${expiresAt.toISOString()}, now=${now.toISOString()}`);
+
+    if (now > expiresAt) {
+      logger.warn(`Email verification: token expired for user ${row.user_id}`);
+      return res.status(400).json({ error: 'Verification link has expired.' });
+    }
+
+    // Mark token as used and set email_verified to true
+    await query('UPDATE email_verification_tokens SET used = TRUE WHERE id = $1', [row.id]);
+    await query('UPDATE users SET email_verified = TRUE, updated_at = NOW() WHERE id = $1', [row.user_id]);
+
+    // Create session
+    const user = {
+      id: row.uid,
+      pnptv_id: row.pnptv_id,
+      telegram: row.telegram,
+      username: row.username,
+      first_name: row.first_name,
+      last_name: row.last_name,
+      subscription_status: row.subscription_status,
+      accepted_terms: row.accepted_terms,
+      photo_file_id: row.photo_file_id,
+      bio: row.bio,
+      language: row.language,
+      role: row.role,
+      email: row.email,
+    };
+
+    req.session.user = buildSession(user);
+    await new Promise((resolve, reject) =>
+      req.session.save(err => (err ? reject(err) : resolve()))
+    );
+
+    logger.info(`Email verified successfully for user ${row.user_id}`);
+    return res.json({ authenticated: true, success: true });
+  } catch (error) {
+    logger.error('Email verify error:', error);
+    return res.status(500).json({ error: 'Failed to verify email' });
+  }
+};
+
+/**
+ * POST /api/webapp/auth/resend-verification
+ * Resend verification email for unverified account.
+ */
+const resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const emailLower = email.toLowerCase().trim();
+    const result = await query(
+      'SELECT id, first_name, email_verified FROM users WHERE email = $1',
+      [emailLower]
+    );
+
+    // Always return 200 to avoid email enumeration
+    if (result.rows.length === 0) {
+      return res.json({ success: true, message: 'If this email exists, verification email was sent.' });
+    }
+
+    const user = result.rows[0];
+
+    // If already verified, just return success
+    if (user.email_verified) {
+      return res.json({ success: true, message: 'Email already verified. You can now log in.' });
+    }
+
+    // Ensure table exists
+    await query(`
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Invalidate old tokens for this user
+    await query('UPDATE email_verification_tokens SET used = TRUE WHERE user_id = $1 AND used = FALSE', [user.id]);
+
+    // Generate new verification token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await query(
+      'INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+      [user.id, token, expiresAt]
+    );
+
+    // Send verification email
+    const verifyUrl = `${process.env.WEBAPP_URL || 'https://pnptv.app'}/verify-email.html?token=${token}`;
+    await emailService.send({
+      to: emailLower,
+      subject: 'PNPtv – Verifica tu correo electrónico',
+      html: `
+        <p>Hola ${user.first_name || 'usuario'},</p>
+        <p>Para verificar tu correo electrónico en PNPtv, haz clic en el enlace de abajo.</p>
+        <p><a href="${verifyUrl}" style="background:#FF00CC;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin:16px 0;">Verificar correo</a></p>
+        <p>Este enlace expira en 24 horas. Si no solicitaste esto, ignora este correo.</p>
+      `,
+    });
+
+    logger.info(`Verification email resent to ${emailLower}`);
+    return res.json({ success: true, message: 'Verification email sent.' });
+  } catch (error) {
+    logger.error('Resend verification error:', error);
+    return res.status(500).json({ error: 'Failed to send verification email' });
   }
 };
 
@@ -1289,6 +1461,8 @@ module.exports = {
   telegramConfirmLogin,
   emailRegister,
   emailLogin,
+  verifyEmail,
+  resendVerification,
   xLoginStart,
   xLoginCallback,
   authStatus,

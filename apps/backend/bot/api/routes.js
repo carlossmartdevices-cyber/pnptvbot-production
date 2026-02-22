@@ -434,10 +434,10 @@ app.get('/lifetime100', pageLimiter, (req, res) => {
 });
 
 // Serve static files from public directory with blocking
-app.use(serveStaticWithBlocking(path.join(__dirname, '../../../public')));
+app.use(serveStaticWithBlocking(path.join(__dirname, '../../../../public')));
 
 // Serve static auth pages with blocking
-app.use('/auth', serveStaticWithBlocking(path.join(__dirname, '../../../public/auth')));
+app.use('/auth', serveStaticWithBlocking(path.join(__dirname, '../../../../public/auth')));
 
 // Explicit routes for auth pages without .html extension
 app.get('/auth/telegram-login-complete', (req, res) => {
@@ -1674,6 +1674,8 @@ app.post('/api/webapp/auth/telegram/token', asyncHandler(webAppController.telegr
 app.get('/api/webapp/auth/telegram/check', asyncHandler(webAppController.telegramCheckToken));
 app.post('/api/webapp/auth/email/register', authLimiter, asyncHandler(webAppController.emailRegister));
 app.post('/api/webapp/auth/email/login', authLimiter, asyncHandler(webAppController.emailLogin));
+app.get('/api/webapp/auth/verify-email', asyncHandler(webAppController.verifyEmail));
+app.post('/api/webapp/auth/resend-verification', authLimiter, asyncHandler(webAppController.resendVerification));
 app.get('/api/webapp/auth/x/start', asyncHandler(webAppController.xLoginStart));
 app.get('/api/webapp/auth/x/callback', asyncHandler(webAppController.xLoginCallback));
 app.get('/api/me', asyncHandler(webAppController.authStatus));

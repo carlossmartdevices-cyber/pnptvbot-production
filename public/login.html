@@ -441,6 +441,22 @@
           }
           showBanner('success', '¡Bienvenido! Redirigiendo...');
           setTimeout(() => { location.href = CANONICAL_APP_URL; }, 800);
+        } else if (data.error === 'email_not_verified') {
+          // Email not verified — show resend option
+          const resendLink = document.createElement('a');
+          resendLink.href = '#';
+          resendLink.style.color = 'var(--amber)';
+          resendLink.style.textDecoration = 'underline';
+          resendLink.style.marginLeft = '4px';
+          resendLink.onclick = (e) => { e.preventDefault(); handleResendVerification(email, btn); };
+          resendLink.textContent = 'Reenviar correo';
+
+          const errorEl = document.getElementById('error-banner');
+          errorEl.textContent = 'Por favor verifica tu email antes de iniciar sesión. ';
+          errorEl.appendChild(resendLink);
+          errorEl.classList.add('show');
+          btn.disabled = false;
+          btn.textContent = 'Iniciar sesión';
         } else {
           showBanner('error', data.error || 'Error al iniciar sesión.');
           btn.disabled = false;
@@ -476,7 +492,15 @@
           body: JSON.stringify({ firstName, email, password }),
         });
         const data = await res.json();
-        if (res.ok && data.authenticated) {
+        if (data.requiresVerification) {
+          showBanner('success', '¡Cuenta creada! Revisa tu correo para verificar tu email.');
+          // Clear form
+          document.getElementById('reg-name').value = '';
+          document.getElementById('reg-email').value = '';
+          document.getElementById('reg-password').value = '';
+          btn.disabled = false;
+          btn.textContent = 'Crear cuenta';
+        } else if (res.ok && data.authenticated) {
           showBanner('success', '¡Cuenta creada! Redirigiendo...');
           setTimeout(() => { location.href = CANONICAL_APP_URL; }, 800);
         } else {
@@ -490,6 +514,32 @@
         btn.textContent = 'Crear cuenta';
       }
       return false;
+    }
+
+    // ── Resend Verification Email ──────────────────────────────────────────────
+    async function handleResendVerification(email, triggerBtn) {
+      clearBanners();
+      triggerBtn.disabled = true;
+      triggerBtn.textContent = 'Reenviando...';
+      try {
+        const res = await fetch('/api/webapp/auth/resend-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showBanner('success', 'Se envió un nuevo correo de verificación. Revisa tu bandeja de entrada.');
+        } else {
+          showBanner('error', data.error || 'Error al reenviar correo.');
+        }
+      } catch {
+        showBanner('error', 'Error de red. Intenta de nuevo.');
+      } finally {
+        triggerBtn.disabled = false;
+        triggerBtn.textContent = 'Iniciar sesión';
+      }
     }
 
     // ── Telegram Login ─────────────────────────────────────────────────────
